@@ -4,9 +4,18 @@ Reelcut — a screencast-style video editor for macOS: a Swift/AppKit UI over a
 Rust staticlib core, the same shape as `~/devel/rasterize`.
 
 **It builds and runs.** M1 (Cut) is done and verified against spec §10; most
-of M2 landed with it. `designs/reelcut-design.md` is still normative for the
-schemas (§5), the op table (§6) and the architecture (§7) — read those before
-changing either side. §10 is the milestone list, §11 the settled decisions.
+of M2 landed with it.
+
+Two documents in `designs/`, and you want both:
+
+- `designs/reelcut-design.md` — the normative spec. The schemas (§5), the op
+  table (§6) and the architecture (§7) govern any change to either side; §11
+  holds decisions already made, which are not to be re-litigated.
+- **`designs/reelcut-roadmap.md` — what is left to build, in six phases**,
+  each naming the files it lands in and what would prove it done. **Start
+  here if you are picking up new work.** Phase 1 is "put eyes on the app":
+  the timeline view and canvas overlay have never been looked at by a person,
+  and what that turns up may re-order everything after it.
 
 ## Commands
 
@@ -110,8 +119,13 @@ cannot see the screen. Those need eyes on the app.
   part of the `AVAssetWriter` seam `Exporter.swift` documents, which spec §7.8
   puts in M2's second half; `AVAssetExportSession` cannot write one.
 - **M3 — Polish: part done.** In: actions (evaluated in `actions.rs`) plus
-  corner radius, shadow, colour controls and chroma key, which all render
-  through `Compositor.metal`. Not started: nests (`Source::Nest` parses but
+  corner radius, colour controls and chroma key, which render through
+  `Compositor.metal`. **Shadow is NOT rendered** — `ShadowProps` is in the
+  model, the inspector edits it and it round-trips through the file, but
+  `Compositor.metal` has no shadow pass, so setting one changes nothing on
+  screen. Spec §7.5 describes the pass it needs (render the layer's alpha to
+  an offscreen texture, blur with `MPSImageGaussianBlur`, draw it first).
+  Chroma key renders but has no inspector UI, so only MCP can set it. Not started: nests (`Source::Nest` parses but
   `evaluate.rs` filters it out of every recipe), filters, reflection,
   spotlight, GIF/APNG export, noise removal, SRT captions, Consolidate Media,
   ffmpeg-assisted import.
