@@ -1,6 +1,6 @@
 /core/target/
 /build/
-/Rasterize.xcodeproj/
+/Reelcut.xcodeproj/
 /app/Info.plist
 xcuserdata/
 .DS_Store

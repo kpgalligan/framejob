@@ -1,0 +1,393 @@
+//! Action evaluation: a clip's properties as they actually are at a clip
+//! time, after every [`Action`] on it has had its say (spec §5.4).
+//!
+//! The rule, exactly: start from the clip's base props, apply the `end`
+//! patch of every action that ENDED at or before the time, in start order,
+//! then — if the time falls inside an action — interpolate from that
+//! accumulated state toward that action's patch along the action's curve.
+//!
+//! Everything routes through TWO routines, [`merge`] and [`lerp`], over
+//! `serde_json::Value`. That is deliberate. The patch schema is "any subset
+//! of the `video`, `audio` and `text` keys, each any subset of that group's
+//! keys", so per-field Rust would be a hundred-arm match that has to be
+//! edited every time §5.2 gains a field — and that would silently forget
+//! one. Going through the serde representation means a field is animatable
+//! the moment `model.rs` declares it, and unknown patch keys are ignored
+//! for free, which is the forward compatibility a project written by a
+//! newer build needs.
+//!
+//! The cost is a serialize/deserialize per evaluation: a handful of small
+//! maps, asked for once per visible clip per frame. That is nothing next to
+//! decoding one video frame, and it is never on the audio path.
+//!
+//! Nothing here edits. Evaluation is a pure read of a [`Clip`], so it can
+//! be called from the recipe, the inspector and `split` alike.
+
+use serde::Serialize;
+use serde_json::{Map, Number, Value};
+
+use crate::audio::MAX_GAIN;
+use crate::edit_props::{SCALE_MAX, SCALE_MIN};
+use crate::model::{Action, AudioProps, Clip, Curve, Project, ShapeProps, TextProps, VideoProps};
+use crate::time::Ticks;
+
+/// How deep [`merge`] and [`lerp`] will walk a patch. The deepest real path
+/// in the §5.2 schema is `video.shadow.color` — three levels — so 8 leaves
+/// generous room while bounding the recursion, which is what keeps a
+/// hand-written or generated patch from driving these routines down an
+/// arbitrarily deep tree. (`serde_json` already caps parse nesting at 128;
+/// this is the cheaper, local guarantee.)
+pub(crate) const MAX_PATCH_DEPTH: u32 = 8;
+
+/// A clip's properties resolved at one instant. `video` and `audio` are
+/// never absent: a clip whose JSON has `"video": null` (an audio-only clip)
+/// evaluates to the defaults, and `enabled` — not the presence of the
+/// props — decides whether the layer is drawn or heard.
+///
+/// `text` and `shape` stay `Option`, because "this clip is a text clip" is
+/// a fact about the clip that evaluation must not invent.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct Evaluated {
+    pub video: VideoProps,
+    pub audio: AudioProps,
+    pub text: Option<TextProps>,
+    pub shape: Option<ShapeProps>,
+}
+
+// ---- curves --------------------------------------------------------------
+
+/// Maps linear progress `u` (clamped to 0..1) to eased progress.
+///
+/// Quadratics and smoothstep, not cubic Béziers. A CSS-style Bézier is
+/// defined as y over x with x itself a cubic, so every evaluation needs a
+/// Newton solve for the parameter — per animated field, per frame — and the
+/// schema would have to carry four more numbers per action. These four
+/// closed forms hit 0 and 1 exactly, are monotone on 0..1, and cover what an
+/// action is for (a move, a scale, a fade that does not start and stop
+/// abruptly). If a later milestone wants arbitrary curves, `Curve` gains a
+/// variant and this function gains an arm; nothing else changes.
+pub fn ease(curve: Curve, u: f64) -> f64 {
+    // NaN would propagate through every interpolated field, so it collapses
+    // to the start of the action rather than poisoning the frame.
+    let u = if u.is_nan() { 0.0 } else { u.clamp(0.0, 1.0) };
+    match curve {
+        Curve::Linear => u,
+        Curve::EaseIn => u * u,
+        // The mirror of ease_in, so an in/out pair is symmetric.
+        Curve::EaseOut => 1.0 - (1.0 - u) * (1.0 - u),
+        // Smoothstep: zero slope at both ends, which is what "ease in and
+        // out" means, in one multiply-add more than the quadratics.
+        Curve::EaseInOut => u * u * (3.0 - 2.0 * u),
+    }
+}
+
+// ---- the two routines ----------------------------------------------------
+
+/// Deep-merges `patch` into `base`: objects merge key by key, anything else
+/// replaces. Keys `base` does not have are added, so a patch may introduce
+/// a whole group (`"shadow": {...}` over a `null`); keys `patch` does not
+/// mention are untouched. Unknown keys survive the merge and are dropped
+/// later by serde, which is exactly the forward-compatible behaviour §5.4
+/// asks for: never an error.
+pub(crate) fn merge(base: &Value, patch: &Value) -> Value {
+    merge_at(base, patch, 0)
+}
+
+fn merge_at(base: &Value, patch: &Value, depth: u32) -> Value {
+    match (base, patch) {
+        (Value::Object(b), Value::Object(p)) if depth < MAX_PATCH_DEPTH => {
+            let mut out = b.clone();
+            for (key, patch_value) in p {
+                let merged = match out.get(key) {
+                    Some(base_value) => merge_at(base_value, patch_value, depth + 1),
+                    None => patch_value.clone(),
+                };
+                out.insert(key.clone(), merged);
+            }
+            Value::Object(out)
+        }
+        _ => patch.clone(),
+    }
+}
+
+/// Interpolates `from` toward `to` by eased progress `u`.
+///
+/// Numbers interpolate; arrays (colors, `key`, `from`/`to` points)
+/// interpolate element by element when the lengths match; objects
+/// interpolate key by key. **Booleans, strings, enums, `null`s and any pair
+/// of mismatched types switch at the END** — they hold the `from` value
+/// until `u` reaches 1 — which is the §5.4 rule and the only sane reading
+/// of "interpolate `left` to `center`".
+fn lerp(from: &Value, to: &Value, u: f64) -> Value {
+    lerp_at(from, to, u, 0)
+}
+
+fn lerp_at(from: &Value, to: &Value, u: f64, depth: u32) -> Value {
+    // The two switch points. `u >= 1.0` is what makes non-numeric fields
+    // take their new value at the action's end and not one tick earlier.
+    if u >= 1.0 {
+        return to.clone();
+    }
+    if u <= 0.0 || depth >= MAX_PATCH_DEPTH {
+        return from.clone();
+    }
+    match (from, to) {
+        (Value::Number(a), Value::Number(b)) => lerp_number(a, b, u),
+        (Value::Array(a), Value::Array(b)) if a.len() == b.len() => Value::Array(
+            a.iter()
+                .zip(b.iter())
+                .map(|(x, y)| lerp_at(x, y, u, depth + 1))
+                .collect(),
+        ),
+        (Value::Object(a), Value::Object(b)) => {
+            let mut out = Map::new();
+            for (key, from_value) in a {
+                let value = match b.get(key) {
+                    Some(to_value) => lerp_at(from_value, to_value, u, depth + 1),
+                    // A key the target lost: nothing to move toward.
+                    None => from_value.clone(),
+                };
+                out.insert(key.clone(), value);
+            }
+            Value::Object(out)
+        }
+        _ => from.clone(),
+    }
+}
+
+/// One number toward another.
+///
+/// The integer case matters: `fade_in`, `fade_out` and the duck ramps are
+/// `Ticks` (i64) in the schema, and writing 12.5 back into one of those
+/// would fail to deserialize. So a pair that is integral on BOTH sides
+/// stays integral (rounded), and anything touching a float stays float —
+/// which is always the case for the f64 fields, because the base state is
+/// serialized from the typed structs.
+fn lerp_number(from: &Number, to: &Number, u: f64) -> Value {
+    let (Some(a), Some(b)) = (from.as_f64(), to.as_f64()) else {
+        return Value::Number(from.clone());
+    };
+    let value = a + (b - a) * u;
+    if from.is_f64() || to.is_f64() {
+        // from_f64 rejects NaN and infinities; falling back to `from` keeps
+        // a nonsense patch from turning the whole frame into null.
+        Number::from_f64(value)
+            .map(Value::Number)
+            .unwrap_or_else(|| Value::Number(from.clone()))
+    } else {
+        // Rust's float-to-int cast saturates, so an absurd patch cannot
+        // panic here.
+        Value::Number(Number::from(value.round() as i64))
+    }
+}
+
+// ---- evaluation ----------------------------------------------------------
+
+/// True when `clip_t` is inside `action`'s span, half-open at the end so
+/// the instant an action finishes belongs to the "already applied" set and
+/// the value is continuous across the boundary.
+fn spans(action: &Action, clip_t: Ticks) -> bool {
+    action.duration > 0
+        && action.start <= clip_t
+        && clip_t < action.start.saturating_add(action.duration)
+}
+
+/// The clip's actions in start order. Actions on a clip may not overlap
+/// (`edit_clip` refuses to create an overlap), but a hand-written project
+/// can still contain one, so the id tiebreak keeps evaluation deterministic
+/// rather than dependent on the order they happen to sit in the array.
+fn ordered_actions(clip: &Clip) -> Vec<&Action> {
+    let mut actions: Vec<&Action> = clip.actions.iter().collect();
+    actions.sort_by_key(|a| (a.start, a.id));
+    actions
+}
+
+/// Serializes a value, or `null` if it somehow cannot be — these types are
+/// plain data, so the fallback is unreachable, but nothing here may panic.
+pub(crate) fn to_json<T: Serialize>(value: &T) -> Value {
+    serde_json::to_value(value).unwrap_or(Value::Null)
+}
+
+/// Brings an evaluated value back into the range the ops enforce.
+///
+/// An action's end patch is deliberately LENIENT — `set_action_end` merges
+/// whatever it is given so a half-written animation is still editable — and
+/// interpolation can also overshoot nothing but reach a bad target. Nobody
+/// downstream can defend itself: the Metal compositor multiplies by opacity
+/// and scales a quad, and `audio.rs` would fold a nonsense gain into an
+/// envelope. So the ONE place an evaluated value is produced is the one
+/// place it is bounded, using the SAME table `edit_props.rs` names for a
+/// direct edit (that module errors and names the key, because a user typed
+/// it; here there is nobody to tell, so it clamps).
+///
+/// NaN collapses to the neutral value rather than propagating: a single NaN
+/// in a uniform block blanks a whole frame.
+fn bounded(value: f64, low: f64, high: f64, neutral: f64) -> f64 {
+    if value.is_nan() {
+        neutral
+    } else {
+        value.clamp(low, high)
+    }
+}
+
+/// Finite-only guard for the fields that have no range, just a requirement
+/// that they be numbers (positions, rotation, the colour offsets).
+fn finite_or(value: f64, neutral: f64) -> f64 {
+    if value.is_finite() {
+        value
+    } else {
+        neutral
+    }
+}
+
+fn clamp_video(mut props: VideoProps) -> VideoProps {
+    props.x = finite_or(props.x, 0.0);
+    props.y = finite_or(props.y, 0.0);
+    props.scale = bounded(props.scale, SCALE_MIN, SCALE_MAX, 1.0);
+    props.rotation = finite_or(props.rotation, 0.0);
+    props.opacity = bounded(props.opacity, 0.0, 1.0, 1.0);
+    props.corner_radius = bounded(props.corner_radius, 0.0, f64::MAX, 0.0);
+    props.crop.l = bounded(props.crop.l, 0.0, f64::MAX, 0.0);
+    props.crop.t = bounded(props.crop.t, 0.0, f64::MAX, 0.0);
+    props.crop.r = bounded(props.crop.r, 0.0, f64::MAX, 0.0);
+    props.crop.b = bounded(props.crop.b, 0.0, f64::MAX, 0.0);
+    if let Some(shadow) = props.shadow.as_mut() {
+        for channel in shadow.color.iter_mut() {
+            *channel = bounded(*channel, 0.0, 1.0, 0.0);
+        }
+        shadow.opacity = bounded(shadow.opacity, 0.0, 1.0, 0.5);
+        shadow.blur = bounded(shadow.blur, 0.0, f64::MAX, 0.0);
+        shadow.angle = finite_or(shadow.angle, 315.0);
+        shadow.distance = bounded(shadow.distance, 0.0, f64::MAX, 0.0);
+    }
+    props.color.brightness = finite_or(props.color.brightness, 0.0);
+    props.color.contrast = finite_or(props.color.contrast, 0.0);
+    props.color.saturation = finite_or(props.color.saturation, 0.0);
+    props.color.hue = finite_or(props.color.hue, 0.0);
+    if let Some(chroma) = props.chroma.as_mut() {
+        for channel in chroma.key.iter_mut() {
+            *channel = bounded(*channel, 0.0, 1.0, 0.0);
+        }
+        chroma.tolerance = bounded(chroma.tolerance, 0.0, 1.0, 0.0);
+        chroma.softness = bounded(chroma.softness, 0.0, 1.0, 0.0);
+        chroma.spill = bounded(chroma.spill, 0.0, 1.0, 0.0);
+    }
+    props
+}
+
+fn clamp_audio(mut props: AudioProps) -> AudioProps {
+    props.volume = bounded(props.volume, 0.0, MAX_GAIN, 1.0);
+    props.fade_in = props.fade_in.max(0);
+    props.fade_out = props.fade_out.max(0);
+    if let Some(duck) = props.duck.as_mut() {
+        duck.level = bounded(duck.level, 0.0, 1.0, 0.2);
+        duck.attack = duck.attack.max(0);
+        duck.release = duck.release.max(0);
+    }
+    props
+}
+
+impl Project {
+    /// The clip's properties at `clip_t` — CLIP time, so 0 is the clip's
+    /// first frame — with every action applied and, if `clip_t` lands
+    /// inside one, interpolated.
+    ///
+    /// Total: any clip, any time, no failure mode. A time before the clip
+    /// or past its end evaluates as the start or end state respectively,
+    /// which is what a scrubbing inspector wants.
+    pub fn evaluate_clip(&self, clip: &Clip, clip_t: Ticks) -> Evaluated {
+        let base_video = clip.video.clone().unwrap_or_default();
+        let base_audio = clip.audio.unwrap_or_default();
+
+        let mut fields = Map::new();
+        fields.insert("video".to_string(), to_json(&base_video));
+        fields.insert("audio".to_string(), to_json(&base_audio));
+        // A patch may only reach `text` on a clip that HAS text: evaluation
+        // resolves properties, it never decides what kind of layer a clip
+        // is. Leaving the key out makes a stray text patch a no-op.
+        if let Some(text) = &clip.text {
+            fields.insert("text".to_string(), to_json(text));
+        }
+        let mut state = Value::Object(fields);
+
+        let actions = ordered_actions(clip);
+        for action in &actions {
+            let end = action.start.saturating_add(action.duration);
+            if action.duration > 0 && end <= clip_t {
+                state = merge(&state, &action.end);
+            }
+        }
+        if let Some(action) = actions.iter().find(|a| spans(a, clip_t)) {
+            // Interpolating the WHOLE state toward the patched state, not
+            // just the patched keys, is what keeps this to one routine:
+            // an untouched field lerps from itself to itself, exactly.
+            let target = merge(&state, &action.end);
+            let elapsed = clip_t.saturating_sub(action.start) as f64;
+            let progress = elapsed / action.duration as f64;
+            state = lerp(&state, &target, ease(action.curve, progress));
+        }
+
+        // A patch that writes a bad type into a field (12.5 into a tick
+        // count, say) loses that whole group rather than failing: the
+        // evaluator has no way to report, and a base-props frame is far
+        // better than a missing one.
+        let evaluated_video = state
+            .get("video")
+            .and_then(|v| serde_json::from_value::<VideoProps>(v.clone()).ok())
+            .unwrap_or(base_video);
+        let evaluated_audio = state
+            .get("audio")
+            .and_then(|v| serde_json::from_value::<AudioProps>(v.clone()).ok())
+            .unwrap_or(base_audio);
+        let evaluated_text = clip.text.clone().map(|base| {
+            state
+                .get("text")
+                .and_then(|v| serde_json::from_value::<TextProps>(v.clone()).ok())
+                .unwrap_or(base)
+        });
+
+        Evaluated {
+            video: clamp_video(evaluated_video),
+            audio: clamp_audio(evaluated_audio),
+            text: evaluated_text,
+            // Shapes are not animatable in version 1: the §5.4 patch is a
+            // subset of video/audio/text only, so the description passes
+            // through untouched.
+            shape: clip.shape.clone(),
+        }
+    }
+
+    /// One clip's evaluated state as JSON, for the inspector
+    /// (`rc_project_clip_state`). `t` is PROJECT time — the playhead —
+    /// which this converts to clip time.
+    ///
+    /// The keys are the project schema's own (`video`, `audio`, `text`,
+    /// `shape`), so the inspector binds to this exactly as it binds to the
+    /// clip itself; `in_action` is the action the playhead is inside, or
+    /// `null`, which is how the inspector knows an edit would set a
+    /// keyframe rather than the base value.
+    ///
+    /// `None` for an unknown clip id — the header's NULL return.
+    pub fn clip_state(&self, clip_id: u32, t: Ticks) -> Option<Value> {
+        let clip = self.clip(clip_id)?;
+        let clip_t = t.saturating_sub(clip.start);
+        let evaluated = self.evaluate_clip(clip, clip_t);
+        let in_action = ordered_actions(clip)
+            .into_iter()
+            .find(|a| spans(a, clip_t))
+            .map(|a| a.id);
+
+        let mut out = Map::new();
+        out.insert("clip".to_string(), Value::from(clip.id));
+        out.insert("t".to_string(), Value::from(t));
+        out.insert(
+            "in_action".to_string(),
+            in_action.map(Value::from).unwrap_or(Value::Null),
+        );
+        out.insert("video".to_string(), to_json(&evaluated.video));
+        out.insert("audio".to_string(), to_json(&evaluated.audio));
+        out.insert("text".to_string(), to_json(&evaluated.text));
+        out.insert("shape".to_string(), to_json(&evaluated.shape));
+        Some(Value::Object(out))
+    }
+}

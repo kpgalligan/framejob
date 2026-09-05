@@ -432,6 +432,15 @@ interpolate per channel; booleans and strings switch at the end. Actions
 on a clip may not overlap (`add_action` refuses). Video, audio and text
 properties all go through the one list with typed patches.
 
+An action's end patch is deliberately **lenient** — `set_action_end` merges
+whatever it is given, so a half-written animation stays editable — while
+`set_video` and its siblings are **strict** and name an out-of-range value.
+The evaluator is therefore the last line of defence: `frame_recipe` and
+`clip_state` clamp every value they produce to the same table the ops
+enforce (opacity 0–1, scale 0.01–10, gain 0–4, non-negative radii and
+crops) and collapse a NaN to that field's neutral value. The compositor
+never has to defend itself, and one bad number cannot blank a frame.
+
 ### 5.5 Purity and undo
 
 Every edit is `fn(&Project, args) -> Option<Project>` — `None` means
@@ -473,17 +482,17 @@ or animates back); "error" = `Err`.
 | Op | Semantics |
 |---|---|
 | `add_clip {track, media, at}` | Whole media as one clip at `at`; source in 0; Fit scale if `fit_new_clips` and the source exceeds the canvas. Refuses if the overlap rule fails. |
-| `add_text_clip {track, at, duration=5 s, text}` / `add_shape_clip {…, shape}` | Same placement rules; default text is the Title preset centered. |
+| `add_text_clip {track, at, duration=5 s, text?}` / `add_shape_clip {…, shape?}` | Same placement rules; default text is the Title preset centered. `text` and `shape` are **patch objects** in the `set_text` / `set_shape` shape, merged over that default — not a bare string or kind. |
 | `move_clip {clips, delta, track}` | Shifts by `delta` ticks (may be negative; clamps at 0) and optionally to another track (all selected clips keep their relative track offsets). **Overlap rule** on the destination track: a clip may overlap at most one neighbour on each side, and each overlap must be ≤ half of the shorter of the two clips; anything else refuses. An overlap is a transition; a clip that gains a predecessor overlap gets `transition_in = cross_dissolve` if it had none. |
 | `trim_start {clip, to}` | New start `to`; source in advances by `(to − start) × speed`. Clamps: `to ≥ start − in/speed` (source bound), `to < end − one frame`. |
 | `trim_end {clip, to}` | New end `to`; clamps to the source's remaining length (`media` sources) and `> start`. |
-| `rate_stretch {clip, to_end}` | `speed = source_len / (to_end − start)`; duration follows. Media sources only. |
-| `split {clips|under_playhead, at}` | Two clips. Second: `start = at`, `in += (at − start) × speed`, base props = the evaluated state at `at`. Actions before `at` stay with the first; after go to the second (start rebased); a straddling action becomes two — the first half's end patch is the evaluated state at `at`. `transition_in` stays with the first. Refuses when `at` is not strictly inside. |
+| `rate_stretch {clip, to_end}` | `speed = source_len / (to_end − start)`; duration follows. Media sources only — a non-media clip is an **error**, not a refusal, so an MCP caller gets a message it can correct from (the UI never offers it). |
+| `split {clips?, at}` | Two clips. Second: `start = at`, `in += (at − start) × speed`, base props = the evaluated state at `at`. Actions before `at` stay with the first; after go to the second (start rebased); a straddling action becomes two — the first half's end patch is the evaluated state at `at`. `transition_in` stays with the first. Refuses when `at` is not strictly inside. **Omitting** `clips` — not passing a flag — means every unlocked clip `at` is strictly inside, the ⌘T-with-no-selection case. |
 | `delete {clips}` | Removes; gaps stay. |
 | `ripple_delete {clips}` / `ripple_delete_range {from, to}` | Removes; then for each removed span (union of the removed clips' spans, processed right-to-left) shifts every clip on **unlocked** tracks whose start ≥ span end left by the span length. Clips on other tracks that straddle a span are left in place. Range form: every unlocked clip is split at both bounds first, the middle pieces removed, then the shift. |
 | `insert_time {at, length}` | Shifts every unlocked clip whose start ≥ `at` right by `length`. Straddling clips are left in place. |
-| `set_speed {clip, rate, keep_pitch}` | `duration = source_len / rate`; actions keep their clip-relative *fraction* of the clip. Refuses on non-media sources. |
-| `freeze_frame {clip, at, duration=2 s}` | `split` at `at`, `insert_time(at, duration)`, then a `still {media, at: source time}` clip filling the gap on the same track with the original's video props. |
+| `set_speed {clip, rate, keep_pitch}` | `duration = source_len / rate`; actions keep their clip-relative *fraction* of the clip. Media sources only, an **error** on any other kind (as `rate_stretch`). Rate is clamped to ×0.1–×10. |
+| `freeze_frame {clip, at, duration=2 s}` | `split` at `at`, `insert_time(at, duration)`, then a `still {media, at: source time}` clip filling the gap on the same track with the original's video props. Media sources only, an **error** on any other kind (as `rate_stretch`). |
 | `detach_audio {clip}` | `enabled.audio = false` on the clip; a new clip with `enabled = {video: false, audio: true}`, same source/in/duration/speed and the audio props, on the track below (a track is inserted at index 0 if needed). Refuses if the media has no audio or audio is already detached. |
 | `duplicate {clips}` | Copies placed after the originals' span on the same tracks (⌥-drag then moves them). |
 | `set_video {clips, patch}` / `set_audio` / `set_text` / `set_shape` | Merge the patch into the base props. Refuses if nothing changes. |
@@ -507,7 +516,7 @@ or animates back); "error" = `Err`.
 | `remove_track {track, with_clips=false}` | Refuses on a non-empty track unless `with_clips`. |
 | `move_track {track, index}` · `set_track {track, name?, hidden?, muted?, locked?}` | |
 | `remove_empty_tracks` | |
-| `add_marker {at, name?, chapter?}` · `set_marker {…}` · `remove_marker` | Markers snap to frames; two markers may not share a time. |
+| `add_marker {at, name?, chapter?, color?}` · `set_marker {marker, time?, name?, chapter?, color?}` · `remove_marker {marker}` | Markers snap to frames; two markers may not share a time. Default color `red`. |
 | `set_canvas {width?, height?, fps?, background?, rescale_clips?, fit_new_clips?, timecode_frames?}` | `rescale_clips` multiplies every clip's `x`, `y`, `scale` by the size ratio. Changing fps re-snaps every clip start and duration. |
 | `add_media {descriptor}` → returns the id · `relink_media {media, path, bookmark}` · `remove_media {media, with_clips=false}` | The descriptor is the `media[]` element minus `id`; the host probes the file. |
 

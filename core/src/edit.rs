@@ -1,0 +1,574 @@
+//! The op envelope — the ONE edit entry point (spec §6, spec §7.1).
+//!
+//! Every edit the app or the agent makes arrives here as one JSON object,
+//! `{"op": "<name>", ...arguments}`, and leaves as a new project. This
+//! module owns the envelope and nothing else: [`Op`] is the schema, and
+//! [`Project::apply`] is a flat dispatch table with no logic in it. The
+//! semantics live in `edit_clip.rs`, `edit_props.rs`, `edit_track.rs` and
+//! `edit_time.rs`.
+//!
+//! **The table below IS the op schema.** `app/Sources/ReelCore.swift`'s
+//! typed builders and `AgentCatalog.swift`'s MCP tools both mirror it, so
+//! it is the one place an argument name or a default is written down.
+//!
+//! Reading the table:
+//!
+//! - **Times are ticks**: `i64` at 600 000 per second ([`crate::TIMESCALE`]),
+//!   the timescale that divides every common frame duration exactly.
+//! - **Every time argument is snapped to the canvas frame grid first**
+//!   (round to nearest), durations included, so a caller may pass a value
+//!   computed from a pixel position without rounding it itself. A negative
+//!   PROJECT time is clamped to 0 — a drag can start left of the timeline
+//!   and there is no negative time there — while a negative LENGTH is an
+//!   `Err`, and so is a negative CLIP time (`add_action`, `set_action`):
+//!   the caller computes those as `playhead − clip.start`, so a negative
+//!   one means the playhead is not on the clip, which is a caller bug and
+//!   not a gesture to round off.
+//! - **`?` marks an optional argument**; `= x` is what it means when
+//!   absent. An absent optional and an explicit `null` mean the same thing.
+//! - **A new id is the project's `next_id` from BEFORE the call.** An op
+//!   returns a project, not a value, so a caller that needs the id of the
+//!   clip, track, marker or media it just added reads `next_id` first.
+//! - Unknown keys are an error, in the envelope and in every property
+//!   patch: a typo in a hand-written op or an agent call is a mistake to
+//!   report, not a silent no-op. The one exception is an action's `end`
+//!   patch, which is evaluated leniently and keeps what it does not know.
+//!
+//! ### Clips
+//!
+//! | Op | Arguments | Semantics |
+//! |---|---|---|
+//! | `add_clip` | `track: u32, media: u32, at: ticks` | Whole media as one clip at `at`; source in 0, Fit scale when `canvas.fit_new_clips` and the source exceeds the canvas. |
+//! | `add_text_clip` | `track: u32, at: ticks, duration?: ticks = 5 s, text?: object` | The Title preset, centered; `text` patches it exactly as `set_text` would. |
+//! | `add_shape_clip` | `track: u32, at: ticks, duration?: ticks = 5 s, shape?: object` | The default rectangle; `shape` patches it exactly as `set_shape` would. |
+//! | `move_clip` | `clips: [u32], delta: ticks, track?: u32` | Shifts the selection by `delta`, clamped so the earliest clip stops at 0; `track` retargets by track-index delta, keeping relative offsets. |
+//! | `trim_start` | `clip: u32, to: ticks` | New start `to`; a media `in` advances by `(to − start) × speed`. Clamped to the source head and to one frame before the end. |
+//! | `trim_end` | `clip: u32, to: ticks` | New end `to`, clamped to `start + one frame` and to the source's remaining length. |
+//! | `rate_stretch` | `clip: u32, to_end: ticks` | `speed = content length / (to_end − start)`; duration follows and actions rescale. A non-media source is an `Err`, not a refusal. |
+//! | `split` | `clips?: [u32], at: ticks` | Cuts at project time `at`. With `clips` absent, cuts every clip on an unlocked track that `at` is strictly inside. |
+//! | `delete` | `clips: [u32]` | Removes the clips; the gaps stay. |
+//! | `ripple_delete` | `clips: [u32]` | Removes, then closes each removed span across every unlocked track. Markers do not move. |
+//! | `ripple_delete_range` | `from: ticks, to: ticks` | Splits every unlocked clip at both bounds, removes the middles, then closes the hole. A reversed range is the same range. |
+//! | `insert_time` | `at: ticks, length: ticks` | Opens a hole: every unlocked clip, and every marker, at or after `at` moves right by `length`. |
+//! | `set_speed` | `clip: u32, rate: f64, keep_pitch?: bool` | `duration = content length / rate` (rate clamped to 0.1–10); actions keep their clip-relative fraction. A non-media source is an `Err`, not a refusal — see "The non-media rule" under Results. |
+//! | `freeze_frame` | `clip: u32, at: ticks, duration?: ticks = 2 s` | `split` at `at`, `insert_time(at, duration)`, then a `still` of that source frame with the clip's video props evaluated at `at`. |
+//! | `detach_audio` | `clip: u32` | Clears the clip's `enabled.audio` and puts an audio-only twin on the track below, inserting a track when there is none. |
+//! | `duplicate` | `clips: [u32]` | Copies each clip one selection-span later on its own track, with fresh ids. |
+//! | `set_video` | `clips: [u32], patch: object` | Merges the patch into each clip's video props (spec §5.2). |
+//! | `set_audio` | `clips: [u32], patch: object` | Merges the patch into each clip's audio props. |
+//! | `set_text` | `clips: [u32], patch: object` | Merges the patch into each clip's text props. |
+//! | `set_shape` | `clips: [u32], patch: object` | Merges the patch into each clip's shape props. |
+//! | `set_enabled` | `clip: u32, video?: bool, audio?: bool` | The per-clip hide and mute switches; omitted fields keep their value. |
+//! | `set_transition` | `clip: u32, kind?: transition` | Sets `transition_in`; absent or `null` clears it. The overlap with the predecessor IS the duration. |
+//! | `set_transition_duration` | `clip: u32, duration: ticks` | Moves the clip so its overlap with its predecessor is exactly `duration`. |
+//!
+//! `transition` is one of `cross_dissolve`, `fade_black`, `fade_white`,
+//! `push_left`, `push_right`, `push_up`, `push_down`, `wipe`, `slide`,
+//! `zoom`.
+//!
+//! ### Actions
+//!
+//! | Op | Arguments | Semantics |
+//! |---|---|---|
+//! | `add_action` | `clip: u32, at: ticks, duration?: ticks = 1 s` | A new action at CLIP time `at` (the caller subtracts `clip.start`), end patch empty. Refuses when it would overlap another action or run past the clip. |
+//! | `set_action` | `clip: u32, action: u32, start?: ticks, duration?: ticks, curve?: curve` | Retimes or re-curves one action; omitted fields keep their value, same overlap checks. |
+//! | `set_action_end` | `clip: u32, action: u32, patch: object` | Merges into the action's `end` patch; a key set to `null` is removed from it. |
+//! | `remove_action` | `clip: u32, action: u32` | |
+//!
+//! `curve` is one of `linear`, `ease_in`, `ease_out`, `ease_in_out`.
+//!
+//! ### Tracks, markers, canvas, media
+//!
+//! | Op | Arguments | Semantics |
+//! |---|---|---|
+//! | `add_track` | `index?: usize = front, name?: string` | Inserts a track; index 0 is the back-most. The default name is `Track <count + 1>`. |
+//! | `remove_track` | `track: u32, with_clips?: bool = false` | Refuses on a track that still holds clips unless `with_clips`, and on the last remaining track. |
+//! | `move_track` | `track: u32, index: usize` | Reorders the stack; index 0 is the back-most. |
+//! | `set_track` | `track: u32, name?: string, hidden?: bool, muted?: bool, locked?: bool` | Omitted fields keep their value. |
+//! | `remove_empty_tracks` | — | Drops every track with no clips, keeping the back-most if that would empty the stack. |
+//! | `add_marker` | `at: ticks, name?: string = "Marker <n>", chapter?: bool, color?: string = "red"` | A marker at `at`, clamped to ≥ 0. Two markers may not share a tick. |
+//! | `set_marker` | `marker: u32, time?: ticks, name?: string, chapter?: bool, color?: string` | Omitted fields keep their value; the same one-marker-per-tick rule. |
+//! | `remove_marker` | `marker: u32` | |
+//! | `set_canvas` | `width?: u32, height?: u32, fps?: [u32, u32], background?: [f64; 4], rescale_clips?: bool = false, fit_new_clips?: bool, timecode_frames?: bool` | `rescale_clips` multiplies every clip's `x`, `y` and `scale` by the size ratio; an fps change re-snaps every clip, action and marker time to the new grid, and DROPS a marker a coarser grid lands on a tick another marker already holds. |
+//! | `add_media` | `descriptor: object` | Appends the `media[]` element of spec §5.2 minus its `id` (the host probes the file). A path already in the list changes nothing. |
+//! | `relink_media` | `media: u32, path: string, bookmark?: string` | Points a media at another file; an absent or `null` bookmark clears the stale one. |
+//! | `remove_media` | `media: u32, with_clips?: bool = false` | Refuses while clips still reference it unless `with_clips`, which removes those clips too. |
+//!
+//! ### Results
+//!
+//! [`Project::apply`] returns the three-way answer the whole editor is
+//! built on (spec §5.5):
+//!
+//! - `Ok(Some(project))` — the new project; the app pushes an undo step.
+//! - `Ok(None)` — the op is valid and changes nothing, or it is a
+//!   documented refusal (the overlap rule, a non-empty track). **No undo
+//!   step**: an identity edit that registered one would be a phantom step
+//!   the user has to undo twice.
+//! - `Err(message)` — an unknown id, an out-of-range value, a malformed
+//!   envelope. Lowercase, naming the offending value.
+//!
+//! **The non-media rule.** `set_speed`, `rate_stretch` and `freeze_frame`
+//! return `Err("clip N is not a media clip")` rather than refusing, because
+//! a `clip` argument naming a text or shape clip for a speed op is an
+//! invalid argument — the same class as an unknown id — and because
+//! `Ok(None)` there is indistinguishable from "the rate was already that",
+//! which is a bad answer to give the MCP agent. Spec §6 originally worded
+//! those three rows "refuses"; it was amended to match, so the three
+//! siblings, the spec and the error tiers in `core/CLAUDE.md` now all agree.
+
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+
+use crate::export::describe;
+use crate::model::{Color, Curve, Project, TransitionKind};
+use crate::time::{Fps, Ticks};
+
+/// Every op name, in the order of the table above.
+///
+/// Kept next to [`Op`] so a mistyped op can be answered with the list
+/// instead of a bare parse error — models and users both mistype op names,
+/// and the alternative is a serde message written in variant-speak.
+pub const OP_NAMES: [&str; 39] = [
+    "add_clip",
+    "add_text_clip",
+    "add_shape_clip",
+    "move_clip",
+    "trim_start",
+    "trim_end",
+    "rate_stretch",
+    "split",
+    "delete",
+    "ripple_delete",
+    "ripple_delete_range",
+    "insert_time",
+    "set_speed",
+    "freeze_frame",
+    "detach_audio",
+    "duplicate",
+    "set_video",
+    "set_audio",
+    "set_text",
+    "set_shape",
+    "set_enabled",
+    "set_transition",
+    "set_transition_duration",
+    "add_action",
+    "set_action",
+    "set_action_end",
+    "remove_action",
+    "add_track",
+    "remove_track",
+    "move_track",
+    "set_track",
+    "remove_empty_tracks",
+    "add_marker",
+    "set_marker",
+    "remove_marker",
+    "set_canvas",
+    "add_media",
+    "relink_media",
+    "remove_media",
+];
+
+/// One edit, parsed from its JSON envelope. The arguments and their
+/// defaults are the module table; every variant denies unknown fields, so a
+/// misspelt argument is an `Err` rather than an argument silently ignored.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "op", rename_all = "snake_case", deny_unknown_fields)]
+pub enum Op {
+    // ---- clips ----------------------------------------------------------
+    AddClip {
+        track: u32,
+        media: u32,
+        at: Ticks,
+    },
+    AddTextClip {
+        track: u32,
+        at: Ticks,
+        #[serde(default)]
+        duration: Option<Ticks>,
+        #[serde(default)]
+        text: Option<Value>,
+    },
+    AddShapeClip {
+        track: u32,
+        at: Ticks,
+        #[serde(default)]
+        duration: Option<Ticks>,
+        #[serde(default)]
+        shape: Option<Value>,
+    },
+    MoveClip {
+        clips: Vec<u32>,
+        delta: Ticks,
+        #[serde(default)]
+        track: Option<u32>,
+    },
+    TrimStart {
+        clip: u32,
+        to: Ticks,
+    },
+    TrimEnd {
+        clip: u32,
+        to: Ticks,
+    },
+    RateStretch {
+        clip: u32,
+        to_end: Ticks,
+    },
+    /// `clips` absent means "every unlocked clip the playhead is inside".
+    Split {
+        #[serde(default)]
+        clips: Option<Vec<u32>>,
+        at: Ticks,
+    },
+    Delete {
+        clips: Vec<u32>,
+    },
+    RippleDelete {
+        clips: Vec<u32>,
+    },
+    RippleDeleteRange {
+        from: Ticks,
+        to: Ticks,
+    },
+    InsertTime {
+        at: Ticks,
+        length: Ticks,
+    },
+    SetSpeed {
+        clip: u32,
+        rate: f64,
+        #[serde(default)]
+        keep_pitch: Option<bool>,
+    },
+    FreezeFrame {
+        clip: u32,
+        at: Ticks,
+        #[serde(default)]
+        duration: Option<Ticks>,
+    },
+    DetachAudio {
+        clip: u32,
+    },
+    Duplicate {
+        clips: Vec<u32>,
+    },
+    SetVideo {
+        clips: Vec<u32>,
+        patch: Value,
+    },
+    SetAudio {
+        clips: Vec<u32>,
+        patch: Value,
+    },
+    SetText {
+        clips: Vec<u32>,
+        patch: Value,
+    },
+    SetShape {
+        clips: Vec<u32>,
+        patch: Value,
+    },
+    SetEnabled {
+        clip: u32,
+        #[serde(default)]
+        video: Option<bool>,
+        #[serde(default)]
+        audio: Option<bool>,
+    },
+    /// An absent or null `kind` clears the transition.
+    SetTransition {
+        clip: u32,
+        #[serde(default)]
+        kind: Option<TransitionKind>,
+    },
+    SetTransitionDuration {
+        clip: u32,
+        duration: Ticks,
+    },
+
+    // ---- actions --------------------------------------------------------
+    AddAction {
+        clip: u32,
+        at: Ticks,
+        #[serde(default)]
+        duration: Option<Ticks>,
+    },
+    SetAction {
+        clip: u32,
+        action: u32,
+        #[serde(default)]
+        start: Option<Ticks>,
+        #[serde(default)]
+        duration: Option<Ticks>,
+        #[serde(default)]
+        curve: Option<Curve>,
+    },
+    SetActionEnd {
+        clip: u32,
+        action: u32,
+        patch: Value,
+    },
+    RemoveAction {
+        clip: u32,
+        action: u32,
+    },
+
+    // ---- tracks, markers, canvas, media ---------------------------------
+    AddTrack {
+        #[serde(default)]
+        index: Option<usize>,
+        #[serde(default)]
+        name: Option<String>,
+    },
+    RemoveTrack {
+        track: u32,
+        #[serde(default)]
+        with_clips: bool,
+    },
+    MoveTrack {
+        track: u32,
+        index: usize,
+    },
+    SetTrack {
+        track: u32,
+        #[serde(default)]
+        name: Option<String>,
+        #[serde(default)]
+        hidden: Option<bool>,
+        #[serde(default)]
+        muted: Option<bool>,
+        #[serde(default)]
+        locked: Option<bool>,
+    },
+    /// A struct variant with no fields, not a unit one, so that
+    /// `deny_unknown_fields` applies to it like every other op.
+    RemoveEmptyTracks {},
+    AddMarker {
+        at: Ticks,
+        #[serde(default)]
+        name: Option<String>,
+        #[serde(default)]
+        chapter: Option<bool>,
+        #[serde(default)]
+        color: Option<String>,
+    },
+    SetMarker {
+        marker: u32,
+        #[serde(default)]
+        time: Option<Ticks>,
+        #[serde(default)]
+        name: Option<String>,
+        #[serde(default)]
+        chapter: Option<bool>,
+        #[serde(default)]
+        color: Option<String>,
+    },
+    RemoveMarker {
+        marker: u32,
+    },
+    SetCanvas {
+        #[serde(default)]
+        width: Option<u32>,
+        #[serde(default)]
+        height: Option<u32>,
+        #[serde(default)]
+        fps: Option<Fps>,
+        #[serde(default)]
+        background: Option<Color>,
+        #[serde(default)]
+        rescale_clips: bool,
+        #[serde(default)]
+        fit_new_clips: Option<bool>,
+        #[serde(default)]
+        timecode_frames: Option<bool>,
+    },
+    AddMedia {
+        descriptor: Value,
+    },
+    RelinkMedia {
+        media: u32,
+        path: String,
+        #[serde(default)]
+        bookmark: Option<String>,
+    },
+    RemoveMedia {
+        media: u32,
+        #[serde(default)]
+        with_clips: bool,
+    },
+}
+
+/// Parses one op envelope.
+///
+/// Two passes on purpose. The first reads the `"op"` key out of a generic
+/// value so that a missing, non-string or unknown name can be answered with
+/// the list of names — the mistake a hand-written or generated op makes
+/// most often, and the one serde's own "unknown variant" message states in
+/// terms of the Rust enum rather than the wire format. The second is the
+/// real deserialize, whose errors (missing field, wrong type, unknown
+/// field) are already precise and are quoted under the op's name.
+pub fn parse(op_json: &str) -> Result<Op, String> {
+    let value: Value =
+        serde_json::from_str(op_json).map_err(|e| format!("op is not valid json: {e}"))?;
+    let Some(object) = value.as_object() else {
+        return Err(format!(
+            "an op must be a json object, not {}",
+            describe(&value)
+        ));
+    };
+    let name = match object.get("op") {
+        None => {
+            return Err(format!(
+                "an op must have an \"op\" name; known ops are {}",
+                OP_NAMES.join(", ")
+            ))
+        }
+        Some(Value::String(name)) => name.clone(),
+        Some(other) => {
+            return Err(format!(
+                "an op name must be a string, not {}",
+                describe(other)
+            ))
+        }
+    };
+    if !OP_NAMES.contains(&name.as_str()) {
+        return Err(format!(
+            "unknown op \"{name}\"; known ops are {}",
+            OP_NAMES.join(", ")
+        ));
+    }
+    serde_json::from_value(value).map_err(|e| format!("op \"{name}\" is not valid: {e}"))
+}
+
+impl Project {
+    /// Applies one op envelope (the module table) and returns the new
+    /// project, `Ok(None)` when it would change nothing, or `Err` when the
+    /// envelope or its arguments are invalid.
+    pub fn apply(&self, op_json: &str) -> Result<Option<Project>, String> {
+        self.apply_op(&parse(op_json)?)
+    }
+
+    /// The dispatch table. Deliberately nothing but calls: an op that needs
+    /// adaptation gets it in the `edit_*` module that owns it, so that the
+    /// JSON envelope and the semantics can never drift apart here.
+    pub fn apply_op(&self, op: &Op) -> Result<Option<Project>, String> {
+        match op {
+            // ---- clips ---------------------------------------------------
+            Op::AddClip { track, media, at } => self.add_clip(*track, *media, *at),
+            Op::AddTextClip {
+                track,
+                at,
+                duration,
+                text,
+            } => self.add_text_clip(*track, *at, *duration, text.as_ref()),
+            Op::AddShapeClip {
+                track,
+                at,
+                duration,
+                shape,
+            } => self.add_shape_clip(*track, *at, *duration, shape.as_ref()),
+            Op::MoveClip {
+                clips,
+                delta,
+                track,
+            } => self.move_clips(clips, *delta, *track),
+            Op::TrimStart { clip, to } => self.trim_start(*clip, *to),
+            Op::TrimEnd { clip, to } => self.trim_end(*clip, *to),
+            Op::RateStretch { clip, to_end } => self.rate_stretch(*clip, *to_end),
+            Op::Split { clips, at } => match clips.as_deref() {
+                Some(ids) => self.split_clips(ids, *at),
+                None => self.split_under_playhead(*at),
+            },
+            Op::Delete { clips } => self.delete_clips(clips),
+            Op::RippleDelete { clips } => self.ripple_delete(clips),
+            Op::RippleDeleteRange { from, to } => self.ripple_delete_range(*from, *to),
+            Op::InsertTime { at, length } => self.insert_time(*at, *length),
+            Op::SetSpeed {
+                clip,
+                rate,
+                keep_pitch,
+            } => self.set_speed(*clip, *rate, *keep_pitch),
+            Op::FreezeFrame { clip, at, duration } => self.freeze_frame(*clip, *at, *duration),
+            Op::DetachAudio { clip } => self.detach_audio(*clip),
+            Op::Duplicate { clips } => self.duplicate_clips(clips),
+            Op::SetVideo { clips, patch } => self.set_video(clips, patch),
+            Op::SetAudio { clips, patch } => self.set_audio(clips, patch),
+            Op::SetText { clips, patch } => self.set_text(clips, patch),
+            Op::SetShape { clips, patch } => self.set_shape(clips, patch),
+            Op::SetEnabled { clip, video, audio } => self.set_enabled(*clip, *video, *audio),
+            Op::SetTransition { clip, kind } => self.set_transition(*clip, *kind),
+            Op::SetTransitionDuration { clip, duration } => {
+                self.set_transition_duration(*clip, *duration)
+            }
+
+            // ---- actions -------------------------------------------------
+            Op::AddAction { clip, at, duration } => self.add_action(*clip, *at, *duration),
+            Op::SetAction {
+                clip,
+                action,
+                start,
+                duration,
+                curve,
+            } => self.set_action(*clip, *action, *start, *duration, *curve),
+            Op::SetActionEnd {
+                clip,
+                action,
+                patch,
+            } => self.set_action_end(*clip, *action, patch),
+            Op::RemoveAction { clip, action } => self.remove_action(*clip, *action),
+
+            // ---- tracks, markers, canvas, media --------------------------
+            Op::AddTrack { index, name } => self.add_track(*index, name.as_deref()),
+            Op::RemoveTrack { track, with_clips } => self.remove_track(*track, *with_clips),
+            Op::MoveTrack { track, index } => self.move_track(*track, *index),
+            Op::SetTrack {
+                track,
+                name,
+                hidden,
+                muted,
+                locked,
+            } => self.set_track(*track, name.as_deref(), *hidden, *muted, *locked),
+            Op::RemoveEmptyTracks {} => self.remove_empty_tracks(),
+            Op::AddMarker {
+                at,
+                name,
+                chapter,
+                color,
+            } => self.add_marker(*at, name.as_deref(), *chapter, color.as_deref()),
+            Op::SetMarker {
+                marker,
+                time,
+                name,
+                chapter,
+                color,
+            } => self.set_marker(*marker, *time, name.as_deref(), *chapter, color.as_deref()),
+            Op::RemoveMarker { marker } => self.remove_marker(*marker),
+            Op::SetCanvas {
+                width,
+                height,
+                fps,
+                background,
+                rescale_clips,
+                fit_new_clips,
+                timecode_frames,
+            } => self.set_canvas(
+                *width,
+                *height,
+                *fps,
+                *background,
+                *rescale_clips,
+                *fit_new_clips,
+                *timecode_frames,
+            ),
+            Op::AddMedia { descriptor } => self.add_media(descriptor),
+            Op::RelinkMedia {
+                media,
+                path,
+                bookmark,
+            } => self.relink_media(*media, path, bookmark.as_deref()),
+            Op::RemoveMedia { media, with_clips } => self.remove_media(*media, *with_clips),
+        }
+    }
+}

@@ -1,0 +1,123 @@
+# app/CLAUDE.md — Swift app rules
+
+Applies to everything under `app/`. Build/verification commands and the FFI
+lockstep are in the root `CLAUDE.md`; the full design is
+`designs/reelcut-design.md` (§3–4 the UI, §7.4–7.8 this file map).
+
+## File map
+
+- `ReelCore.swift` — the **only** home for `rc_*` calls: `ReelProject`
+  (handle + lazily decoded `ProjectSnapshot`), the typed op builders that
+  mirror `core/src/edit.rs`'s op table, timecode, snapping, export settings,
+  and `RecipeSource`. `deinit` frees the Rust allocation. There is no
+  untyped op-JSON call site anywhere else.
+- `ProjectSnapshot.swift` — the `Codable` mirror of the §5.2 project JSON:
+  the read-only view every view draws from.
+- `ProjectDocument.swift` — NSDocument, `.reelcut` package read/write, and
+  the single mutation point (see Undo below).
+- `Playback.swift` · `CompositionBuilder.swift` · `Compositor.swift` ·
+  `LayerRenderers.swift` · `MediaImporter.swift` · `Exporter.swift` — the
+  AVFoundation/Metal side; see spec §7.5–7.8.
+- `EditorViewController.swift`, `TimelineView.swift`,
+  `PreviewCanvasView.swift`, `AgentServer.swift` — **frozen at current
+  size.** Any change adding more than ~50 lines goes in an extension file
+  instead: `EditorViewController+<Feature>.swift`,
+  `AgentServer+<Feature>.swift`, or a new `…SheetController` file. The
+  pieces those extension files build on are therefore internal, not
+  private, and the frozen file keeps only the wiring.
+- `InspectorViewController.swift` (frozen at wiring: the tab strip, the pin,
+  and which pane is shown) + `InspectorPane.swift` (the pane protocol and
+  base, the disclosure section, the row builders, and `InspectorBinding` —
+  the one place that knows reads are evaluated inside an action and that
+  writes there set `set_action_end`) + one file per tab (`VideoPane.swift`,
+  `AudioPane.swift`, `TextPane.swift`, `ShapePane.swift`, `MediaPane.swift`,
+  `DocumentPane.swift`), descriptor-driven from `OptionControls.swift`.
+- `ExportSheetController.swift` (the export card and its progress sheet),
+  `SpeedSheetController.swift`, `RelinkSheetController.swift` — the
+  dialogs, all built from `Sheets.swift`'s `makeSheetView` pieces and put
+  up by `EditorViewController+Export.swift`. A sheet captures a project
+  handle and trusts it, which is safe because every editor action
+  validates false while one is attached.
+- `AgentCatalog.swift` — the MCP tool catalog; a startup check enforces that
+  catalog names match the dispatch registry (it traps in debug and logs in
+  Release, because `make app` builds Release). The handlers live in
+  `AgentServer+Project/Clips/Tracks/Media/Render/History.swift` and their shared
+  argument vocabulary in `AgentServer+Arguments.swift`; a new op means a
+  handler, a catalog entry and a comment naming the UI path it mirrors.
+  Beyond the §6 ops the catalog carries the app-state tools spec §7.9 names
+  plus `set_range`, `undo` and `redo` — the mirrors of I/O/⌥X and ⌘Z/⇧⌘Z,
+  without which the "one edit is one undo step" and "the in/out range scopes
+  the export" properties could not be checked by driving the built app.
+  `target(_:)` resolves the implicit document: an agent-driven app is never
+  the ACTIVE app, so `NSDocumentController.currentDocument` is nil there and
+  the fallback must be `NSApp.orderedDocuments`, never `documents.first`
+  (which silently targets the OLDEST project). An EXPLICIT `project` path is
+  matched through `AgentServer.canonical` — never as a raw string: a caller
+  may spell one file `~/…`, `/tmp/…` or `/private/tmp/…`, and AppKit's save
+  machinery can re-spell `fileURL` into the other half of that last pair
+  mid-session, which made a path that had worked for twenty calls start
+  answering "No open project is at …". `open_project`'s already-open check
+  compares the same way, or it opens one file twice.
+  `AgentServer.offMainTools` names the few handlers that run on the server
+  thread instead of the main one — they wait on the main thread (an async
+  probe's completion, NSDocument's save) or on a long decode, so hopping first
+  would deadlock or freeze the UI; they reach the document through
+  `AgentServer.onMain`.
+- Shared chrome: `Theme.swift` (`DS` design tokens), `Controls.swift`,
+  `OptionControls.swift`, `Sheets.swift`, `EditorChrome.swift` (`BarView`),
+  `FileDropView.swift` (Finder drops + the first responder the bare-key map
+  needs) — copied from Rasterize, keep them in sync rather than forking.
+
+## Rules
+
+**Placement.** New feature = small model/value file + VC extension file +
+gesture session struct. Interactive gestures are modeled as a session struct
+(`ClipDragSession`, `TrimSession`, `CanvasSession` are the template): one
+stored property on the view, logic in the feature's file. Closures assigned
+in `loadView` are one-line forwards to named methods
+(`timeline.onClipDrag = { [weak self] in self?.clipDragged($0) }`) — no
+business logic in closure bodies.
+
+**Undo and dirty tracking.** All document mutation flows through
+`ProjectDocument`'s entry points — `applyEdit` and the
+`beginLiveEdit`/`updateLiveEdit`/`endLiveEdit` trio for gestures.
+`registerUndo` appears nowhere outside `ProjectDocument`. It overrides
+`updateChangeCount` to drop AppKit's automatic undo-based counting; the
+entry points count deterministically via `countEditChange()`.
+**Pitfall:** undo registrations outside an AppKit event (agent edits, async
+callbacks) land in the implicit event group `NSUndoManager` opens per event
+and that AppKit never closes there, silently merging edits into one undo
+step; any off-event path must go through
+`ProjectDocument.performGroupedEdit`, which turns `groupsByEvent` OFF for
+the duration and balances one explicit group.
+**Do not "flush" the manager to grouping level zero** to close that implicit
+group. That leaves an end with no begin, and the undo CHECKPOINT `NSDocument`
+posts from inside the file-coordination accessor of every save then raises
+`endUndoGrouping called with no matching begin`. Under `autosavesInPlace`
+the exception is swallowed inside the coordinator, so the save never
+completes, never writes, and never relinquishes its file-access claim —
+⌘S and `save_project` hang for good after the first off-event edit.
+
+**Agent parity.** Every user-visible edit gets an MCP mirror: a handler in
+the dispatch registry + a catalog entry in `AgentCatalog.swift` (the startup
+parity check enforces the names match) + a comment naming the UI path it
+mirrors. Handlers follow the canonical shape: `target(a)` → validate ids →
+`performGroupedEdit` → `jsonResult`; failures throw `ToolError` and return
+in-band (`isError: true`) so models can self-correct.
+
+**State flow.** Views → VC through `on*` closures (`[weak self]`); document
+→ observers via `.projectDocumentDidChange` with `userInfo["isLive"]` —
+live gestures pass `isLive: true` and observers skip expensive reloads
+mid-gesture. VC → views is direct property assignment.
+
+**Hygiene.** No storyboards/xibs. No `!` force-unwraps, `as!`, or `try!`;
+implicitly-unwrapped optionals only for post-`loadView` view refs. Every
+non-NSCoder class: `@available(*, unavailable) required init?(coder:)
+{ fatalError("<Type> does not support NSCoder") }`. `[weak self]` in
+retained closures, never `unowned`. Main-thread AppKit. `async`/`await` is
+allowed **only inside `MediaImporter.swift`** (AVFoundation's loading API is
+async-only going forward); `DispatchQueue` only at the documented seams
+(the compositor's render queue, the composition rebuild, import, the export
+progress timer). Colors/fonts/metrics come from `DS` tokens; shared controls
+go in `Controls.swift`. Refusals beep (`NSSound.beep()`), errors never
+crash. 4-space indent, ~100 columns.

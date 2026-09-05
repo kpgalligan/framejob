@@ -1,0 +1,529 @@
+import AppKit
+
+/// The agent's clip and action tools: one per row of the clip half of spec §6
+/// (and of the op table in the module doc of `core/src/edit.rs`), with the
+/// same name and the same argument names.
+///
+/// Every handler is the canonical shape — `target(a)`, validate the ids
+/// against the snapshot, build the typed `ReelOp`, `performGroupedEdit`,
+/// `jsonResult` — and carries a comment naming the UI path it mirrors
+/// (app/CLAUDE.md's agent-parity rule). No op JSON is written here: the typed
+/// builders in `ReelCore.swift` are the only place that spells one.
+extension AgentServer {
+
+    // MARK: - Patch vocabularies
+
+    /// The keys each patch accepts, from the §5.2 property groups. Used to
+    /// refuse an unknown key BY NAME rather than let the core's lenient serde
+    /// drop it — a silently ignored typo leaves a model believing it made an
+    /// edit it did not.
+    static let videoPatchKeys: Set<String> = [
+        "x", "y", "scale", "rotation", "opacity", "crop", "corner_radius", "shadow", "color",
+        "chroma",
+    ]
+    static let audioPatchKeys: Set<String> = [
+        "volume", "muted", "fade_in", "fade_out", "duck", "mono", "keep_pitch",
+    ]
+    static let textPatchKeys: Set<String> = [
+        "content", "font", "size", "color", "align", "valign", "line_spacing", "tracking",
+        "outline", "backdrop", "width",
+    ]
+    static let shapePatchKeys: Set<String> = [
+        "kind", "width", "height", "stroke", "fill", "arrow_start", "arrow_end", "radius",
+        "from", "to",
+    ]
+
+    // MARK: - Placing clips
+
+    /// `add_clip` — dragging a Media-tab row onto a track
+    /// (`MediaPane.drop(_:on:target:)` with `MediaDropTarget.track`), and the
+    /// first clip of a project opened from a movie (spec §1).
+    func addClip(_ a: [String: Any]) throws -> String {
+        let document = try target(a)
+        let track = try trackArg(a, "track", document)
+        let media = try mediaArg(a, "media", document)
+        let at = try timeArg(a, "at", document)
+        return try editResult(
+            document, "Add Clip", [.addClip(track: track.id, media: media.id, at: at)])
+    }
+
+    /// `add_text_clip` — Clip ▸ Add Text (`EditorViewController.addTextClip:`,
+    /// M2). The default content and duration are the core's, so an omitted
+    /// argument gives exactly what the menu gives.
+    func addTextClip(_ a: [String: Any]) throws -> String {
+        let document = try target(a)
+        let track = try trackArg(a, "track", document)
+        let at = try timeArg(a, "at", document)
+        let duration = try optionalTimeArg(a, "duration", document)
+        return try editResult(
+            document, "Add Text",
+            [
+                .addTextClip(
+                    track: track.id, at: at, duration: duration, text: stringArg(a, "text"))
+            ])
+    }
+
+    /// `add_shape_clip` — the toolbar's Add Shape menu
+    /// (`EditorViewController.showAddShapeMenu:` → `addShapeClip:`, M2).
+    func addShapeClip(_ a: [String: Any]) throws -> String {
+        let document = try target(a)
+        let track = try trackArg(a, "track", document)
+        let at = try timeArg(a, "at", document)
+        let duration = try optionalTimeArg(a, "duration", document)
+        let name = try requiredString(a, "shape")
+        guard let kind = ShapeKind(rawValue: name) else {
+            throw ToolError(
+                message: "shape must be one of "
+                    + ShapeKind.allCases.map { $0.rawValue }.joined(separator: ", ")
+                    + " (got \"\(name)\").")
+        }
+        return try editResult(
+            document, "Add Shape",
+            [.addShapeClip(track: track.id, at: at, duration: duration, shape: kind)])
+    }
+
+    // MARK: - Moving and trimming
+
+    /// `move_clip` — the timeline's clip drag (`ClipDragSession`). The overlap
+    /// rule lives in the core, so a move that would stack three clips is a
+    /// refusal with a message rather than something to check here.
+    func moveClip(_ a: [String: Any]) throws -> String {
+        let document = try target(a)
+        let clips = try clipsArg(a, "clips", document)
+        let delta = try timeArg(a, "delta", document)
+        var track: TrackSnapshot?
+        if let raw = a["track"], !(raw is NSNull) {
+            track = try trackArg(a, "track", document)
+        }
+        return try editResult(
+            document, "Move Clip", [.moveClip(clips: clips, delta: delta, track: track?.id)])
+    }
+
+    /// `trim_start` — dragging a clip's left edge (`TrimSession`) and W
+    /// (`EditorViewController+Timeline.trimToPlayhead(.start)`).
+    func trimStart(_ a: [String: Any]) throws -> String {
+        let document = try target(a)
+        let clip = try clipArg(a, "clip", document)
+        let to = try timeArg(a, "to", document)
+        return try editResult(document, "Trim Start", [.trimStart(clip: clip.id, to: to)])
+    }
+
+    /// `trim_end` — dragging a clip's right edge, and E.
+    func trimEnd(_ a: [String: Any]) throws -> String {
+        let document = try target(a)
+        let clip = try clipArg(a, "clip", document)
+        let to = try timeArg(a, "to", document)
+        return try editResult(document, "Trim End", [.trimEnd(clip: clip.id, to: to)])
+    }
+
+    /// `rate_stretch` — ⌥-dragging a clip's END edge
+    /// (`TrimSession.isRateStretch`). Media sources only; the core makes any
+    /// other kind an ERROR rather than a refusal precisely so this call gets a
+    /// message it can correct from (spec §6).
+    func rateStretch(_ a: [String: Any]) throws -> String {
+        let document = try target(a)
+        let clip = try clipArg(a, "clip", document)
+        let toEnd = try timeArg(a, "to_end", document)
+        return try editResult(
+            document, "Rate Stretch", [.rateStretch(clip: clip.id, toEnd: toEnd)])
+    }
+
+    /// `split` — ⌘K / T (`splitAtPlayheadCommand`). With no `clips` the core
+    /// splits every unlocked clip under the playhead, which is what the menu
+    /// command does with an empty selection; `at` defaults to the playhead for
+    /// the same reason.
+    func split(_ a: [String: Any]) throws -> String {
+        let document = try target(a)
+        let clips = try optionalClipsArg(a, "clips", document)
+        let at = try optionalTimeArg(a, "at", document) ?? document.playhead
+        return try editResult(document, "Split", [.split(clips: clips, at: at)])
+    }
+
+    // MARK: - Removing time
+
+    /// `delete` — ⌫ (`deleteSelection`). The gaps stay.
+    func deleteClips(_ a: [String: Any]) throws -> String {
+        let document = try target(a)
+        let clips = try clipsArg(a, "clips", document)
+        return try editResult(document, "Delete", [.delete(clips: clips)])
+    }
+
+    /// `ripple_delete` — ⌘⌫ with a selection (`rippleDeleteSelection`).
+    func rippleDelete(_ a: [String: Any]) throws -> String {
+        let document = try target(a)
+        let clips = try clipsArg(a, "clips", document)
+        return try editResult(document, "Ripple Delete", [.rippleDelete(clips: clips)])
+    }
+
+    /// `ripple_delete_range` — ⌘⌫ with NO selection and an in/out range set,
+    /// the other half of `rippleDeleteSelection`.
+    func rippleDeleteRange(_ a: [String: Any]) throws -> String {
+        let document = try target(a)
+        let from = try timeArg(a, "from", document)
+        let to = try timeArg(a, "to", document)
+        guard to > from else {
+            throw ToolError(message: "to must be after from (got \(from) and \(to)).")
+        }
+        return try editResult(
+            document, "Ripple Delete", [.rippleDeleteRange(from: from, to: to)])
+    }
+
+    /// `insert_time` — the gap-opening edit of spec §4.4. It has no menu
+    /// command of its own yet; the agent is its first caller, and the ops are
+    /// the same ones a future insert gesture will build.
+    func insertTime(_ a: [String: Any]) throws -> String {
+        let document = try target(a)
+        let at = try timeArg(a, "at", document)
+        let length = try timeArg(a, "length", document)
+        guard length > 0 else {
+            throw ToolError(message: "length must be more than one frame of ticks.")
+        }
+        return try editResult(document, "Insert Time", [.insertTime(at: at, length: length)])
+    }
+
+    // MARK: - Speed and stills
+
+    /// `set_speed` — Clip ▸ Speed… (`SpeedSheetController`). Media sources
+    /// only, and the core clamps the rate to ×0.1–×10.
+    func setSpeed(_ a: [String: Any]) throws -> String {
+        let document = try target(a)
+        let clip = try clipArg(a, "clip", document)
+        guard let rate = doubleArg(a, "rate"), rate.isFinite, rate > 0 else {
+            throw ToolError(message: "rate must be a positive number (1 = normal speed).")
+        }
+        return try editResult(
+            document, "Speed",
+            [.setSpeed(clip: clip.id, rate: rate, keepPitch: boolArg(a, "keep_pitch"))])
+    }
+
+    /// `freeze_frame` — ⇧⌘F (`freezeSelection`): a split, an inserted gap, and
+    /// a `still` clip filling it.
+    func freezeFrame(_ a: [String: Any]) throws -> String {
+        let document = try target(a)
+        let clip = try clipArg(a, "clip", document)
+        let at = try optionalTimeArg(a, "at", document) ?? document.playhead
+        let duration = try optionalTimeArg(a, "duration", document)
+        return try editResult(
+            document, "Freeze Frame", [.freezeFrame(clip: clip.id, at: at, duration: duration)])
+    }
+
+    /// `detach_audio` — ⌥⌘D (`detachSelectionAudio`): the audio moves to its
+    /// own clip on the track below, inserting one when there is none.
+    func detachAudio(_ a: [String: Any]) throws -> String {
+        let document = try target(a)
+        let clip = try clipArg(a, "clip", document)
+        return try editResult(document, "Detach Audio", [.detachAudio(clip: clip.id)])
+    }
+
+    /// `duplicate` — ⌘D (`duplicateSelection`): copies land after the
+    /// originals' span, ready for a `move_clip`.
+    func duplicateClips(_ a: [String: Any]) throws -> String {
+        let document = try target(a)
+        let clips = try clipsArg(a, "clips", document)
+        return try editResult(document, "Duplicate", [.duplicate(clips: clips)])
+    }
+
+    // MARK: - Properties
+
+    /// `set_video` — the Video tab (`VideoPane` through `InspectorBinding`)
+    /// and every canvas gesture (`CanvasMoveSession` and its siblings).
+    ///
+    /// **The inspector's redirect is deliberately NOT mirrored here**: with
+    /// the playhead inside an action the panes write `set_action_end` instead,
+    /// because that is what dragging a handle inside an animated span means.
+    /// The agent says which it wants — `set_video` changes the clip's BASE
+    /// props, `set_action_end` an action's end state.
+    func setVideo(_ a: [String: Any]) throws -> String {
+        let document = try target(a)
+        let clips = try clipsArg(a, "clips", document)
+        let patch = try patchArg(a, "patch", VideoPatch.self, allowed: Self.videoPatchKeys)
+        guard !patch.isEmpty else {
+            throw ToolError(message: "patch names nothing to change.")
+        }
+        return try editResult(document, "Video Properties", [.setVideo(clips: clips, patch: patch)])
+    }
+
+    /// `set_audio` — the Audio tab (`AudioPane`) and the timeline's fade
+    /// handles (`FadeHandleSession`).
+    func setAudio(_ a: [String: Any]) throws -> String {
+        let document = try target(a)
+        let clips = try clipsArg(a, "clips", document)
+        let patch = try patchArg(a, "patch", AudioPatch.self, allowed: Self.audioPatchKeys)
+        guard !patch.isEmpty else {
+            throw ToolError(message: "patch names nothing to change.")
+        }
+        return try editResult(document, "Audio Properties", [.setAudio(clips: clips, patch: patch)])
+    }
+
+    /// `set_text` — the Text tab (`TextPane`) and the canvas's inline text
+    /// editing (`PreviewCanvasView.commitTextEditing`).
+    func setText(_ a: [String: Any]) throws -> String {
+        let document = try target(a)
+        let clips = try clipsArg(a, "clips", document)
+        let patch = try patchArg(a, "patch", TextPatch.self, allowed: Self.textPatchKeys)
+        guard !patch.isEmpty else {
+            throw ToolError(message: "patch names nothing to change.")
+        }
+        return try editResult(document, "Text Properties", [.setText(clips: clips, patch: patch)])
+    }
+
+    /// `set_shape` — the Shape tab (`ShapePane`) and the canvas's endpoint and
+    /// box handles (`CanvasEndpointSession`, `CanvasScaleSession`).
+    func setShape(_ a: [String: Any]) throws -> String {
+        let document = try target(a)
+        let clips = try clipsArg(a, "clips", document)
+        let patch = try shapePatchArg(a, "patch")
+        guard !patch.isEmpty else {
+            throw ToolError(message: "patch names nothing to change.")
+        }
+        return try editResult(document, "Shape Properties", [.setShape(clips: clips, patch: patch)])
+    }
+
+    /// `set_enabled` — the per-clip video/audio switches of spec §5.2, the two
+    /// halves Detach Audio flips. No UI control carries them yet; the op is
+    /// the same one `detach_audio` writes.
+    func setEnabled(_ a: [String: Any]) throws -> String {
+        let document = try target(a)
+        let clip = try clipArg(a, "clip", document)
+        let video = boolArg(a, "video")
+        let audio = boolArg(a, "audio")
+        guard video != nil || audio != nil else {
+            throw ToolError(message: "set_enabled needs video, audio, or both.")
+        }
+        return try editResult(
+            document, "Clip Enabled", [.setEnabled(clip: clip.id, video: video, audio: audio)])
+    }
+
+    /// `set_transition` — Clip ▸ Transition ▸ (`setTransitionKindCommand`) and
+    /// the Video tab's transition row. The transition is INTO the clip and its
+    /// duration is the overlap with the clip before it; `kind: null` clears
+    /// it.
+    func setTransition(_ a: [String: Any]) throws -> String {
+        let document = try target(a)
+        let clip = try clipArg(a, "clip", document)
+        guard let raw = a["kind"] else {
+            throw ToolError(
+                message: "set_transition needs kind — one of "
+                    + TransitionKind.allCases.map { $0.rawValue }.joined(separator: ", ")
+                    + ", or null to clear it.")
+        }
+        var kind: TransitionKind?
+        if !(raw is NSNull) {
+            guard let name = raw as? String, let parsed = TransitionKind(rawValue: name) else {
+                throw ToolError(
+                    message: "kind must be one of "
+                        + TransitionKind.allCases.map { $0.rawValue }.joined(separator: ", ")
+                        + ", or null.")
+            }
+            kind = parsed
+        }
+        return try editResult(
+            document, kind == nil ? "Remove Transition" : "Set Transition",
+            [.setTransition(clip: clip.id, kind: kind)])
+    }
+
+    /// `set_transition_duration` — the Video tab's transition length field.
+    /// It MOVES the clip so the overlap equals `duration`, subject to the
+    /// overlap rule, which is why a too-long value is a refusal.
+    func setTransitionDuration(_ a: [String: Any]) throws -> String {
+        let document = try target(a)
+        let clip = try clipArg(a, "clip", document)
+        let duration = try timeArg(a, "duration", document)
+        guard duration > 0 else {
+            throw ToolError(
+                message: "duration must be positive — clear a transition with set_transition "
+                    + "and kind null.")
+        }
+        return try editResult(
+            document, "Transition Duration",
+            [.setTransitionDuration(clip: clip.id, duration: duration)])
+    }
+
+    // MARK: - Actions
+
+    /// `add_action` — ⌥⌘K (`EditorViewController+Inspector`'s
+    /// `addActionAtPlayheadCommand`) and the Video tab's Add Action button.
+    /// `at` is CLIP time, not project time: it is measured from the clip's own
+    /// start (spec §5.4).
+    func addAction(_ a: [String: Any]) throws -> String {
+        let document = try target(a)
+        let clip = try clipArg(a, "clip", document)
+        let at = try timeArg(a, "at", document)
+        let duration = try optionalTimeArg(a, "duration", document)
+        let before = clip.actions.map { $0.id }
+        try performGroupedEdit(
+            document, "Add Action", [.addAction(clip: clip.id, at: at, duration: duration)])
+        // Actions are not top-level ids, so `created(from:to:)` cannot see
+        // them; the new one is whatever the clip gained.
+        let after = document.project.snapshot.clip(clip.id)?.actions.map { $0.id } ?? []
+        var result: [String: Any] = ["ok": true, "clip": Int(clip.id)]
+        let added = after.filter { !before.contains($0) }.map { Int($0) }
+        if !added.isEmpty { result["new_actions"] = added }
+        result["project"] = summary(document)
+        return try jsonResult(result)
+    }
+
+    /// `set_action` — dragging an action's band in the Video tab's action
+    /// table, and its curve popup.
+    func setAction(_ a: [String: Any]) throws -> String {
+        let document = try target(a)
+        let clip = try clipArg(a, "clip", document)
+        let action = try actionArg(a, "action", clip)
+        let start = try optionalTimeArg(a, "start", document)
+        let duration = try optionalTimeArg(a, "duration", document)
+        var curve: Curve?
+        if let name = stringArg(a, "curve") {
+            guard let parsed = Curve(rawValue: name) else {
+                throw ToolError(
+                    message: "curve must be one of "
+                        + Curve.allCases.map { $0.rawValue }.joined(separator: ", ")
+                        + " (got \"\(name)\").")
+            }
+            curve = parsed
+        }
+        guard start != nil || duration != nil || curve != nil else {
+            throw ToolError(message: "set_action needs start, duration or curve.")
+        }
+        return try editResult(
+            document, "Action",
+            [
+                .setAction(
+                    clip: clip.id, action: action.id, start: start, duration: duration,
+                    curve: curve)
+            ])
+    }
+
+    /// `set_action_end` — every inspector field written while the playhead is
+    /// inside an action (`InspectorBinding.ops(video:for:)`). The patch is the
+    /// action's END state, merged; a key set to null is REMOVED from it.
+    func setActionEnd(_ a: [String: Any]) throws -> String {
+        let document = try target(a)
+        let clip = try clipArg(a, "clip", document)
+        let action = try actionArg(a, "action", clip)
+        try checkActionPatch(a, "patch")
+        let patch = try patchArg(
+            a, "patch", ActionPatch.self, allowed: ["video", "audio", "text"])
+        guard !patch.isEmpty else {
+            throw ToolError(
+                message: "patch names nothing to change — it takes video, audio and/or text "
+                    + "objects, e.g. {\"video\": {\"scale\": 0.6}}.")
+        }
+        return try editResult(
+            document, "Action End",
+            [.setActionEnd(clip: clip.id, action: action.id, patch: patch)])
+    }
+
+    /// `remove_action` — the Video tab's action-row Remove button.
+    func removeAction(_ a: [String: Any]) throws -> String {
+        let document = try target(a)
+        let clip = try clipArg(a, "clip", document)
+        let action = try actionArg(a, "action", clip)
+        return try editResult(
+            document, "Remove Action", [.removeAction(clip: clip.id, action: action.id)])
+    }
+
+    // MARK: - Patch decoding
+
+    /// The nested half of `set_action_end`'s validation: the top level is
+    /// checked by `patchArg`, each group's keys here.
+    private func checkActionPatch(_ a: [String: Any], _ key: String) throws {
+        guard let object = a[key] as? [String: Any] else {
+            throw ToolError(
+                message: "\(key) must be a JSON object with video, audio and/or text groups, "
+                    + "e.g. {\"video\": {\"opacity\": 0}}")
+        }
+        let groups: [(String, Set<String>)] = [
+            ("video", Self.videoPatchKeys), ("audio", Self.audioPatchKeys),
+            ("text", Self.textPatchKeys),
+        ]
+        for (name, allowed) in groups {
+            guard let raw = object[name], !(raw is NSNull) else { continue }
+            guard let nested = raw as? [String: Any] else {
+                throw ToolError(message: "\(key).\(name) must be a JSON object.")
+            }
+            let unknown = nested.keys.filter { !allowed.contains($0) }.sorted()
+            if let first = unknown.first {
+                throw ToolError(
+                    message: "Unknown \(key).\(name) key \"\(first)\" — allowed keys are "
+                        + allowed.sorted().joined(separator: ", ") + ".")
+            }
+        }
+    }
+
+    /// `ShapePatch` is the one patch that is not `Codable` (it never appears
+    /// inside an action's end patch — spec §5.4 covers video, audio and text
+    /// only), so it is built by hand. `stroke` and `fill` are three-state, the
+    /// way `ShapePatch` spells it: absent leaves the paint alone, null clears
+    /// it, an object or a colour sets it.
+    private func shapePatchArg(_ a: [String: Any], _ key: String) throws -> ShapePatch {
+        guard let object = a[key] as? [String: Any] else {
+            throw ToolError(
+                message: "\(key) must be a JSON object of the shape properties to change, "
+                    + "e.g. {\"kind\": \"arrow\"}")
+        }
+        let unknown = object.keys.filter { !Self.shapePatchKeys.contains($0) }.sorted()
+        if let first = unknown.first {
+            throw ToolError(
+                message: "Unknown \(key) key \"\(first)\" — allowed keys are "
+                    + Self.shapePatchKeys.sorted().joined(separator: ", ") + ".")
+        }
+        var patch = ShapePatch()
+        if let name = stringArg(object, "kind") {
+            guard let kind = ShapeKind(rawValue: name) else {
+                throw ToolError(
+                    message: "kind must be one of "
+                        + ShapeKind.allCases.map { $0.rawValue }.joined(separator: ", ")
+                        + " (got \"\(name)\").")
+            }
+            patch.kind = kind
+        }
+        patch.width = doubleArg(object, "width")
+        patch.height = doubleArg(object, "height")
+        patch.radius = doubleArg(object, "radius")
+        patch.arrowStart = boolArg(object, "arrow_start")
+        patch.arrowEnd = boolArg(object, "arrow_end")
+        if let raw = object["stroke"] {
+            if raw is NSNull {
+                patch.stroke = .some(nil)
+            } else {
+                guard let stroke = raw as? [String: Any], let width = doubleArg(stroke, "width")
+                else {
+                    throw ToolError(
+                        message: "stroke must be null or {\"width\": 6, \"color\": "
+                            + "[r, g, b, a]}.")
+                }
+                patch.stroke = .some(
+                    StrokeProps(width: width, color: try requiredColorArg(stroke, "color")))
+            }
+        }
+        if let raw = object["fill"] {
+            if raw is NSNull {
+                patch.fill = .some(nil)
+            } else {
+                patch.fill = .some(try requiredColorArg(object, "fill"))
+            }
+        }
+        patch.from = try unitPoint(object, "from")
+        patch.to = try unitPoint(object, "to")
+        return patch
+    }
+
+    /// A `from` / `to` endpoint: unit coordinates in the shape's box, for
+    /// lines and arrows only (spec §5.2).
+    private func unitPoint(_ object: [String: Any], _ key: String) throws -> [Double]? {
+        guard let raw = object[key], !(raw is NSNull) else { return nil }
+        guard let array = raw as? [Any], array.count == 2 else {
+            throw ToolError(
+                message: "\(key) must be [x, y] in unit coordinates of the shape's box "
+                    + "(0,0 is its top-left corner).")
+        }
+        var point: [Double] = []
+        for value in array {
+            guard let number = (value as? NSNumber)?.doubleValue, number.isFinite else {
+                throw ToolError(message: "\(key) must contain two numbers.")
+            }
+            point.append(number)
+        }
+        return point
+    }
+}

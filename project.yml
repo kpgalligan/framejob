@@ -1,0 +1,118 @@
+name: Reelcut
+options:
+  bundleIdPrefix: com.kgalligan
+  deploymentTarget:
+    macOS: "15.0"
+  createIntermediateGroups: true
+
+targets:
+  Reelcut:
+    type: application
+    platform: macOS
+    sources:
+      - path: app/Sources
+      - path: app/Assets.xcassets
+      - path: app/Resources/Fonts
+        type: folder
+        buildPhase: resources
+      # A one-frame 16x16 black movie. A timeline of nothing but text, shapes
+      # and images owns no composition track, and AVFoundation gives a
+      # composition of empty edits a duration of ZERO — so nothing renders
+      # offline. This is the minimum real content that gives such a project a
+      # track to tick against; the compositor never samples it.
+      - path: app/Resources/Blank.mp4
+        buildPhase: resources
+      - path: app/Resources/Shaders
+        buildPhase: sources
+    settings:
+      base:
+        PRODUCT_NAME: Reelcut
+        # The Rust core is built for the host arch only; for a universal app,
+        # cargo-build both targets and lipo them, then widen this.
+        ARCHS: arm64
+        SWIFT_VERSION: "5.0"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        SWIFT_OBJC_BRIDGING_HEADER: app/Bridging/Reelcut-Bridging-Header.h
+        LIBRARY_SEARCH_PATHS:
+          - $(PROJECT_DIR)/core/target/release
+        OTHER_LDFLAGS:
+          - -lreelcut_core
+        MTL_LANGUAGE_REVISION: UseDeploymentTarget
+        ENABLE_USER_SCRIPT_SANDBOXING: "NO"
+        ENABLE_HARDENED_RUNTIME: "YES"
+        CODE_SIGN_IDENTITY: "-"
+        CODE_SIGN_STYLE: Manual
+        DEVELOPMENT_TEAM: ""
+        MACOSX_DEPLOYMENT_TARGET: "15.0"
+    info:
+      path: app/Info.plist
+      properties:
+        CFBundleName: Reelcut
+        CFBundleDisplayName: Reelcut
+        CFBundleShortVersionString: "0.1.0"
+        CFBundleVersion: "1"
+        LSMinimumSystemVersion: "15.0"
+        LSApplicationCategoryType: public.app-category.video
+        NSPrincipalClass: NSApplication
+        NSHighResolutionCapable: true
+        ATSApplicationFontsPath: Fonts
+        NSHumanReadableCopyright: ""
+        UTExportedTypeDeclarations:
+          - UTTypeIdentifier: com.kgalligan.reelcut-project
+            UTTypeDescription: Reelcut Project
+            UTTypeConformsTo: [com.apple.package]
+            UTTypeTagSpecification:
+              public.filename-extension: [reelcut]
+        CFBundleDocumentTypes:
+          - CFBundleTypeName: Reelcut Project
+            LSItemContentTypes: [com.kgalligan.reelcut-project]
+            CFBundleTypeRole: Editor
+            NSDocumentClass: Reelcut.ProjectDocument
+            LSTypeIsPackage: true
+            LSHandlerRank: Owner
+          # Opening a media file makes an UNTITLED project sized to it with
+          # the file as the first clip (spec 1) — the app is an Alternate
+          # handler for each so Open With… works from the Finder.
+          - CFBundleTypeName: QuickTime Movie
+            LSItemContentTypes: [com.apple.quicktime-movie]
+            CFBundleTypeRole: Editor
+            NSDocumentClass: Reelcut.ProjectDocument
+            LSHandlerRank: Alternate
+          - CFBundleTypeName: MPEG-4 Movie
+            LSItemContentTypes: [public.mpeg-4, com.apple.m4v-video]
+            CFBundleTypeRole: Editor
+            NSDocumentClass: Reelcut.ProjectDocument
+            LSHandlerRank: Alternate
+          - CFBundleTypeName: Movie
+            LSItemContentTypes: [public.movie]
+            CFBundleTypeRole: Editor
+            NSDocumentClass: Reelcut.ProjectDocument
+            LSHandlerRank: Alternate
+          - CFBundleTypeName: Audio
+            LSItemContentTypes:
+              [com.apple.m4a-audio, public.mp3, com.microsoft.waveform-audio, public.aiff-audio]
+            CFBundleTypeRole: Editor
+            NSDocumentClass: Reelcut.ProjectDocument
+            LSHandlerRank: Alternate
+          - CFBundleTypeName: Image
+            LSItemContentTypes: [public.png, public.jpeg, public.heic]
+            CFBundleTypeRole: Editor
+            NSDocumentClass: Reelcut.ProjectDocument
+            LSHandlerRank: Alternate
+    preBuildScripts:
+      - name: Build Rust Core
+        script: |
+          set -e
+          export PATH="$HOME/.cargo/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
+          cd "$PROJECT_DIR/core"
+          cargo build --release
+        outputFiles:
+          - $(PROJECT_DIR)/core/target/release/libreelcut_core.a
+
+schemes:
+  Reelcut:
+    build:
+      targets:
+        Reelcut: all
+    run:
+      config: Release

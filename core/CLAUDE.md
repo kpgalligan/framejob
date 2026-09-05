@@ -1,0 +1,90 @@
+# core/CLAUDE.md — Rust core rules
+
+Applies to everything under `core/`. Build commands and the FFI three-file
+lockstep are in the root `CLAUDE.md`; the full design is
+`designs/reelcut-design.md` (§5–7 are the schemas, §7.10 this module map).
+
+## Module map
+
+- `lib.rs` — module declarations and re-exports only. No implementation code.
+- `model.rs` — the spec §5.2 types with serde derives, id allocation,
+  lookups, and `validate`. The struct field names ARE the JSON keys.
+- `time.rs` — `Ticks`, `TIMESCALE`, `Fps`, frame snapping, timecode
+  format/parse (non-drop `HH:MM:SS:FF` and `HH:MM:SS.mmm`).
+- `edit.rs` — the op enum + serde and `apply`. **Its module doc IS the op
+  schema table** (the `adjust.rs` pattern in Rasterize) and
+  `app/Sources/ReelCore.swift`'s typed builders mirror it.
+- `edit_clip.rs` / `edit_props.rs` / `edit_track.rs` / `edit_time.rs` — the
+  §6 ops in four `impl Project` blocks: clip placement and the action ops;
+  the four property patches with the range checks that police them; tracks,
+  markers, canvas, media; ripple, insert time, range delete, freeze frame.
+  (Spec §7.10 lists three; `edit_props.rs` was split out of `edit_clip.rs`
+  under the "a new concern is a new module" rule — placement and schema
+  validation are separate concerns and `edit_clip.rs` was 1736 lines. It is
+  still ~1350; see "Modules and size" below.)
+- `actions.rs` — action evaluation and interpolation; `clip_state`.
+- `transition.rs` — overlap detection, the overlap rule, progress at *t*.
+- `evaluate.rs` — `frame_recipe(t)` and `composition_plan()` (A/B
+  assignment, instruction tiling).
+- `audio.rs` — envelopes: fades, volume actions, ducking, mute.
+- `snap.rs` — candidates and `resolve`.
+- `format.rs` — `RC_FORMAT_VERSION`, `RC_CAPS`, read-any-version /
+  write-current.
+- `export.rs` — presets and settings resolution.
+- `agent.rs` — embedded MCP server (streamable HTTP, tools only).
+  **Generic** — knows nothing about video; the host registers the catalog
+  and a callback. Copied from Rasterize; do not add domain knowledge.
+- `ffi.rs` / `ffi_edit.rs` / `ffi_query.rs` / `ffi_agent.rs` — thin shims
+  only; shared plumbing lives in `ffi_util.rs`, never copy-pasted.
+
+## Rules
+
+**Modules and size.** New feature area = new module with its own
+`impl Project` block. Soft cap ~600 lines; needing a new `// ---- name --`
+banner section is the signal to split. Every module keeps a `//!` doc;
+numeric/algorithmic choices get prose "why" comments.
+
+Three modules are over the cap today and are known debt, not licence:
+`edit_clip.rs` (~1350 — the placement ops are one concern and every further
+cut fragments it; the action ops are the next candidate at ~185 lines),
+`model.rs` (~880 — almost all of it is the §5.2 type declarations, and
+splitting the schema across two files would cost more than it saves) and
+`evaluate.rs` (~710 — the plan and the recipe must share `assign()`).
+Do not add to any of them without taking something out.
+
+**One implementation per algorithm.** Before writing time math, find the
+existing implementation and route through it. Shared constants have exactly
+one home (`TIMESCALE` in `time.rs`; `RC_*` caps in `format.rs`).
+
+**Purity.** Every edit takes `&self` and returns a new value — internally
+clone-then-mutate. An op that would change nothing returns `None`, never an
+identical copy: an identical copy registers a phantom undo step in the app.
+
+**Errors.** Two tiers, no error enum: `Option<T>` = the op is valid but
+changes nothing, or a domain refusal, with the reason in the doc comment;
+`Err(String)` = invalid arguments, unknown ids, parse failures — lowercase
+messages naming the offending value. No input may panic. FFI mapping:
+`None` → NULL with `err_out` untouched; `Err` → `set_err(err_out, …)`;
+caught panic → `"internal error: <what>"`.
+
+**Times.** Every tick value that reaches the model is snapped to the
+document's frame grid first (`time::snap_to_frame`). Never store a
+sub-frame time.
+
+**FFI exports.** Every export: `#[no_mangle] pub unsafe extern "C"`, a `///`
+comment restating the header contract, a `/// # Safety` paragraph, NULL
+tolerance first, narrow `unsafe {}` blocks. Route through the shared helpers
+in `ffi_util.rs` — a freshly hand-rolled `catch_unwind` is a review flag.
+Export names mirror the Rust method exactly.
+
+**Format changes.** Any change to persisted project state bumps
+`RC_FORMAT_VERSION` in `format.rs` **and** the `#define` in
+`core/include/reelcut_core.h`; the reader must keep accepting every prior
+version; the writer enforces the reader's caps.
+
+**Tests.** All tests are black-box in `core/tests/` (no `#[cfg(test)]` in
+`src/`), exercised **through the FFI** wherever possible, and verified
+against independently written oracles — never golden files. Shared helpers
+live in `tests/common/`; new feature area = new test file. Every new export
+gets at least one test plus inclusion in the null-safety sweep. Finish Rust
+work with `cargo fmt` and a clean `make lint`.

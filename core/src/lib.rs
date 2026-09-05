@@ -1,0 +1,46 @@
+//! `reelcut_core` — the decision-making half of Reelcut.
+//!
+//! Rust decides, AVFoundation and Metal do (spec §7): this crate holds the
+//! project value, every edit, and the plans and recipes the app renders
+//! from. It touches no pixel and no audio sample.
+//!
+//! The one contract with the app is `core/include/reelcut_core.h`; the
+//! `ffi*` modules implement it and are the only place `extern "C"` appears.
+//! Everything complex crosses as UTF-8 JSON, which keeps the header small
+//! and gives the embedded MCP agent the same vocabulary for free.
+//!
+//! Declarations and re-exports only — no implementation lives here.
+
+pub mod actions;
+pub mod agent;
+pub mod audio;
+pub mod edit;
+pub mod edit_clip;
+pub mod edit_props;
+pub mod edit_time;
+pub mod edit_track;
+pub mod evaluate;
+pub mod export;
+pub mod ffi;
+pub mod ffi_agent;
+pub mod ffi_edit;
+pub mod ffi_query;
+pub mod format;
+pub mod model;
+pub mod snap;
+pub mod time;
+pub mod transition;
+
+mod ffi_util;
+
+pub use crate::actions::Evaluated;
+pub use crate::audio::Ramp;
+pub use crate::edit::{Op, OP_NAMES};
+pub use crate::format::{MAX_CLIPS, MAX_MARKERS, MAX_MEDIA, MAX_TRACKS, RC_FORMAT_VERSION};
+pub use crate::model::{
+    Action, AudioProps, Backdrop, Canvas, Chroma, Clip, Color, ColorAdjust, Crop, Curve, Duck,
+    Enabled, Marker, Media, MediaKind, Outline, Project, Shadow, ShapeKind, ShapeProps, Source,
+    Stroke, TextAlign, TextProps, TextVAlign, Track, Transition, TransitionKind, VideoProps,
+};
+pub use crate::time::{Fps, Ticks, TIMESCALE};
+pub use crate::transition::Overlap;
