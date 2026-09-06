@@ -1,37 +1,45 @@
-//! The two things the platform actually consumes: the composition plan
-//! (spec §7.2) and the frame recipe (spec §7.3).
+//! The composition plan (spec §7.2), and the A/B assignment it shares with
+//! the frame recipe.
 //!
-//! They are the same timeline seen from two distances. The PLAN is
-//! structural — which source ranges go on which composition track, which
-//! instruction covers which span — and Swift rebuilds its
+//! The plan and the recipe are the same timeline seen from two distances.
+//! The PLAN is structural — which source ranges go on which composition
+//! track, which instruction covers which span — and Swift rebuilds its
 //! `AVMutableComposition` only when the plan's JSON string differs from the
 //! one it built (spec §7.6, §11), so this module must be deterministic to
 //! the byte: same project, same string. Every object here is assembled from
 //! ordered walks over `Project::tracks` and `Project::clips_on_track`, never
 //! from a hash map's iteration order.
 //!
-//! The RECIPE is per-instant and per-property: the back-to-front layer list
-//! with every value already resolved through actions, asked for once per
-//! composed frame by `Compositor` and again by the canvas overlay for
-//! hit-testing. It changes on every property edit, which is exactly why it
-//! is NOT part of the plan: a scale drag re-renders without rebuilding a
-//! composition.
+//! The RECIPE is per-instant and per-property, and lives in `recipe.rs`: it
+//! changes on every property edit, which is exactly why it is not part of
+//! the plan — a scale drag re-renders without rebuilding a composition.
 //!
 //! The two must agree on one thing — the composition track id a clip's
 //! video lands on — because the recipe names a track by the id Swift passed
 //! as `preferredTrackID`. So the A/B assignment is written once, in
-//! [`Project::assign`], and both entry points call it.
+//! [`Project::assign`], and both entry points call it. That is why it is
+//! here and `pub(crate)`, along with [`Project::drawing_instances`], which
+//! both the instruction tiling and the layer list are built from.
 //!
 //! Both are TOTAL: any project, any `t`, including a negative one, one past
 //! the end, and one in a project with no clips at all.
+//!
+//! Neither works from `Project::clips` directly. What plays on a timeline
+//! track is a list of [`Instance`]s (`nest.rs`): one per clip that actually
+//! reaches the canvas or the mix, with a nest clip already replaced by the
+//! clips inside it, times already in project time, extents already clipped.
+//! A project with no nests gets exactly one instance per clip, so this is
+//! not a second path — it is the only one.
 
+use std::borrow::Cow;
 use std::collections::BTreeMap;
 
 use serde::Serialize;
 use serde_json::{Map, Value};
 
-use crate::actions::Evaluated;
+use crate::audio::{Ducker, Voice};
 use crate::model::{Clip, Project, Source};
+use crate::nest::Instance;
 use crate::time::{self, Ticks, TIMESCALE};
 
 /// First video and first audio composition track id. Small, stable
@@ -40,8 +48,17 @@ use crate::time::{self, Ticks, TIMESCALE};
 /// number (spec §7.2). The two ranges are far enough apart that a video and
 /// an audio track can never collide, and an id read out of a plan is
 /// self-describing in a log.
+///
+/// The audio range starts at 1001 and not the 101 of M1: two composition
+/// tracks per timeline track was the ceiling only while every clip was its
+/// own layer, and a nest contributes its own tracks on top of the timeline's.
+/// The cap that bounds both is `MAX_TRACKS` = 64 counted across the timeline
+/// AND every nest (`format::check_caps`), so at most 128 video ids can ever
+/// be handed out — comfortably clear of 1001. A collision here would not be
+/// subtle: `CompositionBuilder.makeTrack` throws on a duplicate
+/// `preferredTrackID` rather than quietly renumbering.
 const FIRST_VIDEO_TRACK_ID: u32 = 1;
-const FIRST_AUDIO_TRACK_ID: u32 = 101;
+const FIRST_AUDIO_TRACK_ID: u32 = 1001;
 
 /// The decoder budget. More than eight video composition tracks feeding one
 /// instruction means eight simultaneous hardware decodes plus the
@@ -49,48 +66,19 @@ const FIRST_AUDIO_TRACK_ID: u32 = 101;
 /// failing, so this is a warning in the plan and not a refusal.
 const MAX_CONCURRENT_VIDEO_TRACKS: usize = 8;
 
-/// FNV-1a, 64-bit. A CACHE KEY, not a security digest: Swift keys its
-/// rendered text and shape textures by this hex string, so all that is
-/// asked of it is that the same description always produces the same key
-/// and that two different descriptions rarely collide. FNV is a dozen lines
-/// with no dependency, which is the whole reason it is here rather than a
-/// real hash crate.
-const FNV_OFFSET: u64 = 0xcbf2_9ce4_8422_2325;
-const FNV_PRIME: u64 = 0x0000_0100_0000_01b3;
-
-fn fnv1a(bytes: &[u8]) -> u64 {
-    let mut hash = FNV_OFFSET;
-    for byte in bytes {
-        hash ^= u64::from(*byte);
-        hash = hash.wrapping_mul(FNV_PRIME);
-    }
-    hash
-}
-
-/// The content hash of a rendered layer's description. Hashing the
-/// serialized `Value` is what makes it canonical: `serde_json` writes an
-/// object's keys in one fixed order, so two clips with identical text
-/// always hash the same and share one texture.
-fn content_hash(description: &Value) -> String {
-    format!("{:016x}", fnv1a(description.to_string().as_bytes()))
-}
-
 /// Serializes a plain data value, or `null` if it somehow cannot be — these
 /// are all `#[derive(Serialize)]` structs of numbers, so the fallback is
-/// unreachable, but nothing here may panic.
-fn json<T: Serialize>(value: &T) -> Value {
+/// unreachable, but nothing here may panic. Shared with `recipe.rs`, which
+/// publishes the same kinds of value under the same rule.
+pub(crate) fn json<T: Serialize>(value: &T) -> Value {
     serde_json::to_value(value).unwrap_or(Value::Null)
 }
 
 /// A float as JSON. `Value::from(f64)` turns a non-finite number into
 /// `null`, which would fail to decode as a `Double` on the Swift side, so a
 /// nonsense value becomes 0 and the frame still renders.
-fn number(value: f64) -> Value {
+pub(crate) fn number(value: f64) -> Value {
     Value::from(if value.is_finite() { value } else { 0.0 })
-}
-
-fn clip_end(clip: &Clip) -> Ticks {
-    clip.start.saturating_add(clip.duration)
 }
 
 // ---- the A/B assignment --------------------------------------------------
@@ -140,42 +128,86 @@ impl Segment {
 /// One composition track: an id Swift will use as `preferredTrackID`, and
 /// the non-overlapping segments on it, in start order.
 #[derive(Debug, Clone)]
-struct CompTrack {
+struct CompTrack<'a> {
     id: u32,
     segments: Vec<Segment>,
+    /// One per segment, in the same order, on an AUDIO track; empty on a
+    /// video track, which needs no envelope. A segment alone cannot say how
+    /// loud it is — a nested clip's props and its track are not reachable
+    /// from `Project` by id — so the envelope is computed from these
+    /// (`audio.rs`) rather than by looking the segments' clips back up.
+    voices: Vec<Voice<'a>>,
 }
 
 /// The whole assignment. `video_of` is the bridge to the recipe.
 #[derive(Debug, Clone, Default)]
-struct Assignment {
-    video: Vec<CompTrack>,
-    audio: Vec<CompTrack>,
-    /// clip id → video composition track id, for the recipe's `track`
-    /// sources. A `BTreeMap` rather than a `HashMap` so nothing about this
-    /// module can depend on a randomized iteration order.
-    video_of: BTreeMap<u32, u32>,
+pub(crate) struct Assignment<'a> {
+    video: Vec<CompTrack<'a>>,
+    audio: Vec<CompTrack<'a>>,
+    /// instance path → video composition track id, for the recipe's `track`
+    /// sources. Keyed by [`Instance::path`] and not by clip id, because two
+    /// clips may show the same nest and its contents then play at two places
+    /// on the timeline, on two different composition tracks. A `BTreeMap`
+    /// rather than a `HashMap` so nothing about this module can depend on a
+    /// randomized iteration order.
+    pub(crate) video_of: BTreeMap<Vec<u32>, u32>,
 }
 
-/// Places `segment` on the first track whose last segment ends at or before
-/// it, adding a track when none does — the A/B assignment of spec §7.2.
+/// Places `segment` (and, on an audio track, the `voice` that says how loud
+/// it is) on the first track whose last segment ends at or before it, adding
+/// a track when none does — the A/B assignment of spec §7.2 — and answers
+/// the id of the track it landed on.
+///
 /// With the overlap rule (§6: at most one neighbour per side, at most half
-/// the shorter clip) two tracks per timeline track is the most this can
-/// ever allocate.
-fn place(tracks: &mut Vec<CompTrack>, next_id: &mut u32, segment: Segment) {
+/// the shorter clip) two tracks per timeline track is the most a timeline
+/// clip can ever need. A nest clip is the exception: it stands for a whole
+/// stack, so it needs as many as the nest's own tracks do.
+fn place<'a>(
+    tracks: &mut Vec<CompTrack<'a>>,
+    next_id: &mut u32,
+    segment: Segment,
+    voice: Option<Voice<'a>>,
+) -> u32 {
     let free = tracks
         .iter()
         .position(|t| t.segments.last().is_none_or(|s| s.end() <= segment.start));
     match free.and_then(|i| tracks.get_mut(i)) {
-        Some(track) => track.segments.push(segment),
+        Some(track) => {
+            track.segments.push(segment);
+            track.voices.extend(voice);
+            track.id
+        }
         None => {
             let id = *next_id;
             *next_id = next_id.saturating_add(1);
             tracks.push(CompTrack {
                 id,
                 segments: vec![segment],
+                voices: voice.into_iter().collect(),
             });
+            id
         }
     }
+}
+
+/// The clip as the plan must see it: itself for a timeline clip, and a copy
+/// placed at project time — shortened if the nest clip showing it ended
+/// first — for a nested one.
+///
+/// Only the TAIL is ever cut, which is why there is no in-point arithmetic
+/// here. The timeline gives its clips no window, so a nest clip is never
+/// itself head-clipped, so its contents' first frames are never before the
+/// window it hands them; the same argument then holds one level down. Give
+/// `Source::Nest` an in point one day and this is where the `trim_start`
+/// arithmetic belongs.
+fn lifted<'a>(instance: &Instance<'a>) -> Cow<'a, Clip> {
+    if instance.start == instance.clip.start && instance.duration() == instance.clip.duration {
+        return Cow::Borrowed(instance.clip);
+    }
+    let mut clip = instance.clip.clone();
+    clip.start = instance.start;
+    clip.duration = instance.duration();
+    Cow::Owned(clip)
 }
 
 impl Project {
@@ -183,12 +215,13 @@ impl Project {
     /// track at all.
     ///
     /// Only `media` and `still` sources are DECODED: `image`, `text` and
-    /// `shape` layers are drawn by the compositor from the recipe, and a
-    /// clip whose media is missing has no file to insert — it draws a slate
-    /// instead (spec §7.3).
+    /// `shape` layers are drawn by the compositor from the recipe, a nest is
+    /// never seen here at all (the walk replaced it with its contents), and
+    /// a clip whose media is missing has no file to insert — it draws a
+    /// slate instead (spec §7.3).
     fn segment_of(&self, clip: &Clip) -> Option<Segment> {
         let (media_id, source_in, source_duration) = match &clip.source {
-            Source::Media { media, r#in } => {
+            Source::Media { media, r#in, .. } => {
                 let found = self.media(*media)?;
                 // Timeline duration times speed IS the source range: at 2x
                 // a 5 s clip consumes 10 s of source, and Swift scales the
@@ -253,11 +286,19 @@ impl Project {
 
     /// Every clip's place in the composition (spec §7.2's A/B assignment).
     ///
-    /// Timeline tracks are walked back to front and their clips in start
+    /// Timeline tracks are walked back to front and their instances in start
     /// order, and ids are handed out as tracks are needed, so the numbering
     /// is a pure function of the project — which is what lets Swift compare
     /// plan strings instead of diffing structures.
-    fn assign(&self) -> Assignment {
+    ///
+    /// Instances are sorted by start before they are placed, which the walk
+    /// alone does not guarantee: a nest hands its clips over one inner track
+    /// at a time, so a later track's early clip would otherwise find every
+    /// existing composition track occupied and be given one of its own.
+    /// Packing them in time order is not correctness — segments on a track
+    /// never overlap either way — it is decodes: an extra composition track
+    /// is an extra simultaneous decode for as long as it exists.
+    pub(crate) fn assign(&self) -> Assignment<'_> {
         let mut assignment = Assignment::default();
         let mut next_video = FIRST_VIDEO_TRACK_ID;
         let mut next_audio = FIRST_AUDIO_TRACK_ID;
@@ -265,15 +306,21 @@ impl Project {
         for track in &self.tracks {
             let mut video: Vec<CompTrack> = Vec::new();
             let mut audio: Vec<CompTrack> = Vec::new();
-            for clip in self.clips_on_track(track.id) {
-                let Some(segment) = self.segment_of(clip) else {
+            let mut instances = self.instances_on_track(track.id);
+            // Cached: the key is a heap-allocated path, and re-deriving it on
+            // every comparison would allocate through the whole sort.
+            instances.sort_by_cached_key(|i| (i.start, i.path()));
+            for instance in &instances {
+                let clip = lifted(instance);
+                let Some(segment) = self.segment_of(&clip) else {
                     continue;
                 };
                 let Some(media) = self.media(segment.media) else {
                     continue;
                 };
-                if media.has_video && clip.enabled.video && !track.hidden {
-                    place(&mut video, &mut next_video, segment);
+                if media.has_video && instance.shows_video() {
+                    let id = place(&mut video, &mut next_video, segment, None);
+                    assignment.video_of.insert(instance.path(), id);
                 }
                 // A `still` is a FROZEN PICTURE. Its segment is one source
                 // frame scaled across the whole clip (spec §7.2), which is
@@ -283,17 +330,17 @@ impl Project {
                 // makes, but `set_enabled` can put it back, so the
                 // exclusion belongs here — with the assignment — and not in
                 // the one op that happens to create stills.
-                let frozen = matches!(clip.source, Source::Still { .. });
+                let frozen = matches!(instance.clip.source, Source::Still { .. });
                 // A muted TRACK still contributes its audio segments: the
                 // mute is a zero envelope (audio.rs), so unmuting is a
                 // property edit and never rebuilds the composition.
-                if media.has_audio && clip.enabled.audio && !frozen {
-                    place(&mut audio, &mut next_audio, segment);
-                }
-            }
-            for comp in &video {
-                for segment in &comp.segments {
-                    assignment.video_of.insert(segment.clip, comp.id);
+                if media.has_audio && instance.plays_audio() && !frozen {
+                    place(
+                        &mut audio,
+                        &mut next_audio,
+                        segment,
+                        Some(Voice::of(instance)),
+                    );
                 }
             }
             assignment.video.extend(video);
@@ -302,29 +349,27 @@ impl Project {
         assignment
     }
 
-    /// Every clip that draws a layer, BACK TO FRONT: timeline track order
-    /// (index 0 first), and within a track by start (spec §7.3).
+    /// Every instance that draws a layer, BACK TO FRONT: timeline track
+    /// order (index 0 first), within a track by start, and a nest clip
+    /// replaced in place by its own stack walked the same way (spec §7.3).
     ///
     /// One list serves both the recipe's layers and the plan's instruction
     /// boundaries, so the two can never disagree about what is visible.
-    fn drawing_clips(&self) -> Vec<&Clip> {
-        let mut out: Vec<&Clip> = Vec::new();
-        for track in &self.tracks {
-            if track.hidden {
-                continue;
-            }
-            for clip in self.clips_on_track(track.id) {
-                if clip.enabled.video && self.draws(clip) {
-                    out.push(clip);
-                }
-            }
-        }
+    pub(crate) fn drawing_instances(&self) -> Vec<Instance<'_>> {
+        let mut out = self.all_instances();
+        out.retain(|i| i.shows_video() && self.draws(i.clip));
         out
     }
 
     /// Whether the clip's SOURCE puts anything on the canvas. A missing
     /// media draws a slate, so it counts; an audio-only file used as a
-    /// media clip does not; a nested project is M3 and draws nothing yet.
+    /// media clip does not.
+    ///
+    /// A nest never reaches here as an instance — the walk replaced it with
+    /// what is inside it — so that arm only answers for a nest clip whose
+    /// nest id is dangling, which `validate` refuses and which draws
+    /// nothing rather than a slate: the slate says "this file is missing",
+    /// and no file is involved.
     fn draws(&self, clip: &Clip) -> bool {
         match &clip.source {
             Source::Media { media, .. } | Source::Still { media, .. } => {
@@ -372,27 +417,32 @@ impl Project {
             })
             .collect();
 
+        // Ducking is a property of the whole project, so the duckers are
+        // gathered once from the flattened timeline rather than per track:
+        // `audio_ramps` drops the ones that are its own track's segments.
+        let duckers: Vec<Ducker> = self.duckers(&self.all_instances());
         let audio_tracks: Vec<Value> = assignment
             .audio
             .iter()
             .map(|track| {
-                // The envelope is computed from the clips, not the
-                // segments: fades, actions and ducking all live in the
-                // model, and audio.rs owns every one of them.
-                let clips: Vec<&Clip> = track
-                    .segments
-                    .iter()
-                    .filter_map(|s| self.clip(s.clip))
-                    .collect();
                 let mut out = Map::new();
                 out.insert("id".to_string(), Value::from(track.id));
                 out.insert(
                     "segments".to_string(),
                     Value::Array(track.segments.iter().map(|s| s.to_json(true)).collect()),
                 );
+                // The envelope is computed from the voices, not the
+                // segments: fades, actions, mute and ducking all live in the
+                // model, audio.rs owns every one of them, and a nested
+                // segment's clip cannot be looked back up by id.
                 out.insert(
                     "ramps".to_string(),
-                    Value::Array(self.audio_ramps(&clips).iter().map(json).collect()),
+                    Value::Array(
+                        self.audio_ramps(&track.voices, &duckers)
+                            .iter()
+                            .map(json)
+                            .collect(),
+                    ),
                 );
                 Value::Object(out)
             })
@@ -458,19 +508,17 @@ impl Project {
             return Vec::new();
         }
 
-        // The visible clips are gathered ONCE — the per-span test below
+        // The visible instances are gathered ONCE — the per-span test below
         // re-reads this small list rather than re-walking the project's
-        // tracks and clips for every boundary.
+        // tracks and clips for every boundary. An INSTANCE's edges, not a
+        // clip's: a clip inside a nest starts where the nest clip puts it
+        // and ends where the nest clip cuts it off, and a boundary missed
+        // here is a span whose first tick disagrees with the rest of it —
+        // the one invariant the tiling rests on.
         let visible: Vec<(Ticks, Ticks, Option<u32>)> = self
-            .drawing_clips()
+            .drawing_instances()
             .iter()
-            .map(|c| {
-                (
-                    c.start,
-                    clip_end(c),
-                    assignment.video_of.get(&c.id).copied(),
-                )
-            })
+            .map(|i| (i.start, i.end, assignment.video_of.get(&i.path()).copied()))
             .collect();
 
         let mut bounds: Vec<Ticks> = vec![0, duration];
@@ -534,177 +582,4 @@ fn warnings_for(instructions: &[Instruction]) -> Vec<String> {
         }
     }
     warnings
-}
-
-// ---- the frame recipe ----------------------------------------------------
-
-impl Project {
-    /// The frame recipe at project time `t` (spec §7.3): the back-to-front
-    /// layer list, every property already resolved through actions.
-    ///
-    /// A layer appears when `t` is inside `[start, start + duration)` — the
-    /// half-open range that makes a cut show exactly one clip on the frame
-    /// they share — its track is not hidden, and `enabled.video` is set.
-    /// During a transition both clips are present and adjacent, each
-    /// carrying the same kind and progress with opposite roles, because
-    /// they are neighbours on one track and the layer list keeps track
-    /// order.
-    ///
-    /// Total: `t` may be negative or past the end, and either simply
-    /// produces no layers.
-    pub fn frame_recipe(&self, t: Ticks) -> Value {
-        let assignment = self.assign();
-
-        let layers: Vec<Value> = self
-            .drawing_clips()
-            .into_iter()
-            .filter(|c| c.start <= t && t < clip_end(c))
-            .map(|clip| self.layer(clip, t, &assignment))
-            .collect();
-
-        let mut canvas = Map::new();
-        canvas.insert("width".to_string(), Value::from(self.canvas.width));
-        canvas.insert("height".to_string(), Value::from(self.canvas.height));
-        canvas.insert(
-            "background".to_string(),
-            Value::Array(self.canvas.background.iter().map(|c| number(*c)).collect()),
-        );
-
-        let mut out = Map::new();
-        out.insert("t".to_string(), Value::from(t));
-        out.insert("canvas".to_string(), Value::Object(canvas));
-        out.insert("layers".to_string(), Value::Array(layers));
-        Value::Object(out)
-    }
-
-    /// One layer of the recipe.
-    fn layer(&self, clip: &Clip, t: Ticks, assignment: &Assignment) -> Value {
-        // Clip time: 0 is the clip's first frame, which is what actions are
-        // measured in (spec §5.4).
-        let evaluated = self.evaluate_clip(clip, t.saturating_sub(clip.start));
-        let video = &evaluated.video;
-        let (source, source_size) = self.layer_source(clip, &evaluated, assignment);
-
-        let transition = match self.transition_at(clip.id, t) {
-            Some((kind, progress, incoming, partner)) => {
-                let mut entry = Map::new();
-                entry.insert("kind".to_string(), json(&kind));
-                entry.insert("progress".to_string(), number(progress));
-                entry.insert(
-                    "role".to_string(),
-                    Value::from(if incoming { "in" } else { "out" }),
-                );
-                entry.insert("partner".to_string(), Value::from(partner));
-                Value::Object(entry)
-            }
-            None => Value::Null,
-        };
-
-        let mut out = Map::new();
-        out.insert("clip".to_string(), Value::from(clip.id));
-        out.insert("source".to_string(), source);
-        out.insert("source_size".to_string(), source_size);
-        out.insert("crop".to_string(), json(&video.crop));
-        out.insert("x".to_string(), number(video.x));
-        out.insert("y".to_string(), number(video.y));
-        out.insert("scale".to_string(), number(video.scale));
-        out.insert("rotation".to_string(), number(video.rotation));
-        out.insert("opacity".to_string(), number(video.opacity));
-        out.insert("corner_radius".to_string(), number(video.corner_radius));
-        out.insert("shadow".to_string(), json(&video.shadow));
-        out.insert("color".to_string(), json(&video.color));
-        out.insert("chroma".to_string(), json(&video.chroma));
-        out.insert("transition".to_string(), transition);
-        Value::Object(out)
-    }
-
-    /// A layer's `source` and `source_size`.
-    ///
-    /// `track` means "sample composition video track N", the id the plan
-    /// gave this clip; `image` means "decode this media with ImageIO";
-    /// `text` and `shape` carry the resolved description plus the content
-    /// hash Swift caches the rendered texture by; `missing` is the slate
-    /// (spec §7.3).
-    ///
-    /// **The `missing` arms are defensive, not a feature path.** They fire
-    /// for a clip whose media id is not in `media[]`, and
-    /// [`Project::validate`] refuses exactly that, so no project the FFI
-    /// can hand out reaches them. Spec §5.6's missing media is the FILE
-    /// being gone with the `media[]` entry intact — the core has no
-    /// filesystem, so it cannot see that; Swift substitutes the same
-    /// `missing` source when an asset fails to load. Keeping these arms
-    /// means one vocabulary for the slate rather than two, and means a
-    /// future reader that tolerates a dangling id renders instead of
-    /// panicking.
-    fn layer_source(
-        &self,
-        clip: &Clip,
-        evaluated: &Evaluated,
-        assignment: &Assignment,
-    ) -> (Value, Value) {
-        let media_size = |media: u32| -> Value {
-            match self.media(media) {
-                Some(m) => Value::Array(vec![Value::from(m.width), Value::from(m.height)]),
-                None => Value::Null,
-            }
-        };
-
-        match &clip.source {
-            Source::Media { media, .. } | Source::Still { media, .. } => {
-                match assignment.video_of.get(&clip.id) {
-                    Some(track_id) => {
-                        let mut source = Map::new();
-                        source.insert("kind".to_string(), Value::from("track"));
-                        source.insert("track_id".to_string(), Value::from(*track_id));
-                        (Value::Object(source), media_size(*media))
-                    }
-                    // Reachable only for media the project does not have:
-                    // `drawing_clips` already dropped the clips whose media
-                    // exists but carries no video.
-                    None => (missing_source(), Value::Null),
-                }
-            }
-            Source::Image { media } => {
-                if self.is_missing_media(*media) {
-                    return (missing_source(), Value::Null);
-                }
-                let mut source = Map::new();
-                source.insert("kind".to_string(), Value::from("image"));
-                source.insert("media".to_string(), Value::from(*media));
-                (Value::Object(source), media_size(*media))
-            }
-            Source::Text => {
-                // A text clip with no description is malformed rather than
-                // impossible; the defaults keep the recipe renderable.
-                let text = evaluated.text.clone().unwrap_or_default();
-                let description = json(&text);
-                let mut source = Map::new();
-                source.insert("kind".to_string(), Value::from("text"));
-                source.insert("hash".to_string(), Value::from(content_hash(&description)));
-                source.insert("text".to_string(), description);
-                // Only the platform can lay text out, so the model has no
-                // size to report (spec §5.3, §11).
-                (Value::Object(source), Value::Null)
-            }
-            Source::Shape => {
-                let shape = evaluated.shape.clone().unwrap_or_default();
-                let description = json(&shape);
-                let mut source = Map::new();
-                source.insert("kind".to_string(), Value::from("shape"));
-                source.insert("hash".to_string(), Value::from(content_hash(&description)));
-                source.insert("shape".to_string(), description);
-                let size = Value::Array(vec![number(shape.width), number(shape.height)]);
-                (Value::Object(source), size)
-            }
-            // Nesting is M3; `drawing_clips` filters these out, so this arm
-            // exists only to keep the match exhaustive.
-            Source::Nest { .. } => (missing_source(), Value::Null),
-        }
-    }
-}
-
-fn missing_source() -> Value {
-    let mut source = Map::new();
-    source.insert("kind".to_string(), Value::from("missing"));
-    Value::Object(source)
 }

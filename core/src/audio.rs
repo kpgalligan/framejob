@@ -30,10 +30,24 @@
 //!
 //! Nothing here edits, and nothing here touches a sample: this is a
 //! description of a gain curve, computed from the model alone.
+//!
+//! ### Nested sound
+//!
+//! What plays is not always a clip of `Project::clips`: a clip inside a nest
+//! gets its own segment on a composition track (`nest.rs`), and neither its
+//! props nor its track can be found by id in the project. So the envelope is
+//! computed from [`Voice`]s rather than from clips — a voice being one
+//! audible span plus every clip whose gain shapes it, innermost first. A
+//! nested voice carries its own clip AND each nest clip it is inside,
+//! because a nest clip's volume, fades, mute and muted track apply to
+//! everything within: the stages MULTIPLY. That is what turning a nest down
+//! means, and it is why the old shape — a list of `&Clip` looked up in the
+//! project — could only ever have given nested audio full gain.
 
 use serde::Serialize;
 
 use crate::model::{AudioProps, Clip, Duck, Project};
+use crate::nest::Instance;
 use crate::time::{Ticks, TIMESCALE};
 
 /// One straight-line piece of an envelope: `from` at `start`, reaching `to`
@@ -93,18 +107,80 @@ fn covers(start: Ticks, end: Ticks, t: Ticks, side: Side) -> bool {
     }
 }
 
-fn clip_end(clip: &Clip) -> Ticks {
-    clip.start.saturating_add(clip.duration)
-}
-
 /// A clip elsewhere in the project that pushes this track down while it
 /// plays. Ducking is by clip EXTENT, not by voice activity (spec §11), so
 /// this is all the ducker's audio needed to compute the gain.
+///
+/// `clip` is carried so a track can drop the duckers that are its OWN
+/// segments; the span is project time, which for a nested ducker is the part
+/// of it the nest clip lets through.
 #[derive(Debug, Clone, Copy)]
-struct Ducker {
+pub struct Ducker {
+    clip: u32,
     start: Ticks,
     end: Ticks,
     duck: Duck,
+}
+
+/// One audible span on a composition audio track, and every clip whose gain
+/// shapes it.
+///
+/// The stages are innermost first: the clip that plays, then each nest clip
+/// it is inside, outward. Their gains multiply (see the module doc). A
+/// top-level clip is one stage, which is the whole of the pre-nest
+/// behaviour.
+#[derive(Debug, Clone)]
+pub struct Voice<'a> {
+    /// The span in PROJECT time, already clipped to every nest clip above.
+    start: Ticks,
+    end: Ticks,
+    stages: Vec<Stage<'a>>,
+}
+
+/// One clip's contribution to a voice's gain.
+#[derive(Debug, Clone, Copy)]
+struct Stage<'a> {
+    clip: &'a Clip,
+    /// Project time of this clip's FIRST FRAME — where its fades, its
+    /// actions and its duration are measured from. Deliberately not the
+    /// voice's `start`: a nest clip that cuts an inner clip's head off does
+    /// not drag the inner clip's fade-in along with it.
+    origin: Ticks,
+    /// Whether the track this clip sits on — the nest's, inside one — is
+    /// muted. Read here because a nested clip's track is not in
+    /// `Project::tracks` and cannot be looked up by id.
+    track_muted: bool,
+}
+
+impl<'a> Voice<'a> {
+    /// The voice one flattened clip sings: itself, then the nest clips it is
+    /// inside, outward.
+    pub(crate) fn of(instance: &Instance<'a>) -> Voice<'a> {
+        let mut stages = Vec::with_capacity(instance.inside.len().saturating_add(1));
+        stages.push(Stage {
+            clip: instance.clip,
+            origin: instance.origin,
+            track_muted: instance.track.muted,
+        });
+        for enclosing in instance.inside.iter().rev() {
+            stages.push(Stage {
+                clip: enclosing.clip,
+                origin: enclosing.origin,
+                track_muted: enclosing.track.muted,
+            });
+        }
+        Voice {
+            start: instance.start,
+            end: instance.end,
+            stages,
+        }
+    }
+
+    /// The id of the clip that plays — the innermost stage. A voice always
+    /// has one; the 0 is unreachable and is there so nothing here can panic.
+    fn clip_id(&self) -> u32 {
+        self.stages.first().map(|s| s.clip.id).unwrap_or(0)
+    }
 }
 
 /// The ducker's multiplier at `t`.
@@ -212,31 +288,29 @@ fn joins(a: &Ramp, b: &Ramp) -> bool {
 }
 
 impl Project {
-    /// The volume envelope for ONE composition audio track: the clips in
-    /// `comp_track_clips` are its segments (spec §7.2's A/B assignment
-    /// guarantees they do not overlap).
+    /// The volume envelope for ONE composition audio track: `voices` are its
+    /// segments (spec §7.2's A/B assignment guarantees they do not overlap),
+    /// and `duckers` is every ducking clip in the project — this track's own
+    /// are dropped here rather than by the caller.
     ///
     /// The returned ramps are in start order and tile the track's whole
-    /// extent — first clip start to last clip end — with no gaps, so Swift
+    /// extent — first voice start to last voice end — with no gaps, so Swift
     /// can walk them straight into `setVolumeRamp(fromStartVolume:…)`
     /// without inventing anything in between. An empty input is an empty
     /// envelope.
     ///
     /// Folded in, in this order: the clip's `volume`; its fades; its volume
-    /// actions; then ducking from every OTHER clip in the project whose
-    /// `audio.duck` is set, multiplied over the whole thing. A clip that is
-    /// silenced — `enabled.audio` false, `audio.muted`, or a muted track —
+    /// actions; the same three for every nest clip it is inside; then
+    /// ducking from every OTHER clip in the project whose `audio.duck` is
+    /// set, multiplied over the whole thing. A clip that is silenced —
+    /// `enabled.audio` false, `audio.muted`, or a muted track, at any level —
     /// contributes 0 over its extent, and so does a gap.
-    pub fn audio_ramps(&self, comp_track_clips: &[&Clip]) -> Vec<Ramp> {
-        let mut clips: Vec<&Clip> = comp_track_clips
-            .iter()
-            .copied()
-            .filter(|c| c.duration > 0)
-            .collect();
-        clips.sort_by_key(|c| (c.start, c.id));
+    pub fn audio_ramps(&self, voices: &[Voice<'_>], duckers: &[Ducker]) -> Vec<Ramp> {
+        let mut own: Vec<&Voice> = voices.iter().filter(|v| v.end > v.start).collect();
+        own.sort_by_key(|v| (v.start, v.clip_id()));
         let (Some(extent_start), Some(extent_end)) = (
-            clips.iter().map(|c| c.start).min(),
-            clips.iter().map(|c| clip_end(c)).max(),
+            own.iter().map(|v| v.start).min(),
+            own.iter().map(|v| v.end).max(),
         ) else {
             return Vec::new();
         };
@@ -244,8 +318,15 @@ impl Project {
             return Vec::new();
         }
 
-        let duckers = self.duckers(&clips);
-        let breaks = self.breakpoints(&clips, &duckers, extent_start, extent_end);
+        // A clip does not duck the track it plays on: ducking exists to
+        // lower the OTHER material, and a segment ducking its own neighbours
+        // on one composition track would be a feedback loop with no
+        // user-visible cause.
+        let others: Vec<&Ducker> = duckers
+            .iter()
+            .filter(|d| !own.iter().any(|v| v.clip_id() == d.clip))
+            .collect();
+        let breaks = self.breakpoints(&own, &others, extent_start, extent_end);
 
         let mut ramps: Vec<Ramp> = Vec::with_capacity(breaks.len());
         for pair in breaks.windows(2) {
@@ -258,83 +339,99 @@ impl Project {
             ramps.push(Ramp {
                 start: a,
                 duration: b.saturating_sub(a),
-                from: self.gain_at(&clips, &duckers, a, Side::Right),
-                to: self.gain_at(&clips, &duckers, b, Side::Left),
+                from: self.gain_at(&own, &others, a, Side::Right),
+                to: self.gain_at(&own, &others, b, Side::Left),
             });
         }
         coalesce(ramps)
     }
 
-    /// Every clip whose `audio.duck` is set that is NOT one of this
-    /// composition track's own segments. A clip does not duck the track it
-    /// plays on: ducking exists to lower the OTHER material, and a segment
-    /// ducking its own neighbours on one composition track would be a
-    /// feedback loop with no user-visible cause.
+    /// Every ducking clip in the project, with the span it ducks over.
+    ///
+    /// Computed once per plan from the flattened timeline, so a duck set
+    /// INSIDE a nest ducks over the part of it that plays, and a duck on the
+    /// nest clip itself ducks over the whole nest. A clip appears at most
+    /// once even when several instances name it — a nest shown twice ducks
+    /// over the first span it was found at, which is a corner no UI can
+    /// reach and not worth a second entry that would duck twice.
     ///
     /// The duck is read from the base props, not through actions: the ramp
     /// lengths describe an envelope, and an envelope whose own attack time
     /// animates is not a version-1 feature.
-    fn duckers(&self, own: &[&Clip]) -> Vec<Ducker> {
-        self.clips
-            .iter()
-            .filter(|c| !own.iter().any(|o| o.id == c.id))
-            .filter_map(|c| {
-                c.audio.and_then(|a| a.duck).map(|duck| Ducker {
-                    start: c.start,
-                    end: clip_end(c),
-                    duck,
-                })
-            })
-            .collect()
+    pub(crate) fn duckers(&self, instances: &[Instance<'_>]) -> Vec<Ducker> {
+        let mut out: Vec<Ducker> = Vec::new();
+        for instance in instances {
+            for (clip, start, end) in instance.chain() {
+                if out.iter().any(|d| d.clip == clip.id) {
+                    continue;
+                }
+                if let Some(duck) = clip.audio.and_then(|a| a.duck) {
+                    out.push(Ducker {
+                        clip: clip.id,
+                        start,
+                        end,
+                        duck,
+                    });
+                }
+            }
+        }
+        out
     }
 
     /// The ticks the envelope is sampled at: the ends of the extent, every
-    /// clip and fade edge, every duck edge, and a 1/30 s grid inside each
-    /// action that touches the audio group. Sorted, deduplicated, and
-    /// clipped to the extent, so the ramps built from consecutive entries
-    /// tile it exactly.
+    /// voice edge, every fade edge of every stage, every duck edge, and a
+    /// 1/30 s grid inside each action that touches the audio group. Sorted,
+    /// deduplicated, and clipped to the extent, so the ramps built from
+    /// consecutive entries tile it exactly.
     fn breakpoints(
         &self,
-        clips: &[&Clip],
-        duckers: &[Ducker],
+        voices: &[&Voice<'_>],
+        duckers: &[&Ducker],
         extent_start: Ticks,
         extent_end: Ticks,
     ) -> Vec<Ticks> {
         let mut breaks: Vec<Ticks> = vec![extent_start, extent_end];
 
-        for clip in clips {
-            let end = clip_end(clip);
-            breaks.push(clip.start);
-            breaks.push(end);
-            // Fades come from the base props. If an action animates a fade
-            // length the action's own samples below carry the change; the
-            // fade edges are only a promise that the two obvious corners
-            // are breakpoints.
-            let props = clip.audio.unwrap_or_default();
-            if props.fade_in > 0 {
-                breaks.push(clip.start.saturating_add(props.fade_in));
-            }
-            if props.fade_out > 0 {
-                breaks.push(end.saturating_sub(props.fade_out));
-            }
-
-            for action in &clip.actions {
-                // Only the audio group can move the envelope: an action
-                // interpolates the whole state toward its patch, so a patch
-                // that never mentions `audio` leaves the gain exactly
-                // constant across its span and needs no samples.
-                if action.duration <= 0 || action.end.get("audio").is_none() {
-                    continue;
-                }
-                let start = clip.start.saturating_add(action.start);
-                let end = start.saturating_add(action.duration);
-                breaks.push(start);
+        for voice in voices {
+            // The voice's own edges, which for a nested clip are the nest
+            // clip's edges as much as its own.
+            breaks.push(voice.start);
+            breaks.push(voice.end);
+            for stage in &voice.stages {
+                let clip = stage.clip;
+                let end = stage.origin.saturating_add(clip.duration);
+                breaks.push(stage.origin);
                 breaks.push(end);
-                let step = ACTION_SAMPLE.max(action.duration / MAX_ACTION_SAMPLES + 1);
-                let mut t = start.saturating_add(step);
-                while t < end {
-                    breaks.push(t);
-                    t = t.saturating_add(step);
+                // Fades come from the base props. If an action animates a
+                // fade length the action's own samples below carry the
+                // change; the fade edges are only a promise that the two
+                // obvious corners are breakpoints.
+                let props = clip.audio.unwrap_or_default();
+                if props.fade_in > 0 {
+                    breaks.push(stage.origin.saturating_add(props.fade_in));
+                }
+                if props.fade_out > 0 {
+                    breaks.push(end.saturating_sub(props.fade_out));
+                }
+
+                for action in &clip.actions {
+                    // Only the audio group can move the envelope: an action
+                    // interpolates the whole state toward its patch, so a
+                    // patch that never mentions `audio` leaves the gain
+                    // exactly constant across its span and needs no samples.
+                    if action.duration <= 0 || action.end.get("audio").is_none() {
+                        continue;
+                    }
+                    let start = stage.origin.saturating_add(action.start);
+                    let end = start.saturating_add(action.duration);
+                    breaks.push(start);
+                    breaks.push(end);
+                    let step = ACTION_SAMPLE.max(action.duration / MAX_ACTION_SAMPLES + 1);
+                    let mut t = start.saturating_add(step);
+                    while t < end {
+                        breaks.push(t);
+                        t = t.saturating_add(step);
+                    }
                 }
             }
         }
@@ -354,15 +451,15 @@ impl Project {
 
     /// The whole track's gain at one instant: the covering segment's own
     /// gain (0 in a gap) times every ducker's multiplier.
-    fn gain_at(&self, clips: &[&Clip], duckers: &[Ducker], t: Ticks, side: Side) -> f64 {
+    fn gain_at(&self, voices: &[&Voice<'_>], duckers: &[&Ducker], t: Ticks, side: Side) -> f64 {
         // Segments on one composition track never overlap, so the first
-        // covering clip is the only one; `find` on the start-ordered list
+        // covering voice is the only one; `find` on the start-ordered list
         // keeps a hand-written overlap deterministic rather than summing
         // two clips into a gain nobody asked for.
-        let mut gain = clips
+        let mut gain = voices
             .iter()
-            .find(|c| covers(c.start, clip_end(c), t, side))
-            .map(|c| self.clip_gain(c, t))
+            .find(|v| covers(v.start, v.end, t, side))
+            .map(|v| self.voice_gain(v, t))
             .unwrap_or(0.0);
         for ducker in duckers {
             gain *= duck_gain(ducker, t, side);
@@ -370,20 +467,36 @@ impl Project {
         gain
     }
 
+    /// One voice's gain: its clip's own, times that of every nest clip it is
+    /// inside. Turning a nest down turns everything in it down, and muting
+    /// one silences everything in it — which falls out of the product rather
+    /// than needing a rule of its own.
+    fn voice_gain(&self, voice: &Voice<'_>, t: Ticks) -> f64 {
+        let mut gain = 1.0;
+        for stage in &voice.stages {
+            if gain == 0.0 {
+                break;
+            }
+            gain *= self.stage_gain(stage, t);
+        }
+        gain
+    }
+
     /// One clip's own gain at project time `t`: its evaluated volume shaped
     /// by its fades, or 0 if it is silenced.
-    fn clip_gain(&self, clip: &Clip, t: Ticks) -> f64 {
+    fn stage_gain(&self, stage: &Stage<'_>, t: Ticks) -> f64 {
+        let clip = stage.clip;
         if !clip.enabled.audio {
             return 0.0;
         }
         // A muted TRACK still gets its segments in the composition — the
         // plan does not change when the user unmutes (spec §7.2) — so the
         // mute has to show up here, as a zero envelope.
-        if self.track(clip.track).is_some_and(|t| t.muted) {
+        if stage.track_muted {
             return 0.0;
         }
 
-        let clip_t = t.saturating_sub(clip.start);
+        let clip_t = t.saturating_sub(stage.origin);
         let props = self.audio_props_at(clip, clip_t);
         if props.muted {
             return 0.0;

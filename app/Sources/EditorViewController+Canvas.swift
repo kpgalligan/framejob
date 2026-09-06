@@ -64,6 +64,11 @@ extension EditorViewController {
         canvas.update(
             project: document.project, selection: document.selection,
             playhead: document.playhead)
+        // Selection travels on this same channel (`viewStateDidChange`), and
+        // an armed eyedropper is armed for particular clips
+        // (EditorViewController+Eyedropper.swift), so this is where it learns
+        // that what it was aimed at is no longer selected.
+        syncChromaEyedropper()
     }
 
     /// Places the canvas rectangle. Called from the base file's

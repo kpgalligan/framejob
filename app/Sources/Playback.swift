@@ -54,7 +54,12 @@ final class Playback {
     private var built: BuiltComposition?
     /// The plan the CURRENT item was built from; nil before the first build.
     private(set) var builtPlanJSON: String?
-    private var pending: (plan: CompositionPlan, planJSON: String, urls: [UInt32: URL])?
+    /// The sample-level audio settings the CURRENT item's taps were built
+    /// with. The second half of the rebuild test — see `update`.
+    private var builtAudioDSP = AudioDSPParameters.empty
+    private var pending: (
+        plan: CompositionPlan, planJSON: String, urls: [UInt32: URL], audioDSP: AudioDSPParameters
+    )?
     private var debounceTimer: Timer?
     /// Bumped per rebuild so a slow build that finishes after a newer one
     /// started is discarded instead of replacing a fresher item.
@@ -109,6 +114,11 @@ final class Playback {
         player.replaceCurrentItem(with: nil)
         built = nil
         builtPlanJSON = nil
+        builtAudioDSP = .empty
+        // The audio-DSP mirror is this object's to release, unlike the
+        // `RecipeSource` slot, which is the document's (it outlives the
+        // window and an export may still be reading it).
+        AudioDSPSource.shared.unpublish(recipeKey)
     }
 
     // MARK: - The update rule (§7.6)
@@ -125,12 +135,24 @@ final class Playback {
     ///    `liveRebuildDelay`; the non-live update that ends the gesture
     ///    always rebuilds.
     ///
+    /// **The audio DSP counts as structural too**, which is the one addition
+    /// to that rule. Pan, the compressor and noise reduction are the only
+    /// clip properties the compositor cannot express, so unlike every other
+    /// property they are not picked up by re-reading `RecipeSource`: they are
+    /// frozen into the composition's taps when it is built (`AudioTap.swift`).
+    /// That is not a special case so much as the case volume is already in —
+    /// volume reaches AVFoundation as the plan's ramps, so changing it has
+    /// always rebuilt — and it costs one rebuild per parameter change,
+    /// debounced during a drag like any other.
+    ///
     /// Main thread only — it schedules a run-loop timer and touches AppKit's
     /// player.
     func update(project: ReelProject, urls: [UInt32: URL], isLive: Bool) {
         RecipeSource.shared.set(project, for: recipeKey)
+        let audioDSP = AudioDSPParameters(snapshot: project.snapshot)
+        AudioDSPSource.shared.publish(audioDSP, for: recipeKey)
         let planJSON = project.planJSON
-        if planJSON == builtPlanJSON {
+        if planJSON == builtPlanJSON, audioDSP == builtAudioDSP {
             // Any rebuild still queued was for a plan this edit just undid.
             debounceTimer?.invalidate()
             debounceTimer = nil
@@ -139,7 +161,7 @@ final class Playback {
             return
         }
         guard let plan = project.plan else { return }
-        pending = (plan: plan, planJSON: planJSON, urls: urls)
+        pending = (plan: plan, planJSON: planJSON, urls: urls, audioDSP: audioDSP)
         if isLive {
             debounceTimer?.invalidate()
             debounceTimer = Timer.scheduledTimer(
@@ -180,6 +202,7 @@ final class Playback {
         guard !request.plan.videoTracks.isEmpty || !request.plan.audioTracks.isEmpty else {
             built = nil
             builtPlanJSON = request.planJSON
+            builtAudioDSP = request.audioDSP
             player.replaceCurrentItem(with: nil)
             return
         }
@@ -190,19 +213,21 @@ final class Playback {
         let plan = request.plan
         let planJSON = request.planJSON
         let urls = request.urls
+        let audioDSP = request.audioDSP
         rebuildQueue.async { [weak self] in
             let result = Result {
                 try CompositionBuilder.build(
                     plan: plan, planJSON: planJSON, urls: urls, recipeKey: key)
             }
             DispatchQueue.main.async { [weak self] in
-                self?.finishRebuild(result, generation: generation)
+                self?.finishRebuild(result, generation: generation, audioDSP: audioDSP)
             }
         }
     }
 
     private func finishRebuild(
-        _ result: Result<BuiltComposition, any Error>, generation: Int
+        _ result: Result<BuiltComposition, any Error>, generation: Int,
+        audioDSP: AudioDSPParameters
     ) {
         // A newer rebuild started while this one was on the queue: its result
         // is the current one, and this item would be a step backwards.
@@ -225,6 +250,7 @@ final class Playback {
             item.seekingWaitsForVideoCompositionRendering = true
             built = composition
             builtPlanJSON = composition.planJSON
+            builtAudioDSP = audioDSP
             isSeeking = false
             pendingSeek = nil
             player.replaceCurrentItem(with: item)

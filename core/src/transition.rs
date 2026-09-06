@@ -18,8 +18,17 @@
 //!
 //! Clips never push each other (spec §11): a placement that breaks the rule
 //! is refused, never repaired.
+//!
+//! Two clips overlapping inside a NEST are a transition on exactly the same
+//! terms — the group was made out of clips that already had one — so the
+//! three read-only halves of this module ([`overlap_before_of`],
+//! [`overlap_after_of`], [`transition_among`]) take the container's clips as
+//! a slice rather than reading `Project::clips`, and the `Project` methods
+//! are the timeline's spelling of them. The rule itself stays a `Project`
+//! method: nothing edits inside a nest except `nest` and `unnest`, and both
+//! check the TIMELINE they are moving clips on to.
 
-use crate::model::{Clip, Project, TransitionKind};
+use crate::model::{clips_on, Clip, Project, TransitionKind};
 use crate::time::Ticks;
 
 /// One overlap: `earlier` starts first, `later` is the clip whose
@@ -77,6 +86,51 @@ fn kind_of(later: &Clip) -> TransitionKind {
     later.transition_in.map(|t| t.kind).unwrap_or_default()
 }
 
+/// The overlap between `clip` and its predecessor among `clips` — one
+/// container's clips, the timeline's or a nest's. `None` for an unknown
+/// clip, the first clip on its track, or a plain cut.
+pub(crate) fn overlap_before_of(clips: &[Clip], clip: u32) -> Option<Overlap> {
+    let target = clips.iter().find(|c| c.id == clip)?;
+    let ordered = clips_on(clips, target.track);
+    let index = ordered.iter().position(|c| c.id == clip)?;
+    let previous = ordered.get(index.checked_sub(1)?)?;
+    overlap_of(previous, target)
+}
+
+/// The overlap between `clip` and its successor among `clips` — the one the
+/// SUCCESSOR's `transition_in` describes.
+pub(crate) fn overlap_after_of(clips: &[Clip], clip: u32) -> Option<Overlap> {
+    let target = clips.iter().find(|c| c.id == clip)?;
+    let ordered = clips_on(clips, target.track);
+    let index = ordered.iter().position(|c| c.id == clip)?;
+    let next = ordered.get(index.checked_add(1)?)?;
+    overlap_of(target, next)
+}
+
+/// The transition `clip` is playing at `t`, among the clips of its own
+/// container — [`Project::transition_at`]'s implementation, and the one a
+/// nested clip is evaluated with (at NEST time, not project time).
+pub(crate) fn transition_among(
+    clips: &[Clip],
+    clip: u32,
+    t: Ticks,
+) -> Option<(TransitionKind, f64, bool, u32)> {
+    let target = clips.iter().find(|c| c.id == clip)?;
+    if let Some(overlap) = overlap_before_of(clips, clip) {
+        if let Some(progress) = progress_in(&overlap, t) {
+            // This clip is the later one, so it carries the kind.
+            return Some((kind_of(target), progress, true, overlap.earlier));
+        }
+    }
+    if let Some(overlap) = overlap_after_of(clips, clip) {
+        if let Some(progress) = progress_in(&overlap, t) {
+            let later = clips.iter().find(|c| c.id == overlap.later)?;
+            return Some((kind_of(later), progress, false, overlap.later));
+        }
+    }
+    None
+}
+
 impl Project {
     /// Every overlap on `track`, in time order.
     ///
@@ -102,22 +156,14 @@ impl Project {
     /// the one its own `transition_in` describes. `None` for an unknown
     /// clip, the first clip on a track, or a plain cut.
     pub fn overlap_before(&self, clip: u32) -> Option<Overlap> {
-        let target = self.clip(clip)?;
-        let ordered = self.clips_on_track(target.track);
-        let index = ordered.iter().position(|c| c.id == clip)?;
-        let previous = ordered.get(index.checked_sub(1)?)?;
-        overlap_of(previous, target)
+        overlap_before_of(&self.clips, clip)
     }
 
     /// The overlap between `clip` and its successor on the same track — the
     /// one the SUCCESSOR's `transition_in` describes. `None` for an unknown
     /// clip, the last clip on a track, or a plain cut.
     pub fn overlap_after(&self, clip: u32) -> Option<Overlap> {
-        let target = self.clip(clip)?;
-        let ordered = self.clips_on_track(target.track);
-        let index = ordered.iter().position(|c| c.id == clip)?;
-        let next = ordered.get(index.checked_add(1)?)?;
-        overlap_of(target, next)
+        overlap_after_of(&self.clips, clip)
     }
 
     /// The transition `clip` is playing at project time `t`, as
@@ -131,20 +177,7 @@ impl Project {
     ///
     /// `None` when `t` is a plain cut or ordinary body of the clip.
     pub fn transition_at(&self, clip: u32, t: Ticks) -> Option<(TransitionKind, f64, bool, u32)> {
-        let target = self.clip(clip)?;
-        if let Some(overlap) = self.overlap_before(clip) {
-            if let Some(progress) = progress_in(&overlap, t) {
-                // This clip is the later one, so it carries the kind.
-                return Some((kind_of(target), progress, true, overlap.earlier));
-            }
-        }
-        if let Some(overlap) = self.overlap_after(clip) {
-            if let Some(progress) = progress_in(&overlap, t) {
-                let later = self.clip(overlap.later)?;
-                return Some((kind_of(later), progress, false, overlap.later));
-            }
-        }
-        None
+        transition_among(&self.clips, clip, t)
     }
 
     /// Checks the overlap rule against the state `track` would be left in.

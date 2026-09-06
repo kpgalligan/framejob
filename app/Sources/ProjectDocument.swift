@@ -17,6 +17,18 @@ extension Notification.Name {
     /// a full timeline reload) skip those and refresh once on the final
     /// `false` (app/CLAUDE.md, spec §7.6).
     static let projectDocumentDidChange = Notification.Name("ReelcutProjectDocumentDidChange")
+
+    /// Posted by `ProjectDocument` (object: the document) when the set of
+    /// pre-rendered reversed assets on disk changes — a render finished,
+    /// failed or was cancelled (`ReverseRenderer`).
+    ///
+    /// It needs a notification of its own because it is the one change the
+    /// §7.6 rebuild rule cannot see: reversal is not in the composition plan
+    /// (spec §11), so the plan string is identical before and after, and
+    /// `Playback` would keep playing the composition it already built —
+    /// slates and all. The editor answers this by dropping the item and
+    /// rebuilding.
+    static let reversedMediaDidChange = Notification.Name("ReelcutReversedMediaDidChange")
 }
 
 /// The document, and **the single mutation point**. Every edit in the app —
@@ -69,6 +81,11 @@ final class ProjectDocument: NSDocument {
 
     private static let projectFileName = "project.json"
     private static let cacheDirectoryName = "cache"
+    /// Where File ▸ Consolidate Media… puts the files it copies in (§5.6).
+    /// Unlike `cache/` this one is NOT regenerable: it may be the only copy
+    /// of the footage, which is why `fileWrapper(ofType:)` carries it across
+    /// every save and why `readPackage` re-anchors at it.
+    private static let mediaDirectoryName = "media"
 
     /// Everything the Info.plist claims. The package first (it is what
     /// `writableTypes` offers); the rest are the Alternate handlers — opening
@@ -132,6 +149,18 @@ final class ProjectDocument: NSDocument {
     private var temporaryCacheDirectory: URL?
 
     private var didReleaseRecipeKey = false
+
+    /// Media whose reverse render was cancelled or failed. They are NOT
+    /// retried on the next edit: a render the user stopped must not restart
+    /// itself the moment they touch the timeline, and one that cannot work
+    /// would put its sheet up for ever. Their clips keep drawing the slate,
+    /// and the Video tab's Speed section offers the retry.
+    private var refusedReverseMedia: Set<UInt32> = []
+
+    /// The media the sheet now on screen is rendering, so the outcome can say
+    /// which of them did not land.
+    private var renderingReverseMedia: [UInt32] = []
+    private var isPresentingReverseSheet = false
 
     // MARK: - Life cycle
 
@@ -202,11 +231,19 @@ final class ProjectDocument: NSDocument {
             fileModificationDate = nil
             countEditChange(.changeDone)
         }
+        // BEFORE the window: the editor builds its first composition inside
+        // `addWindowController`, and a resolution published after that would
+        // let a reversed clip play forwards for one build.
+        publishReverseResolution()
         addWindowController(EditorWindowController(document: self))
         // Filmstrips and waveforms for whatever the open brought in. Cheap
         // to ask for repeatedly: `MediaImporter` skips a cache that is
         // already on disk.
         generateCaches()
+        // A package can arrive without its `cache/` — copied out of a zip that
+        // dropped it, or opened after someone cleaned it out — so an open is
+        // as much a reason to render a reverse as ticking the box is.
+        ensureReversedMedia()
     }
 
     override func close() {
@@ -217,6 +254,7 @@ final class ProjectDocument: NSDocument {
         if !didReleaseRecipeKey {
             didReleaseRecipeKey = true
             RecipeSource.shared.unregister(recipeKey)
+            ReverseSource.shared.unpublish(recipeKey)
         }
         super.close()
     }
@@ -253,10 +291,41 @@ final class ProjectDocument: NSDocument {
             throw ReelCoreError(
                 message: "\(url.lastPathComponent) does not contain a readable project.json.")
         }
-        project = try ReelProject.from(json: text)
+        project = Self.reanchoringConsolidatedMedia(try ReelProject.from(json: text), package: url)
         playhead = 0
         selection = []
         inOutRange = nil
+    }
+
+    /// Points missing media at the package's own `media/` directory when the
+    /// file it names is in there under the same name.
+    ///
+    /// Consolidate stores an ABSOLUTE path (the model has no relative form —
+    /// `Media.path` in `model.rs`), so moving or renaming a consolidated
+    /// package would otherwise break every link inside it and hand the user
+    /// a Relink… sheet for footage that never left the package. This is the
+    /// repair, and it is deliberately narrow: only media that resolves to
+    /// NOTHING is touched, so a working link is never overridden by a
+    /// same-named file that happens to sit in `media/`.
+    ///
+    /// Not an edit. It runs on the read queue before the document exists as
+    /// far as AppKit is concerned, registers no undo step and dirties
+    /// nothing; the new paths are written out by whatever save comes next.
+    private static func reanchoringConsolidatedMedia(
+        _ project: ReelProject, package: URL
+    ) -> ReelProject {
+        let directory = package.appendingPathComponent(mediaDirectoryName, isDirectory: true)
+        guard FileManager.default.fileExists(atPath: directory.path) else { return project }
+        var ops: [ReelOp] = []
+        for media in project.snapshot.media where mediaURL(for: media) == nil {
+            let name = (media.path as NSString).lastPathComponent
+            guard !name.isEmpty else { continue }
+            let candidate = directory.appendingPathComponent(name)
+            guard FileManager.default.fileExists(atPath: candidate.path) else { continue }
+            ops.append(.relinkMedia(media: media.id, path: candidate.path))
+        }
+        guard !ops.isEmpty else { return project }
+        return ((try? project.applying(ops)) ?? nil) ?? project
     }
 
     /// Spec §1's opening flow: a movie, sound file or picture becomes a fresh
@@ -332,6 +401,13 @@ final class ProjectDocument: NSDocument {
         json.preferredFilename = Self.projectFileName
         var children = [Self.projectFileName: json]
         if let cache = cacheWrapper() { children[Self.cacheDirectoryName] = cache }
+        // Consolidated media, carried across the same way — and it is not
+        // optional the way the cache is: this wrapper is a whitelist, so a
+        // `media/` left out here is a `media/` DELETED by the next save
+        // (autosave included), taking the only copy of the footage with it.
+        if let media = directoryWrapper(Self.mediaDirectoryName) {
+            children[Self.mediaDirectoryName] = media
+        }
         return FileWrapper(directoryWithFileWrappers: children)
     }
 
@@ -345,6 +421,20 @@ final class ProjectDocument: NSDocument {
               let wrapper = try? FileWrapper(url: directory, options: [])
         else { return nil }
         wrapper.preferredFilename = Self.cacheDirectoryName
+        return wrapper
+    }
+
+    /// Any other directory of the package, as a lazy wrapper — `media/`
+    /// today. Same reasoning as `cacheWrapper` for the laziness, and the
+    /// same nil-when-absent answer; unlike the cache this one only ever
+    /// lives inside a saved package, so an untitled document has none.
+    private func directoryWrapper(_ name: String) -> FileWrapper? {
+        guard let fileURL = fileURL else { return nil }
+        let directory = fileURL.appendingPathComponent(name, isDirectory: true)
+        guard FileManager.default.fileExists(atPath: directory.path),
+              let wrapper = try? FileWrapper(url: directory, options: [])
+        else { return nil }
+        wrapper.preferredFilename = name
         return wrapper
     }
 
@@ -407,6 +497,43 @@ final class ProjectDocument: NSDocument {
         return directory
     }
 
+    /// Where File ▸ Consolidate Media… copies files to (spec §5.6). nil for
+    /// an untitled document, and that nil is the feature's whole refusal:
+    /// the cache may fall back to a temporary directory because a lost
+    /// filmstrip is redrawn, while media consolidated into one would be
+    /// footage orphaned outside any package. `MediaConsolidator` creates the
+    /// directory; nothing else needs it to exist.
+    var mediaDirectory: URL? {
+        fileURL?.appendingPathComponent(Self.mediaDirectoryName, isDirectory: true)
+    }
+
+    /// Re-reads the package's modification date after this app has written
+    /// inside it behind `NSDocument`'s back.
+    ///
+    /// **Consolidate is the one thing that does that**, and without this the
+    /// next save is refused for good: `NSDocument` compares the package
+    /// directory's modification date against `fileModificationDate` and
+    /// answers *"The file has been changed by another application"* — an
+    /// honest complaint about the wrong application, since the change was
+    /// ours. Measured: consolidate, then ⌘S, and every save from then on
+    /// fails until the document is closed and reopened, stranding the
+    /// relinks in memory while the copies sit on disk.
+    ///
+    /// Creating `media/` is what trips it. Writing a filmstrip into `cache/`
+    /// does not, because `fileWrapper(ofType:)` already wrote that directory
+    /// on the last save, so only the CHILD's date moves and the package's own
+    /// stays put.
+    ///
+    /// This is not a "save anyway" override: the date is re-read from disk,
+    /// so a change some OTHER application made in the same moment still
+    /// raises the conflict on the following save.
+    func packageContentsDidChangeOnDisk() {
+        guard let fileURL = fileURL else { return }
+        let values = try? fileURL.resourceValues(forKeys: [.contentModificationDateKey])
+        guard let date = values?.contentModificationDate else { return }
+        fileModificationDate = date
+    }
+
     private var existingCacheDirectory: URL? {
         guard let directory = intendedCacheDirectory,
               FileManager.default.fileExists(atPath: directory.path)
@@ -424,6 +551,155 @@ final class ProjectDocument: NSDocument {
             guard let url = urls[media.id] else { continue }
             MediaImporter.generateCaches(for: media, url: url, in: cache)
         }
+    }
+
+    // MARK: - Reverse (spec §11)
+
+    /// Which clips play backwards from a pre-rendered file, which are still
+    /// waiting for one, and what would have to be rendered to finish the job.
+    ///
+    /// Nests are walked as well as the top level: `assign()` gives an inner
+    /// media clip its own composition track exactly as a top-level clip gets
+    /// one, so an inner reversed clip needs the same substitution — the same
+    /// reason `AudioDSPParameters` walks them.
+    ///
+    /// A media of kind `image` is left alone: a still played backwards is the
+    /// same still, so there is nothing to render and nothing to slate.
+    private func reverseState() -> (resolution: ReverseResolution, jobs: [ReverseRenderer.Job]) {
+        let snapshot = project.snapshot
+        var reversed: [(clip: UInt32, media: MediaSnapshot)] = []
+        // Built by hand rather than with `uniqueKeysWithValues`, which TRAPS
+        // on a repeated key. `validate` rejects duplicate media ids, so this
+        // cannot happen — and a project file is still an input, which is the
+        // one kind of thing that must never take the app down.
+        var media: [UInt32: MediaSnapshot] = [:]
+        for entry in snapshot.media where media[entry.id] == nil { media[entry.id] = entry }
+        func collect(_ clips: [ClipSnapshot]) {
+            for clip in clips where clip.source.isReversed {
+                guard let id = clip.source.mediaID, let entry = media[id],
+                    entry.kind != .image
+                else { continue }
+                reversed.append((clip: clip.id, media: entry))
+            }
+        }
+        collect(snapshot.clips)
+        for nest in snapshot.nests { collect(nest.clips) }
+        guard !reversed.isEmpty, let cache = cacheDirectory else { return (.none, []) }
+
+        var ready: [UInt32: URL] = [:]
+        var pending: Set<UInt32> = []
+        var jobs: [UInt32: ReverseRenderer.Job] = [:]
+        for entry in reversed {
+            // A media file that is gone is already a missing clip; there is
+            // nothing to reverse and nothing this can add to the slate it
+            // already draws.
+            guard let source = mediaURL(for: entry.media), entry.media.duration > 0 else {
+                continue
+            }
+            if let url = ReverseCache.existing(
+                media: entry.media.id, source: source, in: cache) {
+                ready[entry.clip] = url
+                continue
+            }
+            pending.insert(entry.clip)
+            guard jobs[entry.media.id] == nil,
+                let destination = ReverseCache.destination(
+                    media: entry.media.id, source: source, in: cache)
+            else { continue }
+            jobs[entry.media.id] = ReverseRenderer.Job(
+                media: entry.media.id, name: entry.media.name, source: source,
+                destination: destination, duration: entry.media.duration, fps: entry.media.fps,
+                hasAudio: entry.media.hasAudio)
+        }
+        return (
+            ReverseResolution(ready: ready, pending: pending),
+            jobs.values.sorted { $0.media < $1.media }
+        )
+    }
+
+    /// Tells `CompositionBuilder` — through `ReverseSource`, beside the plan —
+    /// which clips read from a reversed file. Main thread, after every edit
+    /// and after every render, and before the first composition is built.
+    func publishReverseResolution() {
+        let state = reverseState()
+        // A refusal lasts exactly as long as the clip that earned it. Untick
+        // Reverse and the media stops being wanted, so the refusal goes with
+        // it — which is what makes ticking the box again a real second ask
+        // rather than a silent no.
+        refusedReverseMedia.formIntersection(state.jobs.map { $0.media })
+        ReverseSource.shared.publish(state.resolution, project: project, for: recipeKey)
+    }
+
+    /// Renders whatever reversed asset is missing, behind a progress sheet.
+    ///
+    /// Deliberately quiet about the cases where it should do nothing: a live
+    /// gesture (the timeline is moving under the user), a sheet already up
+    /// (Export, Consolidate, or this one), and a document with no window
+    /// (the agent's, which gets slates and no dialog). It also never retries
+    /// media the user has already stopped — see `refusedReverseMedia`.
+    ///
+    /// Asynchronous on purpose: it is called from inside an edit, and putting
+    /// a sheet up while the model is mid-mutation is how re-entrancy bugs
+    /// start.
+    func ensureReversedMedia() {
+        guard !isLiveEditing, !isPresentingReverseSheet else { return }
+        let jobs = reverseState().jobs.filter { !refusedReverseMedia.contains($0.media) }
+        guard !jobs.isEmpty else { return }
+        isPresentingReverseSheet = true
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            guard let host = self.windowControllers.first?.contentViewController,
+                host.view.window?.attachedSheet == nil
+            else {
+                self.isPresentingReverseSheet = false
+                return
+            }
+            self.renderingReverseMedia = jobs.map { $0.media }
+            host.presentAsSheet(
+                ReverseProgressSheetController(document: self, jobs: jobs))
+        }
+    }
+
+    /// Asks for `clip`'s reverse again after a cancel or a failure — the
+    /// Video tab's "Render Reverse" button.
+    func retryReversedMedia(for clip: ClipSnapshot) {
+        guard let media = clip.source.mediaID else { return }
+        refusedReverseMedia.remove(media)
+        ensureReversedMedia()
+    }
+
+    /// What the Video tab's Reverse row should say about one clip.
+    func reverseStatus(of clip: ClipSnapshot) -> ReverseStatus {
+        guard clip.source.isReversed, let id = clip.source.mediaID,
+            let media = project.snapshot.media.first(where: { $0.id == id }),
+            media.kind != .image
+        else { return .off }
+        guard let source = mediaURL(for: media), media.duration > 0 else { return .unavailable }
+        guard let cache = cacheDirectory,
+            ReverseCache.existing(media: media.id, source: source, in: cache) != nil
+        else { return refusedReverseMedia.contains(media.id) ? .stopped : .pending }
+        return .ready
+    }
+
+    /// The sheet's one exit. Everything here is ordered around one fact: the
+    /// files on disk changed, and nothing else in the app can tell.
+    func reverseRenderDidFinish(rendered: [UInt32], failures: [String], cancelled: Bool) {
+        isPresentingReverseSheet = false
+        // Unconditionally, and first: a run that failed or was cancelled may
+        // still have created `cache/reversed/` inside the package, and that
+        // alone is what makes NSDocument refuse every later save (the trap
+        // `packageContentsDidChangeOnDisk` exists for).
+        packageContentsDidChangeOnDisk()
+        let landed = Set(rendered)
+        for media in renderingReverseMedia where !landed.contains(media) {
+            refusedReverseMedia.insert(media)
+        }
+        renderingReverseMedia = []
+        publishReverseResolution()
+        // Not `.projectDocumentDidChange`: the project did not change, the
+        // disk did, and the §7.6 rebuild rule compares plans. See the
+        // notification's own comment.
+        NotificationCenter.default.post(name: .reversedMediaDidChange, object: self)
     }
 
     /// File > Add Media… and every drop that adds files to an OPEN project.
@@ -652,8 +928,13 @@ final class ProjectDocument: NSDocument {
     private func projectDidChange(isLive: Bool = false) {
         clampViewState()
         RecipeSource.shared.set(project, for: recipeKey)
+        // Before the notification, for the same reason the recipe is: the
+        // editor rebuilds the composition off the back of it, and a build that
+        // read a stale resolution would play a just-reversed clip forwards.
+        publishReverseResolution()
         NotificationCenter.default.post(
             name: .projectDocumentDidChange, object: self, userInfo: ["isLive": isLive])
+        ensureReversedMedia()
     }
 
     /// Keeps the non-undoable view state honest about a model that just

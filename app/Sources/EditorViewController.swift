@@ -319,6 +319,9 @@ final class EditorViewController: NSViewController {
         NotificationCenter.default.addObserver(
             self, selector: #selector(projectDidChange(_:)),
             name: .projectDocumentDidChange, object: nil)
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(reversedMediaDidChange(_:)),
+            name: .reversedMediaDidChange, object: nil)
         installCanvas()
         installTimeline()
         // Last: it registers the two views above as drop targets for a media
@@ -396,6 +399,16 @@ final class EditorViewController: NSViewController {
     @objc private func projectDidChange(_ note: Notification) {
         guard let document = document, note.object as? ProjectDocument === document else { return }
         refreshFromDocument(isLive: (note.userInfo?["isLive"] as? Bool) ?? false)
+    }
+
+    /// A reversed asset landed on disk. The plan is unchanged, so the §7.6
+    /// rebuild rule would skip it: drop the item and let the refresh below
+    /// rebuild (`ProjectDocument.reversedMediaDidChange`).
+    @objc private func reversedMediaDidChange(_ note: Notification) {
+        guard let document = document, note.object as? ProjectDocument === document else { return }
+        playback.invalidate()
+        publishedProject = nil
+        refreshFromDocument(isLive: false)
     }
 
     /// The one path from a changed project to the preview. `isLive` rides
@@ -814,31 +827,29 @@ final class EditorViewController: NSViewController {
     @objc func fitTimeline(_ sender: Any?) { timeline?.fit() }
     /// ⌘E — the export sheet (EditorViewController+Export.swift).
     @objc func exportProject(_ sender: Any?) { exportProjectCommand() }
+    /// ⌘G / ⇧⌘G — EditorViewController+Nest.swift.
+    @objc func nestClips(_ sender: Any?) { nestSelection() }
+    @objc func unnestClips(_ sender: Any?) { unnestSelection() }
+    /// ⌘X / ⌘C / ⌘V — EditorViewController+Clipboard.swift.
+    @objc func cut(_ sender: Any?) { cutSelection() }
+    @objc func copy(_ sender: Any?) { copySelection() }
+    @objc func paste(_ sender: Any?) { pasteClips() }
 
-    // MARK: - Actions later stages implement
+    // MARK: - Forwards into feature files
     //
     // Every menu item and toolbar button is wired and validated from the
-    // start; the ones whose feature has not landed beep and are disabled by
-    // `plannedActions` below. Each names the M1 step (spec §10) that fills it
-    // in, so the stub and the work that replaces it are never in doubt.
+    // start. Anything whose feature has not landed yet beeps and is disabled
+    // by `plannedActions` below; nothing is in that state today.
 
-    /// M1 step 7 — the clipboard shares the op table's delete/insert-time.
-    @objc func cut(_ sender: Any?) { NSSound.beep() }
-    /// M1 step 7.
-    @objc func copy(_ sender: Any?) { NSSound.beep() }
-    /// M1 step 7.
-    @objc func paste(_ sender: Any?) { NSSound.beep() }
-    /// M3 — nests.
-    @objc func nestClips(_ sender: Any?) { NSSound.beep() }
-    /// M3.
-    @objc func unnestClips(_ sender: Any?) { NSSound.beep() }
     /// Add Text and Add Shape land in EditorViewController+AddClips.swift;
     /// these forward so the toolbar's and the menu's selectors stay the ones
     /// the frozen file declares.
     @objc func addTextClip(_ sender: Any?) { addTextClipAtPlayhead(sender) }
     @objc func addShapeClip(_ sender: Any?) { addShapeClipAtPlayhead(sender) }
-    /// M3 — Consolidate Media.
-    @objc func consolidateMedia(_ sender: Any?) { NSSound.beep() }
+    /// File ▸ Consolidate Media… — EditorViewController+Consolidate.swift.
+    @objc func consolidateMedia(_ sender: Any?) { consolidateMediaCommand() }
+    /// File ▸ Import Captions… — CaptionImporter.swift.
+    @objc func importCaptions(_ sender: Any?) { importCaptionsCommand() }
 }
 
 // MARK: - Timecode field
@@ -925,11 +936,11 @@ extension EditorViewController: NSUserInterfaceValidations {
     /// Selectors whose feature has not landed yet. They stay visible and
     /// wired — so the menu is complete from the first build — but validate
     /// to false, exactly as Rasterize disables a `planned` tool.
-    private static let plannedActions: Set<Selector> = [
-        #selector(cut(_:)), #selector(copy(_:)), #selector(paste(_:)),
-        #selector(nestClips(_:)), #selector(unnestClips(_:)),
-        #selector(consolidateMedia(_:)),
-    ]
+    ///
+    /// Empty since ⌘G / ⇧⌘G landed (EditorViewController+Nest.swift), which
+    /// were the last two. The mechanism stays for the next unfinished
+    /// command; an empty set is the honest way to say there is not one.
+    private static let plannedActions: Set<Selector> = []
 
     func validateUserInterfaceItem(_ item: any NSValidatedUserInterfaceItem) -> Bool {
         guard document != nil else { return false }
@@ -966,7 +977,10 @@ extension EditorViewController: NSUserInterfaceValidations {
             // The canvas, inspector, dialog and clip/track/marker commands
             // answer for themselves; nil means "not one of mine"
             // (EditorViewController+Canvas.swift, +Inspector.swift,
-            // +Export.swift, +Timeline.swift).
+            // +Export.swift, +Timeline.swift, +Nest.swift).
+            if let answer = validateNestAction(action) { return answer }
+            if let answer = validateClipboardAction(action) { return answer }
+            if let answer = validateConsolidateAction(action) { return answer }
             if let answer = validateExportAction(action, item: item) { return answer }
             if let answer = validateCanvasAction(action, item: item) { return answer }
             if let answer = validateInspectorAction(action, item: item) { return answer }

@@ -1,145 +1,99 @@
 # Reelcut — road map after M1
 
-**Status: M1 (Cut) is built, running and verified; M2 is done but for chapter
-tracks.** This is the work that is left, in the order it should be done. It is
-the companion to `reelcut-design.md`, which stays normative for the schemas
-(§5), the op table (§6) and the architecture (§7) — this document never
-overrides it, it only says what has not been built yet and what would prove
-each piece finished.
+**Status: M1, M2 and M3 are built. Every feature in `reelcut-design.md`'s
+milestone list (§10) is implemented and verified against a running binary.**
+What is left is not features: it is the half of the acceptance tests that
+needs a person at the machine, and a short list of known limits.
 
-Published as a page (same content, easier to read):
+This is the companion to `reelcut-design.md`, which stays normative for the
+schemas (§5), the op table (§6) and the architecture (§7); this document never
+overrides it. `CLAUDE.md` holds the milestone status and is the file to update
+as work lands.
+
+Published as a page (the pre-M3 version, kept for the phase plan it describes):
 <https://claude.ai/code/artifact/be6e91de-48f2-413e-a5f1-a4a91a01a0a1>
-
-Reading order: §1 for where things stand, §2 for the two orderings that are
-real, then the phase you are picking up. `CLAUDE.md` holds the current
-milestone status and is the file to update as phases land.
 
 ## 1. Where things stand
 
-`make typecheck` 0 errors · `make test` 103 passing · `make lint` clean ·
-`make app` succeeded. Those four say the code builds and the core is correct.
-They say nothing about whether the app is usable, which is the whole point of
-Phase 1.
+`make test` 203 passing · `make lint` clean · `make typecheck` 0 errors,
+4 warnings (AVFoundation deprecations, deliberate) · `make app` succeeded ·
+57 MCP tools · format version 2.
 
-**Verified working**, each driven against the built binary and checked by
-comparing rendered frames: opening a movie into an untitled project, import,
-tracks, move / trim / split / delete / ripple, undo, transforms, crop,
-markers, transitions, text and shapes, speed, freeze frame, audio levels and
-ducking, `.reelcut` save and open, H.264 / HEVC / ProRes / M4A export, and the
-50 MCP tools.
+**Verified by driving the built binary and comparing rendered frames or
+measured audio** — the standard this project holds itself to, and the reason
+each line below is a claim rather than a hope:
 
-**Written, never seen.** The timeline view and the canvas overlay — spec §10
-steps 6 and 8 — plus live playback with audio and the 60 fps target. The code
-compiles and the pipeline behind it is proven, but no human has looked at
-either view, and MCP cannot see the screen.
+| Landed | What proved it |
+|---|---|
+| Shadow render pass | Offset measured at exactly `distance × scale` along the angle; occluded by its own layer |
+| Chroma-key UI + canvas eyedropper | A green-screen clip keys from the UI alone |
+| Cut / Copy / Paste (`paste` op) | Round-trips within and between documents; one undo step |
+| `AVAssetWriter` export path | Replaced `AVAssetExportSession` outright; frame-identical output |
+| Chapter tracks | `ffprobe -show_chapters` lists them in mp4, mov and m4a — the test M2 owed from the start |
+| Explicit bitrates | Measured within 3–7 % of the request on a pathological source |
+| GIF / APNG | Byte-level parse: image descriptors, per-frame delays, NETSCAPE loop |
+| Filters (7 kinds) | Each changes the frame; an empty list is byte-identical to none; order matters |
+| Spotlight | Outside dimmed to exactly `1 − dim`; the zoom is a real magnification, not a redraw |
+| Reflection | Per-row least squares fits the mirrored source, 47/47 rows |
+| Nests (`nest` / `unnest`) | A nest renders byte-identically to its contents; unnest is the identity |
+| Nested audio | Nested ducking and mute match the top-level result to the decibel |
+| Reverse | Frame order swaps; correct inside a nest and through export |
+| Audio pan / compressor / noise reduction | Each measurably changes the export; neutral settings are bit-identical |
+| SRT captions | Cues land at the right times and render |
+| Consolidate Media | Reopens after the originals are deleted and the package moved |
+| ffmpeg-assisted import | An MKV opens after rewrap; degrades cleanly with no ffmpeg |
 
-**Not built.** The shadow render pass, the chroma-key UI, the clipboard, the
-`AVAssetWriter` export path and everything it unlocks, nests, filters,
-reflection, spotlight, reverse, captions, noise removal, Consolidate Media,
-and ffmpeg-assisted import.
+## 2. What still needs a person at the machine
 
-## 2. The two orderings that are real
+MCP cannot see the screen or hear the audio, so these are unverified — not
+unbuilt. This is the whole of what is left of the acceptance tests.
 
-The phases are otherwise independent and can be reordered freely.
-
-1. **Phase 1 can re-prioritise everything after it.** Two of the app's largest
-   views are unexamined; what a person finds in them may outrank anything
-   below.
-2. **Phase 3 is one seam that three features wait on.**
-   `AVAssetExportSession` cannot write a chapter track, cannot take an explicit
-   bitrate, and cannot produce a GIF. All three need the `AVAssetWriter` path.
-
-## 3. Phase 1 — Put eyes on it
-
-**Goal:** replace "it compiles and the pipeline is proven" with "a person has
-used it." No code is assumed; the likely output is a defect list.
-
-| Work | Where | Done when |
+| Work | Spec | Why an agent cannot close it |
 |---|---|---|
-| Timeline view | Ruler ticks at each zoom, filmstrips, waveforms, clip tints, the transition hatch, fade handles, marker flags, in/out shading — `TimelineView.swift` | Spec §10 step 6 signed off by eye; defects filed |
-| Canvas overlay | Scale/rotate/move handles, crop mode and its 30 % ghost, snap guides, inline text editing — `PreviewCanvasView.swift`, `CanvasSessions.swift` | Spec §10 step 8 signed off by eye |
-| Gesture feel | Drag, trim, ⌥-drag duplicate, ⌥-drag rate stretch, the animate-back on a refused drop | Each gesture is one undo step and feels right |
-| Playback | Audio in sync, J/K/L, scrubbing, the 60 fps target from the compositor's own timing log | Spec §10 steps 4 and 5's human halves pass |
+| Timeline view | §10 step 6 | Ruler ticks at each zoom, filmstrips, waveforms, tints, the transition hatch, fade handles, marker flags, in/out shading. Screenshots show it draws and draws the right things; whether it *reads* well is a judgement |
+| Canvas overlay | §10 step 8 | Scale / rotate / move handles, crop mode and its 30 % ghost, snap guides, inline text editing |
+| Gesture feel | §4.4 | Drag, trim, ⌥-drag duplicate, ⌥-drag rate stretch, the animate-back on a refused drop. Each is one undo step; whether each *feels* right is not measurable |
+| Playback | §10 steps 4–5 | Audio in sync, J/K/L, scrubbing, and the 60 fps target from the compositor's own timing log |
+| The new UI | — | ⌘G / ⇧⌘G, the reverse progress sheet's Cancel and failure paths, the export sheet's Quality row, and the Filters / Spotlight / Reflection / Audio-cleanup sections |
 
-*Verify:* `make run`, open a movie, cut it, write down everything wrong.
+## 3. Known limits, deliberate or deferred
 
-## 4. Phase 2 — Make the UI's promises true
+1. **You cannot edit inside a nest.** Every op's `clip` argument resolves
+   through `Project::clip`, which does not see nested clips. The round trip
+   (⇧⌘G, edit, ⌘G) is the way in. Entering a nest with a breadcrumb is
+   designed (spec §4.4) and not built.
+2. **Audio export is not bit-deterministic near a duck ramp edge** — two
+   exports of one unchanged project differed by 38 samples of one 16-bit LSB
+   (−90 dBFS) in an 8 ms window. AVFoundation's mix, pre-existing, inaudible;
+   it means SHA-based audio comparisons need a fixture without a duck edge.
+3. **A wrong-typed value nested inside a property patch is still dropped.**
+   `set_video {patch: {shadow: {distance: "far"}}}` silently creates a default
+   shadow. The top-level round-trip check cannot recurse safely, because a
+   field legitimately set *to* its default is indistinguishable from absence.
+   This wants a real schema, not a deeper oracle; documented in place on
+   `patchArg`.
+4. **`add_clip` onto an overlap assigns the default `cross_dissolve`**, and an
+   overlap with no kind still dissolves. A "no transition" baseline has to be
+   built by separating clips, not by clearing the kind.
+5. **Two pixels of 2 073 600 move by one LSB** when a layer has a corner
+   radius. Deterministic, so real; antialiasing arithmetic, not behaviour. The
+   suspected cause (a branch in the vertex stage) was tested and disproved.
+6. `AudioProps.mono` is in the schema and unimplemented. Noise reduction
+   delays its track 512 samples. `import_media` over MCP can time out on a
+   first ffmpeg transcode, though the conversion completes and a second call
+   is instant.
 
-**Goal:** every control that exists does what it says. Three places where the
-interface offers something the app does not deliver — worse than a missing
-feature, because it is visible and silently wrong.
-
-**Shadow is the priority.** `ShadowProps` is in the model, all three inspector
-panes edit it, and it round-trips through the file — but `Compositor.metal`
-has no shadow pass at all, so setting one changes nothing on screen. Found by
-grepping the shader, not by using the app.
-
-| Work | Where | Done when |
-|---|---|---|
-| Shadow render pass | Render the layer's alpha to an offscreen texture, blur with `MPSImageGaussianBlur`, draw it before the layer — the pass spec §7.5 describes. `Compositor.swift`'s layer loop, `Compositor.metal` | `render_frame` before and after a `set_video` with a shadow differs, and the offset matches angle and distance |
-| Chroma-key UI | The shader already keys; only the inspector is missing. A Video-pane section plus a canvas eyedropper for the key colour — `VideoPane.swift`, `EditorViewController+Canvas.swift` | A green-screen clip keys from the UI alone, no MCP |
-| Cut / Copy / Paste | Still disabled stubs in `plannedActions`. Clips to the pasteboard as project JSON; paste places at the playhead under the overlap rule — `EditorViewController.swift` wiring plus a new extension file | Round-trips within a document and between two open documents |
-
-## 5. Phase 3 — The writer path
-
-**Goal:** finish M2. The seam is documented at the top of `Exporter.swift`:
-the writer path **replaces `startSession` and nothing else in that file.**
-
-| Work | Where | Done when |
-|---|---|---|
-| Reader/writer pipeline | `AVAssetReader` over the same composition and video composition, feeding `AVAssetWriter` — `Exporter.swift` | Output is frame-identical to the current export path |
-| Chapter track | An `AVAssetWriterInput` text track associated through `AVTrackAssociationTypeChapterList`, fed from markers whose `chapter` flag is set | `ffprobe -show_chapters` lists them — today it is empty |
-| Explicit bitrates | Quality settings in the export sheet, resolved by `rc_export_settings` — `ExportSheetController.swift`, `core/src/export.rs` | Measured bitrate lands within tolerance of the requested one |
-| GIF / APNG | Frame-by-frame through ImageIO, using the offline frame source `Exporter.renderFrame` already exposes | A short range exports and loops in Preview |
-
-## 6. Phase 4 — Nests
-
-**Goal:** ⌘G collapses a selection into one clip you can enter and edit, with
-a breadcrumb back out. The one M3 feature the data model already carries:
-`Source::Nest` parses and round-trips today, it simply draws nothing.
-
-| Work | Where | Done when |
-|---|---|---|
-| Evaluate nests | `drawing_clips` in `core/src/evaluate.rs` filters them out today. The recipe needs a nested layer source and the plan needs the nested project's composition tracks | New core tests: a nest renders what its contents render |
-| Nest / un-nest ops | `nest` and `unnest` in the §6 op table, mirrored in `ReelCore.swift` and `AgentCatalog.swift` | Nest then un-nest is the identity, like split/join |
-| Enter and leave | Double-click to enter, breadcrumb in the editor chrome — `EditorViewController.swift` wiring, logic in a new extension | ⌘G / ⇧⌘G stop being disabled stubs |
-
-## 7. Phase 5 — Effects
-
-**Goal:** the visual polish M3 promises. Every item is a compositor pass plus
-an inspector section, so the shape repeats; Phase 2's shadow pass establishes
-the offscreen-texture pattern the rest reuse. Independent of each other — ship
-them one at a time.
-
-| Work | Where | Done when |
-|---|---|---|
-| Filters | Blur, sharpen, pixelate, sepia, noir, vignette, invert. Spec §4.3 puts Core Image behind them; a shader pass is the alternative and keeps the one-pipeline rule | Each filter changes the frame and survives save/open |
-| Spotlight | Darkens the canvas outside a rectangle or ellipse with an optional 1.2–2× zoom of the region — the stand-in for a screencast editor's callout that works on any footage | Renders, and is animatable through an action |
-| Reflection | A mirrored, faded copy below the layer — one more pass in the same loop | Renders at the right offset and opacity |
-| Reverse | Not native to AVFoundation. §11 settles it: pre-render reversed segments into the package, then play them forward | A reversed clip plays and exports |
-
-## 8. Phase 6 — Ingest and output
-
-**Goal:** close out M3. Each item is self-contained; none blocks another.
-
-| Work | Where | Done when |
-|---|---|---|
-| SRT captions | Import a subtitle file as text clips, and burn in on export | An SRT imports at the right times and renders |
-| Audio cleanup | Remove background noise, smooth volume levels (a compressor), pan — the Audio pane's M3 section, `AudioPane.swift` | Measurable level change on a noisy sample |
-| Consolidate Media | Copy referenced files into `media/` inside the package; the layout is already reserved in spec §5.6 | A consolidated project opens with its sources moved away |
-| ffmpeg-assisted import | Opt-in step shelling out to a user-installed ffmpeg to rewrap MKV, WebM, VP9 and AV1 — the documented mitigation in §11 for choosing AVFoundation | An MKV opens after the rewrap, and the app degrades cleanly without ffmpeg |
-
-## 9. Deliberately not planned
+## 4. Deliberately not planned
 
 Screen and camera recording, multicam, colour grading beyond the per-clip
-controls, audio beyond volume / fade / duck, a plugin system, and any platform
-but macOS. These are the non-goals from spec §1 — the boundary that keeps the
-app the size of a screencast editor's editor rather than Final Cut's.
+controls, audio beyond volume / fade / duck / pan / compression / noise
+reduction, a plugin system, and any platform but macOS. These are the
+non-goals from spec §1 — the boundary that keeps the app the size of
+a screencast editor's editor rather than Final Cut's.
 
-## 10. What "done" means here
+## 5. What "done" means here
 
 Verification is driving the built binary over MCP and comparing `render_frame`
-output, not reading code — the launch line and the tool list are in
-`CLAUDE.md`. A phase is finished when its "Done when" column is demonstrated
-that way, `make test` and `make lint` are clean, and `CLAUDE.md`'s milestone
-status is updated to match.
+output or measured audio, not reading code — the launch line and the tool list
+are in `CLAUDE.md`. Work is finished when that evidence exists, `make test`
+and `make lint` are clean, and `CLAUDE.md`'s milestone status matches.

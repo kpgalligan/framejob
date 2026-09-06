@@ -160,6 +160,7 @@ final class AgentServer {
         "get_project": { $0.getProject },
         "set_playhead": { $0.setPlayhead },
         "set_range": { $0.setRange },
+        "set_selection": { $0.setSelection },
         // Undo history (AgentServer+History.swift)
         "undo": { $0.undoEdit },
         "redo": { $0.redoEdit },
@@ -177,9 +178,13 @@ final class AgentServer {
         "ripple_delete_range": { $0.rippleDeleteRange },
         "insert_time": { $0.insertTime },
         "set_speed": { $0.setSpeed },
+        "set_reversed": { $0.setReversed },
         "freeze_frame": { $0.freezeFrame },
         "detach_audio": { $0.detachAudio },
         "duplicate": { $0.duplicateClips },
+        "paste": { $0.pasteClips },
+        "nest": { $0.nestClips },
+        "unnest": { $0.unnestClips },
         "set_video": { $0.setVideo },
         "set_audio": { $0.setAudio },
         "set_text": { $0.setText },
@@ -205,6 +210,8 @@ final class AgentServer {
         // Media (AgentServer+Media.swift)
         "add_media": { $0.addMedia },
         "import_media": { $0.importMedia },
+        "import_captions": { $0.importCaptions },
+        "consolidate_media": { $0.consolidateMedia },
         "relink_media": { $0.relinkMedia },
         "remove_media": { $0.removeMedia },
         // Rendering and export (AgentServer+Render.swift)
@@ -212,9 +219,35 @@ final class AgentServer {
         "export": { $0.exportProject },
     ]
 
-    /// The enforcement behind the table's contract: nil when `catalogJSON()`
-    /// and `handlers` name exactly the same tools, else a message listing the
-    /// difference.
+    /// Ops the core declares that deliberately have NO tool. Empty, and the
+    /// bar for an entry is high: the agent-parity rule (app/CLAUDE.md) says
+    /// every user-visible edit gets a mirror, so the answer to "this op has
+    /// no tool" is almost always to write the tool. An entry here carries a
+    /// comment saying why it is the exception.
+    private static let opsWithoutTools: Set<String> = []
+
+    /// The enforcement behind the table's contract, in three parts:
+    ///
+    /// 1. `catalogJSON()` and `handlers` name exactly the same tools;
+    /// 2. every op the CORE declares has a tool — the list read through
+    ///    `ReelOp.coreNames()` (`rc_op_names` → `OP_NAMES` in
+    ///    `core/src/edit.rs`) rather than restated here, because a Swift
+    ///    copy of it would be one more spelling to drift and drift is what
+    ///    this check exists to catch;
+    /// 3. every tool's `inputSchema` is structurally sound — an object with
+    ///    a `properties` map, and nothing named `required` that it does not
+    ///    declare.
+    ///
+    /// **What it still cannot see.** Nothing validates a call against
+    /// `inputSchema`, and the core publishes op NAMES, not op arguments, so
+    /// a tool whose argument has the wrong TYPE — `add_text_clip`'s `text`
+    /// declared `string` against the op's `text?: object` — passes all
+    /// three. What guards that is the argument vocabulary in
+    /// `AgentServer+Arguments.swift`, which now refuses a present value of
+    /// the wrong type instead of reading it as absent; a drift of that kind
+    /// then surfaces as an error on the first call rather than as a silently
+    /// dropped argument. Publishing the argument names too would close it
+    /// here, and wants a second table in `edit.rs` to be worth its keep.
     private static func catalogParityFailure(_ catalog: String) -> String? {
         guard
             let tools = (try? JSONSerialization.jsonObject(with: Data(catalog.utf8)))
@@ -222,11 +255,45 @@ final class AgentServer {
         else { return "the tool catalog did not parse as an array of tool objects" }
         let catalogNames = Set(tools.compactMap { $0["name"] as? String })
         let handlerNames = Set(handlers.keys)
-        guard catalogNames != handlerNames else { return nil }
-        let missing = catalogNames.subtracting(handlerNames).sorted()
-        let extra = handlerNames.subtracting(catalogNames).sorted()
-        return "agent tool catalog and dispatch table disagree — in catalog but not "
-            + "dispatch: \(missing); in dispatch but not catalog: \(extra)"
+        if catalogNames != handlerNames {
+            let missing = catalogNames.subtracting(handlerNames).sorted()
+            let extra = handlerNames.subtracting(catalogNames).sorted()
+            return "agent tool catalog and dispatch table disagree — in catalog but not "
+                + "dispatch: \(missing); in dispatch but not catalog: \(extra)"
+        }
+        let ops = ReelOp.coreNames()
+        guard !ops.isEmpty else { return "the core reported no op names" }
+        let uncovered = Set(ops).subtracting(catalogNames).subtracting(opsWithoutTools).sorted()
+        if !uncovered.isEmpty {
+            return "the core's op table has ops with no agent tool: \(uncovered) — every row "
+                + "of spec §6 needs a tool, a handler and a comment naming the UI path it "
+                + "mirrors, or a line in AgentServer.opsWithoutTools saying why not"
+        }
+        let stale = opsWithoutTools.subtracting(ops).sorted()
+        if !stale.isEmpty {
+            return "AgentServer.opsWithoutTools names ops the core does not have: \(stale)"
+        }
+        return schemaFailure(tools)
+    }
+
+    /// Part 3: the structural check on each tool's declared input. It cannot
+    /// know what an argument MEANS, but a schema that is not an object, or
+    /// that requires a property it never declares, is a catalog bug the
+    /// model would meet as an unanswerable "missing required argument".
+    private static func schemaFailure(_ tools: [[String: Any]]) -> String? {
+        for tool in tools {
+            let name = tool["name"] as? String ?? "<unnamed>"
+            guard let schema = tool["inputSchema"] as? [String: Any],
+                schema["type"] as? String == "object",
+                let properties = schema["properties"] as? [String: Any]
+            else { return "the tool \(name) has no object inputSchema with properties" }
+            let required = (schema["required"] as? [Any])?.compactMap { $0 as? String } ?? []
+            let undeclared = required.filter { properties[$0] == nil }.sorted()
+            if !undeclared.isEmpty {
+                return "the tool \(name) requires arguments it does not declare: \(undeclared)"
+            }
+        }
+        return nil
     }
 
     // MARK: - Threading
@@ -291,7 +358,7 @@ final class AgentServer {
     func target(_ a: [String: Any]) throws -> ProjectDocument {
         assert(Thread.isMainThread)
         let documents = openProjects()
-        if let wanted = stringArg(a, "project") {
+        if let wanted = try stringArg(a, "project") {
             let path = (wanted as NSString).expandingTildeInPath
             let canonical = Self.canonical(wanted)
             guard

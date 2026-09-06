@@ -14,14 +14,14 @@ extension AgentServer {
     func addTrack(_ a: [String: Any]) throws -> String {
         let document = try target(a)
         let count = document.project.snapshot.tracks.count
-        let index = intArg(a, "index") ?? count
+        let index = try intArg(a, "index") ?? count
         guard index >= 0, index <= count else {
             throw ToolError(
                 message: "index must be 0…\(count) — 0 is the back of the stack, \(count) the "
                     + "front.")
         }
         return try editResult(
-            document, "New Track", [.addTrack(index: index, name: stringArg(a, "name"))])
+            document, "New Track", [.addTrack(index: index, name: try stringArg(a, "name"))])
     }
 
     /// `remove_track` — Track ▸ Remove Track (`removeTrackCommand`). A
@@ -31,7 +31,7 @@ extension AgentServer {
     func removeTrack(_ a: [String: Any]) throws -> String {
         let document = try target(a)
         let track = try trackArg(a, "track", document)
-        let withClips = boolArg(a, "with_clips")
+        let withClips = try boolArg(a, "with_clips")
         let clips = document.project.snapshot.clips(onTrack: track.id).count
         if clips > 0, withClips != true {
             throw ToolError(
@@ -48,7 +48,7 @@ extension AgentServer {
         let document = try target(a)
         let track = try trackArg(a, "track", document)
         let count = document.project.snapshot.tracks.count
-        guard let index = intArg(a, "index"), index >= 0, index < max(count, 1) else {
+        guard let index = try intArg(a, "index"), index >= 0, index < max(count, 1) else {
             throw ToolError(message: "index must be 0…\(max(count - 1, 0)).")
         }
         return try editResult(
@@ -60,10 +60,10 @@ extension AgentServer {
     func setTrack(_ a: [String: Any]) throws -> String {
         let document = try target(a)
         let track = try trackArg(a, "track", document)
-        let name = stringArg(a, "name")
-        let hidden = boolArg(a, "hidden")
-        let muted = boolArg(a, "muted")
-        let locked = boolArg(a, "locked")
+        let name = try stringArg(a, "name")
+        let hidden = try boolArg(a, "hidden")
+        let muted = try boolArg(a, "muted")
+        let locked = try boolArg(a, "locked")
         guard name != nil || hidden != nil || muted != nil || locked != nil else {
             throw ToolError(message: "set_track needs at least one of name, hidden, muted, locked.")
         }
@@ -94,8 +94,8 @@ extension AgentServer {
             document, "Add Marker",
             [
                 .addMarker(
-                    at: at, name: stringArg(a, "name"), chapter: boolArg(a, "chapter"),
-                    color: stringArg(a, "color"))
+                    at: at, name: try stringArg(a, "name"), chapter: try boolArg(a, "chapter"),
+                    color: try stringArg(a, "color"))
             ])
     }
 
@@ -105,9 +105,9 @@ extension AgentServer {
         let document = try target(a)
         let marker = try markerArg(a, "marker", document)
         let time = try optionalTimeArg(a, "time", document)
-        let name = stringArg(a, "name")
-        let chapter = boolArg(a, "chapter")
-        let color = stringArg(a, "color")
+        let name = try stringArg(a, "name")
+        let chapter = try boolArg(a, "chapter")
+        let color = try stringArg(a, "color")
         guard time != nil || name != nil || chapter != nil || color != nil else {
             throw ToolError(message: "set_marker needs at least one of time, name, chapter, color.")
         }
@@ -134,8 +134,8 @@ extension AgentServer {
     /// checkbox); changing `fps` re-snaps every clip start and duration.
     func setCanvas(_ a: [String: Any]) throws -> String {
         let document = try target(a)
-        let width = intArg(a, "width")
-        let height = intArg(a, "height")
+        let width = try intArg(a, "width")
+        let height = try intArg(a, "height")
         if let width = width, width < 16 || width > 16384 {
             throw ToolError(message: "width must be 16…16384 px (got \(width)).")
         }
@@ -144,9 +144,9 @@ extension AgentServer {
         }
         let fps = try fpsArg(a, "fps")
         let background = try colorArg(a, "background")
-        let rescale = boolArg(a, "rescale_clips")
-        let fitNew = boolArg(a, "fit_new_clips")
-        let timecodeFrames = boolArg(a, "timecode_frames")
+        let rescale = try boolArg(a, "rescale_clips")
+        let fitNew = try boolArg(a, "fit_new_clips")
+        let timecodeFrames = try boolArg(a, "timecode_frames")
         guard width != nil || height != nil || fps != nil || background != nil || rescale != nil
             || fitNew != nil || timecodeFrames != nil
         else {

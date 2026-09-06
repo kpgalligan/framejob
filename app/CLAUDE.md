@@ -16,8 +16,23 @@ lockstep are in the root `CLAUDE.md`; the full design is
 - `ProjectDocument.swift` — NSDocument, `.reelcut` package read/write, and
   the single mutation point (see Undo below).
 - `Playback.swift` · `CompositionBuilder.swift` · `Compositor.swift` ·
-  `LayerRenderers.swift` · `MediaImporter.swift` · `Exporter.swift` — the
-  AVFoundation/Metal side; see spec §7.5–7.8.
+  `CompositorEffects.swift` · `LayerRenderers.swift` · `MediaImporter.swift` ·
+  `Exporter.swift` · `ExporterWriter.swift` · `ExporterImageSequence.swift` —
+  the AVFoundation/Metal side; see spec §7.5–7.8. `CompositorEffects.swift`
+  holds the M3 effect logic so `Compositor.swift` grew only the uniform
+  fields; the uniform block's field ORDER is a contract with
+  `Resources/Shaders/Compositor.metal` and is checked nowhere but by reading
+  both, so change them in one edit.
+- `MediaImporter.swift` · `FFmpegRewrap.swift` — the import funnel and the
+  opt-in ffmpeg step behind it (spec §7.7, §11). `async`/`await` is confined
+  to `MediaImporter.swift`; `FFmpegRewrap` runs `Process` on a serial queue,
+  never on a cooperative thread, because ffmpeg blocks the thread it is on.
+- `CaptionImporter.swift` (File ▸ Import Captions…) · `MediaConsolidator.swift`
+  with `EditorViewController+Consolidate.swift` (File ▸ Consolidate Media…) —
+  the two §5.6 file features. Consolidate writes inside the package behind
+  NSDocument's back, so it MUST tell
+  `ProjectDocument.packageContentsDidChangeOnDisk()` afterwards, or every
+  later save is refused as "changed by another application".
 - `EditorViewController.swift`, `TimelineView.swift`,
   `PreviewCanvasView.swift`, `AgentServer.swift` — **frozen at current
   size.** Any change adding more than ~50 lines goes in an extension file
@@ -45,9 +60,11 @@ lockstep are in the root `CLAUDE.md`; the full design is
   argument vocabulary in `AgentServer+Arguments.swift`; a new op means a
   handler, a catalog entry and a comment naming the UI path it mirrors.
   Beyond the §6 ops the catalog carries the app-state tools spec §7.9 names
-  plus `set_range`, `undo` and `redo` — the mirrors of I/O/⌥X and ⌘Z/⇧⌘Z,
-  without which the "one edit is one undo step" and "the in/out range scopes
-  the export" properties could not be checked by driving the built app.
+  plus `set_range`, `set_selection`, `undo` and `redo` — the mirrors of
+  I/O/⌥X, a timeline or canvas click, and ⌘Z/⇧⌘Z, without which the "one edit
+  is one undo step", "the in/out range scopes the export" and "the selection
+  draws handles" properties could not be checked by driving the built app.
+  None of the four is an op, so none registers an undo step.
   `target(_:)` resolves the implicit document: an agent-driven app is never
   the ACTIVE app, so `NSDocumentController.currentDocument` is nil there and
   the fallback must be `NSApp.orderedDocuments`, never `documents.first`

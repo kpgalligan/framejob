@@ -1,7 +1,8 @@
 //! C FFI: the read-only queries (`rc_project_duration`,
 //! `rc_project_composition_plan`, `rc_project_frame_recipe`,
 //! `rc_project_clip_state`, `rc_project_snap_candidates`,
-//! `rc_snap_resolve` and the `rc_export_*` pair in the header).
+//! `rc_snap_resolve`, `rc_op_names` and the `rc_export_*` pair in the
+//! header).
 //!
 //! Thin shims only, all of them pure: a query never changes the project
 //! and never allocates a handle. Every JSON answer here is COMPACT, unlike
@@ -21,6 +22,7 @@ use std::ptr;
 
 use serde_json::Value;
 
+use crate::edit;
 use crate::export;
 use crate::ffi_util::{
     fallible_op, out_string, project_get, project_json, read_cstr, read_opt_cstr,
@@ -147,6 +149,34 @@ pub unsafe extern "C" fn rc_snap_resolve(
             }
             at
         })
+    }
+}
+
+/// Every op name [`crate::model::Project::apply`] accepts, as a JSON array
+/// of strings in op-table order — `OP_NAMES` in `crate::edit`.
+///
+/// It is exported for the host's own startup check: the MCP catalog in
+/// `app/Sources/AgentCatalog.swift` must carry a tool for every row of the
+/// table, and the only way to check that without a second list to drift is
+/// to ask the side that owns the first one. Never NULL.
+///
+/// # Safety
+/// Takes no pointers; declared `unsafe` only so the whole exported surface
+/// reads the same way. The returned string is freed with
+/// [`crate::ffi::rc_string_free`].
+#[no_mangle]
+pub unsafe extern "C" fn rc_op_names() -> *mut c_char {
+    unsafe {
+        fallible_op(
+            ptr::null_mut(),
+            "listing op names",
+            ptr::null_mut(),
+            || {
+                serde_json::to_string(&edit::OP_NAMES[..])
+                    .map_err(|e| format!("op names are not serializable: {e}"))
+            },
+            out_string,
+        )
     }
 }
 

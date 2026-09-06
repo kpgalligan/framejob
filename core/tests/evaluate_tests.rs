@@ -39,6 +39,11 @@ const SEC: i64 = 600_000;
 /// One frame at the fixtures' canvas rate of 30 fps.
 const FRAME_30: i64 = SEC / 30;
 
+/// The first composition AUDIO track id (spec §7.2). Written out here
+/// rather than imported for the same reason `SEC` is: a change to
+/// `evaluate.rs`'s range has to fail these tests, not move with them.
+const FIRST_AUDIO: i64 = 1001;
+
 /// Comparison slack for gains and interpolated properties. Every expected
 /// value below is exactly representable in binary floating point, so this
 /// only absorbs the multiply-and-add the implementation does on the way.
@@ -435,14 +440,17 @@ fn overlapping_clips_take_two_composition_tracks() {
     let plan = handle.plan();
 
     assert_eq!(comp_track_ids(&plan, "video_tracks"), vec![1, 2]);
-    assert_eq!(comp_track_ids(&plan, "audio_tracks"), vec![101, 102]);
+    assert_eq!(
+        comp_track_ids(&plan, "audio_tracks"),
+        vec![FIRST_AUDIO, FIRST_AUDIO + 1]
+    );
     assert_eq!(
         clip_to_comp_track(&plan, "video_tracks"),
         vec![(11, 1), (12, 2)]
     );
     assert_eq!(
         clip_to_comp_track(&plan, "audio_tracks"),
-        vec![(11, 101), (12, 102)]
+        vec![(11, FIRST_AUDIO), (12, FIRST_AUDIO + 1)]
     );
     assert_tiles(&plan);
     assert_instructions_match_recipe(&handle, &plan);
@@ -463,14 +471,14 @@ fn sequential_clips_share_one_composition_track() {
     let plan = handle.plan();
 
     assert_eq!(comp_track_ids(&plan, "video_tracks"), vec![1]);
-    assert_eq!(comp_track_ids(&plan, "audio_tracks"), vec![101]);
+    assert_eq!(comp_track_ids(&plan, "audio_tracks"), vec![FIRST_AUDIO]);
     let starts: Vec<i64> = array(comp_track(&plan, "video_tracks", 1), "/segments")
         .iter()
         .map(|s| int(s, "/start"))
         .collect();
     assert_eq!(starts, vec![0, 2 * SEC, 4 * SEC], "segments in start order");
     assert_eq!(
-        array(comp_track(&plan, "audio_tracks", 101), "/segments").len(),
+        array(comp_track(&plan, "audio_tracks", FIRST_AUDIO), "/segments").len(),
         3
     );
 }
@@ -501,7 +509,10 @@ fn composition_track_ids_are_stable_across_calls() {
     // Timeline track 2 holds an overlapping pair (ids 1, 2); track 3 one
     // clip, which gets the next id.
     assert_eq!(comp_track_ids(&first, "video_tracks"), vec![1, 2, 3]);
-    assert_eq!(comp_track_ids(&first, "audio_tracks"), vec![101, 102, 103]);
+    assert_eq!(
+        comp_track_ids(&first, "audio_tracks"),
+        vec![FIRST_AUDIO, FIRST_AUDIO + 1, FIRST_AUDIO + 2]
+    );
 }
 
 // ---- plan stability, which decides rebuild versus refresh (spec §7.6) ----
@@ -676,7 +687,7 @@ fn fades_produce_ramps_from_zero_and_to_zero() {
     // By hand: silence at 0 rising to full at 1 s, full until 9 s, then back
     // to silence at 10 s — the envelope of spec §7.2's own example.
     assert_ramps(
-        array(comp_track(&plan, "audio_tracks", 101), "/ramps"),
+        array(comp_track(&plan, "audio_tracks", FIRST_AUDIO), "/ramps"),
         &[
             (0, SEC, 0.0, 1.0),
             (SEC, 8 * SEC, 1.0, 1.0),
@@ -697,7 +708,7 @@ fn a_muted_clip_and_a_muted_track_produce_a_zero_envelope() {
     ));
     let plan = handle.plan();
 
-    let comp = comp_track(&plan, "audio_tracks", 101);
+    let comp = comp_track(&plan, "audio_tracks", FIRST_AUDIO);
     assert_eq!(
         array(comp, "/segments").len(),
         1,
@@ -709,7 +720,7 @@ fn a_muted_clip_and_a_muted_track_produce_a_zero_envelope() {
     let plain = Handle::from_value(&one_clip_project(10 * SEC));
     let silenced = plain.apply(&json!({ "op": "set_track", "track": 2, "muted": true }));
     let silenced_plan = silenced.plan();
-    let silenced_comp = comp_track(&silenced_plan, "audio_tracks", 101);
+    let silenced_comp = comp_track(&silenced_plan, "audio_tracks", FIRST_AUDIO);
     assert_eq!(array(silenced_comp, "/segments").len(), 1);
     assert_ramps(array(silenced_comp, "/ramps"), &[(0, 10 * SEC, 0.0, 0.0)]);
 }
@@ -740,9 +751,12 @@ fn a_ducking_clip_lowers_the_other_track_by_its_level() {
     ));
     let plan = handle.plan();
 
-    assert_eq!(comp_track_ids(&plan, "audio_tracks"), vec![101, 102]);
+    assert_eq!(
+        comp_track_ids(&plan, "audio_tracks"),
+        vec![FIRST_AUDIO, FIRST_AUDIO + 1]
+    );
     assert_ramps(
-        array(comp_track(&plan, "audio_tracks", 101), "/ramps"),
+        array(comp_track(&plan, "audio_tracks", FIRST_AUDIO), "/ramps"),
         &[
             (0, 5 * SEC, 1.0, 1.0),
             (5 * SEC, SEC, 1.0, 0.25),
@@ -754,7 +768,7 @@ fn a_ducking_clip_lowers_the_other_track_by_its_level() {
 
     // A clip never ducks its own composition track.
     assert_ramps(
-        array(comp_track(&plan, "audio_tracks", 102), "/ramps"),
+        array(comp_track(&plan, "audio_tracks", FIRST_AUDIO + 1), "/ramps"),
         &[(5 * SEC, 5 * SEC, 1.0, 1.0)],
     );
 
@@ -779,7 +793,7 @@ fn an_envelope_covers_a_gap_between_clips_with_silence() {
     ));
     let plan = handle.plan();
 
-    let comp = comp_track(&plan, "audio_tracks", 101);
+    let comp = comp_track(&plan, "audio_tracks", FIRST_AUDIO);
     assert_eq!(
         array(comp, "/segments").len(),
         2,
@@ -815,7 +829,7 @@ fn a_linear_volume_action_collapses_to_one_ramp() {
     let handle = Handle::from_value(&volume_action_project("linear"));
     let plan = handle.plan();
     assert_ramps(
-        array(comp_track(&plan, "audio_tracks", 101), "/ramps"),
+        array(comp_track(&plan, "audio_tracks", FIRST_AUDIO), "/ramps"),
         &[
             (0, 2 * SEC, 1.0, 1.0),
             (2 * SEC, 2 * SEC, 1.0, 0.0),
@@ -828,7 +842,7 @@ fn a_linear_volume_action_collapses_to_one_ramp() {
 fn an_eased_volume_action_keeps_the_samples_it_needs() {
     let handle = Handle::from_value(&volume_action_project("ease_in_out"));
     let plan = handle.plan();
-    let ramps = array(comp_track(&plan, "audio_tracks", 101), "/ramps");
+    let ramps = array(comp_track(&plan, "audio_tracks", FIRST_AUDIO), "/ramps");
 
     assert!(
         ramps.len() > 3,
@@ -1182,13 +1196,16 @@ fn a_hidden_track_draws_nothing_and_a_muted_track_still_draws() {
 
     // Hidden is video only: the hidden track's audio still plays at full
     // volume, while the muted track's is zeroed.
-    assert_eq!(comp_track_ids(&plan, "audio_tracks"), vec![101, 102, 103]);
+    assert_eq!(
+        comp_track_ids(&plan, "audio_tracks"),
+        vec![FIRST_AUDIO, FIRST_AUDIO + 1, FIRST_AUDIO + 2]
+    );
     assert_ramps(
-        array(comp_track(&plan, "audio_tracks", 102), "/ramps"),
+        array(comp_track(&plan, "audio_tracks", FIRST_AUDIO + 1), "/ramps"),
         &[(0, 10 * SEC, 1.0, 1.0)],
     );
     assert_ramps(
-        array(comp_track(&plan, "audio_tracks", 103), "/ramps"),
+        array(comp_track(&plan, "audio_tracks", FIRST_AUDIO + 2), "/ramps"),
         &[(0, 10 * SEC, 0.0, 0.0)],
     );
 }
@@ -1209,7 +1226,11 @@ fn a_clip_whose_media_is_absent_renders_a_slate() {
         track: on_track,
         start: 0,
         duration: 10 * SEC,
-        source: Source::Media { media: 99, r#in: 0 },
+        source: Source::Media {
+            media: 99,
+            r#in: 0,
+            reversed: false,
+        },
         enabled: Enabled::default(),
         speed: 1.0,
         video: Some(VideoProps::default()),

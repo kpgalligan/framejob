@@ -45,8 +45,11 @@ extension EditorViewController {
         let at = document.playhead
 
         var ops: [ReelOp] = []
+        // `try?` collapses both failures into one nil: a thrown error and the
+        // `None` of a documented refusal. Either way the front track will not
+        // take this clip, so both take the new-track path.
         if let front = before.tracks.last?.id,
-            let placed = try? document.project.applying(make(front, at)), placed != nil
+            (try? document.project.applying(make(front, at))) != nil
         {
             ops = [make(front, at)]
         } else {

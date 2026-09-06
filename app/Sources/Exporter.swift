@@ -12,25 +12,44 @@ import UniformTypeIdentifiers
 /// that disagreed with the preview would be a bug in one of those two, never
 /// in a second rendering path — because there is not one.
 ///
-/// M1 is `AVAssetExportSession`: the core resolves a preset into concrete
-/// settings, this hands them over, and the sheet polls `progress`.
+/// M1 was `AVAssetExportSession`: the core resolved a preset into concrete
+/// settings, this handed them over, and the sheet polled `progress`. M2's
+/// `AVAssetWriter` path (`ExporterWriter.swift`) has **replaced** it, and this
+/// file is otherwise unchanged — `export`, `cancel`, `finish`, `isRunning`,
+/// the progress timer, every `ExportError`, `renderFrame` and every
+/// settings helper are what they were.
 ///
-/// **M2 seam** — the `AVAssetWriter` path replaces `startSession` and nothing
-/// else in this file. It is what adds: a chapter track (an
-/// `AVAssetWriterInput` text track associated with the video input through
-/// `AVTrackAssociationTypeChapterList`, fed from the project's `chapter`
-/// markers), explicit video/audio bitrates (`ExportSettings.videoBitrate` and
-/// `audioBitrate` are already carried here and are simply unused by the
-/// session path, which only takes a preset name), and the GIF/APNG writers
-/// (ImageIO frame-by-frame over `renderFrame`, which is why that one is
-/// static and takes no session state).
+/// **Why the writer replaced the session outright rather than joining it.**
+/// The session path cannot express three things the sheet already promises:
+/// a chapter track (`AVAssetExportSession` writes none, so a `chapter: true`
+/// marker vanished on export), explicit bitrates (`ExportSettings` has
+/// carried `videoBitrate`/`audioBitrate` all along and a preset NAME can say
+/// nothing about them), and the resolved output size and frame rate — a
+/// preset scales to fit whatever it likes, so the sheet's "1920 × 1080 ·
+/// 25 fps" was a readout of numbers nothing downstream ever read. Keeping
+/// both paths would have made all three conditional: chapters when the
+/// project has them AND the codec took the writer, one quality rule here and
+/// another there, and two answers to "what did the file end up as". That is
+/// the same second-rendering-path this whole design exists to avoid, one
+/// layer down. The writer covers every preset the core offers — H.264, HEVC,
+/// ProRes and audio-only M4A — so there is no case left for the session to
+/// hold.
 ///
-/// **Deprecations.** `exportAsynchronously(completionHandler:)`, `status`,
-/// `progress` and `error` on `AVAssetExportSession`, and
-/// `copyCGImage(at:actualTime:)` on `AVAssetImageGenerator`, are deprecated in
-/// favour of `async` replacements. Deliberately not taken: `async`/`await` is
-/// confined to `MediaImporter.swift` (app/CLAUDE.md), and spec §7.8 names this
-/// exact API. Those are the only deprecation warnings in this file.
+/// **The two formats AVFoundation cannot write** — animated GIF and APNG —
+/// are assembled frame by frame through ImageIO instead
+/// (`ExporterImageSequence.swift`), over `renderFrame`, which is why that one
+/// is static and takes no export state. Neither goes through AVFoundation at
+/// all, so neither is a branch of the writer path: they are a second
+/// pipeline, and `Exporter.pipeline` picks between the two on the core's
+/// `avf_preset`. Everything below the pick — the progress timer, `finish`,
+/// every `ExportError` — is shared, because the sheet cannot tell which one
+/// it got.
+///
+/// **Deprecations.** `copyCGImage(at:actualTime:)` on
+/// `AVAssetImageGenerator` is deprecated in favour of an `async` replacement.
+/// Deliberately not taken: `async`/`await` is confined to
+/// `MediaImporter.swift` (app/CLAUDE.md), and spec §7.8 names this exact API.
+/// It is the only deprecation warning in this file.
 final class Exporter {
 
     /// Why an export stopped. Every case is reported through `completion` —
@@ -43,16 +62,18 @@ final class Exporter {
         /// images, which need no composition track (spec §7.2) — so the
         /// message has to name the second case, which is the surprising one.
         case emptyTimeline
-        /// `AVAssetExportSession` would not build with the preset name the
-        /// core resolved (or the fallback for it).
+        /// This Mac will not encode what the core's preset resolved to — an
+        /// unknown codec name, or one `AVAssetWriter` refuses an input for.
+        /// Carries the preset id when the core gave one, else the codec.
         case presetUnavailable(String)
         /// The settings named a container this build cannot map to a file
         /// type.
         case fileTypeUnsupported(String)
         /// The user pressed Cancel. The sheet dismisses without an alert.
         case cancelled
-        /// The session ended in a state that is neither completed nor
-        /// cancelled and had no error of its own.
+        /// The write ended in a state that is neither completed nor
+        /// cancelled and had no error of its own — or one of the reader's or
+        /// writer's own steps refused with a message worth showing.
         case failed(String)
 
         var errorDescription: String? {
@@ -73,9 +94,10 @@ final class Exporter {
         }
     }
 
-    /// How often the sheet's bar is refreshed. `AVAssetExportSession` has no
-    /// progress callback, so the only way to draw a bar is to ask (spec
-    /// §7.8); 0.1 s is smooth and costs nothing.
+    /// How often the sheet's bar is refreshed. Neither
+    /// `AVAssetExportSession` nor `AVAssetWriter` has a progress callback, so
+    /// the only way to draw a bar is to ask (spec §7.8); 0.1 s is smooth and
+    /// costs nothing.
     static let progressInterval: TimeInterval = 0.1
 
     /// The documented rebuild seam (app/CLAUDE.md): building a composition
@@ -85,7 +107,10 @@ final class Exporter {
     private let buildQueue = DispatchQueue(
         label: "com.kgalligan.reelcut.export", qos: .userInitiated)
 
-    private var session: AVAssetExportSession?
+    /// Whatever is writing this export: the `AVAssetWriter` path or the
+    /// ImageIO one, behind the three calls `Exporter` makes of either
+    /// (`ExportPipeline`).
+    private var writer: (any ExportPipeline)?
     private var timer: Timer?
     /// This export's own `RecipeSource` slot. NOT the document's: the document
     /// republishes on every edit, and a frame already queued must not be
@@ -93,9 +118,8 @@ final class Exporter {
     private var recipeKey: Int?
     private var progressHandler: ((Double) -> Void)?
     private var completionHandler: ((Result<URL, any Error>) -> Void)?
-    private var destination: URL?
     /// Set by `cancel()`. Checked once the build lands, because a cancel
-    /// during the build has no session to stop yet.
+    /// during the build has no writer to stop yet.
     private var cancelRequested = false
 
     init() {}
@@ -126,7 +150,6 @@ final class Exporter {
         cancelRequested = false
         progressHandler = progress
         completionHandler = completion
-        destination = url
 
         guard let plan = project.plan else {
             finish(.failure(ExportError.noPlan))
@@ -151,8 +174,14 @@ final class Exporter {
                 try CompositionBuilder.build(
                     plan: plan, planJSON: planJSON, urls: urls, recipeKey: key)
             }
+            // Read here, not on the main thread: the markers come off the
+            // SNAPSHOT, and on a handle nothing has looked at yet that is the
+            // first decode of the whole project JSON.
+            let chapters = ExportChapter.list(from: project.snapshot.markers)
             DispatchQueue.main.async { [weak self] in
-                self?.startSession(result, settings: settings, to: url)
+                self?.startWriting(
+                    result, project: project, urls: urls, chapters: chapters,
+                    settings: settings, to: url)
             }
         }
     }
@@ -162,16 +191,21 @@ final class Exporter {
     /// `cancelRequested` is for.
     func cancel() {
         cancelRequested = true
-        session?.cancelExport()
+        writer?.cancel()
     }
 
     /// True between `export` and its completion.
     var isRunning: Bool { completionHandler != nil }
 
-    // MARK: - The session
+    // MARK: - The write
 
-    private func startSession(
-        _ result: Result<BuiltComposition, any Error>, settings: ExportSettings, to url: URL
+    /// The built composition, the chapters and the settings, handed to the
+    /// pipeline the settings ask for — the one place this file knows anything
+    /// about how a file is actually written (`ExporterWriter.swift` and
+    /// `ExporterImageSequence.swift`).
+    private func startWriting(
+        _ result: Result<BuiltComposition, any Error>, project: ReelProject,
+        urls: [UInt32: URL], chapters: [ExportChapter], settings: ExportSettings, to url: URL
     ) {
         guard completionHandler != nil else { return }
         guard !cancelRequested else {
@@ -186,70 +220,49 @@ final class Exporter {
         case .success(let composition):
             built = composition
         }
-
-        let presetName = settings.avPreset ?? Exporter.fallbackPreset(for: settings)
-        guard let session = AVAssetExportSession(asset: built.composition, presetName: presetName)
-        else {
-            finish(.failure(ExportError.presetUnavailable(presetName)))
-            return
-        }
-        guard let fileType = Exporter.fileType(for: settings) else {
-            finish(.failure(ExportError.fileTypeUnsupported(settings.container)))
-            return
-        }
-        // AVFoundation refuses to write over an existing file. The save panel
-        // already asked for permission to replace, so removing it here is the
-        // user's answer being carried out, not a surprise.
+        // AVFoundation refuses to write over an existing file, and a stale
+        // one under a half-written image sequence would be no better. The
+        // save panel already asked for permission to replace, so removing it
+        // here is the user's answer being carried out, not a surprise.
         try? FileManager.default.removeItem(at: url)
 
-        session.outputURL = url
-        session.outputFileType = fileType
-        session.shouldOptimizeForNetworkUse = settings.optimizeForNetwork
-        session.timeRange = Exporter.timeRange(settings, composition: built.composition)
-        // An audio-only preset gets NO video composition: attaching one asks
-        // AVFoundation to run the custom compositor for frames nothing will
-        // write, which at best wastes the whole render and at worst refuses
-        // the preset outright.
-        if !settings.isAudioOnly {
-            session.videoComposition = built.videoComposition
+        // Which pipeline writes it is the settings' decision rather than this
+        // file's: `Exporter.pipeline` reads the core's `avf_preset` and hands
+        // back either the `AVAssetWriter` path or the ImageIO one.
+        let writer: any ExportPipeline
+        do {
+            writer = try Exporter.pipeline(
+                built: built, project: project, urls: urls, settings: settings,
+                chapters: chapters, to: url)
+        } catch {
+            finish(.failure(error))
+            return
         }
-        session.audioMix = built.audioMix
-        self.session = session
+        self.writer = writer
 
         // The documented progress-timer seam (app/CLAUDE.md). A run-loop
         // timer, not a dispatch source, so it stops deterministically the
-        // moment the session finishes.
+        // moment the write finishes.
         timer = Timer.scheduledTimer(
             withTimeInterval: Exporter.progressInterval, repeats: true
         ) { [weak self] _ in
             self?.pollProgress()
         }
         progressHandler?(0)
-        session.exportAsynchronously { [weak self] in
-            // AVFoundation calls this on a queue of its own.
-            OperationQueue.main.addOperation { self?.sessionFinished() }
+        // The pipeline calls back on the main thread, exactly once. The bar
+        // is driven to full here rather than left wherever the last sample
+        // put it, so a consumer that watches only `progress` still sees the
+        // end.
+        writer.start { [weak self] result in
+            guard let self = self else { return }
+            if case .success = result { self.progressHandler?(1) }
+            self.finish(result)
         }
     }
 
     private func pollProgress() {
-        guard let session = session else { return }
-        progressHandler?(Double(session.progress))
-    }
-
-    private func sessionFinished() {
-        guard let session = session, let url = destination else { return }
-        switch session.status {
-        case .completed:
-            progressHandler?(1)
-            finish(.success(url))
-        case .cancelled:
-            finish(.failure(ExportError.cancelled))
-        default:
-            finish(
-                .failure(
-                    session.error
-                        ?? ExportError.failed("The export stopped before it finished.")))
-        }
+        guard let writer = writer else { return }
+        progressHandler?(writer.progress)
     }
 
     /// The one exit. Tears down the timer and the recipe slot before the
@@ -262,7 +275,7 @@ final class Exporter {
             RecipeSource.shared.unregister(key)
             recipeKey = nil
         }
-        session = nil
+        writer = nil
         let completion = completionHandler
         completionHandler = nil
         progressHandler = nil
@@ -288,6 +301,13 @@ final class Exporter {
     /// preset the core's decision, and this only exists so a core that adds a
     /// preset before this build knows about it still exports something
     /// sensible instead of refusing.
+    ///
+    /// **Not on the export path any more** — the writer sets the codec, the
+    /// size and the bitrate itself and needs no preset name. Kept because it
+    /// is the one place that maps the core's presets onto the
+    /// `AVAssetExportSession` names spec §7.8 still lists, and because
+    /// `ExportSettings.isAudioOnly` reads `avPreset` against one of them: the
+    /// mapping has not left this file, only the session has.
     static func fallbackPreset(for settings: ExportSettings) -> String {
         if settings.isAudioOnly { return AVAssetExportPresetAppleM4A }
         switch settings.codec.lowercased() {

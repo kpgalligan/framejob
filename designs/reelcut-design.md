@@ -181,7 +181,20 @@ Opacity and Shadow only.
 - *Shadow*: on/off, color, opacity, blur, angle, distance.
 - *Color*: brightness, contrast, saturation, hue rotate; Reset.
 - *Speed*: rate ×0.1 – ×10 with presets (0.5, 1, 2, 4), "Keep pitch",
-  the resulting duration. Reverse is M3.
+  **Reverse**, a "Reversed frames" readout, a Render Reverse button, and
+  the resulting duration. Reverse (M3) is a checkbox over `set_reversed`,
+  but unlike everything else in this tab it does not change the picture by
+  itself: AVFoundation cannot play a clip backwards, so the frames are
+  pre-rendered once per media file (§11, §5.6) and the composition reads
+  that file instead. Ticking the box therefore starts a render behind a
+  progress sheet with a Cancel — and **until the frames exist the clip
+  draws the missing-media slate, never forward frames**, because a clip
+  that silently played the wrong way was the whole defect the pre-render
+  fixes. The readout says which state the clip is in (Rendered, Rendering…,
+  Not rendered, Media missing); Render Reverse is live only in the "Not
+  rendered" state, which is what a cancelled or failed render leaves
+  behind. Nothing retries on its own: a render the user stopped must not
+  restart itself on the next keystroke.
 - *Actions*: table of the clip's actions (start, duration, curve, which
   properties change); Add Action at the playhead (⌥⌘K), Remove, curve
   popup. While the playhead is inside an action, edits in this tab set
@@ -191,6 +204,9 @@ Opacity and Shadow only.
 - M3: *Chroma key* (key color with a canvas eyedropper, tolerance,
   softness, spill suppression), *Reflection*, *Filters* (blur, sharpen,
   pixelate, sepia, noir, vignette, invert — Core Image behind them).
+- M3: *Spotlight* — the stand-in for a screencast editor's freehand callout — lives
+  here rather than in the Shape pane below, because only the layer that
+  owns the pixels can draw its 1.2–2× zoom.
 
 **Audio** — clips whose media has an audio track and whose audio is
 enabled.
@@ -203,7 +219,27 @@ enabled.
   envelopes by the core.
 - Mix to mono. Detach Audio (⌥⌘D; also Clip menu).
 - Volume actions share the Actions table.
-- M3: pan, Smooth volume levels (compressor), Remove background noise.
+- M3 — Pan, "Smooth volume levels" (compressor), "Remove background
+  noise". Unlike everything above, these three cannot be a gain curve, so
+  they are not folded into the core's envelope: they are sample work, done
+  in Swift by one `MTAudioProcessingTap` per composition audio track, and
+  the SAME tap serves the preview and the export (the mix reaches both
+  `AVPlayerItem.audioMix` and `AVAssetReaderAudioMixOutput.audioMix`, and
+  taps were measured to run on each). A track no clip of which uses them
+  gets no tap and is bit-identical to before they existed.
+  - Pan is a balance: one gain per channel, constant power across the
+    sweep and unity at the centre, so 0 is exactly a bypass and a hard
+    pan is +3 dB in the channel it goes to. Inaudible on a clip whose
+    source is mono — the widening to stereo happens after the tap.
+  - The compressor is a channel-strip insert on the track, ahead of the
+    fader: its envelope carries across a cut and the volume, fades and
+    ducking apply after it. Its attack and release are ticks in the
+    schema but sub-frame, and the pane shows them in ms.
+  - Noise reduction is a short-time spectral attenuator over a noise
+    floor tracked from the clip itself — not a gate, and it delays the
+    track it runs on by 512 samples (10.7 ms at 48 kHz).
+  - Read at the clip's BASE properties, never through an action, exactly
+    as ducking is (§7.2).
 
 **Text**
 
@@ -223,9 +259,9 @@ enabled.
 - Kind: rectangle, rounded rectangle, ellipse, line, arrow. Stroke width
   and color, fill color and opacity, arrowheads at start / end, corner
   radius, Shadow.
-- M3: *Spotlight* — darkens the canvas outside a rectangle or ellipse,
-  with optional 1.2–2× zoom of the region. The stand-in for a screencast editor's
-  freehand callout that works on any footage.
+- M3: *Spotlight* — which darkens the canvas outside a rectangle or
+  ellipse, with an optional 1.2–2× zoom of the region — is a
+  `video.spotlight` prop and appears in the **Video** pane, not here.
 
 **Media**
 
@@ -237,8 +273,15 @@ enabled.
 - Right-click: Reveal in Finder, Relink…, Remove (refuses while in use and
   offers "Remove and delete its clips").
 - Files are referenced (path + `URL.bookmarkData()`; the app is not
-  sandboxed, so no security scope), never copied. File > Consolidate
-  Media… copies them into the package (M3).
+  sandboxed, so no security scope), never copied. File ▸ Consolidate
+  Media… — and the pane's own Consolidate… button — copies them into the
+  package and relinks the project at the copies, with a progress sheet and
+  a Cancel; §5.6 has the rules it follows.
+- File ▸ Import Captions… reads a SubRip (`.srt`) file and lays it out as
+  text clips in the Caption preset on a track of their own, which is what
+  makes burn-in on export free: a caption is an ordinary text clip, so it
+  retimes, restyles and renders like one. Malformed entries are reported
+  with their line numbers rather than skipped in silence.
 
 **Document**
 
@@ -309,8 +352,19 @@ squares at the audio corners you drag inward.
   kind — Cross Dissolve, Fade through black / white, Push (4 directions),
   Wipe, Slide, Zoom — and duration. Changing the duration moves the later
   clip to match.
-- Nest (⌘G): selected clips collapse into one clip; double-click enters
-  it with a breadcrumb. M3.
+- Nest (⌘G): the selected clips collapse into one grey clip standing for
+  the group, which then moves, trims, fades and transforms as one thing;
+  the new clip is selected. Un-nest (⇧⌘G) opens every nest clip in the
+  selection and selects what came out, in one undo step. **Entering a
+  nest** — double-click it, the timeline and canvas show its contents, a
+  breadcrumb leads back out — is NOT built, and waits on the op table:
+  every clip argument in §6 resolves against the project's own `clips`
+  (`Project::clip`), so no op can name a clip inside a nest, and an
+  inside view could only be read-only. Naming one needs a path-valued
+  `clip` argument or a nest scope on the envelope — the core already has
+  the shape, `Instance::path`. Until then the round trip is the way in:
+  ⇧⌘G, edit, ⌘G, which is the identity on clip content but drops the
+  nest clip's own group-level properties.
 - Auto-scroll follows the playhead during playback; pinch and ⌘= / ⌘-
   zoom about the cursor; ⇧Z fits the whole timeline.
 
@@ -327,7 +381,7 @@ grid (`rc_time_snap_to_frame`, round-to-nearest); sources keep their own
 rate and AVFoundation picks the source frame. Frame rates are rationals
 `[num, den]` everywhere.
 
-### 5.2 Project — the JSON schema (format version 1)
+### 5.2 Project — the JSON schema (format version 2)
 
 The Rust value, serialized by serde. Small, no pixels. All times are
 ticks, all positions canvas pixels, colors `[r, g, b, a]` floats 0–1,
@@ -335,7 +389,7 @@ angles degrees, opacity/volume 0–1 (volume may exceed 1, up to 4).
 
 ```json
 {
-  "version": 1,
+  "version": 2,
   "canvas": { "width": 1920, "height": 1080, "fps": [30, 1],
               "background": [0, 0, 0, 1], "fit_new_clips": true,
               "timecode_frames": true },
@@ -350,7 +404,7 @@ angles degrees, opacity/volume 0–1 (volume may exceed 1, up to 4).
   ],
   "clips": [
     { "id": 17, "track": 1, "start": 0, "duration": 12000000,
-      "source": { "kind": "media", "media": 1, "in": 3000000 },
+      "source": { "kind": "media", "media": 1, "in": 3000000, "reversed": false },
       "enabled": { "video": true, "audio": true },
       "speed": 1.0,
       "video": { "x": 0, "y": 0, "scale": 1.0, "rotation": 0, "opacity": 1,
@@ -358,9 +412,11 @@ angles degrees, opacity/volume 0–1 (volume may exceed 1, up to 4).
                  "corner_radius": 0,
                  "shadow": null,
                  "color": { "brightness": 0, "contrast": 0, "saturation": 0, "hue": 0 },
-                 "chroma": null },
+                 "chroma": null,
+                 "filters": [], "reflection": null, "spotlight": null },
       "audio": { "volume": 1.0, "muted": false, "fade_in": 0, "fade_out": 0,
-                 "duck": null, "mono": false, "keep_pitch": true },
+                 "duck": null, "mono": false, "keep_pitch": true,
+                 "pan": 0, "compressor": null, "noise_reduction": 0 },
       "text": null, "shape": null,
       "actions": [
         { "id": 1, "start": 2400000, "duration": 900000, "curve": "ease_in_out",
@@ -369,20 +425,52 @@ angles degrees, opacity/volume 0–1 (volume may exceed 1, up to 4).
       "transition_in": null }
   ],
   "markers": [ { "id": 1, "time": 6000000, "name": "Intro", "color": "red", "chapter": true } ],
-  "next_id": 18
+  "next_id": 18,
+  "nests": []
 }
 ```
 
 - `source.kind` is one of `media` (video/audio file, with `in` = source
-  time of the clip's first frame), `still` (`media`, `at` — a freeze
-  frame), `image` (`media` — a PNG/JPEG/HEIC), `text`, `shape`, `nest`
-  (`project` — M3). `speed` applies to `media` only; `still`, `image`,
-  `text`, `shape` have no source bound and any duration.
+  time of the clip's first frame and `reversed` = play it back to front),
+  `still` (`media`, `at` — a freeze frame), `image` (`media` — a
+  PNG/JPEG/HEIC), `text`, `shape`, `nest` (`project` — the ID of an entry
+  in the project's `nests[]`, M3). `speed` applies to `media` only;
+  `still`, `image`, `text`, `shape` and `nest` have no source bound and
+  any duration.
+- `source.reversed` (M3) is a fact, not an instruction: the core does no
+  pixel work, so it changes neither the plan nor the recipe, and Swift
+  substitutes a pre-rendered reversed asset for that media's segments
+  (§11). `in` is then measured in the reversed stream, which is the same
+  length — so an `in` of 0 is the media's last frame, and every time
+  computation in the core is unchanged.
 - `enabled.video` / `enabled.audio` — Detach Audio flips them across two
   clips (§6). A media clip with `has_audio` false has `audio: null`.
 - `video.shadow`: `{ "color": [...], "opacity": 0.5, "blur": 12, "angle": 315, "distance": 8 }`.
 - `video.chroma` (M3): `{ "key": [r,g,b], "tolerance": 0.2, "softness": 0.1, "spill": 0.5 }`.
+- `video.filters` (M3): an ordered list of `{ "kind": …, "amount": 0..1 }`,
+  at most **four** — a shader budget, not taste: the uniform block carries
+  four (kind, amount) pairs. `kind` ∈ `blur`, `sharpen`, `pixelate`,
+  `sepia`, `noir`, `vignette`, `invert`. They are a pass of the one Metal
+  pipeline (§7.5), not Core Image: a second renderer would be a second
+  thing for export to disagree with.
+- `video.reflection` (M3): `null` or `{ "opacity": 0.35, "height": 0.5,
+  "gap": 0, "falloff": 1.0 }`. `height` and `falloff` are fractions of the
+  layer's cropped height so a reflection survives a scale change; `gap` is
+  source pixels.
+- `video.spotlight` (M3): `null` or `{ "shape": "rect" | "ellipse",
+  "x": 0, "y": 0, "width": 480, "height": 270, "feather": 40, "dim": 0.6,
+  "zoom": 1.0 }` — darkens the canvas outside the region and magnifies
+  what is inside it (1–2×). Centre and box are SOURCE pixels from the
+  cropped rect's centre. A *video* prop, not a shape one (§4.3's Shape
+  pane first listed it): only the layer that owns the pixels can draw the
+  zoom.
 - `audio.duck`: `{ "level": 0.2, "attack": 300000, "release": 600000 }`.
+- `audio.pan` (M3) is -1 (hard left) to +1 (hard right);
+  `audio.noise_reduction` (M3) is 0 (off) to 1.
+- `audio.compressor` (M3): `null` or `{ "threshold_db": -18, "ratio": 3,
+  "attack": 6000, "release": 120000, "makeup_db": 0 }` — "smooth volume
+  levels". Unlike ducking, this cannot be expressed as a gain curve, so
+  the model carries the parameters and the DSP is Swift's.
 - `text`: `{ "content": "…", "font": "SourceSans3-SemiBold", "size": 72, "color": [...],
   "align": "center", "valign": "middle", "line_spacing": 1.0, "tracking": 0,
   "outline": null | { "width": 2, "color": [...] },
@@ -399,8 +487,22 @@ angles degrees, opacity/volume 0–1 (volume may exceed 1, up to 4).
   "fade_white" | "push_left" | "push_right" | "push_up" | "push_down" |
   "wipe" | "slide" | "zoom" }`. Its duration *is* the overlap with the
   previous clip on the track; a clip with no overlap ignores it.
-- Ids are unique across all kinds in one project (`next_id`), so an MCP
-  call can name anything by one integer.
+- `nests` (M3) holds the groups every `nest` clip points at:
+  `{ "id": 60, "name": "Intro", "width": 1920, "height": 1080,
+  "tracks": [...], "clips": [...] }`. A nest is **not** a nested project:
+  its tracks and clips live in the parent's one id space, reference the
+  parent's `media[]`, and start from 0 — so the plan's clip-keyed track
+  map, `CompositionBuilder`'s media lookup and `next_id` all keep working
+  when a nest is flattened at evaluation time. Its `width`/`height` are
+  frozen at the size the parent had when it was made, so a later canvas
+  change does not silently re-lay-out a nest. A nest's duration is the
+  largest clip end inside it; the nest CLIP's duration is independent and
+  trims it. Nesting is capped at **8** levels, a nest may not reach
+  itself, and nested tracks and clips count toward the same caps as the
+  timeline's.
+- Ids are unique across all kinds in one project (`next_id`) — INCLUDING
+  everything inside a nest — so an MCP call can name anything by one
+  integer.
 - **Not** in the model: selection, playhead, zoom, scroll, panel sizes.
   That is view state and lives in Swift.
 
@@ -420,6 +522,24 @@ angles degrees, opacity/volume 0–1 (volume may exceed 1, up to 4).
   the size is the measured layout size; only the platform knows it, so
   `LayerRenderers` reports it to the overlay (a cache keyed by the text
   description hash) — the model never stores it.
+- **`spotlight` is in that same source-pixel frame** (M3): its centre is
+  measured from the centre of the *cropped* rect, and its `width`,
+  `height` and `feather` are source pixels — like `corner_radius` and
+  `crop`, and unlike `x`/`y`, which are canvas pixels. So a spotlight
+  stays on the face it was put on when the layer is scaled, moved or
+  rotated, and the compositor scales all four by the layer's scale on the
+  way to canvas space.
+- **`reflection` hangs below the layer** (M3), mirrored about the cropped
+  rect's bottom edge, `gap` source pixels clear of it, `height` of the
+  layer's cropped height tall, fading out with `falloff`. It is drawn
+  BEFORE the layer, so the layer always wins where they meet, and it is
+  part of the layer — it rotates with it.
+- **A nest's layers are flattened at evaluation time** (M3): each drawing
+  clip inside a nest becomes one recipe layer with the nest clip's
+  transform folded in (scales multiply, rotations add, offsets rotate),
+  and every such layer carries the nest's canvas rect as its `clip_rect`
+  (§7.3). Fold and clip are both similarity transforms, so the
+  composition is exact and no intermediate render target is needed.
 
 ### 5.4 Actions
 
@@ -463,6 +583,7 @@ Talk.reelcut/
   cache/                # regenerable; never required to open
     thumbs/<media id>/<index>.jpg
     peaks/<media id>.bin        # f32 max-magnitude per bucket, 100 buckets/s
+    reversed/<media id>-<digest>.mov   # pre-rendered reverse (M3)
   media/                # only after Consolidate (M3)
 ```
 
@@ -470,6 +591,59 @@ The reader accepts every prior version; the writer enforces the reader's
 caps (max 4096 clips, 64 tracks, 1024 markers — `RC_CAPS` in
 `format.rs`). Opening a project whose media is missing opens anyway with
 the clips marked missing (rendered as a slate) and Relink… offered.
+
+**Consolidate Media** (File ▸ Consolidate Media…, and the Media tab's own
+button) fills `media/`: every file the project references is copied in and
+its media entry relinked at the copy, so the package becomes the whole edit
+and survives the footage being moved or deleted. The rules, all of which
+`MediaConsolidator` enforces:
+
+- An untitled project has no package, so the command offers the Save that
+  makes one rather than inventing a destination — a cache written to the
+  temporary directory is regenerable, media put there would be lost.
+- Names are made unique inside `media/` (`intro.mov`, `intro-2.mov`), and
+  two entries resolving to one file share one copy.
+- A file already inside `media/` is never copied onto itself; its entry is
+  still relinked, because a stale bookmark outranks the path in
+  `mediaURL(for:)`.
+- **Bookmarks are cleared** for a consolidated entry: a save writes a new
+  package beside the old one and swaps, so a bookmark INTO the package is a
+  bookmark to a file a later save replaces. The path is the durable half,
+  and opening a package re-anchors any media it cannot find at
+  `<package>/media/<same name>` — which is what lets a consolidated package
+  be moved or renamed.
+- Nothing is relinked until its copy is on disk, so a failure or a Cancel
+  part-way leaves the rest pointing at the originals and the project still
+  opens.
+
+**Reversed assets** (`cache/reversed/`) are the one cache entry that is
+expensive rather than cheap to rebuild, and the choice of where to keep them
+is deliberate. `set_reversed` changes no pixels in the core (§6, §11), so
+Swift pre-renders the media backwards once and the composition substitutes
+that file for the clip's segments; a ten-minute 4K reverse is minutes of
+decode and encode. `cache/` is still the right home: it satisfies the rule
+above — delete it and `ReverseRenderer` makes it again from media the project
+still references — and it travels with the package, so a project handed to
+someone else arrives with its reversed clips ready. That is the opposite of
+the call §11 makes for ffmpeg rewraps, and for the opposite reason: a rewrap
+is the only *decodable* copy of footage, so losing it loses the media, while
+a reverse is a rendering of media that is still there. An untitled document
+renders into the same temporary cache directory the filmstrips use, and the
+first save copies it in.
+
+The file name carries a digest of the source's path, size and modification
+second, exactly as a rewrap's does, because a media *id* outlives the file
+behind it: Relink… can point media 3 at another movie, and a reverse named
+for the id alone would then be frames of the wrong film. The digest makes a
+render both reusable and self-invalidating; the previous digest's file is
+deleted when a new one lands. A reverse is written to a `.partial` sibling
+and moved into place only on success, so a cancel can never leave a
+half-reversed file that later looks finished. Rendering it means creating a
+directory inside the package, so `ProjectDocument.packageContentsDidChangeOnDisk()`
+is called afterwards for the reason Consolidate calls it.
+
+`fileWrapper(ofType:)` is a whitelist of `project.json`, `cache/` and
+`media/`: a directory not named there is DELETED by the next save.
 
 ## 6. Edit operations — exact semantics
 
@@ -482,7 +656,7 @@ or animates back); "error" = `Err`.
 | Op | Semantics |
 |---|---|
 | `add_clip {track, media, at}` | Whole media as one clip at `at`; source in 0; Fit scale if `fit_new_clips` and the source exceeds the canvas. Refuses if the overlap rule fails. |
-| `add_text_clip {track, at, duration=5 s, text?}` / `add_shape_clip {…, shape?}` | Same placement rules; default text is the Title preset centered. `text` and `shape` are **patch objects** in the `set_text` / `set_shape` shape, merged over that default — not a bare string or kind. |
+| `add_text_clip {track, at, duration=5 s, text?}` / `add_shape_clip {…, shape?}` | Same placement rules; default text is the Title preset centered, default shape the rectangle — except that `shape.kind = "arrow"` is created with `arrow_end` on, since an arrow with no head is a diagonal line. `text` and `shape` are **patch objects** in the `set_text` / `set_shape` shape, merged over that default — not a bare string or kind — so an explicit `arrow_end: false` still wins. (The MCP tools additionally accept a bare string as shorthand: the words for `text`, a kind name for `shape`.) |
 | `move_clip {clips, delta, track}` | Shifts by `delta` ticks (may be negative; clamps at 0) and optionally to another track (all selected clips keep their relative track offsets). **Overlap rule** on the destination track: a clip may overlap at most one neighbour on each side, and each overlap must be ≤ half of the shorter of the two clips; anything else refuses. An overlap is a transition; a clip that gains a predecessor overlap gets `transition_in = cross_dissolve` if it had none. |
 | `trim_start {clip, to}` | New start `to`; source in advances by `(to − start) × speed`. Clamps: `to ≥ start − in/speed` (source bound), `to < end − one frame`. |
 | `trim_end {clip, to}` | New end `to`; clamps to the source's remaining length (`media` sources) and `> start`. |
@@ -492,9 +666,13 @@ or animates back); "error" = `Err`.
 | `ripple_delete {clips}` / `ripple_delete_range {from, to}` | Removes; then for each removed span (union of the removed clips' spans, processed right-to-left) shifts every clip on **unlocked** tracks whose start ≥ span end left by the span length. Clips on other tracks that straddle a span are left in place. Range form: every unlocked clip is split at both bounds first, the middle pieces removed, then the shift. |
 | `insert_time {at, length}` | Shifts every unlocked clip whose start ≥ `at` right by `length`. Straddling clips are left in place. |
 | `set_speed {clip, rate, keep_pitch}` | `duration = source_len / rate`; actions keep their clip-relative *fraction* of the clip. Media sources only, an **error** on any other kind (as `rate_stretch`). Rate is clamped to ×0.1–×10. |
+| `set_reversed {clip, reversed}` | Plays the media back to front, or forward again. The core does no pixel work, so this changes neither the plan nor the recipe: Swift substitutes a pre-rendered reversed asset for that media's segments (§11). `in` is measured in the direction the clip PLAYS, so reversing keeps the in point and therefore shows different frames; the alternative would put two conventions into every trim and split. Media sources only, an **error** on any other kind. |
 | `freeze_frame {clip, at, duration=2 s}` | `split` at `at`, `insert_time(at, duration)`, then a `still {media, at: source time}` clip filling the gap on the same track with the original's video props. Media sources only, an **error** on any other kind (as `rate_stretch`). |
 | `detach_audio {clip}` | `enabled.audio = false` on the clip; a new clip with `enabled = {video: false, audio: true}`, same source/in/duration/speed and the audio props, on the track below (a track is inserted at index 0 if needed). Refuses if the media has no audio or audio is already detached. |
 | `duplicate {clips}` | Copies placed after the originals' span on the same tracks (⌥-drag then moves them). |
+| `paste {at, track?, payload}` | Inserts the clips of a clipboard payload — `{"clips": [...], "media": [...]}`, what ⌘C wrote to `com.kgalligan.reelcut.clips` — with fresh ids for the clips, their actions and any media row added. The EARLIEST clip lands exactly at `at` and the rest keep their offsets from it. A payload clip's `track` is a **depth from the front** (0 = front-most), not an id, since the ids belong to the document copied from: `track` names where depth 0 lands (default: the front-most track), the rest follow by the same index delta, and tracks missing behind it are added. Media is matched to `media[]` **by path** — reused when it is there, appended when it is not — so a paste between documents brings the entry with it. A clip the overlap rule refuses on its target track goes on a new track in front (as Add Text does, §4.1), so the only refusal is an empty clip list; a malformed payload is an **error**. |
+| `nest {clips, name?}` | Collapses the selection into ONE clip showing a nest (§5.2), on the front-most track the selection occupied, running from the earliest start to the latest end. The clips move whole — ids, props, actions, transitions — keeping their relative times (the earliest starts at 0 inside) and their track order, onto fresh tracks of the nest's own that copy the source tracks' names and their hidden/muted/locked state. The nest's canvas is frozen at the project's current size, so a later `set_canvas` cannot re-lay-out what is inside it. Media is untouched: a nest references the project's `media[]` in the same one id space. Refuses on an empty selection, on a selection of one nest clip, and when the nest clip would break the overlap rule against what was left behind. |
+| `unnest {clip}` | The inverse: the nest's clips return at `clip.start + their own start` with fresh ids (as `split` then a re-join mints fresh ones), on tracks counted back from the nest clip's own — the nest's front-most track lands where the nest clip was — with tracks missing behind added, and the nest clip goes. A clip the overlap rule refuses lands on a new track in front, as `paste` does, so a group can always be opened. A nest clip trimmed shorter than its contents gives **all** of them back: there is no in point on a nest, so this is the inverse of `nest`, not of the trim. The nest is dropped from `nests[]` when no clip anywhere still shows it. An **error** when `clip` is not a nest clip. |
 | `set_video {clips, patch}` / `set_audio` / `set_text` / `set_shape` | Merge the patch into the base props. Refuses if nothing changes. |
 | `set_enabled {clip, video?, audio?}` | Visibility/mute per clip. |
 | `set_transition {clip, kind|null}` | Sets `transition_in`. `set_transition_duration {clip, duration}` moves the clip so the overlap equals `duration` (subject to the overlap rule). |
@@ -617,7 +795,7 @@ every edit and compares).
     { "id": 2, "segments": [ … ] }
   ],
   "audio_tracks": [
-    { "id": 101, "segments": [
+    { "id": 1001, "segments": [
         { "clip": 17, "media": 1, "source_in": 3000000, "source_duration": 12000000,
           "start": 0, "duration": 12000000, "pitch": "spectral" } ],
       "ramps": [ { "start": 0, "duration": 600000, "from": 0.0, "to": 1.0 },
@@ -635,11 +813,18 @@ every edit and compares).
   to the first composition track (of that timeline track's set) whose last
   segment ends at or before the clip's start; a new one is added when
   none does. With the overlap rule (§6) that is at most two per timeline
-  track. Composition track ids are stable small integers (video 1…,
-  audio 101…) and Swift creates tracks with `preferredTrackID:` equal to
-  them, so the recipe can name a track by the same id. Segments on one
-  composition track never overlap; gaps are left empty (AVFoundation
-  treats them as no frame).
+  track — except for a nest clip, which stands for a whole stack and needs
+  as many as the nest's own tracks do. Composition track ids are stable
+  small integers (video 1…, audio **1001…**) and Swift creates tracks with
+  `preferredTrackID:` equal to them, so the recipe can name a track by the
+  same id. The two ranges are far apart because `MAX_TRACKS` is 64 counted
+  across the timeline *and* every nest, so up to 128 video ids can be
+  handed out; `CompositionBuilder.makeTrack` throws on a collision rather
+  than renumbering. Segments on one composition track never overlap; gaps
+  are left empty (AVFoundation treats them as no frame). The whole
+  assignment runs over the FLATTENED timeline: a clip inside a nest gets a
+  segment at `nest clip start + its own start`, clipped to the nest clip's
+  extent, exactly as a timeline clip does.
 - **Speed / freeze.** `duration != source_duration` means Swift inserts
   the source range then `scaleTimeRange` to `duration`. A `still` clip is
   a segment whose `source_duration` is exactly one source frame — the
@@ -648,15 +833,19 @@ every edit and compares).
   covering the track's whole extent, with fades, volume, volume actions
   (sampled at 1/30 s across their span) and ducking (every other clip's
   envelope multiplied by `level` over the ducking clip's extent with
-  linear attack/release ramps) already folded in. Muted clips and muted
-  tracks produce a 0 envelope; `mono` is a per-segment flag Swift applies
+  linear attack/release ramps) already folded in, **multiplied by the same
+  quantities for every nest clip the segment is inside** — turning a nest
+  down turns everything in it down, and muting one silences it. Muted
+  clips and muted tracks produce a 0 envelope; `mono` is a per-segment flag Swift applies
   with `AVMutableAudioMixInputParameters` where possible (else ignored in
   M2, noted).
 - **Instructions** tile `[0, duration]` with no gaps or overlaps (an
   AVFoundation requirement); a boundary wherever the set of visible
-  layers changes. Hidden tracks contribute nothing. `image`, `text` and
-  `shape` clips need no composition track and do not appear in
-  `required_track_ids`.
+  layers changes — which includes every **inner** clip edge of a nest,
+  since the invariant the tiling rests on is that membership at a span's
+  first tick holds for the whole span. Hidden tracks contribute nothing,
+  inside a nest as much as outside. `image`, `text` and `shape` clips
+  need no composition track and do not appear in `required_track_ids`.
 - The decoder budget: warn (in the plan, `"warnings": [...]`) when more
   than 8 video composition tracks are required by one instruction.
 
@@ -676,6 +865,7 @@ Asked once per frame by the compositor, and by the overlay for hit-testing.
       "corner_radius": 0, "shadow": null,
       "color": { "brightness": 0, "contrast": 0, "saturation": 0, "hue": 0 },
       "chroma": null,
+      "filters": [], "reflection": null, "spotlight": null, "clip_rect": null,
       "transition": null },
     { "clip": 23,
       "source": { "kind": "text", "hash": "9f3c…", "text": { …resolved text props… } },
@@ -694,6 +884,30 @@ Asked once per frame by the compositor, and by the overlay for hit-testing.
   content hash Swift caches textures by), `missing` (draw a slate).
 - `source_size` is the media pixel size, or `null` for text (the renderer
   knows) and the box size for shapes.
+- `filters`, `reflection` and `spotlight` (M3) are the §5.2 property groups
+  already evaluated: an ordered list of `{ "kind", "amount" }` at most
+  `MAX_FILTERS` long, and the two objects or `null`. They are always
+  present, so a renderer never has to ask whether the key exists.
+- `clip_rect` (M3) is `null`, or `{ "x", "y", "w", "h", "rotation" }` — the
+  rotated rectangle in CANVAS pixels the layer is clipped to, with `x`/`y`
+  the rectangle's CENTRE measured from the canvas's top-left corner and
+  `rotation` in degrees clockwise. That frame is not the canvas-centre one
+  a layer's own `x`/`y` use; it is the space the fragment stage's position
+  already arrives in, which is the whole reason for it. Only a nested layer
+  sets it — clipped to its nest's canvas rect — and everything else emits
+  `null`.
+- **A nest contributes one layer per drawing clip inside it** (§5.3), never
+  a layer of its own, so a layer's `clip` names the clip that DRAWS — which
+  for a nested layer is not a clip on the timeline, and may appear twice in
+  one recipe when two clips show the same nest. A nested layer inherits its
+  nest clip's `transition` when it has none of its own, so a dissolve into a
+  nest dissolves everything the nest draws; the inherited `partner` then
+  names a clip that was itself flattened away, which the compositor treats
+  as no partner. Two things deliberately do not survive the flattening: a
+  nest clip's `opacity` multiplies each inner layer separately rather than
+  the composite (inner layers that overlap each other show through), and
+  only the innermost `clip_rect` is carried, because a layer gets one
+  rectangle and the intersection of two rotated rectangles is not one.
 - During a transition both layers are present, adjacent, each carrying the
   same `kind` and `progress` with `role` `out` / `in`. The compositor
   draws them as one pair.
@@ -791,15 +1005,47 @@ WebM, AVI and VP9/AV1 are not opened (§11).
 ### 7.8 Export
 
 Presets (`rc_export_presets`): H.264 1080p / 720p / source size, HEVC
-1080p / 4K, ProRes 422 (MOV), Audio only (M4A). `rc_export_settings`
-resolves a preset plus overrides (size, fps, range = whole or in/out) to
-concrete settings. M1 maps them onto `AVAssetExportSession` preset names
-(`AVAssetExportPresetHEVCHighestQuality`, `…1920x1080`, `…AppleProRes422LPCM`,
-`…AppleM4A`), sets `videoComposition`, `audioMix`, `timeRange`,
-`outputFileType`, `shouldOptimizeForNetworkUse`, and polls `progress` on a
-timer for the sheet. M2 adds the `AVAssetWriter` path (chapter track via
-`AVAssetWriterInput` text track + `AVTrackAssociationTypeChapterList`,
-explicit bitrates, GIF/APNG via ImageIO frame-by-frame).
+1080p / 4K, ProRes 422 (MOV), Audio only (M4A), Animated GIF, Animated PNG.
+`rc_export_settings` resolves a preset plus overrides (size, fps, range =
+whole or in/out, `optimize_for_network`, and the two bitrates below) to
+concrete settings. Each movie preset still carries an
+`AVAssetExportSession` preset name (`AVAssetExportPresetHEVCHighestQuality`,
+`…1920x1080`, `…AppleProRes422LPCM`, `…AppleM4A`) — that mapping is what
+names the codec and tier, and `avf_preset: null` is how a preset says
+AVFoundation cannot write it at all. But **nothing runs a session any
+more**: M2's `AVAssetWriter` path REPLACED it rather than joining it, for
+the reason the whole design exists — two writers would make the chapter
+track, the explicit bitrates and the output size conditional on which one
+happened to run, and leave two answers to "what did the file end up as".
+`ExportWriter` reads the composition through an `AVAssetReader` and writes
+video, audio and a chapter track (an `AVAssetWriterInput` text track
+associated `AVTrackAssociationTypeChapterList`), reporting `progress` on
+the same timer the sheet already polled. GIF and APNG take the ImageIO
+path instead, frame by frame over `Exporter.renderFrame`.
+
+**Quality.** `video_bitrate` and `audio_bitrate` are overrides in bits per
+second, strictly positive; a zero, a negative, a fraction or a non-number
+is an error naming the value. No preset carries a default and neither key
+appears in the resolved settings unless it was asked for: on the session
+path the preset name IS the bitrate ladder, and on the writer path
+VideoToolbox's size-derived rate beats any constant the table could hold.
+Absent therefore means "the encoder decides", which is exactly what
+`ExportSettings.videoBitrate == nil` says on the Swift side.
+
+**GIF and APNG.** AVFoundation writes neither, so their rows resolve to
+`avf_preset: null` — the signal to write the file frame by frame through
+`CGImageDestination` instead of building a session — and to `audio: false`,
+which is a fact about the containers rather than a choice about the
+project. `file_type` is still the file's real UTI (`com.compuserve.gif`;
+`public.png`, an APNG being a PNG carrying `acTL`/`fcTL` chunks), so the
+save panel's content type and extension are right on either path. Both cap
+what the project would otherwise supply, because their cost is frames ×
+pixels and nothing else: GIF at 480 × 270 and 12.5 fps (a GIF frame delay
+is a whole number of hundredths of a second, and 8 cs is the longest that
+still reads as motion), APNG at 960 × 540 and 25 fps (true colour and
+lossless, so it earns the extra pixels, and an `fcTL` delay is an exact
+rational needing no such rounding). Both caps are defaults a size or fps
+override replaces.
 
 ### 7.9 Agent
 
@@ -807,9 +1053,16 @@ explicit bitrates, GIF/APNG via ImageIO frame-by-frame).
 only). Catalog: one tool per §6 op with the same name and arguments, plus
 `open_project {path}`, `new_project {path?}`, `import_media {path}` →
 media id, `save_project`, `get_project` → the JSON, `set_playhead`,
+`set_range`, `set_selection` and `undo` / `redo` (the view state and the
+history are app state, not ops, but without a setter for each the "one
+edit is one undo step" and "the in/out range scopes the export" properties
+cannot be checked by driving the built app),
 `render_frame {t, max_width?}` → PNG (the verification hook: the
 compositor renders offline through an `AVAssetImageGenerator` over the
-same composition + video composition), `export {preset, path}`. Handlers
+same composition + video composition), and
+`export {preset, path, range?, video_bitrate?, audio_bitrate?}` — the
+export sheet's four controls, so an agent export and a menu export can ask
+for the same file. Handlers
 use `performGroupedEdit` so off-event edits get their own undo group
 (Rasterize's `AgentServer.performGroupedEdit`). Default port 4817; env
 `RC_AGENT_PORT`; launch flag `-AgentServerEnabled YES`.
@@ -826,10 +1079,12 @@ concern is a new module with its own `impl Project` block.
 | `model.rs` | the §5.2 types, serde derives, id allocation, invariants (`validate`) |
 | `time.rs` | `Ticks`, `TIMESCALE`, `Fps`, frame snapping, timecode format/parse (non-drop `HH:MM:SS:FF` and `HH:MM:SS.mmm`) |
 | `edit.rs` | the op enum + serde, `apply(&self, op) -> Result<Option<Project>, String>`; **its module doc is the op schema table** |
-| `edit_clip.rs` / `edit_track.rs` / `edit_time.rs` | the §6 ops in three `impl Project` blocks (clips and actions; tracks, markers, canvas, media; ripple, insert time, range delete, freeze) |
+| `edit_clip.rs` / `edit_props.rs` / `edit_track.rs` / `edit_time.rs` | the §6 ops in `impl Project` blocks: clip placement; the four property patches and their range checks; tracks, markers, canvas, media; ripple, insert time, range delete, freeze |
+| `edit_action.rs` / `edit_nest.rs` / `edit_paste.rs` | the ops with a concern of their own: actions (the no-overlap rule); `nest` / `unnest`; `paste` (making another document's clips fit) |
 | `actions.rs` | evaluation and interpolation, `clip_state(clip, t)` |
 | `transition.rs` | overlap detection, the overlap rule, progress at *t* |
 | `evaluate.rs` | `frame_recipe(t)`, `composition_plan()` (A/B assignment, instructions) |
+| `nest.rs` | flattening a nest: the walk that turns a nest clip into the clips it stands for, and the transform they inherit |
 | `audio.rs` | envelopes: fades, volume actions, ducking, mute |
 | `snap.rs` | candidates and `resolve` |
 | `format.rs` | `RC_FORMAT_VERSION`, `RC_CAPS`, read-any-version / write-current |
@@ -1025,9 +1280,20 @@ assisted import.
 ## 11. Decisions made — do not re-litigate
 
 - **AVFoundation, not ffmpeg.** Risk: MKV, WebM/VP9 and AV1-in-MKV do not
-  open. Mitigation (M3): an opt-in import step that shells out to a
+  open. Mitigation (M3, landed): an opt-in import step that shells out to a
   user-installed ffmpeg (present at `/opt/homebrew/bin/ffmpeg` on the
-  development machine) to rewrap or transcode into the package.
+  development machine) to rewrap or transcode. The conversion is written to
+  `~/Library/Application Support/Reelcut/Rewrapped/`, **not into the
+  package**, for two reasons the `FFmpegRewrap.rewrapDirectory` comment
+  spells out: opening an MKV from the Finder makes an UNTITLED document, so
+  the import that needs a conversion is exactly the one with no package to
+  put it in; and `fileWrapper(ofType:)` is a two-child whitelist whose one
+  surviving location, `cache/`, is documented-regenerable (§5.6) — the last
+  place for the only decodable copy of someone's footage. The name carries
+  a digest of path, size and modification date, so a conversion is reused
+  and invalidates itself. `RCFFmpegImport` chooses the policy and
+  `RCFFmpegPath` the binary; with neither ffmpeg nor a cached conversion
+  the import fails exactly as it did before the feature existed.
 - **Custom compositor from day one** (M1 step 5). `AVVideoCompositing`
   has sharp edges — pixel-buffer pools, timing, `renderContextChanged`.
   Building the single-layer version first de-risks every later effect.

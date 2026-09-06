@@ -384,6 +384,22 @@ func canvasRound(_ value: Double) -> Double {
     return (value * 1000).rounded() / 1000
 }
 
+/// A colour as `video.chroma.key`: exactly three components, clamped to 0…1.
+///
+/// That key is the ONE colour in the schema the model spells without an alpha
+/// (`[f64; 3]` in `model.rs`, and `edit_props.rs` bounds each channel), so a
+/// four-component `RGBA` — which is what a colour well hands back, and what
+/// the comparison in `changedRGBA` needs — has to be cut back to three before
+/// it can reach `set_video`. A longer array is not a warning there: serde
+/// answers `invalid length 4, expected an array of length 3` and the whole
+/// edit fails.
+func chromaKeyComponents(_ color: RGBA) -> [Double] {
+    (0..<3).map { index in
+        let value = index < color.count ? color[index] : 0
+        return canvasRound(min(max(value, 0), 1))
+    }
+}
+
 // MARK: - Move
 
 /// Dragging inside the box to move the selection (spec §4.2). Every selected
@@ -724,6 +740,109 @@ struct CanvasEndpointSession {
     mutating func update(unit: CGPoint) {
         self.unit = unit
         didMove = true
+    }
+}
+
+// MARK: - Chroma-key eyedropper
+
+/// Picking the chroma key colour off the canvas (spec §4.3's "key color with
+/// a canvas eyedropper"). One click, not a drag — and a session all the same,
+/// because the sample cannot be taken while that click is being handled.
+///
+/// The preview's pixels belong to the Metal compositor, not to any view, so
+/// the honest way to read one is to compose the frame again offline
+/// (`Exporter.renderFrame` — the same `AVComposition` the export writes from,
+/// so the pixel picked is the pixel the file would hold). That render opens
+/// asset tracks and decodes, which has to happen off the main thread, and by
+/// the time it lands the selection may have moved. Everything the click meant
+/// is therefore captured here first: `EditorViewController+Eyedropper.swift`
+/// runs it and compares this against the selection before it commits.
+struct CanvasEyedropperSession {
+    /// The clips the pick will key — the Video pane's video clips, in the
+    /// order it offers them.
+    let clips: [UInt32]
+    /// The chroma those clips already carry, so a re-pick replaces the colour
+    /// and keeps the tolerances the user dialled in.
+    let base: ChromaProps?
+
+    /// The op that makes the frame this samples FROM. Applied to a COPY of
+    /// the project — pure, never published, never on the undo stack, the way
+    /// `EditorViewController+Inspector`'s probe is (§5.5).
+    ///
+    /// It removes the three things standing between the pixel on screen and
+    /// the number `Compositor.metal` actually compares against the key:
+    ///
+    ///  - the clip's own chroma, because a keyed pixel is a HOLE — the most
+    ///    natural pick of all, "the green I can still see", would otherwise
+    ///    sample whatever shows through it;
+    ///  - its colour adjustment, because the shader keys BEFORE
+    ///    brightness/contrast/saturation/hue (§7.5's order of operations), so
+    ///    the adjusted pixel is not the one being compared;
+    ///  - its opacity, because a faded layer's pixel on screen is already
+    ///    mixed with whatever lies behind it.
+    ///
+    /// What is left is a layer drawn exactly as the key sees it. A layer
+    /// COVERED by another one is still covered — the pick is what is visible
+    /// at that point, which is what a user aiming at it means.
+    var suppression: ReelOp {
+        .setVideo(
+            clips: clips,
+            patch: VideoPatch(opacity: 1, color: .identity, chroma: .some(nil)))
+    }
+
+    /// The sampled colour as the props to write. A first pick keeps
+    /// `Chroma::default`'s tolerances (0.2 / 0.1 / 0.5, `model.rs`), which is
+    /// also what the section's on-switch writes.
+    func chroma(picked color: RGBA) -> ChromaProps {
+        let previous = base ?? ChromaProps()
+        return ChromaProps(
+            key: chromaKeyComponents(color), tolerance: previous.tolerance,
+            softness: previous.softness, spill: previous.spill)
+    }
+
+    /// The colour of the canvas pixel at `point` in a frame composed from
+    /// `canvas`, or nil when there is nothing there to pick.
+    ///
+    /// **The rendered frame is not the canvas.** Its size is whatever the
+    /// composition asked for, so a canvas coordinate indexes it as a
+    /// FRACTION and never as a pixel number; get that wrong and a project
+    /// whose plan was built for another canvas size picks the wrong colour
+    /// silently. Its rows do run top-down, which is the same sense canvas
+    /// space does, so no flip belongs here.
+    ///
+    /// The readback is sRGB. The shader compares the values the decoder
+    /// handed it, so a wide-gamut source can put a pick a per cent or two
+    /// off the number the key needs — which is what `tolerance` is for, and
+    /// why the pick sets a colour rather than a threshold.
+    static func color(at point: CGPoint, in frame: CGImage, canvas: CanvasSnapshot) -> RGBA? {
+        let size = canvas.size
+        guard size.width >= 1, size.height >= 1, frame.width >= 1, frame.height >= 1 else {
+            return nil
+        }
+        let column = Int((point.x / size.width * CGFloat(frame.width)).rounded(.down))
+        let row = Int((point.y / size.height * CGFloat(frame.height)).rounded(.down))
+        guard column >= 0, row >= 0, column < frame.width, row < frame.height else { return nil }
+        guard let pixel = frame.cropping(to: CGRect(x: column, y: row, width: 1, height: 1)),
+              let space = CGColorSpace(name: CGColorSpace.sRGB)
+        else { return nil }
+
+        var bytes = [UInt8](repeating: 0, count: 4)
+        let drawn = bytes.withUnsafeMutableBytes { raw -> Bool in
+            guard let base = raw.baseAddress,
+                  let context = CGContext(
+                      data: base, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 4,
+                      space: space, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
+            else { return false }
+            context.draw(pixel, in: CGRect(x: 0, y: 0, width: 1, height: 1))
+            return true
+        }
+        guard drawn else { return nil }
+        let alpha = Double(bytes[3]) / 255
+        // Nothing on the canvas there. Refused rather than picked: a
+        // transparent pixel un-premultiplies to black, and keying black is
+        // never what a click on empty canvas meant.
+        guard alpha > 0 else { return nil }
+        return (0..<3).map { min(Double(bytes[$0]) / 255 / alpha, 1) }
     }
 }
 

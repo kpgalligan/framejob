@@ -61,6 +61,20 @@ final class MediaPane: InspectorPaneView {
         add.toolTip = "Import files into this project (⇧⌘I)"
         content.append(inspectorButtonRow([add, InspectorRowLabel("⇧⌘I")]))
 
+        // Consolidate belongs beside the list it acts on: this pane is where
+        // the "files are referenced, never copied" rule is visible (a row can
+        // be missing, and Relink… lives here), so it is where the one command
+        // that ends the rule should be reachable. The menu item is the same
+        // action; both validate through the editor.
+        let consolidate = OptionButtonControl(
+            title: "Consolidate…",
+            action: { [weak self] in
+                self?.inspector?.onCommand?(#selector(EditorViewController.consolidateMedia(_:)))
+            },
+            enabled: { !binding.snapshot.media.isEmpty }, onEdit: {})
+        consolidate.toolTip = "Copy every referenced file into this project's package"
+        content.append(inspectorButtonRow([consolidate]))
+
         for media in binding.snapshot.media {
             let row = MediaRowView(media: media.id, pane: self)
             rows.append(row)

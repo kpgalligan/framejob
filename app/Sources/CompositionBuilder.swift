@@ -59,26 +59,48 @@ enum CompositionBuilder {
     ) throws -> BuiltComposition {
         let composition = AVMutableComposition()
         var assets: [UInt32: AVURLAsset] = [:]
+        var reversedAssets: [UInt32: AVURLAsset] = [:]
+
+        // Which clips play backwards, and which are still waiting for the file
+        // that lets them. `Source::Media.reversed` is deliberately absent from
+        // the plan — the core does no pixel work, so reversal changes neither
+        // the plan nor the recipe (§11) — so it arrives beside the plan, from
+        // the document, exactly as the audio DSP below does.
+        let reverse = ReverseSource.shared.resolution(for: recipeKey)
 
         for planTrack in plan.videoTracks {
             let track = try makeTrack(in: composition, mediaType: .video, id: planTrack.id)
-            try fill(track, from: planTrack, mediaType: .video, urls: urls, assets: &assets)
+            try fill(
+                track, from: planTrack, mediaType: .video, urls: urls, reverse: reverse,
+                assets: &assets, reversedAssets: &reversedAssets)
         }
 
         try addPlaceholderIfNeeded(to: composition, plan: plan)
 
+        // The sample-level audio settings the plan cannot carry (pan, the
+        // compressor, noise reduction). Resolved once per build and frozen
+        // into the taps: they are not in the plan, so `Playback` treats a
+        // change to them as structural and rebuilds, exactly as it already
+        // does for a volume change — volume IS in the plan, as ramps.
+        let dsp = AudioDSPSource.shared.parameters(for: recipeKey)
         var inputParameters: [AVAudioMixInputParameters] = []
         for planTrack in plan.audioTracks {
             let track = try makeTrack(in: composition, mediaType: .audio, id: planTrack.id)
-            try fill(track, from: planTrack, mediaType: .audio, urls: urls, assets: &assets)
-            inputParameters.append(audioParameters(for: track, plan: planTrack))
+            try fill(
+                track, from: planTrack, mediaType: .audio, urls: urls, reverse: reverse,
+                assets: &assets, reversedAssets: &reversedAssets)
+            inputParameters.append(
+                audioParameters(
+                    for: track, plan: planTrack,
+                    dsp: dsp.isEmpty
+                        ? nil : AudioTrackDSP(planTrack: planTrack, parameters: dsp)))
         }
 
         // Source orientation is read once per media and then attached per
         // instruction, so the compositor can turn a rotated source's sampling
         // without knowing anything about assets.
         let codes = orientationCodes(plan: plan, urls: urls, assets: &assets)
-        let missing = missingClips(plan: plan, urls: urls)
+        let missing = missingClips(plan: plan, urls: urls, reverse: reverse)
 
         let videoComposition = AVMutableVideoComposition()
         videoComposition.frameDuration = frameDuration(plan.fps)
@@ -145,7 +167,7 @@ enum CompositionBuilder {
             let url = Bundle.main.url(forResource: placeholderName, withExtension: "mp4")
         else { return }
         let asset = AVURLAsset(url: url)
-        guard let source = asset.tracks(withMediaType: .video).first else { return }
+        guard let source = firstTrack(of: asset, mediaType: .video) else { return }
         let id = (plan.audioTracks.map(\.id).max() ?? 0) + 1
         let track = try makeTrack(in: composition, mediaType: .video, id: id)
         let frame = CMTimeRange(start: .zero, duration: source.timeRange.duration)
@@ -186,9 +208,24 @@ enum CompositionBuilder {
     /// scaling of every speed change before it. Appending at the cursor and
     /// scaling the range we just appended keeps composition time equal to
     /// timeline time at every step.
+    ///
+    /// **A reversed clip reads from another file entirely.** `reverse.ready`
+    /// names the pre-rendered backwards copy of the segment's media, which is
+    /// the same length as the forward one, so the segment's `source_in` and
+    /// `source_duration` — measured in the reversed stream by the core's own
+    /// convention (`Source::Media` in `model.rs`) — index straight into it
+    /// with no arithmetic. The substitution is per CLIP and not per media: one
+    /// movie can be forward on one track and backwards on another, and only
+    /// the second reads the reversal.
+    ///
+    /// **A reversed clip with no file yet gets empty time.** It cannot get the
+    /// forward asset: that would play the clip in the wrong direction with
+    /// nothing on screen to say so, which is precisely the bug the pre-render
+    /// exists to fix. `missingClips` then makes it draw §5.6's slate.
     private static func fill(
         _ track: AVMutableCompositionTrack, from planTrack: PlanTrack, mediaType: AVMediaType,
-        urls: [UInt32: URL], assets: inout [UInt32: AVURLAsset]
+        urls: [UInt32: URL], reverse: ReverseResolution, assets: inout [UInt32: AVURLAsset],
+        reversedAssets: inout [UInt32: AVURLAsset]
     ) throws {
         var cursor: Ticks = 0
         for segment in planTrack.segments {
@@ -199,12 +236,22 @@ enum CompositionBuilder {
             }
             guard segment.duration > 0 else { continue }
 
-            let source = sourceTrack(
-                for: segment.media, mediaType: mediaType, urls: urls, assets: &assets)
+            let source: AVAssetTrack?
+            if let reversed = reverse.ready[segment.clip] {
+                source = assetTrack(
+                    at: reversed, key: segment.media, mediaType: mediaType,
+                    assets: &reversedAssets)
+            } else if reverse.pending.contains(segment.clip) {
+                source = nil
+            } else {
+                source = sourceTrack(
+                    for: segment.media, mediaType: mediaType, urls: urls, assets: &assets)
+            }
             guard let source = source else {
-                // Missing (or unreadable) media: hold the place with empty
-                // time so every later segment keeps its timeline position,
-                // and let the compositor draw the slate the recipe asks for.
+                // Missing media, unreadable media, or a reverse that has not
+                // been rendered: hold the place with empty time so every later
+                // segment keeps its timeline position, and let the compositor
+                // draw the slate the recipe asks for.
                 track.insertEmptyTimeRange(
                     CMTimeRange(start: time(cursor), duration: time(segment.duration)))
                 cursor = segment.start + segment.duration
@@ -232,26 +279,43 @@ enum CompositionBuilder {
 
     /// The asset track a segment reads from, cached per media id so a clip
     /// split into twenty segments opens its file once.
-    ///
-    /// `tracks(withMediaType:)` (and `preferredTransform` in
-    /// `orientationCodes`) are deprecated in favour of the async `loadTracks`
-    /// — deliberately not taken: `async`/`await` is confined to
-    /// `MediaImporter.swift` (app/CLAUDE.md), and this runs on the rebuild
-    /// queue where blocking is the point. Those two deprecation warnings are
-    /// that trade, and they are the only ones in this file.
     private static func sourceTrack(
         for media: UInt32, mediaType: AVMediaType, urls: [UInt32: URL],
         assets: inout [UInt32: AVURLAsset]
     ) -> AVAssetTrack? {
+        guard let url = urls[media] else { return nil }
+        return assetTrack(at: url, key: media, mediaType: mediaType, assets: &assets)
+    }
+
+    /// One file's track of a kind, through a caller-owned cache. `key` is the
+    /// media id in every case; the caller keeps FORWARD and REVERSED assets in
+    /// separate dictionaries, so the same movie can be open both ways at once
+    /// without either eviction touching the other.
+    private static func assetTrack(
+        at url: URL, key: UInt32, mediaType: AVMediaType, assets: inout [UInt32: AVURLAsset]
+    ) -> AVAssetTrack? {
         let asset: AVURLAsset
-        if let cached = assets[media] {
+        if let cached = assets[key] {
             asset = cached
         } else {
-            guard let url = urls[media] else { return nil }
-            asset = AVURLAsset(url: url, options: [AVURLAssetPreferPreciseDurationAndTimingKey: true])
-            assets[media] = asset
+            asset = AVURLAsset(
+                url: url, options: [AVURLAssetPreferPreciseDurationAndTimingKey: true])
+            assets[key] = asset
         }
-        return asset.tracks(withMediaType: mediaType).first
+        return firstTrack(of: asset, mediaType: mediaType)
+    }
+
+    /// **The one synchronous track lookup in the app.**
+    ///
+    /// `tracks(withMediaType:)` (and `preferredTransform` in
+    /// `orientationCodes`) are deprecated in favour of the async `loadTracks`
+    /// — deliberately not taken: `async`/`await` is confined to
+    /// `MediaImporter.swift` (app/CLAUDE.md), and this and `ReverseRenderer`
+    /// both run on their own queues where blocking is the point. Funnelling
+    /// every caller through here is what keeps that trade to a single
+    /// deprecation warning rather than one per call site.
+    static func firstTrack(of asset: AVAsset, mediaType: AVMediaType) -> AVAssetTrack? {
+        asset.tracks(withMediaType: mediaType).first
     }
 
     // MARK: - Source orientation
@@ -289,10 +353,17 @@ enum CompositionBuilder {
     /// otherwise means. Video segments only: an `image` layer names its media
     /// directly and already slates itself, and an audio-only clip puts nothing
     /// on the canvas.
+    ///
+    /// A reversed clip whose backwards copy has not been rendered joins them:
+    /// its file is there, but the frames it is meant to play are not, and a
+    /// slate says that where playing the clip forwards would not. The pending
+    /// set is unioned whole rather than filtered against the video tracks —
+    /// the compositor only ever consults this for a layer that names a
+    /// composition track, so an audio-only clip in it is inert.
     private static func missingClips(
-        plan: CompositionPlan, urls: [UInt32: URL]
+        plan: CompositionPlan, urls: [UInt32: URL], reverse: ReverseResolution
     ) -> Set<UInt32> {
-        var missing: Set<UInt32> = []
+        var missing = reverse.pending
         for planTrack in plan.videoTracks {
             for segment in planTrack.segments where urls[segment.media] == nil {
                 missing.insert(segment.clip)
@@ -348,18 +419,26 @@ enum CompositionBuilder {
     // MARK: - Audio
 
     /// One input-parameter block per composition audio track: the plan's
-    /// piecewise-linear envelope as volume ramps, plus the time-pitch
-    /// algorithm its segments asked for.
+    /// piecewise-linear envelope as volume ramps, the time-pitch algorithm its
+    /// segments asked for, and — when any clip on the track asks for one — the
+    /// processing tap that runs pan, the compressor and noise reduction
+    /// (`AudioTap.swift`).
     ///
-    /// `mono` is NOT expressed here. `AVMutableAudioMixInputParameters` has
-    /// no channel-fold control — the only ways are an
-    /// `AVAudioMixInputParameters` audio tap or an `AVAssetReader`
-    /// re-render, both out of scope for M2 — so a clip with `mono: true`
-    /// plays in stereo for now. Spec §7.2 says so explicitly; the flag is
-    /// still carried in the plan so the day this grows a tap, nothing in
-    /// Rust changes.
+    /// **A track with nothing to do still gets no tap.** `dsp` is nil, or its
+    /// `isActive` is false, for every project that does not use the three M3
+    /// audio properties, and the object built here is then exactly the one
+    /// this function built before they existed. A pass-through tap measures
+    /// bit-transparent, so this is a cost-and-clarity decision rather than a
+    /// fidelity one — but it does mean an untouched project's audio needs no
+    /// argument about transparency at all.
+    ///
+    /// `mono` is still NOT expressed here. It could be now — the tap could
+    /// fold the channels — but it is not this slice's field to turn on, and a
+    /// project that has been saving `mono: true` and hearing stereo since M2
+    /// should not start sounding different as a side effect of the pan
+    /// landing. Spec §7.2 still describes the flag as carried and unused.
     private static func audioParameters(
-        for track: AVMutableCompositionTrack, plan: PlanTrack
+        for track: AVMutableCompositionTrack, plan: PlanTrack, dsp: AudioTrackDSP?
     ) -> AVAudioMixInputParameters {
         let parameters = AVMutableAudioMixInputParameters(track: track)
         if let pitch = plan.segments.compactMap({ $0.pitch }).first {
@@ -374,6 +453,9 @@ enum CompositionBuilder {
             parameters.setVolumeRamp(
                 fromStartVolume: Float(ramp.from), toEndVolume: Float(ramp.to),
                 timeRange: CMTimeRange(start: time(ramp.start), duration: time(ramp.duration)))
+        }
+        if let dsp = dsp, let tap = AudioTap.make(for: dsp) {
+            parameters.audioTapProcessor = tap
         }
         return parameters
     }

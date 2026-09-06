@@ -27,8 +27,13 @@ use serde::Serialize;
 use serde_json::{Map, Number, Value};
 
 use crate::audio::MAX_GAIN;
-use crate::edit_props::{SCALE_MAX, SCALE_MIN};
-use crate::model::{Action, AudioProps, Clip, Curve, Project, ShapeProps, TextProps, VideoProps};
+use crate::edit_props::{
+    COMPRESSOR_MAKEUP_MAX_DB, COMPRESSOR_RATIO_MAX, COMPRESSOR_THRESHOLD_MIN_DB, SCALE_MAX,
+    SCALE_MIN, SPOT_ZOOM_MAX,
+};
+use crate::model::{
+    Action, AudioProps, Clip, Curve, Project, ShapeProps, TextProps, VideoProps, MAX_FILTERS,
+};
 use crate::time::Ticks;
 
 /// How deep [`merge`] and [`lerp`] will walk a patch. The deepest real path
@@ -112,12 +117,28 @@ fn merge_at(base: &Value, patch: &Value, depth: u32) -> Value {
 
 /// Interpolates `from` toward `to` by eased progress `u`.
 ///
-/// Numbers interpolate; arrays (colors, `key`, `from`/`to` points)
-/// interpolate element by element when the lengths match; objects
-/// interpolate key by key. **Booleans, strings, enums, `null`s and any pair
-/// of mismatched types switch at the END** — they hold the `from` value
-/// until `u` reaches 1 — which is the §5.4 rule and the only sane reading
-/// of "interpolate `left` to `center`".
+/// Numbers interpolate; arrays (colors, `key`, `from`/`to` points, the
+/// filter list) interpolate element by element when the lengths match;
+/// objects interpolate key by key. **Booleans, strings, enums, `null`s and
+/// any pair of mismatched types switch at the END** — they hold the `from`
+/// value until `u` reaches 1 — which is the §5.4 rule and the only sane
+/// reading of "interpolate `left` to `center`".
+///
+/// Two consequences of those rules are worth stating outright, because
+/// `video.filters` is the first ARRAY OF OBJECTS in the schema and an
+/// animation over one is invisible until somebody writes it:
+///
+///  - **Lists of different lengths switch at the end.** Blur alone toward
+///    blur-plus-vignette has no correspondence between the elements: the
+///    only alternative is to invent an off-strength vignette to grow from,
+///    which is a guess about what the second list means, and a wrong guess
+///    would animate a filter the user never asked to see.
+///  - **Elements that NAME different kinds switch at the end too**, even
+///    when the lengths match — the [`lerp_at`] rule about a discriminant.
+///    Elements that agree on the kind, and elements whose patch side names
+///    no kind at all, interpolate their `amount`, which is the case that
+///    matters: an action that ramps a blur from 0 to 1 is exactly "grow
+///    this filter", and it works.
 fn lerp(from: &Value, to: &Value, u: f64) -> Value {
     lerp_at(from, to, u, 0)
 }
@@ -139,6 +160,23 @@ fn lerp_at(from: &Value, to: &Value, u: f64, depth: u32) -> Value {
                 .map(|(x, y)| lerp_at(x, y, u, depth + 1))
                 .collect(),
         ),
+        // A `kind` is a DISCRIMINANT everywhere in §5.2 — a filter's kind,
+        // a shape's, a transition's — so two objects that NAME different
+        // ones are two different things, and the numbers beside them do not
+        // measure the same quantity. Interpolating them would read a blur's
+        // strength as a sepia's. The whole object switches at the end
+        // instead, exactly as the string naming it would on its own.
+        //
+        // Both sides must name one for this to fire, so a patch element
+        // that leaves `kind` out — `{"filters": [{"amount": 1}]}`, "same
+        // filter, more of it" — still interpolates, key by key, below.
+        (Value::Object(a), Value::Object(b))
+            if a.get("kind").is_some()
+                && b.get("kind").is_some()
+                && a.get("kind") != b.get("kind") =>
+        {
+            from.clone()
+        }
         (Value::Object(a), Value::Object(b)) => {
             let mut out = Map::new();
             for (key, from_value) in a {
@@ -272,6 +310,30 @@ fn clamp_video(mut props: VideoProps) -> VideoProps {
         chroma.softness = bounded(chroma.softness, 0.0, 1.0, 0.0);
         chroma.spill = bounded(chroma.spill, 0.0, 1.0, 0.0);
     }
+    // The shader budget is a hard limit on the recipe, not a preference:
+    // a fifth filter has no uniform slot to arrive in, and the extras are
+    // dropped from the END so the ones the user put first survive.
+    props.filters.truncate(MAX_FILTERS);
+    for filter in props.filters.iter_mut() {
+        filter.amount = bounded(filter.amount, 0.0, 1.0, 0.0);
+    }
+    if let Some(reflection) = props.reflection.as_mut() {
+        reflection.opacity = bounded(reflection.opacity, 0.0, 1.0, 0.35);
+        reflection.height = bounded(reflection.height, 0.0, 1.0, 0.5);
+        reflection.gap = bounded(reflection.gap, 0.0, f64::MAX, 0.0);
+        reflection.falloff = bounded(reflection.falloff, 0.0, 1.0, 1.0);
+    }
+    if let Some(spotlight) = props.spotlight.as_mut() {
+        spotlight.x = finite_or(spotlight.x, 0.0);
+        spotlight.y = finite_or(spotlight.y, 0.0);
+        // A zero-sized region would divide by nothing in the shader's
+        // distance field, so the floor is a pixel rather than 0.
+        spotlight.width = bounded(spotlight.width, 1.0, f64::MAX, 480.0);
+        spotlight.height = bounded(spotlight.height, 1.0, f64::MAX, 270.0);
+        spotlight.feather = bounded(spotlight.feather, 0.0, f64::MAX, 0.0);
+        spotlight.dim = bounded(spotlight.dim, 0.0, 1.0, 0.6);
+        spotlight.zoom = bounded(spotlight.zoom, 1.0, SPOT_ZOOM_MAX, 1.0);
+    }
     props
 }
 
@@ -283,6 +345,23 @@ fn clamp_audio(mut props: AudioProps) -> AudioProps {
         duck.level = bounded(duck.level, 0.0, 1.0, 0.2);
         duck.attack = duck.attack.max(0);
         duck.release = duck.release.max(0);
+    }
+    // Pan's neutral is the CENTRE, not either end: a NaN that silently
+    // threw the voice into one speaker would be worse than one that did
+    // nothing.
+    props.pan = bounded(props.pan, -1.0, 1.0, 0.0);
+    props.noise_reduction = bounded(props.noise_reduction, 0.0, 1.0, 0.0);
+    if let Some(compressor) = props.compressor.as_mut() {
+        compressor.threshold_db = bounded(
+            compressor.threshold_db,
+            COMPRESSOR_THRESHOLD_MIN_DB,
+            0.0,
+            -18.0,
+        );
+        compressor.ratio = bounded(compressor.ratio, 1.0, COMPRESSOR_RATIO_MAX, 3.0);
+        compressor.attack = compressor.attack.max(0);
+        compressor.release = compressor.release.max(0);
+        compressor.makeup_db = bounded(compressor.makeup_db, 0.0, COMPRESSOR_MAKEUP_MAX_DB, 0.0);
     }
     props
 }

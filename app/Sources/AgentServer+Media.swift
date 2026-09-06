@@ -39,7 +39,12 @@ extension AgentServer {
             var result: [String: Any] = [
                 "ok": true,
                 "media": Int(added.first ?? expected),
-                "path": url.path,
+                // The DESCRIPTOR's path, not the argument's: an ffmpeg-assisted
+                // import rewraps the file and the model stores the conversion,
+                // so echoing what was asked for would answer `.mkv` about an
+                // entry that is really a `.mov`. The rule generalises — the
+                // answer must describe what landed in the project.
+                "path": descriptor.path,
                 "kind": descriptor.kind.rawValue,
                 "duration": descriptor.duration,
                 "width": descriptor.width,
@@ -81,6 +86,101 @@ extension AgentServer {
         } catch {
             throw ToolError(message: error.localizedDescription)
         }
+    }
+
+    // MARK: - Captions
+
+    /// `import_captions` — File ▸ Import Captions… (`CaptionImporter`, which
+    /// also carries the reasoning for why a caption is a text clip).
+    ///
+    /// Runs on the main thread like every other op tool: parsing an SRT is
+    /// reading a text file, not probing a movie, so there is nothing to wait
+    /// for and nothing to keep off main.
+    ///
+    /// The result reports what was SKIPPED as well as what landed — a
+    /// caption file with three malformed entries would otherwise import
+    /// silently short, and a model has no other way to see it.
+    func importCaptions(_ a: [String: Any]) throws -> String {
+        let document = try target(a)
+        let path = try requiredString(a, "path")
+        let url = URL(fileURLWithPath: (path as NSString).expandingTildeInPath)
+        guard FileManager.default.fileExists(atPath: url.path) else {
+            throw ToolError(message: "No file at \(url.path)")
+        }
+        var track: UInt32?
+        if a["track"] != nil, !(a["track"] is NSNull) {
+            track = try trackArg(a, "track", document).id
+        }
+        let plan: CaptionImporter.Plan
+        do {
+            plan = try CaptionImporter.plan(for: url, in: document.project, track: track)
+        } catch {
+            throw ToolError(message: error.localizedDescription)
+        }
+        var fields: [String: Any] = ["captions": plan.clips, "cues": plan.cues]
+        if let name = plan.trackName { fields["track_name"] = name }
+        if plan.trimmed > 0 { fields["trimmed"] = plan.trimmed }
+        if !plan.problems.isEmpty {
+            fields["skipped"] = plan.problems.map { $0.description }
+        }
+        return try editResult(document, "Import Captions", plan.ops, fields)
+    }
+
+    // MARK: - Consolidating
+
+    /// `consolidate_media` — File ▸ Consolidate Media…
+    /// (`EditorViewController+Consolidate.swift`; `MediaConsolidator` owns
+    /// the plan, the copying and the four traps).
+    ///
+    /// The copy runs on the main thread, where every non-`offMainTools`
+    /// handler runs: it is `FileManager` work with no waiting in it, so the
+    /// only cost is that the app's own UI is unresponsive while a large
+    /// library copies — the connection is served on the server thread and
+    /// stays live throughout. The app's sheet does the same work on a
+    /// background queue because there is a person watching that one.
+    func consolidateMedia(_ a: [String: Any]) throws -> String {
+        let document = try target(a)
+        let plan: MediaConsolidator.Plan
+        do {
+            plan = try MediaConsolidator.plan(for: document)
+        } catch let error as MediaConsolidator.ConsolidateError {
+            guard case .untitled = error else {
+                throw ToolError(message: error.localizedDescription)
+            }
+            throw ToolError(
+                message: error.localizedDescription + " Call save_project with a path first.")
+        } catch {
+            throw ToolError(message: error.localizedDescription)
+        }
+        // Already self-contained is not an error — it is the state the
+        // caller asked for, and `editResult` would report the empty op list
+        // as a refusal.
+        guard !plan.isEmpty else {
+            return try jsonResult([
+                "ok": true, "copied": 0, "directory": plan.directory.path,
+                "missing": plan.missing,
+                "note": "Every file this project can find is already inside the package.",
+                "project": summary(document),
+            ])
+        }
+        let outcome = MediaConsolidator.run(plan)
+        // Creating `media/` inside the package moves the package's own
+        // modification date, which NSDocument reads as another application
+        // having changed the file and refuses every later save over. Told
+        // unconditionally, since a failed run may still have made it.
+        document.packageContentsDidChangeOnDisk()
+        guard !outcome.ops.isEmpty else {
+            throw ToolError(message: outcome.summary)
+        }
+        var fields: [String: Any] = [
+            "copied": outcome.copied, "bytes": Int(outcome.bytes),
+            "directory": plan.directory.path, "summary": outcome.summary,
+        ]
+        if !outcome.failures.isEmpty { fields["failures"] = outcome.failures }
+        if !outcome.missing.isEmpty { fields["missing"] = outcome.missing }
+        let result = try editResult(document, "Consolidate Media", outcome.ops, fields)
+        document.generateCaches()
+        return result
     }
 
     // MARK: - The raw op
@@ -125,7 +225,7 @@ extension AgentServer {
         }
         let path = try requiredString(object, "path")
         var kind = MediaKind.video
-        if let name = stringArg(object, "kind") {
+        if let name = try stringArg(object, "kind") {
             guard let parsed = MediaKind(rawValue: name) else {
                 throw ToolError(
                     message: "kind must be one of "
@@ -145,15 +245,15 @@ extension AgentServer {
         }
         return MediaDescriptor(
             path: (path as NSString).expandingTildeInPath,
-            bookmark: stringArg(object, "bookmark"),
+            bookmark: try stringArg(object, "bookmark"),
             kind: kind,
-            duration: Ticks(intArg(object, "duration") ?? 0),
-            width: intArg(object, "width") ?? 0,
-            height: intArg(object, "height") ?? 0,
+            duration: Ticks(try intArg(object, "duration") ?? 0),
+            width: try intArg(object, "width") ?? 0,
+            height: try intArg(object, "height") ?? 0,
             fps: fps,
-            hasVideo: boolArg(object, "has_video") ?? (kind != .audio),
-            hasAudio: boolArg(object, "has_audio") ?? (kind == .audio),
-            hasAlpha: boolArg(object, "has_alpha") ?? false)
+            hasVideo: try boolArg(object, "has_video") ?? (kind != .audio),
+            hasAudio: try boolArg(object, "has_audio") ?? (kind == .audio),
+            hasAlpha: try boolArg(object, "has_alpha") ?? false)
     }
 
     // MARK: - Relinking and removing
@@ -169,7 +269,7 @@ extension AgentServer {
         guard FileManager.default.fileExists(atPath: url.path) else {
             throw ToolError(message: "No file at \(url.path)")
         }
-        let bookmark = stringArg(a, "bookmark") ?? bookmarkString(for: url)
+        let bookmark = try stringArg(a, "bookmark") ?? bookmarkString(for: url)
         let result = try editResult(
             document, "Relink Media",
             [.relinkMedia(media: media.id, path: url.path, bookmark: bookmark)],
@@ -184,7 +284,7 @@ extension AgentServer {
     func removeMedia(_ a: [String: Any]) throws -> String {
         let document = try target(a)
         let media = try mediaArg(a, "media", document)
-        let withClips = boolArg(a, "with_clips")
+        let withClips = try boolArg(a, "with_clips")
         let users = document.project.snapshot.clips.filter { $0.source.mediaID == media.id }.count
         if users > 0, withClips != true {
             throw ToolError(

@@ -256,7 +256,7 @@ impl Project {
         duration: Option<Ticks>,
     ) -> Result<Option<Project>, String> {
         let target = self.require_clip(clip)?.clone();
-        let Source::Media { media, r#in } = target.source else {
+        let Source::Media { media, r#in, .. } = target.source else {
             return Err(format!("clip {clip} is not a media clip"));
         };
         // A clip with no video props draws nothing, so there is no frame to

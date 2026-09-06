@@ -15,17 +15,25 @@ lockstep are in the root `CLAUDE.md`; the full design is
   schema table** (the `adjust.rs` pattern in Rasterize) and
   `app/Sources/ReelCore.swift`'s typed builders mirror it.
 - `edit_clip.rs` / `edit_props.rs` / `edit_track.rs` / `edit_time.rs` — the
-  §6 ops in four `impl Project` blocks: clip placement and the action ops;
-  the four property patches with the range checks that police them; tracks,
-  markers, canvas, media; ripple, insert time, range delete, freeze frame.
-  (Spec §7.10 lists three; `edit_props.rs` was split out of `edit_clip.rs`
-  under the "a new concern is a new module" rule — placement and schema
-  validation are separate concerns and `edit_clip.rs` was 1736 lines. It is
-  still ~1350; see "Modules and size" below.)
+  §6 ops in `impl Project` blocks: clip placement; the four property patches
+  with the range checks that police them; tracks, markers, canvas, media;
+  ripple, insert time, range delete, freeze frame.
+- `edit_action.rs` / `edit_nest.rs` / `edit_paste.rs` — the ops with a
+  concern of their own: the action ops and their no-overlap rule; `nest` and
+  `unnest`; `paste`, which has to make another document's clips fit.
+  (Spec §7.10's table is the same list. Each of these was split out of
+  `edit_clip.rs` under the "a new concern is a new module" rule, which is
+  also how `edit_props.rs` came about; `edit_clip.rs` was 1736 lines and is
+  still ~1220 — see "Modules and size" below.)
 - `actions.rs` — action evaluation and interpolation; `clip_state`.
 - `transition.rs` — overlap detection, the overlap rule, progress at *t*.
-- `evaluate.rs` — `frame_recipe(t)` and `composition_plan()` (A/B
-  assignment, instruction tiling).
+- `evaluate.rs` — `composition_plan()` (A/B assignment, instruction
+  tiling) and the `assign()` the recipe shares with it.
+- `recipe.rs` — `frame_recipe(t)`: the layer list at one instant.
+- `nest.rs` — flattening a nest into the clips it stands for, and the
+  transform they inherit. Every walk over "what actually plays" goes
+  through it: `evaluate.rs`, `recipe.rs` and `audio.rs` all consume its
+  instances rather than `Project::clips`.
 - `audio.rs` — envelopes: fades, volume actions, ducking, mute.
 - `snap.rs` — candidates and `resolve`.
 - `format.rs` — `RC_FORMAT_VERSION`, `RC_CAPS`, read-any-version /
@@ -44,13 +52,14 @@ lockstep are in the root `CLAUDE.md`; the full design is
 banner section is the signal to split. Every module keeps a `//!` doc;
 numeric/algorithmic choices get prose "why" comments.
 
-Three modules are over the cap today and are known debt, not licence:
-`edit_clip.rs` (~1350 — the placement ops are one concern and every further
-cut fragments it; the action ops are the next candidate at ~185 lines),
-`model.rs` (~880 — almost all of it is the §5.2 type declarations, and
-splitting the schema across two files would cost more than it saves) and
-`evaluate.rs` (~710 — the plan and the recipe must share `assign()`).
-Do not add to any of them without taking something out.
+Two modules are over the cap today and are known debt, not licence:
+`edit_clip.rs` (~1220 — the placement ops are one concern and every further
+cut fragments it; the action ops were the M3 cut, into `edit_action.rs`) and
+`model.rs` (~1330 — almost all of it is the §5.2 type declarations, and
+splitting the schema across two files would cost more than it saves).
+Do not add to either without taking something out. `evaluate.rs` came off
+the list the same way: nest evaluation grew it past 870, so the recipe half
+moved to `recipe.rs` and the nest walk to `nest.rs`.
 
 **One implementation per algorithm.** Before writing time math, find the
 existing implementation and route through it. Shared constants have exactly

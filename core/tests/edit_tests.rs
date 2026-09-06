@@ -12,9 +12,9 @@
 //! 2. **The three-way answer.** An op that would change nothing must report
 //!    "no change" (NULL, `err_out` untouched) and never a copy, or the app
 //!    grows a phantom undo step (spec §5.5).
-//! 3. **Every op in the table is reachable.** [`op_table`] drives all 39 and
-//!    asserts its own coverage against `OP_NAMES`, so an op that gains an
-//!    argument and loses its only caller cannot pass unnoticed.
+//! 3. **Every op in the table is reachable.** [`op_table`] drives every one
+//!    of them and asserts its own coverage against `OP_NAMES`, so an op that
+//!    gains an argument and loses its only caller cannot pass unnoticed.
 //! 4. **The documented refusals and clamps**: the overlap rule's exact
 //!    boundary, the trim clamps at both source bounds, ripple's respect for
 //!    a locked track, and freeze frame's sync across tracks.
@@ -40,13 +40,13 @@ const SECOND: i64 = 600_000;
 // ---- fixtures ------------------------------------------------------------
 
 /// The everything fixture: three media (video with audio, audio only, an
-/// image), three tracks, a media clip with one action, an audio clip, a text
-/// clip, a shape clip and a marker. Sized so that every op in the table has
-/// somewhere legal to land on it.
+/// image), four tracks, a media clip with one action, an audio clip, a text
+/// clip, a shape clip, a nest clip with a text clip inside it, and a marker.
+/// Sized so that every op in the table has somewhere legal to land on it.
 fn general() -> Handle {
     Handle::from_json(
         r#"{
-  "version": 1,
+  "version": 2,
   "canvas": {"width": 1920, "height": 1080, "fps": [30, 1], "background": [0, 0, 0, 1],
              "fit_new_clips": true, "timecode_frames": true},
   "media": [
@@ -60,7 +60,8 @@ fn general() -> Handle {
   "tracks": [
     {"id": 4, "name": "Track 1"},
     {"id": 5, "name": "Track 2"},
-    {"id": 6, "name": "Track 3"}
+    {"id": 6, "name": "Track 3"},
+    {"id": 7, "name": "Track 4"}
   ],
   "clips": [
     {"id": 10, "track": 4, "start": 0, "duration": 6000000,
@@ -73,10 +74,19 @@ fn general() -> Handle {
     {"id": 30, "track": 6, "start": 0, "duration": 3000000,
      "source": {"kind": "text"}, "video": {}, "text": {"content": "Hello"}},
     {"id": 40, "track": 6, "start": 4200000, "duration": 3000000,
-     "source": {"kind": "shape"}, "video": {}, "shape": {"width": 320, "height": 120}}
+     "source": {"kind": "shape"}, "video": {}, "shape": {"width": 320, "height": 120}},
+    {"id": 41, "track": 7, "start": 0, "duration": 3000000,
+     "source": {"kind": "nest", "project": 42}, "video": {}}
   ],
   "markers": [{"id": 50, "time": 6000000, "name": "Intro"}],
-  "next_id": 60
+  "next_id": 60,
+  "nests": [
+    {"id": 42, "name": "Nest 1", "width": 1920, "height": 1080,
+     "tracks": [{"id": 43, "name": "Nested"}],
+     "clips": [{"id": 44, "track": 43, "start": 0, "duration": 3000000,
+                "source": {"kind": "text"}, "video": {},
+                "text": {"content": "Inside"}}]}
+  ]
 }"#,
     )
 }
@@ -515,9 +525,17 @@ fn op_table() -> Vec<Value> {
         json!({"op": "ripple_delete_range", "from": 1200000, "to": 2400000}),
         json!({"op": "insert_time", "at": 0, "length": 600000}),
         json!({"op": "set_speed", "clip": 10, "rate": 2.0}),
+        json!({"op": "set_reversed", "clip": 10, "reversed": true}),
         json!({"op": "freeze_frame", "clip": 10, "at": 3000000}),
         json!({"op": "detach_audio", "clip": 10}),
         json!({"op": "duplicate", "clips": [10]}),
+        // The payload's own semantics are `paste.rs`'s business; this row is
+        // only here to keep the coverage check below honest.
+        json!({"op": "paste", "at": 24000000,
+               "payload": {"clips": [{"id": 1, "track": 0, "start": 0, "duration": 600000,
+                                      "source": {"kind": "text"}}]}}),
+        json!({"op": "nest", "clips": [30]}),
+        json!({"op": "unnest", "clip": 41}),
         json!({"op": "set_video", "clips": [10], "patch": {"opacity": 0.5}}),
         json!({"op": "set_audio", "clips": [10], "patch": {"volume": 0.5}}),
         json!({"op": "set_text", "clips": [30], "patch": {"content": "Bye"}}),
@@ -1526,7 +1544,7 @@ fn remove_media_takes_its_clips_only_when_asked() {
     assert_eq!(array(&after, "/media").len(), 2);
     assert_eq!(
         array(&after, "/clips").len(),
-        3,
+        4,
         "only clip 10 used media 1"
     );
 }
@@ -1714,7 +1732,7 @@ fn duplicate_places_the_copies_one_span_later_with_fresh_ids() {
     let after = project
         .apply(&json!({"op": "duplicate", "clips": [30, 40]}))
         .value();
-    assert_eq!(array(&after, "/clips").len(), 6);
+    assert_eq!(array(&after, "/clips").len(), 7);
     assert_eq!(placement(&after, first_new), (7_200_000, 3_000_000));
     assert_eq!(
         placement(&after, first_new + 1),
@@ -1722,4 +1740,82 @@ fn duplicate_places_the_copies_one_span_later_with_fresh_ids() {
     );
     // The originals are untouched.
     assert_eq!(placement(&after, 30), (0, 3_000_000));
+}
+
+/// `add_shape_clip`'s creation preset. The default is the rectangle
+/// `ShapeProps::default()` describes, but an arrow inherits nothing useful
+/// from a rectangle: with `arrow_end` off it draws as a plain diagonal line,
+/// which is not a shape anybody asks for by name. The head therefore belongs
+/// to the CREATION preset, not to `ShapeProps::default()` — which is also
+/// the base a `set_shape` merges into, where re-painting an unnamed field
+/// would be a bug.
+#[test]
+fn a_new_arrow_is_created_with_its_head_and_a_patch_still_overrides_it() {
+    let project = general();
+
+    // Omitted entirely: the default rectangle, both heads off.
+    let expected_id = int(&project.value(), "/next_id") as u64;
+    let bare = project
+        .apply(&json!({"op": "add_shape_clip", "track": 5, "at": 18000000}))
+        .value();
+    let shape = by_id(&bare, "/clips", expected_id);
+    assert_eq!(text(shape, "/shape/kind"), "rectangle");
+    assert!(!flag(shape, "/shape/arrow_start"));
+    assert!(!flag(shape, "/shape/arrow_end"));
+
+    // Asked for by kind: the head is on, and nothing else about the preset
+    // moved.
+    let arrow = project
+        .apply(&json!({"op": "add_shape_clip", "track": 5, "at": 18000000,
+                       "shape": {"kind": "arrow"}}))
+        .value();
+    let shape = by_id(&arrow, "/clips", expected_id);
+    assert_eq!(text(shape, "/shape/kind"), "arrow");
+    assert!(
+        flag(shape, "/shape/arrow_end"),
+        "an arrow with no head is a diagonal line"
+    );
+    assert!(
+        !flag(shape, "/shape/arrow_start"),
+        "only the END gets a head by default — a double-headed arrow is asked for"
+    );
+    assert_eq!(num(shape, "/shape/width"), 320.0, "the default box");
+
+    // The patch is merged OVER the preset, so an explicit refusal wins.
+    let headless = project
+        .apply(&json!({"op": "add_shape_clip", "track": 5, "at": 18000000,
+                       "shape": {"kind": "arrow", "arrow_end": false}}))
+        .value();
+    let shape = by_id(&headless, "/clips", expected_id);
+    assert!(!flag(shape, "/shape/arrow_end"));
+
+    // The preset is chosen by the kind the patch names, not by the kind the
+    // clip ends up with by accident: a line stays headless.
+    let line = project
+        .apply(&json!({"op": "add_shape_clip", "track": 5, "at": 18000000,
+                       "shape": {"kind": "line"}}))
+        .value();
+    assert!(!flag(
+        by_id(&line, "/clips", expected_id),
+        "/shape/arrow_end"
+    ));
+}
+
+/// The head is a CREATION preset and nothing else: turning an existing
+/// rectangle into an arrow with `set_shape` leaves `arrow_end` exactly where
+/// the caller left it, because a patch merges into the clip's own props and
+/// must not repaint a field it did not name.
+#[test]
+fn set_shape_does_not_add_a_head_when_it_changes_the_kind() {
+    let project = general();
+    // Clip 40 is the fixture's shape clip.
+    let changed = project
+        .apply(&json!({"op": "set_shape", "clips": [40], "patch": {"kind": "arrow"}}))
+        .value();
+    let shape = by_id(&changed, "/clips", 40);
+    assert_eq!(text(shape, "/shape/kind"), "arrow");
+    assert!(
+        !flag(shape, "/shape/arrow_end"),
+        "set_shape merges; it does not re-preset"
+    );
 }

@@ -58,6 +58,7 @@ extension AgentServer {
             ]
         }
         let shapeNames = ShapeKind.allCases.map { $0.rawValue }
+        let filterNames = FilterKind.allCases.map { $0.rawValue }
         let transitionNames = TransitionKind.allCases.map { $0.rawValue }
         // `null` is a legal value of `set_transition`'s kind — it is how a
         // transition is removed — so the enum has to carry it beside the
@@ -70,23 +71,47 @@ extension AgentServer {
         // left out keeps its current value and a key set to null clears an
         // optional group (shadow, chroma, duck, outline, backdrop, and text's
         // width, which null restores to auto-sizing).
-        let videoPatchDescription =
+        // Explicitly typed for the same reason `shapePatchDescription` is: the
+        // `+` chain now carries a non-literal operand (the filter kinds), and
+        // an inferred type here is what tips the `catalog` literal past the
+        // type checker's budget.
+        let videoPatchDescription: String =
             "Video properties to merge into the clip's base props. Keys: x, y (canvas px from "
             + "the canvas centre, y DOWN), scale (1 = native pixels, 0.01–10), rotation "
             + "(degrees, positive turns clockwise on screen), opacity (0–1), crop "
             + "({l, t, r, b} in SOURCE px — cropping never shifts the content), corner_radius "
             + "(source px), shadow (null or {color, opacity, blur, angle, distance}), color "
             + "({brightness, contrast, saturation, hue}, each 0 = unchanged), chroma (null or "
-            + "{key: [r, g, b], tolerance, softness, spill}). A colour is [r, g, b] or "
+            + "{key: [r, g, b], tolerance, softness, spill}), filters (an ARRAY of "
+            + "{kind, amount} applied in order, at most 4 — kind is "
+            + "\(filterNames.joined(separator: "|")) and amount is 0–1; send the whole array, "
+            + "since it replaces rather than merges, and [] clears the stack), reflection "
+            + "(null or {opacity, height, gap, falloff} — height and falloff are fractions of "
+            + "the layer's cropped height, gap is source px), spotlight (null or "
+            + "{shape: rect|ellipse, x, y, width, height, feather, dim, zoom} — the centre and "
+            + "the box are SOURCE px from the cropped rect's centre, dim is how much darker it "
+            + "is OUTSIDE and zoom 1–2 magnifies what is inside). A colour is [r, g, b] or "
             + "[r, g, b, a], each 0–1; chroma's key is the one that takes no alpha."
         let audioPatchDescription =
             "Audio properties to merge. Keys: volume (0–4, 1 = unity), muted, fade_in, "
-            + "fade_out (ticks), duck (null or {level, attack, release}), mono, keep_pitch."
+            + "fade_out (ticks), duck (null or {level, attack, release}), mono, keep_pitch, "
+            + "pan (-1 hard left … +1 hard right), compressor (null or {threshold_db, ratio, "
+            + "attack, release, makeup_db} — the two times in ticks), noise_reduction (0–1)."
         let textPatchDescription =
             "Text properties to merge. Keys: content, font (a PostScript name), size (px), "
             + "color, align (left|center|right), valign (top|middle|bottom), line_spacing, "
             + "tracking, outline (null or {width, color}), backdrop (null or {color, padding, "
             + "radius}), width (null for auto-sizing, or a wrap width in px). A colour is "
+            + "[r, g, b] or [r, g, b, a], each 0–1."
+        // Interpolated rather than concatenated: a `+` chain this long with
+        // a non-literal operand in it is what tips the whole `catalog`
+        // literal past the type checker's budget.
+        let shapePatchDescription: String =
+            "Shape properties to merge. Keys: kind "
+            + "(\(shapeNames.joined(separator: "|"))), width, height (the box, in source px), "
+            + "stroke (null or {width, color}), fill (null or a colour), radius (rectangle "
+            + "corners), arrow_start, arrow_end, and from / to — the endpoints of a line or "
+            + "arrow as UNIT coordinates in its box, e.g. from [0, 1] to [1, 0]. A colour is "
             + "[r, g, b] or [r, g, b, a], each 0–1."
 
         let catalog: [[String: Any]] = [
@@ -158,6 +183,23 @@ extension AgentServer {
                     "end": ["type": "integer", "description": "Out point, \(ticks)"],
                 ]),
             tool(
+                "set_selection",
+                "Selects clips — clicking one in the timeline or on the canvas, and Edit ▸ "
+                    + "Select All (⌘A). View state like the playhead and the range: nothing is "
+                    + "undoable and the project is untouched. It matters because the canvas "
+                    + "handles, crop mode and every inspector pane act on the SELECTION, so "
+                    + "this is how you put the app into the state a screenshot should show. "
+                    + "Call it with no clips (or []) to select nothing; get_project reports the "
+                    + "result as selection. Note that the ops themselves take their own clips "
+                    + "argument — selecting is not a prerequisite for editing.",
+                [
+                    "clips": [
+                        "type": "array", "items": ["type": "integer"],
+                        "description": "Clip ids to select (get_project lists them). Omit or "
+                            + "pass an empty array to select nothing.",
+                    ]
+                ]),
+            tool(
                 "undo",
                 "Undoes one step — Edit ▸ Undo (⌘Z). Every tool that edits the project makes "
                     + "exactly one step, so one undo walks back exactly one call. Reports the "
@@ -201,9 +243,19 @@ extension AgentServer {
                         "type": "integer",
                         "description": "Length \(ticks) Default 5 s (3000000).",
                     ],
+                    // The op takes a set_text PATCH (`core/src/edit.rs`), and
+                    // this used to declare a bare string — so an object was
+                    // read as absent and the clip got the placeholder. Both
+                    // forms are declared because a string and an object can
+                    // never be confused for one another, and the string is
+                    // the spelling every caller written against the old tool
+                    // already uses.
                     "text": [
-                        "type": "string",
-                        "description": "The words. Default: the Title preset's placeholder.",
+                        "type": ["object", "string"],
+                        "description": "The words, or the styling too. A plain string is "
+                            + "shorthand for {\"content\": …}; an object is a set_text patch "
+                            + "merged over the Title preset. " + textPatchDescription
+                            + " Default: the Title preset's placeholder.",
                     ],
                 ], required: ["track", "at"]),
             tool(
@@ -218,12 +270,21 @@ extension AgentServer {
                         "type": "integer",
                         "description": "Length \(ticks) Default 5 s (3000000).",
                     ],
+                    // Optional, as the op is: omitted, the core's default
+                    // rectangle lands. Declaring it a REQUIRED kind name put
+                    // that default out of reach and made the box and the
+                    // paint need a following set_shape.
                     "shape": [
-                        "type": "string", "enum": shapeNames,
-                        "description": "Which shape. A rounded rectangle is a rectangle with a "
-                            + "radius, not a kind of its own.",
+                        "type": ["object", "string"],
+                        "description": "Which shape, and how it is drawn. A plain string is a "
+                            + "kind — " + shapeNames.joined(separator: ", ")
+                            + " — and an object is a set_shape patch merged over the default "
+                            + "rectangle. " + shapePatchDescription + " Omit it for that "
+                            + "rectangle; a rounded one is a rectangle with a radius, not a "
+                            + "kind of its own. An arrow is created with its head on — pass "
+                            + "arrow_end: false for a bare diagonal.",
                     ],
-                ], required: ["track", "at", "shape"]),
+                ], required: ["track", "at"]),
             tool(
                 "move_clip",
                 "Shifts clips along the timeline by delta ticks (negative moves left; starts "
@@ -340,6 +401,22 @@ extension AgentServer {
                     ],
                 ], required: ["clip", "rate"]),
             tool(
+                "set_reversed",
+                "Plays a media clip back to front, or forward again — Clip ▸ Reverse. Nothing "
+                    + "about the timeline moves: the clip keeps its start, its duration and its "
+                    + "in point, and the in point is measured in the direction the clip plays, "
+                    + "so reversing a trimmed clip shows the other end of the file. Media clips "
+                    + "only: any other kind is an error. The reversed frames are pre-rendered on "
+                    + "the app side the first time they are needed, so the first render_frame or "
+                    + "export after this may take a moment.",
+                [
+                    "clip": clipProperty,
+                    "reversed": [
+                        "type": "boolean",
+                        "description": "true plays it backwards, false forwards again.",
+                    ],
+                ], required: ["clip", "reversed"]),
+            tool(
                 "freeze_frame",
                 "Holds one frame: the clip is split at `at`, a gap of `duration` is opened, and "
                     + "a still of that exact source frame fills it with the clip's own video "
@@ -368,11 +445,75 @@ extension AgentServer {
                     + "span — ⌘D. Follow with move_clip to put them anywhere else.",
                 ["clips": clipsProperty], required: ["clips"]),
             tool(
+                "paste",
+                "Inserts a clipboard payload's clips with fresh ids — ⌘V. The earliest clip in "
+                    + "the payload lands exactly at `at` and the others keep their offsets from "
+                    + "it, so a copied arrangement pastes back intact. The payload is what Copy "
+                    + "(⌘C) put on the pasteboard: {\"clips\": [...], \"media\": [...]}, whose "
+                    + "clips are get_project's clip objects and whose media are its media rows. "
+                    + "TWO things differ from get_project's spelling. A payload clip's `track` "
+                    + "is a DEPTH from the front of the track stack (0 = front-most, 1 the lane "
+                    + "behind it), not a track id, because the ids belong to the project it was "
+                    + "copied from; and media is matched to this project's media[] BY PATH, so a "
+                    + "row it does not have is added and one it does is reused. Ids in the "
+                    + "payload are ignored — everything is re-minted. A clip the overlap rule "
+                    + "refuses on its target track is placed on a new track in front rather "
+                    + "than dropped.",
+                [
+                    "at": [
+                        "type": "integer",
+                        "description": "Where the earliest clip lands, \(ticks) Default: the "
+                            + "playhead.",
+                    ],
+                    "track": [
+                        "type": "integer",
+                        "description": "Track id for the payload's depth 0; the rest follow by "
+                            + "the same offset. Default: the front-most track.",
+                    ],
+                    "payload": [
+                        "type": "object",
+                        "description": "{\"clips\": [...], \"media\": [...]} — see above.",
+                    ],
+                ], required: ["payload"]),
+            tool(
+                "nest",
+                "Collapses clips into ONE clip that stands for the group — ⌘G. The clips move "
+                    + "whole (properties, actions, transitions) onto the nest's own tracks, "
+                    + "keeping their relative times and their stacking order with the earliest "
+                    + "starting at 0; the nest clip lands on the front-most track the selection "
+                    + "occupied and runs from the earliest start to the latest end. From then on "
+                    + "the group moves, trims, fades and transforms as one thing, and the "
+                    + "nest's canvas is frozen at the project's current size so a later "
+                    + "set_canvas cannot re-lay-out what is inside. get_project lists the groups "
+                    + "under `nests`, each with its own tracks and clips. Refused (no change) on "
+                    + "an empty selection, on a single clip that is already a nest, and when the "
+                    + "nest clip would overlap something that was not selected.",
+                [
+                    "clips": clipsProperty,
+                    "name": [
+                        "type": "string",
+                        "description": "What to call the group. Default: Nest <n>.",
+                    ],
+                ], required: ["clips"]),
+            tool(
+                "unnest",
+                "Opens a nest clip: its contents return to the timeline and the nest clip goes — "
+                    + "⇧⌘G. The exact inverse of nest apart from the ids, which are minted "
+                    + "fresh. Clips land at the nest clip's start plus their own, on tracks "
+                    + "counted back from the nest clip's own (tracks missing behind it are "
+                    + "added), and one the overlap rule refuses goes on a new track in front "
+                    + "rather than being dropped. A nest clip trimmed shorter than its contents "
+                    + "gives ALL of them back — trimming a nest hides content rather than "
+                    + "cutting it. An error on any clip that is not a nest.",
+                ["clip": clipProperty], required: ["clip"]),
+            tool(
                 "set_video",
                 "Changes the clips' BASE video properties — position, scale, rotation, opacity, "
-                    + "crop, corner radius, shadow, colour and chroma key. The patch MERGES: "
-                    + "keys you leave out keep their values, and shadow or chroma set to null "
-                    + "clears it. Placement is spec §5.3: the source rectangle is centred at the "
+                    + "crop, corner radius, shadow, colour, chroma key, filters, reflection and "
+                    + "spotlight. The patch MERGES: keys you leave out keep their values, and "
+                    + "shadow, chroma, reflection or spotlight set to null clears it. Filters "
+                    + "are the exception — the array replaces, so send the whole stack. "
+                    + "Placement is spec §5.3: the source rectangle is centred at the "
                     + "canvas centre plus (x, y), scaled, then rotated about that centre, and "
                     + "crop removes edges in place without shifting the content. To animate a "
                     + "property instead, add_action and then set_action_end.",
@@ -382,9 +523,9 @@ extension AgentServer {
                 ], required: ["clips", "patch"]),
             tool(
                 "set_audio",
-                "Changes the clips' BASE audio properties — volume, mute, fades, ducking, mono "
-                    + "and pitch preservation. Merges like set_video; duck set to null removes "
-                    + "the ducking.",
+                "Changes the clips' BASE audio properties — volume, mute, fades, ducking, mono, "
+                    + "pitch preservation, pan, compression and noise reduction. Merges like "
+                    + "set_video; duck or compressor set to null removes it.",
                 [
                     "clips": clipsProperty,
                     "patch": ["type": "object", "description": audioPatchDescription],
@@ -400,18 +541,14 @@ extension AgentServer {
                 ], required: ["clips", "patch"]),
             tool(
                 "set_shape",
-                "Changes a shape clip's geometry and paint. Keys: kind ("
-                    + shapeNames.joined(separator: "|") + "), width, height (the box, in source "
-                    + "px), stroke (null or {width, color}), fill (null or a colour), radius "
-                    + "(rectangle corners), arrow_start, arrow_end, and from / to — the "
-                    + "endpoints of a line or arrow as UNIT coordinates in its box, e.g. "
-                    + "from [0, 1] to [1, 0]. Merges like set_video.",
+                "Changes a shape clip's geometry and paint. Merges like set_video; stroke or "
+                    + "fill set to null removes that half of the paint. Position and scale are "
+                    + "set_video's, not this tool's. Changing kind changes ONLY the kind — an "
+                    + "arrow made this way keeps whatever arrow_end it had, unlike one created "
+                    + "by add_shape_clip.",
                 [
                     "clips": clipsProperty,
-                    "patch": [
-                        "type": "object",
-                        "description": "The shape properties to change (see above).",
-                    ],
+                    "patch": ["type": "object", "description": shapePatchDescription],
                 ], required: ["clips", "patch"]),
             tool(
                 "set_enabled",
@@ -648,6 +785,40 @@ extension AgentServer {
                 ["path": ["type": "string", "description": "Absolute or ~ path to the file."]],
                 required: ["path"]),
             tool(
+                "import_captions",
+                "Reads a SubRip (.srt) caption file and lays it out as TEXT CLIPS, one per cue, "
+                    + "on a new track of its own — File ▸ Import Captions…. They are ordinary "
+                    + "text clips in the Caption preset, so they render in the preview, in "
+                    + "render_frame and in an export (burn-in) with no further step, and any of "
+                    + "them can be retimed with move_clip or restyled with set_text. Times snap "
+                    + "to the frame grid; a cue that overlapped the next one is shortened to "
+                    + "meet it. The result reports how many cues landed and, under skipped, "
+                    + "every entry the file was too malformed to read, with its line number.",
+                [
+                    "path": [
+                        "type": "string",
+                        "description": "Absolute or ~ path to the .srt file.",
+                    ],
+                    "track": [
+                        "type": "integer",
+                        "description": "Put the captions on this existing track instead of a "
+                            + "new one. Cues the overlap rule refuses there are dropped, so "
+                            + "prefer omitting it.",
+                    ],
+                ], required: ["path"]),
+            tool(
+                "consolidate_media",
+                "Copies every file the project references into media/ inside the .reelcut "
+                    + "package and relinks the project at the copies — File ▸ Consolidate "
+                    + "Media…. Afterwards the package is the whole edit: it can be moved or "
+                    + "archived and still open with its original footage deleted. The project "
+                    + "must have been saved (call save_project with a path first); files that "
+                    + "are already inside are left alone, missing files are reported rather "
+                    + "than guessed at, and a file that cannot be copied leaves its media entry "
+                    + "pointing at the original, so the project always still opens. This can "
+                    + "take a while and copies as many bytes as the footage weighs.",
+                [:]),
+            tool(
                 "add_media",
                 "The raw op behind import_media: adds a media entry from a descriptor you "
                     + "supply — the media[] element of the project JSON minus its id (path, "
@@ -732,6 +903,20 @@ extension AgentServer {
                         "enum": ["project", "in_out"],
                         "description": "What to write: the whole timeline (default), or just "
                             + "the in/out range set_range set — the sheet's Range popup.",
+                    ],
+                    "video_bitrate": [
+                        "type": "integer", "minimum": 1,
+                        "description": "Target video rate in BITS per second (8000000 is "
+                            + "8 Mbps) — the sheet's Quality popup. Omit to let the preset's "
+                            + "own encoder settings decide. Ignored by presets that carry no "
+                            + "rate of their own: ProRes is fixed by its profile, and GIF and "
+                            + "APNG have no bitrate at all.",
+                    ],
+                    "audio_bitrate": [
+                        "type": "integer", "minimum": 1,
+                        "description": "Target AAC rate in BITS per second (192000 is "
+                            + "192 kbps) — the sheet's Quality popup. Omit for the preset's "
+                            + "own. Ignored where the sound is not AAC (ProRes writes LPCM).",
                     ],
                 ], required: ["preset", "path"]),
         ]

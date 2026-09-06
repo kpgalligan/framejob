@@ -8,13 +8,20 @@
 //! persisted schema bumps [`RC_FORMAT_VERSION`] here AND the `#define` in
 //! `core/include/reelcut_core.h`, and adds a migration step in [`read`].
 
-use serde_json::Value;
+use serde_json::{json, Value};
 
-use crate::model::Project;
+use crate::model::{Canvas, Project};
 
 /// Bumped by any change to the persisted project schema. Mirrored by
 /// `RC_FORMAT_VERSION` in the C header.
-pub const RC_FORMAT_VERSION: u32 = 1;
+///
+/// Version 2 is the M3 schema: nests (`project.nests`, and a nest CLIP
+/// naming one by id instead of by path), filters, reflection, spotlight,
+/// reversed media, and audio pan / compressor / noise reduction. Every one
+/// of those fields carries a serde default, so a version-1 file reads
+/// unchanged — with the single exception the nest payload's type change
+/// forces, which [`migrate_1_to_2`] handles.
+pub const RC_FORMAT_VERSION: u32 = 2;
 
 /// Reader caps, mirrored by the `RC_MAX_*` defines in the C header. They
 /// exist so a corrupt or generated file cannot make the app allocate
@@ -25,23 +32,34 @@ pub const MAX_TRACKS: usize = 64;
 pub const MAX_MARKERS: usize = 1024;
 pub const MAX_MEDIA: usize = 1024;
 
+/// How many levels of nest may sit inside one another. A cap on the WALK,
+/// not on taste: every evaluation of a nested layer recurses once per
+/// level, and eight levels is already past anything an editor does on
+/// purpose. `Project::validate` refuses a deeper file, and it refuses a
+/// nest that reaches itself at any depth, so no walk downstream needs a
+/// visited set of its own.
+pub const MAX_NEST_DEPTH: u32 = 8;
+
 /// The caps check both sides share: [`Project::validate`] runs it on read,
 /// [`write`] runs it before serializing. One implementation, so the writer
 /// can never produce a file the reader rejects.
+///
+/// Nested tracks and clips count toward the same two caps as the
+/// timeline's. They are the same tracks and clips — a nest is a group held
+/// in the parent's one id space, and flattening one at evaluation time
+/// gives its clips real composition tracks — so counting them separately
+/// would let a project with 64 nests of 64 tracks past a cap that exists to
+/// bound exactly that.
 pub fn check_caps(p: &Project) -> Result<(), String> {
-    if p.clips.len() > MAX_CLIPS {
-        return Err(format!(
-            "too many clips: {} (max {})",
-            p.clips.len(),
-            MAX_CLIPS
-        ));
+    let nested_clips: usize = p.nests.iter().map(|n| n.clips.len()).sum();
+    let nested_tracks: usize = p.nests.iter().map(|n| n.tracks.len()).sum();
+    let clips = p.clips.len().saturating_add(nested_clips);
+    let tracks = p.tracks.len().saturating_add(nested_tracks);
+    if clips > MAX_CLIPS {
+        return Err(format!("too many clips: {clips} (max {MAX_CLIPS})"));
     }
-    if p.tracks.len() > MAX_TRACKS {
-        return Err(format!(
-            "too many tracks: {} (max {})",
-            p.tracks.len(),
-            MAX_TRACKS
-        ));
+    if tracks > MAX_TRACKS {
+        return Err(format!("too many tracks: {tracks} (max {MAX_TRACKS})"));
     }
     if p.markers.len() > MAX_MARKERS {
         return Err(format!(
@@ -58,6 +76,80 @@ pub fn check_caps(p: &Project) -> Result<(), String> {
         ));
     }
     Ok(())
+}
+
+/// Version 1 → 2. One key needs rewriting: a nest clip's `project`.
+///
+/// In version 1 it was a PATH — a reference the core, which has no
+/// filesystem, could never resolve, so `evaluate.rs` could only drop the
+/// clip — and in version 2 it is the id of a `Nest` in `nests[]`. No build
+/// ever created one (no op makes a nest yet; the reader round-tripped the
+/// key and nothing else), so nothing real is being reinterpreted here. The
+/// step exists because "the reader accepts every prior version" is a
+/// promise about hand-written and third-party files too, and a `String`
+/// where a `u32` now belongs is the one version-1 shape serde cannot take
+/// with a default.
+///
+/// The path becomes an EMPTY nest carrying it as a name. That keeps the
+/// clip — its track, its times, its transform, its actions — and loses only
+/// a reference that never resolved to anything; deleting the clip instead
+/// would silently throw away something a person placed on a timeline.
+///
+/// Anything else is left exactly as it is. A shape this cannot make sense
+/// of gets serde's schema error, naming the key, rather than a guess made
+/// here.
+fn migrate_1_to_2(value: &mut Value) {
+    let default_canvas = Canvas::default();
+    let width = value
+        .pointer("/canvas/width")
+        .and_then(Value::as_u64)
+        .unwrap_or(u64::from(default_canvas.width));
+    let height = value
+        .pointer("/canvas/height")
+        .and_then(Value::as_u64)
+        .unwrap_or(u64::from(default_canvas.height));
+    // Ids come from the file's own counter, which is exactly what it is
+    // for: `validate` demands `next_id` be past every id in the project, so
+    // allocating from it cannot collide with one.
+    let mut next_id = value.get("next_id").and_then(Value::as_u64).unwrap_or(1);
+
+    let mut made: Vec<Value> = Vec::new();
+    if let Some(clips) = value.get_mut("clips").and_then(Value::as_array_mut) {
+        for clip in clips {
+            let Some(source) = clip.get_mut("source").and_then(Value::as_object_mut) else {
+                continue;
+            };
+            if source.get("kind").and_then(Value::as_str) != Some("nest") {
+                continue;
+            }
+            let Some(path) = source.get("project").and_then(Value::as_str) else {
+                continue;
+            };
+            let id = next_id;
+            next_id = next_id.saturating_add(1);
+            made.push(json!({
+                "id": id, "name": path, "width": width, "height": height,
+                "tracks": [], "clips": []
+            }));
+            source.insert("project".to_string(), Value::from(id));
+        }
+    }
+    if made.is_empty() {
+        return;
+    }
+
+    let Some(root) = value.as_object_mut() else {
+        return;
+    };
+    // A version-1 file with a `nests` key is a hand edit, not something a
+    // build wrote, so the migrated nests join it rather than replacing it.
+    match root.get_mut("nests").and_then(Value::as_array_mut) {
+        Some(existing) => existing.extend(made),
+        None => {
+            root.insert("nests".to_string(), Value::Array(made));
+        }
+    }
+    root.insert("next_id".to_string(), Value::from(next_id));
 }
 
 /// Parses project JSON of ANY version this build knows, migrating it
@@ -101,17 +193,12 @@ pub fn read(json: &str) -> Result<Project, String> {
         ));
     }
 
-    // MIGRATION HOOK. Each future bump adds one step here, applied in order
-    // from `version` up to RC_FORMAT_VERSION, rewriting `value` in place
-    // before it is deserialized:
-    //
-    //     if version < 2 { migrate_1_to_2(&mut value); }
-    //     if version < 3 { migrate_2_to_3(&mut value); }
-    //
-    // Version 1 is the first, so there is nothing to migrate yet. The
-    // binding is `mut` for that future; silence the unused warning until
-    // the first step lands.
-    let _ = &mut value;
+    // MIGRATION HOOK. Each bump adds one step here, applied in order from
+    // `version` up to RC_FORMAT_VERSION, rewriting `value` in place before
+    // it is deserialized. A future version 3 adds its own line below.
+    if version < 2 {
+        migrate_1_to_2(&mut value);
+    }
 
     let mut project: Project = serde_json::from_value(value)
         .map_err(|e| format!("project json does not match the schema: {e}"))?;

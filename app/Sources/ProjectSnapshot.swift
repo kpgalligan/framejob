@@ -205,6 +205,44 @@ enum ShapeKind: String, Codable, CaseIterable {
     var isLinear: Bool { self == .line || self == .arrow }
 }
 
+/// The image filters of spec §4.2 (M3). Every one is a few lines in
+/// `Compositor.metal`'s single pass — a filter needing its own render target
+/// is not one of these.
+enum FilterKind: String, Codable, CaseIterable {
+    case blur, sharpen, pixelate, sepia, noir, vignette, invert
+
+    var displayName: String {
+        switch self {
+        case .blur: return "Blur"
+        case .sharpen: return "Sharpen"
+        case .pixelate: return "Pixelate"
+        case .sepia: return "Sepia"
+        case .noir: return "Noir"
+        case .vignette: return "Vignette"
+        case .invert: return "Invert"
+        }
+    }
+
+    /// The code the shader's uniform block carries. 0 means "no filter", so
+    /// these count from 1 and the order is the model's declaration order —
+    /// `Compositor.metal` reads them, so it must not be re-ordered here.
+    var shaderCode: Int {
+        (FilterKind.allCases.firstIndex(of: self) ?? 0) + 1
+    }
+}
+
+/// A spotlight's region: the two shapes spec §4.2 names.
+enum SpotShape: String, Codable, CaseIterable {
+    case rect, ellipse
+
+    var displayName: String {
+        switch self {
+        case .rect: return "Rectangle"
+        case .ellipse: return "Ellipse"
+        }
+    }
+}
+
 /// An action's easing. Raw values are the model's spelling; the key decoding
 /// strategy never touches VALUES, so these stay snake_case.
 enum Curve: String, Codable, CaseIterable {
@@ -434,8 +472,12 @@ struct CropInsets: Codable, Equatable {
     var isZero: Bool { l == 0 && t == 0 && r == 0 && b == 0 }
 }
 
-/// A drop shadow. `angle` is degrees clockwise from straight up; `distance`
-/// and `blur` are canvas pixels.
+/// A drop shadow. `angle` is degrees with 0 pointing RIGHT and increasing
+/// COUNTER-CLOCKWISE — the convention `model.rs` states and the one the
+/// default 315° depends on, which is why it falls down-and-right on a y-down
+/// canvas. `distance` and `blur` are SOURCE pixels, like the corner radius
+/// and the crop, so `Compositor.encodeShadow` scales both by the layer's
+/// scale before it resolves them into canvas-space offsets.
 struct ShadowProps: Codable, Equatable {
     let color: RGBA
     let opacity: Double
@@ -517,6 +559,110 @@ struct ChromaProps: Codable, Equatable {
     }
 }
 
+/// One image filter and how much of it. Order matters: the compositor
+/// applies `VideoProps.filters` in order, so blur-then-sepia and
+/// sepia-then-blur are different pictures.
+struct FilterProps: Codable, Equatable {
+    let kind: FilterKind
+    /// 0 = present but doing nothing, 1 = full effect.
+    let amount: Double
+
+    /// The most one layer may carry — `MAX_FILTERS` in `model.rs`. A shader
+    /// budget, not taste: the uniform block holds four (kind, amount) pairs.
+    static let max = 4
+
+    init(kind: FilterKind = .blur, amount: Double = 0.5) {
+        self.kind = kind
+        self.amount = amount
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        kind = c.lenient(.kind, FilterKind.blur)
+        amount = c.lenient(.amount, 0.5)
+    }
+}
+
+/// A mirrored copy of the layer drawn below it, fading out (M3). `height`
+/// and `falloff` are FRACTIONS of the layer's cropped height, not pixels, so
+/// a reflection survives a scale change; `gap` is source pixels, like the
+/// corner radius and the crop.
+struct ReflectionProps: Codable, Equatable {
+    let opacity: Double
+    let height: Double
+    let gap: Double
+    /// 0 does not fade at all; 1 reaches transparent exactly at `height`.
+    let falloff: Double
+
+    init(opacity: Double = 0.35, height: Double = 0.5, gap: Double = 0, falloff: Double = 1) {
+        self.opacity = opacity
+        self.height = height
+        self.gap = gap
+        self.falloff = falloff
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        opacity = c.lenient(.opacity, 0.35)
+        height = c.lenient(.height, 0.5)
+        gap = c.lenient(.gap, 0)
+        falloff = c.lenient(.falloff, 1)
+    }
+}
+
+/// Darkens the canvas outside a rectangle or ellipse and optionally magnifies
+/// what is inside it (M3) — the stand-in for a screencast editor's freehand callout.
+///
+/// A VIDEO prop even though spec §4.2 first listed it under Shape: the zoom
+/// half can only be drawn by the layer that owns the pixels. The centre and
+/// the box are SOURCE pixels from the centre of the cropped rect, the same
+/// frame `cornerRadius` and `crop` use.
+struct SpotlightProps: Codable, Equatable {
+    let shape: SpotShape
+    let x: Double
+    let y: Double
+    let width: Double
+    let height: Double
+    /// Source pixels the edge is blurred over; 0 is a hard edge.
+    let feather: Double
+    /// How much darker everything OUTSIDE is; 1 is black.
+    let dim: Double
+    /// Magnification inside the region; 1 is none.
+    let zoom: Double
+
+    init(
+        shape: SpotShape = .rect, x: Double = 0, y: Double = 0, width: Double = 480,
+        height: Double = 270, feather: Double = 40, dim: Double = 0.6, zoom: Double = 1
+    ) {
+        self.shape = shape
+        self.x = x
+        self.y = y
+        self.width = width
+        self.height = height
+        self.feather = feather
+        self.dim = dim
+        self.zoom = zoom
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        shape = c.lenient(.shape, SpotShape.rect)
+        x = c.lenient(.x, 0)
+        y = c.lenient(.y, 0)
+        width = c.lenient(.width, 480)
+        height = c.lenient(.height, 270)
+        feather = c.lenient(.feather, 40)
+        dim = c.lenient(.dim, 0.6)
+        zoom = c.lenient(.zoom, 1)
+    }
+
+    /// The region as a rect in the same source-pixel space, centred on
+    /// `(x, y)` — what the overlay draws a handle box around.
+    var box: CGRect {
+        CGRect(x: x - width / 2, y: y - height / 2, width: width, height: height)
+    }
+}
+
 /// The pixel half of a clip. `x`/`y` are canvas pixels from the canvas
 /// CENTRE, y down; `scale` 1 = native pixels; `rotation` degrees clockwise.
 struct VideoProps: Codable, Equatable {
@@ -531,12 +677,17 @@ struct VideoProps: Codable, Equatable {
     let shadow: ShadowProps?
     let color: ColorAdjust
     let chroma: ChromaProps?
+    /// Applied in order, at most `FilterProps.max` of them (M3).
+    let filters: [FilterProps]
+    let reflection: ReflectionProps?
+    let spotlight: SpotlightProps?
 
     init(
         x: Double = 0, y: Double = 0, scale: Double = 1, rotation: Double = 0,
         opacity: Double = 1, crop: CropInsets = .zero, cornerRadius: Double = 0,
         shadow: ShadowProps? = nil, color: ColorAdjust = .identity,
-        chroma: ChromaProps? = nil
+        chroma: ChromaProps? = nil, filters: [FilterProps] = [],
+        reflection: ReflectionProps? = nil, spotlight: SpotlightProps? = nil
     ) {
         self.x = x
         self.y = y
@@ -548,6 +699,9 @@ struct VideoProps: Codable, Equatable {
         self.shadow = shadow
         self.color = color
         self.chroma = chroma
+        self.filters = filters
+        self.reflection = reflection
+        self.spotlight = spotlight
     }
 
     init(from decoder: Decoder) throws {
@@ -562,6 +716,9 @@ struct VideoProps: Codable, Equatable {
         shadow = c.lenient(.shadow)
         color = c.lenient(.color, ColorAdjust.identity)
         chroma = c.lenient(.chroma)
+        filters = c.lenient(.filters, [])
+        reflection = c.lenient(.reflection)
+        spotlight = c.lenient(.spotlight)
     }
 
     static let identity = VideoProps()
@@ -591,6 +748,41 @@ struct DuckProps: Codable, Equatable {
     }
 }
 
+/// "Smooth volume levels" (§4.3): a downward compressor over the clip's own
+/// samples. Unlike ducking, which the core resolves into ramps on other
+/// clips' envelopes, this one depends on the samples — so the model carries
+/// the parameters and the DSP happens on this side.
+struct CompressorProps: Codable, Equatable {
+    /// dBFS above which gain reduction starts.
+    let thresholdDb: Double
+    /// N:1 — 1 is no compression, 20 is effectively a limiter.
+    let ratio: Double
+    let attack: Ticks
+    let release: Ticks
+    /// dB applied after compression, to win back what it took.
+    let makeupDb: Double
+
+    init(
+        thresholdDb: Double = -18, ratio: Double = 3, attack: Ticks = 6000,
+        release: Ticks = 120_000, makeupDb: Double = 0
+    ) {
+        self.thresholdDb = thresholdDb
+        self.ratio = ratio
+        self.attack = attack
+        self.release = release
+        self.makeupDb = makeupDb
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        thresholdDb = c.lenient(.thresholdDb, -18)
+        ratio = c.lenient(.ratio, 3)
+        attack = c.lenient(.attack, 6000)
+        release = c.lenient(.release, 120_000)
+        makeupDb = c.lenient(.makeupDb, 0)
+    }
+}
+
 /// The sample half of a clip. `volume` may exceed 1, up to 4 (§5.2).
 struct AudioProps: Codable, Equatable {
     let volume: Double
@@ -602,10 +794,16 @@ struct AudioProps: Codable, Equatable {
     /// Preserve pitch through a speed change (`scaleTimeRange` + a
     /// time-pitch algorithm; the plan carries it per segment).
     let keepPitch: Bool
+    /// -1 hard left, 0 centred, +1 hard right (M3).
+    let pan: Double
+    let compressor: CompressorProps?
+    /// How much background noise to remove: 0 is off (M3).
+    let noiseReduction: Double
 
     init(
         volume: Double = 1, muted: Bool = false, fadeIn: Ticks = 0, fadeOut: Ticks = 0,
-        duck: DuckProps? = nil, mono: Bool = false, keepPitch: Bool = true
+        duck: DuckProps? = nil, mono: Bool = false, keepPitch: Bool = true,
+        pan: Double = 0, compressor: CompressorProps? = nil, noiseReduction: Double = 0
     ) {
         self.volume = volume
         self.muted = muted
@@ -614,6 +812,9 @@ struct AudioProps: Codable, Equatable {
         self.duck = duck
         self.mono = mono
         self.keepPitch = keepPitch
+        self.pan = pan
+        self.compressor = compressor
+        self.noiseReduction = noiseReduction
     }
 
     init(from decoder: Decoder) throws {
@@ -625,6 +826,9 @@ struct AudioProps: Codable, Equatable {
         duck = c.lenient(.duck)
         mono = c.lenient(.mono, false)
         keepPitch = c.lenient(.keepPitch, true)
+        pan = c.lenient(.pan, 0)
+        compressor = c.lenient(.compressor)
+        noiseReduction = c.lenient(.noiseReduction, 0)
     }
 
     /// Volume in dB for the Audio tab's read-out; -inf shows as silence.
@@ -867,19 +1071,27 @@ struct ActionSnapshot: Codable, Equatable, Identifiable {
 /// the Swift keyword `in` — so it codes by hand rather than through the
 /// snake_case strategy.
 enum ClipSource: Codable, Equatable {
-    /// A video or audio file. `in` is the source time of the first frame.
-    case media(id: UInt32, in: Ticks)
+    /// A video or audio file. `in` is the source time of the first frame —
+    /// in the REVERSED stream when `reversed` is set, which has the same
+    /// duration, so no time math anywhere changes with the flag.
+    case media(id: UInt32, in: Ticks, reversed: Bool)
     /// A freeze frame: one source frame held. `at` is the source time.
     case still(id: UInt32, at: Ticks)
     /// A still picture file (PNG/JPEG/HEIC).
     case image(id: UInt32)
     case text
     case shape
-    /// A nested project (M3).
+    /// A group of tracks and clips shown as one clip, by nest id
+    /// (`ProjectSnapshot.nests`).
+    ///
+    /// A NUMBER since format version 2. It was a path in version 1 while
+    /// this side already decoded a `UInt32` — `lenient` swallowed the
+    /// mismatch to 0, so a nest clip silently lost its identity crossing
+    /// the FFI. The two sides now agree.
     case nest(project: UInt32)
 
     private enum CodingKeys: String, CodingKey {
-        case kind, media, at, project
+        case kind, media, at, project, reversed
         case sourceIn = "in"
     }
 
@@ -888,7 +1100,9 @@ enum ClipSource: Codable, Equatable {
         let kind = c.lenient(.kind, "media")
         switch kind {
         case "media":
-            self = .media(id: c.lenient(.media, 0), in: c.lenient(.sourceIn, 0))
+            self = .media(
+                id: c.lenient(.media, 0), in: c.lenient(.sourceIn, 0),
+                reversed: c.lenient(.reversed, false))
         case "still":
             self = .still(id: c.lenient(.media, 0), at: c.lenient(.at, 0))
         case "image":
@@ -909,9 +1123,10 @@ enum ClipSource: Codable, Equatable {
         var c = encoder.container(keyedBy: CodingKeys.self)
         try c.encode(kindName, forKey: .kind)
         switch self {
-        case .media(let id, let sourceIn):
+        case .media(let id, let sourceIn, let reversed):
             try c.encode(id, forKey: .media)
             try c.encode(sourceIn, forKey: .sourceIn)
+            try c.encode(reversed, forKey: .reversed)
         case .still(let id, let at):
             try c.encode(id, forKey: .media)
             try c.encode(at, forKey: .at)
@@ -927,9 +1142,22 @@ enum ClipSource: Codable, Equatable {
     /// The media this clip references, or nil for the generated kinds.
     var mediaID: UInt32? {
         switch self {
-        case .media(let id, _), .still(let id, _), .image(let id): return id
+        case .media(let id, _, _), .still(let id, _), .image(let id): return id
         case .text, .shape, .nest: return nil
         }
+    }
+
+    /// The nest this clip shows, or nil for every other kind.
+    var nestID: UInt32? {
+        if case .nest(let project) = self { return project }
+        return nil
+    }
+
+    /// True when the clip plays its media backwards, which is what
+    /// `CompositionBuilder` substitutes a pre-rendered reversed asset for.
+    var isReversed: Bool {
+        if case .media(_, _, let reversed) = self { return reversed }
+        return false
     }
 
     /// The model's tag, for op JSON, timeline tinting and agent replies.
@@ -948,7 +1176,7 @@ enum ClipSource: Codable, Equatable {
     /// bound (§5.2 — `still`, `image`, `text`, `shape` may take any length).
     var sourceIn: Ticks {
         switch self {
-        case .media(_, let sourceIn): return sourceIn
+        case .media(_, let sourceIn, _): return sourceIn
         case .still(_, let at): return at
         case .image, .text, .shape, .nest: return 0
         }
@@ -1099,6 +1327,59 @@ struct MarkerSnapshot: Codable, Equatable, Identifiable {
     }
 }
 
+// MARK: - Nests
+
+/// A group of tracks and clips the timeline shows as ONE clip (§5.2,
+/// `source.kind = "nest"`).
+///
+/// **Not a nested project.** Its tracks and clips live in the PARENT's one
+/// id space and reference the parent's `media`, and its times are measured
+/// from its own start. That is what keeps `ProjectDocument.mediaURLs()`, the
+/// plan's clip-keyed track map and `next_id` working unchanged when a nest
+/// is flattened at evaluation time; a second id space would mean re-minting
+/// every inner id on the way out.
+struct NestSnapshot: Codable, Equatable, Identifiable {
+    let id: UInt32
+    let name: String
+    /// The nest's own canvas, frozen at the size the parent had when it was
+    /// made — a later canvas change must not re-lay-out a nest.
+    let width: UInt32
+    let height: UInt32
+    /// Back to front, index 0 rearmost, like `ProjectSnapshot.tracks`.
+    let tracks: [TrackSnapshot]
+    /// Times are relative to the nest: its earliest clip starts at 0.
+    let clips: [ClipSnapshot]
+
+    init(
+        id: UInt32, name: String = "", width: UInt32 = 1920, height: UInt32 = 1080,
+        tracks: [TrackSnapshot] = [], clips: [ClipSnapshot] = []
+    ) {
+        self.id = id
+        self.name = name
+        self.width = width
+        self.height = height
+        self.tracks = tracks
+        self.clips = clips
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UInt32.self, forKey: .id)
+        name = c.lenient(.name, "")
+        width = c.lenient(.width, 1920)
+        height = c.lenient(.height, 1080)
+        tracks = c.lenient(.tracks, [])
+        clips = c.lenient(.clips, [])
+    }
+
+    /// The nest's canvas as a size, for laying its contents out.
+    var canvasSize: CGSize { CGSize(width: Int(width), height: Int(height)) }
+
+    /// End of the last clip inside; 0 when empty. What a nest CLIP's
+    /// duration is measured against — never the parent's.
+    var duration: Ticks { clips.map(\.end).max() ?? 0 }
+}
+
 // MARK: - The project
 
 /// The whole document, decoded once per `ReelProject` handle
@@ -1113,11 +1394,16 @@ struct ProjectSnapshot: Codable, Equatable {
     let clips: [ClipSnapshot]
     let markers: [MarkerSnapshot]
     let nextId: UInt32
+    /// The groups every `nest` clip points at (format version 2). Empty in
+    /// anything written before it, which is what the model's serde defaults
+    /// buy: a version-1 file opens with no nests rather than not at all.
+    let nests: [NestSnapshot]
 
     init(
-        version: Int = 1, canvas: CanvasSnapshot = CanvasSnapshot(),
+        version: Int = ProjectSnapshot.formatVersion, canvas: CanvasSnapshot = CanvasSnapshot(),
         media: [MediaSnapshot] = [], tracks: [TrackSnapshot] = [],
-        clips: [ClipSnapshot] = [], markers: [MarkerSnapshot] = [], nextId: UInt32 = 1
+        clips: [ClipSnapshot] = [], markers: [MarkerSnapshot] = [], nextId: UInt32 = 1,
+        nests: [NestSnapshot] = []
     ) {
         self.version = version
         self.canvas = canvas
@@ -1126,18 +1412,25 @@ struct ProjectSnapshot: Codable, Equatable {
         self.clips = clips
         self.markers = markers
         self.nextId = nextId
+        self.nests = nests
     }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        version = c.lenient(.version, 1)
+        version = c.lenient(.version, ProjectSnapshot.formatVersion)
         canvas = c.lenient(.canvas, CanvasSnapshot())
         media = c.lenient(.media, [])
         tracks = c.lenient(.tracks, [])
         clips = c.lenient(.clips, [])
         markers = c.lenient(.markers, [])
         nextId = c.lenient(.nextId, 1)
+        nests = c.lenient(.nests, [])
     }
+
+    /// `RC_FORMAT_VERSION` — the version the core always writes, mirrored
+    /// here so a decode that never saw the key still reports the truth. The
+    /// C header is the contract; this is a fallback, not a second source.
+    static let formatVersion = 2
 
     /// The value a failed decode falls back to, so `ReelProject.snapshot`
     /// can stay non-optional and no view needs an "unloaded" state.
@@ -1149,6 +1442,12 @@ struct ProjectSnapshot: Codable, Equatable {
     func track(_ id: UInt32) -> TrackSnapshot? { tracks.first { $0.id == id } }
     func media(_ id: UInt32) -> MediaSnapshot? { media.first { $0.id == id } }
     func marker(_ id: UInt32) -> MarkerSnapshot? { markers.first { $0.id == id } }
+    func nest(_ id: UInt32) -> NestSnapshot? { nests.first { $0.id == id } }
+
+    /// The nest a clip shows, when it shows one.
+    func nest(for clip: ClipSnapshot) -> NestSnapshot? {
+        clip.source.nestID.flatMap { nest($0) }
+    }
 
     /// One track's clips in timeline order — the order the overlap rule and
     /// every transition lookup assume.
@@ -1168,24 +1467,39 @@ struct ProjectSnapshot: Codable, Equatable {
         clip.source.mediaID.flatMap { media($0) }
     }
 
-    /// The timeline's label for a clip: the media file name where there is
-    /// one, else the kind.
+    /// The timeline's label for a clip: the nest's name for a nest clip, the
+    /// media file name where there is one, else the kind.
+    ///
+    /// The nest comes first because it is the only one of the three the user
+    /// chose themselves — `nest` takes a `name`, and ⌘G's default `Nest <n>`
+    /// is what distinguishes one grey bar from the next.
     func name(of clip: ClipSnapshot) -> String {
-        media(for: clip)?.name ?? clip.fallbackName
+        if let nest = nest(for: clip), !nest.name.isEmpty { return nest.name }
+        return media(for: clip)?.name ?? clip.fallbackName
     }
 
     /// The clip's UNCROPPED source rectangle size in source pixels — the
-    /// input to `canvasRect`. nil for text (only `LayerRenderers` can
-    /// measure a text layout, §5.3) and for nests (M3).
+    /// input to `canvasRect`. nil for text, where only `LayerRenderers` can
+    /// measure a layout (§5.3).
+    ///
+    /// **A nest's is its own canvas**, frozen at the size the project had
+    /// when it was made. That is exactly the rectangle the core clips a
+    /// nest's flattened layers to (`clip_rect`, spec §7.3), so a nest clip's
+    /// handles, its Fit/Fill and its scale drags all act on the box its
+    /// contents actually occupy. Reading the PROJECT's canvas here instead
+    /// would be a second, disagreeing answer the moment `set_canvas` runs.
     func sourceSize(of clip: ClipSnapshot) -> CGSize? {
         switch clip.source {
-        case .media(let id, _), .still(let id, _), .image(let id):
+        case .media(let id, _, _), .still(let id, _), .image(let id):
             guard let m = media(id), m.width > 0, m.height > 0 else { return nil }
             return m.pixelSize
         case .shape:
             guard let s = clip.shape, s.width > 0, s.height > 0 else { return nil }
             return s.boxSize
-        case .text, .nest:
+        case .nest:
+            guard let n = nest(for: clip), n.width > 0, n.height > 0 else { return nil }
+            return n.canvasSize
+        case .text:
             return nil
         }
     }
@@ -1383,6 +1697,41 @@ struct RecipeTransition: Codable, Equatable {
     var isIncoming: Bool { role == "in" }
 }
 
+/// The rotated canvas rectangle a layer is clipped to (§7.3 `clip_rect`).
+///
+/// Only a nest ever sets one — a layer flattened out of a nest is clipped to
+/// that nest's canvas rect — so every layer the core emits today carries
+/// `null` here. The type exists so the compositor can implement the clip
+/// once, against a recipe shape that will not change when nests arrive.
+struct RecipeClipRect: Codable, Equatable {
+    let x: Double
+    let y: Double
+    let w: Double
+    let h: Double
+    /// Degrees, about the rectangle's centre, like a layer's own rotation.
+    let rotation: Double
+
+    init(x: Double, y: Double, w: Double, h: Double, rotation: Double = 0) {
+        self.x = x
+        self.y = y
+        self.w = w
+        self.h = h
+        self.rotation = rotation
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        x = c.lenient(.x, 0)
+        y = c.lenient(.y, 0)
+        w = c.lenient(.w, 0)
+        h = c.lenient(.h, 0)
+        rotation = c.lenient(.rotation, 0)
+    }
+
+    /// The unrotated rectangle, centred on `(x, y)` in canvas pixels.
+    var rect: CGRect { CGRect(x: x - w / 2, y: y - h / 2, width: w, height: h) }
+}
+
 /// One layer of a composed frame, every property already evaluated through
 /// the clip's actions.
 struct RecipeLayer: Codable, Equatable {
@@ -1401,6 +1750,13 @@ struct RecipeLayer: Codable, Equatable {
     let shadow: ShadowProps?
     let color: ColorAdjust
     let chroma: ChromaProps?
+    /// Applied in order, at most `FilterProps.max` of them.
+    let filters: [FilterProps]
+    let reflection: ReflectionProps?
+    let spotlight: SpotlightProps?
+    /// The rectangle this layer is clipped to; nil unless it came out of a
+    /// nest. Always nil today — see `RecipeClipRect`.
+    let clipRect: RecipeClipRect?
     let transition: RecipeTransition?
 
     init(from decoder: Decoder) throws {
@@ -1418,6 +1774,10 @@ struct RecipeLayer: Codable, Equatable {
         shadow = c.lenient(.shadow)
         color = c.lenient(.color, ColorAdjust.identity)
         chroma = c.lenient(.chroma)
+        filters = c.lenient(.filters, [])
+        reflection = c.lenient(.reflection)
+        spotlight = c.lenient(.spotlight)
+        clipRect = c.lenient(.clipRect)
         transition = c.lenient(.transition)
     }
 
@@ -1433,7 +1793,8 @@ struct RecipeLayer: Codable, Equatable {
     var videoProps: VideoProps {
         VideoProps(
             x: x, y: y, scale: scale, rotation: rotation, opacity: opacity, crop: crop,
-            cornerRadius: cornerRadius, shadow: shadow, color: color, chroma: chroma)
+            cornerRadius: cornerRadius, shadow: shadow, color: color, chroma: chroma,
+            filters: filters, reflection: reflection, spotlight: spotlight)
     }
 }
 
@@ -1527,9 +1888,12 @@ struct PlanRamp: Codable, Equatable {
     }
 }
 
-/// One composition track: video ids start at 1, audio at 101, and
+/// One composition track: video ids start at 1, audio at 1001, and
 /// `CompositionBuilder` passes the id as `preferredTrackID` so the recipe
-/// can name a track by the same number.
+/// can name a track by the same number. (Audio moved up from 101 when nests
+/// landed — a nest contributes its own tracks, so the old gap of a hundred
+/// was reachable. Nothing in Swift reads the number; both halves come from
+/// the plan.)
 struct PlanTrack: Codable, Equatable, Identifiable {
     let id: Int
     let segments: [PlanSegment]

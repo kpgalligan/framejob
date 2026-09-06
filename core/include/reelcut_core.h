@@ -39,14 +39,19 @@ extern "C" {
 #define RC_TIMESCALE 600000
 
 /* Bumped by any change to the persisted project schema. The reader accepts
- * every prior version; the writer always writes this one. */
-#define RC_FORMAT_VERSION 1
+ * every prior version; the writer always writes this one.
+ *
+ * Version 2 is the M3 schema: nests, filters, reflection, spotlight,
+ * reversed media, and audio pan / compressor / noise reduction. */
+#define RC_FORMAT_VERSION 2
 
 /* Reader caps enforced by the writer, so every file this build produces can
- * be read back (`RC_CAPS` in core/src/format.rs). */
+ * be read back (`RC_CAPS` in core/src/format.rs). A nest's tracks and clips
+ * count toward the same two caps as the timeline's. */
 #define RC_MAX_CLIPS 4096
 #define RC_MAX_TRACKS 64
 #define RC_MAX_MARKERS 1024
+#define RC_MAX_NEST_DEPTH 8
 
 typedef struct RcProject RcProject;
 
@@ -88,6 +93,12 @@ void rc_project_free(RcProject *p);
  * The caller must therefore initialise its `char *err = NULL;` before the
  * call and test it after a NULL return. */
 RcProject *rc_project_apply(const RcProject *p, const char *op, char **err_out);
+
+/* Every op name `rc_project_apply` accepts, as a JSON array of strings in
+ * the order of that table. The host reads it to check its MCP tool catalog
+ * covers the whole table; the core owns the list so no copy can drift from
+ * it. Never NULL. */
+char *rc_op_names(void);
 
 /* --------------------------------------------------------------- queries */
 

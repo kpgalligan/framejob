@@ -31,12 +31,12 @@
 //! patch, which is opaque [`serde_json::Value`] here, is evaluated
 //! leniently by `actions.rs`, and is kept as written by `set_action_end`.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use serde::{Deserialize, Serialize};
 
 use crate::format::{self, RC_FORMAT_VERSION};
-use crate::time::{Fps, Ticks};
+use crate::time::{Fps, Ticks, TIMESCALE};
 
 /// Linear RGBA, each channel 0..1. Alpha is premultiplied by nothing — the
 /// renderer decides.
@@ -62,6 +62,13 @@ pub struct Project {
     pub markers: Vec<Marker>,
     #[serde(default = "default_next_id")]
     pub next_id: u32,
+    /// The groups every `source.kind = "nest"` clip points at (format
+    /// version 2). Appended after `next_id` rather than filed next to
+    /// `clips` because declaration order IS key order: a version-1 file
+    /// diffed against a version-2 one differs by a trailing key, not by a
+    /// re-ordering of everything after `clips`.
+    #[serde(default)]
+    pub nests: Vec<Nest>,
 }
 
 /// The fixed canvas every clip is composited onto.
@@ -191,8 +198,7 @@ pub struct Clip {
 }
 
 /// What a clip shows. `media` is the only kind with a source bound —
-/// `still`, `image`, `text` and `shape` may have any duration; `nest` is
-/// M3 and is parsed and round-tripped only.
+/// `still`, `image`, `text`, `shape` and `nest` may have any duration.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Source {
@@ -201,6 +207,23 @@ pub enum Source {
         /// Source time of the clip's first frame.
         #[serde(rename = "in")]
         r#in: Ticks,
+        /// Play the media back to front.
+        ///
+        /// The core does no pixel work, so this is a FACT about the clip,
+        /// not an instruction: it changes neither the plan nor the recipe.
+        /// Swift resolves it by substituting a pre-rendered reversed asset
+        /// for this media's segments (spec §11 — "reverse is not native;
+        /// M3 pre-renders reversed segments").
+        ///
+        /// `in` is then measured in that REVERSED stream, which has the
+        /// same duration as the forward one — so an `in` of 0 is the
+        /// media's last frame, and every time computation in this crate
+        /// (trimming, splitting, `source_length`) stays correct with no
+        /// case for it. That is the whole reason for the convention: the
+        /// alternative, a forward-source in point, would make advancing
+        /// `in` on a split run the wrong way.
+        #[serde(default)]
+        reversed: bool,
     },
     Still {
         media: u32,
@@ -213,7 +236,18 @@ pub enum Source {
     Text,
     Shape,
     Nest {
-        project: String,
+        /// The [`Nest`] this clip shows, by id, in the project's `nests[]`.
+        ///
+        /// A NUMBER, not the path this key held in format version 1. The
+        /// core has no filesystem, so a path was a reference it could never
+        /// resolve — `evaluate.rs` could only filter such a clip out — and
+        /// Swift has decoded this key as a `UInt32` since M1
+        /// (`ProjectSnapshot.swift`), leniently swallowing the type
+        /// mismatch to 0, so a nest clip silently lost its identity every
+        /// time it crossed the FFI. Version 2 makes the two sides agree;
+        /// `format::read` migrates a version-1 path into a named, empty
+        /// nest so the clip keeps its place on the timeline.
+        project: u32,
     },
 }
 
@@ -232,6 +266,73 @@ impl Default for Enabled {
             video: true,
             audio: true,
         }
+    }
+}
+
+// ---- nests ---------------------------------------------------------------
+
+/// A group of tracks and clips that the parent timeline shows as ONE clip
+/// (spec §5.2, `source.kind = "nest"`).
+///
+/// **A nest is not a nested [`Project`].** It holds its tracks and clips in
+/// the PARENT's one id number space, it references the parent's `media[]`,
+/// and its times are measured from its own start. The recursive shape looks
+/// tidier and is a trap: the composition plan keys a clip's video track by
+/// clip id, every segment names a media id the app resolves through the
+/// outer `media[]`, and `next_id` is a single counter — so a second id
+/// space would force every inner id to be re-minted on the way out, in
+/// three places, on every evaluation. One id space makes all three work
+/// unchanged, keeps [`Project::validate`]'s uniqueness sweep a straight
+/// extension rather than a recursion, and keeps a nested clip nameable by
+/// one integer over MCP exactly like every other object.
+///
+/// A nest's own duration is the largest clip end inside it
+/// ([`Nest::duration`]). The nest CLIP's duration is independent of that:
+/// it is trimmed like any other clip, and it may be shorter (the tail is
+/// cut) or longer (the surplus draws nothing).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Nest {
+    pub id: u32,
+    #[serde(default)]
+    pub name: String,
+    /// The nest's own canvas, frozen at the size the parent had when the
+    /// nest was made. Deliberately NOT read from the parent at evaluation
+    /// time: a later `set_canvas` would otherwise silently re-lay-out every
+    /// nest in the project, moving content the user never touched.
+    #[serde(default = "default_canvas_width")]
+    pub width: u32,
+    #[serde(default = "default_canvas_height")]
+    pub height: u32,
+    /// Index 0 is the BACK of the nest's own stack, as everywhere else.
+    #[serde(default)]
+    pub tracks: Vec<Track>,
+    /// Times are relative to the nest, so its earliest clip starts at 0.
+    #[serde(default)]
+    pub clips: Vec<Clip>,
+}
+
+impl Nest {
+    /// End of the last clip inside; 0 when the nest is empty. This is what
+    /// a nest clip's duration is measured against — never the parent's.
+    pub fn duration(&self) -> Ticks {
+        self.clips
+            .iter()
+            .map(|c| c.start.saturating_add(c.duration))
+            .max()
+            .unwrap_or(0)
+            .max(0)
+    }
+
+    /// The nests this one shows directly, by id, in clip order — the edge
+    /// list [`Project::validate`] walks for cycles and for depth.
+    pub fn child_nests(&self) -> Vec<u32> {
+        self.clips
+            .iter()
+            .filter_map(|c| match &c.source {
+                Source::Nest { project } => Some(*project),
+                _ => None,
+            })
+            .collect()
     }
 }
 
@@ -255,6 +356,10 @@ pub struct VideoProps {
     pub shadow: Option<Shadow>,
     pub color: ColorAdjust,
     pub chroma: Option<Chroma>,
+    /// Applied in the listed order, at most [`MAX_FILTERS`] of them.
+    pub filters: Vec<Filter>,
+    pub reflection: Option<Reflection>,
+    pub spotlight: Option<Spotlight>,
 }
 
 impl Default for VideoProps {
@@ -270,6 +375,9 @@ impl Default for VideoProps {
             shadow: None,
             color: ColorAdjust::default(),
             chroma: None,
+            filters: Vec::new(),
+            reflection: None,
+            spotlight: None,
         }
     }
 }
@@ -342,6 +450,140 @@ impl Default for Chroma {
     }
 }
 
+/// The most filters one layer may carry.
+///
+/// A SHADER BUDGET, not taste: the compositor's uniform block carries four
+/// `(kind, amount)` pairs and the fragment shader applies them in a fixed
+/// unrolled order, so a fifth filter has nowhere to go. `set_video` names
+/// the overflow rather than dropping it — a silently ignored filter is a
+/// user staring at a control that does nothing.
+pub const MAX_FILTERS: usize = 4;
+
+/// One image filter and how much of it (M3). Order matters: filters are
+/// applied in the order they appear in `video.filters`, so blur-then-sepia
+/// and sepia-then-blur are different pictures.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Filter {
+    pub kind: FilterKind,
+    /// 0 = the filter is present but does nothing, 1 = its full effect.
+    pub amount: f64,
+}
+
+impl Default for Filter {
+    /// Half-strength blur: the value a newly added filter takes, chosen so
+    /// adding one from the inspector visibly does something without
+    /// destroying the frame.
+    fn default() -> Self {
+        Filter {
+            kind: FilterKind::Blur,
+            amount: 0.5,
+        }
+    }
+}
+
+/// The filter set of spec §4.2. Deliberately closed and small: every one is
+/// a handful of lines in `Compositor.metal`'s single pass (spec §7.5), and
+/// a filter that needs its own render target is not one of these.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FilterKind {
+    #[default]
+    Blur,
+    Sharpen,
+    Pixelate,
+    Sepia,
+    Noir,
+    Vignette,
+    Invert,
+}
+
+/// A mirrored copy of the layer drawn below it, fading out (M3).
+///
+/// `height` and `falloff` are fractions rather than pixels so a reflection
+/// survives a scale change: half the layer, however big the layer is.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Reflection {
+    /// Opacity of the reflection where it touches the layer.
+    pub opacity: f64,
+    /// How much of the layer is mirrored, as a fraction of its CROPPED
+    /// height.
+    pub height: f64,
+    /// Source pixels between the layer's bottom edge and the reflection.
+    pub gap: f64,
+    /// How fast the mirrored copy fades out: 0 does not fade at all, 1
+    /// reaches transparent exactly at `height`.
+    pub falloff: f64,
+}
+
+impl Default for Reflection {
+    /// The glassy shelf: a dim half-height mirror hard against the layer.
+    fn default() -> Self {
+        Reflection {
+            opacity: 0.35,
+            height: 0.5,
+            gap: 0.0,
+            falloff: 1.0,
+        }
+    }
+}
+
+/// Darkens the canvas outside a rectangle or ellipse, optionally magnifying
+/// what is inside it (spec §4.2, M3) — the stand-in for a screencast editor's
+/// freehand callout that works on any footage.
+///
+/// A `video` prop, not a `shape` one, though spec §4.2 first listed it
+/// under Shape: the zoom half can only be drawn by the layer that owns the
+/// pixels, so it lives beside chroma key, filters and reflection.
+///
+/// The centre and the box are SOURCE pixels measured from the centre of the
+/// layer's cropped rect — the same frame `corner_radius` and `crop` use —
+/// so a spotlight stays on the face it was put on when the layer is scaled,
+/// moved or rotated.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Spotlight {
+    pub shape: SpotShape,
+    pub x: f64,
+    pub y: f64,
+    pub width: f64,
+    pub height: f64,
+    /// Source pixels the edge is blurred over; 0 is a hard edge.
+    pub feather: f64,
+    /// How much darker everything OUTSIDE is: 0 changes nothing, 1 is
+    /// black.
+    pub dim: f64,
+    /// Magnification INSIDE the region. 1 is no zoom, which is why the
+    /// range starts there and not at 0.
+    pub zoom: f64,
+}
+
+impl Default for Spotlight {
+    /// A 480 × 270 window — a 16:9 quarter of a 1080p source — centred, at
+    /// the spec's "darkens the canvas outside" with no zoom.
+    fn default() -> Self {
+        Spotlight {
+            shape: SpotShape::Rect,
+            x: 0.0,
+            y: 0.0,
+            width: 480.0,
+            height: 270.0,
+            feather: 40.0,
+            dim: 0.6,
+            zoom: 1.0,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SpotShape {
+    #[default]
+    Rect,
+    Ellipse,
+}
+
 // ---- audio properties ----------------------------------------------------
 
 /// `volume` is a linear gain and may exceed 1, up to 4 (spec §5.2).
@@ -356,6 +598,12 @@ pub struct AudioProps {
     pub mono: bool,
     /// Preserve pitch when the clip's speed is not 1.
     pub keep_pitch: bool,
+    /// -1 hard left, 0 centred, +1 hard right.
+    pub pan: f64,
+    pub compressor: Option<Compressor>,
+    /// How much background noise to remove: 0 is off, 1 the most the
+    /// platform will do.
+    pub noise_reduction: f64,
 }
 
 impl Default for AudioProps {
@@ -368,6 +616,45 @@ impl Default for AudioProps {
             duck: None,
             mono: false,
             keep_pitch: true,
+            pan: 0.0,
+            compressor: None,
+            noise_reduction: 0.0,
+        }
+    }
+}
+
+/// "Smooth volume levels" (spec §4.3): a downward compressor over the
+/// clip's own samples.
+///
+/// Unlike [`Duck`], which the core resolves into ramps on OTHER clips'
+/// envelopes, this one cannot be expressed as a gain curve — it depends on
+/// the samples — so the model carries the parameters and the DSP happens on
+/// the Swift side. The units are the ones an audio engineer types:
+/// dBFS for the threshold and the makeup, a plain ratio for the knee, and
+/// ticks for the two time constants like every other time in the schema.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Compressor {
+    /// dBFS above which gain reduction starts.
+    pub threshold_db: f64,
+    /// N:1 — 1 is no compression at all, 20 is effectively a limiter.
+    pub ratio: f64,
+    pub attack: Ticks,
+    pub release: Ticks,
+    /// dB of gain applied after compression, to win back what it took.
+    pub makeup_db: f64,
+}
+
+impl Default for Compressor {
+    /// A gentle speech setting: 3:1 above -18 dBFS, fast enough to catch a
+    /// consonant (10 ms) and slow enough not to pump (200 ms).
+    fn default() -> Self {
+        Compressor {
+            threshold_db: -18.0,
+            ratio: 3.0,
+            attack: TIMESCALE / 100,
+            release: TIMESCALE / 5,
+            makeup_db: 0.0,
         }
     }
 }
@@ -619,6 +906,18 @@ fn default_one() -> f64 {
     1.0
 }
 
+/// A [`Nest`]'s canvas when the file does not say. The same 1080p
+/// [`Canvas::default`] gives, and for the same reason: a size a nest can be
+/// laid out against is better than a zero one `validate` would have to
+/// refuse, and a nest written without a canvas came from a hand edit.
+fn default_canvas_width() -> u32 {
+    Canvas::default().width
+}
+
+fn default_canvas_height() -> u32 {
+    Canvas::default().height
+}
+
 /// The colour a marker has when nothing says otherwise, matching the
 /// spec §5.2 example. It is a palette NAME the UI resolves to a swatch, not
 /// a hex triple, so the core stores whatever string it is given and never
@@ -639,6 +938,19 @@ fn empty_patch() -> serde_json::Value {
 }
 
 // ---- lookups and invariants ----------------------------------------------
+
+/// The clips of one container on `track`, in start order, ties broken by id.
+///
+/// Free rather than a method because a [`Nest`] holds its clips the same way
+/// a [`Project`] does and must order them the same way: the plan's A/B
+/// assignment and the recipe's layer order are both defined by this
+/// sequence, and two spellings of it would let a nested clip stack in an
+/// order the timeline never would.
+pub(crate) fn clips_on(clips: &[Clip], track: u32) -> Vec<&Clip> {
+    let mut found: Vec<&Clip> = clips.iter().filter(|c| c.track == track).collect();
+    found.sort_by_key(|c| (c.start, c.id));
+    found
+}
 
 impl Project {
     /// An empty project at the given canvas size: one track, no media, no
@@ -667,6 +979,7 @@ impl Project {
             clips: Vec::new(),
             markers: Vec::new(),
             next_id: 2,
+            nests: Vec::new(),
         })
     }
 
@@ -695,6 +1008,10 @@ impl Project {
         self.markers.iter().find(|m| m.id == id)
     }
 
+    pub fn nest(&self, id: u32) -> Option<&Nest> {
+        self.nests.iter().find(|n| n.id == id)
+    }
+
     /// Hands out the next id and advances the counter. Saturating rather
     /// than wrapping: exhausting 4 billion ids is impossible under the
     /// caps, and saturating cannot silently reissue id 0.
@@ -708,9 +1025,7 @@ impl Project {
     /// is stable across edits (two clips may share a start only
     /// transiently, but the plan's A/B assignment must be deterministic).
     pub fn clips_on_track(&self, track: u32) -> Vec<&Clip> {
-        let mut clips: Vec<&Clip> = self.clips.iter().filter(|c| c.track == track).collect();
-        clips.sort_by_key(|c| (c.start, c.id));
-        clips
+        clips_on(&self.clips, track)
     }
 
     /// End of the last clip; 0 when there are no clips.
@@ -733,7 +1048,7 @@ impl Project {
     /// or a speed that is not a positive finite number.
     pub fn source_length(&self, clip: &Clip) -> Option<Ticks> {
         let (media_id, source_in) = match &clip.source {
-            Source::Media { media, r#in } => (*media, *r#in),
+            Source::Media { media, r#in, .. } => (*media, *r#in),
             _ => return None,
         };
         let media = self.media(media_id)?;
@@ -822,28 +1137,89 @@ impl Project {
             }
             max_id = max_id.max(marker.id);
         }
+        // A nest holds its tracks and clips in this SAME id space (see
+        // [`Nest`]), so its ids join the one sweep rather than getting a
+        // second one — which is the whole reason a nest is not a nested
+        // project.
+        for nest in &self.nests {
+            if !ids.insert(nest.id) {
+                return Err(format!("duplicate id {} on nest", nest.id));
+            }
+            max_id = max_id.max(nest.id);
+            for track in &nest.tracks {
+                if !ids.insert(track.id) {
+                    return Err(format!(
+                        "duplicate id {} on a track in nest {}",
+                        track.id, nest.id
+                    ));
+                }
+                max_id = max_id.max(track.id);
+            }
+            for clip in &nest.clips {
+                if !ids.insert(clip.id) {
+                    return Err(format!(
+                        "duplicate id {} on a clip in nest {}",
+                        clip.id, nest.id
+                    ));
+                }
+                max_id = max_id.max(clip.id);
+                for action in &clip.actions {
+                    if !ids.insert(action.id) {
+                        return Err(format!(
+                            "duplicate id {} on an action in nest {}",
+                            action.id, nest.id
+                        ));
+                    }
+                    max_id = max_id.max(action.id);
+                }
+            }
+        }
 
-        for clip in &self.clips {
-            if self.track(clip.track).is_none() {
+        self.check_clips(&self.clips, &self.tracks, "")?;
+        for nest in &self.nests {
+            self.check_clips(&nest.clips, &nest.tracks, &format!(" in nest {}", nest.id))?;
+        }
+        self.check_nesting()?;
+
+        if self.next_id <= max_id {
+            return Err(format!(
+                "next_id {} is not greater than id {}",
+                self.next_id, max_id
+            ));
+        }
+        Ok(())
+    }
+
+    /// The invariants a clip must satisfy wherever it lives: the track it
+    /// names is in the SAME container, its times are sane, whatever it
+    /// references exists, and every action on it has a duration.
+    ///
+    /// `whose` names the container in the message — `""` on the timeline,
+    /// `" in nest 12"` inside one — so a violation is reported where it
+    /// actually is. Media, by contrast, is always the project's: a nest
+    /// references the parent's `media[]`, never one of its own.
+    fn check_clips(&self, clips: &[Clip], tracks: &[Track], whose: &str) -> Result<(), String> {
+        for clip in clips {
+            if !tracks.iter().any(|t| t.id == clip.track) {
                 return Err(format!(
-                    "clip {} is on unknown track {}",
+                    "clip {}{whose} is on unknown track {}",
                     clip.id, clip.track
                 ));
             }
             if clip.duration <= 0 {
                 return Err(format!(
-                    "clip {} has non-positive duration {}",
+                    "clip {}{whose} has non-positive duration {}",
                     clip.id, clip.duration
                 ));
             }
             if clip.start < 0 {
                 return Err(format!(
-                    "clip {} has negative start {}",
+                    "clip {}{whose} has negative start {}",
                     clip.id, clip.start
                 ));
             }
-            // Only the media-bound sources name a media; nest is M3 and
-            // carries a path, not an id.
+            // Only the media-bound sources name a media; a nest names a
+            // nest, and the generated kinds name nothing.
             let referenced = match &clip.source {
                 Source::Media { media, .. } => Some(*media),
                 Source::Still { media, .. } => Some(*media),
@@ -853,27 +1229,101 @@ impl Project {
             if let Some(media) = referenced {
                 if self.is_missing_media(media) {
                     return Err(format!(
-                        "clip {} refers to unknown media {}",
+                        "clip {}{whose} refers to unknown media {}",
                         clip.id, media
+                    ));
+                }
+            }
+            if let Source::Nest { project } = &clip.source {
+                if self.nest(*project).is_none() {
+                    return Err(format!(
+                        "clip {}{whose} refers to unknown nest {}",
+                        clip.id, project
                     ));
                 }
             }
             for action in &clip.actions {
                 if action.duration <= 0 {
                     return Err(format!(
-                        "action {} on clip {} has non-positive duration {}",
+                        "action {} on clip {}{whose} has non-positive duration {}",
                         action.id, clip.id, action.duration
                     ));
                 }
             }
         }
+        Ok(())
+    }
 
-        if self.next_id <= max_id {
-            return Err(format!(
-                "next_id {} is not greater than id {}",
-                self.next_id, max_id
-            ));
+    /// Refuses a nest that contains itself at any remove, and a stack of
+    /// nests deeper than [`format::MAX_NEST_DEPTH`].
+    ///
+    /// Both are the same walk. Every nest reachable from the timeline is
+    /// visited, and then every nest that is NOT — an orphan is still part
+    /// of the file, `unnest` can still put its contents back on the
+    /// timeline, and a cycle hiding in one is a corrupt project whether or
+    /// not anything points at it today.
+    fn check_nesting(&self) -> Result<(), String> {
+        let mut chain: Vec<u32> = Vec::new();
+        let mut known: HashMap<u32, u32> = HashMap::new();
+        for clip in &self.clips {
+            if let Source::Nest { project } = &clip.source {
+                self.nest_height(*project, 1, &mut chain, &mut known)?;
+            }
+        }
+        for nest in &self.nests {
+            if !known.contains_key(&nest.id) {
+                self.nest_height(nest.id, 1, &mut chain, &mut known)?;
+            }
         }
         Ok(())
+    }
+
+    /// How many levels of nest this one is the top of — 1 for a nest that
+    /// contains no nests — given that it sits at `level` itself.
+    ///
+    /// `chain` is the path currently being walked, so a repeat in it is a
+    /// cycle. `known` memoizes finished nests: without it a diamond (two
+    /// clips in one nest showing the same nest) would be walked twice, and
+    /// eight levels of that is exponential. A memoized nest is finished, so
+    /// it can never be on `chain`, so the memo can never hide a cycle.
+    ///
+    /// Recursion is bounded by the depth cap, not by the number of nests:
+    /// the check happens on the way DOWN, so a 4096-deep chain in a
+    /// hand-written file is refused at level 9 rather than walked.
+    fn nest_height(
+        &self,
+        id: u32,
+        level: u32,
+        chain: &mut Vec<u32>,
+        known: &mut HashMap<u32, u32>,
+    ) -> Result<u32, String> {
+        let cap = format::MAX_NEST_DEPTH;
+        if level > cap {
+            return Err(format!("nests are more than {cap} deep at nest {id}"));
+        }
+        // An unknown nest is `check_clips`'s error to report, not this
+        // walk's: reaching one here means it named a nest that is not in
+        // `nests[]`, which that sweep has already refused.
+        let Some(nest) = self.nest(id) else {
+            return Ok(0);
+        };
+        if let Some(height) = known.get(&id).copied() {
+            if level.saturating_add(height).saturating_sub(1) > cap {
+                return Err(format!("nests are more than {cap} deep at nest {id}"));
+            }
+            return Ok(height);
+        }
+        if chain.contains(&id) {
+            return Err(format!("nest {id} contains itself"));
+        }
+        chain.push(id);
+        let mut tallest = 0;
+        for child in nest.child_nests() {
+            tallest = tallest.max(self.nest_height(child, level + 1, chain, known)?);
+        }
+        chain.pop();
+        let height = tallest + 1;
+        known.insert(id, height);
+        Ok(height)
     }
 }

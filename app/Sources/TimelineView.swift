@@ -792,9 +792,14 @@ final class TimelineView: NSView, NSTextFieldDelegate {
     }
 
     /// True when the clip contributes samples, i.e. deserves a waveform and
-    /// fade handles.
+    /// fade handles. A nest clip has no media but does have a mix — the core
+    /// gives it audio props exactly when something inside it sings, and its
+    /// fades apply to all of that (`core/src/audio.rs`) — so it gets the
+    /// handles. There is no waveform to draw for one; `drawWaveform` finds no
+    /// media and returns.
     func hasAudio(_ clip: ClipSnapshot) -> Bool {
         guard clip.enabled.audio else { return false }
+        if case .nest = clip.source { return clip.audio != nil }
         guard let media = snapshot.media(for: clip) else { return false }
         return media.hasAudio
     }

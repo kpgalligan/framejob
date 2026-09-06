@@ -2,15 +2,23 @@ import AppKit
 import UniformTypeIdentifiers
 
 /// File ▸ Export… (⌘E) and the toolbar's Export button: pick a preset, adjust
-/// the size, the frame rate and the range, then a save panel and a progress
-/// sheet (spec §7.8, §10 step 10).
+/// the size, the frame rate, the quality and the range, then a save panel and
+/// a progress sheet (spec §7.8, §10 step 10).
 ///
 /// Every number the sheet shows comes back from `rc_export_settings` — the
 /// sheet never computes an output size, a rate or a duration itself. That is
 /// the §7 rule ("Rust decides") applied to a dialog: the controls only say
 /// what to ASK for, the core answers, and what the readout shows is exactly
 /// what `Exporter` will be handed. It also means a preset the core adds
-/// tomorrow needs no change here.
+/// tomorrow needs no change here: the picker is built from
+/// `ReelExport.presets()`, so GIF, APNG or anything else joins the menu the
+/// moment the core's table lists it, and `Applies` below decides which of
+/// this sheet's controls that row can honestly take.
+///
+/// The one number the sheet DOES choose is the bit rate: a quality tier is a
+/// request, like a custom size, not a readout. It is spelled as bits per
+/// pixel per frame so it means the same picture at every size, and what the
+/// core answers with is what the footnote reports.
 ///
 /// Its own file rather than another section of `Sheets.swift` (frozen at its
 /// current size), built from the same `makeSheetView`/`makeButtonRow` pieces
@@ -37,6 +45,7 @@ final class ExportSheetController: NSViewController {
     private let presetSizeCheckbox = NSButton(
         checkboxWithTitle: "Use the preset's size", target: nil, action: nil)
     private let ratePopup = NSPopUpButton(frame: .zero, pullsDown: false)
+    private let qualityPopup = NSPopUpButton(frame: .zero, pullsDown: false)
     private let rangePopup = NSPopUpButton(frame: .zero, pullsDown: false)
     private let summaryLabel = NSTextField(wrappingLabelWithString: "")
     private let footnote = sheetFootnote("")
@@ -50,6 +59,124 @@ final class ExportSheetController: NSViewController {
     /// limit: a sanity range so a mistyped digit cannot ask the encoder for a
     /// 300 000-pixel frame.
     private static let sizeRange = 16...8192
+
+    // MARK: - Quality
+
+    /// One row of the Quality popup: a video rate expressed as bits per pixel
+    /// per frame, and the AAC rate that goes with it.
+    ///
+    /// **Where the video numbers come from.** They are anchored on one
+    /// published figure and scaled from it rather than guessed: YouTube's
+    /// recommended upload for 1080p SDR H.264 at 30 fps is 8 Mbps, and
+    /// 1920 × 1080 × 30 is 62.2 Mpixel/s, so "High" is 8 000 000 / 62 200 000
+    /// ≈ 0.129 bits per pixel per frame. The other three tiers are 0.5×,
+    /// 0.75× and 1.5× of it — 4, 6 and 12 Mbps at 1080p30, which brackets
+    /// Apple's HLS Authoring Specification 1080p H.264 rung (6.0–7.8 Mbps)
+    /// on both sides.
+    ///
+    /// Holding bits-per-pixel constant makes the rate scale with the frame's
+    /// area, so High is 3.6 Mbps at 720p and 32 Mbps at 4K. That is
+    /// deliberately flatter than YouTube's own ladder, which is generous at
+    /// the small end because its rungs are transcode targets; a master at a
+    /// constant bits-per-pixel is the same picture at every size, which is
+    /// what choosing "High" ought to mean.
+    private struct QualityTier {
+        let name: String
+        /// Bits per pixel per frame, for H.264 at 30 fps or less.
+        let bitsPerPixel: Double
+        /// AAC-LC stereo, bits per second. 128 kbps is the streaming
+        /// baseline, 256 is what Apple Music ships, and 320 is where AAC-LC
+        /// stops paying for the extra bits.
+        let audioBitsPerSecond: Int
+
+        /// The video rate for a `width` × `height` frame at `fps`.
+        ///
+        /// The 30 is not a stand-in for `fps`: the frame rate enters through
+        /// `rateFactor` instead, because bits do not scale linearly with it.
+        /// Consecutive frames are more alike the closer together they are,
+        /// which is why YouTube's ladder asks 1.5× for its 48–60 fps column
+        /// and nothing extra for 24 fps over 30. This mirrors that shape —
+        /// one step at 30 and below, one above it.
+        func videoBitsPerSecond(width: Int, height: Int, fps: Fps, codec: String) -> Int {
+            let pixels = Double(max(width, 1)) * Double(max(height, 1))
+            let rateFactor = fps.double > 30.5 ? 1.5 : 1.0
+            // HEVC reaches the same picture at roughly 60 % of H.264's rate —
+            // the ratio between the two 1080p rungs of the same Apple
+            // specification the tiers are calibrated against.
+            let codecFactor = QualityTier.isHEVC(codec) ? 0.6 : 1.0
+            let bits = pixels * 30 * bitsPerPixel * rateFactor * codecFactor
+            // To the nearest 100 kbps: these are estimates, and a request for
+            // "7 963 200 bits" would claim a precision they do not have.
+            return max(100_000, Int((bits / 100_000).rounded()) * 100_000)
+        }
+
+        private static func isHEVC(_ codec: String) -> Bool {
+            let codec = codec.lowercased()
+            return codec.hasPrefix("hevc") || codec.hasPrefix("h265") || codec.hasPrefix("h.265")
+        }
+    }
+
+    /// The tiers, in menu order. Index 0 of the popup is "Preset default",
+    /// i.e. no override at all — the preset's own rate, or the export
+    /// session's ladder when it carries none.
+    private static let tiers: [QualityTier] = [
+        QualityTier(name: "Low", bitsPerPixel: 0.064, audioBitsPerSecond: 128_000),
+        QualityTier(name: "Medium", bitsPerPixel: 0.096, audioBitsPerSecond: 192_000),
+        QualityTier(name: "High", bitsPerPixel: 0.129, audioBitsPerSecond: 256_000),
+        QualityTier(name: "Maximum", bitsPerPixel: 0.193, audioBitsPerSecond: 320_000),
+    ]
+
+    /// What the picked preset can actually take from this sheet.
+    ///
+    /// Both the enablement of every control AND every override key are read
+    /// from one of these, so a greyed-out control can never still be sending
+    /// a value to the core — which is what keeps the sheet honest as presets
+    /// that are not H.264 movies join the list.
+    private struct Applies {
+        private let preset: ExportPreset?
+
+        init(_ preset: ExportPreset?) {
+            self.preset = preset
+        }
+
+        /// A frame sequence — GIF or APNG — has a size and a frame rate but
+        /// no bit rate to spend and no audio track to put one on.
+        private var frameSequence: Bool {
+            guard let preset = preset else { return false }
+            return ExportSheetController.isFrameSequence(container: preset.container)
+        }
+
+        /// ProRes is a fixed-rate intra codec: the profile decides the data
+        /// rate, and §7.8's preset pairs it with LPCM audio, so neither
+        /// number is the sheet's to name.
+        private var fixedRate: Bool {
+            preset?.codec.lowercased().hasPrefix("prores") ?? false
+        }
+
+        private var hasVideo: Bool { preset.map { !$0.audioOnly } ?? false }
+
+        var size: Bool { hasVideo }
+        var frameRate: Bool { hasVideo }
+        var videoBitrate: Bool { hasVideo && !frameSequence && !fixedRate }
+        var audioBitrate: Bool { preset != nil && !frameSequence && !fixedRate }
+        var quality: Bool { videoBitrate || audioBitrate }
+    }
+
+    /// GIF and APNG. Spelled once, and taken from the container rather than
+    /// the codec because that is the field both `ExportPreset` and
+    /// `ExportSettings` carry.
+    private static func isFrameSequence(container: String) -> Bool {
+        let container = container.lowercased()
+        return container == "gif" || container == "apng"
+    }
+
+    /// A bit rate as the tier rows and the footnote spell it.
+    private static func rateText(_ bitsPerSecond: Int) -> String {
+        if bitsPerSecond >= 1_000_000 {
+            return String(format: "%.1f Mbps", Double(bitsPerSecond) / 1_000_000)
+        }
+        return "\(Int((Double(bitsPerSecond) / 1000).rounded())) kbps"
+    }
 
     init(editor: EditorViewController) {
         self.editor = editor
@@ -101,6 +228,15 @@ final class ExportSheetController: NSViewController {
         ratePopup.action = #selector(rangeOrRateChanged(_:))
         ratePopup.widthAnchor.constraint(equalToConstant: 150).isActive = true
 
+        qualityPopup.addItem(withTitle: "Preset default")
+        // Bare names now; `syncQualityTitles` puts the rate each tier would
+        // ask for beside them as soon as the first resolve has run.
+        qualityPopup.addItems(withTitles: Self.tiers.map { $0.name })
+        qualityPopup.font = DS.sans(13)
+        qualityPopup.target = self
+        qualityPopup.action = #selector(qualityChanged(_:))
+        qualityPopup.widthAnchor.constraint(equalToConstant: 200).isActive = true
+
         rangePopup.addItem(withTitle: "Whole project")
         if range != nil { rangePopup.addItem(withTitle: "In/out range") }
         rangePopup.font = DS.sans(13)
@@ -118,6 +254,7 @@ final class ExportSheetController: NSViewController {
             [fieldLabel("Size:"), sizeRow()],
             [NSGridCell.emptyContentView, presetSizeCheckbox],
             [fieldLabel("Frame rate:"), ratePopup],
+            [fieldLabel("Quality:"), qualityPopup],
             [fieldLabel("Range:"), rangePopup],
         ])
         grid.rowSpacing = 10
@@ -138,8 +275,8 @@ final class ExportSheetController: NSViewController {
             title: "Export…", style: .primary, target: self, action: #selector(exportClicked(_:)))
         view = makeSheetView(
             title: "Export",
-            hint: "The preset decides the codec and the container; the size, the frame rate and "
-                + "the range override what it would otherwise take from the project.",
+            hint: "The preset decides the codec and the container; the size, the frame rate, the "
+                + "quality and the range override what it would otherwise take from the project.",
             content: content,
             buttonRow: makeButtonRow(
                 cancel: cancelButton, apply: exportButton, leading: [footnote]))
@@ -190,20 +327,73 @@ final class ExportSheetController: NSViewController {
         return presets[index]
     }
 
+    private var currentApplies: Applies { Applies(currentPreset) }
+
+    /// The frame-rate override, or nil for "Project rate" — and always nil
+    /// for a preset that has no frames, so a rate picked for a movie cannot
+    /// follow the user into an audio-only export.
+    private var currentRate: Fps? {
+        let index = ratePopup.indexOfSelectedItem - 1
+        guard currentApplies.frameRate, index >= 0, index < Self.rates.count else { return nil }
+        return Self.rates[index]
+    }
+
+    /// The quality tier, or nil for "Preset default" — and, on the same
+    /// rule, always nil for a preset that takes no bit rate.
+    private var currentTier: QualityTier? {
+        let index = qualityPopup.indexOfSelectedItem - 1
+        guard currentApplies.quality, index >= 0, index < Self.tiers.count else { return nil }
+        return Self.tiers[index]
+    }
+
+    /// The frame the controls are ASKING for: the same numbers `overrides()`
+    /// sends, plus the fallbacks the core would apply to them.
+    ///
+    /// The tiers are computed against this rather than against `resolved`,
+    /// which still describes the PREVIOUS preset at the moment a new one is
+    /// being resolved — the bit rate would then be one change behind the
+    /// size it was supposed to be for.
+    private func requestedFormat() -> (width: Int, height: Int, fps: Fps) {
+        let canvas = editor?.document?.project.snapshot.canvas ?? CanvasSnapshot()
+        var width = currentPreset?.width ?? canvas.width
+        var height = currentPreset?.height ?? canvas.height
+        if currentApplies.size, presetSizeCheckbox.state == .off {
+            width = clampedSize(widthField)
+            height = clampedSize(heightField)
+        }
+        return (width, height, currentRate ?? canvas.fps)
+    }
+
     /// The override object, with every key the controls are NOT overriding
     /// left out — the same rule the op builders follow, so the core's own
     /// defaults apply (§6). Keys are the core's override names in
-    /// `export.rs` — `width`, `height`, `fps`, `range`.
+    /// `export.rs` — `width`, `height`, `fps`, `range`, `video_bitrate`,
+    /// `audio_bitrate`.
     private func overrides() -> [String: Any]? {
         var overrides: [String: Any] = [:]
-        if presetSizeCheckbox.state == .off {
-            overrides["width"] = clampedSize(widthField)
-            overrides["height"] = clampedSize(heightField)
+        let applies = currentApplies
+        let format = requestedFormat()
+        if applies.size, presetSizeCheckbox.state == .off {
+            overrides["width"] = format.width
+            overrides["height"] = format.height
         }
-        let rate = ratePopup.indexOfSelectedItem - 1
-        if rate >= 0, rate < Self.rates.count {
-            let fps = Self.rates[rate]
+        if let fps = currentRate {
             overrides["fps"] = [fps.num, fps.den]
+        }
+        // Bits per second: the unit `export.rs` reads these two overrides in,
+        // and the one `AVVideoAverageBitRateKey` takes after it. They are
+        // sent separately because a preset may take one and not the other —
+        // the audio-only row has no video rate to set, and a frame-sequence
+        // row has neither.
+        if let tier = currentTier {
+            if applies.videoBitrate {
+                overrides["video_bitrate"] = tier.videoBitsPerSecond(
+                    width: format.width, height: format.height, fps: format.fps,
+                    codec: currentPreset?.codec ?? "")
+            }
+            if applies.audioBitrate {
+                overrides["audio_bitrate"] = tier.audioBitsPerSecond
+            }
         }
         // The core reads the range as ONE nested object (`export.rs`), and
         // ignores override keys it does not know — so `start` and `duration`
@@ -222,16 +412,25 @@ final class ExportSheetController: NSViewController {
         min(max(field.integerValue, Self.sizeRange.lowerBound), Self.sizeRange.upperBound)
     }
 
-    /// Rewrites the readout, the footnote, the size fields and the Export
-    /// button from `resolved`. The size fields follow the core while the
-    /// preset owns the size, which is what makes the checkbox readable: turn
-    /// it off and the fields already hold the numbers to edit.
+    /// Rewrites the readout, the footnote, the controls' enablement and the
+    /// Export button from `resolved`. The size fields follow the core while
+    /// the preset owns the size, which is what makes the checkbox readable:
+    /// turn it off and the fields already hold the numbers to edit.
+    ///
+    /// Enablement comes from the PRESET rather than from `resolved`, so a
+    /// refused resolve leaves the controls where they were instead of
+    /// greying out the very one that has to be changed to fix it.
     private func syncReadout() {
+        let applies = currentApplies
         let usingPreset = presetSizeCheckbox.state == .on
+        presetSizeCheckbox.isEnabled = applies.size
         for field in [widthField, heightField] {
-            field.isEnabled = !usingPreset
-            field.textColor = usingPreset ? DS.textMuted : DS.textStrong
+            field.isEnabled = applies.size && !usingPreset
+            field.textColor = field.isEnabled ? DS.textStrong : DS.textMuted
         }
+        ratePopup.isEnabled = applies.frameRate
+        qualityPopup.isEnabled = applies.quality
+        syncQualityTitles(applies)
 
         guard let settings = resolved else {
             summaryLabel.stringValue = resolveError ?? "These settings are not available."
@@ -245,17 +444,86 @@ final class ExportSheetController: NSViewController {
             heightField.integerValue = settings.height
         }
         summaryLabel.textColor = DS.textMuted
-        let duration = ReelTime.format(settings.duration, fps: settings.fps, frames: true)
-        if settings.isAudioOnly {
-            summaryLabel.stringValue = "Audio only · \(settings.fps.displayName) fps · \(duration)"
-        } else {
-            summaryLabel.stringValue =
-                "\(settings.width) × \(settings.height) · \(settings.fps.displayName) fps · "
-                + duration
-        }
-        footnote.stringValue =
-            "\(settings.codec.uppercased()) · \(settings.container.uppercased())"
+        summaryLabel.stringValue = summary(for: settings)
+        footnote.stringValue = footnoteText(for: settings)
         exportButton?.isEnabled = settings.duration > 0
+    }
+
+    /// Re-titles the tier rows with the rate each would ask for at the size
+    /// and frame rate now chosen. "High" on its own says nothing; "High ·
+    /// 8.0 Mbps" is the control's actual promise, and it has to move when
+    /// the frame it is a rate for moves.
+    private func syncQualityTitles(_ applies: Applies) {
+        let format = requestedFormat()
+        let codec = currentPreset?.codec ?? ""
+        for (index, tier) in Self.tiers.enumerated() {
+            guard let item = qualityPopup.item(at: index + 1) else { continue }
+            if applies.videoBitrate {
+                let rate = tier.videoBitsPerSecond(
+                    width: format.width, height: format.height, fps: format.fps, codec: codec)
+                item.title = "\(tier.name) · \(Self.rateText(rate))"
+            } else if applies.audioBitrate {
+                item.title = "\(tier.name) · \(Self.rateText(tier.audioBitsPerSecond))"
+            } else {
+                item.title = tier.name
+            }
+        }
+    }
+
+    /// The one-line description of what the file will contain.
+    private func summary(for settings: ExportSettings) -> String {
+        if settings.isAudioOnly {
+            // Milliseconds rather than frames, and no rate in the line: audio
+            // has no frames, which is the same reason the rate popup is
+            // greyed out for this preset.
+            let duration = ReelTime.format(settings.duration, fps: settings.fps, frames: false)
+            return "Audio only · \(duration)"
+        }
+        let duration = ReelTime.format(settings.duration, fps: settings.fps, frames: true)
+        var text = "\(settings.width) × \(settings.height) · \(settings.fps.displayName) fps · "
+            + duration
+        if Self.isFrameSequence(container: settings.container) {
+            // What a GIF or an APNG costs is frames, not seconds — and it
+            // carries no audio however much of it the timeline has, which is
+            // worth saying before the export rather than after it.
+            text += " · \(frameCount(settings)) frames, no audio"
+        }
+        return text
+    }
+
+    /// The bottom-left footnote: the codec, the container, and the rates the
+    /// CORE resolved — never the ones the tier asked for, and not filtered by
+    /// what the sheet thinks applies, since a preset is free to carry a rate
+    /// of its own that no control here offered.
+    ///
+    /// The distinction matters because `export.rs` drops override keys it
+    /// does not know, silently (the same trap the range comment above names).
+    /// A tier picked against a core that has no bit-rate overrides has to
+    /// read as "the preset's own rate" rather than let the popup imply a
+    /// number the file will not have.
+    private func footnoteText(for settings: ExportSettings) -> String {
+        var parts = [settings.codec.uppercased()]
+        let container = settings.container.uppercased()
+        // A frame-sequence preset's codec IS its container: "GIF · GIF".
+        if container != parts[0] { parts.append(container) }
+        if let rate = settings.videoBitrate {
+            parts.append(Self.rateText(rate))
+        }
+        if let rate = settings.audioBitrate {
+            parts.append("\(Self.rateText(rate)) audio")
+        }
+        if currentTier != nil, settings.videoBitrate == nil, settings.audioBitrate == nil {
+            parts.append("preset's own rate")
+        }
+        return parts.joined(separator: " · ")
+    }
+
+    /// How many frames the resolved range holds. Arithmetic on what the core
+    /// answered, not a second opinion about it.
+    private func frameCount(_ settings: ExportSettings) -> Int {
+        let step = settings.fps.frameDuration
+        guard step > 0 else { return 0 }
+        return Int(settings.duration / step)
     }
 
     // MARK: - Controls
@@ -269,6 +537,10 @@ final class ExportSheetController: NSViewController {
     }
 
     @objc private func rangeOrRateChanged(_ sender: Any?) {
+        resolve()
+    }
+
+    @objc private func qualityChanged(_ sender: Any?) {
         resolve()
     }
 

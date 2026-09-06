@@ -40,7 +40,7 @@
 //! |---|---|---|
 //! | `add_clip` | `track: u32, media: u32, at: ticks` | Whole media as one clip at `at`; source in 0, Fit scale when `canvas.fit_new_clips` and the source exceeds the canvas. |
 //! | `add_text_clip` | `track: u32, at: ticks, duration?: ticks = 5 s, text?: object` | The Title preset, centered; `text` patches it exactly as `set_text` would. |
-//! | `add_shape_clip` | `track: u32, at: ticks, duration?: ticks = 5 s, shape?: object` | The default rectangle; `shape` patches it exactly as `set_shape` would. |
+//! | `add_shape_clip` | `track: u32, at: ticks, duration?: ticks = 5 s, shape?: object` | The default rectangle — an `arrow` kind gets `arrow_end` on, since a headless arrow is a diagonal line; `shape` patches that preset exactly as `set_shape` would, so an explicit `arrow_end: false` still wins. |
 //! | `move_clip` | `clips: [u32], delta: ticks, track?: u32` | Shifts the selection by `delta`, clamped so the earliest clip stops at 0; `track` retargets by track-index delta, keeping relative offsets. |
 //! | `trim_start` | `clip: u32, to: ticks` | New start `to`; a media `in` advances by `(to − start) × speed`. Clamped to the source head and to one frame before the end. |
 //! | `trim_end` | `clip: u32, to: ticks` | New end `to`, clamped to `start + one frame` and to the source's remaining length. |
@@ -51,9 +51,13 @@
 //! | `ripple_delete_range` | `from: ticks, to: ticks` | Splits every unlocked clip at both bounds, removes the middles, then closes the hole. A reversed range is the same range. |
 //! | `insert_time` | `at: ticks, length: ticks` | Opens a hole: every unlocked clip, and every marker, at or after `at` moves right by `length`. |
 //! | `set_speed` | `clip: u32, rate: f64, keep_pitch?: bool` | `duration = content length / rate` (rate clamped to 0.1–10); actions keep their clip-relative fraction. A non-media source is an `Err`, not a refusal — see "The non-media rule" under Results. |
+//! | `set_reversed` | `clip: u32, reversed: bool` | Plays the media back to front, or forward again. A FACT about the clip, not a plan change: Swift substitutes a pre-rendered reversed asset (spec §11). The in point is measured in the direction the clip plays, so reversing keeps `in` and therefore shows different frames. A non-media source is an `Err`, not a refusal. |
 //! | `freeze_frame` | `clip: u32, at: ticks, duration?: ticks = 2 s` | `split` at `at`, `insert_time(at, duration)`, then a `still` of that source frame with the clip's video props evaluated at `at`. |
 //! | `detach_audio` | `clip: u32` | Clears the clip's `enabled.audio` and puts an audio-only twin on the track below, inserting a track when there is none. |
 //! | `duplicate` | `clips: [u32]` | Copies each clip one selection-span later on its own track, with fresh ids. |
+//! | `paste` | `at: ticks, track?: u32, payload: object` | Inserts the clips of a clipboard payload — `{"clips": […], "media": […]}`, what Copy wrote — with fresh ids, the earliest landing at `at` and the rest keeping their offsets. A payload clip's `track` is a DEPTH from the front (0 = front-most), so `track` says where depth 0 lands (default: the front) and the rest follow by the same index delta; tracks missing behind it are added. Media is matched to `media[]` by path and appended when absent. A clip the overlap rule refuses goes on a new track in front; an empty clip list changes nothing. |
+//! | `nest` | `clips: [u32], name?: string = "Nest <n>"` | Collapses the selection into ONE clip showing a nest, on the front-most track the selection occupied, running from the earliest start to the latest end. The clips move whole — ids, props, actions, transitions — keeping their relative times (earliest → 0) and their track order; the nest's canvas is frozen at the project's current size. Refuses on an empty selection, on a lone nest clip, and when the nest clip would break the overlap rule. |
+//! | `unnest` | `clip: u32` | The inverse: the nest's clips return at `clip.start + their own start`, with fresh ids, on tracks counted back from the nest clip's own (front-most nest track first), and the nest clip goes. `nest` then `unnest` is the identity on clip content, ids aside. A clip the overlap rule refuses lands on a new track in front, as `paste` does; a nest clip trimmed shorter than its contents gives ALL of them back (a nest has no in point); the nest is dropped when nothing else shows it. `Err` when `clip` is not a nest clip. |
 //! | `set_video` | `clips: [u32], patch: object` | Merges the patch into each clip's video props (spec §5.2). |
 //! | `set_audio` | `clips: [u32], patch: object` | Merges the patch into each clip's audio props. |
 //! | `set_text` | `clips: [u32], patch: object` | Merges the patch into each clip's text props. |
@@ -128,7 +132,7 @@ use crate::time::{Fps, Ticks};
 /// Kept next to [`Op`] so a mistyped op can be answered with the list
 /// instead of a bare parse error — models and users both mistype op names,
 /// and the alternative is a serde message written in variant-speak.
-pub const OP_NAMES: [&str; 39] = [
+pub const OP_NAMES: [&str; 43] = [
     "add_clip",
     "add_text_clip",
     "add_shape_clip",
@@ -142,9 +146,13 @@ pub const OP_NAMES: [&str; 39] = [
     "ripple_delete_range",
     "insert_time",
     "set_speed",
+    "set_reversed",
     "freeze_frame",
     "detach_audio",
     "duplicate",
+    "paste",
+    "nest",
+    "unnest",
     "set_video",
     "set_audio",
     "set_text",
@@ -242,6 +250,10 @@ pub enum Op {
         #[serde(default)]
         keep_pitch: Option<bool>,
     },
+    SetReversed {
+        clip: u32,
+        reversed: bool,
+    },
     FreezeFrame {
         clip: u32,
         at: Ticks,
@@ -253,6 +265,23 @@ pub enum Op {
     },
     Duplicate {
         clips: Vec<u32>,
+    },
+    /// `payload` is opaque here and parsed by `edit_paste.rs`: it is the
+    /// clipboard's own JSON, not an argument list, and the one place that
+    /// knows its shape is the module that has to make it fit.
+    Paste {
+        at: Ticks,
+        #[serde(default)]
+        track: Option<u32>,
+        payload: Value,
+    },
+    Nest {
+        clips: Vec<u32>,
+        #[serde(default)]
+        name: Option<String>,
+    },
+    Unnest {
+        clip: u32,
     },
     SetVideo {
         clips: Vec<u32>,
@@ -490,9 +519,13 @@ impl Project {
                 rate,
                 keep_pitch,
             } => self.set_speed(*clip, *rate, *keep_pitch),
+            Op::SetReversed { clip, reversed } => self.set_reversed(*clip, *reversed),
             Op::FreezeFrame { clip, at, duration } => self.freeze_frame(*clip, *at, *duration),
             Op::DetachAudio { clip } => self.detach_audio(*clip),
             Op::Duplicate { clips } => self.duplicate_clips(clips),
+            Op::Paste { at, track, payload } => self.paste(*at, *track, payload),
+            Op::Nest { clips, name } => self.nest_clips(clips, name.as_deref()),
+            Op::Unnest { clip } => self.unnest_clip(*clip),
             Op::SetVideo { clips, patch } => self.set_video(clips, patch),
             Op::SetAudio { clips, patch } => self.set_audio(clips, patch),
             Op::SetText { clips, patch } => self.set_text(clips, patch),

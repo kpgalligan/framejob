@@ -1,13 +1,20 @@
 import AppKit
 
 /// The Video tab (spec §4.3): Transform, Crop, Corner Radius, Shadow, Colour,
-/// Speed, Actions and — when the clip overlaps its predecessor — Transition.
+/// Chroma Key, Filters, Reflection, Spotlight, Speed, Actions and — when the
+/// clip overlaps its predecessor — Transition.
 ///
-/// Text and shape clips get Transform, Opacity and Shadow only, which is why
-/// the pixel-only groups are gated on `allSourcePixels` and Speed on
-/// `allMedia` (only a `media` source accepts `set_speed`, §6). A section that
-/// does not apply is absent rather than disabled: the pane is rebuilt when the
-/// selection's kinds change, so there is nothing stale to grey out.
+/// Text and shape clips get the groups that measure the layer against itself
+/// — Transform, Opacity, Shadow, Filters, Reflection and Spotlight — but not
+/// the ones that need a decoded frame behind them, which is why Crop, Corner
+/// Radius, Colour and Chroma Key are gated on `allSourcePixels` and Speed on
+/// `allMedia` (only a `media` source accepts `set_speed`, §6). Filters,
+/// Reflection and Spotlight follow Shadow's precedent rather than Chroma's:
+/// their lengths are source pixels and their strengths are fractions of the
+/// layer's own rectangle, both of which a text or shape layer has (the
+/// renderer measures it). A section that does not apply is absent rather than
+/// disabled: the pane is rebuilt when the selection's kinds change, so there
+/// is nothing stale to grey out.
 final class VideoPane: InspectorPaneView {
     override var tab: InspectorTab { .video }
 
@@ -40,6 +47,11 @@ final class VideoPane: InspectorPaneView {
         var parts = [super.structureSignature]
         parts.append(allSourcePixels ? "px" : "-")
         parts.append(allMedia ? "media" : "-")
+        // The filter stack is the one section whose ROW COUNT comes from the
+        // model, so its length belongs here: adding or removing a filter has
+        // to rebuild the pane, while re-ordering or re-dialling one only
+        // refreshes it (the rows read by index, so the values simply move).
+        parts.append("f\(binding.videoProps.filters.count)")
         if binding.isSingle, let clip = binding.primary {
             parts.append(clip.actions.map { String($0.id) }.joined(separator: "."))
             parts.append(overlap(before: clip) != nil ? "transition" : "-")
@@ -58,7 +70,11 @@ final class VideoPane: InspectorPaneView {
         sections.append(inspectorShadowSection(binding))
         if allSourcePixels {
             sections.append(colorSection())
+            sections.append(chromaSection())
         }
+        sections.append(filtersSection())
+        sections.append(reflectionSection())
+        sections.append(spotlightSection())
         if allMedia {
             sections.append(speedSection())
         }
@@ -259,11 +275,478 @@ final class VideoPane: InspectorPaneView {
             ])
     }
 
+    // MARK: Chroma key
+
+    /// The M3 green-screen group (§4.3): the switch, the key colour with its
+    /// canvas eyedropper, and the three knobs the shader keys with. The core
+    /// bounds all four of them to 0…1 (`edit_props.rs`'s `video.chroma.*`),
+    /// so the three are dialled as percentages of that range and the colour
+    /// is written as the three components `chroma.key` is — the one colour in
+    /// the schema with no alpha in it.
+    ///
+    /// Every control writes a WHOLE `ChromaProps`, exactly as the Shadow
+    /// group does: the patch replaces the object, so each edit re-sends the
+    /// other three values as they stand.
+    ///
+    /// "Pick from Canvas" stays live with the key switched OFF, and picking
+    /// then turns it on: someone who has just aimed at the green has already
+    /// said what they want, and making them flip a switch first to be allowed
+    /// to say it is a step that carries no decision.
+    private func chromaSection() -> InspectorSection {
+        let binding = self.binding
+        func current() -> ChromaProps { binding.videoProps.chroma ?? ChromaProps() }
+        func ops(_ next: ChromaProps) -> [ReelOp] {
+            binding.ops(video: VideoPatch(chroma: .some(next)))
+        }
+        func on() -> Bool { binding.videoProps.chroma != nil }
+        let pick = OptionButtonControl(
+            title: "Pick from Canvas",
+            action: { [weak self] in
+                self?.inspector?.onCommand?(#selector(EditorViewController.pickChromaKey(_:)))
+            },
+            enabled: { true }, onEdit: {})
+        pick.toolTip = "Click the preview to sample the key color (Esc cancels)"
+        return InspectorSection(
+            id: "video.chroma", title: "Chroma Key",
+            note: { binding.actionNote },
+            reset: { binding.apply("Chroma Key", video: VideoPatch(chroma: .some(nil))) },
+            rows: [
+                inspectorCheckRow(
+                    "Key out a color", binding, name: "Chroma Key",
+                    read: on,
+                    ops: { value in
+                        binding.ops(
+                            video: VideoPatch(chroma: value ? .some(ChromaProps()) : .some(nil)))
+                    },
+                    mixed: { binding.mixedVideo { $0.chroma != nil } }),
+                inspectorColorRow(
+                    "Key Color", binding, name: "Chroma Key Color",
+                    // Padded to four components on the way in and cut back to
+                    // three on the way out: `changedRGBA`'s unchanged-colour
+                    // guard compares component by component and gives up when
+                    // the two lengths differ — which, with the colour panel
+                    // writing continuously through a drag, would beep at every
+                    // mouse-moved event that changed nothing.
+                    read: { current().key + [1] },
+                    ops: { color in
+                        let c = current()
+                        return ops(
+                            ChromaProps(
+                                key: chromaKeyComponents(color), tolerance: c.tolerance,
+                                softness: c.softness, spill: c.spill))
+                    },
+                    mixed: { binding.mixedVideo { $0.chroma?.key } },
+                    enabled: on),
+                inspectorButtonRow([pick]),
+                inspectorValueRow(
+                    "Tolerance", binding, name: "Chroma Tolerance", unit: "%", decimals: 0,
+                    min: 0, max: 100, quick: [0, 10, 20, 40, 60],
+                    read: { current().tolerance * 100 },
+                    ops: { value in
+                        let c = current()
+                        return ops(
+                            ChromaProps(
+                                key: c.key, tolerance: value / 100, softness: c.softness,
+                                spill: c.spill))
+                    },
+                    mixed: { binding.mixedVideo { $0.chroma?.tolerance } },
+                    enabled: on),
+                inspectorValueRow(
+                    "Softness", binding, name: "Chroma Softness", unit: "%", decimals: 0,
+                    min: 0, max: 100, quick: [0, 5, 10, 25, 50],
+                    read: { current().softness * 100 },
+                    ops: { value in
+                        let c = current()
+                        return ops(
+                            ChromaProps(
+                                key: c.key, tolerance: c.tolerance, softness: value / 100,
+                                spill: c.spill))
+                    },
+                    mixed: { binding.mixedVideo { $0.chroma?.softness } },
+                    enabled: on),
+                inspectorValueRow(
+                    "Spill", binding, name: "Chroma Spill", unit: "%", decimals: 0,
+                    min: 0, max: 100, quick: [0, 25, 50, 75, 100],
+                    read: { current().spill * 100 },
+                    ops: { value in
+                        let c = current()
+                        return ops(
+                            ChromaProps(
+                                key: c.key, tolerance: c.tolerance, softness: c.softness,
+                                spill: value / 100))
+                    },
+                    mixed: { binding.mixedVideo { $0.chroma?.spill } },
+                    enabled: on),
+            ])
+    }
+
+    // MARK: Filters
+
+    /// The filter stack (§4.3's M3 list), at most `FilterProps.max` deep.
+    ///
+    /// **Order is the whole point.** The compositor applies `video.filters`
+    /// in the order they are listed, so blur-then-sepia and sepia-then-blur
+    /// are different pictures, and a control set that cannot say which comes
+    /// first would be lying about what the layer does. That is why each
+    /// filter's row leads with a POSITION popup rather than an ordinal label:
+    /// the number both shows where the filter sits and is the thing that
+    /// moves it. It occupies the label column the rest of the inspector
+    /// already reserves, where a Move Up / Move Down pair costs two controls
+    /// beyond it and up-only costs one plus a dead first row; and with four
+    /// slots it reaches any order in one gesture rather than three.
+    ///
+    /// Nothing here is a general-purpose list editor, and it must not become
+    /// one: the cap is four, so the whole stack is on screen at once, the
+    /// rows are built against a fixed index (the count is in
+    /// `structureSignature`, so add and remove rebuild the pane while a
+    /// re-order merely refreshes it), and every write sends the WHOLE array.
+    /// That last point is what keeps add, remove and re-order ordinary
+    /// `set_video` patches instead of three new ops — `actions::merge`
+    /// replaces arrays wholesale rather than merging them element by element.
+    private func filtersSection() -> InspectorSection {
+        let binding = self.binding
+        let kinds = FilterKind.allCases
+        func list() -> [FilterProps] { binding.videoProps.filters }
+        func at(_ index: Int) -> FilterProps? {
+            let filters = list()
+            return filters.indices.contains(index) ? filters[index] : nil
+        }
+        func ops(_ next: [FilterProps]) -> [ReelOp] {
+            binding.ops(video: VideoPatch(filters: next))
+        }
+        /// One slot changed, the rest of the stack as it stands. An index the
+        /// model no longer holds yields the list unchanged, which the core
+        /// answers as the identity it is (`None`, a refusal beep, no undo
+        /// step) — the row is a frame behind its rebuild there, and writing a
+        /// guess about which filter was meant would be worse than a beep.
+        func replacing(_ index: Int, _ next: FilterProps) -> [FilterProps] {
+            var filters = list()
+            guard filters.indices.contains(index) else { return filters }
+            filters[index] = next
+            return filters
+        }
+
+        let count = list().count
+        func row(_ index: Int) -> NSView {
+            let order = OptionPopupControl(
+                width: InspectorMetrics.labelWidth,
+                items: (1...Swift.max(count, 1)).map { String($0) },
+                read: { index },
+                write: { position in
+                    var next = list()
+                    guard next.indices.contains(index), next.indices.contains(position),
+                          position != index
+                    else { return }
+                    next.insert(next.remove(at: index), at: position)
+                    binding.apply("Reorder Filters", ops(next))
+                },
+                enabled: { true },
+                onEdit: { binding.edited() })
+            order.toolTip = "Where this filter sits in the stack; they are applied in order"
+            let kind = OptionPopupControl(
+                width: 92, items: kinds.map { $0.displayName },
+                read: { kinds.firstIndex(of: at(index)?.kind ?? .blur) ?? 0 },
+                write: { choice in
+                    guard let filter = at(index), kinds.indices.contains(choice) else { return }
+                    binding.apply(
+                        "Filter Kind",
+                        ops(
+                            replacing(
+                                index, FilterProps(kind: kinds[choice], amount: filter.amount))))
+                },
+                enabled: { true },
+                onEdit: { binding.edited() })
+            let remove = OptionButtonControl(
+                title: "Remove",
+                action: {
+                    var next = list()
+                    guard next.indices.contains(index) else {
+                        NSSound.beep()
+                        return
+                    }
+                    next.remove(at: index)
+                    binding.apply("Remove Filter", ops(next))
+                },
+                enabled: { true }, onEdit: {})
+            return inspectorRow(
+                nil, [order, kind, remove],
+                mixed: {
+                    binding.mixedVideo { props in
+                        props.filters.indices.contains(index) ? props.filters[index].kind : nil
+                    }
+                })
+        }
+
+        var rows: [NSView] = []
+        for index in 0..<count {
+            rows.append(row(index))
+            rows.append(
+                inspectorValueRow(
+                    "Amount", binding, name: "Filter Amount", unit: "%", decimals: 0, min: 0,
+                    max: 100, quick: [0, 25, 50, 75, 100],
+                    read: { (at(index)?.amount ?? 0) * 100 },
+                    ops: { value in
+                        guard let filter = at(index) else { return [] }
+                        return ops(
+                            replacing(index, FilterProps(kind: filter.kind, amount: value / 100)))
+                    },
+                    mixed: {
+                        binding.mixedVideo { props in
+                            props.filters.indices.contains(index)
+                                ? props.filters[index].amount : nil
+                        }
+                    }))
+        }
+        if count == 0 {
+            rows.append(inspectorRow(nil, [InspectorRowLabel("No filters on this clip.")]))
+        }
+        let add = OptionButtonControl(
+            title: "Add Filter",
+            action: {
+                var next = list()
+                guard next.count < FilterProps.max else {
+                    NSSound.beep()
+                    return
+                }
+                next.append(FilterProps())
+                binding.apply("Add Filter", ops(next))
+            },
+            enabled: { list().count < FilterProps.max }, onEdit: {})
+        add.toolTip = "Append a half-strength blur to the end of the stack"
+        rows.append(
+            inspectorButtonRow([add, InspectorRowLabel("\(FilterProps.max) at most")]))
+
+        return InspectorSection(
+            id: "video.filters", title: "Filters",
+            note: { binding.actionNote },
+            reset: { binding.apply("Filters", video: VideoPatch(filters: [])) },
+            rows: rows)
+    }
+
+    // MARK: Reflection
+
+    /// The mirrored copy drawn below the layer (§4.3's M3 list).
+    ///
+    /// `height` and `falloff` are FRACTIONS of the layer's cropped height —
+    /// half the layer, however big the layer is — so both are dialled as
+    /// percentages; `gap` is source pixels, the frame the crop, the corner
+    /// radius and the shadow's distance already work in.
+    ///
+    /// Every control writes a WHOLE `ReflectionProps`, exactly as Shadow and
+    /// Chroma Key do: the patch replaces the object, so each edit re-sends
+    /// the other three values as they stand.
+    private func reflectionSection() -> InspectorSection {
+        let binding = self.binding
+        func current() -> ReflectionProps { binding.videoProps.reflection ?? ReflectionProps() }
+        func ops(_ next: ReflectionProps) -> [ReelOp] {
+            binding.ops(video: VideoPatch(reflection: .some(next)))
+        }
+        func on() -> Bool { binding.videoProps.reflection != nil }
+        return InspectorSection(
+            id: "video.reflection", title: "Reflection",
+            note: { binding.actionNote },
+            reset: { binding.apply("Reflection", video: VideoPatch(reflection: .some(nil))) },
+            rows: [
+                inspectorCheckRow(
+                    "Mirror the layer below itself", binding, name: "Reflection",
+                    read: on,
+                    ops: { value in
+                        binding.ops(
+                            video: VideoPatch(
+                                reflection: value ? .some(ReflectionProps()) : .some(nil)))
+                    },
+                    mixed: { binding.mixedVideo { $0.reflection != nil } }),
+                inspectorValueRow(
+                    "Opacity", binding, name: "Reflection Opacity", unit: "%", decimals: 0,
+                    min: 0, max: 100, quick: [0, 20, 35, 50, 75],
+                    read: { current().opacity * 100 },
+                    ops: { value in
+                        let r = current()
+                        return ops(
+                            ReflectionProps(
+                                opacity: value / 100, height: r.height, gap: r.gap,
+                                falloff: r.falloff))
+                    },
+                    mixed: { binding.mixedVideo { $0.reflection?.opacity } },
+                    enabled: on),
+                inspectorValueRow(
+                    "Height", binding, name: "Reflection Height", unit: "%", decimals: 0,
+                    min: 0, max: 100, quick: [25, 50, 75, 100],
+                    read: { current().height * 100 },
+                    ops: { value in
+                        let r = current()
+                        return ops(
+                            ReflectionProps(
+                                opacity: r.opacity, height: value / 100, gap: r.gap,
+                                falloff: r.falloff))
+                    },
+                    mixed: { binding.mixedVideo { $0.reflection?.height } },
+                    enabled: on),
+                inspectorValueRow(
+                    "Gap", binding, name: "Reflection Gap", unit: " px", decimals: 0, min: 0,
+                    max: 200, quick: [0, 4, 8, 16, 32],
+                    read: { current().gap },
+                    ops: { value in
+                        let r = current()
+                        return ops(
+                            ReflectionProps(
+                                opacity: r.opacity, height: r.height, gap: value,
+                                falloff: r.falloff))
+                    },
+                    mixed: { binding.mixedVideo { $0.reflection?.gap } },
+                    enabled: on),
+                inspectorValueRow(
+                    "Falloff", binding, name: "Reflection Falloff", unit: "%", decimals: 0,
+                    min: 0, max: 100, quick: [0, 25, 50, 75, 100],
+                    read: { current().falloff * 100 },
+                    ops: { value in
+                        let r = current()
+                        return ops(
+                            ReflectionProps(
+                                opacity: r.opacity, height: r.height, gap: r.gap,
+                                falloff: value / 100))
+                    },
+                    mixed: { binding.mixedVideo { $0.reflection?.falloff } },
+                    enabled: on),
+            ])
+    }
+
+    // MARK: Spotlight
+
+    /// Darkens the canvas outside a rectangle or ellipse and optionally
+    /// magnifies what is inside it — the stand-in for a screencast editor's freehand
+    /// callout (§4.3's M3 list).
+    ///
+    /// It lives HERE and not in the Shape pane, where spec §4.3 first listed
+    /// it, because the zoom half can only be drawn by the layer that owns the
+    /// pixels: a separate darkening shape could dim the frame but could never
+    /// magnify it. The centre and the box are SOURCE pixels measured from the
+    /// centre of the cropped rect — the same frame Crop and Corner Radius use
+    /// — so they are plain px fields rather than percentages, and the centre
+    /// is allowed outside the layer (the core only asks that x and y be
+    /// finite): half a spotlight running off the edge of the frame is a
+    /// legitimate picture.
+    ///
+    /// Eight fields is enough that spelling all of them out at every row
+    /// would bury the one that changes, so the whole-object write the patch
+    /// needs goes through `edited(…)` — one named argument per row, the other
+    /// seven re-read from the current value.
+    private func spotlightSection() -> InspectorSection {
+        let binding = self.binding
+        let shapes = SpotShape.allCases
+        func current() -> SpotlightProps { binding.videoProps.spotlight ?? SpotlightProps() }
+        func on() -> Bool { binding.videoProps.spotlight != nil }
+        func edited(
+            shape: SpotShape? = nil, x: Double? = nil, y: Double? = nil, width: Double? = nil,
+            height: Double? = nil, feather: Double? = nil, dim: Double? = nil, zoom: Double? = nil
+        ) -> [ReelOp] {
+            let s = current()
+            return binding.ops(
+                video: VideoPatch(
+                    spotlight: .some(
+                        SpotlightProps(
+                            shape: shape ?? s.shape, x: x ?? s.x, y: y ?? s.y,
+                            width: width ?? s.width, height: height ?? s.height,
+                            feather: feather ?? s.feather, dim: dim ?? s.dim,
+                            zoom: zoom ?? s.zoom))))
+        }
+        return InspectorSection(
+            id: "video.spotlight", title: "Spotlight",
+            note: { binding.actionNote },
+            reset: { binding.apply("Spotlight", video: VideoPatch(spotlight: .some(nil))) },
+            rows: [
+                inspectorCheckRow(
+                    "Spotlight a region", binding, name: "Spotlight",
+                    read: on,
+                    ops: { value in
+                        binding.ops(
+                            video: VideoPatch(
+                                spotlight: value ? .some(SpotlightProps()) : .some(nil)))
+                    },
+                    mixed: { binding.mixedVideo { $0.spotlight != nil } }),
+                inspectorPopupRow(
+                    "Shape", binding, name: "Spotlight Shape",
+                    items: shapes.map { $0.displayName },
+                    read: { shapes.firstIndex(of: current().shape) ?? 0 },
+                    ops: { index in
+                        guard shapes.indices.contains(index) else { return [] }
+                        return edited(shape: shapes[index])
+                    },
+                    mixed: { binding.mixedVideo { $0.spotlight?.shape } },
+                    enabled: on),
+                inspectorValueRow(
+                    "Center X", binding, name: "Spotlight Center", unit: " px", decimals: 0,
+                    min: -20000, max: 20000, slider: false,
+                    read: { current().x },
+                    ops: { edited(x: $0) },
+                    mixed: { binding.mixedVideo { $0.spotlight?.x } },
+                    enabled: on),
+                inspectorValueRow(
+                    "Center Y", binding, name: "Spotlight Center", unit: " px", decimals: 0,
+                    min: -20000, max: 20000, slider: false,
+                    read: { current().y },
+                    ops: { edited(y: $0) },
+                    mixed: { binding.mixedVideo { $0.spotlight?.y } },
+                    enabled: on),
+                // The core takes width and height as strictly greater than
+                // zero (`above`, not `at_least`): a spotlight with no area is
+                // a fully dimmed frame with no way back, so the field's floor
+                // is one pixel rather than nought.
+                inspectorValueRow(
+                    "Width", binding, name: "Spotlight Size", unit: " px", decimals: 0, min: 1,
+                    max: 20000, quick: [240, 480, 720, 960], slider: false,
+                    read: { current().width },
+                    ops: { edited(width: $0) },
+                    mixed: { binding.mixedVideo { $0.spotlight?.width } },
+                    enabled: on),
+                inspectorValueRow(
+                    "Height", binding, name: "Spotlight Size", unit: " px", decimals: 0, min: 1,
+                    max: 20000, quick: [135, 270, 405, 540], slider: false,
+                    read: { current().height },
+                    ops: { edited(height: $0) },
+                    mixed: { binding.mixedVideo { $0.spotlight?.height } },
+                    enabled: on),
+                inspectorValueRow(
+                    "Feather", binding, name: "Spotlight Feather", unit: " px", decimals: 0,
+                    min: 0, max: 200, quick: [0, 10, 20, 40, 80],
+                    read: { current().feather },
+                    ops: { edited(feather: $0) },
+                    mixed: { binding.mixedVideo { $0.spotlight?.feather } },
+                    enabled: on),
+                inspectorValueRow(
+                    "Dim", binding, name: "Spotlight Dim", unit: "%", decimals: 0, min: 0,
+                    max: 100, quick: [0, 30, 60, 80, 100],
+                    read: { current().dim * 100 },
+                    ops: { edited(dim: $0 / 100) },
+                    mixed: { binding.mixedVideo { $0.spotlight?.dim } },
+                    enabled: on),
+                // 1 is "no zoom" and 2× is the ceiling `SPOT_ZOOM_MAX` puts
+                // on it: the pixels come from the same decoded frame, and
+                // past 2× nothing is left but softness.
+                inspectorValueRow(
+                    "Zoom", binding, name: "Spotlight Zoom", unit: "×", decimals: 2, min: 1,
+                    max: 2, quick: [1, 1.2, 1.5, 2],
+                    read: { current().zoom },
+                    ops: { edited(zoom: $0) },
+                    mixed: { binding.mixedVideo { $0.spotlight?.zoom } },
+                    enabled: on),
+            ])
+    }
+
     // MARK: Speed
 
     /// Speed is a clip-level op, not a patch: `set_speed` takes one clip and
     /// re-times its actions (§6), so the selection becomes one op each and the
-    /// whole batch is a single undo step.
+    /// whole batch is a single undo step. `set_reversed` is the same shape.
+    ///
+    /// **Reverse carries a state readout that no other control here needs.**
+    /// AVFoundation cannot play a clip backwards, so ticking the box does not
+    /// change the picture by itself: it makes the app pre-render the frames
+    /// (spec §11), and until they exist the clip draws a slate rather than
+    /// lying about which way it is going. The readout says which of those the
+    /// clip is in, and the button is what restarts a render the user stopped
+    /// — the one path back from `ReverseStatus.stopped`, since nothing retries
+    /// on its own.
     private func speedSection() -> InspectorSection {
         let binding = self.binding
         func rate() -> Double {
@@ -274,6 +757,19 @@ final class VideoPane: InspectorPaneView {
             binding.clips.filter { $0.source.hasSourceBound }
                 .map { .setSpeed(clip: $0.id, rate: next, keepPitch: keepPitch) }
         }
+        func status() -> ReverseStatus {
+            guard let document = binding.document, let clip = binding.primary else { return .off }
+            return document.reverseStatus(of: clip)
+        }
+        let render = OptionButtonControl(
+            title: "Render Reverse",
+            action: { [weak self] in
+                guard let binding = self?.binding, let clip = binding.primary else { return }
+                binding.document?.retryReversedMedia(for: clip)
+            },
+            enabled: { status() == .stopped },
+            onEdit: {})
+        render.toolTip = "Render the reversed frames this clip needs"
         return InspectorSection(
             id: "video.speed", title: "Speed",
             reset: { binding.apply("Set Speed", speedOps(1, keepPitch: nil)) },
@@ -289,6 +785,16 @@ final class VideoPane: InspectorPaneView {
                     read: { binding.audioProps.keepPitch },
                     ops: { value in speedOps(rate(), keepPitch: value) },
                     mixed: { binding.mixedAudio { $0.keepPitch } }),
+                inspectorCheckRow(
+                    "Reverse", binding, name: "Reverse",
+                    read: { binding.primary?.source.isReversed ?? false },
+                    ops: { value in
+                        binding.clips.filter { $0.source.hasSourceBound }
+                            .map { .setReversed(clip: $0.id, reversed: value) }
+                    },
+                    mixed: { binding.mixed { $0.source.isReversed } }),
+                inspectorRow("Reversed frames", [inspectorReadout { status().summary }]),
+                inspectorButtonRow([render]),
                 inspectorRow(
                     "Duration",
                     [

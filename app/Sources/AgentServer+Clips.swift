@@ -19,10 +19,11 @@ extension AgentServer {
     /// edit it did not.
     static let videoPatchKeys: Set<String> = [
         "x", "y", "scale", "rotation", "opacity", "crop", "corner_radius", "shadow", "color",
-        "chroma",
+        "chroma", "filters", "reflection", "spotlight",
     ]
     static let audioPatchKeys: Set<String> = [
-        "volume", "muted", "fade_in", "fade_out", "duck", "mono", "keep_pitch",
+        "volume", "muted", "fade_in", "fade_out", "duck", "mono", "keep_pitch", "pan",
+        "compressor", "noise_reduction",
     ]
     static let textPatchKeys: Set<String> = [
         "content", "font", "size", "color", "align", "valign", "line_spacing", "tracking",
@@ -55,31 +56,75 @@ extension AgentServer {
         let track = try trackArg(a, "track", document)
         let at = try timeArg(a, "at", document)
         let duration = try optionalTimeArg(a, "duration", document)
+        let text = try textArg(a, "text")
         return try editResult(
             document, "Add Text",
-            [
-                .addTextClip(
-                    track: track.id, at: at, duration: duration, text: stringArg(a, "text"))
-            ])
+            [.addTextClip(track: track.id, at: at, duration: duration, text: text)])
     }
 
     /// `add_shape_clip` — the toolbar's Add Shape menu
     /// (`EditorViewController.showAddShapeMenu:` → `addShapeClip:`, M2).
+    ///
+    /// `shape` is OPTIONAL, as the op table says: omitted, what lands is the
+    /// core's default rectangle — the same clip the menu's Rectangle item
+    /// makes. It used to be a required kind name here, which put the op's
+    /// own default out of reach and left the box and the paint needing a
+    /// following `set_shape`.
     func addShapeClip(_ a: [String: Any]) throws -> String {
         let document = try target(a)
         let track = try trackArg(a, "track", document)
         let at = try timeArg(a, "at", document)
         let duration = try optionalTimeArg(a, "duration", document)
-        let name = try requiredString(a, "shape")
-        guard let kind = ShapeKind(rawValue: name) else {
-            throw ToolError(
-                message: "shape must be one of "
-                    + ShapeKind.allCases.map { $0.rawValue }.joined(separator: ", ")
-                    + " (got \"\(name)\").")
-        }
+        let shape = try shapeArg(a, "shape")
         return try editResult(
             document, "Add Shape",
-            [.addShapeClip(track: track.id, at: at, duration: duration, shape: kind)])
+            [.addShapeClip(track: track.id, at: at, duration: duration, shape: shape)])
+    }
+
+    /// `add_text_clip`'s `text`: the `set_text` PATCH the op documents
+    /// (`core/src/edit.rs`), with a bare string accepted as shorthand for
+    /// `{"content": …}`.
+    ///
+    /// **Why keep the shorthand.** It cannot be ambiguous — a JSON string is
+    /// never a JSON object, and `content` is the only thing a caller who
+    /// writes bare words can mean — and a string is what this tool declared
+    /// for its whole life, so no existing caller has to be rewritten to get
+    /// the fix. What it replaces was worse than either half: the string was
+    /// the ONLY accepted form, and the object the op documents was read with
+    /// `stringArg`, which answered nil for it and dropped it in silence, so
+    /// a fully specified title arrived as the Title placeholder.
+    private func textArg(_ a: [String: Any], _ key: String) throws -> TextPatch? {
+        guard let raw = a[key], !(raw is NSNull) else { return nil }
+        if let words = raw as? String { return TextPatch(content: words) }
+        guard raw is [String: Any] else {
+            throw ToolError(
+                message: "\(key) must be the words, or a set_text patch object — e.g. "
+                    + "\"Chapter One\" or {\"content\": \"Chapter One\", \"size\": 96}.")
+        }
+        return try patchArg(a, key, TextPatch.self, allowed: Self.textPatchKeys)
+    }
+
+    /// `add_shape_clip`'s `shape`, the same way: the `set_shape` patch the
+    /// op documents, with a bare kind name as shorthand for `{"kind": …}` —
+    /// which is the only form the tool used to take, and which the Add Shape
+    /// menu still means.
+    private func shapeArg(_ a: [String: Any], _ key: String) throws -> ShapePatch? {
+        guard let raw = a[key], !(raw is NSNull) else { return nil }
+        if let name = raw as? String {
+            guard let kind = ShapeKind(rawValue: name) else {
+                throw ToolError(
+                    message: "\(key) must be one of "
+                        + ShapeKind.allCases.map { $0.rawValue }.joined(separator: ", ")
+                        + ", or a set_shape patch object (got \"\(name)\").")
+            }
+            return ShapePatch(kind: kind)
+        }
+        guard raw is [String: Any] else {
+            throw ToolError(
+                message: "\(key) must be a kind name, or a set_shape patch object — e.g. "
+                    + "\"arrow\" or {\"kind\": \"arrow\", \"width\": 400}.")
+        }
+        return try shapePatchArg(a, key)
     }
 
     // MARK: - Moving and trimming
@@ -188,12 +233,29 @@ extension AgentServer {
     func setSpeed(_ a: [String: Any]) throws -> String {
         let document = try target(a)
         let clip = try clipArg(a, "clip", document)
-        guard let rate = doubleArg(a, "rate"), rate.isFinite, rate > 0 else {
+        guard let rate = try doubleArg(a, "rate"), rate.isFinite, rate > 0 else {
             throw ToolError(message: "rate must be a positive number (1 = normal speed).")
         }
         return try editResult(
             document, "Speed",
-            [.setSpeed(clip: clip.id, rate: rate, keepPitch: boolArg(a, "keep_pitch"))])
+            [.setSpeed(clip: clip.id, rate: rate, keepPitch: try boolArg(a, "keep_pitch"))])
+    }
+
+    /// `set_reversed` — Clip ▸ Reverse. Media sources only, and nothing on the
+    /// timeline moves: the core changes one boolean and the app substitutes a
+    /// pre-rendered reversed asset for that media's segments (spec §11).
+    ///
+    /// `reversed` is required rather than a toggle on purpose: an agent that
+    /// cannot see the current value would otherwise have to read the project
+    /// back to know which way it just flipped it.
+    func setReversed(_ a: [String: Any]) throws -> String {
+        let document = try target(a)
+        let clip = try clipArg(a, "clip", document)
+        guard let reversed = try boolArg(a, "reversed") else {
+            throw ToolError(message: "reversed must be true or false.")
+        }
+        return try editResult(
+            document, "Reverse", [.setReversed(clip: clip.id, reversed: reversed)])
     }
 
     /// `freeze_frame` — ⇧⌘F (`freezeSelection`): a split, an inserted gap, and
@@ -223,6 +285,65 @@ extension AgentServer {
         return try editResult(document, "Duplicate", [.duplicate(clips: clips)])
     }
 
+    /// `paste` — ⌘V (`EditorViewController+Clipboard.pasteClips`). The app's
+    /// Copy writes this payload to `NSPasteboard.general`; an agent builds one
+    /// itself, which is why the catalog entry spells the two places it differs
+    /// from `get_project`'s clips (a `track` is a depth, media travels by
+    /// path). `at` defaults to the playhead, the way the menu command uses it.
+    ///
+    /// The payload's own shape is the core's to police — `edit_paste.rs` names
+    /// what was wrong in a message this call returns in band — so only the two
+    /// things a model gets wrong before the core ever sees them are checked
+    /// here: a payload that is not an object, and one with no clips in it
+    /// (which the core answers with "no change", the least useful reply of
+    /// the three).
+    func pasteClips(_ a: [String: Any]) throws -> String {
+        let document = try target(a)
+        let at = try optionalTimeArg(a, "at", document) ?? document.playhead
+        var track: TrackSnapshot?
+        if let raw = a["track"], !(raw is NSNull) {
+            track = try trackArg(a, "track", document)
+        }
+        guard let payload = a["payload"] as? [String: Any] else {
+            throw ToolError(
+                message: "payload must be a JSON object — {\"clips\": [...], \"media\": [...]}, "
+                    + "what Copy puts on the pasteboard.")
+        }
+        guard let clips = payload["clips"] as? [Any], !clips.isEmpty else {
+            throw ToolError(
+                message: "payload.clips must be a non-empty array of clip objects, each with a "
+                    + "track DEPTH (0 = front-most) in place of its track id.")
+        }
+        return try editResult(
+            document, "Paste", [.paste(at: at, track: track?.id, payload: payload)])
+    }
+
+    // MARK: - Grouping
+
+    /// `nest` — ⌘G (`EditorViewController+Nest.nestSelection`). The core
+    /// decides the track, the span and the nest's canvas; the only thing
+    /// checked here is the one argument it cannot answer usefully for, an
+    /// empty `clips` list, which `clipsArg` already refuses.
+    func nestClips(_ a: [String: Any]) throws -> String {
+        let document = try target(a)
+        let clips = try clipsArg(a, "clips", document)
+        let name = try stringArg(a, "name")
+        return try editResult(document, "Nest", [.nest(clips: clips, name: name)])
+    }
+
+    /// `unnest` — ⇧⌘G (`EditorViewController+Nest.unnestSelection`).
+    ///
+    /// The "not a nest clip" case is left to the core rather than pre-checked
+    /// against the snapshot: it is the core's error to word, and a check here
+    /// would be a second copy of the rule that could drift from it. What IS
+    /// checked is the id, through `clipArg`, so an unknown one is named the
+    /// same way every other clip argument names it.
+    func unnestClips(_ a: [String: Any]) throws -> String {
+        let document = try target(a)
+        let clip = try clipArg(a, "clip", document)
+        return try editResult(document, "Un-nest", [.unnest(clip: clip.id)])
+    }
+
     // MARK: - Properties
 
     /// `set_video` — the Video tab (`VideoPane` through `InspectorBinding`)
@@ -237,10 +358,48 @@ extension AgentServer {
         let document = try target(a)
         let clips = try clipsArg(a, "clips", document)
         let patch = try patchArg(a, "patch", VideoPatch.self, allowed: Self.videoPatchKeys)
+        try Self.checkVideoEnums(a["patch"] as? [String: Any] ?? [:], "patch")
         guard !patch.isEmpty else {
             throw ToolError(message: "patch names nothing to change.")
         }
         return try editResult(document, "Video Properties", [.setVideo(clips: clips, patch: patch)])
+    }
+
+    /// The two string ENUMS a video patch can carry, checked by hand.
+    ///
+    /// `patchArg`'s round-trip test catches a value the patch could not read,
+    /// but only at the top level, and its own doc says why it cannot recurse:
+    /// one level down every field has a real default, so a value that decoded
+    /// TO that default is indistinguishable from a value that was absent.
+    /// `filters[].kind` and `spotlight.shape` are exactly that case and the
+    /// worst version of it — `ProjectSnapshot` decodes both leniently, on
+    /// purpose, so that a file naming a filter this build has never heard of
+    /// still opens rather than blanking the whole project. The cost is that
+    /// `{"kind": "glow"}` reaches the core as `blur`: not a nuance dropped but
+    /// a DIFFERENT filter applied, and the caller told it worked (measured).
+    ///
+    /// So the closed sets are checked here, against the enums themselves —
+    /// no new list to fall out of step with, and the refusal names the value.
+    private static func checkVideoEnums(_ object: [String: Any], _ path: String) throws {
+        if let filters = object["filters"] as? [[String: Any]] {
+            let known = FilterKind.allCases.map { $0.rawValue }
+            for (i, filter) in filters.enumerated() {
+                guard let kind = filter["kind"] else { continue }
+                guard let name = kind as? String, FilterKind(rawValue: name) != nil else {
+                    throw ToolError(
+                        message: "\(path).filters[\(i)].kind is not a filter — it must "
+                            + "be one of " + known.joined(separator: ", ") + ".")
+                }
+            }
+        }
+        if let spotlight = object["spotlight"] as? [String: Any], let shape = spotlight["shape"] {
+            let known = SpotShape.allCases.map { $0.rawValue }
+            guard let name = shape as? String, SpotShape(rawValue: name) != nil else {
+                throw ToolError(
+                    message: "\(path).spotlight.shape is not a shape — it must be one of "
+                        + known.joined(separator: ", ") + ".")
+            }
+        }
     }
 
     /// `set_audio` — the Audio tab (`AudioPane`) and the timeline's fade
@@ -285,8 +444,8 @@ extension AgentServer {
     func setEnabled(_ a: [String: Any]) throws -> String {
         let document = try target(a)
         let clip = try clipArg(a, "clip", document)
-        let video = boolArg(a, "video")
-        let audio = boolArg(a, "audio")
+        let video = try boolArg(a, "video")
+        let audio = try boolArg(a, "audio")
         guard video != nil || audio != nil else {
             throw ToolError(message: "set_enabled needs video, audio, or both.")
         }
@@ -372,7 +531,7 @@ extension AgentServer {
         let start = try optionalTimeArg(a, "start", document)
         let duration = try optionalTimeArg(a, "duration", document)
         var curve: Curve?
-        if let name = stringArg(a, "curve") {
+        if let name = try stringArg(a, "curve") {
             guard let parsed = Curve(rawValue: name) else {
                 throw ToolError(
                     message: "curve must be one of "
@@ -447,6 +606,9 @@ extension AgentServer {
                     message: "Unknown \(key).\(name) key \"\(first)\" — allowed keys are "
                         + allowed.sorted().joined(separator: ", ") + ".")
             }
+            // An action's end state carries the same video patch `set_video`
+            // does, so it carries the same two lenient enums.
+            if name == "video" { try Self.checkVideoEnums(nested, "\(key).\(name)") }
         }
     }
 
@@ -468,7 +630,7 @@ extension AgentServer {
                     + Self.shapePatchKeys.sorted().joined(separator: ", ") + ".")
         }
         var patch = ShapePatch()
-        if let name = stringArg(object, "kind") {
+        if let name = try stringArg(object, "kind") {
             guard let kind = ShapeKind(rawValue: name) else {
                 throw ToolError(
                     message: "kind must be one of "
@@ -477,16 +639,16 @@ extension AgentServer {
             }
             patch.kind = kind
         }
-        patch.width = doubleArg(object, "width")
-        patch.height = doubleArg(object, "height")
-        patch.radius = doubleArg(object, "radius")
-        patch.arrowStart = boolArg(object, "arrow_start")
-        patch.arrowEnd = boolArg(object, "arrow_end")
+        patch.width = try doubleArg(object, "width")
+        patch.height = try doubleArg(object, "height")
+        patch.radius = try doubleArg(object, "radius")
+        patch.arrowStart = try boolArg(object, "arrow_start")
+        patch.arrowEnd = try boolArg(object, "arrow_end")
         if let raw = object["stroke"] {
             if raw is NSNull {
                 patch.stroke = .some(nil)
             } else {
-                guard let stroke = raw as? [String: Any], let width = doubleArg(stroke, "width")
+                guard let stroke = raw as? [String: Any], let width = try doubleArg(stroke, "width")
                 else {
                     throw ToolError(
                         message: "stroke must be null or {\"width\": 6, \"color\": "

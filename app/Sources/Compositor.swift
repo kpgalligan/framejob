@@ -2,6 +2,7 @@ import AVFoundation
 import AppKit
 import CoreVideo
 import Metal
+import MetalPerformanceShaders
 
 /// One `AVVideoComposition` instruction, carrying the `RecipeSource` slot the
 /// frames inside it must be read from (spec §7.5).
@@ -306,11 +307,73 @@ struct LayerUniforms {
     var partnerMaxX: Float = 0
     var partnerMaxY: Float = 0
     var partnerAlpha: Float = 0
-    /// Padding: keeps the block a multiple of 16 bytes. Spend these before
-    /// growing the struct.
-    var reserved0: Float = 0
-    var reserved1: Float = 0
-    var reserved2: Float = 0
+    /// 1 = this pass is the shadow MASK pass: the fragment stage returns the
+    /// layer's coverage instead of its colour so `MPSImageGaussianBlur` has a
+    /// clean silhouette to work on (see `encodeShadow`). Every input to the
+    /// alpha still applies, which is why the mask is drawn by the layer
+    /// pipeline itself and not by a simpler one that would drift out of step
+    /// with it.
+    var shadowMask: Float = 0
+    // The M3 effect block — filters, reflection, spotlight and the nest clip
+    // rectangle. `CompositorEffects.swift` fills every one of these and is
+    // where each field's meaning, units and range are argued; the
+    // declarations live here because the layout contract above governs the
+    // whole struct and a reader checking it against `Compositor.metal` has to
+    // see all 68 fields in one list.
+    //
+    // These 28 begin with the four floats that used to be `reserved0…3`, so
+    // the padding tail is now empty: 40 + 28 = 68 floats = 272 bytes = 17×16.
+    // The next field to land must come with three companions, or bring the
+    // padding back.
+    var filterKind0: Float = 0
+    var filterKind1: Float = 0
+    var filterKind2: Float = 0
+    var filterKind3: Float = 0
+    var filterAmount0: Float = 0
+    var filterAmount1: Float = 0
+    var filterAmount2: Float = 0
+    var filterAmount3: Float = 0
+    var reflectionPass: Float = 0
+    var reflectionOpacity: Float = 0
+    var reflectionHeight: Float = 0
+    var reflectionGap: Float = 0
+    var reflectionFalloff: Float = 0
+    var spotEnabled: Float = 0
+    var spotShape: Float = 0
+    var spotX: Float = 0
+    var spotY: Float = 0
+    var spotW: Float = 0
+    var spotH: Float = 0
+    var spotFeather: Float = 0
+    var spotDim: Float = 0
+    var spotZoom: Float = 1
+    var clipEnabled: Float = 0
+    var clipX: Float = 0
+    var clipY: Float = 0
+    var clipW: Float = 0
+    var clipH: Float = 0
+    var clipRotation: Float = 0
+}
+
+/// The shadow pass's uniform block, mirroring `ShadowUniforms` in
+/// `Compositor.metal` FIELD FOR FIELD under the same layout contract as
+/// `LayerUniforms` — scalars only, added at the end, a multiple of 16 bytes.
+///
+/// Separate from `LayerUniforms` because the shadow draw is a full-canvas quad
+/// that samples a mask: it shares none of the layer block's placement fields,
+/// and keeping it apart costs `LayerUniforms` one float rather than six.
+struct ShadowUniforms {
+    var canvasWidth: Float = 1
+    var canvasHeight: Float = 1
+    /// The displacement in CANVAS pixels, y down, resolved from the model's
+    /// (distance, angle) by `encodeShadow`.
+    var offsetX: Float = 0
+    var offsetY: Float = 0
+    var colorR: Float = 0
+    var colorG: Float = 0
+    var colorB: Float = 0
+    /// The shadow's opacity with the shadow colour's own alpha folded in.
+    var opacity: Float = 0
 }
 
 /// `TransitionKind` (§5.2) as the shader's code plus its direction vector.
@@ -346,6 +409,71 @@ enum TransitionCode {
     }
 }
 
+/// The destination render pass, as a value that can be suspended and resumed.
+///
+/// One encoder for the whole frame is the fast path and stays the fast path:
+/// it is created once, every layer draws into it, and an unshadowed frame
+/// never touches anything else here. A shadow, though, has to render its mask
+/// into a DIFFERENT texture and then run an MPS kernel, and neither can be
+/// encoded while a render encoder is open — so the shadow sequence suspends
+/// the pass and the next `open()` resumes it with `.load` in place of
+/// `.clear`. That costs a store and a load of the canvas per shadowed layer,
+/// which is the standing price of doing the blur in the same command buffer;
+/// the alternative, one offscreen texture per shadowed layer so every mask
+/// could be rendered up front, is the allocation the budget refuses.
+private struct DestinationPass {
+    let buffer: MTLCommandBuffer
+    let target: MTLTexture
+    let clear: MTLClearColor
+    let pipeline: MTLRenderPipelineState
+    let sampler: MTLSamplerState
+    private var encoder: MTLRenderCommandEncoder?
+    /// False only before the very first `open()`. The first pass CLEARS —
+    /// the destination is a recycled pixel buffer and holds an old frame —
+    /// and every resumption after it loads what has been drawn so far.
+    private var cleared = false
+
+    /// Spelled out because the private members above would otherwise make the
+    /// memberwise initializer private too.
+    init(
+        buffer: MTLCommandBuffer, target: MTLTexture, clear: MTLClearColor,
+        pipeline: MTLRenderPipelineState, sampler: MTLSamplerState
+    ) {
+        self.buffer = buffer
+        self.target = target
+        self.clear = clear
+        self.pipeline = pipeline
+        self.sampler = sampler
+    }
+
+    /// The open encoder, opening one if the pass is suspended. A newly opened
+    /// encoder carries the layer pipeline and the shared sampler, so a caller
+    /// that has not changed either draws straight into it.
+    mutating func open() -> MTLRenderCommandEncoder? {
+        if let encoder = encoder { return encoder }
+        let descriptor = MTLRenderPassDescriptor()
+        descriptor.colorAttachments[0].texture = target
+        descriptor.colorAttachments[0].loadAction = cleared ? .load : .clear
+        descriptor.colorAttachments[0].storeAction = .store
+        descriptor.colorAttachments[0].clearColor = clear
+        guard let opened = buffer.makeRenderCommandEncoder(descriptor: descriptor) else {
+            return nil
+        }
+        opened.setRenderPipelineState(pipeline)
+        opened.setFragmentSamplerState(sampler, index: 0)
+        encoder = opened
+        cleared = true
+        return opened
+    }
+
+    /// Ends the encoder if one is open. Also how the frame is finished: the
+    /// command buffer must have no open encoder when it is committed.
+    mutating func suspend() {
+        encoder?.endEncoding()
+        encoder = nil
+    }
+}
+
 // MARK: - The Metal side
 
 /// Device, pipeline and caches for the compositor. Split out so `Compositor`
@@ -356,12 +484,50 @@ final class MetalRenderer {
     private let device: MTLDevice
     private let commandQueue: MTLCommandQueue
     private let pipeline: MTLRenderPipelineState
+    /// The same layer fragment stage compiled WITH the two filters that
+    /// gather neighbouring pixels — see `kGatherFilters` in the shader for the
+    /// measurement that made this a second pipeline instead of a branch, and
+    /// `Collection.needsGather` for which layers get it.
+    private let gatherPipeline: MTLRenderPipelineState
+    /// The full-canvas quad that draws one blurred mask as a shadow (§7.5).
+    private let shadowPipeline: MTLRenderPipelineState
     private let sampler: MTLSamplerState
     private let textureCache: CVMetalTextureCache
     /// Bound wherever the shader ignores the texture (the missing-media
     /// slate), because a draw with no texture bound is undefined.
     private let placeholder: MTLTexture
     private let renderers: LayerRenderers
+    /// Whether this device can run `MPSImageGaussianBlur`. Every Mac the app
+    /// supports can, but the check is free and a `false` here degrades to a
+    /// hard-edged shadow instead of to a dropped frame.
+    private let blurSupported: Bool
+    /// The one shared offscreen pair, sized to the canvas — see `encodeShadow`
+    /// for why canvas-sized and why one pair. Nil until the first shadow is
+    /// drawn, so a project without shadows allocates nothing, and replaced
+    /// when the canvas size changes.
+    private var shadowSurfaces: ShadowSurfaces?
+    /// `MPSImageGaussianBlur` bakes its sigma in at init, so a kernel built
+    /// per frame would build a new one on every tick of the blur slider.
+    /// Keyed by sigma quantized to a quarter pixel — finer than anyone can
+    /// see — and emptied wholesale once it grows past a handful, which is all
+    /// a dragged slider ever leaves behind.
+    private var blurKernels: [Int: MPSImageGaussianBlur] = [:]
+
+    /// The canvas-sized mask and its blurred pair.
+    private struct ShadowSurfaces {
+        let mask: MTLTexture
+        let blurred: MTLTexture
+    }
+
+    /// The sigma cap. The core only enforces `blur >= 0` (`edit_props.rs`), so
+    /// an agent is free to ask for 100 000, and MPS would take the GPU with
+    /// it. The inspector's slider stops at 200 source pixels — σ = 100 at 1×
+    /// — so the cap only bites on a layer scaled past 1× at maximum blur.
+    private static let maxShadowSigma: Float = 100
+    /// Below this the Gaussian is narrower than a pixel: skip MPS entirely and
+    /// let the shadow draw sample the unblurred mask, which is what a
+    /// `blur: 0` shadow means anyway.
+    private static let minShadowSigma: Float = 0.5
 
     init?() {
         guard let device = MTLCreateSystemDefaultDevice(),
@@ -374,24 +540,24 @@ final class MetalRenderer {
             ?? device.makeDefaultLibrary()
         guard let library = library,
             let vertexFunction = library.makeFunction(name: "reelcut_layer_vertex"),
-            let fragmentFunction = library.makeFunction(name: "reelcut_layer_fragment")
+            let fragmentFunction = MetalRenderer.layerFragment(library, gather: false),
+            let gatherFunction = MetalRenderer.layerFragment(library, gather: true),
+            let shadowVertex = library.makeFunction(name: "reelcut_shadow_vertex"),
+            let shadowFragment = library.makeFunction(name: "reelcut_shadow_fragment")
         else { return nil }
 
-        let descriptor = MTLRenderPipelineDescriptor()
-        descriptor.label = "Reelcut layer"
-        descriptor.vertexFunction = vertexFunction
-        descriptor.fragmentFunction = fragmentFunction
-        descriptor.colorAttachments[0].pixelFormat = .bgra8Unorm
-        // Source-over on PREMULTIPLIED colour: the fragment stage always
-        // outputs `rgb * a`, so the source factor is one, not source alpha.
-        descriptor.colorAttachments[0].isBlendingEnabled = true
-        descriptor.colorAttachments[0].rgbBlendOperation = .add
-        descriptor.colorAttachments[0].alphaBlendOperation = .add
-        descriptor.colorAttachments[0].sourceRGBBlendFactor = .one
-        descriptor.colorAttachments[0].sourceAlphaBlendFactor = .one
-        descriptor.colorAttachments[0].destinationRGBBlendFactor = .oneMinusSourceAlpha
-        descriptor.colorAttachments[0].destinationAlphaBlendFactor = .oneMinusSourceAlpha
-        guard let pipeline = try? device.makeRenderPipelineState(descriptor: descriptor)
+        guard
+            let pipeline = try? device.makeRenderPipelineState(
+                descriptor: MetalRenderer.pipelineDescriptor(
+                    label: "Reelcut layer", vertex: vertexFunction,
+                    fragment: fragmentFunction)),
+            let gatherPipeline = try? device.makeRenderPipelineState(
+                descriptor: MetalRenderer.pipelineDescriptor(
+                    label: "Reelcut layer, gathering", vertex: vertexFunction,
+                    fragment: gatherFunction)),
+            let shadowPipeline = try? device.makeRenderPipelineState(
+                descriptor: MetalRenderer.pipelineDescriptor(
+                    label: "Reelcut shadow", vertex: shadowVertex, fragment: shadowFragment))
         else { return nil }
 
         let samplerDescriptor = MTLSamplerDescriptor()
@@ -427,14 +593,39 @@ final class MetalRenderer {
         self.device = device
         self.commandQueue = commandQueue
         self.pipeline = pipeline
+        self.gatherPipeline = gatherPipeline
+        self.shadowPipeline = shadowPipeline
         self.sampler = sampler
         self.textureCache = cache
         self.placeholder = placeholder
         self.renderers = LayerRenderers(device: device)
+        self.blurSupported = MPSSupportsMTLDevice(device)
     }
 
     @available(*, unavailable) required init?(coder: NSCoder) {
         fatalError("MetalRenderer does not support NSCoder")
+    }
+
+    /// The compositor's ONE blend mode, in descriptor form: source-over on
+    /// PREMULTIPLIED colour, so the source factor is one and not source alpha.
+    /// Both pipelines are built from this — a shadow is just another layer,
+    /// drawn under its own.
+    private static func pipelineDescriptor(
+        label: String, vertex: MTLFunction, fragment: MTLFunction
+    ) -> MTLRenderPipelineDescriptor {
+        let descriptor = MTLRenderPipelineDescriptor()
+        descriptor.label = label
+        descriptor.vertexFunction = vertex
+        descriptor.fragmentFunction = fragment
+        descriptor.colorAttachments[0].pixelFormat = .bgra8Unorm
+        descriptor.colorAttachments[0].isBlendingEnabled = true
+        descriptor.colorAttachments[0].rgbBlendOperation = .add
+        descriptor.colorAttachments[0].alphaBlendOperation = .add
+        descriptor.colorAttachments[0].sourceRGBBlendFactor = .one
+        descriptor.colorAttachments[0].sourceAlphaBlendFactor = .one
+        descriptor.colorAttachments[0].destinationRGBBlendFactor = .oneMinusSourceAlpha
+        descriptor.colorAttachments[0].destinationAlphaBlendFactor = .oneMinusSourceAlpha
+        return descriptor
     }
 
     /// Drops the `CVMetalTexture`s wrapping the previous render context's
@@ -444,7 +635,8 @@ final class MetalRenderer {
     }
 
     /// Composes one frame: clear to the canvas background, then one pass per
-    /// recipe layer back to front.
+    /// recipe layer back to front — plus, for a layer that has a shadow, the
+    /// three passes `encodeShadow` puts in front of it.
     func render(
         recipe: FrameRecipe?, into destination: CVPixelBuffer,
         request: AVAsynchronousVideoCompositionRequest, instruction: RecipeInstruction?
@@ -459,17 +651,19 @@ final class MetalRenderer {
 
         let canvas = recipe?.canvas ?? RecipeCanvas(
             width: target.width, height: target.height, background: [0, 0, 0, 1])
-        let pass = MTLRenderPassDescriptor()
-        pass.colorAttachments[0].texture = target
-        pass.colorAttachments[0].loadAction = .clear
-        pass.colorAttachments[0].storeAction = .store
-        pass.colorAttachments[0].clearColor = clearColor(canvas.background)
-
-        guard let buffer = commandQueue.makeCommandBuffer(),
-            let encoder = buffer.makeRenderCommandEncoder(descriptor: pass)
-        else { throw CompositorError.noDestinationTexture }
-        encoder.setRenderPipelineState(pipeline)
-        encoder.setFragmentSamplerState(sampler, index: 0)
+        guard let buffer = commandQueue.makeCommandBuffer() else {
+            throw CompositorError.noDestinationTexture
+        }
+        // One encoder for the whole frame, as before — but a shadowed layer
+        // has to interrupt it (`encodeShadow`), so the pass is a value that
+        // can be suspended and resumed rather than one long-lived encoder.
+        var pass = DestinationPass(
+            buffer: buffer, target: target, clear: clearColor(canvas.background),
+            pipeline: pipeline, sampler: sampler)
+        // Opened eagerly: a recipe with no layers at all still has to CLEAR
+        // the destination, which is a recycled pixel buffer holding an old
+        // frame, not a blank one.
+        guard pass.open() != nil else { throw CompositorError.noDestinationTexture }
 
         let layers = recipe?.layers ?? []
         for layer in layers {
@@ -497,15 +691,39 @@ final class MetalRenderer {
                 // an error. Nothing to draw.
                 continue
             }
+            // A blur or a sharpen needs the fragment stage compiled WITH the
+            // tap loop, which is a whole second pipeline rather than a branch
+            // — the shader's `kGatherFilters` has the measurement. Every other
+            // layer, which is nearly all of them, keeps the pipeline the pass
+            // is already carrying and changes no state at all.
+            let state = layer.filters.needsGather ? gatherPipeline : pipeline
+            if let shadow = layer.shadow {
+                encodeShadow(
+                    shadow, uniforms: uniforms, texture: texture, canvas: canvas,
+                    state: state, pass: &pass)
+            }
+            // Cheap when the pass is already open, which for an unshadowed
+            // layer it always is: the encoder, the pipeline state and the
+            // sampler are exactly the ones the previous layer left behind.
+            guard let encoder = pass.open() else {
+                throw CompositorError.noDestinationTexture
+            }
+            if state !== pipeline { encoder.setRenderPipelineState(state) }
+            if layer.reflection != nil {
+                encodeReflection(uniforms: uniforms, texture: texture, encoder: encoder)
+            }
             encoder.setVertexBytes(
                 &uniforms, length: MemoryLayout<LayerUniforms>.stride, index: 0)
             encoder.setFragmentBytes(
                 &uniforms, length: MemoryLayout<LayerUniforms>.stride, index: 0)
             encoder.setFragmentTexture(texture, index: 0)
             encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
+            // Back to the pass's own pipeline, so the next layer inherits the
+            // state `DestinationPass.open()` promises.
+            if state !== pipeline { encoder.setRenderPipelineState(pipeline) }
         }
 
-        encoder.endEncoding()
+        pass.suspend()
         buffer.commit()
         // The pixel buffer is handed to AVFoundation the moment this returns,
         // so the GPU must be finished with it. Waiting on the serial render
@@ -588,6 +806,204 @@ final class MetalRenderer {
         return texture
     }
 
+    // MARK: - Shadows
+
+    /// One layer's drop shadow, encoded BEFORE the layer's own pass (§7.5).
+    /// Three steps:
+    ///
+    /// 1. the layer is drawn again, into the shared mask texture, with
+    ///    `shadowMask = 1` — which makes the fragment stage return coverage
+    ///    instead of colour. It is the SAME vertex and fragment pair, so the
+    ///    silhouette matches the layer's placement, rotation, crop, corner
+    ///    radius, chroma hole, transition weight and own opacity exactly, by
+    ///    construction rather than by two pieces of code agreeing to — which
+    ///    is also why a half-transparent layer casts a half-strength shadow;
+    /// 2. `MPSImageGaussianBlur` blurs that mask into its pair;
+    /// 3. a full-canvas quad samples the blurred pair, displaced by the
+    ///    shadow's (distance, angle) and tinted with its colour, blended into
+    ///    the destination with the same premultiplied source-over as any
+    ///    layer. The caller then draws the layer itself on top.
+    ///
+    /// **Why the offscreen textures are CANVAS-sized and not layer-sized.**
+    /// The mask comes out of the layer pipeline, whose vertex stage works in
+    /// canvas coordinates: the anchor is the canvas centre plus the clip's
+    /// (x, y), rotation turns about that anchor, and a push, slide or zoom
+    /// transition offsets the quad by a fraction of the CANVAS. A layer-sized
+    /// target would need every one of those restated in a second coordinate
+    /// space — a duplicate of the vertex stage, which would silently disagree
+    /// with the original the first time a transition moved a quad. It would
+    /// also have to be padded by `distance + 3σ` on all four sides and
+    /// re-padded for every layer, which is the per-layer allocation the 8 ms
+    /// budget cannot pay for. One canvas-sized pair is allocated on the first
+    /// shadowed frame and reused by every shadowed layer of every frame
+    /// after. What the choice costs is coverage that falls outside the canvas,
+    /// which is not in the mask: that only shows on a layer hanging off the
+    /// edge, and the blur's `.clamp` edge mode is the closer of the two
+    /// approximations available there.
+    ///
+    /// The pair is reused WITHIN a frame too. Two shadowed layers mean two
+    /// mask passes into the same texture, which is safe because the passes of
+    /// one command buffer execute in order and Metal inserts the
+    /// write-after-read barrier for a device-allocated texture; the price is
+    /// that two shadows cannot overlap on the GPU. That is the right trade at
+    /// two or three shadows in a frame, and the reason to revisit it is
+    /// thirty.
+    private func encodeShadow(
+        _ shadow: ShadowProps, uniforms: LayerUniforms, texture: MTLTexture,
+        canvas: RecipeCanvas, state: MTLRenderPipelineState, pass: inout DestinationPass
+    ) {
+        func component(_ index: Int) -> Float {
+            index < shadow.color.count ? Float(min(max(shadow.color[index], 0), 1))
+                : (index == 3 ? 1 : 0)
+        }
+        // §5.2's Color is RGBA and the inspector's `opacity` is a separate
+        // control, so a translucent shadow colour multiplies the two rather
+        // than one of them silently winning.
+        let opacity = Float(min(max(shadow.opacity, 0), 1)) * component(3)
+        guard opacity > 0 else { return }
+
+        // `blur` is a RADIUS in SOURCE pixels; MPS wants a standard deviation
+        // in canvas pixels. Two conversions, both deliberate:
+        //   · × the layer's scale, because every other length on this layer
+        //     (the corner radius, the crop) is in source pixels, and a shadow
+        //     that did not grow with its layer would look pasted on;
+        //   · ÷ 2, the CSS `box-shadow` and Core Graphics convention — a
+        //     Gaussian of σ = r/2 keeps essentially all of its weight inside
+        //     ±r, so the shadow reaches about as far as the number says.
+        let sigma = min(
+            Float(max(shadow.blur, 0)) * uniforms.scale * 0.5, MetalRenderer.maxShadowSigma)
+        guard
+            let silhouette = shadowSilhouette(
+                uniforms: uniforms, texture: texture, sigma: sigma, canvas: canvas,
+                state: state, pass: &pass),
+            let encoder = pass.open()
+        else { return }
+
+        var u = ShadowUniforms()
+        u.canvasWidth = uniforms.canvasWidth
+        u.canvasHeight = uniforms.canvasHeight
+        // The model's angle is DEGREES, 0 pointing right and increasing
+        // COUNTER-CLOCKWISE (`model.rs`), while the canvas is y-DOWN — so the
+        // y term carries the minus sign that turns a counter-clockwise angle
+        // into a y-down displacement. Checked against the default shadow:
+        // 315° gives (+0.71, +0.71), which in this space is down-and-right,
+        // which is what `Shadow::default` says it is.
+        let radians = Float(shadow.angle) * .pi / 180
+        // Distance is source pixels too, and scaled the same way — but NOT
+        // rotated by the layer's rotation: the direction is a property of the
+        // light, in canvas space, so every shadow in a frame falls the same
+        // way however its layer is turned.
+        let distance = Float(max(shadow.distance, 0)) * uniforms.scale
+        u.offsetX = distance * cos(radians)
+        u.offsetY = -distance * sin(radians)
+        u.colorR = component(0)
+        u.colorG = component(1)
+        u.colorB = component(2)
+        u.opacity = opacity
+
+        encoder.setRenderPipelineState(shadowPipeline)
+        encoder.setFragmentBytes(&u, length: MemoryLayout<ShadowUniforms>.stride, index: 0)
+        encoder.setFragmentTexture(silhouette, index: 0)
+        encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
+        // Back to the layer pipeline, so the caller's own draw needs no state
+        // change of its own and an unshadowed layer costs what it always did.
+        encoder.setRenderPipelineState(pipeline)
+    }
+
+    /// Steps 1 and 2 of `encodeShadow`: the coverage pass into the shared mask
+    /// and the blur into its pair. Returns the texture the shadow draw should
+    /// sample — the blurred one normally, the mask itself for a `blur: 0`
+    /// shadow or a device MPS will not run on — or nil when the offscreen pair
+    /// cannot be had, in which case the layer renders without a shadow rather
+    /// than not at all.
+    ///
+    /// Leaves the destination pass SUSPENDED: neither a second render pass nor
+    /// an MPS kernel can be encoded while a render encoder is open, which is
+    /// the reason `DestinationPass` exists.
+    private func shadowSilhouette(
+        uniforms: LayerUniforms, texture: MTLTexture, sigma: Float, canvas: RecipeCanvas,
+        state: MTLRenderPipelineState, pass: inout DestinationPass
+    ) -> MTLTexture? {
+        let width = max(1, canvas.width)
+        let height = max(1, canvas.height)
+        guard let surfaces = shadowPair(width: width, height: height) else { return nil }
+
+        pass.suspend()
+        var u = uniforms
+        u.shadowMask = 1
+        let descriptor = MTLRenderPassDescriptor()
+        descriptor.colorAttachments[0].texture = surfaces.mask
+        descriptor.colorAttachments[0].loadAction = .clear
+        descriptor.colorAttachments[0].storeAction = .store
+        descriptor.colorAttachments[0].clearColor = MTLClearColor(
+            red: 0, green: 0, blue: 0, alpha: 0)
+        guard let encoder = pass.buffer.makeRenderCommandEncoder(descriptor: descriptor) else {
+            return nil
+        }
+        // The layer's OWN specialization, so a blurred layer casts the
+        // silhouette its blur actually leaves — the mask is only correct by
+        // construction while it is the same fragment stage as the layer.
+        encoder.setRenderPipelineState(state)
+        encoder.setFragmentSamplerState(sampler, index: 0)
+        encoder.setVertexBytes(&u, length: MemoryLayout<LayerUniforms>.stride, index: 0)
+        encoder.setFragmentBytes(&u, length: MemoryLayout<LayerUniforms>.stride, index: 0)
+        encoder.setFragmentTexture(texture, index: 0)
+        encoder.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
+        encoder.endEncoding()
+
+        guard sigma >= MetalRenderer.minShadowSigma, let blur = blurKernel(sigma: sigma) else {
+            return surfaces.mask
+        }
+        blur.encode(
+            commandBuffer: pass.buffer, sourceTexture: surfaces.mask,
+            destinationTexture: surfaces.blurred)
+        return surfaces.blurred
+    }
+
+    /// The shared offscreen pair at the canvas size, allocated on first use
+    /// and whenever the canvas changes size. Both are allocated together: a
+    /// shadow with no blur leaves the second one idle, which is the cheaper
+    /// mistake to make.
+    private func shadowPair(width: Int, height: Int) -> ShadowSurfaces? {
+        if let surfaces = shadowSurfaces, surfaces.mask.width == width,
+            surfaces.mask.height == height
+        {
+            return surfaces
+        }
+        let descriptor = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: .bgra8Unorm, width: width, height: height, mipmapped: false)
+        // Rendered into, sampled by the shadow pass, and written by MPS (which
+        // takes a compute path for some sigmas and a render path for others,
+        // so both usages have to be there).
+        descriptor.usage = [.renderTarget, .shaderRead, .shaderWrite]
+        // GPU-only: nothing on the CPU ever reads a shadow mask.
+        descriptor.storageMode = .private
+        guard let mask = device.makeTexture(descriptor: descriptor),
+            let blurred = device.makeTexture(descriptor: descriptor)
+        else { return nil }
+        mask.label = "Reelcut shadow mask"
+        blurred.label = "Reelcut shadow blur"
+        let surfaces = ShadowSurfaces(mask: mask, blurred: blurred)
+        shadowSurfaces = surfaces
+        return surfaces
+    }
+
+    private func blurKernel(sigma: Float) -> MPSImageGaussianBlur? {
+        guard blurSupported else { return nil }
+        let key = Int((sigma * 4).rounded())
+        if let hit = blurKernels[key] { return hit }
+        if blurKernels.count >= 16 { blurKernels.removeAll() }
+        let kernel = MPSImageGaussianBlur(device: device, sigma: Float(key) / 4)
+        // The mask is a canvas-sized WINDOW on a layer that may run past the
+        // canvas edge, so the coverage just outside it is unknown rather than
+        // absent. Clamping the edge assumes it continues, which is right for
+        // the full-bleed layer that is the common case; `.zero` would fade
+        // every such shadow out along the frame border.
+        kernel.edgeMode = .clamp
+        blurKernels[key] = kernel
+        return kernel
+    }
+
     // MARK: - Uniforms
 
     /// The per-layer block. Placement is §5.3's rule expressed in the shader's
@@ -624,6 +1040,11 @@ final class MetalRenderer {
             u.chromaSoftness = Float(max(0, chroma.softness))
             u.chromaSpill = Float(min(max(chroma.spill, 0), 1))
         }
+        // The M3 effect block, in `CompositorEffects.swift`.
+        u.apply(filters: layer.filters)
+        u.apply(reflection: layer.reflection)
+        u.apply(spotlight: layer.spotlight)
+        u.apply(clipRect: layer.clipRect)
         if let transition = layer.transition {
             u.transitionKind = TransitionCode.code(transition.kind)
             u.transitionProgress = Float(min(max(transition.progress, 0), 1))
@@ -655,10 +1076,17 @@ final class MetalRenderer {
     /// size only the text renderer knows has no box here at all. The
     /// correction is then simply not applied and that pixel keeps the old
     /// behaviour, which is right for a partner that does not cover it.
+    /// A clipped partner is refused for the same reason a rounded one is: the
+    /// nest rectangle cuts coverage the box would claim, and over-claiming is
+    /// the one direction that shows — the outgoing layer would be brightened
+    /// where nothing is coming in to darken it. A partner with a REFLECTION
+    /// needs no such guard: a reflection only ever adds coverage below the
+    /// box, so the box under-claims, which is the reading this function
+    /// already returns nil to get.
     private static func partnerBox(
         _ partner: RecipeLayer, canvas: RecipeCanvas, progress: Double
     ) -> CGRect? {
-        guard partner.rotation == 0, partner.cornerRadius == 0,
+        guard partner.rotation == 0, partner.cornerRadius == 0, partner.clipRect == nil,
             let size = partner.sourceSizeCG, size.width > 0, size.height > 0
         else { return nil }
         let anchor = CGPoint(

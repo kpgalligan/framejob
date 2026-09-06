@@ -197,6 +197,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
                 "Add Media…", #selector(EditorViewController.addMediaFiles(_:)), "i",
                 [.command, .shift]))
         menu.addItem(
+            item("Import Captions…", #selector(EditorViewController.importCaptions(_:))))
+        menu.addItem(
             item("Consolidate Media…", #selector(EditorViewController.consolidateMedia(_:))))
         menu.addItem(.separator())
         menu.addItem(item("Export…", #selector(EditorViewController.exportProject(_:)), "e"))

@@ -15,7 +15,10 @@ pub mod actions;
 pub mod agent;
 pub mod audio;
 pub mod edit;
+pub mod edit_action;
 pub mod edit_clip;
+pub mod edit_nest;
+pub mod edit_paste;
 pub mod edit_props;
 pub mod edit_time;
 pub mod edit_track;
@@ -27,6 +30,8 @@ pub mod ffi_edit;
 pub mod ffi_query;
 pub mod format;
 pub mod model;
+pub mod nest;
+pub mod recipe;
 pub mod snap;
 pub mod time;
 pub mod transition;
@@ -36,11 +41,14 @@ mod ffi_util;
 pub use crate::actions::Evaluated;
 pub use crate::audio::Ramp;
 pub use crate::edit::{Op, OP_NAMES};
-pub use crate::format::{MAX_CLIPS, MAX_MARKERS, MAX_MEDIA, MAX_TRACKS, RC_FORMAT_VERSION};
+pub use crate::format::{
+    MAX_CLIPS, MAX_MARKERS, MAX_MEDIA, MAX_NEST_DEPTH, MAX_TRACKS, RC_FORMAT_VERSION,
+};
 pub use crate::model::{
-    Action, AudioProps, Backdrop, Canvas, Chroma, Clip, Color, ColorAdjust, Crop, Curve, Duck,
-    Enabled, Marker, Media, MediaKind, Outline, Project, Shadow, ShapeKind, ShapeProps, Source,
-    Stroke, TextAlign, TextProps, TextVAlign, Track, Transition, TransitionKind, VideoProps,
+    Action, AudioProps, Backdrop, Canvas, Chroma, Clip, Color, ColorAdjust, Compressor, Crop,
+    Curve, Duck, Enabled, Filter, FilterKind, Marker, Media, MediaKind, Nest, Outline, Project,
+    Reflection, Shadow, ShapeKind, ShapeProps, Source, SpotShape, Spotlight, Stroke, TextAlign,
+    TextProps, TextVAlign, Track, Transition, TransitionKind, VideoProps, MAX_FILTERS,
 };
 pub use crate::time::{Fps, Ticks, TIMESCALE};
 pub use crate::transition::Overlap;

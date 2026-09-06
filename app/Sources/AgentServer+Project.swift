@@ -63,7 +63,7 @@ extension AgentServer {
             }
             return document
         }
-        guard let path = stringArg(a, "path") else {
+        guard let path = try stringArg(a, "path") else {
             return try onMain { try self.jsonResult(["project": self.summary(document)]) }
         }
         let url = Self.destinationURL(path, extension: ProjectDocument.projectFileExtension)
@@ -82,7 +82,7 @@ extension AgentServer {
     func saveProject(_ a: [String: Any]) throws -> String {
         let document = try onMain { try self.target(a) }
         let existing = onMain { document.fileURL }
-        if let path = stringArg(a, "path") {
+        if let path = try stringArg(a, "path") {
             let url = Self.destinationURL(path, extension: ProjectDocument.projectFileExtension)
             try save(document, to: url, operation: .saveAsOperation)
             return try onMain {
@@ -252,5 +252,48 @@ extension AgentServer {
             result["in_out_range"] = NSNull()
         }
         return try jsonResult(result)
+    }
+
+    /// `set_selection` — clicking a clip in the timeline
+    /// (`EditorViewController+Timeline.timelineSelected`) or on the canvas
+    /// (`+Canvas.canvasSelected`), and Edit ▸ Select All / Select Forward
+    /// (`selectAll(_:)`, `selectAfterPlayhead(_:)`). View state like the
+    /// playhead and the range: no op runs and nothing is undoable.
+    ///
+    /// It is the write half of a field `get_project` already reported, and
+    /// the one the agent was missing: the canvas handles, crop mode and
+    /// every inspector pane act on the SELECTION, so without this nothing
+    /// they do could be driven or checked by driving the app — which is why
+    /// spec §10 step 8 stayed unverified.
+    func setSelection(_ a: [String: Any]) throws -> String {
+        let document = try target(a)
+        var ids: [UInt32] = []
+        if let raw = a["clips"], !(raw is NSNull) {
+            // An explicit `[]` means "select nothing", which is a real
+            // intent here — unlike an OP over no clips, the mistake
+            // `optionalClipsArg` refuses an empty list as. Omitting `clips`
+            // does the same, the way `set_range` with no bounds clears the
+            // range.
+            if let array = raw as? [Any], array.isEmpty {
+                ids = []
+            } else {
+                ids = try clipsArg(a, "clips", document)
+            }
+        }
+        // `clipsArg` validating every id against the snapshot is the ONLY
+        // thing keeping a dead id out of the selection: `viewStateDidChange`
+        // republishes the view state but does not run
+        // `ProjectDocument.clampViewState`, which prunes on a MODEL change,
+        // so nothing downstream will notice one.
+        document.selection = Set(ids)
+        if let editor = editor(document) {
+            editor.viewStateDidChange()
+        }
+        return try jsonResult(
+            [
+                "ok": true,
+                "selection": document.selection.sorted().map { Int($0) },
+                "project": summary(document),
+            ])
     }
 }

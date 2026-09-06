@@ -421,9 +421,10 @@ enum ReelExport {
         return ReelJSON.decode([ExportPreset].self, from: json) ?? []
     }
 
-    /// Resolves `preset` plus optional `overrides` (size, fps, range)
-    /// against the project. Throws with the core's message for an unknown
-    /// preset or bad overrides, so the sheet can show it verbatim.
+    /// Resolves `preset` plus optional `overrides` (size, fps, range, and the
+    /// two bitrates the Quality popup writes) against the project. Throws
+    /// with the core's message for an unknown preset or bad overrides, so the
+    /// sheet can show it verbatim.
     static func settings(
         _ p: ReelProject, preset: String, overrides: [String: Any]? = nil
     ) throws -> ExportSettings {
@@ -519,35 +520,58 @@ extension ReelOp {
     /// preset in the core.
     ///
     /// The op's `text` argument is a `set_text` PATCH, not a string — the
-    /// core merges it over the Title preset — so the caller's words go in
-    /// under `content`. Passing the bare string is what the core answers
+    /// core merges it over the Title preset — so the whole of `TextPatch`
+    /// is reachable at creation and the caller's words go in under
+    /// `content`. Passing a bare string is what the core answers
     /// `text patch must be a json object` to.
     static func addTextClip(
-        track: UInt32, at: Ticks, duration: Ticks? = nil, text: String? = nil
+        track: UInt32, at: Ticks, duration: Ticks? = nil, text: TextPatch? = nil
     ) -> ReelOp {
         var a = OpArgs()
         a.put("track", track)
         a.put("at", at)
         a.put("duration", duration)
-        a.put("text", text.map { ["content": $0] })
+        a.put("text", text.map { $0.dictionary })
         return ReelOp(name: "add_text_clip", args: a.values)
     }
 
-    /// A shape clip of `shape` kind; stroke, fill and box come from the
-    /// core's defaults and are changed afterwards with `set_shape`.
+    /// A shape clip; `duration` defaults to 5 s and `shape` to the core's
+    /// default rectangle.
     ///
     /// As with `addTextClip`, the op's `shape` argument is a `set_shape`
-    /// patch merged over the default rectangle, so the kind travels as
-    /// `{"kind": …}`.
+    /// patch merged over that default (and over an arrow's head — see the
+    /// op table), so the box and the paint are reachable at creation too.
     static func addShapeClip(
-        track: UInt32, at: Ticks, duration: Ticks? = nil, shape: ShapeKind
+        track: UInt32, at: Ticks, duration: Ticks? = nil, shape: ShapePatch? = nil
     ) -> ReelOp {
         var a = OpArgs()
         a.put("track", track)
         a.put("at", at)
         a.put("duration", duration)
-        a.put("shape", ["kind": shape.rawValue])
+        a.put("shape", shape.map { $0.dictionary })
         return ReelOp(name: "add_shape_clip", args: a.values)
+    }
+
+    /// The kind-only shorthand for the one caller that wants nothing else:
+    /// the Add Shape menu, which picks a kind and takes the core's box,
+    /// paint and — for an arrow — its head. An overload rather than a job
+    /// for the caller, so `EditorViewController+AddClips` never has to
+    /// spell a patch, and so this stays the only file that knows a kind
+    /// travels as `{"kind": …}`.
+    static func addShapeClip(
+        track: UInt32, at: Ticks, duration: Ticks? = nil, shape: ShapeKind
+    ) -> ReelOp {
+        addShapeClip(track: track, at: at, duration: duration, shape: ShapePatch(kind: shape))
+    }
+
+    /// Every op name the core accepts, in the order of its table
+    /// (`OP_NAMES` in `core/src/edit.rs`), read through the FFI rather than
+    /// copied into Swift: a copy is one more spelling to drift, and the one
+    /// caller — `AgentServer`'s startup parity check — exists precisely to
+    /// catch drift. Empty only if the core failed, which it does not.
+    static func coreNames() -> [String] {
+        guard let json = takeString(rc_op_names()) else { return [] }
+        return ReelJSON.decode([String].self, from: json) ?? []
     }
 
     /// Shifts clips by `delta` ticks and optionally to another track (the
@@ -641,6 +665,24 @@ extension ReelOp {
         return ReelOp(name: "set_speed", args: a.values)
     }
 
+    /// Plays a media clip back to front, or forward again.
+    ///
+    /// A FACT about the clip and not a plan change: the core's recipe and
+    /// composition plan come out identical either way, and it is Swift that
+    /// resolves it by substituting a pre-rendered reversed asset for that
+    /// media's segments (spec §11). The in point is measured in the direction
+    /// the clip plays, so flipping this keeps `in` and therefore shows
+    /// different frames — the tail of the file instead of its head.
+    ///
+    /// Media sources only: any other kind is an `Err`, not a refusal (the
+    /// non-media rule, §6).
+    static func setReversed(clip: UInt32, reversed: Bool) -> ReelOp {
+        var a = OpArgs()
+        a.put("clip", clip)
+        a.put("reversed", reversed)
+        return ReelOp(name: "set_reversed", args: a.values)
+    }
+
     /// Split, insert time, then a one-source-frame `still` filling the gap.
     /// `duration` defaults to 2 s.
     static func freezeFrame(clip: UInt32, at: Ticks, duration: Ticks? = nil) -> ReelOp {
@@ -664,6 +706,54 @@ extension ReelOp {
         var a = OpArgs()
         a.put("clips", clips)
         return ReelOp(name: "duplicate", args: a.values)
+    }
+
+    /// Inserts a clipboard payload's clips with fresh ids, the earliest one
+    /// landing exactly at `at` and the rest keeping their offsets from it.
+    ///
+    /// `payload` is what Copy wrote to the pasteboard —
+    /// `{"clips": [...], "media": [...]}` — and
+    /// `EditorViewController+Clipboard.swift` is the only place that builds
+    /// one. **A payload clip's `track` is a DEPTH from the front of the stack**
+    /// (0 = front-most), not a track id: the ids in it belong to whichever
+    /// document was copied from. `track` here, by contrast, IS an id of this
+    /// project, naming where depth 0 lands; omitted, that is the front track.
+    static func paste(at: Ticks, track: UInt32? = nil, payload: [String: Any]) -> ReelOp {
+        var a = OpArgs()
+        a.put("at", at)
+        a.put("track", track)
+        a.put("payload", payload)
+        return ReelOp(name: "paste", args: a.values)
+    }
+
+    /// Collapses `clips` into ONE clip showing a nest — ⌘G.
+    ///
+    /// The clips move whole (ids, props, actions, transitions) into the
+    /// nest's own tracks, keeping their relative times with the earliest at
+    /// 0; the nest clip lands on the front-most track the selection occupied
+    /// and covers exactly the span the selection covered. `name` defaults to
+    /// `Nest <n>` in the core. Refused on an empty selection, on a lone nest
+    /// clip, and when the nest clip would break the overlap rule.
+    static func nest(clips: [UInt32], name: String? = nil) -> ReelOp {
+        var a = OpArgs()
+        a.put("clips", clips)
+        a.put("name", name)
+        return ReelOp(name: "nest", args: a.values)
+    }
+
+    /// Puts a nest clip's contents back on the timeline and removes it —
+    /// ⇧⌘G. The inverse of `nest`, ids aside: each clip returns at
+    /// `clip.start +` its own start, on tracks counted back from the nest
+    /// clip's own, and a clip the overlap rule refuses goes on a new track in
+    /// front rather than being dropped.
+    ///
+    /// A nest clip trimmed shorter than its contents gives ALL of them back —
+    /// `Source::Nest` has no in point, so trimming one hid content rather
+    /// than cutting it. An `Err` on any other kind of clip.
+    static func unnest(clip: UInt32) -> ReelOp {
+        var a = OpArgs()
+        a.put("clip", clip)
+        return ReelOp(name: "unnest", args: a.values)
     }
 
     /// Merges `patch` into the clips' base video props. Refuses when
@@ -982,8 +1072,36 @@ extension ChromaProps {
     }
 }
 
+extension FilterProps {
+    var dictionary: [String: Any] { ["kind": kind.rawValue, "amount": amount] }
+}
+
+extension ReflectionProps {
+    var dictionary: [String: Any] {
+        ["opacity": opacity, "height": height, "gap": gap, "falloff": falloff]
+    }
+}
+
+extension SpotlightProps {
+    var dictionary: [String: Any] {
+        [
+            "shape": shape.rawValue, "x": x, "y": y, "width": width, "height": height,
+            "feather": feather, "dim": dim, "zoom": zoom,
+        ]
+    }
+}
+
 extension DuckProps {
     var dictionary: [String: Any] { ["level": level, "attack": attack, "release": release] }
+}
+
+extension CompressorProps {
+    var dictionary: [String: Any] {
+        [
+            "threshold_db": thresholdDb, "ratio": ratio, "attack": attack, "release": release,
+            "makeup_db": makeupDb,
+        ]
+    }
 }
 
 extension OutlineProps {
@@ -1003,10 +1121,17 @@ extension StrokeProps {
 /// A sparse patch of video properties. Every field is optional and only the
 /// set ones are sent, so `set_video` merges rather than replaces.
 ///
-/// **The double optionals** (`shadow`, `chroma`) carry the third state the
-/// model needs: `nil` leaves the field alone, `.some(nil)` sends an explicit
-/// JSON null (clear it), `.some(value)` sets it. A single optional cannot
-/// say "clear".
+/// **The double optionals** (`shadow`, `chroma`, `reflection`, `spotlight`)
+/// carry the third state the model needs: `nil` leaves the field alone,
+/// `.some(nil)` sends an explicit JSON null (clear it), `.some(value)` sets
+/// it. A single optional cannot say "clear".
+///
+/// **`filters` is a SINGLE optional** and deliberately so: the model field is
+/// `Vec<Filter>`, not `Option<Vec<Filter>>`, so there is no null form to
+/// send. `nil` leaves the stack alone and `[]` clears it. Every write sends
+/// the whole array — `actions::merge` replaces arrays wholesale — which is
+/// what makes add, remove and reorder ordinary `set_video` patches rather
+/// than three new ops.
 struct VideoPatch: Codable, Equatable {
     var x: Double?
     var y: Double?
@@ -1018,11 +1143,16 @@ struct VideoPatch: Codable, Equatable {
     var shadow: ShadowProps??
     var color: ColorAdjust?
     var chroma: ChromaProps??
+    var filters: [FilterProps]?
+    var reflection: ReflectionProps??
+    var spotlight: SpotlightProps??
 
     init(
         x: Double? = nil, y: Double? = nil, scale: Double? = nil, rotation: Double? = nil,
         opacity: Double? = nil, crop: CropInsets? = nil, cornerRadius: Double? = nil,
-        shadow: ShadowProps?? = nil, color: ColorAdjust? = nil, chroma: ChromaProps?? = nil
+        shadow: ShadowProps?? = nil, color: ColorAdjust? = nil, chroma: ChromaProps?? = nil,
+        filters: [FilterProps]? = nil, reflection: ReflectionProps?? = nil,
+        spotlight: SpotlightProps?? = nil
     ) {
         self.x = x
         self.y = y
@@ -1034,6 +1164,9 @@ struct VideoPatch: Codable, Equatable {
         self.shadow = shadow
         self.color = color
         self.chroma = chroma
+        self.filters = filters
+        self.reflection = reflection
+        self.spotlight = spotlight
     }
 
     init(from decoder: Decoder) throws {
@@ -1048,6 +1181,9 @@ struct VideoPatch: Codable, Equatable {
         shadow = c.nullable(.shadow)
         color = c.lenient(.color)
         chroma = c.nullable(.chroma)
+        filters = c.lenient(.filters)
+        reflection = c.nullable(.reflection)
+        spotlight = c.nullable(.spotlight)
     }
 
     var dictionary: [String: Any] {
@@ -1074,6 +1210,21 @@ struct VideoPatch: Codable, Equatable {
                 d["chroma"] = NSNull()
             }
         }
+        if let filters = filters { d["filters"] = filters.map { $0.dictionary } }
+        if let reflection = reflection {
+            if let reflection = reflection {
+                d["reflection"] = reflection.dictionary
+            } else {
+                d["reflection"] = NSNull()
+            }
+        }
+        if let spotlight = spotlight {
+            if let spotlight = spotlight {
+                d["spotlight"] = spotlight.dictionary
+            } else {
+                d["spotlight"] = NSNull()
+            }
+        }
         return d
     }
 
@@ -1090,10 +1241,14 @@ struct AudioPatch: Codable, Equatable {
     var duck: DuckProps??
     var mono: Bool?
     var keepPitch: Bool?
+    var pan: Double?
+    var compressor: CompressorProps??
+    var noiseReduction: Double?
 
     init(
         volume: Double? = nil, muted: Bool? = nil, fadeIn: Ticks? = nil, fadeOut: Ticks? = nil,
-        duck: DuckProps?? = nil, mono: Bool? = nil, keepPitch: Bool? = nil
+        duck: DuckProps?? = nil, mono: Bool? = nil, keepPitch: Bool? = nil, pan: Double? = nil,
+        compressor: CompressorProps?? = nil, noiseReduction: Double? = nil
     ) {
         self.volume = volume
         self.muted = muted
@@ -1102,6 +1257,9 @@ struct AudioPatch: Codable, Equatable {
         self.duck = duck
         self.mono = mono
         self.keepPitch = keepPitch
+        self.pan = pan
+        self.compressor = compressor
+        self.noiseReduction = noiseReduction
     }
 
     init(from decoder: Decoder) throws {
@@ -1113,6 +1271,9 @@ struct AudioPatch: Codable, Equatable {
         duck = c.nullable(.duck)
         mono = c.lenient(.mono)
         keepPitch = c.lenient(.keepPitch)
+        pan = c.lenient(.pan)
+        compressor = c.nullable(.compressor)
+        noiseReduction = c.lenient(.noiseReduction)
     }
 
     var dictionary: [String: Any] {
@@ -1126,6 +1287,15 @@ struct AudioPatch: Codable, Equatable {
         }
         if let mono = mono { d["mono"] = mono }
         if let keepPitch = keepPitch { d["keep_pitch"] = keepPitch }
+        if let pan = pan { d["pan"] = pan }
+        if let compressor = compressor {
+            if let compressor = compressor {
+                d["compressor"] = compressor.dictionary
+            } else {
+                d["compressor"] = NSNull()
+            }
+        }
+        if let noiseReduction = noiseReduction { d["noise_reduction"] = noiseReduction }
         return d
     }
 
@@ -1349,6 +1519,22 @@ final class RecipeSource {
         let project = projects[key]
         lock.unlock()
         return project?.recipe(at: t)
+    }
+
+    /// The handle published under `key`, for the mirrors that sit beside this
+    /// one and need something a frame recipe does not carry —
+    /// `AudioDSPSource` reads per-clip audio settings off it.
+    ///
+    /// This is what makes a key ENOUGH. Every caller that builds a
+    /// composition publishes the project here first, including the two in
+    /// `Exporter` that mint a fresh key of their own, so a mirror handed a
+    /// key it has no entry for can still derive its answer from exactly the
+    /// project being built instead of guessing at which open document that
+    /// key belongs to.
+    func project(for key: Int) -> ReelProject? {
+        lock.lock()
+        defer { lock.unlock() }
+        return projects[key]
     }
 }
 

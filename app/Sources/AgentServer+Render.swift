@@ -35,7 +35,7 @@ extension AgentServer {
         }
         let (project, urls, time, canvasSize) = context
         var maxWidth: Int?
-        if let requested = intArg(a, "max_width") {
+        if let requested = try intArg(a, "max_width") {
             guard requested >= 16, requested <= 8192 else {
                 throw ToolError(message: "max_width must be 16…8192 px (got \(requested)).")
             }
@@ -86,7 +86,7 @@ extension AgentServer {
     func exportProject(_ a: [String: Any]) throws -> String {
         let presetID = try requiredString(a, "preset")
         let path = try requiredString(a, "path")
-        let wholeProject = (stringArg(a, "range") ?? "project").lowercased()
+        let wholeProject = (try stringArg(a, "range") ?? "project").lowercased()
         guard ["project", "in_out"].contains(wholeProject) else {
             throw ToolError(
                 message: "range must be \"project\" (the whole timeline) or \"in_out\" "
@@ -102,16 +102,27 @@ extension AgentServer {
             // "Whole project" is no override at all, "In/out range" is the
             // core's ONE nested `range` object (`export.rs`). The core snaps
             // it to the frame grid and clamps it to the project.
-            var overrides: [String: Any]?
+            var overrides: [String: Any] = [:]
             if wholeProject == "in_out" {
                 guard let range = document.inOutRange, range.end > range.start else {
                     throw ToolError(
                         message: "This project has no in/out range — set one with set_range "
                             + "{start, end}, or export with range \"project\".")
                 }
-                overrides = [
-                    "range": ["start": range.start, "duration": range.end - range.start]
-                ]
+                overrides["range"] = ["start": range.start, "duration": range.end - range.start]
+            }
+            // The sheet's Quality popup, in the core's own words: it resolves
+            // a tier into these two keys and nothing else
+            // (`ExportSheetController.overrides()`), so the agent spells them
+            // the same way rather than re-deriving a rate from a tier name.
+            // The core validates them — positive, u32 — and an unset key means
+            // "the preset decides", which is what a nil bitrate already means
+            // to the writer.
+            if let video = try self.intArg(a, "video_bitrate") {
+                overrides["video_bitrate"] = video
+            }
+            if let audio = try self.intArg(a, "audio_bitrate") {
+                overrides["audio_bitrate"] = audio
             }
             let settings: ExportSettings
             do {

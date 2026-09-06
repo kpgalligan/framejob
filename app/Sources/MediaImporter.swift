@@ -60,6 +60,25 @@ enum MediaImporter {
                 return "Timed out reading \(url.lastPathComponent)."
             }
         }
+
+        /// Whether a user-installed ffmpeg is worth offering (`FFmpegRewrap`).
+        ///
+        /// `unreadable` is the one that matters: AVFoundation answers a
+        /// Matroska or a WebM with `AVFoundationErrorDomain -11828 "Cannot
+        /// Open"` on the *container*, before it has looked at the codecs
+        /// inside, so a plain H.264 recording in an `.mkv` lands here and is
+        /// one stream copy away from importing. `noTracks` is included
+        /// because a container AVFoundation half-understands can report a
+        /// duration and no tracks; `FFmpegRewrap.plan` refuses a file that
+        /// genuinely has no video and no audio, so a truly empty one keeps
+        /// this message. `timedOut` is not: a stalled network mount will
+        /// stall ffmpeg too, and the second wait is not a kindness.
+        var invitesFFmpeg: Bool {
+            switch self {
+            case .unreadable, .noTracks: return true
+            case .timedOut: return false
+            }
+        }
     }
 
     // MARK: - Probing
@@ -87,10 +106,25 @@ enum MediaImporter {
     /// 1080×1920, not 1920×1080 with a rotation nobody applied. Getting this
     /// wrong is invisible until the first phone clip lands sideways on the
     /// canvas, which is why it is the verification of M1 step 3.
+    ///
+    /// **AVFoundation only.** The opt-in ffmpeg step lives one level up, in
+    /// `probeAllowingRewrap`, so this stays the pure "what does the system
+    /// think of this file" question that the rewrap's own re-probe can ask
+    /// without recursing.
     static func probe(url: URL) async throws -> MediaDescriptor {
         if isImage(url) { return try probeImage(url) }
         return try await probeAsset(url)
     }
+
+    /// The queue the completion-handler face probes on. A serial queue, not
+    /// the cooperative pool: a conversion (`FFmpegRewrap`) blocks its thread
+    /// for as long as ffmpeg runs, which is exactly what a cooperative
+    /// thread must never do, and serialising means a batch drop of four
+    /// unreadable files asks four questions in order rather than stacking
+    /// four alerts. `app/CLAUDE.md` names import as one of the documented
+    /// `DispatchQueue` seams.
+    private static let importQueue = DispatchQueue(
+        label: "com.kgalligan.reelcut.import", qos: .userInitiated)
 
     /// The synchronous face of `probe` for the rest of the app: the result
     /// arrives on the main thread, so the caller can go straight to
@@ -98,17 +132,63 @@ enum MediaImporter {
     static func probe(
         url: URL, completion: @escaping (Result<MediaDescriptor, any Error>) -> Void
     ) {
-        Task {
+        importQueue.async {
+            let outcome = Result { try probeAllowingRewrap(url) }
+            DispatchQueue.main.async { completion(outcome) }
+        }
+    }
+
+    /// The AVFoundation probe plus spec §11's opt-in ffmpeg step, and the
+    /// body of both synchronous faces.
+    ///
+    /// The two halves are deliberately not nested inside `probe(url:)`.
+    /// `waitForProbe` puts a 30-second ceiling on AVFoundation, which is
+    /// right for reading headers and catastrophically wrong for a transcode;
+    /// `FFmpegRewrap.assist` therefore runs OUTSIDE it, unbounded, and its
+    /// result is probed with a fresh ceiling of its own. `assist` also needs
+    /// the main thread for its consent alert, which it can only have because
+    /// this function's callers are never the thread being waited on.
+    ///
+    /// Every one of the four import paths funnels through here — document
+    /// open (`ProjectDocument.readMediaFile`), File ▸ Add Media… and Finder
+    /// drops (`ProjectDocument.probeNext`), and the agent's `import_media`
+    /// (`AgentServer+Media.probe`) — so an MKV opens the same way in all of
+    /// them, and `assist` answering `nil` leaves all four with exactly the
+    /// failure they report on a machine that has no ffmpeg.
+    ///
+    /// **Known cost of the document-open path.** Three of those four callers
+    /// are already off the main thread, so ffmpeg runs with the UI live. The
+    /// fourth, `read(from:ofType:)`, is *allowed* to run on main (its own
+    /// comment says NSDocumentController does not always take the concurrent
+    /// read queue), and there it blocks: opening a WebM straight from the
+    /// Finder can beachball for the length of the encode. The consent alert
+    /// states the cost first, which is the mitigation available from here —
+    /// a progress sheet would need a seam in `ProjectDocument`, which owns
+    /// the sheet-presenting side of every long operation.
+    private static func probeAllowingRewrap(_ url: URL) throws -> MediaDescriptor {
+        do {
+            return try waitForProbe(url)
+        } catch let failure as ImportError where failure.invitesFFmpeg && !isImage(url) {
+            // Images are excluded because ImageIO's refusal means the picture
+            // is corrupt, not that the container is exotic — and a PNG is not
+            // something to hand to a video converter.
+            guard let rewrapped = try FFmpegRewrap.assist(url) else { throw failure }
             do {
-                let descriptor = try await probe(url: url)
-                await MainActor.run { completion(.success(descriptor)) }
+                return try waitForProbe(rewrapped)
             } catch {
-                await MainActor.run { completion(.failure(error)) }
+                // ffmpeg wrote a file AVFoundation still will not open. The
+                // conversion is cached by name, so leaving it there would
+                // hand the same broken result back for ever; throwing it away
+                // makes the next attempt a real attempt. The error reported
+                // is the ORIGINAL one, because the file the user chose is the
+                // one they are being told about.
+                FFmpegRewrap.discard(rewrapped)
+                throw failure
             }
         }
     }
 
-    /// Carries one probe's outcome across the semaphore in `probeBlocking`.
+    /// Carries one probe's outcome across the semaphore in `waitForProbe`.
     /// Unchecked because the join is the synchronisation: the detached task
     /// writes it, signals, and never touches it again; the waiter reads it
     /// only after the wait returns.
@@ -129,6 +209,14 @@ enum MediaImporter {
     /// the result comes back through a plain semaphore, so the waiting thread
     /// is never the thread being waited on.
     static func probeBlocking(url: URL) throws -> MediaDescriptor {
+        try probeAllowingRewrap(url)
+    }
+
+    /// One AVFoundation probe, waited for from whatever thread called —
+    /// `probeBlocking`'s original body, now shared with the
+    /// completion-handler face and used twice per assisted import (once on
+    /// the file the user chose, once on what ffmpeg made of it).
+    private static func waitForProbe(_ url: URL) throws -> MediaDescriptor {
         let box = ProbeBox()
         let semaphore = DispatchSemaphore(value: 0)
         Task.detached(priority: .userInitiated) {

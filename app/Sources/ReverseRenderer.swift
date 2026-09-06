@@ -1,0 +1,1216 @@
+import AVFoundation
+import AppKit
+
+// MARK: - Where a reversed asset lives
+
+/// The `cache/reversed/` half of the package (spec §5.6), and what makes one
+/// of its files stale.
+///
+/// **Why inside the package.** §5.6 reserves `cache/` for data that is
+/// regenerable and never required to open, and a reversed asset is exactly
+/// that: delete it and the renderer makes it again from media the project
+/// still references. It is regenerable in the strict sense and *expensive* in
+/// the practical one — a ten-minute 4K clip is minutes of decode and encode —
+/// so it belongs somewhere that travels with the edit rather than somewhere
+/// that has to be rebuilt on the machine the package lands on.
+/// `fileWrapper(ofType:)` already carries `cache/` across every save through
+/// the LAZY `FileWrapper` the filmstrips ride, and `NSFileWrapper` hard-links
+/// a child it is writing back over its own original — so a save in place pays
+/// for the reverse once. A Save As, or an autosave to a new draft location,
+/// really does copy it; that is the cost of a package that travels whole.
+///
+/// **Why not Application Support, where `FFmpegRewrap` puts its conversions.**
+/// §11's reasoning for that choice does not transfer. A rewrap is the only
+/// *decodable* copy of footage the app can open, so losing it loses the media;
+/// a reverse is a derived rendering of media that is still there, so losing it
+/// costs time. And a rewrap is made during an import, when the document is
+/// usually still untitled and has no package — while a reverse is asked for
+/// mid-edit, on a project that has one. An untitled document falls back to
+/// `ProjectDocument`'s temporary cache directory exactly as filmstrips do, and
+/// the first save copies the render into the package with everything else.
+///
+/// **Why the name carries a digest.** The contract's `<media id>.mov` names
+/// the file by a project-scoped id, and ids outlive the file behind them:
+/// Relink… can point media 3 at a completely different movie, and a reversed
+/// asset for the old one would then be silently wrong — forward frames from
+/// the wrong film. The digest is `FFmpegRewrap`'s (path, size, modification
+/// second), for its reasons: it makes the render both reusable and
+/// self-invalidating, and reading gigabytes to decide whether to re-encode
+/// gigabytes is the wrong trade.
+enum ReverseCache {
+    /// The subdirectory of `cache/` this feature owns.
+    static let directoryName = "reversed"
+
+    static func directory(in cache: URL) -> URL {
+        cache.appendingPathComponent(directoryName, isDirectory: true)
+    }
+
+    /// Where `media`'s reversal of `source` goes. nil when the source cannot
+    /// be measured, which is the same answer as "there is nothing to reverse".
+    static func destination(media: UInt32, source: URL, in cache: URL) -> URL? {
+        guard let digest = digest(of: source) else { return nil }
+        return directory(in: cache).appendingPathComponent("\(media)-\(digest).mov")
+    }
+
+    /// A finished reversal already on disk, if there is one.
+    static func existing(media: UInt32, source: URL, in cache: URL) -> URL? {
+        guard let url = destination(media: media, source: source, in: cache),
+            FileManager.default.fileExists(atPath: url.path)
+        else { return nil }
+        return url
+    }
+
+    /// Throws away the reversals of `media` that a fresh one has just made
+    /// obsolete — the previous digest's file after a relink, and any partial
+    /// left by a render that died.
+    ///
+    /// Refuses to delete anything that is not a sibling of `keep` inside a
+    /// directory named `reversed`, and refuses to delete `keep` itself. This
+    /// takes a URL and removes files, which is the shape of function a bug
+    /// elsewhere turns into data loss, so the guard is not a formality
+    /// (`FFmpegRewrap.discard` makes the same one).
+    static func prune(media: UInt32, keeping keep: URL) {
+        let directory = keep.deletingLastPathComponent()
+        guard directory.lastPathComponent == directoryName,
+            let names = try? FileManager.default.contentsOfDirectory(atPath: directory.path)
+        else { return }
+        let kept = keep.lastPathComponent
+        for name in names where name != kept && name.hasPrefix("\(media)-") {
+            try? FileManager.default.removeItem(at: directory.appendingPathComponent(name))
+        }
+    }
+
+    /// FNV-1a over path, byte size and modification second — `FFmpegRewrap`'s
+    /// digest, spelled again here rather than shared because that one is
+    /// private to its own naming scheme and this one keys a different
+    /// directory. Not a content hash, for the reason that file gives.
+    private static func digest(of source: URL) -> String? {
+        let attributes = try? FileManager.default.attributesOfItem(atPath: source.path)
+        guard let size = (attributes?[.size] as? NSNumber)?.int64Value else { return nil }
+        let modified = (attributes?[.modificationDate] as? Date)?.timeIntervalSince1970 ?? 0
+        var hash: UInt64 = 0xcbf2_9ce4_8422_2325
+        for byte in "\(source.path)|\(size)|\(Int64(modified.rounded()))".utf8 {
+            hash = (hash ^ UInt64(byte)) &* 0x0000_0100_0000_01b3
+        }
+        let hex = String(hash, radix: 16)
+        return String(repeating: "0", count: max(0, 16 - hex.count)) + hex
+    }
+}
+
+// MARK: - What the composition is told
+
+/// Which clips play from a reversed file, and which are still waiting for one.
+///
+/// Keyed by CLIP and not by media, because reversal is a property of the clip:
+/// the same movie forward on one track and backwards on another — the
+/// boomerang every editor has made — is one media entry, two clips, and only
+/// one of them may read the reversed file.
+struct ReverseResolution: Equatable {
+    /// Clip id → the pre-rendered file its segments read from instead of the
+    /// media's own.
+    let ready: [UInt32: URL]
+    /// Clips that are reversed and have NO file yet: the render has not run,
+    /// was cancelled, or failed. `CompositionBuilder` holds their place with
+    /// empty time and marks them missing, so they draw §5.6's slate.
+    ///
+    /// This is the whole point of publishing pending clips rather than simply
+    /// omitting them. A reversed clip with no reversed asset used to play
+    /// FORWARD — the picture silently disagreed with the model — and a slate
+    /// is the honest answer: something is meant to be here and is not.
+    let pending: Set<UInt32>
+
+    static let none = ReverseResolution(ready: [:], pending: [])
+
+    var isEmpty: Bool { ready.isEmpty && pending.isEmpty }
+}
+
+/// What the Video tab's Speed section says about one clip's reverse, and the
+/// state machine behind the "Render Reverse" button.
+///
+/// There is no state that means "reversed and playing forwards", which is the
+/// point: every state below either has the frames or says out loud that it
+/// does not.
+enum ReverseStatus: Equatable {
+    /// Not reversed — or reversed media that needs no rendering, which a
+    /// still picture is.
+    case off
+    /// Reversed, with the backwards copy on disk.
+    case ready
+    /// Reversed, and its frames are being made or about to be.
+    case pending
+    /// Reversed, and the render was cancelled or failed. Nothing will retry it
+    /// on its own; the button does.
+    case stopped
+    /// Reversed, but the media itself is missing or has no length — the clip
+    /// is already drawing a missing-media slate for a different reason.
+    case unavailable
+
+    /// The row's own words.
+    var summary: String {
+        switch self {
+        case .off: return "—"
+        case .ready: return "Rendered"
+        case .pending: return "Rendering…"
+        case .stopped: return "Not rendered"
+        case .unavailable: return "Media missing"
+        }
+    }
+}
+
+/// The process-wide place `CompositionBuilder` finds a document's reverse
+/// resolution, keyed by the same `RecipeSource` slot the compositor reads
+/// recipes under — `AudioDSPSource`'s shape, for `AudioDSPSource`'s reasons.
+///
+/// The two mirrors exist for the same underlying fact: `CompositionBuilder` is
+/// handed the composition PLAN, and the plan is `evaluate.rs`'s structural
+/// description of what to decode. `Source::Media.reversed` is deliberately not
+/// in it — the core does no pixel work, so reversal changes neither the plan
+/// nor the recipe (spec §11) — which leaves exactly one place for the answer
+/// to arrive: beside the plan, published by the document.
+///
+/// **A key with no entry is answered by the handle, not by a search.** An
+/// export mints a FRESH `RecipeSource` key so a queued frame cannot be
+/// composed from a project the user changed mid-write, and nothing publishes
+/// under that new key — but it does publish the project HANDLE under it, and a
+/// handle is one object that exactly one document published. So the lookup
+/// asks `RecipeSource` which handle the key was registered with and takes the
+/// entry that published that same object.
+///
+/// It was once a scan for the document whose plan JSON matched. Reversal is
+/// deliberately absent from the plan, so a reversed clip and a forward one
+/// produce the SAME plan string: two such documents open at once were
+/// indistinguishable to the scan, and the ambiguous answer — slate everything
+/// either candidate called reversed — left a correctly rendered reversed clip
+/// showing the missing-media plate in the preview and in the export, with no
+/// way back. Measured, not theorised. Identity cannot be ambiguous, so the
+/// case is gone rather than handled.
+///
+/// A key whose handle nobody published is still `.none`: no document claims
+/// that composition, so no clip in it reads from a reversed file.
+final class ReverseSource {
+    static let shared = ReverseSource()
+
+    private struct Entry {
+        /// The handle this resolution was computed from. Compared, never
+        /// dereferenced — it is here to name a document, and holding it
+        /// strongly would keep a closed document's Rust project alive.
+        let project: ObjectIdentifier
+        let resolution: ReverseResolution
+    }
+
+    private let lock = NSLock()
+    private var entries: [Int: Entry] = [:]
+
+    private init() {}
+
+    /// Publishes a document's resolution. Main thread, after every edit and
+    /// after every render that finishes.
+    func publish(_ resolution: ReverseResolution, project: ReelProject, for key: Int) {
+        lock.lock()
+        defer { lock.unlock() }
+        entries[key] = Entry(project: ObjectIdentifier(project), resolution: resolution)
+    }
+
+    /// Drops a document's slot, the way `RecipeSource.unregister` does.
+    func unpublish(_ key: Int) {
+        lock.lock()
+        defer { lock.unlock() }
+        entries.removeValue(forKey: key)
+    }
+
+    /// The resolution for the composition being built under `key`: the
+    /// entry published under that key, or the one published for the very
+    /// handle the key was registered with. See the type's own comment.
+    func resolution(for key: Int) -> ReverseResolution {
+        lock.lock()
+        let own = entries[key]
+        lock.unlock()
+        if let own = own { return own.resolution }
+        guard let project = RecipeSource.shared.project(for: key) else { return .none }
+        let handle = ObjectIdentifier(project)
+        lock.lock()
+        defer { lock.unlock() }
+        return entries.values.first { $0.project == handle }?.resolution ?? .none
+    }
+}
+
+// MARK: - The renderer
+
+/// Decodes one media file and writes it back to front, so AVFoundation can
+/// play a reversed clip forward (spec §11: "reverse is not native; M3
+/// pre-renders reversed segments").
+///
+/// **The reader-to-writer shape is `ExporterWriter`'s**, and deliberately so:
+/// an `AVAssetReader` feeding an `AVAssetWriter`, cancelled by a flag every
+/// sample checks, progress kept by hand because `AVAssetWriter` has none. What
+/// differs is the ONE thing reversal forces — a writer's inputs take samples
+/// in ascending presentation order, and the frames arrive in the opposite one,
+/// so the file cannot be streamed through. Frames have to be held.
+///
+/// **Chunks, because holding the whole film is not an option.** The asset is
+/// walked backwards a slice at a time: read `[t, t + Δ)` into memory, append
+/// its frames newest-first, then step back to `[t − Δ, t)`. Δ is sized by
+/// BYTES rather than by seconds — 4K frames are sixteen times a 720p frame —
+/// so the resident cost is bounded whatever the source is, at the price of one
+/// `AVAssetReader` per slice.
+///
+/// **The arithmetic that makes the reversed file line up with the model.**
+/// `Source::Media.reversed` measures `in` in the REVERSED stream (see
+/// `Source::Media` in `core/src/model.rs`), which only works if the reversal
+/// is exactly as long as the original. So the pivot is the media's own
+/// duration `T` as the model recorded it, and a frame shown at source time `p`
+/// until `p'` is written at `T − p'`. Frame durations therefore come out of
+/// the gaps between presentation stamps rather than out of a nominal rate,
+/// which keeps a variable-rate source exact instead of nearly right, and the
+/// written stream tiles `[0, T)` with no seam.
+///
+/// **What it does NOT do.**
+/// * It does not carry the source's `preferredTransform`, and must not. A
+///   custom compositor gets RAW decoded frames and turns the sampling itself
+///   from the orientation code `CompositionBuilder.orientationCodes` reads off
+///   the FORWARD asset (§7.5). The frames written here are the same coded
+///   frames the forward file decodes to, so that one code is right for both;
+///   baking a transform in would turn a portrait clip twice.
+/// * It does not preserve an alpha channel or a wide-gamut transfer curve. The
+///   intermediate is 8-bit BGRA into H.264/HEVC, so a reversed ProRes 4444
+///   clip loses its transparency and a reversed HDR clip is tone-mapped by the
+///   decoder rather than by the compositor. Both are the price of an
+///   intermediate small enough to live in the package; neither is silent —
+///   the picture changes visibly when the clip is reversed.
+final class ReverseRenderer {
+
+    /// One media file to reverse, decided on the main thread against the
+    /// document's snapshot so the render loop consults nothing that can move.
+    struct Job: Equatable {
+        let media: UInt32
+        /// The media's display name, for the sheet's status line.
+        let name: String
+        let source: URL
+        let destination: URL
+        /// The media's duration as the MODEL has it — the pivot the reversal
+        /// is measured about, and the number `in` is measured against.
+        let duration: Ticks
+        let fps: Fps
+        let hasAudio: Bool
+    }
+
+    enum ReverseError: LocalizedError {
+        /// Nothing in the file can be reversed: no readable track, or a
+        /// duration the model does not believe in.
+        case unreadable(String)
+        case cancelled
+        case failed(String)
+
+        var errorDescription: String? {
+            switch self {
+            case .unreadable(let name):
+                return "“\(name)” has no video or audio that can be reversed."
+            case .cancelled:
+                return "The reverse was cancelled."
+            case .failed(let reason):
+                return "The reversed clip could not be rendered: \(reason)"
+            }
+        }
+    }
+
+    /// `MediaConsolidator.CancelToken`'s shape: one flag, one lock, safe from
+    /// any thread and safe to set twice.
+    final class CancelToken {
+        private let lock = NSLock()
+        private var flag = false
+
+        var isCancelled: Bool {
+            lock.lock()
+            defer { lock.unlock() }
+            return flag
+        }
+
+        func cancel() {
+            lock.lock()
+            flag = true
+            lock.unlock()
+        }
+    }
+
+    /// How much decoded picture may be resident at once. One slice of the
+    /// source is held whole, so this is the renderer's whole memory budget and
+    /// not a soft target: half a gigabyte is two seconds of 1080p or half a
+    /// second of 4K, which keeps the per-slice reader overhead small without
+    /// making the app a memory hog while it works.
+    private static let bufferBudget = 512 * 1024 * 1024
+
+    private let job: Job
+    /// Written to first and moved into place only on success, so a cancel or a
+    /// crash can never leave a half-reversed file that `ReverseCache.existing`
+    /// would hand out as finished.
+    private let partial: URL
+
+    init(job: Job) {
+        self.job = job
+        self.partial = job.destination.appendingPathExtension("partial")
+    }
+
+    @available(*, unavailable) required init?(coder: NSCoder) {
+        fatalError("ReverseRenderer does not support NSCoder")
+    }
+
+    /// Renders the whole file. Synchronous and disk-bound — call it OFF the
+    /// main thread — and never throws: every outcome comes back as a
+    /// `Result`, because the caller is a sheet that has to say something
+    /// either way.
+    func run(
+        cancel: CancelToken? = nil, progress: ((Double) -> Void)? = nil
+    ) -> Result<URL, any Error> {
+        do {
+            let url = try write(cancel: cancel, progress: progress)
+            return .success(url)
+        } catch {
+            try? FileManager.default.removeItem(at: partial)
+            return .failure(error)
+        }
+    }
+
+    // MARK: - The write
+
+    private func write(cancel: CancelToken?, progress: ((Double) -> Void)?) throws -> URL {
+        let asset = AVURLAsset(
+            url: job.source, options: [AVURLAssetPreferPreciseDurationAndTimingKey: true])
+        // The one synchronous track lookup in the app, shared with
+        // `CompositionBuilder` so the deprecation it costs is paid once.
+        let videoTrack = CompositionBuilder.firstTrack(of: asset, mediaType: .video)
+        let audioTrack =
+            job.hasAudio ? CompositionBuilder.firstTrack(of: asset, mediaType: .audio) : nil
+        let total = CompositionBuilder.time(job.duration)
+        guard videoTrack != nil || audioTrack != nil, total > .zero else {
+            throw ReverseError.unreadable(job.name)
+        }
+
+        // The coded frame size, taken from a frame rather than from the
+        // track's `naturalSize`: the async-only accessors are the reason
+        // (app/CLAUDE.md keeps `await` inside `MediaImporter`), and a decoded
+        // frame is in any case the more honest source of the number the
+        // encoder has to match.
+        let dimensions = videoTrack.flatMap { Self.dimensions(of: asset, track: $0, limit: total) }
+
+        try FileManager.default.createDirectory(
+            at: partial.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try? FileManager.default.removeItem(at: partial)
+        let writer: AVAssetWriter
+        do {
+            writer = try AVAssetWriter(outputURL: partial, fileType: .mov)
+        } catch {
+            throw ReverseError.failed(error.localizedDescription)
+        }
+
+        var videoInput: AVAssetWriterInput?
+        var adaptor: AVAssetWriterInputPixelBufferAdaptor?
+        if let dimensions = dimensions, dimensions.width > 0, dimensions.height > 0 {
+            let input = AVAssetWriterInput(
+                mediaType: .video, outputSettings: Self.videoSettings(dimensions, fps: job.fps))
+            input.expectsMediaDataInRealTime = false
+            guard writer.canAdd(input) else {
+                throw ReverseError.failed("this Mac cannot encode the format it needs")
+            }
+            writer.add(input)
+            adaptor = AVAssetWriterInputPixelBufferAdaptor(
+                assetWriterInput: input,
+                sourcePixelBufferAttributes: [
+                    kCVPixelBufferPixelFormatTypeKey as String: Int(kCVPixelFormatType_32BGRA),
+                    kCVPixelBufferWidthKey as String: Int(dimensions.width),
+                    kCVPixelBufferHeightKey as String: Int(dimensions.height),
+                    kCVPixelBufferIOSurfacePropertiesKey as String: [String: Any](),
+                ])
+            videoInput = input
+        }
+        var audioInput: AVAssetWriterInput?
+        if audioTrack != nil {
+            let input = AVAssetWriterInput(mediaType: .audio, outputSettings: Self.audioSettings)
+            input.expectsMediaDataInRealTime = false
+            if writer.canAdd(input) {
+                writer.add(input)
+                audioInput = input
+            }
+        }
+        guard videoInput != nil || audioInput != nil else {
+            throw ReverseError.unreadable(job.name)
+        }
+        guard writer.startWriting() else {
+            throw ReverseError.failed(
+                writer.error?.localizedDescription ?? "the file could not be opened for writing")
+        }
+        writer.startSession(atSourceTime: .zero)
+
+        do {
+            try walkBackwards(
+                asset: asset, videoTrack: videoTrack, audioTrack: audioTrack, total: total,
+                dimensions: dimensions, writer: writer, videoInput: videoInput, adaptor: adaptor,
+                audioInput: audioInput, cancel: cancel, progress: progress)
+        } catch {
+            // A writer left in `.writing` keeps its file open and its encoder
+            // alive until it is deallocated; cancelling closes both now and
+            // takes the part-written file with it.
+            writer.cancelWriting()
+            throw error
+        }
+
+        if cancel?.isCancelled == true {
+            writer.cancelWriting()
+            throw ReverseError.cancelled
+        }
+        // `finishWriting` closes the container on a queue of its own, and this
+        // method's contract is that the file exists when it returns.
+        let done = DispatchSemaphore(value: 0)
+        writer.finishWriting { done.signal() }
+        done.wait()
+        guard writer.status == .completed else {
+            throw ReverseError.failed(
+                writer.error?.localizedDescription ?? "the write stopped before it finished")
+        }
+
+        try? FileManager.default.removeItem(at: job.destination)
+        do {
+            try FileManager.default.moveItem(at: partial, to: job.destination)
+        } catch {
+            throw ReverseError.failed(error.localizedDescription)
+        }
+        ReverseCache.prune(media: job.media, keeping: job.destination)
+        return job.destination
+    }
+
+    /// Walks the source from its end to its start, one slice at a time,
+    /// appending each slice's samples in reverse.
+    ///
+    /// **The timing.** `following` is the presentation stamp of the frame
+    /// AFTER the one being written — the whole of the arithmetic, and the
+    /// reason a slice boundary costs nothing: a frame shown from `p` until
+    /// `following` is written at `T − following`, and the next frame back
+    /// supplies its own `following` when its turn comes. It starts at `T`, so
+    /// the source's last frame lands at zero, and it decreases strictly, so
+    /// every append is later than the last one.
+    ///
+    /// **Why the samples are fed on demand rather than in time order.** An
+    /// `AVAssetWriter` interleaves its tracks and will not take from one input
+    /// while it wants the other: `isReadyForMoreMediaData` goes false on the
+    /// track it has enough of, and STAYS false until the other one catches
+    /// up — for good, if nothing ever feeds it. Measured on this build, three
+    /// ways: 150 frames of video beside an untouched audio input stall at
+    /// frame 41; six seconds of audio beside an untouched video input stall
+    /// too; and even strict output-time interleaving stalls, because the
+    /// writer wanted sound that was already a tenth of a second AHEAD of the
+    /// picture. There is no lead to tune. So this decodes a slice of both
+    /// tracks, then feeds whichever input says it is hungry, and only reads
+    /// the next slice when one of the two queues runs dry — which is
+    /// `requestMediaDataWhenReady`'s bargain, made by polling because the
+    /// producer here is a loop rather than a callback.
+    ///
+    /// **Silence, and why it is not a fudge.** A stretch of the source with no
+    /// audio in it — a video track that outlasts its audio, the commonest
+    /// cause — would leave the audio input starving and the picture stalled
+    /// against it. It is filled with silence instead, which is also exactly
+    /// what the source plays there and what the composition would have made of
+    /// the forward file.
+    private func walkBackwards(
+        asset: AVURLAsset, videoTrack: AVAssetTrack?, audioTrack: AVAssetTrack?, total: CMTime,
+        dimensions: CMVideoDimensions?, writer: AVAssetWriter, videoInput: AVAssetWriterInput?,
+        adaptor: AVAssetWriterInputPixelBufferAdaptor?, audioInput: AVAssetWriterInput?,
+        cancel: CancelToken?, progress: ((Double) -> Void)?
+    ) throws {
+        let slice = Self.sliceDuration(dimensions: dimensions, fps: job.fps)
+        let seconds = max(CMTimeGetSeconds(total), 0.000_001)
+        var cursor = total
+        var following = total
+        var written: Int64 = 0
+
+        // What has been decoded and not yet handed to the writer. Never more
+        // than about two slices: the loop refills only when one of them empties.
+        var pictures: [(time: CMTime, buffer: CVPixelBuffer)] = []
+        var sounds: [CMSampleBuffer] = []
+
+        /// Feeds hungry inputs. `untilOneEmpty` is the normal mode — stop as
+        /// soon as either queue runs dry, so the caller can refill both before
+        /// the writer has a chance to want the empty one. The final pass runs
+        /// with it false and marks each input finished as its queue empties,
+        /// which is what releases the other from the interleave.
+        func feed(untilOneEmpty: Bool, videoDone: inout Bool, audioDone: inout Bool) throws {
+            while true {
+                if cancel?.isCancelled == true { throw ReverseError.cancelled }
+                guard writer.status == .writing else {
+                    throw ReverseError.failed(
+                        writer.error?.localizedDescription ?? "the write stopped early")
+                }
+                let hasPicture = !pictures.isEmpty
+                let hasSound = !sounds.isEmpty
+                if untilOneEmpty {
+                    // Only a track that EXISTS can run dry. Testing the
+                    // picture unconditionally would make an audio-only source
+                    // return on its first look and pile the whole file up in
+                    // `sounds` before anything was written.
+                    if videoInput != nil, !hasPicture { return }
+                    if audioInput != nil, !hasSound { return }
+                } else {
+                    if !hasPicture, !videoDone, let input = videoInput {
+                        input.markAsFinished()
+                        videoDone = true
+                        continue
+                    }
+                    if !hasSound, !audioDone, let input = audioInput {
+                        input.markAsFinished()
+                        audioDone = true
+                        continue
+                    }
+                    if !hasPicture, !hasSound { return }
+                }
+                if hasPicture, let input = videoInput, let adaptor = adaptor,
+                    input.isReadyForMoreMediaData
+                {
+                    let entry = pictures.removeFirst()
+                    guard adaptor.append(entry.buffer, withPresentationTime: entry.time) else {
+                        throw ReverseError.failed(
+                            writer.error?.localizedDescription ?? "a frame could not be encoded")
+                    }
+                    continue
+                }
+                if hasSound, let input = audioInput, input.isReadyForMoreMediaData {
+                    let entry = sounds.removeFirst()
+                    guard input.append(entry) else {
+                        throw ReverseError.failed(
+                            writer.error?.localizedDescription ?? "the sound could not be written")
+                    }
+                    continue
+                }
+                // Both encoders are busy. 5 ms is far shorter than a frame and
+                // far longer than a context switch.
+                Thread.sleep(forTimeInterval: 0.005)
+            }
+        }
+
+        var videoDone = videoInput == nil
+        var audioDone = audioInput == nil
+        while cursor > .zero {
+            if cancel?.isCancelled == true { throw ReverseError.cancelled }
+            let start = CMTimeMaximum(.zero, cursor - slice)
+            // `sliceDuration` never returns zero, so this cannot fire — but a
+            // loop that walks backwards on a background thread is not the
+            // place to trust arithmetic, and the cost of being sure is a
+            // comparison.
+            guard start < cursor else { break }
+            let read = try Self.read(
+                asset: asset, range: CMTimeRange(start: start, end: cursor), limit: total,
+                videoTrack: videoTrack, audioTrack: audioTrack, cancel: cancel)
+
+            if adaptor != nil {
+                for frame in read.frames.reversed() {
+                    // Two frames at one stamp would append twice at the same
+                    // output time, which a writer input refuses outright. It
+                    // should not happen — the slice is sorted and a track has
+                    // one frame per instant — so the answer is to drop the
+                    // duplicate rather than lose the file over it.
+                    guard frame.time < following else { continue }
+                    pictures.append((time: total - following, buffer: frame.buffer))
+                    following = frame.time
+                }
+            }
+            if audioInput != nil, let format = Self.audioFormat {
+                sounds.append(
+                    contentsOf: Self.audioBlocks(
+                        read.audio, format: format, from: &written,
+                        covering: Self.audioFrames(in: total - start)))
+            }
+
+            try feed(untilOneEmpty: true, videoDone: &videoDone, audioDone: &audioDone)
+            cursor = start
+            progress?(min(max(1 - CMTimeGetSeconds(cursor) / seconds, 0), 1))
+        }
+        // The final pass drains both queues and marks each input finished as
+        // it empties, so `write` has nothing left to do but close the file.
+        try feed(untilOneEmpty: false, videoDone: &videoDone, audioDone: &audioDone)
+    }
+
+    // MARK: - Reading one slice
+
+    /// One decoded frame, held until its turn to be written comes round.
+    private struct Frame {
+        let time: CMTime
+        let buffer: CVPixelBuffer
+    }
+
+    private struct Slice {
+        var frames: [Frame] = []
+        /// Interleaved 16-bit LPCM, in source order; reversed on the way out.
+        var audio: [UInt8] = []
+    }
+
+    /// Reads everything in `range` into memory.
+    ///
+    /// The two outputs are drained a sample at a time each rather than one
+    /// after the other: an `AVAssetReader` decodes both tracks as it goes, and
+    /// emptying one output while the other is untouched makes it buffer the
+    /// second track's samples on our behalf, which is the one thing this
+    /// method exists to avoid.
+    ///
+    /// Samples outside `[range.start, range.end)` are dropped rather than
+    /// clipped. A reader may hand back a frame that begins before the range
+    /// (the sync sample it had to decode from), and that frame belongs to the
+    /// PREVIOUS slice, which has already written it — so admitting it here
+    /// would write it twice and break the strictly-decreasing stamp the
+    /// caller's arithmetic depends on.
+    private static func read(
+        asset: AVURLAsset, range: CMTimeRange, limit: CMTime, videoTrack: AVAssetTrack?,
+        audioTrack: AVAssetTrack?, cancel: CancelToken?
+    ) throws -> Slice {
+        let reader: AVAssetReader
+        do {
+            reader = try AVAssetReader(asset: asset)
+        } catch {
+            throw ReverseError.failed(error.localizedDescription)
+        }
+        reader.timeRange = range
+
+        var videoOutput: AVAssetReaderTrackOutput?
+        if let track = videoTrack {
+            let output = AVAssetReaderTrackOutput(
+                track: track,
+                outputSettings: [
+                    // The format the whole app composites in
+                    // (`Compositor.requiredPixelBufferAttributes…`), so
+                    // nothing converts between here and the encoder.
+                    kCVPixelBufferPixelFormatTypeKey as String: Int(kCVPixelFormatType_32BGRA),
+                    kCVPixelBufferIOSurfacePropertiesKey as String: [String: Any](),
+                ])
+            if reader.canAdd(output) {
+                reader.add(output)
+                videoOutput = output
+            }
+        }
+        var audioOutput: AVAssetReaderTrackOutput?
+        if let track = audioTrack {
+            let output = AVAssetReaderTrackOutput(
+                track: track, outputSettings: decodedAudioSettings)
+            if reader.canAdd(output) {
+                reader.add(output)
+                audioOutput = output
+            }
+        }
+        guard reader.startReading() else {
+            throw ReverseError.failed(
+                reader.error?.localizedDescription ?? "the file could not be read")
+        }
+
+        var slice = Slice()
+        var videoDone = videoOutput == nil
+        var audioDone = audioOutput == nil
+        while !videoDone || !audioDone {
+            if cancel?.isCancelled == true {
+                reader.cancelReading()
+                throw ReverseError.cancelled
+            }
+            if !videoDone {
+                if let sample = videoOutput?.copyNextSampleBuffer() {
+                    let time = CMSampleBufferGetPresentationTimeStamp(sample)
+                    if time.isNumeric, time >= range.start, time < range.end, time < limit,
+                        let image = CMSampleBufferGetImageBuffer(sample),
+                        let held = copyBuffer(image)
+                    {
+                        slice.frames.append(Frame(time: time, buffer: held))
+                    }
+                } else {
+                    videoDone = true
+                }
+            }
+            if !audioDone {
+                if let sample = audioOutput?.copyNextSampleBuffer() {
+                    appendAudioBytes(of: sample, to: &slice.audio)
+                } else {
+                    audioDone = true
+                }
+            }
+        }
+        let status = reader.status
+        reader.cancelReading()
+        guard status != .failed else {
+            throw ReverseError.failed(
+                reader.error?.localizedDescription ?? "the file could not be read to the end")
+        }
+        // Decompressed output arrives in display order on every path measured
+        // here, but the reversal is only correct if it really is sorted, and a
+        // slice is a few dozen frames.
+        slice.frames.sort { $0.time < $1.time }
+        return slice
+    }
+
+    /// A private copy of a decoded frame.
+    ///
+    /// The reader hands back buffers from a pool it means to recycle, and this
+    /// renderer holds a whole slice of them at once — so they are copied out
+    /// rather than retained, which is the difference between a bounded read
+    /// and a reader that starves itself. A pool of our own would recycle
+    /// nothing (every buffer in a slice is live at the same time), so these
+    /// are plain allocations.
+    private static func copyBuffer(_ source: CVPixelBuffer) -> CVPixelBuffer? {
+        let width = CVPixelBufferGetWidth(source)
+        let height = CVPixelBufferGetHeight(source)
+        guard width > 0, height > 0, CVPixelBufferGetPlaneCount(source) <= 1 else { return nil }
+        var created: CVPixelBuffer?
+        guard CVPixelBufferCreate(
+            kCFAllocatorDefault, width, height, CVPixelBufferGetPixelFormatType(source),
+            [
+                kCVPixelBufferIOSurfacePropertiesKey as String: [String: Any](),
+                kCVPixelBufferMetalCompatibilityKey as String: true,
+            ] as CFDictionary, &created) == kCVReturnSuccess, let target = created
+        else { return nil }
+        guard CVPixelBufferLockBaseAddress(source, .readOnly) == kCVReturnSuccess else {
+            return nil
+        }
+        defer { CVPixelBufferUnlockBaseAddress(source, .readOnly) }
+        guard CVPixelBufferLockBaseAddress(target, []) == kCVReturnSuccess else { return nil }
+        defer { CVPixelBufferUnlockBaseAddress(target, []) }
+        guard let from = CVPixelBufferGetBaseAddress(source),
+            let to = CVPixelBufferGetBaseAddress(target)
+        else { return nil }
+        let fromStride = CVPixelBufferGetBytesPerRow(source)
+        let toStride = CVPixelBufferGetBytesPerRow(target)
+        let rowBytes = min(fromStride, toStride)
+        for row in 0..<height {
+            memcpy(to + row * toStride, from + row * fromStride, rowBytes)
+        }
+        return target
+    }
+
+    /// One audio sample buffer's bytes, appended to the slice's run.
+    private static func appendAudioBytes(of sample: CMSampleBuffer, to bytes: inout [UInt8]) {
+        guard let block = CMSampleBufferGetDataBuffer(sample) else { return }
+        let length = CMBlockBufferGetDataLength(block)
+        guard length > 0 else { return }
+        var copied = [UInt8](repeating: 0, count: length)
+        let status = copied.withUnsafeMutableBytes { raw -> OSStatus in
+            guard let base = raw.baseAddress else { return -1 }
+            return CMBlockBufferCopyDataBytes(
+                block, atOffset: 0, dataLength: length, destination: base)
+        }
+        guard status == kCMBlockBufferNoErr else { return }
+        bytes.append(contentsOf: copied)
+    }
+
+    // MARK: - Audio
+
+    /// What comes out of the reader and goes into the file: 16-bit
+    /// interleaved LPCM at 48 kHz stereo — `ExporterWriter.decodedAudioSettings`
+    /// again, so a reversed clip mixes exactly like a forward one, and LPCM in
+    /// rather than AAC so an intermediate costs no generation of its own.
+    private static let audioSampleRate = 48000
+    private static let audioChannels = 2
+    private static let audioBytesPerFrame = 4
+
+    private static let decodedAudioSettings: [String: Any] = [
+        AVFormatIDKey: Int(kAudioFormatLinearPCM),
+        AVSampleRateKey: audioSampleRate,
+        AVNumberOfChannelsKey: audioChannels,
+        AVLinearPCMBitDepthKey: 16,
+        AVLinearPCMIsFloatKey: false,
+        AVLinearPCMIsBigEndianKey: false,
+        AVLinearPCMIsNonInterleaved: false,
+    ]
+
+    private static let audioSettings: [String: Any] = decodedAudioSettings
+
+    /// The description every block written here carries: 48 kHz stereo,
+    /// 16-bit signed, packed, little-endian — `decodedAudioSettings` spelled
+    /// as an `AudioStreamBasicDescription`.
+    ///
+    /// Built rather than taken off the first sample the reader hands back,
+    /// because a slice may legitimately contain no sound at all and still have
+    /// to write silence into it (see `walkBackwards`). The two descriptions
+    /// are the same one either way: the reader was ASKED for this format.
+    private static let audioFormat: CMFormatDescription? = {
+        var description = AudioStreamBasicDescription(
+            mSampleRate: Float64(audioSampleRate),
+            mFormatID: kAudioFormatLinearPCM,
+            mFormatFlags: kAudioFormatFlagIsSignedInteger | kAudioFormatFlagIsPacked,
+            mBytesPerPacket: UInt32(audioBytesPerFrame),
+            mFramesPerPacket: 1,
+            mBytesPerFrame: UInt32(audioBytesPerFrame),
+            mChannelsPerFrame: UInt32(audioChannels),
+            mBitsPerChannel: 16,
+            mReserved: 0)
+        var format: CMFormatDescription?
+        guard CMAudioFormatDescriptionCreate(
+            allocator: kCFAllocatorDefault, asbd: &description, layoutSize: 0, layout: nil,
+            magicCookieSize: 0, magicCookie: nil, extensions: nil,
+            formatDescriptionOut: &format) == noErr
+        else { return nil }
+        return format
+    }()
+
+    /// A time as a whole number of 48 kHz frames — the unit the audio input's
+    /// stamps are counted in, so a slice boundary is an integer and not a
+    /// rounding.
+    private static func audioFrames(in time: CMTime) -> Int64 {
+        let scaled = CMTimeConvertScale(
+            time, timescale: CMTimeScale(audioSampleRate), method: .roundHalfAwayFromZero)
+        return scaled.isNumeric ? max(0, scaled.value) : 0
+    }
+
+    /// One slice's sound as writer-sized blocks, in output order, padded with
+    /// silence out to `endFrame` — the frame the picture has reached by the
+    /// end of this slice.
+    ///
+    /// The padding is what keeps the audio input fed through a stretch of the
+    /// source that has none, and the blocks are what keep it from running away
+    /// from the picture; `walkBackwards` explains why both matter. `written`
+    /// is the running frame count, so the blocks are contiguous across slices
+    /// and no boundary can round into a click.
+    private static func audioBlocks(
+        _ bytes: [UInt8], format: CMFormatDescription, from written: inout Int64,
+        covering endFrame: Int64
+    ) -> [CMSampleBuffer] {
+        let width = audioBytesPerFrame
+        var run = reversedFrames(bytes)
+        let reached = written + Int64(run.count / width)
+        if reached < endFrame {
+            run.append(
+                contentsOf: [UInt8](repeating: 0, count: Int(endFrame - reached) * width))
+        }
+        // A quarter of a second: far inside the lead an `AVAssetWriter`
+        // tolerates, far longer than the per-append cost is worth paying more
+        // often.
+        let blockFrames = audioSampleRate / 4
+        var blocks: [CMSampleBuffer] = []
+        var offset = 0
+        while offset < run.count {
+            let frames = min(blockFrames, (run.count - offset) / width)
+            guard frames > 0 else { break }
+            let block = Array(run[offset..<(offset + frames * width)])
+            guard let sample = audioSample(
+                block, format: format,
+                at: CMTime(value: written, timescale: CMTimeScale(audioSampleRate)),
+                frames: frames)
+            else { break }
+            blocks.append(sample)
+            written += Int64(frames)
+            offset += frames * width
+        }
+        return blocks
+    }
+
+    /// The slice's audio with its FRAMES reversed — the channels inside one
+    /// frame keep their order, or the left and right would swap.
+    private static func reversedFrames(_ bytes: [UInt8]) -> [UInt8] {
+        let width = audioBytesPerFrame
+        let frames = bytes.count / width
+        var out = [UInt8](repeating: 0, count: frames * width)
+        for frame in 0..<frames {
+            let from = (frames - 1 - frame) * width
+            let to = frame * width
+            for byte in 0..<width { out[to + byte] = bytes[from + byte] }
+        }
+        return out
+    }
+
+    /// One block of reversed LPCM as a sample buffer. Constant bytes per
+    /// frame, so one timing entry and one size entry describe the lot —
+    /// `ExporterWriter.chapterSample`'s construction with a different payload.
+    private static func audioSample(
+        _ bytes: [UInt8], format: CMFormatDescription, at time: CMTime, frames: Int
+    ) -> CMSampleBuffer? {
+        var block: CMBlockBuffer?
+        guard CMBlockBufferCreateWithMemoryBlock(
+            allocator: kCFAllocatorDefault, memoryBlock: nil, blockLength: bytes.count,
+            blockAllocator: kCFAllocatorDefault, customBlockSource: nil, offsetToData: 0,
+            dataLength: bytes.count, flags: 0, blockBufferOut: &block) == kCMBlockBufferNoErr,
+            let buffer = block,
+            CMBlockBufferReplaceDataBytes(
+                with: bytes, blockBuffer: buffer, offsetIntoDestination: 0,
+                dataLength: bytes.count) == kCMBlockBufferNoErr
+        else { return nil }
+
+        var timing = CMSampleTimingInfo(
+            duration: CMTime(value: 1, timescale: CMTimeScale(audioSampleRate)),
+            presentationTimeStamp: time, decodeTimeStamp: .invalid)
+        var size = audioBytesPerFrame
+        var sample: CMSampleBuffer?
+        guard CMSampleBufferCreate(
+            allocator: kCFAllocatorDefault, dataBuffer: buffer, dataReady: true,
+            makeDataReadyCallback: nil, refcon: nil, formatDescription: format,
+            sampleCount: CMItemCount(frames), sampleTimingEntryCount: 1,
+            sampleTimingArray: &timing, sampleSizeEntryCount: 1, sampleSizeArray: &size,
+            sampleBufferOut: &sample) == noErr
+        else { return nil }
+        return sample
+    }
+
+    // MARK: - Settings
+
+    /// The coded frame size, read from one decoded frame at the head of the
+    /// file. Nil means "no picture", which an audio-only source really has and
+    /// an unreadable video track amounts to.
+    private static func dimensions(
+        of asset: AVURLAsset, track: AVAssetTrack, limit: CMTime
+    ) -> CMVideoDimensions? {
+        guard let reader = try? AVAssetReader(asset: asset) else { return nil }
+        reader.timeRange = CMTimeRange(
+            start: .zero,
+            duration: CMTimeMinimum(limit, CompositionBuilder.time(ReelTime.perSecond)))
+        let output = AVAssetReaderTrackOutput(
+            track: track,
+            outputSettings: [
+                kCVPixelBufferPixelFormatTypeKey as String: Int(kCVPixelFormatType_32BGRA)
+            ])
+        guard reader.canAdd(output) else { return nil }
+        reader.add(output)
+        guard reader.startReading() else { return nil }
+        defer { reader.cancelReading() }
+        guard let sample = output.copyNextSampleBuffer(),
+            let format = CMSampleBufferGetFormatDescription(sample)
+        else { return nil }
+        return CMVideoFormatDescriptionGetDimensions(format)
+    }
+
+    /// The encoder settings for the picture.
+    ///
+    /// **The size is the source's, exactly.** Not rounded to even, not scaled:
+    /// the compositor maps the model's `source_size` across whatever texture
+    /// arrives, so a reversed asset that is one pixel narrower than the
+    /// forward one would stretch the clip the moment it is reversed.
+    ///
+    /// **The rate is generous because this is an intermediate.** Its pixels
+    /// are encoded again on the way to the export, and a stingy intermediate
+    /// is a generation of loss the user did not ask for — so roughly double
+    /// `ExporterWriter`'s delivery figures, and HEVC past 1080p where the
+    /// bitrate saving is worth the slower encode.
+    private static func videoSettings(_ dimensions: CMVideoDimensions, fps: Fps) -> [String: Any] {
+        let width = Int(dimensions.width)
+        let height = Int(dimensions.height)
+        let rate = fps.double > 0 ? fps.double : 30
+        let hevc = width * height > 1920 * 1080
+        let bits = Int(
+            min(
+                max(Double(max(1, width * height)) * rate * (hevc ? 0.12 : 0.24), 2_000_000),
+                240_000_000))
+        var compression: [String: Any] = [
+            AVVideoAverageBitRateKey: bits,
+            // A keyframe at least every two seconds, for the same reason the
+            // export sets one: this file is scrubbed and seeked into on every
+            // preview frame.
+            AVVideoMaxKeyFrameIntervalDurationKey: 2.0,
+            AVVideoExpectedSourceFrameRateKey: Int(rate.rounded()),
+        ]
+        if !hevc { compression[AVVideoProfileLevelKey] = AVVideoProfileLevelH264HighAutoLevel }
+        return [
+            AVVideoCodecKey: hevc ? AVVideoCodecType.hevc : AVVideoCodecType.h264,
+            AVVideoWidthKey: width,
+            AVVideoHeightKey: height,
+            AVVideoColorPropertiesKey: [
+                AVVideoColorPrimariesKey: AVVideoColorPrimaries_ITU_R_709_2,
+                AVVideoTransferFunctionKey: AVVideoTransferFunction_ITU_R_709_2,
+                AVVideoYCbCrMatrixKey: AVVideoYCbCrMatrix_ITU_R_709_2,
+            ],
+            AVVideoCompressionPropertiesKey: compression,
+        ]
+    }
+
+    /// How much of the source one slice covers: as many frames as the budget
+    /// holds, turned back into time. An audio-only file has no frames to hold,
+    /// so it takes long slices and pays for very few readers.
+    private static func sliceDuration(dimensions: CMVideoDimensions?, fps: Fps) -> CMTime {
+        let rate = fps.double > 0 ? fps.double : 30
+        guard let dimensions = dimensions, dimensions.width > 0, dimensions.height > 0 else {
+            return CompositionBuilder.time(ReelTime.perSecond * 30)
+        }
+        let bytes = Int(dimensions.width) * Int(dimensions.height) * 4
+        let frames = min(max(bufferBudget / max(1, bytes), 4), 300)
+        let ticks = Ticks((Double(frames) / rate * Double(ReelTime.perSecond)).rounded())
+        return CompositionBuilder.time(max(ticks, 1))
+    }
+
+}
+
+// MARK: - Progress
+
+/// The sheet that stays up while reversed assets are rendered: a bar, the file
+/// being reversed, a Cancel that stops within one slice, and the report when
+/// it is over.
+///
+/// **Why a sheet and not a background job with a badge.** A reversed clip that
+/// has not been rendered draws a slate, so the timeline is telling the truth
+/// but the picture is missing — and a user who ticked Reverse two seconds ago
+/// needs to be told that the missing picture is being made, how far along it
+/// is, and how to stop it. The sheet is also what stops the timeline moving
+/// under a render: every editor action validates false while one is attached
+/// (`EditorViewController.validateUserInterfaceItem`), which is the same
+/// bargain Export and Consolidate Media strike.
+///
+/// It owns the run, so the render survives whatever the editor does next — the
+/// presenting controller retains the sheet while it is on screen, and nothing
+/// else holds the token.
+final class ReverseProgressSheetController: NSViewController {
+    /// Weak: the sheet is presented BY this document's editor, so a strong
+    /// reference would be a cycle for as long as it is up.
+    private weak var document: ProjectDocument?
+    private let jobs: [ReverseRenderer.Job]
+    private let token = ReverseRenderer.CancelToken()
+
+    private let bar = NSProgressIndicator()
+    private let statusLabel = NSTextField(wrappingLabelWithString: "Preparing…")
+    private let detailLabel = NSTextField(labelWithString: "")
+    /// Set in `loadView`; the only implicitly-unwrapped optionals here
+    /// (app/CLAUDE.md allows them for exactly this).
+    private var stopButton: NSButton!
+    private var closeButton: NSButton!
+
+    private var didStart = false
+    private var didFinish = false
+
+    init(document: ProjectDocument, jobs: [ReverseRenderer.Job]) {
+        self.document = document
+        self.jobs = jobs
+        super.init(nibName: nil, bundle: nil)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("ReverseProgressSheetController does not support NSCoder")
+    }
+
+    override func loadView() {
+        bar.style = .bar
+        bar.isIndeterminate = false
+        bar.minValue = 0
+        bar.maxValue = 1
+        bar.doubleValue = 0
+        bar.usesThreadedAnimation = true
+        bar.widthAnchor.constraint(equalToConstant: sheetWidth - sheetInset * 2).isActive = true
+
+        statusLabel.font = DS.sans(12)
+        statusLabel.textColor = DS.textMuted
+        statusLabel.preferredMaxLayoutWidth = sheetWidth - sheetInset * 2
+        statusLabel.stringValue =
+            jobs.count == 1
+            ? "Rendering a reversed copy of “\(jobs[0].name)”…"
+            : "Rendering reversed copies of \(jobs.count) files…"
+
+        detailLabel.font = DS.mono(11)
+        detailLabel.textColor = DS.textFaint
+        detailLabel.lineBreakMode = .byTruncatingMiddle
+        detailLabel.widthAnchor.constraint(equalToConstant: sheetWidth - sheetInset * 2)
+            .isActive = true
+
+        let content = NSStackView(views: [bar, statusLabel, detailLabel])
+        content.orientation = .vertical
+        content.alignment = .leading
+        content.spacing = 8
+
+        stopButton = StickerButton(
+            title: "Cancel", style: .secondary, target: self, action: #selector(stopClicked(_:)))
+        closeButton = StickerButton(
+            title: "Close", style: .primary, target: self, action: #selector(closeClicked(_:)))
+        // Hidden AND disabled while it runs: AppKit skips both when it looks
+        // for the Return key's target, so Cancel is the only live button until
+        // there is a result to read.
+        closeButton.isHidden = true
+        closeButton.isEnabled = false
+
+        view = makeSheetView(
+            title: "Reversing", hint: "AVFoundation cannot play a clip backwards, so Reelcut "
+                + "renders the reversed frames once and keeps them in the project package.",
+            content: content, buttonRow: makeButtonRow(cancel: stopButton, apply: closeButton))
+    }
+
+    /// Reversing a SECOND clip while this sheet is up leaves that one queued
+    /// and nothing running — `ensureReversedMedia` refuses to stack sheets. So
+    /// the document is asked to look again once this one is off the screen,
+    /// which is here rather than in `reverseRenderDidFinish` because a sheet
+    /// dismissed a moment ago is still `window.attachedSheet` and the next
+    /// presentation would be refused for the same reason. Media the user
+    /// stopped or that failed is remembered as refused, so this cannot loop.
+    override func viewDidDisappear() {
+        super.viewDidDisappear()
+        document?.ensureReversedMedia()
+    }
+
+    override func viewDidAppear() {
+        super.viewDidAppear()
+        guard !didStart else { return }
+        didStart = true
+        let jobs = self.jobs
+        let token = self.token
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            var rendered: [UInt32] = []
+            var failures: [String] = []
+            var cancelled = false
+            for (index, job) in jobs.enumerated() {
+                if token.isCancelled {
+                    cancelled = true
+                    break
+                }
+                DispatchQueue.main.async { self?.detailLabel.stringValue = job.name }
+                let result = ReverseRenderer(job: job).run(
+                    cancel: token,
+                    progress: { fraction in
+                        let overall = (Double(index) + fraction) / Double(jobs.count)
+                        DispatchQueue.main.async { self?.progressed(overall) }
+                    })
+                switch result {
+                case .success:
+                    rendered.append(job.media)
+                case .failure(let error):
+                    if case ReverseRenderer.ReverseError.cancelled = error {
+                        cancelled = true
+                    } else {
+                        failures.append("\(job.name): \(error.localizedDescription)")
+                    }
+                }
+                if cancelled { break }
+            }
+            let outcome = (rendered: rendered, failures: failures, cancelled: cancelled)
+            DispatchQueue.main.async { self?.finished(outcome) }
+        }
+    }
+
+    private func progressed(_ fraction: Double) {
+        guard !didFinish else { return }
+        bar.doubleValue = min(max(fraction, 0), 1)
+    }
+
+    /// The one exit for all three outcomes. The document is told before
+    /// anything is said on screen, because it is what republishes the
+    /// resolution and makes the preview stop drawing slates.
+    private func finished(
+        _ outcome: (rendered: [UInt32], failures: [String], cancelled: Bool)
+    ) {
+        didFinish = true
+        document?.reverseRenderDidFinish(
+            rendered: outcome.rendered, failures: outcome.failures, cancelled: outcome.cancelled)
+        guard !outcome.failures.isEmpty || outcome.cancelled else {
+            // Nothing to report and nothing to decide: the picture is back.
+            bar.doubleValue = 1
+            dismiss(self)
+            return
+        }
+        statusLabel.textColor = DS.textStrong
+        statusLabel.stringValue =
+            outcome.cancelled
+            ? "Stopped. Clips that are still reversed show a slate until their frames are "
+                + "rendered — reach the Speed section of the Video tab to try again."
+            : "\(outcome.failures.count) file"
+                + "\(outcome.failures.count == 1 ? "" : "s") could not be reversed. Those clips "
+                + "show a slate rather than play forwards."
+        detailLabel.stringValue = outcome.failures.first ?? ""
+        stopButton.isHidden = true
+        stopButton.isEnabled = false
+        closeButton.isHidden = false
+        closeButton.isEnabled = true
+    }
+
+    /// Cancelling stops inside the current slice and keeps the files already
+    /// finished; the ones left over stay pending, and their clips stay slated.
+    @objc private func stopClicked(_ sender: Any?) {
+        guard !didFinish else { return }
+        stopButton.isEnabled = false
+        detailLabel.stringValue = "Stopping…"
+        token.cancel()
+    }
+
+    @objc private func closeClicked(_ sender: Any?) {
+        dismiss(self)
+    }
+}

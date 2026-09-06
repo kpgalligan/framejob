@@ -88,8 +88,22 @@ enum InspectorTab: Int, CaseIterable {
 
     /// Whether the clip carries live audio: its media has a track AND this
     /// half of the clip is enabled (Detach Audio flips that, §6).
+    ///
+    /// A nest clip has no media of its own, so the media test cannot answer
+    /// for it — and "no" would be the wrong answer, because a nest clip's own
+    /// volume, mute and fades MULTIPLY every voice inside it
+    /// (`core/src/audio.rs`: turning a nest down turns everything in it
+    /// down). What it is asked instead is whether it has audio properties at
+    /// all, which is the core's own answer to the same question: `nest` gives
+    /// the clip an `AudioProps` exactly when something inside it can make a
+    /// sound (`edit_nest.rs`) and `set_audio` errors with "clip N has no
+    /// audio properties" when it did not. Walking the contents here would be
+    /// a second copy of that rule, free to drift from the one the writes go
+    /// through.
     static func hasAudio(_ clip: ClipSnapshot, in snapshot: ProjectSnapshot) -> Bool {
-        guard clip.enabled.audio, let media = snapshot.media(for: clip) else { return false }
+        guard clip.enabled.audio else { return false }
+        if case .nest = clip.source { return clip.audio != nil }
+        guard let media = snapshot.media(for: clip) else { return false }
         return media.hasAudio
     }
 

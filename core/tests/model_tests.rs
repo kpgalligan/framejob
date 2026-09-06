@@ -34,8 +34,9 @@ use reelcut_core::ffi_agent::{
 };
 use reelcut_core::ffi_edit::rc_project_apply;
 use reelcut_core::ffi_query::{
-    rc_export_presets, rc_export_settings, rc_project_clip_state, rc_project_composition_plan,
-    rc_project_duration, rc_project_frame_recipe, rc_project_snap_candidates, rc_snap_resolve,
+    rc_export_presets, rc_export_settings, rc_op_names, rc_project_clip_state,
+    rc_project_composition_plan, rc_project_duration, rc_project_frame_recipe,
+    rc_project_snap_candidates, rc_snap_resolve,
 };
 
 /// Every `TransitionKind`, every `ShapeKind`, every `Curve` — the wire
@@ -54,6 +55,10 @@ const TRANSITION_KINDS: [&str; 10] = [
     "zoom",
 ];
 const SHAPE_KINDS: [&str; 4] = ["rectangle", "ellipse", "line", "arrow"];
+const FILTER_KINDS: [&str; 7] = [
+    "blur", "sharpen", "pixelate", "sepia", "noir", "vignette", "invert",
+];
+const SPOT_SHAPES: [&str; 2] = ["rect", "ellipse"];
 const CURVES: [&str; 4] = ["linear", "ease_in", "ease_out", "ease_in_out"];
 
 // ---- the schema round trip -----------------------------------------------
@@ -90,7 +95,7 @@ fn full_project() -> Value {
         4,
         0,
         12_000_000,
-        json!({ "kind": "media", "media": 1, "in": 3_000_000 }),
+        json!({ "kind": "media", "media": 1, "in": 3_000_000, "reversed": true }),
     );
     clip10["enabled"] = json!({ "video": true, "audio": false });
     clip10["speed"] = json!(1.5);
@@ -101,12 +106,24 @@ fn full_project() -> Value {
         "shadow": { "color": [0.0, 0.0, 0.0, 1.0], "opacity": 0.5, "blur": 12.0,
                     "angle": 315.0, "distance": 8.0 },
         "color": { "brightness": 0.1, "contrast": -0.2, "saturation": 0.3, "hue": 45.0 },
-        "chroma": { "key": [0.0, 1.0, 0.0], "tolerance": 0.2, "softness": 0.1, "spill": 0.5 }
+        "chroma": { "key": [0.0, 1.0, 0.0], "tolerance": 0.2, "softness": 0.1, "spill": 0.5 },
+        "filters": [
+            { "kind": "blur", "amount": 0.25 },
+            { "kind": "sharpen", "amount": 0.5 },
+            { "kind": "pixelate", "amount": 0.75 },
+            { "kind": "sepia", "amount": 1.0 }
+        ],
+        "reflection": { "opacity": 0.35, "height": 0.5, "gap": 4.0, "falloff": 0.8 },
+        "spotlight": { "shape": "rect", "x": -20.0, "y": 30.0, "width": 480.0,
+                       "height": 270.0, "feather": 40.0, "dim": 0.6, "zoom": 1.5 }
     });
     clip10["audio"] = json!({
         "volume": 1.25, "muted": false, "fade_in": 300_000, "fade_out": 600_000,
         "duck": { "level": 0.2, "attack": 300_000, "release": 600_000 },
-        "mono": true, "keep_pitch": false
+        "mono": true, "keep_pitch": false,
+        "pan": -0.5, "noise_reduction": 0.25,
+        "compressor": { "threshold_db": -24.0, "ratio": 4.0, "attack": 6000,
+                        "release": 120_000, "makeup_db": 3.0 }
     });
     // One action per curve, laid out end to end inside the clip.
     let ends = [
@@ -146,7 +163,10 @@ fn full_project() -> Value {
         "corner_radius": 0.0,
         "shadow": null,
         "color": { "brightness": 0.0, "contrast": 0.0, "saturation": 0.0, "hue": 0.0 },
-        "chroma": null
+        "chroma": null,
+        "filters": [],
+        "reflection": null,
+        "spotlight": null
     });
 
     // Clip 21: an image, with the audio group absent (`null`) even though
@@ -236,22 +256,48 @@ fn full_project() -> Value {
         })
         .collect();
 
-    // Clip 40: a nest (M3) — parsed and round-tripped, nothing more.
+    // Clip 40: a nest, naming nest 60 by id — the format version 2 shape.
     let clip40 = base_clip(
         40,
         5,
         7_800_000,
         1_200_000,
-        json!({ "kind": "nest", "project": "Intro.reelcut" }),
+        json!({ "kind": "nest", "project": 60 }),
     );
 
-    let mut clips = vec![clip10, clip20, clip21, clip22, clip41, clip42];
+    // Clip 43: the filter kinds and the spotlight shape clip 10 did not
+    // reach. Four filters is the cap, and there are seven kinds, so no one
+    // clip can carry them all.
+    let mut clip43 = base_clip(
+        43,
+        5,
+        9_000_000,
+        600_000,
+        json!({ "kind": "image", "media": 3 }),
+    );
+    clip43["video"] = json!({
+        "x": 0.0, "y": 0.0, "scale": 1.0, "rotation": 0.0, "opacity": 1.0,
+        "crop": { "l": 0.0, "t": 0.0, "r": 0.0, "b": 0.0 },
+        "corner_radius": 0.0, "shadow": null,
+        "color": { "brightness": 0.0, "contrast": 0.0, "saturation": 0.0, "hue": 0.0 },
+        "chroma": null,
+        "filters": [
+            { "kind": "noir", "amount": 1.0 },
+            { "kind": "vignette", "amount": 0.4 },
+            { "kind": "invert", "amount": 0.2 }
+        ],
+        "reflection": null,
+        "spotlight": { "shape": "ellipse", "x": 0.0, "y": 0.0, "width": 320.0,
+                       "height": 320.0, "feather": 0.0, "dim": 1.0, "zoom": 1.0 }
+    });
+
+    let mut clips = vec![clip10, clip20, clip21, clip22, clip41, clip42, clip43];
     clips.extend(shape_clips);
     clips.extend(transition_clips);
     clips.push(clip40);
 
     json!({
-        "version": 1,
+        "version": 2,
         "canvas": {
             "width": 1280, "height": 720, "fps": [30000, 1001],
             "background": [0.1, 0.2, 0.3, 1.0],
@@ -276,6 +322,35 @@ fn full_project() -> Value {
         "markers": [
             { "id": 50, "time": 6_000_000, "name": "Intro", "color": "red", "chapter": true },
             { "id": 51, "time": 12_000_000, "name": "", "color": "blue", "chapter": false }
+        ],
+        // Two nests, one inside the other: every id here lives in the same
+        // number space as everything above it, which is the whole point of
+        // the shape (`Nest` in model.rs).
+        "nests": [
+            {
+                "id": 60, "name": "Intro", "width": 1280, "height": 720,
+                "tracks": [
+                    { "id": 61, "name": "Nested", "hidden": false,
+                      "muted": false, "locked": false }
+                ],
+                "clips": [
+                    base_clip(62, 61, 0, 1_200_000,
+                              json!({ "kind": "media", "media": 1, "in": 0,
+                                      "reversed": false })),
+                    base_clip(63, 61, 1_200_000, 600_000,
+                              json!({ "kind": "nest", "project": 70 }))
+                ]
+            },
+            {
+                "id": 70, "name": "Logo", "width": 640, "height": 360,
+                "tracks": [
+                    { "id": 71, "name": "Nested", "hidden": false,
+                      "muted": false, "locked": false }
+                ],
+                "clips": [
+                    base_clip(72, 71, 0, 600_000, json!({ "kind": "image", "media": 3 }))
+                ]
+            }
         ],
         "next_id": 100
     })
@@ -378,8 +453,15 @@ fn every_enum_variant_is_covered_by_the_round_trip() {
     // to the lists above, this fails before the round trip can pass by
     // simply never mentioning it.
     let written = Handle::from_value(&full_project()).to_json();
-    for kind in TRANSITION_KINDS.iter().chain(SHAPE_KINDS.iter()) {
+    for kind in TRANSITION_KINDS
+        .iter()
+        .chain(SHAPE_KINDS.iter())
+        .chain(FILTER_KINDS.iter())
+    {
         assert_contains(&written, &format!("\"kind\": \"{kind}\""));
+    }
+    for shape in SPOT_SHAPES {
+        assert_contains(&written, &format!("\"shape\": \"{shape}\""));
     }
     for curve in CURVES {
         assert_contains(&written, &format!("\"curve\": \"{curve}\""));
@@ -406,7 +488,7 @@ fn a_new_project_is_the_documented_empty_project() {
     assert_eq!(
         project.value(),
         json!({
-            "version": 1,
+            "version": 2,
             "canvas": {
                 "width": 1280, "height": 720, "fps": [30000, 1001],
                 "background": [0.0, 0.0, 0.0, 1.0],
@@ -417,7 +499,8 @@ fn a_new_project_is_the_documented_empty_project() {
                          "muted": false, "locked": false }],
             "clips": [],
             "markers": [],
-            "next_id": 2
+            "next_id": 2,
+            "nests": []
         })
     );
 }
@@ -441,7 +524,7 @@ fn an_empty_object_is_an_empty_project() {
     assert_eq!(
         project,
         json!({
-            "version": 1,
+            "version": 2,
             "canvas": {
                 "width": 1920, "height": 1080, "fps": [30, 1],
                 "background": [0.0, 0.0, 0.0, 1.0],
@@ -451,7 +534,8 @@ fn an_empty_object_is_an_empty_project() {
             "tracks": [],
             "clips": [],
             "markers": [],
-            "next_id": 1
+            "next_id": 1,
+            "nests": []
         }),
         "an empty project object did not take the documented defaults"
     );
@@ -475,7 +559,10 @@ fn omitted_optional_keys_take_the_documented_defaults() {
     }))
     .value();
 
-    assert_eq!(at(&project, "/version"), &json!(1));
+    assert_eq!(at(&project, "/version"), &json!(2));
+    // A file that never heard of nests reads as one with none, which is
+    // what "every new field carries a serde default" buys.
+    assert_eq!(at(&project, "/nests"), &json!([]));
     assert_eq!(
         at(&project, "/media/0"),
         &json!({
@@ -528,8 +615,9 @@ fn empty_property_objects_take_the_documented_defaults() {
               "video": {}, "audio": {}, "text": {}, "shape": {} },
             { "id": 3, "track": 1, "start": 600_000, "duration": 600_000,
               "source": { "kind": "text" },
-              "video": { "shadow": {}, "chroma": {} },
-              "audio": { "duck": {} },
+              "video": { "shadow": {}, "chroma": {}, "filters": [{}],
+                         "reflection": {}, "spotlight": {} },
+              "audio": { "duck": {}, "compressor": {} },
               "text": { "outline": {}, "backdrop": {} },
               "shape": { "stroke": {} } }
         ],
@@ -544,7 +632,8 @@ fn empty_property_objects_take_the_documented_defaults() {
             "crop": { "l": 0.0, "t": 0.0, "r": 0.0, "b": 0.0 },
             "corner_radius": 0.0, "shadow": null,
             "color": { "brightness": 0.0, "contrast": 0.0, "saturation": 0.0, "hue": 0.0 },
-            "chroma": null
+            "chroma": null,
+            "filters": [], "reflection": null, "spotlight": null
         }),
         "VideoProps defaults"
     );
@@ -552,7 +641,8 @@ fn empty_property_objects_take_the_documented_defaults() {
         at(&project, "/clips/0/audio"),
         &json!({
             "volume": 1.0, "muted": false, "fade_in": 0, "fade_out": 0,
-            "duck": null, "mono": false, "keep_pitch": true
+            "duck": null, "mono": false, "keep_pitch": true,
+            "pan": 0.0, "compressor": null, "noise_reduction": 0.0
         }),
         "AudioProps defaults"
     );
@@ -587,6 +677,29 @@ fn empty_property_objects_take_the_documented_defaults() {
         at(&project, "/clips/1/video/chroma"),
         &json!({ "key": [0.0, 1.0, 0.0], "tolerance": 0.2, "softness": 0.1, "spill": 0.5 }),
         "Chroma defaults"
+    );
+    assert_eq!(
+        at(&project, "/clips/1/video/reflection"),
+        &json!({ "opacity": 0.35, "height": 0.5, "gap": 0.0, "falloff": 1.0 }),
+        "Reflection defaults"
+    );
+    assert_eq!(
+        at(&project, "/clips/1/video/spotlight"),
+        &json!({ "shape": "rect", "x": 0.0, "y": 0.0, "width": 480.0, "height": 270.0,
+                 "feather": 40.0, "dim": 0.6, "zoom": 1.0 }),
+        "Spotlight defaults"
+    );
+    assert_eq!(
+        at(&project, "/clips/1/video/filters/0"),
+        &json!({ "kind": "blur", "amount": 0.5 }),
+        "Filter defaults"
+    );
+    assert_eq!(
+        at(&project, "/clips/1/audio/compressor"),
+        // 10 ms attack and 200 ms release, in ticks at 600 000/s.
+        &json!({ "threshold_db": -18.0, "ratio": 3.0, "attack": 6000,
+                 "release": 120_000, "makeup_db": 0.0 }),
+        "Compressor defaults"
     );
     assert_eq!(
         at(&project, "/clips/1/audio/duck"),
@@ -699,10 +812,10 @@ fn an_unknown_source_kind_is_a_schema_error() {
 
 #[test]
 fn a_newer_format_version_is_refused_and_says_so() {
-    let msg = Handle::try_from_value(&json!({ "version": 2 }))
+    let msg = Handle::try_from_value(&json!({ "version": 3 }))
         .expect_err("a newer format version must be refused");
-    assert_contains(&msg, "version 2 is newer than this build understands");
-    assert_contains(&msg, "(version 1)");
+    assert_contains(&msg, "version 3 is newer than this build understands");
+    assert_contains(&msg, "(version 2)");
     assert_contains(&msg, "update Reelcut");
 
     // The gate reads the RAW json, so it has to cope with however the
@@ -710,9 +823,9 @@ fn a_newer_format_version_is_refused_and_says_so() {
     // as a JSON float is the case that would otherwise slip past `as_u64`,
     // fall back to "current", and reach the user as a schema error about a
     // field this build has never heard of.
-    let msg = Handle::try_from_value(&json!({ "version": 2.0 }))
+    let msg = Handle::try_from_value(&json!({ "version": 3.0 }))
         .expect_err("a newer format version written as a float must be refused");
-    assert_contains(&msg, "version 2 is newer than this build understands");
+    assert_contains(&msg, "version 3 is newer than this build understands");
 
     // A version that is not a number at all is named rather than ignored.
     let msg = Handle::try_from_value(&json!({ "version": "two" }))
@@ -721,13 +834,18 @@ fn a_newer_format_version_is_refused_and_says_so() {
 }
 
 #[test]
-fn version_one_is_accepted_and_the_writer_stamps_the_current_version() {
-    assert_eq!(
-        Handle::from_value(&json!({ "version": 1 })).value()["version"],
-        json!(1)
-    );
+fn every_prior_version_is_accepted_and_the_writer_stamps_the_current_one() {
+    // The reader's promise (spec §5.6): a file from an older build opens,
+    // and what comes back out is the current version.
+    for version in [1, 2] {
+        assert_eq!(
+            Handle::from_value(&json!({ "version": version })).value()["version"],
+            json!(2),
+            "version {version} did not read back as the current version"
+        );
+    }
     // Absent, the version defaults to current rather than to 0.
-    assert_eq!(Handle::from_json("{}").value()["version"], json!(1));
+    assert_eq!(Handle::from_json("{}").value()["version"], json!(2));
 }
 
 #[test]
@@ -1638,6 +1756,12 @@ fn sweep_every_export_with_nulls() -> Vec<String> {
     let text = cstring("00:00:01");
     assert!(unsafe { rc_timecode_parse(text.as_ptr(), 30, 1, ptr::null_mut()) });
     cover("rc_timecode_parse");
+
+    // rc_op_names takes no pointers at all, so "NULL-safe" here just means
+    // it answers its documented never-NULL string.
+    let ops = take_string(unsafe { rc_op_names() }).expect("op names are never NULL");
+    assert_contains(&ops, "\"add_shape_clip\"");
+    cover("rc_op_names");
 
     let presets = take_string(unsafe { rc_export_presets() }).expect("presets are never NULL");
     assert_contains(&presets, "h264_1080p");

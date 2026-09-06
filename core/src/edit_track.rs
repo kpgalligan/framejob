@@ -61,7 +61,9 @@ const MEDIA_KEYS: [&str; 10] = [
 // ---- helpers -------------------------------------------------------------
 
 /// Whether `clip` shows `media`. The three media-bound sources name an id;
-/// text, shape and nest do not (spec §5.2).
+/// text, shape and nest do not (spec §5.2) — a nest clip shows a GROUP, and
+/// what that group references is asked of its own clips, which live in the
+/// same id space and are swept alongside the timeline's.
 fn uses_media(clip: &Clip, media: u32) -> bool {
     matches!(
         clip.source,
@@ -646,13 +648,21 @@ impl Project {
     /// an id that is gone is what `validate` rejects.
     pub fn remove_media(&self, media: u32, with_clips: bool) -> Result<Option<Project>, String> {
         self.require_media(media)?;
-        let used = self.clips.iter().any(|c| uses_media(c, media));
+        // A nest references the project's `media[]` like everything else
+        // (spec §5.2, one id space), so a clip INSIDE one counts as usage
+        // and is removed with `with_clips` — but the nest CLIP is not
+        // itself a user of the media and stays put. Taking it out would
+        // throw away everything else in the group over one file.
+        let used = self.every_clip().any(|c| uses_media(c, media));
         if used && !with_clips {
             return Ok(None);
         }
 
         let mut next = self.clone();
         next.clips.retain(|c| !uses_media(c, media));
+        for nest in next.nests.iter_mut() {
+            nest.clips.retain(|c| !uses_media(c, media));
+        }
         next.media.retain(|m| m.id != media);
         self.finish(next)
     }

@@ -1,16 +1,28 @@
 import AppKit
 
 /// The Audio tab (spec §4.3): volume with its dB read-out, mute, the two
-/// fades, ducking, mix-to-mono and Detach Audio.
+/// fades, ducking, noise reduction, the compressor, pan, mix-to-mono and
+/// Detach Audio.
 ///
 /// Everything here is one `set_audio` patch over the selection, except Detach
 /// Audio, which is a clip-level op the editor already owns (⌥⌘D) — the pane
 /// hands it back through `onCommand` rather than re-implementing it.
+///
+/// The last three sections are in SIGNAL ORDER rather than in order of
+/// familiarity: noise reduction, then the compressor, then the pan in Mix, is
+/// the order `AudioDSPChain` actually runs them in, and the order matters to
+/// what the numbers mean (the compressor's threshold is read against a signal
+/// the reducer has already cleaned). Volume, the fades and ducking come first
+/// in the pane and LAST in the signal, being the fader the core folds into the
+/// plan's envelope.
 final class AudioPane: InspectorPaneView {
     override var tab: InspectorTab { .audio }
 
     override func makeSections() -> [InspectorSection] {
-        [volumeSection(), fadeSection(), duckSection(), mixSection()]
+        [
+            volumeSection(), fadeSection(), duckSection(), noiseSection(),
+            compressorSection(), mixSection(),
+        ]
     }
 
     // MARK: Volume
@@ -137,8 +149,155 @@ final class AudioPane: InspectorPaneView {
             ])
     }
 
+    // MARK: Noise reduction
+
+    /// "Remove background noise" (spec §4.2's M3 line).
+    ///
+    /// The read-out states the strongest attenuation any part of the spectrum
+    /// can receive, which is the one number that describes this honestly: the
+    /// filter is a spectral attenuator over a noise floor it measures from the
+    /// clip itself, so it never removes MORE than the floor it found, and the
+    /// amount sets how far a bin may be pushed down. It is not a gate and does
+    /// not silence anything between words; see
+    /// `AudioNoiseReductionStage` for what it does, sample by sample.
+    private func noiseSection() -> InspectorSection {
+        let binding = self.binding
+        return InspectorSection(
+            id: "audio.noise", title: "Noise Reduction",
+            reset: { binding.apply("Noise Reduction", audio: AudioPatch(noiseReduction: 0)) },
+            rows: [
+                inspectorValueRow(
+                    "Remove noise", binding, name: "Remove Background Noise", unit: "%",
+                    decimals: 0, min: 0, max: 100, quick: [0, 25, 50, 75, 100],
+                    read: { binding.audioProps.noiseReduction * 100 },
+                    ops: { binding.ops(audio: AudioPatch(noiseReduction: $0 / 100)) },
+                    mixed: { binding.mixedAudio { $0.noiseReduction } }),
+                inspectorRow(
+                    "Depth",
+                    [
+                        inspectorReadout {
+                            let amount = binding.audioProps.noiseReduction
+                            if amount <= 0 { return "off" }
+                            if amount >= 1 { return "floor removed" }
+                            return String(format: "%.0f dB at most", -20 * log10(1 - amount))
+                        }
+                    ]),
+            ])
+    }
+
+    // MARK: Compressor
+
+    /// "Smooth volume levels" (spec §4.2's M3 line): a downward compressor
+    /// across the clip.
+    ///
+    /// Every control writes a whole `CompressorProps`, the way Ducking writes
+    /// a whole `DuckProps` — the patch replaces the object, so each edit
+    /// re-sends the other four values as they stand.
+    ///
+    /// The two times are in MILLISECONDS and are not snapped to the frame
+    /// grid, unlike every other time in this pane. A compressor's attack is
+    /// 10 ms where a frame is 33; snapping it would round the default to
+    /// nothing. The core agrees — `check_audio` asks only that they are
+    /// positive.
+    private func compressorSection() -> InspectorSection {
+        let binding = self.binding
+        func current() -> CompressorProps { binding.audioProps.compressor ?? CompressorProps() }
+        func ops(_ next: CompressorProps) -> [ReelOp] {
+            binding.ops(audio: AudioPatch(compressor: .some(next)))
+        }
+        func on() -> Bool { binding.audioProps.compressor != nil }
+        func ticks(_ milliseconds: Double) -> Ticks {
+            Ticks((max(milliseconds, 0) / 1000 * Double(ReelTime.perSecond)).rounded())
+        }
+        func milliseconds(_ ticks: Ticks) -> Double {
+            Double(ticks) / Double(ReelTime.perSecond) * 1000
+        }
+        return InspectorSection(
+            id: "audio.compressor", title: "Compressor",
+            reset: { binding.apply("Compressor", audio: AudioPatch(compressor: .some(nil))) },
+            rows: [
+                inspectorCheckRow(
+                    "Smooth volume levels", binding, name: "Compressor",
+                    read: on,
+                    ops: { value in
+                        binding.ops(
+                            audio: AudioPatch(
+                                compressor: value ? .some(CompressorProps()) : .some(nil)))
+                    },
+                    mixed: { binding.mixedAudio { $0.compressor != nil } }),
+                inspectorValueRow(
+                    "Threshold", binding, name: "Compressor Threshold", unit: " dB", decimals: 1,
+                    min: -60, max: 0, quick: [-30, -24, -18, -12, -6],
+                    read: { current().thresholdDb },
+                    ops: { value in
+                        ops(
+                            CompressorProps(
+                                thresholdDb: value, ratio: current().ratio,
+                                attack: current().attack, release: current().release,
+                                makeupDb: current().makeupDb))
+                    },
+                    enabled: on),
+                inspectorValueRow(
+                    "Ratio", binding, name: "Compressor Ratio", unit: ":1", decimals: 1, min: 1,
+                    max: 20, quick: [1.5, 2, 3, 4, 8, 20],
+                    read: { current().ratio },
+                    ops: { value in
+                        ops(
+                            CompressorProps(
+                                thresholdDb: current().thresholdDb, ratio: value,
+                                attack: current().attack, release: current().release,
+                                makeupDb: current().makeupDb))
+                    },
+                    enabled: on),
+                inspectorValueRow(
+                    "Attack", binding, name: "Compressor Attack", unit: " ms", decimals: 0, min: 0,
+                    max: 200, quick: [1, 5, 10, 30, 100],
+                    read: { milliseconds(current().attack) },
+                    ops: { value in
+                        ops(
+                            CompressorProps(
+                                thresholdDb: current().thresholdDb, ratio: current().ratio,
+                                attack: ticks(value), release: current().release,
+                                makeupDb: current().makeupDb))
+                    },
+                    enabled: on),
+                inspectorValueRow(
+                    "Release", binding, name: "Compressor Release", unit: " ms", decimals: 0,
+                    min: 10, max: 2000, quick: [50, 100, 200, 500, 1000],
+                    read: { milliseconds(current().release) },
+                    ops: { value in
+                        ops(
+                            CompressorProps(
+                                thresholdDb: current().thresholdDb, ratio: current().ratio,
+                                attack: current().attack, release: ticks(value),
+                                makeupDb: current().makeupDb))
+                    },
+                    enabled: on),
+                inspectorValueRow(
+                    "Makeup", binding, name: "Compressor Makeup", unit: " dB", decimals: 1, min: 0,
+                    max: 24, quick: [0, 3, 6, 12],
+                    read: { current().makeupDb },
+                    ops: { value in
+                        ops(
+                            CompressorProps(
+                                thresholdDb: current().thresholdDb, ratio: current().ratio,
+                                attack: current().attack, release: current().release,
+                                makeupDb: value))
+                    },
+                    enabled: on),
+            ])
+    }
+
     // MARK: Mix
 
+    /// Pan lives here rather than in a section of its own because it is a
+    /// placement control, next to the other one.
+    ///
+    /// It is a BALANCE on a stereo clip — one gain per channel, unity at the
+    /// centre, constant power across the sweep (`AudioPanLaw`) — and it is
+    /// inaudible on a clip whose source is mono, because the widening to
+    /// stereo happens after the point where the pan is applied. The read-out
+    /// says which side, so "0" is never ambiguous.
     private func mixSection() -> InspectorSection {
         let binding = self.binding
         let detach = OptionButtonControl(
@@ -150,7 +309,24 @@ final class AudioPane: InspectorPaneView {
         detach.toolTip = "Move the audio to its own clip on the track below (⌥⌘D)"
         return InspectorSection(
             id: "audio.mix", title: "Mix",
+            reset: { binding.apply("Mix", audio: AudioPatch(mono: false, pan: 0)) },
             rows: [
+                inspectorValueRow(
+                    "Pan", binding, name: "Pan", unit: "", decimals: 0, min: -100, max: 100,
+                    quick: [-100, -50, 0, 50, 100],
+                    read: { binding.audioProps.pan * 100 },
+                    ops: { binding.ops(audio: AudioPatch(pan: $0 / 100)) },
+                    mixed: { binding.mixedAudio { $0.pan } }),
+                inspectorRow(
+                    "Position",
+                    [
+                        inspectorReadout {
+                            let pan = binding.audioProps.pan
+                            if abs(pan) < 0.005 { return "centre" }
+                            return String(
+                                format: "%@ %.0f", pan < 0 ? "left" : "right", abs(pan) * 100)
+                        }
+                    ]),
                 inspectorCheckRow(
                     "Mix to mono", binding, name: "Mix to Mono",
                     read: { binding.audioProps.mono },

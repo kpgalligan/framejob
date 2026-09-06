@@ -1,13 +1,13 @@
 //! The clip and action ops — spec §6, tables "Clips" and "Actions".
 //!
 //! One `impl Project` block holding every edit that adds, places, trims,
-//! splits, copies or re-describes a clip, plus the action ops. The four
-//! property patches are the OTHER half of the clip surface and live in
-//! `edit_props.rs`, with the range checks that police them: this file
-//! decides where a clip sits, that one decides what it looks like.
-//! `edit.rs` dispatches to both by name; nothing here knows about JSON op
-//! envelopes, and nothing here mutates `self` — an edit clones, changes
-//! the clone, and hands it back (spec §5.5).
+//! splits, copies or re-describes a clip. The four property patches are the
+//! OTHER half of the clip surface and live in `edit_props.rs`, with the
+//! range checks that police them: this file decides where a clip sits, that
+//! one decides what it looks like. The action ops, which were here, are
+//! `edit_action.rs`. `edit.rs` dispatches to all three by name; nothing
+//! here knows about JSON op envelopes, and nothing here mutates `self` — an
+//! edit clones, changes the clone, and hands it back (spec §5.5).
 //!
 //! Three rules run through all of it:
 //!
@@ -37,9 +37,8 @@ use serde_json::Value;
 
 use crate::actions::{self, Evaluated, MAX_PATCH_DEPTH};
 use crate::edit_props::{check_shape, check_text, merge_group, Group, SCALE_MAX, SCALE_MIN};
-use crate::export::describe;
 use crate::model::{
-    Action, AudioProps, Clip, Curve, Enabled, Media, MediaKind, Project, ShapeProps, Source,
+    Action, AudioProps, Clip, Enabled, Media, MediaKind, Project, ShapeKind, ShapeProps, Source,
     TextProps, Track, Transition, TransitionKind, VideoProps,
 };
 use crate::time::{self, Ticks, TIMESCALE};
@@ -48,10 +47,6 @@ use crate::time::{self, Ticks, TIMESCALE};
 /// image whose descriptor carries no duration. Five seconds is a screencast editor's
 /// title default and long enough to read.
 const DEFAULT_CLIP_DURATION: Ticks = 5 * TIMESCALE;
-
-/// Default duration for `add_action`: one second of animation, the length
-/// the Actions table offers before the user drags either edge.
-const DEFAULT_ACTION_DURATION: Ticks = TIMESCALE;
 
 /// Speed range, matching the inspector's ×0.1 – ×10 (spec §4.3). Outside
 /// it, `scaleTimeRange` and the time-pitch unit stop producing anything
@@ -96,18 +91,6 @@ fn content_length(clip: &Clip) -> Ticks {
 
 pub(crate) fn clip_end(clip: &Clip) -> Ticks {
     clip.start.saturating_add(clip.duration)
-}
-
-/// Whether `[start, start+duration)` touches any action on the clip other
-/// than `skip` (the action being edited). Actions on a clip may not overlap
-/// (spec §5.4); this is the test both `add_action` and `set_action` refuse
-/// on.
-fn actions_overlap(actions: &[Action], skip: Option<u32>, start: Ticks, duration: Ticks) -> bool {
-    let end = start.saturating_add(duration);
-    actions
-        .iter()
-        .filter(|a| Some(a.id) != skip)
-        .any(|a| start < a.start.saturating_add(a.duration) && a.start < end)
 }
 
 /// Gives every clip that now overlaps its predecessor and has no
@@ -172,29 +155,6 @@ fn narrow_to(state: &Value, shape: &Value, depth: u32) -> Value {
     Value::Object(out)
 }
 
-/// Removes from `value` every key the incoming `patch` set to `null` —
-/// `set_action_end`'s delete rule (spec §6). Only keys the patch mentions
-/// are touched, so a `null` that was already in the end patch (animating a
-/// shadow away, say) survives untouched.
-fn prune_removed(value: &mut Value, patch: &Value, depth: u32) {
-    let Value::Object(patched) = patch else {
-        return;
-    };
-    let Value::Object(target) = value else {
-        return;
-    };
-    if depth >= MAX_PATCH_DEPTH {
-        return;
-    }
-    for (key, sub) in patched {
-        if sub.is_null() {
-            target.remove(key);
-        } else if let Some(slot) = target.get_mut(key) {
-            prune_removed(slot, sub, depth + 1);
-        }
-    }
-}
-
 /// Cuts `clip_id` in two at project time `at`, in place. Returns false —
 /// and changes nothing — when `at` is not strictly inside the clip, which
 /// is the spec's refusal.
@@ -219,7 +179,12 @@ fn split_clip(project: &mut Project, clip_id: u32, at: Ticks) -> bool {
     second.duration = clip_end(&original).saturating_sub(at);
     // The cut consumes `clip_t` of timeline, which is `clip_t * speed` of
     // source; a still's frozen frame and the sourceless kinds do not move.
-    if let Source::Media { media, r#in } = original.source {
+    if let Source::Media {
+        media,
+        r#in,
+        reversed,
+    } = original.source
+    {
         let advance = (clip_t as f64 * original.speed).round();
         let advance = if advance.is_finite() {
             advance as Ticks
@@ -229,6 +194,7 @@ fn split_clip(project: &mut Project, clip_id: u32, at: Ticks) -> bool {
         second.source = Source::Media {
             media,
             r#in: r#in.saturating_add(advance).max(0),
+            reversed,
         };
     }
     // Presence of a group is a fact about the clip, so an audio-only clip
@@ -422,7 +388,14 @@ impl Project {
                         found.duration
                     ));
                 }
-                (Source::Media { media, r#in: 0 }, duration)
+                (
+                    Source::Media {
+                        media,
+                        r#in: 0,
+                        reversed: false,
+                    },
+                    duration,
+                )
             }
         };
 
@@ -507,7 +480,7 @@ impl Project {
 
     /// A shape clip at `at` on `track`: the default stroked box, five
     /// seconds by default, with `shape` merged over it as a `set_shape`
-    /// patch (spec §6).
+    /// patch (spec §6). An arrow is created with its head on.
     pub fn add_shape_clip(
         &self,
         track: u32,
@@ -518,11 +491,25 @@ impl Project {
         let props = match shape {
             None => ShapeProps::default(),
             Some(patch) => {
-                let merged = merge_group(
-                    &actions::to_json(&ShapeProps::default()),
-                    patch,
-                    Group::Shape,
-                )?;
+                // An arrow with `arrow_end: false` draws as a plain diagonal
+                // line, which is not what asking for an arrow means and not
+                // what spec §5.2's own arrow example shows. The head is
+                // switched on HERE, in the creation preset, rather than in
+                // `ShapeProps::default()`: that default is also the base a
+                // stored shape is deserialized against and the value a
+                // later `set_shape { "kind": "arrow" }` merges into, and a
+                // patch that re-paints a field the caller did not name
+                // would break the merge contract. Merging the patch over
+                // this preset (not under it) keeps an explicit
+                // `"arrow_end": false` winning.
+                let kind = patch
+                    .get("kind")
+                    .and_then(|value| serde_json::from_value(value.clone()).ok());
+                let base = ShapeProps {
+                    arrow_end: matches!(kind, Some(ShapeKind::Arrow)),
+                    ..ShapeProps::default()
+                };
+                let merged = merge_group(&actions::to_json(&base), patch, Group::Shape)?;
                 let props: ShapeProps = serde_json::from_value(merged)
                     .map_err(|e| format!("shape patch does not match the schema: {e}"))?;
                 check_shape(&props)?;
@@ -750,7 +737,12 @@ impl Project {
 
         let delta = to.saturating_sub(target.start);
         let mut moved = target.clone();
-        if let Source::Media { media, r#in } = target.source {
+        if let Source::Media {
+            media,
+            r#in,
+            reversed,
+        } = target.source
+        {
             let advance = (delta as f64 * target.speed).round();
             let advance = if advance.is_finite() {
                 advance as Ticks
@@ -760,6 +752,7 @@ impl Project {
             moved.source = Source::Media {
                 media,
                 r#in: r#in.saturating_add(advance).max(0),
+                reversed,
             };
         }
         moved.start = to;
@@ -1009,6 +1002,49 @@ impl Project {
         self.finish(next)
     }
 
+    /// Plays a media clip back to front, or forward again (spec §6).
+    ///
+    /// The core does no pixel work, so this only records a FACT about the
+    /// clip: neither the plan nor the recipe changes, and Swift resolves it
+    /// by substituting a pre-rendered reversed asset for this media's
+    /// segments (spec §11).
+    ///
+    /// The in point is left exactly where it is, and that is the whole
+    /// subtlety: `in` is measured in the stream the clip PLAYS
+    /// (`model::Source::Media`), so reversing keeps the in point and
+    /// therefore shows different frames — the tail of the file instead of
+    /// its head. Advancing it to keep the same frames would be a second
+    /// convention, and every trim, split and `source_length` in the crate
+    /// would need to know which one was in force.
+    ///
+    /// A non-media source is an `Err` and not a refusal — the non-media rule
+    /// (`edit.rs`, Results). `Ok(None)` when the clip already plays that
+    /// way.
+    pub fn set_reversed(&self, clip: u32, reversed: bool) -> Result<Option<Project>, String> {
+        let target = self.require_clip(clip)?;
+        let Source::Media {
+            media,
+            r#in,
+            reversed: current,
+        } = target.source
+        else {
+            return Err(format!("clip {clip} is not a media clip"));
+        };
+        if current == reversed {
+            return Ok(None);
+        }
+
+        let mut next = self.clone();
+        if let Some(slot) = next.clip_mut(clip) {
+            slot.source = Source::Media {
+                media,
+                r#in,
+                reversed,
+            };
+        }
+        self.finish(next)
+    }
+
     /// Splits the clip's audio onto its own clip on the track BELOW,
     /// inserting a track at index 0 when the clip is already on the bottom
     /// one (spec §6).
@@ -1178,169 +1214,6 @@ impl Project {
             slot.start = start;
         }
         set_gained_transitions(&mut next, &[target.track]);
-        self.finish(next)
-    }
-
-    // ---- actions ---------------------------------------------------------
-
-    /// Adds an action to the clip at CLIP time `at` — the caller converts
-    /// the playhead by subtracting the clip's start — one second long by
-    /// default, with an empty end patch, so it changes nothing until the
-    /// inspector edits it (spec §6).
-    ///
-    /// Refuses (`None`) when it would overlap another action on the clip or
-    /// run past the clip's end. `Err` on a negative start or a non-positive
-    /// duration.
-    pub fn add_action(
-        &self,
-        clip: u32,
-        at: Ticks,
-        duration: Option<Ticks>,
-    ) -> Result<Option<Project>, String> {
-        let target = self.require_clip(clip)?.clone();
-        let at = self.snapped(at);
-        if at < 0 {
-            return Err(format!("action start must not be negative, not {at}"));
-        }
-        let duration = match duration {
-            None => DEFAULT_ACTION_DURATION,
-            Some(given) => {
-                let snapped = self.snapped(given);
-                if snapped <= 0 {
-                    return Err(format!("action duration must be positive, not {given}"));
-                }
-                snapped
-            }
-        };
-        if at.saturating_add(duration) > target.duration {
-            return Ok(None);
-        }
-        if actions_overlap(&target.actions, None, at, duration) {
-            return Ok(None);
-        }
-
-        let mut next = self.clone();
-        let id = next.allocate_id();
-        if let Some(slot) = next.clip_mut(clip) {
-            slot.actions.push(Action {
-                id,
-                start: at,
-                duration,
-                curve: Curve::default(),
-                end: Value::Object(serde_json::Map::new()),
-            });
-        }
-        self.finish(next)
-    }
-
-    /// Retimes or re-curves one action; every argument left `None` keeps
-    /// its current value (spec §6). Same overlap and clip-end checks as
-    /// `add_action`.
-    pub fn set_action(
-        &self,
-        clip: u32,
-        action: u32,
-        start: Option<Ticks>,
-        duration: Option<Ticks>,
-        curve: Option<Curve>,
-    ) -> Result<Option<Project>, String> {
-        let target = self.require_clip(clip)?.clone();
-        let existing = target
-            .actions
-            .iter()
-            .find(|a| a.id == action)
-            .ok_or_else(|| format!("no action with id {action} on clip {clip}"))?
-            .clone();
-
-        let new_start = match start {
-            None => existing.start,
-            Some(given) => {
-                let snapped = self.snapped(given);
-                if snapped < 0 {
-                    return Err(format!("action start must not be negative, not {given}"));
-                }
-                snapped
-            }
-        };
-        let new_duration = match duration {
-            None => existing.duration,
-            Some(given) => {
-                let snapped = self.snapped(given);
-                if snapped <= 0 {
-                    return Err(format!("action duration must be positive, not {given}"));
-                }
-                snapped
-            }
-        };
-        if new_start.saturating_add(new_duration) > target.duration {
-            return Ok(None);
-        }
-        if actions_overlap(&target.actions, Some(action), new_start, new_duration) {
-            return Ok(None);
-        }
-
-        let mut next = self.clone();
-        if let Some(slot) = next
-            .clip_mut(clip)
-            .and_then(|c| c.actions.iter_mut().find(|a| a.id == action))
-        {
-            slot.start = new_start;
-            slot.duration = new_duration;
-            if let Some(curve) = curve {
-                slot.curve = curve;
-            }
-        }
-        self.finish(next)
-    }
-
-    /// Merges `patch` into the action's end state; a key set to `null`
-    /// REMOVES it, which is how the inspector stops animating one property
-    /// without deleting the action (spec §6).
-    ///
-    /// Unknown keys are kept, not rejected: an end patch is evaluated
-    /// leniently (`actions.rs`), and a project written by a newer build
-    /// must survive a round trip through this one.
-    pub fn set_action_end(
-        &self,
-        clip: u32,
-        action: u32,
-        patch: &Value,
-    ) -> Result<Option<Project>, String> {
-        let target = self.require_clip(clip)?;
-        let existing = target
-            .actions
-            .iter()
-            .find(|a| a.id == action)
-            .ok_or_else(|| format!("no action with id {action} on clip {clip}"))?;
-        if !patch.is_object() {
-            return Err(format!(
-                "action end patch must be a json object, not {}",
-                describe(patch)
-            ));
-        }
-        let mut merged = actions::merge(&existing.end, patch);
-        prune_removed(&mut merged, patch, 0);
-
-        let mut next = self.clone();
-        if let Some(slot) = next
-            .clip_mut(clip)
-            .and_then(|c| c.actions.iter_mut().find(|a| a.id == action))
-        {
-            slot.end = merged;
-        }
-        self.finish(next)
-    }
-
-    /// Removes one action from a clip (spec §6).
-    pub fn remove_action(&self, clip: u32, action: u32) -> Result<Option<Project>, String> {
-        let target = self.require_clip(clip)?;
-        if !target.actions.iter().any(|a| a.id == action) {
-            return Err(format!("no action with id {action} on clip {clip}"));
-        }
-        let mut next = self.clone();
-        if let Some(slot) = next.clip_mut(clip) {
-            slot.actions.retain(|a| a.id != action);
-        }
         self.finish(next)
     }
 }
