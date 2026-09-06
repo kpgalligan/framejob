@@ -110,24 +110,158 @@ final class StickerButton: NSButton {
     }
 }
 
+// MARK: - AccentButton
+
+/// The house call-to-action: a flat accent rectangle with an optional leading
+/// symbol. Hover lightens the fill; that is the whole state model.
+///
+/// Deliberately **not** `StickerButton`: the sticker pill with its 1.5px
+/// border and offset shadow was retired in the Rasterize redesign, and the
+/// window chrome follows — square-ish, flat, quiet. `StickerButton` stays for
+/// the sheets and the welcome screen, which are not chrome.
+final class AccentButton: NSButton {
+    private let symbolName: String?
+    private let fallbackGlyph: String
+    private var hovered = false
+
+    private static let height: CGFloat = 26
+    private static let padding: CGFloat = 12
+    private static let symbolGap: CGFloat = 6
+    private static let symbolPointSize: CGFloat = 15
+
+    init(title: String, symbol: String?, fallback: String, tooltip: String, action: Selector?) {
+        self.symbolName = symbol
+        self.fallbackGlyph = fallback
+        super.init(frame: .zero)
+        self.title = title
+        target = nil
+        self.action = action
+        isBordered = false
+        wantsLayer = true
+        font = DS.sans(12, weight: .semibold)
+        setButtonType(.momentaryChange)
+        toolTip = tooltip
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("AccentButton does not support NSCoder")
+    }
+
+    override var isFlipped: Bool { true }
+
+    private var labelAttributes: [NSAttributedString.Key: Any] {
+        [
+            .font: font ?? DS.sans(12, weight: .semibold),
+            .foregroundColor: DS.onAccent.withAlphaComponent(isEnabled ? 1 : 0.5),
+        ]
+    }
+
+    private var symbolImage: NSImage? {
+        guard let symbolName = symbolName else { return nil }
+        return NSImage(systemSymbolName: symbolName, accessibilityDescription: title)?
+            .withSymbolConfiguration(
+                NSImage.SymbolConfiguration(pointSize: Self.symbolPointSize, weight: .medium))
+    }
+
+    private var glyphWidth: CGFloat {
+        guard symbolName != nil else { return 0 }
+        if let image = symbolImage { return image.size.width + Self.symbolGap }
+        return ceil(fallbackGlyph.size(withAttributes: labelAttributes).width) + Self.symbolGap
+    }
+
+    override var intrinsicContentSize: NSSize {
+        let textWidth = ceil(title.size(withAttributes: labelAttributes).width)
+        return NSSize(width: glyphWidth + textWidth + Self.padding * 2, height: Self.height)
+    }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        trackingAreas.forEach(removeTrackingArea)
+        addTrackingArea(
+            NSTrackingArea(
+                rect: bounds, options: [.mouseEnteredAndExited, .activeInKeyWindow],
+                owner: self, userInfo: nil))
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        hovered = true
+        needsDisplay = true
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        hovered = false
+        needsDisplay = true
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        var fill = DS.accent
+        if isEnabled, isHighlighted {
+            fill = fill.blended(withFraction: 0.16, of: .black) ?? fill
+        } else if isEnabled, hovered {
+            fill = fill.blended(withFraction: 0.18, of: .white) ?? fill
+        }
+        NSBezierPath(
+            roundedRect: bounds, xRadius: DS.buttonRadius, yRadius: DS.buttonRadius
+        ).addClip()
+        fill.withAlphaComponent(isEnabled ? 1 : 0.42).setFill()
+        bounds.fill()
+
+        let attributes = labelAttributes
+        let textSize = title.size(withAttributes: attributes)
+        let contentWidth = glyphWidth + ceil(textSize.width)
+        var x = (bounds.width - contentWidth) / 2
+        let tint = DS.onAccent.withAlphaComponent(isEnabled ? 1 : 0.5)
+        if symbolName != nil {
+            if let image = symbolImage?.tinted(with: tint) {
+                image.draw(
+                    in: NSRect(
+                        x: x, y: bounds.midY - image.size.height / 2,
+                        width: image.size.width, height: image.size.height))
+                x += image.size.width + Self.symbolGap
+            } else {
+                let size = fallbackGlyph.size(withAttributes: attributes)
+                fallbackGlyph.draw(
+                    at: NSPoint(x: x, y: bounds.midY - size.height / 2),
+                    withAttributes: attributes)
+                x += ceil(size.width) + Self.symbolGap
+            }
+        }
+        title.draw(
+            at: NSPoint(x: x, y: bounds.midY - textSize.height / 2), withAttributes: attributes)
+    }
+}
+
 // MARK: - GhostButton
 
 /// Borderless icon button used in the toolbar (icon over 10px label) and the
 /// panel footer (icon only). Hover shows a faint fill; press scales
 /// to 0.97; disabled dims to 42%.
+///
+/// `size`, `pointSize` and `cornerRadius` default to the Rasterize-copied
+/// original, so the shared file is extended rather than forked: the window
+/// toolbar asks for 30 × 26 at 19 pt and the timeline bar for 28 × 24 at 17 pt,
+/// both on the 4 pt button radius.
 final class GhostButton: NSButton {
     private let iconName: String
     private let fallbackGlyph: String
     private let caption: String?
+    private let fixedSize: NSSize?
+    private let pointSize: CGFloat
+    private let cornerRadius: CGFloat
     private var hovered = false
 
     init(
         symbol: String, fallback: String, caption: String?, tooltip: String,
-        action: Selector?
+        action: Selector?, size: NSSize? = nil, pointSize: CGFloat = 15,
+        cornerRadius: CGFloat = 8
     ) {
         self.iconName = symbol
         self.fallbackGlyph = fallback
         self.caption = caption
+        self.fixedSize = size
+        self.pointSize = pointSize
+        self.cornerRadius = cornerRadius
         super.init(frame: .zero)
         title = ""
         target = nil
@@ -146,7 +280,8 @@ final class GhostButton: NSButton {
     override var isFlipped: Bool { true }
 
     override var intrinsicContentSize: NSSize {
-        caption == nil ? NSSize(width: 30, height: 26) : NSSize(width: 52, height: 46)
+        if let fixedSize = fixedSize { return fixedSize }
+        return caption == nil ? NSSize(width: 30, height: 26) : NSSize(width: 52, height: 46)
     }
 
     override func updateTrackingAreas() {
@@ -170,7 +305,8 @@ final class GhostButton: NSButton {
 
     override func draw(_ dirtyRect: NSRect) {
         if hovered && isEnabled {
-            let path = NSBezierPath(roundedRect: bounds, xRadius: 8, yRadius: 8)
+            let path = NSBezierPath(
+                roundedRect: bounds, xRadius: cornerRadius, yRadius: cornerRadius)
             DS.hoverFill.setFill()
             path.fill()
         }
@@ -205,7 +341,7 @@ final class GhostButton: NSButton {
     private func drawIcon(tint: NSColor, center: NSPoint) {
         let icon = NSImage(systemSymbolName: iconName, accessibilityDescription: toolTip)?
             .withSymbolConfiguration(
-                NSImage.SymbolConfiguration(pointSize: 15, weight: .medium))
+                NSImage.SymbolConfiguration(pointSize: pointSize, weight: .medium))
         guard let icon = icon else {
             let attributes: [NSAttributedString.Key: Any] = [
                 .font: DS.sans(14), .foregroundColor: tint,
@@ -243,19 +379,51 @@ extension NSImage {
 
 enum DSField {
     /// Styles a text field as the design's 7px-radius bordered field with
-    /// mono content ("a 7px rectangle means: type here").
-    static func style(_ field: NSTextField) {
+    /// mono content ("a 7px rectangle means: type here"). The toolbar's
+    /// timecode passes the compact trio — 24 pt on the 4 pt button radius,
+    /// mono 12 medium — and everything else takes the defaults.
+    static func style(
+        _ field: NSTextField, height: CGFloat = 26, radius: CGFloat = DS.fieldRadius,
+        font: NSFont = DS.mono(13)
+    ) {
         field.isBezeled = false
         field.isBordered = false
         field.drawsBackground = true
         field.backgroundColor = .textBackgroundColor
         field.textColor = DS.textStrong
-        field.font = DS.mono(13)
+        field.font = font
         field.wantsLayer = true
         field.layer?.borderWidth = 1
         field.layer?.borderColor = DS.borderStrong.cgColor
-        field.layer?.cornerRadius = 7
-        field.heightAnchor.constraint(equalToConstant: 26).isActive = true
+        field.layer?.cornerRadius = radius
+        field.heightAnchor.constraint(equalToConstant: height).isActive = true
+    }
+}
+
+// MARK: - Hairline
+
+/// A 1 pt rule used as a cluster divider inside a chrome bar. A plain view so
+/// it takes part in the stack's layout instead of being painted by whatever
+/// draws behind it.
+final class DividerView: NSView {
+    private let length: CGFloat
+
+    init(length: CGFloat = 20) {
+        self.length = length
+        super.init(frame: .zero)
+        wantsLayer = true
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("DividerView does not support NSCoder")
+    }
+
+    override var intrinsicContentSize: NSSize { NSSize(width: 1, height: length) }
+
+    override func draw(_ dirtyRect: NSRect) {
+        DS.border.setFill()
+        bounds.fill()
     }
 }
 

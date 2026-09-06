@@ -122,6 +122,40 @@ enum DS {
     static let menuMinWidth: CGFloat = 206
     static let canvasInset: CGFloat = 36
 
+    // MARK: - Metrics (the chrome cleanup)
+
+    /// The window's own two bars. `optionsBarHeight` is also 36 and they are
+    /// deliberately separate names: Rasterize's options bar and Reelcut's
+    /// timeline bar are the same height for the same reason, not the same
+    /// thing.
+    static let toolbarHeight: CGFloat = 44
+    static let timelineBarHeight: CGFloat = 36
+    /// The timeline's track-header column and its ruler band.
+    static let trackHeaderWidth: CGFloat = 132
+    static let rulerHeight: CGFloat = 22
+
+    /// A clip bar: its corner, the name strip along its top, the grips that
+    /// appear on the selected one, and the width of one filmstrip tile.
+    static let clipRadius: CGFloat = 4
+    static let clipHeaderHeight: CGFloat = 16
+    static let trimGripWidth: CGFloat = 6
+    static let filmstripThumb: CGFloat = 34
+
+    /// Lane heights by track size (S/M/L) and track kind (text, video,
+    /// audio). At S a clip is its name strip and little else, which is
+    /// intended. `TimelineLayout` is the only reader.
+    static let trackHeights: [[CGFloat]] = [
+        [30, 54, 40],
+        [44, 84, 60],
+        [58, 116, 82],
+    ]
+
+    /// The radius scale: 3 for controls (`controlRadius`), 4 for buttons and
+    /// clips, 5 for list rows, 7 for the bordered fields that predate it.
+    static let buttonRadius: CGFloat = 4
+    static let listRowRadius: CGFloat = 5
+    static let fieldRadius: CGFloat = 7
+
     // MARK: - Motion
 
     static let hoverDuration: TimeInterval = 0.14

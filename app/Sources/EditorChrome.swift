@@ -10,6 +10,10 @@ final class BarView: NSView {
     enum Border {
         case top
         case bottom
+        /// Both edges — the timeline bar, which has lanes under it and a
+        /// split divider over it and needs to read as its own band. The one
+        /// case Rasterize's copy does not have.
+        case both
         case none
     }
 
@@ -35,6 +39,9 @@ final class BarView: NSView {
         case .top:
             NSRect(x: 0, y: 0, width: bounds.width, height: 1).fill()
         case .bottom:
+            NSRect(x: 0, y: bounds.height - 1, width: bounds.width, height: 1).fill()
+        case .both:
+            NSRect(x: 0, y: 0, width: bounds.width, height: 1).fill()
             NSRect(x: 0, y: bounds.height - 1, width: bounds.width, height: 1).fill()
         case .none:
             break
