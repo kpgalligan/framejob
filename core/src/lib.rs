@@ -24,6 +24,7 @@ pub mod edit_time;
 pub mod edit_track;
 pub mod evaluate;
 pub mod export;
+pub mod export_size;
 pub mod ffi;
 pub mod ffi_agent;
 pub mod ffi_edit;

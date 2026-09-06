@@ -2,11 +2,17 @@
 //! (spec §7.8).
 //!
 //! Rust decides, AVFoundation does: nothing here encodes anything. The job
-//! is to turn "H.264 1080p, the in/out range, 30 fps" into the exact set of
-//! values Swift hands to `AVAssetExportSession` — the preset name, the
-//! output file type, the time range, the frame size — so that the choice of
-//! preset is testable without a GPU and the MCP agent's `export` tool takes
-//! the same vocabulary the UI does.
+//! is to turn "H.264, 1920 × 1080, the in/out range, 30 fps" into the exact
+//! set of values Swift hands to the writer — the preset name, the output
+//! file type, the time range, the frame size — so that the choice of format
+//! is testable without a GPU and the MCP agent's `export` tool takes the
+//! same vocabulary the UI does.
+//!
+//! A preset is an ENCODING — a container and a codec — and carries no size:
+//! an export is at the document's own size unless one is asked for, and
+//! the sizes on offer for a document and a format are a separate list,
+//! [`Project::export_sizes`] in `export_size.rs`, whose rows reach the
+//! resolver here as the same `width`/`height` overrides a script sends.
 //!
 //! Two of the presets name a format AVFoundation cannot write at all: an
 //! animated GIF and an animated PNG are assembled frame by frame through
@@ -92,15 +98,23 @@ impl Container {
     }
 }
 
-struct Preset {
+/// One row of the table. Crate-visible so `export_size.rs` can read the
+/// cap and the codec of the row it lists sizes for, through [`preset`];
+/// the fields it does not need stay private to this module.
+pub(crate) struct Preset {
     id: &'static str,
     name: &'static str,
     container: Container,
-    codec: &'static str,
+    pub(crate) codec: &'static str,
     /// False for the audio-only preset; every other row carries video.
     video: bool,
-    /// `None` means "the project's canvas size" — the source-size presets.
-    size: Option<(u32, u32)>,
+    /// `None` means "the project's canvas size", which is what every movie
+    /// row wants: a preset is an encoding, and the size is the document's
+    /// unless a `width`/`height` override says otherwise. The resolver
+    /// fills the canvas in for the audio-only row too, so every settings
+    /// object carries a width. Only the two image rows pin one — the cap
+    /// `Project::export_sizes` lists as their default.
+    pub(crate) size: Option<(u32, u32)>,
     /// `None` means "the project's canvas rate", which is what every movie
     /// preset wants. Only the image-sequence rows pin one, because their
     /// cost is frames × pixels and nothing else.
@@ -110,11 +124,39 @@ struct Preset {
     avf_preset: Option<&'static str>,
 }
 
-/// The §7.8 set. M1 maps the movie rows onto `AVAssetExportSession`'s named
-/// presets, which is why each carries one: the session's preset decides the
-/// codec and the bitrate ladder, and the size below is what the video
-/// composition renders at. The two image rows carry none — Swift writes
-/// those frame by frame through ImageIO.
+/// The §7.8 set: one row per ENCODING, in menu order. A row is a container
+/// and a codec and nothing else — no size, no rate — so an export is at the
+/// document's own size and rate unless a person asks for another, through
+/// the Size popup the sheet fills from `Project::export_sizes` or the
+/// overrides a script sends. The size used to be part of the row ("H.264
+/// 1080p", "HEVC 4K"), and that shape made the format menu two questions
+/// asked as one: picking HEVC meant picking 1080p or 4K with it, and a
+/// 1440p or a vertical document had no row that fit it at all. Two
+/// questions get two controls, and the format is only ever the encoding.
+///
+/// The two image rows are the exception and keep a size and a rate,
+/// because for them the numbers ARE what makes the row worth having: a GIF
+/// or an APNG costs frames × pixels with no inter-frame prediction to
+/// spend against, so "at the document's size and rate" is a file no one
+/// can send, and the cap is the point of the format rather than a default
+/// it happens to carry (§7.8; the row comments argue each number). Both
+/// caps are still defaults a size or fps override replaces, and
+/// `export_sizes` lists each as the first row of its list.
+///
+/// The FIRST row is the default: `rc_export_presets` is "in menu order"
+/// and the export sheet opens on its first entry, so whatever sits here is
+/// what ⌘E writes unless a person picks otherwise. H.264 in MP4 is the
+/// file every player and every upload form takes, which is why it leads
+/// and HEVC — half the size, not yet everywhere — follows.
+///
+/// Each movie row carries an `AVAssetExportSession` preset name for the
+/// record: the two "highest quality" names are the ones a session would
+/// take the composition's own size under rather than fit it to a fixed
+/// frame, which is exactly a row with no size of its own. Nothing runs a
+/// session any more (§7.8), so on the Swift side the name is only the
+/// signal that AVFoundation can write the row at all; the two image rows
+/// carry none, which is the signal to write them frame by frame through
+/// ImageIO instead.
 ///
 /// **No row carries a default bitrate, deliberately.** On the session path
 /// the preset name IS the ladder — `AVAssetExportSession` exposes no way to
@@ -126,30 +168,14 @@ struct Preset {
 /// bitrate to set. A bitrate is therefore something the user asks for — the
 /// `video_bitrate` / `audio_bitrate` overrides — never something a preset
 /// assumes on their behalf.
-const PRESETS: [Preset; 9] = [
+const PRESETS: [Preset; 6] = [
+    // The default (see above). The ids are the `export` tool's vocabulary
+    // and every script that calls it spells them, so a row is named for
+    // the encoding alone — `h264`, not `h264_document` — because the size
+    // is no longer anything the id could say.
     Preset {
-        id: "h264_1080p",
-        name: "H.264 1080p",
-        container: Container::Mp4,
-        codec: "h264",
-        video: true,
-        size: Some((1920, 1080)),
-        fps: None,
-        avf_preset: Some("AVAssetExportPreset1920x1080"),
-    },
-    Preset {
-        id: "h264_720p",
-        name: "H.264 720p",
-        container: Container::Mp4,
-        codec: "h264",
-        video: true,
-        size: Some((1280, 720)),
-        fps: None,
-        avf_preset: Some("AVAssetExportPreset1280x720"),
-    },
-    Preset {
-        id: "h264_source",
-        name: "H.264 source size",
+        id: "h264",
+        name: "H.264 (MP4)",
         container: Container::Mp4,
         codec: "h264",
         video: true,
@@ -158,24 +184,14 @@ const PRESETS: [Preset; 9] = [
         avf_preset: Some("AVAssetExportPresetHighestQuality"),
     },
     Preset {
-        id: "hevc_1080p",
-        name: "HEVC 1080p",
+        id: "hevc",
+        name: "HEVC (MP4)",
         container: Container::Mp4,
         codec: "hevc",
         video: true,
-        size: Some((1920, 1080)),
+        size: None,
         fps: None,
-        avf_preset: Some("AVAssetExportPresetHEVC1920x1080"),
-    },
-    Preset {
-        id: "hevc_4k",
-        name: "HEVC 4K",
-        container: Container::Mp4,
-        codec: "hevc",
-        video: true,
-        size: Some((3840, 2160)),
-        fps: None,
-        avf_preset: Some("AVAssetExportPresetHEVC3840x2160"),
+        avf_preset: Some("AVAssetExportPresetHEVCHighestQuality"),
     },
     Preset {
         id: "prores_422",
@@ -254,6 +270,14 @@ fn fps_json(fps: Option<Fps>) -> Value {
 }
 
 impl Preset {
+    /// True for the rows written frame by frame through ImageIO — the ones
+    /// with no session preset — whose picture is FITTED inside the size
+    /// rather than letterboxed to it, so a size on them is a box and the
+    /// resolved numbers are the fit (`export_size::fit_within`).
+    pub(crate) fn fits_inside_size(&self) -> bool {
+        self.video && self.avf_preset.is_none()
+    }
+
     fn to_json(&self) -> Value {
         let mut out = Map::new();
         out.insert("id".to_string(), Value::from(self.id));
@@ -272,8 +296,8 @@ impl Preset {
             },
         );
         // `size` and `fps` are spelled the same way for the same reason:
-        // null is "whatever the project is", which the picker shows as
-        // "source" and the resolver fills in from the canvas.
+        // null is "whatever the project is" — the document size, the
+        // document rate — which the resolver fills in from the canvas.
         out.insert("fps".to_string(), fps_json(self.fps));
         out.insert(
             "avf_preset".to_string(),
@@ -290,6 +314,18 @@ impl Preset {
 /// returns.
 pub fn presets() -> Value {
     Value::Array(PRESETS.iter().map(Preset::to_json).collect())
+}
+
+/// The row for `id`, or the error naming it. The ONE lookup: both
+/// [`Project::export_settings`] and `Project::export_sizes` go through it,
+/// so an unknown preset reads the same whichever of the two the sheet or
+/// the `export` tool asked first, and a row cannot have sizes and no
+/// settings or the other way round.
+pub(crate) fn preset(id: &str) -> Result<&'static Preset, String> {
+    PRESETS
+        .iter()
+        .find(|p| p.id == id)
+        .ok_or_else(|| format!("unknown export preset \"{id}\""))
 }
 
 // ---- override reading ----------------------------------------------------
@@ -376,10 +412,7 @@ impl Project {
         preset_id: &str,
         overrides: Option<&Value>,
     ) -> Result<Value, String> {
-        let preset = PRESETS
-            .iter()
-            .find(|p| p.id == preset_id)
-            .ok_or_else(|| format!("unknown export preset \"{preset_id}\""))?;
+        let preset = preset(preset_id)?;
 
         let overrides = match overrides {
             None => None,
@@ -393,13 +426,25 @@ impl Project {
             }
         };
 
-        // Size: the preset's, else the canvas — the "source size" presets
-        // render at whatever the project composites at.
+        // Size: the preset's cap if it has one, else the canvas — a movie
+        // preset renders at whatever the project composites at, and a size
+        // the sheet's popup or a script chose arrives as the override.
         let (preset_width, preset_height) = preset
             .size
             .unwrap_or((self.canvas.width, self.canvas.height));
         let width = positive_u32(overrides, "width")?.unwrap_or(preset_width);
         let height = positive_u32(overrides, "height")?.unwrap_or(preset_height);
+        // An image format is written with the picture FITTED inside the
+        // size, never letterboxed and never upscaled (`export_size.rs` has
+        // the rule and the reason), so what is reported is the size the
+        // file will have, not the box it was fitted into: the sheet's
+        // readout, its Size popup and the `export` tool's result all say
+        // the numbers the writer draws.
+        let (width, height) = if preset.fits_inside_size() {
+            crate::export_size::fit_within((self.canvas.width, self.canvas.height), (width, height))
+        } else {
+            (width, height)
+        };
 
         // The preset's rate, else the canvas — the image-sequence presets
         // cap the rate for the same reason they cap the size, and every

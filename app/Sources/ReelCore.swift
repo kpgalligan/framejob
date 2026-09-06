@@ -325,7 +325,7 @@ struct ExportPreset: Decodable, Equatable, Identifiable {
     let container: String
     /// "h264", "hevc", "prores_422", "aac".
     let codec: String
-    /// Fixed output size, or nil for "source size".
+    /// Fixed output size, or nil for the document (canvas) size.
     let width: Int?
     let height: Int?
     let audioOnly: Bool
@@ -352,7 +352,8 @@ struct ExportPreset: Decodable, Equatable, Identifiable {
 }
 
 /// A preset plus overrides resolved against the project into the concrete
-/// numbers `Exporter` hands `AVAssetExportSession` (§7.8).
+/// numbers `Exporter` configures its pipeline with — `ExportWriter` or the
+/// ImageIO frame sequence (§7.8).
 struct ExportSettings: Decodable, Equatable {
     let preset: String
     let container: String
@@ -363,8 +364,9 @@ struct ExportSettings: Decodable, Equatable {
     /// The range to write — the whole timeline, or the in/out range.
     let start: Ticks
     let duration: Ticks
-    /// The `AVAssetExportSession` preset name for the M1 path, when the core
-    /// picked one.
+    /// The `AVAssetExportSession` preset name the row carries for the
+    /// record; nil is the signal that AVFoundation cannot write this
+    /// container and the frames go through ImageIO (`isImageSequence`).
     let avPreset: String?
     /// The `AVFileType` raw value, e.g. "com.apple.quicktime-movie".
     let fileType: String?
@@ -411,14 +413,45 @@ struct ExportSettings: Decodable, Equatable {
     var renderSize: CGSize { CGSize(width: width, height: height) }
 }
 
+/// One row of the export sheet's Size popup, from `rc_export_sizes`: the
+/// document's own size, an image format's cap, or a standard size fitted to
+/// the document's aspect.
+struct ExportSize: Decodable, Equatable, Identifiable {
+    /// "document", "preset" (an image format's cap), "2160p", "1440p",
+    /// "1080p" or "720p" — the vocabulary the `export` tool's `size` takes.
+    let id: String
+    /// "Document size", "GIF default", "4K", "1080p"… — the sheet appends
+    /// the numbers.
+    let name: String
+    let width: Int
+    let height: Int
+}
+
 /// Export presets and settings resolution — the core decides, `Exporter`
 /// does (§7.8).
 enum ReelExport {
-    /// The presets, in the order the export sheet lists them. Empty only if
-    /// the core failed, which it does not.
+    /// The presets — one per encoding — in the order the export sheet lists
+    /// them; the first is the default the sheet opens on. Empty only if the
+    /// core failed, which it does not.
     static func presets() -> [ExportPreset] {
         guard let json = takeString(rc_export_presets()) else { return [] }
         return ReelJSON.decode([ExportPreset].self, from: json) ?? []
+    }
+
+    /// The sizes the Size popup offers for `preset` against this project, in
+    /// menu order; the first is the default. Throws with the core's message
+    /// for an unknown preset.
+    static func sizes(_ p: ReelProject, preset: String) throws -> [ExportSize] {
+        var err: UnsafeMutablePointer<CChar>? = nil
+        let raw = rc_export_sizes(p.ptr, preset, &err)
+        guard let json = takeString(raw) else {
+            throw ReelCoreError(
+                message: takeString(err) ?? "The core could not list export sizes.")
+        }
+        guard let sizes = ReelJSON.decode([ExportSize].self, from: json) else {
+            throw ReelCoreError(message: "The core's export sizes could not be read.")
+        }
+        return sizes
     }
 
     /// Resolves `preset` plus optional `overrides` (size, fps, range, and the

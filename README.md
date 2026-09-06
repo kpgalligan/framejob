@@ -41,9 +41,11 @@ normative: §5.2 is the project schema, §6 the op table, §7 the architecture.
   with a Metal compositor drawing every frame from the core's frame recipe.
   A property-only edit re-renders the paused frame without rebuilding the
   player (the plan JSON is compared as a string).
-- **Export** through `AVAssetExportSession` over the same composition, with
-  presets resolved by the core, plus an offline single-frame render used for
-  verification.
+- **Export** through an `AVAssetWriter` over the same composition, the
+  format (H.264, HEVC, ProRes 422, M4A, GIF, APNG) and the size chosen
+  separately and both resolved by the core — the default size is the
+  document's own, or for a GIF or APNG the format's cap fitted to it — plus
+  an offline single-frame render used for verification.
 - **MCP agent** (below): one tool per edit op, plus open/new/save/read,
   import, playhead, frame render and export.
 
@@ -51,14 +53,12 @@ Milestone status against spec §10: **M1 (Cut) is done** — every §10 check th
 can be run offline was run against a built app, by driving it over MCP and
 diffing `render_frame` and exported files against the sources. Most of M2
 landed with it — text, shapes, transitions, audio
-volume/fade/duck/detach, freeze frame, speed, the in/out range and the agent.
-Still owed by M2: `addTextClip:` and `addShapeClip:` are menu stubs that beep
-(the ops and the panes behind them exist and the agent can already call them),
-and chapter markers do not reach an exported file (the `AVAssetWriter` seam in
-`Exporter.swift`). M3 is part done — actions, corner radius, shadow, colour
-controls and chroma key all render — and nests, filters, reflection,
-spotlight, GIF/APNG export, noise removal, SRT captions, Consolidate Media and
-ffmpeg-assisted import are untouched.
+volume/fade/duck/detach, freeze frame, speed, the in/out range and the agent —
+and **M2 and M3 are now done too**: chapters on export, nests, filters,
+reflection, spotlight, reverse, the audio DSP, GIF/APNG export, SRT captions,
+Consolidate Media and ffmpeg-assisted import. `CLAUDE.md` carries the
+milestone record and `designs/reelcut-roadmap.md` what still needs a person
+at the machine.
 
 What has actually been checked, and what has not: the model, the ops, the
 composition plan, the frame recipe, the compositor, save/open and export were
@@ -173,7 +173,7 @@ its own:
 | `set_range {start?, end?}` | the in/out range (I / O / ⌥X); no bounds clears it |
 | `undo` · `redo` | one step each (⌘Z / ⇧⌘Z), reporting the step's name |
 | `render_frame {t, max_width?}` | **the verification hook** |
-| `export {preset, path, range?}` | writes a file and waits for it; `range: "in_out"` scopes it to the in/out range |
+| `export {preset, path, size?, range?, video_bitrate?, audio_bitrate?}` | writes a file and waits for it; `preset` is the encoding, `size` a Size-popup row (`document`, `1080p`, …) or `[width, height]`, default the document's size (a GIF or APNG's cap); `range: "in_out"` scopes it to the in/out range; the bitrates are the sheet's Quality popup in bits per second |
 
 `set_range`, `undo` and `redo` exist so that spec §10's own verifications —
 "every op is one undo step and undo restores the frame", "the in/out range

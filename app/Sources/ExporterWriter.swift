@@ -535,14 +535,16 @@ final class ExportWriter {
     /// The encoder settings for the picture.
     ///
     /// **Size.** The composition renders at the CANVAS size (§7.2), and the
-    /// core resolves the export size from the preset or the sheet's fields —
-    /// they are not the same number, and the session path simply dropped the
-    /// second one on the floor: the preset scaled to fit whatever it liked,
-    /// so the sheet's "1920 × 1080" was a wish. Here the encoder is told the
-    /// size the sheet promised and `AVVideoScalingModeResizeAspect` fits the
-    /// canvas inside it, letterboxing rather than distorting when the two
-    /// aspects differ. Dimensions are forced even because H.264 and HEVC
-    /// require it.
+    /// core resolves the export size — the document's unless the sheet's
+    /// Size popup, its Custom fields or the `export` tool asked for another
+    /// — and they are not the same number; the session path simply dropped
+    /// the second one on the floor: the preset scaled to fit whatever it
+    /// liked, so the sheet's "1920 × 1080" was a wish. Here the encoder is
+    /// told the size the sheet promised and `AVVideoScalingModeResizeAspect`
+    /// fits the canvas inside it, letterboxing rather than distorting when
+    /// the two aspects differ. Dimensions are forced even because H.264 and
+    /// HEVC require it; the standard rows arrive even already
+    /// (`export_size.rs`), so this bites only on a custom size.
     ///
     /// **Bitrate.** `settings.videoBitrate` when the core resolved one. When
     /// it did not, a rate computed from the frame — bits per pixel per frame,

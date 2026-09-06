@@ -34,7 +34,7 @@ use reelcut_core::ffi_agent::{
 };
 use reelcut_core::ffi_edit::rc_project_apply;
 use reelcut_core::ffi_query::{
-    rc_export_presets, rc_export_settings, rc_op_names, rc_project_clip_state,
+    rc_export_presets, rc_export_settings, rc_export_sizes, rc_op_names, rc_project_clip_state,
     rc_project_composition_plan, rc_project_duration, rc_project_frame_recipe,
     rc_project_snap_candidates, rc_snap_resolve,
 };
@@ -1655,7 +1655,7 @@ fn sweep_every_export_with_nulls() -> Vec<String> {
 
     let live = Handle::new(1920, 1080, 30, 1);
     let op = cstring("{\"op\":\"remove_empty_tracks\"}");
-    let preset = cstring("h264_1080p");
+    let preset = cstring("h264");
 
     // rc_string_free — NULL-tolerant.
     unsafe { rc_string_free(ptr::null_mut()) };
@@ -1764,8 +1764,19 @@ fn sweep_every_export_with_nulls() -> Vec<String> {
     cover("rc_op_names");
 
     let presets = take_string(unsafe { rc_export_presets() }).expect("presets are never NULL");
-    assert_contains(&presets, "h264_1080p");
+    assert_contains(&presets, "\"h264\"");
     cover("rc_export_presets");
+
+    // rc_export_sizes — the project and the preset, separately and
+    // together; a NULL project is a caller bug and says so.
+    let mut err: *mut c_char = ptr::null_mut();
+    assert!(unsafe { rc_export_sizes(ptr::null(), preset.as_ptr(), &mut err) }.is_null());
+    assert_eq!(take_string(err).as_deref(), Some("project is NULL"));
+    let mut err: *mut c_char = ptr::null_mut();
+    assert!(unsafe { rc_export_sizes(live.as_ptr(), ptr::null(), &mut err) }.is_null());
+    assert_eq!(take_string(err).as_deref(), Some("preset_id is NULL"));
+    assert!(unsafe { rc_export_sizes(ptr::null(), ptr::null(), ptr::null_mut()) }.is_null());
+    cover("rc_export_sizes");
 
     let mut err: *mut c_char = ptr::null_mut();
     assert!(

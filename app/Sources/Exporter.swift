@@ -303,11 +303,12 @@ final class Exporter {
     /// sensible instead of refusing.
     ///
     /// **Not on the export path any more** — the writer sets the codec, the
-    /// size and the bitrate itself and needs no preset name. Kept because it
-    /// is the one place that maps the core's presets onto the
-    /// `AVAssetExportSession` names spec §7.8 still lists, and because
-    /// `ExportSettings.isAudioOnly` reads `avPreset` against one of them: the
-    /// mapping has not left this file, only the session has.
+    /// size and the bitrate itself and needs no preset name. Kept because
+    /// `ExportSettings.isAudioOnly` reads `avPreset` against one of these
+    /// names, and as the one record of which fixed-frame session preset a
+    /// codec at a size would have meant, now that the core's rows carry only
+    /// the "highest quality" names (§7.8): the mapping has not left this
+    /// file, only the session has.
     static func fallbackPreset(for settings: ExportSettings) -> String {
         if settings.isAudioOnly { return AVAssetExportPresetAppleM4A }
         switch settings.codec.lowercased() {

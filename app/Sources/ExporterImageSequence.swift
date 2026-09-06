@@ -53,14 +53,12 @@ extension Exporter {
     /// The pipeline for these settings: the `AVAssetWriter` path for every
     /// movie preset, the ImageIO path for the two image ones.
     ///
-    /// `built` reaches both, though they use it very differently. The writer
-    /// reads the whole composition back through it; the image path takes only
-    /// the size the compositor renders at (`renderSize` is the plan's canvas,
-    /// §7.2) and then renders each frame from the project itself. It is not
-    /// wasted work there even so — building the composition is what turns
-    /// missing or unreadable media into a reported failure before a single
-    /// frame is written, and `Exporter` has built it before either pipeline
-    /// exists.
+    /// `built` reaches only the writer, which reads the whole composition
+    /// back through it; the image path renders each frame from the project
+    /// itself, at the size the core resolved. Building the composition is
+    /// not wasted work for it even so — that is what turns missing or
+    /// unreadable media into a reported failure before a single frame is
+    /// written, and `Exporter` has built it before either pipeline exists.
     ///
     /// `chapters` reach only the writer. Neither GIF nor APNG has anywhere to
     /// put them, which is the same fact about those containers that
@@ -72,9 +70,7 @@ extension Exporter {
         guard settings.isImageSequence else {
             return try ExportWriter(built: built, settings: settings, chapters: chapters, to: url)
         }
-        return try ImageSequenceWriter(
-            project: project, urls: urls, settings: settings,
-            sourceSize: built.videoComposition.renderSize, to: url)
+        return try ImageSequenceWriter(project: project, urls: urls, settings: settings, to: url)
     }
 }
 
@@ -254,8 +250,14 @@ final class ImageSequenceWriter: ExportPipeline {
     /// The rate the export resolved to — the preset's or the sheet's, not
     /// necessarily the project's — for the timecode in a failure message.
     private let fps: Fps
-    /// The width to render at; the height follows from the source's aspect.
-    private let renderWidth: Int
+    /// The size every frame is written at: the settings', exactly. The core
+    /// has already fitted the picture inside the cap or the requested size
+    /// (`export_size.rs`), so these are the numbers the sheet showed and the
+    /// numbers the `export` tool reports, and the file has to carry them
+    /// rather than whatever `AVAssetImageGenerator` rounds its `maximumSize`
+    /// down to — a 1080 × 1920 timeline asked for at 152 × 270 came back
+    /// 151 wide.
+    private let frameSize: CGSize
     private let sink: CGImageDestination
     private let frameProperties: CFDictionary
 
@@ -277,10 +279,7 @@ final class ImageSequenceWriter: ExportPipeline {
     /// Resolves the settings into a frame list and opens the destination, or
     /// throws the `Exporter.ExportError` the sheet should show. Nothing is
     /// rendered and nothing is written until `start`.
-    init(
-        project: ReelProject, urls: [UInt32: URL], settings: ExportSettings,
-        sourceSize: CGSize, to url: URL
-    ) throws {
+    init(project: ReelProject, urls: [UInt32: URL], settings: ExportSettings, to url: URL) throws {
         guard let format = ImageSequenceFormat(container: settings.container) else {
             throw Exporter.ExportError.fileTypeUnsupported(settings.container)
         }
@@ -311,7 +310,7 @@ final class ImageSequenceWriter: ExportPipeline {
         self.fps = settings.fps
         let start = max(0, settings.start)
         self.times = (0..<count).map { start + Ticks($0) * step }
-        self.renderWidth = Self.width(fitting: sourceSize, into: settings)
+        self.frameSize = CGSize(width: max(1, settings.width), height: max(1, settings.height))
         self.frameProperties = format.frameProperties(
             delay: Double(step) / Double(ReelTime.perSecond))
 
@@ -412,14 +411,14 @@ final class ImageSequenceWriter: ExportPipeline {
     /// so a nil is a real failure worth reporting.
     private func append(at time: Ticks) -> (any Error)? {
         guard let image = Exporter.renderFrame(
-            project: project, urls: urls, at: time, maxWidth: renderWidth)
+            project: project, urls: urls, at: time, maxWidth: Int(frameSize.width))
         else {
             let timecode = ReelTime.format(time, fps: fps, frames: true)
             return Exporter.ExportError.failed(
                 "The frame at \(timecode) could not be rendered, so the "
                     + "\(format.displayName) was not written.")
         }
-        CGImageDestinationAddImage(sink, image, frameProperties)
+        CGImageDestinationAddImage(sink, Self.sized(image, to: frameSize), frameProperties)
         return nil
     }
 
@@ -442,23 +441,27 @@ final class ImageSequenceWriter: ExportPipeline {
 
     // MARK: - Size
 
-    /// The width to render each frame at: the picture fitted INSIDE the size
-    /// the settings promise, aspect kept, never upscaled.
+    /// `image` drawn into a bitmap of exactly `size`, or `image` itself when
+    /// it already is that size.
     ///
-    /// Fitted rather than letterboxed, which is where this differs from the
-    /// writer path on purpose. The writer hands the encoder a fixed frame and
-    /// `AVVideoScalingModeResizeAspect` pads a mismatched aspect with black;
-    /// padding a GIF costs bytes in every frame for pixels that carry
-    /// nothing, and the size on these two presets is a budget rather than a
-    /// delivery format — 480 × 270 means "no bigger than this", so a vertical
-    /// timeline should come out narrow, not boxed. Never upscaled for the
-    /// same reason `Exporter.renderFrame`'s own scaling never is: a bigger
-    /// file that carries no more detail.
-    private static func width(fitting source: CGSize, into settings: ExportSettings) -> Int {
-        let box = CGSize(width: max(1, settings.width), height: max(1, settings.height))
-        guard source.width >= 1, source.height >= 1 else { return Int(box.width) }
-        let scale = min(box.width / source.width, box.height / source.height)
-        guard scale < 1 else { return max(1, Int(source.width.rounded())) }
-        return max(1, Int((source.width * scale).rounded()))
+    /// The fit — the picture INSIDE the size, aspect kept, never upscaled,
+    /// where the movie writer letterboxes — is the core's decision
+    /// (`export_size.rs`, spec §7.8) and `settings.width` × `height` is its
+    /// answer; this only makes the frame that size. `renderFrame` is asked
+    /// for that width and the generator's own fit lands within a pixel of
+    /// it, so the draw is a hair's scale and never a crop. A context that
+    /// cannot be made — no memory — falls back to the frame as rendered,
+    /// which is a pixel off rather than nothing.
+    private static func sized(_ image: CGImage, to size: CGSize) -> CGImage {
+        let width = max(1, Int(size.width)), height = max(1, Int(size.height))
+        if image.width == width && image.height == height { return image }
+        guard let context = CGContext(
+            data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
+            space: image.colorSpace ?? CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
+        else { return image }
+        context.interpolationQuality = .high
+        context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+        return context.makeImage() ?? image
     }
 }

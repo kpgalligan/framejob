@@ -880,23 +880,51 @@ extension AgentServer {
                 ]),
             tool(
                 "export",
-                "Writes the timeline to a movie file and waits for it to finish — ⌘E. The "
-                    + "preset is resolved by the core into concrete settings (container, codec, "
-                    + "size, rate, range) and handed to the same exporter the app's own sheet "
-                    + "uses, so an agent export and a menu export cannot disagree. An existing "
-                    + "file at the path is replaced, and the container's extension is added when "
-                    + "the path has none. The result reports the settings that were used and the "
-                    + "file's size.",
+                "Writes the timeline to a file and waits for it to finish — ⌘E, the export "
+                    + "sheet's five controls (format, size, frame rate, quality, range) in the "
+                    + "sheet's own vocabulary, all but the frame rate — this exports at the "
+                    + "document's rate, or on gif and apng at the format's own rate (12.5 and "
+                    + "25 fps). The preset is the ENCODING only and the size a separate "
+                    + "choice defaulting to the document's own, or on gif and apng to the "
+                    + "format's cap; the core resolves both into concrete settings "
+                    + "(container, codec, size, rate, range) and hands them to the same "
+                    + "exporter the sheet uses, so an agent export and a menu export cannot "
+                    + "disagree. An existing file at the path is replaced, and the "
+                    + "container's extension is added when the path has none. The result "
+                    + "reports the settings that were used and the file's size.",
                 [
                     "preset": [
                         "type": "string",
-                        "description": "Export preset id. Pass a wrong one once and the error "
+                        "description": "Export preset id — one per encoding, a container and a "
+                            + "codec with no size of its own (that is size's). h264 is what "
+                            + "the export sheet opens on. Pass a wrong one once and the error "
                             + "lists them all.",
                     ],
                     "path": [
                         "type": "string",
                         "description": "Where to write, e.g. ~/Movies/cut.mp4. The folder must "
                             + "exist.",
+                    ],
+                    "size": [
+                        "type": ["string", "array"],
+                        "items": ["type": "integer"], "minItems": 2, "maxItems": 2,
+                        "description": "Output size — the sheet's Size popup. A row id: document "
+                            + "(the default, the document's own size), 1080p, 720p, 1440p or "
+                            + "2160p (the number is the SHORT edge and the long edge follows "
+                            + "the document's aspect, rounded to even, so a vertical project's "
+                            + "1080p is 1080 × 1920), or preset for an image format's cap (gif "
+                            + "and apng, where it is the default) — or an explicit [width, "
+                            + "height] in px, the sheet's Custom…. Every row exists on every "
+                            + "document — a 1920 × 1080 project's 1080p is its own size and is "
+                            + "listed anyway — so an id means the same thing wherever it is "
+                            + "sent; only preset is confined to gif and apng. Omit for the "
+                            + "document size or the image format's cap; a wrong id's error "
+                            + "lists the ids. A movie is written at exactly the size asked "
+                            + "for, letterboxed if the aspect differs. On gif and apng a size "
+                            + "— the cap, a row, or [width, height] — is a box the picture is "
+                            + "fitted inside, aspect kept and never upscaled, and the width "
+                            + "and height reported back are the file's: a vertical 1080 × "
+                            + "1920 project's GIF default is 152 × 270.",
                     ],
                     "range": [
                         "type": "string",

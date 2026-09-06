@@ -27,6 +27,16 @@
 //!    those assertions is worked out in the comment above it.
 //! 5. **The documented permissiveness.** An override key this build does not
 //!    know is ignored, and null means "use the preset".
+//! 6. **The default.** The first row of the menu is what the export sheet
+//!    opens on, and it has to export at the document's own size — a row
+//!    with a size of its own put there by mistake would export every
+//!    project at that size.
+//! 7. **The size is an override.** A preset is an encoding and no movie
+//!    row carries a size, so 1920 × 1080 comes from `width`/`height` — the
+//!    way the sheet's Size popup and the tool's `size` reach the resolver —
+//!    and each axis alone leaves the other the document's.
+//!
+//! The sizes the sheet offers are `core/tests/export_size.rs`.
 
 mod common;
 
@@ -46,7 +56,9 @@ struct Expected {
     id: &'static str,
     container: &'static str,
     codec: &'static str,
-    /// The fixed output size, or `None` for "whatever the project is".
+    /// The fixed output size, or `None` for "whatever the project is" —
+    /// every movie row, a preset being an encoding; the two image caps are
+    /// the only `Some`.
     size: Option<(i64, i64)>,
     /// The fixed output rate, or `None` for "whatever the project is".
     fps: Option<(i64, i64)>,
@@ -62,33 +74,16 @@ struct Expected {
     avf_preset: Option<&'static str>,
 }
 
-/// The menu, in menu order. The two image formats come last: they are the
-/// specialist rows, and everything above them is a movie.
-const EXPECTED: [Expected; 9] = [
+/// The menu, in menu order: one row per encoding, and the ids are the
+/// `export` tool's vocabulary. H.264 comes first because the first row is
+/// the default (`first_preset_is_the_default_and_exports_at_the_document_size`)
+/// and MP4/H.264 is the file everything plays; the two image formats come
+/// last: they are the specialist rows, and everything above them is a
+/// movie. The old size-carrying ids (`h264_1080p`, `hevc_4k`…) are gone
+/// without aliases — `an_unknown_preset_errors_and_names_it` pins that.
+const EXPECTED: [Expected; 6] = [
     Expected {
-        id: "h264_1080p",
-        container: "mp4",
-        codec: "h264",
-        size: Some((1920, 1080)),
-        fps: None,
-        video: true,
-        audio: true,
-        file_type: "public.mpeg-4",
-        avf_preset: Some("AVAssetExportPreset1920x1080"),
-    },
-    Expected {
-        id: "h264_720p",
-        container: "mp4",
-        codec: "h264",
-        size: Some((1280, 720)),
-        fps: None,
-        video: true,
-        audio: true,
-        file_type: "public.mpeg-4",
-        avf_preset: Some("AVAssetExportPreset1280x720"),
-    },
-    Expected {
-        id: "h264_source",
+        id: "h264",
         container: "mp4",
         codec: "h264",
         size: None,
@@ -99,26 +94,15 @@ const EXPECTED: [Expected; 9] = [
         avf_preset: Some("AVAssetExportPresetHighestQuality"),
     },
     Expected {
-        id: "hevc_1080p",
+        id: "hevc",
         container: "mp4",
         codec: "hevc",
-        size: Some((1920, 1080)),
+        size: None,
         fps: None,
         video: true,
         audio: true,
         file_type: "public.mpeg-4",
-        avf_preset: Some("AVAssetExportPresetHEVC1920x1080"),
-    },
-    Expected {
-        id: "hevc_4k",
-        container: "mp4",
-        codec: "hevc",
-        size: Some((3840, 2160)),
-        fps: None,
-        video: true,
-        audio: true,
-        file_type: "public.mpeg-4",
-        avf_preset: Some("AVAssetExportPresetHEVC3840x2160"),
+        avf_preset: Some("AVAssetExportPresetHEVCHighestQuality"),
     },
     Expected {
         id: "prores_422",
@@ -266,6 +250,7 @@ fn the_menu_is_the_table() {
         rows.len(),
         EXPECTED.len()
     );
+    let mut names = std::collections::HashSet::new();
     for (row, want) in rows.iter().zip(EXPECTED.iter()) {
         let id = text(row, "/id");
         assert_eq!(id, want.id, "the menu is out of order at {id}");
@@ -275,6 +260,13 @@ fn the_menu_is_the_table() {
         assert!(
             !text(row, "/name").is_empty(),
             "{id} has no name for the picker to show"
+        );
+        // Distinct, because `NSPopUpButton` drops an item whose title it
+        // already has — a repeated name would shift every later row's
+        // index and row 0 could stop meaning the table's first entry.
+        assert!(
+            names.insert(text(row, "/name").to_string()),
+            "{id} repeats the name of an earlier row"
         );
         match want.size {
             Some((w, h)) => assert_eq!(
@@ -305,6 +297,44 @@ fn the_menu_is_the_table() {
             ),
         }
     }
+}
+
+/// The first row is what ⌘E exports without a choice being made — the sheet
+/// opens on it — and the default export resolution is the document's own.
+/// So the first row must carry no size (a fixed one would export a 1440p or
+/// a vertical project at 1920 × 1080 by default), must be a movie, and must
+/// resolve to the canvas exactly: 1600 × 900 here, a size no preset pins.
+#[test]
+fn first_preset_is_the_default_and_exports_at_the_document_size() {
+    let rows = preset_rows();
+    let first = rows.first().expect("rc_export_presets offers no preset");
+    let id = text(first, "/id");
+    // Present AND null: `Value`'s index reads an absent key as null too,
+    // and a row that lost its `size` key would otherwise pass as unsized.
+    assert!(
+        matches!(first.get("size"), Some(Value::Null)),
+        "the default preset {id} pins a size, or carries no size key"
+    );
+    assert!(
+        flag(first, "/video"),
+        "the default preset {id} has no video"
+    );
+    assert!(
+        !text(first, "/name").is_empty(),
+        "the default preset {id} has no name for the picker to show"
+    );
+
+    let out = settings(&project(), id, None);
+    assert_eq!(
+        (int(&out, "/width"), int(&out, "/height")),
+        (CANVAS_WIDTH, CANVAS_HEIGHT),
+        "the default export {id} is not at the document size"
+    );
+    assert_eq!(
+        fps_of(&out),
+        (30, 1),
+        "the default export {id} is not at the document rate"
+    );
 }
 
 #[test]
@@ -365,11 +395,63 @@ fn every_preset_in_the_menu_resolves_to_what_it_advertised() {
 #[test]
 fn an_unknown_preset_errors_and_names_it() {
     let handle = project();
-    let msg = match handle.export_settings("h265_8k", None) {
-        Err(msg) => msg,
-        Ok(value) => panic!("an unknown preset resolved to {value}"),
-    };
-    assert_contains(&msg, "h265_8k");
+    // The old ids that carried a size are unknown now, with no alias: a
+    // script still saying "h264_1080p" is told so rather than handed an
+    // H.264 export at the document size it did not ask for.
+    for id in [
+        "h265_8k",
+        "h264_1080p",
+        "h264_720p",
+        "h264_source",
+        "hevc_1080p",
+        "hevc_4k",
+    ] {
+        let msg = match handle.export_settings(id, None) {
+            Err(msg) => msg,
+            Ok(value) => panic!("the unknown preset {id} resolved to {value}"),
+        };
+        assert_contains(&msg, id);
+    }
+}
+
+/// No movie row carries a size, so a fixed one is always an override —
+/// the sheet's Size popup and the tool's `size` both arrive here as
+/// `width`/`height` — and the two axes are independent: one alone leaves
+/// the other the document's, rather than pulling a default in with it.
+#[test]
+fn a_size_override_is_how_a_movie_export_leaves_the_document_size() {
+    let handle = project();
+    for want in EXPECTED
+        .iter()
+        .filter(|want| want.video && want.size.is_none())
+    {
+        let both = settings(
+            &handle,
+            want.id,
+            Some(&json!({"width": 1920, "height": 1080})),
+        );
+        assert_eq!(
+            (int(&both, "/width"), int(&both, "/height")),
+            (1920, 1080),
+            "{} size override",
+            want.id
+        );
+
+        let width_only = settings(&handle, want.id, Some(&json!({"width": 1280})));
+        assert_eq!(
+            (int(&width_only, "/width"), int(&width_only, "/height")),
+            (1280, CANVAS_HEIGHT),
+            "{} width alone",
+            want.id
+        );
+        let height_only = settings(&handle, want.id, Some(&json!({"height": 720})));
+        assert_eq!(
+            (int(&height_only, "/width"), int(&height_only, "/height")),
+            (CANVAS_WIDTH, 720),
+            "{} height alone",
+            want.id
+        );
+    }
 }
 
 // ---- the image formats ---------------------------------------------------
@@ -408,18 +490,74 @@ fn the_image_formats_cap_the_size_and_the_rate_the_project_would_have_given() {
     assert_eq!(fps_of(&apng), (25, 1));
 }
 
+/// On an image format a size is a box the picture is fitted inside, never
+/// upscaled, and the settings report the FIT — the size the file will
+/// have — for the cap and for an override alike, while a movie reports the
+/// override exactly (the writer letterboxes to it). The fit itself is
+/// `rc_export_sizes`'s rule, pinned in `export_size.rs`'s tests; here only
+/// that `rc_export_settings` applies the same one.
+#[test]
+fn an_image_format_resolves_to_the_fit_not_the_box() {
+    // A vertical 1080 × 1920 canvas on the 1600 × 900 fixture's project.
+    let handle = project().apply(&json!({"op": "set_canvas", "width": 1080, "height": 1920}));
+    let size = |value: &Value| (int(value, "/width"), int(value, "/height"));
+
+    // The cap: 270 tall, 1080 × 270 / 1920 = 151.875 → 152 wide.
+    assert_eq!(size(&settings(&handle, "gif", None)), (152, 270));
+    // The same box asked for by hand is the same fit.
+    assert_eq!(
+        size(&settings(
+            &handle,
+            "gif",
+            Some(&json!({"width": 480, "height": 270}))
+        )),
+        (152, 270)
+    );
+    // A box the canvas already fits inside is the canvas — never upscaled.
+    assert_eq!(
+        size(&settings(
+            &handle,
+            "gif",
+            Some(&json!({"width": 4000, "height": 4000}))
+        )),
+        (1080, 1920)
+    );
+    // A movie is the box itself, letterboxed by the writer.
+    assert_eq!(
+        size(&settings(
+            &handle,
+            "h264",
+            Some(&json!({"width": 480, "height": 270}))
+        )),
+        (480, 270)
+    );
+}
+
 #[test]
 fn an_override_still_beats_the_image_preset() {
     let handle = project();
-    // The cap is a default, not a rule: someone who wants a 4K GIF and
-    // knows what that costs is allowed to ask for one.
+    // The cap is a default, not a rule: a smaller box is honoured — the
+    // 16:9 fixture fills 320 × 180 exactly — and so is a rate.
     let out = settings(
         &handle,
         "gif",
-        Some(&json!({"width": 3840, "height": 2160, "fps": [10, 1]})),
+        Some(&json!({"width": 320, "height": 180, "fps": [10, 1]})),
     );
-    assert_eq!((int(&out, "/width"), int(&out, "/height")), (3840, 2160));
+    assert_eq!((int(&out, "/width"), int(&out, "/height")), (320, 180));
     assert_eq!(fps_of(&out), (10, 1));
+    // A bigger box is honoured too, up to the picture there is: an image
+    // format is never upscaled, so "4K" on a 1600 × 900 timeline is the
+    // timeline. That is the rule `an_image_format_resolves_to_the_fit_not_
+    // the_box` pins; here only that the override reached it.
+    let out = settings(
+        &handle,
+        "gif",
+        Some(&json!({"width": 3840, "height": 2160})),
+    );
+    assert_eq!(
+        (int(&out, "/width"), int(&out, "/height")),
+        (CANVAS_WIDTH, CANVAS_HEIGHT)
+    );
 }
 
 // ---- bitrates ------------------------------------------------------------
@@ -429,7 +567,7 @@ fn the_bitrates_round_trip_exactly() {
     let handle = project();
     let out = settings(
         &handle,
-        "h264_1080p",
+        "h264",
         Some(&json!({"video_bitrate": 8_000_000, "audio_bitrate": 192_000})),
     );
     assert_eq!(int(&out, "/video_bitrate"), 8_000_000);
@@ -437,11 +575,7 @@ fn the_bitrates_round_trip_exactly() {
 
     // Each is independent of the other: asking for one must not summon a
     // default for the other, because there is no default to summon.
-    let video_only = settings(
-        &handle,
-        "h264_1080p",
-        Some(&json!({"video_bitrate": 12_000_000})),
-    );
+    let video_only = settings(&handle, "h264", Some(&json!({"video_bitrate": 12_000_000})));
     assert_eq!(int(&video_only, "/video_bitrate"), 12_000_000);
     assert!(
         video_only.get("audio_bitrate").is_none(),
@@ -467,10 +601,10 @@ fn a_null_bitrate_means_the_preset_decides() {
     // a sheet can send one object with the fields it does not set nulled.
     let out = settings(
         &handle,
-        "hevc_1080p",
+        "hevc",
         Some(&json!({"video_bitrate": null, "audio_bitrate": null})),
     );
-    assert_eq!(out, settings(&handle, "hevc_1080p", None));
+    assert_eq!(out, settings(&handle, "hevc", None));
 }
 
 #[test]
@@ -493,7 +627,7 @@ fn a_bitrate_that_is_not_a_positive_count_of_bits_errors() {
         json!(4_294_967_296u64),
     ] {
         for key in ["video_bitrate", "audio_bitrate"] {
-            let msg = refusal(&handle, "h264_1080p", &one(key, bad.clone()));
+            let msg = refusal(&handle, "h264", &one(key, bad.clone()));
             assert_contains(&msg, key);
             assert_contains(&msg, &bad.to_string());
         }
@@ -503,7 +637,7 @@ fn a_bitrate_that_is_not_a_positive_count_of_bits_errors() {
     // the value and not about the bound being wrong.
     let out = settings(
         &handle,
-        "h264_1080p",
+        "h264",
         Some(&json!({"video_bitrate": 4_294_967_295u64})),
     );
     assert_eq!(int(&out, "/video_bitrate"), 4_294_967_295);
@@ -534,13 +668,13 @@ fn a_bitrate_is_accepted_by_every_preset_that_cannot_use_one() {
 #[test]
 fn an_override_key_this_build_does_not_know_is_ignored() {
     let handle = project();
-    let plain = settings(&handle, "h264_720p", None);
+    let plain = settings(&handle, "h264", None);
     // Documented on `export_settings`: a newer UI may send fields this
     // build has never heard of, and must still get an export rather than
     // an error. `quality` is exactly the shape of the next such field.
     let out = settings(
         &handle,
-        "h264_720p",
+        "h264",
         Some(&json!({"quality": "best", "bitrate": 8_000_000, "codec": "av1"})),
     );
     assert_eq!(out, plain);
@@ -550,13 +684,13 @@ fn an_override_key_this_build_does_not_know_is_ignored() {
 fn a_malformed_overrides_object_errors() {
     let handle = project();
     for bad in [json!("width=800"), json!([800, 600]), json!(7)] {
-        let msg = refusal(&handle, "h264_1080p", &bad);
+        let msg = refusal(&handle, "h264", &bad);
         assert_contains(&msg, "json object");
     }
     // Absent and null both mean "no overrides".
     assert_eq!(
-        settings(&handle, "h264_1080p", Some(&Value::Null)),
-        settings(&handle, "h264_1080p", None)
+        settings(&handle, "h264", Some(&Value::Null)),
+        settings(&handle, "h264", None)
     );
 }
 
@@ -570,7 +704,7 @@ fn the_range_snaps_to_the_export_rate_not_the_project_rate() {
     // frame 3 = 60 000. A duration of 100 000 is five frames exactly.
     let movie = settings(
         &handle,
-        "h264_1080p",
+        "h264",
         Some(&json!({"range": {"start": 50_000, "duration": 100_000}})),
     );
     assert_eq!(int(&movie, "/range/start"), 60_000);
@@ -596,7 +730,7 @@ fn the_range_is_clamped_to_the_project_after_snapping() {
     // whole project.
     let before = settings(
         &handle,
-        "h264_1080p",
+        "h264",
         Some(&json!({"range": {"start": -3 * SECOND}})),
     );
     assert_eq!(int(&before, "/range/start"), 0);
@@ -605,7 +739,7 @@ fn the_range_is_clamped_to_the_project_after_snapping() {
     // A duration past the end is cut to what is left after the start.
     let long = settings(
         &handle,
-        "h264_1080p",
+        "h264",
         Some(&json!({"range": {"start": 2 * SECOND, "duration": 99 * SECOND}})),
     );
     assert_eq!(int(&long, "/range/start"), 2 * SECOND);
@@ -632,7 +766,7 @@ fn a_range_that_resolves_to_nothing_is_refused() {
     // Half a frame at 30 fps rounds to zero.
     let msg = refusal(
         &handle,
-        "h264_1080p",
+        "h264",
         &json!({"range": {"start": 0, "duration": 9_000}}),
     );
     assert_contains(&msg, "empty");
@@ -640,13 +774,13 @@ fn a_range_that_resolves_to_nothing_is_refused() {
     // A start at or past the end leaves no room for any duration.
     let msg = refusal(
         &handle,
-        "h264_1080p",
+        "h264",
         &json!({"range": {"start": PROJECT_DURATION}}),
     );
     assert_contains(&msg, "empty");
     let msg = refusal(
         &handle,
-        "h264_1080p",
+        "h264",
         &json!({"range": {"start": 99 * SECOND, "duration": SECOND}}),
     );
     assert_contains(&msg, "empty");
@@ -664,7 +798,7 @@ fn a_range_that_resolves_to_nothing_is_refused() {
     assert_contains(&msg, &PROJECT_DURATION.to_string());
     let movie = settings(
         &handle,
-        "h264_1080p",
+        "h264",
         Some(&json!({"range": {"start": 0, "duration": 20_000}})),
     );
     assert_eq!(int(&movie, "/range/duration"), 20_000);
@@ -679,7 +813,7 @@ fn a_range_that_is_not_two_tick_counts_errors() {
         json!({"range": {"start": "0"}}),
         json!({"range": {"duration": 1.5}}),
     ] {
-        let msg = refusal(&handle, "h264_1080p", &bad);
+        let msg = refusal(&handle, "h264", &bad);
         assert_contains(&msg, "export range");
     }
 }

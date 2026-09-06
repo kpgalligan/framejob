@@ -21,7 +21,7 @@ Two documents in `designs/`, and you want both:
 
 ```sh
 make app        # cargo build --release + xcodegen + xcodebuild → build/Build/Products/Release/Reelcut.app
-make test       # cd core && cargo test --release  (117 black-box tests)
+make test       # cd core && cargo test --release  (222 black-box tests)
 make lint       # cargo clippy --all-targets -- -D warnings
 make typecheck  # swiftc -typecheck of app/Sources/*.swift — the ONLY authoritative Swift check
 make project    # xcodegen generate (Reelcut.xcodeproj is generated; project.yml is the source of truth)
@@ -30,12 +30,11 @@ make run        # make app, then launch
 
 `make typecheck` is fast and catches nearly everything; run it before
 `make app` (~90 s). Rust changes need `make test` and `make lint` too.
-`make typecheck` currently reports 0 errors and 9 warnings: 8 AVFoundation
-deprecations (4 in `CompositionBuilder.swift`, 4 in `Exporter.swift`), which
+`make typecheck` currently reports 0 errors and 4 warnings, all AVFoundation
+deprecations (3 in `CompositionBuilder.swift`, 1 in `Exporter.swift`), which
 are deliberate — their replacements are `async`-only and `async` is confined
-to `MediaImporter.swift` — plus one "comparing non-optional value … to nil"
-in `EditorViewController+AddClips.swift:49`. That is the whole baseline; any
-tenth warning is new and yours.
+to `MediaImporter.swift`. That is the whole baseline; any fifth warning is
+new and yours.
 
 ## File map
 
@@ -117,7 +116,11 @@ cannot see the screen. Those need eyes on the app.
 - **M1 — Cut: done.** Open a movie into an untitled project at its size and
   rate, import, tracks, move/trim/split/delete/ripple, playback and JKL,
   transform/crop/opacity, markers, `.reelcut` save/open, undo, H.264 and HEVC
-  export, and cut/copy/paste (⌘X/⌘C/⌘V — `EditorViewController+Clipboard.swift`
+  export (⌘E's Format popup opens on `h264`, the first row of `export.rs`'s
+  encoding-only table, and its Size popup on the first row of
+  `rc_export_sizes` — the document's own size — so an export is at the
+  document's size unless another row or a custom size is picked), and
+  cut/copy/paste (⌘X/⌘C/⌘V — `EditorViewController+Clipboard.swift`
   over the `paste` op, whose payload schema is `core/src/edit_paste.rs`'s
   module doc).
 - **M2 — Compose: done.** Text, shapes, transitions, audio

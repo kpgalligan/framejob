@@ -1,8 +1,8 @@
 //! C FFI: the read-only queries (`rc_project_duration`,
 //! `rc_project_composition_plan`, `rc_project_frame_recipe`,
 //! `rc_project_clip_state`, `rc_project_snap_candidates`,
-//! `rc_snap_resolve`, `rc_op_names` and the `rc_export_*` pair in the
-//! header).
+//! `rc_snap_resolve`, `rc_op_names` and the three `rc_export_*` queries in
+//! the header).
 //!
 //! Thin shims only, all of them pure: a query never changes the project
 //! and never allocates a handle. Every JSON answer here is COMPACT, unlike
@@ -11,8 +11,9 @@
 //! the plan on every edit for a string compare — so the whitespace would
 //! be paid for at frame rate and read by nobody.
 //!
-//! A query has no `err_out` except [`rc_export_settings`], whose failures
-//! (an unknown preset, a bad override) are a user-facing dialog. The rest
+//! A query has no `err_out` except the two export resolvers,
+//! [`rc_export_sizes`] and [`rc_export_settings`], whose failures (an
+//! unknown preset, a bad override) are a user-facing dialog. The rest
 //! answer NULL, 0 or `t` for a NULL project, an unknown id or malformed
 //! JSON — there is nothing a caller could do with a message it did not
 //! already know from the id it passed in.
@@ -180,7 +181,10 @@ pub unsafe extern "C" fn rc_op_names() -> *mut c_char {
     }
 }
 
-/// The export presets as a JSON array (spec §7.8), in menu order.
+/// The export presets as a JSON array (spec §7.8), in menu order: one row
+/// per encoding, none with a size of its own but the two image caps. The
+/// FIRST row is the default: the export sheet opens on it, which is why the
+/// table puts H.264 there (`export::PRESETS`).
 ///
 /// # Safety
 /// Takes no pointers; declared `unsafe` only so the whole exported surface
@@ -194,6 +198,45 @@ pub unsafe extern "C" fn rc_export_presets() -> *mut c_char {
             "listing export presets",
             ptr::null_mut(),
             || Ok(export::presets().to_string()),
+            out_string,
+        )
+    }
+}
+
+/// The output sizes the export sheet offers for `preset_id` against the
+/// project, as a JSON array of `{id, name, width, height}` in menu order,
+/// the FIRST row the default: the document's own size, or an image
+/// format's cap ahead of it (`Project::export_sizes` in `export_size.rs`
+/// says why the standard rows are named by their short edge). NULL with a
+/// message through `err_out` for a NULL project, a NULL `preset_id` or an
+/// unknown preset.
+///
+/// # Safety
+/// `p` must be NULL or a valid handle from this library that has not been
+/// freed; `preset_id` must be NULL or a valid NUL-terminated C string;
+/// `err_out` must be NULL or a valid pointer to writable `*mut c_char`.
+/// Both the result and the message are freed with
+/// [`crate::ffi::rc_string_free`].
+#[no_mangle]
+pub unsafe extern "C" fn rc_export_sizes(
+    p: *const Project,
+    preset_id: *const c_char,
+    err_out: *mut *mut c_char,
+) -> *mut c_char {
+    let body = || {
+        if p.is_null() {
+            return Err("project is NULL".to_string());
+        }
+        let preset = unsafe { read_cstr(preset_id, "preset_id") }?;
+        let project = unsafe { &*p };
+        project.export_sizes(&preset).map(|sizes| sizes.to_string())
+    };
+    unsafe {
+        fallible_op(
+            err_out,
+            "listing export sizes",
+            ptr::null_mut(),
+            body,
             out_string,
         )
     }

@@ -36,8 +36,8 @@ use reelcut_core::ffi::{
 };
 use reelcut_core::ffi_edit::rc_project_apply;
 use reelcut_core::ffi_query::{
-    rc_export_settings, rc_project_clip_state, rc_project_composition_plan, rc_project_duration,
-    rc_project_frame_recipe, rc_project_snap_candidates,
+    rc_export_settings, rc_export_sizes, rc_project_clip_state, rc_project_composition_plan,
+    rc_project_duration, rc_project_frame_recipe, rc_project_snap_candidates,
 };
 use reelcut_core::model::Project;
 
@@ -317,6 +317,27 @@ impl Handle {
             "rc_project_snap_candidates",
         );
         parse_json(&out, "rc_project_snap_candidates")
+    }
+
+    /// The Size popup's rows for `preset` — `rc_export_sizes` — or the
+    /// message explaining the refusal.
+    pub fn export_sizes(&self, preset: &str) -> Result<Value, String> {
+        let preset_text = cstring(preset);
+        let mut err: *mut c_char = ptr::null_mut();
+        let raw = unsafe { rc_export_sizes(self.ptr, preset_text.as_ptr(), &mut err) };
+        match take_string(raw) {
+            Some(text) => {
+                assert!(
+                    err.is_null(),
+                    "rc_export_sizes returned sizes AND set err_out"
+                );
+                Ok(parse_json(&text, "rc_export_sizes"))
+            }
+            None => {
+                Err(take_string(err)
+                    .expect("rc_export_sizes returned NULL without setting err_out"))
+            }
+        }
     }
 
     /// Resolved export settings, or the message explaining the refusal.

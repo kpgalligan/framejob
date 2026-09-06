@@ -718,7 +718,7 @@ server.
    (timeline, canvas,           ▲ undo = old handle               Frame recipe(t)          + AudioMix + VideoComposition
     inspector, agent)           │                                      │                          │
                                 │                                      ▼                          ▼
-                                └──── new handle + snapshot ◀──  Metal compositor ◀── decoded frames ── AVPlayer / AVAssetExportSession
+                                └──── new handle + snapshot ◀──  Metal compositor ◀── decoded frames ── AVPlayer / ExportWriter
                                                                  (AVVideoCompositing)
                                                                        │
                                                                        ▼
@@ -764,8 +764,9 @@ char   *rc_timecode_format(int64_t t, uint32_t fps_num, uint32_t fps_den, bool f
 bool    rc_timecode_parse(const char *s, uint32_t fps_num, uint32_t fps_den, int64_t *out);
 
 /* export */
-char *rc_export_presets(void);                                          /* [{id, name, container, codec, ...}] */
-char *rc_export_settings(const RcProject *p, const char *preset_id, const char *overrides_json);
+char *rc_export_presets(void);                                          /* [{id, name, container, codec, size, ...}], one per encoding */
+char *rc_export_sizes(const RcProject *p, const char *preset_id, char **err_out); /* [{id, name, width, height}], the default first */
+char *rc_export_settings(const RcProject *p, const char *preset_id, const char *overrides_json, char **err_out);
 
 /* agent — same signatures as Rasterize's rz_agent_* (copy them) */
 ```
@@ -925,7 +926,7 @@ Asked once per frame by the compositor, and by the overlay for hit-testing.
 | `Compositor.swift` | the `AVVideoCompositing` class and its Metal pipeline (§7.5) |
 | `LayerRenderers.swift` | text (Core Text) and shape (Core Graphics) descriptions → premultiplied BGRA `MTLTexture`s, LRU-cached by hash; reports measured text sizes to the overlay |
 | `MediaImporter.swift` | `AVURLAsset` probing (the **one** place `async`/`await` is allowed — AVFoundation's loading API is async-only going forward), thumbnails via `AVAssetImageGenerator`, peaks via `AVAssetReader` + vDSP, cache files in the package |
-| `Exporter.swift` | M1: `AVAssetExportSession` over the same composition, preset from the core, progress sheet. M2: `AVAssetReader`/`AVAssetWriter` path for chapters, explicit bitrates, GIF/APNG |
+| `Exporter.swift` | picks the pipeline for the core's settings — `ExportWriter` (`AVAssetReader`/`AVAssetWriter`: chapters, explicit bitrates) or the ImageIO frame sequence for GIF/APNG — reports progress, and renders one frame offline for `render_frame` |
 | `TimelineView.swift` | custom `NSView` in an `NSScrollView`; drawing from the snapshot; gesture sessions (`ClipDragSession`, `TrimSession`, `RangeSession`, `MarkerDragSession`) as structs; `on*` closures to the VC |
 | `PreviewCanvasView.swift` | `AVPlayerLayer` under a transparent overlay `NSView`; `CanvasSession` structs for move/scale/rotate/crop; handle drawing |
 | `InspectorViewController.swift` + `VideoPane` / `AudioPane` / `TextPane` / `ShapePane` / `MediaPane` / `DocumentPane` | one file per tab, descriptor-driven controls from `OptionControls.swift` |
@@ -1004,15 +1005,43 @@ WebM, AVI and VP9/AV1 are not opened (§11).
 
 ### 7.8 Export
 
-Presets (`rc_export_presets`): H.264 1080p / 720p / source size, HEVC
-1080p / 4K, ProRes 422 (MOV), Audio only (M4A), Animated GIF, Animated PNG.
+Presets (`rc_export_presets`), in menu order, are ENCODINGS — a container
+and a codec, with no size of their own: `h264` H.264 (MP4), `hevc` HEVC
+(MP4), `prores_422` ProRes 422 (MOV), `audio_m4a` Audio only (M4A), `gif`
+Animated GIF, `apng` Animated PNG. The size is a separate choice whose
+default is the document's own size, so a 1440p or a vertical project does
+not come out at 1920 × 1080 because a row said so; the two image formats
+are the exception and carry the cap argued below. **The first row of each
+list is the default.** The export sheet opens on `h264`, and its Size
+popup on the first row of `rc_export_sizes(project, preset)`, which lists
+the sizes offered for that document and format: the document's size
+(`document` — "Document size", not "source size": §4.3's source size is a
+media item's, and this row renders at the canvas), or for an image format
+its cap (`preset`) with the document's size second; then the standard
+sizes fitted to the document's aspect, largest first — `2160p` (named 4K),
+`1440p`, `1080p`, `720p`. The number is the SHORT edge, because "1080p
+ultrawide" is 2560 × 1080 and "1080p vertical" is 1080 × 1920 — the short
+edge is the number people mean — and the long edge is the document's,
+scaled to match and rounded to the nearest even integer, since H.264 and
+HEVC need even dimensions and a size the writer would quietly change is
+not one the sheet may offer. A row may repeat an earlier row's numbers —
+a 1920 × 1080 document's `1080p` is its own size — and is listed anyway,
+because an id is the `export` tool's vocabulary and has to mean the same
+thing on every document; the sheet hides a row whose numbers an earlier
+row already has, keeping the name that says more. On an image format
+every row's numbers are the canvas fitted inside that box, never upscaled
+(below). The audio-only preset lists the same rows as `h264` and the sheet
+disables the control. The agent's `export` takes the same ids in its
+`size`, or an explicit `[width, height]` (the sheet's "Custom…").
 `rc_export_settings` resolves a preset plus overrides (size, fps, range =
 whole or in/out, `optimize_for_network`, and the two bitrates below) to
-concrete settings. Each movie preset still carries an
-`AVAssetExportSession` preset name (`AVAssetExportPresetHEVCHighestQuality`,
-`…1920x1080`, `…AppleProRes422LPCM`, `…AppleM4A`) — that mapping is what
-names the codec and tier, and `avf_preset: null` is how a preset says
-AVFoundation cannot write it at all. But **nothing runs a session any
+concrete settings, no size override meaning the preset's cap where it has
+one and the canvas otherwise. Each preset AVFoundation can write still
+carries an `AVAssetExportSession` preset name
+(`AVAssetExportPresetHighestQuality`, `…HEVCHighestQuality`,
+`…AppleProRes422LPCM`, `…AppleM4A`) — that mapping is what names the
+codec and tier, and `avf_preset: null` is how a preset says AVFoundation
+cannot write it at all. But **nothing runs a session any
 more**: M2's `AVAssetWriter` path REPLACED it rather than joining it, for
 the reason the whole design exists — two writers would make the chapter
 track, the explicit bitrates and the output size conditional on which one
@@ -1045,7 +1074,17 @@ is a whole number of hundredths of a second, and 8 cs is the longest that
 still reads as motion), APNG at 960 × 540 and 25 fps (true colour and
 lossless, so it earns the extra pixels, and an `fcTL` delay is an exact
 rational needing no such rounding). Both caps are defaults a size or fps
-override replaces.
+override replaces. On these two formats a size — the cap, a row of the
+Size popup, a custom size — is a box the picture is FITTED inside, aspect
+kept and never upscaled, where the movie writer letterboxes to exactly the
+frame asked for (`AVVideoScalingModeResizeAspect`): padding a GIF costs
+bytes in every frame for pixels that carry nothing, and a bigger frame
+carries no more detail. The core does the fitting (`export_size.rs`,
+applied by `rc_export_settings` and `rc_export_sizes` alike), so the Size
+popup, the sheet's readout and the `export` tool all report the numbers
+the file will have — a vertical 1080 × 1920 timeline's "GIF default" is
+152 × 270 — and `ExporterImageSequence` draws each frame at exactly that
+size rather than fitting a second time.
 
 ### 7.9 Agent
 
@@ -1060,9 +1099,11 @@ cannot be checked by driving the built app),
 `render_frame {t, max_width?}` → PNG (the verification hook: the
 compositor renders offline through an `AVAssetImageGenerator` over the
 same composition + video composition), and
-`export {preset, path, range?, video_bitrate?, audio_bitrate?}` — the
-export sheet's four controls, so an agent export and a menu export can ask
-for the same file. Handlers
+`export {preset, path, size?, range?, video_bitrate?, audio_bitrate?}` —
+the export sheet's five controls in the sheet's own vocabulary (all but
+the frame rate: the tool exports at the document's, or on GIF and APNG at
+the format's cap), so an agent export and a menu export can ask for the
+same file. Handlers
 use `performGroupedEdit` so off-event edits get their own undo group
 (Rasterize's `AgentServer.performGroupedEdit`). Default port 4817; env
 `RC_AGENT_PORT`; launch flag `-AgentServerEnabled YES`.
@@ -1088,7 +1129,8 @@ concern is a new module with its own `impl Project` block.
 | `audio.rs` | envelopes: fades, volume actions, ducking, mute |
 | `snap.rs` | candidates and `resolve` |
 | `format.rs` | `RC_FORMAT_VERSION`, `RC_CAPS`, read-any-version / write-current |
-| `export.rs` | presets and settings resolution |
+| `export.rs` | presets (one per encoding) and settings resolution |
+| `export_size.rs` | `export_sizes(preset)`: the Size popup's rows — the document's size, an image format's cap, the standard sizes fitted to the document's aspect by the short-edge rule — and `fit_within`, the rule for what a size means on an image format, which `export_settings` applies too |
 | `agent.rs` | MCP server (copied) |
 | `ffi.rs` / `ffi_edit.rs` / `ffi_query.rs` / `ffi_agent.rs` / `ffi_util.rs` | thin shims; `ffi_util` holds `catch_unwind` + `err_out` + CString helpers (copy Rasterize's) |
 
@@ -1266,9 +1308,11 @@ assisted import.
    commits one undo step.
 9. **Markers + Document tab.** Add/move/rename markers, canvas size and
    fps ops with `rescale_clips`. *Verify:* op tests and the ruler.
-10. **Export.** Presets, the export sheet, `Exporter` over
-    `AVAssetExportSession`, progress, cancel. *Verify:* the exported file
-    plays in QuickTime Player and matches `render_frame` at three times.
+10. **Export.** Presets (one per encoding) and sizes, the export sheet,
+    `Exporter` over `ExportWriter`, progress, cancel. *Verify:*
+    the exported file plays in QuickTime Player and matches `render_frame`
+    at three times, and a project whose canvas is not 1920 × 1080 exports
+    at its own size with the sheet's defaults.
 11. **Multi-track + thumbnails + peaks.** A/B assignment and instruction
     ranges for several tracks, layer ordering, hidden/muted/locked
     tracks, filmstrips and waveforms from the cache. *Verify:* the tiling

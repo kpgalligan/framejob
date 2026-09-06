@@ -147,8 +147,26 @@ bool rc_timecode_parse(const char *s, uint32_t fps_num, uint32_t fps_den, int64_
 
 /* ---------------------------------------------------------------- export */
 
-/* The export presets as a JSON array (spec 7.8). */
+/* The export presets as a JSON array (spec 7.8), in menu order: one row per
+   ENCODING — a container and a codec — with no size of its own, so that an
+   export is at the document's size unless a size is asked for. The two
+   image formats are the exception and carry the cap 7.8 argues. The FIRST
+   row is the default the export sheet opens on. */
 char *rc_export_presets(void);
+
+/* The output sizes the export sheet offers for `preset_id` against this
+   project, as a JSON array of {id, name, width, height} in menu order. The
+   FIRST row is the default: the document's own size ("document"), or for an
+   image format its cap ("preset"). After it come the standard sizes fitted to
+   the document's aspect — "2160p" (named 4K), "1440p", "1080p", "720p": the
+   number is the SHORT edge, the long edge follows the document, rounded to
+   even. On an image format every row's numbers are the canvas fitted inside
+   that box, never upscaled — the size the file will have. A row may repeat an
+   earlier row's numbers (a 1920 × 1080 document's "1080p" is its own size)
+   and is listed anyway, since an id must mean the same thing on every
+   document; the sheet hides repeats. NULL with a message through `err_out`
+   for a NULL project, a NULL `preset_id`, or an unknown preset. */
+char *rc_export_sizes(const RcProject *p, const char *preset_id, char **err_out);
 
 /* A preset plus optional `overrides_json` resolved against the project into
  * concrete settings. NULL with a message through `err_out` for an unknown

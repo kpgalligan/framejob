@@ -8,7 +8,8 @@ lockstep are in the root `CLAUDE.md`; the full design is
 
 - `ReelCore.swift` — the **only** home for `rc_*` calls: `ReelProject`
   (handle + lazily decoded `ProjectSnapshot`), the typed op builders that
-  mirror `core/src/edit.rs`'s op table, timecode, snapping, export settings,
+  mirror `core/src/edit.rs`'s op table, timecode, snapping, export presets,
+  sizes and settings (`ExportPreset`, `ExportSize`, `ExportSettings`),
   and `RecipeSource`. `deinit` frees the Rust allocation. There is no
   untyped op-JSON call site anywhere else.
 - `ProjectSnapshot.swift` — the `Codable` mirror of the §5.2 project JSON:

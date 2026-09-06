@@ -38,7 +38,16 @@ lockstep are in the root `CLAUDE.md`; the full design is
 - `snap.rs` — candidates and `resolve`.
 - `format.rs` — `RC_FORMAT_VERSION`, `RC_CAPS`, read-any-version /
   write-current.
-- `export.rs` — presets and settings resolution.
+- `export.rs` — presets (one per encoding; the two image caps are the only
+  sizes in the table) and settings resolution. `preset(id)` is the one
+  lookup both resolvers share.
+- `export_size.rs` — `export_sizes(preset)`: the sizes the export sheet
+  offers for a document and a format — the format's cap, the document's
+  own size, then the standard sizes named by their SHORT edge and fitted to
+  the document's aspect, rounded to even; rows may repeat and the sheet
+  hides them. Also `fit_within`, what a size MEANS on an image format (the
+  picture fitted inside it, never upscaled), which `export_settings` uses
+  so the resolved numbers are the file's.
 - `agent.rs` — embedded MCP server (streamable HTTP, tools only).
   **Generic** — knows nothing about video; the host registers the catalog
   and a callback. Copied from Rasterize; do not add domain knowledge.

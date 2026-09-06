@@ -41,14 +41,26 @@ extension AgentServer {
 
     func intArg(_ a: [String: Any], _ key: String) throws -> Int? {
         try scalarArg(a, key, "a whole number") { raw in
-            (raw as? NSNumber)?.intValue ?? (raw as? String).flatMap(Int.init)
+            Self.numeric(raw)?.intValue ?? (raw as? String).flatMap(Int.init)
         }
     }
 
     func doubleArg(_ a: [String: Any], _ key: String) throws -> Double? {
         try scalarArg(a, key, "a number") { raw in
-            (raw as? NSNumber)?.doubleValue ?? (raw as? String).flatMap(Double.init)
+            Self.numeric(raw)?.doubleValue ?? (raw as? String).flatMap(Double.init)
         }
+    }
+
+    /// `raw` as a number, or nil for a JSON boolean. `JSONSerialization`
+    /// hands `true` over as an `NSNumber` too, and reading it as 1 would
+    /// let `video_bitrate: true` reach the core as one bit per second — a
+    /// wrong-typed value taken silently, which is the failure every reader
+    /// here exists to refuse. Only the type id tells the two apart.
+    private static func numeric(_ raw: Any) -> NSNumber? {
+        guard let number = raw as? NSNumber,
+            CFGetTypeID(number) != CFBooleanGetTypeID()
+        else { return nil }
+        return number
     }
 
     func boolArg(_ a: [String: Any], _ key: String) throws -> Bool? {
