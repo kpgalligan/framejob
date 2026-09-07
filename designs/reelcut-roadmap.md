@@ -2,8 +2,9 @@
 
 **Status: M1, M2 and M3 are built. Every feature in `reelcut-design.md`'s
 milestone list (§10) is implemented and verified against a running binary.**
-What is left is not features: it is the half of the acceptance tests that
-needs a person at the machine, and a short list of known limits.
+What is left of the SPEC is not features: it is the half of the acceptance
+tests that needs a person at the machine, and a short list of known limits.
+What to build beyond the spec is `reelcut-roadmap-2.md`.
 
 This is the companion to `reelcut-design.md`, which stays normative for the
 schemas (§5), the op table (§6) and the architecture (§7); this document never

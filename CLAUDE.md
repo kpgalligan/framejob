@@ -6,14 +6,19 @@ Rust staticlib core, the same shape as `~/devel/rasterize`.
 **It builds and runs.** M1 (Cut) is done and verified against spec §10; most
 of M2 landed with it.
 
-Three things in `designs/`, and you want all of them:
+Four things in `designs/`, and you want all of them:
 
 - `designs/reelcut-design.md` — the normative spec. The schemas (§5), the op
   table (§6) and the architecture (§7) govern any change to either side; §11
   holds decisions already made, which are not to be re-litigated.
-- **`designs/reelcut-roadmap.md` — what is left to build, in six phases**,
-  each naming the files it lands in and what would prove it done. **Start
-  here if you are picking up new work.**
+- `designs/reelcut-roadmap.md` — the record of M1–M3: what proved each
+  piece, what still needs a person at the machine, and the known limits.
+- **`designs/reelcut-roadmap-2.md` — what to build next, in ten phases**
+  (cutting moves, clip identity, the screencast trio, captions and text
+  animations, sound, looks, output, viewing, and entering a nest), each
+  naming its ops, schema bump, files, MCP mirrors and the proof that closes
+  it. **Start here if you are picking up new work**, and update its status
+  table as phases land.
 - `designs/design_handoff_reelcut/` — the chrome cleanup and the identity,
   now SHIPPED. Its `README.md` is the normative source for the redesign's
   metrics (spec §3–§4.4 summarises them); the two `.dc.html` files are
