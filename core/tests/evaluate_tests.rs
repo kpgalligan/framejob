@@ -1210,6 +1210,148 @@ fn a_hidden_track_draws_nothing_and_a_muted_track_still_draws() {
     );
 }
 
+// ---- solo ----------------------------------------------------------------
+
+/// Sets a track flag the way a FILE carries it, on the track at `index`.
+/// A fixture edit rather than a `set_track` op, so two variants of one base
+/// share every id and every track position and their plans compare as text.
+fn set_track_flag(project: &mut Value, index: usize, flag: &str) {
+    project["tracks"][index][flag] = json!(true);
+}
+
+#[test]
+fn a_soloed_track_silences_every_other_track_and_nothing_else() {
+    // Track 3 soloed among three. By hand: tracks 2 and 4 are treated as
+    // muted — a zero envelope over their clips' extent — and track 3 plays
+    // exactly as it did. Every segment stays, since a solo is an envelope
+    // and never a rebuild (spec §7.2).
+    let base = Handle::from_value(&three_track_project()).plan();
+    let mut soloed = three_track_project();
+    set_track_flag(&mut soloed, 1, "solo");
+    let handle = Handle::from_value(&soloed);
+    let plan = handle.plan();
+
+    assert_eq!(
+        comp_track_ids(&plan, "audio_tracks"),
+        vec![FIRST_AUDIO, FIRST_AUDIO + 1, FIRST_AUDIO + 2]
+    );
+    for id in [FIRST_AUDIO, FIRST_AUDIO + 1, FIRST_AUDIO + 2] {
+        assert_eq!(
+            array(comp_track(&plan, "audio_tracks", id), "/segments").len(),
+            1,
+            "a solo keeps every segment: un-soloing must not rebuild"
+        );
+    }
+    assert_ramps(
+        array(comp_track(&plan, "audio_tracks", FIRST_AUDIO), "/ramps"),
+        &[(0, 10 * SEC, 0.0, 0.0)],
+    );
+    assert_ramps(
+        array(comp_track(&plan, "audio_tracks", FIRST_AUDIO + 1), "/ramps"),
+        &[(0, 10 * SEC, 1.0, 1.0)],
+    );
+    assert_ramps(
+        array(comp_track(&plan, "audio_tracks", FIRST_AUDIO + 2), "/ramps"),
+        &[(0, 10 * SEC, 0.0, 0.0)],
+    );
+    // The soloed track's own envelope is what it was without the solo.
+    assert_eq!(
+        comp_track(&plan, "audio_tracks", FIRST_AUDIO + 1)["ramps"],
+        comp_track(&base, "audio_tracks", FIRST_AUDIO + 1)["ramps"]
+    );
+
+    // Audio only: every layer still draws, and the picture side of the plan
+    // is untouched.
+    assert_eq!(layer_ids(&handle.recipe(5 * SEC)), vec![11, 12, 13]);
+    assert_eq!(plan["video_tracks"], base["video_tracks"]);
+    assert_eq!(plan["instructions"], base["instructions"]);
+}
+
+#[test]
+fn a_track_that_is_both_muted_and_soloed_is_silent() {
+    // Mute wins. Track 3 carries both flags: its mute silences it, and its
+    // solo silences tracks 2 and 4 — all three are zero, segments intact.
+    let mut both = three_track_project();
+    set_track_flag(&mut both, 1, "muted");
+    set_track_flag(&mut both, 1, "solo");
+    let plan = Handle::from_value(&both).plan();
+
+    for id in [FIRST_AUDIO, FIRST_AUDIO + 1, FIRST_AUDIO + 2] {
+        let comp = comp_track(&plan, "audio_tracks", id);
+        assert_eq!(array(comp, "/segments").len(), 1);
+        assert_ramps(array(comp, "/ramps"), &[(0, 10 * SEC, 0.0, 0.0)]);
+    }
+}
+
+#[test]
+fn a_solo_on_a_track_with_nothing_audible_still_silences_the_others() {
+    // The rule is on the track SET, not on what plays: track 3 holds one
+    // clip of a silent movie, and soloing it mutes the two tracks that do
+    // have sound. Clip 12 gets no audio segment at all, so the two
+    // composition audio tracks are track 2's and track 4's. (Media 5: the
+    // project has one id space, and 2 is the first track's.)
+    let silent_movie = media(5, "video", 60 * SEC, [30, 1], true, false);
+    let mut value = project(
+        vec![video_media(1), silent_movie],
+        vec![track(2), track(3), track(4)],
+        vec![
+            media_clip(11, 2, 0, 10 * SEC, 1),
+            media_clip(12, 3, 0, 10 * SEC, 5),
+            media_clip(13, 4, 0, 10 * SEC, 1),
+        ],
+        14,
+    );
+    set_track_flag(&mut value, 1, "solo");
+    let handle = Handle::from_value(&value);
+    let plan = handle.plan();
+
+    assert_eq!(
+        clip_to_comp_track(&plan, "audio_tracks"),
+        vec![(11, FIRST_AUDIO), (13, FIRST_AUDIO + 1)]
+    );
+    for id in [FIRST_AUDIO, FIRST_AUDIO + 1] {
+        assert_ramps(
+            array(comp_track(&plan, "audio_tracks", id), "/ramps"),
+            &[(0, 10 * SEC, 0.0, 0.0)],
+        );
+    }
+    // The silent movie still draws: solo is a mixing word.
+    assert_eq!(layer_ids(&handle.recipe(5 * SEC)), vec![11, 12, 13]);
+}
+
+#[test]
+fn soloing_one_track_is_the_same_plan_as_muting_every_other() {
+    // Two documents from ONE base, so every id and every track position
+    // agrees and the plans compare as the bytes Swift compares (spec §7.6):
+    // "solo track 3" and "mute tracks 2 and 4" must be one plan, or the app
+    // would build two different audio mixes for one mix.
+    let mut soloed = three_track_project();
+    set_track_flag(&mut soloed, 1, "solo");
+    let mut others_muted = three_track_project();
+    set_track_flag(&mut others_muted, 0, "muted");
+    set_track_flag(&mut others_muted, 2, "muted");
+    let soloed = Handle::from_value(&soloed);
+    let others_muted = Handle::from_value(&others_muted);
+
+    assert_eq!(soloed.plan_text(), others_muted.plan_text());
+
+    // And that plan is neither "everything silent" nor the base's: the
+    // track in question plays and the equality is not vacuous.
+    let plan = soloed.plan();
+    assert_ramps(
+        array(comp_track(&plan, "audio_tracks", FIRST_AUDIO + 1), "/ramps"),
+        &[(0, 10 * SEC, 1.0, 1.0)],
+    );
+    assert_ramps(
+        array(comp_track(&plan, "audio_tracks", FIRST_AUDIO), "/ramps"),
+        &[(0, 10 * SEC, 0.0, 0.0)],
+    );
+    assert_ne!(
+        soloed.plan_text(),
+        Handle::from_value(&three_track_project()).plan_text()
+    );
+}
+
 // ---- missing media -------------------------------------------------------
 
 #[test]
@@ -1239,6 +1381,8 @@ fn a_clip_whose_media_is_absent_renders_a_slate() {
         shape: None,
         actions: Vec::new(),
         transition_in: None,
+        name: None,
+        label: None,
     });
     value.next_id = 12;
 
@@ -1479,7 +1623,7 @@ fn a_segment_never_names_source_time_outside_the_file() {
 /// An action's `end` patch is deliberately lenient — `set_action_end` merges
 /// whatever it is handed — so the evaluator is the last line of defence
 /// before a value reaches the Metal compositor's uniform block. It bounds
-/// every evaluated field to the same table `edit_props.rs` enforces on a
+/// every evaluated field to the same table `props_check.rs` enforces on a
 /// direct edit, and collapses a NaN to the neutral value rather than
 /// propagating it (one NaN blanks a whole frame).
 ///

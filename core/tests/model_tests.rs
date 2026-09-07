@@ -80,7 +80,9 @@ fn base_clip(id: u64, track: u64, start: i64, duration: i64, source: Value) -> V
         "text": null,
         "shape": null,
         "actions": [],
-        "transition_in": null
+        "transition_in": null,
+        "name": null,
+        "label": null
     })
 }
 
@@ -99,6 +101,8 @@ fn full_project() -> Value {
     );
     clip10["enabled"] = json!({ "video": true, "audio": false });
     clip10["speed"] = json!(1.5);
+    clip10["name"] = json!("Talk");
+    clip10["label"] = json!("blue");
     clip10["video"] = json!({
         "x": 120.5, "y": -64.25, "scale": 0.75, "rotation": 12.5, "opacity": 0.9,
         "crop": { "l": 10.0, "t": 20.0, "r": 30.0, "b": 40.0 },
@@ -297,7 +301,7 @@ fn full_project() -> Value {
     clips.push(clip40);
 
     json!({
-        "version": 2,
+        "version": 3,
         "canvas": {
             "width": 1280, "height": 720, "fps": [30000, 1001],
             "background": [0.1, 0.2, 0.3, 1.0],
@@ -315,8 +319,10 @@ fn full_project() -> Value {
               "fps": [30, 1], "has_video": true, "has_audio": false, "has_alpha": true }
         ],
         "tracks": [
-            { "id": 4, "name": "Track 1", "hidden": false, "muted": false, "locked": false },
-            { "id": 5, "name": "Overlay", "hidden": true, "muted": true, "locked": true }
+            { "id": 4, "name": "Track 1", "hidden": false, "muted": false, "locked": false,
+              "solo": false },
+            { "id": 5, "name": "Overlay", "hidden": true, "muted": true, "locked": true,
+              "solo": true }
         ],
         "clips": clips,
         "markers": [
@@ -331,7 +337,7 @@ fn full_project() -> Value {
                 "id": 60, "name": "Intro", "width": 1280, "height": 720,
                 "tracks": [
                     { "id": 61, "name": "Nested", "hidden": false,
-                      "muted": false, "locked": false }
+                      "muted": false, "locked": false, "solo": false }
                 ],
                 "clips": [
                     base_clip(62, 61, 0, 1_200_000,
@@ -345,7 +351,7 @@ fn full_project() -> Value {
                 "id": 70, "name": "Logo", "width": 640, "height": 360,
                 "tracks": [
                     { "id": 71, "name": "Nested", "hidden": false,
-                      "muted": false, "locked": false }
+                      "muted": false, "locked": false, "solo": false }
                 ],
                 "clips": [
                     base_clip(72, 71, 0, 600_000, json!({ "kind": "image", "media": 3 }))
@@ -488,7 +494,7 @@ fn a_new_project_is_the_documented_empty_project() {
     assert_eq!(
         project.value(),
         json!({
-            "version": 2,
+            "version": 3,
             "canvas": {
                 "width": 1280, "height": 720, "fps": [30000, 1001],
                 "background": [0.0, 0.0, 0.0, 1.0],
@@ -496,7 +502,7 @@ fn a_new_project_is_the_documented_empty_project() {
             },
             "media": [],
             "tracks": [{ "id": 1, "name": "Track 1", "hidden": false,
-                         "muted": false, "locked": false }],
+                         "muted": false, "locked": false, "solo": false }],
             "clips": [],
             "markers": [],
             "next_id": 2,
@@ -524,7 +530,7 @@ fn an_empty_object_is_an_empty_project() {
     assert_eq!(
         project,
         json!({
-            "version": 2,
+            "version": 3,
             "canvas": {
                 "width": 1920, "height": 1080, "fps": [30, 1],
                 "background": [0.0, 0.0, 0.0, 1.0],
@@ -559,7 +565,7 @@ fn omitted_optional_keys_take_the_documented_defaults() {
     }))
     .value();
 
-    assert_eq!(at(&project, "/version"), &json!(2));
+    assert_eq!(at(&project, "/version"), &json!(3));
     // A file that never heard of nests reads as one with none, which is
     // what "every new field carries a serde default" buys.
     assert_eq!(at(&project, "/nests"), &json!([]));
@@ -574,7 +580,8 @@ fn omitted_optional_keys_take_the_documented_defaults() {
     );
     assert_eq!(
         at(&project, "/tracks/0"),
-        &json!({ "id": 1, "name": "", "hidden": false, "muted": false, "locked": false }),
+        &json!({ "id": 1, "name": "", "hidden": false, "muted": false, "locked": false,
+                 "solo": false }),
         "track defaults"
     );
     assert_eq!(
@@ -597,7 +604,8 @@ fn omitted_optional_keys_take_the_documented_defaults() {
             "actions": [
                 { "id": 6, "start": 0, "duration": 600_000, "curve": "linear", "end": {} }
             ],
-            "transition_in": null
+            "transition_in": null,
+            "name": null, "label": null
         }),
         "clip and action defaults"
     );
@@ -812,10 +820,10 @@ fn an_unknown_source_kind_is_a_schema_error() {
 
 #[test]
 fn a_newer_format_version_is_refused_and_says_so() {
-    let msg = Handle::try_from_value(&json!({ "version": 3 }))
+    let msg = Handle::try_from_value(&json!({ "version": 4 }))
         .expect_err("a newer format version must be refused");
-    assert_contains(&msg, "version 3 is newer than this build understands");
-    assert_contains(&msg, "(version 2)");
+    assert_contains(&msg, "version 4 is newer than this build understands");
+    assert_contains(&msg, "(version 3)");
     assert_contains(&msg, "update Reelcut");
 
     // The gate reads the RAW json, so it has to cope with however the
@@ -823,9 +831,9 @@ fn a_newer_format_version_is_refused_and_says_so() {
     // as a JSON float is the case that would otherwise slip past `as_u64`,
     // fall back to "current", and reach the user as a schema error about a
     // field this build has never heard of.
-    let msg = Handle::try_from_value(&json!({ "version": 3.0 }))
+    let msg = Handle::try_from_value(&json!({ "version": 4.0 }))
         .expect_err("a newer format version written as a float must be refused");
-    assert_contains(&msg, "version 3 is newer than this build understands");
+    assert_contains(&msg, "version 4 is newer than this build understands");
 
     // A version that is not a number at all is named rather than ignored.
     let msg = Handle::try_from_value(&json!({ "version": "two" }))
@@ -837,15 +845,15 @@ fn a_newer_format_version_is_refused_and_says_so() {
 fn every_prior_version_is_accepted_and_the_writer_stamps_the_current_one() {
     // The reader's promise (spec §5.6): a file from an older build opens,
     // and what comes back out is the current version.
-    for version in [1, 2] {
+    for version in [1, 2, 3] {
         assert_eq!(
             Handle::from_value(&json!({ "version": version })).value()["version"],
-            json!(2),
+            json!(3),
             "version {version} did not read back as the current version"
         );
     }
     // Absent, the version defaults to current rather than to 0.
-    assert_eq!(Handle::from_json("{}").value()["version"], json!(2));
+    assert_eq!(Handle::from_json("{}").value()["version"], json!(3));
 }
 
 #[test]

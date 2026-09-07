@@ -42,11 +42,12 @@ extern "C" {
  * every prior version; the writer always writes this one.
  *
  * Version 2 is the M3 schema: nests, filters, reflection, spotlight,
- * reversed media, and audio pan / compressor / noise reduction. */
-#define RC_FORMAT_VERSION 2
+ * reversed media, and audio pan / compressor / noise reduction. Version 3
+ * is clip identity: a clip's `name` and `label`, and a track's `solo`. */
+#define RC_FORMAT_VERSION 3
 
 /* Reader caps enforced by the writer, so every file this build produces can
- * be read back (`RC_CAPS` in core/src/format.rs). A nest's tracks and clips
+ * be read back (the `MAX_*` constants in core/src/format.rs). A nest's tracks and clips
  * count toward the same two caps as the timeline's. */
 #define RC_MAX_CLIPS 4096
 #define RC_MAX_TRACKS 64

@@ -333,13 +333,16 @@ impl Project {
                 let frozen = matches!(instance.clip.source, Source::Still { .. });
                 // A muted TRACK still contributes its audio segments: the
                 // mute is a zero envelope (audio.rs), so unmuting is a
-                // property edit and never rebuilds the composition.
+                // property edit and never rebuilds the composition. A solo
+                // is the same envelope, judged against the container's
+                // track set — which for the timeline is `self.tracks`, the
+                // one set the instance does not carry.
                 if media.has_audio && instance.plays_audio() && !frozen {
                     place(
                         &mut audio,
                         &mut next_audio,
                         segment,
-                        Some(Voice::of(instance)),
+                        Some(Voice::of(&self.tracks, instance)),
                     );
                 }
             }

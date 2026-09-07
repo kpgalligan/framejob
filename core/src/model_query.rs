@@ -57,6 +57,7 @@ impl Project {
                 hidden: false,
                 muted: false,
                 locked: false,
+                solo: false,
             }],
             clips: Vec::new(),
             markers: Vec::new(),

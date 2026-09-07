@@ -59,12 +59,19 @@ class MCP:
         return [t["name"] for t in self._request("tools/list", {})["tools"]]
 
     def call(self, name, **arguments):
-        result = self._request("tools/call", {"name": name, "arguments": arguments})
+        """Call a tool with keyword arguments. A tool ARGUMENT spelled `name`
+        (`add_track`, `set_track`, `add_marker`, `set_marker`, `nest`)
+        collides with this parameter — send those through `call_with`."""
+        return self.call_with(name, arguments)
+
+    def call_with(self, tool, arguments):
+        """Call `tool` with `arguments` as a dict, whatever its keys are."""
+        result = self._request("tools/call", {"name": tool, "arguments": arguments})
         text = "".join(
             part.get("text", "") for part in result.get("content", []) if part.get("type") == "text"
         )
         if result.get("isError"):
-            raise ToolError(f"{name}: {text}")
+            raise ToolError(f"{tool}: {text}")
         try:
             return json.loads(text)
         except json.JSONDecodeError:

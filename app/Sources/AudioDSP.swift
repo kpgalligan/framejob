@@ -70,7 +70,7 @@ struct AudioCompressorSettings: Equatable {
         makeupDB: Double
     ) {
         // A hand-edited project can carry anything; the op's own range checks
-        // (`edit_props.rs`'s `check_audio`) only cover what the app wrote.
+        // (`props_check.rs`'s `check_audio`) only cover what the app wrote.
         self.thresholdDB = thresholdDB.isFinite ? Swift.min(Swift.max(thresholdDB, -60), 0) : -18
         self.ratio = ratio.isFinite ? Swift.min(Swift.max(ratio, 1), 20) : 1
         self.attackSeconds = attackSeconds.isFinite ? Swift.max(attackSeconds, 0) : 0

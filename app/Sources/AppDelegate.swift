@@ -226,6 +226,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         menu.addItem(item("Copy", #selector(EditorViewController.copy(_:)), "c"))
         menu.addItem(item("Paste", #selector(EditorViewController.paste(_:)), "v"))
         menu.addItem(
+            item(
+                "Paste Attributes", #selector(EditorViewController.pasteAttributes(_:)), "v",
+                [.command, .option]))
+        menu.addItem(
             item("Duplicate", #selector(EditorViewController.duplicateClips(_:)), "d"))
         // Bare ⌫: U+0008 (NSBackspaceCharacter) is what AppKit matches the
         // Delete key against and what it draws as ⌫ (U+007F is forward
@@ -291,6 +295,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             item("Close Gap", #selector(EditorViewController.closeGapAtPlayhead(_:))))
         menu.addItem(submenuItem(transitionMenu()))
         menu.addItem(.separator())
+        // Identity (format version 3): the clip's own name and its label.
+        menu.addItem(
+            item(
+                "Rename…", #selector(EditorViewController.renameClip(_:)), "r",
+                [.command, .shift]))
+        menu.addItem(submenuItem(labelMenu()))
+        menu.addItem(.separator())
         menu.addItem(item("Nest", #selector(EditorViewController.nestClips(_:)), "g"))
         menu.addItem(
             item("Un-nest", #selector(EditorViewController.unnestClips(_:)), "g", [.command, .shift]))
@@ -311,6 +322,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         return menu
     }
 
+    /// Built from `ClipLabel.allCases` with the case's index as the tag — the
+    /// `transitionMenu()` idiom — so the six colours, their order and their
+    /// inks come from the one file that owns them. Each item carries a dot in
+    /// its colour: a label IS a colour, and a menu of six colour words that
+    /// showed none would make the user picture them.
+    private func labelMenu() -> NSMenu {
+        let menu = NSMenu(title: "Label")
+        for (index, label) in ClipLabel.allCases.enumerated() {
+            let entry = tagged(
+                label.displayName, #selector(EditorViewController.setClipLabel(_:)), index)
+            entry.image = Self.labelDot(label.color)
+            menu.addItem(entry)
+        }
+        menu.addItem(.separator())
+        menu.addItem(tagged("None", #selector(EditorViewController.setClipLabel(_:)), -1))
+        return menu
+    }
+
+    /// A 10 pt filled circle — the timeline strip's 6 pt label dot at menu
+    /// size. Not a template image: the point of it is its colour.
+    private static func labelDot(_ color: NSColor) -> NSImage {
+        let image = NSImage(size: NSSize(width: 10, height: 10), flipped: false) { rect in
+            color.setFill()
+            NSBezierPath(ovalIn: rect.insetBy(dx: 0.5, dy: 0.5)).fill()
+            return true
+        }
+        return image
+    }
+
     private func trackMenu() -> NSMenu {
         let menu = NSMenu(title: "Track")
         menu.addItem(
@@ -322,6 +362,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         menu.addItem(item("Hide Video", #selector(EditorViewController.toggleTrackHidden(_:))))
         menu.addItem(item("Mute Audio", #selector(EditorViewController.toggleTrackMuted(_:))))
         menu.addItem(item("Lock Track", #selector(EditorViewController.toggleTrackLocked(_:))))
+        // The checkmark is the validator's (EditorViewController+Identity.swift).
+        menu.addItem(item("Solo", #selector(EditorViewController.toggleTrackSolo(_:))))
         return menu
     }
 

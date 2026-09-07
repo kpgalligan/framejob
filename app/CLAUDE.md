@@ -44,9 +44,12 @@ lockstep are in the root `CLAUDE.md`; the full design is
   `PreviewCanvasView.swift`, `AgentServer.swift` — **frozen at current
   size.** Any change adding more than ~50 lines goes in an extension file
   instead: `EditorViewController+<Feature>.swift`,
-  `AgentServer+<Feature>.swift`, or a new `…SheetController` file. The
-  pieces those extension files build on are therefore internal, not
-  private, and the frozen file keeps only the wiring.
+  `AgentServer+<Feature>.swift`, `TimelineView+<Feature>.swift` — two
+  precedents: the `extension TimelineView` inside
+  `EditorViewController+Edge.swift`, and `TimelineView+Rename.swift` — or a
+  new `…SheetController` file. The pieces those extension files build on
+  are therefore internal, not private, and the frozen file keeps only the
+  wiring.
 - `InspectorViewController.swift` (frozen at wiring: the tab strip and which
   pane is shown) + `InspectorPane.swift` (the pane protocol and base, the
   disclosure section with its collapsed-state key and its right-aligned
@@ -66,6 +69,12 @@ lockstep are in the root `CLAUDE.md`; the full design is
   shared across contexts (`video.speed` is the Speed group for a video clip
   and the first group an audio-only one gets), so a "open the first section"
   rule has to walk until it finds one the user has not stored.
+  **And a second:** a field's `refresh` is skipped while its field editor is
+  attached, which it still is inside `controlTextDidEndEditing` (after
+  Return or Tab AppKit even re-attaches it), so every refresh a commit runs
+  is skipped — `InspectorNameField` and the timecode field set their
+  `stringValue` directly as the commit ends, or a cleared name would keep
+  showing blank while the strip shows the fallback.
 - `ExportSheetController.swift` (the export card and its progress sheet),
   `SpeedSheetController.swift`, `RelinkSheetController.swift` — the
   dialogs, all built from `Sheets.swift`'s `makeSheetView` pieces and put
@@ -76,8 +85,18 @@ lockstep are in the root `CLAUDE.md`; the full design is
   catalog names match the dispatch registry (it traps in debug and logs in
   Release, because `make app` builds Release). The handlers live in
   `AgentServer+Project/Clips/Tracks/Media/Render/History.swift` and their shared
-  argument vocabulary in `AgentServer+Arguments.swift`; a new op means a
+  argument vocabulary in `AgentServer+Arguments.swift` — `intArg`,
+  `doubleArg`, `boolArg`, `stringArg`, `stringsArg` (an optional list of
+  strings, a lone string counting as a one-element list; emptiness and
+  vocabulary are the caller's), the id readers (`clipArg`, `clipsArg`,
+  `trackArg`, …), `timeArg`, `colorArg` and `patchArg`, each refusing a
+  value it cannot read BY NAME rather than dropping it; a new op means a
   handler, a catalog entry and a comment naming the UI path it mirrors.
+  One gap in that guard worth knowing: `patchArg`'s round-trip check
+  cannot see a wrong-typed value for a `T??` field — `{"label": 7}`
+  decodes as a CLEAR and passes — so `set_clip`'s handler adds a per-key
+  type check (`checkClipPatchTypes`) after it; `TextPatch.width` still
+  has the gap.
   Beyond the §6 ops the catalog carries the app-state tools spec §7.9 names
   plus `set_range`, `set_selection`, `undo` and `redo` — the mirrors of
   I/O/⌥X, a timeline or canvas click, and ⌘Z/⇧⌘Z, without which the "one edit
@@ -93,7 +112,12 @@ lockstep are in the root `CLAUDE.md`; the full design is
   machinery can re-spell `fileURL` into the other half of that last pair
   mid-session, which made a path that had worked for twenty calls start
   answering "No open project is at …". `open_project`'s already-open check
-  compares the same way, or it opens one file twice.
+  compares the same way, or it opens one file twice. One trap the phase-2
+  proof measured: an explicit path is matched with `documents.first(where:)`,
+  so when several OPEN documents hold one path — only `new_project {path}`
+  and `save_project {path}` can make that, the GUI cannot — an unspecified
+  one answers, and there is no close tool to clear the others. A script
+  that saves at a path uses a fresh name per run for that reason.
   `AgentServer.offMainTools` names the few handlers that run on the server
   thread instead of the main one — they wait on the main thread (an async
   probe's completion, NSDocument's save) or on a long decode, so hopping first
@@ -108,6 +132,44 @@ lockstep are in the root `CLAUDE.md`; the full design is
   drags are begun from there — the same split `TimelineClipDrawing.swift`
   and `MediaPane.swift`'s drop targets use, and the reason `dragSnapper` and
   `makeSnapper` are internal.
+- `TimelineView+Rename.swift` — the inline clip rename (a double-click on a
+  clip, Clip ▸ Rename…) over the one editor `TimelineView` keeps for track
+  and marker renames; the frozen file holds only the `clicks == 2` hook and
+  the `relocateRename()` at the end of `rebuildLayout`. Every rename hands
+  `beginRename` a `relocate` closure answering its field's rect under the
+  CURRENT layout, so the field FOLLOWS its target through a zoom, a resize
+  and any document change (an agent's edit, a save's dirty crossing) rather
+  than being ended — removing the field commits what was typed, and under
+  an agent's grouped edit that half-typed rename would land inside the
+  agent's undo step. A relocator answering nil (the target was deleted)
+  ends the field with its commit DROPPED, never sent to a dead id. The
+  shared editor also drops an UNCHANGED commit (an accidental double-click
+  would otherwise pin a clip's fallback as its own name, and beep as an
+  identity on a track or marker) and an EMPTY one, so a name is CLEARED in
+  the Clip tab's header field (`ClipSelectionHeaderView`), never in the
+  strip; and it blurs whatever else is being typed into BEFORE installing
+  its field, because that editor's commit rebuilds the layout. The strip
+  field is clamped to the visible lanes: AppKit does not scroll a timeline
+  to a field editor's caret.
+- `EditorViewController+Identity.swift` — Clip ▸ Rename… (⇧⌘R), Clip ▸
+  Label ▸ (a tagged submenu over `ClipLabel.allCases`) and the Track ▸ Solo
+  item's checkmark; Solo's body is `toggleTrack(.solo)` in `+Timeline.swift`
+  beside its siblings, and Edit ▸ Paste Attributes (⌥⌘V) is in
+  `+Clipboard.swift`, beside the pasteboard it reads.
+- `EditorViewController+Clipboard.swift` — ⌘X / ⌘C / ⌘V over the
+  `com.kgalligan.reelcut.clips` pasteboard type (the `paste` op's payload,
+  whose schema is `core/src/edit_paste.rs`'s module doc), and ⌥⌘V Paste
+  Attributes, which sends that same payload to `paste_attributes` with no
+  `groups` — the core's default rule, every group both clips have.
+- `ClipLabel.swift` — the ONE home of the marker-colour vocabulary: the six
+  names in order (`red`, `orange`, `yellow`, `green`, `blue`, `purple`),
+  their display names and their inks, the ruler's marker palette verbatim.
+  The timeline's label dot, the ruler's marker flags
+  (`TimelineRulerView.markerColor` routes through `color(named:)`), the
+  Clip ▸ Label submenu and the Clip tab header all read it. The core stores
+  a label or a marker colour NAME unvalidated (the `Marker.color` policy:
+  a build that policed the list would refuse a newer build's project), so
+  an unknown name is an error nowhere here — it draws in `DS.textStrong`.
 - The chrome cleanup's own files (the design handoff in
   `designs/design_handoff_reelcut/`, spec §3–§4.4):
   `EditorViewController+Toolbar.swift` (the 44 pt row; the frozen file keeps

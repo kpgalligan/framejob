@@ -1,13 +1,15 @@
 import AppKit
 
-/// Edit ▸ Cut / Copy / Paste (⌘X, ⌘C, ⌘V) — the three menu items
-/// `EditorViewController.swift` forwards here.
+/// Edit ▸ Cut / Copy / Paste / Paste Attributes (⌘X, ⌘C, ⌘V, ⌥⌘V) — the
+/// four menu items `EditorViewController.swift` forwards here.
 ///
-/// The clipboard is one op and one pasteboard type. Copy writes the selection
-/// as the `paste` op's payload (the module doc of `core/src/edit_paste.rs` is
-/// its schema) under `com.kgalligan.reelcut.clips`; Paste hands that payload
-/// straight back to the core, which does all the deciding — fresh ids, media
-/// matched by path, the overlap rule, the frame grid. Nothing about a clip is
+/// The clipboard is one pasteboard type and two ops that read it. Copy writes
+/// the selection as the `paste` op's payload (the module doc of
+/// `core/src/edit_paste.rs` is its schema) under `com.kgalligan.reelcut.clips`;
+/// Paste hands that payload straight back to the core, which does all the
+/// deciding — fresh ids, media matched by path, the overlap rule, the frame
+/// grid — and Paste Attributes hands the SAME payload to `paste_attributes`,
+/// which reads only its first clip's property groups. Nothing about a clip is
 /// interpreted on this side.
 ///
 /// Two decisions worth stating, because neither is forced:
@@ -155,6 +157,32 @@ extension EditorViewController {
         viewStateDidChange()
     }
 
+    // MARK: - Paste Attributes
+
+    /// ⌥⌘V. The payload's first clip's LOOK — its video, audio, text and shape
+    /// groups — onto every selected clip, leaving `groups` to the core's
+    /// default (every group both sides have, spec §6). Nothing that makes the
+    /// clip THIS clip travels: not its place, speed, actions, transition, name
+    /// or label, and not a text clip's words or a shape's geometry.
+    ///
+    /// Whole selection, one op, one undo step. The core's `None` — the
+    /// payload's clip and the targets share no group, or the look is already
+    /// theirs — is `applyEdit`'s beep, and an out-of-range payload is its
+    /// error, presented. There is no group picker here: the default rule is
+    /// what ⌥⌘V has always meant in a cutting room, and the agent's tool
+    /// (`paste_attributes`) takes `groups` for anyone who needs the choice.
+    func pasteAttributes() {
+        guard let document = document, !document.selection.isEmpty,
+              let payload = pasteboardPayload()
+        else {
+            NSSound.beep()
+            return
+        }
+        document.applyEdit(
+            "Paste Attributes",
+            .pasteAttributes(clips: Array(document.selection), payload: payload))
+    }
+
     /// The payload on the pasteboard, or nil when there is nothing of ours
     /// there to paste — an empty pasteboard, another app's content, or a
     /// payload with no clips in it.
@@ -184,6 +212,10 @@ extension EditorViewController {
             return !document.selection.isEmpty
         case #selector(paste(_:)):
             return canPasteClips
+        case #selector(pasteAttributes(_:)):
+            // Paste needs no selection (the clips land at the playhead);
+            // Paste Attributes needs something to paste ONTO.
+            return canPasteClips && !document.selection.isEmpty
         default:
             return nil
         }

@@ -600,12 +600,19 @@ fn op_table() -> Vec<Value> {
         json!({"op": "paste", "at": 24000000,
                "payload": {"clips": [{"id": 1, "track": 0, "start": 0, "duration": 600000,
                                       "source": {"kind": "text"}}]}}),
+        // Likewise: a payload clip whose video differs from clip 10's
+        // defaults, so the default groups rule has something to copy.
+        json!({"op": "paste_attributes", "clips": [10],
+               "payload": {"clips": [{"id": 1, "track": 0, "start": 0, "duration": 600000,
+                                      "source": {"kind": "text"},
+                                      "video": {"opacity": 0.5}}]}}),
         json!({"op": "nest", "clips": [30]}),
         json!({"op": "unnest", "clip": 41}),
         json!({"op": "set_video", "clips": [10], "patch": {"opacity": 0.5}}),
         json!({"op": "set_audio", "clips": [10], "patch": {"volume": 0.5}}),
         json!({"op": "set_text", "clips": [30], "patch": {"content": "Bye"}}),
         json!({"op": "set_shape", "clips": [40], "patch": {"width": 400}}),
+        json!({"op": "set_clip", "clips": [10], "patch": {"name": "Talk"}}),
         json!({"op": "set_enabled", "clip": 10, "video": false}),
         json!({"op": "set_transition", "clip": 10, "kind": "wipe"}),
         json!({"op": "set_transition_duration", "clip": 40, "duration": 600000}),
@@ -1786,6 +1793,225 @@ fn two_markers_may_not_share_a_tick() {
         .apply(&json!({"op": "add_marker", "at": -600000}))
         .value();
     assert_eq!(int(by_id(&clamped, "/markers", 60), "/time"), 0);
+}
+
+#[test]
+fn set_track_solo_sets_clears_and_refuses_when_unchanged() {
+    let project = general();
+    let before = project.value();
+    // Every fixture track starts unsoloed, so "solo off" is the identity.
+    project.refuses(&json!({"op": "set_track", "track": 4, "solo": false}));
+
+    let soloed = project.apply(&json!({"op": "set_track", "track": 4, "solo": true}));
+    // The oracle: the document as it was with that ONE flag flipped — track 4
+    // is the back-most, index 0.
+    let mut expected = before.clone();
+    expected["tracks"][0]["solo"] = json!(true);
+    assert_eq!(soloed.value(), expected, "solo on track 4 and nothing else");
+    soloed.refuses(&json!({"op": "set_track", "track": 4, "solo": true}));
+
+    // Off again is the original document, and solo rides with the other
+    // switches in one op.
+    let back = soloed.apply(&json!({"op": "set_track", "track": 4, "solo": false}));
+    assert_eq!(back.value(), before);
+    let both = project
+        .apply(&json!({"op": "set_track", "track": 5, "muted": true, "solo": true}))
+        .value();
+    assert!(flag(by_id(&both, "/tracks", 5), "/muted"));
+    assert!(flag(by_id(&both, "/tracks", 5), "/solo"));
+}
+
+// ---- clip identity -------------------------------------------------------
+
+/// The `set_clip` envelope over one clip.
+fn set_clip(clip: i64, patch: Value) -> Value {
+    json!({"op": "set_clip", "clips": [clip], "patch": patch})
+}
+
+/// `project` with the clip of `clip`'s id replaced by `clip` — the oracle
+/// for an op that may touch one clip and nothing else.
+fn with_clip(project: &Value, clip: &Value) -> Value {
+    let id = clip["id"].as_u64().expect("a clip has an id");
+    let mut out = project.clone();
+    if let Some(slot) = out["clips"]
+        .as_array_mut()
+        .and_then(|clips| clips.iter_mut().find(|c| c["id"].as_u64() == Some(id)))
+    {
+        *slot = clip.clone();
+    }
+    out
+}
+
+#[test]
+fn set_clip_stores_a_name_and_a_label_and_touches_nothing_else() {
+    let project = general();
+    let before = project.value();
+    let after = project
+        .apply(&set_clip(10, json!({"name": "Talk", "label": "blue"})))
+        .value();
+    let clip = by_id(&after, "/clips", 10);
+    assert_eq!(text(clip, "/name"), "Talk");
+    assert_eq!(text(clip, "/label"), "blue");
+
+    // The oracle: the clip as it was with exactly those two keys rewritten,
+    // in a document that is otherwise byte for byte the one it came from.
+    let mut expected = by_id(&before, "/clips", 10).clone();
+    expected["name"] = json!("Talk");
+    expected["label"] = json!("blue");
+    assert_eq!(after, with_clip(&before, &expected));
+}
+
+#[test]
+fn a_null_or_an_empty_string_clears_and_a_name_is_trimmed() {
+    let project = general();
+    let named = project.apply(&set_clip(
+        10,
+        json!({"name": "  Talk, take 2\t", "label": " blue "}),
+    ));
+    let value = named.value();
+    let clip = by_id(&value, "/clips", 10);
+    assert_eq!(text(clip, "/name"), "Talk, take 2", "stored trimmed");
+    assert_eq!(text(clip, "/label"), "blue");
+
+    // Each of the three spellings of "none" takes the document all the way
+    // back to the unnamed original — `null` because that is what the schema
+    // stores, an empty or blank string because "unnamed" is `None` here and
+    // a stored "" would hide the fallback name behind nothing.
+    for cleared in [json!(null), json!(""), json!("   \t ")] {
+        let after = named
+            .apply(&set_clip(10, json!({"name": cleared, "label": cleared})))
+            .value();
+        assert_eq!(
+            after,
+            project.value(),
+            "clearing with {cleared} left something"
+        );
+    }
+}
+
+#[test]
+fn an_omitted_key_keeps_its_value() {
+    let project = general();
+    let named = project.apply(&set_clip(10, json!({"name": "Talk", "label": "blue"})));
+    let before = named.value();
+
+    let relabelled = named
+        .apply(&set_clip(10, json!({"label": "green"})))
+        .value();
+    let mut expected = by_id(&before, "/clips", 10).clone();
+    expected["label"] = json!("green");
+    assert_eq!(
+        relabelled,
+        with_clip(&before, &expected),
+        "the name went with the label"
+    );
+
+    let renamed = named.apply(&set_clip(10, json!({"name": "Intro"}))).value();
+    let mut expected = by_id(&before, "/clips", 10).clone();
+    expected["name"] = json!("Intro");
+    assert_eq!(
+        renamed,
+        with_clip(&before, &expected),
+        "the label went with the name"
+    );
+}
+
+#[test]
+fn set_clip_that_changes_nothing_is_a_refusal() {
+    let project = general();
+    // Unnamed already, so clearing is the identity — and so are an empty
+    // patch and an empty selection.
+    project.refuses(&set_clip(10, json!({"name": null, "label": ""})));
+    project.refuses(&set_clip(10, json!({})));
+    project.refuses(&json!({"op": "set_clip", "clips": [], "patch": {"name": "Talk"}}));
+
+    let named = project.apply(&set_clip(10, json!({"name": "Talk", "label": "blue"})));
+    named.refuses(&set_clip(10, json!({"name": "Talk"})));
+    // What is stored is the trimmed text, so the same name with spaces
+    // around it is the same name.
+    named.refuses(&set_clip(10, json!({"name": "  Talk  ", "label": "blue"})));
+}
+
+#[test]
+fn a_bad_clip_patch_is_an_error_naming_what_was_wrong() {
+    let project = general();
+    assert_eq!(
+        project.errors(&set_clip(10, json!({"nmae": "Talk"}))),
+        "unknown key \"nmae\" in a clip patch"
+    );
+    assert_eq!(
+        project.errors(&set_clip(10, json!({"name": 5}))),
+        "\"name\" in a clip patch must be a string or null, not 5"
+    );
+    assert_eq!(
+        project.errors(&set_clip(10, json!({"label": ["blue"]}))),
+        "\"label\" in a clip patch must be a string or null, not [\"blue\"]"
+    );
+    assert_eq!(
+        project.errors(&json!({"op": "set_clip", "clips": [10], "patch": "Talk"})),
+        "clip patch must be a json object, not \"Talk\""
+    );
+    assert_contains(
+        &project.errors(&set_clip(999, json!({"name": "Talk"}))),
+        "no clip with id 999",
+    );
+    // The patch is checked BEFORE the clip ids are resolved (spec §6), so an
+    // unknown key is refused with an empty selection — where a valid patch
+    // is the identity — and beside an unknown id, where it outranks the id
+    // error. The four group patches order it the other way round; this one
+    // does not, and the docs say so.
+    assert_eq!(
+        project.errors(&json!({"op": "set_clip", "clips": [], "patch": {"nmae": "x"}})),
+        "unknown key \"nmae\" in a clip patch"
+    );
+    assert_eq!(
+        project.errors(&json!({"op": "set_clip", "clips": [999], "patch": {"nmae": "x"}})),
+        "unknown key \"nmae\" in a clip patch"
+    );
+    // The envelope's own rule still applies: a key the op does not take.
+    assert_contains(
+        &project.errors(&json!({"op": "set_clip", "clips": [10], "name": "Talk"})),
+        "op \"set_clip\" is not valid",
+    );
+}
+
+#[test]
+fn set_clip_applies_to_every_named_clip() {
+    let project = general();
+    let before = project.value();
+    let after = project
+        .apply(&json!({"op": "set_clip", "clips": [40, 10, 30], "patch": {"label": "red"}}))
+        .value();
+    for id in [10, 30, 40] {
+        assert_eq!(text(by_id(&after, "/clips", id), "/label"), "red");
+    }
+    for id in [20, 41] {
+        assert_eq!(at(by_id(&after, "/clips", id), "/label"), &Value::Null);
+    }
+    // The selection's order is not the storage order: the clips stay where
+    // they were listed.
+    let order = |project: &Value| -> Vec<i64> {
+        array(project, "/clips")
+            .iter()
+            .filter_map(|c| c["id"].as_i64())
+            .collect()
+    };
+    assert_eq!(order(&after), order(&before));
+    // A clip named twice is patched once — the same answer as naming it once.
+    let twice = project
+        .apply(&json!({"op": "set_clip", "clips": [10, 10], "patch": {"label": "red"}}))
+        .value();
+    assert_eq!(
+        twice,
+        project
+            .apply(&set_clip(10, json!({"label": "red"})))
+            .value()
+    );
+    // One unknown id fails the whole op, before anything is written.
+    assert_contains(
+        &project.errors(&json!({"op": "set_clip", "clips": [10, 999], "patch": {"label": "red"}})),
+        "no clip with id 999",
+    );
 }
 
 // ---- actions -------------------------------------------------------------

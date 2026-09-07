@@ -129,8 +129,13 @@ final class TimelineView: NSView, NSTextFieldDelegate {
     let caches = TimelineCaches()
 
     /// The inline editor used for a track or marker rename.
-    private var renameField: NSTextField?
-    private var renameCommit: ((String) -> Void)?
+    // Internal, not private: TimelineView+Rename.swift relocates and ends
+    // the field (the rule for the pieces an extension builds on).
+    var renameField: NSTextField?
+    var renameCommit: ((String) -> Void)?
+    /// Where the open field belongs under the CURRENT layout — nil once its
+    /// target is gone (`relocateRename`, TimelineView+Rename.swift).
+    var renameRelocate: (() -> NSRect?)?
 
     // MARK: - Life cycle
 
@@ -263,6 +268,9 @@ final class TimelineView: NSView, NSTextFieldDelegate {
             content.frame = NSRect(origin: .zero, size: size)
         }
         pinFloatingBands()
+        // A rename field sits at one layout's rects; it follows its target
+        // to the new ones (TimelineView+Rename.swift says why it is not ended).
+        relocateRename()
         content.needsDisplay = true
         zoomSlider.doubleValue = Double(Self.sliderValue(for: zoom))
         window?.invalidateCursorRects(for: content)
@@ -390,8 +398,13 @@ final class TimelineView: NSView, NSTextFieldDelegate {
     /// subview of the floating band it edits, which is why those bands let
     /// their subviews be hit even though they refuse hits themselves.
     func beginRename(
-        in host: NSView, frame: NSRect, text: String, commit: @escaping (String) -> Void
+        in host: NSView, frame: NSRect, text: String, relocate: (() -> NSRect?)? = nil,
+        commit: @escaping (String) -> Void
     ) {
+        // Whatever else is being typed into commits FIRST, refresh and all:
+        // a commit's refresh rebuilds the layout, and a field added before it
+        // ran would be relocated (or ended) under the first-responder handoff.
+        _ = window?.makeFirstResponder(nil)
         endRename()
         let field = NSTextField(string: text)
         field.frame = frame
@@ -403,14 +416,31 @@ final class TimelineView: NSView, NSTextFieldDelegate {
         field.delegate = self
         host.addSubview(field)
         renameField = field
-        renameCommit = commit
-        window?.makeFirstResponder(field)
+        renameRelocate = relocate
+        let original = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        renameCommit = { value in
+            // Unchanged is not a rename: on a clip it would pin the fallback
+            // as an own name; on a track or a marker it is the core's identity.
+            guard value != original else { return }
+            commit(value)
+        }
+        if window?.makeFirstResponder(field) != true {
+            endRename()
+            window?.makeFirstResponder(window?.contentView)
+        }
     }
 
-    private func endRename() {
-        renameField?.removeFromSuperview()
+    func endRename() {
+        guard let field = renameField else { return }
+        field.removeFromSuperview()
         renameField = nil
         renameCommit = nil
+        renameRelocate = nil
+        // Removing the view that holds the field editor ends its editing —
+        // the commit below runs from inside that — and AppKit then hands
+        // first responder to the WINDOW, after the callback restored the
+        // root. Back to the root, or the bare-key map is dead until a click.
+        if window?.firstResponder === window { window?.makeFirstResponder(window?.contentView) }
     }
 
     func controlTextDidEndEditing(_ obj: Notification) {
@@ -490,6 +520,12 @@ final class TimelineView: NSView, NSTextFieldDelegate {
             // selection on the way into its own slip.
             if flags.contains(.option), flags.contains(.shift) {
                 beginSlip(id, at: point, flags: flags)
+                break
+            }
+            // A double-click renames (TimelineView+Rename.swift) — also
+            // before the selection, for the same reason.
+            if clicks == 2 {
+                beginClipRename(id)
                 break
             }
             selectClip(id, flags: flags)
@@ -762,21 +798,25 @@ final class TimelineView: NSView, NSTextFieldDelegate {
             onEdit?("Mute Track", [.setTrack(track: track.id, muted: !track.muted)])
         case .locked:
             onEdit?("Lock Track", [.setTrack(track: track.id, locked: !track.locked)])
+        case .solo:
+            onEdit?("Solo Track", [.setTrack(track: track.id, solo: !track.solo)])
         }
     }
 
     private func renameTrack(_ track: TrackSnapshot, row: Int) {
-        let frame = NSRect(
-            x: 6, y: layout.rowTop(row) - TimelineLayout.rulerHeight + 3,
-            width: TimelineLayout.headerWidth - 12, height: 20)
-        beginRename(in: headers, frame: frame, text: track.name) { [weak self] name in
+        beginRename(
+            in: headers, frame: trackRenameFrame(row: row), text: track.name,
+            relocate: trackRenameRelocator(track.id)
+        ) { [weak self] name in
             self?.onEdit?("Rename Track", [.setTrack(track: track.id, name: name)])
         }
     }
 
     private func renameMarker(_ marker: MarkerSnapshot) {
-        let frame = NSRect(x: max(layout.x(for: marker.time) - 40, 0), y: 3, width: 110, height: 20)
-        beginRename(in: ruler, frame: frame, text: marker.name) { [weak self] name in
+        beginRename(
+            in: ruler, frame: markerRenameFrame(marker), text: marker.name,
+            relocate: markerRenameRelocator(marker.id)
+        ) { [weak self] name in
             self?.onEdit?("Rename Marker", [.setMarker(marker: marker.id, name: name)])
         }
     }
@@ -1359,17 +1399,10 @@ final class TimelineRulerView: NSView {
         }
     }
 
-    /// The model stores a colour NAME (spec §5.2), not components.
+    /// The model stores a colour NAME (spec §5.2), not components; the
+    /// vocabulary is `ClipLabel`'s, shared with the clip label dot.
     private func markerColor(_ name: String) -> NSColor {
-        switch name.lowercased() {
-        case "red": return .systemRed
-        case "orange": return DS.coral
-        case "yellow": return DS.butter
-        case "green": return DS.forest
-        case "blue": return .systemBlue
-        case "purple": return .systemPurple
-        default: return DS.textStrong
-        }
+        ClipLabel.color(named: name)
     }
 
     private func drawPlayheadHead(owner: TimelineView, layout: TimelineLayout) {
@@ -1413,7 +1446,8 @@ final class TimelineHeaderView: NSView {
         return hit === self ? nil : hit
     }
 
-    /// The three toggles, laid out from the row's bottom-left. `local` is the
+    /// The four toggles (eye, speaker, lock, headphones), laid out from the
+    /// row's bottom-left. `local` is the
     /// point relative to the ROW's top-left corner; the content view's hit
     /// test is the only caller, which is why the geometry lives here beside
     /// the drawing that has to agree with it.
@@ -1430,7 +1464,7 @@ final class TimelineHeaderView: NSView {
     }
 
     static func button(at local: CGPoint, height: CGFloat) -> TimelineHeaderButton? {
-        let buttons: [TimelineHeaderButton] = [.hidden, .muted, .locked]
+        let buttons: [TimelineHeaderButton] = [.hidden, .muted, .locked, .solo]
         for (index, button) in buttons.enumerated()
         where buttonRect(index, height: height).insetBy(dx: -1, dy: -1).contains(local) {
             return button
@@ -1465,6 +1499,7 @@ final class TimelineHeaderView: NSView {
                 (.hidden, track.hidden ? "eye.slash" : "eye", "H", track.hidden),
                 (.muted, track.muted ? "speaker.slash" : "speaker.wave.2", "M", track.muted),
                 (.locked, track.locked ? "lock" : "lock.open", "L", track.locked),
+                (.solo, "headphones", "S", track.solo),
             ]
             for (position, toggle) in toggles.enumerated() {
                 var box = Self.buttonRect(position, height: height)

@@ -33,6 +33,11 @@
 //!   patch: a typo in a hand-written op or an agent call is a mistake to
 //!   report, not a silent no-op. The one exception is an action's `end`
 //!   patch, which is evaluated leniently and keeps what it does not know.
+//!   `set_clip` is the fifth patch op. In every patch an absent key keeps
+//!   and a `null` clears an OPTIONAL field (a shadow, a duck, a text
+//!   `width`; a required one refuses it by name) — in `set_clip` the field
+//!   itself, and there an EMPTY string clears too: an unnamed clip is
+//!   `None`, not `""`.
 //!
 //! ### Clips
 //!
@@ -62,12 +67,14 @@
 //! | `detach_audio` | `clip: u32` | Clears the clip's `enabled.audio` and puts an audio-only twin on the track below, inserting a track when there is none. |
 //! | `duplicate` | `clips: [u32]` | Copies each clip one selection-span later on its own track, with fresh ids. |
 //! | `paste` | `at: ticks, track?: u32, payload: object` | Inserts the clips of a clipboard payload — `{"clips": […], "media": […]}`, what Copy wrote — with fresh ids, the earliest landing at `at` and the rest keeping their offsets. A payload clip's `track` is a DEPTH from the front (0 = front-most), so `track` says where depth 0 lands (default: the front) and the rest follow by the same index delta; tracks missing behind it are added. Media is matched to `media[]` by path and appended when absent. A clip the overlap rule refuses goes on a new track in front; an empty clip list changes nothing. |
+//! | `paste_attributes` | `clips: [u32], payload: object, groups?: [video \| audio \| text \| shape]` | Copies the payload's EARLIEST clip's property groups (at one start the front-most, then the lower id — never the array's first, which is creation order) onto each clip: video and audio whole, text but content, shape but kind, width, height, from and to. Default: every group both sides have; a named group either side lacks is an Err. Speed, enabled, actions, transition and identity stay. None when nothing changes. |
 //! | `nest` | `clips: [u32], name?: string = "Nest <n>"` | Collapses the selection into ONE clip showing a nest, on the front-most track the selection occupied, running from the earliest start to the latest end. The clips move whole — ids, props, actions, transitions — keeping their relative times (earliest → 0) and their track order; the nest's canvas is frozen at the project's current size. Refuses on an empty selection, on a lone nest clip, and when the nest clip would break the overlap rule. |
 //! | `unnest` | `clip: u32` | The inverse: the nest's clips return at `clip.start + their own start`, with fresh ids, on tracks counted back from the nest clip's own (front-most nest track first), and the nest clip goes. `nest` then `unnest` is the identity on clip content, ids aside. A clip the overlap rule refuses lands on a new track in front, as `paste` does; a nest clip trimmed shorter than its contents gives ALL of them back (a nest has no in point); the nest is dropped when nothing else shows it. `Err` when `clip` is not a nest clip. |
 //! | `set_video` | `clips: [u32], patch: object` | Merges the patch into each clip's video props (spec §5.2). |
 //! | `set_audio` | `clips: [u32], patch: object` | Merges the patch into each clip's audio props. |
 //! | `set_text` | `clips: [u32], patch: object` | Merges the patch into each clip's text props. |
 //! | `set_shape` | `clips: [u32], patch: object` | Merges the patch into each clip's shape props. |
+//! | `set_clip` | `clips: [u32], patch: {name?: string \| null, label?: string \| null}` | Sets or clears the clip's own name and label; absent keeps, null or an empty string clears. Unknown keys are an Err. A split, duplicate, detach or paste carries both. None when nothing changes. |
 //! | `set_enabled` | `clip: u32, video?: bool, audio?: bool` | The per-clip hide and mute switches; omitted fields keep their value. |
 //! | `set_transition` | `clip: u32, kind?: transition` | Sets `transition_in`; absent or `null` clears it. The overlap with the predecessor IS the duration. |
 //! | `set_transition_duration` | `clip: u32, duration: ticks` | Moves the clip so its overlap with its predecessor is exactly `duration`. |
@@ -94,7 +101,7 @@
 //! | `add_track` | `index?: usize = front, name?: string` | Inserts a track; index 0 is the back-most. The default name is `Track <count + 1>`. |
 //! | `remove_track` | `track: u32, with_clips?: bool = false` | Refuses on a track that still holds clips unless `with_clips`, and on the last remaining track. |
 //! | `move_track` | `track: u32, index: usize` | Reorders the stack; index 0 is the back-most. |
-//! | `set_track` | `track: u32, name?: string, hidden?: bool, muted?: bool, locked?: bool` | Omitted fields keep their value. |
+//! | `set_track` | `track: u32, name?: string, hidden?: bool, muted?: bool, locked?: bool, solo?: bool` | Omitted fields keep their value. |
 //! | `remove_empty_tracks` | — | Drops every track with no clips, keeping the back-most if that would empty the stack. |
 //! | `add_marker` | `at: ticks, name?: string = "Marker <n>", chapter?: bool, color?: string = "red"` | A marker at `at`, clamped to ≥ 0. Two markers may not share a tick. |
 //! | `set_marker` | `marker: u32, time?: ticks, name?: string, chapter?: bool, color?: string` | Omitted fields keep their value; the same one-marker-per-tick rule. |
@@ -133,6 +140,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use crate::edit_props::Group;
 use crate::export::describe;
 use crate::model::{Color, Curve, Project, TransitionKind};
 use crate::time::{Fps, Ticks};
@@ -142,7 +150,7 @@ use crate::time::{Fps, Ticks};
 /// Kept next to [`Op`] so a mistyped op can be answered with the list
 /// instead of a bare parse error — models and users both mistype op names,
 /// and the alternative is a serde message written in variant-speak.
-pub const OP_NAMES: [&str; 49] = [
+pub const OP_NAMES: [&str; 51] = [
     "add_clip",
     "add_text_clip",
     "add_shape_clip",
@@ -167,12 +175,14 @@ pub const OP_NAMES: [&str; 49] = [
     "detach_audio",
     "duplicate",
     "paste",
+    "paste_attributes",
     "nest",
     "unnest",
     "set_video",
     "set_audio",
     "set_text",
     "set_shape",
+    "set_clip",
     "set_enabled",
     "set_transition",
     "set_transition_duration",
@@ -317,6 +327,15 @@ pub enum Op {
         track: Option<u32>,
         payload: Value,
     },
+    /// The same opaque `payload` as `paste`. `groups` absent means "every
+    /// group both sides have"; an unknown group name is a serde error from
+    /// the envelope, like any other bad enum value.
+    PasteAttributes {
+        clips: Vec<u32>,
+        payload: Value,
+        #[serde(default)]
+        groups: Option<Vec<Group>>,
+    },
     Nest {
         clips: Vec<u32>,
         #[serde(default)]
@@ -338,6 +357,14 @@ pub enum Op {
         patch: Value,
     },
     SetShape {
+        clips: Vec<u32>,
+        patch: Value,
+    },
+    /// The fifth patch op: `patch` is `{name?, label?}`, each a string or
+    /// `null`, read by `edit_props.rs`. A patch rather than two envelope
+    /// arguments because an envelope's absent and null mean the same thing
+    /// and this op needs them to differ.
+    SetClip {
         clips: Vec<u32>,
         patch: Value,
     },
@@ -412,6 +439,8 @@ pub enum Op {
         muted: Option<bool>,
         #[serde(default)]
         locked: Option<bool>,
+        #[serde(default)]
+        solo: Option<bool>,
     },
     /// A struct variant with no fields, not a unit one, so that
     /// `deny_unknown_fields` applies to it like every other op.
@@ -572,12 +601,18 @@ impl Project {
             Op::DetachAudio { clip } => self.detach_audio(*clip),
             Op::Duplicate { clips } => self.duplicate_clips(clips),
             Op::Paste { at, track, payload } => self.paste(*at, *track, payload),
+            Op::PasteAttributes {
+                clips,
+                payload,
+                groups,
+            } => self.paste_attributes(clips, payload, groups.as_deref()),
             Op::Nest { clips, name } => self.nest_clips(clips, name.as_deref()),
             Op::Unnest { clip } => self.unnest_clip(*clip),
             Op::SetVideo { clips, patch } => self.set_video(clips, patch),
             Op::SetAudio { clips, patch } => self.set_audio(clips, patch),
             Op::SetText { clips, patch } => self.set_text(clips, patch),
             Op::SetShape { clips, patch } => self.set_shape(clips, patch),
+            Op::SetClip { clips, patch } => self.set_clip(clips, patch),
             Op::SetEnabled { clip, video, audio } => self.set_enabled(*clip, *video, *audio),
             Op::SetTransition { clip, kind } => self.set_transition(*clip, *kind),
             Op::SetTransitionDuration { clip, duration } => {
@@ -610,7 +645,8 @@ impl Project {
                 hidden,
                 muted,
                 locked,
-            } => self.set_track(*track, name.as_deref(), *hidden, *muted, *locked),
+                solo,
+            } => self.set_track(*track, name.as_deref(), *hidden, *muted, *locked, *solo),
             Op::RemoveEmptyTracks {} => self.remove_empty_tracks(),
             Op::AddMarker {
                 at,

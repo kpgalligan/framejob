@@ -28,7 +28,7 @@ Four things in `designs/`, and you want all of them:
 
 ```sh
 make app        # cargo build --release + xcodegen + xcodebuild → build/Build/Products/Release/Reelcut.app
-make test       # cd core && cargo test --release  (222 black-box tests)
+make test       # cd core && cargo test --release  (282 black-box tests)
 make lint       # cargo clippy --all-targets -- -D warnings
 make typecheck  # swiftc -typecheck of app/Sources/*.swift — the ONLY authoritative Swift check
 make project    # xcodegen generate (Reelcut.xcodeproj is generated; project.yml is the source of truth)
@@ -48,9 +48,10 @@ new and yours.
 ```
 core/                Rust staticlib — the model, the ops, the plan, the recipe,
   include/…_core.h     export settings, the generic MCP server. THE FFI CONTRACT
-  src/                 model(+_query) time edit(+_clip/_edge/_insert/_props/
-                       _track/_time) actions transition evaluate audio snap
-                       format export agent ffi*
+  src/                 model(+_query/_props) time edit(+_clip/_edge/_insert/
+                       _props/_track/_time/_paste/_nest/_action) props_check
+                       actions transition evaluate recipe nest audio snap
+                       format export(+_size) agent ffi*
   tests/               black-box, through the FFI (core/CLAUDE.md)
 app/
   Sources/             AppKit app, programmatic UI (app/CLAUDE.md has the map)
@@ -58,7 +59,8 @@ app/
   Bridging/            the bridging header importing core/include/reelcut_core.h
 designs/             reelcut-design.md — normative spec;
                      design_handoff_reelcut/ — the shipped chrome + identity
-tools/proof/         the MCP client and the per-phase proof scripts
+tools/proof/         the MCP client, the per-phase proof scripts, and harness/ —
+                     the offscreen chrome renderer ("Seeing the chrome" below)
 project.yml          xcodegen definition; Makefile; README.md (user-facing)
 ```
 
@@ -107,18 +109,24 @@ make app
 
 The log line names the port it actually bound (a taken port falls back to an
 ephemeral one). Then drive it with any MCP client over streamable HTTP at
-`http://127.0.0.1:<port>/mcp` — 63 tools: one per §6 op (49) plus `open_project`,
+`http://127.0.0.1:<port>/mcp` — 65 tools: one per §6 op (51) plus `open_project`,
 `new_project`, `save_project`, `get_project`, `import_media`, `import_captions`,
 `consolidate_media`, `set_playhead`, `set_range`, `set_selection`, `undo`, `redo`,
 `render_frame` and `export`.
 `render_frame` writes a PNG and returns its path, so a script can diff it
 against `ffmpeg`-extracted source frames; `export` waits for the file.
 
-**`tools/proof/` holds the scripts that do this**, one per road-map-2 phase,
-over a dependency-free MCP client (`mcp.py`). Its README says how to make the
-test media and run one; every claim in them is a placement read back through
-`get_project` or a BYTE comparison of two rendered PNGs. Add the next
-phase's proof there rather than writing a throwaway.
+**`tools/proof/` holds the scripts that do this** — an MCP script per
+road-map-2 phase over a dependency-free client (`mcp.py`), and from phase 2
+an offscreen-chrome script beside it (`phase2_chrome.py`, over `harness/`,
+which needs no port). Its README says how to make the test media and run
+one; every claim in them is a placement read back through `get_project`, a
+BYTE comparison of two PNGs (`render_frame`'s, or the harness's, where the
+claim is also WHERE the changed pixels landed), or a sample-for-sample
+comparison of two exports decoded to PCM (which needs `ffmpeg` at proof
+time). Before trusting any MCP proof, `grep "Reelcut: " /tmp/reelcut-<port>.log`
+must print nothing — that prefix is the startup parity check complaining.
+Add the next phase's proof there rather than writing a throwaway.
 
 Spec §10's per-step verifications are the acceptance tests. Steps 3, 4, 5, 7,
 9, 10, 11 and 12 have been run against a built app and passed; 1 and 2 are
@@ -131,17 +139,33 @@ step 5's 60 fps, neither of which a still frame can answer.
 
 `screencapture` needs a Screen Recording grant the agent's terminal does not
 have, and it silently writes a black PNG rather than failing. The way to LOOK
-at the chrome is therefore to render it offscreen: compile every file in
-`app/Sources` except `main.swift` together with a small `main.swift` of your
-own, link `core/target/release/libreelcut_core.a`, open a `.reelcut` package
-through `ProjectDocument.read(from:ofType:)`, put an `EditorViewController` in
-an `NSWindow`, spin the runloop a few turns, and `cacheDisplay(in:to:)` the
-content view into a PNG. That is the same paint path the window uses, it needs
-no TCC grant, it renders either appearance on demand, and it is how the
-redesign was checked. The preview well comes out black — a Metal layer has no
-drawable offscreen — which does not matter, because the chrome is the point.
-Selection, the playhead and the S/M/L size are VIEW state and are not in the
-package, so the harness has to set them itself.
+at the chrome is therefore to render it offscreen, and the program that does
+it is in the tree: **`tools/proof/harness/`** compiles every file in
+`app/Sources` except `main.swift` with a `main.swift` of its own, links
+`core/target/release/libreelcut_core.a`, opens a `.reelcut` package through
+`ProjectDocument.read(from:ofType:)`, puts an `EditorViewController` in an
+`NSWindow`, spins the runloop a few turns and `cacheDisplay(in:to:)`s the
+content view into a PNG — the same paint path the window uses, no TCC grant,
+either appearance on demand, and how the redesign was checked.
+
+```sh
+tools/proof/harness/build.sh     # ~30 s into tools/proof/work/harness/, skipped when fresh
+                                 # (--force rebuilds); needs the staticlib from make test
+tools/proof/work/harness/harness <project.reelcut|welcome> <out.png> <light|dark> \
+    [w] [h] [selectIndex] [playheadSec] [sizeIndex 0-2] [clip|media|document]
+```
+
+The PNG is at the main display's backing scale (2880×1724 for the default
+1440×862 window on a Retina Mac). The preview well comes out black — a Metal
+layer has no drawable offscreen — which does not matter, because the chrome
+is the point. Selection, the playhead and the S/M/L size are VIEW state and
+not in the package, so the arguments set them; and the harness pins every
+`UserDefaults` key the chrome reads (the persisted pane sizes, collapsed
+state, track height, snapping, guides and the Document tab's checkbox) plus
+`AppleShowScrollBars = Always` in the argument domain, so two renders of one
+package are byte-identical on one machine, mouse or no mouse.
+`tools/proof/phase2_chrome.py` is the proof built on it: a pixel diff of two
+renders, measured against rectangles from the layout constants.
 
 ## Milestone status
 
@@ -184,12 +208,15 @@ package, so the harness has to set them itself.
   600 frames rather than truncate. The export sheet's Quality row and the
   `export` tool's `video_bitrate` / `audio_bitrate` write the core's two
   override keys in bits per second.
-  **The schema is version 2** (`RC_FORMAT_VERSION` in `core/src/format.rs`
-  and the header): filters, reflection, spotlight, `Source::Media.reversed`,
-  audio pan / compressor / noise reduction, and `Project.nests` all persist,
-  and a version-1 file still opens — including the one shape serde cannot
-  absorb with a default, a v1 nest clip whose `project` was a path string,
-  which `migrate_1_to_2` rewrites into a named empty `Nest`.
+  **The schema is version 3** (`RC_FORMAT_VERSION` in `core/src/format.rs`
+  and the header). Version 2 was M3's: filters, reflection, spotlight,
+  `Source::Media.reversed`, audio pan / compressor / noise reduction, and
+  `Project.nests` all persist, and a version-1 file still opens — including
+  the one shape serde cannot absorb with a default, a v1 nest clip whose
+  `project` was a path string, which `migrate_1_to_2` rewrites into a named
+  empty `Nest`. Version 3 is road map 2's phase 2 — a clip's `name` and
+  `label`, a track's `solo` — and has no migrate step, since all three
+  default (`format.rs` says why it bumps anyway).
   **Filters, reflection and spotlight render**, through three new passes in
   `Compositor.metal` (blur/sharpen/pixelate fold into the sample, the four
   point filters run in slot order after) with their inspector sections in
@@ -330,5 +357,102 @@ package, so the harness has to set them itself.
   three in `edit_tests.rs`; slip-and-back and roll-and-back compare whole
   documents byte for byte, and the insert/overwrite tests assert on what did
   NOT move as much as on what did.
+- **Road map 2, phase 2 — Clip identity: done.** Three fields, two ops,
+  one argument, schema version 3.
+  `Clip.name`, `Clip.label` and `Track.solo` are the LAST keys of their
+  structs (`core/src/model.rs`) and all three default, so
+  `RC_FORMAT_VERSION` went to 3 with no migrate step — `format.rs` says why
+  the bump still matters — and `core/tests/schema_v3.rs` opens version-1
+  and version-2 fixtures and reads the new keys' order off the written
+  text, since a parsed `Value` sorts them. `model.rs` was over the cap, so
+  the §5.2 property types went out FIRST, into `core/src/model_props.rs`
+  (the schema's vocabulary, where `model.rs` is its shape; re-exported
+  whole, so every `crate::model::X` path held; 939 → 462), and
+  `edit_props.rs`'s range checks followed into `props_check.rs` when
+  `set_clip` took that file over the line.
+  **`set_clip` is the fifth patch op** — `{clips, patch: {name?, label?}}`
+  in `edit_props.rs`, NOT the road map's two top-level arguments, and that
+  is the phase's one deviation from its plan: the op envelope reads an
+  absent optional and an explicit `null` as the same thing and the crate
+  has no tri-state argument idiom, while a patch already has the one
+  wanted (absent keeps, `null` clears) and the Swift side already had
+  `T??` patches and `patchArg`. Inside it an empty string clears too, after
+  the trim a name gets, because an unnamed clip is `None`; an unknown key
+  is an `Err`, checked before the ids. A split, duplicate, detach or paste
+  carries name and label along (they clone the clip); `paste_attributes`
+  never does. `set_track` gained `solo`.
+  **`paste_attributes`** (`edit_paste.rs`, beside the payload it reads)
+  copies the Copy payload's EARLIEST clip's property groups (at one start
+  the front-most, then the lower id — never the array's first, which is
+  creation order) onto each target,
+  REPLACED whole, never merged — video and audio whole, transform included
+  (`audio.muted` and `keep_pitch` travel; they are properties like
+  opacity); text but `content`; shape but `kind`, `width`, `height`,
+  `from`, `to`. `groups` absent means every group BOTH sides have,
+  silently skipping the rest; a named group either side lacks is an `Err`,
+  all-or-nothing; each copied group passes the range checks a patch does
+  (`Project::check_group`). Speed, enabled, actions, the transition, the
+  source and identity stay.
+  **Solo** is a zero envelope like mute, decided in `audio.rs::Voice::of`
+  against the stage's container track set — `silenced`: `muted ||
+  (any_solo && !solo)`, so mute wins, a soloed track with nothing audible
+  still silences the rest, a nest's tracks are judged among themselves
+  and a timeline solo reaches a whole nest through its enclosing stage.
+  `plays_audio`, `assign` and the plan's segments are untouched, so a solo
+  toggle changes ramps only, and `plan_text()` of "solo A" is
+  byte-identical to "mute every track but A". `nest` copies `solo` into
+  the nest's own track as it copies `muted`.
+  UI: rename by double-clicking a clip (`TimelineView+Rename.swift`, over
+  the one editor the view keeps for tracks and markers; the frozen file
+  holds the `clicks == 2` hook — before `selectClip`, like the ⌥⇧ slip
+  branch — and a `relocateRename()` at the end of `rebuildLayout`, which
+  moves the open field to the new layout's rect, or ends it with its
+  commit DROPPED when its clip is gone), in the
+  Clip tab's header field (`ClipSelectionHeaderView`, `ClipPane.swift`)
+  and Clip ▸ Rename… ⇧⌘R (`EditorViewController+Identity.swift`). A label
+  is a 6 pt dot at the right end of the name strip and beside the header's
+  name, and Clip ▸ Label ▸ is a tagged submenu over `ClipLabel.allCases` —
+  `ClipLabel.swift` is the ONE home of the marker-colour vocabulary, and
+  the ruler's marker flags read it now too; the tint stays the kind's.
+  Solo is the fourth header toggle (`headphones`, index 3; its text
+  fallback is S, as H/M/L are the other three's — the glyph is what draws) and
+  Track ▸ Solo; ⌥⌘V is Edit ▸ Paste Attributes over the existing
+  pasteboard type, sent with no `groups` (the default rule). The mirror is
+  `set_clip`, `paste_attributes` and `set_track`'s `solo`, and `set_clip`'s
+  handler adds a per-key TYPE check, because `patchArg` cannot refuse a
+  number for a `String??` — it decodes as a clear.
+  Worth knowing: the shared rename editor DROPS an unchanged commit (an
+  accidental double-click would otherwise pin a clip's fallback as its own
+  name) and an empty one (right for a track or a marker, whose names cannot
+  be cleared), so the strip cannot
+  clear a name — the Clip tab's header field is where an emptied name goes
+  back to the fallback. A solo belongs to its TRACK, so nesting a clip off
+  a soloed track onto an unsoloed one (the nest clip lands on the
+  selection's front-most track, and the solo stays behind on the emptied
+  one) silences it, exactly as moving it there would — a documented limit,
+  not a bug. And a rename committed inside another gesture (type, then
+  click a header toggle without Enter) merges into that gesture's undo
+  step, and Escape does not cancel the field — both pre-existing for track
+  and marker renames.
+  Measured (`tools/proof/phase2_proof.py` over MCP against `make app`'s
+  binary; `tools/proof/phase2_chrome.py` offscreen): soloing the back track
+  of a two-tone project exports audio sample-for-sample identical to muting
+  the front track (0 of 477,056 samples differ) and to a project holding
+  only that tone; a track both soloed and muted exports digital silence,
+  equal to muting both; the frame over a picture track is byte-identical
+  before and after a solo. `set_clip`'s `null`, `""` and a blank string all
+  clear, a padded name is trimmed, identity and a wrong-typed key are
+  refused by name, and a split carries name and label to both halves.
+  `paste_attributes` leaves both targets' video and audio equal to the
+  source's, the text's `content` and all eleven keys outside the groups
+  byte-identical, and undoes in one step with the frame restored
+  byte-identically. Offscreen, a rename changes exactly three pixel
+  clusters — selection block, Clip header, name strip — and nothing else;
+  a label changes only the strip's and the header's right ends, red and
+  blue differ only there and read as their inks, and the body's tint pixel
+  is unchanged; a solo lights the headphones box and nothing else. Worth
+  knowing beside the M3 note on audio export: two exports of an unchanged,
+  duck-free, fade-free two-track project decode byte-identical, so the
+  wobble is confined to duck edges and a solo/mute proof needs no tolerance.
 
 Keep this file current as code lands.

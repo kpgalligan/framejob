@@ -22,11 +22,11 @@
 
 use serde_json::Value;
 
-use crate::edit_props::{color_ok, SCALE_MAX, SCALE_MIN};
 use crate::export::describe;
 use crate::model::{
     Clip, Color, Marker, Media, MediaKind, Project, Source, Track, DEFAULT_MARKER_COLOR,
 };
+use crate::props_check::{color_ok, SCALE_MAX, SCALE_MIN};
 use crate::time::{self, Fps, Ticks};
 
 /// Canvas dimension bounds. The floor is small enough for a thumbnail-sized
@@ -228,6 +228,7 @@ impl Project {
                 hidden: false,
                 muted: false,
                 locked: false,
+                solo: false,
             },
         );
         self.finish(next)
@@ -292,6 +293,7 @@ impl Project {
         hidden: Option<bool>,
         muted: Option<bool>,
         locked: Option<bool>,
+        solo: Option<bool>,
     ) -> Result<Option<Project>, String> {
         self.require_track(track)?;
         let mut next = self.clone();
@@ -307,6 +309,9 @@ impl Project {
             }
             if let Some(locked) = locked {
                 found.locked = locked;
+            }
+            if let Some(solo) = solo {
+                found.solo = solo;
             }
         }
         self.finish(next)

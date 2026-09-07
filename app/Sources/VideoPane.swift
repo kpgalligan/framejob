@@ -277,7 +277,7 @@ final class VideoPane: InspectorPaneView {
 
     /// The M3 green-screen group (§4.3): the switch, the key colour with its
     /// canvas eyedropper, and the three knobs the shader keys with. The core
-    /// bounds all four of them to 0…1 (`edit_props.rs`'s `video.chroma.*`),
+    /// bounds all four of them to 0…1 (`props_check.rs`'s `video.chroma.*`),
     /// so the three are dialled as percentages of that range and the colour
     /// is written as the three components `chroma.key` is — the one colour in
     /// the schema with no alpha in it.

@@ -55,8 +55,13 @@ extension AgentServer {
             document, "Move Track", [.moveTrack(track: track.id, index: index)])
     }
 
-    /// `set_track` — the header's three toggles (`toggleTrack`, mirrored by
-    /// Track ▸ Hide Video / Mute Audio / Lock Track) and its inline rename.
+    /// `set_track` — the header's four toggles (`toggleTrack`, mirrored by
+    /// Track ▸ Hide Video / Mute Audio / Lock Track / Solo; the header's S is
+    /// `TimelineView.toggleHeader`'s `.solo` case) and its inline rename.
+    /// Solo is an audio rule on the track's CONTAINER — the timeline, or a
+    /// nest's own tracks: while any track there is soloed, every track that
+    /// is not is silent, mute wins on a track that is both, and pictures are
+    /// untouched (`core/src/audio.rs`).
     func setTrack(_ a: [String: Any]) throws -> String {
         let document = try target(a)
         let track = try trackArg(a, "track", document)
@@ -64,14 +69,17 @@ extension AgentServer {
         let hidden = try boolArg(a, "hidden")
         let muted = try boolArg(a, "muted")
         let locked = try boolArg(a, "locked")
-        guard name != nil || hidden != nil || muted != nil || locked != nil else {
-            throw ToolError(message: "set_track needs at least one of name, hidden, muted, locked.")
+        let solo = try boolArg(a, "solo")
+        guard name != nil || hidden != nil || muted != nil || locked != nil || solo != nil else {
+            throw ToolError(
+                message: "set_track needs at least one of name, hidden, muted, locked, solo.")
         }
         return try editResult(
             document, "Track Properties",
             [
                 .setTrack(
-                    track: track.id, name: name, hidden: hidden, muted: muted, locked: locked)
+                    track: track.id, name: name, hidden: hidden, muted: muted, locked: locked,
+                    solo: solo)
             ])
     }
 

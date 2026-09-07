@@ -449,6 +449,8 @@ impl Project {
             shape: None,
             actions: Vec::new(),
             transition_in: None,
+            name: None,
+            label: None,
         };
         if next
             .check_overlap_rule(std::slice::from_ref(&still), still.track, &[])

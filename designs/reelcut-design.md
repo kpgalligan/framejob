@@ -207,6 +207,19 @@ source's own facts. `ClipKindStyle` is the one mapping from a clip to that
 chip, and the timeline bar and the timeline's own name strips read it too, so
 the three views of one selection agree by construction.
 
+Since format version 3 that name line is, for a SINGLE selected clip, an
+editable field (`InspectorNameField`) showing the DISPLAYED name —
+`ProjectSnapshot.name(of:)`: the clip's own name, else the fallback. Its
+commit sends the trimmed text through `set_clip`, and an emptied field on a
+clip with a name of its own sends `null`: this is the one place in the UI a
+name is cleared back to the fallback, because the shared rename editor the
+timeline uses for tracks, markers and clips drops an empty commit (a track
+or marker name cannot be cleared). Emptying a field that already showed the
+fallback sends nothing. A multi-selection keeps the drawn "N clips
+selected". A label every selected clip shares draws as a 6 pt dot at the
+line's right end — the strip's dot, so the two views agree — and the mono
+line sits at y 27 under the 20 pt field.
+
 Sections are disclosure groups with a reset-to-default in the header, a
 right-aligned mono 10 pt summary of the group's current state (`100%`,
 `neutral`, `+0.0 dB`, `off`) so a collapsed group still tells you something,
@@ -397,7 +410,10 @@ loops, ripple-delete-range, and export. Markers are small flags, chapter
 markers filled; double-click to rename; drag to move.
 
 **Tracks**: header shows the name (double-click to rename), eye (hide
-video), speaker (mute), lock. Top track is front-most. Drag a header to
+video), speaker (mute), lock, and — format version 3 — headphones (solo: a
+fourth toggle at the same pitch, whose rule is §5.2's; `S` is its text
+fallback, as H, M and L are the other three's, drawn only when the SF
+Symbol is missing). Top track is front-most. Drag a header to
 reorder. Dragging a clip above the top track or below the bottom one
 creates a track; Track > Remove Empty Tracks cleans up. New Track is ⇧⌘N.
 
@@ -409,7 +425,10 @@ begins, which was the whole complaint.
 - **Name strip**: 16 pt along the top, `rgba(black, 0.26)` over the tint,
   6 pt padding, an 11 pt kind symbol at 62 % white, then the name at 10 pt
   semibold, 92 % white, truncated with an ellipsis. The symbol is the point
-  of it — a clip's kind used to be invisible.
+  of it — a clip's kind used to be invisible. A labelled clip (§5.2)
+  carries a 6 pt dot in its label's colour at the strip's right end, the
+  name giving up 11 pt for it; the tint stays the KIND's, never the
+  label's. A double-click on the clip opens a rename field over the strip.
 - **Tint by kind**, `ClipKindStyle`: video slate, audio green, still violet,
   text amber, shape teal, nest grey. A `media` clip is video or audio by
   whether its FILE has pictures, not by `enabled.video` — that flag is the
@@ -484,7 +503,7 @@ grid (`rc_time_snap_to_frame`, round-to-nearest); sources keep their own
 rate and AVFoundation picks the source frame. Frame rates are rationals
 `[num, den]` everywhere.
 
-### 5.2 Project — the JSON schema (format version 2)
+### 5.2 Project — the JSON schema (format version 3)
 
 The Rust value, serialized by serde. Small, no pixels. All times are
 ticks, all positions canvas pixels, colors `[r, g, b, a]` floats 0–1,
@@ -492,7 +511,7 @@ angles degrees, opacity/volume 0–1 (volume may exceed 1, up to 4).
 
 ```json
 {
-  "version": 2,
+  "version": 3,
   "canvas": { "width": 1920, "height": 1080, "fps": [30, 1],
               "background": [0, 0, 0, 1], "fit_new_clips": true,
               "timecode_frames": true },
@@ -503,7 +522,8 @@ angles degrees, opacity/volume 0–1 (volume may exceed 1, up to 4).
       "has_alpha": false }
   ],
   "tracks": [
-    { "id": 1, "name": "Track 1", "hidden": false, "muted": false, "locked": false }
+    { "id": 1, "name": "Track 1", "hidden": false, "muted": false, "locked": false,
+      "solo": false }
   ],
   "clips": [
     { "id": 17, "track": 1, "start": 0, "duration": 12000000,
@@ -525,7 +545,8 @@ angles degrees, opacity/volume 0–1 (volume may exceed 1, up to 4).
         { "id": 1, "start": 2400000, "duration": 900000, "curve": "ease_in_out",
           "end": { "video": { "scale": 0.6, "x": 520 } } }
       ],
-      "transition_in": null }
+      "transition_in": null,
+      "name": null, "label": null }
   ],
   "markers": [ { "id": 1, "time": 6000000, "name": "Intro", "color": "red", "chapter": true } ],
   "next_id": 18,
@@ -590,6 +611,26 @@ angles degrees, opacity/volume 0–1 (volume may exceed 1, up to 4).
   "fade_white" | "push_left" | "push_right" | "push_up" | "push_down" |
   "wipe" | "slide" | "zoom" }`. Its duration *is* the overlap with the
   previous clip on the track; a clip with no overlap ignores it.
+- `name` (format version 3): the clip's own name, or `null` — the common
+  case — meaning "call it what it shows": the app falls back to the nest's
+  name for a nest clip, the media file's name where there is one, else the
+  kind (`ProjectSnapshot.name(of:)`, the one fallback the name strip, the
+  selection block and the Clip tab header all read). `set_clip` stores it
+  trimmed; the schema keeps whatever it is given.
+- `label` (format version 3): `null`, or a colour NAME from the marker
+  vocabulary — `red`, `orange`, `yellow`, `green`, `blue`, `purple`, the
+  one list, spelled once on the app side (`ClipLabel.swift`) and drawn as a
+  6 pt dot on the clip (§4.4). Stored unvalidated, exactly like a marker's
+  `color` and for the same reason: a build that policed the list would
+  refuse a project written by a newer one, so an unknown name is kept and
+  drawn in the neutral ink.
+- `tracks[].solo` (format version 3): while any track in a container's
+  track set — the timeline's, or one nest's own — is soloed, every track
+  in that set without `solo` is treated as muted; mute wins, so a track
+  that is both muted and soloed stays silent. Audio only — it hides
+  nothing — and per container, so a nest's own tracks are judged among
+  themselves. The rule is on the set, not on what plays: a soloed track
+  with nothing audible on it still silences the rest (§7.2).
 - `nests` (M3) holds the groups every `nest` clip points at:
   `{ "id": 60, "name": "Intro", "width": 1920, "height": 1080,
   "tracks": [...], "clips": [...] }`. A nest is **not** a nested project:
@@ -691,8 +732,9 @@ Talk.reelcut/
 ```
 
 The reader accepts every prior version; the writer enforces the reader's
-caps (max 4096 clips, 64 tracks, 1024 markers — `RC_CAPS` in
-`format.rs`). Opening a project whose media is missing opens anyway with
+caps (4096 clips, 64 tracks, 1024 markers, 1024 media, nests 8 deep — the
+`MAX_*` constants in `format.rs`, four of them mirrored as `RC_MAX_*` in
+the header). Opening a project whose media is missing opens anyway with
 the clips marked missing (rendered as a slate) and Relink… offered.
 
 **Consolidate Media** (File ▸ Consolidate Media…, and the Media tab's own
@@ -780,9 +822,11 @@ or animates back); "error" = `Err`.
 | `detach_audio {clip}` | `enabled.audio = false` on the clip; a new clip with `enabled = {video: false, audio: true}`, same source/in/duration/speed and the audio props, on the track below (a track is inserted at index 0 if needed). Refuses if the media has no audio or audio is already detached. |
 | `duplicate {clips}` | Copies placed after the originals' span on the same tracks (⌥-drag then moves them). |
 | `paste {at, track?, payload}` | Inserts the clips of a clipboard payload — `{"clips": [...], "media": [...]}`, what ⌘C wrote to `com.kgalligan.reelcut.clips` — with fresh ids for the clips, their actions and any media row added. The EARLIEST clip lands exactly at `at` and the rest keep their offsets from it. A payload clip's `track` is a **depth from the front** (0 = front-most), not an id, since the ids belong to the document copied from: `track` names where depth 0 lands (default: the front-most track), the rest follow by the same index delta, and tracks missing behind it are added. Media is matched to `media[]` **by path** — reused when it is there, appended when it is not — so a paste between documents brings the entry with it. A clip the overlap rule refuses on its target track goes on a new track in front (as Add Text does, §4.1), so the only refusal is an empty clip list; a malformed payload is an **error**. |
-| `nest {clips, name?}` | Collapses the selection into ONE clip showing a nest (§5.2), on the front-most track the selection occupied, running from the earliest start to the latest end. The clips move whole — ids, props, actions, transitions — keeping their relative times (the earliest starts at 0 inside) and their track order, onto fresh tracks of the nest's own that copy the source tracks' names and their hidden/muted/locked state. The nest's canvas is frozen at the project's current size, so a later `set_canvas` cannot re-lay-out what is inside it. Media is untouched: a nest references the project's `media[]` in the same one id space. Refuses on an empty selection, on a selection of one nest clip, and when the nest clip would break the overlap rule against what was left behind. |
+| `paste_attributes {clips, payload, groups?}` | Copies the payload's EARLIEST clip's property groups onto each clip (at one start the front-most, then the lower id — never the array's first, which is Copy's creation order) — `payload` is the same Copy payload `paste` takes, and only that clip's `video`, `audio`, `text` and `shape` are read; its ids, times, media rows and nests do not matter and nothing is minted. A group is REPLACED whole, never merged: video and audio whole, transform included (`audio.muted` and `keep_pitch` travel — they are properties like opacity); text but its `content`; a shape but its `kind`, `width`, `height`, `from` and `to`. `groups` ∈ `video`, `audio`, `text`, `shape`: absent, it means every group BOTH sides have, silently skipping the rest; a NAMED group the payload clip lacks, or a target lacks, is an **error**, all-or-nothing, and so is a copied value the inspector would refuse — each copied group passes the patches' range checks. Speed, enabled, actions, the transition, the source and the clip's own name and label stay. Refuses when nothing changes, and on an empty `groups` list. |
+| `nest {clips, name?}` | Collapses the selection into ONE clip showing a nest (§5.2), on the front-most track the selection occupied, running from the earliest start to the latest end. The clips move whole — ids, props, actions, transitions — keeping their relative times (the earliest starts at 0 inside) and their track order, onto fresh tracks of the nest's own that copy the source tracks' names and their hidden/muted/locked/solo state (a copied solo is then judged among the nest's own tracks, §5.2). The nest's canvas is frozen at the project's current size, so a later `set_canvas` cannot re-lay-out what is inside it. Media is untouched: a nest references the project's `media[]` in the same one id space. Refuses on an empty selection, on a selection of one nest clip, and when the nest clip would break the overlap rule against what was left behind. |
 | `unnest {clip}` | The inverse: the nest's clips return at `clip.start + their own start` with fresh ids (as `split` then a re-join mints fresh ones), on tracks counted back from the nest clip's own — the nest's front-most track lands where the nest clip was — with tracks missing behind added, and the nest clip goes. A clip the overlap rule refuses lands on a new track in front, as `paste` does, so a group can always be opened. A nest clip trimmed shorter than its contents gives **all** of them back: there is no in point on a nest, so this is the inverse of `nest`, not of the trim. The nest is dropped from `nests[]` when no clip anywhere still shows it. An **error** when `clip` is not a nest clip. |
 | `set_video {clips, patch}` / `set_audio` / `set_text` / `set_shape` | Merge the patch into the base props. Refuses if nothing changes. |
+| `set_clip {clips, patch: {name?: string \| null, label?: string \| null}}` | The fifth patch op: sets or clears the clip's own name and label (§5.2). Inside the patch an absent key keeps, `null` clears, and so does an empty string — after the trim a name gets on its way in — because an unnamed clip is `null`, not `""`. Any other key is an **error**, checked before the clip ids. A patch and not two top-level arguments, because the op envelope reads an absent optional and an explicit `null` as the same thing, and "keep" and "clear" have to differ here. A `split`, `duplicate`, `detach_audio` or `paste` carries both along (they clone the clip); `paste_attributes` never does. Refuses if nothing changes. |
 | `set_enabled {clip, video?, audio?}` | Visibility/mute per clip. |
 | `set_transition {clip, kind|null}` | Sets `transition_in`. `set_transition_duration {clip, duration}` moves the clip so the overlap equals `duration` (subject to the overlap rule). |
 
@@ -801,7 +845,7 @@ or animates back); "error" = `Err`.
 |---|---|
 | `add_track {index, name?}` | Inserts (index 0 = back). |
 | `remove_track {track, with_clips=false}` | Refuses on a non-empty track unless `with_clips`. |
-| `move_track {track, index}` · `set_track {track, name?, hidden?, muted?, locked?}` | |
+| `move_track {track, index}` · `set_track {track, name?, hidden?, muted?, locked?, solo?}` | Omitted fields keep their value. `solo` (format version 3) is §5.2's container rule — while any track in the set is soloed every other is treated as muted, mute wins, audio only, a nest's tracks judged among themselves — applied as a 0 envelope in `audio.rs` (§7.2) and never in the plan, so a solo toggle changes ramps and nothing else. |
 | `remove_empty_tracks` | |
 | `add_marker {at, name?, chapter?, color?}` · `set_marker {marker, time?, name?, chapter?, color?}` · `remove_marker {marker}` | Markers snap to frames; two markers may not share a time. Default color `red`. |
 | `set_canvas {width?, height?, fps?, background?, rescale_clips?, fit_new_clips?, timecode_frames?}` | `rescale_clips` multiplies every clip's `x`, `y`, `scale` by the size ratio. Changing fps re-snaps every clip start and duration. |
@@ -946,7 +990,17 @@ every edit and compares).
   linear attack/release ramps) already folded in, **multiplied by the same
   quantities for every nest clip the segment is inside** — turning a nest
   down turns everything in it down, and muting one silences it. Muted
-  clips and muted tracks produce a 0 envelope; `mono` is a per-segment flag Swift applies
+  clips and muted tracks produce a 0 envelope, and so does a track
+  silenced by a solo: while any track in a container's track set — the
+  timeline's, or one nest's own — has `solo`, every track in that set
+  without it is treated as muted, and mute wins (a track both muted and
+  soloed stays silent). The rule is on the set, not on what plays: a
+  soloed track holding nothing audible still silences the rest. Audio
+  only, and an envelope exactly like mute — the segments stay in the
+  plan, so soloing never rebuilds the composition; a solo inside a nest
+  is judged among that nest's tracks alone, and a timeline solo on some
+  other track silences a whole nest through the nest clip's own stage, by
+  the same multiply. `mono` is a per-segment flag Swift applies
   with `AVMutableAudioMixInputParameters` where possible (else ignored in
   M2, noted).
 - **Instructions** tile `[0, duration]` with no gaps or overlaps (an
@@ -1226,20 +1280,23 @@ concern is a new module with its own `impl Project` block.
 | Module | Owns |
 |---|---|
 | `lib.rs` | declarations and re-exports only |
-| `model.rs` | the §5.2 types and serde derives, and the serde defaults that say what an absent key means — the schema, and nothing else |
+| `model.rs` | the §5.2 types and serde derives, and the serde defaults that say what an absent key means — the schema's SHAPE, and nothing else |
+| `model_props.rs` | the §5.2 per-clip property types — `VideoProps`, `Crop`, `Shadow`, `ColorAdjust`, `Chroma`, `Filter`, `Reflection`, `Spotlight`, `AudioProps`, `Compressor`, `Duck`, `TextProps`, `Outline`, `Backdrop`, `ShapeProps`, `Stroke` and their enums, with their defaults: the schema's VOCABULARY where `model.rs` is its shape. Cut out under the size rule (road map 2, phase 2) and re-exported whole by `model.rs`, so every `crate::model::X` path still resolves |
 | `model_query.rs` | reading a project: `Project::new`, id allocation, the `clip` / `track` / `media` / `marker` / `nest` lookups, `clips_on`, `duration`, `validate` with its nesting walk, and the three source-window measurements (`content_length`, `source_head`, `source_length`) every placement op clamps against |
 | `time.rs` | `Ticks`, `TIMESCALE`, `Fps`, frame snapping, timecode format/parse (non-drop `HH:MM:SS:FF` and `HH:MM:SS.mmm`) |
 | `edit.rs` | the op enum + serde, `apply(&self, op) -> Result<Option<Project>, String>`; **its module doc is the op schema table** |
-| `edit_clip.rs` / `edit_props.rs` / `edit_track.rs` / `edit_time.rs` | the §6 ops in `impl Project` blocks: clip placement; the four property patches and their range checks; tracks, markers, canvas, media; ripple, insert time, range delete, freeze |
+| `edit_clip.rs` / `edit_props.rs` / `edit_track.rs` / `edit_time.rs` | the §6 ops in `impl Project` blocks: clip placement; the five property patches (`set_video` / `set_audio` / `set_text` / `set_shape`, and `set_clip` for the clip's own name and label — `Group`, the vocabulary the patches and `paste_attributes` share, lives here); tracks, markers, canvas, media; ripple, insert time, range delete, freeze |
+| `props_check.rs` | the range checks every value written into a property group passes first — `check_video` / `check_audio` / `check_text` / `check_shape`, the `finite` / `in_range` family under them, and the bounds they check against (§4.3's numbers, which `actions.rs`'s `clamp_video` reads too) — cut out of `edit_props.rs` in phase 2 because a range check is a fact about the vocabulary, not about an edit; a patch and a `paste_attributes` copy run the same checks (`Project::check_group`) |
 | `edit_edge.rs` / `edit_insert.rs` | the cutting moves that keep something fixed on purpose: `slip` and `roll` (the clip's place, and the pair's outer edges); `insert_clip` and `overwrite_clip` (the other tracks, and the timeline's total length) |
-| `edit_action.rs` / `edit_nest.rs` / `edit_paste.rs` | the ops with a concern of their own: actions (the no-overlap rule); `nest` / `unnest`; `paste` (making another document's clips fit) |
+| `edit_action.rs` / `edit_nest.rs` / `edit_paste.rs` | the ops with a concern of their own: actions (the no-overlap rule); `nest` / `unnest`; `paste` (making another document's clips fit) and `paste_attributes` (the same payload's earliest clip's property groups copied onto clips already placed — replaced whole, never merged) |
 | `actions.rs` | evaluation and interpolation, `clip_state(clip, t)` |
 | `transition.rs` | overlap detection, the overlap rule, progress at *t* |
-| `evaluate.rs` | `frame_recipe(t)`, `composition_plan()` (A/B assignment, instructions) |
+| `evaluate.rs` | `composition_plan()` (A/B assignment, instruction tiling) and the `assign()` the recipe shares with it |
+| `recipe.rs` | `frame_recipe(t)`: the layer list at one instant — like every walk over what plays, it consumes `nest.rs`'s instances |
 | `nest.rs` | flattening a nest: the walk that turns a nest clip into the clips it stands for, and the transform they inherit |
-| `audio.rs` | envelopes: fades, volume actions, ducking, mute |
+| `audio.rs` | envelopes: fades, volume actions, ducking, mute and solo — solo judged per container (the timeline, or a nest's own tracks) in `Voice::of` against that container's track set, never in the plan |
 | `snap.rs` | candidates and `resolve` |
-| `format.rs` | `RC_FORMAT_VERSION`, `RC_CAPS`, read-any-version / write-current |
+| `format.rs` | `RC_FORMAT_VERSION`, the `MAX_*` reader caps (`RC_MAX_*` in the header), read-any-version / write-current |
 | `export.rs` | presets (one per encoding) and settings resolution |
 | `export_size.rs` | `export_sizes(preset)`: the Size popup's rows — the document's size, an image format's cap, the standard sizes fitted to the document's aspect by the short-edge rule — and `fit_within`, the rule for what a size means on an image format, which `export_settings` applies too |
 | `agent.rs` | MCP server (copied) |
@@ -1344,6 +1401,8 @@ a clean `make lint` before finishing Rust work.
 | ⇧⌘N | New track |
 | ⇧⌘I | Add media… |
 | ⌘G / ⇧⌘G | Nest / un-nest (M3) |
+| ⇧⌘R | Rename the selected clip — an inline field over its name strip |
+| ⌥⌘V | Paste Attributes — the copied clip's look onto the selection |
 | ⌘E | Export… |
 | ⌥⌘I | Toggle inspector |
 | `,` / `.` (⇧ ×10) | Nudge the selection one frame |
@@ -1352,6 +1411,7 @@ a clean `make lint` before finishing Rust work.
 | ⌥-drag clip edge | Rate stretch |
 | ⌥⇧-drag clip edge | Roll — the hard cut that edge sits on |
 | Double-click an empty lane span | Close that gap |
+| Double-click a clip | Rename it in place |
 | ⌥-drop / ⇧⌥-drop from the Media tab | Insert / overwrite at the drop |
 | ⌥-click a track header | Select every clip on that track |
 | ⌘-drag | Suppress snapping |
@@ -1363,8 +1423,6 @@ a key, nothing more.
 
 | Keys | Action | Phase |
 |---|---|---|
-| ⇧⌘R | Rename clip | 2 |
-| ⌥⌘V | Paste Attributes | 2 |
 | Z | Zoom-to-region mode on the canvas | 3 |
 | ⌥⌘E | Save Frame… | 7 |
 | ⇧⌘P | Preview Window | 8 |
@@ -1372,12 +1430,13 @@ a key, nothing more.
 
 Menus: File (New Project, Open…, Open Recent, Close, Save, Save As…,
 Add Media…, Import Captions… (M3), Consolidate Media… (M3), Export…),
-Edit (Undo, Redo, Cut, Copy, Paste, Duplicate, Delete, Ripple Delete,
-Insert at Playhead, Overwrite at Playhead, Select All, Select After
-Playhead, Select All on Track), Clip (Split, Trim Start, Trim End, Freeze
-Frame, Detach Audio, Add Action, Speed…, Close Gap, Transition ▸, Nest,
+Edit (Undo, Redo, Cut, Copy, Paste, Paste Attributes, Duplicate, Delete,
+Ripple Delete, Insert at Playhead, Overwrite at Playhead, Select All,
+Select After Playhead, Select All on Track), Clip (Split, Trim Start, Trim
+End, Freeze Frame, Detach Audio, Add Action, Speed…, Close Gap,
+Transition ▸, Rename…, Label ▸ (the six colours and None), Nest,
 Un-nest), Track (New Track,
-Remove Track, Remove Empty Tracks, Hide/Mute/Lock), Mark (Add Marker,
+Remove Track, Remove Empty Tracks, Hide/Mute/Lock/Solo), Mark (Add Marker,
 Set In, Set Out, Clear Range, Next/Previous Marker), View (Zoom, Fit,
 Snapping, Safe Areas, Inspector, Timeline Track Height), Window, Help.
 All menu items are nil-target selectors validated in

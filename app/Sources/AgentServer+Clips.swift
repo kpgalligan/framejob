@@ -33,6 +33,16 @@ extension AgentServer {
         "kind", "width", "height", "stroke", "fill", "arrow_start", "arrow_end", "radius",
         "from", "to",
     ]
+    /// The fifth patch's two keys: a clip's own name and its label
+    /// (`ClipPatch`, spec §5.2's `name` and `label`).
+    static let clipPatchKeys: Set<String> = ["name", "label"]
+
+    /// The four property groups `paste_attributes` can be told to carry —
+    /// `Group` in `core/src/edit_props.rs`, spelled as the wire spells it, in
+    /// the order the core checks them (and so the order its range errors
+    /// come back in). The catalog's `groups` enum reads this list, so the
+    /// two cannot disagree.
+    static let attributeGroups: [String] = ["video", "audio", "text", "shape"]
 
     // MARK: - Placing clips
 
@@ -359,13 +369,6 @@ extension AgentServer {
     /// itself, which is why the catalog entry spells the two places it differs
     /// from `get_project`'s clips (a `track` is a depth, media travels by
     /// path). `at` defaults to the playhead, the way the menu command uses it.
-    ///
-    /// The payload's own shape is the core's to police — `edit_paste.rs` names
-    /// what was wrong in a message this call returns in band — so only the two
-    /// things a model gets wrong before the core ever sees them are checked
-    /// here: a payload that is not an object, and one with no clips in it
-    /// (which the core answers with "no change", the least useful reply of
-    /// the three).
     func pasteClips(_ a: [String: Any]) throws -> String {
         let document = try target(a)
         let at = try optionalTimeArg(a, "at", document) ?? document.playhead
@@ -373,6 +376,21 @@ extension AgentServer {
         if let raw = a["track"], !(raw is NSNull) {
             track = try trackArg(a, "track", document)
         }
+        let payload = try pastePayloadArg(a)
+        return try editResult(
+            document, "Paste", [.paste(at: at, track: track?.id, payload: payload)])
+    }
+
+    /// The Copy payload `paste` and `paste_attributes` both take, read the
+    /// same way so the two tools cannot drift on what a payload is.
+    ///
+    /// The payload's own shape is the core's to police — `edit_paste.rs` names
+    /// what was wrong in a message the call returns in band — so only the two
+    /// things a model gets wrong before the core ever sees them are checked
+    /// here: a payload that is not an object, and one with no clips in it
+    /// (which `paste` answers with "no change", the least useful reply of the
+    /// three, and `paste_attributes` with an error that names no key).
+    private func pastePayloadArg(_ a: [String: Any]) throws -> [String: Any] {
         guard let payload = a["payload"] as? [String: Any] else {
             throw ToolError(
                 message: "payload must be a JSON object — {\"clips\": [...], \"media\": [...]}, "
@@ -383,8 +401,42 @@ extension AgentServer {
                 message: "payload.clips must be a non-empty array of clip objects, each with a "
                     + "track DEPTH (0 = front-most) in place of its track id.")
         }
+        return payload
+    }
+
+    /// `paste_attributes` — ⌥⌘V, Edit ▸ Paste Attributes
+    /// (`EditorViewController+Clipboard.pasteAttributes`): the payload's FIRST
+    /// clip's property groups onto the selection, each group replacing the
+    /// target's whole group. The menu command sends no `groups`, so it gets
+    /// the default rule — every group both clips have.
+    ///
+    /// `groups` is checked here against the four names, because the core
+    /// refuses a misspelt one as serde's envelope error, which names the
+    /// variant but not the argument; an EMPTY list is refused too, since the
+    /// core answers it with "no change" and a caller who wrote `[]` meant
+    /// something. Which groups travel by default, what a target keeps, and
+    /// the "clip N has no audio properties" refusals are the core's
+    /// (`edit_paste.rs`) and come back in band, as `paste`'s do.
+    func pasteAttributes(_ a: [String: Any]) throws -> String {
+        let document = try target(a)
+        let clips = try clipsArg(a, "clips", document)
+        let payload = try pastePayloadArg(a)
+        let groups = try stringsArg(a, "groups")
+        let known = Self.attributeGroups.joined(separator: ", ")
+        if let groups = groups {
+            guard !groups.isEmpty else {
+                throw ToolError(
+                    message: "groups is empty — name at least one of \(known), or leave it "
+                        + "out to paste every group both clips have.")
+            }
+            if let unknown = groups.first(where: { !Self.attributeGroups.contains($0) }) {
+                throw ToolError(
+                    message: "groups contains \"\(unknown)\" — each must be one of \(known).")
+            }
+        }
         return try editResult(
-            document, "Paste", [.paste(at: at, track: track?.id, payload: payload)])
+            document, "Paste Attributes",
+            [.pasteAttributes(clips: clips, payload: payload, groups: groups)])
     }
 
     // MARK: - Grouping
@@ -505,6 +557,44 @@ extension AgentServer {
             throw ToolError(message: "patch names nothing to change.")
         }
         return try editResult(document, "Shape Properties", [.setShape(clips: clips, patch: patch)])
+    }
+
+    /// `set_clip` — the clip's own name and label: the inline rename over the
+    /// timeline's name strip (double-click, `TimelineView+Rename.swift`), the
+    /// Clip tab's header field (`ClipSelectionHeaderView` in `ClipPane.swift`,
+    /// where a name is also CLEARED — the inline editor drops an empty
+    /// commit), Clip ▸ Rename… ⇧⌘R and Clip ▸ Label ▸
+    /// (`EditorViewController+Identity.swift`).
+    ///
+    /// Read through `patchArg` like the other four patches, then one check of
+    /// its own: both keys are three-state strings (`ClipPatch`), and
+    /// for a `String??` field a value of the wrong type decodes as
+    /// `.some(nil)` — a CLEAR — which the round trip in `patchArg` cannot
+    /// tell from a real null (measured: `{"label": 7}` read as "remove the
+    /// label"). The label's VALUE is not policed beyond its type: the core
+    /// stores a colour name unvalidated, the policy `add_marker`'s `color`
+    /// already has, so a project from a newer build still opens here.
+    func setClip(_ a: [String: Any]) throws -> String {
+        let document = try target(a)
+        let clips = try clipsArg(a, "clips", document)
+        let patch = try patchArg(a, "patch", ClipPatch.self, allowed: Self.clipPatchKeys)
+        try Self.checkClipPatchTypes(a["patch"] as? [String: Any] ?? [:], "patch")
+        guard !patch.isEmpty else {
+            throw ToolError(message: "patch names nothing to change.")
+        }
+        return try editResult(document, "Clip Properties", [.setClip(clips: clips, patch: patch)])
+    }
+
+    /// The type check `patchArg` cannot make for a `String??` field: each of
+    /// the clip patch's keys, when present, is a string or null and nothing
+    /// else. Runs AFTER `patchArg`, so an unknown key is still that function's
+    /// error, named the same way it is for every other patch.
+    private static func checkClipPatchTypes(_ object: [String: Any], _ path: String) throws {
+        for key in clipPatchKeys.sorted() {
+            guard let value = object[key], !(value is NSNull), !(value is String) else { continue }
+            throw ToolError(
+                message: "\(path).\(key) must be a string, or null to clear it.")
+        }
     }
 
     /// `set_enabled` — the per-clip video/audio switches of spec §5.2, the two

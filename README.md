@@ -25,13 +25,18 @@ normative: §5.2 is the project schema, §6 the op table, §7 the architecture.
   marker drag, audio fade handles and track reorder — each one undo step,
   each snapping to clip edges, markers and the playhead (N toggles, ⌘
   suppresses). Double-clicking an empty span closes that gap; a media row
-  dropped with ⌥ inserts and with ⇧⌥ overwrites.
+  dropped with ⌥ inserts and with ⇧⌥ overwrites. Double-clicking a clip
+  renames it in place, a labelled clip wears a 6 pt dot in its label's
+  colour on its name strip (the tint still says the kind), and a track
+  header has eye, speaker, lock and headphones — solo.
 - **Canvas** with an `AVPlayerLayer` under a transparent overlay: move, scale,
   rotate and crop handles, line/arrow endpoint handles, safe-area guides,
   snapping to the canvas centre and edges, inline text editing, and Fit /
   50 % / 100 % / 200 % zoom stops.
 - **Inspector** with three tabs — Clip, Media, Document. The Clip tab is a
-  selection header over the sections that selection's kind earns (transform,
+  selection header — the clip's name, editable there for a single clip and
+  the one place a name can be cleared back to what the clip shows, with its
+  label dot — over the sections that selection's kind earns (transform,
   crop, filters, text, shape, audio, actions…), each collapsible. Every field
   reads the *evaluated* value at the playhead and writes to the clip's base
   props — or, when the playhead is inside an animation action, to that
@@ -39,9 +44,15 @@ normative: §5.2 is the project schema, §6 the op table, §7 the architecture.
 - **Editing**: move, nudge, trim, slip, roll, split, delete, lift, ripple
   delete (and ripple delete range), close gap, insert time, insert and
   overwrite, duplicate, speed, freeze frame, detach audio, transitions,
-  actions, markers, tracks, canvas size and rate. Every edit is a pure op in
-  the Rust core returning a new immutable project handle, so undo is a stack
-  of handles and a refused edit costs nothing.
+  actions, markers, tracks, canvas size and rate; a clip's own name and
+  colour label (Clip ▸ Rename…, Clip ▸ Label ▸; a clip with no name of
+  its own is called what it shows), solo (Track ▸ Solo — the other tracks
+  in the same container go quiet, and mute still wins), and Paste
+  Attributes (⌥⌘V: the copied clip's look onto the selection, each group
+  replaced whole, a text clip keeping its words and a shape its kind and
+  size). Every edit is a pure op in the Rust core returning a new
+  immutable project handle, so undo is a stack of handles and a refused
+  edit costs nothing.
 - **Playback** over an `AVComposition` built from the core's composition plan,
   with a Metal compositor drawing every frame from the core's frame recipe.
   A property-only edit re-renders the paused frame without rebuilding the
@@ -163,8 +174,9 @@ runs. It is off by default.
 `overwrite_clip`, `move_clip`, `trim_start`, `trim_end`, `rate_stretch`,
 `slip`, `roll`, `split`, `delete`, `ripple_delete`, `ripple_delete_range`,
 `lift_range`, `insert_time`, `close_gap`, `set_speed`, `set_reversed`,
-`freeze_frame`, `detach_audio`, `duplicate`, `paste`, `nest`, `unnest`,
-`set_video`, `set_audio`, `set_text`, `set_shape`, `set_enabled`,
+`freeze_frame`, `detach_audio`, `duplicate`, `paste`, `paste_attributes`,
+`nest`, `unnest`, `set_video`, `set_audio`, `set_text`, `set_shape`,
+`set_clip`, `set_enabled`,
 `set_transition`, `set_transition_duration`, the four action ops, and the
 track, marker, canvas and media ops — plus the app-state tools below. The
 count of each is `rc_op_names`' length and the catalog's, and the startup

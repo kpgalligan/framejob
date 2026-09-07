@@ -155,6 +155,31 @@ fn segment_of(plan: &Value, group: &str, clip: i64) -> Value {
     panic!("no {group} segment for clip {clip} in {plan}");
 }
 
+/// The composition audio track carrying `clip`'s segment. A nested clip's
+/// segment lands wherever the A/B assignment puts it, so a test about its
+/// envelope asks by clip rather than by track id.
+fn audio_track_of(plan: &Value, clip: i64) -> &Value {
+    array(plan, "/audio_tracks")
+        .iter()
+        .find(|t| {
+            array(t, "/segments")
+                .iter()
+                .any(|s| int(s, "/clip") == clip)
+        })
+        .unwrap_or_else(|| panic!("no audio segment for clip {clip} in {plan}"))
+}
+
+/// One ramp at a constant `gain` over `[start, start + duration)` — the whole
+/// envelope of a clip with no fades, no actions and no ducker near it.
+fn assert_flat(comp: &Value, start: i64, duration: i64, gain: f64) {
+    let ramps = array(comp, "/ramps");
+    assert_eq!(ramps.len(), 1, "a constant gain is one ramp; got {ramps:?}");
+    assert_eq!(int(&ramps[0], "/start"), start);
+    assert_eq!(int(&ramps[0], "/duration"), duration);
+    close(num(&ramps[0], "/from"), gain, "gain at the start");
+    close(num(&ramps[0], "/to"), gain, "gain at the end");
+}
+
 fn layer_of(recipe: &Value, clip: i64) -> Value {
     array(recipe, "/layers")
         .iter()
@@ -925,6 +950,123 @@ fn muting_a_nest_clip_or_its_track_silences_everything_inside() {
     zero(&base(nest_clip(3, 2, 0, 2 * SEC, 4), muted_track));
 }
 
+/// Two timeline tracks over 0 – 2 s — track 2 holding a nest clip (4) and
+/// track 3 a media clip (6) — where the nest (5) has two tracks of its own,
+/// 7 and 8, each with one media clip (9 on 7, 10 on 8). Every track whose
+/// id is in `solo` is soloed, wherever it lives; the flag is set the way a
+/// file carries it, not through `set_track`, so the fixture says nothing
+/// about the op.
+fn nest_beside_a_track(solo: &[u32]) -> Handle {
+    let with = |id: u32| {
+        let mut track = track(id);
+        if solo.contains(&id) {
+            track["solo"] = json!(true);
+        }
+        track
+    };
+    Handle::from_value(&project(
+        vec![video_media(1)],
+        vec![with(2), with(3)],
+        vec![
+            nest_clip(4, 2, 0, 2 * SEC, 5),
+            media_clip(6, 3, 0, 2 * SEC, 1),
+        ],
+        vec![nest(
+            5,
+            vec![with(7), with(8)],
+            vec![
+                media_clip(9, 7, 0, 2 * SEC, 1),
+                media_clip(10, 8, 0, 2 * SEC, 1),
+            ],
+        )],
+        11,
+    ))
+}
+
+#[test]
+fn a_solo_among_a_nests_own_tracks_silences_only_its_siblings() {
+    // Track 7 soloed inside the nest, none on the timeline: clip 10 on the
+    // nest's track 8 is silenced, clip 9 plays, and the timeline's track 3
+    // — not in that container — is untouched. Every segment stays.
+    let plan = nest_beside_a_track(&[7]).plan();
+    assert_eq!(array(&plan, "/audio_tracks").len(), 3);
+    for comp in array(&plan, "/audio_tracks") {
+        assert_eq!(array(comp, "/segments").len(), 1);
+    }
+    assert_flat(audio_track_of(&plan, 9), 0, 2 * SEC, 1.0);
+    assert_flat(audio_track_of(&plan, 10), 0, 2 * SEC, 0.0);
+    assert_flat(audio_track_of(&plan, 6), 0, 2 * SEC, 1.0);
+}
+
+#[test]
+fn a_timeline_solo_is_judged_among_timeline_tracks_and_reaches_into_a_nest() {
+    // Track 3 soloed on the timeline: the nest clip's track 2 is silenced,
+    // and through the nest clip's stage so is everything inside it — the
+    // nest's own tracks, neither soloed, have no say.
+    let plan = nest_beside_a_track(&[3]).plan();
+    assert_flat(audio_track_of(&plan, 6), 0, 2 * SEC, 1.0);
+    assert_flat(audio_track_of(&plan, 9), 0, 2 * SEC, 0.0);
+    assert_flat(audio_track_of(&plan, 10), 0, 2 * SEC, 0.0);
+
+    // The nest clip's OWN track soloed: the whole nest plays and track 3 is
+    // silent, because inside the nest the rule is judged among tracks 7
+    // and 8, where no solo is set.
+    let plan = nest_beside_a_track(&[2]).plan();
+    assert_flat(audio_track_of(&plan, 6), 0, 2 * SEC, 0.0);
+    assert_flat(audio_track_of(&plan, 9), 0, 2 * SEC, 1.0);
+    assert_flat(audio_track_of(&plan, 10), 0, 2 * SEC, 1.0);
+
+    // A solo at each level composes by the multiply: track 2 lets the nest
+    // through, track 7 then picks clip 9 out of it.
+    let plan = nest_beside_a_track(&[2, 7]).plan();
+    assert_flat(audio_track_of(&plan, 6), 0, 2 * SEC, 0.0);
+    assert_flat(audio_track_of(&plan, 9), 0, 2 * SEC, 1.0);
+    assert_flat(audio_track_of(&plan, 10), 0, 2 * SEC, 0.0);
+
+    // And track 3's solo takes the nest out whatever is soloed inside it.
+    let plan = nest_beside_a_track(&[3, 7]).plan();
+    assert_flat(audio_track_of(&plan, 6), 0, 2 * SEC, 1.0);
+    assert_flat(audio_track_of(&plan, 9), 0, 2 * SEC, 0.0);
+    assert_flat(audio_track_of(&plan, 10), 0, 2 * SEC, 0.0);
+}
+
+#[test]
+fn a_solo_two_nests_deep_is_judged_among_that_nests_tracks() {
+    // Nest 5 sits on the timeline and holds, on its track 7, a clip showing
+    // nest 11, and on its track 8 a media clip. Nest 11 holds one media clip
+    // on its track 12. Soloing track 7 — the MIDDLE container — silences
+    // clip 10, its sibling, and nothing else: not the timeline's clip 6,
+    // and not clip 13 two levels down, whose own container has no solo.
+    // This pins the walk's "a stage at depth d is judged among the tracks of
+    // the (d − 1)th enclosing nest" against every off-by-one.
+    let mut middle = track(7);
+    middle["solo"] = json!(true);
+    let plan = Handle::from_value(&project(
+        vec![video_media(1)],
+        vec![track(2), track(3)],
+        vec![
+            nest_clip(4, 2, 0, 2 * SEC, 5),
+            media_clip(6, 3, 0, 2 * SEC, 1),
+        ],
+        vec![
+            nest(
+                5,
+                vec![middle, track(8)],
+                vec![
+                    nest_clip(9, 7, 0, 2 * SEC, 11),
+                    media_clip(10, 8, 0, 2 * SEC, 1),
+                ],
+            ),
+            nest(11, vec![track(12)], vec![media_clip(13, 12, 0, 2 * SEC, 1)]),
+        ],
+        14,
+    ))
+    .plan();
+    assert_flat(audio_track_of(&plan, 6), 0, 2 * SEC, 1.0);
+    assert_flat(audio_track_of(&plan, 10), 0, 2 * SEC, 0.0);
+    assert_flat(audio_track_of(&plan, 13), 0, 2 * SEC, 1.0);
+}
+
 #[test]
 fn a_nested_clip_fades_on_its_own_edges_not_the_nest_clips() {
     // A one-second fade-in on a clip that starts one second into the nest:
@@ -1130,4 +1272,51 @@ fn nesting_carries_a_muted_track_into_the_nest() {
         ramps.iter().all(|r| num(r, "/from") == 0.0),
         "still silent, in {ramps:?}"
     );
+}
+
+#[test]
+fn nesting_carries_a_soloed_track_into_the_nest_and_the_mix_is_unchanged() {
+    // Track 4 soloed, track 2 not: before nesting, clip 5 plays and clip 3
+    // is silent. `nest` puts the nest clip on the front-most source track —
+    // track 4, still soloed on the timeline — and copies the solo onto the
+    // nest's own copy of track 4, so inside the nest clip 3 is silenced by
+    // the same rule that silenced it outside. Each clip's envelope agrees
+    // before and after, which is the whole point of the copy.
+    let mut soloed = track(4);
+    soloed["solo"] = json!(true);
+    let before = Handle::from_value(&project(
+        vec![video_media(1)],
+        vec![track(2), soloed],
+        vec![
+            media_clip(3, 2, 0, 2 * SEC, 1),
+            media_clip(5, 4, 0, 2 * SEC, 1),
+        ],
+        vec![],
+        6,
+    ));
+    let nest_id = int(&before.value(), "/next_id") as u64;
+    let after = before.apply(&json!({"op": "nest", "clips": [3, 5]}));
+
+    let value = after.value();
+    let nest = by_id(&value, "/nests", nest_id);
+    let solos: Vec<bool> = array(nest, "/tracks")
+        .iter()
+        .map(|t| flag(t, "/solo"))
+        .collect();
+    assert_eq!(
+        solos,
+        vec![false, true],
+        "the solo came too, on its own track"
+    );
+
+    let (before, after) = (before.plan(), after.plan());
+    for clip in [3, 5] {
+        assert_eq!(
+            audio_track_of(&after, clip)["ramps"],
+            audio_track_of(&before, clip)["ramps"],
+            "clip {clip}'s envelope changed under nesting"
+        );
+    }
+    assert_flat(audio_track_of(&after, 5), 0, 2 * SEC, 1.0);
+    assert_flat(audio_track_of(&after, 3), 0, 2 * SEC, 0.0);
 }

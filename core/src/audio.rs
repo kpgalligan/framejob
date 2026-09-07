@@ -5,8 +5,9 @@
 //! volume ramp over a time range, so everything that decides how loud a
 //! composition audio track is at an instant — the clip's `volume`, its
 //! `fade_in`/`fade_out`, volume ACTIONS, ducking from other clips, and the
-//! three ways audio can be silenced (a muted clip, a muted track, a clip
-//! with `enabled.audio` false) — has to be folded into one piecewise-linear
+//! four ways audio can be silenced (a muted clip, a muted track, a track
+//! silenced by a solo elsewhere in its container, a clip with
+//! `enabled.audio` false) — has to be folded into one piecewise-linear
 //! function of project time before it crosses the FFI. AVFoundation has no
 //! notion of "these ramps multiply".
 //!
@@ -43,10 +44,26 @@
 //! everything within: the stages MULTIPLY. That is what turning a nest down
 //! means, and it is why the old shape — a list of `&Clip` looked up in the
 //! project — could only ever have given nested audio full gain.
+//!
+//! ### Solo
+//!
+//! A solo is a mute on everyone else: while any track in a container's
+//! track set has `solo`, every track in that set without it is silent, and
+//! mute wins, so a track that is both muted and soloed stays silent
+//! (`silenced`). The container is the timeline for a timeline track and
+//! the nest's own tracks for a track inside a nest, so a nest's solo is
+//! judged among its siblings and a timeline solo among the timeline's —
+//! and a timeline solo on some other track silences a whole nest through
+//! its enclosing stage, by the same multiply. The rule is on the SET, not
+//! on what plays: a soloed track holding nothing audible still silences the
+//! rest, which is what a mixer's solo button does. Audio only — the
+//! picture is untouched — and an envelope exactly like mute: the segments
+//! stay in the plan and the gain goes to 0, so soloing never rebuilds the
+//! composition.
 
 use serde::Serialize;
 
-use crate::model::{AudioProps, Clip, Duck, Project};
+use crate::model::{AudioProps, Clip, Duck, Project, Track};
 use crate::nest::Instance;
 use crate::time::{Ticks, TIMESCALE};
 
@@ -147,26 +164,53 @@ struct Stage<'a> {
     /// not drag the inner clip's fade-in along with it.
     origin: Ticks,
     /// Whether the track this clip sits on — the nest's, inside one — is
-    /// muted. Read here because a nested clip's track is not in
-    /// `Project::tracks` and cannot be looked up by id.
+    /// muted, or silenced by a solo elsewhere in its container. Decided
+    /// here, in the walk, because a nested clip's track is not in
+    /// `Project::tracks` and cannot be looked up by id, and because the
+    /// solo rule needs the track's whole container set, which only the walk
+    /// can name (see `silenced`).
     track_muted: bool,
+}
+
+/// Whether `track` is silent for reasons of its own: muted, or not soloed
+/// while some other track in `set` — its container's tracks — is. Mute
+/// wins over solo, so a track carrying both is silent: a mute is the user's
+/// own word about THIS track, and a solo that overrode it would make the
+/// mute button lie. The test is on the set alone, never on what the tracks
+/// hold, so a soloed track with nothing audible on it still silences the
+/// rest.
+fn silenced(set: &[Track], track: &Track) -> bool {
+    track.muted || (set.iter().any(|t| t.solo) && !track.solo)
 }
 
 impl<'a> Voice<'a> {
     /// The voice one flattened clip sings: itself, then the nest clips it is
     /// inside, outward.
-    pub(crate) fn of(instance: &Instance<'a>) -> Voice<'a> {
+    ///
+    /// `top` is the timeline's track set, `Project::tracks`, which the
+    /// instance does not carry: each stage's track is judged for solo among
+    /// the tracks of ITS container, and for a stage at depth `d` — `d` nest
+    /// clips above it — that container is the timeline when `d` is 0, else
+    /// the nest the `d`th enclosing clip shows (`inside` is outermost
+    /// first, so that is `inside[d - 1].nest`).
+    pub(crate) fn of(top: &[Track], instance: &Instance<'a>) -> Voice<'a> {
+        let set_at = |depth: usize| -> &[Track] {
+            depth
+                .checked_sub(1)
+                .and_then(|i| instance.inside.get(i))
+                .map_or(top, |enclosing| enclosing.nest.tracks.as_slice())
+        };
         let mut stages = Vec::with_capacity(instance.inside.len().saturating_add(1));
         stages.push(Stage {
             clip: instance.clip,
             origin: instance.origin,
-            track_muted: instance.track.muted,
+            track_muted: silenced(set_at(instance.inside.len()), instance.track),
         });
-        for enclosing in instance.inside.iter().rev() {
+        for (depth, enclosing) in instance.inside.iter().enumerate().rev() {
             stages.push(Stage {
                 clip: enclosing.clip,
                 origin: enclosing.origin,
-                track_muted: enclosing.track.muted,
+                track_muted: silenced(set_at(depth), enclosing.track),
             });
         }
         Voice {
@@ -303,8 +347,9 @@ impl Project {
     /// actions; the same three for every nest clip it is inside; then
     /// ducking from every OTHER clip in the project whose `audio.duck` is
     /// set, multiplied over the whole thing. A clip that is silenced —
-    /// `enabled.audio` false, `audio.muted`, or a muted track, at any level —
-    /// contributes 0 over its extent, and so does a gap.
+    /// `enabled.audio` false, `audio.muted`, or a track that is muted or
+    /// silenced by a solo in its container, at any level — contributes 0
+    /// over its extent, and so does a gap.
     pub fn audio_ramps(&self, voices: &[Voice<'_>], duckers: &[Ducker]) -> Vec<Ramp> {
         let mut own: Vec<&Voice> = voices.iter().filter(|v| v.end > v.start).collect();
         own.sort_by_key(|v| (v.start, v.clip_id()));
@@ -489,9 +534,10 @@ impl Project {
         if !clip.enabled.audio {
             return 0.0;
         }
-        // A muted TRACK still gets its segments in the composition — the
-        // plan does not change when the user unmutes (spec §7.2) — so the
-        // mute has to show up here, as a zero envelope.
+        // A muted TRACK — or one a solo elsewhere has silenced — still gets
+        // its segments in the composition: the plan does not change when
+        // the user unmutes or un-solos (spec §7.2), so the silence has to
+        // show up here, as a zero envelope.
         if stage.track_muted {
             return 0.0;
         }

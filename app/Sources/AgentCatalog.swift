@@ -113,6 +113,21 @@ extension AgentServer {
             + "corners), arrow_start, arrow_end, and from / to — the endpoints of a line or "
             + "arrow as UNIT coordinates in its box, e.g. from [0, 1] to [1, 0]. A colour is "
             + "[r, g, b] or [r, g, b, a], each 0–1."
+        // The fifth patch, `set_clip`'s. The label names are `ClipLabel`'s —
+        // the one home of the marker-colour vocabulary — read rather than
+        // restated, and typed for the same budget reason as the four above.
+        let labelNames = ClipLabel.allCases.map { $0.rawValue }
+        let clipPatchDescription: String =
+            "name and/or label; a key set to null clears it. Labels are the marker colours: "
+            + "\(labelNames.joined(separator: ", "))."
+        // `paste_attributes`'s group list, its enum read from the handler's
+        // own list so the schema and the check cannot disagree.
+        let groupsProperty: [String: Any] = [
+            "type": "array", "minItems": 1,
+            "items": ["type": "string", "enum": Self.attributeGroups] as [String: Any],
+            "description": "Which property groups travel. Default: every group both clips "
+                + "have; an empty list is refused.",
+        ]
 
         let catalog: [[String: Any]] = [
 
@@ -564,6 +579,30 @@ extension AgentServer {
                     ],
                 ], required: ["payload"]),
             tool(
+                "paste_attributes",
+                "Copies the payload's EARLIEST clip's property groups onto each of the clips — "
+                    + "Edit ▸ Paste Attributes (⌥⌘V). The payload is the same Copy payload "
+                    + "paste takes, but only its earliest clip's video, audio, text and shape are "
+                    + "read (at one start the front-most, then the lower id — never the array's "
+                    + "first, which is creation order): its ids and media rows do not matter. Each group "
+                    + "REPLACES the target's whole group rather than merging — video and audio "
+                    + "whole (position and scale included), text but its content, a shape but "
+                    + "its kind, width, height, from and to. Left out, `groups` means every "
+                    + "group BOTH clips have, silently skipping the rest; a named group the "
+                    + "payload clip lacks, or a target lacks, is an error, and so is a value "
+                    + "the inspector would refuse. Speed, enabled, actions, the transition and "
+                    + "the clip's own name and label stay. Refused (no change) when nothing "
+                    + "would change.",
+                [
+                    "clips": clipsProperty,
+                    "payload": [
+                        "type": "object",
+                        "description": "{\"clips\": [...], \"media\": [...]} — what Copy puts "
+                            + "on the pasteboard; see paste.",
+                    ],
+                    "groups": groupsProperty,
+                ], required: ["clips", "payload"]),
+            tool(
                 "nest",
                 "Collapses clips into ONE clip that stands for the group — ⌘G. The clips move "
                     + "whole (properties, actions, transitions) onto the nest's own tracks, "
@@ -637,6 +676,21 @@ extension AgentServer {
                 [
                     "clips": clipsProperty,
                     "patch": ["type": "object", "description": shapePatchDescription],
+                ], required: ["clips", "patch"]),
+            tool(
+                "set_clip",
+                "Names or labels clips — the timeline's inline rename (double-click the name "
+                    + "strip), the Clip tab's name field, Clip ▸ Rename… (⇧⌘R) and Clip ▸ "
+                    + "Label ▸. A clip with no name of its own shows what it holds — the nest, "
+                    + "the media file, or its kind — and clearing the name returns to that. "
+                    + "The patch merges like set_video: a key left out keeps its value, null "
+                    + "clears it, and so does an empty or blank name (names are trimmed). A "
+                    + "split, duplicate, detach or paste carries both along; paste_attributes "
+                    + "never does. The label is a colour name drawn as a dot on the clip, "
+                    + "stored as given, so keep to the six names.",
+                [
+                    "clips": clipsProperty,
+                    "patch": ["type": "object", "description": clipPatchDescription],
                 ], required: ["clips", "patch"]),
             tool(
                 "set_enabled",
@@ -773,15 +827,19 @@ extension AgentServer {
                 ], required: ["track", "index"]),
             tool(
                 "set_track",
-                "Renames a track or flips its three switches. hidden drops its picture from the "
-                    + "composition, muted its sound; locked keeps every ripple, insert and range "
-                    + "edit off it.",
+                "Renames a track or flips its four switches — the track header's toggles, "
+                    + "Track ▸ Hide Video / Mute Audio / Lock Track / Solo. hidden drops its "
+                    + "picture from the composition, muted its sound; locked keeps every ripple, "
+                    + "insert and range edit off it; solo silences every OTHER track in its "
+                    + "container (the timeline, or a nest's own tracks) that is not also soloed "
+                    + "— mute wins on a track that is both, and pictures are untouched.",
                 [
                     "track": trackProperty,
                     "name": ["type": "string"],
                     "hidden": ["type": "boolean"],
                     "muted": ["type": "boolean"],
                     "locked": ["type": "boolean"],
+                    "solo": ["type": "boolean"],
                 ], required: ["track"]),
             tool(
                 "remove_empty_tracks",

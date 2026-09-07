@@ -27,12 +27,12 @@ use serde::Serialize;
 use serde_json::{Map, Number, Value};
 
 use crate::audio::MAX_GAIN;
-use crate::edit_props::{
-    COMPRESSOR_MAKEUP_MAX_DB, COMPRESSOR_RATIO_MAX, COMPRESSOR_THRESHOLD_MIN_DB, SCALE_MAX,
-    SCALE_MIN, SPOT_ZOOM_MAX,
-};
 use crate::model::{
     Action, AudioProps, Clip, Curve, Project, ShapeProps, TextProps, VideoProps, MAX_FILTERS,
+};
+use crate::props_check::{
+    COMPRESSOR_MAKEUP_MAX_DB, COMPRESSOR_RATIO_MAX, COMPRESSOR_THRESHOLD_MIN_DB, SCALE_MAX,
+    SCALE_MIN, SPOT_ZOOM_MAX,
 };
 use crate::time::Ticks;
 
@@ -254,8 +254,8 @@ pub(crate) fn to_json<T: Serialize>(value: &T) -> Value {
 /// downstream can defend itself: the Metal compositor multiplies by opacity
 /// and scales a quad, and `audio.rs` would fold a nonsense gain into an
 /// envelope. So the ONE place an evaluated value is produced is the one
-/// place it is bounded, using the SAME table `edit_props.rs` names for a
-/// direct edit (that module errors and names the key, because a user typed
+/// place it is bounded, using the SAME table `props_check.rs` holds for a
+/// direct edit (there a check errors and names the key, because a user typed
 /// it; here there is nobody to tell, so it clamps).
 ///
 /// NaN collapses to the neutral value rather than propagating: a single NaN

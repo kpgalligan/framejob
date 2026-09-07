@@ -1,13 +1,13 @@
 //! The clip and action ops — spec §6, tables "Clips" and "Actions".
 //!
 //! One `impl Project` block holding every edit that adds, places, trims,
-//! splits, copies or re-describes a clip. The four property patches are the
-//! OTHER half of the clip surface and live in `edit_props.rs`, with the
-//! range checks that police them: this file decides where a clip sits, that
-//! one decides what it looks like. The action ops, which were here, are
-//! `edit_action.rs`. `edit.rs` dispatches to all three by name; nothing
-//! here knows about JSON op envelopes, and nothing here mutates `self` — an
-//! edit clones, changes the clone, and hands it back (spec §5.5).
+//! splits, copies or re-describes a clip. The five property patches are the
+//! OTHER half of the clip surface, `edit_props.rs`'s, policed by the range
+//! checks of `props_check.rs`: this file decides where a clip sits, that one
+//! what it looks like. The action ops, which were here, are `edit_action.rs`.
+//! `edit.rs` dispatches to all three by name; nothing here knows about JSON
+//! op envelopes, and nothing here mutates `self` — an edit clones, changes
+//! the clone, and hands it back (spec §5.5).
 //!
 //! Three rules run through all of it:
 //!
@@ -29,18 +29,19 @@
 //! restating them.
 //!
 //! The two ops here that DO take a patch — `add_text_clip` and
-//! `add_shape_clip` — build their preset and then hand it to
-//! `edit_props`'s merge and checks, so a `text` argument is validated
+//! `add_shape_clip` — build their preset and then hand it to `edit_props`'s
+//! merge and `props_check`'s checks, so a `text` argument is validated
 //! exactly as a later `set_text` would be.
 
 use serde_json::Value;
 
 use crate::actions::{self, Evaluated, MAX_PATCH_DEPTH};
-use crate::edit_props::{check_shape, check_text, merge_group, Group, SCALE_MAX, SCALE_MIN};
+use crate::edit_props::{merge_group, Group};
 use crate::model::{
     Action, AudioProps, Clip, Enabled, Media, MediaKind, Project, ShapeKind, ShapeProps, Source,
     TextProps, Track, Transition, TransitionKind, VideoProps,
 };
+use crate::props_check::{check_shape, check_text, SCALE_MAX, SCALE_MIN};
 use crate::time::{self, Ticks, TIMESCALE};
 
 /// Default duration for a source with no source bound — text, shape, and an
@@ -434,6 +435,8 @@ impl Project {
             shape: None,
             actions: Vec::new(),
             transition_in: None,
+            name: None,
+            label: None,
         };
         if self
             .check_overlap_rule(std::slice::from_ref(&clip), track, &[])
@@ -588,6 +591,8 @@ impl Project {
             shape: described.shape,
             actions: Vec::new(),
             transition_in: None,
+            name: None,
+            label: None,
         };
         if self
             .check_overlap_rule(std::slice::from_ref(&clip), track, &[])
@@ -1089,6 +1094,7 @@ impl Project {
                         hidden: false,
                         muted: false,
                         locked: false,
+                        solo: false,
                     },
                 );
                 id

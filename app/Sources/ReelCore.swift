@@ -837,6 +837,24 @@ extension ReelOp {
         return ReelOp(name: "paste", args: a.values)
     }
 
+    /// Copies the payload's FIRST clip's property groups onto each of
+    /// `clips` — ⌥⌘V. `payload` is the same Copy payload `paste` takes.
+    /// `groups` names which of `video`, `audio`, `text` and `shape` travel;
+    /// omitted, every group BOTH sides have does, silently skipping the rest,
+    /// where a named group either side lacks is an error. Video and audio
+    /// paste whole, text keeps its content, a shape keeps its kind and
+    /// geometry; speed, enabled, actions, the transition and the clip's own
+    /// name and label stay. Refuses when nothing changes.
+    static func pasteAttributes(
+        clips: [UInt32], payload: [String: Any], groups: [String]? = nil
+    ) -> ReelOp {
+        var a = OpArgs()
+        a.put("clips", clips)
+        a.put("payload", payload)
+        a.put("groups", groups)
+        return ReelOp(name: "paste_attributes", args: a.values)
+    }
+
     /// Collapses `clips` into ONE clip showing a nest — ⌘G.
     ///
     /// The clips move whole (ids, props, actions, transitions) into the
@@ -896,6 +914,19 @@ extension ReelOp {
         a.put("clips", clips)
         a.put("patch", patch.dictionary)
         return ReelOp(name: "set_shape", args: a.values)
+    }
+
+    /// Sets or clears the clips' own name and label — the fifth patch op,
+    /// shaped like `set_video` so the agent reads it through the same
+    /// `patchArg`. Each key is three-state (`ClipPatch`): absent keeps, null
+    /// clears, a string sets. The core trims a name and treats an empty one
+    /// as a clear, so the app may send what the user typed. Refuses when
+    /// nothing changes.
+    static func setClip(clips: [UInt32], patch: ClipPatch) -> ReelOp {
+        var a = OpArgs()
+        a.put("clips", clips)
+        a.put("patch", patch.dictionary)
+        return ReelOp(name: "set_clip", args: a.values)
     }
 
     /// Per-clip visibility and mute — the two halves Detach Audio flips.
@@ -1002,9 +1033,13 @@ extension ReelOp {
         return ReelOp(name: "move_track", args: a.values)
     }
 
+    /// Omitted fields keep their value. `solo` is the fourth switch: while
+    /// any track in a container is soloed, every track that is not is
+    /// silent; mute wins over solo on the same track, and pictures are
+    /// untouched either way.
     static func setTrack(
         track: UInt32, name: String? = nil, hidden: Bool? = nil, muted: Bool? = nil,
-        locked: Bool? = nil
+        locked: Bool? = nil, solo: Bool? = nil
     ) -> ReelOp {
         var a = OpArgs()
         a.put("track", track)
@@ -1012,6 +1047,7 @@ extension ReelOp {
         a.put("hidden", hidden)
         a.put("muted", muted)
         a.put("locked", locked)
+        a.put("solo", solo)
         return ReelOp(name: "set_track", args: a.values)
     }
 
@@ -1548,6 +1584,45 @@ struct ShapePatch: Equatable {
         if let radius = radius { d["radius"] = radius }
         if let from = from { d["from"] = from }
         if let to = to { d["to"] = to }
+        return d
+    }
+
+    var isEmpty: Bool { dictionary.isEmpty }
+}
+
+/// A patch of a clip's IDENTITY — `set_clip`'s argument. Both keys are
+/// three-state, exactly as `TextPatch.width` is: nil leaves the field
+/// alone, `.some(nil)` sends an explicit JSON null (the fallback name comes
+/// back, or the label goes), `.some(value)` sets it. The core trims a name
+/// and clears on an empty one, so a field's raw text may be sent as it is.
+///
+/// A label is a colour NAME from `ClipLabel`'s vocabulary. The core stores
+/// it unvalidated — the `Marker.color` policy — so the builder does not
+/// check it either; `ClipLabel.color(named:)` absorbs a name this build
+/// does not know.
+struct ClipPatch: Codable, Equatable {
+    var name: String??
+    var label: String??
+
+    init(name: String?? = nil, label: String?? = nil) {
+        self.name = name
+        self.label = label
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        name = c.nullable(.name)
+        label = c.nullable(.label)
+    }
+
+    var dictionary: [String: Any] {
+        var d: [String: Any] = [:]
+        if let name = name {
+            if let name = name { d["name"] = name } else { d["name"] = NSNull() }
+        }
+        if let label = label {
+            if let label = label { d["label"] = label } else { d["label"] = NSNull() }
+        }
         return d
     }
 

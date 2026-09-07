@@ -780,10 +780,16 @@ final class EditorViewController: NSViewController {
     @objc func insertMediaAtPlayhead(_ sender: Any?) { placeSelectedMedia(insert: true) }
     @objc func overwriteMediaAtPlayhead(_ sender: Any?) { placeSelectedMedia(insert: false) }
     @objc func selectAllClipsOnTrack(_ sender: Any?) { selectAllOnTrack() }
-    /// ⌘X / ⌘C / ⌘V — EditorViewController+Clipboard.swift.
+    /// ⌘X / ⌘C / ⌘V / ⌥⌘V — EditorViewController+Clipboard.swift.
     @objc func cut(_ sender: Any?) { cutSelection() }
     @objc func copy(_ sender: Any?) { copySelection() }
     @objc func paste(_ sender: Any?) { pasteClips() }
+    @objc func pasteAttributes(_ sender: Any?) { pasteAttributes() }
+    /// ⇧⌘R, Clip ▸ Label ▸ and Track ▸ Solo — EditorViewController+Identity.swift
+    /// (Solo's body is `toggleTrack` in +Timeline.swift, beside its siblings).
+    @objc func renameClip(_ sender: Any?) { renameClipCommand() }
+    @objc func setClipLabel(_ sender: Any?) { setClipLabelCommand(sender) }
+    @objc func toggleTrackSolo(_ sender: Any?) { toggleTrack(.solo) }
 
     // MARK: - Forwards into feature files
     //
@@ -936,6 +942,7 @@ extension EditorViewController: NSUserInterfaceValidations {
             if let answer = validateInspectorAction(action, item: item) { return answer }
             if let answer = validateTimelineAction(action) { return answer }
             if let answer = validateEdgeAction(action) { return answer }
+            if let answer = validateIdentityAction(action, item: item) { return answer }
         }
         return true
     }

@@ -21,7 +21,13 @@ use crate::model::{Canvas, Project};
 /// of those fields carries a serde default, so a version-1 file reads
 /// unchanged — with the single exception the nest payload's type change
 /// forces, which [`migrate_1_to_2`] handles.
-pub const RC_FORMAT_VERSION: u32 = 2;
+///
+/// Version 3 is clip identity (road map 2, phase 2): `Clip.name`,
+/// `Clip.label` and `Track.solo`. All three carry a serde default — `None`,
+/// `None`, `false` — so a version-2 file reads unchanged and no migration
+/// step exists for it; the bump is there so a version-2 build refuses a
+/// file whose names and labels it would otherwise silently drop.
+pub const RC_FORMAT_VERSION: u32 = 3;
 
 /// Reader caps, mirrored by the `RC_MAX_*` defines in the C header. They
 /// exist so a corrupt or generated file cannot make the app allocate
@@ -195,7 +201,8 @@ pub fn read(json: &str) -> Result<Project, String> {
 
     // MIGRATION HOOK. Each bump adds one step here, applied in order from
     // `version` up to RC_FORMAT_VERSION, rewriting `value` in place before
-    // it is deserialized. A future version 3 adds its own line below.
+    // it is deserialized. Version 3 needed no rewrite, so it has no line;
+    // the next version that does adds its own below.
     if version < 2 {
         migrate_1_to_2(&mut value);
     }

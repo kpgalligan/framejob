@@ -89,6 +89,29 @@ extension AgentServer {
         return value
     }
 
+    /// A list of strings (`paste_attributes`'s `groups`), or nil when `key`
+    /// is absent or null. A lone string is taken as a one-element list — the
+    /// courtesy `clipsArg` extends to a lone id, for the same reason — and an
+    /// element of any other type is an error naming the key, under the same
+    /// rule as the scalar readers above. What the strings may SAY, and
+    /// whether an empty list is a mistake, are the caller's to decide: an
+    /// empty list means different things to different ops.
+    func stringsArg(_ a: [String: Any], _ key: String) throws -> [String]? {
+        guard let raw = a[key], !(raw is NSNull) else { return nil }
+        if let one = raw as? String { return [one] }
+        guard let array = raw as? [Any] else {
+            throw ToolError(message: "\(key) must be an array of strings.")
+        }
+        var values: [String] = []
+        for value in array {
+            guard let string = value as? String else {
+                throw ToolError(message: "\(key) must contain strings only.")
+            }
+            values.append(string)
+        }
+        return values
+    }
+
     /// An id argument. Ids are unique across kinds in one project (spec §5.2),
     /// so this only checks the range; the lookups below check existence.
     func idArg(_ a: [String: Any], _ key: String) throws -> UInt32 {

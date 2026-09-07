@@ -97,7 +97,9 @@ def main():
     mcp = MCP(PORT)
 
     names = mcp.tools()
-    check(len(names) == 63, f"the catalog is 63 tools (got {len(names)})")
+    # A floor, not the count: phase 1 found 63, and every later phase adds
+    # tools. The exact count is the NEWEST phase's script's to assert.
+    check(len(names) >= 63, f"the catalog holds phase 1's 63 tools or more (got {len(names)})")
     for tool in ["slip", "roll", "lift_range", "close_gap", "insert_clip", "overwrite_clip"]:
         check(tool in names, f"{tool} is a tool")
 

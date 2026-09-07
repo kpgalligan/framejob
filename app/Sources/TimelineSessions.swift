@@ -8,11 +8,14 @@ enum TimelineEdge: Equatable {
     case end
 }
 
-/// The three toggles in a track header (spec §4.4).
+/// The four toggles in a track header (spec §4.4): eye, speaker, lock, and
+/// — since format version 3 — the headphones that solo the track's audio
+/// (its text fallback is S, as H/M/L are the other three's).
 enum TimelineHeaderButton: Equatable {
     case hidden
     case muted
     case locked
+    case solo
 }
 
 /// What is under the pointer. `TimelineContentView` computes exactly one of

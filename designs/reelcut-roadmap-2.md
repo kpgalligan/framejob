@@ -1,7 +1,8 @@
 # Reelcut — road map 2: beyond the spec
 
-**Status: phases 0 and 1 are built (`4fb72c6`); the rest is not. Pick up at
-phase 2.** Spec §10's three milestones are done
+**Status: phases 0, 1 and 2 are done (`4fb72c6` for the first two; phase 2
+on 2026-09-07, its hash added by the commit after it, as `4d28518` did for
+those); the rest is not. Pick up at phase 3.** Spec §10's three milestones are done
 (`reelcut-roadmap.md` records how each was proved). This is the plan for
 what a capable editor still lacks, found by reading the op table, the menus,
 the key map and the code against the question "what does a cutter reach for
@@ -41,14 +42,14 @@ full text.
   check enforces it. A gesture that is only a `move_clip` (nudge) needs
   nothing; a composite the UI offers as one command (blurred background,
   zoom back, normalise clip) gets a tool that performs the same composite.
-- **`model.rs` and `edit_clip.rs` are over the size cap**, still. Phase 0
-  brought `model.rs` down from 1330 to 940 by moving the lookups and
-  `validate` to `model_query.rs`, which is the room phases 2, 3, 4 and 6
-  spend on their fields — on the order of 150 lines between them. It does
-  not last:
-  the next cut, when one of those phases needs it, is the §5.2 property
-  types (`VideoProps` and its friends) into a `model_props.rs`, and
-  `core/CLAUDE.md` says so. No new op goes into `edit_clip.rs`.
+- **`edit_clip.rs` is over the size cap**, still, and `edit_track.rs` with
+  it. `model.rs` no longer is: phase 0 brought it down from 1330 to 940 by
+  moving the lookups and `validate` to `model_query.rs`, and phase 2 took
+  it to 462 by moving the §5.2 property types (`VideoProps` and its
+  friends) into `model_props.rs` — the cut this bullet used to promise —
+  and moved `edit_props.rs`'s range checks into `props_check.rs` the same
+  way, so phases 3, 4 and 6 have room for their fields. `core/CLAUDE.md`
+  names the next cuts. No new op goes into `edit_clip.rs`.
 - **Frozen files** (`EditorViewController.swift`, `TimelineView.swift`,
   `PreviewCanvasView.swift`, `AgentServer.swift`,
   `InspectorViewController.swift`) take wiring only; each feature below
@@ -89,7 +90,7 @@ fails without the fix. Green tests prove the cases someone thought of.
 |---|---|---|---|---|
 | 0 | Groundwork | ½ | — | **done** 2026-09-06 (`4fb72c6`) |
 | 1 | Cutting moves | 1–2 | — | **done** 2026-09-06 (`4fb72c6`) |
-| 2 | Clip identity | 1 | v3 | not started |
+| 2 | Clip identity | 1 | v3 | **done** 2026-09-07 |
 | 3 | The screencast trio | 2 | v4 | not started |
 | 4 | Words | 2 | v5 | not started |
 | 5 | Sound | 1–2 | — | not started |
@@ -103,8 +104,8 @@ nothing that later phases need; 6 depends on 3's list-interpolation rule; 9
 is last because it is the largest and touches every op at once. Any other
 order works if that one dependency is kept.
 
-**What phases 0 and 1 left behind for the rest**, so no later phase invents
-a second one:
+**What phases 0, 1 and 2 left behind for the rest**, so no later phase
+invents a second one:
 
 | | |
 |---|---|
@@ -115,7 +116,12 @@ a second one:
 | `ProjectDocument.targetTrack` | the one rule for "which track does a command with no track argument act on": the first selected clip's, else the front-most. Phase 6's Add Background… wants it. |
 | `ProjectDocument.selectedMedia` | the Media tab's selected row, clamped like the other view state. Phase 8's Media-tab work builds on this rather than adding another. |
 | `EditorViewController+Edge.swift` | carries an `extension TimelineView` as well as the controller's, which is how a gesture is added without touching the frozen view. Phases 3 and 9 need the same trick. |
-| `tools/proof/` | the MCP client and the per-phase proof scripts. |
+| `tools/proof/` | the MCP client, the per-phase proof scripts, and `harness/` — the offscreen chrome renderer, for any claim about what the chrome SHOWS. |
+| `ClipLabel.swift` | the marker-colour vocabulary — six names, their order, display names and inks — spelled once. A marker, a label, or anything else that carries a colour NAME reads it. |
+| `Project::check_group` (`edit_props.rs`) | the range check for ONE property group of one clip, what a patch and `paste_attributes` both run. A composite that writes a group runs it too. |
+| `audio.rs::silenced` | muted, or soloed-out within a container's track set. Any later per-track audio switch joins it rather than adding a second read of `track.muted`. |
+| `TimelineView+Rename.swift` | the second `extension TimelineView` precedent (after `+Edge.swift`'s), and the shape for adding an in-place editor to the frozen view: the hook in the frozen file, the field in the extension. |
+| `AgentServer+Arguments.stringsArg` | an optional list of strings from a tool call, a lone string counting as one. Phase 4's caption options and phase 7's export options want it. |
 
 ## 2. Phases
 
@@ -417,6 +423,82 @@ additions to `edit_tests.rs` and `paste.rs`. Swift: `ProjectSnapshot.swift`
 `AgentServer+Clips.swift` / `+Tracks.swift`. `ClipKindStyle.swift` is NOT on
 the list — see the correction above.
 
+**What landed.** All of it — the three fields at version 3, the two ops
+and the `solo` argument, the four UI surfaces and their mirrors — plus
+the following, where the code differs from the table above or settled
+what it left open:
+
+- **`set_clip` takes a patch**, `{clips, patch: {name?: string | null,
+  label?: string | null}}`, not the table's two top-level arguments. The
+  op envelope's rule (`edit.rs`) is that an absent optional and an
+  explicit `null` mean the same thing, and the crate has no tri-state
+  argument idiom — while a patch already has exactly the one wanted
+  (absent keeps, `null` clears) and the Swift side already had `T??`
+  patches and `patchArg`. So it is the fifth patch op, in `edit_props.rs`
+  beside the other four. Inside the patch an EMPTY string clears too,
+  after the trim a name gets, because an unnamed clip is `None`, not
+  `""`; an unknown key is an `Err`, checked before the clip ids, so it is
+  refused even with an empty selection.
+- **`paste_attributes` replaces a group whole, never merges**: "make this
+  look like that" is the gesture, and a merge would leave the target's
+  shadow under a source that had none. What a target keeps is what makes
+  it the clip it is: a text clip's `content`; a shape's `kind`, `width`,
+  `height`, `from`, `to`. `audio.muted` and `keep_pitch` travel with the
+  audio group — properties like opacity — and `keep_pitch` only acts when
+  the speed is not 1, which does not travel; neither do `enabled`, the
+  actions, the transition, the source, the name or the label. `groups`
+  absent means every group BOTH sides have, silently skipping the rest; a
+  NAMED group the payload clip lacks (`payload clip has no audio
+  properties`) or a target lacks (`clip 30 has no audio properties`) is
+  an `Err`, all-or-nothing, because a caller who asked would otherwise
+  never learn it did not happen; an empty explicit list is `None` in the
+  core and a refusal by name over MCP. Each copied group then passes the
+  range checks a patch does (`Project::check_group`, which checks only the
+  group that was replaced), so a hand-written payload cannot smuggle in a
+  value the inspector would refuse. Only ONE payload clip's four groups
+  are read — the EARLIEST (at one start the front-most, then the lower
+  id), which the review changed from the array's first, since that is
+  Copy's creation order and invisible to the user; its ids, media rows
+  and nests are irrelevant and nothing is minted.
+- **Solo: mute wins, and a solo with nothing audible still silences.**
+  `silenced(set, track) = muted || (set.any(solo) && !solo)` in
+  `audio.rs`, judged per container in `Voice::of` (the timeline's tracks
+  at depth 0, `inside[d − 1].nest.tracks` at depth d), an envelope like
+  mute — the segments stay in the plan, `plays_audio` and `assign` are
+  untouched, so a solo toggle changes ramps only. The rule is on the set,
+  not on what plays, which is what a mixer's button does; and
+  `plan_text()` of "solo A" is byte-identical to "mute every track but
+  A", which is the string the composition rebuild is keyed on.
+- **`nested_track` copies `solo`** as it copies hidden/muted/locked, so
+  what played before nesting plays after, judged inside among the nest's
+  own tracks. One consequence to know — a limit, not a bug: the nest clip
+  lands on the selection's front-most source track, so a solo on a
+  NON-front-most selected track stays behind on the emptied timeline
+  track and then silences the whole nest, which is what moving that clip
+  to an unsoloed track would do too, since a solo belongs to its track.
+  `unnest` carries no track flag back out, as it never did for `muted`.
+- **Two cuts under the size rule**, done before the fields went in:
+  `model_props.rs` (the §5.2 property types, 531 lines, re-exported
+  whole by `model.rs`, which went from 939 to 462) and `props_check.rs`
+  (`edit_props.rs`'s range-check section, cut when `set_clip` and
+  `check_group` took that file over the cap). Both are in spec §7.10 and
+  `core/CLAUDE.md`.
+- **The Clip tab's header field is the clearing path.** The shared inline
+  editor `TimelineView` keeps for tracks and markers drops an EMPTY
+  commit — right there, since those names cannot be cleared — so the
+  strip's double-click and ⇧⌘R can rename but not clear. The header
+  field (`ClipSelectionHeaderView`) shows the DISPLAYED name, own or
+  fallback, and an emptied field on a named clip sends `{"name": null}`;
+  on an unnamed one it sends nothing and the fallback is redrawn.
+- **The mirror type-checks `set_clip`'s two keys itself.** `patchArg`'s
+  round-trip guard cannot refuse a wrong-typed value for a `String??`
+  field — `{"label": 7}` decodes as a CLEAR and passes — so
+  `checkClipPatchTypes` runs after it and refuses with `patch.label must
+  be a string, or null to clear it.` The same gap still exists for
+  `TextPatch.width`, unfixed. The label's VALUE is not policed, by the
+  `Marker.color` policy; `ClipLabel.swift` is the vocabulary's one home,
+  and the catalog's description reads the six names from it.
+
 **Proof.**
 - A v2 fixture opens; every clip's displayed name is unchanged (the fallback
   is the old behaviour); write-read round-trips `name`, `label`, `solo`.
@@ -426,6 +508,133 @@ the list — see the correction above.
   other track muted (sample-for-sample).
 - `paste_attributes` leaves the target's props equal to the source's for
   the named groups and byte-identical elsewhere; one undo step.
+
+**Proved** on 2026-09-07, and again after the review round. Core: `make
+test` **284 passed / 0 failed** — 251 before, plus `core/tests/schema_v3.rs`
+(8) and additions to `edit_tests.rs` (+7), `paste.rs` (+10, two of them
+from the review), `evaluate_tests.rs` (+4) and `nest.rs` (+4). `make lint`
+clean, `make typecheck` 0 errors and the same 4 AVFoundation deprecation
+warnings. The solo claims in the core are hand-written ramp tables, and
+`plan_text()` of "solo A" equals "mute every track but A".
+
+App: driven over MCP against `make app`'s binary — **85/85 checks**,
+`tools/proof/phase2_proof.py` (84 from the provers, plus a `set_track`
+rename through the client's `call_with` from the review), re-run against
+the reviewed build, with `phase1_proof.py` still at 66/66 beside it; the
+catalog is 65 tools and the startup parity check passed. Every frame claim
+is a byte comparison of `render_frame` PNGs and every audio claim a
+sample-for-sample comparison of `audio_m4a` exports decoded to PCM:
+
+- Schema: a saved `project.json` is version 3, every clip object ends
+  `name` then `label` and every track `solo`; a byte copy of the package
+  opened from disk reads them back; a hand-made version-2 fixture opens,
+  reports version 3 and reads `null` / `null` / `false` everywhere.
+- `set_clip`: `null`, `""` and a blank string all clear; a padded name is
+  trimmed; identity, an unknown key and a wrong-typed `label` or `name`
+  are refused by name and leave the clip unchanged; a top-level `name`
+  with no patch is refused; a split carries name and label to both halves.
+- `paste_attributes`: onto two targets, the video and audio groups equal
+  the source's, the text's `content` and the eleven keys outside the four
+  groups are byte-identical, and `undo` is one step that restores the
+  whole document and the frame byte for byte.
+- Solo: soloing the back track of a two-tone project exports
+  sample-for-sample equal (0 of 477,056 samples differ) to muting the front
+  track and to a project holding only that tone; soloed and muted together
+  is digital silence, equal to muting both; the frame over a picture track
+  is byte-identical before and after a solo. Two exports of the unchanged
+  project decode byte-identical, so no tolerance was needed — the M3
+  wobble is confined to duck edges.
+
+Offscreen: `tools/proof/phase2_chrome.py`, **26/26**, over
+`tools/proof/harness/` with six hand-written one-text-clip packages, every
+claim a pixel diff of two renders measured against rectangles from the
+layout constants:
+
+- Two renders of one package are byte-identical, and a version-2 file
+  renders byte-identical to its version-3 spelling.
+- A rename changes exactly three pixel clusters, one inside each of the
+  selection block, the Clip header and the name strip, and nothing outside
+  them.
+- A label changes the strip's right end and the header's right end,
+  nothing outside the lanes and the header, and not the body's centre
+  pixel (the tint stays the kind's); the same clip labelled red differs
+  from blue only at those two ends, where the changed pixels read bluer
+  under blue and redder under red — the label's VALUE reaches both dots,
+  which a one-ink build (tried) fails.
+- A solo changes pixels only inside the track header column, within ±1 pt
+  of the headphones box.
+
+Still owed by a person at the machine — event-driven UI a still frame
+cannot answer: (1) double-click a clip → the field appears over its strip
+with the current name, Enter commits "Rename Clip" and all three places
+update; (2) the Clip-tab header field commits on Tab or click-away,
+emptying it on a named clip returns the fallback in one undo step, and on
+an unnamed clip nothing happens and nothing beeps; (3) the field's 12 pt
+semibold text sits acceptably in its 20 pt box; (4) ⇧⌘R scrolls a far-off
+clip into view before the field opens, clear of the header column and the
+ruler; (5) the headphones toggle's box and tint match the other three at
+S/M/L; (6) Track ▸ Solo's checkmark tracks the header; (7) Label ▸ Blue
+puts the dot on the strip AND in the header, the checkmark moves, None
+clears both; (8) ⌥⌘V after ⌘C of a styled clip changes another clip's look
+and beeps when the two share no group; (9) a zoom or a resize while a
+rename field is open moves the field with its clip and keeps what was
+typed, and ⌘⌫ or the timeline bar's Delete under an open field closes
+it with no rename sent and no sheet.
+
+**Reviewed, and six real defects fixed.** The change was read by eight
+readers — correctness, the core's rules, the audio rule, the app's
+rules, the gestures and menus, the MCP mirror, the docs and the proofs
+— who returned 71 findings; every one was put to three sceptics told
+to refute it, and 30 survived. The six that were code, each now covered
+by a test or a proof check that fails without the fix where one can be
+written:
+
+1. **The strip rename pinned the fallback as the clip's own name.** The
+   field opens showing what the strip shows, and an unchanged Enter
+   sent that back as `set_clip {name}` — an undo step and a dirty
+   document for an accidental double-click, and a text clip's strip
+   frozen at the words it had. The shared editor now drops an
+   UNCHANGED commit as well as an empty one, for all three renames.
+2. **The Clip-tab header field stayed blank after a clear.** A field's
+   `refresh` is skipped while its field editor is attached, which it
+   still is inside `controlTextDidEndEditing` — after Return or Tab
+   AppKit even re-attaches it — so every refresh the commit ran was
+   skipped and the field showed what was typed while the strip showed
+   the fallback. `InspectorNameField` re-reads the model as the commit
+   ends; app/CLAUDE.md records the pitfall beside the other one.
+3. **Deleting the clip under an open rename field sent the rename to
+   the dead id** and put up the core's refusal in a sheet after a
+   delete that had succeeded. Every rename now hands `beginRename` a
+   `relocate` closure answering its field's rect under the CURRENT
+   layout; `rebuildLayout` ends with `relocateRename()` instead of
+   `endRename()`, so the field FOLLOWS its target through a zoom, a
+   resize and any document change, and a relocator answering nil ends
+   the field with its commit dropped. The old `endRename()` had also
+   meant an agent's edit mid-typing folded the half-typed name into the
+   agent's undo step.
+4. **`beginRename` installed the new field before the first-responder
+   handoff**, so the previous editor's commit — which rebuilds the
+   layout — ran with the new field already in place. It blurs whatever
+   else is being typed into first, and gives up if the window refuses
+   the field.
+5. **A double-click on the visible part of a long clip whose start was
+   scrolled off opened the field out of view** — AppKit does not scroll
+   a timeline to a field editor's caret. The field is clamped to the
+   visible lanes.
+6. **`paste_attributes` read the payload's FIRST clip**, which is Copy's
+   storage order — creation order, neither timeline nor selection order
+   and invisible to the user. It now reads the EARLIEST, ties to the
+   front-most and then the lower id, and the test
+   `the_look_comes_from_the_earliest_copied_clip` fails on the old code.
+
+The rest: two core gaps closed with tests (an explicit `groups` list
+RESTRICTS the copy; an unknown patch key is refused before the ids are
+resolved), the waveform dimming under a solo as it does under a mute,
+the chrome proof telling one label colour from another (a one-ink
+build now fails it), `mcp.py` gaining `call_with` so a tool argument
+spelled `name` can be sent, the harness pinning one more defaults key,
+and a dozen doc statements that had gone false or were missing —
+`RC_CAPS`, which four documents named and nothing defined, among them.
 
 ---
 
@@ -499,7 +708,7 @@ scale, move and rotation. `RC_FORMAT_VERSION` 4.
   block gains four regions, and `Compositor.swift`'s field order changes in
   the same edit (the order is a contract checked only by reading both).
   `CompositorEffects.swift` holds the Swift side.
-- Range checks in `edit_props.rs`, clamps in `clamp_video`; `set_video`
+- Range checks in `props_check.rs`, clamps in `clamp_video`; `set_video`
   carries the patch, so no new op.
 - Inspector: a VideoPane "Obscure" section — rows with shape, kind,
   amount, feather, numeric box, add / remove — and "Place on Canvas",
@@ -507,7 +716,7 @@ scale, move and rotation. `RC_FORMAT_VERSION` 4.
 
 **Where.** `SilenceDetector.swift`, `SilenceSheetController.swift`,
 `edit_time.rs`, `model.rs`, `format.rs` + header, `actions.rs`,
-`edit_props.rs`, `evaluate.rs`/`recipe.rs` (the clamp), `Compositor.metal`,
+`edit_props.rs` / `props_check.rs`, `evaluate.rs`/`recipe.rs` (the clamp), `Compositor.metal`,
 `Compositor.swift`, `CompositorEffects.swift`, `VideoPane.swift`,
 `CanvasSessions.swift`, `EditorViewController+ZoomRegion.swift`, a new
 `core/src/edit_zoom.rs` for `add_zoom_action` (placement maths is a concern
@@ -706,7 +915,7 @@ two-pass pipeline), `ExportSheetController.swift`, `AudioPane.swift`,
 
 `RC_FORMAT_VERSION` 6.
 
-**Where.** `model.rs`, `format.rs` + header, `edit_props.rs` (range checks
+**Where.** `model.rs`, `format.rs` + header, `props_check.rs` (range checks
 for the new fields), `actions.rs`, `Compositor.metal`, `Compositor.swift`,
 `CompositorEffects.swift`, `LayerRenderers.swift`, `VideoPane.swift`,
 `ShapePane.swift`, `EditorViewController+AddClips.swift` (the two
@@ -888,13 +1097,12 @@ handle, `AgentServer+Arguments.swift`, `AgentServer+Project.swift`, catalog.
 Checked against spec §9 for conflicts; a phase that binds one promotes its
 row into §9.
 
-Phase 1's rows have been promoted into spec §9's bound table and are struck
-from this one; what is left is what is still only a claim on a key.
+Phases 1 and 2's rows have been promoted into spec §9's bound table and
+are struck from this one; what is left is what is still only a claim on a
+key.
 
 | Keys | Action | Phase |
 |---|---|---|
-| ⇧⌘R | Rename clip | 2 |
-| ⌥⌘V | Paste Attributes | 2 |
 | `Z` | Zoom-to-region mode on the canvas | 3 |
 | ⌥⌘E | Save Frame… | 7 |
 | ⇧⌘P | Preview Window | 8 |
@@ -904,13 +1112,15 @@ Menus. **Landed in phase 1**: Clip ▸ Close Gap, and Edit ▸ Insert at
 Playhead / Overwrite at Playhead / Select All on Track. There is no Edit ▸
 Lift item and there should not be — a lift is what ⌫ does with a range and
 nothing selected, so it is the Delete item's other half rather than a
-second row saying almost the same thing.
+second row saying almost the same thing. **Landed in phase 2**: Clip ▸
+Rename… and Label ▸ (the six colours, each with its swatch, then None),
+Edit ▸ Paste Attributes, and Track ▸ Solo — no key, a checkmark for the
+current track, the header's S being the everyday path.
 
-Still to come: Clip gains Rename…, Label ▸, Remove Silences…, Add
-Background…, Add Blurred Background, Open / Close Nest; Edit gains Paste
-Attributes; File gains Generate Captions…, Export Captions…, Save Frame…;
-Track gains Solo; View gains Preview Quality ▸ and Preview Window; Window
-gains Export Queue.
+Still to come: Clip gains Remove Silences…, Add Background…, Add Blurred
+Background, Open / Close Nest; File gains Generate Captions…, Export
+Captions…, Save Frame…; View gains Preview Quality ▸ and Preview Window;
+Window gains Export Queue.
 
 ## 4. Considered and left out
 

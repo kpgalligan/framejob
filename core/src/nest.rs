@@ -64,7 +64,8 @@ pub(crate) struct Enclosing<'a> {
     pub clip: &'a Clip,
     /// The track IT sits on, in its own container: the project's tracks for
     /// a nest clip on the timeline, an outer nest's for one inside another.
-    /// Carried for `hidden` and `muted`, which apply to everything inside.
+    /// Carried for `hidden`, `muted` and `solo`, which apply to everything
+    /// inside.
     pub track: &'a Track,
     /// What it shows — needed for the nest's own canvas rect, which is what
     /// a flattened layer is clipped to.

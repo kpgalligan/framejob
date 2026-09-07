@@ -24,12 +24,16 @@
 //!    project that has never seen the file brings the row, a paste into one
 //!    that has reuses it.
 //! 5. **The refusals and the errors**, each named.
+//! 6. **Paste Attributes**, the other op over the same payload: which
+//!    groups cross by default, that a group is replaced whole (a field the
+//!    target had and the payload did not is GONE afterwards), what a text
+//!    or shape clip keeps, and that nothing outside the four groups moves.
 
 mod common;
 
 use serde_json::{json, Value};
 
-use common::{array, assert_contains, at, int, num, text, Handle};
+use common::{array, assert_contains, at, by_id, flag, int, num, text, Handle};
 
 /// One frame of the 30 fps canvas every fixture uses: 600 000 ticks per
 /// second (spec §5.1), so 30 fps is 20 000 ticks.
@@ -661,4 +665,424 @@ fn the_pasted_project_is_still_valid() {
         at(&reopened.value(), "/clips").as_array().map(Vec::len),
         Some(6)
     );
+}
+
+// ---- paste attributes ----------------------------------------------------
+
+/// The project Paste Attributes lands ON: one lane and three clips — a media
+/// clip (10: video + audio), a text clip (30: video + text) and a shape clip
+/// (40: video + shape) — each holding values a paste has to overwrite, and
+/// each with a speed, a switch, an action, a transition, a name or a label
+/// that no group carries, so their staying is a fact and not a default.
+fn targets() -> Handle {
+    Handle::from_json(
+        r#"{
+  "version": 3,
+  "canvas": {"width": 1920, "height": 1080, "fps": [30, 1], "background": [0, 0, 0, 1],
+             "fit_new_clips": true, "timecode_frames": true},
+  "media": [
+    {"id": 1, "path": "/m/talk.mov", "kind": "video", "duration": 36000000,
+     "width": 1920, "height": 1080, "fps": [30, 1], "has_video": true, "has_audio": true}
+  ],
+  "tracks": [{"id": 4, "name": "Track 1"}],
+  "clips": [
+    {"id": 10, "track": 4, "start": 0, "duration": 3000000, "speed": 1.0,
+     "source": {"kind": "media", "media": 1, "in": 0},
+     "enabled": {"video": true, "audio": false},
+     "video": {"y": -60, "opacity": 0.3},
+     "audio": {"volume": 0.5, "fade_out": 600000},
+     "actions": [{"id": 11, "start": 600000, "duration": 600000, "curve": "ease_in",
+                  "end": {"video": {"x": 100}}}],
+     "name": "Talk", "label": "green"},
+    {"id": 30, "track": 4, "start": 6000000, "duration": 1200000,
+     "source": {"kind": "text"}, "video": {"x": 5},
+     "text": {"content": "Hi", "size": 96, "line_spacing": 1.5},
+     "name": "Title"},
+    {"id": 40, "track": 4, "start": 9000000, "duration": 1200000,
+     "source": {"kind": "shape"}, "video": {},
+     "shape": {"kind": "rectangle", "width": 320, "height": 120, "from": [0, 0], "to": [10, 10],
+               "stroke": {"width": 8}},
+     "transition_in": {"kind": "wipe"}}
+  ],
+  "markers": [],
+  "next_id": 50
+}"#,
+    )
+}
+
+/// The payload a Paste Attributes reads FROM: one clip with every group
+/// present and every field it carries set away from its default, so a group
+/// that travels is visible and a field a target keeps is distinguishable
+/// from one that was copied. The keys outside the four groups are set too,
+/// away from every target's values, for the same reason.
+fn looks() -> Value {
+    json!({"clips": [{
+        "id": 1, "track": 0, "start": 0, "duration": 600000, "speed": 2.0,
+        "enabled": {"video": false, "audio": true},
+        "source": {"kind": "text"},
+        "video": {"x": 40, "scale": 0.8, "rotation": 12, "opacity": 0.7, "corner_radius": 6,
+                  "shadow": {"blur": 12}},
+        "audio": {"volume": 0.9, "fade_in": 120000, "muted": true, "keep_pitch": true,
+                  "pan": -0.5},
+        "text": {"content": "Source", "size": 48, "color": [1, 0, 0, 1], "tracking": 2},
+        "shape": {"kind": "ellipse", "width": 999, "height": 888, "from": [1, 2], "to": [3, 4],
+                  "radius": 9, "fill": [0, 1, 0, 1], "arrow_end": true, "stroke": null},
+        "actions": [{"id": 2, "start": 0, "duration": 600000, "curve": "linear",
+                     "end": {"video": {"opacity": 0}}}],
+        "transition_in": {"kind": "zoom"},
+        "name": "Source", "label": "red"
+    }]})
+}
+
+/// A payload clip as the SCHEMA writes it, every default filled in — read
+/// back through the reader, not through the op — so a group that was copied
+/// whole can be compared as a whole object against what the payload said.
+fn as_written(clip: &Value) -> Value {
+    let id = clip["id"].as_u64().expect("a clip has an id");
+    let mut clip = clip.clone();
+    clip["track"] = json!(99);
+    let project = Handle::from_value(&json!({
+        "version": 3, "tracks": [{"id": 99, "name": "T"}], "clips": [clip], "next_id": 100
+    }));
+    by_id(&project.value(), "/clips", id).clone()
+}
+
+/// `project` with the clip of `clip`'s id replaced by `clip` — the oracle
+/// for an op that may touch one clip and nothing else.
+fn with_clip(project: &Value, clip: &Value) -> Value {
+    let id = clip["id"].as_u64().expect("a clip has an id");
+    let mut out = project.clone();
+    if let Some(slot) = out["clips"]
+        .as_array_mut()
+        .and_then(|clips| clips.iter_mut().find(|c| c["id"].as_u64() == Some(id)))
+    {
+        *slot = clip.clone();
+    }
+    out
+}
+
+/// The `paste_attributes` envelope with `groups` left out: the default rule.
+fn paste_attributes(clips: &[i64], payload: &Value) -> Value {
+    json!({"op": "paste_attributes", "clips": clips, "payload": payload})
+}
+
+#[test]
+fn the_default_groups_are_those_both_sides_have() {
+    // A media clip's look onto a text clip. The media clip has video and
+    // audio, the text clip video and text: the video crosses, the text is
+    // not the payload's to touch, and the audio has nowhere to go — skipped,
+    // not refused, because nobody asked for it by name.
+    let project = source();
+    let before = project.value();
+    let payload = payload_for(&before, &[10]);
+    let after = project.apply(&paste_attributes(&[30], &payload)).value();
+
+    let mut expected = by_id(&before, "/clips", 30).clone();
+    expected["video"] = by_id(&before, "/clips", 10)["video"].clone();
+    assert_eq!(after, with_clip(&before, &expected));
+    let title = by_id(&after, "/clips", 30);
+    assert_eq!(text(title, "/text/content"), "Hi");
+    assert_eq!(at(title, "/audio"), &Value::Null, "no audio group appeared");
+}
+
+#[test]
+fn video_and_audio_paste_whole_and_the_transform_comes_too() {
+    let project = targets();
+    let before = project.value();
+    let after = project.apply(&paste_attributes(&[10], &looks())).value();
+    let clip = by_id(&after, "/clips", 10);
+    let written = as_written(&looks()["clips"][0]);
+
+    // Each group IS the payload's, as the schema writes it …
+    assert_eq!(clip["video"], written["video"]);
+    assert_eq!(clip["audio"], written["audio"]);
+    // … which, spelled out: the transform came, a default in the payload
+    // REPLACED a value the target had (a merge would have kept y and
+    // fade_out), and the two audio switches travelled like any property.
+    assert_eq!(num(clip, "/video/x"), 40.0);
+    assert_eq!(num(clip, "/video/rotation"), 12.0);
+    assert_eq!(num(clip, "/video/y"), 0.0, "was -60");
+    assert_eq!(num(clip, "/video/shadow/blur"), 12.0);
+    assert_eq!(num(clip, "/audio/volume"), 0.9);
+    assert_eq!(int(clip, "/audio/fade_out"), 0, "was 600 000");
+    assert!(flag(clip, "/audio/muted"));
+    assert!(flag(clip, "/audio/keep_pitch"));
+    assert_eq!(num(clip, "/audio/pan"), -0.5);
+    // Nothing else on the timeline moved.
+    let mut expected = by_id(&before, "/clips", 10).clone();
+    expected["video"] = written["video"].clone();
+    expected["audio"] = written["audio"].clone();
+    assert_eq!(after, with_clip(&before, &expected));
+}
+
+#[test]
+fn text_keeps_its_content_and_shape_keeps_its_geometry() {
+    let project = targets();
+    let before = project.value();
+    let after = project
+        .apply(&paste_attributes(&[30, 40], &looks()))
+        .value();
+    let written = as_written(&looks()["clips"][0]);
+
+    // The text clip: everything but the content is the payload's — size,
+    // colour, tracking, and a line spacing the payload left at its default.
+    let title = by_id(&after, "/clips", 30);
+    let mut expected_text = written["text"].clone();
+    expected_text["content"] = json!("Hi");
+    assert_eq!(title["text"], expected_text);
+    assert_eq!(num(title, "/text/size"), 48.0);
+    assert_eq!(num(title, "/text/line_spacing"), 1.0, "was 1.5");
+    assert_eq!(title["video"], written["video"], "video crossed as well");
+
+    // The shape clip: its kind and geometry are its own; the rest — radius,
+    // fill, the arrow head, and a stroke the payload cleared — is the
+    // payload's.
+    let shape = by_id(&after, "/clips", 40);
+    let was = &by_id(&before, "/clips", 40)["shape"];
+    let mut expected_shape = written["shape"].clone();
+    for key in ["kind", "width", "height", "from", "to"] {
+        expected_shape[key] = was[key].clone();
+    }
+    assert_eq!(shape["shape"], expected_shape);
+    assert_eq!(text(shape, "/shape/kind"), "rectangle");
+    assert_eq!(num(shape, "/shape/width"), 320.0);
+    assert_eq!(num(shape, "/shape/height"), 120.0);
+    assert_eq!(at(shape, "/shape/to"), &json!([10.0, 10.0]));
+    assert_eq!(num(shape, "/shape/radius"), 9.0);
+    assert!(flag(shape, "/shape/arrow_end"));
+    assert_eq!(at(shape, "/shape/stroke"), &Value::Null, "was width 8");
+}
+
+#[test]
+fn nothing_outside_the_four_groups_travels() {
+    let project = targets();
+    let before = project.value();
+    let after = project
+        .apply(&paste_attributes(&[10, 30, 40], &looks()))
+        .value();
+    const STAYS: [&str; 11] = [
+        "id",
+        "track",
+        "start",
+        "duration",
+        "source",
+        "enabled",
+        "speed",
+        "actions",
+        "transition_in",
+        "name",
+        "label",
+    ];
+    for id in [10, 30, 40] {
+        let was = by_id(&before, "/clips", id);
+        let now = by_id(&after, "/clips", id);
+        for key in STAYS {
+            assert_eq!(now[key], was[key], "clip {id}'s {key} travelled");
+        }
+    }
+    // …and the payload differs from every target on each of those keys, so
+    // the assertion above cannot pass by accident.
+    let source = &looks()["clips"][0];
+    for key in [
+        "enabled",
+        "speed",
+        "actions",
+        "transition_in",
+        "name",
+        "label",
+    ] {
+        for id in [10, 30, 40] {
+            assert_ne!(
+                source[key],
+                by_id(&before, "/clips", id)[key],
+                "the fixture agrees with the payload on {key}, so the test would be vacuous"
+            );
+        }
+    }
+}
+
+#[test]
+fn a_named_group_either_side_lacks_is_an_error() {
+    let project = source();
+    let before = project.value();
+    // Clip 30 is a text clip — video and text, no audio — so asking for its
+    // audio names a group the payload does not have.
+    let from_text = payload_for(&before, &[30]);
+    assert_eq!(
+        project.errors(&json!({"op": "paste_attributes", "clips": [10],
+                               "payload": from_text, "groups": ["audio"]})),
+        "payload clip has no audio properties"
+    );
+    // Clip 10 has audio; the text clip has nowhere to put it. The video
+    // named beside it does not soften the answer: an explicit list is all
+    // or nothing.
+    let from_media = payload_for(&before, &[10]);
+    assert_eq!(
+        project.errors(&json!({"op": "paste_attributes", "clips": [30],
+                               "payload": from_media, "groups": ["video", "audio"]})),
+        "clip 30 has no audio properties"
+    );
+    // A group name outside the four is the envelope's to refuse.
+    let msg = project.errors(&json!({"op": "paste_attributes", "clips": [30],
+                                     "payload": from_media, "groups": ["colour"]}));
+    assert_contains(&msg, "op \"paste_attributes\" is not valid");
+    assert_contains(&msg, "colour");
+}
+
+#[test]
+fn an_explicit_list_copies_only_the_groups_it_names() {
+    // Both sides have video and audio, and only the video is asked for, so
+    // the target's audio — a volume and a fade-out the default rule would
+    // have replaced — is exactly what it was. An explicit list restricts
+    // the copy; it does not merely gate it.
+    let project = targets();
+    let before = project.value();
+    let was = by_id(&before, "/clips", 10);
+    let written = as_written(&looks()["clips"][0]);
+    let named = |groups: Value| json!({"op": "paste_attributes", "clips": [10], "payload": looks(), "groups": groups});
+
+    let after = project.apply(&named(json!(["video"]))).value();
+    let clip = by_id(&after, "/clips", 10);
+    assert_eq!(clip["video"], written["video"]);
+    assert_eq!(clip["audio"], was["audio"], "the audio was not named");
+    assert_eq!(num(clip, "/audio/volume"), 0.5);
+    assert_eq!(int(clip, "/audio/fade_out"), 600_000);
+    let mut expected = was.clone();
+    expected["video"] = written["video"].clone();
+    assert_eq!(after, with_clip(&before, &expected));
+
+    // And the other way round, so the answer is the list's and not video's.
+    let after = project.apply(&named(json!(["audio"]))).value();
+    let clip = by_id(&after, "/clips", 10);
+    assert_eq!(clip["audio"], written["audio"]);
+    assert_eq!(clip["video"], was["video"], "the video was not named");
+    assert_eq!(num(clip, "/video/opacity"), 0.3);
+    let mut expected = was.clone();
+    expected["audio"] = written["audio"].clone();
+    assert_eq!(after, with_clip(&before, &expected));
+}
+
+#[test]
+fn the_look_comes_from_the_earliest_copied_clip() {
+    // Copy writes a multi-clip selection in the document's STORAGE order —
+    // creation order, which no move ever changes — so the payload's array
+    // order is not the timeline's. The look that travels is the clip the
+    // user sees first: the earliest, at one start the front-most (the
+    // payload's `track` is a depth, 0 = front), and at one place the lower
+    // id. Each pair below is listed in the array the wrong way round.
+    let project = targets();
+    let before = project.value();
+    let was = by_id(&before, "/clips", 10);
+    let variant = |id: i64, track: i64, start: i64, opacity: f64| -> Value {
+        let mut clip = looks()["clips"][0].clone();
+        clip["id"] = json!(id);
+        clip["track"] = json!(track);
+        clip["start"] = json!(start);
+        clip["video"]["opacity"] = json!(opacity);
+        clip
+    };
+    let opacity_after = |payload: &Value| -> f64 {
+        let after = project.apply(&paste_attributes(&[10], payload)).value();
+        num(by_id(&after, "/clips", 10), "/video/opacity")
+    };
+
+    // Later on the timeline but first in the array — and the lower id, so
+    // the id rule alone could not give this answer. (The payload clip's
+    // action is id 2, which is why no variant takes that id.)
+    let later = variant(1, 0, 6 * SECOND, 0.7);
+    let earlier = variant(3, 0, 0, 0.25);
+    let payload = json!({"clips": [later, earlier.clone()]});
+    assert_eq!(opacity_after(&payload), 0.25);
+    // …and the whole document says the earlier clip's groups came, whole.
+    let written = as_written(&earlier);
+    let mut expected = was.clone();
+    expected["video"] = written["video"].clone();
+    expected["audio"] = written["audio"].clone();
+    assert_eq!(
+        project.apply(&paste_attributes(&[10], &payload)).value(),
+        with_clip(&before, &expected)
+    );
+
+    // The same start: the front-most wins, whichever was created first.
+    let behind = variant(1, 1, 0, 0.7);
+    let front = variant(3, 0, 0, 0.25);
+    assert_eq!(opacity_after(&json!({"clips": [behind, front]})), 0.25);
+
+    // The same start and depth, which only a hand-written payload can
+    // carry: the lower id, so the answer is still deterministic.
+    let seven = variant(7, 0, 0, 0.7);
+    let three = variant(3, 0, 0, 0.25);
+    assert_eq!(opacity_after(&json!({"clips": [seven, three]})), 0.25);
+}
+
+#[test]
+fn an_empty_group_list_an_identity_paste_and_an_empty_selection_change_nothing() {
+    let project = source();
+    let before = project.value();
+    let payload = payload_for(&before, &[10]);
+    project.refuses(&json!({"op": "paste_attributes", "clips": [30],
+                            "payload": payload, "groups": []}));
+    // A clip's own look back onto it.
+    project.refuses(&paste_attributes(&[10], &payload));
+    project.refuses(&paste_attributes(&[], &payload));
+}
+
+#[test]
+fn a_payload_out_of_range_or_without_clips_is_an_error() {
+    let project = targets();
+    // The same bounds, and the same words, a patch is held to.
+    let mut blown = looks();
+    blown["clips"][0]["video"]["opacity"] = json!(5);
+    assert_contains(
+        &project.errors(&paste_attributes(&[10], &blown)),
+        "video.opacity must be between 0 and 1, not 5",
+    );
+    let mut loud = looks();
+    loud["clips"][0]["audio"]["volume"] = json!(9);
+    assert_contains(
+        &project.errors(&paste_attributes(&[10], &loud)),
+        "audio.volume must be between 0 and 4, not 9",
+    );
+    // A payload with nothing to read a look from, and one that is not a
+    // payload at all.
+    assert_eq!(
+        project.errors(&paste_attributes(&[10], &json!({"clips": []}))),
+        "paste payload has no clips"
+    );
+    assert_contains(
+        &project.errors(&paste_attributes(&[10], &json!(5))),
+        "a paste payload must be a json object",
+    );
+    assert_contains(
+        &project.errors(&paste_attributes(&[999], &looks())),
+        "no clip with id 999",
+    );
+    // The payload is read before the ids are resolved — the order `set_clip`
+    // keeps for its patch — so a payload with nothing in it is refused for
+    // that even beside an unknown clip.
+    assert_eq!(
+        project.errors(&paste_attributes(&[999], &json!({"clips": []}))),
+        "paste payload has no clips"
+    );
+}
+
+#[test]
+fn paste_attributes_is_one_op() {
+    // The FFI has no undo, so "one undo step" is asserted the way the app
+    // would see it: ONE apply changes both of clip 10's groups and clip 30's
+    // text at once, and the project it was applied to is untouched (spec
+    // §5.5). The result reopens, which is what `finish`'s validation owes.
+    let project = targets();
+    let before = project.value();
+    let pasted = project.apply(&paste_attributes(&[10, 30], &looks()));
+    let after = pasted.value();
+    assert_eq!(project.value(), before);
+    for (id, group) in [(10, "video"), (10, "audio"), (30, "text")] {
+        assert_ne!(
+            by_id(&after, "/clips", id)[group],
+            by_id(&before, "/clips", id)[group],
+            "clip {id}'s {group} did not change in the one apply"
+        );
+    }
+    assert_eq!(Handle::from_json(&pasted.to_json()).value(), after);
 }

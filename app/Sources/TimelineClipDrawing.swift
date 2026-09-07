@@ -78,7 +78,13 @@ extension TimelineContentView {
             drawFilmstrip(clip, in: regions.video, tint: tint, owner: owner, visible: visible)
         }
         if !regions.audio.isEmpty {
-            let muted = clip.audioProps.muted || track.muted
+            // Silent is what the core mixes as silent (`audio.rs`'s
+            // `silenced`): muted, or some OTHER track in the container soloed.
+            // The header's M stays unlit under a solo — it shows the switch —
+            // but the waveform shows the mix. Nested clips are never drawn
+            // here, so the container is always the timeline's own track set.
+            let silencedBySolo = owner.snapshot.tracks.contains { $0.solo } && !track.solo
+            let muted = clip.audioProps.muted || track.muted || silencedBySolo
             drawWaveform(clip, in: regions.audio, owner: owner, visible: visible, muted: muted)
         }
         drawNameStrip(clip, in: body, owner: owner)
@@ -161,8 +167,12 @@ extension TimelineContentView {
     // MARK: - Name strip
 
     /// The 16 pt strip along the body's top: a black wash over the tint, the
-    /// kind symbol, then the name truncated with an ellipsis. The kind symbol
-    /// is the point of it — a clip's kind used to be invisible.
+    /// kind symbol, the name truncated with an ellipsis, and — when the clip
+    /// carries a label — a 6 pt dot in the label's colour at the right end.
+    /// The kind symbol is the point of it — a clip's kind used to be
+    /// invisible. The label is a DOT and never the tint: the tint says what a
+    /// clip IS (spec §4.4's six inks, which the washes below are calibrated
+    /// for), and a label is something the user said about it.
     private func drawNameStrip(_ clip: ClipSnapshot, in body: CGRect, owner: TimelineView) {
         let strip = CGRect(
             x: body.minX, y: body.minY, width: body.width,
@@ -172,6 +182,7 @@ extension TimelineContentView {
 
         let padding: CGFloat = 6
         var x = strip.minX + padding
+        var nameEnd = strip.maxX - padding
         let symbol = ClipKindStyle.symbol(for: clip, in: owner.snapshot)
         let iconBox = CGRect(x: x, y: strip.minY, width: 11, height: strip.height)
         if iconBox.maxX <= strip.maxX - padding {
@@ -180,21 +191,34 @@ extension TimelineContentView {
                 tint: NSColor.white.withAlphaComponent(0.62))
             x = iconBox.maxX + 5
         }
+        // Guarded like the icon: a strip too narrow for both keeps the kind
+        // and drops the dot, rather than painting one over its own edge. The
+        // name gives up the dot's 6 pt plus the icon's 5 pt gap for it. Any
+        // non-empty label draws — an unknown name in the neutral ink — so a
+        // project from a newer build still shows WHERE its labels are.
+        if let label = clip.label, !label.isEmpty {
+            let dot = CGRect(
+                x: strip.maxX - padding - 6, y: strip.midY - 3, width: 6, height: 6)
+            if dot.minX >= x {
+                ClipLabel.color(named: label).withAlphaComponent(0.92).setFill()
+                NSBezierPath(ovalIn: dot).fill()
+                nameEnd = dot.minX - 5
+            }
+        }
         TimelineDraw.truncated(
             owner.snapshot.name(of: clip),
-            in: CGRect(
-                x: x, y: strip.minY, width: max(strip.maxX - padding - x, 0),
-                height: strip.height),
+            in: CGRect(x: x, y: strip.minY, width: max(nameEnd - x, 0), height: strip.height),
             font: DS.sans(10, weight: .semibold),
             color: NSColor.white.withAlphaComponent(0.92))
     }
 
     // There is deliberately NO second line under the name strip for a text or
     // shape clip. The design's mock shows one ("Title card" over "Nightfall"),
-    // but this model has no separate clip name: `ProjectSnapshot.name(of:)`
-    // falls back to `clip.fallbackName`, which for a text clip IS the text and
-    // for a shape clip IS the kind's display name. Drawing it again under the
-    // strip made every text clip stutter its own content. The strip carries it.
+    // but a clip's own `name` (format version 3) is optional and most have
+    // none: `ProjectSnapshot.name(of:)` then falls back to `clip.fallbackName`,
+    // which for a text clip IS the text and for a shape clip IS the kind's
+    // display name. Drawing it again under the strip made every text clip
+    // stutter its own content. The strip carries whichever name the clip has.
 
     // MARK: - Transition
 

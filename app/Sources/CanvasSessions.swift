@@ -387,7 +387,7 @@ func canvasRound(_ value: Double) -> Double {
 /// A colour as `video.chroma.key`: exactly three components, clamped to 0…1.
 ///
 /// That key is the ONE colour in the schema the model spells without an alpha
-/// (`[f64; 3]` in `model.rs`, and `edit_props.rs` bounds each channel), so a
+/// (`[f64; 3]` in `model.rs`, and `props_check.rs` bounds each channel), so a
 /// four-component `RGBA` — which is what a colour well hands back, and what
 /// the comparison in `changedRGBA` needs — has to be cut back to three before
 /// it can reach `set_video`. A longer array is not a warning there: serde

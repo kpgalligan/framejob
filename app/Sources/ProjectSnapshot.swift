@@ -403,16 +403,21 @@ struct TrackSnapshot: Codable, Equatable, Identifiable {
     let muted: Bool
     /// Locked tracks are not hit-tested and ripple/insert-time skip them.
     let locked: Bool
+    /// While any track in its container is soloed, every track that is not
+    /// is silent — audio only, and mute still wins on the same track. The
+    /// core's envelopes apply it (`audio.rs`); the header only shows it.
+    let solo: Bool
 
     init(
         id: UInt32, name: String = "Track", hidden: Bool = false, muted: Bool = false,
-        locked: Bool = false
+        locked: Bool = false, solo: Bool = false
     ) {
         self.id = id
         self.name = name
         self.hidden = hidden
         self.muted = muted
         self.locked = locked
+        self.solo = solo
     }
 
     init(from decoder: Decoder) throws {
@@ -422,6 +427,7 @@ struct TrackSnapshot: Codable, Equatable, Identifiable {
         hidden = c.lenient(.hidden, false)
         muted = c.lenient(.muted, false)
         locked = c.lenient(.locked, false)
+        solo = c.lenient(.solo, false)
     }
 }
 
@@ -1210,13 +1216,21 @@ struct ClipSnapshot: Codable, Equatable, Identifiable {
     /// The transition into this clip. Its DURATION is the overlap with the
     /// previous clip on the track; with no overlap it is ignored.
     let transitionIn: TransitionSnapshot?
+    /// The clip's OWN name (format version 3); nil means "call it what it
+    /// shows", and `ProjectSnapshot.name(of:)` holds that fallback.
+    let name: String?
+    /// A colour name from `ClipLabel`'s vocabulary, or nil for no label.
+    /// Stored unvalidated on both sides, so draw it through
+    /// `ClipLabel.color(named:)`, which absorbs a name this build lacks.
+    let label: String?
 
     init(
         id: UInt32, track: UInt32, start: Ticks = 0, duration: Ticks = 0,
         source: ClipSource = .text, enabled: EnabledFlags = EnabledFlags(),
         speed: Double = 1, video: VideoProps? = nil, audio: AudioProps? = nil,
         text: TextProps? = nil, shape: ShapeProps? = nil,
-        actions: [ActionSnapshot] = [], transitionIn: TransitionSnapshot? = nil
+        actions: [ActionSnapshot] = [], transitionIn: TransitionSnapshot? = nil,
+        name: String? = nil, label: String? = nil
     ) {
         self.id = id
         self.track = track
@@ -1231,6 +1245,8 @@ struct ClipSnapshot: Codable, Equatable, Identifiable {
         self.shape = shape
         self.actions = actions
         self.transitionIn = transitionIn
+        self.name = name
+        self.label = label
     }
 
     init(from decoder: Decoder) throws {
@@ -1248,6 +1264,8 @@ struct ClipSnapshot: Codable, Equatable, Identifiable {
         shape = c.lenient(.shape)
         actions = c.lenient(.actions, [])
         transitionIn = c.lenient(.transitionIn)
+        name = c.lenient(.name)
+        label = c.lenient(.label)
     }
 
     /// Project time one tick past the clip's last frame.
@@ -1430,7 +1448,7 @@ struct ProjectSnapshot: Codable, Equatable {
     /// `RC_FORMAT_VERSION` — the version the core always writes, mirrored
     /// here so a decode that never saw the key still reports the truth. The
     /// C header is the contract; this is a fallback, not a second source.
-    static let formatVersion = 2
+    static let formatVersion = 3
 
     /// The value a failed decode falls back to, so `ReelProject.snapshot`
     /// can stay non-optional and no view needs an "unloaded" state.
@@ -1467,13 +1485,20 @@ struct ProjectSnapshot: Codable, Equatable {
         clip.source.mediaID.flatMap { media($0) }
     }
 
-    /// The timeline's label for a clip: the nest's name for a nest clip, the
-    /// media file name where there is one, else the kind.
+    /// The timeline's label for a clip: its own name when it has one, else
+    /// the nest's name for a nest clip, the media file name where there is
+    /// one, else the kind.
     ///
-    /// The nest comes first because it is the only one of the three the user
-    /// chose themselves — `nest` takes a `name`, and ⌘G's default `Nest <n>`
-    /// is what distinguishes one grey bar from the next.
+    /// The clip's own name comes first because it is the only one of the
+    /// four the user gave THIS clip; the nest next, because `nest` takes a
+    /// `name` and ⌘G's default `Nest <n>` is what distinguishes one grey bar
+    /// from the next. The trim mirrors the core's `set_clip`, so a name that
+    /// is nothing but whitespace — which only a hand-written file can hold —
+    /// reads as no name rather than as a blank strip.
     func name(of clip: ClipSnapshot) -> String {
+        if let own = clip.name?.trimmingCharacters(in: .whitespacesAndNewlines), !own.isEmpty {
+            return own
+        }
         if let nest = nest(for: clip), !nest.name.isEmpty { return nest.name }
         return media(for: clip)?.name ?? clip.fallbackName
     }

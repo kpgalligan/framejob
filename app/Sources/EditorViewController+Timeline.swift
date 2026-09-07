@@ -294,8 +294,10 @@ extension EditorViewController {
         document?.applyEdit("Remove Empty Tracks", .removeEmptyTracks())
     }
 
-    /// Track ▸ Hide Video / Mute Audio / Lock Track — the same three toggles
-    /// the header column draws.
+    /// Track ▸ Hide Video / Mute Audio / Lock Track / Solo — the same four
+    /// toggles the header column draws. Solo is audio only and mute wins over
+    /// it (spec §7.2); the core's envelopes apply the rule, so this is one
+    /// flag like the other three.
     func toggleTrack(_ button: TimelineHeaderButton) {
         guard let document = document, let track = currentTrack else {
             NSSound.beep()
@@ -308,6 +310,8 @@ extension EditorViewController {
             document.applyEdit("Mute Track", .setTrack(track: track.id, muted: !track.muted))
         case .locked:
             document.applyEdit("Lock Track", .setTrack(track: track.id, locked: !track.locked))
+        case .solo:
+            document.applyEdit("Solo Track", .setTrack(track: track.id, solo: !track.solo))
         }
     }
 
@@ -363,6 +367,10 @@ extension EditorViewController {
             // on — the same subset `presentSpeedSheet` opens the sheet with.
             return selectedClips.contains { $0.source.hasSourceBound }
         case #selector(rippleDeleteClips(_:)):
+            // The same guard as Delete: ⌘⌫ in a field editor is "delete to
+            // the start of the line", not a ripple delete of the selection —
+            // and the selected clip is the one whose rename field is open.
+            if view.window?.firstResponder is NSText { return false }
             return hasSelection || (document.inOutRange.map { $0.end > $0.start } ?? false)
         case #selector(trimStartToPlayhead(_:)), #selector(trimEndToPlayhead(_:)),
             #selector(freezeFrame(_:)):

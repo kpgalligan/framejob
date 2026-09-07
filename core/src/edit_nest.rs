@@ -35,19 +35,22 @@
 //! earliest start to the latest end. The nest's own canvas is frozen at the
 //! project's current size, so a later `set_canvas` cannot silently re-lay
 //! out what is inside it ([`Nest`]). Its tracks are fresh — new ids, the
-//! source tracks' names and their `hidden`/`muted`/`locked` flags — because
-//! the timeline's tracks stay on the timeline, holding whatever was not
-//! selected.
+//! source tracks' names and their `hidden`/`muted`/`locked`/`solo` flags —
+//! because the timeline's tracks stay on the timeline, holding whatever was
+//! not selected.
 
 use crate::edit_clip::{clip_end, set_gained_transitions};
 use crate::model::{AudioProps, Clip, Enabled, Nest, Project, Source, Track, VideoProps};
 
 /// A track with a fresh id, copying `from`'s name and its hidden / muted /
-/// locked state.
+/// locked / solo state.
 ///
 /// The state is copied and not cleared: a selection taken off a muted track
 /// must go on sounding the way it did, and the mute now lives on the nest's
-/// own track where the user can find it.
+/// own track where the user can find it. Solo copies for the same reason —
+/// what played before nesting plays after — even though a solo is judged
+/// per container, so inside the nest it is now judged among the nest's own
+/// tracks.
 fn nested_track(project: &mut Project, from: &Track) -> Track {
     Track {
         id: project.allocate_id(),
@@ -55,6 +58,7 @@ fn nested_track(project: &mut Project, from: &Track) -> Track {
         hidden: from.hidden,
         muted: from.muted,
         locked: from.locked,
+        solo: from.solo,
     }
 }
 
@@ -69,6 +73,7 @@ fn new_track(project: &mut Project) -> Track {
         hidden: false,
         muted: false,
         locked: false,
+        solo: false,
     }
 }
 
@@ -190,6 +195,8 @@ impl Project {
             // dissolve over whatever overlap it inherits — the same rule
             // every other op uses for a clip that gains one.
             transition_in: None,
+            name: None,
+            label: None,
         });
 
         if next.check_overlap_rule(&[], front_track, &[]).is_err() {

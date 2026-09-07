@@ -519,7 +519,7 @@ final class MetalRenderer {
         let blurred: MTLTexture
     }
 
-    /// The sigma cap. The core only enforces `blur >= 0` (`edit_props.rs`), so
+    /// The sigma cap. The core only enforces `blur >= 0` (`props_check.rs`), so
     /// an agent is free to ask for 100 000, and MPS would take the GPU with
     /// it. The inspector's slider stops at 200 source pixels — σ = 100 at 1×
     /// — so the cap only bites on a layer scaled past 1× at maximum blur.

@@ -1,6 +1,8 @@
-//! The four property patches — `set_video`, `set_audio`, `set_text`,
-//! `set_shape` (spec §6, the "Clips" table) — and the range checks that
-//! police everything written into a clip's property groups.
+//! The property patches — `set_video`, `set_audio`, `set_text`, `set_shape`
+//! and, for the clip's own name and label, `set_clip` (spec §6, the "Clips"
+//! table). The range checks that police everything written into a clip's
+//! property groups are `props_check.rs`'s, cut out of here in phase 2;
+//! this file runs them after every merge and restates none of them.
 //!
 //! This is the schema half of editing, split off from `edit_clip.rs`'s
 //! placement half: nothing here moves a clip in time or on a track, and
@@ -27,46 +29,31 @@
 //!    `edit_clip.rs` and clamps because a slider asking for ×20 wants the
 //!    fastest thing available.
 //!
-//! The bounds themselves are the inspector's (spec §4.3), so a value this
-//! module accepts is a value a control can show.
+//! The bounds themselves, and the four checks against them, are
+//! `props_check.rs`'s (the inspector's numbers, spec §4.3): a value that
+//! passes there is a value a control can show, and a merge here is stored
+//! only once its group has passed.
 
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::actions::{self, MAX_PATCH_DEPTH};
-use crate::audio::MAX_GAIN;
 use crate::export::describe;
 use crate::model::{
-    AudioProps, Chroma, Clip, Color, Compressor, Filter, Project, Reflection, Shadow, ShapeProps,
-    Source, Spotlight, TextProps, VideoProps, MAX_FILTERS,
+    AudioProps, Chroma, Clip, Compressor, Filter, Project, Reflection, Shadow, ShapeProps, Source,
+    Spotlight, TextProps, VideoProps,
 };
-use crate::time::Ticks;
-
-/// Scale range, matching the inspector's 1–1000 % (spec §4.3). The lower
-/// bound is not 0: a zero scale is an invisible layer that looks like a
-/// broken render, and `opacity` is the way to hide something.
-pub(crate) const SCALE_MIN: f64 = 0.01;
-pub(crate) const SCALE_MAX: f64 = 10.0;
-
-/// The most a spotlight may magnify what is inside it — spec §4.2's
-/// "optional 1.2–2× zoom". Past 2× the region is soft: the pixels are
-/// coming from the same decoded frame, and nothing creates detail.
-pub(crate) const SPOT_ZOOM_MAX: f64 = 2.0;
-
-/// The compressor's bounds (spec §4.3, "smooth volume levels"). The
-/// threshold floor is -60 dBFS because below it there is nothing but noise
-/// to compress; 20:1 is a limiter, which is as far as a "smooth the levels"
-/// control should be able to go; and 24 dB of makeup is enough to bring a
-/// heavily compressed voice back to full scale and no more.
-pub(crate) const COMPRESSOR_THRESHOLD_MIN_DB: f64 = -60.0;
-pub(crate) const COMPRESSOR_RATIO_MAX: f64 = 20.0;
-pub(crate) const COMPRESSOR_MAKEUP_MAX_DB: f64 = 24.0;
+use crate::props_check::{check_audio, check_shape, check_text, check_video};
 
 // ---- property groups -----------------------------------------------------
 
-/// The four property groups a patch can address. Carries the group's name
-/// for error messages and its template for the unknown-key check.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum Group {
+/// The four property groups a patch can address — and, as `video | audio |
+/// text | shape` on the wire, the names `paste_attributes` takes. Carries
+/// the group's name for error messages and its template for the
+/// unknown-key check.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Group {
     Video,
     Audio,
     Text,
@@ -74,7 +61,7 @@ pub(crate) enum Group {
 }
 
 impl Group {
-    fn name(self) -> &'static str {
+    pub(crate) fn name(self) -> &'static str {
         match self {
             Group::Video => "video",
             Group::Audio => "audio",
@@ -181,220 +168,6 @@ pub(crate) fn merge_group(base: &Value, patch: &Value, group: Group) -> Result<V
     Ok(actions::merge(base, patch))
 }
 
-// ---- range checks --------------------------------------------------------
-
-fn finite(key: &str, value: f64) -> Result<(), String> {
-    if value.is_finite() {
-        Ok(())
-    } else {
-        Err(format!("{key} must be a finite number, not {value}"))
-    }
-}
-
-fn in_range(key: &str, value: f64, low: f64, high: f64) -> Result<(), String> {
-    if value.is_finite() && value >= low && value <= high {
-        Ok(())
-    } else {
-        Err(format!(
-            "{key} must be between {low} and {high}, not {value}"
-        ))
-    }
-}
-
-fn at_least(key: &str, value: f64, low: f64) -> Result<(), String> {
-    if value.is_finite() && value >= low {
-        Ok(())
-    } else {
-        Err(format!("{key} must be at least {low}, not {value}"))
-    }
-}
-
-fn above(key: &str, value: f64, low: f64) -> Result<(), String> {
-    if value.is_finite() && value > low {
-        Ok(())
-    } else {
-        Err(format!("{key} must be greater than {low}, not {value}"))
-    }
-}
-
-/// Colors are `[r, g, b, a]` floats 0–1 (spec §5.2); a channel outside that
-/// is a unit mistake (0–255) the renderer would turn into a blown-out
-/// layer, so it is named rather than clamped.
-pub(crate) fn color_ok(key: &str, color: &Color) -> Result<(), String> {
-    for channel in color {
-        in_range(key, *channel, 0.0, 1.0)?;
-    }
-    Ok(())
-}
-
-fn ticks_positive_or_zero(key: &str, value: Ticks) -> Result<(), String> {
-    if value >= 0 {
-        Ok(())
-    } else {
-        Err(format!("{key} must not be negative, not {value}"))
-    }
-}
-
-/// The video group. `size` is the source's pixel size when it is known, so
-/// a crop can be checked against the thing being cropped.
-fn check_video(props: &VideoProps, size: Option<(f64, f64)>) -> Result<(), String> {
-    finite("video.x", props.x)?;
-    finite("video.y", props.y)?;
-    in_range("video.scale", props.scale, SCALE_MIN, SCALE_MAX)?;
-    finite("video.rotation", props.rotation)?;
-    in_range("video.opacity", props.opacity, 0.0, 1.0)?;
-    at_least("video.corner_radius", props.corner_radius, 0.0)?;
-    at_least("video.crop.l", props.crop.l, 0.0)?;
-    at_least("video.crop.t", props.crop.t, 0.0)?;
-    at_least("video.crop.r", props.crop.r, 0.0)?;
-    at_least("video.crop.b", props.crop.b, 0.0)?;
-    // Opposite edges must leave something behind: a crop that meets or
-    // crosses is an empty rectangle, which no renderer can draw.
-    if let Some((width, height)) = size {
-        let horizontal = props.crop.l + props.crop.r;
-        if horizontal >= width {
-            return Err(format!(
-                "video.crop l + r must be less than the source width {width}, not {horizontal}"
-            ));
-        }
-        let vertical = props.crop.t + props.crop.b;
-        if vertical >= height {
-            return Err(format!(
-                "video.crop t + b must be less than the source height {height}, not {vertical}"
-            ));
-        }
-    }
-    if let Some(shadow) = &props.shadow {
-        color_ok("video.shadow.color", &shadow.color)?;
-        in_range("video.shadow.opacity", shadow.opacity, 0.0, 1.0)?;
-        at_least("video.shadow.blur", shadow.blur, 0.0)?;
-        finite("video.shadow.angle", shadow.angle)?;
-        at_least("video.shadow.distance", shadow.distance, 0.0)?;
-    }
-    // The color controls are offsets from neutral, not absolute levels, so
-    // any finite value is meaningful; the UI's sliders bound them.
-    finite("video.color.brightness", props.color.brightness)?;
-    finite("video.color.contrast", props.color.contrast)?;
-    finite("video.color.saturation", props.color.saturation)?;
-    finite("video.color.hue", props.color.hue)?;
-    if let Some(chroma) = &props.chroma {
-        for channel in &chroma.key {
-            in_range("video.chroma.key", *channel, 0.0, 1.0)?;
-        }
-        in_range("video.chroma.tolerance", chroma.tolerance, 0.0, 1.0)?;
-        in_range("video.chroma.softness", chroma.softness, 0.0, 1.0)?;
-        in_range("video.chroma.spill", chroma.spill, 0.0, 1.0)?;
-    }
-    // The budget is named rather than trimmed, for the same reason a value
-    // out of range is named: the fifth filter would be gone from the next
-    // write and the user would be looking at a control that did nothing.
-    if props.filters.len() > MAX_FILTERS {
-        return Err(format!(
-            "video.filters must hold at most {MAX_FILTERS} filters, not {}",
-            props.filters.len()
-        ));
-    }
-    for filter in &props.filters {
-        in_range("video.filters[].amount", filter.amount, 0.0, 1.0)?;
-    }
-    if let Some(reflection) = &props.reflection {
-        in_range("video.reflection.opacity", reflection.opacity, 0.0, 1.0)?;
-        in_range("video.reflection.height", reflection.height, 0.0, 1.0)?;
-        at_least("video.reflection.gap", reflection.gap, 0.0)?;
-        in_range("video.reflection.falloff", reflection.falloff, 0.0, 1.0)?;
-    }
-    if let Some(spotlight) = &props.spotlight {
-        // The centre may sit outside the layer — half a spotlight running
-        // off the edge of the frame is a legitimate picture — so x and y
-        // are only required to be numbers.
-        finite("video.spotlight.x", spotlight.x)?;
-        finite("video.spotlight.y", spotlight.y)?;
-        above("video.spotlight.width", spotlight.width, 0.0)?;
-        above("video.spotlight.height", spotlight.height, 0.0)?;
-        at_least("video.spotlight.feather", spotlight.feather, 0.0)?;
-        in_range("video.spotlight.dim", spotlight.dim, 0.0, 1.0)?;
-        // 1 is "no zoom", so the range starts there: a spotlight that
-        // shrank what it points at would be a magnifier held backwards.
-        in_range("video.spotlight.zoom", spotlight.zoom, 1.0, SPOT_ZOOM_MAX)?;
-    }
-    Ok(())
-}
-
-fn check_audio(props: &AudioProps) -> Result<(), String> {
-    in_range("audio.volume", props.volume, 0.0, MAX_GAIN)?;
-    ticks_positive_or_zero("audio.fade_in", props.fade_in)?;
-    ticks_positive_or_zero("audio.fade_out", props.fade_out)?;
-    if let Some(duck) = &props.duck {
-        in_range("audio.duck.level", duck.level, 0.0, 1.0)?;
-        ticks_positive_or_zero("audio.duck.attack", duck.attack)?;
-        ticks_positive_or_zero("audio.duck.release", duck.release)?;
-    }
-    in_range("audio.pan", props.pan, -1.0, 1.0)?;
-    in_range("audio.noise_reduction", props.noise_reduction, 0.0, 1.0)?;
-    if let Some(compressor) = &props.compressor {
-        in_range(
-            "audio.compressor.threshold_db",
-            compressor.threshold_db,
-            COMPRESSOR_THRESHOLD_MIN_DB,
-            0.0,
-        )?;
-        in_range(
-            "audio.compressor.ratio",
-            compressor.ratio,
-            1.0,
-            COMPRESSOR_RATIO_MAX,
-        )?;
-        ticks_positive_or_zero("audio.compressor.attack", compressor.attack)?;
-        ticks_positive_or_zero("audio.compressor.release", compressor.release)?;
-        in_range(
-            "audio.compressor.makeup_db",
-            compressor.makeup_db,
-            0.0,
-            COMPRESSOR_MAKEUP_MAX_DB,
-        )?;
-    }
-    Ok(())
-}
-
-pub(crate) fn check_text(props: &TextProps) -> Result<(), String> {
-    above("text.size", props.size, 0.0)?;
-    color_ok("text.color", &props.color)?;
-    above("text.line_spacing", props.line_spacing, 0.0)?;
-    finite("text.tracking", props.tracking)?;
-    if let Some(outline) = &props.outline {
-        at_least("text.outline.width", outline.width, 0.0)?;
-        color_ok("text.outline.color", &outline.color)?;
-    }
-    if let Some(backdrop) = &props.backdrop {
-        color_ok("text.backdrop.color", &backdrop.color)?;
-        at_least("text.backdrop.padding", backdrop.padding, 0.0)?;
-        at_least("text.backdrop.radius", backdrop.radius, 0.0)?;
-    }
-    if let Some(width) = props.width {
-        above("text.width", width, 0.0)?;
-    }
-    Ok(())
-}
-
-pub(crate) fn check_shape(props: &ShapeProps) -> Result<(), String> {
-    above("shape.width", props.width, 0.0)?;
-    above("shape.height", props.height, 0.0)?;
-    at_least("shape.radius", props.radius, 0.0)?;
-    if let Some(stroke) = &props.stroke {
-        at_least("shape.stroke.width", stroke.width, 0.0)?;
-        color_ok("shape.stroke.color", &stroke.color)?;
-    }
-    if let Some(fill) = &props.fill {
-        color_ok("shape.fill", fill)?;
-    }
-    for point in [&props.from, &props.to] {
-        for coordinate in point {
-            finite("shape.from/to", *coordinate)?;
-        }
-    }
-    Ok(())
-}
-
 // ---- the ops -------------------------------------------------------------
 
 impl Project {
@@ -449,6 +222,79 @@ impl Project {
     /// Merges `patch` into every named shape clip's shape props (spec §6).
     pub fn set_shape(&self, clips: &[u32], patch: &Value) -> Result<Option<Project>, String> {
         self.patch_clips(clips, patch, Group::Shape)
+    }
+
+    /// Sets or clears every named clip's own name and label (spec §6) — the
+    /// fifth patch op, shaped like `set_video` so that "absent keeps, null
+    /// clears" lives where it already does in this crate: inside a patch
+    /// object, never as an envelope argument, whose absent and null mean the
+    /// same thing. The keys are `name` and `label`, each a string or `null`.
+    /// A string is stored trimmed, and an EMPTY one — after trimming — clears
+    /// too: `set_track`'s rule for a name, except that "unnamed" is `None`
+    /// here, so the app's fallback name returns. `Err` for an unknown clip,
+    /// an unknown key, or a value that is neither a string nor `null`;
+    /// `None` when nothing changes.
+    pub fn set_clip(&self, clips: &[u32], patch: &Value) -> Result<Option<Project>, String> {
+        let Some(fields) = patch.as_object() else {
+            return Err(format!(
+                "clip patch must be a json object, not {}",
+                describe(patch)
+            ));
+        };
+        // The outer `Option` is "was the key given"; the inner is what to
+        // store, `None` for a clear.
+        let mut name: Option<Option<String>> = None;
+        let mut label: Option<Option<String>> = None;
+        for (key, value) in fields {
+            let slot = match key.as_str() {
+                "name" => &mut name,
+                "label" => &mut label,
+                other => return Err(format!("unknown key \"{other}\" in a clip patch")),
+            };
+            *slot = Some(match value {
+                Value::Null => None,
+                Value::String(text) => Some(text.trim())
+                    .filter(|t| !t.is_empty())
+                    .map(String::from),
+                other => {
+                    return Err(format!(
+                        "\"{key}\" in a clip patch must be a string or null, not {}",
+                        describe(other)
+                    ))
+                }
+            });
+        }
+        let ids: Vec<u32> = self.selected_clips(clips)?.iter().map(|c| c.id).collect();
+
+        let mut next = self.clone();
+        for id in ids {
+            if let Some(slot) = next.clip_mut(id) {
+                if let Some(name) = &name {
+                    slot.name = name.clone();
+                }
+                if let Some(label) = &label {
+                    slot.label = label.clone();
+                }
+            }
+        }
+        self.finish(next)
+    }
+
+    /// The range check for ONE of a clip's groups — what `paste_attributes`
+    /// runs on each group it has just replaced, and only on those, so a
+    /// payload written by hand meets the bounds a patch does and a group the
+    /// op did not touch is not its business. A group the clip lacks has
+    /// nothing to check.
+    pub(crate) fn check_group(&self, clip: &Clip, group: Group) -> Result<(), String> {
+        match group {
+            Group::Video => match &clip.video {
+                Some(video) => check_video(video, self.source_size(clip)),
+                None => Ok(()),
+            },
+            Group::Audio => clip.audio.as_ref().map_or(Ok(()), check_audio),
+            Group::Text => clip.text.as_ref().map_or(Ok(()), check_text),
+            Group::Shape => clip.shape.as_ref().map_or(Ok(()), check_shape),
+        }
     }
 
     /// The one implementation behind the four `set_*` property ops: merge,
