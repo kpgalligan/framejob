@@ -405,9 +405,10 @@ extension AgentServer {
     }
 
     /// `paste_attributes` — ⌥⌘V, Edit ▸ Paste Attributes
-    /// (`EditorViewController+Clipboard.pasteAttributes`): the payload's FIRST
-    /// clip's property groups onto the selection, each group replacing the
-    /// target's whole group. The menu command sends no `groups`, so it gets
+    /// (`EditorViewController+Clipboard.pasteAttributes`): the payload's
+    /// EARLIEST clip's property groups onto the selection (at one start the
+    /// front-most, then the lower id), each group replacing the target's
+    /// whole group. The menu command sends no `groups`, so it gets
     /// the default rule — every group both clips have.
     ///
     /// `groups` is checked here against the four names, because the core

@@ -57,9 +57,12 @@
 //! its enclosing stage, by the same multiply. The rule is on the SET, not
 //! on what plays: a soloed track holding nothing audible still silences the
 //! rest, which is what a mixer's solo button does. Audio only — the
-//! picture is untouched — and an envelope exactly like mute: the segments
-//! stay in the plan and the gain goes to 0, so soloing never rebuilds the
-//! composition.
+//! picture is untouched — and an envelope exactly like mute: the plan's
+//! segments, `plays_audio` and `assign` never see it, so a solo toggle
+//! changes ramps and nothing else. (The ramps are IN the plan JSON the app
+//! keys its rebuild on, so a solo rebuilds the composition exactly as a
+//! mute or a volume change does — `Playback.swift` compares the whole
+//! plan.)
 
 use serde::Serialize;
 

@@ -493,8 +493,12 @@ what it left open:
   round-trip guard cannot refuse a wrong-typed value for a `String??`
   field — `{"label": 7}` decodes as a CLEAR and passes — so
   `checkClipPatchTypes` runs after it and refuses with `patch.label must
-  be a string, or null to clear it.` The same gap still exists for
-  `TextPatch.width`, unfixed. The label's VALUE is not policed, by the
+  be a string, or null to clear it.` The gap is `nullable()`'s, not that
+  one field's: it still exists for the other nine `T??` patch fields
+  (`VideoPatch.shadow` / `chroma` / `reflection` / `spotlight`,
+  `AudioPatch.duck` / `compressor`, `TextPatch.outline` / `backdrop` /
+  `width`), where on an object-valued one a wrong type CLEARS the
+  effect — unfixed. The label's VALUE is not policed, by the
   `Marker.color` policy; `ClipLabel.swift` is the vocabulary's one home,
   and the catalog's description reads the six names from it.
 

@@ -116,8 +116,8 @@ a new placement op goes in a new module (`edit_edge.rs`, `edit_insert.rs`),
 and the next cut in `edit_track.rs` is `set_canvas` with its `rescale` /
 `resnap` / `check_dimension` helpers into an `edit_canvas.rs`. Two more
 sit at the line and take nothing without a cut of their own: `edit.rs`
-(689, a module doc that IS the op table and grows a row per op) and
-`edit_paste.rs` (598). `model.rs` is OFF the list: it came DOWN from 1330
+(691, a module doc that IS the op table and grows a row per op) and
+`edit_paste.rs` (600). `model.rs` is OFF the list: it came DOWN from 1330
 to 940 when the lookups and `validate` moved to `model_query.rs`, and to
 462 in road map 2's phase 2 when the §5.2 property types moved to
 `model_props.rs` (531); `edit_props.rs` came back under the cap in the

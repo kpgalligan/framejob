@@ -28,7 +28,7 @@ Four things in `designs/`, and you want all of them:
 
 ```sh
 make app        # cargo build --release + xcodegen + xcodebuild → build/Build/Products/Release/Reelcut.app
-make test       # cd core && cargo test --release  (282 black-box tests)
+make test       # cd core && cargo test --release  (284 black-box tests)
 make lint       # cargo clippy --all-targets -- -D warnings
 make typecheck  # swiftc -typecheck of app/Sources/*.swift — the ONLY authoritative Swift check
 make project    # xcodegen generate (Reelcut.xcodeproj is generated; project.yml is the source of truth)
@@ -353,7 +353,7 @@ renders, measured against rectangles from the layout constants.
   the fourth piece of view state, clamped like the other three, drawn by
   `MediaRowView` and stored on the document because `MediaPane` is rebuilt
   whole whenever the media list changes.
-  Measured: `core/tests/edge.rs` (12) and `core/tests/insert.rs` (7) plus
+  Measured: `core/tests/edge.rs` (16) and `core/tests/insert.rs` (10) plus
   three in `edit_tests.rs`; slip-and-back and roll-and-back compare whole
   documents byte for byte, and the insert/overwrite tests assert on what did
   NOT move as much as on what did.

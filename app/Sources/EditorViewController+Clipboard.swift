@@ -9,7 +9,7 @@ import AppKit
 /// Paste hands that payload straight back to the core, which does all the
 /// deciding — fresh ids, media matched by path, the overlap rule, the frame
 /// grid — and Paste Attributes hands the SAME payload to `paste_attributes`,
-/// which reads only its first clip's property groups. Nothing about a clip is
+/// which reads only its earliest clip's property groups. Nothing about a clip is
 /// interpreted on this side.
 ///
 /// Two decisions worth stating, because neither is forced:
@@ -159,8 +159,9 @@ extension EditorViewController {
 
     // MARK: - Paste Attributes
 
-    /// ⌥⌘V. The payload's first clip's LOOK — its video, audio, text and shape
-    /// groups — onto every selected clip, leaving `groups` to the core's
+    /// ⌥⌘V. The payload's EARLIEST clip's LOOK — its video, audio, text and
+    /// shape groups, the earliest by start, then the front-most track, then
+    /// the lower id — onto every selected clip, leaving `groups` to the core's
     /// default (every group both sides have, spec §6). Nothing that makes the
     /// clip THIS clip travels: not its place, speed, actions, transition, name
     /// or label, and not a text clip's words or a shape's geometry.

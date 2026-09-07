@@ -837,8 +837,10 @@ extension ReelOp {
         return ReelOp(name: "paste", args: a.values)
     }
 
-    /// Copies the payload's FIRST clip's property groups onto each of
-    /// `clips` — ⌥⌘V. `payload` is the same Copy payload `paste` takes.
+    /// Copies the payload's EARLIEST clip's property groups onto each of
+    /// `clips` — ⌥⌘V. Earliest by start, at one start the front-most
+    /// track and then the lower id; never the array's first, which is
+    /// Copy's creation order. `payload` is the same Copy payload `paste` takes.
     /// `groups` names which of `video`, `audio`, `text` and `shape` travel;
     /// omitted, every group BOTH sides have does, silently skipping the rest,
     /// where a named group either side lacks is an error. Video and audio

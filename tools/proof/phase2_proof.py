@@ -60,6 +60,35 @@ def canonical(value):
     return json.dumps(value, sort_keys=True, separators=(",", ":"))
 
 
+def copy_package(source, destination):
+    """A byte copy of a `.reelcut` package, tolerating the cache's churn.
+
+    The package being copied is OPEN in the instance under proof, and that
+    instance writes thumbnails while the copy runs: each one goes to
+    `cache/thumbs/<media>/.<n>.jpg-<random>` and is renamed into place, so a
+    plain `shutil.copytree` fails on a name that was listed a moment earlier
+    and is already gone (measured: `[Errno 2] .8.jpg-nKhR`). A file that
+    vanishes under `cache/` is therefore skipped — it is a thumbnail, a peaks
+    file or a reversed render, all regenerable and no part of any claim made
+    here. Everything else is copied byte for byte, and a file that vanishes
+    ANYWHERE else is still an error.
+
+    `cache/` itself is copied rather than skipped: the app creates the
+    directory when it opens a package that has none, which changes the
+    package directory's modification date, and `save_project` then refuses
+    the document as "changed by another application" (also measured)."""
+    for root, _, files in os.walk(source):
+        relative = os.path.relpath(root, source)
+        target = destination if relative == "." else os.path.join(destination, relative)
+        os.makedirs(target, exist_ok=True)
+        for name in files:
+            try:
+                shutil.copy2(os.path.join(root, name), os.path.join(target, name))
+            except FileNotFoundError:
+                if relative.split(os.sep)[0] != "cache":
+                    raise
+
+
 class Session:
     """One project, with frame rendering reduced to a hash."""
 
@@ -85,7 +114,7 @@ class Session:
         # a path that is ALREADY open answers "already_open" without
         # re-reading the file, so a read-back-from-disk claim needs a path of
         # its own.
-        shutil.copytree(open_from, self.path)
+        copy_package(open_from, self.path)
         answer = self.mcp.call("open_project", path=self.path)
         check(
             not answer.get("already_open"),
@@ -312,7 +341,7 @@ def main():
     fixture = os.path.join(WORK, "schema-v2-source.reelcut")
     if os.path.exists(fixture):
         shutil.rmtree(fixture)
-    shutil.copytree(s.path, fixture)
+    copy_package(s.path, fixture)
     with open(os.path.join(fixture, "project.json"), "w", encoding="utf-8") as handle:
         handle.write(strip_v3(text))
     v2_text = project_json(fixture)

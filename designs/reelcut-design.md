@@ -996,8 +996,11 @@ every edit and compares).
   without it is treated as muted, and mute wins (a track both muted and
   soloed stays silent). The rule is on the set, not on what plays: a
   soloed track holding nothing audible still silences the rest. Audio
-  only, and an envelope exactly like mute — the segments stay in the
-  plan, so soloing never rebuilds the composition; a solo inside a nest
+  only, and an envelope exactly like mute — the plan's segments,
+  `plays_audio` and `assign` never see it, so a solo changes ramps and
+  nothing else (which the app rebuilds on, as it does a mute or a
+  volume change: the ramps are part of the plan JSON §7.6 compares); a
+  solo inside a nest
   is judged among that nest's tracks alone, and a timeline solo on some
   other track silences a whole nest through the nest clip's own stage, by
   the same multiply. `mono` is a per-segment flag Swift applies

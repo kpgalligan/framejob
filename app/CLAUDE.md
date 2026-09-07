@@ -93,10 +93,14 @@ lockstep are in the root `CLAUDE.md`; the full design is
   value it cannot read BY NAME rather than dropping it; a new op means a
   handler, a catalog entry and a comment naming the UI path it mirrors.
   One gap in that guard worth knowing: `patchArg`'s round-trip check
-  cannot see a wrong-typed value for a `T??` field — `{"label": 7}`
-  decodes as a CLEAR and passes — so `set_clip`'s handler adds a per-key
-  type check (`checkClipPatchTypes`) after it; `TextPatch.width` still
-  has the gap.
+  cannot see a wrong-typed value for a `T??` field — the `nullable()`
+  decoder in `ProjectSnapshot.swift` swallows every decode error and
+  answers `.some(nil)`, so `{"label": 7}` decodes as a CLEAR and passes.
+  `set_clip`'s handler adds a per-key type check (`checkClipPatchTypes`)
+  after it; the other nine `T??` patch fields still have the gap —
+  `VideoPatch.shadow` / `chroma` / `reflection` / `spotlight`,
+  `AudioPatch.duck` / `compressor`, `TextPatch.outline` / `backdrop` /
+  `width` — and on the object-valued ones a wrong type CLEARS the effect.
   Beyond the §6 ops the catalog carries the app-state tools spec §7.9 names
   plus `set_range`, `set_selection`, `undo` and `redo` — the mirrors of
   I/O/⌥X, a timeline or canvas click, and ⌘Z/⇧⌘Z, without which the "one edit
