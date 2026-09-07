@@ -1,20 +1,23 @@
 # Reelcut — road map 2: beyond the spec
 
-**Status: phases 0 and 1 are built; the rest is not.** Spec §10's three milestones
-are done (`reelcut-roadmap.md` records how each was proved). This is the plan
-for what a capable editor still lacks, found by reading the op table, the
-menus, the key map and the code against the question "what does a cutter
-reach for and not find". It is sized for **several sessions**: ten phases,
-each one to two sessions, each closable on its own and each ending in
-evidence.
+**Status: phases 0 and 1 are built (`4fb72c6`); the rest is not. Pick up at
+phase 2.** Spec §10's three milestones are done
+(`reelcut-roadmap.md` records how each was proved). This is the plan for
+what a capable editor still lacks, found by reading the op table, the menus,
+the key map and the code against the question "what does a cutter reach for
+and not find". It is sized for **several sessions**: ten phases, each one to
+two sessions, each closable on its own and each ending in evidence.
 
 Companion relations, unchanged: `reelcut-design.md` stays normative for the
 schemas (§5), the op table (§6) and the architecture (§7) — **a phase that
 adds an op or a field updates §5.2 / §6 as it lands**, exactly as it updates
 `edit.rs`'s module doc, `ReelCore.swift`'s builders and `AgentCatalog.swift`.
-`CLAUDE.md` holds the milestone status; its paragraph for a phase is written
-when the phase's proof exists. `reelcut-roadmap.md` is the record of M1–M3
-and its "known limits" list still stands.
+Phase 1 found one mirror this list forgot: **spec §7.10's Rust module map**,
+which `core/CLAUDE.md` calls "the same list" — so a phase that adds a MODULE
+updates it too, not only a phase that adds an op. `CLAUDE.md` holds the milestone status; its
+paragraph for a phase is written when the phase's proof exists.
+`reelcut-roadmap.md` is the record of M1–M3 and its "known limits" list
+still stands.
 
 ## 0. Rules every phase inherits
 
@@ -38,9 +41,14 @@ full text.
   check enforces it. A gesture that is only a `move_clip` (nudge) needs
   nothing; a composite the UI offers as one command (blurred background,
   zoom back, normalise clip) gets a tool that performs the same composite.
-- **`model.rs` and `edit_clip.rs` are over the size cap.** Phase 0 takes
-  the lookups out of `model.rs` so the later phases can add their fields;
-  no new op goes into `edit_clip.rs`.
+- **`model.rs` and `edit_clip.rs` are over the size cap**, still. Phase 0
+  brought `model.rs` down from 1330 to 940 by moving the lookups and
+  `validate` to `model_query.rs`, which is the room phases 2, 3, 4 and 6
+  spend on their fields — on the order of 150 lines between them. It does
+  not last:
+  the next cut, when one of those phases needs it, is the §5.2 property
+  types (`VideoProps` and its friends) into a `model_props.rs`, and
+  `core/CLAUDE.md` says so. No new op goes into `edit_clip.rs`.
 - **Frozen files** (`EditorViewController.swift`, `TimelineView.swift`,
   `PreviewCanvasView.swift`, `AgentServer.swift`,
   `InspectorViewController.swift`) take wiring only; each feature below
@@ -48,6 +56,12 @@ full text.
 - **Proof is driving the built binary over MCP** and comparing
   `render_frame` output or measured audio, plus black-box core tests against
   an oracle. Each phase's "Proof" list is its exit criterion.
+  **The script goes in `tools/proof/`** as `phase<N>_proof.py`, over the
+  dependency-free MCP client phase 1 left there, so a proof can be re-run
+  after a later phase rather than believed on the strength of a paragraph.
+  A frame claim is a BYTE comparison of two PNGs or it is not a proof; a
+  check that would pass against a build where the op did nothing is not one
+  either, and phase 1's review found two of those in its own script.
 - **The baseline** is `make test` green, `make lint` clean and
   `make typecheck` at 0 errors / 4 deliberate warnings. A phase leaves it
   there.
@@ -55,16 +69,26 @@ full text.
 **Session protocol.** A session picks one phase (or half of one), reads its
 section here and the two side `CLAUDE.md`s, lands the work, runs the proof,
 then updates: the status table below, `CLAUDE.md`'s milestone status, the
-spec's §5.2 / §6 / §9 for anything they mirror, and the README's feature
-bullets. Unfinished halves are written down here under the phase, not left
-implicit.
+spec's §5.2 / §6 / §7.10 / §9 for anything they mirror, and the README's
+feature bullets. Unfinished halves are written down here under the phase,
+not left implicit.
+
+**And then reads the change back adversarially, before committing.** Phase 1
+did, and it found five real defects in work that already had 244 green tests
+and a 63-check MCP proof behind it — including one that made every overwrite
+of an imported still a silent no-op on a 29.97 timeline, and one that had
+the bare-⌫ menu item eating Delete out of every text field. The shape that
+worked: one reader per dimension (correctness, the core's rules, the app's
+rules, the gestures, the MCP mirror, the docs), then every finding put to
+sceptics told to refute it, then a regression test for each survivor that
+fails without the fix. Green tests prove the cases someone thought of.
 
 ## 1. Status
 
 | Phase | Theme | Sessions | Schema | Status |
 |---|---|---|---|---|
-| 0 | Groundwork | ½ | — | **done** 2026-09-06 |
-| 1 | Cutting moves | 1–2 | — | **done** 2026-09-06 |
+| 0 | Groundwork | ½ | — | **done** 2026-09-06 (`4fb72c6`) |
+| 1 | Cutting moves | 1–2 | — | **done** 2026-09-06 (`4fb72c6`) |
 | 2 | Clip identity | 1 | v3 | not started |
 | 3 | The screencast trio | 2 | v4 | not started |
 | 4 | Words | 2 | v5 | not started |
@@ -78,6 +102,20 @@ Order is by value over dependency. Phases 1–3 pay back first and share
 nothing that later phases need; 6 depends on 3's list-interpolation rule; 9
 is last because it is the largest and touches every op at once. Any other
 order works if that one dependency is kept.
+
+**What phases 0 and 1 left behind for the rest**, so no later phase invents
+a second one:
+
+| | |
+|---|---|
+| `core/src/model_query.rs` | the three source-window measurements — `source_head`, `content_length`, `source_length` — plus the lookups and `validate`. Any op that clamps against a media clamps against these. |
+| `edit_clip.rs::whole_media_length` | how long a clip showing the whole of a media is, snapped. `add_clip`, `insert_clip` and `overwrite_clip` share it. |
+| `time.rs::snap_up_to_frame` / `snap_down_to_frame` | directional frame snapping, for a clamp BOUND — which cannot be rounded to the nearest frame without letting a caller past what it protects. |
+| `edit_time.rs::ordered_range` / `clear_range` | "put a range in order" and "empty it on every unlocked track", shared by `lift_range` and `ripple_delete_range`. Phase 3's `ripple_delete_ranges` is a loop over the second. |
+| `ProjectDocument.targetTrack` | the one rule for "which track does a command with no track argument act on": the first selected clip's, else the front-most. Phase 6's Add Background… wants it. |
+| `ProjectDocument.selectedMedia` | the Media tab's selected row, clamped like the other view state. Phase 8's Media-tab work builds on this rather than adding another. |
+| `EditorViewController+Edge.swift` | carries an `extension TimelineView` as well as the controller's, which is how a gesture is added without touching the frozen view. Phases 3 and 9 need the same trick. |
+| `tools/proof/` | the MCP client and the per-phase proof scripts. |
 
 ## 2. Phases
 
@@ -339,11 +377,18 @@ picture, which is the same at every time and could not have failed.
 A clip has no name of its own — the strip shows its media's file name —
 and there is no way to mark one. Solo is the one track switch missing.
 
-**Schema.** `Clip.name: Option<String>` (absent → today's fallback: the
-media's file name, a text clip's first line, the kind word — the ONE
-fallback lives in `ClipKindStyle`, which already owns the kind word);
+**Schema.** `Clip.name: Option<String>` (absent → today's fallback);
 `Clip.label: Option<String>` using the marker colour vocabulary;
 `Track.solo: bool`. `RC_FORMAT_VERSION` 3.
+
+**Correction to the plan, found while reading for phase 1:** the one
+fallback is NOT in `ClipKindStyle`. It is
+`ProjectSnapshot.name(of:)` — "the nest's name for a nest clip, the media
+file name where there is one, else the kind" — and all three readers already
+route through it (`TimelineClipDrawing`, `TimelineBar`'s selection block,
+`ClipPane`'s header). So `Clip.name` goes at the HEAD of that one function
+and nothing else changes. `ClipKindStyle` owns the kind WORD and the tint,
+which is a different question and stays where it is.
 
 | Op | Arguments | Semantics |
 |---|---|---|
@@ -362,13 +407,15 @@ Attributes: Edit ▸ Paste Attributes (⌥⌘V) over the existing
 `com.kgalligan.reelcut.clips` pasteboard type in
 `EditorViewController+Clipboard.swift`.
 
-**Where.** `model.rs` (after Phase 0), `format.rs` + header, `edit_props.rs`,
+**Where.** `model.rs`, `format.rs` + header, `edit_props.rs`,
 `edit_paste.rs`, `edit_track.rs`, `audio.rs`; `core/tests/schema_v3.rs`,
-additions to `edit_tests.rs` and `paste.rs`. Swift: `ProjectSnapshot.swift`,
-`ClipKindStyle.swift`, `TimelineClipDrawing.swift`, `TimelineView+Rename.swift`,
-`ClipPane.swift`, `TimelineBar.swift` (the selection block reads the name),
+additions to `edit_tests.rs` and `paste.rs`. Swift: `ProjectSnapshot.swift`
+(the fallback, and the `Codable` mirror of the two new clip fields),
+`TimelineClipDrawing.swift` (the label dot on the name strip),
+`TimelineView+Rename.swift`, `ClipPane.swift`, `TimelineBar.swift`,
 `EditorViewController+Clipboard.swift`, `AppDelegate.swift`, the catalog and
-`AgentServer+Clips.swift` / `+Tracks.swift`.
+`AgentServer+Clips.swift` / `+Tracks.swift`. `ClipKindStyle.swift` is NOT on
+the list — see the correction above.
 
 **Proof.**
 - A v2 fixture opens; every clip's displayed name is unchanged (the fallback
@@ -841,12 +888,11 @@ handle, `AgentServer+Arguments.swift`, `AgentServer+Project.swift`, catalog.
 Checked against spec §9 for conflicts; a phase that binds one promotes its
 row into §9.
 
+Phase 1's rows have been promoted into spec §9's bound table and are struck
+from this one; what is left is what is still only a claim on a key.
+
 | Keys | Action | Phase |
 |---|---|---|
-| `,` / `.` (⇧ ×10) | Nudge selection one frame | 1 |
-| ⌥⇧-drag body / ⌥⇧-drag edge | Slip / roll | 1 |
-| ⌫ with a range, nothing selected | Lift range | 1 |
-| ⌥-drop / ⇧⌥-drop from the Media list | Insert / overwrite | 1 |
 | ⇧⌘R | Rename clip | 2 |
 | ⌥⌘V | Paste Attributes | 2 |
 | `Z` | Zoom-to-region mode on the canvas | 3 |
@@ -854,12 +900,17 @@ row into §9.
 | ⇧⌘P | Preview Window | 8 |
 | ⌘↓ / ⌘↑ | Open / close nest | 9 |
 
-Menus: Clip gains Rename…, Label ▸, Close Gap, Remove Silences…, Add
-Background…, Add Blurred Background, Open / Close Nest; Edit gains Lift,
-Insert at Playhead, Overwrite at Playhead, Paste Attributes, Select All on
-Track; File gains Generate Captions…, Export Captions…, Save Frame…; Track
-gains Solo; View gains Preview Quality ▸ and Preview Window; Window gains
-Export Queue.
+Menus. **Landed in phase 1**: Clip ▸ Close Gap, and Edit ▸ Insert at
+Playhead / Overwrite at Playhead / Select All on Track. There is no Edit ▸
+Lift item and there should not be — a lift is what ⌫ does with a range and
+nothing selected, so it is the Delete item's other half rather than a
+second row saying almost the same thing.
+
+Still to come: Clip gains Rename…, Label ▸, Remove Silences…, Add
+Background…, Add Blurred Background, Open / Close Nest; Edit gains Paste
+Attributes; File gains Generate Captions…, Export Captions…, Save Frame…;
+Track gains Solo; View gains Preview Quality ▸ and Preview Window; Window
+gains Export Queue.
 
 ## 4. Considered and left out
 
@@ -886,5 +937,11 @@ Named so the next reader does not re-derive them.
 The same as before: the phase's proof exists as measured output from the
 built binary and from black-box core tests, `make test` and `make lint` are
 clean, `make typecheck` is at its baseline, the status table above says
-"done" with the date, and `CLAUDE.md`'s milestone status, the spec's
-tables and the README say what now exists.
+"done" with the date and the commit, and `CLAUDE.md`'s milestone status, the
+spec's tables and the README say what now exists.
+
+Phase 1 added one clause to that, having learnt it the hard way: **the
+change has been read back adversarially and what that found is fixed and
+covered.** A phase is not done because its own tests pass — those test the
+cases whoever wrote them thought of. It is done when someone has gone
+looking for what they did not.
