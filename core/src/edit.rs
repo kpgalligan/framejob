@@ -41,15 +41,21 @@
 //! | `add_clip` | `track: u32, media: u32, at: ticks` | Whole media as one clip at `at`; source in 0, Fit scale when `canvas.fit_new_clips` and the source exceeds the canvas. |
 //! | `add_text_clip` | `track: u32, at: ticks, duration?: ticks = 5 s, text?: object` | The Title preset, centered; `text` patches it exactly as `set_text` would. |
 //! | `add_shape_clip` | `track: u32, at: ticks, duration?: ticks = 5 s, shape?: object` | The default rectangle — an `arrow` kind gets `arrow_end` on, since a headless arrow is a diagonal line; `shape` patches that preset exactly as `set_shape` would, so an explicit `arrow_end: false` still wins. |
+//! | `insert_clip` | `track: u32, media: u32, at: ticks` | The insert edit: the clip `at` is strictly inside on `track` is split, every unlocked track opens by the media's whole length, then that media lands at `at`. Only the destination track is cut — straddlers elsewhere ride the shift whole. |
+//! | `overwrite_clip` | `track: u32, media: u32, at: ticks` | The overwrite edit: `[at, at + media length)` is cleared on `track` ALONE — cut at both bounds, the middles removed — and the media lands there. Nothing shifts and no other track is touched. |
 //! | `move_clip` | `clips: [u32], delta: ticks, track?: u32` | Shifts the selection by `delta`, clamped so the earliest clip stops at 0; `track` retargets by track-index delta, keeping relative offsets. |
 //! | `trim_start` | `clip: u32, to: ticks` | New start `to`; a media `in` advances by `(to − start) × speed`. Clamped to the source head and to one frame before the end. |
 //! | `trim_end` | `clip: u32, to: ticks` | New end `to`, clamped to `start + one frame` and to the source's remaining length. |
 //! | `rate_stretch` | `clip: u32, to_end: ticks` | `speed = content length / (to_end − start)`; duration follows and actions rescale. A non-media source is an `Err`, not a refusal. |
+//! | `slip` | `clip: u32, delta: ticks` | Slides the source under a fixed clip: `in += delta × speed`, start and duration unchanged, clamped so the window stays inside the media. A `still` moves its `at` instead. A slip the clamps reduce to nothing is `None`; a source with nothing to slip is an `Err`. |
+//! | `roll` | `clip: u32, to: ticks` | Moves a hard cut: this clip's start and its predecessor's end both become `to`. The predecessor is the clip on the track ending EXACTLY at this one's start; with none — a gap, or an overlap, whose length is `set_transition_duration`'s — it refuses. Clamped to one frame and to the source available on each side. |
 //! | `split` | `clips?: [u32], at: ticks` | Cuts at project time `at`. With `clips` absent, cuts every clip on an unlocked track that `at` is strictly inside. |
 //! | `delete` | `clips: [u32]` | Removes the clips; the gaps stay. |
 //! | `ripple_delete` | `clips: [u32]` | Removes, then closes each removed span across every unlocked track. Markers do not move. |
 //! | `ripple_delete_range` | `from: ticks, to: ticks` | Splits every unlocked clip at both bounds, removes the middles, then closes the hole. A reversed range is the same range. |
+//! | `lift_range` | `from: ticks, to: ticks` | `ripple_delete_range` without the close: every unlocked clip is split at both bounds and the middles removed, and nothing moves. A reversed range is the same range. |
 //! | `insert_time` | `at: ticks, length: ticks` | Opens a hole: every unlocked clip, and every marker, at or after `at` moves right by `length`. |
+//! | `close_gap` | `track: u32, at: ticks` | Closes the empty span on `track` that contains `at`, bounded by the nearest clip edges there: everything from its far side shifts left by its length, across every unlocked track. Refuses on a locked `track`, on an `at` that is on a clip, with no clip after the gap, and when the shift would break the overlap rule — a gap closes fully or not at all. |
 //! | `set_speed` | `clip: u32, rate: f64, keep_pitch?: bool` | `duration = content length / rate` (rate clamped to 0.1–10); actions keep their clip-relative fraction. A non-media source is an `Err`, not a refusal — see "The non-media rule" under Results. |
 //! | `set_reversed` | `clip: u32, reversed: bool` | Plays the media back to front, or forward again. A FACT about the clip, not a plan change: Swift substitutes a pre-rendered reversed asset (spec §11). The in point is measured in the direction the clip plays, so reversing keeps `in` and therefore shows different frames. A non-media source is an `Err`, not a refusal. |
 //! | `freeze_frame` | `clip: u32, at: ticks, duration?: ticks = 2 s` | `split` at `at`, `insert_time(at, duration)`, then a `still` of that source frame with the clip's video props evaluated at `at`. |
@@ -111,14 +117,18 @@
 //! - `Err(message)` — an unknown id, an out-of-range value, a malformed
 //!   envelope. Lowercase, naming the offending value.
 //!
-//! **The non-media rule.** `set_speed`, `rate_stretch` and `freeze_frame`
-//! return `Err("clip N is not a media clip")` rather than refusing, because
-//! a `clip` argument naming a text or shape clip for a speed op is an
-//! invalid argument — the same class as an unknown id — and because
+//! **The non-media rule.** `set_speed`, `rate_stretch`, `freeze_frame` and
+//! `slip` return `Err("clip N is not a media clip")` rather than refusing,
+//! because a `clip` argument naming a text or shape clip for a speed op is
+//! an invalid argument — the same class as an unknown id — and because
 //! `Ok(None)` there is indistinguishable from "the rate was already that",
 //! which is a bad answer to give the MCP agent. Spec §6 originally worded
-//! those three rows "refuses"; it was amended to match, so the three
-//! siblings, the spec and the error tiers in `core/CLAUDE.md` now all agree.
+//! the first three rows "refuses"; it was amended to match, so the
+//! siblings, the spec and the error tiers in `core/CLAUDE.md` now all
+//! agree. `slip` draws the line one step further out than its siblings do:
+//! a `still` has a source TIME, and slipping that is exactly what the op
+//! means, so the question the rule asks there is "has this clip a source at
+//! all", not "is this a media source".
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -132,19 +142,25 @@ use crate::time::{Fps, Ticks};
 /// Kept next to [`Op`] so a mistyped op can be answered with the list
 /// instead of a bare parse error — models and users both mistype op names,
 /// and the alternative is a serde message written in variant-speak.
-pub const OP_NAMES: [&str; 43] = [
+pub const OP_NAMES: [&str; 49] = [
     "add_clip",
     "add_text_clip",
     "add_shape_clip",
+    "insert_clip",
+    "overwrite_clip",
     "move_clip",
     "trim_start",
     "trim_end",
     "rate_stretch",
+    "slip",
+    "roll",
     "split",
     "delete",
     "ripple_delete",
     "ripple_delete_range",
+    "lift_range",
     "insert_time",
+    "close_gap",
     "set_speed",
     "set_reversed",
     "freeze_frame",
@@ -206,6 +222,16 @@ pub enum Op {
         #[serde(default)]
         shape: Option<Value>,
     },
+    InsertClip {
+        track: u32,
+        media: u32,
+        at: Ticks,
+    },
+    OverwriteClip {
+        track: u32,
+        media: u32,
+        at: Ticks,
+    },
     MoveClip {
         clips: Vec<u32>,
         delta: Ticks,
@@ -224,6 +250,14 @@ pub enum Op {
         clip: u32,
         to_end: Ticks,
     },
+    Slip {
+        clip: u32,
+        delta: Ticks,
+    },
+    Roll {
+        clip: u32,
+        to: Ticks,
+    },
     /// `clips` absent means "every unlocked clip the playhead is inside".
     Split {
         #[serde(default)]
@@ -240,9 +274,17 @@ pub enum Op {
         from: Ticks,
         to: Ticks,
     },
+    LiftRange {
+        from: Ticks,
+        to: Ticks,
+    },
     InsertTime {
         at: Ticks,
         length: Ticks,
+    },
+    CloseGap {
+        track: u32,
+        at: Ticks,
     },
     SetSpeed {
         clip: u32,
@@ -498,6 +540,8 @@ impl Project {
                 duration,
                 shape,
             } => self.add_shape_clip(*track, *at, *duration, shape.as_ref()),
+            Op::InsertClip { track, media, at } => self.insert_clip(*track, *media, *at),
+            Op::OverwriteClip { track, media, at } => self.overwrite_clip(*track, *media, *at),
             Op::MoveClip {
                 clips,
                 delta,
@@ -506,6 +550,8 @@ impl Project {
             Op::TrimStart { clip, to } => self.trim_start(*clip, *to),
             Op::TrimEnd { clip, to } => self.trim_end(*clip, *to),
             Op::RateStretch { clip, to_end } => self.rate_stretch(*clip, *to_end),
+            Op::Slip { clip, delta } => self.slip(*clip, *delta),
+            Op::Roll { clip, to } => self.roll(*clip, *to),
             Op::Split { clips, at } => match clips.as_deref() {
                 Some(ids) => self.split_clips(ids, *at),
                 None => self.split_under_playhead(*at),
@@ -513,7 +559,9 @@ impl Project {
             Op::Delete { clips } => self.delete_clips(clips),
             Op::RippleDelete { clips } => self.ripple_delete(clips),
             Op::RippleDeleteRange { from, to } => self.ripple_delete_range(*from, *to),
+            Op::LiftRange { from, to } => self.lift_range(*from, *to),
             Op::InsertTime { at, length } => self.insert_time(*at, *length),
+            Op::CloseGap { track, at } => self.close_gap(*track, *at),
             Op::SetSpeed {
                 clip,
                 rate,

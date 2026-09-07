@@ -286,6 +286,37 @@ extension AgentServer {
                     ],
                 ], required: ["track", "at"]),
             tool(
+                "insert_clip",
+                "The INSERT edit — Edit ▸ Insert at Playhead, or ⌥-dropping a Media-tab row. "
+                    + "Makes room for the whole media at `at`: the clip `at` is inside on "
+                    + "`track` is split first, then every unlocked track opens by the media's "
+                    + "length, then the media lands in the hole. Only the destination track is "
+                    + "cut — a clip straddling `at` on another track rides the shift whole, "
+                    + "which is what keeps a music bed unbroken. One undo step.",
+                [
+                    "track": trackProperty,
+                    "media": [
+                        "type": "integer",
+                        "description": "Media id — import_media returns one.",
+                    ],
+                    "at": ["type": "integer", "description": "Where to insert, \(ticks)"],
+                ], required: ["track", "media", "at"]),
+            tool(
+                "overwrite_clip",
+                "The OVERWRITE edit — Edit ▸ Overwrite at Playhead, or ⇧⌥-dropping a Media-tab "
+                    + "row. Takes the room instead of making it: the span the media needs is "
+                    + "cleared on `track` ALONE — cut at both bounds, whatever is left inside "
+                    + "removed — and nothing shifts, so the cut's length and every other track "
+                    + "are untouched. One undo step.",
+                [
+                    "track": trackProperty,
+                    "media": [
+                        "type": "integer",
+                        "description": "Media id — import_media returns one.",
+                    ],
+                    "at": ["type": "integer", "description": "Where to overwrite, \(ticks)"],
+                ], required: ["track", "media", "at"]),
+            tool(
                 "move_clip",
                 "Shifts clips along the timeline by delta ticks (negative moves left; starts "
                     + "clamp at 0) and optionally onto another track — the timeline's clip drag. "
@@ -335,6 +366,35 @@ extension AgentServer {
                     "to_end": ["type": "integer", "description": "New end, \(ticks)"],
                 ], required: ["clip", "to_end"]),
             tool(
+                "slip",
+                "Slides the SOURCE under a fixed clip — ⌥⇧-dragging a clip's body. What the "
+                    + "clip shows changes; where it sits does not, so nothing downstream moves. "
+                    + "`delta` is timeline ticks and the source moves by delta × the clip's "
+                    + "speed; a positive delta shows LATER material. Clamped so the window "
+                    + "stays inside the media, and a slip the clamps reduce to nothing changes "
+                    + "nothing. A freeze clip moves the frame it holds instead. Media and "
+                    + "freeze clips only: any other kind is an error.",
+                [
+                    "clip": clipProperty,
+                    "delta": [
+                        "type": "integer",
+                        "description": "How far to slide the source, \(ticks)",
+                    ],
+                ], required: ["clip", "delta"]),
+            tool(
+                "roll",
+                "Moves a hard CUT — ⌥⇧-dragging a clip's edge. This clip's start and its "
+                    + "predecessor's end both become `to`: one clip grows by exactly what the "
+                    + "other loses, and the pair's outer edges and total length do not move. "
+                    + "The predecessor is the clip on the same track ending EXACTLY at this "
+                    + "one's start; with a gap or an overlap there instead, nothing changes (an "
+                    + "overlap is a transition — use set_transition_duration). Clamped so each "
+                    + "clip keeps a frame and neither asks for source it does not have.",
+                [
+                    "clip": clipProperty,
+                    "to": ["type": "integer", "description": "Where the cut moves to, \(ticks)"],
+                ], required: ["clip", "to"]),
+            tool(
                 "split",
                 "Cuts clips in two at `at` — ⌘K. The second piece keeps playing the source from "
                     + "where the first stopped, and each keeps the animation actions that fall "
@@ -373,6 +433,18 @@ extension AgentServer {
                     "to": ["type": "integer", "description": "Range end, \(ticks)"],
                 ], required: ["from", "to"]),
             tool(
+                "lift_range",
+                "Cuts a time range out and LEAVES the hole — ⌫ with an in/out range and nothing "
+                    + "selected. Every unlocked clip is split at both bounds and the middles "
+                    + "removed, and nothing moves: every clip after the range keeps the moment "
+                    + "it had, which is what makes this the safe cut when a mix or a caption "
+                    + "track is already timed. Use ripple_delete_range to close the hole "
+                    + "instead.",
+                [
+                    "from": ["type": "integer", "description": "Range start, \(ticks)"],
+                    "to": ["type": "integer", "description": "Range end, \(ticks)"],
+                ], required: ["from", "to"]),
+            tool(
                 "insert_time",
                 "Opens a gap: every unlocked clip starting at or after `at` moves right by "
                     + "`length`. Straddling clips are left in place, so this makes room without "
@@ -381,6 +453,22 @@ extension AgentServer {
                     "at": ["type": "integer", "description": "Where the gap opens, \(ticks)"],
                     "length": ["type": "integer", "description": "How much room, \(ticks)"],
                 ], required: ["at", "length"]),
+            tool(
+                "close_gap",
+                "Closes the empty span on `track` that contains `at` — double-clicking a gap in "
+                    + "a lane, or Clip ▸ Close Gap. The gap is bounded by the nearest clip "
+                    + "edges on that track, and everything from its far side slides left by its "
+                    + "length across every unlocked track. Nothing changes when `at` is on a "
+                    + "clip, when the track is locked, when there is no clip after the gap, or "
+                    + "when the shift would break the overlap rule — a gap closes fully or not "
+                    + "at all.",
+                [
+                    "track": trackProperty,
+                    "at": [
+                        "type": "integer",
+                        "description": "A time inside the gap, \(ticks)",
+                    ],
+                ], required: ["track", "at"]),
             tool(
                 "set_speed",
                 "Changes a clip's playback rate — Clip ▸ Speed…. The duration follows (source "

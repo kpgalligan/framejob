@@ -1,6 +1,7 @@
-//! Ripple, insert time, range delete and freeze frame — spec §6 rows
-//! `ripple_delete`, `ripple_delete_range`, `insert_time` and
-//! `freeze_frame`, and the §11 decisions they implement.
+//! Ripple, insert time, range delete, lift, close gap and freeze frame —
+//! spec §6 rows `ripple_delete`, `ripple_delete_range`, `lift_range`,
+//! `close_gap`, `insert_time` and `freeze_frame`, and the §11 decisions
+//! they implement.
 //!
 //! What separates these from `edit_clip.rs`'s ops is that they move
 //! material they were never given: closing or opening a hole in the cut
@@ -91,6 +92,51 @@ fn shift_clips(project: &mut Project, from: Ticks, delta: Ticks) {
     }
 }
 
+/// The bounds a range op works on: snapped, clamped to 0 and put in order,
+/// so a drag that ended left of where it began is the same range. `None`
+/// for an empty one.
+fn ordered_range(project: &Project, from: Ticks, to: Ticks) -> Option<(Ticks, Ticks)> {
+    let first = project.snapped(from).max(0);
+    let second = project.snapped(to).max(0);
+    let (start, end) = if first <= second {
+        (first, second)
+    } else {
+        (second, first)
+    };
+    (end > start).then_some((start, end))
+}
+
+/// Empties `[start, end)` on every unlocked track: both bounds are cut
+/// first (`split_under_playhead` IS "split every unlocked clip here"), so
+/// afterwards every unlocked clip that touched the range lies entirely
+/// inside it, and those are removed.
+///
+/// Clips on LOCKED tracks are neither split nor removed, even when they lie
+/// inside the range: rule 2 is absolute, and a locked track keeps exactly
+/// what it had.
+///
+/// The one thing this does NOT do is decide what happens to the hole, which
+/// is the whole difference between a lift and a ripple delete.
+fn clear_range(project: &Project, start: Ticks, end: Ticks) -> Result<Project, String> {
+    let mut current = match project.split_under_playhead(start)? {
+        Some(split) => split,
+        None => project.clone(),
+    };
+    if let Some(split) = current.split_under_playhead(end)? {
+        current = split;
+    }
+
+    let unlocked = unlocked_tracks(&current);
+    let inside: Vec<u32> = current
+        .clips
+        .iter()
+        .filter(|c| unlocked.contains(&c.track) && c.start >= start && clip_end(c) <= end)
+        .map(|c| c.id)
+        .collect();
+    current.clips.retain(|c| !inside.contains(&c.id));
+    Ok(current)
+}
+
 // ---- the ops -------------------------------------------------------------
 
 impl Project {
@@ -159,39 +205,111 @@ impl Project {
     /// ended left of where it began is the same range. An empty range is
     /// `None`.
     pub fn ripple_delete_range(&self, from: Ticks, to: Ticks) -> Result<Option<Project>, String> {
-        let first = self.snapped(from).max(0);
-        let second = self.snapped(to).max(0);
-        let (start, end) = if first <= second {
-            (first, second)
-        } else {
-            (second, first)
+        let Some((start, end)) = ordered_range(self, from, to) else {
+            return Ok(None);
+        };
+        let mut next = clear_range(self, start, end)?;
+        // Negated by subtraction rather than by `-length`, so an absurd
+        // range cannot overflow on the negation.
+        shift_clips(&mut next, end, start.saturating_sub(end));
+        let unlocked = unlocked_tracks(&next);
+        set_gained_transitions(&mut next, &unlocked);
+        self.finish(next)
+    }
+
+    /// Removes everything between `from` and `to` on unlocked tracks and
+    /// leaves the hole open — `ripple_delete_range` without the close
+    /// (spec §6).
+    ///
+    /// The lift is the cut that costs nothing downstream: every clip that
+    /// starts at or after `to` keeps the moment it had, so a mix, a caption
+    /// track and a music bed stay where they were cut to. It is the
+    /// counterpart of a ripple, not a lesser one — ⌫ with a range and
+    /// nothing selected, where ⌘⌫ ripples.
+    ///
+    /// Markers do not move either, for the plainer reason that nothing
+    /// under them did.
+    ///
+    /// The bounds are snapped, clamped to 0 and ordered, so a drag that
+    /// ended left of where it began is the same range. An empty range, or
+    /// one that held nothing an unlocked track could give up, is `None`.
+    pub fn lift_range(&self, from: Ticks, to: Ticks) -> Result<Option<Project>, String> {
+        let Some((start, end)) = ordered_range(self, from, to) else {
+            return Ok(None);
+        };
+        // No shift, so nothing can be brought into contact with anything
+        // and no transition can be gained.
+        self.finish(clear_range(self, start, end)?)
+    }
+
+    /// Closes the empty span on `track` that contains `at`: everything from
+    /// the far side of it, on every unlocked track, moves left by the gap's
+    /// length (spec §6).
+    ///
+    /// The gap is bounded by the nearest clip edges ON `track` — the last
+    /// end at or before `at`, or 0 when nothing precedes it, and the first
+    /// start after it. A playhead ON a clip is not in a gap, and a gap with
+    /// nothing after it is not one to close: both are `None`.
+    ///
+    /// The shift is the ripple's, timeline-wide over unlocked tracks with
+    /// straddlers staying put, so the material that follows the gap keeps
+    /// its relative timing on every track. **A locked `track` refuses**:
+    /// its own clips are the ones that would not move, and closing a gap by
+    /// shifting everything except the track the gap is on is not what
+    /// anyone asked for.
+    ///
+    /// **Refuses when the shift would break the overlap rule** anywhere it
+    /// moved something, rather than closing as far as it can. A gap closes
+    /// fully or not at all: a partial close leaves the user looking at a
+    /// smaller gap with no way to tell whether the op ran.
+    ///
+    /// Markers do not move, as they do not for any other ripple (only
+    /// `insert_time`, where no collision is possible, moves them).
+    ///
+    /// `Err` for an unknown track.
+    pub fn close_gap(&self, track: u32, at: Ticks) -> Result<Option<Project>, String> {
+        if self.require_track(track)?.locked {
+            return Ok(None);
+        }
+        let at = self.snapped(at).max(0);
+        let ordered = self.clips_on_track(track);
+        if ordered.iter().any(|c| c.start <= at && at < clip_end(c)) {
+            return Ok(None);
+        }
+        let start = ordered
+            .iter()
+            .map(|c| clip_end(c))
+            .filter(|end| *end <= at)
+            .max()
+            .unwrap_or(0);
+        let Some(end) = ordered.iter().map(|c| c.start).filter(|s| *s > at).min() else {
+            return Ok(None);
         };
         if end <= start {
             return Ok(None);
         }
 
-        let mut current = match self.split_under_playhead(start)? {
-            Some(split) => split,
-            None => self.clone(),
-        };
-        if let Some(split) = current.split_under_playhead(end)? {
-            current = split;
+        // Only the tracks something actually moves on can gain an overlap,
+        // and only those are checked: a rule violation elsewhere is not
+        // this op's to report, and refusing over one would make a gap
+        // uncloseable for a reason the user cannot see.
+        let unlocked = unlocked_tracks(self);
+        let mut touched: Vec<u32> = Vec::new();
+        for clip in &self.clips {
+            if clip.start >= end && unlocked.contains(&clip.track) && !touched.contains(&clip.track)
+            {
+                touched.push(clip.track);
+            }
         }
 
-        let unlocked = unlocked_tracks(&current);
-        let inside: Vec<u32> = current
-            .clips
-            .iter()
-            .filter(|c| unlocked.contains(&c.track) && c.start >= start && clip_end(c) <= end)
-            .map(|c| c.id)
-            .collect();
-
-        let mut next = current;
-        next.clips.retain(|c| !inside.contains(&c.id));
-        // Negated by subtraction rather than by `-length`, so an absurd
-        // range cannot overflow on the negation.
+        let mut next = self.clone();
         shift_clips(&mut next, end, start.saturating_sub(end));
-        set_gained_transitions(&mut next, &unlocked);
+        for id in &touched {
+            if next.check_overlap_rule(&[], *id, &[]).is_err() {
+                return Ok(None);
+            }
+        }
+        set_gained_transitions(&mut next, &touched);
         self.finish(next)
     }
 

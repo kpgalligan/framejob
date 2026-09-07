@@ -338,6 +338,66 @@ fn range_project() -> Handle {
     )
 }
 
+/// A fixture with two closable gaps on one track and different consequences
+/// for each: closing the LEADING gap (0 – 4 s, in front of clip 10) is
+/// legal everywhere, while closing the one at 6 s – 8 s slides clip 22 onto
+/// clip 21 by more than the overlap rule allows and must be refused whole.
+///
+/// Track 5 is locked and holds a gap whose closure WOULD be legal for every
+/// other track, so the refusal there is the lock itself and not a collision
+/// the shift would have caused anyway. (Track 4 is locked too, but its gap
+/// is one the shift could not close in any case.)
+///
+/// Track 6's pair is placed so that closing the leading gap brings clip 35
+/// onto clip 34 by a legal amount: an overlap IS a transition, so the
+/// newcomer must come out of it with the default dissolve.
+fn gap_project() -> Handle {
+    Handle::from_json(
+        r#"{
+  "version": 1,
+  "canvas": {"width": 1920, "height": 1080, "fps": [30, 1], "background": [0, 0, 0, 1],
+             "fit_new_clips": true, "timecode_frames": true},
+  "media": [
+    {"id": 1, "path": "/m/talk.mov", "kind": "video", "duration": 36000000,
+     "width": 1920, "height": 1080, "fps": [30, 1], "has_video": true, "has_audio": true}
+  ],
+  "tracks": [
+    {"id": 2, "name": "Picture"},
+    {"id": 3, "name": "Bed"},
+    {"id": 4, "name": "Locked", "locked": true},
+    {"id": 5, "name": "Held", "locked": true},
+    {"id": 6, "name": "Bed"}
+  ],
+  "clips": [
+    {"id": 10, "track": 2, "start": 2400000, "duration": 1200000,
+     "source": {"kind": "media", "media": 1, "in": 0}, "video": {}, "audio": {}},
+    {"id": 11, "track": 2, "start": 4800000, "duration": 1200000,
+     "source": {"kind": "media", "media": 1, "in": 0}, "video": {}, "audio": {}},
+    {"id": 20, "track": 3, "start": 0, "duration": 600000,
+     "source": {"kind": "media", "media": 1, "in": 0}, "video": {}, "audio": {}},
+    {"id": 21, "track": 3, "start": 4200000, "duration": 1200000,
+     "source": {"kind": "media", "media": 1, "in": 0}, "video": {}, "audio": {}},
+    {"id": 22, "track": 3, "start": 6000000, "duration": 600000,
+     "source": {"kind": "media", "media": 1, "in": 0}, "video": {}, "audio": {}},
+    {"id": 30, "track": 4, "start": 0, "duration": 1200000,
+     "source": {"kind": "media", "media": 1, "in": 0}, "video": {}, "audio": {}},
+    {"id": 31, "track": 4, "start": 3600000, "duration": 1200000,
+     "source": {"kind": "media", "media": 1, "in": 0}, "video": {}, "audio": {}},
+    {"id": 32, "track": 5, "start": 0, "duration": 600000,
+     "source": {"kind": "media", "media": 1, "in": 0}, "video": {}, "audio": {}},
+    {"id": 33, "track": 5, "start": 1200000, "duration": 600000,
+     "source": {"kind": "media", "media": 1, "in": 0}, "video": {}, "audio": {}},
+    {"id": 34, "track": 6, "start": 0, "duration": 2400000,
+     "source": {"kind": "media", "media": 1, "in": 0}, "video": {}, "audio": {}},
+    {"id": 35, "track": 6, "start": 4200000, "duration": 2400000,
+     "source": {"kind": "media", "media": 1, "in": 0}, "video": {}, "audio": {}}
+  ],
+  "markers": [{"id": 40, "time": 5000000, "name": "Mark"}],
+  "next_id": 50
+}"#,
+    )
+}
+
 /// A clip with a scale action to freeze inside, a second unlocked track that
 /// must stay in sync, a LOCKED third track that must not move, and a marker
 /// past the freeze point.
@@ -515,15 +575,21 @@ fn op_table() -> Vec<Value> {
         json!({"op": "add_clip", "track": 4, "media": 3, "at": 12000000}),
         json!({"op": "add_text_clip", "track": 5, "at": 0, "duration": 1200000}),
         json!({"op": "add_shape_clip", "track": 5, "at": 1800000}),
+        json!({"op": "insert_clip", "track": 4, "media": 3, "at": 3000000}),
+        json!({"op": "overwrite_clip", "track": 4, "media": 3, "at": 1200000}),
         json!({"op": "move_clip", "clips": [10], "delta": 600000}),
         json!({"op": "trim_start", "clip": 10, "to": 1200000}),
         json!({"op": "trim_end", "clip": 10, "to": 4800000}),
         json!({"op": "rate_stretch", "clip": 10, "to_end": 4800000}),
+        json!({"op": "slip", "clip": 10, "delta": 600000}),
+        json!({"op": "roll", "clip": 40, "to": 3600000}),
         json!({"op": "split", "clips": [10], "at": 3000000}),
         json!({"op": "delete", "clips": [40]}),
         json!({"op": "ripple_delete", "clips": [10]}),
         json!({"op": "ripple_delete_range", "from": 1200000, "to": 2400000}),
+        json!({"op": "lift_range", "from": 1200000, "to": 2400000}),
         json!({"op": "insert_time", "at": 0, "length": 600000}),
+        json!({"op": "close_gap", "track": 6, "at": 3600000}),
         json!({"op": "set_speed", "clip": 10, "rate": 2.0}),
         json!({"op": "set_reversed", "clip": 10, "reversed": true}),
         json!({"op": "freeze_frame", "clip": 10, "at": 3000000}),
@@ -567,9 +633,15 @@ fn op_table() -> Vec<Value> {
 }
 
 /// The ops of [`op_table`] whose answer on [`general`] is the documented
-/// "valid, changes nothing" rather than an edit: every track in that fixture
-/// holds a clip, so there is nothing for `remove_empty_tracks` to drop.
-const UNCHANGING: [&str; 1] = ["remove_empty_tracks"];
+/// "valid, changes nothing" rather than an edit.
+///
+/// Every track in that fixture holds a clip, so there is nothing for
+/// `remove_empty_tracks` to drop; and no two clips in it abut, so `roll`
+/// finds no hard cut to move and refuses, which is its documented answer to
+/// a gap. Both rows are still worth having here — they prove the envelope
+/// parses and the dispatch reaches the op — and `roll`'s actual edits are
+/// proved against a fixture built for them in `core/tests/edge.rs`.
+const UNCHANGING: [&str; 2] = ["remove_empty_tracks", "roll"];
 
 // ---- the op table --------------------------------------------------------
 
@@ -1011,6 +1083,122 @@ fn ripple_delete_range_splits_every_unlocked_clip_it_straddles() {
     );
     // An empty range changes nothing.
     project.refuses(&json!({"op": "ripple_delete_range", "from": 2400000, "to": 2400000}));
+}
+
+#[test]
+fn lift_range_removes_the_middle_and_moves_nothing() {
+    let project = range_project();
+    let before = project.value();
+    // The same range the ripple test uses, so the difference between the
+    // two ops is exactly the difference between the two results.
+    let after = project
+        .apply(&json!({"op": "lift_range", "from": 2400000, "to": 4200000}))
+        .value();
+
+    // Clip 10 keeps its head; the middle piece is gone.
+    assert_eq!(placement(&after, 10), (0, 2_400_000));
+    // And clip 11 stays exactly where it was — this is the whole point.
+    assert_eq!(
+        by_id(&after, "/clips", 11),
+        by_id(&before, "/clips", 11),
+        "a lift moved a clip after the range"
+    );
+
+    // Clip 30's head was inside the range and went with it; its tail stayed
+    // where it was, carrying the source it had advanced to.
+    let survivors: Vec<i64> = array(&after, "/clips")
+        .iter()
+        .filter(|c| int(c, "/track") == 4)
+        .map(|c| int(c, "/id"))
+        .collect();
+    assert_eq!(
+        survivors.len(),
+        1,
+        "clip 30's head was removed, its tail kept"
+    );
+    let tail = by_id(&after, "/clips", survivors[0] as u64);
+    assert_eq!(int(tail, "/start"), 4_200_000);
+    assert_eq!(int(tail, "/duration"), 3_000_000);
+    assert_eq!(int(tail, "/source/in"), 1_200_000 + 1_200_000);
+
+    // The locked clip is neither split, removed nor moved; the marker
+    // inside the range stays, because nothing under it moved.
+    assert_eq!(by_id(&after, "/clips", 20), by_id(&before, "/clips", 20));
+    assert_eq!(int(by_id(&after, "/markers", 40), "/time"), 3_000_000);
+
+    // A reversed drag is the same range.
+    assert_eq!(
+        project
+            .apply(&json!({"op": "lift_range", "from": 4200000, "to": 2400000}))
+            .to_json(),
+        project
+            .apply(&json!({"op": "lift_range", "from": 2400000, "to": 4200000}))
+            .to_json()
+    );
+    // An empty range, and a range with nothing an unlocked track can give
+    // up, both change nothing.
+    project.refuses(&json!({"op": "lift_range", "from": 2400000, "to": 2400000}));
+    project.refuses(&json!({"op": "lift_range", "from": 7200000, "to": 8400000}));
+}
+
+#[test]
+fn close_gap_takes_the_whole_gap_out_of_every_unlocked_track() {
+    let project = gap_project();
+    let before = project.value();
+    // The gap in front of clip 10 runs 0 – 4 s, so everything from 4 s on
+    // moves left by four seconds and nothing before it exists to move.
+    let after = project
+        .apply(&json!({"op": "close_gap", "track": 2, "at": 1200000}))
+        .value();
+    assert_eq!(placement(&after, 10), (0, 1_200_000));
+    assert_eq!(placement(&after, 11), (2_400_000, 1_200_000));
+    // The shift is timeline-wide: the bed moves by the same four seconds,
+    // except the clip that began before the gap's end.
+    assert_eq!(by_id(&after, "/clips", 20), by_id(&before, "/clips", 20));
+    assert_eq!(placement(&after, 21), (1_800_000, 1_200_000));
+    assert_eq!(placement(&after, 22), (3_600_000, 600_000));
+    // The locked track keeps both of its clips and its own gap.
+    assert_eq!(by_id(&after, "/clips", 30), by_id(&before, "/clips", 30));
+    assert_eq!(by_id(&after, "/clips", 31), by_id(&before, "/clips", 31));
+    // Markers do not move, as they do not for any other ripple.
+    assert_eq!(
+        by_id(&after, "/markers", 40),
+        by_id(&before, "/markers", 40)
+    );
+
+    // Clip 35 lands 600 000 ticks over clip 34, which is inside the overlap
+    // rule's limit — and an overlap IS a transition, so the newcomer gets
+    // the default dissolve rather than rendering as two stacked layers.
+    assert_eq!(placement(&after, 34), (0, 2_400_000));
+    assert_eq!(placement(&after, 35), (1_800_000, 2_400_000));
+    assert_eq!(
+        text(by_id(&after, "/clips", 35), "/transition_in/kind"),
+        "cross_dissolve"
+    );
+}
+
+#[test]
+fn close_gap_refuses_rather_than_closing_part_of_the_way() {
+    let project = gap_project();
+    // Closing the 6 s – 8 s gap would slide clip 22 two seconds left, onto
+    // clip 21, by more than half the shorter of the two. A gap closes fully
+    // or not at all, so this is a refusal and not a partial close.
+    project.refuses(&json!({"op": "close_gap", "track": 2, "at": 4200000}));
+
+    // A locked track never moves, so the gap on it cannot be closed either.
+    // Track 5's gap is the honest test of that: closing it would be legal
+    // for every other track, so the ONLY reason this refuses is the lock.
+    project.refuses(&json!({"op": "close_gap", "track": 5, "at": 900000}));
+    project.refuses(&json!({"op": "close_gap", "track": 4, "at": 2400000}));
+    // A playhead on a clip is not in a gap.
+    project.refuses(&json!({"op": "close_gap", "track": 2, "at": 3000000}));
+    // And a gap with nothing after it is not one to close.
+    project.refuses(&json!({"op": "close_gap", "track": 2, "at": 7000000}));
+
+    assert_contains(
+        &project.errors(&json!({"op": "close_gap", "track": 99, "at": 0})),
+        "no track with id 99",
+    );
 }
 
 #[test]

@@ -15,7 +15,13 @@ lockstep are in the root `CLAUDE.md`; the full design is
 - `ProjectSnapshot.swift` — the `Codable` mirror of the §5.2 project JSON:
   the read-only view every view draws from.
 - `ProjectDocument.swift` — NSDocument, `.reelcut` package read/write, and
-  the single mutation point (see Undo below).
+  the single mutation point (see Undo below). It also holds the four pieces
+  of VIEW state every view agrees on and nothing persists: the playhead, the
+  clip selection, the in/out range and `selectedMedia` (the Media tab's
+  selected row, which Edit ▸ Insert / Overwrite at Playhead place). All four
+  are re-clamped to live ids by `clampViewState`, and `selectedMedia` lives
+  here rather than on `MediaPane` because that pane is rebuilt whole
+  whenever the media list changes.
 - `Playback.swift` · `CompositionBuilder.swift` · `Compositor.swift` ·
   `CompositorEffects.swift` · `LayerRenderers.swift` · `MediaImporter.swift` ·
   `Exporter.swift` · `ExporterWriter.swift` · `ExporterImageSequence.swift` —
@@ -93,6 +99,15 @@ lockstep are in the root `CLAUDE.md`; the full design is
   probe's completion, NSDocument's save) or on a long decode, so hopping first
   would deadlock or freeze the UI; they reach the document through
   `AgentServer.onMain`.
+- `EditorViewController+Edge.swift` — the cutting moves (spec §6's `slip`,
+  `roll`, `close_gap`, `insert_clip`, `overwrite_clip`) plus the `,` / `.`
+  nudge and Select All on Track. `lift_range` is the odd one out: it is the
+  ⌫ branch of `deleteSelection` in `EditorViewController+Timeline.swift`,
+  beside the ⌘⌫ ripple it pairs with. It carries an
+  `extension TimelineView` as well as the controller's, because the two ⌥⇧
+  drags are begun from there — the same split `TimelineClipDrawing.swift`
+  and `MediaPane.swift`'s drop targets use, and the reason `dragSnapper` and
+  `makeSnapper` are internal.
 - The chrome cleanup's own files (the design handoff in
   `designs/design_handoff_reelcut/`, spec §3–§4.4):
   `EditorViewController+Toolbar.swift` (the 44 pt row; the frozen file keeps
@@ -171,7 +186,9 @@ non-NSCoder class: `@available(*, unavailable) required init?(coder:)
 { fatalError("<Type> does not support NSCoder") }`. `[weak self]` in
 retained closures, never `unowned`. Main-thread AppKit. `async`/`await` is
 allowed **only inside `MediaImporter.swift`** (AVFoundation's loading API is
-async-only going forward); `DispatchQueue` only at the documented seams
+async-only going forward) — and nothing else earns the exception by asking:
+speech recognition uses `SFSpeechRecognizer`'s callback API for exactly this
+reason (spec §11); `DispatchQueue` only at the documented seams
 (the compositor's render queue, the composition rebuild, import, the export
 progress timer). Colors/fonts/metrics come from `DS` tokens; shared controls
 go in `Controls.swift`. Refusals beep (`NSSound.beep()`), errors never

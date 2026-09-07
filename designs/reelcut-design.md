@@ -760,14 +760,20 @@ or animates back); "error" = `Err`.
 |---|---|
 | `add_clip {track, media, at}` | Whole media as one clip at `at`; source in 0; Fit scale if `fit_new_clips` and the source exceeds the canvas. Refuses if the overlap rule fails. |
 | `add_text_clip {track, at, duration=5 s, text?}` / `add_shape_clip {…, shape?}` | Same placement rules; default text is the Title preset centered, default shape the rectangle — except that `shape.kind = "arrow"` is created with `arrow_end` on, since an arrow with no head is a diagonal line. `text` and `shape` are **patch objects** in the `set_text` / `set_shape` shape, merged over that default — not a bare string or kind — so an explicit `arrow_end: false` still wins. (The MCP tools additionally accept a bare string as shorthand: the words for `text`, a kind name for `shape`.) |
+| `insert_clip {track, media, at}` | The INSERT edit: the clip `at` is strictly inside on `track` is split, every unlocked track opens by the media's whole length (`insert_time`), then the media lands at `at`. Only the destination track is cut — a straddler on another track rides the shift whole, which is what keeps a bed unbroken. One op, so one undo step and one tool. Refuses when the clip could not be placed after the room was made, which is what a locked destination track gives. |
+| `overwrite_clip {track, media, at}` | The OVERWRITE edit: `[at, at + media length)` is cleared on `track` ALONE — cut at both bounds, whatever is left inside removed — and the media lands there. Nothing shifts and no other track is touched; the named track is cleared whether or not it is locked, exactly as `ripple_delete` removes the clips it was given. |
 | `move_clip {clips, delta, track}` | Shifts by `delta` ticks (may be negative; clamps at 0) and optionally to another track (all selected clips keep their relative track offsets). **Overlap rule** on the destination track: a clip may overlap at most one neighbour on each side, and each overlap must be ≤ half of the shorter of the two clips; anything else refuses. An overlap is a transition; a clip that gains a predecessor overlap gets `transition_in = cross_dissolve` if it had none. |
 | `trim_start {clip, to}` | New start `to`; source in advances by `(to − start) × speed`. Clamps: `to ≥ start − in/speed` (source bound), `to < end − one frame`. |
 | `trim_end {clip, to}` | New end `to`; clamps to the source's remaining length (`media` sources) and `> start`. |
 | `rate_stretch {clip, to_end}` | `speed = source_len / (to_end − start)`; duration follows. Media sources only — a non-media clip is an **error**, not a refusal, so an MCP caller gets a message it can correct from (the UI never offers it). |
+| `slip {clip, delta}` | Slides the source under a fixed clip: `in += delta × speed`, start and duration unchanged, so nothing downstream moves. `delta` is TIMELINE ticks; positive shows later material. Clamped so the window stays inside the media (`in ≥ 0`, `in + duration × speed ≤ media.duration`), and a slip the clamps reduce to nothing refuses. A `still` moves its `at` instead — it has a source time if not a window. Any other source is an **error**, as `rate_stretch` is. Actions are clip-relative and do not move. |
+| `roll {clip, to}` | Moves a hard cut: this clip's start and its predecessor's end both become `to`, and nothing else moves — the pair's outer edges and its total length are invariants. The predecessor is the clip on the same track ending EXACTLY at this one's start; with a gap or an overlap there instead it refuses (an overlap is a transition, and its length is `set_transition_duration`'s). Clamped four ways: one frame kept on each side, this clip's own source head, and the predecessor's remaining source. Front-trim semantics here (`in` follows), a plain end trim there. |
 | `split {clips?, at}` | Two clips. Second: `start = at`, `in += (at − start) × speed`, base props = the evaluated state at `at`. Actions before `at` stay with the first; after go to the second (start rebased); a straddling action becomes two — the first half's end patch is the evaluated state at `at`. `transition_in` stays with the first. Refuses when `at` is not strictly inside. **Omitting** `clips` — not passing a flag — means every unlocked clip `at` is strictly inside, the ⌘T-with-no-selection case. |
 | `delete {clips}` | Removes; gaps stay. |
 | `ripple_delete {clips}` / `ripple_delete_range {from, to}` | Removes; then for each removed span (union of the removed clips' spans, processed right-to-left) shifts every clip on **unlocked** tracks whose start ≥ span end left by the span length. Clips on other tracks that straddle a span are left in place. Range form: every unlocked clip is split at both bounds first, the middle pieces removed, then the shift. |
+| `lift_range {from, to}` | `ripple_delete_range` without the close: every unlocked clip is split at both bounds and the middles removed, and NOTHING moves — every clip after the range keeps the moment it had, and so do the markers. ⌫ with a range and nothing selected, where ⌘⌫ ripples. |
 | `insert_time {at, length}` | Shifts every unlocked clip whose start ≥ `at` right by `length`. Straddling clips are left in place. |
+| `close_gap {track, at}` | Closes the empty span on `track` that contains `at`, bounded by the nearest clip edges there (0 in front when nothing precedes it): everything from the gap's far side shifts left by its length, across every unlocked track, straddlers staying put. Refuses on a locked `track`, on an `at` that is on a clip, when there is no clip after the gap, and when the shift would break the overlap rule — a gap closes fully or not at all, because a partial close leaves the user unable to tell whether the op ran. Markers do not move. |
 | `set_speed {clip, rate, keep_pitch}` | `duration = source_len / rate`; actions keep their clip-relative *fraction* of the clip. Media sources only, an **error** on any other kind (as `rate_stretch`). Rate is clamped to ×0.1–×10. |
 | `set_reversed {clip, reversed}` | Plays the media back to front, or forward again. The core does no pixel work, so this changes neither the plan nor the recipe: Swift substitutes a pre-rendered reversed asset for that media's segments (§11). `in` is measured in the direction the clip PLAYS, so reversing keeps the in point and therefore shows different frames; the alternative would put two conventions into every trim and split. Media sources only, an **error** on any other kind. |
 | `freeze_frame {clip, at, duration=2 s}` | `split` at `at`, `insert_time(at, duration)`, then a `still {media, at: source time}` clip filling the gap on the same track with the original's video props. Media sources only, an **error** on any other kind (as `rate_stretch`). |
@@ -1220,10 +1226,12 @@ concern is a new module with its own `impl Project` block.
 | Module | Owns |
 |---|---|
 | `lib.rs` | declarations and re-exports only |
-| `model.rs` | the §5.2 types, serde derives, id allocation, invariants (`validate`) |
+| `model.rs` | the §5.2 types and serde derives, and the serde defaults that say what an absent key means — the schema, and nothing else |
+| `model_query.rs` | reading a project: `Project::new`, id allocation, the `clip` / `track` / `media` / `marker` / `nest` lookups, `clips_on`, `duration`, `validate` with its nesting walk, and the three source-window measurements (`content_length`, `source_head`, `source_length`) every placement op clamps against |
 | `time.rs` | `Ticks`, `TIMESCALE`, `Fps`, frame snapping, timecode format/parse (non-drop `HH:MM:SS:FF` and `HH:MM:SS.mmm`) |
 | `edit.rs` | the op enum + serde, `apply(&self, op) -> Result<Option<Project>, String>`; **its module doc is the op schema table** |
 | `edit_clip.rs` / `edit_props.rs` / `edit_track.rs` / `edit_time.rs` | the §6 ops in `impl Project` blocks: clip placement; the four property patches and their range checks; tracks, markers, canvas, media; ripple, insert time, range delete, freeze |
+| `edit_edge.rs` / `edit_insert.rs` | the cutting moves that keep something fixed on purpose: `slip` and `roll` (the clip's place, and the pair's outer edges); `insert_clip` and `overwrite_clip` (the other tracks, and the timeline's total length) |
 | `edit_action.rs` / `edit_nest.rs` / `edit_paste.rs` | the ops with a concern of their own: actions (the no-overlap rule); `nest` / `unnest`; `paste` (making another document's clips fit) |
 | `actions.rs` | evaluation and interpolation, `clip_state(clip, t)` |
 | `transition.rs` | overlap detection, the overlap rule, progress at *t* |
@@ -1321,7 +1329,7 @@ a clean `make lint` before finishing Rust work.
 | Home / End | Start / end |
 | ⌘T | Split at playhead |
 | W / E | Trim start / end to playhead |
-| ⌫ | Delete, leave gap |
+| ⌫ | Delete the selection, leaving a gap — or LIFT the in/out range when nothing is selected |
 | ⌘⌫ | Ripple delete (selection, or the in/out range) |
 | ⇧⌘F | Freeze frame |
 | ⌥⌘D | Detach audio |
@@ -1338,15 +1346,37 @@ a clean `make lint` before finishing Rust work.
 | ⌘G / ⇧⌘G | Nest / un-nest (M3) |
 | ⌘E | Export… |
 | ⌥⌘I | Toggle inspector |
+| `,` / `.` (⇧ ×10) | Nudge the selection one frame |
 | ⌥-drag clip | Duplicate |
+| ⌥⇧-drag clip | Slip — the source under a fixed clip |
 | ⌥-drag clip edge | Rate stretch |
+| ⌥⇧-drag clip edge | Roll — the hard cut that edge sits on |
+| Double-click an empty lane span | Close that gap |
+| ⌥-drop / ⇧⌥-drop from the Media tab | Insert / overwrite at the drop |
+| ⌥-click a track header | Select every clip on that track |
 | ⌘-drag | Suppress snapping |
 
+**Proposed, not yet bound** — the keys `designs/reelcut-roadmap-2.md` asks
+for, kept here so a phase that binds one checks this table for a conflict
+first and then promotes its row into the one above. A row here is a claim on
+a key, nothing more.
+
+| Keys | Action | Phase |
+|---|---|---|
+| ⇧⌘R | Rename clip | 2 |
+| ⌥⌘V | Paste Attributes | 2 |
+| Z | Zoom-to-region mode on the canvas | 3 |
+| ⌥⌘E | Save Frame… | 7 |
+| ⇧⌘P | Preview Window | 8 |
+| ⌘↓ / ⌘↑ | Open / close nest | 9 |
+
 Menus: File (New Project, Open…, Open Recent, Close, Save, Save As…,
-Add Media…, Consolidate Media… (M3), Export…), Edit (Undo, Redo, Cut,
-Copy, Paste, Duplicate, Delete, Ripple Delete, Select All, Select After
-Playhead), Clip (Split, Trim Start, Trim End, Freeze Frame, Detach Audio,
-Add Action, Speed…, Transition ▸, Nest, Un-nest), Track (New Track,
+Add Media…, Import Captions… (M3), Consolidate Media… (M3), Export…),
+Edit (Undo, Redo, Cut, Copy, Paste, Duplicate, Delete, Ripple Delete,
+Insert at Playhead, Overwrite at Playhead, Select All, Select After
+Playhead, Select All on Track), Clip (Split, Trim Start, Trim End, Freeze
+Frame, Detach Audio, Add Action, Speed…, Close Gap, Transition ▸, Nest,
+Un-nest), Track (New Track,
 Remove Track, Remove Empty Tracks, Hide/Mute/Lock), Mark (Add Marker,
 Set In, Set Out, Clear Range, Next/Previous Marker), View (Zoom, Fit,
 Snapping, Safe Areas, Inspector, Timeline Track Height), Window, Help.
@@ -1473,6 +1503,12 @@ assisted import.
 - **No left panel.** Media is an inspector tab. Revisit if libraries grow
   past a few dozen files.
 - **`async`/`await` is allowed only in `MediaImporter`.** Everything else
-  keeps Rasterize's synchronous AppKit discipline.
+  keeps Rasterize's synchronous AppKit discipline. Speech recognition, when
+  it lands, does NOT earn a second exception: `SFSpeechRecognizer`'s
+  callback API is complete for what a transcription needs (a result handler
+  per hypothesis and a final one), so `Transcriber.swift` uses it and the
+  rule stands. `SpeechAnalyzer`, the macOS 26 replacement, is `async`-only
+  and would earn the argument again — but only when the deployment target
+  moves, and then as one more named file, never as a general licence.
 - **Media is referenced, not copied**, by path + bookmark (not
   security-scoped; the app is not sandboxed). Consolidate is M3.

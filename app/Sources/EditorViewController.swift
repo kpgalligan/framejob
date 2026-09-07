@@ -714,6 +714,12 @@ final class EditorViewController: NSViewController {
             toggleCropMode(nil)
         case "z" where shift:
             fitTimeline(nil)
+        // ⇧ is still applied to `charactersIgnoringModifiers`, so ⇧, arrives
+        // as "<" on a US layout — both spellings mean the same nudge.
+        case ",", "<":
+            nudgeSelection(frames: shift ? -10 : -1)
+        case ".", ">":
+            nudgeSelection(frames: shift ? 10 : 1)
         default:
             return false
         }
@@ -766,6 +772,14 @@ final class EditorViewController: NSViewController {
     /// ⌘G / ⇧⌘G — EditorViewController+Nest.swift.
     @objc func nestClips(_ sender: Any?) { nestSelection() }
     @objc func unnestClips(_ sender: Any?) { unnestSelection() }
+    /// Clip ▸ Close Gap, Edit ▸ Insert / Overwrite at Playhead and Edit ▸
+    /// Select All on Track — EditorViewController+Edge.swift. The two drags
+    /// (⌥⇧ slip and roll) and the `,` / `.` nudge live there too and need no
+    /// menu item of their own.
+    @objc func closeGapAtPlayhead(_ sender: Any?) { closeGapAtPlayheadCommand() }
+    @objc func insertMediaAtPlayhead(_ sender: Any?) { placeSelectedMedia(insert: true) }
+    @objc func overwriteMediaAtPlayhead(_ sender: Any?) { placeSelectedMedia(insert: false) }
+    @objc func selectAllClipsOnTrack(_ sender: Any?) { selectAllOnTrack() }
     /// ⌘X / ⌘C / ⌘V — EditorViewController+Clipboard.swift.
     @objc func cut(_ sender: Any?) { cutSelection() }
     @objc func copy(_ sender: Any?) { copySelection() }
@@ -921,6 +935,7 @@ extension EditorViewController: NSUserInterfaceValidations {
             if let answer = validateCanvasAction(action, item: item) { return answer }
             if let answer = validateInspectorAction(action, item: item) { return answer }
             if let answer = validateTimelineAction(action) { return answer }
+            if let answer = validateEdgeAction(action) { return answer }
         }
         return true
     }

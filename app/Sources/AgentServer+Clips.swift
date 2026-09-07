@@ -127,6 +127,31 @@ extension AgentServer {
         return try shapePatchArg(a, key)
     }
 
+    /// `insert_clip` — Edit ▸ Insert at Playhead
+    /// (`EditorViewController.insertMediaAtPlayhead:`) and an ⌥-drop from the
+    /// Media tab. The split, the room and the placement are ONE core op, so
+    /// this is one undo step exactly as the menu command is.
+    func insertClip(_ a: [String: Any]) throws -> String {
+        let document = try target(a)
+        let track = try trackArg(a, "track", document)
+        let media = try mediaArg(a, "media", document)
+        let at = try timeArg(a, "at", document)
+        return try editResult(
+            document, "Insert", [.insertClip(track: track.id, media: media.id, at: at)])
+    }
+
+    /// `overwrite_clip` — Edit ▸ Overwrite at Playhead
+    /// (`EditorViewController.overwriteMediaAtPlayhead:`) and a ⇧⌥-drop from the
+    /// Media tab.
+    func overwriteClip(_ a: [String: Any]) throws -> String {
+        let document = try target(a)
+        let track = try trackArg(a, "track", document)
+        let media = try mediaArg(a, "media", document)
+        let at = try timeArg(a, "at", document)
+        return try editResult(
+            document, "Overwrite", [.overwriteClip(track: track.id, media: media.id, at: at)])
+    }
+
     // MARK: - Moving and trimming
 
     /// `move_clip` — the timeline's clip drag (`ClipDragSession`). The overlap
@@ -173,6 +198,28 @@ extension AgentServer {
             document, "Rate Stretch", [.rateStretch(clip: clip.id, toEnd: toEnd)])
     }
 
+    /// `slip` — ⌥⇧-dragging a clip's BODY (`SlipSession`). `delta` is
+    /// timeline ticks and the source moves by `delta × speed`; the clip does
+    /// not move at all. A source with no window to slip is an ERROR rather
+    /// than a refusal, for the reason `rate_stretch`'s is (spec §6).
+    func slip(_ a: [String: Any]) throws -> String {
+        let document = try target(a)
+        let clip = try clipArg(a, "clip", document)
+        let delta = try timeArg(a, "delta", document)
+        return try editResult(document, "Slip", [.slip(clip: clip.id, delta: delta)])
+    }
+
+    /// `roll` — ⌥⇧-dragging a clip's EDGE (`RollSession`). The predecessor is
+    /// whatever ends exactly at this clip's start; with a gap or an overlap
+    /// there instead, the core refuses and the caller is told nothing
+    /// changed.
+    func roll(_ a: [String: Any]) throws -> String {
+        let document = try target(a)
+        let clip = try clipArg(a, "clip", document)
+        let to = try timeArg(a, "to", document)
+        return try editResult(document, "Roll", [.roll(clip: clip.id, to: to)])
+    }
+
     /// `split` — ⌘K / T (`splitAtPlayheadCommand`). With no `clips` the core
     /// splits every unlocked clip under the playhead, which is what the menu
     /// command does with an empty selection; `at` defaults to the playhead for
@@ -213,6 +260,18 @@ extension AgentServer {
             document, "Ripple Delete", [.rippleDeleteRange(from: from, to: to)])
     }
 
+    /// `lift_range` — ⌫ with an in/out range and NOTHING selected
+    /// (`deleteSelection`), the counterpart of `ripple_delete_range`'s ⌘⌫.
+    func liftRange(_ a: [String: Any]) throws -> String {
+        let document = try target(a)
+        let from = try timeArg(a, "from", document)
+        let to = try timeArg(a, "to", document)
+        guard to > from else {
+            throw ToolError(message: "to must be after from (got \(from) and \(to)).")
+        }
+        return try editResult(document, "Lift", [.liftRange(from: from, to: to)])
+    }
+
     /// `insert_time` — the gap-opening edit of spec §4.4. It has no menu
     /// command of its own yet; the agent is its first caller, and the ops are
     /// the same ones a future insert gesture will build.
@@ -224,6 +283,16 @@ extension AgentServer {
             throw ToolError(message: "length must be more than one frame of ticks.")
         }
         return try editResult(document, "Insert Time", [.insertTime(at: at, length: length)])
+    }
+
+    /// `close_gap` — double-clicking an empty span in a lane, and Clip ▸
+    /// Close Gap with the playhead in one
+    /// (`EditorViewController.closeGapAtPlayhead:`).
+    func closeGap(_ a: [String: Any]) throws -> String {
+        let document = try target(a)
+        let track = try trackArg(a, "track", document)
+        let at = try timeArg(a, "at", document)
+        return try editResult(document, "Close Gap", [.closeGap(track: track.id, at: at)])
     }
 
     // MARK: - Speed and stills

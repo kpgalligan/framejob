@@ -28,7 +28,8 @@
 //! method: nothing edits inside a nest except `nest` and `unnest`, and both
 //! check the TIMELINE they are moving clips on to.
 
-use crate::model::{clips_on, Clip, Project, TransitionKind};
+use crate::model::{Clip, Project, TransitionKind};
+use crate::model_query::clips_on;
 use crate::time::Ticks;
 
 /// One overlap: `earlier` starts first, `later` is the clip whose

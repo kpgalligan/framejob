@@ -75,20 +75,6 @@ struct Described {
     shape: Option<ShapeProps>,
 }
 
-/// The source material one clip shows, in source ticks: its timeline length
-/// times its speed. The same quantity `evaluate::segment_of` inserts into
-/// the composition, so a speed edit here and the segment there agree.
-fn content_length(clip: &Clip) -> Ticks {
-    let scaled = clip.duration as f64 * clip.speed;
-    // The cast saturates rather than wrapping, so an absurd speed cannot
-    // produce a negative length; a degenerate one falls back to 1:1.
-    if scaled.is_finite() && scaled >= 1.0 {
-        scaled.round() as Ticks
-    } else {
-        clip.duration.max(1)
-    }
-}
-
 pub(crate) fn clip_end(clip: &Clip) -> Ticks {
     clip.start.saturating_add(clip.duration)
 }
@@ -255,6 +241,17 @@ impl Project {
         time::snap_to_frame(t, self.canvas.fps)
     }
 
+    /// The frame boundary at or after `t`, and the one at or before it —
+    /// for a clamp BOUND, which cannot be rounded to the nearest frame the
+    /// way a value can without letting a caller past what it protects.
+    pub(crate) fn snapped_up(&self, t: Ticks) -> Ticks {
+        time::snap_up_to_frame(t, self.canvas.fps)
+    }
+
+    pub(crate) fn snapped_down(&self, t: Ticks) -> Ticks {
+        time::snap_down_to_frame(t, self.canvas.fps)
+    }
+
     /// One frame of canvas time — the shortest a clip or an action may be.
     /// A degenerate canvas rate falls back to 1/30 s so the minimum is
     /// never zero.
@@ -293,6 +290,42 @@ impl Project {
         }
         next.validate()?;
         Ok(Some(next))
+    }
+
+    /// How long a clip showing the WHOLE of `media` is — what `add_clip`
+    /// gives one, and therefore how much room `insert_clip` opens and how
+    /// much span `overwrite_clip` clears.
+    ///
+    /// A still image has no source bound, so it gets the default length
+    /// unless its descriptor carried one; a timed media with no duration is
+    /// an `Err`, because a zero-length clip is not a thing the timeline can
+    /// hold.
+    ///
+    /// **The default is snapped like every other length.** It is a constant
+    /// number of ticks, and a constant is not on the frame grid of a rate
+    /// that does not divide the timescale — at 30000/1001 five seconds is
+    /// 3 003 000 ticks, not 3 000 000. Handing back the raw constant made
+    /// `insert_clip` open a hole a sliver wider than the clip it placed and
+    /// `overwrite_clip` clear a span that missed the fragment `split_clips`
+    /// had just made, which refused the whole op. One length, on the grid,
+    /// for all three callers.
+    pub(crate) fn whole_media_length(&self, media: &Media) -> Result<Ticks, String> {
+        match media.kind {
+            MediaKind::Image if media.duration <= 0 => {
+                Ok(self.snapped(DEFAULT_CLIP_DURATION).max(self.frame()))
+            }
+            MediaKind::Image => Ok(self.snapped(media.duration)),
+            MediaKind::Video | MediaKind::Audio => {
+                let duration = self.snapped(media.duration);
+                if duration <= 0 {
+                    return Err(format!(
+                        "media {} has no duration ({} ticks)",
+                        media.id, media.duration
+                    ));
+                }
+                Ok(duration)
+            }
+        }
     }
 
     /// Fit scale for a new clip: `min(cw/sw, ch/sh)` when `fit_new_clips`
@@ -369,34 +402,14 @@ impl Project {
         // A drag can start left of zero; the timeline has no negative time.
         let at = self.snapped(at).max(0);
 
-        let (source, duration) = match found.kind {
-            // A still image has no source bound, so it gets the default
-            // length unless the descriptor gave it one.
-            MediaKind::Image => {
-                let duration = if found.duration > 0 {
-                    self.snapped(found.duration)
-                } else {
-                    DEFAULT_CLIP_DURATION
-                };
-                (Source::Image { media }, duration)
-            }
-            MediaKind::Video | MediaKind::Audio => {
-                let duration = self.snapped(found.duration);
-                if duration <= 0 {
-                    return Err(format!(
-                        "media {media} has no duration ({} ticks)",
-                        found.duration
-                    ));
-                }
-                (
-                    Source::Media {
-                        media,
-                        r#in: 0,
-                        reversed: false,
-                    },
-                    duration,
-                )
-            }
+        let duration = self.whole_media_length(&found)?;
+        let source = match found.kind {
+            MediaKind::Image => Source::Image { media },
+            MediaKind::Video | MediaKind::Audio => Source::Media {
+                media,
+                r#in: 0,
+                reversed: false,
+            },
         };
 
         let has_pixels = found.has_video || matches!(found.kind, MediaKind::Image);
@@ -714,19 +727,7 @@ impl Project {
         let latest = end.saturating_sub(self.frame());
         let mut to = self.snapped(to).min(latest).max(0);
 
-        if let Source::Media { r#in, .. } = target.source {
-            // `in` ticks of source lie before the clip's first frame, which
-            // is `in / speed` ticks of TIMELINE at this clip's rate.
-            let head = if target.speed.is_finite() && target.speed > 0.0 {
-                let head = (r#in.max(0) as f64 / target.speed).floor();
-                if head.is_finite() {
-                    head as Ticks
-                } else {
-                    0
-                }
-            } else {
-                0
-            };
+        if let Some(head) = self.source_head(&target) {
             to = to.max(target.start.saturating_sub(head).max(0));
         }
         // The two clamps can cross when the source has almost nothing left
@@ -820,7 +821,7 @@ impl Project {
         if duration < self.frame() {
             return Ok(None);
         }
-        let rate = content_length(&target) as f64 / duration as f64;
+        let rate = self.content_length(&target) as f64 / duration as f64;
         if !rate.is_finite() || !(SPEED_MIN..=SPEED_MAX).contains(&rate) {
             return Ok(None);
         }
@@ -973,7 +974,7 @@ impl Project {
         }
         let rate = rate.clamp(SPEED_MIN, SPEED_MAX);
 
-        let scaled = content_length(&target) as f64 / rate;
+        let scaled = self.content_length(&target) as f64 / rate;
         let duration = if scaled.is_finite() {
             self.snapped(scaled.round() as Ticks).max(self.frame())
         } else {

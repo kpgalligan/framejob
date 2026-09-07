@@ -226,6 +226,67 @@ struct TrimSession {
     }
 }
 
+// MARK: - The edge moves
+
+/// ⌥⇧-dragging a clip's BODY: the source slides under a fixed clip
+/// (spec §6 `slip`).
+///
+/// The op's `delta` is the TOTAL travel since mouse-down, not this tick's
+/// increment, because `updateLiveEdit` re-applies against the handle the
+/// gesture started from. It is also deliberately unsnapped: the thing being
+/// moved is inside the media, where the timeline's candidates — other
+/// clips' edges, the markers, the playhead — mean nothing. The core rounds
+/// it to the frame grid, so the film still steps a frame at a time.
+struct SlipSession {
+    let clip: UInt32
+    /// Time under the pointer at mouse-down, so the film keeps pace with
+    /// the cursor.
+    let grabTime: Ticks
+
+    var delta: Ticks = 0
+    var didMove = false
+
+    var op: ReelOp { .slip(clip: clip, delta: delta) }
+
+    mutating func update(time: Ticks) {
+        delta = time - grabTime
+        didMove = true
+    }
+}
+
+/// ⌥⇧-dragging a clip's EDGE: the hard cut moves and nothing else does
+/// (spec §6 `roll`).
+///
+/// Either edge rolls, but they roll DIFFERENT cuts, and the op only ever
+/// names the clip on the cut's right: grabbing the start edge rolls this
+/// clip against its predecessor, and grabbing the end edge rolls the
+/// SUCCESSOR against this one. `clip` is resolved at mouse-down, so the
+/// session itself has one job.
+///
+/// Clamped in the preview as well as in the core, for `TrimSession`'s
+/// reason: the bar must not be drawn inverted for the ticks the core is
+/// busy refusing. The bounds here are the frame minimums only — the source
+/// clamps need the media, which the core has and the view does not — so a
+/// drag past those still looks live and lands where the core allows.
+struct RollSession {
+    let clip: UInt32
+    let earliest: Ticks
+    let latest: Ticks
+
+    var time: Ticks
+    var guide: Ticks?
+    var didMove = false
+
+    var op: ReelOp { .roll(clip: clip, to: time) }
+
+    mutating func update(time: Ticks, snapper: TimelineSnapper) {
+        let resolved = snapper.resolve(time)
+        self.time = max(earliest, min(resolved.time, latest))
+        guide = resolved.guide
+        didMove = true
+    }
+}
+
 // MARK: - Marquee
 
 /// Rubber-band selection on an empty lane. ⇧ adds to what was already

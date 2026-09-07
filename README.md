@@ -21,22 +21,27 @@ normative: §5.2 is the project schema, §6 the op table, §7 the architecture.
 - **Timeline** with a frame-accurate ruler, filmstrips and waveforms from a
   per-media cache, three row heights, magnify/⌥-wheel zoom about the cursor,
   and gesture sessions for drag, trim, rate-stretch (⌥ on the end edge),
-  marquee select, playhead scrub, marker drag, audio fade handles and track
-  reorder — each one undo step, each snapping to clip edges, markers and the
-  playhead (N toggles, ⌘ suppresses).
+  slip (⌥⇧ on a body), roll (⌥⇧ on an edge), marquee select, playhead scrub,
+  marker drag, audio fade handles and track reorder — each one undo step,
+  each snapping to clip edges, markers and the playhead (N toggles, ⌘
+  suppresses). Double-clicking an empty span closes that gap; a media row
+  dropped with ⌥ inserts and with ⇧⌥ overwrites.
 - **Canvas** with an `AVPlayerLayer` under a transparent overlay: move, scale,
   rotate and crop handles, line/arrow endpoint handles, safe-area guides,
   snapping to the canvas centre and edges, inline text editing, and Fit /
   50 % / 100 % / 200 % zoom stops.
-- **Inspector** with six tabs (Video, Audio, Text, Shape, Media, Document),
-  any of which can be pinned. Every field reads the *evaluated* value at the
-  playhead and writes to the clip's base props — or, when the playhead is
-  inside an animation action, to that action's end state.
-- **Editing**: move, trim, split, delete, ripple delete (and ripple delete
-  range), insert time, duplicate, speed, freeze frame, detach audio,
-  transitions, actions, markers, tracks, canvas size and rate. Every edit is a
-  pure op in the Rust core returning a new immutable project handle, so undo is
-  a stack of handles and a refused edit costs nothing.
+- **Inspector** with three tabs — Clip, Media, Document. The Clip tab is a
+  selection header over the sections that selection's kind earns (transform,
+  crop, filters, text, shape, audio, actions…), each collapsible. Every field
+  reads the *evaluated* value at the playhead and writes to the clip's base
+  props — or, when the playhead is inside an animation action, to that
+  action's end state.
+- **Editing**: move, nudge, trim, slip, roll, split, delete, lift, ripple
+  delete (and ripple delete range), close gap, insert time, insert and
+  overwrite, duplicate, speed, freeze frame, detach audio, transitions,
+  actions, markers, tracks, canvas size and rate. Every edit is a pure op in
+  the Rust core returning a new immutable project handle, so undo is a stack
+  of handles and a refused edit costs nothing.
 - **Playback** over an `AVComposition` built from the core's composition plan,
   with a Metal compositor drawing every frame from the core's frame recipe.
   A property-only edit re-renders the paused frame without rebuilding the
@@ -99,7 +104,7 @@ Makefile              Build orchestration
 | `Exporter.swift` · `ExportSheetController.swift` | writing a file, and rendering one frame offline |
 | `TimelineLayout.swift` · `TimelineSessions.swift` · `TimelineView.swift` | all tick↔point arithmetic; the gesture session structs; the timeline view |
 | `CanvasSessions.swift` · `PreviewCanvasView.swift` | canvas geometry and gestures; the preview and its overlay |
-| `InspectorPane.swift` · `InspectorViewController.swift` · `VideoPane` `AudioPane` `TextPane` `ShapePane` `MediaPane` `DocumentPane` | the binding that knows about actions, and one file per tab |
+| `InspectorPane.swift` · `InspectorViewController.swift` · `ClipPane` `MediaPane` `DocumentPane` (with `VideoPane` `AudioPane` `TextPane` `ShapePane` as section factories) | the binding that knows about actions, one file per tab, and the sections the Clip tab composes |
 | `EditorViewController.swift` + `EditorViewController+{Timeline,Canvas,Inspector,Export}.swift` | wiring in the base file, features in extensions |
 | `AgentServer.swift` + `AgentServer+{Arguments,Project,Clips,Tracks,Media,Render,History}.swift` · `AgentCatalog.swift` | the MCP endpoint, its handlers, and the tool catalog |
 | `AppDelegate.swift` · `EditorWindowController.swift` · `WelcomeWindowController.swift` · `main.swift` | menus (nil-target selectors), window, welcome |
@@ -152,15 +157,19 @@ runs. It is off by default.
 
 ### The tools
 
-50 of them. **One per row of the op table** in spec §6 and the module doc of
-`core/src/edit.rs` — 39, with the same name and the same argument names:
-`add_clip`, `add_text_clip`, `add_shape_clip`, `move_clip`, `trim_start`,
-`trim_end`, `rate_stretch`, `split`, `delete`, `ripple_delete`,
-`ripple_delete_range`, `insert_time`, `set_speed`, `freeze_frame`,
-`detach_audio`, `duplicate`, `set_video`, `set_audio`, `set_text`,
-`set_shape`, `set_enabled`, `set_transition`, `set_transition_duration`, the
-four action ops, and the track, marker, canvas and media ops. Plus eleven of
-its own:
+**One tool per row of the op table** in spec §6 and the module doc of
+`core/src/edit.rs`, with the same name and the same argument names —
+`add_clip`, `add_text_clip`, `add_shape_clip`, `insert_clip`,
+`overwrite_clip`, `move_clip`, `trim_start`, `trim_end`, `rate_stretch`,
+`slip`, `roll`, `split`, `delete`, `ripple_delete`, `ripple_delete_range`,
+`lift_range`, `insert_time`, `close_gap`, `set_speed`, `set_reversed`,
+`freeze_frame`, `detach_audio`, `duplicate`, `paste`, `nest`, `unnest`,
+`set_video`, `set_audio`, `set_text`, `set_shape`, `set_enabled`,
+`set_transition`, `set_transition_duration`, the four action ops, and the
+track, marker, canvas and media ops — plus the app-state tools below. The
+count of each is `rc_op_names`' length and the catalog's, and the startup
+parity check compares them, so it is one number in the code and not one
+here.
 
 | Tool | |
 |---|---|
@@ -169,13 +178,17 @@ its own:
 | `save_project {path?}` | returns once the package is really on disk |
 | `get_project` | the whole §5.2 JSON, plus the playhead, selection and in/out range that live only in the app |
 | `import_media {path}` | probes a file and returns the **new media id**; `add_clip` then places it |
+| `import_captions {path, track?}` | an SRT file as text clips (File ▸ Import Captions…) |
+| `consolidate_media {}` | copies every referenced file into the package (File ▸ Consolidate Media…) |
 | `set_playhead {t}` | moves the playhead and seeks the preview |
 | `set_range {start?, end?}` | the in/out range (I / O / ⌥X); no bounds clears it |
+| `set_selection {clips?}` | the timeline selection (a click); no clips clears it |
 | `undo` · `redo` | one step each (⌘Z / ⇧⌘Z), reporting the step's name |
 | `render_frame {t, max_width?}` | **the verification hook** |
 | `export {preset, path, size?, range?, video_bitrate?, audio_bitrate?}` | writes a file and waits for it; `preset` is the encoding, `size` a Size-popup row (`document`, `1080p`, …) or `[width, height]`, default the document's size (a GIF or APNG's cap); `range: "in_out"` scopes it to the in/out range; the bitrates are the sheet's Quality popup in bits per second |
 
-`set_range`, `undo` and `redo` exist so that spec §10's own verifications —
+`set_range`, `set_selection`, `undo` and `redo` exist so that spec §10's own
+verifications —
 "every op is one undo step and undo restores the frame", "the in/out range
 scopes the export" — can be checked by driving the built app, which is how
 this project is verified.

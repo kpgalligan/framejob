@@ -182,10 +182,20 @@ extension EditorViewController {
         document.applyEdit(edge == .start ? "Trim Start" : "Trim End", ops)
     }
 
-    /// ⌫ — removes and leaves the gap.
+    /// ⌫ — removes the selection and leaves the gap, or LIFTS the in/out
+    /// range when nothing is selected (spec §9).
+    ///
+    /// The pairing with ⌘⌫ below is deliberate and complete: each key does
+    /// the same thing to a selection and to a range, and the difference
+    /// between the two keys is only whether the hole closes.
     func deleteSelection() {
-        guard let document = document, !document.selection.isEmpty else {
-            NSSound.beep()
+        guard let document = document else { return }
+        if document.selection.isEmpty {
+            guard let range = document.inOutRange, range.end > range.start else {
+                NSSound.beep()
+                return
+            }
+            document.applyEdit("Lift", .liftRange(from: range.start, to: range.end))
             return
         }
         document.applyEdit("Delete", .delete(clips: Array(document.selection)))
@@ -332,9 +342,21 @@ extension EditorViewController {
         guard let document = document else { return false }
         let hasSelection = !document.selection.isEmpty
         switch action {
-        case #selector(deleteClips(_:)), #selector(duplicateClips(_:)),
-            #selector(detachAudio(_:)):
+        case #selector(duplicateClips(_:)), #selector(detachAudio(_:)):
             return hasSelection
+        case #selector(deleteClips(_:)):
+            // ⌫ lifts the in/out range with nothing selected, so the item
+            // has to be live for that too.
+            //
+            // And it has to be DEAD while text is being edited, which is
+            // the guard AppDelegate's comment on this item asks for and
+            // which nothing supplied before: "\u{8}" is a modifier-less key
+            // equivalent, AppKit resolves those ahead of the first
+            // responder, and a live item therefore eats the Delete key in
+            // the timecode field, an inline rename and a text clip alike.
+            // The same test `handleEditorKey` opens with.
+            if view.window?.firstResponder is NSText { return false }
+            return hasSelection || (document.inOutRange.map { $0.end > $0.start } ?? false)
         case #selector(showSpeedSheet(_:)):
             // `set_speed` is an ERROR on a non-media source (spec §6), so the
             // item is live only when the selection holds something it can act

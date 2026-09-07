@@ -260,14 +260,17 @@ final class MediaPane: InspectorPaneView {
         guard binding.snapshot.media(media) != nil else { return false }
         let fps = binding.canvas.fps
         switch target {
-        case .track(let track, let at):
-            binding.apply(
-                "Add Clip",
-                [
-                    .addClip(
-                        track: track, media: media,
-                        at: ReelTime.snapToFrame(max(at, 0), fps: fps))
-                ])
+        case .track(let track, let at, let mode):
+            let when = ReelTime.snapToFrame(max(at, 0), fps: fps)
+            switch mode {
+            case .add:
+                binding.apply("Add Clip", [.addClip(track: track, media: media, at: when)])
+            case .insert:
+                binding.apply("Insert", [.insertClip(track: track, media: media, at: when)])
+            case .overwrite:
+                binding.apply(
+                    "Overwrite", [.overwriteClip(track: track, media: media, at: when)])
+            }
         case .canvas:
             let at = ReelTime.snapToFrame(max(binding.playhead, 0), fps: fps)
             let index = binding.snapshot.tracks.count
@@ -286,6 +289,37 @@ final class MediaPane: InspectorPaneView {
                 [.addTrack(index: index), .addClip(track: track, media: media, at: at)])
         }
         return true
+    }
+
+    /// A row was clicked: it becomes the document's selected media, which is
+    /// what Edit ▸ Insert / Overwrite at Playhead act on. View state, so it
+    /// neither dirties the document nor registers an undo step.
+    func select(_ media: UInt32) {
+        guard let document = binding.document, document.selectedMedia != media else { return }
+        document.selectedMedia = media
+        // Only the rows draw the selection, and the Edit menu asks for it
+        // when it validates, so a redraw is the whole of the update.
+        rows.forEach { $0.needsDisplay = true }
+    }
+
+    /// The row menu's Insert / Overwrite at Playhead. The same two ops the
+    /// Edit menu runs, on the row that was right-clicked.
+    func place(_ media: UInt32, insert: Bool) {
+        select(media)
+        guard binding.snapshot.media(media) != nil,
+              let track = binding.document?.targetTrack
+        else {
+            NSSound.beep()
+            return
+        }
+        let at = ReelTime.snapToFrame(max(binding.playhead, 0), fps: binding.canvas.fps)
+        binding.apply(
+            insert ? "Insert" : "Overwrite",
+            [
+                insert
+                    ? .insertClip(track: track, media: media, at: at)
+                    : .overwriteClip(track: track, media: media, at: at)
+            ])
     }
 
     /// The row menu's Reveal in Finder.
@@ -379,6 +413,11 @@ final class MediaRowView: NSView, NSDraggingSource {
     private var mouseDownAt: CGPoint?
     private var hovered = false
 
+    /// Whether this row is the document's selected media. Read rather than
+    /// stored, because the pane is rebuilt whole whenever the media list
+    /// changes and per-row state would not survive it.
+    private var selected: Bool { pane?.binding.document?.selectedMedia == media }
+
     init(media: UInt32, pane: MediaPane) {
         self.media = media
         self.pane = pane
@@ -386,7 +425,8 @@ final class MediaRowView: NSView, NSDraggingSource {
         wantsLayer = true
         // The row is a drag source (§4.3) and nothing about it says so. The
         // list has no room for a line that does, so the row says it itself.
-        toolTip = "Drag to a timeline track, or onto the canvas."
+        toolTip =
+            "Drag to a timeline track, or onto the canvas. Hold ⌥ to insert, ⇧⌥ to overwrite."
     }
 
     @available(*, unavailable)
@@ -468,11 +508,14 @@ final class MediaRowView: NSView, NSDraggingSource {
         let box = NSBezierPath(
             roundedRect: bounds.insetBy(dx: 0.5, dy: 0.5),
             xRadius: DS.listRowRadius, yRadius: DS.listRowRadius)
-        if hovered {
+        if selected {
+            DS.accent.withAlphaComponent(0.14).setFill()
+            box.fill()
+        } else if hovered {
             DS.hoverFill.setFill()
             box.fill()
         }
-        DS.border.setStroke()
+        (selected ? DS.accent : DS.border).setStroke()
         box.stroke()
 
         let thumb = NSRect(
@@ -574,6 +617,7 @@ final class MediaRowView: NSView, NSDraggingSource {
 
     override func mouseDown(with event: NSEvent) {
         mouseDownAt = convert(event.locationInWindow, from: nil)
+        pane?.select(media)
     }
 
     /// A drag past the slop starts the row's drag session (§4.3: to a track,
@@ -638,6 +682,18 @@ final class MediaRowView: NSView, NSDraggingSource {
 
     override func menu(for event: NSEvent) -> NSMenu? {
         let menu = NSMenu()
+        // Two groups: what to do with the file on the timeline, then what to
+        // do with the file. The loop shape cannot express a separator, so the
+        // groups are two loops with one between them.
+        for (title, selector) in [
+            ("Insert at Playhead", #selector(insertMedia(_:))),
+            ("Overwrite at Playhead", #selector(overwriteMedia(_:))),
+        ] {
+            let item = NSMenuItem(title: title, action: selector, keyEquivalent: "")
+            item.target = self
+            menu.addItem(item)
+        }
+        menu.addItem(.separator())
         for (title, selector) in [
             ("Reveal in Finder", #selector(revealMedia(_:))),
             ("Relink…", #selector(relinkMedia(_:))),
@@ -649,6 +705,12 @@ final class MediaRowView: NSView, NSDraggingSource {
         }
         return menu
     }
+
+    /// The row knows its own id, so these two place THIS file whatever the
+    /// list's selection is — and they select it on the way, so the Edit menu
+    /// and the row agree afterwards.
+    @objc private func insertMedia(_ sender: Any?) { pane?.place(media, insert: true) }
+    @objc private func overwriteMedia(_ sender: Any?) { pane?.place(media, insert: false) }
 
     @objc private func revealMedia(_ sender: Any?) { pane?.reveal(media) }
     @objc private func relinkMedia(_ sender: Any?) { pane?.relink(media) }
@@ -664,10 +726,30 @@ extension NSPasteboard.PasteboardType {
     static let reelcutMedia = NSPasteboard.PasteboardType("com.kgalligan.reelcut.media")
 }
 
+/// What a drop onto a lane does about the room the clip needs (spec §6).
+///
+/// The modifiers are the timeline's own, read at the moment of the drop:
+/// none places the clip and lets the overlap rule refuse it, ⌥ makes room
+/// for it and ⇧⌥ takes the room it needs. ⌥ alone is free here — the
+/// duplicate-drag it means elsewhere is a gesture on a CLIP, and this drag
+/// starts in the media list.
+enum MediaDropMode: Equatable {
+    case add
+    case insert
+    case overwrite
+
+    /// The mode the modifiers currently held describe.
+    static func current(_ flags: NSEvent.ModifierFlags) -> MediaDropMode {
+        guard flags.contains(.option) else { return .add }
+        return flags.contains(.shift) ? .overwrite : .insert
+    }
+}
+
 /// Where a dragged media row landed.
 enum MediaDropTarget: Equatable {
-    /// A timeline track, at the time under the cursor.
-    case track(UInt32, Ticks)
+    /// A timeline track, at the time under the cursor, and what to do about
+    /// what is already there.
+    case track(UInt32, Ticks, MediaDropMode)
     /// The preview canvas: a new top track at the playhead (§4.3).
     case canvas
 }
@@ -713,7 +795,12 @@ extension TimelineView {
         let point = content.convert(sender.draggingLocation, from: nil)
         guard let row = layout.row(atY: point.y), let track = track(atRow: row)
         else { return false }
-        return session.drop(self, .track(track.id, max(layout.time(atX: point.x), 0)))
+        // `NSDraggingInfo` carries no modifiers, so the flags are read live —
+        // which is right anyway: what matters is what is held at the DROP.
+        let mode = MediaDropMode.current(
+            NSEvent.modifierFlags.intersection(.deviceIndependentFlagsMask))
+        return session.drop(
+            self, .track(track.id, max(layout.time(atX: point.x), 0), mode))
     }
 }
 

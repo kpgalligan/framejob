@@ -175,6 +175,38 @@ pub fn snap_to_frame(t: Ticks, fps: Fps) -> Ticks {
     }
 }
 
+/// The first frame boundary at or after `t` — [`snap_to_frame`] rounded
+/// UP rather than to the nearest.
+///
+/// A clamp BOUND cannot be rounded to the nearest frame the way a value
+/// can: rounding a lower bound down would let a caller land a frame outside
+/// what the bound was protecting. The two directional forms exist for
+/// exactly that, and `roll` is their first caller — its bounds come from
+/// floored source measurements and are not on the grid.
+pub fn snap_up_to_frame(t: Ticks, fps: Fps) -> Ticks {
+    let nearest = snap_to_frame(t, fps);
+    if nearest >= t {
+        return nearest;
+    }
+    match frame_index(nearest, fps).and_then(|index| tick_at_frame(index + 1, fps)) {
+        Some(next) => next,
+        None => t,
+    }
+}
+
+/// The last frame boundary at or before `t` — the mirror of
+/// [`snap_up_to_frame`], for an upper bound.
+pub fn snap_down_to_frame(t: Ticks, fps: Fps) -> Ticks {
+    let nearest = snap_to_frame(t, fps);
+    if nearest <= t {
+        return nearest;
+    }
+    match frame_index(nearest, fps).and_then(|index| tick_at_frame(index - 1, fps)) {
+        Some(previous) => previous,
+        None => t,
+    }
+}
+
 // ---- seconds -------------------------------------------------------------
 
 /// Seconds to ticks, rounded. A NaN or out-of-range input saturates rather

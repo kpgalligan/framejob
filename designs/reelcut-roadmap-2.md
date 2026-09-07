@@ -1,6 +1,6 @@
 # Reelcut — road map 2: beyond the spec
 
-**Status: nothing in this document is built.** Spec §10's three milestones
+**Status: phases 0 and 1 are built; the rest is not.** Spec §10's three milestones
 are done (`reelcut-roadmap.md` records how each was proved). This is the plan
 for what a capable editor still lacks, found by reading the op table, the
 menus, the key map and the code against the question "what does a cutter
@@ -63,8 +63,8 @@ implicit.
 
 | Phase | Theme | Sessions | Schema | Status |
 |---|---|---|---|---|
-| 0 | Groundwork | ½ | — | not started |
-| 1 | Cutting moves | 1–2 | — | not started |
+| 0 | Groundwork | ½ | — | **done** 2026-09-06 |
+| 1 | Cutting moves | 1–2 | — | **done** 2026-09-06 |
 | 2 | Clip identity | 1 | v3 | not started |
 | 3 | The screencast trio | 2 | v4 | not started |
 | 4 | Words | 2 | v5 | not started |
@@ -92,20 +92,52 @@ order works if that one dependency is kept.
   lines of type declarations, which is what it was meant to be, and
   Phases 2, 3, 4 and 6 can add their fields without breaking the
   "take something out first" rule.
+  **Landed** as `core/src/model_query.rs` (408 lines: `Project::new`, the
+  five id lookups, `allocate_id`, `clips_on`, `clips_on_track`, `duration`,
+  `source_length`, `is_missing_media`, `validate` and its nesting walk);
+  `model.rs` is 939. **One deviation: the serde defaults stayed.** A
+  `#[serde(default = "…")]` function is what an absent key MEANS, which is
+  schema, and moving 43 lines would have cost seven fully-qualified
+  `crate::model_query::…` paths and put `default_one()` in a module about
+  lookups. The size goal was met without them. When the schema does outgrow
+  the cap again — Phases 2, 3, 4 and 6 add about 145 lines between them —
+  the next cut is the §5.2 property types into a `model_props.rs`, which is
+  now written down in `core/CLAUDE.md`.
 - **README.** The "Inspector" bullet still describes six pinnable tabs and
   the tool count says 50; the chrome cleanup made it three tabs and the
   catalog is 57. Fix both, and leave the counts in ONE place each so the
   later phases update one line.
+  **Landed**: the Inspector bullet and the layout table now say three tabs
+  and name the section factories; the tools section names the ops but no
+  longer counts them — the count is `rc_op_names`' length and the catalog's,
+  which the startup parity check already compares, so a phase that adds an
+  op updates no number here. `import_captions`, `consolidate_media` and
+  `set_selection` were missing from the app-state table and are in it.
 - **Key-map ledger.** Add the proposed keys from §4 of this document to
   spec §9 as a "proposed" block, so a phase that binds a key checks it
   there and promotes the row.
+  **Landed**: spec §9 carries a second table, "Proposed, not yet bound",
+  with the phase number on every row. No conflict with the bound table was
+  found; `,` `.` `Z` and ⌥⌘E / ⇧⌘P / ⇧⌘R / ⌥⌘V / ⌘↓ / ⌘↑ are all free.
 - **Decide the `async` allow-list question** for Phase 4 (Speech) now, so
   that session does not open with a rules debate. Recommendation: the
   callback API, no new exception.
+  **Decided, as recommended**, and written into spec §11 and `app/CLAUDE.md`
+  so it is not reopened: `SFSpeechRecognizer`'s callback API is complete for
+  a transcription, so `Transcriber.swift` uses it. `SpeechAnalyzer` is
+  `async`-only and would earn the argument again — but only when the
+  deployment target moves, and then as one more named file.
 
 **Proof.** `make test`, `make lint`, `make typecheck` at baseline;
 `rc_op_names` unchanged; the v2 fixture opens; `git diff --stat` shows
 `model.rs` shrinking by what `model_query.rs` gained.
+
+**Proved** on 2026-09-06: `make lint` clean, `make test` 222 passed / 0
+failed (the schema-v1 and schema-v2 fixture tests among them), `make
+typecheck` 0 errors and the same 4 AVFoundation deprecation warnings.
+`edit.rs` was not touched, so `OP_NAMES` is the same 43. `git diff --stat`:
+`model.rs` −403, `model_query.rs` +408 (the difference is the new module
+doc and its imports).
 
 ---
 
@@ -152,6 +184,44 @@ close_gap — it is the ripple family's home and has room),
 `EditorViewController+Edge.swift`, `MediaPane.swift` (menu + drop
 modifiers), `AppDelegate.swift`, two `case` lines in the frozen key switch.
 
+**What landed.** All six ops, both gestures, all three keys, and one thing
+the plan did not foresee: the Edit-menu pair needs a media SELECTION, which
+the app did not have. `ProjectDocument.selectedMedia` is now the fourth
+piece of view state beside the playhead, the clip selection and the in/out
+range — clamped by `clampViewState` like the others, set by
+`MediaRowView.mouseDown`, drawn by the row, and stored on the DOCUMENT
+because `MediaPane` is rebuilt whole whenever the media list changes.
+
+Three deviations, all small and all deliberate:
+
+- **`close_gap` and `insert_clip` both refuse on a locked `track`.** The plan
+  did not say. For `close_gap`, its own clips are the ones that would not
+  move, so closing a gap on a locked track by shifting every OTHER track is
+  not what anyone asked for. For `insert_clip`, `insert_time` will not shift
+  a locked track at all, so the room the op promises cannot be made there —
+  and leaving that to `add_clip` to notice would have refused only where the
+  locked track happened to hold something at `at`, and quietly added a clip
+  to a locked track everywhere else. `overwrite_clip` deliberately does NOT
+  refuse: the caller named the track, exactly as `ripple_delete` removes the
+  clips it was given, and a lock decides only what may shift, which for an
+  overwrite is nothing.
+- **The overlap check after `close_gap`'s shift is per touched track**, not
+  timeline-wide: a rule violation on a track nothing moved on is not this
+  op's to report, and refusing over one would make a gap uncloseable for a
+  reason the user cannot see.
+- **`ripple_delete_range` was refactored onto the same two helpers as
+  `lift_range`** (`ordered_range`, `clear_range`), so the two cut
+  identically and differ only in the shift. The alternative was a second
+  spelling of "split both bounds and drop the middles".
+
+Two pieces of shared arithmetic moved rather than being copied:
+`content_length` went from `edit_clip.rs` to `model_query.rs` and
+`source_head` was extracted out of `trim_start`'s body, so the three
+measurements of a source window — head, window, remaining — have one home
+and a slip and a trim cannot disagree about where a media ends.
+`whole_media_length` came out of `add_clip` for the same reason: the room an
+insert opens is the room `add_clip` would have needed.
+
 **Proof.**
 - `slip` by `+d` then `−d` is the identity; a slip past the source head
   clamps and reports the clamp as `None` when nothing moved.
@@ -166,6 +236,99 @@ modifiers), `AppDelegate.swift`, two `case` lines in the frozen key switch.
   before, on every track; `overwrite_clip`: frames outside the span are
   byte-identical before and after.
 - Each key and gesture is one undo step (`undo` over MCP restores the frame).
+
+**Proved** on 2026-09-06, and again after the review round below. Core:
+`make test` **251 passed / 0 failed** — 222 before, plus `core/tests/edge.rs`
+(16), `core/tests/insert.rs` (10) and three in `edit_tests.rs` for
+`lift_range` and `close_gap`. `make lint` clean, `make typecheck` 0 errors
+and the same 4 AVFoundation deprecation warnings. The identity claims are
+whole-document byte comparisons, not field checks: slip-and-back and
+roll-and-back both reproduce the input JSON exactly.
+
+App: driven over MCP against `make app`'s binary — **66/66 checks**, and the
+script is in the repo at `tools/proof/phase1_proof.py` so it can be re-run
+after a later phase rather than believed on the strength of this paragraph.
+The catalog is 63 tools and the startup parity check passed. Every frame claim is a byte comparison of `render_frame`
+PNGs against ffmpeg-generated test cards:
+
+- Slip: the frame at 3 s after a `+2 s` slip is byte-identical to the frame
+  that was at 5 s; there and back is byte-identical to the start; the window
+  travels exactly the 4 s a 6 s clip of a 10 s media has, and then reports
+  no change.
+- Roll: the frames at 6 s − 1 frame and at 8 s are byte-identical before and
+  after — **a roll moves the cut, not the film** — while the frame at
+  8 s − 1 frame changes, because that is the tick the cut crossed. The
+  pair's outer edges and total length are unchanged; `undo` restores the
+  frame. A roll across a gap changes nothing.
+- Lift: the clip after the range is untouched and its frame is byte-identical;
+  the range renders as the canvas background, byte-identical to a span that
+  was always empty. The same range through `ripple_delete_range` moves that
+  clip, which is the whole difference between the two.
+- Close gap: the next clip lands on the gap's start, a locked track's clips
+  do not move, and the three refusals (no gap, a time on a clip, a locked
+  track) all report no change.
+- Insert: the frame at `at + len` after is byte-identical to the frame at
+  `at` before, on the destination track AND on another one; a straddler on
+  another track is neither cut nor moved.
+- Overwrite: frames before the span and on other tracks are byte-identical,
+  the frame inside it is the new clip, and no other track moved at all.
+- Every op is one undo step: `undo` restores both the placements and the
+  frame bytes.
+
+Not machine-checked, for the reason spec §10 gives about steps 6 and 8: the
+two ⌥⇧ drags, the `,` / `.` nudge, the ⌫-with-a-range lift, the empty-lane
+double-click, the ⌥-click on a track header and the ⌥ / ⇧⌥ drop are
+event-driven UI. Their ops are proved above and their wiring typechecks; a
+person at the machine is what is left.
+
+**Reviewed, and five real defects fixed.** The change was then read by a
+fan-out of reviewers — correctness, the core's rules, the app's rules, the
+gestures, the MCP mirror and the docs, one per dimension — with every
+finding put to three sceptics prompted to refute it. Thirty-one survived.
+The five that were code, each now covered by a test that fails without the
+fix:
+
+1. **`whole_media_length` handed back an unsnapped constant.** Five seconds
+   is 3 000 000 ticks, and 3 000 000 is not on the frame grid of a rate that
+   does not divide the timescale — at 30000/1001 it is 3 003 000. So an
+   image with no duration of its own made `overwrite_clip` clear a span that
+   missed the fragment `split_clips` had just cut, the fragment survived,
+   the new clip landed on top of it, and the overlap rule refused the whole
+   op: **every overwrite of an imported still on a /1001 timeline was a
+   silent no-op**, and every insert of one opened a hole a sliver wider than
+   the clip it placed. `MediaImporter` writes `duration: 0` for every image,
+   so this was the ordinary case, not a corner.
+2. **`slip` answered `Ok(None)` for a text clip** when the delta rounded to
+   nothing, because the zero-delta short circuit ran before the source-kind
+   check — the one answer the non-media rule exists to stop the MCP agent
+   being given.
+3. **`roll` clamped a snapped `to` to UNSNAPPED bounds.** Both source bounds
+   are floored divisions by a clip's speed, so a clamped roll could write a
+   sub-frame time into two clips at once. `time.rs` gained the directional
+   pair a bound needs — `snap_up_to_frame` and `snap_down_to_frame` — since
+   a lower bound rounded to the nearest frame lets a caller past what it
+   protects.
+4. **`insert_clip` did not check the destination lock**, so an insert at a
+   point where the locked track happened to be empty succeeded, adding a
+   clip to a locked track and rippling every unlocked one.
+5. **The bare-⌫ menu item had no "text is being edited" guard.** The item is
+   a modifier-less key equivalent, which AppKit resolves ahead of the first
+   responder; `AppDelegate`'s own comment on it asks for exactly this guard
+   and nothing had ever supplied one. Widening the item to "selection OR
+   range" made it worse, so the guard went in.
+
+The rest were a snap guide computed and never drawn (a roll was the one
+snapping gesture with no snap line), `selectedMedia` missing from the two
+view-state resets on the read path, the row menu and the Edit menu
+targeting different tracks under the same name (`targetTrack` moved to
+`ProjectDocument`, so there is one rule), four doc statements that had gone
+false, two handler comments naming selectors that do not exist, and seven
+gaps in the tests: `roll` was never run at a speed other than 1, never on a
+sourceless pair, `close_gap`'s and `insert_clip`'s lock guards were both
+satisfied by a different code path, `overwrite_clip` on a locked track was
+untested, `close_gap`'s `set_gained_transitions` branch was never taken, and
+two of the MCP proof's cross-track frame checks were hashing a flat green
+picture, which is the same at every time and could not have failed.
 
 ---
 

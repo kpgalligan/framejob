@@ -48,8 +48,9 @@ new and yours.
 ```
 core/                Rust staticlib — the model, the ops, the plan, the recipe,
   include/…_core.h     export settings, the generic MCP server. THE FFI CONTRACT
-  src/                 model time edit(+_clip/_props/_track/_time) actions
-                       transition evaluate audio snap format export agent ffi*
+  src/                 model(+_query) time edit(+_clip/_edge/_insert/_props/
+                       _track/_time) actions transition evaluate audio snap
+                       format export agent ffi*
   tests/               black-box, through the FFI (core/CLAUDE.md)
 app/
   Sources/             AppKit app, programmatic UI (app/CLAUDE.md has the map)
@@ -57,6 +58,7 @@ app/
   Bridging/            the bridging header importing core/include/reelcut_core.h
 designs/             reelcut-design.md — normative spec;
                      design_handoff_reelcut/ — the shipped chrome + identity
+tools/proof/         the MCP client and the per-phase proof scripts
 project.yml          xcodegen definition; Makefile; README.md (user-facing)
 ```
 
@@ -105,12 +107,18 @@ make app
 
 The log line names the port it actually bound (a taken port falls back to an
 ephemeral one). Then drive it with any MCP client over streamable HTTP at
-`http://127.0.0.1:<port>/mcp` — 57 tools: one per §6 op (43) plus `open_project`,
+`http://127.0.0.1:<port>/mcp` — 63 tools: one per §6 op (49) plus `open_project`,
 `new_project`, `save_project`, `get_project`, `import_media`, `import_captions`,
 `consolidate_media`, `set_playhead`, `set_range`, `set_selection`, `undo`, `redo`,
 `render_frame` and `export`.
 `render_frame` writes a PNG and returns its path, so a script can diff it
 against `ffmpeg`-extracted source frames; `export` waits for the file.
+
+**`tools/proof/` holds the scripts that do this**, one per road-map-2 phase,
+over a dependency-free MCP client (`mcp.py`). Its README says how to make the
+test media and run one; every claim in them is a placement read back through
+`get_project` or a BYTE comparison of two rendered PNGs. Add the next
+phase's proof there rather than writing a throwaway.
 
 Spec §10's per-step verifications are the acceptance tests. Steps 3, 4, 5, 7,
 9, 10, 11 and 12 have been run against a built app and passed; 1 and 2 are
@@ -272,5 +280,55 @@ package, so the harness has to set them itself.
   sketches (merging would delete every per-section Reset), and the transport
   buttons are 34 pt rather than 30, because SF Symbols' `backward` measures
   exactly 30 pt at the 19 pt the same document asks for.
+
+- **Road map 2, phase 0 — Groundwork: done.** `core/src/model_query.rs` took
+  the lookups, `Project::new`, `validate` and the source-window arithmetic
+  (`content_length`, `source_head`, `source_length` — the three measurements
+  every placement op clamps against) out of `model.rs`, which is now the
+  schema and its serde defaults and nothing else. The README's stale counts
+  went with it, spec §9 grew a "proposed, not yet bound" table so a phase
+  that binds a key checks for a conflict first, and spec §11 records the
+  decision that speech recognition does NOT earn a second `async` exception.
+- **Road map 2, phase 1 — Cutting moves: done.** Six ops, two gestures,
+  three keys, no schema change.
+  `core/src/edit_edge.rs` holds **`slip`** (the source slides under a fixed
+  clip; a `still` moves the frame it holds; any other source is an `Err`
+  under the non-media rule, which the module doc of `edit.rs` now states in
+  four names rather than three) and **`roll`** (the hard cut moves and
+  nothing else does; the predecessor is whatever ends EXACTLY at the clip's
+  start, so a gap or an overlap refuses). `core/src/edit_insert.rs` holds
+  **`insert_clip`** and **`overwrite_clip`**, both compositions of
+  `split_clips` + `insert_time` + `add_clip` made one op so a drop is one
+  undo step — and because the composition carries a rule neither half states:
+  an insert cuts only the DESTINATION track and then shifts every unlocked
+  one. `edit_time.rs` gained **`lift_range`** (the range cut with the hole
+  left open) and **`close_gap`**, which refuses rather than closing part of
+  the way; its `ripple_delete_range` was refactored onto the same
+  `ordered_range` + `clear_range` pair, so a lift and a ripple cut
+  identically and differ only in the shift.
+  UI: ⌥⇧-drag a body slips and ⌥⇧-drag an edge rolls (`SlipSession` /
+  `RollSession` in `TimelineSessions.swift`, begun from
+  `EditorViewController+Edge.swift` because `TimelineView.swift` is frozen —
+  `dragSnapper` and `makeSnapper` became internal for it, and both cases
+  short-circuit BEFORE `selectClip`, which would read the ⇧ as "toggle
+  membership" and drop the clip out of the selection on its way into its own
+  slip). `,` / `.` nudge by a frame, ⇧ by ten (both `,` and `<` are matched,
+  since `charactersIgnoringModifiers` keeps Shift applied). ⌫ with a range
+  and nothing selected LIFTS — the Delete menu item's validation had to move
+  out of its group for it, because a modifier-less key equivalent is
+  resolved ahead of the first responder. Double-clicking an empty lane span
+  closes that gap; Clip ▸ Close Gap does the playhead's.
+  Insert / overwrite are reachable four ways: Edit ▸ Insert at Playhead and
+  Overwrite at Playhead, the Media row's context menu, and an ⌥ / ⇧⌥ drop
+  (`MediaDropMode`, read from `NSEvent.modifierFlags` at the drop, since
+  `NSDraggingInfo` carries none). The Edit-menu pair needed a media
+  SELECTION, which the app did not have: `ProjectDocument.selectedMedia` is
+  the fourth piece of view state, clamped like the other three, drawn by
+  `MediaRowView` and stored on the document because `MediaPane` is rebuilt
+  whole whenever the media list changes.
+  Measured: `core/tests/edge.rs` (12) and `core/tests/insert.rs` (7) plus
+  three in `edit_tests.rs`; slip-and-back and roll-and-back compare whole
+  documents byte for byte, and the insert/overwrite tests assert on what did
+  NOT move as much as on what did.
 
 Keep this file current as code lands.

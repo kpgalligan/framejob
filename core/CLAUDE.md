@@ -7,8 +7,15 @@ lockstep are in the root `CLAUDE.md`; the full design is
 ## Module map
 
 - `lib.rs` — module declarations and re-exports only. No implementation code.
-- `model.rs` — the spec §5.2 types with serde derives, id allocation,
-  lookups, and `validate`. The struct field names ARE the JSON keys.
+- `model.rs` — the spec §5.2 types with serde derives and the serde
+  defaults that say what an absent key means. The struct field names ARE
+  the JSON keys, and the file is only the schema.
+- `model_query.rs` — reading a project: `Project::new`, id allocation, the
+  `clip`/`track`/`media`/`marker`/`nest` lookups, `clips_on`,
+  `is_missing_media`, `duration`, `validate` with its nesting walk, and the
+  three source-window measurements every placement op clamps against —
+  `source_head` (what lies before the window), `content_length` (the window)
+  and `source_length` (what a window starting at `in` could grow to).
 - `time.rs` — `Ticks`, `TIMESCALE`, `Fps`, frame snapping, timecode
   format/parse (non-drop `HH:MM:SS:FF` and `HH:MM:SS.mmm`).
 - `edit.rs` — the op enum + serde and `apply`. **Its module doc IS the op
@@ -18,6 +25,14 @@ lockstep are in the root `CLAUDE.md`; the full design is
   §6 ops in `impl Project` blocks: clip placement; the four property patches
   with the range checks that police them; tracks, markers, canvas, media;
   ripple, insert time, range delete, freeze frame.
+- `edit_edge.rs` / `edit_insert.rs` — the cutting moves that keep something
+  fixed on purpose: `slip` and `roll` (the clip's place, and the pair's
+  outer edges), `insert_clip` and `overwrite_clip` (the other tracks, and
+  the whole timeline's length). `edit_edge.rs` clamps against
+  `model_query.rs`'s three source measurements rather than restating them;
+  `edit_insert.rs` takes its one length from `edit_clip.rs`'s
+  `whole_media_length`, which is the length `add_clip` itself uses, so the
+  room an insert opens is exactly the room the clip needs.
 - `edit_action.rs` / `edit_nest.rs` / `edit_paste.rs` — the ops with a
   concern of their own: the action ops and their no-overlap rule; `nest` and
   `unnest`; `paste`, which has to make another document's clips fit.
@@ -62,13 +77,16 @@ banner section is the signal to split. Every module keeps a `//!` doc;
 numeric/algorithmic choices get prose "why" comments.
 
 Two modules are over the cap today and are known debt, not licence:
-`edit_clip.rs` (~1220 — the placement ops are one concern and every further
+`edit_clip.rs` (~1200 — the placement ops are one concern and every further
 cut fragments it; the action ops were the M3 cut, into `edit_action.rs`) and
-`model.rs` (~1330 — almost all of it is the §5.2 type declarations, and
-splitting the schema across two files would cost more than it saves).
-Do not add to either without taking something out. `evaluate.rs` came off
-the list the same way: nest evaluation grew it past 870, so the recipe half
-moved to `recipe.rs` and the nest walk to `nest.rs`.
+`model.rs` (~940 — almost all of it is §5.2 type declarations). Do not add
+to either without taking something out: a new placement op goes in a new
+module (`edit_edge.rs`, `edit_insert.rs`), and the next cut in `model.rs`,
+which the schema will need within a phase or two, is the §5.2 property
+types (`VideoProps` and its friends) into a `model_props.rs`. `model.rs`
+came DOWN from 1330 when the lookups and `validate` moved to
+`model_query.rs`; `evaluate.rs` came off the list the same way, its recipe
+half moving to `recipe.rs` and the nest walk to `nest.rs`.
 
 **One implementation per algorithm.** Before writing time math, find the
 existing implementation and route through it. Shared constants have exactly

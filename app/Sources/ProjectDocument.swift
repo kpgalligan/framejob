@@ -73,6 +73,33 @@ final class ProjectDocument: NSDocument {
     /// ripple-delete-range and export.
     var inOutRange: (start: Ticks, end: Ticks)?
 
+    /// The track a command with no track argument of its own acts on: the
+    /// first selected clip's, else the front-most (`tracks` is back to
+    /// front, so the last is the front).
+    ///
+    /// It lives here because two commands with the SAME NAME read it — Edit
+    /// ▸ Insert at Playhead and the media row's own Insert at Playhead —
+    /// and the row cannot reach the editor. Two spellings of the rule would
+    /// let one menu item land the clip on a different track from the other.
+    var targetTrack: UInt32? {
+        let snapshot = project.snapshot
+        if let clip = snapshot.clips.first(where: { selection.contains($0.id) }) {
+            return clip.track
+        }
+        return snapshot.tracks.last?.id
+    }
+
+    /// The Media tab's selected row, if any — what Edit ▸ Insert at Playhead
+    /// and Overwrite at Playhead place.
+    ///
+    /// It lives here rather than on `MediaPane` because the pane is rebuilt
+    /// wholesale whenever the media list changes (`structureSignature`), so
+    /// per-row state does not survive an import; and because the editor
+    /// cannot reach the pane instance — `InspectorViewController.panes` is
+    /// private. Like the other three, it is view state: not undoable, not
+    /// persisted, and re-clamped to ids that still exist.
+    var selectedMedia: UInt32?
+
     // MARK: - Types
 
     /// The package UTI, exported by project.yml.
@@ -295,6 +322,7 @@ final class ProjectDocument: NSDocument {
         playhead = 0
         selection = []
         inOutRange = nil
+        selectedMedia = nil
     }
 
     /// Points missing media at the package's own `media/` directory when the
@@ -358,6 +386,7 @@ final class ProjectDocument: NSDocument {
         playhead = 0
         selection = []
         inOutRange = nil
+        selectedMedia = nil
     }
 
     /// Builds the project one imported file becomes. The canvas takes the
@@ -995,6 +1024,11 @@ final class ProjectDocument: NSDocument {
         let ids = Set(project.snapshot.clips.map { $0.id })
         if !selection.isEmpty {
             selection.formIntersection(ids)
+        }
+        if let media = selectedMedia,
+            !project.snapshot.media.contains(where: { $0.id == media })
+        {
+            selectedMedia = nil
         }
         playhead = max(0, playhead)
     }

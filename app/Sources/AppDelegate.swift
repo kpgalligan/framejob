@@ -240,11 +240,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
                 "Ripple Delete", #selector(EditorViewController.rippleDeleteClips(_:)),
                 "\u{8}", [.command]))
         menu.addItem(.separator())
+        // The two placement edits for the Media tab's selected file. No key
+        // equivalent: they are reached often enough from the row's own
+        // context menu and from an ⌥ / ⇧⌥ drop, and the letters a cutter
+        // expects for them (F and D) are both taken.
+        menu.addItem(
+            item(
+                "Insert at Playhead", #selector(EditorViewController.insertMediaAtPlayhead(_:))))
+        menu.addItem(
+            item(
+                "Overwrite at Playhead",
+                #selector(EditorViewController.overwriteMediaAtPlayhead(_:))))
+        menu.addItem(.separator())
         menu.addItem(item("Select All", #selector(EditorViewController.selectAll(_:)), "a"))
         menu.addItem(
             item(
                 "Select After Playhead", #selector(EditorViewController.selectAfterPlayhead(_:)),
                 "a", [.command, .option]))
+        menu.addItem(
+            item(
+                "Select All on Track", #selector(EditorViewController.selectAllClipsOnTrack(_:))))
         return menu
     }
 
@@ -272,6 +287,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
                 "Add Action", #selector(EditorViewController.addActionAtPlayhead(_:)), "k",
                 [.command, .option]))
         menu.addItem(item("Speed…", #selector(EditorViewController.showSpeedSheet(_:))))
+        menu.addItem(
+            item("Close Gap", #selector(EditorViewController.closeGapAtPlayhead(_:))))
         menu.addItem(submenuItem(transitionMenu()))
         menu.addItem(.separator())
         menu.addItem(item("Nest", #selector(EditorViewController.nestClips(_:)), "g"))

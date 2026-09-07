@@ -49,7 +49,8 @@
 use serde::Serialize;
 
 use crate::format::MAX_NEST_DEPTH;
-use crate::model::{clips_on, Canvas, Clip, Nest, Project, Source, Track, VideoProps};
+use crate::model::{Canvas, Clip, Nest, Project, Source, Track, VideoProps};
+use crate::model_query::clips_on;
 use crate::time::Ticks;
 
 /// One nest clip on the way down to an instance: what it shows, where it

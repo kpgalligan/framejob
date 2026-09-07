@@ -96,6 +96,8 @@ final class TimelineView: NSView, NSTextFieldDelegate {
 
     var clipDrag: ClipDragSession?
     var trim: TrimSession?
+    var slip: SlipSession?
+    var roll: RollSession?
     var marquee: RangeSession?
     var scrub: PlayheadSession?
     var markerDrag: MarkerDragSession?
@@ -113,7 +115,10 @@ final class TimelineView: NSView, NSTextFieldDelegate {
     /// `add_track` would renumber the rows mid-drag).
     private var dragHeights: [UInt32: CGFloat] = [:]
     private var dragRowHeights: [CGFloat] = []
-    private var dragSnapper = TimelineSnapper(
+    /// Internal, not private, because `EditorViewController+Edge.swift`
+    /// builds the slip and roll sessions from there (the same reason
+    /// `TimelineBar.swift` forced the toolbar controls internal).
+    var dragSnapper = TimelineSnapper(
         fps: .thirty, candidates: [], threshold: 1, enabled: false)
 
     /// The ghost drawn while a refused drop springs back (spec §4.4).
@@ -425,7 +430,7 @@ final class TimelineView: NSView, NSTextFieldDelegate {
 
     /// Everything a session needs to snap, built once per gesture so the
     /// candidate list is not re-fetched from the core on every mouse-moved.
-    private func makeSnapper(excluding clips: [UInt32], suppressed: Bool) -> TimelineSnapper {
+    func makeSnapper(excluding clips: [UInt32], suppressed: Bool) -> TimelineSnapper {
         let core = onSnapCandidates?(clips) ?? []
         return TimelineSnapper(
             fps: snapshot.canvas.fps,
@@ -469,6 +474,10 @@ final class TimelineView: NSView, NSTextFieldDelegate {
                 renameTrack(track, row: row)
                 break
             }
+            if flags.contains(.option) {
+                selectClipsOnTrack(track.id)
+                break
+            }
             trackDrag = TrackDragSession(
                 track: track.id, originalRow: row, trackCount: snapshot.tracks.count, row: row)
 
@@ -476,10 +485,21 @@ final class TimelineView: NSView, NSTextFieldDelegate {
             toggleHeader(button, row: row)
 
         case .clip(let id):
+            // ⌥⇧ before the selection, deliberately: `selectClip` reads ⇧ as
+            // "toggle membership" and would drop the clip out of the
+            // selection on the way into its own slip.
+            if flags.contains(.option), flags.contains(.shift) {
+                beginSlip(id, at: point, flags: flags)
+                break
+            }
             selectClip(id, flags: flags)
             beginClipDrag(anchor: id, at: point, flags: flags)
 
         case .clipEdge(let id, let edge):
+            if flags.contains(.option), flags.contains(.shift) {
+                beginRoll(id, edge: edge, flags: flags)
+                break
+            }
             selectClip(id, flags: flags)
             beginTrim(id, edge: edge, flags: flags)
 
@@ -491,7 +511,14 @@ final class TimelineView: NSView, NSTextFieldDelegate {
                 length: edge == .start ? props.fadeIn : props.fadeOut)
             onLiveBegin?()
 
-        case .lane(_, _):
+        case .lane(let row, let time):
+            // A double-click in empty lane space closes the gap it landed
+            // in. The single click AppKit delivered first started and ended
+            // a marquee, which registers nothing.
+            if clicks == 2 {
+                closeGap(row: row, at: time)
+                break
+            }
             if !flags.contains(.shift), !selection.isEmpty {
                 selection = []
                 onSelectionChanged?(selection)
@@ -531,6 +558,14 @@ final class TimelineView: NSView, NSTextFieldDelegate {
             session.update(time: time, snapper: dragSnapper)
             trim = session
             onLiveUpdate?([session.op])
+        } else if var session = slip {
+            session.update(time: time)
+            slip = session
+            onLiveUpdate?([session.op])
+        } else if var session = roll {
+            session.update(time: time, snapper: dragSnapper)
+            roll = session
+            onLiveUpdate?([session.op])
         } else if var session = markerDrag {
             session.update(time: time, snapper: dragSnapper)
             markerDrag = session
@@ -566,6 +601,12 @@ final class TimelineView: NSView, NSTextFieldDelegate {
         } else if let session = trim {
             trim = nil
             onLiveEnd?(session.isRateStretch ? "Rate Stretch" : "Trim Clip")
+        } else if slip != nil {
+            slip = nil
+            onLiveEnd?("Slip")
+        } else if roll != nil {
+            roll = nil
+            onLiveEnd?("Roll")
         } else if markerDrag != nil {
             markerDrag = nil
             onLiveEnd?("Move Marker")
@@ -686,6 +727,17 @@ final class TimelineView: NSView, NSTextFieldDelegate {
               (0..<base.tracks.count).contains(session.row)
         else { return nil }
         return base.tracks[base.tracks.count - 1 - session.row].id
+    }
+
+    /// ⌥-click a track header: every clip on it (spec §9). Here rather than
+    /// in `EditorViewController+Edge.swift` only because `selection` is
+    /// `private(set)` — it is the same view-state channel `selectClip` and
+    /// the marquee use, and registers no undo step.
+    private func selectClipsOnTrack(_ track: UInt32) {
+        let ids = Set(snapshot.clips.filter { $0.track == track }.map { $0.id })
+        guard selection != ids else { return }
+        selection = ids
+        onSelectionChanged?(selection)
     }
 
     private func selectClip(_ id: UInt32, flags: NSEvent.ModifierFlags) {
@@ -1155,7 +1207,9 @@ final class TimelineContentView: NSView {
             NSBezierPath(rect: rect.insetBy(dx: 0.5, dy: 0.5)).stroke()
         }
 
-        let guide = owner.clipDrag?.guide ?? owner.trim?.guide ?? owner.markerDrag?.guide
+        let guide =
+            owner.clipDrag?.guide ?? owner.trim?.guide ?? owner.roll?.guide
+            ?? owner.markerDrag?.guide
         if let guide = guide {
             DS.snapGuide.setFill()
             NSRect(x: layout.x(for: guide) - 0.5, y: 0, width: 1, height: bounds.height).fill()

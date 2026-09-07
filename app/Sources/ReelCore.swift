@@ -597,6 +597,40 @@ extension ReelOp {
         addShapeClip(track: track, at: at, duration: duration, shape: ShapePatch(kind: shape))
     }
 
+    /// The insert edit: makes room for the whole media at `at` on `track`
+    /// — the clip `at` is inside on that track is cut first, then every
+    /// unlocked track opens by the media's length — and places it. One op,
+    /// so one undo step and one MCP tool. Refuses when the clip could not
+    /// be placed after the room was made (a locked destination track);
+    /// errors on an unknown track or media, or a media with no duration.
+    static func insertClip(track: UInt32, media: UInt32, at: Ticks) -> ReelOp {
+        var a = OpArgs()
+        a.put("track", track)
+        a.put("media", media)
+        a.put("at", at)
+        return ReelOp(name: "insert_clip", args: a.values)
+    }
+
+    /// The overwrite edit: takes the room instead of making it. The span
+    /// the media needs is cleared on `track` ALONE — cut at both bounds,
+    /// the middles removed — and nothing shifts.
+    ///
+    /// A LOCKED destination is cleared like any other: the caller named the
+    /// track, exactly as `rippleDelete` removes the clips it was given, and
+    /// a lock decides only what may SHIFT — which here is nothing. That is
+    /// the one place this differs from `insertClip`, which refuses on a
+    /// locked track because the room it promises cannot be made there.
+    /// Refuses when the clip could not be placed after the span was
+    /// cleared; errors on an unknown track or media, or a media with no
+    /// duration.
+    static func overwriteClip(track: UInt32, media: UInt32, at: Ticks) -> ReelOp {
+        var a = OpArgs()
+        a.put("track", track)
+        a.put("media", media)
+        a.put("at", at)
+        return ReelOp(name: "overwrite_clip", args: a.values)
+    }
+
     /// Every op name the core accepts, in the order of its table
     /// (`OP_NAMES` in `core/src/edit.rs`), read through the FFI rather than
     /// copied into Swift: a copy is one more spelling to drift, and the one
@@ -643,6 +677,29 @@ extension ReelOp {
         return ReelOp(name: "rate_stretch", args: a.values)
     }
 
+    /// ⌥⇧-drag on a clip body: the source slides under a fixed clip.
+    /// `delta` is TIMELINE ticks and the source moves by `delta × speed`;
+    /// the start and duration do not move at all. Clamped inside the media,
+    /// and a delta the clamps reduce to nothing is a refusal. A `still`
+    /// moves the frame it holds; any other source is an error.
+    static func slip(clip: UInt32, delta: Ticks) -> ReelOp {
+        var a = OpArgs()
+        a.put("clip", clip)
+        a.put("delta", delta)
+        return ReelOp(name: "slip", args: a.values)
+    }
+
+    /// ⌥⇧-drag on a clip edge: the hard cut between this clip and the one
+    /// ending exactly at its start moves to `to`, and nothing else does.
+    /// Refuses without a hard cut there — a gap, or an overlap, whose
+    /// length is `setTransitionDuration`'s.
+    static func roll(clip: UInt32, to: Ticks) -> ReelOp {
+        var a = OpArgs()
+        a.put("clip", clip)
+        a.put("to", to)
+        return ReelOp(name: "roll", args: a.values)
+    }
+
     /// Splits at `at`. OMITTING `clips` entirely — not passing a flag — is
     /// what means "every unlocked clip under the playhead", the
     /// ⌘T-with-no-selection case: the core's `Op::Split` carries
@@ -680,6 +737,15 @@ extension ReelOp {
         return ReelOp(name: "ripple_delete_range", args: a.values)
     }
 
+    /// The same cut without the close: ⌫ with a range and nothing
+    /// selected. Every clip after the range keeps the moment it had.
+    static func liftRange(from: Ticks, to: Ticks) -> ReelOp {
+        var a = OpArgs()
+        a.put("from", from)
+        a.put("to", to)
+        return ReelOp(name: "lift_range", args: a.values)
+    }
+
     /// Shifts every unlocked clip starting at or after `at` right by
     /// `length`; straddling clips stay put.
     static func insertTime(at: Ticks, length: Ticks) -> ReelOp {
@@ -687,6 +753,18 @@ extension ReelOp {
         a.put("at", at)
         a.put("length", length)
         return ReelOp(name: "insert_time", args: a.values)
+    }
+
+    /// Closes the empty span on `track` that contains `at`, shifting
+    /// everything past it left across every unlocked track. Refuses on a
+    /// locked track, on an `at` that is on a clip, with nothing after the
+    /// gap, and when the shift would break the overlap rule — a gap closes
+    /// fully or not at all.
+    static func closeGap(track: UInt32, at: Ticks) -> ReelOp {
+        var a = OpArgs()
+        a.put("track", track)
+        a.put("at", at)
+        return ReelOp(name: "close_gap", args: a.values)
     }
 
     /// Media sources only; actions keep their clip-relative fraction.
