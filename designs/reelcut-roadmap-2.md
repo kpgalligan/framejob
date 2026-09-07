@@ -1,8 +1,7 @@
 # Reelcut — road map 2: beyond the spec
 
-**Status: phases 0, 1 and 2 are done (`4fb72c6` for the first two; phase 2
-on 2026-09-07, its hash added by the commit after it, as `4d28518` did for
-those); the rest is not. Pick up at phase 3.** Spec §10's three milestones are done
+**Status: phases 0, 1 and 2 are done (`4fb72c6`, `c1b5188`); the rest is
+not. Pick up at phase 3.** Spec §10's three milestones are done
 (`reelcut-roadmap.md` records how each was proved). This is the plan for
 what a capable editor still lacks, found by reading the op table, the menus,
 the key map and the code against the question "what does a cutter reach for
@@ -90,7 +89,7 @@ fails without the fix. Green tests prove the cases someone thought of.
 |---|---|---|---|---|
 | 0 | Groundwork | ½ | — | **done** 2026-09-06 (`4fb72c6`) |
 | 1 | Cutting moves | 1–2 | — | **done** 2026-09-06 (`4fb72c6`) |
-| 2 | Clip identity | 1 | v3 | **done** 2026-09-07 |
+| 2 | Clip identity | 1 | v3 | **done** 2026-09-07 (`c1b5188`) |
 | 3 | The screencast trio | 2 | v4 | not started |
 | 4 | Words | 2 | v5 | not started |
 | 5 | Sound | 1–2 | — | not started |
