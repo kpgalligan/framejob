@@ -365,7 +365,11 @@ final class OptionPopupControl: NSView, OptionControl {
 
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
-        trackingAreas.forEach(removeTrackingArea)
+        // Owner-filtered: a blanket removal takes `NSToolTipManager`'s area
+        // with it and no tooltip on this control ever appears again — the
+        // pitfall is written out in `Controls.swift`'s
+        // `StickerButton.updateTrackingAreas`.
+        for area in trackingAreas where area.owner === self { removeTrackingArea(area) }
         addTrackingArea(
             NSTrackingArea(
                 rect: bounds, options: [.mouseEnteredAndExited, .activeInKeyWindow],
@@ -621,7 +625,15 @@ final class OptionSegmentedControl: NSView, OptionControl, NSViewToolTipOwner {
 
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
-        trackingAreas.forEach(removeTrackingArea)
+        // Owner-filtered, as everywhere else (the pitfall is written out in
+        // `Controls.swift`'s `StickerButton.updateTrackingAreas`). The
+        // per-segment tooltips below are safe either way: `addToolTip` takes an
+        // `NSViewToolTipOwner` for the STRING, but the tracking area it
+        // installs is owned by `NSToolTipManager` like any other tooltip
+        // (measured) — so this filter never sees them, and the
+        // `removeAllToolTips()` + re-add pair remains the one thing that keeps
+        // the cell rects in step with a resize.
+        for area in trackingAreas where area.owner === self { removeTrackingArea(area) }
         addTrackingArea(
             NSTrackingArea(
                 rect: bounds,
@@ -872,7 +884,10 @@ final class OptionButtonControl: NSView, OptionControl {
 
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
-        trackingAreas.forEach(removeTrackingArea)
+        // Owner-filtered — the pitfall is in `Controls.swift`'s
+        // `StickerButton.updateTrackingAreas`. This control's tooltip is the
+        // Media tab's "what Consolidate… does", among others.
+        for area in trackingAreas where area.owner === self { removeTrackingArea(area) }
         addTrackingArea(
             NSTrackingArea(
                 rect: bounds, options: [.mouseEnteredAndExited, .activeInKeyWindow],
@@ -1008,7 +1023,9 @@ final class MoreButton: NSView {
 
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
-        trackingAreas.forEach(removeTrackingArea)
+        // Owner-filtered — the pitfall is in `Controls.swift`'s
+        // `StickerButton.updateTrackingAreas`.
+        for area in trackingAreas where area.owner === self { removeTrackingArea(area) }
         addTrackingArea(
             NSTrackingArea(
                 rect: bounds, options: [.mouseEnteredAndExited, .activeInKeyWindow],

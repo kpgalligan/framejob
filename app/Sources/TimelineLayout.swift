@@ -24,14 +24,16 @@ import AppKit
 struct TimelineLayout {
     // MARK: - Fixed metrics
 
-    /// Spec §4.4's 120 pt track-header column.
-    static let headerWidth: CGFloat = 120
-    static let rulerHeight: CGFloat = 26
+    /// Spec §4.4's track-header column and its ruler band. The numbers are
+    /// `DS`'s — the redesign widened the column to 132 and shortened the ruler
+    /// to 22 — but the NAMES stay here, because every call site in the
+    /// timeline spells them `TimelineLayout.headerWidth` and that is the
+    /// vocabulary of this file.
+    static let headerWidth = DS.trackHeaderWidth
+    static let rulerHeight = DS.rulerHeight
     /// Gap between two lanes, and the gap above the first one.
     static let laneSpacing: CGFloat = 2
     static let lanesInset: CGFloat = 4
-    /// Small / medium / large (View ▸ Timeline Track Height).
-    static let trackHeights: [CGFloat] = [34, 56, 88]
     /// Empty time kept past the last clip so the end is reachable and a clip
     /// can be dragged past it.
     static let trailingPad: CGFloat = 260
@@ -43,16 +45,179 @@ struct TimelineLayout {
     /// Snap distance in POINTS; converted to ticks per zoom by
     /// `snapThreshold` so snapping feels the same at every zoom.
     static let snapSlop: CGFloat = 8
-    static let clipRadius: CGFloat = 4
+    static let clipRadius = DS.clipRadius
     /// Side of the fade-handle squares at the audio corners.
     static let fadeHandle: CGFloat = 8
+
+    // MARK: - Track kinds
+
+    /// What a track holds, which is the only thing that decides how tall its
+    /// lane is. The raw values index `DS.trackHeights`' inner array, so the
+    /// enum and the token table can never drift apart.
+    enum TrackKind: Int {
+        case text = 0
+        case video = 1
+        case audio = 2
+    }
+
+    /// A track's kind, from the clips on it: text when it holds nothing but
+    /// text and shapes, audio when every clip sings and none of them draws,
+    /// and video for everything else — an EMPTY track included, because a
+    /// fresh track is where footage is about to land.
+    ///
+    /// Not a method on the layout: the layout is a pure value that never
+    /// touches a snapshot, so this runs once where the layout is built and
+    /// only the resulting heights go in.
+    ///
+    /// **Do not call this in a loop over the tracks.** It builds a whole
+    /// `SnapshotIndex` per call, which is the very O(tracks × clips) the
+    /// sizing path was rewritten to avoid; `rowHeights` and `trackHeights`
+    /// build one index and classify every track against it. This overload
+    /// exists for a one-off question about a single track.
+    static func trackKind(of clips: [ClipSnapshot], in snapshot: ProjectSnapshot) -> TrackKind {
+        trackKind(of: clips, index: SnapshotIndex(snapshot))
+    }
+
+    private static func trackKind(of clips: [ClipSnapshot], index: SnapshotIndex) -> TrackKind {
+        guard !clips.isEmpty else { return .video }
+        if clips.allSatisfy({ clip in
+            if case .text = clip.source { return true }
+            if case .shape = clip.source { return true }
+            return false
+        }) {
+            return .text
+        }
+        if clips.allSatisfy({ carriesAudio($0, index: index) && !carriesVideo($0, index: index) }) {
+            return .audio
+        }
+        return .video
+    }
+
+    /// The snapshot's clips bucketed by track and its media keyed by id, built
+    /// ONCE per height calculation.
+    ///
+    /// `TimelineView.rebuildLayout()` calls `rowHeights` on every tick of a
+    /// live gesture — thirty times a second through a whole drag — and the
+    /// obvious spelling of it is quadratic: `snapshot.clips(onTrack:)` filters
+    /// the whole clip array (and sorts it) once per TRACK, and
+    /// `snapshot.media(for:)` scans the whole media array once per CLIP. On a
+    /// long timeline that is the drag's frame budget.
+    ///
+    /// **The buckets are UNSORTED**, unlike `ProjectSnapshot.clips(onTrack:)`.
+    /// That is safe for exactly one reason: classification asks a bucket only
+    /// `isEmpty` and `allSatisfy`, neither of which can see an order. Anything
+    /// order-sensitive — an overlap rule, a transition lookup — must keep
+    /// using the snapshot's sorted accessor.
+    private struct SnapshotIndex {
+        private var clipsByTrack: [UInt32: [ClipSnapshot]] = [:]
+        private var mediaByID: [UInt32: MediaSnapshot] = [:]
+
+        init(_ snapshot: ProjectSnapshot) {
+            for clip in snapshot.clips {
+                clipsByTrack[clip.track, default: []].append(clip)
+            }
+            for item in snapshot.media {
+                mediaByID[item.id] = item
+            }
+        }
+
+        func clips(onTrack id: UInt32) -> [ClipSnapshot] { clipsByTrack[id] ?? [] }
+
+        func media(for clip: ClipSnapshot) -> MediaSnapshot? {
+            clip.source.mediaID.flatMap { mediaByID[$0] }
+        }
+    }
+
+    /// True when the clip contributes samples. Deliberately the same test
+    /// `TimelineView.hasAudio` makes — a nest sings when the core gave it
+    /// audio props — so a lane is called audio for exactly the reason its
+    /// clips draw waveforms.
+    private static func carriesAudio(_ clip: ClipSnapshot, index: SnapshotIndex) -> Bool {
+        guard clip.enabled.audio else { return false }
+        if case .nest = clip.source { return clip.audio != nil }
+        return index.media(for: clip)?.hasAudio ?? false
+    }
+
+    /// True when the clip draws pixels. Wider than `TimelineView.hasVideo`,
+    /// which answers "is there a filmstrip": a text, shape or nest clip has no
+    /// thumbnails but is unquestionably picture, and a lane of them must not
+    /// be sized as if it were sound.
+    private static func carriesVideo(_ clip: ClipSnapshot, index: SnapshotIndex) -> Bool {
+        guard clip.enabled.video else { return false }
+        switch clip.source {
+        case .media, .still, .image: return index.media(for: clip)?.hasVideo ?? false
+        case .text, .shape, .nest: return true
+        }
+    }
+
+    /// The lane height of every DISPLAY ROW, top row first — the array
+    /// `rowHeights` wants. Row 0 is the front-most track (`tracks.last`), so
+    /// the model order is reversed here and nowhere else.
+    ///
+    /// `frozen` overrides the classification for the tracks it names. A clip
+    /// drag previews its own ops, and the clip under the pointer may be the
+    /// very one that made its track an audio track — a lane that resized
+    /// mid-drag would move the drop target the user is aiming at, so the
+    /// gesture freezes what it started with and a track the preview INVENTED
+    /// (an `add_track` under the pointer) still gets classified fresh.
+    static func rowHeights(
+        for snapshot: ProjectSnapshot, sizeIndex: Int, frozen: [UInt32: CGFloat] = [:]
+    ) -> [CGFloat] {
+        let sizes = sizeRow(sizeIndex)
+        let index = SnapshotIndex(snapshot)
+        // `??` takes its right side as an autoclosure, so a frozen track is
+        // still never classified — the freeze is what keeps a lane from
+        // resizing under the pointer mid-drag.
+        return snapshot.tracks.reversed().map { track in
+            frozen[track.id] ?? height(of: track, index: index, sizes: sizes)
+        }
+    }
+
+    /// The same heights keyed by TRACK id — what a gesture freezes, because a
+    /// preview can restack the rows under it but never renumber a track.
+    static func trackHeights(for snapshot: ProjectSnapshot, sizeIndex: Int) -> [UInt32: CGFloat] {
+        let sizes = sizeRow(sizeIndex)
+        let index = SnapshotIndex(snapshot)
+        var table: [UInt32: CGFloat] = [:]
+        for track in snapshot.tracks {
+            table[track.id] = height(of: track, index: index, sizes: sizes)
+        }
+        return table
+    }
+
+    private static func sizeRow(_ sizeIndex: Int) -> [CGFloat] {
+        DS.trackHeights[min(max(sizeIndex, 0), DS.trackHeights.count - 1)]
+    }
+
+    private static func height(
+        of track: TrackSnapshot, index: SnapshotIndex, sizes: [CGFloat]
+    ) -> CGFloat {
+        let kind = trackKind(of: index.clips(onTrack: track.id), index: index)
+        guard sizes.indices.contains(kind.rawValue) else { return 84 }
+        return sizes[kind.rawValue]
+    }
+
+    /// The height a row outside `rowHeights` is worth: the size's VIDEO lane.
+    /// `unclampedRow` extrapolates with it above and below the stack, so a
+    /// drag past either end still counts rows at a believable pitch. The 84
+    /// is the medium video lane, and is reachable only if `DS.trackHeights`
+    /// is ever reshaped to fewer than three columns.
+    static func fallbackHeight(sizeIndex: Int) -> CGFloat {
+        let sizes = sizeRow(sizeIndex)
+        guard sizes.indices.contains(TrackKind.video.rawValue) else { return 84 }
+        return sizes[TrackKind.video.rawValue]
+    }
 
     // MARK: - State
 
     var canvas = CanvasSnapshot()
     var trackCount = 0
-    /// Index into `trackHeights`.
+    /// Index into `DS.trackHeights` — the S/M/L control.
     var heightIndex = 1
+    /// Lane height per DISPLAY ROW, row 0 first, from
+    /// `rowHeights(for:sizeIndex:)`. Empty is legal and every row then falls
+    /// back to the size's video height.
+    var rowHeights: [CGFloat] = []
     /// Points per second — the zoom.
     var zoom: CGFloat = defaultZoom
     var duration: Ticks = 0
@@ -62,35 +227,63 @@ struct TimelineLayout {
 
     // MARK: - Vertical
 
-    var trackHeight: CGFloat {
-        Self.trackHeights[min(max(heightIndex, 0), Self.trackHeights.count - 1)]
+    /// The height of one lane. Every row has its own since the redesign: a
+    /// text lane is 30/44/58, a video lane 54/84/116 and an audio lane
+    /// 40/60/82 (`DS.trackHeights`).
+    func trackHeight(row: Int) -> CGFloat {
+        rowHeights.indices.contains(row)
+            ? rowHeights[row] : Self.fallbackHeight(sizeIndex: heightIndex)
     }
 
     /// Top of the first lane, below the ruler band.
     var lanesTop: CGFloat { Self.rulerHeight + Self.lanesInset }
 
-    var rowPitch: CGFloat { trackHeight + Self.laneSpacing }
+    /// One row's height plus the gap under it.
+    func rowPitch(_ row: Int) -> CGFloat { trackHeight(row: row) + Self.laneSpacing }
 
-    var lanesHeight: CGFloat { CGFloat(max(trackCount, 0)) * rowPitch }
+    var lanesHeight: CGFloat { rowTop(max(trackCount, 0)) - lanesTop }
 
     var contentHeight: CGFloat {
         max(lanesTop + lanesHeight + Self.lanesInset, viewport.height)
     }
 
-    /// Top of display row `row`. Row 0 is the TOP lane, which is the
-    /// front-most track — `tracks.last` — because spec §4.4 puts the
-    /// front-most track on top while the model stores index 0 at the back.
-    func rowTop(_ row: Int) -> CGFloat { lanesTop + CGFloat(row) * rowPitch }
+    /// Top of display row `row`, as a prefix sum over `rowHeights`. Row 0 is
+    /// the TOP lane, which is the front-most track — `tracks.last` — because
+    /// spec §4.4 puts the front-most track on top while the model stores index
+    /// 0 at the back. A negative row is above the stack and is extrapolated at
+    /// the fallback pitch, which is what keeps `unclampedRow` invertible there.
+    func rowTop(_ row: Int) -> CGFloat {
+        guard row > 0 else {
+            let pitch = Self.fallbackHeight(sizeIndex: heightIndex) + Self.laneSpacing
+            return lanesTop + CGFloat(row) * pitch
+        }
+        var y = lanesTop
+        for index in 0..<row {
+            y += rowPitch(index)
+        }
+        return y
+    }
 
     func rowRect(_ row: Int, width: CGFloat) -> CGRect {
-        CGRect(x: 0, y: rowTop(row), width: width, height: trackHeight)
+        CGRect(x: 0, y: rowTop(row), width: width, height: trackHeight(row: row))
     }
 
     /// The display row at `y`, unclamped: negative above the top lane and
     /// `>= trackCount` below the bottom one, which is exactly what a clip
-    /// drag needs to decide it should create a track (spec §4.4).
+    /// drag needs to decide it should create a track (spec §4.4). Rows have
+    /// different heights now, so this walks them rather than dividing — and
+    /// past either end it falls back to a constant pitch so "two rows below
+    /// the bottom" still means something.
     func unclampedRow(atY y: CGFloat) -> Int {
-        Int(((y - lanesTop) / rowPitch).rounded(.down))
+        let pitch = Self.fallbackHeight(sizeIndex: heightIndex) + Self.laneSpacing
+        guard y >= lanesTop else { return Int(((y - lanesTop) / pitch).rounded(.down)) }
+        var top = lanesTop
+        for row in 0..<max(trackCount, 0) {
+            let bottom = top + rowPitch(row)
+            if y < bottom { return row }
+            top = bottom
+        }
+        return max(trackCount, 0) + Int(((y - top) / pitch).rounded(.down))
     }
 
     /// The display row at `y`, or nil when the point is outside the lanes.
@@ -159,7 +352,7 @@ struct TimelineLayout {
         let left = x(for: clip.start)
         let right = x(for: clip.end)
         return CGRect(
-            x: left, y: rowTop(row), width: max(right - left, 2), height: trackHeight)
+            x: left, y: rowTop(row), width: max(right - left, 2), height: trackHeight(row: row))
     }
 
     /// The tick range `rect` covers, clamped at zero — what the ruler and the

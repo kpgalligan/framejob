@@ -45,7 +45,18 @@ final class StickerButton: NSButton {
 
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
-        trackingAreas.forEach(removeTrackingArea)
+        // ONLY this view's own areas — the canonical statement of the trap
+        // every control in this file and in `OptionControls.swift` points at.
+        // **Pitfall:** `NSView.toolTip` is implemented as a tracking area
+        // owned by `NSToolTipManager`, and it sits in `trackingAreas` beside
+        // ours (measured: owner `NSToolTipManager`, the view's whole bounds).
+        // So the obvious `trackingAreas.forEach(removeTrackingArea)` deletes
+        // the tooltip on the first layout pass and NOTHING ever puts it back —
+        // which is why the icon-only buttons of the toolbar and the timeline
+        // bar, where the tooltip is the only thing that names them, were
+        // silent. Filtering by owner drops just the hover area this method
+        // added last time.
+        for area in trackingAreas where area.owner === self { removeTrackingArea(area) }
         addTrackingArea(
             NSTrackingArea(
                 rect: bounds, options: [.mouseEnteredAndExited, .activeInKeyWindow],
@@ -177,7 +188,9 @@ final class AccentButton: NSButton {
 
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
-        trackingAreas.forEach(removeTrackingArea)
+        // Owner-filtered, or the `toolTip` set in `init` goes with it — see
+        // the pitfall in `StickerButton.updateTrackingAreas` above.
+        for area in trackingAreas where area.owner === self { removeTrackingArea(area) }
         addTrackingArea(
             NSTrackingArea(
                 rect: bounds, options: [.mouseEnteredAndExited, .activeInKeyWindow],
@@ -240,7 +253,7 @@ final class AccentButton: NSButton {
 ///
 /// `size`, `pointSize` and `cornerRadius` default to the Rasterize-copied
 /// original, so the shared file is extended rather than forked: the window
-/// toolbar asks for 30 × 26 at 19 pt and the timeline bar for 28 × 24 at 17 pt,
+/// toolbar asks for 34 × 26 at 19 pt and the timeline bar for 28 × 24 at 17 pt,
 /// both on the 4 pt button radius.
 final class GhostButton: NSButton {
     private let iconName: String
@@ -286,7 +299,10 @@ final class GhostButton: NSButton {
 
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
-        trackingAreas.forEach(removeTrackingArea)
+        // Owner-filtered — see the pitfall in `StickerButton` above. This is
+        // the button the toolbar and the timeline bar are made of, and its
+        // `toolTip` is the ONLY thing that names an icon-only control.
+        for area in trackingAreas where area.owner === self { removeTrackingArea(area) }
         addTrackingArea(
             NSTrackingArea(
                 rect: bounds, options: [.mouseEnteredAndExited, .activeInKeyWindow],
@@ -474,7 +490,8 @@ final class PanelTabsView: NSView {
 
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
-        trackingAreas.forEach(removeTrackingArea)
+        // Owner-filtered — see the pitfall in `StickerButton` above.
+        for area in trackingAreas where area.owner === self { removeTrackingArea(area) }
         addTrackingArea(
             NSTrackingArea(
                 rect: bounds,

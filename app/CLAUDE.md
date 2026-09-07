@@ -41,13 +41,25 @@ lockstep are in the root `CLAUDE.md`; the full design is
   `AgentServer+<Feature>.swift`, or a new `…SheetController` file. The
   pieces those extension files build on are therefore internal, not
   private, and the frozen file keeps only the wiring.
-- `InspectorViewController.swift` (frozen at wiring: the tab strip, the pin,
-  and which pane is shown) + `InspectorPane.swift` (the pane protocol and
-  base, the disclosure section, the row builders, and `InspectorBinding` —
-  the one place that knows reads are evaluated inside an action and that
-  writes there set `set_action_end`) + one file per tab (`VideoPane.swift`,
-  `AudioPane.swift`, `TextPane.swift`, `ShapePane.swift`, `MediaPane.swift`,
-  `DocumentPane.swift`), descriptor-driven from `OptionControls.swift`.
+- `InspectorViewController.swift` (frozen at wiring: the tab strip and which
+  pane is shown) + `InspectorPane.swift` (the pane protocol and base, the
+  disclosure section with its collapsed-state key and its right-aligned
+  summary, the row builders, and `InspectorBinding` — the one place that
+  knows reads are evaluated inside an action and that writes there set
+  `set_action_end`) + `ClipPane.swift` for the Clip tab, `MediaPane.swift`
+  and `DocumentPane.swift` for the other two, with `VideoPane.swift`,
+  `AudioPane.swift`, `TextPane.swift` and `ShapePane.swift` surviving as the
+  section factories `ClipPane` composes. Descriptor-driven from
+  `OptionControls.swift`. **Three tabs, not six**: `InspectorTab` is
+  `clip | media | document`, all always live, and the old
+  disabled-tab / preferred-tab / pin apparatus is gone — which sections
+  appear is `ClipPane.makeSections()`'s answer.
+  **Pitfall:** an `InspectorSection`'s `UserDefaults` key records COLLAPSED,
+  so an untouched section has no stored value and `defaultExpanded` applies;
+  never flip that polarity or every saved panel inverts. And section ids are
+  shared across contexts (`video.speed` is the Speed group for a video clip
+  and the first group an audio-only one gets), so a "open the first section"
+  rule has to walk until it finds one the user has not stored.
 - `ExportSheetController.swift` (the export card and its progress sheet),
   `SpeedSheetController.swift`, `RelinkSheetController.swift` — the
   dialogs, all built from `Sheets.swift`'s `makeSheetView` pieces and put
@@ -81,6 +93,22 @@ lockstep are in the root `CLAUDE.md`; the full design is
   probe's completion, NSDocument's save) or on a long decode, so hopping first
   would deadlock or freeze the UI; they reach the document through
   `AgentServer.onMain`.
+- The chrome cleanup's own files (the design handoff in
+  `designs/design_handoff_reelcut/`, spec §3–§4.4):
+  `EditorViewController+Toolbar.swift` (the 44 pt row; the frozen file keeps
+  only the stored views, which are internal for exactly that reason),
+  `TimelineBar.swift` (the 36 pt bar and its selection block),
+  `TimelineClipDrawing.swift` (a clip is one object — body, name strip,
+  filmstrip under a tint wash, waveform, grips, transition zone),
+  `ClipPane.swift` (the Clip tab: the selection header, and
+  `makeSections()`, the function from a selection's kind to the sections it
+  gets — the four old clip panes are held there as section FACTORIES, never
+  in a view hierarchy), `ClipKindStyle.swift` (the ONE mapping from a clip to
+  its tint, symbol and kind word; it takes the snapshot, because a `media`
+  clip is video or audio by whether its FILE has pictures and not by
+  `enabled.video`, which is the Detach switch), and `BrandMark.swift` (the
+  mark drawn from the handoff's geometry table — no blend mode, unlike the
+  motif it replaced).
 - Shared chrome: `Theme.swift` (`DS` design tokens), `Controls.swift`,
   `OptionControls.swift`, `Sheets.swift`, `EditorChrome.swift` (`BarView`),
   `FileDropView.swift` (Finder drops + the first responder the bare-key map
@@ -127,6 +155,15 @@ in-band (`isError: true`) so models can self-correct.
 → observers via `.projectDocumentDidChange` with `userInfo["isLive"]` —
 live gestures pass `isLive: true` and observers skip expensive reloads
 mid-gesture. VC → views is direct property assignment.
+
+**Tracking areas.** `updateTrackingAreas` must remove only the view's OWN
+areas — `for area in trackingAreas where area.owner === self` — never
+`trackingAreas.forEach(removeTrackingArea)`. `NSView.toolTip` and
+`addToolTip(_:owner:userData:)` are both implemented as tracking areas owned
+by `NSToolTipManager`, they sit in `trackingAreas` beside yours, and nothing
+reinstalls one that is removed. The blanket form silently killed the tooltip
+on every custom control in the app, which for an icon-only button is the only
+thing that names it.
 
 **Hygiene.** No storyboards/xibs. No `!` force-unwraps, `as!`, or `try!`;
 implicitly-unwrapped optionals only for post-`loadView` view refs. Every

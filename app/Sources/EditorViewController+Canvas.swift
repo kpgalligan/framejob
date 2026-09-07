@@ -90,8 +90,16 @@ extension EditorViewController {
 
     // MARK: - Intents from the view
 
+    /// A PICK, which is not the same thing as a selection change: the
+    /// inspector is told first and unconditionally, because clicking a clip
+    /// means "show me this one" even when it was already selected (the design
+    /// handoff's interaction list, and the reason `clipPicked()` exists rather
+    /// than the panel inferring it from `ids != lastSelection`). The guard
+    /// below still stops an unchanged selection from posting a refresh.
     private func canvasSelected(_ ids: Set<UInt32>) {
-        guard let document = document, document.selection != ids else { return }
+        guard let document = document else { return }
+        if !ids.isEmpty { inspector?.clipPicked() }
+        guard document.selection != ids else { return }
         document.selection = ids
         viewStateDidChange()
     }

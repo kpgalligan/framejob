@@ -71,7 +71,16 @@ extension EditorViewController {
         timeline?.setPlayhead(document?.playhead ?? 0)
     }
 
-    /// `View ▸ Timeline Track Height` and the toolbar's S/M/L, in one place.
+    /// `View ▸ Timeline Track Height` and the timeline bar's S/M/L, in one
+    /// place.
+    ///
+    /// The control was visual-only until the redesign; it now picks a ROW of
+    /// `DS.trackHeights`, and which COLUMN of that row a lane takes is its
+    /// kind — text, video or audio (`TimelineLayout.trackKind`). Nothing more
+    /// is needed here: `trackHeightIndex`'s `didSet` rebuilds the layout, and
+    /// the rebuild is what re-classifies every track. The index is still
+    /// clamped to 0...2 before it is persisted, because a stale default from
+    /// an older build must not index past the table.
     func applyTrackHeight(_ index: Int) {
         trackHeight = min(max(index, 0), 2)
         UserDefaults.standard.set(trackHeight, forKey: Self.trackHeightKey)
@@ -80,8 +89,16 @@ extension EditorViewController {
 
     // MARK: - Intents from the view
 
+    /// A PICK, which is not the same thing as a selection change: the
+    /// inspector is told first and unconditionally, because clicking a clip
+    /// means "show me this one" even when it was already selected (the design
+    /// handoff's interaction list, and the reason `clipPicked()` exists rather
+    /// than the panel inferring it from `ids != lastSelection`). The guard
+    /// below still stops an unchanged selection from posting a refresh.
     private func timelineSelected(_ ids: Set<UInt32>) {
-        guard let document = document, document.selection != ids else { return }
+        guard let document = document else { return }
+        if !ids.isEmpty { inspector?.clipPicked() }
+        guard document.selection != ids else { return }
         document.selection = ids
         viewStateDidChange()
     }

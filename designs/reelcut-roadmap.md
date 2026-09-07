@@ -42,6 +42,7 @@ each line below is a claim rather than a hope:
 | SRT captions | Cues land at the right times and render |
 | Consolidate Media | Reopens after the originals are deleted and the package moved |
 | ffmpeg-assisted import | An MKV opens after rewrap; degrades cleanly with no ffmpeg |
+| Chrome cleanup + identity (`design_handoff_reelcut/`) | The chrome was RENDERED OFFSCREEN and looked at, in both appearances and at all three track sizes — see "Seeing the chrome" in `CLAUDE.md` |
 
 ## 2. What still needs a person at the machine
 
@@ -50,11 +51,12 @@ unbuilt. This is the whole of what is left of the acceptance tests.
 
 | Work | Spec | Why an agent cannot close it |
 |---|---|---|
-| Timeline view | §10 step 6 | Ruler ticks at each zoom, filmstrips, waveforms, tints, the transition hatch, fade handles, marker flags, in/out shading. Screenshots show it draws and draws the right things; whether it *reads* well is a judgement |
-| Canvas overlay | §10 step 8 | Scale / rotate / move handles, crop mode and its 30 % ghost, snap guides, inline text editing |
+| Timeline view | §10 step 6 | **Looked at.** The offscreen render shows lanes, ruler ticks, filmstrips under the tint wash, waveforms, tints, the transition hatch and the selection ring drawing correctly at S/M/L in both appearances. Still unseen because they are transient: the snap guide, the marker flags in use, the in/out shading, the fade handles being dragged |
+| Canvas overlay | §10 step 8 | **Partly looked at.** The render shows the eight handles and the rotation knob on the selected clip, correctly placed. Crop mode and its 30 % ghost, the snap guides and inline text editing are still unseen |
 | Gesture feel | §4.4 | Drag, trim, ⌥-drag duplicate, ⌥-drag rate stretch, the animate-back on a refused drop. Each is one undo step; whether each *feels* right is not measurable |
 | Playback | §10 steps 4–5 | Audio in sync, J/K/L, scrubbing, and the 60 fps target from the compositor's own timing log |
 | The new UI | — | ⌘G / ⇧⌘G, the reverse progress sheet's Cancel and failure paths, the export sheet's Quality row, and the Filters / Spotlight / Reflection / Audio-cleanup sections |
+| Hover, tooltips and cursors | — | Every tooltip in the app was dead until the tracking-area fix, so none of them has ever been READ. The ghost-button hover fill, the trim cursor and the S/M/L relayout also need a pointer |
 
 ## 3. Known limits, deliberate or deferred
 
@@ -78,7 +80,13 @@ unbuilt. This is the whole of what is left of the acceptance tests.
 5. **Two pixels of 2 073 600 move by one LSB** when a layer has a corner
    radius. Deterministic, so real; antialiasing arithmetic, not behaviour. The
    suspected cause (a branch in the vertex stage) was tested and disproved.
-6. `AudioProps.mono` is in the schema and unimplemented. Noise reduction
+6. **A clip's transition zone can still paint over the PREVIOUS clip's
+   selection ring.** Within one clip the transition is drawn before the ring,
+   but the zone belongs to clip N+1 and is drawn when N+1 draws — after N is
+   finished. Closing it wants a two-pass loop in `TimelineContentView.draw`
+   (every clip, then every transition, then every ring); the visible cost
+   today is a hatch over 20-odd points of coral.
+7. `AudioProps.mono` is in the schema and unimplemented. Noise reduction
    delays its track 512 samples. `import_media` over MCP can time out on a
    first ffmpeg transcode, though the conversion completes and a second call
    is instant.

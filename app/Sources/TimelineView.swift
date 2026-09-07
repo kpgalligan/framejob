@@ -18,7 +18,8 @@ import AppKit
 /// what lets `TimelineContentView` own ALL the mouse handling instead of
 /// three views each re-deriving what is under the pointer.
 final class TimelineView: NSView, NSTextFieldDelegate {
-    static let toolbarHeight: CGFloat = 32
+    /// The bar over the lanes — `TimelineBar.swift` builds it.
+    static let toolbarHeight = DS.timelineBarHeight
 
     // MARK: - State pushed in by the controller
 
@@ -76,9 +77,13 @@ final class TimelineView: NSView, NSTextFieldDelegate {
     let content = TimelineContentView()
     let ruler = TimelineRulerView()
     let headers = TimelineHeaderView()
-    private var snapToggle: OptionCheckboxControl?
-    private var heightControl: OptionSegmentedControl?
-    private let zoomSlider = NSSlider(
+    /// The three bar controls this view keeps a handle on. Internal rather
+    /// than private because `TimelineBar.swift` builds them (this file is
+    /// frozen at wiring — app/CLAUDE.md).
+    var snapToggle: OptionCheckboxControl?
+    var heightControl: OptionSegmentedControl?
+    var selectionBlock: TimelineSelectionBlock?
+    let zoomSlider = NSSlider(
         value: 0.5, minValue: 0, maxValue: 1, target: nil, action: nil)
 
     /// Content-space origin of the two floating bands, refreshed on every
@@ -101,6 +106,13 @@ final class TimelineView: NSView, NSTextFieldDelegate {
     /// changes `snapshot` under the gesture (a previewed `add_track` restacks
     /// every row) and the row → track mapping must not move with it.
     private var dragBase: ProjectSnapshot?
+    /// The lane heights the same gesture started with — by track id for the
+    /// DRAWING (a track whose kind the preview changed must not resize under
+    /// the pointer) and by row for the row ARITHMETIC (`unclampedRow` has to
+    /// keep answering against the grid the drag began on, or a previewed
+    /// `add_track` would renumber the rows mid-drag).
+    private var dragHeights: [UInt32: CGFloat] = [:]
+    private var dragRowHeights: [CGFloat] = []
     private var dragSnapper = TimelineSnapper(
         fps: .thirty, candidates: [], threshold: 1, enabled: false)
 
@@ -183,86 +195,16 @@ final class TimelineView: NSView, NSTextFieldDelegate {
 
     // MARK: - Toolbar (spec §4.4's row)
 
+    /// The 36 pt timeline bar. Its contents — the selection block, the eight
+    /// edit actions the toolbar handed down, Snap, zoom and S/M/L — are
+    /// `TimelineBar.swift`'s; only the three handles this view later refreshes
+    /// come back here.
     private func buildToolbar() -> NSView {
-        let bar = BarView(border: .bottom)
-
-        let actions = NSStackView(views: [
-            GhostButton(
-                symbol: "scissors", fallback: "✂", caption: nil, tooltip: "Split (⌘T)",
-                action: #selector(EditorViewController.splitAtPlayhead(_:))),
-            GhostButton(
-                symbol: "arrow.right.to.line", fallback: "⇥", caption: nil,
-                tooltip: "Trim Start to Playhead (W)",
-                action: #selector(EditorViewController.trimStartToPlayhead(_:))),
-            GhostButton(
-                symbol: "arrow.left.to.line", fallback: "⇤", caption: nil,
-                tooltip: "Trim End to Playhead (E)",
-                action: #selector(EditorViewController.trimEndToPlayhead(_:))),
-            GhostButton(
-                symbol: "delete.left", fallback: "⌫", caption: nil,
-                tooltip: "Ripple Delete (⌘⌫)",
-                action: #selector(EditorViewController.rippleDeleteClips(_:))),
-            GhostButton(
-                symbol: "bookmark", fallback: "◆", caption: nil, tooltip: "Add Marker (M)",
-                action: #selector(EditorViewController.addMarker(_:))),
-        ])
-        actions.orientation = .horizontal
-        actions.spacing = 2
-
-        let snap = OptionCheckboxControl(
-            label: "Snap",
-            read: { [weak self] in self?.snappingEnabled ?? false },
-            write: { [weak self] _ in self?.onSnappingToggled?() },
-            enabled: { true },
-            onEdit: { [weak self] in self?.snapToggle?.refresh() })
-        snapToggle = snap
-
-        // The one raw AppKit control in the app's chrome: spec §4.4 asks for
-        // a zoom SLIDER and `OptionControls.swift` (which is Rasterize's, and
-        // stays in sync with it) has no slider to borrow.
-        zoomSlider.target = self
-        zoomSlider.action = #selector(zoomSliderChanged(_:))
-        zoomSlider.isContinuous = true
-        zoomSlider.controlSize = .small
-        zoomSlider.toolTip = "Timeline Zoom"
-        zoomSlider.widthAnchor.constraint(equalToConstant: 108).isActive = true
-
-        let height = OptionSegmentedControl(
-            segments: [
-                (symbol: "reelcut.small", fallback: "S", tooltip: "Small tracks"),
-                (symbol: "reelcut.medium", fallback: "M", tooltip: "Medium tracks"),
-                (symbol: "reelcut.large", fallback: "L", tooltip: "Large tracks"),
-            ],
-            read: { [weak self] in self?.trackHeightIndex ?? 1 },
-            write: { [weak self] index in self?.onTrackHeightChanged?(index) },
-            segmentEnabled: nil, enabled: { true },
-            onEdit: { [weak self] in self?.heightControl?.refresh() })
-        heightControl = height
-
-        let spacer = NSView()
-        spacer.setContentHuggingPriority(NSLayoutConstraint.Priority(1), for: .horizontal)
-        spacer.setContentCompressionResistancePriority(
-            NSLayoutConstraint.Priority(1), for: .horizontal)
-
-        let row = NSStackView(views: [
-            actions, snap, spacer, zoomSlider,
-            GhostButton(
-                symbol: "arrow.left.and.right", fallback: "⇔", caption: nil,
-                tooltip: "Fit Timeline (⇧Z)",
-                action: #selector(EditorViewController.fitTimeline(_:))),
-            height,
-        ])
-        row.translatesAutoresizingMaskIntoConstraints = false
-        row.orientation = .horizontal
-        row.alignment = .centerY
-        row.spacing = 8
-        bar.addSubview(row)
-        NSLayoutConstraint.activate([
-            row.leadingAnchor.constraint(equalTo: bar.leadingAnchor, constant: 8),
-            row.trailingAnchor.constraint(equalTo: bar.trailingAnchor, constant: -8),
-            row.centerYAnchor.constraint(equalTo: bar.centerYAnchor),
-        ])
-        return bar
+        let parts = TimelineBar.build(owner: self)
+        selectionBlock = parts.selection
+        snapToggle = parts.snap
+        heightControl = parts.size
+        return parts.view
     }
 
     // MARK: - State in
@@ -280,6 +222,7 @@ final class TimelineView: NSView, NSTextFieldDelegate {
         self.playhead = playhead
         self.inOutRange = inOutRange
         self.cacheDirectory = cacheDirectory
+        selectionBlock?.update(snapshot: snapshot, selection: selection)
         rebuildLayout()
     }
 
@@ -300,6 +243,11 @@ final class TimelineView: NSView, NSTextFieldDelegate {
         next.canvas = snapshot.canvas
         next.trackCount = snapshot.tracks.count
         next.heightIndex = trackHeightIndex
+        // Lane heights are per track KIND now, so they are classified here —
+        // once per rebuild — and handed to the layout as plain numbers.
+        next.rowHeights = TimelineLayout.rowHeights(
+            for: snapshot, sizeIndex: trackHeightIndex,
+            frozen: clipDrag == nil ? [:] : dragHeights)
         next.zoom = zoom
         next.duration = snapshot.duration
         next.viewport = scrollView.contentView.bounds.size
@@ -359,7 +307,8 @@ final class TimelineView: NSView, NSTextFieldDelegate {
         return TimelineLayout.minZoom * exp(min(max(value, 0), 1) * span)
     }
 
-    @objc private func zoomSliderChanged(_ sender: NSSlider) {
+    /// Internal: the bar owns the slider and points it back here.
+    @objc func zoomSliderChanged(_ sender: NSSlider) {
         let anchor = scrollView.contentView.bounds.midX
         setZoom(Self.zoom(forSlider: CGFloat(sender.doubleValue)), anchoredAt: anchor)
     }
@@ -574,6 +523,7 @@ final class TimelineView: NSView, NSTextFieldDelegate {
             // previewed `add_track` restacks the live one under the pointer.
             var base = layout
             base.trackCount = session.trackCount
+            base.rowHeights = dragRowHeights
             session.update(time: time, row: base.unclampedRow(atY: point.y), snapper: dragSnapper)
             clipDrag = session
             onLiveUpdate?(session.ops(destination: destination(for: session)))
@@ -611,6 +561,8 @@ final class TimelineView: NSView, NSTextFieldDelegate {
             onLiveEnd?(session.duplicating ? "Duplicate Clips" : "Move Clips")
             checkRefusal(of: session)
             dragBase = nil
+            dragHeights = [:]
+            dragRowHeights = []
         } else if let session = trim {
             trim = nil
             onLiveEnd?(session.isRateStretch ? "Rate Stretch" : "Trim Clip")
@@ -645,9 +597,17 @@ final class TimelineView: NSView, NSTextFieldDelegate {
         let landedRow = layout.row(forTrackIndex: index)
         guard clip.start != session.proposedStart || landedRow != session.row else { return }
         let row = min(max(session.row, 0), max(layout.trackCount - 1, 0))
-        var ghost = layout.clipRect(clip, row: row)
+        // Both ends of the springback are the clip's BODY, not its lane rect:
+        // the redesign insets a bar 3 pt top and bottom
+        // (`TimelineContentView.bodyRect`), so a ghost built from the lane
+        // would be a taller rectangle than the clip it claims to be — and it
+        // is drawn on the clip's own corner radius, over the clip, where the
+        // difference is the whole point of the animation.
+        var ghost = TimelineContentView.bodyRect(layout.clipRect(clip, row: row))
         ghost.origin.x = layout.x(for: session.proposedStart)
-        flashRefusal(from: ghost, to: layout.clipRect(clip, row: landedRow))
+        flashRefusal(
+            from: ghost,
+            to: TimelineContentView.bodyRect(layout.clipRect(clip, row: landedRow)))
     }
 
     private func beginClipDrag(anchor: UInt32, at point: CGPoint, flags: NSEvent.ModifierFlags) {
@@ -684,6 +644,9 @@ final class TimelineView: NSView, NSTextFieldDelegate {
         let bottom = probeTrack(prefix + [.addTrack(index: 0)], existing: existingTracks)
 
         dragBase = snapshot
+        dragHeights = TimelineLayout.trackHeights(
+            for: snapshot, sizeIndex: trackHeightIndex)
+        dragRowHeights = layout.rowHeights
         dragSnapper = makeSnapper(excluding: ids, suppressed: flags.contains(.command))
         clipDrag = ClipDragSession(
             clips: ids, anchor: anchor, anchorStart: clip.start,
@@ -771,24 +734,6 @@ final class TimelineView: NSView, NSTextFieldDelegate {
     func track(atRow row: Int) -> TrackSnapshot? {
         let index = layout.trackIndex(forRow: row)
         return snapshot.tracks.indices.contains(index) ? snapshot.tracks[index] : nil
-    }
-
-    /// The clip tint of spec §4.4, from `Theme.swift`'s tokens.
-    static func tint(for clip: ClipSnapshot) -> NSColor {
-        switch clip.source {
-        case .media:
-            return clip.enabled.video ? DS.clipVideo : DS.clipAudio
-        case .still:
-            return DS.clipStill
-        case .image:
-            return DS.clipStill
-        case .text:
-            return DS.clipText
-        case .shape:
-            return DS.clipShape
-        case .nest:
-            return DS.clipNest
-        }
     }
 
     /// True when the clip contributes samples, i.e. deserves a waveform and
@@ -911,13 +856,18 @@ enum TimelineDraw {
     }
 
     /// 45° hatching — a locked track and a transition overlap both wear it.
-    static func hatch(_ rect: CGRect, color: NSColor, spacing: CGFloat = 7) {
+    /// The transition asks for the redesign's 3 pt line on 7 pt spacing; the
+    /// locked track keeps the hairline it has always had, which is why the
+    /// width is a defaulted parameter rather than a new constant.
+    static func hatch(
+        _ rect: CGRect, color: NSColor, spacing: CGFloat = 7, lineWidth: CGFloat = 1
+    ) {
         guard rect.width > 0, rect.height > 0 else { return }
         NSGraphicsContext.current?.saveGraphicsState()
         NSBezierPath(rect: rect).addClip()
         color.setStroke()
         let path = NSBezierPath()
-        path.lineWidth = 1
+        path.lineWidth = lineWidth
         var x = rect.minX - rect.height
         while x < rect.maxX {
             path.move(to: NSPoint(x: x, y: rect.maxY))
@@ -969,6 +919,10 @@ enum TimelineDraw {
 /// and ALL of the timeline's mouse handling (the ruler and the header column
 /// float above it but refuse hits, so this view alone decides what is under
 /// the pointer — see `TimelineView`'s note).
+///
+/// One clip's paint is `TimelineClipDrawing.swift` — the body, the name strip,
+/// the filmstrip and the waveform — because that is where the redesign's work
+/// went and this file is frozen at wiring (app/CLAUDE.md).
 final class TimelineContentView: NSView {
     weak var timeline: TimelineView?
 
@@ -1040,7 +994,8 @@ final class TimelineContentView: NSView {
         if point.x < owner.pinnedX + TimelineLayout.headerWidth {
             guard let row = layout.row(atY: point.y) else { return .none }
             let local = CGPoint(x: point.x - owner.pinnedX, y: point.y - layout.rowTop(row))
-            if let button = TimelineHeaderView.button(at: local, height: layout.trackHeight) {
+            let lane = layout.trackHeight(row: row)
+            if let button = TimelineHeaderView.button(at: local, height: lane) {
                 return .headerButton(row: row, button: button)
             }
             return .header(row: row)
@@ -1054,8 +1009,11 @@ final class TimelineContentView: NSView {
             guard point.x >= rect.minX - 1, point.x <= rect.maxX + 1 else { continue }
             guard !track.locked else { return .clip(clip.id) }
             if owner.hasAudio(clip) {
+                // The same rectangle the waveform is drawn in
+                // (`TimelineClipDrawing.contentRect`), never the lane rect —
+                // the fade handles sit under the clip's name strip.
                 let audio = Self.regions(
-                    in: rect, hasVideo: owner.hasVideo(clip), hasAudio: true
+                    in: Self.contentRect(rect), hasVideo: owner.hasVideo(clip), hasAudio: true
                 ).audio
                 for edge in [TimelineEdge.start, TimelineEdge.end]
                 where Self.fadeRect(clip, edge: edge, audio: audio, layout: layout)
@@ -1211,155 +1169,22 @@ final class TimelineContentView: NSView {
 
         if let refusal = owner.refusal {
             let t = min(max(refusal.progress, 0), 1)
+            // The SIZE is interpolated too, not just the origin. Lanes used to
+            // be one height, so carrying `from`'s size was free; they are now
+            // per kind (`DS.trackHeights`), and a refused drop from a 60 pt
+            // audio lane onto a 44 pt text lane would land a ghost 16 pt taller
+            // than the clip it springs back to.
             let rect = CGRect(
                 x: refusal.from.minX + (refusal.to.minX - refusal.from.minX) * t,
                 y: refusal.from.minY + (refusal.to.minY - refusal.from.minY) * t,
-                width: refusal.from.width, height: refusal.from.height)
+                width: refusal.from.width + (refusal.to.width - refusal.from.width) * t,
+                height: refusal.from.height + (refusal.to.height - refusal.from.height) * t)
             DS.playhead.withAlphaComponent(0.75 * (1 - t) + 0.25).setStroke()
             let path = NSBezierPath(
                 roundedRect: rect.insetBy(dx: 1, dy: 1),
                 xRadius: TimelineLayout.clipRadius, yRadius: TimelineLayout.clipRadius)
             path.lineWidth = 2
             path.stroke()
-        }
-    }
-
-    /// One clip bar: tint, filmstrip, waveform, transition, actions, label,
-    /// fade handles, selection outline — spec §4.4's list, in paint order.
-    private func draw(
-        clip: ClipSnapshot, in rect: CGRect, track: TrackSnapshot, previous: ClipSnapshot?,
-        owner: TimelineView, visible: CGRect
-    ) {
-        let layout = owner.layout
-        let dimmed = track.hidden || (!clip.enabled.video && !clip.enabled.audio)
-        var tint = TimelineView.tint(for: clip)
-        if dimmed {
-            tint = tint.blended(withFraction: 0.5, of: DS.chromeBackground) ?? tint
-        }
-
-        NSGraphicsContext.current?.saveGraphicsState()
-        NSBezierPath(
-            roundedRect: rect, xRadius: TimelineLayout.clipRadius,
-            yRadius: TimelineLayout.clipRadius
-        ).addClip()
-        tint.setFill()
-        rect.fill()
-
-        let hasVideo = owner.hasVideo(clip)
-        let hasAudio = owner.hasAudio(clip)
-        let regions = Self.regions(in: rect, hasVideo: hasVideo, hasAudio: hasAudio)
-        if !regions.video.isEmpty {
-            drawFilmstrip(clip, in: regions.video, owner: owner, visible: visible)
-        }
-        if !regions.audio.isEmpty {
-            let muted = clip.audioProps.muted || track.muted
-            drawWaveform(clip, in: regions.audio, owner: owner, visible: visible, muted: muted)
-        }
-
-        // An action is a darker band along the top edge over its span; its
-        // start is CLIP time, so it maps back through the clip's own start.
-        for action in clip.actions where action.duration > 0 {
-            let from = layout.x(for: clip.start + action.start)
-            let to = layout.x(for: clip.start + action.endTime)
-            NSColor.black.withAlphaComponent(0.34).setFill()
-            NSRect(x: from, y: rect.minY, width: max(to - from, 2), height: 5).fill()
-        }
-
-        // The label sits below the action band when there is one, so the two
-        // never fight for the same five points.
-        let labelTop = rect.minY + (clip.actions.isEmpty ? 2 : 6)
-        TimelineDraw.label(
-            owner.snapshot.name(of: clip),
-            in: CGRect(x: rect.minX + 5, y: labelTop, width: rect.width - 8, height: 13),
-            font: DS.sans(10, weight: .semibold), color: NSColor.white.withAlphaComponent(0.92))
-        NSGraphicsContext.current?.restoreGraphicsState()
-
-        // The transition zone is the OVERLAP with the previous clip, so it is
-        // drawn unclipped — it belongs to both bars.
-        if let transition = clip.transitionIn, let previous = previous, previous.end > clip.start {
-            let zone = CGRect(
-                x: layout.x(for: clip.start), y: rect.minY,
-                width: max(layout.width(of: previous.end - clip.start), 2), height: rect.height)
-            NSColor.black.withAlphaComponent(0.22).setFill()
-            zone.fill()
-            TimelineDraw.hatch(zone, color: NSColor.white.withAlphaComponent(0.4), spacing: 5)
-            TimelineDraw.label(
-                transition.kind.displayName,
-                in: CGRect(x: zone.minX, y: zone.maxY - 13, width: zone.width, height: 12),
-                font: DS.sans(9), color: NSColor.white.withAlphaComponent(0.85), centered: true)
-        }
-
-        if hasAudio, regions.audio.height >= TimelineLayout.fadeHandle + 2 {
-            for edge in [TimelineEdge.start, TimelineEdge.end] {
-                let handle = Self.fadeRect(clip, edge: edge, audio: regions.audio, layout: layout)
-                NSColor.white.withAlphaComponent(0.7).setFill()
-                handle.fill()
-            }
-        }
-
-        if owner.selection.contains(clip.id) {
-            DS.playhead.setStroke()
-            let outline = NSBezierPath(
-                roundedRect: rect.insetBy(dx: 1, dy: 1), xRadius: TimelineLayout.clipRadius,
-                yRadius: TimelineLayout.clipRadius)
-            outline.lineWidth = 2
-            outline.stroke()
-        }
-    }
-
-    private func drawFilmstrip(
-        _ clip: ClipSnapshot, in rect: CGRect, owner: TimelineView, visible: CGRect
-    ) {
-        guard rect.height >= 20, let directory = owner.cacheDirectory,
-              let media = owner.snapshot.media(for: clip), media.width > 0, media.height > 0
-        else { return }
-        let aspect = CGFloat(media.width) / CGFloat(media.height)
-        let tile = max((rect.height * aspect).rounded(), 12)
-        let skipped = max(((visible.minX - rect.minX) / tile).rounded(.down), 0)
-        var x = rect.minX + skipped * tile
-        let limit = min(rect.maxX, visible.maxX)
-        while x < limit {
-            let time = max(owner.layout.time(atX: x + tile / 2), clip.start)
-            let source = TimelineView.sourceTime(of: clip, at: time)
-            let index = Int(max(source, 0) / ReelTime.perSecond)
-            if let image = owner.caches.thumbnail(media: media.id, index: index, in: directory) {
-                TimelineDraw.image(
-                    image, in: CGRect(x: x, y: rect.minY, width: tile, height: rect.height))
-            }
-            x += tile
-        }
-    }
-
-    /// The cached peaks (100 buckets per source second) as a centred column
-    /// plot. Muted draws at 40 % (spec §4.4).
-    private func drawWaveform(
-        _ clip: ClipSnapshot, in rect: CGRect, owner: TimelineView, visible: CGRect, muted: Bool
-    ) {
-        guard rect.height >= 8, let directory = owner.cacheDirectory,
-              let media = owner.snapshot.media(for: clip),
-              let peaks = owner.caches.peaks(media: media.id, in: directory), !peaks.isEmpty
-        else { return }
-        let alpha: CGFloat = muted ? 0.4 : 1
-        NSColor.white.withAlphaComponent(0.72 * alpha).setFill()
-        let midY = rect.midY
-        let half = rect.height / 2 - 1
-        let from = max(rect.minX, visible.minX)
-        let to = min(rect.maxX, visible.maxX)
-        var x = from.rounded(.down)
-        let bucketsPerSecond = Double(MediaImporter.peakBucketsPerSecond)
-        while x < to {
-            let time = max(owner.layout.time(atX: x), clip.start)
-            let source = TimelineView.sourceTime(of: clip, at: time)
-            let bucket = Int(
-                (Double(max(source, 0)) / Double(ReelTime.perSecond) * bucketsPerSecond)
-                    .rounded(.down))
-            guard peaks.indices.contains(bucket) else {
-                x += 1
-                continue
-            }
-            let amplitude = CGFloat(min(max(peaks[bucket], 0), 1)) * half
-            NSRect(x: x, y: midY - amplitude, width: 1, height: max(amplitude * 2, 1)).fill()
-            x += 1
         }
     }
 }
@@ -1509,7 +1334,7 @@ final class TimelineRulerView: NSView {
 
 // MARK: - Track headers
 
-/// The floating 120 pt header column: name, then eye / speaker / lock
+/// The floating 132 pt header column: name, then eye / speaker / lock
 /// (spec §4.4). Like the ruler it refuses hits so the content view can own
 /// the mouse, and like the ruler it still lets a rename field through.
 final class TimelineHeaderView: NSView {
@@ -1542,8 +1367,12 @@ final class TimelineHeaderView: NSView {
         CGRect(
             x: buttonInset + CGFloat(index) * (buttonSize + 3),
             // Never above 16 pt: on a Small track the name label owns the top
-            // of the row and the toggles have to clear it.
-            y: max(height - buttonSize - 2, 16), width: buttonSize, height: buttonSize)
+            // of the row and the toggles have to clear it. The outer `min`
+            // then keeps them INSIDE the row — a 30 pt small text lane has no
+            // 16 + 17 pt to give, and an overflowing toggle would paint over
+            // the lane below, which is drawn before it.
+            y: min(max(height - buttonSize - 2, 16), max(height - buttonSize, 0)),
+            width: buttonSize, height: buttonSize)
     }
 
     static func button(at local: CGPoint, height: CGFloat) -> TimelineHeaderButton? {
@@ -1565,7 +1394,8 @@ final class TimelineHeaderView: NSView {
             let row = layout.row(forTrackIndex: index)
             // Local y: the column's frame starts at the ruler's height.
             let top = layout.rowTop(row) - TimelineLayout.rulerHeight
-            let rect = CGRect(x: 0, y: top, width: bounds.width, height: layout.trackHeight)
+            let height = layout.trackHeight(row: row)
+            let rect = CGRect(x: 0, y: top, width: bounds.width, height: height)
             guard rect.intersects(dirtyRect) else { continue }
             DS.chromeBackground.setFill()
             rect.fill()
@@ -1583,7 +1413,7 @@ final class TimelineHeaderView: NSView {
                 (.locked, track.locked ? "lock" : "lock.open", "L", track.locked),
             ]
             for (position, toggle) in toggles.enumerated() {
-                var box = Self.buttonRect(position, height: layout.trackHeight)
+                var box = Self.buttonRect(position, height: height)
                 box.origin.y += rect.minY
                 if toggle.3 {
                     DS.selectionFill.setFill()

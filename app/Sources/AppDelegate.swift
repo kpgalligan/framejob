@@ -59,6 +59,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         }
     }
 
+    /// Reelcut > About Reelcut. The standard panel, but with the mark drawn
+    /// by `BrandMark` in place of the app icon: the icon carries the squircle
+    /// tile and its ink rule, which is right in the Dock and wrong on a panel
+    /// that is already a card. The untiled mark is what the identity handoff
+    /// asks for here (Part 1, "Files in `logo/`").
+    @objc func showAboutPanel(_ sender: Any?) {
+        NSApp.orderFrontStandardAboutPanel(options: [
+            .applicationIcon: BrandMark.image(size: 128)
+        ])
+    }
+
     // MARK: - Agent server
 
     /// Tools > Allow Agent Connections: hosts an MCP endpoint on localhost so
@@ -158,8 +169,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
     private func appMenu() -> NSMenu {
         let menu = NSMenu(title: "Reelcut")
-        menu.addItem(
-            item("About Reelcut", #selector(NSApplication.orderFrontStandardAboutPanel(_:))))
+        menu.addItem(item("About Reelcut", #selector(AppDelegate.showAboutPanel(_:))))
         menu.addItem(.separator())
         menu.addItem(item("Hide Reelcut", #selector(NSApplication.hide(_:)), "h"))
         menu.addItem(

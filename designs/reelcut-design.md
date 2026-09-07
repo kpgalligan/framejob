@@ -62,65 +62,91 @@ publishing to YouTube/Vimeo, the stock-media library.
 
 ## 3. Window layout
 
+The chrome below is the one the design handoff in
+`designs/design_handoff_reelcut/` specifies; it replaced the first cut, whose
+toolbar was a grab bag, whose Export was a system pill, and whose clips had no
+visible boundary. That handoff's README is the normative source for the
+metrics; this section is the summary.
+
 ```
 ┌────────────────────────────────────────────────────────────────────────────────┐
-│ ⏮ ◀◀ ▶ ▶▶ ⏭ ↻   00:00:20:12 / 00:01:00:00   [Fit ▾] [Safe]      [T] [▭▾] [M] [Export] │
+│                    Demo — 1080 × 1920 · 25 fps · edited          (OS title bar) │
+├────────────────────────────────────────────────────────────────────────────────┤
+│ ⏮ ◀◀ ▶ ▶▶ ⏭ ↻ │ 00:00:20:12 / 00:01:00:00          [Fit ▾] [Safe] │ [⤴ Export…] │
 ├───────────────────────────────────────────────────────┬────────────────────────┤
-│                                                       │ Video Audio Text Shape │
-│      ┌─────────────────────────────────────────┐      │ Media Document         │
-│      │ Intro title                             │      │────────────────────────│
-│      │                                         │      │ ▾ Transform            │
-│      │                                         │      │   Scale    ──o──  100 %│
-│      │            (screen recording)           │      │   Position x 480 y 270 │
-│      │                                     ──▶ │      │   Rotation        0 °  │
-│      │                           ┌────────┐    │      │   Opacity  ────o  100 %│
-│      │                           │ webcam ○┼   │      │ ▸ Crop                 │
-│      │                           └────────┘    │      │ ▸ Corner radius        │
-│      └─────────────────────────────────────────┘      │ ▸ Shadow               │
-│        1920 × 1080 · 30 fps                           │ ▸ Color                │
-│                                                       │ ▸ Speed                │
-│                                                       │ ▸ Actions              │
-│                                                       │ ▸ Transition           │
+│                                                       │  Clip  Media  Document │
+│      ┌─────────────────────────────────────────┐      │────────────────────────│
+│      │ Intro title                             │      │ ▌clipA.mov             │
+│      │                                         │      │  video · 00:00:21:00 … │
+│      │            (screen recording)           │      │ ▾ TRANSFORM       100% │
+│      │                                     ──▶ │      │   Scale    ──o──  100 %│
+│      │                           ┌────────┐    │      │   Position x 480 y 270 │
+│      │                           │ webcam ○┼   │      │ ▸ CROP        none [⟲] │
+│      │                           └────────┘    │      │ ▸ CORNER RADIUS 0 px   │
+│      └─────────────────────────────────────────┘      │ ▸ SHADOW           off │
+│        1080 × 1920 · 25 fps                           │ ▸ SPEED         1.00×  │
+│                                                       │ ▸ TIMING  00:00:21:00  │
 ├───────────────────────────────────────────────────────┴────────────────────────┤
-│ [Split ⌘T] [Ripple ⌘⌫] [Marker M] [Snap ●]                zoom ──o── [Fit] ▤ │
+│ ▌clipA.mov     │ ✂ ⇥ ⇤ ⌫ ◆ ⧉ Aa ▭ │ Snap ●        ⊖ ──o── ⊕ ⇔ │ [S][M][L]     │
+│  V1 · video    │                                                               │
+├────────────────────────────────────────────────────────────────────────────────┤
 │          ┆0:00      0:10   ▼  0:20      0:30      0:40      0:50      1:00     │
-│ Track 4  ┆ [Intro title ▒▒▒▒]           [Arrow ▒]                              │
-│ Track 3  ┆ [Webcam.mov ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓]                          │
-│ Track 2  ┆ [Screen recording.mov ████████████████████████████][xf][B-roll ████]│
-│ Track 1  ┆ [Music.m4a ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~]   │
+│ T1       ┆ [Aa Intro title      ]                                              │
+│ V1       ┆ [▦ Screen recording.mov ███████████████████][/][▦ B-roll ██████████] │
+│ A1       ┆ [∿ Music.m4a ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~]  │
 └────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 | Region | Default | Range | Holds |
 |---|---|---|---|
-| Toolbar | 44 pt | fixed | transport, timecode, canvas zoom, safe guides, add text/shape/marker, export |
+| Title bar | OS | — | the document name, and its size · rate · edited state as the subtitle |
+| Toolbar | 44 pt | fixed | transport, timecode, canvas zoom, safe guides, Export |
 | Preview canvas | flexible | — | the composition at canvas size, letterboxed in the void |
-| Inspector | 320 pt | 280–440, collapsible (⌥⌘I) | tab strip + collapsible sections |
-| Timeline | 240 pt | 140 pt – 60 % of window | its own toolbar row, ruler, track headers + lanes |
+| Inspector | 304 pt | 280–440, collapsible (⌥⌘I) | three tabs + collapsible sections |
+| Timeline bar | 36 pt | fixed | the selection block, the clip actions, snap, zoom, S/M/L |
+| Timeline | 300 pt | 140 pt – 60 % of window | ruler, track headers + lanes |
+
+The toolbar carries only what applies to the whole document at all times —
+*where you are in it*, *how you are looking at it*, and *getting it out*.
+Everything that acts on a clip is in the timeline bar, beside blade and
+ripple-delete. Document identity is the title bar's, because the OS already
+gives it a home.
 
 Inspector and timeline are `NSSplitView` panes; sizes persist in
 `UserDefaults`. There is no left panel: the media library is an inspector
-tab, as in a screencast editor, so the canvas gets the width. The window has a
-welcome sibling (`WelcomeWindowController`, as in Rasterize) offering Open
-Video…, New Project…, and Recent.
+tab, as in a screencast editor, so the canvas gets the width. Below about 1080 pt wide,
+narrow the inspector before anything else. The window has a welcome sibling
+(`WelcomeWindowController`, as in Rasterize) offering Open Video…, New Project
+and Recent, under the stacked wordmark.
 
 ## 4. The regions in detail
 
 ### 4.1 Toolbar
 
-- **Transport**: go to start, previous edit point, play/pause, next edit
-  point, go to end, loop (loops the in/out range when set, else all).
-- **Timecode** in the mono face: current time, then duration, in the
-  document's frame rate (`00:00:20:12 / 00:01:00:00`). Click to type a
-  time; accepts `1:23`, `83.5`, `1:23:04`. A Document setting switches
-  frames to milliseconds. Formatting and parsing are core functions
+44 pt, `BarView(border: .bottom)`, 12 pt padding, 12 pt between clusters, with
+a 1 pt `DS.border` rule between them.
+
+- **Transport**: six `GhostButton`s at 34 × 26 pt on the 4 pt button radius,
+  19 pt symbols, 2 pt gaps — go to start, previous edit point, play/pause,
+  next edit point, go to end, loop (loops the in/out range when set, else all).
+- **Timecode** in the mono face: a 24 pt bordered field on the button radius
+  holding the current time, then the duration in `DS.mono(11)`
+  (`00:00:20:12 / 00:01:00:00`), in the document's frame rate. Click to type a
+  time; accepts `1:23`, `83.5`, `1:23:04`. A Document setting switches frames
+  to milliseconds. Formatting and parsing are core functions
   (`rc_timecode_format` / `rc_timecode_parse`).
 - **Canvas zoom** popup (Fit, 50, 100, 200 %) and a title-safe /
   action-safe guide toggle (90 % and 80 % rectangles).
-- **Add Text** (T), **Add Shape** menu (rectangle, ellipse, line, arrow),
-  **Add Marker** (M), **Export…** (⌘E).
+- **Export…** (⌘E) is an `AccentButton`: 26 pt, the 4 pt radius, `DS.accent`
+  fill, `DS.onAccent` at 12 pt semibold, a 15 pt `square.and.arrow.up` at a
+  6 pt gap. Hover lightens the fill; that is the whole state model. It is
+  deliberately **not** `StickerButton` — the sticker pill was retired in the
+  Rasterize redesign and the chrome follows, square-ish and quiet.
+  `StickerButton` stays for the sheets and the welcome screen.
 
-Snapping lives in the timeline toolbar because it is a timeline concern.
+Add Text, Add Shape, Add Marker and Duplicate are in the **timeline bar**
+(§4.4), because each acts on a clip. Snapping is there too, because it is a
+timeline concern.
 
 ### 4.2 Preview canvas
 
@@ -130,6 +156,8 @@ Snapping lives in the timeline toolbar because it is a timeline concern.
   Space-drag pans when zoomed in.
 - Shows the frame at the playhead. During playback the frames come from
   the player; while scrubbing or editing, from exact seeks.
+- The size caption under the video is mono 10 pt in `DS.textFaint` with
+  0.06em tracking, matching every other machine-produced number in the app.
 - **Selection**: click picks the topmost visible clip under the cursor at
   the current time (locked or hidden tracks are not hit). ⇧-click
   extends. Clicking empty canvas clears. Hit-testing uses each layer's
@@ -159,18 +187,49 @@ Snapping lives in the timeline toolbar because it is a timeline concern.
 
 ### 4.3 Inspector
 
-Tab strip across the top: **Video, Audio, Text, Shape, Media, Document.**
-A tab is disabled when no selected clip has that aspect. Selecting a clip
-switches to the most relevant enabled tab unless the user pinned one.
-Multiple selected clips edit their common properties together (one op
-with several clip ids).
+Tab strip across the top: **Clip, Media, Document** — `PanelTabsView`, all
+three always live. Clicking a clip anywhere shows the Clip tab, including a
+click that re-picks the clip already selected. Multiple selected clips edit
+their common properties together (one op with several clip ids).
 
-Sections are disclosure groups with a reset-to-default in the header.
+It was six tabs — Video, Audio, Text, Shape, Media, Document — with a
+disabled state per tab, a most-relevant-tab rule and a pin to defeat it. Four
+of the six were about the same thing, the selected clip, and 304 pt gave each
+about 50 pt of strip. They are now SECTIONS inside the Clip tab, and which
+sections appear is a function of the selection's kind (`ClipPane.makeSections`)
+— the piece of logic that replaces the whole tab-visibility apparatus. With
+that, a pin protects nothing and is gone.
+
+The Clip tab opens with a 44 pt selection header: an 8 × 26 pt tint chip in
+the clip's kind colour, the name at 12 pt semibold, and a mono 10 pt line
+giving the kind word, the duration in the DOCUMENT's timecode, and the
+source's own facts. `ClipKindStyle` is the one mapping from a clip to that
+chip, and the timeline bar and the timeline's own name strips read it too, so
+the three views of one selection agree by construction.
+
+Sections are disclosure groups with a reset-to-default in the header, a
+right-aligned mono 10 pt summary of the group's current state (`100%`,
+`neutral`, `+0.0 dB`, `off`) so a collapsed group still tells you something,
+and per-section open/closed state in `UserDefaults`. Transform opens by
+default and the rest are closed; a selection that gets no Transform — an
+audio-only clip — opens its first section instead, so the panel is never a
+wall of shut headers.
+
+**Note on the section list.** The design handoff's table sketches five groups
+(Transform, Video, Audio, Effects, Timing). What shipped keeps the panes'
+EXISTING sections as the units and filters them by kind, because merging them
+would have thrown away every per-section Reset button and every
+evaluated-action note. The handoff's own implementation note asks for exactly
+that — the rows move "largely as-is", and the work is the shell and the
+kind-to-sections function.
 Controls are Rasterize's `OptionControls` family: slider + field pairs
 with quick-value chevrons, color wells, steppers.
 
-**Video** — any clip with pixels. Text and shape clips get Transform,
-Opacity and Shadow only.
+The section groups below are named as they were when each was a tab; they
+are now sections of the Clip tab, offered when the selection has that aspect.
+
+**Video sections** — any clip with pixels. Text and shape clips get
+Transform, Opacity and Shadow only.
 
 - *Transform*: Scale % (1–1000), Position X / Y in canvas pixels (origin
   at canvas center, X right, Y down), Rotation °, Opacity %. Buttons:
@@ -208,8 +267,8 @@ Opacity and Shadow only.
   here rather than in the Shape pane below, because only the layer that
   owns the pixels can draw its 1.2–2× zoom.
 
-**Audio** — clips whose media has an audio track and whose audio is
-enabled.
+**Audio sections** — clips whose media has an audio track and whose audio
+is enabled.
 
 - Volume % (0–400, dB shown), Mute.
 - Fade in / fade out in seconds (also the corner handles on the clip).
@@ -241,7 +300,7 @@ enabled.
   - Read at the clip's BASE properties, never through an action, exactly
     as ducking is (§7.2).
 
-**Text**
+**Text sections**
 
 - Content (multi-line), font family / style / size, color, alignment
   (left / center / right and top / middle / bottom within the box), line
@@ -254,7 +313,7 @@ enabled.
 - Animation is Actions on position / opacity / scale. Built-in text
   animations (typewriter, per-word fade) are M3.
 
-**Shape**
+**Shape sections**
 
 - Kind: rectangle, rounded rectangle, ellipse, line, arrow. Stroke width
   and color, fill color and opacity, arrowheads at start / end, corner
@@ -263,9 +322,12 @@ enabled.
   ellipse, with an optional 1.2–2× zoom of the region — is a
   `video.spotlight` prop and appears in the **Video** pane, not here.
 
-**Media**
+**Media tab** — a 38 pt action row (Add Media…, its ⇧⌘I hint, a right-aligned
+item count), the list, then a 40 pt footer holding Consolidate… and a line
+saying what it does.
 
-- Every imported file: thumbnail, name, duration, dimensions, fps, an
+- Every imported file as a 52 pt row: a 34 × 38 pt thumbnail, the name at
+  12 pt, a mono 10 pt meta line of duration, dimensions and fps, an
   audio badge, a "missing" badge. Add Media… (⇧⌘I); drag files from the
   Finder onto the panel, the canvas, or the timeline.
 - Drag from the list to a timeline track (drops at the cursor) or onto
@@ -283,7 +345,9 @@ enabled.
   retimes, restyles and renders like one. Malformed entries are reported
   with their line numbers rather than skipped in silence.
 
-**Document**
+**Document tab** — a summary group first (Resolution, Frame rate, Duration,
+Tracks, Background as read-outs on an 86 pt label column), then the editable
+groups below it.
 
 - Canvas size: presets (1080p, 4K, 720p, 1080×1920 vertical, 1080×1080
   square, 2560×1440, source size) or custom; a "resize clips
@@ -297,14 +361,33 @@ enabled.
 
 ### 4.4 Timeline
 
-A toolbar row, the ruler, then the lanes. Track headers (120 pt) on the
+A bar, the ruler (22 pt), then the lanes. Track headers (132 pt) on the
 left scroll vertically with the lanes; ruler and lanes scroll horizontally
 together (one `NSScrollView` whose document view draws everything; the
 header column and ruler are floating subviews pinned in `scroll(_:)`).
 
-**Toolbar row**: Split (⌘T), Trim Start (W), Trim End (E), Ripple Delete
-(⌘⌫), Add Marker (M), Snap toggle (N), zoom slider with Fit (⇧Z), track
-height (S / M / L).
+**Timeline bar** (36 pt, `BarView(border: .both)`), left to right:
+
+- A **selection block** at the left edge that never moves, minimum 176 pt:
+  an 8 × 20 pt tint chip in the clip's kind colour, the name at 11 pt
+  semibold over `Track V1 · video` in mono 9 pt. With nothing selected, a
+  `DS.borderStrong` chip and "No selection"; with several, the count. It is
+  the same `ClipKindStyle` mapping the inspector's header and the clip's own
+  name strip use.
+- **Clip actions**, `GhostButton`s at 28 × 24 pt with 17 pt symbols: Split
+  (⌘T), Trim Start (W), Trim End (E), Ripple Delete (⌘⌫), Add Marker (M),
+  Duplicate (⌘D), Add Text (T), Add Shape. The last four came down from the
+  window toolbar. Add Shape is here rather than nowhere because it has no
+  menu item anywhere in the app.
+- **Snap** (N), then the zoom cluster — minus, the slider, plus, Fit (⇧Z) —
+  and the **S / M / L** track size.
+
+**Track size** picks a ROW of lane heights and a track's KIND picks the
+column: text 30 / 44 / 58, video 54 / 84 / 116, audio 40 / 60 / 82. A track
+holding nothing but text and shapes is a text track; one whose every clip
+sings and none of which draws is an audio track; everything else, an empty
+track included, is video. At S a clip is its name strip and little else,
+which is intended.
 
 **Ruler**: adaptive ticks (frames → seconds → 10 s → minutes as you zoom).
 The playhead head is a coral triangle you drag to scrub; clicking the
@@ -318,14 +401,34 @@ video), speaker (mute), lock. Top track is front-most. Drag a header to
 reorder. Dragging a clip above the top track or below the bottom one
 creates a track; Track > Remove Empty Tracks cleans up. New Track is ⇧⌘N.
 
-**Clips** are 4 pt-rounded bars. Name label top-left; a filmstrip of
-thumbnails on video clips; waveform on the lower half of a video clip
-with audio, or the whole bar of an audio clip. Tint by kind: video slate,
-audio green, still violet, text amber, shape teal, nest grey. Selected:
-coral outline. Locked track: hatched overlay. Muted: waveform at 40 %.
-An action is a darker band along the top edge over its span. A transition
-is a hatched overlap zone labelled with its kind. Fade handles are small
-squares at the audio corners you drag inward.
+**Clips are objects, not bands.** A clip is a 4 pt-rounded body inset 3 pt
+from the lane's top and bottom, clipped to that shape, with a 1 pt
+`rgba(white, 0.14)` border — so you can see where one ends and the next
+begins, which was the whole complaint.
+
+- **Name strip**: 16 pt along the top, `rgba(black, 0.26)` over the tint,
+  6 pt padding, an 11 pt kind symbol at 62 % white, then the name at 10 pt
+  semibold, 92 % white, truncated with an ellipsis. The symbol is the point
+  of it — a clip's kind used to be invisible.
+- **Tint by kind**, `ClipKindStyle`: video slate, audio green, still violet,
+  text amber, shape teal, nest grey. A `media` clip is video or audio by
+  whether its FILE has pictures, not by `enabled.video` — that flag is the
+  Detach switch, and reading it made every imported mp3 draw as video.
+- **Video body**: filmstrip thumbnails at a fixed 34 pt tile, 72 % opacity,
+  with the clip's tint washed back over them at 54 % so the clip still reads
+  as one tinted object rather than a strip of photographs.
+- **Audio body**: waveform at `rgba(white, 0.44)`, symmetric about the
+  body's centre. Muted draws at 40 %.
+- **Selected**: a 2 pt coral ring, plus 6 pt `rgba(white, 0.38)` trim grips
+  at both ends — on the selected clip only, and only where the clip is wide
+  enough and its track unlocked for a trim to be possible, so a grip never
+  offers what a click cannot take.
+- An action is a darker band under the name strip over its span. A
+  **transition** is the overlap zone, drawn above both bars: a 45° hatch at
+  `rgba(white, 0.26)`, 3 pt on a 7 pt perpendicular period, with a solid
+  edge down each side, and its kind named only when the word fits. Locked
+  track: hatched overlay. Fade handles are small squares at the audio
+  corners you drag inward.
 
 **Gestures** (exact op semantics in §6)
 

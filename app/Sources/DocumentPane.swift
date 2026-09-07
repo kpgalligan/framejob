@@ -1,7 +1,8 @@
 import AppKit
 
-/// The Document tab (spec §4.3): canvas size, frame rate, background,
-/// duration, the timecode format, "fit new clips", and the markers list.
+/// The Document tab (spec §4.3): what the document is, then canvas size,
+/// frame rate, background, the timecode format, "fit new clips", and the
+/// markers list.
 ///
 /// Nothing here is a clip property, so nothing here goes through
 /// `InspectorBinding.ops` — every row is one `set_canvas` or one marker op,
@@ -24,7 +25,91 @@ final class DocumentPane: InspectorPaneView {
     }
 
     override func makeSections() -> [InspectorSection] {
-        [canvasSection(), rateSection(), appearanceSection(), markersSection()]
+        [summarySection(), canvasSection(), rateSection(), appearanceSection(), markersSection()]
+    }
+
+    // MARK: Summary
+
+    /// The label column of the summary rows. Deliberately NOT
+    /// `InspectorMetrics.labelWidth` (76): these labels are whole words
+    /// ("Resolution", "Frame rate", "Background") where the clip panes' are
+    /// single properties, and widening the shared metric would re-flow every
+    /// row in every other pane to fix five rows here.
+    private static let summaryLabelWidth: CGFloat = 86
+
+    /// What the document IS, read-only, before the controls that change it
+    /// (handoff README, Part 2 §5). The tab used to open on a size popup,
+    /// which answers "what can I set" before "what am I looking at".
+    ///
+    /// The design lists a sixth row, Colour. `CanvasSnapshot` (spec §5.2)
+    /// carries no colour space — a canvas is a size, a rate, a background and
+    /// a timecode format, and the whole pipeline is sRGB — so the row is left
+    /// out rather than filled with a value the model does not hold.
+    private func summarySection() -> InspectorSection {
+        let binding = self.binding
+        return InspectorSection(
+            id: "doc.summary", title: "Document",
+            rows: [
+                summaryRow("Resolution") {
+                    "\(binding.canvas.width) × \(binding.canvas.height)"
+                },
+                summaryRow("Frame rate") { "\(binding.canvas.fps.displayName) fps" },
+                summaryRow("Duration") {
+                    ReelTime.format(
+                        binding.snapshot.duration, fps: binding.canvas.fps,
+                        frames: binding.canvas.timecodeFrames)
+                },
+                summaryRow("Tracks") { String(binding.snapshot.tracks.count) },
+                summaryRow("Background") {
+                    DocumentPane.colorName(binding.canvas.background)
+                },
+            ])
+    }
+
+    /// One read-out on the 86 pt column. `inspectorRow` would be the natural
+    /// builder, but its label column is `InspectorMetrics`' shared width and
+    /// takes no override, so the row is assembled here.
+    ///
+    /// The value is an `inspectorReadout` — an `OptionControl` — because none
+    /// of these five is in `structureSignature`: adding a track or moving the
+    /// last clip changes what the row says without rebuilding the pane, and a
+    /// plain label would go stale where a control is refreshed.
+    private func summaryRow(_ label: String, _ read: @escaping () -> String) -> NSView {
+        let field = InspectorRowLabel(label)
+        field.translatesAutoresizingMaskIntoConstraints = false
+        field.widthAnchor.constraint(
+            equalToConstant: DocumentPane.summaryLabelWidth).isActive = true
+        let trailing = NSView()
+        trailing.setContentHuggingPriority(NSLayoutConstraint.Priority(1), for: .horizontal)
+        trailing.setContentCompressionResistancePriority(
+            NSLayoutConstraint.Priority(1), for: .horizontal)
+        let row = NSStackView(views: [field, inspectorReadout(width: 150, read), trailing])
+        row.orientation = .horizontal
+        row.alignment = .centerY
+        row.spacing = 6
+        return row
+    }
+
+    /// The background as a word when it is one of the two the eye names, and
+    /// as a hex triplet otherwise — a read-out, so it is spelled the way a
+    /// machine-produced number is. Alpha is reported separately because a
+    /// transparent canvas is a fact about the EXPORT, not about the colour.
+    private static func colorName(_ rgba: RGBA) -> String {
+        let color = rgba.nsColor
+        let alpha = color.alphaComponent
+        guard alpha > 0.005 else { return "Transparent" }
+        func byte(_ value: CGFloat) -> Int { Int((value * 255).rounded()) }
+        let r = byte(color.redComponent)
+        let g = byte(color.greenComponent)
+        let b = byte(color.blueComponent)
+        let name: String
+        switch (r, g, b) {
+        case (0, 0, 0): name = "Black"
+        case (255, 255, 255): name = "White"
+        default: name = String(format: "#%02X%02X%02X", r, g, b)
+        }
+        guard alpha < 0.995 else { return name }
+        return "\(name) · \(Int((alpha * 100).rounded()))%"
     }
 
     // MARK: Canvas size
@@ -98,14 +183,14 @@ final class DocumentPane: InspectorPaneView {
                 inspectorRow("Preset", [popup]),
                 inspectorValueRow(
                     "Width", binding, name: "Canvas Size", unit: " px", decimals: 0, min: 16,
-                    max: 16384, slider: false,
+                    max: 16384, slider: false, width: InspectorMetrics.wideFieldWidth,
                     read: { Double(binding.canvas.width) },
                     ops: { value in
                         sizeOps(width: Int(value.rounded()), height: binding.canvas.height)
                     }),
                 inspectorValueRow(
                     "Height", binding, name: "Canvas Size", unit: " px", decimals: 0, min: 16,
-                    max: 16384, slider: false,
+                    max: 16384, slider: false, width: InspectorMetrics.wideFieldWidth,
                     read: { Double(binding.canvas.height) },
                     ops: { value in
                         sizeOps(width: binding.canvas.width, height: Int(value.rounded()))

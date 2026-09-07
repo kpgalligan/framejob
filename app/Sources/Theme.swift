@@ -42,8 +42,8 @@ enum DS {
     /// Clip tints by source kind — "video slate, audio green, still violet,
     /// text amber, shape teal, nest grey". Fixed inks rather than semantic
     /// ones: a clip's kind must read the same in both appearances, and the
-    /// bars carry white-ish labels either way. `TimelineView.tint(for:)` is
-    /// the only mapping from a `ClipSource` to one of these.
+    /// bars carry white-ish labels either way. `ClipKindStyle` is
+    /// the only mapping from a clip to one of these.
     static let clipVideo = NSColor(
         srgbRed: 0x3E / 255, green: 0x50 / 255, blue: 0x63 / 255, alpha: 1)
     static let clipAudio = NSColor(

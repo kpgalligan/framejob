@@ -19,11 +19,21 @@ import UniformTypeIdentifiers
 final class EditorViewController: NSViewController {
     // MARK: - Metrics (spec §3's table)
 
-    static let toolbarHeight: CGFloat = 44
-    static let defaultInspectorWidth: CGFloat = 320
+    static let toolbarHeight = DS.toolbarHeight
+    /// The redesign's inspector width (`DS.panelWidth`, 304). The two clamps
+    /// below are the window's, not the design's, and stay where they were.
+    static let defaultInspectorWidth = DS.panelWidth
     static let minInspectorWidth: CGFloat = 280
     static let maxInspectorWidth: CGFloat = 440
-    static let defaultTimelineHeight: CGFloat = 240
+    /// 300, not the 240 that predates the redesign: lane heights are per KIND
+    /// now (`DS.trackHeights`), so a Medium text/video/audio stack is
+    /// 44 + 84 + 60 pt of lanes plus 2 pt between each, the 22 pt ruler, the
+    /// timeline's own 36 pt bar and 4 pt of lane inset top and bottom — 260 pt
+    /// before a fourth track, against a 240 pt pane that clipped the last one.
+    /// The DEFAULT only: the two clamps below and the persisted
+    /// `timelineHeightKey` are untouched, so a pane the user has already sized
+    /// keeps the size they gave it.
+    static let defaultTimelineHeight: CGFloat = 300
     static let minTimelineHeight: CGFloat = 140
     /// The timeline may not eat more than 60 % of the window (spec §3).
     static let maxTimelineFraction: CGFloat = 0.6
@@ -71,20 +81,33 @@ final class EditorViewController: NSViewController {
     private let upperSplit = NSSplitView()
 
     // MARK: - Toolbar
+    //
+    // The views only. `buildToolbar`, `refreshToolbarControls` and the cluster
+    // metrics are `EditorViewController+Toolbar.swift`; an extension cannot add
+    // stored properties, so these seven stay here and are internal for it.
 
-    private let timecodeField = NSTextField(string: "00:00:00:00")
-    private let durationLabel = NSTextField(labelWithString: "/ 00:00:00:00")
-    private var zoomPopup: OptionPopupControl!
-    private var safeToggle: OptionCheckboxControl!
-    private let playButton = GhostButton(
-        symbol: "play.fill", fallback: "▶", caption: nil, tooltip: "Play (Space)",
-        action: #selector(playPause(_:)))
-    private let pauseButton = GhostButton(
-        symbol: "pause.fill", fallback: "❚❚", caption: nil, tooltip: "Pause (Space)",
-        action: #selector(playPause(_:)))
-    private let loopButton = GhostButton(
+    let timecodeField = NSTextField(string: "00:00:00:00")
+    let durationLabel = NSTextField(labelWithString: "/ 00:00:00:00")
+    var zoomPopup: OptionPopupControl!
+    var safeToggle: OptionCheckboxControl!
+    let playButton = GhostButton(
+        symbol: "play", fallback: "▶", caption: nil, tooltip: "Play (Space)",
+        action: #selector(playPause(_:)),
+        size: EditorViewController.transportButtonSize,
+        pointSize: EditorViewController.transportSymbolPointSize,
+        cornerRadius: DS.buttonRadius)
+    let pauseButton = GhostButton(
+        symbol: "pause", fallback: "❚❚", caption: nil, tooltip: "Pause (Space)",
+        action: #selector(playPause(_:)),
+        size: EditorViewController.transportButtonSize,
+        pointSize: EditorViewController.transportSymbolPointSize,
+        cornerRadius: DS.buttonRadius)
+    let loopButton = GhostButton(
         symbol: "repeat", fallback: "↻", caption: nil, tooltip: "Loop",
-        action: #selector(toggleLoop(_:)))
+        action: #selector(toggleLoop(_:)),
+        size: EditorViewController.transportButtonSize,
+        pointSize: EditorViewController.transportSymbolPointSize,
+        cornerRadius: DS.buttonRadius)
 
     // MARK: - View state
 
@@ -166,92 +189,6 @@ final class EditorViewController: NSViewController {
         ])
 
         view = root
-    }
-
-    /// Spec §4.1's row: transport, timecode, canvas zoom, safe guides, then
-    /// the add/export group pushed to the trailing edge.
-    private func buildToolbar() -> NSView {
-        let bar = BarView(border: .bottom)
-
-        DSField.style(timecodeField)
-        timecodeField.font = DS.mono(12)
-        timecodeField.alignment = .center
-        timecodeField.delegate = self
-        timecodeField.toolTip = "Current time — click to type one (1:23, 83.5, 1:23:04)"
-        timecodeField.widthAnchor.constraint(equalToConstant: 112).isActive = true
-
-        durationLabel.font = DS.mono(12)
-        durationLabel.textColor = DS.textFaint
-
-        zoomPopup = OptionPopupControl(
-            width: 74, items: Self.canvasZoomTitles,
-            read: { [weak self] in self?.canvasZoomIndex ?? 0 },
-            write: { [weak self] index in self?.setCanvasZoom(index) },
-            enabled: { true },
-            onEdit: { [weak self] in self?.refreshToolbarControls() })
-
-        safeToggle = OptionCheckboxControl(
-            label: "Safe",
-            read: { [weak self] in self?.safeGuidesVisible ?? false },
-            write: { [weak self] value in self?.setSafeGuides(value) },
-            enabled: { true },
-            onEdit: { [weak self] in self?.refreshToolbarControls() })
-
-        let transport = NSStackView(views: [
-            GhostButton(
-                symbol: "backward.end.fill", fallback: "⏮", caption: nil,
-                tooltip: "Go to Start (Home)", action: #selector(goToStart(_:))),
-            GhostButton(
-                symbol: "chevron.left.2", fallback: "◀◀", caption: nil,
-                tooltip: "Previous Edit Point (↑)", action: #selector(previousEditPoint(_:))),
-            playButton, pauseButton,
-            GhostButton(
-                symbol: "chevron.right.2", fallback: "▶▶", caption: nil,
-                tooltip: "Next Edit Point (↓)", action: #selector(nextEditPoint(_:))),
-            GhostButton(
-                symbol: "forward.end.fill", fallback: "⏭", caption: nil,
-                tooltip: "Go to End (End)", action: #selector(goToEnd(_:))),
-            loopButton,
-        ])
-        transport.orientation = .horizontal
-        transport.spacing = 2
-
-        let spacer = NSView()
-        spacer.setContentHuggingPriority(NSLayoutConstraint.Priority(1), for: .horizontal)
-        spacer.setContentCompressionResistancePriority(
-            NSLayoutConstraint.Priority(1), for: .horizontal)
-
-        let trailing = NSStackView(views: [
-            GhostButton(
-                symbol: "textformat", fallback: "T", caption: nil,
-                tooltip: "Add Text (T)", action: #selector(addTextClip(_:))),
-            GhostButton(
-                symbol: "square.on.circle", fallback: "▭", caption: nil,
-                tooltip: "Add Shape", action: #selector(showAddShapeMenu(_:))),
-            GhostButton(
-                symbol: "bookmark", fallback: "◆", caption: nil,
-                tooltip: "Add Marker (M)", action: #selector(addMarker(_:))),
-            StickerButton(
-                title: "Export…", style: .primary, target: nil,
-                action: #selector(exportProject(_:))),
-        ])
-        trailing.orientation = .horizontal
-        trailing.spacing = 4
-
-        let row = NSStackView(views: [
-            transport, timecodeField, durationLabel, zoomPopup, safeToggle, spacer, trailing,
-        ])
-        row.translatesAutoresizingMaskIntoConstraints = false
-        row.orientation = .horizontal
-        row.alignment = .centerY
-        row.spacing = 10
-        bar.addSubview(row)
-        NSLayoutConstraint.activate([
-            row.leadingAnchor.constraint(equalTo: bar.leadingAnchor, constant: 10),
-            row.trailingAnchor.constraint(equalTo: bar.trailingAnchor, constant: -10),
-            row.centerYAnchor.constraint(equalTo: bar.centerYAnchor),
-        ])
-        return bar
     }
 
     /// The nested splits of spec §3: canvas | inspector on top, timeline
@@ -496,12 +433,6 @@ final class EditorViewController: NSViewController {
         inspectorPlayheadMoved()
     }
 
-    private func refreshToolbarControls() {
-        zoomPopup?.refresh()
-        safeToggle?.refresh()
-        loopButton.alphaValue = loopEnabled ? 1 : 0.55
-    }
-
     // MARK: - Transport actions
 
     @objc func playPause(_ sender: Any?) {
@@ -566,7 +497,9 @@ final class EditorViewController: NSViewController {
 
     // MARK: - Canvas zoom and guides
 
-    private func setCanvasZoom(_ index: Int) {
+    /// Internal: the toolbar's zoom popup writes through it
+    /// (EditorViewController+Toolbar.swift).
+    func setCanvasZoom(_ index: Int) {
         canvasZoomIndex = min(max(index, 0), Self.canvasZoomScales.count - 1)
         layoutCanvas()
         refreshToolbarControls()
@@ -584,7 +517,9 @@ final class EditorViewController: NSViewController {
         setCanvasZoom(0)
     }
 
-    private func setSafeGuides(_ visible: Bool) {
+    /// Internal: the toolbar's Safe checkbox writes through it
+    /// (EditorViewController+Toolbar.swift).
+    func setSafeGuides(_ visible: Bool) {
         safeGuidesVisible = visible
         safeGuides.isHidden = !visible
         UserDefaults.standard.set(visible, forKey: Self.safeGuidesKey)
@@ -690,9 +625,10 @@ final class EditorViewController: NSViewController {
         }
     }
 
-    /// The Add Shape toolbar button's menu (rectangle, ellipse, line,
-    /// arrow). Tags index `ShapeKind.allCases`, so the menu can never drift
-    /// from the enum.
+    /// The Add Shape button's menu (rectangle, ellipse, line, arrow) — the
+    /// button is the timeline bar's since the chrome cleanup took clip actions
+    /// out of the toolbar. Tags index `ShapeKind.allCases`, so the menu can
+    /// never drift from the enum.
     @objc func showAddShapeMenu(_ sender: Any?) {
         let menu = NSMenu()
         for (index, kind) in ShapeKind.allCases.enumerated() {

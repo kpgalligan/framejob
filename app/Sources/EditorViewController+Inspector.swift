@@ -60,6 +60,15 @@ extension EditorViewController {
     /// Project → inspector, from `refreshFromDocument`. `isLive` rides
     /// through: mid-gesture the values change but the panel's shape does not,
     /// so the panel refreshes its fields and never rebuilds them.
+    ///
+    /// **This is also how clicking a clip shows the Clip tab.** A timeline or
+    /// canvas pick writes `document.selection` and calls `viewStateDidChange`,
+    /// which posts `.projectDocumentDidChange` and lands here; the inspector
+    /// compares the incoming selection with the one it last drew and switches
+    /// tabs when it changed. The rule lives there rather than at the two pick
+    /// sites because the panel is the thing that has to know which tab it is
+    /// on — and because ⌘A, ⌥⌘A, paste and an agent's `set_selection` all
+    /// arrive by this same path and mean the same thing.
     func refreshInspector(isLive: Bool) {
         inspector?.refresh(isLive: isLive)
     }

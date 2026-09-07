@@ -767,7 +767,58 @@ final class ProjectDocument: NSDocument {
         default:
             break
         }
-        super.updateChangeCount(change)
+        publishingEditedState { super.updateChangeCount(change) }
+    }
+
+    /// The OTHER half of the count, and the one a save arrives through.
+    ///
+    /// **Pitfall:** a save does not pass through `updateChangeCount(_:)` at
+    /// all. Measured against an AppKit harness: an `autosavesInPlace` document
+    /// clears its count here instead — `updateChangeCount(withToken:for:)`,
+    /// on the main thread, for ⌘S (`saveAs`) and for every silent
+    /// autosave-in-place alike. Hooking only the method above would publish
+    /// clean → edited and never edited → clean, which is exactly the "· edited"
+    /// suffix that used to stick in the window subtitle for the life of the
+    /// document.
+    override func updateChangeCount(
+        withToken changeCountToken: Any, for saveOperation: NSDocument.SaveOperationType
+    ) {
+        publishingEditedState {
+            super.updateChangeCount(withToken: changeCountToken, for: saveOperation)
+        }
+    }
+
+    /// Runs one change-count mutation and posts `.projectDocumentDidChange`
+    /// when — and only when — `isDocumentEdited` CROSSED.
+    ///
+    /// The window subtitle is the only dirty indicator this app has: under
+    /// `autosavesInPlace` AppKit never sets `NSWindow.isDocumentEdited` and
+    /// never sends `NSWindowController.setDocumentEdited(_:)`, so there is no
+    /// close-button dot (`EditorWindowController.subtitle(for:)` says the rest).
+    /// Nothing can observe the flag either — `NSDocument.isDocumentEdited` is
+    /// not KVO-compliant — so the crossing is published by hand, and
+    /// `EditorViewController.refreshFromDocument` rewrites the subtitle off the
+    /// back of it like any other change.
+    ///
+    /// **On the crossing only.** That observer reloads the timeline and the
+    /// inspector; posting on every call would put a full refresh behind every
+    /// autosave. `isLive: false` because a dirty-state change is never
+    /// mid-gesture: the live ticks are not counted.
+    ///
+    /// **And never from inside an edit** (`allowEditChangeCount`), which posts
+    /// its own a moment later. Not just to save the duplicate: `projectDidChange`
+    /// deliberately publishes the reverse resolution BEFORE its notification,
+    /// and an extra post from in here would land between the count and that
+    /// publish — so the editor would rebuild its composition against the
+    /// PREVIOUS project's resolution and play a just-reversed clip forwards,
+    /// on the first edit after every save. The edit paths all count and then
+    /// post, so the crossing is published either way.
+    private func publishingEditedState(_ body: () -> Void) {
+        let wasEdited = isDocumentEdited
+        body()
+        guard isDocumentEdited != wasEdited, !allowEditChangeCount else { return }
+        NotificationCenter.default.post(
+            name: .projectDocumentDidChange, object: self, userInfo: ["isLive": false])
     }
 
     /// The explicit counting entry used by this class's edit paths.

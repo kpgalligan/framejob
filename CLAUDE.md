@@ -6,16 +6,18 @@ Rust staticlib core, the same shape as `~/devel/rasterize`.
 **It builds and runs.** M1 (Cut) is done and verified against spec §10; most
 of M2 landed with it.
 
-Two documents in `designs/`, and you want both:
+Three things in `designs/`, and you want all of them:
 
 - `designs/reelcut-design.md` — the normative spec. The schemas (§5), the op
   table (§6) and the architecture (§7) govern any change to either side; §11
   holds decisions already made, which are not to be re-litigated.
 - **`designs/reelcut-roadmap.md` — what is left to build, in six phases**,
   each naming the files it lands in and what would prove it done. **Start
-  here if you are picking up new work.** Phase 1 is "put eyes on the app":
-  the timeline view and canvas overlay have never been looked at by a person,
-  and what that turns up may re-order everything after it.
+  here if you are picking up new work.**
+- `designs/design_handoff_reelcut/` — the chrome cleanup and the identity,
+  now SHIPPED. Its `README.md` is the normative source for the redesign's
+  metrics (spec §3–§4.4 summarises them); the two `.dc.html` files are
+  browser prototypes, not code to port, and `logo/` is the identity master.
 
 ## Commands
 
@@ -48,7 +50,8 @@ app/
   Sources/             AppKit app, programmatic UI (app/CLAUDE.md has the map)
   Resources/Shaders/   Compositor.metal — the per-layer compositing pass
   Bridging/            the bridging header importing core/include/reelcut_core.h
-designs/             reelcut-design.md — normative spec
+designs/             reelcut-design.md — normative spec;
+                     design_handoff_reelcut/ — the shipped chrome + identity
 project.yml          xcodegen definition; Makefile; README.md (user-facing)
 ```
 
@@ -107,9 +110,25 @@ against `ffmpeg`-extracted source frames; `export` waits for the file.
 Spec §10's per-step verifications are the acceptance tests. Steps 3, 4, 5, 7,
 9, 10, 11 and 12 have been run against a built app and passed; 1 and 2 are
 what `make app` and `make test` check every time. **Steps 6 (timeline view)
-and 8 (canvas overlay) are visual and have never been checked by anyone**, and
-neither has step 4's "the clip plays with audio" or step 5's 60 fps — MCP
-cannot see the screen. Those need eyes on the app.
+and 8 (canvas overlay) have now been LOOKED AT** — see "Seeing the chrome"
+below. Still unchecked by a human: step 4's "the clip plays with audio" and
+step 5's 60 fps, neither of which a still frame can answer.
+
+## Seeing the chrome
+
+`screencapture` needs a Screen Recording grant the agent's terminal does not
+have, and it silently writes a black PNG rather than failing. The way to LOOK
+at the chrome is therefore to render it offscreen: compile every file in
+`app/Sources` except `main.swift` together with a small `main.swift` of your
+own, link `core/target/release/libreelcut_core.a`, open a `.reelcut` package
+through `ProjectDocument.read(from:ofType:)`, put an `EditorViewController` in
+an `NSWindow`, spin the runloop a few turns, and `cacheDisplay(in:to:)` the
+content view into a PNG. That is the same paint path the window uses, it needs
+no TCC grant, it renders either appearance on demand, and it is how the
+redesign was checked. The preview well comes out black — a Metal layer has no
+drawable offscreen — which does not matter, because the chrome is the point.
+Selection, the playhead and the S/M/L size are VIEW state and are not in the
+package, so the harness has to set them itself.
 
 ## Milestone status
 
@@ -207,5 +226,46 @@ cannot see the screen. Those need eyes on the app.
   the default `cross_dissolve`**, so a "no transition" baseline has to be
   built by moving clips apart, not by clearing the kind — an overlap with no
   kind still dissolves (`transition.rs`: `unwrap_or_default()`).
+
+- **The chrome cleanup and the new identity: done**
+  (`designs/design_handoff_reelcut/`). The three things the user named — a
+  grab-bag toolbar, an out-of-place Export button, and clips you could not
+  tell apart — plus the identity around them.
+  **Identity**: `AppIcon.appiconset` is the two-clips-and-a-playhead mark, and
+  `BrandMark.swift` draws the same geometry for the welcome lockup and the
+  About panel. No blend mode anywhere in it (the motif it replaced was the
+  app's only `.multiply`), and it holds at 16 px.
+  **Toolbar** (`EditorViewController+Toolbar.swift`): transport · timecode —
+  view · Export, and nothing else. The three clip actions went down to the
+  timeline bar, the document meta went up to the title bar's subtitle, and
+  Export is an `AccentButton` — flat, 4 pt radius, `DS.accent` — not the
+  system pill. `StickerButton` survives for the sheets and the welcome screen.
+  **Timeline bar** (`TimelineBar.swift`): a fixed selection block at the left
+  edge, the eight clip actions, snap, the zoom cluster, S/M/L — and S/M/L now
+  drives REAL heights, per track KIND (`DS.trackHeights`, text/video/audio),
+  which is why `TimelineLayout.rowTop` is a prefix sum and not a multiply.
+  **Clips are objects** (`TimelineClipDrawing.swift`): a 3 pt-inset body with
+  a hairline border, a 16 pt name strip carrying the kind symbol, a filmstrip
+  under a 54 % tint wash, trim grips on the selected clip only, and a
+  transition zone hatched at the design's 3 pt on 7 pt PERPENDICULAR period
+  (`TimelineDraw.hatch` steps along X on a 45° line, so the call site scales
+  the spacing by √2).
+  **Inspector**: six tabs became three (`ClipPane.swift`), with a selection
+  header, per-section summaries, and sections chosen by the selection's kind.
+  Two things worth knowing before you touch it: an `InspectorPaneView` is
+  `isFlipped` so its scroll view starts at the TOP, and the section
+  collapsed-state key records COLLAPSED, so the default applies only when
+  nothing is stored.
+  Fixed along the way, both app-wide and neither strictly the redesign's:
+  **an audio-only file used to read as video everywhere** (the tint asked
+  `enabled.video`, the Detach switch, instead of whether the file has
+  pictures — `ClipKindStyle` now takes the snapshot), and **every custom
+  control's tooltip was dead**, because `trackingAreas.forEach(removeTrackingArea)`
+  takes `NSToolTipManager`'s area with it and nothing puts it back.
+  Two deviations from the handoff, both deliberate: the Clip tab keeps the
+  panes' existing sections rather than merging them into the five the mock
+  sketches (merging would delete every per-section Reset), and the transport
+  buttons are 34 pt rather than 30, because SF Symbols' `backward` measures
+  exactly 30 pt at the 19 pt the same document asks for.
 
 Keep this file current as code lands.

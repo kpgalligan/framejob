@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Source+Sans+3:wght@400;600&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,300..500,0..1,0&display=swap" rel="stylesheet">
+<style>
+  body { margin: 0; background: #101010; }
+  a { color: #62b0ff; text-decoration: none; }
+  a:hover { color: #8cc6ff; }
+</style>
+</helmet>
+
+<div style="padding:28px;display:flex;justify-content:center;overflow-x:auto;font-family:'Source Sans 3',system-ui,sans-serif">
+<div style="width:1440px;flex:none;background:#232323;border:1px solid #3a3a3a;border-radius:8px;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,0.55);color:#e6e6e4;position:relative">
+
+  <div style="height:30px;background:#2c2c2c;border-bottom:1px solid #3a3a3a;display:flex;align-items:center;gap:10px;padding:0 12px">
+    <div style="display:flex;gap:8px">
+      <div style="width:11px;height:11px;border-radius:50%;background:#ff5f57"></div>
+      <div style="width:11px;height:11px;border-radius:50%;background:#febc2e"></div>
+      <div style="width:11px;height:11px;border-radius:50%;background:#28c840"></div>
+    </div>
+    <div style="flex:1;display:flex;align-items:center;justify-content:center;gap:8px">
+      <span style="font:600 12px/1 'Source Sans 3',sans-serif;color:#dcdcd8">Untitled Project</span>
+      <span style="font:400 11px/1 'IBM Plex Mono',monospace;color:#8f8f8a">1080 × 1920 · 25.106 fps · edited</span>
+    </div>
+    <div style="width:64px"></div>
+  </div>
+
+  <div style="height:44px;background:#262626;border-bottom:1px solid #3a3a3a;display:flex;align-items:center;gap:12px;padding:0 12px">
+    <div style="display:flex;gap:2px">
+      <sc-for list="{{ transport }}" as="b" hint-placeholder-count="6">
+        <div style="width:30px;height:26px;border-radius:4px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#c8c8c2" style-hover="background:#333;color:#e6e6e4">
+          <span style="font-family:'Material Symbols Outlined';font-size:19px;line-height:1">{{ b }}</span>
+        </div>
+      </sc-for>
+    </div>
+    <div style="width:1px;height:20px;background:#3a3a3a"></div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <div style="height:24px;border:1px solid #55554f;background:#1d1d1d;border-radius:4px;display:flex;align-items:center;padding:0 9px;font:500 12px/1 'IBM Plex Mono',monospace;color:#f0efe9">00:00:04:05</div>
+      <span style="font:400 11px/1 'IBM Plex Mono',monospace;color:#6e6e68">/ 00:00:37:05</span>
+    </div>
+    <div style="flex:1"></div>
+    <div style="display:flex;align-items:center;gap:12px">
+      <div style="height:24px;border:1px solid #3a3a3a;background:#2b2b2b;border-radius:4px;display:flex;align-items:center;gap:8px;padding:0 8px;font:400 11px/1 'IBM Plex Mono',monospace;color:#dcdcd8;cursor:pointer">Fit<span style="font-family:'Material Symbols Outlined';font-size:13px;color:#8f8f8a">unfold_more</span></div>
+      <div onClick="{{ toggleSafe }}" style="display:flex;align-items:center;gap:6px;cursor:pointer">
+        <div style="width:13px;height:13px;border-radius:3px;border:1px solid {{ safeBorder }};background:{{ safeFill }};display:flex;align-items:center;justify-content:center;font:500 9px/1 'IBM Plex Mono',monospace;color:#8cc6ff">{{ safeTick }}</div>
+        <span style="font:400 11px/1 'Source Sans 3',sans-serif;color:#b9b9b3">Safe</span>
+      </div>
+    </div>
+    <div style="width:1px;height:20px;background:#3a3a3a"></div>
+    <div style="height:26px;border-radius:4px;background:#3d6ea8;display:flex;align-items:center;gap:6px;padding:0 12px;cursor:pointer" style-hover="background:#4a7fbd">
+      <span style="font-family:'Material Symbols Outlined';font-size:15px;line-height:1;color:#f0f6ff">ios_share</span>
+      <span style="font:600 12px/1 'Source Sans 3',sans-serif;color:#f0f6ff">Export</span>
+    </div>
+  </div>
+
+  <div style="display:flex;height:470px">
+    <div style="flex:1;background:#171717;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;position:relative">
+      <div style="height:410px;width:231px;position:relative;box-shadow:0 0 0 1px #3a3a3a,0 8px 30px rgba(0,0,0,0.5)">
+        <img src="assets/reel-frame.png" alt="preview" style="width:100%;height:100%;object-fit:cover;display:block">
+        <sc-if value="{{ safe }}" hint-placeholder-val="{{ false }}">
+          <div style="position:absolute;inset:0;pointer-events:none">
+            <div style="position:absolute;left:5%;top:5%;right:5%;bottom:5%;border:1px solid rgba(244,101,63,0.85)"></div>
+            <div style="position:absolute;left:10%;top:10%;right:10%;bottom:10%;border:1px solid rgba(244,101,63,0.5)"></div>
+          </div>
+        </sc-if>
+      </div>
+      <div style="font:400 10px/1 'IBM Plex Mono',monospace;color:#6e6e68;letter-spacing:0.06em">1080 × 1920 · 25.106 FPS</div>
+    </div>
+
+    <div style="width:304px;background:#242424;border-left:1px solid #3a3a3a;display:flex;flex-direction:column">
+      <div style="display:flex;height:32px;border-bottom:1px solid #3a3a3a">
+        <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="3">
+          <div onClick="{{ t.pick }}" style="flex:1;display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;border-right:1px solid #3a3a3a">
+            <sc-if value="{{ t.active }}" hint-placeholder-val="{{ true }}">
+              <div style="position:absolute;inset:0;background:#2c2c2c;border-bottom:2px solid #62b0ff"></div>
+            </sc-if>
+            <span style="font:600 12px/1 'Source Sans 3',sans-serif;position:relative;color:{{ t.color }}">{{ t.name }}</span>
+          </div>
+        </sc-for>
+      </div>
+
+      <sc-if value="{{ clipTab }}" hint-placeholder-val="{{ true }}">
+        <div style="display:flex;flex-direction:column;flex:1;overflow:hidden">
+          <div style="height:44px;border-bottom:1px solid #3a3a3a;display:flex;align-items:center;gap:9px;padding:0 12px">
+            <div style="width:8px;height:26px;border-radius:2px;background:{{ selTint }}"></div>
+            <div style="display:flex;flex-direction:column;gap:3px;overflow:hidden">
+              <span style="font:600 12px/1 'Source Sans 3',sans-serif;color:#e6e6e4;white-space:nowrap">{{ selName }}</span>
+              <span style="font:400 10px/1 'IBM Plex Mono',monospace;color:#8f8f8a;white-space:nowrap">{{ selMeta }}</span>
+            </div>
+          </div>
+          <div style="flex:1;overflow:hidden">
+            <sc-for list="{{ sections }}" as="s" hint-placeholder-count="5">
+              <div style="border-bottom:1px solid #303030">
+                <div onClick="{{ s.toggle }}" style="height:28px;display:flex;align-items:center;gap:7px;padding:0 10px;cursor:pointer" style-hover="background:#2a2a2a">
+                  <span style="font-family:'Material Symbols Outlined';font-size:15px;line-height:1;color:#8f8f8a">{{ s.chevron }}</span>
+                  <span style="font:500 10px/1 'IBM Plex Mono',monospace;letter-spacing:0.09em;color:#b9b9b3">{{ s.label }}</span>
+                  <div style="flex:1"></div>
+                  <span style="font:400 10px/1 'IBM Plex Mono',monospace;color:#6e6e68">{{ s.summary }}</span>
+                </div>
+                <sc-if value="{{ s.open }}" hint-placeholder-val="{{ true }}">
+                  <div style="padding:2px 10px 10px;display:grid;grid-template-columns:76px 1fr;gap:7px 10px;align-items:center">
+                    <sc-for list="{{ s.rows }}" as="r" hint-placeholder-count="3">
+                      <span style="font:400 11px/1 'Source Sans 3',sans-serif;color:#8f8f8a">{{ r.label }}</span>
+                      <div style="height:22px;border:1px solid #3a3a3a;background:#2b2b2b;border-radius:3px;display:flex;align-items:center;justify-content:space-between;padding:0 7px;font:400 11px/1 'IBM Plex Mono',monospace;color:#dcdcd8">{{ r.value }}<span style="font-family:'Material Symbols Outlined';font-size:12px;color:#55554f">{{ r.affix }}</span></div>
+                    </sc-for>
+                  </div>
+                </sc-if>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ mediaTab }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;flex-direction:column;flex:1">
+          <div style="height:38px;border-bottom:1px solid #3a3a3a;display:flex;align-items:center;gap:8px;padding:0 10px">
+            <div style="height:24px;border-radius:4px;border:1px solid #55554f;background:#2b2b2b;display:flex;align-items:center;gap:6px;padding:0 9px;cursor:pointer" style-hover="background:#333">
+              <span style="font-family:'Material Symbols Outlined';font-size:14px;color:#c8c8c2">add</span>
+              <span style="font:600 11px/1 'Source Sans 3',sans-serif;color:#dcdcd8">Add Media</span>
+            </div>
+            <span style="font:400 10px/1 'IBM Plex Mono',monospace;color:#6e6e68">⇧⌘I</span>
+            <div style="flex:1"></div>
+            <span style="font:400 10px/1 'IBM Plex Mono',monospace;color:#6e6e68">3 items</span>
+          </div>
+          <div style="flex:1;padding:8px;display:flex;flex-direction:column;gap:3px">
+            <sc-for list="{{ mediaItems }}" as="m" hint-placeholder-count="3">
+              <div style="height:52px;border-radius:5px;border:1px solid #303030;display:flex;align-items:center;gap:9px;padding:0 8px;cursor:grab" style-hover="background:#2a2a2a">
+                <div style="width:34px;height:38px;border-radius:3px;border:1px solid #3a3a3a;overflow:hidden;background:{{ m.tint }}">
+                  <img src="assets/reel-frame.png" alt="" style="width:100%;height:100%;object-fit:cover;display:block;opacity:{{ m.thumbAlpha }}">
+                </div>
+                <div style="display:flex;flex-direction:column;gap:4px;overflow:hidden">
+                  <span style="font:400 12px/1 'Source Sans 3',sans-serif;color:#dcdcd8;white-space:nowrap">{{ m.name }}</span>
+                  <span style="font:400 10px/1 'IBM Plex Mono',monospace;color:#8f8f8a;white-space:nowrap">{{ m.meta }}</span>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+          <div style="height:40px;border-top:1px solid #3a3a3a;display:flex;align-items:center;padding:0 10px;gap:10px">
+            <div style="height:24px;border-radius:4px;border:1px solid #3a3a3a;background:#2b2b2b;display:flex;align-items:center;padding:0 9px;font:400 11px/1 'Source Sans 3',sans-serif;color:#b9b9b3;cursor:pointer" style-hover="background:#333">Consolidate…</div>
+            <span style="font:400 10px/1 'Source Sans 3',sans-serif;color:#6e6e68">Copies sources into the package</span>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ docTab }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;flex-direction:column;flex:1">
+          <div style="padding:12px 10px;display:grid;grid-template-columns:86px 1fr;gap:8px 10px;align-items:center">
+            <sc-for list="{{ docRows }}" as="r" hint-placeholder-count="6">
+              <span style="font:400 11px/1 'Source Sans 3',sans-serif;color:#8f8f8a">{{ r.label }}</span>
+              <div style="height:22px;border:1px solid #3a3a3a;background:#2b2b2b;border-radius:3px;display:flex;align-items:center;padding:0 7px;font:400 11px/1 'IBM Plex Mono',monospace;color:#dcdcd8">{{ r.value }}</div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+    </div>
+  </div>
+
+  <div style="height:36px;background:#262626;border-top:1px solid #3a3a3a;border-bottom:1px solid #3a3a3a;display:flex;align-items:center;gap:12px;padding:0 12px">
+    <div style="display:flex;align-items:center;gap:8px;min-width:176px">
+      <div style="width:8px;height:20px;border-radius:2px;background:{{ selTint }}"></div>
+      <div style="display:flex;flex-direction:column;gap:2px;overflow:hidden">
+        <span style="font:600 11px/1.1 'Source Sans 3',sans-serif;color:#e6e6e4;white-space:nowrap">{{ selName }}</span>
+        <span style="font:400 9px/1.1 'IBM Plex Mono',monospace;color:#8f8f8a;white-space:nowrap">{{ selWhere }}</span>
+      </div>
+    </div>
+    <div style="width:1px;height:18px;background:#3a3a3a"></div>
+    <div style="display:flex;gap:2px">
+      <sc-for list="{{ editActions }}" as="a" hint-placeholder-count="7">
+        <div style="width:28px;height:24px;border-radius:4px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#a3a39c" style-hover="background:#333;color:#e6e6e4">
+          <span style="font-family:'Material Symbols Outlined';font-size:17px;line-height:1">{{ a }}</span>
+        </div>
+      </sc-for>
+    </div>
+    <div style="width:1px;height:18px;background:#3a3a3a"></div>
+    <div onClick="{{ toggleSnap }}" style="display:flex;align-items:center;gap:6px;cursor:pointer">
+      <div style="width:13px;height:13px;border-radius:3px;border:1px solid {{ snapBorder }};background:{{ snapFill }};display:flex;align-items:center;justify-content:center;font:500 9px/1 'IBM Plex Mono',monospace;color:#8cc6ff">{{ snapTick }}</div>
+      <span style="font:400 11px/1 'Source Sans 3',sans-serif;color:#b9b9b3">Snap</span>
+    </div>
+    <div style="flex:1"></div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <span style="font-family:'Material Symbols Outlined';font-size:15px;color:#8f8f8a">zoom_out</span>
+      <div style="width:110px;height:3px;background:#3a3a3a;border-radius:2px;position:relative">
+        <div style="position:absolute;left:0;top:0;bottom:0;width:42%;background:#62b0ff;border-radius:2px"></div>
+        <div style="position:absolute;left:42%;top:-4px;width:11px;height:11px;border-radius:50%;background:#e6e6e4;margin-left:-5px"></div>
+      </div>
+      <span style="font-family:'Material Symbols Outlined';font-size:15px;color:#8f8f8a">zoom_in</span>
+    </div>
+    <div style="width:1px;height:18px;background:#3a3a3a"></div>
+    <div style="display:flex">
+      <sc-for list="{{ sizeButtons }}" as="b" hint-placeholder-count="3">
+        <div onClick="{{ b.pick }}" style="width:24px;height:22px;border:1px solid {{ b.border }};border-left:{{ b.leftBorder }};background:{{ b.bg }};border-radius:{{ b.radius }};display:flex;align-items:center;justify-content:center;font:500 10px/1 'IBM Plex Mono',monospace;color:{{ b.color }};cursor:pointer">{{ b.label }}</div>
+      </sc-for>
+    </div>
+  </div>
+
+  <div style="height:282px;background:#1d1d1d;position:relative;overflow:hidden">
+    <div style="display:flex;height:22px;border-bottom:1px solid #303030;background:#232323">
+      <div style="width:132px;border-right:1px solid #3a3a3a;display:flex;align-items:center;padding:0 10px;font:400 9px/1 'IBM Plex Mono',monospace;letter-spacing:0.09em;color:#6e6e68">TIMELINE</div>
+      <div style="flex:1;position:relative">
+        <sc-for list="{{ ticks }}" as="t" hint-placeholder-count="10">
+          <div style="position:absolute;left:{{ t.x }}px;top:0;bottom:0;display:flex;align-items:center;gap:5px;padding-left:4px;border-left:1px solid #3a3a3a">
+            <span style="font:400 9px/1 'IBM Plex Mono',monospace;color:#7c7c76">{{ t.label }}</span>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+
+    <sc-for list="{{ tracks }}" as="tr" hint-placeholder-count="3">
+      <div style="display:flex;height:{{ tr.h }}px;border-bottom:1px solid #2a2a2a">
+        <div style="width:132px;border-right:1px solid #3a3a3a;background:#232323;display:flex;flex-direction:column;justify-content:center;gap:6px;padding:0 10px">
+          <div style="display:flex;align-items:center;gap:6px">
+            <div style="width:6px;height:6px;border-radius:1px;background:{{ tr.tint }}"></div>
+            <span style="font:600 11px/1 'Source Sans 3',sans-serif;color:#dcdcd8">{{ tr.name }}</span>
+            <div style="flex:1"></div>
+            <span style="font:400 9px/1 'IBM Plex Mono',monospace;color:#6e6e68">{{ tr.kind }}</span>
+          </div>
+          <div style="display:flex;gap:2px">
+            <sc-for list="{{ tr.toggles }}" as="g" hint-placeholder-count="3">
+              <div style="width:20px;height:18px;border-radius:3px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#8f8f8a" style-hover="background:#333;color:#dcdcd8">
+                <span style="font-family:'Material Symbols Outlined';font-size:13px;line-height:1">{{ g }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+        <div style="flex:1;position:relative;background:{{ tr.lane }}">
+          <sc-for list="{{ tr.clips }}" as="c" hint-placeholder-count="1">
+            <div onClick="{{ c.pick }}" style="position:absolute;left:{{ c.x }}px;width:{{ c.w }}px;top:3px;bottom:3px;border-radius:4px;overflow:hidden;background:{{ c.tint }};border:1px solid rgba(255,255,255,0.14);box-shadow:{{ c.ring }};cursor:pointer;display:flex;flex-direction:column">
+              <div style="height:16px;flex:none;background:rgba(0,0,0,0.26);display:flex;align-items:center;gap:5px;padding:0 6px;overflow:hidden">
+                <span style="font-family:'Material Symbols Outlined';font-size:11px;line-height:1;color:rgba(255,255,255,0.62)">{{ c.icon }}</span>
+                <span style="font:600 10px/1 'Source Sans 3',sans-serif;color:rgba(255,255,255,0.92);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.name }}</span>
+              </div>
+              <div style="flex:1;position:relative;overflow:hidden">
+                <sc-if value="{{ c.film }}" hint-placeholder-val="{{ false }}">
+                  <div style="position:absolute;inset:0;display:flex">
+                    <sc-for list="{{ c.thumbs }}" as="th" hint-placeholder-count="8">
+                      <img src="assets/reel-frame.png" alt="" style="width:34px;height:100%;flex:none;object-fit:cover;display:block;opacity:0.72">
+                    </sc-for>
+                  </div>
+                  <div style="position:absolute;inset:0;background:{{ c.wash }}"></div>
+                </sc-if>
+                <sc-if value="{{ c.wave }}" hint-placeholder-val="{{ false }}">
+                  <svg viewBox="0 0 1000 100" preserveAspectRatio="none" style="position:absolute;inset:0;width:100%;height:100%">
+                    <path d="{{ wavePath }}" fill="rgba(255,255,255,0.44)"></path>
+                  </svg>
+                </sc-if>
+                <sc-if value="{{ c.caption }}" hint-placeholder-val="{{ false }}">
+                  <div style="position:absolute;inset:0;display:flex;align-items:center;padding:0 8px;font:600 11px/1 'Source Sans 3',sans-serif;color:rgba(255,255,255,0.72);white-space:nowrap;overflow:hidden">{{ c.caption }}</div>
+                </sc-if>
+              </div>
+              <sc-if value="{{ c.selected }}" hint-placeholder-val="{{ false }}">
+                <div style="position:absolute;left:0;top:0;bottom:0;width:6px;background:rgba(255,255,255,0.38);cursor:col-resize"></div>
+              </sc-if>
+              <sc-if value="{{ c.selected }}" hint-placeholder-val="{{ false }}">
+                <div style="position:absolute;right:0;top:0;bottom:0;width:6px;background:rgba(255,255,255,0.38);cursor:col-resize"></div>
+              </sc-if>
+            </div>
+          </sc-for>
+          <sc-for list="{{ tr.transitions }}" as="x" hint-placeholder-count="0">
+            <div style="position:absolute;left:{{ x.x }}px;width:{{ x.w }}px;top:3px;bottom:3px;background:repeating-linear-gradient(45deg,rgba(255,255,255,0.26) 0 3px,rgba(255,255,255,0) 3px 7px);border-left:1px solid rgba(255,255,255,0.4);border-right:1px solid rgba(255,255,255,0.4);z-index:3;pointer-events:none"></div>
+          </sc-for>
+        </div>
+      </div>
+    </sc-for>
+
+    <div style="position:absolute;left:{{ playX }}px;top:0;bottom:0;width:2px;background:#f4653f;z-index:6;pointer-events:none"></div>
+    <div style="position:absolute;left:{{ playHeadX }}px;top:0;width:13px;height:9px;background:#f4653f;clip-path:polygon(0 0,100% 0,50% 100%);z-index:7;pointer-events:none"></div>
+  </div>
+
+</div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1496,&quot;height&quot;:950},&quot;trackSize&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;S&quot;,&quot;M&quot;,&quot;L&quot;],&quot;default&quot;:&quot;M&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Timeline&quot;}}">
+const TINTS = {
+  video: "#3E5063",
+  audio: "#2C7A58",
+  still: "#6A4B93",
+  text: "#B17C1E",
+  shape: "#247686",
+  nest: "#55595F",
+};
+
+const PPS = 1308 / 40;
+const px = (s) => Math.round(s * PPS);
+
+const CLIPS = {
+  v1: { name: "IMG_9619.MOV", kind: "video", icon: "movie", start: 0, end: 21, track: "V1",
+        meta: "00:00:21:00 · 1080×1920 · 25.106 fps" },
+  v2: { name: "IMG_9622.MOV", kind: "video", icon: "movie", start: 20.5, end: 37.2, track: "V1",
+        meta: "00:00:16:18 · 1080×1920 · 25.106 fps" },
+  t1: { name: "Title card", kind: "text", icon: "title", start: 0.5, end: 5, track: "T1",
+        caption: "Nightfall", meta: "00:00:04:12 · Darker Grotesque Black 96pt" },
+  t2: { name: "Lower third", kind: "text", icon: "title", start: 12, end: 18, track: "T1",
+        caption: "Kevin · producer", meta: "00:00:06:00 · Source Sans 3 SemiBold 42pt" },
+  a1: { name: "room-tone.wav", kind: "audio", icon: "graphic_eq", start: 0, end: 37.2, track: "A1",
+        meta: "00:00:37:05 · 48 kHz stereo" },
+};
+
+const SECTIONS = [
+  { id: "transform", label: "TRANSFORM", summary: "100%", rows: [
+      ["Position", "0, 0", "open_with"], ["Scale", "100%", ""], ["Rotation", "0.0°", ""], ["Anchor", "Center", "unfold_more"]] },
+  { id: "video", label: "VIDEO", summary: "normal", rows: [
+      ["Opacity", "100%", ""], ["Blend", "Normal", "unfold_more"], ["Corner radius", "0 px", ""], ["Speed", "1.00×", ""]] },
+  { id: "audio", label: "AUDIO", summary: "0.0 dB", rows: [
+      ["Volume", "0.0 dB", ""], ["Pan", "Center", ""], ["Fade in", "0.0 s", ""], ["Fade out", "0.5 s", ""], ["Duck", "Off", "unfold_more"]] },
+  { id: "effects", label: "EFFECTS", summary: "none", rows: [
+      ["Filter", "None", "unfold_more"], ["Chroma key", "Off", "unfold_more"], ["Shadow", "Off", "unfold_more"], ["Reflection", "Off", "unfold_more"]] },
+  { id: "timing", label: "TIMING", summary: "21:00", rows: [
+      ["In", "00:00:00:00", ""], ["Out", "00:00:21:00", ""], ["Duration", "00:00:21:00", ""], ["Reverse", "Off", "unfold_more"]] },
+];
+
+const HEIGHTS = { S: { T1: 30, V1: 54, A1: 40 }, M: { T1: 44, V1: 84, A1: 60 }, L: { T1: 58, V1: 116, A1: 82 } };
+
+function wavePath() {
+  const n = 240, up = [], dn = [];
+  for (let i = 0; i < n; i++) {
+    const x = ((i / (n - 1)) * 1000).toFixed(1);
+    const s = Math.abs(Math.sin(i * 0.71) * 0.46 + Math.sin(i * 0.13) * 0.32 + Math.sin(i * 2.31) * 0.18);
+    const a = 5 + s * 41;
+    up.push(x + "," + (50 - a).toFixed(1));
+    dn.unshift(x + "," + (50 + a).toFixed(1));
+  }
+  return "M" + up.join(" L") + " L" + dn.join(" L") + " Z";
+}
+
+class Component extends DCLogic {
+  state = {
+    tab: "clip",
+    selected: "v1",
+    size: "M",
+    snap: true,
+    safe: false,
+    open: { transform: true, video: true, audio: false, effects: false, timing: false },
+  };
+
+  check(on) {
+    return {
+      border: on ? "#4a7fd0" : "#55554f",
+      fill: on ? "rgba(10,132,255,0.3)" : "#2b2b2b",
+      tick: on ? "✓" : "",
+    };
+  }
+
+  clipView(id, trackTint) {
+    const c = CLIPS[id];
+    const selected = this.state.selected === id;
+    const w = px(c.end) - px(c.start);
+    return {
+      x: px(c.start),
+      w,
+      name: c.name,
+      icon: c.icon,
+      tint: TINTS[c.kind],
+      selected,
+      ring: selected ? "0 0 0 2px #f4653f" : "none",
+      film: c.kind === "video",
+      wave: c.kind === "audio",
+      caption: c.caption ?? false,
+      wash: TINTS[c.kind] + "8a",
+      thumbs: c.kind === "video" ? Array.from({ length: Math.ceil(w / 34) }, (_, i) => i) : [],
+      pick: () => this.setState({ selected: id, tab: "clip" }),
+    };
+  }
+
+  renderVals() {
+    const s = this.state;
+    const h = HEIGHTS[s.size];
+    const sel = CLIPS[s.selected];
+    const snap = this.check(s.snap);
+    const safe = this.check(s.safe);
+
+    const tabs = [["clip", "Clip"], ["media", "Media"], ["document", "Document"]].map(([id, name]) => ({
+      name,
+      active: s.tab === id,
+      color: s.tab === id ? "#e6e6e4" : "#b9b9b3",
+      pick: () => this.setState({ tab: id }),
+    }));
+
+    const sizeButtons = ["S", "M", "L"].map((label, i) => {
+      const on = s.size === label;
+      return {
+        label,
+        border: on ? "#4a7fd0" : "#3a3a3a",
+        leftBorder: i === 0 ? "1px solid " + (on ? "#4a7fd0" : "#3a3a3a") : "0",
+        bg: on ? "rgba(10,132,255,0.24)" : "#2b2b2b",
+        color: on ? "#8cc6ff" : "#9a9a95",
+        radius: i === 0 ? "3px 0 0 3px" : i === 2 ? "0 3px 3px 0" : "0",
+        pick: () => this.setState({ size: label }),
+      };
+    });
+
+    return {
+      transport: ["skip_previous", "fast_rewind", "play_arrow", "fast_forward", "skip_next", "repeat"],
+      editActions: ["content_cut", "first_page", "last_page", "backspace", "bookmark_add", "content_copy", "title"],
+      tabs,
+      clipTab: s.tab === "clip",
+      mediaTab: s.tab === "media",
+      docTab: s.tab === "document",
+      selName: sel.name,
+      selMeta: sel.meta,
+      selWhere: "Track " + sel.track + " · " + sel.kind,
+      selTint: TINTS[sel.kind],
+      sections: SECTIONS.map((sec) => ({
+        label: sec.label,
+        summary: sec.summary,
+        open: !!s.open[sec.id],
+        chevron: s.open[sec.id] ? "expand_more" : "chevron_right",
+        rows: sec.rows.map(([label, value, affix]) => ({ label, value, affix })),
+        toggle: () => this.setState((st) => ({ open: { ...st.open, [sec.id]: !st.open[sec.id] } })),
+      })),
+      mediaItems: [
+        { name: "IMG_9619.MOV", meta: "01:48:24 · 1080×1920", tint: TINTS.video, thumbAlpha: 1 },
+        { name: "IMG_9622.MOV", meta: "00:41:02 · 1080×1920", tint: TINTS.video, thumbAlpha: 1 },
+        { name: "room-tone.wav", meta: "00:37:05 · 48 kHz", tint: TINTS.audio, thumbAlpha: 0 },
+      ],
+      docRows: [
+        { label: "Resolution", value: "1080 × 1920" },
+        { label: "Frame rate", value: "25.106 fps" },
+        { label: "Duration", value: "00:00:37:05" },
+        { label: "Colour", value: "Rec. 709" },
+        { label: "Background", value: "Black" },
+        { label: "Tracks", value: "3" },
+      ],
+      ticks: Array.from({ length: 10 }, (_, i) => {
+        const sec = i * 4;
+        return {
+          x: px(sec),
+          label: String(Math.floor(sec)).padStart(2, "0") + ":" +
+            String(Math.round((sec % 1) * 25)).padStart(2, "0"),
+        };
+      }).map((t, i) => ({ x: t.x, label: "00:" + t.label })),
+      tracks: [
+        { name: "T1", kind: "text", tint: TINTS.text, lane: "#1f1f1f", h: h.T1,
+          toggles: ["visibility", "lock_open"],
+          clips: [this.clipView("t1"), this.clipView("t2")], transitions: [] },
+        { name: "V1", kind: "video", tint: TINTS.video, lane: "#1a1a1a", h: h.V1,
+          toggles: ["visibility", "volume_up", "lock_open"],
+          clips: [this.clipView("v1"), this.clipView("v2")],
+          transitions: [{ x: px(20.5), w: px(21) - px(20.5) }] },
+        { name: "A1", kind: "audio", tint: TINTS.audio, lane: "#1f1f1f", h: h.A1,
+          toggles: ["volume_up", "lock_open"],
+          clips: [this.clipView("a1")], transitions: [] },
+      ],
+      wavePath: wavePath(),
+      playX: 132 + px(4.2),
+      playHeadX: 132 + px(4.2) - 5.5,
+      snapBorder: snap.border, snapFill: snap.fill, snapTick: snap.tick,
+      toggleSnap: () => this.setState((st) => ({ snap: !st.snap })),
+      safe: s.safe,
+      safeBorder: safe.border, safeFill: safe.fill, safeTick: safe.tick,
+      toggleSafe: () => this.setState((st) => ({ safe: !st.safe })),
+      sizeButtons,
+    };
+  }
+}
+
+</script>
+</body>
+</html>

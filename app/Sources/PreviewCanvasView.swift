@@ -211,8 +211,18 @@ final class PreviewCanvasView: NSView {
         canvasFrame = rect
         playerHost.frame = rect
         safeGuides.frame = rect
-        caption.stringValue =
-            "\(canvas.width) × \(canvas.height) · \(canvas.fps.displayName) fps"
+        // 0.06em tracking, the treatment every machine-produced number in the
+        // chrome gets. Tracking needs an ATTRIBUTED value, and an attributed
+        // value carries its own alignment — the field's `.center` no longer
+        // applies once one is set — so the centring rides along in it.
+        let captionStyle = NSMutableParagraphStyle()
+        captionStyle.alignment = .center
+        caption.attributedStringValue = NSAttributedString(
+            string: "\(canvas.width) × \(canvas.height) · \(canvas.fps.displayName) fps",
+            attributes: [
+                .font: DS.mono(10), .foregroundColor: DS.textFaint,
+                .kern: 10 * 0.06, .paragraphStyle: captionStyle,
+            ])
         caption.frame = CGRect(
             x: 0, y: min(rect.maxY + Self.captionGap, bounds.height - Self.captionHeight),
             width: bounds.width, height: Self.captionHeight)

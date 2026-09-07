@@ -1,8 +1,16 @@
 import AppKit
 
-/// The Video tab (spec §4.3): Transform, Crop, Corner Radius, Shadow, Colour,
-/// Chroma Key, Filters, Reflection, Spotlight, Speed, Actions and — when the
-/// clip overlaps its predecessor — Transition.
+/// The Clip tab's PIXEL sections (spec §4.3): Transform, Crop, Corner Radius,
+/// Colour, Chroma Key, Filters, Reflection, Spotlight, Speed, Actions and —
+/// when the clip overlaps its predecessor — Transition.
+///
+/// **This pane is never shown.** Since the six tabs became three it is a
+/// factory: `ClipPane` holds one instance and calls the section methods below
+/// in the order the design asks for, mixing them with the audio, text and
+/// shape panes' sections according to what is selected. Everything here still
+/// reads and writes through the shared `InspectorBinding`, so the sections do
+/// not care which pane built them. `structureSignature` is still this pane's
+/// job — `ClipPane` composes it with the other three.
 ///
 /// Text and shape clips get the groups that measure the layer against itself
 /// — Transform, Opacity, Shadow, Filters, Reflection and Spotlight — but not
@@ -16,27 +24,25 @@ import AppKit
 /// disabled: the pane is rebuilt when the selection's kinds change, so there
 /// is nothing stale to grey out.
 final class VideoPane: InspectorPaneView {
-    override var tab: InspectorTab { .video }
-
     // MARK: - Applicability
 
     /// Clips whose rectangle comes from decoded pixels — the ones with a crop,
     /// a colour treatment and a corner radius.
-    private var allSourcePixels: Bool {
+    var allSourcePixels: Bool {
         let clips = binding.clips
         return !clips.isEmpty
             && clips.allSatisfy { InspectorTab.hasSourcePixels($0, in: binding.snapshot) }
     }
 
     /// Clips `set_speed` accepts (§6: a non-media source is an error).
-    private var allMedia: Bool {
+    var allMedia: Bool {
         let clips = binding.clips
         return !clips.isEmpty && clips.allSatisfy { $0.source.hasSourceBound }
     }
 
     /// The overlap with the previous clip on the same track, when there is
     /// one. That overlap IS the transition's duration (§5.2).
-    private func overlap(before clip: ClipSnapshot) -> Ticks? {
+    func overlap(before clip: ClipSnapshot) -> Ticks? {
         let earlier = binding.snapshot.clips(onTrack: clip.track).filter { $0.start < clip.start }
         guard let previous = earlier.last else { return nil }
         let overlap = previous.end - clip.start
@@ -59,38 +65,20 @@ final class VideoPane: InspectorPaneView {
         return parts.joined(separator: "|")
     }
 
-    // MARK: - Sections
-
-    override func makeSections() -> [InspectorSection] {
-        var sections: [InspectorSection] = [transformSection()]
-        if allSourcePixels {
-            sections.append(cropSection())
-            sections.append(cornerSection())
-        }
-        sections.append(inspectorShadowSection(binding))
-        if allSourcePixels {
-            sections.append(colorSection())
-            sections.append(chromaSection())
-        }
-        sections.append(filtersSection())
-        sections.append(reflectionSection())
-        sections.append(spotlightSection())
-        if allMedia {
-            sections.append(speedSection())
-        }
-        sections.append(actionsSection())
-        if binding.isSingle, let clip = binding.primary, overlap(before: clip) != nil {
-            sections.append(transitionSection(clip.id))
-        }
-        return sections
-    }
-
     // MARK: Transform
 
-    private func transformSection() -> InspectorSection {
+    /// The one section the design leaves OPEN by default: it is what a
+    /// freshly picked clip is most often picked for.
+    func transformSection() -> InspectorSection {
         let binding = self.binding
         return InspectorSection(
             id: "video.transform", title: "Transform",
+            summary: {
+                let props = binding.videoProps
+                let scale = String(format: "%.0f%%", props.scale * 100)
+                guard abs(props.rotation) >= 0.05 else { return scale }
+                return scale + String(format: " · %.0f°", props.rotation)
+            },
             note: { binding.actionNote },
             reset: {
                 binding.apply(
@@ -163,7 +151,7 @@ final class VideoPane: InspectorPaneView {
 
     // MARK: Crop
 
-    private func cropSection() -> InspectorSection {
+    func cropSection() -> InspectorSection {
         let binding = self.binding
         func crop() -> CropInsets { binding.videoProps.crop }
         func ops(_ next: CropInsets) -> [ReelOp] { binding.ops(video: VideoPatch(crop: next)) }
@@ -176,8 +164,14 @@ final class VideoPane: InspectorPaneView {
         cropButton.toolTip = "Drag the crop edges on the canvas (C)"
         return InspectorSection(
             id: "video.crop", title: "Crop",
+            summary: {
+                let c = crop()
+                guard c.l != 0 || c.t != 0 || c.r != 0 || c.b != 0 else { return "none" }
+                return String(format: "%.0f·%.0f·%.0f·%.0f", c.l, c.t, c.r, c.b)
+            },
             note: { binding.actionNote },
             reset: { binding.apply("Crop", video: VideoPatch(crop: .zero)) },
+            defaultExpanded: false,
             rows: [
                 inspectorValueRow(
                     "Left", binding, name: "Crop", unit: " px", decimals: 0, min: 0, max: 20000,
@@ -205,12 +199,14 @@ final class VideoPane: InspectorPaneView {
 
     // MARK: Corner radius
 
-    private func cornerSection() -> InspectorSection {
+    func cornerSection() -> InspectorSection {
         let binding = self.binding
         return InspectorSection(
             id: "video.corner", title: "Corner Radius",
+            summary: { String(format: "%.0f px", binding.videoProps.cornerRadius) },
             note: { binding.actionNote },
             reset: { binding.apply("Corner Radius", video: VideoPatch(cornerRadius: 0)) },
+            defaultExpanded: false,
             rows: [
                 inspectorValueRow(
                     "Radius", binding, name: "Corner Radius", unit: " px", decimals: 0, min: 0,
@@ -223,14 +219,16 @@ final class VideoPane: InspectorPaneView {
 
     // MARK: Colour
 
-    private func colorSection() -> InspectorSection {
+    func colorSection() -> InspectorSection {
         let binding = self.binding
         func color() -> ColorAdjust { binding.videoProps.color }
         func ops(_ next: ColorAdjust) -> [ReelOp] { binding.ops(video: VideoPatch(color: next)) }
         return InspectorSection(
             id: "video.color", title: "Color",
+            summary: { color().isIdentity ? "neutral" : "adjusted" },
             note: { binding.actionNote },
             reset: { binding.apply("Color", video: VideoPatch(color: .identity)) },
+            defaultExpanded: false,
             rows: [
                 inspectorValueRow(
                     "Brightness", binding, name: "Brightness", decimals: 2, min: -1, max: 1,
@@ -292,7 +290,7 @@ final class VideoPane: InspectorPaneView {
     /// then turns it on: someone who has just aimed at the green has already
     /// said what they want, and making them flip a switch first to be allowed
     /// to say it is a step that carries no decision.
-    private func chromaSection() -> InspectorSection {
+    func chromaSection() -> InspectorSection {
         let binding = self.binding
         func current() -> ChromaProps { binding.videoProps.chroma ?? ChromaProps() }
         func ops(_ next: ChromaProps) -> [ReelOp] {
@@ -308,8 +306,10 @@ final class VideoPane: InspectorPaneView {
         pick.toolTip = "Click the preview to sample the key color (Esc cancels)"
         return InspectorSection(
             id: "video.chroma", title: "Chroma Key",
+            summary: { on() ? String(format: "%.0f%%", current().tolerance * 100) : "off" },
             note: { binding.actionNote },
             reset: { binding.apply("Chroma Key", video: VideoPatch(chroma: .some(nil))) },
+            defaultExpanded: false,
             rows: [
                 inspectorCheckRow(
                     "Key out a color", binding, name: "Chroma Key",
@@ -403,7 +403,7 @@ final class VideoPane: InspectorPaneView {
     /// That last point is what keeps add, remove and re-order ordinary
     /// `set_video` patches instead of three new ops — `actions::merge`
     /// replaces arrays wholesale rather than merging them element by element.
-    private func filtersSection() -> InspectorSection {
+    func filtersSection() -> InspectorSection {
         let binding = self.binding
         let kinds = FilterKind.allCases
         func list() -> [FilterProps] { binding.videoProps.filters }
@@ -518,8 +518,15 @@ final class VideoPane: InspectorPaneView {
 
         return InspectorSection(
             id: "video.filters", title: "Filters",
+            summary: {
+                let stack = list()
+                guard !stack.isEmpty else { return "none" }
+                return stack.count == 1
+                    ? stack[0].kind.displayName.lowercased() : "\(stack.count) filters"
+            },
             note: { binding.actionNote },
             reset: { binding.apply("Filters", video: VideoPatch(filters: [])) },
+            defaultExpanded: false,
             rows: rows)
     }
 
@@ -535,7 +542,7 @@ final class VideoPane: InspectorPaneView {
     /// Every control writes a WHOLE `ReflectionProps`, exactly as Shadow and
     /// Chroma Key do: the patch replaces the object, so each edit re-sends
     /// the other three values as they stand.
-    private func reflectionSection() -> InspectorSection {
+    func reflectionSection() -> InspectorSection {
         let binding = self.binding
         func current() -> ReflectionProps { binding.videoProps.reflection ?? ReflectionProps() }
         func ops(_ next: ReflectionProps) -> [ReelOp] {
@@ -544,8 +551,10 @@ final class VideoPane: InspectorPaneView {
         func on() -> Bool { binding.videoProps.reflection != nil }
         return InspectorSection(
             id: "video.reflection", title: "Reflection",
+            summary: { on() ? String(format: "%.0f%%", current().opacity * 100) : "off" },
             note: { binding.actionNote },
             reset: { binding.apply("Reflection", video: VideoPatch(reflection: .some(nil))) },
+            defaultExpanded: false,
             rows: [
                 inspectorCheckRow(
                     "Mirror the layer below itself", binding, name: "Reflection",
@@ -631,7 +640,7 @@ final class VideoPane: InspectorPaneView {
     /// would bury the one that changes, so the whole-object write the patch
     /// needs goes through `edited(…)` — one named argument per row, the other
     /// seven re-read from the current value.
-    private func spotlightSection() -> InspectorSection {
+    func spotlightSection() -> InspectorSection {
         let binding = self.binding
         let shapes = SpotShape.allCases
         func current() -> SpotlightProps { binding.videoProps.spotlight ?? SpotlightProps() }
@@ -652,8 +661,10 @@ final class VideoPane: InspectorPaneView {
         }
         return InspectorSection(
             id: "video.spotlight", title: "Spotlight",
+            summary: { on() ? current().shape.displayName.lowercased() : "off" },
             note: { binding.actionNote },
             reset: { binding.apply("Spotlight", video: VideoPatch(spotlight: .some(nil))) },
+            defaultExpanded: false,
             rows: [
                 inspectorCheckRow(
                     "Spotlight a region", binding, name: "Spotlight",
@@ -737,17 +748,14 @@ final class VideoPane: InspectorPaneView {
 
     /// Speed is a clip-level op, not a patch: `set_speed` takes one clip and
     /// re-times its actions (§6), so the selection becomes one op each and the
-    /// whole batch is a single undo step. `set_reversed` is the same shape.
+    /// whole batch is a single undo step.
     ///
-    /// **Reverse carries a state readout that no other control here needs.**
-    /// AVFoundation cannot play a clip backwards, so ticking the box does not
-    /// change the picture by itself: it makes the app pre-render the frames
-    /// (spec §11), and until they exist the clip draws a slate rather than
-    /// lying about which way it is going. The readout says which of those the
-    /// clip is in, and the button is what restarts a render the user stopped
-    /// — the one path back from `ReverseStatus.stopped`, since nothing retries
-    /// on its own.
-    private func speedSection() -> InspectorSection {
+    /// Reverse used to sit here, next to Rate, because both re-time the same
+    /// source. It now sits in the Clip tab's Timing section with In, Out and
+    /// Duration, which is what the redesign asks for and reads better anyway:
+    /// Rate is how fast, Reverse is which way, and the duration readout the
+    /// two of them share belongs with the edges it is measured between.
+    func speedSection() -> InspectorSection {
         let binding = self.binding
         func rate() -> Double {
             let value = binding.primary?.speed ?? 1
@@ -757,22 +765,11 @@ final class VideoPane: InspectorPaneView {
             binding.clips.filter { $0.source.hasSourceBound }
                 .map { .setSpeed(clip: $0.id, rate: next, keepPitch: keepPitch) }
         }
-        func status() -> ReverseStatus {
-            guard let document = binding.document, let clip = binding.primary else { return .off }
-            return document.reverseStatus(of: clip)
-        }
-        let render = OptionButtonControl(
-            title: "Render Reverse",
-            action: { [weak self] in
-                guard let binding = self?.binding, let clip = binding.primary else { return }
-                binding.document?.retryReversedMedia(for: clip)
-            },
-            enabled: { status() == .stopped },
-            onEdit: {})
-        render.toolTip = "Render the reversed frames this clip needs"
         return InspectorSection(
             id: "video.speed", title: "Speed",
+            summary: { String(format: "%.2f×", rate()) },
             reset: { binding.apply("Set Speed", speedOps(1, keepPitch: nil)) },
+            defaultExpanded: false,
             rows: [
                 inspectorValueRow(
                     "Rate", binding, name: "Set Speed", unit: "×", decimals: 2, min: 0.1, max: 10,
@@ -785,26 +782,6 @@ final class VideoPane: InspectorPaneView {
                     read: { binding.audioProps.keepPitch },
                     ops: { value in speedOps(rate(), keepPitch: value) },
                     mixed: { binding.mixedAudio { $0.keepPitch } }),
-                inspectorCheckRow(
-                    "Reverse", binding, name: "Reverse",
-                    read: { binding.primary?.source.isReversed ?? false },
-                    ops: { value in
-                        binding.clips.filter { $0.source.hasSourceBound }
-                            .map { .setReversed(clip: $0.id, reversed: value) }
-                    },
-                    mixed: { binding.mixed { $0.source.isReversed } }),
-                inspectorRow("Reversed frames", [inspectorReadout { status().summary }]),
-                inspectorButtonRow([render]),
-                inspectorRow(
-                    "Duration",
-                    [
-                        inspectorReadout {
-                            guard let clip = binding.primary else { return "—" }
-                            return ReelTime.format(
-                                clip.duration, fps: binding.canvas.fps,
-                                frames: binding.canvas.timecodeFrames)
-                        }
-                    ]),
             ])
     }
 
@@ -813,7 +790,7 @@ final class VideoPane: InspectorPaneView {
     /// The actions table (§4.3). One clip at a time: an action id belongs to
     /// its clip, so a table over a multi-selection would be lying about which
     /// span it edits.
-    private func actionsSection() -> InspectorSection {
+    func actionsSection() -> InspectorSection {
         let binding = self.binding
         var rows: [NSView] = []
         if binding.isSingle, let clip = binding.primary {
@@ -833,7 +810,13 @@ final class VideoPane: InspectorPaneView {
             rows.append(
                 inspectorRow(nil, [InspectorRowLabel("Select one clip to edit its actions.")]))
         }
-        return InspectorSection(id: "video.actions", title: "Actions", rows: rows)
+        return InspectorSection(
+            id: "video.actions", title: "Actions",
+            summary: {
+                guard binding.isSingle, let clip = binding.primary else { return nil }
+                return clip.actions.isEmpty ? "none" : "\(clip.actions.count)"
+            },
+            defaultExpanded: false, rows: rows)
     }
 
     /// A row binds by ID, never by the captured value: an edit elsewhere in
@@ -935,7 +918,7 @@ final class VideoPane: InspectorPaneView {
 
     // MARK: Transition
 
-    private func transitionSection(_ clip: UInt32) -> InspectorSection {
+    func transitionSection(_ clip: UInt32) -> InspectorSection {
         let binding = self.binding
         let kinds = TransitionKind.allCases
         let items = ["None"] + kinds.map { $0.displayName }
@@ -951,6 +934,14 @@ final class VideoPane: InspectorPaneView {
         }
         return InspectorSection(
             id: "video.transition", title: "Transition",
+            summary: {
+                guard let kind = binding.snapshot.clip(clip)?.transitionIn?.kind else {
+                    return "none"
+                }
+                return kind.displayName.lowercased()
+                    + String(format: " · %.2f s", overlapSeconds())
+            },
+            defaultExpanded: false,
             rows: [
                 inspectorPopupRow(
                     "Kind", binding, name: "Set Transition", items: items,

@@ -1,13 +1,23 @@
 import AppKit
 
-/// The Shape tab (spec §4.3): kind, stroke, fill, arrowheads, corner radius
-/// and the shared Shadow group.
+/// The Clip tab's SHAPE sections (spec §4.3): kind, stroke, fill, arrowheads
+/// and corner radius.
+///
+/// **This pane is never shown**: since the six tabs became three it is a
+/// factory `ClipPane` holds and calls, right after Transform, when EVERY
+/// selected clip is a shape clip. The shared Shadow group is not in the list
+/// any more — it writes `video.shadow`, so the Clip tab carries it once, in
+/// the effects group.
 ///
 /// Shapes are described, never rasterized, in the model (§11), so every
 /// control here is one `set_shape` patch — and unlike Video/Audio/Text there
 /// is no action form, because §5.4's patch covers those three only.
 final class ShapePane: InspectorPaneView {
-    override var tab: InspectorTab { .shape }
+    /// Whether the shape sections apply: they write `set_shape`, which errors
+    /// on any other kind, so a mixed selection gets none of them.
+    var allShape: Bool {
+        !binding.clips.isEmpty && binding.shapeClips.count == binding.clips.count
+    }
 
     /// The kind decides which controls mean anything (a line has no fill, a
     /// box has no endpoints), so it belongs in the rebuild signature.
@@ -15,20 +25,14 @@ final class ShapePane: InspectorPaneView {
         super.structureSignature + "|" + binding.shapeProps.kind.rawValue
     }
 
-    override func makeSections() -> [InspectorSection] {
-        [
-            shapeSection(), strokeSection(), fillSection(), arrowSection(),
-            inspectorShadowSection(binding),
-        ]
-    }
-
     // MARK: Kind and box
 
-    private func shapeSection() -> InspectorSection {
+    func shapeSection() -> InspectorSection {
         let binding = self.binding
         let kinds = ShapeKind.allCases
         return InspectorSection(
             id: "shape.kind", title: "Shape",
+            summary: { binding.shapeProps.kind.displayName.lowercased() },
             reset: { binding.apply("Shape", shape: ShapePatch(radius: 0)) },
             rows: [
                 inspectorPopupRow(
@@ -64,13 +68,15 @@ final class ShapePane: InspectorPaneView {
 
     // MARK: Stroke
 
-    private func strokeSection() -> InspectorSection {
+    func strokeSection() -> InspectorSection {
         let binding = self.binding
         func current() -> StrokeProps { binding.shapeProps.stroke ?? StrokeProps() }
         func on() -> Bool { binding.shapeProps.stroke != nil }
         return InspectorSection(
             id: "shape.stroke", title: "Stroke",
+            summary: { on() ? String(format: "%.1f px", current().width) : "off" },
             reset: { binding.apply("Stroke", shape: ShapePatch(stroke: .some(StrokeProps()))) },
+            defaultExpanded: false,
             rows: [
                 inspectorCheckRow(
                     "Stroke", binding, name: "Stroke", read: on,
@@ -105,14 +111,16 @@ final class ShapePane: InspectorPaneView {
     /// The fill's opacity IS its alpha channel — the model has one colour per
     /// fill, not a colour plus an opacity — so the slider rewrites the fourth
     /// component and leaves the other three alone.
-    private func fillSection() -> InspectorSection {
+    func fillSection() -> InspectorSection {
         let binding = self.binding
         func current() -> RGBA { binding.shapeProps.fill ?? [1, 1, 1, 1] }
         func on() -> Bool { binding.shapeProps.fill != nil }
         func alpha() -> Double { current().count >= 4 ? current()[3] : 1 }
         return InspectorSection(
             id: "shape.fill", title: "Fill",
+            summary: { on() ? String(format: "%.0f%%", alpha() * 100) : "off" },
             reset: { binding.apply("Fill", shape: ShapePatch(fill: .some(nil))) },
+            defaultExpanded: false,
             rows: [
                 inspectorCheckRow(
                     "Fill", binding, name: "Fill", read: on,
@@ -140,13 +148,23 @@ final class ShapePane: InspectorPaneView {
 
     // MARK: Arrowheads
 
-    private func arrowSection() -> InspectorSection {
+    func arrowSection() -> InspectorSection {
         let binding = self.binding
         /// Arrowheads only mean something on the two linear kinds, whose
         /// geometry is the `from`/`to` endpoints (§5.2).
         func linear() -> Bool { binding.shapeProps.kind.isLinear }
         return InspectorSection(
             id: "shape.arrows", title: "Arrowheads",
+            summary: {
+                let props = binding.shapeProps
+                switch (props.arrowStart, props.arrowEnd) {
+                case (true, true): return "both"
+                case (true, false): return "start"
+                case (false, true): return "end"
+                case (false, false): return "none"
+                }
+            },
+            defaultExpanded: false,
             rows: [
                 inspectorCheckRow(
                     "Arrowhead at start", binding, name: "Arrowhead",

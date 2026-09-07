@@ -15,7 +15,7 @@ final class EditorWindowController: NSWindowController {
         window.minSize = NSSize(width: 900, height: 620)
 
         // Content size: the canvas at a comfortable preview scale plus the
-        // chrome around it (toolbar 44, inspector 320, timeline 240), clamped
+        // chrome around it (toolbar 44, inspector 304, timeline 300), clamped
         // to 85 % of the screen. A 4K project must not open a 4K window.
         let canvas = document.project.snapshot.canvas
         var contentSize = NSSize(
@@ -45,11 +45,33 @@ final class EditorWindowController: NSWindowController {
         fatalError("EditorWindowController does not support NSCoder")
     }
 
-    /// "1920 × 1080 · 30 fps" — the two document facts that are never in the
-    /// title. Static so `EditorViewController` can refresh it after a
-    /// `set_canvas` without reaching into this controller's internals.
+    /// "1920 × 1080 · 30 fps · edited" — the document facts that are never in
+    /// the title. The chrome cleanup made the title bar carry the project's
+    /// identity (there is no status bar and the toolbar no longer shows
+    /// document meta), so the dirty flag has to read out here in words: under
+    /// `ProjectDocument.autosavesInPlace` AppKit never sets
+    /// `NSWindow.isDocumentEdited`, so there is no close-button dot and this
+    /// suffix is the only dirty indicator the window has. Static so
+    /// `EditorViewController` can refresh it after a `set_canvas` without
+    /// reaching into this controller's internals.
+    ///
+    /// **Both halves are published, and not from here.** The only caller that
+    /// re-reads this is `EditorViewController.refreshFromDocument`, which runs
+    /// off `.projectDocumentDidChange`; `ProjectDocument.publishingEditedState`
+    /// posts that whenever `isDocumentEdited` crosses, so edited → clean lands
+    /// after ⌘S and after every silent autosave-in-place, not just
+    /// clean → edited. Do not try to move that hook here: overriding
+    /// `NSWindowController.setDocumentEdited` is dead code, because — measured
+    /// against an AppKit harness — a document whose `autosavesInPlace` is true
+    /// never receives that message at all (with it false the override does get
+    /// (false)/(true)/(false) on `addWindowController`/`.changeDone`/
+    /// `.changeCleared`). It belongs in `ProjectDocument`, which owns the
+    /// count, and it has to hook BOTH counting entry points: a save does not
+    /// pass through `updateChangeCount(_:)` — an autosaving document clears
+    /// through `updateChangeCount(withToken:for:)` instead.
     static func subtitle(for document: ProjectDocument) -> String {
         let canvas = document.project.snapshot.canvas
-        return "\(canvas.width) × \(canvas.height) · \(canvas.fps.displayName) fps"
+        let meta = "\(canvas.width) × \(canvas.height) · \(canvas.fps.displayName) fps"
+        return document.isDocumentEdited ? meta + " · edited" : meta
     }
 }

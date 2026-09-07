@@ -1,8 +1,12 @@
 import AppKit
 
-/// The Audio tab (spec §4.3): volume with its dB read-out, mute, the two
-/// fades, ducking, noise reduction, the compressor, pan, mix-to-mono and
-/// Detach Audio.
+/// The Clip tab's AUDIO sections (spec §4.3): volume with its dB read-out,
+/// mute, the two fades, ducking, noise reduction, the compressor, pan,
+/// mix-to-mono and Detach Audio.
+///
+/// **This pane is never shown**: since the six tabs became three it is a
+/// factory `ClipPane` holds and calls, last in the Clip tab, whenever at least
+/// one selected clip carries audio (`InspectorTab.hasAudio`).
 ///
 /// Everything here is one `set_audio` patch over the selection, except Detach
 /// Audio, which is a clip-level op the editor already owns (⌥⌘D) — the pane
@@ -14,25 +18,23 @@ import AppKit
 /// what the numbers mean (the compressor's threshold is read against a signal
 /// the reducer has already cleaned). Volume, the fades and ducking come first
 /// in the pane and LAST in the signal, being the fader the core folds into the
-/// plan's envelope.
+/// plan's envelope. `ClipPane` keeps them in that order.
 final class AudioPane: InspectorPaneView {
-    override var tab: InspectorTab { .audio }
-
-    override func makeSections() -> [InspectorSection] {
-        [
-            volumeSection(), fadeSection(), duckSection(), noiseSection(),
-            compressorSection(), mixSection(),
-        ]
-    }
-
     // MARK: Volume
 
-    private func volumeSection() -> InspectorSection {
+    func volumeSection() -> InspectorSection {
         let binding = self.binding
         return InspectorSection(
             id: "audio.volume", title: "Volume",
+            summary: {
+                let props = binding.audioProps
+                if props.muted { return "muted" }
+                guard props.decibels.isFinite else { return "silent" }
+                return String(format: "%+.1f dB", props.decibels)
+            },
             note: { binding.actionNote },
             reset: { binding.apply("Volume", audio: AudioPatch(volume: 1, muted: false)) },
+            defaultExpanded: false,
             rows: [
                 inspectorValueRow(
                     "Volume", binding, name: "Volume", unit: "%", decimals: 0, min: 0, max: 400,
@@ -61,14 +63,22 @@ final class AudioPane: InspectorPaneView {
 
     /// Fades are also the corner handles on the clip (§4.4), so the numbers
     /// here and the drag there write the same two fields.
-    private func fadeSection() -> InspectorSection {
+    func fadeSection() -> InspectorSection {
         let binding = self.binding
         func ticks(_ seconds: Double) -> Ticks {
             ReelTime.snapToFrame(ReelTime.ticks(seconds: max(seconds, 0)), fps: binding.canvas.fps)
         }
         return InspectorSection(
             id: "audio.fades", title: "Fades",
+            summary: {
+                let props = binding.audioProps
+                guard props.fadeIn > 0 || props.fadeOut > 0 else { return "none" }
+                return String(
+                    format: "%.2f · %.2f s", ReelTime.seconds(props.fadeIn),
+                    ReelTime.seconds(props.fadeOut))
+            },
             reset: { binding.apply("Fades", audio: AudioPatch(fadeIn: 0, fadeOut: 0)) },
+            defaultExpanded: false,
             rows: [
                 inspectorValueRow(
                     "Fade in", binding, name: "Fade In", unit: " s", decimals: 2, min: 0, max: 10,
@@ -93,7 +103,7 @@ final class AudioPane: InspectorPaneView {
     ///
     /// Every control writes a whole `DuckProps`: the patch replaces the
     /// object, so each edit re-sends the other two values as they stand.
-    private func duckSection() -> InspectorSection {
+    func duckSection() -> InspectorSection {
         let binding = self.binding
         func current() -> DuckProps { binding.audioProps.duck ?? DuckProps() }
         func ops(_ next: DuckProps) -> [ReelOp] { binding.ops(audio: AudioPatch(duck: .some(next))) }
@@ -103,7 +113,9 @@ final class AudioPane: InspectorPaneView {
         }
         return InspectorSection(
             id: "audio.duck", title: "Ducking",
+            summary: { on() ? String(format: "%.0f%%", current().level * 100) : "off" },
             reset: { binding.apply("Ducking", audio: AudioPatch(duck: .some(nil))) },
+            defaultExpanded: false,
             rows: [
                 inspectorCheckRow(
                     "Duck other audio", binding, name: "Ducking",
@@ -160,11 +172,16 @@ final class AudioPane: InspectorPaneView {
     /// amount sets how far a bin may be pushed down. It is not a gate and does
     /// not silence anything between words; see
     /// `AudioNoiseReductionStage` for what it does, sample by sample.
-    private func noiseSection() -> InspectorSection {
+    func noiseSection() -> InspectorSection {
         let binding = self.binding
         return InspectorSection(
             id: "audio.noise", title: "Noise Reduction",
+            summary: {
+                let amount = binding.audioProps.noiseReduction
+                return amount <= 0 ? "off" : String(format: "%.0f%%", amount * 100)
+            },
             reset: { binding.apply("Noise Reduction", audio: AudioPatch(noiseReduction: 0)) },
+            defaultExpanded: false,
             rows: [
                 inspectorValueRow(
                     "Remove noise", binding, name: "Remove Background Noise", unit: "%",
@@ -199,7 +216,7 @@ final class AudioPane: InspectorPaneView {
     /// 10 ms where a frame is 33; snapping it would round the default to
     /// nothing. The core agrees — `check_audio` asks only that they are
     /// positive.
-    private func compressorSection() -> InspectorSection {
+    func compressorSection() -> InspectorSection {
         let binding = self.binding
         func current() -> CompressorProps { binding.audioProps.compressor ?? CompressorProps() }
         func ops(_ next: CompressorProps) -> [ReelOp] {
@@ -214,7 +231,9 @@ final class AudioPane: InspectorPaneView {
         }
         return InspectorSection(
             id: "audio.compressor", title: "Compressor",
+            summary: { on() ? String(format: "%.1f:1", current().ratio) : "off" },
             reset: { binding.apply("Compressor", audio: AudioPatch(compressor: .some(nil))) },
+            defaultExpanded: false,
             rows: [
                 inspectorCheckRow(
                     "Smooth volume levels", binding, name: "Compressor",
@@ -298,7 +317,7 @@ final class AudioPane: InspectorPaneView {
     /// inaudible on a clip whose source is mono, because the widening to
     /// stereo happens after the point where the pan is applied. The read-out
     /// says which side, so "0" is never ambiguous.
-    private func mixSection() -> InspectorSection {
+    func mixSection() -> InspectorSection {
         let binding = self.binding
         let detach = OptionButtonControl(
             title: "Detach Audio",
@@ -309,7 +328,13 @@ final class AudioPane: InspectorPaneView {
         detach.toolTip = "Move the audio to its own clip on the track below (⌥⌘D)"
         return InspectorSection(
             id: "audio.mix", title: "Mix",
+            summary: {
+                let pan = binding.audioProps.pan
+                if abs(pan) < 0.005 { return binding.audioProps.mono ? "mono" : "centre" }
+                return String(format: "%@ %.0f", pan < 0 ? "left" : "right", abs(pan) * 100)
+            },
             reset: { binding.apply("Mix", audio: AudioPatch(mono: false, pan: 0)) },
+            defaultExpanded: false,
             rows: [
                 inspectorValueRow(
                     "Pan", binding, name: "Pan", unit: "", decimals: 0, min: -100, max: 100,

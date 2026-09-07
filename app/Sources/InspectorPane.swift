@@ -1,7 +1,7 @@
 import AppKit
 
-/// The inspector's shared vocabulary (spec §4.3): which tabs exist and when
-/// they are live, the disclosure section every pane is built from, the row and
+/// The inspector's shared vocabulary (spec §4.3): which tabs exist, the
+/// disclosure section every pane is built from, the row and
 /// control builders, and — the piece that carries the most rules —
 /// `InspectorBinding`, which is the ONE place that knows how a pane reads a
 /// property and how an edit made in a pane reaches the document.
@@ -26,56 +26,32 @@ import AppKit
 
 // MARK: - Tabs
 
-/// The six tabs of spec §4.3, in strip order. The raw value is the strip
-/// index and the `UserDefaults` spelling of a pin, so the order is API.
+/// The three tabs of the chrome cleanup, in strip order: the selected CLIP,
+/// the project's media, the document itself. The raw value is the strip index,
+/// so the order is API.
+///
+/// It was six — Video, Audio, Text, Shape, Media, Document — and four of those
+/// were the same thing viewed four ways: the selected clip. Collapsing them
+/// took the whole tab-visibility policy with it (a disabled tab, a preferred
+/// tab, a pin to defeat the preference), because a Clip tab that lists the
+/// sections the SELECTION actually has is always the right tab for a clip.
+/// `ClipPane.makeSections()` is where that decision moved to.
+///
+/// The three kind tests below outlived the tabs they were written for: they
+/// are now what decides which sections the Clip tab shows.
 enum InspectorTab: Int, CaseIterable {
-    case video, audio, text, shape, media, document
+    case clip, media, document
 
     var title: String {
         switch self {
-        case .video: return "Video"
-        case .audio: return "Audio"
-        case .text: return "Text"
-        case .shape: return "Shape"
+        case .clip: return "Clip"
         case .media: return "Media"
         case .document: return "Document"
         }
     }
 
-    /// What the strip draws when six full titles do not fit the pane's width
-    /// (the inspector is 280–440 pt wide).
-    var shortTitle: String {
-        switch self {
-        case .document: return "Doc"
-        default: return title
-        }
-    }
-
-    /// A tab is disabled when no selected clip has that aspect (§4.3). Media
-    /// and Document are properties of the project, so they are always live.
-    func isEnabled(for clips: [ClipSnapshot], in snapshot: ProjectSnapshot) -> Bool {
-        switch self {
-        case .media, .document:
-            return true
-        case .video:
-            return clips.contains { InspectorTab.hasPixels($0, in: snapshot) }
-        case .audio:
-            return clips.contains { InspectorTab.hasAudio($0, in: snapshot) }
-        case .text:
-            return clips.contains { clip in
-                if case .text = clip.source { return true }
-                return false
-            }
-        case .shape:
-            return clips.contains { clip in
-                if case .shape = clip.source { return true }
-                return false
-            }
-        }
-    }
-
-    /// Whether the clip puts pixels on the canvas — the Video tab's test, and
-    /// the one that keeps an audio-only clip out of it.
+    /// Whether the clip puts pixels on the canvas — and the test that keeps
+    /// an audio-only clip out of the video sections.
     static func hasPixels(_ clip: ClipSnapshot, in snapshot: ProjectSnapshot) -> Bool {
         switch clip.source {
         case .text, .shape, .nest:
@@ -116,20 +92,6 @@ enum InspectorTab: Int, CaseIterable {
         case .text, .shape, .nest: return false
         }
     }
-
-    /// The tab a fresh selection lands on unless the user pinned one. A text
-    /// clip wants Text, a shape wants Shape, a clip with no pixels wants
-    /// Audio; everything else wants Video.
-    static func preferred(for clips: [ClipSnapshot], in snapshot: ProjectSnapshot) -> InspectorTab {
-        guard let clip = clips.first else { return .media }
-        switch clip.source {
-        case .text: return .text
-        case .shape: return .shape
-        default:
-            if !hasPixels(clip, in: snapshot), hasAudio(clip, in: snapshot) { return .audio }
-            return .video
-        }
-    }
 }
 
 // MARK: - Metrics
@@ -138,10 +100,12 @@ enum InspectorTab: Int, CaseIterable {
 /// this panel's grid, not the app's chrome.
 enum InspectorMetrics {
     static let labelWidth: CGFloat = 76
-    static let rowSpacing: CGFloat = 6
+    static let rowSpacing: CGFloat = 7
     static let sectionSpacing: CGFloat = 2
     static let inset: CGFloat = 10
-    static let headerHeight: CGFloat = 26
+    /// 28, not 26: the header now carries a state summary beside the title,
+    /// and the design sizes the row around it.
+    static let headerHeight: CGFloat = 28
     static let fieldWidth: CGFloat = 58
     static let wideFieldWidth: CGFloat = 72
     static let popupWidth: CGFloat = 116
@@ -261,6 +225,72 @@ final class InspectorNameField: NSTextField, OptionControl, NSTextFieldDelegate 
         let value = stringValue
         guard value != read() else { return }
         write(value)
+        onEdit()
+    }
+}
+
+/// An editable TIMECODE — the Clip tab's In and Out. `OptionFieldControl` is
+/// a number with a unit and would spell 4.5 seconds "4.50 s"; a clip's edges
+/// are read against the ruler, so they are spelled the way the ruler and the
+/// toolbar spell them.
+///
+/// Parsing is the core's (`ReelTime.parse`), so `1:23`, `83.5` and `1:23:04`
+/// mean here what they mean in the toolbar's field — and, exactly as there,
+/// text it refuses beeps and the field snaps back rather than committing a
+/// guess. A trim the CORE refuses beeps too, from `applyEdit`; nothing here
+/// clamps a value into range on the user's behalf.
+final class InspectorTimecodeField: NSTextField, OptionControl, NSTextFieldDelegate {
+    private let read: () -> Ticks
+    private let write: (Ticks) -> Void
+    private let fps: () -> Fps
+    private let frames: () -> Bool
+    private let onEdit: () -> Void
+
+    init(
+        read: @escaping () -> Ticks, write: @escaping (Ticks) -> Void,
+        fps: @escaping () -> Fps, frames: @escaping () -> Bool,
+        onEdit: @escaping () -> Void
+    ) {
+        self.read = read
+        self.write = write
+        self.fps = fps
+        self.frames = frames
+        self.onEdit = onEdit
+        super.init(frame: .zero)
+        DSField.style(self, height: DS.controlHeight, radius: DS.controlRadius, font: DS.mono(11))
+        translatesAutoresizingMaskIntoConstraints = false
+        widthAnchor.constraint(equalToConstant: 104).isActive = true
+        delegate = self
+        refresh()
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("InspectorTimecodeField does not support NSCoder")
+    }
+
+    private var formatted: String {
+        ReelTime.format(read(), fps: fps(), frames: frames())
+    }
+
+    func refresh() {
+        // Skipped while the field is being typed into, or the value it is
+        // about to commit would be overwritten by the one it replaces.
+        guard currentEditor() == nil else { return }
+        let value = formatted
+        if stringValue != value { stringValue = value }
+    }
+
+    func controlTextDidEndEditing(_ obj: Notification) {
+        guard stringValue != formatted else { return }
+        guard let ticks = ReelTime.parse(stringValue, fps: fps()) else {
+            NSSound.beep()
+            // Set directly rather than through `refresh()`: the field editor
+            // may still be attached here, and `refresh()` would defer to it.
+            stringValue = formatted
+            return
+        }
+        write(ReelTime.snapToFrame(ticks, fps: fps()))
         onEdit()
     }
 }
@@ -521,10 +551,14 @@ final class InspectorTextArea: NSView, OptionControl, NSTextViewDelegate {
 
 // MARK: - Sections
 
-/// One disclosure group: a header with the title, an optional reset-to-default
-/// button, and the rows. Collapsed state is per section id in `UserDefaults`,
-/// so a pane rebuilt after every edit does not keep re-opening a group the
-/// user closed.
+/// One disclosure group: a header with the title, a right-aligned summary of
+/// what the group currently says, an optional reset-to-default button, and the
+/// rows. Collapsed state is per section id in `UserDefaults`, so a pane
+/// rebuilt after every edit does not keep re-opening a group the user closed.
+///
+/// **The stored value records COLLAPSED, not expanded** — a section nobody has
+/// touched has no stored value at all, which is what lets `defaultExpanded`
+/// mean anything. Flipping that spelling would invert every saved panel.
 final class InspectorSection: NSView {
     /// `UserDefaults` key prefix; the suffix is the section's stable id.
     static let collapsedKeyPrefix = "ReelcutInspectorSection."
@@ -534,14 +568,24 @@ final class InspectorSection: NSView {
     private let content = NSStackView()
     private(set) var isExpanded = true
 
+    /// `summary` is a closure rather than a string because it is re-read on
+    /// every `refresh()`: a collapsed section still has to tell the truth
+    /// about the value under it. `defaultExpanded` is the state before the
+    /// user has ever touched THIS section — the design opens Transform and
+    /// the primary section of a text or shape selection, and closes the rest.
     init(
-        id: String, title: String, note: (() -> String?)? = nil,
-        reset: (() -> Void)? = nil, rows: [NSView]
+        id: String, title: String, summary: (() -> String?)? = nil,
+        note: (() -> String?)? = nil, reset: (() -> Void)? = nil,
+        defaultExpanded: Bool = true, rows: [NSView]
     ) {
         self.id = id
         super.init(frame: .zero)
         let key = Self.collapsedKeyPrefix + id
-        isExpanded = !UserDefaults.standard.bool(forKey: key)
+        if let collapsed = UserDefaults.standard.object(forKey: key) as? Bool {
+            isExpanded = !collapsed
+        } else {
+            isExpanded = defaultExpanded
+        }
 
         content.orientation = .vertical
         content.alignment = .leading
@@ -553,7 +597,7 @@ final class InspectorSection: NSView {
         }
         for row in rows { addRow(row) }
 
-        header.configure(title: title, reset: reset)
+        header.configure(title: title, summary: summary, reset: reset)
         header.onToggle = { [weak self] in self?.toggle() }
 
         let stack = NSStackView(views: [header, content])
@@ -592,20 +636,52 @@ final class InspectorSection: NSView {
         UserDefaults.standard.set(!isExpanded, forKey: Self.collapsedKeyPrefix + id)
     }
 
+    /// Opens the section as a DEFAULT, for a pane that decided after building
+    /// it that this is the group to open (`ClipPane`'s "the first section is
+    /// open when there is no Transform"). `defaultExpanded` cannot say it: the
+    /// pane only knows which section is first once it has them all.
+    ///
+    /// **It defers to the user and writes nothing.** A section the user has
+    /// ever toggled has a stored value, and re-opening a group somebody closed
+    /// on every rebuild would be worse than the closed panel this fixes;
+    /// storing the state here would then make that override permanent.
+    /// Returns whether it opened the section, so a caller walking a list can
+    /// stop at the first one that had no stored preference.
+    @discardableResult
+    func expandByDefault() -> Bool {
+        guard UserDefaults.standard.object(forKey: Self.collapsedKeyPrefix + id) == nil,
+              !isExpanded
+        else { return false }
+        isExpanded = true
+        content.isHidden = false
+        header.isExpanded = true
+        return true
+    }
+
     func refresh() {
+        header.refreshSummary()
         refreshOptionControls(in: content)
     }
 }
 
-/// The section header: disclosure triangle, title in the micro-label face,
-/// and the reset button pinned to the trailing edge. The button is a subview
-/// so it eats its own clicks — everything else toggles the group.
+/// The section header: disclosure triangle, title in the micro-label face, the
+/// current-state summary, and the reset button pinned to the trailing edge.
+/// The button is a subview so it eats its own clicks — everything else toggles
+/// the group.
 final class InspectorSectionHeader: NSView {
     var onToggle: (() -> Void)?
     var isExpanded = true {
         didSet { needsDisplay = true }
     }
     private var title = ""
+    private var summary: (() -> String?)?
+    /// The last summary drawn, so a refresh only redraws when it CHANGED —
+    /// the panel refreshes on every document change and on every playhead
+    /// move inside an action.
+    private var lastSummary: String?
+    /// Held so the summary can stop short of it: the two share the header's
+    /// trailing end, and a summary drawn under the button would be unreadable.
+    private weak var resetButton: NSView?
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -627,14 +703,17 @@ final class InspectorSectionHeader: NSView {
         NSSize(width: NSView.noIntrinsicMetric, height: InspectorMetrics.headerHeight)
     }
 
-    func configure(title: String, reset: (() -> Void)?) {
+    func configure(title: String, summary: (() -> String?)?, reset: (() -> Void)?) {
         self.title = title
+        self.summary = summary
+        lastSummary = summary?()
         guard let reset = reset else { return }
         let button = OptionButtonControl(
             title: "Reset", action: reset, enabled: { true }, onEdit: {})
         button.toolTip = "Reset this section to its defaults"
         button.translatesAutoresizingMaskIntoConstraints = false
         addSubview(button)
+        resetButton = button
         NSLayoutConstraint.activate([
             button.trailingAnchor.constraint(
                 equalTo: trailingAnchor, constant: -InspectorMetrics.inset),
@@ -642,12 +721,25 @@ final class InspectorSectionHeader: NSView {
         ])
     }
 
+    /// Re-reads the summary closure; redraws only when the answer moved.
+    func refreshSummary() {
+        let next = summary?()
+        guard next != lastSummary else { return }
+        lastSummary = next
+        needsDisplay = true
+    }
+
     override func mouseDown(with event: NSEvent) {
         onToggle?()
     }
 
     override func draw(_ dirtyRect: NSRect) {
-        DS.hoverFill.withAlphaComponent(0.35).setFill()
+        // **Pitfall:** `DS.hoverFill` is `quaternaryLabelColor`, which is
+        // ALREADY about 10% ink — taking 0.35 of it left a 3.5% wash that is
+        // invisible in the light appearance, so the header did not separate
+        // from the rows under it. Drawn at its own alpha it is a quiet band
+        // that reads in both appearances.
+        DS.hoverFill.setFill()
         bounds.fill()
         DS.border.setFill()
         NSRect(x: 0, y: bounds.height - 1, width: bounds.width, height: 1).fill()
@@ -671,8 +763,54 @@ final class InspectorSectionHeader: NSView {
                 at: NSPoint(x: box.minX, y: box.minY), withAttributes: attributes)
         }
 
-        let label = DS.microLabel(title, size: 10)
+        let label = Self.titleLabel(title)
         label.draw(at: NSPoint(x: box.maxX + 6, y: bounds.midY - label.size().height / 2))
+        drawSummary(after: box.maxX + 6 + label.size().width)
+    }
+
+    /// The title in the micro-label FACE — mono 10, uppercase, 0.09em tracking
+    /// — but not in the micro-label's ink.
+    ///
+    /// **Pitfall:** `DS.microLabel` paints in `DS.textFaint`
+    /// (`tertiaryLabelColor`), which over this header's fill is grey on grey;
+    /// with the Clip tab now stacking up to twenty collapsed headers, that
+    /// reads as a list of DISABLED rows rather than a list of groups. Built
+    /// here rather than by changing `DS.microLabel`, whose other callers draw
+    /// one quiet label over the chrome, where faint is right. The summary
+    /// beside it stays `textFaint`: it is secondary to the title.
+    private static func titleLabel(_ title: String) -> NSAttributedString {
+        let size: CGFloat = 10
+        return NSAttributedString(
+            string: title.uppercased(),
+            attributes: [
+                .font: DS.mono(size), .kern: size * 0.09, .foregroundColor: DS.textMuted,
+            ])
+    }
+
+    /// The state summary, right-aligned in whatever room is left between the
+    /// title and the Reset button. Truncated rather than clipped: it is a
+    /// sentence fragment, and half a word with no ellipsis reads as a bug.
+    private func drawSummary(after titleEnd: CGFloat) {
+        guard let text = summary?(), !text.isEmpty else { return }
+        // A Reset button that Auto Layout has not placed yet has a zero frame,
+        // and taking its minX would put the summary's right edge at −6 and skip
+        // it below. `refreshSummary` only redraws when the TEXT changes, so a
+        // summary skipped on the first pass would stay missing until its value
+        // moved — hence the unplaced button falls back to the inset.
+        let button = resetButton.map { $0.frame.width > 0 ? $0.frame.minX : nil } ?? nil
+        let right = (button ?? bounds.width - InspectorMetrics.inset) - 6
+        let left = titleEnd + 8
+        guard right - left > 14 else { return }
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.alignment = .right
+        paragraph.lineBreakMode = .byTruncatingTail
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: DS.mono(10), .foregroundColor: DS.textFaint, .paragraphStyle: paragraph,
+        ]
+        let height = text.size(withAttributes: attributes).height
+        text.draw(
+            in: NSRect(x: left, y: bounds.midY - height / 2, width: right - left, height: height),
+            withAttributes: attributes)
     }
 }
 
@@ -839,7 +977,9 @@ func inspectorShadowSection(_ binding: InspectorBinding) -> InspectorSection {
 
     return InspectorSection(
         id: "video.shadow", title: "Shadow",
+        summary: { on() ? String(format: "%.0f px", current().blur) : "off" },
         reset: { binding.apply("Shadow", video: VideoPatch(shadow: .some(nil))) },
+        defaultExpanded: false,
         rows: [
             toggle,
             inspectorColorRow(
@@ -1194,6 +1334,8 @@ class InspectorPaneView: NSView, InspectorPane {
     weak var inspector: InspectorViewController?
     private let stack = NSStackView()
     private var sections: [InspectorSection] = []
+    /// The current build's header, when the pane makes one.
+    private var headerControl: (any OptionControl)?
     /// The previous build's views, held one generation past their removal —
     /// see the pitfall in `rebuild()`.
     private var retired: [NSView] = []
@@ -1230,12 +1372,34 @@ class InspectorPaneView: NSView, InspectorPane {
         fatalError("InspectorPaneView does not support NSCoder")
     }
 
+    /// A pane reads top-down and now runs to twenty sections, so its
+    /// coordinates should read top-down too: (0, 0) is the selection header,
+    /// and `scroll(to: .zero)` is the top of the list.
+    ///
+    /// **Pitfall:** an unflipped document view is bottom-origin, and a scroll
+    /// view shows the bottom of one that is taller than its clip view. What
+    /// keeps this panel off that path is a single constraint —
+    /// `InspectorViewController.showPane` pins the pane's `topAnchor` to the
+    /// clip view's — and a redesign that ever drops or reshapes that pin would
+    /// open the Clip tab below the header and the whole Transform group, with
+    /// nothing on screen to say anything was above. Flipped, the pin is a
+    /// layout detail rather than the only thing standing between the user and
+    /// an upside-down panel. Auto Layout itself is unaffected (measured: the
+    /// same document height and the same at-rest visible rows either way).
+    override var isFlipped: Bool { true }
+
     // MARK: Subclass hooks
 
-    var tab: InspectorTab { .video }
+    var tab: InspectorTab { .clip }
 
     /// The sections, in order. Called on every rebuild.
     func makeSections() -> [InspectorSection] { [] }
+
+    /// A view ABOVE the sections, rebuilt with them and refreshed with them —
+    /// the Clip tab's selection header. It is an `OptionControl` for the one
+    /// reason every other control here is: `refresh()` is how the model
+    /// reaches it, and nothing pushes values into a view in this panel.
+    func makeHeader() -> (any OptionControl)? { nil }
 
     /// What the pane says when it has nothing to show; nil means "never
     /// empty" (Media and Document).
@@ -1256,6 +1420,7 @@ class InspectorPaneView: NSView, InspectorPane {
 
     func rebuild() {
         sections = []
+        headerControl = nil
         // **Pitfall:** a rebuild often runs INSIDE a control's own event
         // handler — a button's `action()` applies the edit, the document
         // posts, and the pane rebuilds before that handler returns. Keeping
@@ -1270,6 +1435,14 @@ class InspectorPaneView: NSView, InspectorPane {
             stack.addArrangedSubview(placeholder)
             placeholder.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
             return
+        }
+        // Above the sections, and only with something selected: with nothing
+        // selected the empty row above has already said so, and a header
+        // reading "No selection" beside it would say it twice.
+        if let header = makeHeader() {
+            headerControl = header
+            stack.addArrangedSubview(header)
+            header.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
         }
         for section in makeSections() {
             sections.append(section)
@@ -1300,6 +1473,7 @@ class InspectorPaneView: NSView, InspectorPane {
     }
 
     func refresh() {
+        headerControl?.refresh()
         for section in sections { section.refresh() }
     }
 }

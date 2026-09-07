@@ -1,7 +1,13 @@
 import AppKit
 
-/// The Text tab (spec §4.3): content, face, colour, alignment, spacing,
-/// outline, backdrop, shadow, the box mode, and the four presets.
+/// The Clip tab's TEXT sections (spec §4.3): content, face, colour,
+/// alignment, spacing, outline, backdrop, the box mode, and the four presets.
+///
+/// **This pane is never shown**: since the six tabs became three it is a
+/// factory `ClipPane` holds and calls, right after Transform, when EVERY
+/// selected clip is a text clip. Shadow is not in the list any more — it is
+/// one field (`video.shadow`) shared with the video and shape sections, so the
+/// Clip tab carries it once, in the effects group.
 ///
 /// The model stores ONE font string — a PostScript name (§5.2's
 /// `"SourceSans3-SemiBold"`) — while the panel offers the two popups people
@@ -9,7 +15,11 @@ import AppKit
 /// them, and it is deliberately tolerant: a project made on another machine
 /// can name a face this one does not have, and the pane must still open.
 final class TextPane: InspectorPaneView {
-    override var tab: InspectorTab { .text }
+    /// Whether the text sections apply: they write `set_text`, which errors on
+    /// any other kind, so a mixed selection gets none of them.
+    var allText: Bool {
+        !binding.clips.isEmpty && binding.textClips.count == binding.clips.count
+    }
 
     /// A family change replaces the style popup's ITEMS, so it has to be part
     /// of the rebuild signature — refreshing alone would leave the old
@@ -18,16 +28,9 @@ final class TextPane: InspectorPaneView {
         super.structureSignature + "|" + TextFace.family(of: binding.textProps.font)
     }
 
-    override func makeSections() -> [InspectorSection] {
-        [
-            contentSection(), fontSection(), styleSection(), outlineSection(),
-            backdropSection(), inspectorShadowSection(binding), boxSection(), presetSection(),
-        ]
-    }
-
     // MARK: Content
 
-    private func contentSection() -> InspectorSection {
+    func contentSection() -> InspectorSection {
         let binding = self.binding
         let area = InspectorTextArea(
             read: { binding.textProps.content },
@@ -36,13 +39,18 @@ final class TextPane: InspectorPaneView {
             onEdit: { binding.edited() })
         return InspectorSection(
             id: "text.content", title: "Content",
+            summary: {
+                let line = binding.textProps.content
+                    .split(whereSeparator: \.isNewline).first.map(String.init) ?? ""
+                return line.isEmpty ? "empty" : line
+            },
             note: { binding.actionNote },
             rows: [area])
     }
 
     // MARK: Face
 
-    private func fontSection() -> InspectorSection {
+    func fontSection() -> InspectorSection {
         let binding = self.binding
         let families = TextFace.families
         let family = TextFace.family(of: binding.textProps.font)
@@ -76,7 +84,9 @@ final class TextPane: InspectorPaneView {
 
         return InspectorSection(
             id: "text.font", title: "Font",
+            summary: { String(format: "%.0f px", binding.textProps.size) },
             note: { binding.actionNote },
+            defaultExpanded: false,
             rows: [
                 inspectorRow(
                     "Family", [familyPopup], mixed: { binding.mixedText { $0.font } }),
@@ -92,7 +102,7 @@ final class TextPane: InspectorPaneView {
 
     // MARK: Style
 
-    private func styleSection() -> InspectorSection {
+    func styleSection() -> InspectorSection {
         let binding = self.binding
         let aligns = ["left", "center", "right"]
         let valigns = ["top", "middle", "bottom"]
@@ -125,6 +135,7 @@ final class TextPane: InspectorPaneView {
 
         return InspectorSection(
             id: "text.style", title: "Style",
+            summary: { binding.textProps.align },
             note: { binding.actionNote },
             reset: {
                 let defaults = TextProps()
@@ -134,6 +145,7 @@ final class TextPane: InspectorPaneView {
                         color: defaults.color, align: defaults.align, valign: defaults.valign,
                         lineSpacing: defaults.lineSpacing, tracking: defaults.tracking))
             },
+            defaultExpanded: false,
             rows: [
                 inspectorColorRow(
                     "Color", binding, name: "Text Color", read: { binding.textProps.color },
@@ -158,13 +170,15 @@ final class TextPane: InspectorPaneView {
 
     // MARK: Outline
 
-    private func outlineSection() -> InspectorSection {
+    func outlineSection() -> InspectorSection {
         let binding = self.binding
         func current() -> OutlineProps { binding.textProps.outline ?? OutlineProps() }
         func on() -> Bool { binding.textProps.outline != nil }
         return InspectorSection(
             id: "text.outline", title: "Outline",
+            summary: { on() ? String(format: "%.1f px", current().width) : "off" },
             reset: { binding.apply("Outline", text: TextPatch(outline: .some(nil))) },
+            defaultExpanded: false,
             rows: [
                 inspectorCheckRow(
                     "Outline", binding, name: "Outline", read: on,
@@ -196,7 +210,7 @@ final class TextPane: InspectorPaneView {
 
     // MARK: Backdrop
 
-    private func backdropSection() -> InspectorSection {
+    func backdropSection() -> InspectorSection {
         let binding = self.binding
         func current() -> BackdropProps { binding.textProps.backdrop ?? BackdropProps() }
         func on() -> Bool { binding.textProps.backdrop != nil }
@@ -205,7 +219,9 @@ final class TextPane: InspectorPaneView {
         }
         return InspectorSection(
             id: "text.backdrop", title: "Backdrop",
+            summary: { on() ? String(format: "%.0f px", current().padding) : "off" },
             reset: { binding.apply("Backdrop", text: TextPatch(backdrop: .some(nil))) },
+            defaultExpanded: false,
             rows: [
                 inspectorCheckRow(
                     "Backdrop", binding, name: "Backdrop", read: on,
@@ -251,7 +267,7 @@ final class TextPane: InspectorPaneView {
     /// Auto-size or a fixed width that wraps (§4.3). `width` is the model's
     /// three-state field: an explicit null restores auto-sizing, which is why
     /// the patch uses the double optional.
-    private func boxSection() -> InspectorSection {
+    func boxSection() -> InspectorSection {
         let binding = self.binding
         func fixed() -> Bool { binding.textProps.width != nil }
         func currentWidth() -> Double {
@@ -268,7 +284,9 @@ final class TextPane: InspectorPaneView {
             onEdit: { binding.edited() })
         return InspectorSection(
             id: "text.box", title: "Box",
+            summary: { fixed() ? String(format: "%.0f px", currentWidth()) : "auto" },
             reset: { binding.apply("Text Box", text: TextPatch(width: .some(nil))) },
+            defaultExpanded: false,
             rows: [
                 inspectorRow("Mode", [mode], mixed: { binding.mixedText { $0.width != nil } }),
                 inspectorValueRow(
@@ -286,7 +304,7 @@ final class TextPane: InspectorPaneView {
     /// and backdrop (text) plus where the box sits (video) — committed as ONE
     /// undo step, and it routes through the binding like everything else, so
     /// applying one inside an action sets that action's end state.
-    private func presetSection() -> InspectorSection {
+    func presetSection() -> InspectorSection {
         var buttons: [NSView] = []
         for preset in TextPreset.all {
             buttons.append(
@@ -297,6 +315,7 @@ final class TextPane: InspectorPaneView {
         }
         return InspectorSection(
             id: "text.presets", title: "Presets",
+            defaultExpanded: false,
             rows: [
                 inspectorButtonRow(Array(buttons.prefix(2))),
                 inspectorButtonRow(Array(buttons.dropFirst(2))),
