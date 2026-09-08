@@ -92,7 +92,7 @@ fails without the fix. Green tests prove the cases someone thought of.
 | 1 | Cutting moves | 1–2 | — | **done** 2026-09-06 (`4fb72c6`) |
 | 2 | Clip identity | 1 | v3 | **done** 2026-09-07 (`c1b5188`) |
 | 3 | The screencast trio | 2 | v4 | **done** 2026-09-07 (`ac7f849`) |
-| 4 | Words | 2 | v5 | **done** 2026-09-08 (`<commit>`) |
+| 4 | Words | 2 | v5 | **done** 2026-09-08 (`8ec3be5`) |
 | 5 | Sound | 1–2 | — | not started |
 | 6 | Looks | 1–2 | v6 | not started |
 | 7 | Output | 1–2 | — | not started |
