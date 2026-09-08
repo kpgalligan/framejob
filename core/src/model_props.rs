@@ -1,6 +1,7 @@
 //! The per-clip property types of spec §5.2 — the `video`, `audio`, `text`
 //! and `shape` groups a [`crate::model::Clip`] carries, and every struct
-//! and enum inside them.
+//! and enum inside them but the region types, which are
+//! `model_regions.rs`'s and are re-exported below.
 //!
 //! Split out of `model.rs` under the size rule (core/CLAUDE.md: a module
 //! over ~600 lines gives something up before it takes anything on), and
@@ -11,18 +12,36 @@
 //! what the compositor's uniforms are read from. Reading one is reading the
 //! schema's SHAPE; reading the other is reading its VOCABULARY.
 //!
-//! Every path stays as it was: `model.rs` re-exports this whole module with
-//! `pub use crate::model_props::*`, so `crate::model::VideoProps` and the
-//! crate-root re-exports in `lib.rs` are untouched. The rules are
-//! `model.rs`'s too — the field names ARE the JSON keys, declaration order
-//! IS key order, every type is `#[serde(default)]` over a hand-written
-//! [`Default`] that says what an absent key means, and nothing here carries
-//! `deny_unknown_fields`.
+//! It has since paid the same rule once itself: road map 2's phase 3c added
+//! `video.obscure` and its two types, which took the file to 633 lines, so
+//! the boxes drawn ON the picture — [`Spotlight`], [`ObscureRegion`],
+//! [`SpotShape`] and [`MAX_OBSCURE`] — went out to `model_regions.rs`
+//! before the phase took anything else on. They share one coordinate frame
+//! and one shape enum, which is the seam; that module's doc states the
+//! frame.
+//!
+//! Every path stays as it was, through both cuts: `model.rs` re-exports
+//! this whole module with `pub use crate::model_props::*` and this module
+//! re-exports `model_regions.rs` the same way, so `crate::model::VideoProps`,
+//! `crate::model::Spotlight` and the crate-root re-exports in `lib.rs` are
+//! all untouched. The rules are `model.rs`'s too — the field names ARE the
+//! JSON keys, declaration order IS key order, every type is
+//! `#[serde(default)]` over a hand-written [`Default`] that says what an
+//! absent key means, and nothing here carries `deny_unknown_fields`.
 
 use serde::{Deserialize, Serialize};
 
 use crate::model::Color;
 use crate::time::{Ticks, TIMESCALE};
+
+/// The region types — [`Spotlight`], [`ObscureRegion`], the [`SpotShape`]
+/// both are drawn with and the [`MAX_OBSCURE`] budget on the second — live
+/// in `model_regions.rs` and are re-exported whole, so every
+/// `crate::model_props::Spotlight` path (and, through `model.rs`'s own
+/// glob, every `crate::model::Spotlight` one) still resolves. See that
+/// module's doc for the frame they share, which is why they are a file of
+/// their own.
+pub use crate::model_regions::*;
 
 // ---- video properties ----------------------------------------------------
 
@@ -48,6 +67,8 @@ pub struct VideoProps {
     pub filters: Vec<Filter>,
     pub reflection: Option<Reflection>,
     pub spotlight: Option<Spotlight>,
+    /// Hidden regions, at most [`MAX_OBSCURE`] of them (format version 4).
+    pub obscure: Vec<ObscureRegion>,
 }
 
 impl Default for VideoProps {
@@ -66,6 +87,7 @@ impl Default for VideoProps {
             filters: Vec::new(),
             reflection: None,
             spotlight: None,
+            obscure: Vec::new(),
         }
     }
 }
@@ -215,61 +237,6 @@ impl Default for Reflection {
             falloff: 1.0,
         }
     }
-}
-
-/// Darkens the canvas outside a rectangle or ellipse, optionally magnifying
-/// what is inside it (spec §4.2, M3) — the stand-in for a screencast editor's
-/// freehand callout that works on any footage.
-///
-/// A `video` prop, not a `shape` one, though spec §4.2 first listed it
-/// under Shape: the zoom half can only be drawn by the layer that owns the
-/// pixels, so it lives beside chroma key, filters and reflection.
-///
-/// The centre and the box are SOURCE pixels measured from the centre of the
-/// layer's cropped rect — the same frame `corner_radius` and `crop` use —
-/// so a spotlight stays on the face it was put on when the layer is scaled,
-/// moved or rotated.
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
-#[serde(default)]
-pub struct Spotlight {
-    pub shape: SpotShape,
-    pub x: f64,
-    pub y: f64,
-    pub width: f64,
-    pub height: f64,
-    /// Source pixels the edge is blurred over; 0 is a hard edge.
-    pub feather: f64,
-    /// How much darker everything OUTSIDE is: 0 changes nothing, 1 is
-    /// black.
-    pub dim: f64,
-    /// Magnification INSIDE the region. 1 is no zoom, which is why the
-    /// range starts there and not at 0.
-    pub zoom: f64,
-}
-
-impl Default for Spotlight {
-    /// A 480 × 270 window — a 16:9 quarter of a 1080p source — centred, at
-    /// the spec's "darkens the canvas outside" with no zoom.
-    fn default() -> Self {
-        Spotlight {
-            shape: SpotShape::Rect,
-            x: 0.0,
-            y: 0.0,
-            width: 480.0,
-            height: 270.0,
-            feather: 40.0,
-            dim: 0.6,
-            zoom: 1.0,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum SpotShape {
-    #[default]
-    Rect,
-    Ellipse,
 }
 
 // ---- audio properties ----------------------------------------------------

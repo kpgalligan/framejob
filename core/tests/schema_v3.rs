@@ -12,11 +12,13 @@
 //! - **The schema stores what it is given.** A name round-trips with its
 //!   surrounding spaces: trimming is an OP's job (`set_clip`), never the
 //!   reader's, so a file is never rewritten just by being opened.
-//! - **A version-4 file is refused with the exact message.** The version
-//!   gate is the only thing that stops a version-2 build from silently
-//!   dropping every name and label in a newer file (unknown keys are
-//!   ignored, by design — `model.rs`'s module doc), so the bump has to be
-//!   there even though no field needed rewriting.
+//! - **A file from the future is refused with the exact message.** The
+//!   version gate is the only thing that stops a version-2 build from
+//!   silently dropping every name and label in a newer file (unknown keys
+//!   are ignored, by design — `model.rs`'s module doc), so the bump has to
+//!   be there even though no field needed rewriting. The number the test
+//!   uses tracks `RC_FORMAT_VERSION` + 1; the claim is about the gate, not
+//!   about any one version.
 //! - **Identity travels with the clip, and no further.** A split clone
 //!   carries name and label to both halves (`duplicate`, `detach_audio` and
 //!   `paste` clone the same way); `nest` copies `solo` into the nest's own
@@ -82,7 +84,7 @@ fn identified() -> Value {
 }
 
 fn assert_identity_defaults(project: &Value) {
-    assert_eq!(at(project, "/version"), &json!(3));
+    assert_eq!(at(project, "/version"), &json!(4));
     assert_eq!(at(project, "/clips/0/name"), &Value::Null);
     assert_eq!(at(project, "/clips/0/label"), &Value::Null);
     assert_eq!(at(project, "/tracks/0/solo"), &json!(false));
@@ -93,26 +95,26 @@ fn assert_identity_defaults(project: &Value) {
 #[test]
 fn a_version_two_file_reads_with_the_identity_fields_at_their_defaults() {
     // Every new field carries a serde default, so a file written before
-    // any of this existed opens untouched and comes back as a version-3
-    // project with no names, no labels and nothing soloed.
+    // any of this existed opens untouched and comes back as a
+    // current-version project with no names, no labels and nothing soloed.
     assert_identity_defaults(&Handle::from_value(&one_clip(2)).value());
 }
 
 #[test]
 fn a_version_one_file_reads_the_same_way() {
     // The migration chain still runs underneath: a version-1 file reaches
-    // version 3 through `migrate_1_to_2` and then through nothing at all,
-    // because version 3 needed no rewrite.
+    // the current version through `migrate_1_to_2` and then through
+    // nothing at all, because no version since has needed a rewrite.
     assert_identity_defaults(&Handle::from_value(&one_clip(1)).value());
 }
 
 #[test]
-fn a_version_four_file_is_refused_with_the_exact_message() {
-    let msg = Handle::try_from_value(&json!({ "version": 4 }))
+fn a_file_one_version_newer_is_refused_with_the_exact_message() {
+    let msg = Handle::try_from_value(&json!({ "version": 5 }))
         .expect_err("a newer format version must be refused");
     assert_eq!(
         msg,
-        "project format version 4 is newer than this build understands (version 3); \
+        "project format version 5 is newer than this build understands (version 4); \
          update Reelcut to open it"
     );
 }
@@ -125,7 +127,7 @@ fn name_label_and_solo_round_trip_exactly() {
     // spaces: trimming is `set_clip`'s job, and a reader that tidied would
     // rewrite a file just by opening it.
     let written = Handle::from_value(&identified()).value();
-    assert_eq!(at(&written, "/version"), &json!(3));
+    assert_eq!(at(&written, "/version"), &json!(4));
     assert_eq!(text(&written, "/clips/0/name"), NAME);
     assert_eq!(text(&written, "/clips/0/label"), "blue");
     assert!(flag(&written, "/tracks/0/solo"));

@@ -1,7 +1,8 @@
 # Reelcut — road map 2: beyond the spec
 
-**Status: phases 0, 1 and 2 are done (`4fb72c6`, `c1b5188`); the rest is
-not. Pick up at phase 3.** Spec §10's three milestones are done
+**Status: phases 0–3 are done — §1's table below carries the commit of each,
+which is the one place they live; the rest is not. Pick up at phase 4.**
+Spec §10's three milestones are done
 (`reelcut-roadmap.md` records how each was proved). This is the plan for
 what a capable editor still lacks, found by reading the op table, the menus,
 the key map and the code against the question "what does a cutter reach for
@@ -90,7 +91,7 @@ fails without the fix. Green tests prove the cases someone thought of.
 | 0 | Groundwork | ½ | — | **done** 2026-09-06 (`4fb72c6`) |
 | 1 | Cutting moves | 1–2 | — | **done** 2026-09-06 (`4fb72c6`) |
 | 2 | Clip identity | 1 | v3 | **done** 2026-09-07 (`c1b5188`) |
-| 3 | The screencast trio | 2 | v4 | not started |
+| 3 | The screencast trio | 2 | v4 | **done** 2026-09-07 (`<commit>`) |
 | 4 | Words | 2 | v5 | not started |
 | 5 | Sound | 1–2 | — | not started |
 | 6 | Looks | 1–2 | v6 | not started |
@@ -103,7 +104,7 @@ nothing that later phases need; 6 depends on 3's list-interpolation rule; 9
 is last because it is the largest and touches every op at once. Any other
 order works if that one dependency is kept.
 
-**What phases 0, 1 and 2 left behind for the rest**, so no later phase
+**What phases 0–3 left behind for the rest**, so no later phase
 invents a second one:
 
 | | |
@@ -121,6 +122,13 @@ invents a second one:
 | `audio.rs::silenced` | muted, or soloed-out within a container's track set. Any later per-track audio switch joins it rather than adding a second read of `track.muted`. |
 | `TimelineView+Rename.swift` | the second `extension TimelineView` precedent (after `+Edge.swift`'s), and the shape for adding an in-place editor to the frozen view: the hook in the frozen file, the field in the extension. |
 | `AgentServer+Arguments.stringsArg` | an optional list of strings from a tool call, a lone string counting as one. Phase 4's caption options and phase 7's export options want it. |
+| `actions.rs`'s LIST rule | an end patch interpolates a list per index when the lengths match and each pair of entries agrees on its discrete fields, and switches at the end otherwise — the crate's rule, not one list's, and confined to list ENTRIES so no named object's animation changed. Phase 6's filter work is the one that asked for it; anything else that adds an array of objects gets it free. |
+| `model_regions.rs` | the ONE region frame — `x`/`y` a CENTRE in source pixels from the cropped rect's centre, `width`/`height` its size — and the one `SpotShape` every region is drawn with. A later region joins these rather than declaring a second frame or a second two-shape enum. |
+| `edit_zoom.rs`'s placement equation | the solve from a rectangle in that frame to an action's `scale`/`x`/`y`, rotation and crop included, with the scale clamped before the offsets follow it. Phase 6's Add Background… and any later "zoom to selection" cite it rather than re-deriving. |
+| `SilenceDetector.Input.read` | the seam that takes a snapshot, a plan, a selection and the peak files off the document ONCE, after which everything is arithmetic over values — which is what lets a sheet re-detect synchronously and an agent run the same code. Phase 5's meters and phase 8's search want the same shape. |
+| `TimelineView+Candidates.swift` | the third `extension TimelineView`, and the precedent for adding a WASH under the clips: a stored property with a `didSet`, two one-line draw calls in the frozen file, the bodies outside it. An overlay view cannot do it — the ruler fills its own bounds opaquely first. |
+| `EditorViewController+ZoomRegion.swift` / `CanvasRegionView` | the second modal canvas mode, and the shape of one: an overlay whose PRESENCE is the mode, one-line closures back to the controller, a key that TOGGLES (an overlay that has lost focus cannot be dismissed by Esc), and an auto-close beside `syncChromaEyedropper`. Installed through `armCanvasMode`, which ends every OTHER armed mode first — a third mode inherits that by being installed at all, where each arming path remembering the others was the review's defect. |
+| `AgentServer+Arguments.rangesArg` / `nestedNumberArg` | a list of `[from, to]` pairs and a number one level down, each named by its path and each snapped through the same helper the scalar readers use. |
 
 ## 2. Phases
 
@@ -726,6 +734,154 @@ scale, move and rotation. `RC_FORMAT_VERSION` 4.
 of its own), `core/tests/zoom.rs`, `core/tests/schema_v4.rs`, catalog and
 handlers.
 
+**What landed.** All three features, at version 4, with the two ops, the
+tool, the shader pass and every path into them — plus the following, where
+the code differs from the plan above or settled what it left open. Six of
+them matter enough to read before touching the area:
+
+- **`add_zoom_action` gained a sixth argument, `curve`**, which the table
+  above does not have, defaulting to the eased-BOTH-ends form rather than
+  `Curve::default()`'s linear. A screencast zoom that starts and stops
+  abruptly is the one thing the feature exists to avoid, and adding the
+  argument later would have meant a second op inside one gesture — which
+  breaks the one-op-one-undo-step property the composite exists for. It
+  reuses `set_action`'s argument name, enum and error strings, applied by
+  composing `set_action` rather than by writing `slot.curve`.
+- **The obscure shader stage runs at 4b, between the sharpen and the point
+  filters** — not after them, which is where a pass "parallel to spotlight"
+  would naturally have gone. It must come AFTER the sharpen, whose unsharp
+  term is built from the raw texture and added on top, or a layer carrying
+  both a sharpen and a region would have the hidden detail put straight
+  back; and BEFORE the point filters, because a region replaces the colour
+  with a second sample of the same texture, so a sample taken after them
+  would show as an ungraded hole on a sepia or inverted layer. Between the
+  two is the only correct place, and the region's colour is then graded,
+  lit and filtered exactly like the picture around it. The argument is
+  written into `Compositor.metal`'s order-of-operations comment, beside the
+  one that says why the neighbourhood filters do not run in slot order
+  either.
+- **The widened interpolation discriminant applies to LIST ENTRIES only.**
+  One reading of "each entry's discrete fields (`shape`, `kind`)" above was
+  to widen the crate's generic object test; that would have changed
+  SHIPPED behaviour, because `video.spotlight` is an object with a `shape`
+  field and a spotlight animated rect → ellipse would have stopped
+  interpolating its geometry until the last instant. So `ENTRY_DISCRIMINANTS`
+  is reached only from the array arm (`lerp_entry`), the object rule still
+  knows `kind` alone, and `core/tests/schema_v2.rs` pins both halves — the
+  region case AND a regression test that fails the moment anyone moves
+  `shape` into the object arm.
+- **⇧ chooses fill during the canvas drag**, read at every mouse-dragged
+  and mouse-up rather than latched at the press, and named in the hint pill
+  and the button's tooltip. The band drags FREE, which is what makes `fill`
+  meaningful at all, but nothing above said how a user chooses it; without
+  this modifier `fill` would have been reachable only over MCP.
+- **The sheet spells the removed total as a timecode** — "23 cuts ·
+  removes 00:00:04:12" — through `ReelTime.format`, not the "M:SS" the
+  plan's line sketches. `SpeedSheetController` does the same with the
+  lengths it predicts, and a second spelling of a time in a sheet is
+  exactly what that formatter exists to prevent.
+- **A region's default kind is `pixelate` at amount 1**, not the blur a
+  reader coming from `Filter` would expect, and its feather is 20 rather
+  than the spotlight's 40. A filter has to be visible without destroying
+  the frame; a region that only half hides has failed at its one job, and a
+  blur at the shader's maximum radius is soft enough to read a large
+  password field through. A face region is also smaller than a callout
+  window, and a 40-pixel ramp on a 200-pixel box is mostly ramp. The rest
+  of the defaults are the spotlight's own box, 480 × 270 centred, so the
+  two region controls put the same rectangle on screen.
+
+And the smaller settlements, each argued where it lives:
+
+- **The singular delegates to the plural.** `ripple_delete_range(from, to)`
+  is now `self.ripple_delete_ranges(&[[from, to]])` — one implementation
+  per algorithm — and the guard on that claim is that `edit_tests.rs`
+  gained 220 lines and lost ZERO, so every existing ripple test passed
+  unedited.
+- **`ZoomRegion` and `ZoomFit` live in `edit_zoom.rs`**, not with the model
+  types: they are op ARGUMENTS and never reach a project file. Their range
+  checks are ten local lines in `props_check.rs`'s exact wording rather
+  than a widening of that module's private `finite` / `above`, for the same
+  reason. And a region's own clamp went where `clamp_video` already lives,
+  in `actions.rs` rather than beside the checks in `props_check.rs`: a
+  check is about a value being written, a clamp about one being evaluated.
+- **The zoom reads the clip evaluated at `at`, and zooms BACK to the base.**
+  `at` is the frame the rectangle was drawn on, which is what makes the
+  answer match what the user saw; the residual limit is that a rotation
+  animated between `at` and `at + duration` is not tracked. A null region
+  writes the clip's BASE `scale`/`x`/`y`, not the evaluated ones, because
+  "zoom back" means back to where the clip started. `nest.rs`'s `rotate`
+  was widened to `pub(crate)` and CALLED rather than restated.
+- **A NaN `amount` clamps to 1, not 0.** Every other neutral in
+  `clamp_video` is "changes nothing" or the type's default; for a region
+  both readings point the same way, and a NaN that resolved to "hides
+  nothing" would quietly publish the face the region was drawn over.
+- **`model_props.rs` paid the size rule again.** `video.obscure`'s types
+  took it to 633, so `Spotlight`, `SpotShape`, `ObscureRegion`,
+  `ObscureKind` and `MAX_OBSCURE` went out to a new `model_regions.rs`
+  (218) and it came back to 498. The cut is by CONCERN, not by line count:
+  those five share one coordinate frame and one shape enum. The move's only
+  textual change was three intra-doc links rewritten to the house's
+  fully-qualified form, because their targets stayed behind.
+- **The version-4 interpolation tests live in `schema_v2.rs`**, beside the
+  filter cases that pin the same rule, with a paragraph in that file's
+  module doc saying why a version-4 assertion sits in a file titled "what
+  version 2 added".
+- **No `MediaImporter.peaksExist` was needed.** `loadPeaks` already answers
+  nil for a cache that is not on disk, and the detector records those media
+  in `pendingMedia`, which the sheet names and re-runs on
+  `.mediaCacheDidChange` — the same information with no new API and no
+  second stat of a file about to be read.
+- **`detect_silence` runs ON the main thread**, not off it as the plan's
+  line says. `offMainTools`' criterion is "waits for something the main
+  thread must deliver", not "touches the disk", and this reads a few
+  hundred KB of peak files and does one arithmetic pass —
+  `consolidate_media` and `import_captions` are the precedent. It also
+  **does not clamp its three numbers** into the sheet's
+  slider ranges: those are chrome, not model rules, and a tool that
+  silently clamped would report a detection the caller did not ask for. It
+  refuses only what is not a level or not a length, and echoes all three so
+  a caller sees what ran. `rangesArg` likewise passes a REVERSED pair
+  through untouched — the core orders every pair, and a reader that
+  rewrote its argument would make what a caller reads back disagree with
+  the call it made.
+- **The Obscure section is six rows per region, not eight**, the centre and
+  the size paired into one row each where the spotlight gives all four a
+  row of their own, and it has no on/off checkbox because an empty list IS
+  off — the filter stack's idiom, not the spotlight's. "Place on
+  Canvas" is one button for the SECTION rather than one per row, because
+  `InspectorViewController.onCommand` carries a selector and no index, and
+  an index-carrying seam for one button would be the first of its kind.
+- **`PreviewCanvasView.swift` was not touched**, though the plan listed it:
+  everything the region mode asks of it is already internal, and the
+  modal-overlay shape exists precisely so the frozen file gains no seventh
+  stored session. The three `@objc` selectors are declared on the extension
+  itself (`pickChromaKey`'s precedent), so the frozen controller gained one
+  key case, one forward for Remove Silences and one validator arm — 21
+  lines.
+- **Stored regions are not drawn on the canvas** outside the modal mode: a
+  blurred region is self-evident on the
+  picture, unlike a spotlight's geometry, and drawing it properly means a
+  new hit-test family for drag handles. `CanvasLayerBox.canvasPoint` and
+  `canvasQuad` are written, unused, as the seed for that.
+- **The band commits a RECT**, so an ellipse is reached only through the
+  row's Shape popup afterwards. Deliberate — the band is a rectangle.
+
+Three limits inherited rather than introduced, worth knowing before
+chasing them: a PARTIAL entry in an end patch (`{"obscure": [{"amount":
+1}]}`) interpolates smoothly and then, at the switch, takes
+`ObscureRegion::default()` for every key it omitted, because `merge`
+replaces a list rather than merging it — `video.filters` has had this since
+M3; a pixelated region takes ONE raw sample, so on a layer that also
+carries a global blur the blocks come out unblurred while the picture
+around them is blurred (the coarser of the two is what hides), where a
+blurred region combines in quadrature and is always at least as blurred as
+its surroundings; and a reversed clip INSIDE a nest is analysed unmirrored
+and cannot be named by the selection scope, because a nested clip has no id
+`snapshot.clip(_:)` can look up — a mis-reading confined to the nest's own
+span, which since the review's nest fix is a wall no candidate may enter
+either way. A region on a slated (missing-media) layer
+also does nothing, the posture the sharpen already takes.
+
 **Proof.**
 - Silence: a synthesised file with known quiet spans (`ffmpeg -f lavfi`
   sine with gaps) is detected within one bucket (10 ms) plus the padding;
@@ -742,6 +898,170 @@ handlers.
   expected size; scaling the layer scales the region (measured centre
   offset); an action from amount 0 → 1 renders the midpoint between the two
   stills.
+
+**Proved** on 2026-09-07. Core: `make test` **338 passed / 0 failed** — 284
+before, plus `core/tests/schema_v4.rs` (12), `core/tests/zoom.rs` (32) and
+additions to `edit_tests.rs` (+5), `schema_v2.rs` (+5) and the
+`model_tests.rs` fixture. `make lint` and `cargo fmt --check` clean,
+`make typecheck` 0 errors and the same 4 AVFoundation deprecation warnings,
+`make app` building. The zoom's arithmetic is pinned by hand-computed
+oracles rather than golden values: the whole cropped source under `fit` is
+EXACTLY `min(cw/sw, ch/sh)` at the origin, which is the only thing tying
+the core's maths to VideoPane's "Fit to Canvas" button; a quarter-width
+region is scale 4 at −1920; a 90° clip answers 2.25 and (0, −1080) where
+the naive formula would say 4 and (−1920, 0); a region wanting more than
+the maximum clamps and takes its offsets from the CLAMPED value; and every
+end-patch assertion checks the patch's keys are exactly `scale`, `x`, `y`,
+so the op can never freeze a layer's angle for the span of a zoom. On the
+cut side, two disjoint ranges in one `ripple_delete_ranges` equal the two
+singular ops applied LATER RANGE FIRST as whole documents, and differ from
+the same two applied earlier-first; two touching ranges leave the same
+lanes as two singular ops but `next_id` exactly one lower — the merge is a
+behaviour, not a tidy-up.
+
+App: driven over MCP against `make app`'s binary, with the catalog at **68
+tools** and the startup parity log EMPTY. A 320 × 180 region on a 640 × 360
+clip under `fit` wrote the end patch `{scale: 2, x: 0, y: 0}`; a null
+region wrote the base transform back under the undo name "Zoom Back";
+`detect_silence` answered with −40 dBFS, 0.5 s, 0.1 s and the scope it
+used; `[[1 s, 2 s], [3 s, 4 s]]` in one call turned a 5 s clip into three
+1 s clips. Refusals are by name: a wrong-typed tick gives
+`ranges[0][1] must be a time in ticks (600000 per second)` — `rangesArg`
+snapping through the same path `timeArg` uses — and an absent `region`
+gives a message that spells out that `x` and `y` are its CENTRE. The
+regression proofs re-ran beside it: `phase1_proof.py` **66/66**,
+`phase2_proof.py` **85/85** and `phase2_chrome.py` **26/26**, the last two
+after phase 2's tool-count assertion became the floor its own comment
+always said it should be (the EXACT count belongs to the newest phase's
+script). The phase's own scripts go beside them in `tools/proof/` —
+`phase3_proof.py` over MCP at **121/121** (91 when the phase first landed,
+plus the thirty the review's fixes brought — eleven for the shader, and the
+rest for the nest wall and the list-length rule), the review's own
+`phase3_silence_scope.py` at **8/8**, and `phase3_chrome.py` at
+**33/33** for the two claims the offscreen harness can answer: the
+candidate wash (its α solved from two backgrounds and matched to
+`DS.timelineCandidateShade`'s 0.24, not the range shade's 0.12) and the
+Obscure section's summary and rows with the Clip tab open. The preview
+well renders black offscreen, so nothing about the PICTURE can be proved
+there and 3b's canvas drag cannot be photographed at all. Both needed two
+new harness arguments — `candidateSpans` and `expandSections`, view state
+no package carries, defaulting to `-` so every earlier caller renders the
+bytes it always did.
+
+Still owed by a person at the machine — the event-driven half no still
+frame answers: (1) `Z` with a clip selected puts up the crosshair, a drag
+paints the band with the resolved rectangle ghosted beside it, ⇧ switches
+it to fill mid-drag, and release adds one action; (2) `Z` again, Esc,
+moving the selection and arming the chroma eyedropper each end the mode,
+and ⇧Z still fits the timeline;
+(3) Clip ▸ Remove Silences… shades its candidates on the ruler AND the
+lanes, the shading survives every control change and clears when the sheet
+goes; (4) the sheet's *Selected clips* row is disabled when the selection
+makes no sound, and the pending-peaks note names the file still being
+analysed and clears when it lands; (5) "Place on Canvas" appends a region
+where the band was drawn and greys out at four; (6) an obscured region
+actually hides a face at 100 % zoom, which is the whole point and which
+only eyes can judge.
+
+**Reviewed, and six real defects fixed.** The change was then read by nine
+readers — correctness, the core's rules, the shader, the detector, the
+canvas gestures, the inspector, the MCP mirror, the docs and the proofs —
+and every finding was put to three sceptics told to refute it; nine
+survived. The six that were code:
+
+1. **A blurred region ERASED a pixelated one it overlapped.** Both mixes
+   took a fresh sample of the RAW texture and mixed it over the colour
+   accumulated so far, so whichever ran second won outright — and the blur
+   always ran second. A region at 5 % blur dropped over a full-strength
+   pixelation put the face the blocks had destroyed back on screen,
+   softened by a pixel: ADDING a region made the frame less hidden, which
+   is the one thing this feature must never do. The fragment stage now
+   measures each hiding as a length in source pixels times the mix it would
+   be applied at, applies the greater ALONE, and gives a tie to the
+   pixelate, which destroys where a blur only softens.
+2. **A region that hides nothing forced its neighbour to full strength.**
+   The two covers were the bare max of the slot masks, so a region at
+   `amount` 0 — "there but hides nothing", as `model_regions.rs` documents
+   it — pulled a neighbouring pixelation's cover to 1 inside its own box: a
+   hard-edged square of 64-pixel blocks conjured by adding a region that
+   hides nothing. A cover is now each slot's mask weighted by that slot's
+   own strength over the strongest strength of its kind, which is
+   continuous in `amount` where a "skip the empty slots" guard would have
+   left a cliff between 0 and 0.001. Both fixes are covered by ELEVEN new
+   byte comparisons in `phase3_proof.py`, part of why that script is
+   **121 checks** and not the 91 it landed with.
+3. **A silenced clip in the SELECTED scope proposed deleting itself.** A
+   voice the mix has silenced reads quiet at every tick by construction
+   (`level` short-circuits on a zero envelope) while still COVERING its
+   span, so a muted music bed in scope answered with one cut across the
+   whole song — and `ripple_delete_ranges` cuts every unlocked track, so
+   that cut would have taken the audible voiceover under it away with it.
+   `Input.defaultScope` chose that scope by itself, which made muting the
+   music to hear the voiceover — the ordinary way anyone checks a mix — the
+   way in. Both scopes now drop a silenced voice, `defaultScope` answers
+   `audible` for a selection of them, and the sheet says so. The new
+   `tools/proof/phase3_silence_scope.py` pins it at **8/8**; its two
+   failing checks answer `[[padding, 10 s − padding]]` on a build without
+   the fix, so neither can pass against one.
+4. **Remove Silences proposed cuts INSIDE a nest.** The plan flattens a
+   nest, so its audio segments carry the INNER clips' ids and a quiet run
+   over a nest read like any other — but `Source::Nest` has no in point, so
+   splitting a nest clip strands its tail instead of trimming it. A nest is
+   now a WALL: its sound still counts toward the quiet test, because it is
+   what the user hears, and no candidate may INTERSECT one. The limit that
+   leaves is the one every edit inside a nest has (spec §4.4): the dead air
+   in a nest is reached by un-nesting, cutting and nesting again.
+   `phase3_proof.py`'s "3a — a nest is a wall" section is the check, over a
+   fixture whose second copy of the quiet clip is nested.
+5. **Appending a region while the playhead was inside an action was
+   swallowed, then deleted.** The list rule interpolates per index only
+   while the two lengths match, so a longer list written into an action's
+   END patch is invisible for the whole span the user is looking at — the
+   section does not even grow a row, since `structureSignature` counts the
+   EVALUATED list — and the next write of that list replaces the end patch
+   with the base list, without the new entry. A list write whose LENGTH
+   differs from the clip's own now lands on the BASE props wherever the
+   playhead sits; dialling a value inside an existing entry still animates,
+   which is what the list rule is for, and `phase3_proof.py`'s "a list
+   write inside an action: a LENGTH is not an animation" section holds both
+   halves apart.
+6. **Arming the chroma eyedropper did not end an armed region mode**, so a
+   later canvas drag could commit a zoom or append a region nobody asked
+   for. Both modes are installed through one `armCanvasMode` now, which
+   ends every armed mode first, and a third inherits the rule by being
+   installed at all. This is the one of the six no automated check reaches
+   — two modal overlays and a mouse — so it is argued where it lives and
+   added to the list a person must still work through, at (2).
+
+The two that were documents: app/CLAUDE.md claimed `AgentServer.checkVideoEnums`
+guards the chroma key's shape, which has no enum in it at all (a colour and
+three numbers); and spec §6's `add_zoom_action` row listed the base
+transform among what is read "from the clip evaluated at `at`", four
+sentences before saying the zoom back writes the clip's base — only
+rotation and crop are read evaluated, the zoom BACK's three numbers are the
+STORED base, and the placement reads no transform of either kind, since the
+`scale`/`x`/`y` it writes are absolute. Nothing in the tree reads
+`designs/`, so no check can fail on a sentence; what pins the behaviour is
+`core/tests/zoom.rs`'s `rotation_is_read_from_the_state_at_the_actions_start`
+and `a_null_region_zooms_back_to_the_clips_base_transform`, and both halves
+were measured again over MCP against the built binary — a zoom back placed
+after an action that moves the layer writes the base three and not the
+evaluated ones, and two clips differing only in their transform take the
+same zoom for the same region.
+
+Two limits were recorded rather than fixed, both older than this phase and
+both now reachable through it. The instance **deadlocks somewhere past
+forty open documents** — nothing closes one, there is no such tool — which
+is four or five proof runs on one process; `tools/proof/README.md` measures
+it and says to relaunch rather than read a hang as a failure. And on the
+MCP path **a nested object inside a patch is decoded into a typed Swift
+struct and re-serialised**, so a misspelt key inside one is DROPPED where
+the core would have named it, and a known key the caller left out is sent
+as its DEFAULT, which resets that field. `shadow` has behaved that way
+since M3 and `obscure` inherits it; the core refuses both
+(`deny_unknown_fields`, `core/tests/schema_v4.rs`), the agent's decoder
+simply gets there first. `phase3_proof.py` prints it as a note beside the
+checks rather than asserting it, since it is nobody's intended behaviour.
 
 ---
 
@@ -1100,13 +1420,13 @@ handle, `AgentServer+Arguments.swift`, `AgentServer+Project.swift`, catalog.
 Checked against spec §9 for conflicts; a phase that binds one promotes its
 row into §9.
 
-Phases 1 and 2's rows have been promoted into spec §9's bound table and
+Phases 1, 2 and 3's rows have been promoted into spec §9's bound table and
 are struck from this one; what is left is what is still only a claim on a
-key.
+key. Phase 3 took `Z` — bare, to arm and disarm the canvas region mode,
+with ⇧Z still Fit Timeline.
 
 | Keys | Action | Phase |
 |---|---|---|
-| `Z` | Zoom-to-region mode on the canvas | 3 |
 | ⌥⌘E | Save Frame… | 7 |
 | ⇧⌘P | Preview Window | 8 |
 | ⌘↓ / ⌘↑ | Open / close nest | 9 |
@@ -1118,9 +1438,13 @@ nothing selected, so it is the Delete item's other half rather than a
 second row saying almost the same thing. **Landed in phase 2**: Clip ▸
 Rename… and Label ▸ (the six colours, each with its swatch, then None),
 Edit ▸ Paste Attributes, and Track ▸ Solo — no key, a checkmark for the
-current track, the header's S being the everyday path.
+current track, the header's S being the everyday path. **Landed in phase
+3**: Clip ▸ Remove Silences…, with no key equivalent and in the cutting
+group beside Close Gap. Zoom to Region and Zoom Back got no menu items on
+purpose — `Z` and the Video sections' two buttons are the paths, `C`'s
+crop mode being the precedent for a bare-key canvas mode.
 
-Still to come: Clip gains Remove Silences…, Add Background…, Add Blurred
+Still to come: Clip gains Add Background…, Add Blurred
 Background, Open / Close Nest; File gains Generate Captions…, Export
 Captions…, Save Frame…; View gains Preview Quality ▸ and Preview Window;
 Window gains Export Queue.

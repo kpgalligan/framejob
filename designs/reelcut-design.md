@@ -170,6 +170,24 @@ timeline concern.
 - **Crop mode** (C, or double-click a video clip): the handles become
   crop edges in source space; the uncropped source ghosts at 30 %.
   Esc or Return leaves.
+- **Region mode** (Z, or the Video sections' "Zoom to Region…" and the
+  Obscure section's "Place on Canvas"): a modal overlay over the canvas on
+  which a rectangle is dragged free — no aspect lock, which is what makes
+  `fill` reachable at all. While a ZOOM drag runs, the rectangle that will
+  actually end up filling the canvas is stroked dashed in the same ink at a
+  lower alpha — larger than the band under `fit`, smaller under `fill` — so
+  what you will get is on screen. Release commits: a zoom action at the playhead
+  (⇧ chooses fill over fit) or an appended `video.obscure` region,
+  whichever armed the mode. Z toggles, Esc cancels, and moving the
+  selection ends it; the mode refuses to arm at all when there is no
+  single selected clip on the canvas at the playhead, since there would be
+  nothing to draw a rectangle over. A band under 6 px on either axis beeps
+  and leaves the mode armed — a stray click is a miss, not a decision. The
+  rectangle is read in §5.3's source-pixel frame through all four of its
+  corners, so a rotated layer gets the right box. Arming ANY modal canvas
+  mode ends whatever other one was armed — the eyedropper and the region
+  band are one overlay each and only one may be up, or a drag begun for one
+  commits the other's edit.
 - **Text** clips edit inline on double-click (an `NSTextView` overlay
   positioned in canvas space). Line and arrow shapes have endpoint
   handles.
@@ -241,8 +259,13 @@ with quick-value chevrons, color wells, steppers.
 The section groups below are named as they were when each was a tab; they
 are now sections of the Clip tab, offered when the selection has that aspect.
 
-**Video sections** — any clip with pixels. Text and shape clips get
-Transform, Opacity and Shadow only.
+**Video sections** — any clip with a video property group, which is every
+clip that draws. A text or shape clip therefore gets Transform and the
+whole effects group (Shadow, Filters, Reflection, Spotlight, Obscure) too:
+those measure the layer against its own source pixels, and a title has
+those as much as a movie does. What it does NOT get is the sections tied to
+a source that has pixels of its own — Crop, Corner radius, Colour and
+Chroma key — or to a media source, which is Speed.
 
 - *Transform*: Scale % (1–1000), Position X / Y in canvas pixels (origin
   at canvas center, X right, Y down), Rotation °, Opacity %. Buttons:
@@ -270,7 +293,13 @@ Transform, Opacity and Shadow only.
 - *Actions*: table of the clip's actions (start, duration, curve, which
   properties change); Add Action at the playhead (⌥⌘K), Remove, curve
   popup. While the playhead is inside an action, edits in this tab set
-  that action's end state and the section header says so.
+  that action's end state and the section header says so — with one
+  exception, ADDING or REMOVING an entry of a list-valued property
+  (`video.filters`, `video.obscure`), which always writes the base props.
+  §5.4's list rule interpolates per index only while the two lengths
+  match, so a longer or shorter list in an end patch would be invisible
+  for the whole span and then be overwritten by the next write of that
+  list; dialling a value INSIDE an entry still animates.
 - *Transition* appears when the clip overlaps its predecessor: kind and
   duration.
 - M3: *Chroma key* (key color with a canvas eyedropper, tolerance,
@@ -279,6 +308,21 @@ Transform, Opacity and Shadow only.
 - M3: *Spotlight* — the stand-in for a screencast editor's freehand callout — lives
   here rather than in the Shape pane below, because only the layer that
   owns the pixels can draw its 1.2–2× zoom.
+- Format version 4: *Obscure* — up to four regions that hide what is under
+  them, six rows each (kind with a Remove button, then shape, amount,
+  feather, and the centre and the size as PAIRED fields rather than the
+  spotlight's four separate value rows — four regions at eight rows apiece
+  is a section nobody can see the end of), with Add Region and "Place on
+  Canvas" in the footer, both disabled at the cap. It is the filter
+  stack's idiom, not the spotlight's: there is no on/off checkbox because
+  an empty list IS off, and the whole array goes back through one
+  `set_video` patch. "Place on Canvas" arms §4.2's region mode and
+  APPENDS what is drawn — one button for the section rather than one per
+  row, because the inspector's command seam carries a selector and no
+  index. Stored regions are not drawn on the canvas outside that mode: a
+  blurred region is self-evident on the picture, unlike a spotlight's
+  geometry, and drag handles for one are a hit-test family the frozen
+  canvas file has no room for yet.
 
 **Audio sections** — clips whose media has an audio track and whose audio
 is enabled.
@@ -503,7 +547,7 @@ grid (`rc_time_snap_to_frame`, round-to-nearest); sources keep their own
 rate and AVFoundation picks the source frame. Frame rates are rationals
 `[num, den]` everywhere.
 
-### 5.2 Project — the JSON schema (format version 3)
+### 5.2 Project — the JSON schema (format version 4)
 
 The Rust value, serialized by serde. Small, no pixels. All times are
 ticks, all positions canvas pixels, colors `[r, g, b, a]` floats 0–1,
@@ -511,7 +555,7 @@ angles degrees, opacity/volume 0–1 (volume may exceed 1, up to 4).
 
 ```json
 {
-  "version": 3,
+  "version": 4,
   "canvas": { "width": 1920, "height": 1080, "fps": [30, 1],
               "background": [0, 0, 0, 1], "fit_new_clips": true,
               "timecode_frames": true },
@@ -536,7 +580,8 @@ angles degrees, opacity/volume 0–1 (volume may exceed 1, up to 4).
                  "shadow": null,
                  "color": { "brightness": 0, "contrast": 0, "saturation": 0, "hue": 0 },
                  "chroma": null,
-                 "filters": [], "reflection": null, "spotlight": null },
+                 "filters": [], "reflection": null, "spotlight": null,
+                 "obscure": [] },
       "audio": { "volume": 1.0, "muted": false, "fade_in": 0, "fade_out": 0,
                  "duck": null, "mono": false, "keep_pitch": true,
                  "pan": 0, "compressor": null, "noise_reduction": 0 },
@@ -588,6 +633,35 @@ angles degrees, opacity/volume 0–1 (volume may exceed 1, up to 4).
   cropped rect's centre. A *video* prop, not a shape one (§4.3's Shape
   pane first listed it): only the layer that owns the pixels can draw the
   zoom.
+- `video.obscure` (format version 4): an ordered list of regions that HIDE
+  what is under them — a face, a password field — each
+  `{ "shape": "rect" | "ellipse", "x": 0, "y": 0, "width": 480,
+  "height": 270, "feather": 20, "kind": "blur" | "pixelate",
+  "amount": 1.0 }`, at most **four**, a shader budget exactly as
+  `video.filters` is: the uniform block carries four regions and a fifth
+  would be a control that hides nothing. Every value spelled there is what
+  an omitted key takes, `shape` defaulting to `rect` and `kind` to
+  `pixelate`. The box is the spotlight's own, so the two region controls
+  put the same rectangle on screen; the kind and the amount are the
+  opposite of a filter's half-strength blur, on purpose. A filter has to be
+  visible without destroying the frame, while a region that only half hides
+  has failed at its one job, and a blur at the shader's maximum radius is
+  soft enough to read a large password field through — so the default is
+  the kind that actually hides. `shape` is the spotlight's `SpotShape`, the
+  same two shapes spelled once (`model_regions.rs`); `kind` is a closed
+  vocabulary of its
+  own and not a narrowed filter kind, so a hand-written `"sepia"` is
+  refused on the way in rather than clamped later. The geometry is
+  §5.3's source-pixel frame, so a region rides with its layer through
+  scale, move and rotation; `amount` maps to the same maxima the blur and
+  pixelate filters use. Where two regions cover one pixel the GREATER
+  hiding wins and the other is not applied at all — a length in source
+  pixels times the mix it would be applied at, a tie going to the pixelate
+  — because both are a fresh sample of the raw picture and applying the
+  second would put back what the first destroyed; adding a region can never
+  make a frame less hidden, and a region at `amount` 0 is there and changes
+  nothing. Written through `set_video` like any other video
+  property — there is no obscure op.
 - `audio.duck`: `{ "level": 0.2, "attack": 300000, "release": 600000 }`.
 - `audio.pan` (M3) is -1 (hard left) to +1 (hard right);
   `audio.noise_reduction` (M3) is 0 (off) to 1.
@@ -673,6 +747,17 @@ angles degrees, opacity/volume 0–1 (volume may exceed 1, up to 4).
   stays on the face it was put on when the layer is scaled, moved or
   rotated, and the compositor scales all four by the layer's scale on the
   way to canvas space.
+- **Every region in the model is in that one frame** — each entry of
+  `video.obscure` (format version 4) and the rectangle `add_zoom_action`
+  (§6) is given, as well as the spotlight's box. `x`/`y` are the region's
+  **CENTRE**, an offset in source pixels from the centre of the cropped
+  rect, and `width`/`height` its size in the same pixels; the field names
+  say neither, so both the op table and the core say it in words. One
+  frame is what lets a region drawn on the canvas, a region typed into the
+  inspector and a region sent over MCP mean the same rectangle, and it is
+  why `Spotlight`, `ObscureRegion` and the `SpotShape` they share sit in
+  one module (`model_regions.rs`, §7.10) rather than beside the fields
+  that hold them.
 - **`reflection` hangs below the layer** (M3), mirrored about the cropped
   rect's bottom edge, `gap` source pixels clear of it, `height` of the
   layer's cropped height tall, fading out with `falloff`. It is drawn
@@ -695,6 +780,20 @@ action's end patch along its curve. Numeric fields interpolate; colors
 interpolate per channel; booleans and strings switch at the end. Actions
 on a clip may not overlap (`add_action` refuses). Video, audio and text
 properties all go through the one list with typed patches.
+
+**Lists interpolate per index** when the two sides are the same length and
+each pair of entries agrees on the keys that say WHAT the entry is — a
+filter's `kind`, a region's `kind` and `shape` — and switch at the end
+otherwise; the hold is per entry, so a list in which one region changes
+shape still interpolates every region beside it. That is the crate's rule
+and not one list's (`actions.rs`), so `video.filters` and `video.obscure`
+are both governed by it with no code of their own. The wider set of
+discriminants is deliberately confined to list ENTRIES: in a list an
+entry's only identity is its index, so a changed `shape` gives no way to
+tell a reshaped region from a replaced one, while `video.spotlight` is one
+named object whose `shape` is a property of it — an action that moves that
+spotlight from a rect to an ellipse still interpolates its geometry, as it
+always did.
 
 An action's end patch is deliberately **lenient** — `set_action_end` merges
 whatever it is given, so a half-written animation stays editable — while
@@ -813,6 +912,7 @@ or animates back); "error" = `Err`.
 | `split {clips?, at}` | Two clips. Second: `start = at`, `in += (at − start) × speed`, base props = the evaluated state at `at`. Actions before `at` stay with the first; after go to the second (start rebased); a straddling action becomes two — the first half's end patch is the evaluated state at `at`. `transition_in` stays with the first. Refuses when `at` is not strictly inside. **Omitting** `clips` — not passing a flag — means every unlocked clip `at` is strictly inside, the ⌘T-with-no-selection case. |
 | `delete {clips}` | Removes; gaps stay. |
 | `ripple_delete {clips}` / `ripple_delete_range {from, to}` | Removes; then for each removed span (union of the removed clips' spans, processed right-to-left) shifts every clip on **unlocked** tracks whose start ≥ span end left by the span length. Clips on other tracks that straddle a span are left in place. Range form: every unlocked clip is split at both bounds first, the middle pieces removed, then the shift. |
+| `ripple_delete_ranges {ranges: [[from, to], …]}` | Several ranges as ONE edit — the silence cut. Each pair is snapped, clamped and ordered exactly as `ripple_delete_range`'s one is (a reversed pair is the same range), the pairs are then MERGED — touching as well as overlapping — and the survivors cut and closed right to left. So the op is **merge-then-cut and not N `ripple_delete_range`s**, and the difference is visible in the document: a cut at a boundary that no longer exists would mint a fragment and burn an id. `set_gained_transitions` runs once at the end, over the unlocked tracks. Markers do not move, as they do not for the singular. An empty list, and a list that merges to nothing, change nothing. Written by Clip ▸ Remove Silences… as one undo step, whatever the number of cuts. |
 | `lift_range {from, to}` | `ripple_delete_range` without the close: every unlocked clip is split at both bounds and the middles removed, and NOTHING moves — every clip after the range keeps the moment it had, and so do the markers. ⌫ with a range and nothing selected, where ⌘⌫ ripples. |
 | `insert_time {at, length}` | Shifts every unlocked clip whose start ≥ `at` right by `length`. Straddling clips are left in place. |
 | `close_gap {track, at}` | Closes the empty span on `track` that contains `at`, bounded by the nearest clip edges there (0 in front when nothing precedes it): everything from the gap's far side shifts left by its length, across every unlocked track, straddlers staying put. Refuses on a locked `track`, on an `at` that is on a clip, when there is no clip after the gap, and when the shift would break the overlap rule — a gap closes fully or not at all, because a partial close leaves the user unable to tell whether the op ran. Markers do not move. |
@@ -835,6 +935,7 @@ or animates back); "error" = `Err`.
 | Op | Semantics |
 |---|---|
 | `add_action {clip, at, duration=1 s}` | Refuses if it would overlap another action or run past the clip end. End patch starts empty (= no change until edited). |
+| `add_zoom_action {clip, at, duration=1 s, region: {x, y, width, height} \| null, fit="fit", curve="ease_in_out"}` | An `add_action` whose end patch is the `scale`, `x` and `y` that bring `region` to the canvas — the screencast zoom. **`region`'s `x` and `y` are its CENTRE** and `width`/`height` its size, both source pixels from the centre of the cropped rect (§5.3's one region frame); the field names say neither, so the tool description and the core's doc say it too. `fit` shows the whole region, `fill` covers the whole canvas, both measured THROUGH the clip's rotation — a rectangle contains a rotated rectangle exactly when it contains its four corners, and the test collapses to the naive form at 0°. Rotation and crop — and nothing else — are read from the clip evaluated at `at`, the frame the rectangle was drawn on: the `scale`, `x` and `y` it writes are absolute, so the placement never reads a transform, base or evaluated. A rotation animated between `at` and `at + duration` is not tracked. The scale clamps to the layer maximum and the offsets are derived from the CLAMPED value, so a region too small to reach it still lands centred and only the magnification degrades. `region` absent or `null` is a zoom BACK: the end patch is the clip's STORED base `scale`, `x`, `y` — the one thing here that is NOT read evaluated, because "back" means where the clip sits when nothing is animating it, which is also what a later zoom on the same clip measures from. It composes `add_action` + `set_action` + `set_action_end`, so it is one undo step and inherits every `add_action` refusal rather than restating it; a clip with no video properties is an **error**. |
 | `set_action {clip, action, start?, duration?, curve?}` | Same overlap checks. |
 | `set_action_end {clip, action, patch}` | Merges into the end patch; a key set to `null` removes it. |
 | `remove_action {clip, action}` | |
@@ -1032,7 +1133,8 @@ Asked once per frame by the compositor, and by the overlay for hit-testing.
       "corner_radius": 0, "shadow": null,
       "color": { "brightness": 0, "contrast": 0, "saturation": 0, "hue": 0 },
       "chroma": null,
-      "filters": [], "reflection": null, "spotlight": null, "clip_rect": null,
+      "filters": [], "reflection": null, "spotlight": null, "obscure": [],
+      "clip_rect": null,
       "transition": null },
     { "clip": 23,
       "source": { "kind": "text", "hash": "9f3c…", "text": { …resolved text props… } },
@@ -1051,10 +1153,14 @@ Asked once per frame by the compositor, and by the overlay for hit-testing.
   content hash Swift caches textures by), `missing` (draw a slate).
 - `source_size` is the media pixel size, or `null` for text (the renderer
   knows) and the box size for shapes.
-- `filters`, `reflection` and `spotlight` (M3) are the §5.2 property groups
-  already evaluated: an ordered list of `{ "kind", "amount" }` at most
-  `MAX_FILTERS` long, and the two objects or `null`. They are always
-  present, so a renderer never has to ask whether the key exists.
+- `filters`, `reflection` and `spotlight` (M3) and `obscure` (format
+  version 4) are the §5.2 property groups already evaluated: an ordered
+  list of `{ "kind", "amount" }` at most `MAX_FILTERS` long, the two
+  objects or `null`, and a list of at most `MAX_OBSCURE` regions. All four
+  are always present — `obscure` is `[]` on a layer with no regions — so a
+  renderer never has to ask whether the key exists. None of them is
+  touched when a nest's transform is folded into a layer (§5.3): they are
+  in source pixels or are per-pixel maths, and only the placement folds.
 - `clip_rect` (M3) is `null`, or `{ "x", "y", "w", "h", "rotation" }` — the
   rotated rectangle in CANVAS pixels the layer is clipped to, with `x`/`y`
   the rectangle's CENTRE measured from the canvas's top-left corner and
@@ -1262,6 +1368,23 @@ media id, `save_project`, `get_project` → the JSON, `set_playhead`,
 history are app state, not ops, but without a setter for each the "one
 edit is one undo step" and "the in/out range scopes the export" properties
 cannot be checked by driving the built app),
+`import_captions {path, track?}` and `consolidate_media {}` (M3's two
+§5.6 file features),
+`detect_silence {clips?, threshold_db?, min_length?, padding?}` → the
+quiet spans of the timeline and the scope they were taken over, which
+`ripple_delete_ranges` then cuts — the one tool that reads a CACHE rather
+than the model, and the only app-state tool that neither edits nor moves
+anything (it is the sheet's own detector, so an agent and Clip ▸ Remove
+Silences… propose the same cuts). A moment is quiet where every clip in
+scope is quiet there, measured as the file's peak times the mix envelope
+(§7.2), and two things are never in a candidate: a clip the mix has
+SILENCED, which is dropped from either scope rather than read as quiet —
+it covers its span while passing the test at every tick, so a muted music
+bed would otherwise propose one cut across the whole song and take the
+voiceover under it — and a NEST, whose sound counts toward the test but
+which no candidate may intersect, because `Source::Nest` has no in point
+and splitting a nest clip strands its tail (§4.4's round trip is how the
+dead air inside one is reached),
 `render_frame {t, max_width?}` → PNG (the verification hook: the
 compositor renders offline through an `AVAssetImageGenerator` over the
 same composition + video composition), and
@@ -1284,7 +1407,8 @@ concern is a new module with its own `impl Project` block.
 |---|---|
 | `lib.rs` | declarations and re-exports only |
 | `model.rs` | the §5.2 types and serde derives, and the serde defaults that say what an absent key means — the schema's SHAPE, and nothing else |
-| `model_props.rs` | the §5.2 per-clip property types — `VideoProps`, `Crop`, `Shadow`, `ColorAdjust`, `Chroma`, `Filter`, `Reflection`, `Spotlight`, `AudioProps`, `Compressor`, `Duck`, `TextProps`, `Outline`, `Backdrop`, `ShapeProps`, `Stroke` and their enums, with their defaults: the schema's VOCABULARY where `model.rs` is its shape. Cut out under the size rule (road map 2, phase 2) and re-exported whole by `model.rs`, so every `crate::model::X` path still resolves |
+| `model_props.rs` | the §5.2 per-clip property types — `VideoProps`, `Crop`, `Shadow`, `ColorAdjust`, `Chroma`, `Filter`, `Reflection`, `AudioProps`, `Compressor`, `Duck`, `TextProps`, `Outline`, `Backdrop`, `ShapeProps`, `Stroke` and their enums, with their defaults: the schema's VOCABULARY where `model.rs` is its shape. Cut out under the size rule (road map 2, phase 2) and re-exported whole by `model.rs`, so every `crate::model::X` path still resolves |
+| `model_regions.rs` | the boxes drawn ON the picture — `Spotlight`, `ObscureRegion`, the `SpotShape` both are drawn with and the `MAX_OBSCURE` budget on the second. One concern, not three adjacent ones: they share one coordinate frame (`x`/`y` the region's CENTRE, an offset in SOURCE pixels from the centre of the layer's CROPPED rect; `width`/`height` its size in the same pixels — which is what carries a region with its layer through scale, move and rotation) and one shape enum. Cut out of `model_props.rs` under the size rule (road map 2, phase 3c) and re-exported whole by it, so every `crate::model::X` path still resolves; the FIELDS holding them (`VideoProps.spotlight`, `VideoProps.obscure`) stay with the video group |
 | `model_query.rs` | reading a project: `Project::new`, id allocation, the `clip` / `track` / `media` / `marker` / `nest` lookups, `clips_on`, `duration`, `validate` with its nesting walk, and the three source-window measurements (`content_length`, `source_head`, `source_length`) every placement op clamps against |
 | `time.rs` | `Ticks`, `TIMESCALE`, `Fps`, frame snapping, timecode format/parse (non-drop `HH:MM:SS:FF` and `HH:MM:SS.mmm`) |
 | `edit.rs` | the op enum + serde, `apply(&self, op) -> Result<Option<Project>, String>`; **its module doc is the op schema table** |
@@ -1292,7 +1416,8 @@ concern is a new module with its own `impl Project` block.
 | `props_check.rs` | the range checks every value written into a property group passes first — `check_video` / `check_audio` / `check_text` / `check_shape`, the `finite` / `in_range` family under them, and the bounds they check against (§4.3's numbers, which `actions.rs`'s `clamp_video` reads too) — cut out of `edit_props.rs` in phase 2 because a range check is a fact about the vocabulary, not about an edit; a patch and a `paste_attributes` copy run the same checks (`Project::check_group`) |
 | `edit_edge.rs` / `edit_insert.rs` | the cutting moves that keep something fixed on purpose: `slip` and `roll` (the clip's place, and the pair's outer edges); `insert_clip` and `overwrite_clip` (the other tracks, and the timeline's total length) |
 | `edit_action.rs` / `edit_nest.rs` / `edit_paste.rs` | the ops with a concern of their own: actions (the no-overlap rule); `nest` / `unnest`; `paste` (making another document's clips fit) and `paste_attributes` (the same payload's earliest clip's property groups copied onto clips already placed — replaced whole, never merged) |
-| `actions.rs` | evaluation and interpolation, `clip_state(clip, t)` |
+| `edit_zoom.rs` | `add_zoom_action`, the screencast zoom (road map 2, phase 3b) — the one op whose substance is geometry rather than bookkeeping, which is why it is not a fifth function in `edit_action.rs`. **Its module doc is the placement equation**: the two frames (Q, `model_regions.rs`'s source pixels from the cropped rect's centre; C, canvas pixels) and the solve that turns a rectangle drawn on the picture into the `scale` / `x` / `y` an action's end patch carries, rotation and crop included. Composes `add_action` + `set_action` + `set_action_end`, so a drag is one undo step and every `add_action` refusal is inherited rather than copied |
+| `actions.rs` | evaluation and interpolation, `clip_state(clip, t)`, and `clamp_video`, the last line of defence §5.4 describes. §5.4's LIST rule is stated here once and applies to every array of objects in the schema (`video.filters`, `video.obscure`), neither of which carries a line of its own code; the widened discriminant set is confined to list ENTRIES, so `video.spotlight`'s animation is what it has always been |
 | `transition.rs` | overlap detection, the overlap rule, progress at *t* |
 | `evaluate.rs` | `composition_plan()` (A/B assignment, instruction tiling) and the `assign()` the recipe shares with it |
 | `recipe.rs` | `frame_recipe(t)`: the layer list at one instant — like every walk over what plays, it consumes `nest.rs`'s instances |
@@ -1399,6 +1524,7 @@ a clean `make lint` before finishing Rust work.
 | N | Toggle snapping |
 | T | Add text clip at playhead |
 | C | Crop mode on the selected clip |
+| Z | Region mode on the canvas — drag a rectangle over the selected clip to zoom to it (⇧ fills instead of fits), Esc cancels. Z again disarms it, and so does moving the selection: one key in and out, because a modal overlay that has lost focus can no longer be dismissed by Esc |
 | ⇧Z | Fit timeline |
 | ⌘= / ⌘- / ⌘0 | Zoom in / out / fit (canvas, or timeline when focused) |
 | ⇧⌘N | New track |
@@ -1426,7 +1552,6 @@ a key, nothing more.
 
 | Keys | Action | Phase |
 |---|---|---|
-| Z | Zoom-to-region mode on the canvas | 3 |
 | ⌥⌘E | Save Frame… | 7 |
 | ⇧⌘P | Preview Window | 8 |
 | ⌘↓ / ⌘↑ | Open / close nest | 9 |
@@ -1436,9 +1561,9 @@ Add Media…, Import Captions… (M3), Consolidate Media… (M3), Export…),
 Edit (Undo, Redo, Cut, Copy, Paste, Paste Attributes, Duplicate, Delete,
 Ripple Delete, Insert at Playhead, Overwrite at Playhead, Select All,
 Select After Playhead, Select All on Track), Clip (Split, Trim Start, Trim
-End, Freeze Frame, Detach Audio, Add Action, Speed…, Close Gap,
-Transition ▸, Rename…, Label ▸ (the six colours and None), Nest,
-Un-nest), Track (New Track,
+End, Freeze Frame, Detach Audio, Add Action, Speed…, Close Gap, Remove
+Silences…, Transition ▸, Rename…, Label ▸ (the six colours and None),
+Nest, Un-nest), Track (New Track,
 Remove Track, Remove Empty Tracks, Hide/Mute/Lock/Solo), Mark (Add Marker,
 Set In, Set Out, Clear Range, Next/Previous Marker), View (Zoom, Fit,
 Snapping, Safe Areas, Inspector, Timeline Track Height), Window, Help.

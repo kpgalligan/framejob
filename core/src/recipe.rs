@@ -133,9 +133,9 @@ impl Project {
         out.insert("source".to_string(), source);
         out.insert("source_size".to_string(), source_size);
         // Crop, corner radius, the colour controls, the filters, the
-        // reflection and the spotlight are all in SOURCE pixels or are
-        // per-pixel maths, so a nest's transform does not touch them: only
-        // the placement is folded.
+        // reflection, the spotlight and the obscured regions are all in
+        // SOURCE pixels or are per-pixel maths, so a nest's transform does
+        // not touch them: only the placement is folded.
         out.insert("crop".to_string(), json(&video.crop));
         out.insert("x".to_string(), number(placed.x));
         out.insert("y".to_string(), number(placed.y));
@@ -149,6 +149,7 @@ impl Project {
         out.insert("filters".to_string(), json(&video.filters));
         out.insert("reflection".to_string(), json(&video.reflection));
         out.insert("spotlight".to_string(), json(&video.spotlight));
+        out.insert("obscure".to_string(), json(&video.obscure));
         // The rotated canvas rectangle this layer is clipped to, or null.
         // Only a layer out of a nest has one — the nest's own canvas rect,
         // in the place the nest clip put it.

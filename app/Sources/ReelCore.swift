@@ -737,6 +737,25 @@ extension ReelOp {
         return ReelOp(name: "ripple_delete_range", args: a.values)
     }
 
+    /// Several ranges cut and closed as ONE edit — Clip ▸ Remove Silences…
+    /// (`SilenceSheetController`), whose forty little cuts have to be one
+    /// undo step.
+    ///
+    /// The core MERGES the pairs first (touching as well as overlapping) and
+    /// then cuts the survivors right to left, so this is deliberately NOT the
+    /// same thing as N `ripple_delete_range` ops sent in a row: two ranges
+    /// that touch make one shift, not two, and a caller that wanted the
+    /// singular's semantics per range would have to send them itself, in
+    /// descending order. A reversed pair is the same range, and a list that
+    /// merges to nothing changes nothing.
+    static func rippleDeleteRanges(ranges: [(from: Ticks, to: Ticks)]) -> ReelOp {
+        var a = OpArgs()
+        // `[[from, to], …]`, the wire shape the op parses — arrays rather
+        // than objects, as `Color` and `Fps` are.
+        a.put("ranges", ranges.map { [$0.from, $0.to] })
+        return ReelOp(name: "ripple_delete_ranges", args: a.values)
+    }
+
     /// The same cut without the close: ⌫ with a range and nothing
     /// selected. Every clip after the range keeps the moment it had.
     static func liftRange(from: Ticks, to: Ticks) -> ReelOp {
@@ -965,6 +984,61 @@ extension ReelOp {
 
 // MARK: - Op factories: actions
 
+/// The rectangle `add_zoom_action` zooms to, in the SPOTLIGHT'S frame:
+/// `x` and `y` are its **CENTRE** as an offset in source pixels from the
+/// centre of the layer's cropped rect, and `width`/`height` are its size in
+/// source pixels. `ZoomRegion` in `core/src/edit_zoom.rs` is the same four
+/// numbers, and its module doc carries the placement equation.
+///
+/// Centre-and-size because that is what `SpotlightProps` and `ObscureProps`
+/// already are, and three region types where one reads its `x` differently
+/// from the other two is a wrong picture found months later. A drag gives
+/// two corners; converting them is one subtraction at the call site.
+///
+/// An op ARGUMENT, not model state — it never reaches a project file — so it
+/// lives here beside the builder that sends it rather than in
+/// `ProjectSnapshot.swift`, exactly as `MediaDescriptor` does.
+struct ZoomRegion: Equatable {
+    var x: Double
+    var y: Double
+    var width: Double
+    var height: Double
+
+    init(x: Double, y: Double, width: Double, height: Double) {
+        self.x = x
+        self.y = y
+        self.width = width
+        self.height = height
+    }
+
+    /// The region a rect in that same source-pixel frame describes —
+    /// `SpotlightProps.box` read backwards, for a gesture that has two
+    /// corners rather than a centre.
+    init(box: CGRect) {
+        self.init(x: box.midX, y: box.midY, width: box.width, height: box.height)
+    }
+
+    var dictionary: [String: Any] { ["x": x, "y": y, "width": width, "height": height] }
+}
+
+/// How the region is made to meet the canvas. `ZoomFit` in
+/// `core/src/edit_zoom.rs`; both readings are measured THROUGH the clip's
+/// rotation, so a rotated clip zooms to the rectangle the user drew.
+enum ZoomFit: String, CaseIterable {
+    /// The whole region visible — the core's default, because a zoom the
+    /// user drew a box for should show the box.
+    case fit
+    /// The region covers the canvas, so nothing outside it is on screen.
+    case fill
+
+    var displayName: String {
+        switch self {
+        case .fit: return "Fit"
+        case .fill: return "Fill"
+        }
+    }
+}
+
 extension ReelOp {
     /// `at` is CLIP time. Refuses on an overlap with another action or a
     /// span past the clip end. The end patch starts empty.
@@ -974,6 +1048,41 @@ extension ReelOp {
         a.put("at", at)
         a.put("duration", duration)
         return ReelOp(name: "add_action", args: a.values)
+    }
+
+    /// The screencast zoom: an `add_action` whose end patch is the `scale`,
+    /// `x` and `y` that bring `region` to the canvas — `Z`'s rubber band on
+    /// the canvas (`ZoomRegionSession`) and the Actions section's two
+    /// buttons. `at` is CLIP time, like `add_action`'s.
+    ///
+    /// A `nil` region is a zoom BACK: the end patch is the clip's own base
+    /// `scale`, `x` and `y`. It is sent as an EXPLICIT null rather than as an
+    /// omitted key — the core reads the two the same way, and the op's JSON
+    /// should say what it meant, since a reader of a saved call cannot tell a
+    /// deliberate zoom back from a forgotten argument otherwise. The MCP tool
+    /// makes the same distinction the only place it can be made, by requiring
+    /// the key (`AgentServer.addZoomAction`).
+    ///
+    /// `fit` and `curve` are omitted when nil so the core's own defaults
+    /// apply — `fit`, and `ease_in_out` rather than `Curve.default`'s
+    /// `linear`, because a zoom that starts and stops abruptly is the one
+    /// thing this feature exists to avoid.
+    static func addZoomAction(
+        clip: UInt32, at: Ticks, duration: Ticks? = nil, region: ZoomRegion?,
+        fit: ZoomFit? = nil, curve: Curve? = nil
+    ) -> ReelOp {
+        var a = OpArgs()
+        a.put("clip", clip)
+        a.put("at", at)
+        a.put("duration", duration)
+        if let region = region {
+            a.put("region", region.dictionary)
+        } else {
+            a.putNull("region")
+        }
+        a.put("fit", fit?.rawValue)
+        a.put("curve", curve?.rawValue)
+        return ReelOp(name: "add_zoom_action", args: a.values)
     }
 
     /// Moves or re-curves an action; the same overlap checks apply.
@@ -1240,6 +1349,15 @@ extension SpotlightProps {
     }
 }
 
+extension ObscureProps {
+    var dictionary: [String: Any] {
+        [
+            "shape": shape.rawValue, "x": x, "y": y, "width": width, "height": height,
+            "feather": feather, "kind": kind.rawValue, "amount": amount,
+        ]
+    }
+}
+
 extension DuckProps {
     var dictionary: [String: Any] { ["level": level, "attack": attack, "release": release] }
 }
@@ -1281,6 +1399,13 @@ extension StrokeProps {
 /// the whole array — `actions::merge` replaces arrays wholesale — which is
 /// what makes add, remove and reorder ordinary `set_video` patches rather
 /// than three new ops.
+///
+/// **`obscure` is a single optional for exactly the same reason** (phase 3c):
+/// `VideoProps.obscure` is a `Vec<ObscureRegion>` with no null form either,
+/// so `nil` leaves the regions alone, `[]` clears them, and adding, removing
+/// or re-ordering a region is one whole-array `set_video`. A second rule for
+/// the second list would be a rule to remember; there is one rule, and it is
+/// "a list is replaced whole".
 struct VideoPatch: Codable, Equatable {
     var x: Double?
     var y: Double?
@@ -1295,13 +1420,14 @@ struct VideoPatch: Codable, Equatable {
     var filters: [FilterProps]?
     var reflection: ReflectionProps??
     var spotlight: SpotlightProps??
+    var obscure: [ObscureProps]?
 
     init(
         x: Double? = nil, y: Double? = nil, scale: Double? = nil, rotation: Double? = nil,
         opacity: Double? = nil, crop: CropInsets? = nil, cornerRadius: Double? = nil,
         shadow: ShadowProps?? = nil, color: ColorAdjust? = nil, chroma: ChromaProps?? = nil,
         filters: [FilterProps]? = nil, reflection: ReflectionProps?? = nil,
-        spotlight: SpotlightProps?? = nil
+        spotlight: SpotlightProps?? = nil, obscure: [ObscureProps]? = nil
     ) {
         self.x = x
         self.y = y
@@ -1316,6 +1442,7 @@ struct VideoPatch: Codable, Equatable {
         self.filters = filters
         self.reflection = reflection
         self.spotlight = spotlight
+        self.obscure = obscure
     }
 
     init(from decoder: Decoder) throws {
@@ -1333,6 +1460,7 @@ struct VideoPatch: Codable, Equatable {
         filters = c.lenient(.filters)
         reflection = c.nullable(.reflection)
         spotlight = c.nullable(.spotlight)
+        obscure = c.lenient(.obscure)
     }
 
     var dictionary: [String: Any] {
@@ -1374,6 +1502,7 @@ struct VideoPatch: Codable, Equatable {
                 d["spotlight"] = NSNull()
             }
         }
+        if let obscure = obscure { d["obscure"] = obscure.map { $0.dictionary } }
         return d
     }
 

@@ -29,6 +29,7 @@ use serde_json::{Map, Number, Value};
 use crate::audio::MAX_GAIN;
 use crate::model::{
     Action, AudioProps, Clip, Curve, Project, ShapeProps, TextProps, VideoProps, MAX_FILTERS,
+    MAX_OBSCURE,
 };
 use crate::props_check::{
     COMPRESSOR_MAKEUP_MAX_DB, COMPRESSOR_RATIO_MAX, COMPRESSOR_THRESHOLD_MIN_DB, SCALE_MAX,
@@ -118,29 +119,81 @@ fn merge_at(base: &Value, patch: &Value, depth: u32) -> Value {
 /// Interpolates `from` toward `to` by eased progress `u`.
 ///
 /// Numbers interpolate; arrays (colors, `key`, `from`/`to` points, the
-/// filter list) interpolate element by element when the lengths match;
-/// objects interpolate key by key. **Booleans, strings, enums, `null`s and
-/// any pair of mismatched types switch at the END** — they hold the `from`
-/// value until `u` reaches 1 — which is the §5.4 rule and the only sane
-/// reading of "interpolate `left` to `center`".
+/// filter and obscure lists) interpolate element by element when the
+/// lengths match; objects interpolate key by key. **Booleans, strings,
+/// enums, `null`s and any pair of mismatched types switch at the END** —
+/// they hold the `from` value until `u` reaches 1 — which is the §5.4 rule
+/// and the only sane reading of "interpolate `left` to `center`".
 ///
-/// Two consequences of those rules are worth stating outright, because
-/// `video.filters` is the first ARRAY OF OBJECTS in the schema and an
-/// animation over one is invisible until somebody writes it:
+/// # The list rule
+///
+/// Written out here because it is now the CRATE's rule rather than one
+/// list's: **an end patch interpolates a list PER INDEX when the lengths
+/// match and each pair of entries agrees on its discrete fields, and
+/// switches at the end otherwise.** `video.filters` was the schema's first
+/// array of objects and `video.obscure` (format version 4) is the second,
+/// both governed by exactly this and neither carrying a line of its own
+/// code. An animation over a list is invisible until somebody writes one,
+/// so the two consequences are worth stating outright:
 ///
 ///  - **Lists of different lengths switch at the end.** Blur alone toward
 ///    blur-plus-vignette has no correspondence between the elements: the
 ///    only alternative is to invent an off-strength vignette to grow from,
 ///    which is a guess about what the second list means, and a wrong guess
 ///    would animate a filter the user never asked to see.
-///  - **Elements that NAME different kinds switch at the end too**, even
-///    when the lengths match — the [`lerp_at`] rule about a discriminant.
-///    Elements that agree on the kind, and elements whose patch side names
-///    no kind at all, interpolate their `amount`, which is the case that
+///  - **Entries that NAME different things switch at the end too**, even
+///    when the lengths match — the [`ENTRY_DISCRIMINANTS`] rule, applied by
+///    [`lerp_entry`]. Entries that agree, and entries whose patch side
+///    names neither key, interpolate their numbers, which is the case that
 ///    matters: an action that ramps a blur from 0 to 1 is exactly "grow
-///    this filter", and it works.
+///    this filter", and it works. The hold is PER ENTRY — a list in which
+///    one region changes shape still interpolates every region beside it,
+///    because the list's correspondence is intact and only that one
+///    entry's is not.
 fn lerp(from: &Value, to: &Value, u: f64) -> Value {
     lerp_at(from, to, u, 0)
+}
+
+/// The keys that name WHAT a list entry is rather than how much of it there
+/// is: a filter's `kind`, an obscure region's `kind` and its `shape`.
+///
+/// The wider set is deliberately confined to LIST ENTRIES; the object rule
+/// in [`lerp_at`] still knows `kind` alone. That is not a compromise, it is
+/// the distinction the two cases actually have. In a list, an entry's only
+/// identity is its INDEX: when entry 1 comes back as a different shape of
+/// region there is nothing to say whether the user reshaped that region or
+/// replaced it, so morphing one into the other invents a correspondence.
+/// On a named object there is no such doubt — `video.spotlight` is one
+/// spotlight, `shape` is a property OF it, and an action that moves it from
+/// a rect to an ellipse is still moving that spotlight's centre and box.
+/// Widening the object rule to `shape` would have frozen the geometry of
+/// every such animation until the last instant and then jumped it: a silent
+/// change to shipped behaviour, in a feature phase 3 has nothing to do
+/// with. `core/tests/schema_v2.rs` pins both halves.
+const ENTRY_DISCRIMINANTS: [&str; 2] = ["kind", "shape"];
+
+/// One entry of a list toward the entry at the same index —
+/// [`lerp_at`] under the wider [`ENTRY_DISCRIMINANTS`] set.
+///
+/// Only [`lerp_at`]'s array arm calls this, which is what keeps the switch
+/// point in ONE place: by the time an entry is reached `u` is strictly
+/// inside the span, because the whole list has already gone to `to` at
+/// `u >= 1.0` and held at `from` at `u <= 0.0`. So holding an entry here
+/// holds it for the whole span, and the end still switches — no second copy
+/// of the two guards, which would be a second place to get them wrong.
+fn lerp_entry(from: &Value, to: &Value, u: f64, depth: u32) -> Value {
+    if let (Value::Object(a), Value::Object(b)) = (from, to) {
+        // Both sides must name a discriminant for this to fire, so a patch
+        // entry that leaves them out — `{"filters": [{"amount": 1}]}`,
+        // "same filter, more of it" — still interpolates, key by key.
+        let names_another_thing = ENTRY_DISCRIMINANTS
+            .iter()
+            .any(|key| matches!((a.get(*key), b.get(*key)), (Some(x), Some(y)) if x != y));
+        if names_another_thing {
+            return from.clone();
+        }
+    }
+    lerp_at(from, to, u, depth)
 }
 
 fn lerp_at(from: &Value, to: &Value, u: f64, depth: u32) -> Value {
@@ -154,10 +207,12 @@ fn lerp_at(from: &Value, to: &Value, u: f64, depth: u32) -> Value {
     }
     match (from, to) {
         (Value::Number(a), Value::Number(b)) => lerp_number(a, b, u),
+        // Elements go through `lerp_entry`, which is this function under a
+        // wider discriminant set — the list rule, stated in full on [`lerp`].
         (Value::Array(a), Value::Array(b)) if a.len() == b.len() => Value::Array(
             a.iter()
                 .zip(b.iter())
-                .map(|(x, y)| lerp_at(x, y, u, depth + 1))
+                .map(|(x, y)| lerp_entry(x, y, u, depth + 1))
                 .collect(),
         ),
         // A `kind` is a DISCRIMINANT everywhere in §5.2 — a filter's kind,
@@ -170,6 +225,10 @@ fn lerp_at(from: &Value, to: &Value, u: f64, depth: u32) -> Value {
         // Both sides must name one for this to fire, so a patch element
         // that leaves `kind` out — `{"filters": [{"amount": 1}]}`, "same
         // filter, more of it" — still interpolates, key by key, below.
+        //
+        // `kind` is the ONLY discriminant here. A list ENTRY is judged
+        // against [`ENTRY_DISCRIMINANTS`] before it ever reaches this arm,
+        // and that constant argues why the two sets differ.
         (Value::Object(a), Value::Object(b))
             if a.get("kind").is_some()
                 && b.get("kind").is_some()
@@ -333,6 +392,27 @@ fn clamp_video(mut props: VideoProps) -> VideoProps {
         spotlight.feather = bounded(spotlight.feather, 0.0, f64::MAX, 0.0);
         spotlight.dim = bounded(spotlight.dim, 0.0, 1.0, 0.6);
         spotlight.zoom = bounded(spotlight.zoom, 1.0, SPOT_ZOOM_MAX, 1.0);
+    }
+    // The regions are the filter list's story with a sharper ending: a
+    // fifth region has no uniform slot either, and what a dropped one costs
+    // is not an effect the user cannot see but the face they hid, back on
+    // screen. `set_video` NAMES the overflow rather than trimming it for
+    // that reason; here there is nobody to tell, so the extras go from the
+    // end and the ones drawn first survive.
+    props.obscure.truncate(MAX_OBSCURE);
+    for region in props.obscure.iter_mut() {
+        region.x = finite_or(region.x, 0.0);
+        region.y = finite_or(region.y, 0.0);
+        // A zero-sized region divides by nothing in the shader's distance
+        // field, exactly as the spotlight's does, so the floor is a pixel.
+        region.width = bounded(region.width, 1.0, f64::MAX, 480.0);
+        region.height = bounded(region.height, 1.0, f64::MAX, 270.0);
+        region.feather = bounded(region.feather, 0.0, f64::MAX, 0.0);
+        // NaN takes the type's own default, full strength — a neutral
+        // chosen for what it PREVENTS rather than for changing nothing, as
+        // a filter's 0 is. An amount that arrived as a NaN and resolved to
+        // "hides nothing" would quietly publish the face it was drawn over.
+        region.amount = bounded(region.amount, 0.0, 1.0, 1.0);
     }
     props
 }

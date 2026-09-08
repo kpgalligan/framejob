@@ -29,7 +29,25 @@ lockstep are in the root `CLAUDE.md`; the full design is
   holds the M3 effect logic so `Compositor.swift` grew only the uniform
   fields; the uniform block's field ORDER is a contract with
   `Resources/Shaders/Compositor.metal` and is checked nowhere but by reading
-  both, so change them in one edit.
+  both, so change them in one edit. It is 104 floats (416 bytes, 26 × 16)
+  since `video.obscure` landed, and the four regions in it are
+  REGION-MAJOR — all eight fields of region 0, then region 1 — in the
+  model's own field order, so the two files read as one list and a reader
+  can check the contract by eye, which is the only way it is ever checked.
+  `CompositorEffects.swift`'s header doc is where the amount→length
+  mappings are written down (a blur's outer tap ring at `amount × 24`
+  source pixels; a pixelate's block at `1 + amount × 63`, so amount 1 is a
+  flat 64 × 64 SOURCE-pixel block anchored at the texture origin) — a proof
+  that measures a block has to read a number from somewhere.
+  **Two rules the review put into the region pass**, both in
+  `Compositor.metal` and both about what happens where regions meet: where
+  two cover one fragment the GREATER hiding wins and the other is not
+  applied at all (a source-pixel length times the mix it would be applied
+  at, a tie going to the pixelate), because both mixes take a fresh sample
+  of the RAW texture and running the second would put back what the first
+  hid; and a slot's share of a cover is weighted by its own strength, so a
+  region at `amount` 0 — "there but hides nothing" — cannot pull a
+  neighbour's effect to full strength inside its own box.
 - `MediaImporter.swift` · `FFmpegRewrap.swift` — the import funnel and the
   opt-in ffmpeg step behind it (spec §7.7, §11). `async`/`await` is confined
   to `MediaImporter.swift`; `FFmpegRewrap` runs `Process` on a serial queue,
@@ -44,19 +62,38 @@ lockstep are in the root `CLAUDE.md`; the full design is
   `PreviewCanvasView.swift`, `AgentServer.swift` — **frozen at current
   size.** Any change adding more than ~50 lines goes in an extension file
   instead: `EditorViewController+<Feature>.swift`,
-  `AgentServer+<Feature>.swift`, `TimelineView+<Feature>.swift` — two
-  precedents: the `extension TimelineView` inside
-  `EditorViewController+Edge.swift`, and `TimelineView+Rename.swift` — or a
+  `AgentServer+<Feature>.swift`, `TimelineView+<Feature>.swift` — three
+  precedents for the view: the `extension TimelineView` inside
+  `EditorViewController+Edge.swift`, `TimelineView+Rename.swift`, and
+  `TimelineView+Candidates.swift` — or a
   new `…SheetController` file. The pieces those extension files build on
   are therefore internal, not private, and the frozen file keeps only the
   wiring.
+  **Pitfall:** a selector declared `@objc` on an
+  `extension EditorViewController` needs NO forward in the frozen file — a
+  second declaration there is a redeclaration error, not a forward
+  (`pickChromaKey` is the precedent; `zoomToRegion`, `zoomBack` and
+  `placeObscureRegion` followed it). The forward block is for commands
+  whose body lives at the foot of a NON-extension feature file, which is
+  what `importCaptions` and `removeSilences` are.
+  **And a second:** `handleEditorCharacter`'s bare-key `switch` matches in
+  SOURCE order, so a new `case "x"` must go BELOW any
+  `case "x" where <modifier>` above it. A bare `case "z"` placed first
+  would swallow ⇧Z and kill Fit Timeline with no compiler warning at all.
 - `InspectorViewController.swift` (frozen at wiring: the tab strip and which
   pane is shown) + `InspectorPane.swift` (the pane protocol and base, the
   disclosure section with its collapsed-state key and its right-aligned
   summary, the row builders, and `InspectorBinding` — the one place that
   knows reads are evaluated inside an action and that writes there set
-  `set_action_end`) + `ClipPane.swift` for the Clip tab, `MediaPane.swift`
-  and `DocumentPane.swift` for the other two, with `VideoPane.swift`,
+  `set_action_end`, with the ONE exception `structural(video:for:)` pulls
+  out: a list-valued key (`filters`, `obscure`) whose new LENGTH differs
+  from the clip's own goes to the BASE props wherever the playhead is,
+  because `actions.rs`'s list rule interpolates per index only while the
+  lengths match — an appended region written into an end patch is invisible
+  for the whole span, does not even grow a row, and is then dropped by the
+  next write of that list) + `ClipPane.swift` for the Clip tab,
+  `MediaPane.swift` and `DocumentPane.swift` for the other two, with
+  `VideoPane.swift`,
   `AudioPane.swift`, `TextPane.swift` and `ShapePane.swift` surviving as the
   section factories `ClipPane` composes. Descriptor-driven from
   `OptionControls.swift`. **Three tabs, not six**: `InspectorTab` is
@@ -84,12 +121,18 @@ lockstep are in the root `CLAUDE.md`; the full design is
 - `AgentCatalog.swift` — the MCP tool catalog; a startup check enforces that
   catalog names match the dispatch registry (it traps in debug and logs in
   Release, because `make app` builds Release). The handlers live in
-  `AgentServer+Project/Clips/Tracks/Media/Render/History.swift` and their shared
+  `AgentServer+Project/Clips/Tracks/Media/Render/History/Silence.swift` and
+  their shared
   argument vocabulary in `AgentServer+Arguments.swift` — `intArg`,
   `doubleArg`, `boolArg`, `stringArg`, `stringsArg` (an optional list of
   strings, a lone string counting as a one-element list; emptiness and
   vocabulary are the caller's), the id readers (`clipArg`, `clipsArg`,
-  `trackArg`, …), `timeArg`, `colorArg` and `patchArg`, each refusing a
+  `trackArg`, …), `timeArg`, `rangesArg` (a list of `[from, to]` pairs,
+  every tick through the same `snappedTick` `timeArg` uses, a lone flat
+  pair counting as one range), `nestedNumberArg` (a number one level down,
+  named by its path — how a `{x, y, width, height}` object is read without
+  dropping a member it cannot parse), `colorArg` and `patchArg`, each
+  refusing a
   value it cannot read BY NAME rather than dropping it; a new op means a
   handler, a catalog entry and a comment naming the UI path it mirrors.
   One gap in that guard worth knowing: `patchArg`'s round-trip check
@@ -101,6 +144,15 @@ lockstep are in the root `CLAUDE.md`; the full design is
   `VideoPatch.shadow` / `chroma` / `reflection` / `spotlight`,
   `AudioPatch.duck` / `compressor`, `TextPatch.outline` / `backdrop` /
   `width` — and on the object-valued ones a wrong type CLEARS the effect.
+  A second thing that round trip cannot do, older than phase 3 and
+  measured again by its proof: a nested OBJECT in a patch is decoded into
+  its typed struct and re-serialised, so an unknown key inside one is
+  dropped where the core would have named it, and a known key the caller
+  omitted is sent as that struct's DEFAULT — which resets the field. That
+  is `shadow`, `chroma`, `duck` and now every `obscure` entry: the core
+  refuses both (`deny_unknown_fields`), the decoder simply gets there
+  first, so a patch of a nested object is a REPLACEMENT and has to be sent
+  whole.
   Beyond the §6 ops the catalog carries the app-state tools spec §7.9 names
   plus `set_range`, `set_selection`, `undo` and `redo` — the mirrors of
   I/O/⌥X, a timeline or canvas click, and ⌘Z/⇧⌘Z, without which the "one edit
@@ -122,11 +174,23 @@ lockstep are in the root `CLAUDE.md`; the full design is
   and `save_project {path}` can make that, the GUI cannot — an unspecified
   one answers, and there is no close tool to clear the others. A script
   that saves at a path uses a fresh name per run for that reason.
+  A second lenient decode worth knowing: `ProjectSnapshot`'s enums fall
+  back to a default rather than throwing, so `{"kind": "glow"}` inside an
+  `obscure` region would silently become `pixelate` and the caller be told
+  it worked. `AgentServer.checkVideoEnums` is what closes that, and it
+  checks the FOUR string enums a video patch can carry and no more:
+  `filters[].kind`, `spotlight.shape` and now `obscure[].shape` and
+  `obscure[].kind`, each against its own `allCases`. Nothing else in a
+  video patch is an enum — `chroma` is a colour and three numbers — so a
+  new enum inside a patch has to be added to it by hand.
   `AgentServer.offMainTools` names the few handlers that run on the server
   thread instead of the main one — they wait on the main thread (an async
   probe's completion, NSDocument's save) or on a long decode, so hopping first
   would deadlock or freeze the UI; they reach the document through
-  `AgentServer.onMain`.
+  `AgentServer.onMain`. The criterion is "waits for something the main
+  thread must deliver", not "touches the disk": `detect_silence` reads a
+  few hundred KB of peak files and does one arithmetic pass, and stays
+  ON-main for that reason, as `consolidate_media` and `import_captions` do.
 - `EditorViewController+Edge.swift` — the cutting moves (spec §6's `slip`,
   `roll`, `close_gap`, `insert_clip`, `overwrite_clip`) plus the `,` / `.`
   nudge and Select All on Track. `lift_range` is the odd one out: it is the
@@ -136,6 +200,61 @@ lockstep are in the root `CLAUDE.md`; the full design is
   drags are begun from there — the same split `TimelineClipDrawing.swift`
   and `MediaPane.swift`'s drop targets use, and the reason `dragSnapper` and
   `makeSnapper` are internal.
+- `SilenceDetector.swift` · `SilenceSheetController.swift` ·
+  `TimelineView+Candidates.swift` — Remove Silences (Clip ▸ Remove
+  Silences…, and the `detect_silence` tool). The detector is pure
+  arithmetic over values: `Input.read` is the one seam that takes a
+  snapshot, a plan, a selection and the peak files off a `ProjectDocument`,
+  and everything after it is a function of those — which is what lets the
+  sheet re-detect SYNCHRONOUSLY on every control change (the document
+  cannot change under an open sheet) and lets the agent run the same code.
+  **It reads the PLAN, not the peaks alone**: a peak bucket is pre-fader,
+  so the level it asks about is `peak × envelope`, and because `audio.rs`
+  expresses mute and solo as a ZERO envelope both fall out for free with no
+  second Swift copy of `silenced` to drift from the first.
+  **Pitfall the review found:** that same zero envelope makes a silenced
+  voice pass the quiet test at EVERY tick while still covering its span, so
+  it is dropped from both scopes rather than counted — in scope it would
+  propose one cut across its whole clip, and `ripple_delete_ranges` cuts
+  every unlocked track, taking whatever is audible under it. `defaultScope`
+  answers `.audible` for a selection of silenced clips for the same reason,
+  and the sheet's "Selected clips" row is disabled off that answer. **And a
+  NEST is a wall**: the plan flattens one, so its segments carry the INNER
+  clips' ids, and a candidate that reached inside would split a nest clip —
+  which has no in point, so its tail is stranded, not trimmed. A nest's
+  sound counts toward the quiet test and no candidate may intersect one.
+  The menu
+  command and its validator sit at the FOOT of the sheet's own file, the
+  shape `CaptionImporter.swift` set. The candidate wash is drawn, not
+  overlaid — an overlay view cannot work, because the ruler fills its whole
+  bounds opaquely first — so `TimelineView.swift` carries one stored
+  property and two one-line draw calls and the bodies live in the
+  extension.
+  **Pitfall:** an `NSPopUpButton`'s menu validates its own rows, so
+  `menu.autoenablesItems = false` has to come before disabling one or
+  AppKit puts it straight back on.
+- `EditorViewController+Eyedropper.swift` ·
+  `EditorViewController+ZoomRegion.swift` — the two modal canvas modes:
+  the chroma pick, armed from the Chroma section's eyedropper button, and
+  the region band on bare `Z`. Both install a bare `NSView` over
+  `canvasContainer` whose PRESENCE is the mode, hand it one-line closures
+  back to named methods on the controller, and end themselves when the
+  selection changes (`syncChromaEyedropper` / `syncRegionMode` in
+  `refreshCanvas`); the frozen `PreviewCanvasView.swift` gains no seventh
+  stored session for either. Both are installed through **`armCanvasMode`,
+  which ends every OTHER armed mode first** — the review found the
+  eyedropper arming over a live region mode, so one canvas drag could
+  commit a zoom nobody asked for; a third mode inherits the rule by being
+  installed at all, and no arming path has to remember the others.
+  The region mode's key TOGGLES rather than only
+  arming, because an overlay that has lost first responder can no longer be
+  dismissed by Esc — the eyedropper's practical failure, not a
+  hypothetical. All coordinate mapping goes through
+  `PreviewCanvasView.viewToCanvas` / `canvasToView` (spec §11), and
+  `CanvasLayerBox.sourcePoint` — the region frame — reads the EVALUATED
+  props, the opposite of every other session in `CanvasSessions.swift`,
+  because a region is drawn on what is on SCREEN and has to agree with
+  `edit_zoom.rs`'s `evaluate_clip(clip, at)`.
 - `TimelineView+Rename.swift` — the inline clip rename (a double-click on a
   clip, Clip ▸ Rename…) over the one editor `TimelineView` keeps for track
   and marker renames; the frozen file holds only the `clicks == 2` hook and

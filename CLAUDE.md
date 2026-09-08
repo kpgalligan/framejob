@@ -28,7 +28,7 @@ Four things in `designs/`, and you want all of them:
 
 ```sh
 make app        # cargo build --release + xcodegen + xcodebuild → build/Build/Products/Release/Reelcut.app
-make test       # cd core && cargo test --release  (284 black-box tests)
+make test       # cd core && cargo test --release  (338 black-box tests)
 make lint       # cargo clippy --all-targets -- -D warnings
 make typecheck  # swiftc -typecheck of app/Sources/*.swift — the ONLY authoritative Swift check
 make project    # xcodegen generate (Reelcut.xcodeproj is generated; project.yml is the source of truth)
@@ -48,10 +48,10 @@ new and yours.
 ```
 core/                Rust staticlib — the model, the ops, the plan, the recipe,
   include/…_core.h     export settings, the generic MCP server. THE FFI CONTRACT
-  src/                 model(+_query/_props) time edit(+_clip/_edge/_insert/
-                       _props/_track/_time/_paste/_nest/_action) props_check
-                       actions transition evaluate recipe nest audio snap
-                       format export(+_size) agent ffi*
+  src/                 model(+_query/_props/_regions) time edit(+_clip/_edge/
+                       _insert/_props/_track/_time/_paste/_nest/_action/_zoom)
+                       props_check actions transition evaluate recipe nest
+                       audio snap format export(+_size) agent ffi*
   tests/               black-box, through the FFI (core/CLAUDE.md)
 app/
   Sources/             AppKit app, programmatic UI (app/CLAUDE.md has the map)
@@ -109,10 +109,11 @@ make app
 
 The log line names the port it actually bound (a taken port falls back to an
 ephemeral one). Then drive it with any MCP client over streamable HTTP at
-`http://127.0.0.1:<port>/mcp` — 65 tools: one per §6 op (51) plus `open_project`,
-`new_project`, `save_project`, `get_project`, `import_media`, `import_captions`,
-`consolidate_media`, `set_playhead`, `set_range`, `set_selection`, `undo`, `redo`,
-`render_frame` and `export`.
+`http://127.0.0.1:<port>/mcp` — 68 tools: one per §6 op (53) plus
+`open_project`, `new_project`, `save_project`, `get_project`,
+`import_media`, `import_captions`,
+`consolidate_media`, `detect_silence`, `set_playhead`, `set_range`,
+`set_selection`, `undo`, `redo`, `render_frame` and `export`.
 `render_frame` writes a PNG and returns its path, so a script can diff it
 against `ffmpeg`-extracted source frames; `export` waits for the file.
 
@@ -152,20 +153,27 @@ either appearance on demand, and how the redesign was checked.
 tools/proof/harness/build.sh     # ~30 s into tools/proof/work/harness/, skipped when fresh
                                  # (--force rebuilds); needs the staticlib from make test
 tools/proof/work/harness/harness <project.reelcut|welcome> <out.png> <light|dark> \
-    [w] [h] [selectIndex] [playheadSec] [sizeIndex 0-2] [clip|media|document]
+    [w] [h] [selectIndex] [playheadSec] [sizeIndex 0-2] [clip|media|document] \
+    [candidateSpans] [expandSections]
 ```
 
 The PNG is at the main display's backing scale (2880×1724 for the default
 1440×862 window on a Retina Mac). The preview well comes out black — a Metal
 layer has no drawable offscreen — which does not matter, because the chrome
-is the point. Selection, the playhead and the S/M/L size are VIEW state and
-not in the package, so the arguments set them; and the harness pins every
+is the point. Selection, the playhead, the S/M/L size, Remove Silences'
+candidate spans (`"1-2,6-7"`, seconds) and the inspector sections to open
+(`"video.obscure"`) are VIEW state and not in the package, so the arguments
+set them — the last two exist because a sheet cannot be put up offscreen and
+a `defaultExpanded: false` section would otherwise show only its header.
+Both default to `-`, so a nine-argument call renders the bytes it always
+did. The harness also pins every
 `UserDefaults` key the chrome reads (the persisted pane sizes, collapsed
 state, track height, snapping, guides and the Document tab's checkbox) plus
 `AppleShowScrollBars = Always` in the argument domain, so two renders of one
 package are byte-identical on one machine, mouse or no mouse.
-`tools/proof/phase2_chrome.py` is the proof built on it: a pixel diff of two
-renders, measured against rectangles from the layout constants.
+`tools/proof/phase2_chrome.py` and `phase3_chrome.py` are the proofs built on
+it: a pixel diff of two renders, measured against rectangles from the layout
+constants.
 
 ## Milestone status
 
@@ -208,7 +216,7 @@ renders, measured against rectangles from the layout constants.
   600 frames rather than truncate. The export sheet's Quality row and the
   `export` tool's `video_bitrate` / `audio_bitrate` write the core's two
   override keys in bits per second.
-  **The schema is version 3** (`RC_FORMAT_VERSION` in `core/src/format.rs`
+  **The schema is version 4** (`RC_FORMAT_VERSION` in `core/src/format.rs`
   and the header). Version 2 was M3's: filters, reflection, spotlight,
   `Source::Media.reversed`, audio pan / compressor / noise reduction, and
   `Project.nests` all persist, and a version-1 file still opens — including
@@ -216,7 +224,8 @@ renders, measured against rectangles from the layout constants.
   `project` was a path string, which `migrate_1_to_2` rewrites into a named
   empty `Nest`. Version 3 is road map 2's phase 2 — a clip's `name` and
   `label`, a track's `solo` — and has no migrate step, since all three
-  default (`format.rs` says why it bumps anyway).
+  default (`format.rs` says why it bumps anyway); version 4 is phase 3's
+  `video.obscure`, on the same terms.
   **Filters, reflection and spotlight render**, through three new passes in
   `Compositor.metal` (blur/sharpen/pixelate fold into the sample, the four
   point filters run in slot order after) with their inspector sections in
@@ -454,5 +463,147 @@ renders, measured against rectangles from the layout constants.
   knowing beside the M3 note on audio export: two exports of an unchanged,
   duck-free, fade-free two-track project decode byte-identical, so the
   wobble is confined to duck edges and a solo/mute proof needs no tolerance.
+- **Road map 2, phase 3 — The screencast trio: done.** One schema key at
+  version 4, two ops, one app-state tool, three features that make a
+  screen recording cut fast.
+  **`video.obscure`** (`core/src/model_regions.rs`) is a list of at most
+  four regions that HIDE what is under them — `{shape, x, y, width,
+  height, feather, kind, amount}`, defaulting to a rect 480×270 at the
+  centre, feather 20, **`pixelate` at amount 1**. That default is the
+  opposite of a filter's half-strength blur for the opposite reason: a
+  filter has to be visible without destroying the frame, while a region
+  that only half hides has failed at its one job, and a blur at the
+  shader's maximum radius is soft enough to read a large password field
+  through. `shape` REUSES the spotlight's `SpotShape`; `kind` is a closed
+  `ObscureKind`, not a narrowed `FilterKind`, so a hand-written `"sepia"`
+  is refused on the way in rather than clamped later. Every field defaults,
+  so `RC_FORMAT_VERSION` went to 4 with no migrate step — `format.rs` says
+  why the bump still matters — and it is written through `set_video` like
+  any other video property, with no op of its own. The types went into a
+  new `model_regions.rs` (218) as `model_props.rs` crossed the cap at 633
+  and came back to 498: the boxes drawn ON the picture are one concern,
+  sharing one coordinate frame and one shape enum.
+  **`ripple_delete_ranges`** (`edit_time.rs`) is the silence cut: the pairs
+  are ordered, MERGED — touching as well as overlapping — and then cut and
+  closed right to left, with `set_gained_transitions` once at the end. It
+  is defined as merge-then-cut and NOT as N singular ops, because a cut at
+  a boundary that no longer exists mints a fragment and burns an id; and
+  `ripple_delete_range` is now `self.ripple_delete_ranges(&[[from, to]])`,
+  one implementation per algorithm, proved by `edit_tests.rs` gaining 220
+  lines and losing zero.
+  **`add_zoom_action`** (`core/src/edit_zoom.rs`, 390) turns a rectangle
+  into an action: its module doc IS the placement equation, between the
+  region frame (spec §5.3) and canvas pixels. `fit`/`fill` are measured
+  THROUGH the clip's rotation (a rectangle contains a rotated one exactly
+  when it contains its four corners), rotation and crop are read from the
+  clip evaluated at `at`, and the scale is clamped BEFORE the offsets are
+  derived from it, so a region that wants more than ×10 still lands
+  centred and only the magnification degrades. It composes `add_action` +
+  `set_action` + `set_action_end` — one undo step, every refusal
+  inherited — and calls `nest.rs`'s `rotate` (widened to `pub(crate)`)
+  rather than writing a second rotation.
+  **`detect_silence`** reads the PLAN, not the peaks alone: a bucket's
+  loudness is `peak × envelope`, and since `audio.rs` expresses mute and
+  solo as a ZERO envelope, both fall out for free with no second Swift
+  copy of `silenced`. A tick covered by no scope segment is never a
+  candidate — a hole in the timeline is not dead air — and the surviving
+  runs lose their padding and snap INWARD, the conservative direction for
+  a destructive edit. Two things are never IN a candidate, both settled by
+  the review: a clip the mix has silenced, which is dropped from either
+  scope rather than read as quiet (it covers its span while passing the
+  quiet test at every tick, so a selected muted music bed proposed one cut
+  across the whole song and the ripple took the voiceover under it); and a
+  NEST, whose sound counts toward the test but which no candidate may
+  intersect, because `Source::Nest` has no in point and splitting a nest
+  clip strands its tail rather than trimming it.
+  **The list-interpolation rule** is now the crate's, stated once in
+  `actions.rs`: an end patch interpolates a list per index when the lengths
+  match and each pair of entries agrees on its discrete fields, and
+  switches at the end otherwise. `video.filters` and `video.obscure` are
+  both governed by it and neither carries a line of its own code.
+  UI: **Clip ▸ Remove Silences…** (`SilenceSheetController.swift`, its
+  detector in `SilenceDetector.swift`) with the candidate spans shaded on
+  the ruler and the lanes (`DS.timelineCandidateShade`,
+  `TimelineView+Candidates.swift`); **bare Z** arms and disarms a canvas
+  region mode (`EditorViewController+ZoomRegion.swift`, `CanvasSessions`'
+  `ZoomRegionSession`) whose band drags free with the rectangle it will
+  actually resolve to ghosted dashed beside it; and the Video sections
+  gained **Obscure** (`VideoPane.obscureSection`) plus Zoom to Region… /
+  Zoom Back buttons.
+  Six deviations worth knowing, all argued where they live: **`curve` is a
+  sixth argument** on `add_zoom_action` (defaulting to the eased-both-ends
+  form, not `Curve::default()`'s linear), because a screencast zoom that
+  starts and stops abruptly is the thing the feature exists to avoid and
+  adding it later would mean a second op in one gesture; **the obscure
+  shader stage runs at 4b**, between the sharpen and the point filters, not
+  after them — it must follow the sharpen, whose detail term is built from
+  the RAW texture and would put the hidden detail straight back, and
+  precede the point filters, or a region on a sepia layer would show as an
+  ungraded hole (`Compositor.metal`'s order-of-operations comment argues
+  it); **the widened discriminant set `{kind, shape}` applies to LIST
+  ENTRIES only**, so `video.spotlight`'s shipped animation is byte for byte
+  what it was, and a regression test pins it; **⇧ chooses fill** during the
+  canvas drag, which is the only way `fill` is reachable from the canvas at
+  all; **the sheet spells the removed total as a timecode** ("23 cuts ·
+  removes 00:00:04:12") through `ReelTime.format`, because inventing a
+  second spelling of a time is what that formatter exists to prevent; and
+  the region default kind is **pixelate**, not the blur a reader coming
+  from `Filter` would expect.
+  Measured: `make test` 338 (284 before — `schema_v4.rs` 12, `zoom.rs` 32,
+  `edit_tests.rs` +5 and `schema_v2.rs` +5, plus `model_tests.rs`'s fixture,
+  which grew two regions and no test),
+  `make lint` and `cargo fmt --check` clean, `make typecheck` 0 errors and
+  the same 4 AVFoundation warnings, `make app` building, the catalog at 68
+  tools and the startup parity log EMPTY. Against that binary over MCP: a
+  320×180 region on a 640×360 clip under `fit` wrote `{scale: 2, x: 0,
+  y: 0}` and a null region wrote the base transform back under the undo
+  name "Zoom Back"; `detect_silence` answered with −40 dBFS, 0.5 s, 0.1 s
+  and the scope it used; `[[1 s, 2 s], [3 s, 4 s]]` in one
+  `ripple_delete_ranges` turned one 5 s clip into three 1 s clips; and a
+  wrong-typed tick came back as `ranges[0][1] must be a time in ticks`,
+  an absent `region` by name. The phase's own scripts are
+  `tools/proof/phase3_proof.py` (**121/121** over MCP — 91 at the landing,
+  plus the thirty the review's fixes brought),
+  `phase3_silence_scope.py` (**8/8**, the review's own: what the detector
+  must NOT find when something is muted) and
+  `phase3_chrome.py` (**33/33** offscreen — the candidate wash and the
+  Obscure section's rows; the preview well is black offscreen, so nothing
+  about the PICTURE is claimed there), and phases 1 and 2 still prove at
+  66/66, 85/85 and 26/26.
+  **Reviewed by nine readers, six real defects fixed** — road map 2's
+  phase-3 section lists them; the two with teeth were a blurred region
+  ERASING a pixelated one it overlapped (both mixes sampled the raw
+  texture, so the second won outright and the blur always ran second) and
+  a silenced clip in the selected scope proposing to delete itself.
+  Worth knowing before you chase them, none of them new defects: a PARTIAL
+  entry in an action's end patch (`{"obscure": [{"amount": 1}]}`)
+  interpolates smoothly and then takes `ObscureRegion::default()` for every
+  key it omitted at the switch, because `merge` replaces a list rather than
+  merging it — filters have had this since M3; a PIXELATED region takes one
+  raw sample, so on a layer that also carries a global blur the blocks come
+  out unblurred while the picture around them is blurred (the coarser of
+  the two is what hides), while a blurred region combines in quadrature and
+  is always at least as blurred as its surroundings; a region on a SLATED
+  (missing-media) layer does nothing, the same posture the sharpen takes;
+  the canvas band commits a RECT, so an ellipse is reached only through the
+  section's Shape popup; stored regions are NOT drawn on the canvas outside
+  the modal mode (drag handles for one are a hit-test family
+  `PreviewCanvasView.swift` has no room for yet); where two regions cover
+  one pixel the GREATER hiding wins and the other is not applied at all,
+  so an overlap of a blur and a pixelate shows one of them and never a
+  blend; adding or removing a region or a filter writes the BASE props even
+  inside an action (a list of a different length cannot interpolate, so an
+  end patch would swallow it); and a reversed clip
+  INSIDE a nest is analysed unmirrored and cannot be named by the selection
+  scope, because a nested clip has no id the snapshot can look up.
+  Two limits older than the phase but reachable through it, both recorded
+  and neither fixed: an instance DEADLOCKS somewhere past forty open
+  documents, because nothing closes one (`tools/proof/README.md` measures
+  it — relaunch between proof sessions rather than reading a hang as a
+  failure); and on the MCP path a nested object inside a patch is decoded
+  into a typed Swift struct and re-serialised, so a misspelt key inside one
+  is DROPPED where the core would have named it and a known key the caller
+  omitted is sent as its DEFAULT, which resets that field — `shadow` since
+  M3, `obscure` now.
 
 Keep this file current as code lands.

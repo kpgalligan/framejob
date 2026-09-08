@@ -20,6 +20,16 @@
 //!   is the schema's first array of objects, and the rules it lands on
 //!   (same kind interpolates, different kind or different length switches
 //!   at the end) are invisible until somebody animates one.
+//!
+//! That last section outgrew version 2 in road map 2's phase 3c, and
+//! deliberately: the rules the filter cases pin are the CRATE's list rule,
+//! not the filter's, so the two cases only a SECOND list can show are
+//! pinned here beside them rather than in a file of their own — a version-4
+//! `video.obscure` entry that changes `shape` holding while its neighbour
+//! interpolates, and the `video.spotlight` animation that must NOT change
+//! because of it. `actions.rs`'s `ENTRY_DISCRIMINANTS` argues why those two
+//! answers differ; these are the tests that would fail if a later hand
+//! collapsed them into one.
 
 mod common;
 
@@ -145,7 +155,7 @@ fn a_version_one_file_reads_with_the_new_fields_at_their_defaults() {
     }))
     .value();
 
-    assert_eq!(at(&project, "/version"), &json!(3));
+    assert_eq!(at(&project, "/version"), &json!(4));
     assert_eq!(at(&project, "/nests"), &json!([]));
     assert_eq!(at(&project, "/clips/0/video/filters"), &json!([]));
     assert_eq!(at(&project, "/clips/0/video/reflection"), &Value::Null);
@@ -523,6 +533,115 @@ fn a_filter_list_of_a_different_length_switches_at_the_end() {
     assert_eq!(text(&ended, "/video/filters/1/kind"), "vignette");
 }
 
+/// One hidden region, written out WHOLE. An end patch replaces a list
+/// rather than merging into it, so a partial entry would take its missing
+/// keys from `ObscureRegion::default()` at the switch — a real property of
+/// the schema (the filter tests above lean on it deliberately) but noise in
+/// a test measuring which entries held and which moved.
+fn region(shape: &str, kind: &str, width: f64, amount: f64) -> Value {
+    json!({
+        "shape": shape, "x": 0.0, "y": 0.0, "width": width, "height": 200.0,
+        "feather": 0.0, "kind": kind, "amount": amount
+    })
+}
+
+#[test]
+fn an_obscure_region_that_changes_shape_holds_and_switches_at_the_end() {
+    // Version 4's `video.obscure` is the schema's SECOND array of objects
+    // and gets not one line of interpolation code of its own — the list
+    // rule (`actions.rs`, on `lerp`) already governs it. What it adds is a
+    // second discrete field: `shape` names WHAT the entry is, so a rect
+    // toward an ellipse is not a rectangle growing rounder, it is another
+    // region arriving at that index, and there is nothing to morph.
+    let handle = animated(
+        json!({ "obscure": [region("rect", "pixelate", 400.0, 0.2)] }),
+        json!({}),
+        json!({ "video": { "obscure": [region("ellipse", "pixelate", 800.0, 1.0)] } }),
+    );
+
+    let halfway = state(&handle, 3 * SEC);
+    assert_eq!(text(&halfway, "/video/obscure/0/shape"), "rect");
+    close(num(&halfway, "/video/obscure/0/width"), 400.0, "held width");
+    close(num(&halfway, "/video/obscure/0/amount"), 0.2, "held amount");
+
+    let ended = state(&handle, 4 * SEC);
+    assert_eq!(text(&ended, "/video/obscure/0/shape"), "ellipse");
+    close(
+        num(&ended, "/video/obscure/0/width"),
+        800.0,
+        "switched width",
+    );
+    close(
+        num(&ended, "/video/obscure/0/amount"),
+        1.0,
+        "switched amount",
+    );
+}
+
+#[test]
+fn an_obscure_list_interpolates_per_index_and_holds_only_the_entry_that_changed() {
+    // The hold is per ENTRY, not per list: the correspondence a matching
+    // length establishes is index by index, and index 1 losing it says
+    // nothing about index 0. A screencast whose blur grows over a face
+    // while a second region is swapped for another shape must still see
+    // the first one grow.
+    let handle = animated(
+        json!({ "obscure": [
+            region("rect", "pixelate", 400.0, 0.2),
+            region("rect", "blur", 400.0, 0.2)
+        ] }),
+        json!({}),
+        json!({ "video": { "obscure": [
+            region("rect", "pixelate", 800.0, 1.0),
+            region("ellipse", "blur", 800.0, 1.0)
+        ] } }),
+    );
+
+    let halfway = state(&handle, 3 * SEC);
+    close(num(&halfway, "/video/obscure/0/width"), 600.0, "width at 0");
+    close(num(&halfway, "/video/obscure/0/amount"), 0.6, "amount at 0");
+    close(num(&halfway, "/video/obscure/1/width"), 400.0, "width at 1");
+    close(num(&halfway, "/video/obscure/1/amount"), 0.2, "amount at 1");
+    assert_eq!(text(&halfway, "/video/obscure/1/shape"), "rect");
+}
+
+#[test]
+fn a_spotlight_that_changes_shape_still_interpolates_its_geometry() {
+    // A REGRESSION GUARD, and the reason `shape` is a discriminant for a
+    // list ENTRY only. There is exactly one `video.spotlight`: rounding it
+    // off is a change to that spotlight, not another one arriving in its
+    // place, so its centre, its box and its dim keep moving through the
+    // change exactly as they did before version 4 existed. Widening
+    // `lerp_at`'s object rule to `shape` would freeze all three until the
+    // last instant and then jump them — silently, in a feature phase 3 has
+    // nothing to do with. This test is what says so out loud.
+    let handle = animated(
+        json!({ "spotlight": { "shape": "rect", "x": 0.0, "y": 0.0, "width": 400.0,
+                               "height": 200.0, "feather": 0.0, "dim": 0.0, "zoom": 1.0 } }),
+        json!({}),
+        json!({ "video": { "spotlight": {
+            "shape": "ellipse", "x": 200.0, "width": 800.0, "dim": 1.0
+        } } }),
+    );
+
+    let halfway = state(&handle, 3 * SEC);
+    close(num(&halfway, "/video/spotlight/x"), 100.0, "x");
+    close(num(&halfway, "/video/spotlight/width"), 600.0, "width");
+    close(num(&halfway, "/video/spotlight/dim"), 0.5, "dim");
+    // The enum itself is a string and switches at the end, as it always
+    // has — it is the numbers beside it that must not wait for it.
+    assert_eq!(text(&halfway, "/video/spotlight/shape"), "rect");
+
+    let ended = state(&handle, 4 * SEC);
+    assert_eq!(text(&ended, "/video/spotlight/shape"), "ellipse");
+    close(num(&ended, "/video/spotlight/x"), 200.0, "x at the end");
+    close(
+        num(&ended, "/video/spotlight/width"),
+        800.0,
+        "width at the end",
+    );
+}
+
 #[test]
 fn reflection_and_spotlight_interpolate_field_by_field() {
     let handle = animated(
@@ -645,6 +764,53 @@ fn an_action_that_asks_for_more_filters_than_the_budget_keeps_the_first_four() {
     assert_eq!(filters.len(), 4, "the recipe never carries a fifth filter");
     assert_eq!(text(&ended, "/video/filters/0/kind"), "blur");
     assert_eq!(text(&ended, "/video/filters/3/kind"), "noir");
+}
+
+#[test]
+fn an_action_that_asks_for_more_regions_than_the_budget_keeps_the_first_four() {
+    // `MAX_OBSCURE` is the same hard limit on the recipe for the same
+    // reason, and an `end` patch is the way past `set_video`'s named
+    // refusal, so the evaluator has to hold the line for the shader.
+    let handle = animated(
+        json!({ "obscure": [region("rect", "pixelate", 100.0, 1.0)] }),
+        json!({}),
+        json!({ "video": { "obscure": [
+            region("rect", "pixelate", 100.0, 1.0),
+            region("rect", "pixelate", 200.0, 1.0),
+            region("rect", "pixelate", 300.0, 1.0),
+            region("rect", "pixelate", 400.0, 1.0),
+            region("rect", "pixelate", 500.0, 1.0)
+        ] } }),
+    );
+    let ended = state(&handle, 4 * SEC);
+    assert_eq!(
+        array(&ended, "/video/obscure").len(),
+        4,
+        "the recipe never carries a fifth region"
+    );
+    close(num(&ended, "/video/obscure/0/width"), 100.0, "first kept");
+    close(num(&ended, "/video/obscure/3/width"), 400.0, "fourth kept");
+}
+
+#[test]
+fn a_region_outside_its_ranges_is_clamped_rather_than_refused() {
+    // The same last line of defence the rest of the video group gets, with
+    // one value chosen differently: a NaN `amount` resolves to 1, not to 0.
+    // Every other neutral in `clamp_video` is "changes nothing"; here
+    // "changes nothing" would publish the face the region was drawn over.
+    let handle = animated(
+        json!({ "obscure": [region("rect", "pixelate", 400.0, 1.0)] }),
+        json!({}),
+        json!({ "video": { "obscure": [{
+            "shape": "rect", "x": 0.0, "y": 0.0, "width": 0.0, "height": -10.0,
+            "feather": -5.0, "kind": "blur", "amount": 4.0
+        }] } }),
+    );
+    let ended = state(&handle, 4 * SEC);
+    close(num(&ended, "/video/obscure/0/width"), 1.0, "width");
+    close(num(&ended, "/video/obscure/0/height"), 1.0, "height");
+    close(num(&ended, "/video/obscure/0/feather"), 0.0, "feather");
+    close(num(&ended, "/video/obscure/0/amount"), 1.0, "amount");
 }
 
 // ---- nests: the schema and its invariants --------------------------------

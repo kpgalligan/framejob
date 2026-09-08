@@ -180,6 +180,7 @@ final class AgentServer {
         "delete": { $0.deleteClips },
         "ripple_delete": { $0.rippleDelete },
         "ripple_delete_range": { $0.rippleDeleteRange },
+        "ripple_delete_ranges": { $0.rippleDeleteRanges },
         "lift_range": { $0.liftRange },
         "insert_time": { $0.insertTime },
         "close_gap": { $0.closeGap },
@@ -202,9 +203,12 @@ final class AgentServer {
         "set_transition_duration": { $0.setTransitionDuration },
         // Actions (AgentServer+Clips.swift)
         "add_action": { $0.addAction },
+        "add_zoom_action": { $0.addZoomAction },
         "set_action": { $0.setAction },
         "set_action_end": { $0.setActionEnd },
         "remove_action": { $0.removeAction },
+        // Silence detection (AgentServer+Silence.swift)
+        "detect_silence": { $0.detectSilence },
         // Tracks, markers and the canvas (AgentServer+Tracks.swift)
         "add_track": { $0.addTrack },
         "remove_track": { $0.removeTrack },

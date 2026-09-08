@@ -250,6 +250,55 @@ struct CanvasLayerBox {
             y: min(max((local.y - box.minY) / box.height, 0), 1))
     }
 
+    // MARK: The region frame
+
+    /// A canvas point as SOURCE pixels measured from the centre of the
+    /// layer's CROPPED rect — the frame `video.spotlight`, `video.obscure`
+    /// and `add_zoom_action`'s region all speak (`model_regions.rs`'s
+    /// `Spotlight`, and `Compositor.metal`'s
+    /// `centre = cropped * 0.5 + float2(spotX, spotY)`). Spec §5.3 calls it Q.
+    ///
+    /// **It reads the EVALUATED props, and that is the opposite of every
+    /// gesture session in this file.** Move, Scale, Rotate and Crop all
+    /// capture the clip's BASE props at mouse-down, because `set_video`
+    /// merges into base props and a clip inside an action must not be baked
+    /// to its animated value. A region is measured the other way round: the
+    /// user drags over what is ON SCREEN, and a source-pixel answer is
+    /// transform-invariant only if the un-transform matches the transform
+    /// that drew it. `video` here IS the recipe's evaluated state, so a clip
+    /// already inside an action scaling it 2× yields the region the user
+    /// drew rather than half of it — and it agrees by construction with
+    /// `edit_zoom.rs`, which reads the clip evaluated at the action's start.
+    /// The two readings differ only once a clip has actions, which is
+    /// exactly when a zoom action is being added to it.
+    func sourcePoint(_ point: CGPoint) -> CGPoint {
+        let local = unrotated(point)
+        let box = rect
+        let s = video.scale > 0 ? video.scale : 1
+        return CGPoint(x: (local.x - box.midX) / s, y: (local.y - box.midY) / s)
+    }
+
+    /// The inverse of `sourcePoint`: a point in the layer's own source-pixel
+    /// frame, back on the canvas — what draws a stored region where its
+    /// pixels are.
+    func canvasPoint(source point: CGPoint) -> CGPoint {
+        let box = rect
+        let s = video.scale > 0 ? video.scale : 1
+        return rotated(CGPoint(x: box.midX + point.x * s, y: box.midY + point.y * s))
+    }
+
+    /// A rectangle in the source-pixel frame as its four canvas-space
+    /// corners, TL TR BR BL — `corners(of:)`'s twin, for the one shape that
+    /// is axis-aligned in the LAYER's axes rather than in the canvas's.
+    func canvasQuad(ofSource box: CGRect) -> [CGPoint] {
+        [
+            canvasPoint(source: CGPoint(x: box.minX, y: box.minY)),
+            canvasPoint(source: CGPoint(x: box.maxX, y: box.minY)),
+            canvasPoint(source: CGPoint(x: box.maxX, y: box.maxY)),
+            canvasPoint(source: CGPoint(x: box.minX, y: box.maxY)),
+        ]
+    }
+
     // MARK: Building
 
     /// The boxes of one composed frame, back to front — the recipe's own
@@ -843,6 +892,181 @@ struct CanvasEyedropperSession {
         // never what a click on empty canvas meant.
         guard alpha > 0 else { return nil }
         return (0..<3).map { min(Double(bytes[$0]) / 255 / alpha, 1) }
+    }
+}
+
+// MARK: - Region drags
+
+/// What a region dragged on the canvas is FOR (spec §4.2's region mode).
+///
+/// One rubber band serves two commits — `add_zoom_action`'s `region` and a
+/// `video.obscure` entry — because they are the same rectangle in the same
+/// frame, spec §5.3's Q. A second overlay with a second copy of the maths is
+/// precisely the drift this file exists to prevent, so the purpose travels
+/// with the session and `EditorViewController+ZoomRegion.swift` branches on
+/// it in exactly one place: the commit. The geometry below reads it only to
+/// say whether the resolved frame is worth drawing.
+enum CanvasRegionPurpose {
+    /// `Z`, and the Actions section's "Zoom to Region…".
+    case zoom
+    /// The Obscure section's "Place on Canvas".
+    case obscure
+}
+
+/// A rectangle dragged over the picture: the region a zoom action lands on,
+/// or one `video.obscure` entry (spec §4.2, §4.3).
+///
+/// Both ends are held in CANVAS pixels — the space this whole file speaks —
+/// and turned into source pixels only through the layer's box, so a rotated
+/// or a cropped clip needs no special case here. The band itself drags FREE:
+/// constraining it to the canvas's aspect would make `fill` unreachable from
+/// the canvas, since a band that already has the canvas's shape fits and
+/// fills identically. What keeps that honest is the resolved frame — the
+/// rectangle that will actually be on screen when the zoom lands — which the
+/// mode strokes beside the band while the drag is live, the same instinct as
+/// the crop ghost.
+struct ZoomRegionSession {
+    let purpose: CanvasRegionPurpose
+    /// The clip the region belongs to. The mode is armed for exactly one.
+    let clip: UInt32
+    /// Where the press landed, canvas pixels.
+    let anchor: CGPoint
+    var current: CGPoint
+    /// ⇧ held during a ZOOM drag: the region covers the canvas rather than
+    /// sitting inside it. It means nothing to an obscure region, which is
+    /// the rectangle it is drawn as.
+    var fill = false
+    /// False until the pointer actually leaves the press point — a click
+    /// that drew no rectangle must commit nothing, the `didMove` flag every
+    /// session here carries.
+    var didMove = false
+
+    /// The smallest band that counts, in CANVAS pixels. A press with a
+    /// twitch in it would otherwise ask the core to zoom to a region a
+    /// fraction of a pixel wide, which is an `Err` naming `region.width`
+    /// rather than the "nothing happened" it looks like.
+    static let minBand: CGFloat = 6
+
+    /// The dragged rectangle in canvas pixels, however the two corners lie.
+    var canvasRect: CGRect {
+        CGRect(
+            x: min(anchor.x, current.x), y: min(anchor.y, current.y),
+            width: abs(current.x - anchor.x), height: abs(current.y - anchor.y))
+    }
+
+    /// The flag is raised by MOVEMENT, not by the call: `mouseUp` runs this
+    /// once more with the release point so the band ends where the pointer
+    /// did, and a press-and-release that never moved must still read as the
+    /// click it was.
+    mutating func update(point: CGPoint, fill: Bool) {
+        current = point
+        self.fill = fill
+        if point != anchor { didMove = true }
+    }
+
+    /// The band as a rectangle in the layer's own source-pixel frame — the
+    /// min corner and the size, which `region(in:)` turns into the centre
+    /// and size the op wants. Nil when the drag is too small to mean
+    /// anything.
+    ///
+    /// All FOUR corners of the band are taken through `sourcePoint`, not the
+    /// two the drag names: the band is axis-aligned in CANVAS space, so on a
+    /// rotated layer its bounding box in Q is spanned by the other diagonal
+    /// as much as by this one. At zero rotation the four collapse to the two
+    /// and this is the rectangle that was dragged.
+    func sourceRect(in box: CanvasLayerBox) -> CGRect? {
+        let band = canvasRect
+        guard didMove, band.width >= Self.minBand, band.height >= Self.minBand else { return nil }
+        let corners = [
+            CGPoint(x: band.minX, y: band.minY), CGPoint(x: band.maxX, y: band.minY),
+            CGPoint(x: band.maxX, y: band.maxY), CGPoint(x: band.minX, y: band.maxY),
+        ].map { box.sourcePoint($0) }
+        guard let first = corners.first else { return nil }
+        var minX = first.x, maxX = first.x, minY = first.y, maxY = first.y
+        for point in corners.dropFirst() {
+            minX = min(minX, point.x)
+            maxX = max(maxX, point.x)
+            minY = min(minY, point.y)
+            maxY = max(maxY, point.y)
+        }
+        let rect = CGRect(x: minX, y: minY, width: maxX - minX, height: maxY - minY)
+        guard rect.width > 0, rect.height > 0 else { return nil }
+        return rect
+    }
+
+    /// The band as the op's region: the CENTRE and the size, in source
+    /// pixels from the cropped rect's centre. Rounded the way every canvas
+    /// gesture rounds what it writes.
+    ///
+    /// `ZoomRegion` is `add_zoom_action`'s argument type
+    /// (`ReelCore.swift`), and it is what an `ObscureProps` is built from
+    /// too: the two commits differ in where the four numbers go, never in
+    /// what they mean. The centre is taken before the rounding rather than
+    /// after, so a band rounded to whole pixels cannot drift half a pixel
+    /// off the rectangle that was drawn.
+    func region(in box: CanvasLayerBox) -> ZoomRegion? {
+        guard let rect = sourceRect(in: box) else { return nil }
+        return ZoomRegion(
+            x: canvasRound(rect.midX), y: canvasRound(rect.midY),
+            width: canvasRound(rect.width), height: canvasRound(rect.height))
+    }
+
+    /// The scale `add_zoom_action` will resolve for this band — `k = |cos θ|`,
+    /// `m = |sin θ|`, and the two formulas `edit_zoom.rs`'s module doc
+    /// derives, clamped into the layer's legal range exactly as the core
+    /// clamps before it computes the offsets.
+    ///
+    /// **This is a PREVIEW, and the core remains the authority.** Nothing is
+    /// written from it: the op recomputes the same number from the same
+    /// region, so the picture the band promises is the picture the op
+    /// produces. It is repeated here for one reason — a `fit`/`fill`
+    /// argument only means something if the band can differ from the result,
+    /// and the only way to show that difference is to draw it. If the two
+    /// ever disagree, `edit_zoom.rs` is right and this is the copy to fix.
+    func resolvedScale(in box: CanvasLayerBox, source: CGRect) -> Double {
+        let canvas = box.canvas.size
+        let radians = box.rotation * .pi / 180
+        let k = abs(cos(radians))
+        let m = abs(sin(radians))
+        let width = Double(canvas.width)
+        let height = Double(canvas.height)
+        let rw = Double(source.width)
+        let rh = Double(source.height)
+        let scale: Double
+        if fill {
+            scale = max((width * k + height * m) / rw, (width * m + height * k) / rh)
+        } else {
+            scale = min(width / (rw * k + rh * m), height / (rw * m + rh * k))
+        }
+        return min(max(scale, CanvasScaleSession.minScale), CanvasScaleSession.maxScale)
+    }
+
+    /// What the canvas will actually SHOW once the zoom lands, drawn in
+    /// today's canvas space.
+    ///
+    /// The derivation is two lines. After the zoom a point `q` sits at
+    /// `(W/2, H/2) + s′·R(θ)·(q − q_c)`, so the `q` still on screen are
+    /// `q_c + R(−θ)·u/s′` for `u` in the canvas box. Today that same set
+    /// draws at `canvasPoint(q_c) + (s/s′)·u`, because the two rotations
+    /// cancel: a zoom changes the layer's scale and position, never its
+    /// angle, so the rectangle is AXIS-ALIGNED in canvas space however the
+    /// layer is turned. It is centred on the region's centre and measures
+    /// `(s/s′)` of the canvas. For `fit` it is the smallest canvas-shaped
+    /// rectangle containing the region, and it touches it on one axis; for
+    /// `fill` it sits inside it. When the scale had to be clamped it grows,
+    /// which is the honest picture of a region too small to reach.
+    func frameRect(in box: CanvasLayerBox, source: CGRect) -> CGRect? {
+        guard purpose == .zoom else { return nil }
+        let resolved = resolvedScale(in: box, source: source)
+        let scale = box.video.scale > 0 ? box.video.scale : 1
+        guard resolved > 0 else { return nil }
+        let factor = CGFloat(scale / resolved)
+        let size = box.canvas.size
+        let centre = box.canvasPoint(source: CGPoint(x: source.midX, y: source.midY))
+        let width = size.width * factor
+        let height = size.height * factor
+        return CGRect(
+            x: centre.x - width / 2, y: centre.y - height / 2, width: width, height: height)
     }
 }
 

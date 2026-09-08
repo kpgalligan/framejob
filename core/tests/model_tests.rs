@@ -24,7 +24,7 @@ use std::ptr;
 
 use serde_json::{json, Value};
 
-use common::{assert_contains, at, cstring, expect_string, take_string, Handle};
+use common::{array, assert_contains, at, cstring, expect_string, take_string, Handle};
 use reelcut_core::ffi::{
     rc_project_clone, rc_project_free, rc_project_from_json, rc_project_new, rc_project_to_json,
     rc_string_free, rc_time_snap_to_frame, rc_timecode_format, rc_timecode_parse,
@@ -59,6 +59,10 @@ const FILTER_KINDS: [&str; 7] = [
     "blur", "sharpen", "pixelate", "sepia", "noir", "vignette", "invert",
 ];
 const SPOT_SHAPES: [&str; 2] = ["rect", "ellipse"];
+/// `ObscureKind`, format version 4. Both spellings are also `FilterKind`s,
+/// which is why the sweep below looks INSIDE `video.obscure` for them
+/// rather than trusting a search of the written text.
+const OBSCURE_KINDS: [&str; 2] = ["blur", "pixelate"];
 const CURVES: [&str; 4] = ["linear", "ease_in", "ease_out", "ease_in_out"];
 
 // ---- the schema round trip -----------------------------------------------
@@ -119,7 +123,13 @@ fn full_project() -> Value {
         ],
         "reflection": { "opacity": 0.35, "height": 0.5, "gap": 4.0, "falloff": 0.8 },
         "spotlight": { "shape": "rect", "x": -20.0, "y": 30.0, "width": 480.0,
-                       "height": 270.0, "feather": 40.0, "dim": 0.6, "zoom": 1.5 }
+                       "height": 270.0, "feather": 40.0, "dim": 0.6, "zoom": 1.5 },
+        "obscure": [
+            { "shape": "ellipse", "x": -220.5, "y": 140.25, "width": 260.0,
+              "height": 320.0, "feather": 36.0, "kind": "blur", "amount": 0.75 },
+            { "shape": "rect", "x": 310.0, "y": -80.0, "width": 640.0,
+              "height": 96.0, "feather": 0.0, "kind": "pixelate", "amount": 0.25 }
+        ]
     });
     clip10["audio"] = json!({
         "volume": 1.25, "muted": false, "fade_in": 300_000, "fade_out": 600_000,
@@ -170,7 +180,8 @@ fn full_project() -> Value {
         "chroma": null,
         "filters": [],
         "reflection": null,
-        "spotlight": null
+        "spotlight": null,
+        "obscure": []
     });
 
     // Clip 21: an image, with the audio group absent (`null`) even though
@@ -292,7 +303,8 @@ fn full_project() -> Value {
         ],
         "reflection": null,
         "spotlight": { "shape": "ellipse", "x": 0.0, "y": 0.0, "width": 320.0,
-                       "height": 320.0, "feather": 0.0, "dim": 1.0, "zoom": 1.0 }
+                       "height": 320.0, "feather": 0.0, "dim": 1.0, "zoom": 1.0 },
+        "obscure": []
     });
 
     let mut clips = vec![clip10, clip20, clip21, clip22, clip41, clip42, clip43];
@@ -301,7 +313,7 @@ fn full_project() -> Value {
     clips.push(clip40);
 
     json!({
-        "version": 3,
+        "version": 4,
         "canvas": {
             "width": 1280, "height": 720, "fps": [30000, 1001],
             "background": [0.1, 0.2, 0.3, 1.0],
@@ -458,17 +470,20 @@ fn every_enum_variant_is_covered_by_the_round_trip() {
     // Guards the fixture itself: if a variant is added to the model and not
     // to the lists above, this fails before the round trip can pass by
     // simply never mentioning it.
-    let written = Handle::from_value(&full_project()).to_json();
+    let handle = Handle::from_value(&full_project());
+    let written = handle.to_json();
     for kind in TRANSITION_KINDS
         .iter()
         .chain(SHAPE_KINDS.iter())
         .chain(FILTER_KINDS.iter())
+        .chain(OBSCURE_KINDS.iter())
     {
         assert_contains(&written, &format!("\"kind\": \"{kind}\""));
     }
     for shape in SPOT_SHAPES {
         assert_contains(&written, &format!("\"shape\": \"{shape}\""));
     }
+
     for curve in CURVES {
         assert_contains(&written, &format!("\"curve\": \"{curve}\""));
     }
@@ -480,6 +495,26 @@ fn every_enum_variant_is_covered_by_the_round_trip() {
     }
     for align in ["left", "center", "right", "top", "middle", "bottom"] {
         assert_contains(&written, &format!("\"{align}\""));
+    }
+
+    // One list cannot be guarded by searching the text at all: every
+    // `ObscureKind` is also a `FilterKind`, and a region's `shape` is the
+    // spotlight's own `SpotShape`, so the sweeps above find both spellings
+    // whether or not the fixture hides a single region. The guard for
+    // format version 4's list has to read the list itself.
+    let project = handle.value();
+    let regions = array(&project, "/clips/0/video/obscure");
+    for kind in OBSCURE_KINDS {
+        assert!(
+            regions.iter().any(|region| region["kind"] == kind),
+            "no region in the fixture is a {kind}"
+        );
+    }
+    for shape in SPOT_SHAPES {
+        assert!(
+            regions.iter().any(|region| region["shape"] == shape),
+            "no region in the fixture is a {shape}"
+        );
     }
 }
 
@@ -494,7 +529,7 @@ fn a_new_project_is_the_documented_empty_project() {
     assert_eq!(
         project.value(),
         json!({
-            "version": 3,
+            "version": 4,
             "canvas": {
                 "width": 1280, "height": 720, "fps": [30000, 1001],
                 "background": [0.0, 0.0, 0.0, 1.0],
@@ -530,7 +565,7 @@ fn an_empty_object_is_an_empty_project() {
     assert_eq!(
         project,
         json!({
-            "version": 3,
+            "version": 4,
             "canvas": {
                 "width": 1920, "height": 1080, "fps": [30, 1],
                 "background": [0.0, 0.0, 0.0, 1.0],
@@ -565,7 +600,7 @@ fn omitted_optional_keys_take_the_documented_defaults() {
     }))
     .value();
 
-    assert_eq!(at(&project, "/version"), &json!(3));
+    assert_eq!(at(&project, "/version"), &json!(4));
     // A file that never heard of nests reads as one with none, which is
     // what "every new field carries a serde default" buys.
     assert_eq!(at(&project, "/nests"), &json!([]));
@@ -641,7 +676,7 @@ fn empty_property_objects_take_the_documented_defaults() {
             "corner_radius": 0.0, "shadow": null,
             "color": { "brightness": 0.0, "contrast": 0.0, "saturation": 0.0, "hue": 0.0 },
             "chroma": null,
-            "filters": [], "reflection": null, "spotlight": null
+            "filters": [], "reflection": null, "spotlight": null, "obscure": []
         }),
         "VideoProps defaults"
     );
@@ -820,10 +855,10 @@ fn an_unknown_source_kind_is_a_schema_error() {
 
 #[test]
 fn a_newer_format_version_is_refused_and_says_so() {
-    let msg = Handle::try_from_value(&json!({ "version": 4 }))
+    let msg = Handle::try_from_value(&json!({ "version": 5 }))
         .expect_err("a newer format version must be refused");
-    assert_contains(&msg, "version 4 is newer than this build understands");
-    assert_contains(&msg, "(version 3)");
+    assert_contains(&msg, "version 5 is newer than this build understands");
+    assert_contains(&msg, "(version 4)");
     assert_contains(&msg, "update Reelcut");
 
     // The gate reads the RAW json, so it has to cope with however the
@@ -831,9 +866,9 @@ fn a_newer_format_version_is_refused_and_says_so() {
     // as a JSON float is the case that would otherwise slip past `as_u64`,
     // fall back to "current", and reach the user as a schema error about a
     // field this build has never heard of.
-    let msg = Handle::try_from_value(&json!({ "version": 4.0 }))
+    let msg = Handle::try_from_value(&json!({ "version": 5.0 }))
         .expect_err("a newer format version written as a float must be refused");
-    assert_contains(&msg, "version 4 is newer than this build understands");
+    assert_contains(&msg, "version 5 is newer than this build understands");
 
     // A version that is not a number at all is named rather than ignored.
     let msg = Handle::try_from_value(&json!({ "version": "two" }))
@@ -845,15 +880,15 @@ fn a_newer_format_version_is_refused_and_says_so() {
 fn every_prior_version_is_accepted_and_the_writer_stamps_the_current_one() {
     // The reader's promise (spec §5.6): a file from an older build opens,
     // and what comes back out is the current version.
-    for version in [1, 2, 3] {
+    for version in [1, 2, 3, 4] {
         assert_eq!(
             Handle::from_value(&json!({ "version": version })).value()["version"],
-            json!(3),
+            json!(4),
             "version {version} did not read back as the current version"
         );
     }
     // Absent, the version defaults to current rather than to 0.
-    assert_eq!(Handle::from_json("{}").value()["version"], json!(3));
+    assert_eq!(Handle::from_json("{}").value()["version"], json!(4));
 }
 
 #[test]

@@ -31,8 +31,9 @@ normative: §5.2 is the project schema, §6 the op table, §7 the architecture.
   header has eye, speaker, lock and headphones — solo.
 - **Canvas** with an `AVPlayerLayer` under a transparent overlay: move, scale,
   rotate and crop handles, line/arrow endpoint handles, safe-area guides,
-  snapping to the canvas centre and edges, inline text editing, and Fit /
-  50 % / 100 % / 200 % zoom stops.
+  snapping to the canvas centre and edges, inline text editing, a region
+  band on Z for a zoom or an obscured area, and Fit / 50 % / 100 % / 200 %
+  zoom stops.
 - **Inspector** with three tabs — Clip, Media, Document. The Clip tab is a
   selection header — the clip's name, editable there for a single clip and
   the one place a name can be cleared back to what the clip shows, with its
@@ -42,7 +43,7 @@ normative: §5.2 is the project schema, §6 the op table, §7 the architecture.
   props — or, when the playhead is inside an animation action, to that
   action's end state.
 - **Editing**: move, nudge, trim, slip, roll, split, delete, lift, ripple
-  delete (and ripple delete range), close gap, insert time, insert and
+  delete (one range, or many at once), close gap, insert time, insert and
   overwrite, duplicate, speed, freeze frame, detach audio, transitions,
   actions, markers, tracks, canvas size and rate; a clip's own name and
   colour label (Clip ▸ Rename…, Clip ▸ Label ▸; a clip with no name of
@@ -53,6 +54,22 @@ normative: §5.2 is the project schema, §6 the op table, §7 the architecture.
   size). Every edit is a pure op in the Rust core returning a new
   immutable project handle, so undo is a stack of handles and a refused
   edit costs nothing.
+- **The screencast trio.** **Remove Silences** (Clip ▸ Remove Silences…)
+  finds the dead air — threshold, minimum length and padding, over the
+  selected clips or everything audible — shades the candidate spans on the
+  ruler and the lanes while you tune it, and takes them all out in one undo
+  step, however many cuts that is. It measures what you HEAR, not what is
+  in the file: the level it tests is the waveform peak times the mix
+  envelope, so a muted or soloed-out clip is silent for free. **Zoom to
+  Region** (Z, or the Actions section's button) is the screencast zoom:
+  drag a rectangle over the selected clip and release, and the core solves
+  for the scale and position that bring it to the canvas — through the
+  clip's rotation and crop, eased at both ends, one action, one undo step;
+  ⇧ fills the canvas instead of fitting, and Zoom Back animates to where
+  the clip started. **Obscure** hides a face or a password field behind up
+  to four blurred or pixelated regions per clip, each drawn on the canvas
+  or typed into the inspector, each riding with its layer through every
+  scale, move and rotation, and each animatable like any other property.
 - **Playback** over an `AVComposition` built from the core's composition plan,
   with a Metal compositor drawing every frame from the core's frame recipe.
   A property-only edit re-renders the paused frame without rebuilding the
@@ -117,9 +134,9 @@ Makefile              Build orchestration
 | `CanvasSessions.swift` · `PreviewCanvasView.swift` | canvas geometry and gestures; the preview and its overlay |
 | `InspectorPane.swift` · `InspectorViewController.swift` · `ClipPane` `MediaPane` `DocumentPane` (with `VideoPane` `AudioPane` `TextPane` `ShapePane` as section factories) | the binding that knows about actions, one file per tab, and the sections the Clip tab composes |
 | `EditorViewController.swift` + `EditorViewController+{Timeline,Canvas,Inspector,Export}.swift` | wiring in the base file, features in extensions |
-| `AgentServer.swift` + `AgentServer+{Arguments,Project,Clips,Tracks,Media,Render,History}.swift` · `AgentCatalog.swift` | the MCP endpoint, its handlers, and the tool catalog |
+| `AgentServer.swift` + `AgentServer+{Arguments,Project,Clips,Tracks,Media,Render,History,Silence}.swift` · `AgentCatalog.swift` | the MCP endpoint, its handlers, and the tool catalog |
 | `AppDelegate.swift` · `EditorWindowController.swift` · `WelcomeWindowController.swift` · `main.swift` | menus (nil-target selectors), window, welcome |
-| `SpeedSheetController.swift` · `RelinkSheetController.swift` | the remaining dialogs |
+| `SpeedSheetController.swift` · `RelinkSheetController.swift` · `SilenceSheetController.swift` (with `SilenceDetector.swift` behind it) | the remaining dialogs |
 | `Theme.swift` · `Controls.swift` · `OptionControls.swift` · `Sheets.swift` · `EditorChrome.swift` · `FileDropView.swift` | shared chrome, copied from Rasterize |
 
 ## Building
@@ -173,11 +190,13 @@ runs. It is off by default.
 `add_clip`, `add_text_clip`, `add_shape_clip`, `insert_clip`,
 `overwrite_clip`, `move_clip`, `trim_start`, `trim_end`, `rate_stretch`,
 `slip`, `roll`, `split`, `delete`, `ripple_delete`, `ripple_delete_range`,
-`lift_range`, `insert_time`, `close_gap`, `set_speed`, `set_reversed`,
+`ripple_delete_ranges`, `lift_range`, `insert_time`, `close_gap`,
+`set_speed`, `set_reversed`,
 `freeze_frame`, `detach_audio`, `duplicate`, `paste`, `paste_attributes`,
 `nest`, `unnest`, `set_video`, `set_audio`, `set_text`, `set_shape`,
 `set_clip`, `set_enabled`,
-`set_transition`, `set_transition_duration`, the four action ops, and the
+`set_transition`, `set_transition_duration`, the four action ops and
+`add_zoom_action` beside them, and the
 track, marker, canvas and media ops — plus the app-state tools below. The
 count of each is `rc_op_names`' length and the catalog's, and the startup
 parity check compares them, so it is one number in the code and not one
@@ -192,6 +211,7 @@ here.
 | `import_media {path}` | probes a file and returns the **new media id**; `add_clip` then places it |
 | `import_captions {path, track?}` | an SRT file as text clips (File ▸ Import Captions…) |
 | `consolidate_media {}` | copies every referenced file into the package (File ▸ Consolidate Media…) |
+| `detect_silence {clips?, threshold_db?, min_length?, padding?}` | the quiet spans of the timeline, which `ripple_delete_ranges` then cuts — the same detector Clip ▸ Remove Silences… uses, so an agent and the sheet propose the same cuts. It changes nothing; loudness is the waveform peak times the mix envelope, so mute and solo are already in the answer |
 | `set_playhead {t}` | moves the playhead and seeks the preview |
 | `set_range {start?, end?}` | the in/out range (I / O / ⌥X); no bounds clears it |
 | `set_selection {clips?}` | the timeline selection (a click); no clips clears it |

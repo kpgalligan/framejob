@@ -256,8 +256,8 @@ final class Compositor: NSObject, AVVideoCompositing {
 /// between them. Never introduce a `SIMD2`/`SIMD4` member here (or a vector
 /// type there) — the alignment rules for vectors differ from Swift's and the
 /// mismatch shows up as a frame of garbage, not as a compile error. Add
-/// fields at the END, in pairs, and mirror them in the shader in the same
-/// order.
+/// fields at the END, in groups of four (the struct is deliberately a
+/// multiple of 16 bytes), and mirror them in the shader in the same order.
 struct LayerUniforms {
     var canvasWidth: Float = 1
     var canvasHeight: Float = 1
@@ -315,16 +315,16 @@ struct LayerUniforms {
     /// with it.
     var shadowMask: Float = 0
     // The M3 effect block — filters, reflection, spotlight and the nest clip
-    // rectangle. `CompositorEffects.swift` fills every one of these and is
-    // where each field's meaning, units and range are argued; the
-    // declarations live here because the layout contract above governs the
-    // whole struct and a reader checking it against `Compositor.metal` has to
-    // see all 68 fields in one list.
+    // rectangle — and, after it, phase 3c's obscured regions.
+    // `CompositorEffects.swift` fills every one of these and is where each
+    // field's meaning, units and range are argued; the declarations live here
+    // because the layout contract above governs the whole struct and a reader
+    // checking it against `Compositor.metal` has to see all 104 fields in one
+    // list.
     //
-    // These 28 begin with the four floats that used to be `reserved0…3`, so
-    // the padding tail is now empty: 40 + 28 = 68 floats = 272 bytes = 17×16.
-    // The next field to land must come with three companions, or bring the
-    // padding back.
+    // The M3 block's 28 begin with the four floats that used to be
+    // `reserved0…3`; the obscure block's 36 restore a padding tail of three.
+    // 40 + 28 + 36 = 104 floats = 416 bytes, and 416 is 26 × 16.
     var filterKind0: Float = 0
     var filterKind1: Float = 0
     var filterKind2: Float = 0
@@ -353,6 +353,59 @@ struct LayerUniforms {
     var clipW: Float = 0
     var clipH: Float = 0
     var clipRotation: Float = 0
+    // The obscured regions (phase 3c). Four slots of eight fields, laid out
+    // REGION-MAJOR — all of region 0, then region 1 — where the filter block
+    // above is field-major. A filter's record is two fields, so field-major
+    // happened to fall into runs of four there; an eight-field record laid out
+    // field-major would give thirty-two lines no reader could line up against
+    // the shader's, and reading the two lists side by side is the ONLY way
+    // this contract is ever checked.
+    //
+    // Each slot repeats `ObscureProps`'s own field order, which is
+    // `ObscureRegion`'s in `model_regions.rs`, which is the spotlight block's
+    // above: shape, centre, size, feather, then the two that say what the
+    // region does. `obscureEnabled` is the `spotEnabled` / `clipEnabled`
+    // precedent — one uniform read in the fragment stage's effect gate
+    // instead of four kind codes, and that gate's shape was measured.
+    var obscureEnabled: Float = 0
+    var obscure0Shape: Float = 0
+    var obscure0X: Float = 0
+    var obscure0Y: Float = 0
+    var obscure0W: Float = 0
+    var obscure0H: Float = 0
+    var obscure0Feather: Float = 0
+    var obscure0Kind: Float = 0
+    var obscure0Amount: Float = 0
+    var obscure1Shape: Float = 0
+    var obscure1X: Float = 0
+    var obscure1Y: Float = 0
+    var obscure1W: Float = 0
+    var obscure1H: Float = 0
+    var obscure1Feather: Float = 0
+    var obscure1Kind: Float = 0
+    var obscure1Amount: Float = 0
+    var obscure2Shape: Float = 0
+    var obscure2X: Float = 0
+    var obscure2Y: Float = 0
+    var obscure2W: Float = 0
+    var obscure2H: Float = 0
+    var obscure2Feather: Float = 0
+    var obscure2Kind: Float = 0
+    var obscure2Amount: Float = 0
+    var obscure3Shape: Float = 0
+    var obscure3X: Float = 0
+    var obscure3Y: Float = 0
+    var obscure3W: Float = 0
+    var obscure3H: Float = 0
+    var obscure3Feather: Float = 0
+    var obscure3Kind: Float = 0
+    var obscure3Amount: Float = 0
+    // The padding tail, back after the M3 block consumed the last one. Three
+    // floats, so the next field to land can be added on its own; a fourth
+    // needs three companions again.
+    var reserved0: Float = 0
+    var reserved1: Float = 0
+    var reserved2: Float = 0
 }
 
 /// The shadow pass's uniform block, mirroring `ShadowUniforms` in
@@ -691,12 +744,17 @@ final class MetalRenderer {
                 // an error. Nothing to draw.
                 continue
             }
-            // A blur or a sharpen needs the fragment stage compiled WITH the
-            // tap loop, which is a whole second pipeline rather than a branch
-            // — the shader's `kGatherFilters` has the measurement. Every other
-            // layer, which is nearly all of them, keeps the pipeline the pass
-            // is already carrying and changes no state at all.
-            let state = layer.filters.needsGather ? gatherPipeline : pipeline
+            // A blur or a sharpen — a filter's, or an obscured region's —
+            // needs the fragment stage compiled WITH the tap loop, which is a
+            // whole second pipeline rather than a branch: the shader's
+            // `kGatherFilters` has the measurement. Every other layer, which
+            // is nearly all of them, keeps the pipeline the pass is already
+            // carrying and changes no state at all. The predicate belongs to
+            // the LAYER and not to its filter list, because a region that
+            // blurs gathers exactly as a blur filter does — and both gather
+            // sites in the shader are compiled out of the other pipeline, so
+            // getting this wrong renders the region plain and silently.
+            let state = layer.needsGather ? gatherPipeline : pipeline
             if let shadow = layer.shadow {
                 encodeShadow(
                     shadow, uniforms: uniforms, texture: texture, canvas: canvas,
@@ -1040,11 +1098,13 @@ final class MetalRenderer {
             u.chromaSoftness = Float(max(0, chroma.softness))
             u.chromaSpill = Float(min(max(chroma.spill, 0), 1))
         }
-        // The M3 effect block, in `CompositorEffects.swift`.
+        // The M3 effect block and the obscured regions after it, all in
+        // `CompositorEffects.swift`.
         u.apply(filters: layer.filters)
         u.apply(reflection: layer.reflection)
         u.apply(spotlight: layer.spotlight)
         u.apply(clipRect: layer.clipRect)
+        u.apply(obscure: layer.obscure)
         if let transition = layer.transition {
             u.transitionKind = TransitionCode.code(transition.kind)
             u.transitionProgress = Float(min(max(transition.progress, 0), 1))

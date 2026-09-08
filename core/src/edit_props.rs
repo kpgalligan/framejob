@@ -40,8 +40,8 @@ use serde_json::Value;
 use crate::actions::{self, MAX_PATCH_DEPTH};
 use crate::export::describe;
 use crate::model::{
-    AudioProps, Chroma, Clip, Compressor, Filter, Project, Reflection, Shadow, ShapeProps, Source,
-    Spotlight, TextProps, VideoProps,
+    AudioProps, Chroma, Clip, Compressor, Filter, ObscureRegion, Project, Reflection, Shadow,
+    ShapeProps, Source, Spotlight, TextProps, VideoProps,
 };
 use crate::props_check::{check_audio, check_shape, check_text, check_video};
 
@@ -74,8 +74,13 @@ impl Group {
     /// sub-object present, so the key check can see inside `shadow`,
     /// `chroma`, `reflection`, `spotlight`, `duck`, `compressor`,
     /// `outline`, `backdrop` and `stroke` even when the clip currently has
-    /// `null` there — and one `filters` entry, so it can see inside the
-    /// array's elements too.
+    /// `null` there — and one `filters` entry and one `obscure` region, so
+    /// it can see inside the elements of the two arrays of objects too.
+    /// Both entries are load-bearing: `check_keys` reads the FIRST element
+    /// of the template's array as the reference for every element it is
+    /// given, so a list left at its empty default would hand it no
+    /// reference at all and a misspelling inside a region would be dropped
+    /// in silence — the very failure the array arm was written for.
     fn template(self) -> Value {
         match self {
             Group::Video => actions::to_json(&VideoProps {
@@ -84,6 +89,7 @@ impl Group {
                 filters: vec![Filter::default()],
                 reflection: Some(Reflection::default()),
                 spotlight: Some(Spotlight::default()),
+                obscure: vec![ObscureRegion::default()],
                 ..VideoProps::default()
             }),
             Group::Audio => actions::to_json(&AudioProps {
@@ -117,11 +123,12 @@ fn check_keys(
     path: &str,
     depth: u32,
 ) -> Result<(), String> {
-    // An array of objects — `video.filters` — is the one place the schema
-    // puts keys inside an array, and every element has the SAME shape, so
-    // the template's first entry describes all of them. Without this a
-    // misspelled `{"filters": [{"amont": 1}]}` would be dropped in silence
-    // by serde, which is exactly the failure this check exists to prevent.
+    // An array of objects — `video.filters`, and from format version 4
+    // `video.obscure` — is where the schema puts keys inside an array, and
+    // every element has the SAME shape, so the template's first entry
+    // describes all of them. Without this a misspelled
+    // `{"filters": [{"amont": 1}]}` would be dropped in silence by serde,
+    // which is exactly the failure this check exists to prevent.
     // Arrays of numbers (a colour, `from`/`to`) fall through it harmlessly:
     // a number against a number has no keys to check.
     if let (Value::Array(given), Value::Array(known)) = (patch, template) {

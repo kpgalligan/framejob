@@ -714,6 +714,13 @@ final class EditorViewController: NSViewController {
             toggleCropMode(nil)
         case "z" where shift:
             fitTimeline(nil)
+        // Bare Z arms the canvas region mode (road map 2's phase 3b, spec §9),
+        // and it must stay BELOW the ⇧Z case: a `switch` matches in source
+        // order, so a bare "z" above it would swallow Fit Timeline silently.
+        // The command itself toggles, so Z is also the way back out
+        // (EditorViewController+ZoomRegion.swift).
+        case "z":
+            zoomToRegion(nil)
         // ⇧ is still applied to `charactersIgnoringModifiers`, so ⇧, arrives
         // as "<" on a US layout — both spellings mean the same nudge.
         case ",", "<":
@@ -806,6 +813,16 @@ final class EditorViewController: NSViewController {
     @objc func consolidateMedia(_ sender: Any?) { consolidateMediaCommand() }
     /// File ▸ Import Captions… — CaptionImporter.swift.
     @objc func importCaptions(_ sender: Any?) { importCaptionsCommand() }
+    /// Clip ▸ Remove Silences… — the body and its validator are at the foot of
+    /// SilenceSheetController.swift, beside the sheet they open, exactly as
+    /// Import Captions' are at the foot of CaptionImporter.swift.
+    ///
+    /// Zoom to Region and Zoom Back need no forward here: both are declared
+    /// `@objc` on `extension EditorViewController` in
+    /// EditorViewController+ZoomRegion.swift (`pickChromaKey`'s precedent),
+    /// and a second declaration in this file would be a redeclaration, not a
+    /// forward.
+    @objc func removeSilences(_ sender: Any?) { removeSilencesCommand() }
 }
 
 // MARK: - Timecode field
@@ -943,6 +960,10 @@ extension EditorViewController: NSUserInterfaceValidations {
             if let answer = validateTimelineAction(action) { return answer }
             if let answer = validateEdgeAction(action) { return answer }
             if let answer = validateIdentityAction(action, item: item) { return answer }
+            // The one arm whose file is not an `EditorViewController+…`:
+            // Remove Silences' body and validator live at the foot of
+            // SilenceSheetController.swift, beside the sheet.
+            if let answer = validateSilenceAction(action) { return answer }
         }
         return true
     }

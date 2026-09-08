@@ -29,6 +29,17 @@ final class TimelineView: NSView, NSTextFieldDelegate {
     private(set) var inOutRange: (start: Ticks, end: Ticks)?
     private(set) var cacheDirectory: URL?
 
+    /// Remove Silences' candidate spans, washed over the lanes and the ruler
+    /// while its sheet is up (`TimelineView+Candidates.swift` draws them).
+    /// Deliberately NOT part of `update(...)`: they are the sheet's own view
+    /// state, so the sheet sets them and clears them in `viewDidDisappear`.
+    var candidateSpans: [SilenceDetector.Span] = [] {
+        didSet {
+            content.needsDisplay = true
+            ruler.needsDisplay = true
+        }
+    }
+
     /// Snapping (N) and the track height live on the controller — the menu,
     /// this toolbar and the canvas all have to read one flag — so they are
     /// pushed in and pushed back out through closures.
@@ -1216,6 +1227,7 @@ final class TimelineContentView: NSView {
                 height: layout.lanesHeight
             ).fill()
         }
+        drawCandidateSpans(owner: owner, layout: layout)
 
         for (index, track) in snapshot.tracks.enumerated() {
             let row = layout.row(forTrackIndex: index)
@@ -1325,6 +1337,7 @@ final class TimelineRulerView: NSView {
                 width: layout.width(of: range.end - range.start), height: bounds.height
             ).fill()
         }
+        drawCandidateSpans(owner: owner, layout: layout)
 
         let steps = layout.rulerSteps()
         let range = layout.visibleRange(dirtyRect)

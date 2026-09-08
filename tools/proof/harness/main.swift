@@ -17,10 +17,31 @@
 //
 //   harness <project.reelcut|welcome> <out.png> <light|dark>
 //           [w] [h] [selectIndex] [playheadSec] [sizeIndex 0-2] [clip|media|document]
+//           [candidateSpans] [expandSections]
 //
 // `selectIndex` picks the clip at that index in START order (-1 for none).
 // The PNG is written at the main screen's backing scale (2x on a Retina
 // Mac: a 1440x862 window is a 2880x1724 image), 8-bit RGBA.
+//
+// The last two arguments were added for `tools/proof/phase3_chrome.py`, and
+// they are the SAME kind of thing as `selectIndex` and `playheadSec`: view
+// state a package cannot carry, so the render has to be told it. Both default
+// to "-" (nothing), which is exactly what every earlier caller got, so a
+// nine-argument invocation renders the bytes it always did.
+//
+//   `candidateSpans`   Remove Silences' candidate wash (road map 2 phase 3a):
+//                      comma-separated `start-end` pairs in SECONDS, e.g.
+//                      "1-2,6-7". The sheet is the only thing that sets
+//                      `TimelineView.candidateSpans` in the app and a sheet
+//                      cannot be put up offscreen, so without this the wash
+//                      could not be photographed at all.
+//   `expandSections`   comma-separated `InspectorSection` ids to open, e.g.
+//                      "video.obscure". A section's collapsed state is a
+//                      `UserDefaults` key this file already pins (it CLEARS
+//                      them, so `defaultExpanded` decides), and a section
+//                      built `defaultExpanded: false` therefore shows nothing
+//                      but its header — its rows cannot be seen at all. Each
+//                      id here pins its key to "not collapsed".
 //
 // Determinism: the app persists its pane sizes, the inspector's collapsed
 // state, the track height, snapping and the Document tab's one checkbox in
@@ -55,8 +76,8 @@ enum Harness {
     /// what an earlier run (or another program sharing the defaults domain)
     /// left behind. The keys are `EditorViewController`'s, `InspectorPane`'s
     /// and `DocumentPane`'s; the values are the app's own defaults.
-    static func pinDefaults(sizeIndex: Int) {
-        let pinned: [String: Any] = [
+    static func pinDefaults(sizeIndex: Int, expand: [String]) {
+        var pinned: [String: Any] = [
             "ReelcutInspectorWidth": 304.0,       // DS.panelWidth
             "ReelcutTimelineHeight": 300.0,       // EditorViewController.defaultTimelineHeight
             "ReelcutInspectorCollapsed": false,
@@ -78,6 +99,12 @@ enum Harness {
             // render, `Always` and `Automatic`-with-a-mouse are identical.
             "AppleShowScrollBars": "Always",
         ]
+        // `InspectorSection` stores COLLAPSED, so `false` is "open". The loop
+        // below drops every such key from the persistent domain and the
+        // argument domain is searched first, so these decide.
+        for id in expand where !id.isEmpty {
+            pinned[InspectorSection.collapsedKeyPrefix + id] = false
+        }
         UserDefaults.standard.setVolatileDomain(pinned, forName: UserDefaults.argumentDomain)
         // A section's collapsed state is stored per section id; any such key
         // left in the persistent domain would re-collapse one section on one
@@ -86,6 +113,28 @@ enum Harness {
         for key in defaults.dictionaryRepresentation().keys
         where key.hasPrefix("ReelcutInspectorSection.") {
             defaults.removeObject(forKey: key)
+        }
+    }
+
+    /// A comma-separated argument. "-" and "" both mean nothing, so an
+    /// omitted argument and an explicit "no" are the same thing — every
+    /// other argument here reads that way too.
+    static func list(_ text: String) -> [String] {
+        guard text != "-", !text.isEmpty else { return [] }
+        return text.split(separator: ",").map { String($0) }
+    }
+
+    /// `list`'s entries as `start-end` pairs in SECONDS. A pair that is not
+    /// two numbers is DROPPED rather than clamped: the caller is a proof
+    /// script, and a silently mis-parsed span would show up as a missing
+    /// wash, which is a failing check rather than a passing lie.
+    static func spans(_ text: String) -> [SilenceDetector.Span] {
+        list(text).compactMap { pair in
+            let parts = pair.split(separator: "-")
+            guard parts.count == 2, let from = Double(parts[0]), let to = Double(parts[1])
+            else { return nil }
+            return SilenceDetector.Span(
+                start: Ticks(from * 600_000), end: Ticks(to * 600_000))
         }
     }
 
@@ -122,8 +171,11 @@ let selectIndex = arguments.count > 6 ? Int(arguments[6]) ?? -1 : -1
 let playheadSeconds = arguments.count > 7 ? Double(arguments[7]) ?? 0 : 0
 let sizeIndex = arguments.count > 8 ? min(max(Int(arguments[8]) ?? 1, 0), 2) : 1
 let tabName = arguments.count > 9 ? arguments[9] : "clip"
+/// Two more pieces of view state a package cannot carry — see the header.
+let candidateSpans = Harness.spans(arguments.count > 10 ? arguments[10] : "-")
+let expandSections = Harness.list(arguments.count > 11 ? arguments[11] : "-")
 
-Harness.pinDefaults(sizeIndex: sizeIndex)
+Harness.pinDefaults(sizeIndex: sizeIndex, expand: expandSections)
 let app = NSApplication.shared
 app.setActivationPolicy(.prohibited)
 NSApp.appearance = NSAppearance(named: appearanceName)
@@ -176,6 +228,13 @@ controller.refreshFromDocument(isLive: false)
 for _ in 0..<12 {
     RunLoop.current.run(until: Date().addingTimeInterval(0.05))
     controller.view.layoutSubtreeIfNeeded()
+}
+// The candidate wash is the sheet's own view state and is deliberately not
+// part of `TimelineView.update(...)`, so it is pushed in here — after the
+// refresh that would otherwise have run over it — and the last few runloop
+// turns below let its `didSet` redisplay land.
+if !candidateSpans.isEmpty {
+    controller.timeline?.candidateSpans = candidateSpans
 }
 switch tabName {
 case "media": controller.inspector?.select(.media)

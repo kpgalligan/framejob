@@ -1,7 +1,7 @@
 //! Ripple, insert time, range delete, lift, close gap and freeze frame —
-//! spec §6 rows `ripple_delete`, `ripple_delete_range`, `lift_range`,
-//! `close_gap`, `insert_time` and `freeze_frame`, and the §11 decisions
-//! they implement.
+//! spec §6 rows `ripple_delete`, `ripple_delete_range`,
+//! `ripple_delete_ranges`, `lift_range`, `close_gap`, `insert_time` and
+//! `freeze_frame`, and the §11 decisions they implement.
 //!
 //! What separates these from `edit_clip.rs`'s ops is that they move
 //! material they were never given: closing or opening a hole in the cut
@@ -204,14 +204,76 @@ impl Project {
     /// The bounds are snapped, clamped to 0 and ordered, so a drag that
     /// ended left of where it began is the same range. An empty range is
     /// `None`.
+    ///
+    /// It is [`Project::ripple_delete_ranges`] with one pair, and nothing
+    /// else: with a single span there is nothing for the merge to merge and
+    /// nothing for the right-to-left loop to order, so the two are
+    /// step-for-step the same edit. Keeping a second body here would be a
+    /// second implementation of one algorithm, free to drift.
     pub fn ripple_delete_range(&self, from: Ticks, to: Ticks) -> Result<Option<Project>, String> {
-        let Some((start, end)) = ordered_range(self, from, to) else {
+        self.ripple_delete_ranges(&[[from, to]])
+    }
+
+    /// Removes SEVERAL ranges and closes each hole in one edit — the
+    /// silence cut (spec §6), one op because it is one undo step.
+    ///
+    /// **The op is defined as merge-then-cut, not as N
+    /// `ripple_delete_range`s**, and the difference is visible in the
+    /// document, so it is worth stating plainly: each pair is snapped,
+    /// clamped to 0 and put in order exactly as the single range is, the
+    /// results are MERGED — touching pairs as well as overlapping ones —
+    /// and only the survivors are cut. Two quiet spans that meet leave one
+    /// hole, and cutting at a boundary that no longer exists would split
+    /// clips into fragments nobody asked for and burn the ids to prove it.
+    /// A caller that wants N separate edits sends N ops.
+    ///
+    /// The survivors are cut and closed RIGHT TO LEFT, because closing an
+    /// earlier hole moves the clips a later hole's bounds were measured
+    /// against — every bound here is a time in the project as the caller
+    /// saw it, not in the project as the previous cut left it.
+    ///
+    /// `set_gained_transitions` runs ONCE at the end, over the unlocked
+    /// tracks, as it does for `ripple_delete`'s own union of spans: a clip
+    /// that overlaps a neighbour between two shifts and then slides clear
+    /// again should not come out holding a transition for an overlap that
+    /// no longer exists.
+    ///
+    /// Everything else is `ripple_delete_range`'s contract: locked tracks
+    /// are neither split, removed nor shifted; straddlers stay put; markers
+    /// do not move (a marker inside a removed span has no moment left to
+    /// name, and giving the plural a second marker rule would give two
+    /// ripples two rules); a clip a shift brings onto a neighbour gains the
+    /// default transition rather than stacking.
+    ///
+    /// There is no cap on the list: the op is pure, so nothing is
+    /// half-applied, and a pathological call is already answered — each cut
+    /// splits, every split validates, and `format::check_caps` refuses the
+    /// clip count it would take to get there.
+    ///
+    /// An empty list, a list of empty ranges, and a list that merges to
+    /// nothing all change nothing (`None`).
+    pub fn ripple_delete_ranges(&self, ranges: &[[Ticks; 2]]) -> Result<Option<Project>, String> {
+        // Snapped FIRST, merged after: two ranges three ticks apart are the
+        // same range once both bounds are on the frame grid, and only a
+        // merge that runs afterwards can see it.
+        let spans = union(
+            ranges
+                .iter()
+                .filter_map(|pair| ordered_range(self, pair[0], pair[1]))
+                .map(|(start, end)| Span { start, end })
+                .collect(),
+        );
+        if spans.is_empty() {
             return Ok(None);
-        };
-        let mut next = clear_range(self, start, end)?;
-        // Negated by subtraction rather than by `-length`, so an absurd
-        // range cannot overflow on the negation.
-        shift_clips(&mut next, end, start.saturating_sub(end));
+        }
+
+        let mut next = self.clone();
+        for span in spans.iter().rev() {
+            next = clear_range(&next, span.start, span.end)?;
+            // Negated by subtraction rather than by `-length`, so an absurd
+            // range cannot overflow on the negation.
+            shift_clips(&mut next, span.end, span.start.saturating_sub(span.end));
+        }
         let unlocked = unlocked_tracks(&next);
         set_gained_transitions(&mut next, &unlocked);
         self.finish(next)

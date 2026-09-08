@@ -273,11 +273,12 @@ def main():
     # ---- A. the catalog ---------------------------------------------------
     print("catalog")
     names = mcp.tools()
-    # The EXACT count is the newest phase's script's to assert — it is what
-    # tells a stale binary on the port from the build under test — and it
-    # moves to the next phase's script when that lands; the earlier scripts
-    # keep a floor, so a later phase's tools never fail an older proof.
-    check(len(names) == 65, f"the catalog is 65 tools (got {len(names)})")
+    # A floor, not the count: phase 2 found 65, and every later phase adds
+    # tools (phase 3 made it 68). The EXACT count is the newest phase's
+    # script's to assert — it is what tells a stale binary on the port from
+    # the build under test — and it moved on when phase 3 landed; the earlier
+    # scripts keep a floor, so a later phase's tools never fail an older proof.
+    check(len(names) >= 65, f"the catalog holds phase 2's 65 tools or more (got {len(names)})")
     for tool in ["set_clip", "paste_attributes"]:
         check(tool in names, f"{tool} is a tool")
 
@@ -312,7 +313,7 @@ def main():
     s.save()
     text = project_json(s.path)
     root = json.loads(text)
-    check('"version": 3' in text and root["version"] == 3, "the saved project.json is version 3")
+    check('"version": 4' in text and root["version"] == 4, "the saved project.json is version 4")
     check(
         all(list(c.keys())[-2:] == ["name", "label"] for c in root["clips"]),
         "every clip object ends with name then label",
@@ -333,7 +334,7 @@ def main():
     check(
         (clip["name"], clip["label"]) == ("Talk", "blue")
         and reopened.tracks()[front]["solo"] is True
-        and reopened.project()["version"] == 3,
+        and reopened.project()["version"] == 4,
         "a byte copy of the package opens from disk with name, label and solo intact",
     )
 
@@ -354,7 +355,7 @@ def main():
     )
     v2 = Session(mcp, "schema-v2", open_from=fixture)
     project = v2.project()
-    check(project["version"] == 3, "a version-2 file opens and reports version 3")
+    check(project["version"] == 4, "a version-2 file opens and reports version 4")
     check(
         {c["id"] for c in project["clips"]} == {a, t}
         and [tr["id"] for tr in project["tracks"]] == [back, front],
@@ -367,7 +368,7 @@ def main():
     check(all(tr["solo"] is False for tr in project["tracks"]), "every track reads solo false")
     v2.save()
     root = json.loads(project_json(v2.path))
-    check(root["version"] == 3, "saving it writes version 3")
+    check(root["version"] == 4, "saving it writes version 4")
     check(
         all(list(c.keys())[-2:] == ["name", "label"] for c in root["clips"])
         and all(list(tr.keys())[-1] == "solo" for tr in root["tracks"]),

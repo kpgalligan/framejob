@@ -298,7 +298,12 @@ fn finite(value: f64, fallback: f64) -> f64 {
 /// §5.3), so the textbook rotation matrix already turns clockwise on screen
 /// — which is what a positive `rotation` means everywhere else in Reelcut,
 /// and what `Compositor.metal`'s `rotate2` does with the same sign.
-fn rotate(x: f64, y: f64, degrees: f64) -> (f64, f64) {
+///
+/// `pub(crate)` because it is the crate's ONE rotation: `edit_zoom.rs`
+/// solves the placement rule for a region and needs the same sense, and a
+/// second copy of four lines of trigonometry is exactly how two halves of
+/// one editor come to disagree about which way is clockwise.
+pub(crate) fn rotate(x: f64, y: f64, degrees: f64) -> (f64, f64) {
     let (sin, cos) = degrees.to_radians().sin_cos();
     (cos * x - sin * y, sin * x + cos * y)
 }

@@ -66,6 +66,18 @@ extension AgentServer {
         var transitionEnum: [Any] = transitionNames
         transitionEnum.append(NSNull())
         let curveNames = Curve.allCases.map { $0.rawValue }
+        let obscureNames = ObscureKind.allCases.map { $0.rawValue }
+        // The obscure list's clause, kept as its own explicitly-typed local
+        // rather than spliced into the video chain below: that chain already
+        // carries a non-literal operand and is one of the three expressions
+        // this file records tipping the type checker's budget.
+        let obscureClause: String =
+            ", obscure (an ARRAY of {shape: rect|ellipse, x, y, width, height, feather, kind, "
+            + "amount} that HIDES what is under each one, at most \(ObscureProps.max) — kind is "
+            + "\(obscureNames.joined(separator: "|")) and amount is 0–1, feather is the source "
+            + "px the effect ramps in over, and the centre and the box are SOURCE px from the "
+            + "cropped rect's centre, the same frame the spotlight uses. Like filters it is "
+            + "replaced whole rather than merged, so send the whole array and [] to clear it)"
         // The three patch vocabularies, written once: every property group of
         // spec §5.2, with the ranges the ops enforce. A patch MERGES, so a key
         // left out keeps its current value and a key set to null clears an
@@ -90,7 +102,9 @@ extension AgentServer {
             + "the layer's cropped height, gap is source px), spotlight (null or "
             + "{shape: rect|ellipse, x, y, width, height, feather, dim, zoom} — the centre and "
             + "the box are SOURCE px from the cropped rect's centre, dim is how much darker it "
-            + "is OUTSIDE and zoom 1–2 magnifies what is inside). A colour is [r, g, b] or "
+            + "is OUTSIDE and zoom 1–2 magnifies what is inside)"
+            + obscureClause
+            + ". A colour is [r, g, b] or "
             + "[r, g, b, a], each 0–1; chroma's key is the one that takes no alpha."
         let audioPatchDescription =
             "Audio properties to merge. Keys: volume (0–4, 1 = unity), muted, fade_in, "
@@ -120,6 +134,37 @@ extension AgentServer {
         let clipPatchDescription: String =
             "name and/or label; a key set to null clears it. Labels are the marker colours: "
             + "\(labelNames.joined(separator: ", "))."
+        // `ripple_delete_ranges`' list of pairs and `add_zoom_action`'s
+        // region, hoisted out of the `catalog` literal for the same reason
+        // the patch descriptions above are: a nested schema written inline
+        // there is the kind of expression that tips the whole literal past
+        // the type checker's budget.
+        let rangesProperty: [String: Any] = [
+            "type": "array", "minItems": 1,
+            "items": [
+                "type": "array", "items": ["type": "integer"], "minItems": 2, "maxItems": 2,
+            ] as [String: Any],
+            "description": "The spans to cut, each a [from, to] pair \(ticks)",
+        ]
+        // `region` is nullable — null is the zoom BACK — and REQUIRED, which
+        // is the one place that distinction can be made: the op reads an
+        // absent argument and an explicit null the same way, so a forgotten
+        // rectangle would silently become the opposite edit.
+        let zoomRegionProperty: [String: Any] = [
+            "type": ["object", "null"],
+            "properties": [
+                "x": ["type": "number", "description": "The region's CENTRE, source px."],
+                "y": ["type": "number", "description": "The region's CENTRE, source px."],
+                "width": ["type": "number", "description": "Its width in source px."],
+                "height": ["type": "number", "description": "Its height in source px."],
+            ] as [String: Any],
+            "required": ["x", "y", "width", "height"],
+            "description": "The rectangle to zoom to, in SOURCE pixels: x and y are its "
+                + "CENTRE measured from the centre of the clip's cropped rect — the frame "
+                + "video.spotlight and video.obscure use — and width and height its size. "
+                + "null is a zoom BACK to the clip's own scale and position; the key is "
+                + "required so a forgotten rectangle cannot become that by accident.",
+        ]
         // `paste_attributes`'s group list, its enum read from the handler's
         // own list so the schema and the check cannot disagree.
         let groupsProperty: [String: Any] = [
@@ -448,6 +493,56 @@ extension AgentServer {
                     "to": ["type": "integer", "description": "Range end, \(ticks)"],
                 ], required: ["from", "to"]),
             tool(
+                "ripple_delete_ranges",
+                "Cuts SEVERAL time ranges out of the whole timeline as ONE edit — what Clip ▸ "
+                    + "Remove Silences… sends. Each pair is put in order (a reversed pair is "
+                    + "the same range), the pairs are then MERGED — overlapping and touching "
+                    + "alike — and the survivors are cut right to left exactly as "
+                    + "ripple_delete_range cuts one. So this is NOT the same as calling that "
+                    + "once per pair: two ranges that meet make one shift, not two. It is one "
+                    + "undo step however many ranges there are, which is the point. Markers do "
+                    + "not move, as under every ripple. An empty list, and a list that merges "
+                    + "to nothing, change nothing. detect_silence returns ranges in this shape.",
+                ["ranges": rangesProperty], required: ["ranges"]),
+            tool(
+                "detect_silence",
+                "Finds the quiet stretches of the timeline and REPORTS them, changing nothing "
+                    + "— the read half of Clip ▸ Remove Silences…, whose Remove button sends "
+                    + "the answer to ripple_delete_ranges. Quiet is measured IN THE MIX: each "
+                    + "10 ms of a clip's cached waveform times the audio envelope at that "
+                    + "moment, so volume, fades, ducking, mute and another track's solo all "
+                    + "count. A run quieter than threshold_db and at least min_length long is "
+                    + "a candidate; it then loses padding at each end, and its bounds snap "
+                    + "INWARD to the frame grid — which can leave a frame of room tone, where "
+                    + "outward would clip the attack of the next word. A moment no clip in "
+                    + "scope covers is not a candidate at all: a hole in the timeline is not "
+                    + "dead air. The result reports the scope it used, and names any media "
+                    + "whose waveform is still being analysed rather than counting it silent.",
+                [
+                    "clips": [
+                        "type": "array", "items": ["type": "integer"], "minItems": 1,
+                        "description": "Analyse only these clips — the sheet's Selected "
+                            + "clips scope. Omit to take the sheet's own opening rule: the "
+                            + "project's current selection when it holds anything with sound, "
+                            + "every audible clip otherwise. The result says which ran.",
+                    ],
+                    "threshold_db": [
+                        "type": "number", "maximum": 0,
+                        "description": "Quieter than this counts as silence, in dBFS in the "
+                            + "mix. Default -40.",
+                    ],
+                    "min_length": [
+                        "type": "integer",
+                        "description": "The shortest quiet run worth cutting, \(ticks) "
+                            + "Default 0.5 s (300000).",
+                    ],
+                    "padding": [
+                        "type": "integer",
+                        "description": "Left at each end of every candidate, \(ticks) "
+                            + "Default 0.1 s (60000).",
+                    ],
+                ]),
+            tool(
                 "lift_range",
                 "Cuts a time range out and LEAVES the hole — ⌫ with an in/out range and nothing "
                     + "selected. Every unlocked clip is split at both bounds and the middles "
@@ -748,6 +843,46 @@ extension AgentServer {
                         "description": "How long it runs \(ticks) Default 1 s (600000).",
                     ],
                 ], required: ["clip", "at"]),
+            tool(
+                "add_zoom_action",
+                "Adds an animation that zooms the picture to a rectangle — the screencast "
+                    + "zoom, and what the canvas's Z mode and the Video tab's Zoom to Region… "
+                    + "both send. Over `duration` starting at `at`, the clip's scale, x and y "
+                    + "ease to the values that bring `region` to the canvas: `fit` shows the "
+                    + "whole region, `fill` covers the whole canvas, both measured THROUGH the "
+                    + "clip's rotation. `region: null` is a zoom BACK — the end state is the "
+                    + "clip's own base scale, x and y. `at` is CLIP time, measured from the "
+                    + "clip's own start. Rotation and crop are read from the clip as it is at "
+                    + "`at`, and the scale is clamped to the layer maximum with the position "
+                    + "computed from the clamped value, so a region too small to fill the "
+                    + "canvas still lands centred. Refused when it would overlap another "
+                    + "action or run past the clip's end; an error on a clip with no picture. "
+                    + "The new action's id comes back as new_actions, and set_action_end adds "
+                    + "to what the same action animates.",
+                [
+                    "clip": clipProperty,
+                    "at": [
+                        "type": "integer",
+                        "description": "Where the zoom starts, in CLIP time, \(ticks)",
+                    ],
+                    "duration": [
+                        "type": "integer",
+                        "description": "How long it runs \(ticks) Default 1 s (600000).",
+                    ],
+                    "region": zoomRegionProperty,
+                    "fit": [
+                        "type": "string", "enum": ZoomFit.allCases.map { $0.rawValue },
+                        "description": "fit shows the whole region (the default); fill covers "
+                            + "the whole canvas, cropping whatever the region's shape does not "
+                            + "match.",
+                    ],
+                    "curve": [
+                        "type": "string", "enum": curveNames,
+                        "description": "How the zoom eases. Default ease_in_out, not linear: "
+                            + "a zoom that starts and stops abruptly is the thing this exists "
+                            + "to avoid.",
+                    ],
+                ], required: ["clip", "at", "region"]),
             tool(
                 "set_action",
                 "Moves or re-times an action, or changes its easing curve. Same overlap checks "

@@ -24,6 +24,7 @@ pub mod edit_paste;
 pub mod edit_props;
 pub mod edit_time;
 pub mod edit_track;
+pub mod edit_zoom;
 pub mod evaluate;
 pub mod export;
 pub mod export_size;
@@ -35,6 +36,7 @@ pub mod format;
 pub mod model;
 pub mod model_props;
 pub mod model_query;
+pub mod model_regions;
 pub mod nest;
 pub mod props_check;
 pub mod recipe;
@@ -52,9 +54,10 @@ pub use crate::format::{
 };
 pub use crate::model::{
     Action, AudioProps, Backdrop, Canvas, Chroma, Clip, Color, ColorAdjust, Compressor, Crop,
-    Curve, Duck, Enabled, Filter, FilterKind, Marker, Media, MediaKind, Nest, Outline, Project,
-    Reflection, Shadow, ShapeKind, ShapeProps, Source, SpotShape, Spotlight, Stroke, TextAlign,
-    TextProps, TextVAlign, Track, Transition, TransitionKind, VideoProps, MAX_FILTERS,
+    Curve, Duck, Enabled, Filter, FilterKind, Marker, Media, MediaKind, Nest, ObscureKind,
+    ObscureRegion, Outline, Project, Reflection, Shadow, ShapeKind, ShapeProps, Source, SpotShape,
+    Spotlight, Stroke, TextAlign, TextProps, TextVAlign, Track, Transition, TransitionKind,
+    VideoProps, MAX_FILTERS, MAX_OBSCURE,
 };
 pub use crate::time::{Fps, Ticks, TIMESCALE};
 pub use crate::transition::Overlap;

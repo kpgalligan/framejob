@@ -27,7 +27,21 @@ use crate::model::{Canvas, Project};
 /// `None`, `false` — so a version-2 file reads unchanged and no migration
 /// step exists for it; the bump is there so a version-2 build refuses a
 /// file whose names and labels it would otherwise silently drop.
-pub const RC_FORMAT_VERSION: u32 = 3;
+///
+/// Version 4 is hidden regions (road map 2, phase 3c):
+/// [`crate::model::VideoProps::obscure`], a list of at most
+/// [`crate::model::MAX_OBSCURE`] rectangles or ellipses each hiding what is
+/// under it behind a blur or a pixelation. The list carries a serde default
+/// — the empty one — so a version-3 file reads unchanged and there is again
+/// no migration step; the bump is there for version 3's reason exactly,
+/// that unknown keys are ignored at every level by design (`model.rs`'s
+/// module doc), so without the version gate a version-3 build would open a
+/// version-4 file, drop every region on read, and write the loss back over
+/// the original on the next save. Nothing else phase 3 added persists a new
+/// key: `ripple_delete_ranges` only removes time, and `add_zoom_action`
+/// writes an ordinary [`crate::model::Action`] whose `end` patch is schema
+/// that already existed.
+pub const RC_FORMAT_VERSION: u32 = 4;
 
 /// Reader caps, mirrored by the `RC_MAX_*` defines in the C header. They
 /// exist so a corrupt or generated file cannot make the app allocate
@@ -201,8 +215,9 @@ pub fn read(json: &str) -> Result<Project, String> {
 
     // MIGRATION HOOK. Each bump adds one step here, applied in order from
     // `version` up to RC_FORMAT_VERSION, rewriting `value` in place before
-    // it is deserialized. Version 3 needed no rewrite, so it has no line;
-    // the next version that does adds its own below.
+    // it is deserialized. Versions 3 and 4 needed no rewrite — every field
+    // either added carries a serde default — so neither has a line; the
+    // next version that changes a field's SHAPE adds its own below.
     if version < 2 {
         migrate_1_to_2(&mut value);
     }

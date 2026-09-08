@@ -13,11 +13,27 @@ lockstep are in the root `CLAUDE.md`; the full design is
   its tracks, clips, sources, actions, markers and nests.
 - `model_props.rs` — the schema's VOCABULARY: the §5.2 per-clip property
   types (`VideoProps`, `Crop`, `Shadow`, `ColorAdjust`, `Chroma`,
-  `Filter`, `Reflection`, `Spotlight`, `AudioProps`, `Compressor`, `Duck`,
-  `TextProps`, `Outline`, `Backdrop`, `ShapeProps`, `Stroke` and their
-  enums) with their defaults. Re-exported whole by `model.rs`, so every
-  `crate::model::X` path and the `lib.rs` re-exports are unchanged; it is a
-  separate file because of the size rule, not a separate concern.
+  `Filter`, `Reflection`, `AudioProps`, `Compressor`, `Duck`, `TextProps`,
+  `Outline`, `Backdrop`, `ShapeProps`, `Stroke` and their enums) with their
+  defaults. Re-exported whole by `model.rs`, so every `crate::model::X`
+  path and the `lib.rs` re-exports are unchanged; it is a separate file
+  because of the size rule, not a separate concern.
+- `model_regions.rs` — the boxes drawn ON the picture: `Spotlight`,
+  `ObscureRegion`, the `SpotShape` both are drawn with and the
+  `MAX_OBSCURE` budget on the second. Cut out of `model_props.rs` in road
+  map 2's phase 3c, when `video.obscure` took that file to 633 lines, and
+  cut HERE because these are one concern and not three adjacent ones: they
+  share one coordinate frame — `x`/`y` the region's CENTRE, as an offset in
+  SOURCE pixels from the centre of the layer's CROPPED rect, `width`/
+  `height` its size in the same pixels, which is what makes a region ride
+  with its layer through scale, move and rotation — and one shape enum,
+  reused rather than copied because shared vocabulary has one home.
+  `edit_zoom.rs` calls that frame Q and writes the equation out; nothing
+  else repeats it. Re-exported whole by `model_props.rs`, which `model.rs`
+  re-exports whole in turn, so `crate::model::Spotlight` and every other
+  path is unchanged. The FIELDS that hold these values
+  (`VideoProps.spotlight`, `VideoProps.obscure`) stay with the video group
+  in `model_props.rs`.
 - `model_query.rs` — reading a project: `Project::new`, id allocation, the
   `clip`/`track`/`media`/`marker`/`nest` lookups, `clips_on`,
   `is_missing_media`, `duration`, `validate` with its nesting walk, and the
@@ -33,8 +49,10 @@ lockstep are in the root `CLAUDE.md`; the full design is
   §6 ops in `impl Project` blocks: clip placement; the five property
   patches (the four groups, and `set_clip` for the clip's own name and
   label) and `Group`, the vocabulary the patches and `paste_attributes`
-  share; tracks, markers, canvas, media; ripple, insert time, range delete,
-  freeze frame.
+  share; tracks, markers, canvas, media; ripple, insert time, range delete
+  (one range or several — `ripple_delete_ranges` merges its pairs and cuts
+  right to left as ONE edit, and the singular delegates to it), freeze
+  frame.
 - `props_check.rs` — the range checks every value written into a property
   group passes first: `check_video` / `check_audio` / `check_text` /
   `check_shape`, the `finite` / `in_range` family they are built from, and
@@ -65,8 +83,36 @@ lockstep are in the root `CLAUDE.md`; the full design is
   (Spec §7.10's table is the same list. Each of these was split out of
   `edit_clip.rs` under the "a new concern is a new module" rule, which is
   also how `edit_props.rs` came about; `edit_clip.rs` was 1736 lines and is
-  still ~1220 — see "Modules and size" below.)
-- `actions.rs` — action evaluation and interpolation; `clip_state`.
+  still 1226 — see "Modules and size" below.)
+- `edit_zoom.rs` — `add_zoom_action`, the screencast zoom (road map 2,
+  phase 3b): the one op whose substance is GEOMETRY rather than
+  bookkeeping, which is why it is not a fifth function in
+  `edit_action.rs`. **Its module doc IS the placement equation** — the two
+  frames it works between (Q, `model_regions.rs`'s source pixels from the
+  cropped rect's centre; C, canvas pixels) and the solve that turns a
+  rectangle drawn on the picture into the `scale`/`x`/`y` an action's end
+  patch carries, rotation and crop included. The op composes `add_action` +
+  `set_action` + `set_action_end` so a drag is one undo step and every
+  refusal `add_action` documents is inherited rather than re-copied; the
+  canvas band, the inspector's button and the MCP tool all reach the same
+  arithmetic here rather than deriving it three times.
+- `actions.rs` — action evaluation and interpolation; `clip_state`; and
+  `clamp_video`, the evaluator's last line of defence, which bounds every
+  value an end patch can carry (`set_action_end` is deliberately lenient,
+  so this is the only thing between a hand-written project file and the
+  uniform block). The LIST rule lives here too and is stated once as the
+  CRATE's rather than one list's: an end patch interpolates a list per
+  index when the lengths match and each pair of entries agrees on its
+  discrete fields, and switches at the end otherwise. `video.filters` and
+  `video.obscure` are both governed by it and neither carries a line of its
+  own code. The widened discriminant set (`ENTRY_DISCRIMINANTS`, `kind`
+  and `shape`) is confined to list ENTRIES — in a list an entry's only
+  identity is its index, so a changed `shape` gives no way to tell a
+  reshaped region from a replaced one, while `video.spotlight` is one named
+  object whose `shape` is a property of it. Widening the object rule too
+  would have frozen the geometry of every spotlight animation: a silent
+  change to shipped behaviour, which `core/tests/schema_v2.rs` now pins
+  against.
 - `transition.rs` — overlap detection, the overlap rule, progress at *t*.
 - `evaluate.rs` — `composition_plan()` (A/B assignment, instruction
   tiling) and the `assign()` the recipe shares with it.
@@ -107,23 +153,38 @@ lockstep are in the root `CLAUDE.md`; the full design is
 banner section is the signal to split. Every module keeps a `//!` doc;
 numeric/algorithmic choices get prose "why" comments.
 
-Two modules are over the cap today and are known debt, not licence:
-`edit_clip.rs` (~1225 — the placement ops are one concern and every further
-cut fragments it; the action ops were the M3 cut, into `edit_action.rs`) and
-`edit_track.rs` (674 — tracks, markers, canvas and media, four small
-concerns in one block). Do not add to either without taking something out:
-a new placement op goes in a new module (`edit_edge.rs`, `edit_insert.rs`),
-and the next cut in `edit_track.rs` is `set_canvas` with its `rescale` /
-`resnap` / `check_dimension` helpers into an `edit_canvas.rs`. Two more
-sit at the line and take nothing without a cut of their own: `edit.rs`
-(691, a module doc that IS the op table and grows a row per op) and
-`edit_paste.rs` (600). `model.rs` is OFF the list: it came DOWN from 1330
-to 940 when the lookups and `validate` moved to `model_query.rs`, and to
-462 in road map 2's phase 2 when the §5.2 property types moved to
-`model_props.rs` (531); `edit_props.rs` came back under the cap in the
-same phase when its range checks moved to `props_check.rs`; `evaluate.rs`
-came off the list the same way, its recipe half moving to `recipe.rs` and
-the nest walk to `nest.rs`.
+Three modules are over the cap today and are known debt, not licence:
+`edit_clip.rs` (1226 — the placement ops are one concern and every further
+cut fragments it; the action ops were the M3 cut, into `edit_action.rs`),
+`edit.rs` (730 — a module doc that IS the op table and grows a row per op,
+which is what took it over in phase 3) and `edit_track.rs` (674 — tracks,
+markers, canvas and media, four small concerns in one block). Do not add to
+any of them without taking something out: a new placement op goes in a new
+module (`edit_edge.rs`, `edit_insert.rs`), a new op with a concern of its
+own goes in one too (`edit_zoom.rs` was phase 3's), and the next cut in
+`edit_track.rs` is `set_canvas` with its `rescale` / `resnap` /
+`check_dimension` helpers into an `edit_canvas.rs`. One more sits exactly
+at the line and takes nothing without a cut of its own: `edit_paste.rs`
+(600).
+
+Phase 3's other growth stayed comfortably under: `actions.rs` is 552 (the
+list rule and `clamp_video`'s region block), `edit_time.rs` 526
+(`ripple_delete_ranges`, which the singular now delegates to rather than
+duplicating), and `edit_zoom.rs` 390 — the new module the geometry went
+into rather than a fifth function in `edit_action.rs`. Those three are the
+files to weigh a phase-4 or phase-6 addition against next.
+
+`model.rs` is OFF the list: it came DOWN from 1330 to 940 when the lookups
+and `validate` moved to `model_query.rs` (454), and to 462 in road map 2's
+phase 2 when the §5.2 property types moved to `model_props.rs`;
+`edit_props.rs` (394) came back under the cap in the same phase when its
+range checks moved to `props_check.rs` (294); `evaluate.rs` (588) came off
+the list the same way, its recipe half moving to `recipe.rs` and the nest
+walk to `nest.rs`. `model_props.rs` then paid the rule itself: 531 at the
+phase-2 cut, 633 once phase 3c added `video.obscure`'s types, and 498 once
+the region vocabulary went out to `model_regions.rs` (218) — a file over
+the cap gives something up BEFORE it takes anything on, and phases 4 and 6
+both add properties to it.
 
 **One implementation per algorithm.** Before writing time math, find the
 existing implementation and route through it. Shared constants have exactly
@@ -154,10 +215,11 @@ Export names mirror the Rust method exactly.
 **Format changes.** Any change to persisted project state bumps
 `RC_FORMAT_VERSION` in `format.rs` **and** the `#define` in
 `core/include/reelcut_core.h`; the reader must keep accepting every prior
-version; the writer enforces the reader's caps. The version is 3. A bump
+version; the writer enforces the reader's caps. The version is 4. A bump
 whose new fields all carry a serde default needs no migrate step —
-version 3 (a clip's `name` and `label`, a track's `solo`) has none, and
-`format.rs`'s MIGRATION HOOK comment says so — but it still bumps, so an
+version 3 (a clip's `name` and `label`, a track's `solo`) and version 4
+(`video.obscure`, the hidden regions of phase 3c) have none, and
+`format.rs`'s MIGRATION HOOK comment says so — but they still bump, so an
 older build refuses a file whose fields it would otherwise silently drop;
 a bump that changes a field's SHAPE adds a step there (`migrate_1_to_2`).
 Either way a `schema_vN.rs` test opens the previous versions' fixtures

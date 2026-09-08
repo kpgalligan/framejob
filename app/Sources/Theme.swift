@@ -67,6 +67,12 @@ enum DS {
     static var snapGuide: NSColor { butter }
     /// The in/out range wash over the ruler and the lanes.
     static var timelineRangeShade: NSColor { coral.withAlphaComponent(0.12) }
+    /// Remove Silences' candidate spans, shaded the same way while the sheet
+    /// is up. The same ink at roughly double the wash, because an in/out range
+    /// and a candidate span can overlap: one constant for both would leave the
+    /// user looking at a single tint with no way to tell which is which, or
+    /// how many spans are under it.
+    static var timelineCandidateShade: NSColor { coral.withAlphaComponent(0.24) }
 
     // MARK: - Type
 

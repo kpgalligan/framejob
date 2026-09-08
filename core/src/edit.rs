@@ -58,6 +58,7 @@
 //! | `delete` | `clips: [u32]` | Removes the clips; the gaps stay. |
 //! | `ripple_delete` | `clips: [u32]` | Removes, then closes each removed span across every unlocked track. Markers do not move. |
 //! | `ripple_delete_range` | `from: ticks, to: ticks` | Splits every unlocked clip at both bounds, removes the middles, then closes the hole. A reversed range is the same range. |
+//! | `ripple_delete_ranges` | `ranges: [[from, to], …]` | Several ranges as one edit — the silence cut. Each pair is snapped, clamped and ordered as `ripple_delete_range`'s one is, the pairs are then MERGED (touching as well as overlapping) and the survivors cut and closed right to left, so the op is merge-then-cut and not N `ripple_delete_range`s. Markers do not move. An empty list, and one that merges to nothing, change nothing. |
 //! | `lift_range` | `from: ticks, to: ticks` | `ripple_delete_range` without the close: every unlocked clip is split at both bounds and the middles removed, and nothing moves. A reversed range is the same range. |
 //! | `insert_time` | `at: ticks, length: ticks` | Opens a hole: every unlocked clip, and every marker, at or after `at` moves right by `length`. |
 //! | `close_gap` | `track: u32, at: ticks` | Closes the empty span on `track` that contains `at`, bounded by the nearest clip edges there: everything from its far side shifts left by its length, across every unlocked track. Refuses on a locked `track`, on an `at` that is on a clip, with no clip after the gap, and when the shift would break the overlap rule — a gap closes fully or not at all. |
@@ -88,11 +89,14 @@
 //! | Op | Arguments | Semantics |
 //! |---|---|---|
 //! | `add_action` | `clip: u32, at: ticks, duration?: ticks = 1 s` | A new action at CLIP time `at` (the caller subtracts `clip.start`), end patch empty. Refuses when it would overlap another action or run past the clip. |
+//! | `add_zoom_action` | `clip: u32, at: ticks, duration?: ticks = 1 s, region?: {x, y, width, height} \| null, fit?: fit \| fill = fit, curve?: curve = ease_in_out` | An `add_action` whose end patch is the `scale`, `x` and `y` that bring `region` to the canvas — the screencast zoom. `region`'s `x`/`y` are its **CENTRE** and `width`/`height` its size, both SOURCE pixels from the centre of the clip's cropped rect (the spotlight's frame); `fit` shows the whole region, `fill` covers the whole canvas, both measured THROUGH the clip's rotation. Rotation and crop are read from the clip evaluated at `at`; the scale clamps to the layer maximum and the offsets follow the CLAMPED value, so a region too small to fill the canvas still lands centred. `region` absent or `null` is a zoom BACK: the end patch is the clip's base `scale`, `x`, `y`. Same refusals as `add_action`; a clip with no video properties is an `Err`. |
 //! | `set_action` | `clip: u32, action: u32, start?: ticks, duration?: ticks, curve?: curve` | Retimes or re-curves one action; omitted fields keep their value, same overlap checks. |
 //! | `set_action_end` | `clip: u32, action: u32, patch: object` | Merges into the action's `end` patch; a key set to `null` is removed from it. |
 //! | `remove_action` | `clip: u32, action: u32` | |
 //!
-//! `curve` is one of `linear`, `ease_in`, `ease_out`, `ease_in_out`.
+//! `curve` is one of `linear`, `ease_in`, `ease_out`, `ease_in_out`. The
+//! placement equation `add_zoom_action` solves, and the two limits it
+//! carries, are `edit_zoom.rs`'s module doc.
 //!
 //! ### Tracks, markers, canvas, media
 //!
@@ -141,6 +145,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::edit_props::Group;
+use crate::edit_zoom::{ZoomFit, ZoomRegion};
 use crate::export::describe;
 use crate::model::{Color, Curve, Project, TransitionKind};
 use crate::time::{Fps, Ticks};
@@ -150,7 +155,7 @@ use crate::time::{Fps, Ticks};
 /// Kept next to [`Op`] so a mistyped op can be answered with the list
 /// instead of a bare parse error — models and users both mistype op names,
 /// and the alternative is a serde message written in variant-speak.
-pub const OP_NAMES: [&str; 51] = [
+pub const OP_NAMES: [&str; 53] = [
     "add_clip",
     "add_text_clip",
     "add_shape_clip",
@@ -166,6 +171,7 @@ pub const OP_NAMES: [&str; 51] = [
     "delete",
     "ripple_delete",
     "ripple_delete_range",
+    "ripple_delete_ranges",
     "lift_range",
     "insert_time",
     "close_gap",
@@ -187,6 +193,7 @@ pub const OP_NAMES: [&str; 51] = [
     "set_transition",
     "set_transition_duration",
     "add_action",
+    "add_zoom_action",
     "set_action",
     "set_action_end",
     "remove_action",
@@ -283,6 +290,12 @@ pub enum Op {
     RippleDeleteRange {
         from: Ticks,
         to: Ticks,
+    },
+    /// `[from, to]` pairs rather than objects — the spelling `Color` and
+    /// `Fps` already use for a fixed-shape array, and the one serde refuses
+    /// at any other length rather than reading a stray third number.
+    RippleDeleteRanges {
+        ranges: Vec<[Ticks; 2]>,
     },
     LiftRange {
         from: Ticks,
@@ -392,6 +405,23 @@ pub enum Op {
         at: Ticks,
         #[serde(default)]
         duration: Option<Ticks>,
+    },
+    /// The zoom's arguments are `add_action`'s plus the region it lands
+    /// on. `region` is `Option` with a serde default so that an absent key
+    /// and an explicit `null` mean the same thing — the envelope's rule —
+    /// and here they mean a zoom BACK; a caller that wants an absent region
+    /// REFUSED (the MCP tool does) says so in its own schema.
+    AddZoomAction {
+        clip: u32,
+        at: Ticks,
+        #[serde(default)]
+        duration: Option<Ticks>,
+        #[serde(default)]
+        region: Option<ZoomRegion>,
+        #[serde(default)]
+        fit: Option<ZoomFit>,
+        #[serde(default)]
+        curve: Option<Curve>,
     },
     SetAction {
         clip: u32,
@@ -588,6 +618,7 @@ impl Project {
             Op::Delete { clips } => self.delete_clips(clips),
             Op::RippleDelete { clips } => self.ripple_delete(clips),
             Op::RippleDeleteRange { from, to } => self.ripple_delete_range(*from, *to),
+            Op::RippleDeleteRanges { ranges } => self.ripple_delete_ranges(ranges),
             Op::LiftRange { from, to } => self.lift_range(*from, *to),
             Op::InsertTime { at, length } => self.insert_time(*at, *length),
             Op::CloseGap { track, at } => self.close_gap(*track, *at),
@@ -621,6 +652,14 @@ impl Project {
 
             // ---- actions -------------------------------------------------
             Op::AddAction { clip, at, duration } => self.add_action(*clip, *at, *duration),
+            Op::AddZoomAction {
+                clip,
+                at,
+                duration,
+                region,
+                fit,
+                curve,
+            } => self.add_zoom_action(*clip, *at, *duration, *region, *fit, *curve),
             Op::SetAction {
                 clip,
                 action,

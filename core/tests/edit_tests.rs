@@ -471,6 +471,22 @@ fn placement(project: &Value, clip: u64) -> (i64, i64) {
     (int(found, "/start"), int(found, "/duration"))
 }
 
+/// Every clip on one track as `(start, duration)`, ascending.
+///
+/// A cut that splits mints ids no test should name — the numbers depend on
+/// the order the split walked the array in, which is not part of any op's
+/// contract — so a lane a range op reshaped is compared as the sequence of
+/// placements it left, which is.
+fn lane(project: &Value, track: i64) -> Vec<(i64, i64)> {
+    let mut found: Vec<(i64, i64)> = array(project, "/clips")
+        .iter()
+        .filter(|c| int(c, "/track") == track)
+        .map(|c| (int(c, "/start"), int(c, "/duration")))
+        .collect();
+    found.sort_unstable();
+    found
+}
+
 /// The source in point of a media clip.
 fn source_in(project: &Value, clip: u64) -> i64 {
     int(by_id(project, "/clips", clip), "/source/in")
@@ -587,6 +603,8 @@ fn op_table() -> Vec<Value> {
         json!({"op": "delete", "clips": [40]}),
         json!({"op": "ripple_delete", "clips": [10]}),
         json!({"op": "ripple_delete_range", "from": 1200000, "to": 2400000}),
+        json!({"op": "ripple_delete_ranges",
+               "ranges": [[1200000, 1800000], [2400000, 3000000]]}),
         json!({"op": "lift_range", "from": 1200000, "to": 2400000}),
         json!({"op": "insert_time", "at": 0, "length": 600000}),
         json!({"op": "close_gap", "track": 6, "at": 3600000}),
@@ -617,6 +635,11 @@ fn op_table() -> Vec<Value> {
         json!({"op": "set_transition", "clip": 10, "kind": "wipe"}),
         json!({"op": "set_transition_duration", "clip": 40, "duration": 600000}),
         json!({"op": "add_action", "clip": 20, "at": 0, "duration": 600000}),
+        // Clip 10's own action runs 1 200 000 – 1 800 000, so this one sits
+        // clear of it; the region is a quarter of the 1920×1080 source,
+        // centred, which `fit` answers with a scale of 3.
+        json!({"op": "add_zoom_action", "clip": 10, "at": 3000000,
+               "region": {"x": 0.0, "y": 0.0, "width": 640.0, "height": 360.0}}),
         json!({"op": "set_action", "clip": 10, "action": 11, "curve": "linear"}),
         json!({"op": "set_action_end", "clip": 10, "action": 11,
                "patch": {"video": {"opacity": 0.2}}}),
@@ -1090,6 +1113,203 @@ fn ripple_delete_range_splits_every_unlocked_clip_it_straddles() {
     );
     // An empty range changes nothing.
     project.refuses(&json!({"op": "ripple_delete_range", "from": 2400000, "to": 2400000}));
+}
+
+#[test]
+fn ripple_delete_ranges_cuts_right_to_left_like_the_singular_op() {
+    let project = range_project();
+    let before = project.value();
+    // Two disjoint, non-touching ranges — 2 s – 3 s and 8 s – 9 s — so the
+    // merge has nothing to do and the plural op does exactly the work the
+    // singular op does twice.
+    let plural = project.apply(&json!({"op": "ripple_delete_ranges",
+                                       "ranges": [[1200000, 1800000], [4800000, 5400000]]}));
+
+    // The oracle: the two singular ops, LATER RANGE FIRST, because closing
+    // an earlier hole moves the clips a later hole's bounds were measured
+    // against. Whole documents, so ids and `next_id` are part of the claim.
+    let singly = project.apply_all(&[
+        json!({"op": "ripple_delete_range", "from": 4800000, "to": 5400000}),
+        json!({"op": "ripple_delete_range", "from": 1200000, "to": 1800000}),
+    ]);
+    assert_eq!(plural.to_json(), singly.to_json());
+
+    // The same two singular ops the other way round are a DIFFERENT
+    // document, which is what makes the comparison above a claim about the
+    // order rather than about two ranges that happen to commute.
+    let wrong_way = project.apply_all(&[
+        json!({"op": "ripple_delete_range", "from": 1200000, "to": 1800000}),
+        json!({"op": "ripple_delete_range", "from": 4800000, "to": 5400000}),
+    ]);
+    assert_ne!(plural.to_json(), wrong_way.to_json());
+
+    // Hand-computed from the fixture. Clip 10 (0 – 6 s) loses 2 s – 3 s and
+    // its tail slides left by one second; clip 11 (8 s – 10 s) loses its
+    // first second and what is left slides left by both; clip 30
+    // (5 s – 12 s) is cut in two by the later range, its head sliding left
+    // by one second and its tail by two.
+    let after = plural.value();
+    assert_eq!(
+        lane(&after, 2),
+        vec![(0, 1_200_000), (1_200_000, 1_800_000), (4_200_000, 600_000)],
+    );
+    assert_eq!(
+        lane(&after, 4),
+        vec![(2_400_000, 1_800_000), (4_200_000, 1_800_000)],
+    );
+    // Two seconds came out, so the project is two seconds shorter.
+    assert_eq!(plural.duration(), project.duration() - 1_200_000);
+
+    // The locked track is untouched in both directions: neither cut by a
+    // range that covers it nor moved by a shift that passed under it.
+    assert_eq!(lane(&after, 3), lane(&before, 3));
+    assert_eq!(by_id(&after, "/clips", 20), by_id(&before, "/clips", 20));
+
+    // Markers do not move, exactly as they do not for the singular op.
+    assert_eq!(int(by_id(&after, "/markers", 40), "/time"), 3_000_000);
+}
+
+#[test]
+fn ripple_delete_ranges_merges_overlapping_and_touching_pairs() {
+    let project = range_project();
+    // The range the singular op's test above uses, reached three ways.
+    let merged = project.apply(&json!({"op": "ripple_delete_range",
+                                       "from": 2400000, "to": 4200000}));
+    let one = merged.to_json();
+
+    // Overlapping: 4 s – 6 s and 5 s – 7 s.
+    assert_eq!(
+        project
+            .apply(&json!({"op": "ripple_delete_ranges",
+                           "ranges": [[2400000, 3600000], [3000000, 4200000]]}))
+            .to_json(),
+        one,
+    );
+    // Touching: 4 s – 5 s and 5 s – 7 s. Two quiet spans that meet leave one
+    // hole, and there is no cut at 5 s in the answer.
+    assert_eq!(
+        project
+            .apply(&json!({"op": "ripple_delete_ranges",
+                           "ranges": [[2400000, 3000000], [3000000, 4200000]]}))
+            .to_json(),
+        one,
+    );
+    // Out of order and duplicated: the merge sorts and collapses both.
+    assert_eq!(
+        project
+            .apply(&json!({"op": "ripple_delete_ranges",
+                           "ranges": [[3000000, 4200000], [2400000, 3600000],
+                                      [2400000, 3600000]]}))
+            .to_json(),
+        one,
+    );
+
+    // The same touching pair cut as two singular ops is NOT that document,
+    // which is what makes the merge a behaviour and not a tidy-up: the
+    // second cut splits at 5 s, mints a fragment and removes it again, so
+    // the placements come out the same and `next_id` comes out one higher.
+    // That burnt id is the whole visible difference, and it is why the op
+    // is defined as merge-then-cut rather than as N singular ops.
+    let singly = project
+        .apply_all(&[
+            json!({"op": "ripple_delete_range", "from": 3000000, "to": 4200000}),
+            json!({"op": "ripple_delete_range", "from": 2400000, "to": 3000000}),
+        ])
+        .value();
+    let once = merged.value();
+    assert_ne!(singly, once);
+    for track in [2, 4] {
+        assert_eq!(lane(&singly, track), lane(&once, track));
+    }
+    assert_eq!(int(&singly, "/next_id"), int(&once, "/next_id") + 1);
+}
+
+#[test]
+fn ripple_delete_ranges_orders_clamps_and_snaps_every_pair_first() {
+    let project = range_project();
+    let one = project
+        .apply(&json!({"op": "ripple_delete_range", "from": 2400000, "to": 4200000}))
+        .to_json();
+
+    // A list of one IS the singular op, byte for byte.
+    assert_eq!(
+        project
+            .apply(&json!({"op": "ripple_delete_ranges", "ranges": [[2400000, 4200000]]}))
+            .to_json(),
+        one,
+    );
+    // A reversed pair is the same range, as a reversed drag is.
+    assert_eq!(
+        project
+            .apply(&json!({"op": "ripple_delete_ranges", "ranges": [[4200000, 2400000]]}))
+            .to_json(),
+        one,
+    );
+    // A negative bound clamps to 0 rather than erroring — a project time,
+    // not a length (the envelope's rule).
+    assert_eq!(
+        project
+            .apply(&json!({"op": "ripple_delete_ranges", "ranges": [[-1200000, 1200000]]}))
+            .to_json(),
+        project
+            .apply(&json!({"op": "ripple_delete_range", "from": 0, "to": 1200000}))
+            .to_json(),
+    );
+    // Snapped BEFORE merging: one frame at 30 fps is 20 000 ticks, so these
+    // two pairs land on 4 s – 5 s and 5 s – 7 s and merge. Merging first
+    // would leave them five ticks apart and cut twice.
+    assert_eq!(
+        project
+            .apply(&json!({"op": "ripple_delete_ranges",
+                           "ranges": [[2400001, 3000000], [3000005, 4200000]]}))
+            .to_json(),
+        one,
+    );
+}
+
+#[test]
+fn ripple_delete_ranges_with_nothing_to_cut_changes_nothing() {
+    let project = range_project();
+    // An empty list is "nothing to do", not a malformed argument: the
+    // answer that registers no undo step, as an empty selection does for
+    // `ripple_delete`.
+    project.refuses(&json!({"op": "ripple_delete_ranges", "ranges": []}));
+    // Every pair empty — the last one only after snapping puts both of its
+    // bounds on the same frame.
+    project.refuses(&json!({"op": "ripple_delete_ranges",
+                            "ranges": [[2400000, 2400000], [1200000, 1200000],
+                                       [3000001, 2999999]]}));
+    // A range past everything: nothing to split, nothing to remove and no
+    // clip beyond it to shift.
+    project.refuses(&json!({"op": "ripple_delete_ranges", "ranges": [[7200000, 8400000]]}));
+    // Mixed, and the dead range costs one no-op pass and nothing else — not
+    // even an id.
+    assert_eq!(
+        project
+            .apply(&json!({"op": "ripple_delete_ranges",
+                           "ranges": [[2400000, 4200000], [7200000, 8400000]]}))
+            .to_json(),
+        project
+            .apply(&json!({"op": "ripple_delete_range", "from": 2400000, "to": 4200000}))
+            .to_json(),
+    );
+}
+
+#[test]
+fn ripple_delete_ranges_takes_pairs_and_only_pairs() {
+    let project = range_project();
+    // A fixed-shape array, the spelling `Color` and `Fps` already use: a
+    // pair of any other length is refused rather than read short or long.
+    for (wrong, length) in [(json!([[2400000]]), 1), (json!([[0, 1200000, 2400000]]), 3)] {
+        let msg = project.errors(&json!({"op": "ripple_delete_ranges", "ranges": wrong}));
+        assert_contains(&msg, "op \"ripple_delete_ranges\" is not valid");
+        assert_contains(&msg, &format!("invalid length {length}"));
+    }
+    // And the list itself is required — there is no "no ranges" default.
+    assert_contains(
+        &project.errors(&json!({"op": "ripple_delete_ranges"})),
+        "missing field `ranges`",
+    );
 }
 
 #[test]

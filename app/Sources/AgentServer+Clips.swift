@@ -19,7 +19,7 @@ extension AgentServer {
     /// edit it did not.
     static let videoPatchKeys: Set<String> = [
         "x", "y", "scale", "rotation", "opacity", "crop", "corner_radius", "shadow", "color",
-        "chroma", "filters", "reflection", "spotlight",
+        "chroma", "filters", "reflection", "spotlight", "obscure",
     ]
     static let audioPatchKeys: Set<String> = [
         "volume", "muted", "fade_in", "fade_out", "duck", "mono", "keep_pitch", "pan",
@@ -270,6 +270,37 @@ extension AgentServer {
             document, "Ripple Delete", [.rippleDeleteRange(from: from, to: to)])
     }
 
+    /// `ripple_delete_ranges` — the commit of Clip ▸ Remove Silences…
+    /// (`SilenceSheetController`), which is where a caller gets forty cuts
+    /// to make and needs them to be one undo step. Its undo name is that
+    /// sheet's, "Remove Silences", on this path and on the menu's alike, so
+    /// one assertion covers both.
+    ///
+    /// It is NOT N `ripple_delete_range` calls: the core merges the pairs —
+    /// touching as well as overlapping — and cuts the survivors right to
+    /// left, so two ranges that meet make one shift rather than two. The
+    /// ranges are read exactly as any other time is, snapped to the frame
+    /// grid, and a reversed pair is the same range.
+    ///
+    /// `detect_silence` produces the list this takes; nothing stops a caller
+    /// writing its own.
+    func rippleDeleteRanges(_ a: [String: Any]) throws -> String {
+        let document = try target(a)
+        guard let ranges = try rangesArg(a, "ranges", document) else {
+            throw ToolError(
+                message: "Missing required argument: ranges (an array of [from, to] pairs, "
+                    + "each a time in ticks). detect_silence returns them in this shape.")
+        }
+        // An empty list is `Ok(None)` in the core — "nothing to do" — which
+        // `performGroupedEdit` would report as the overlap-rule refusal.
+        // Naming it here says the true thing.
+        guard !ranges.isEmpty else {
+            throw ToolError(message: "ranges is empty — name at least one [from, to] pair.")
+        }
+        return try editResult(
+            document, "Remove Silences", [.rippleDeleteRanges(ranges: ranges)])
+    }
+
     /// `lift_range` — ⌫ with an in/out range and NOTHING selected
     /// (`deleteSelection`), the counterpart of `ripple_delete_range`'s ⌘⌫.
     func liftRange(_ a: [String: Any]) throws -> String {
@@ -487,16 +518,17 @@ extension AgentServer {
         return try editResult(document, "Video Properties", [.setVideo(clips: clips, patch: patch)])
     }
 
-    /// The two string ENUMS a video patch can carry, checked by hand.
+    /// The four string ENUMS a video patch can carry, checked by hand.
     ///
     /// `patchArg`'s round-trip test catches a value the patch could not read,
     /// but only at the top level, and its own doc says why it cannot recurse:
     /// one level down every field has a real default, so a value that decoded
     /// TO that default is indistinguishable from a value that was absent.
-    /// `filters[].kind` and `spotlight.shape` are exactly that case and the
-    /// worst version of it — `ProjectSnapshot` decodes both leniently, on
-    /// purpose, so that a file naming a filter this build has never heard of
-    /// still opens rather than blanking the whole project. The cost is that
+    /// `filters[].kind`, `spotlight.shape` and an obscure region's `shape`
+    /// and `kind` are exactly that case and the worst version of it —
+    /// `ProjectSnapshot` decodes all four leniently, on purpose, so that a
+    /// file naming a filter this build has never heard of still opens rather
+    /// than blanking the whole project. The cost is that
     /// `{"kind": "glow"}` reaches the core as `blur`: not a nuance dropped but
     /// a DIFFERENT filter applied, and the caller told it worked (measured).
     ///
@@ -520,6 +552,31 @@ extension AgentServer {
                 throw ToolError(
                     message: "\(path).spotlight.shape is not a shape — it must be one of "
                         + known.joined(separator: ", ") + ".")
+            }
+        }
+        // An obscure region carries BOTH closed vocabularies, and both decode
+        // leniently: an unknown `shape` reads as a rectangle and an unknown
+        // `kind` as `pixelate`, so "ellipse-ish" and "sepia" would both be
+        // taken and something else applied. `shape` is `SpotShape` — the same
+        // two shapes as the spotlight's, one home for the vocabulary — and
+        // `kind` is `ObscureKind`'s own two.
+        if let regions = object["obscure"] as? [[String: Any]] {
+            let shapes = SpotShape.allCases.map { $0.rawValue }
+            let kinds = ObscureKind.allCases.map { $0.rawValue }
+            for (i, region) in regions.enumerated() {
+                if let shape = region["shape"] {
+                    guard let name = shape as? String, SpotShape(rawValue: name) != nil else {
+                        throw ToolError(
+                            message: "\(path).obscure[\(i)].shape is not a shape — it must be "
+                                + "one of " + shapes.joined(separator: ", ") + ".")
+                    }
+                }
+                guard let kind = region["kind"] else { continue }
+                guard let name = kind as? String, ObscureKind(rawValue: name) != nil else {
+                    throw ToolError(
+                        message: "\(path).obscure[\(i)].kind is not a way to obscure — it must "
+                            + "be one of " + kinds.joined(separator: ", ") + ".")
+                }
             }
         }
     }
@@ -669,17 +726,125 @@ extension AgentServer {
         let clip = try clipArg(a, "clip", document)
         let at = try timeArg(a, "at", document)
         let duration = try optionalTimeArg(a, "duration", document)
+        return try addedActionResult(
+            document, clip, "Add Action",
+            [.addAction(clip: clip.id, at: at, duration: duration)])
+    }
+
+    /// `add_zoom_action` — the canvas's `Z` rubber band
+    /// (`ZoomRegionSession`, `EditorViewController+ZoomRegion.swift`) and the
+    /// Video tab's Actions section, whose "Zoom to Region…" arms the same
+    /// mode and whose "Zoom Back" sends this with a null region.
+    ///
+    /// One op rather than `add_action` + `set_action_end` because the
+    /// arithmetic that turns a rectangle into a scale and an offset belongs
+    /// in the core (`core/src/edit_zoom.rs`'s module doc has the equation),
+    /// and because a gesture must be one undo step.
+    ///
+    /// **`region` is REQUIRED here and optional in the op**, which is the one
+    /// place the distinction can be made. The core's envelope reads an absent
+    /// optional and an explicit null identically — the crate has no
+    /// tri-state argument idiom, which `set_clip` settled in phase 2 — so a
+    /// forgotten rectangle would silently become a zoom BACK, the opposite
+    /// edit. Requiring the key means a caller says `null` on purpose.
+    func addZoomAction(_ a: [String: Any]) throws -> String {
+        let document = try target(a)
+        let clip = try clipArg(a, "clip", document)
+        let at = try timeArg(a, "at", document)
+        let duration = try optionalTimeArg(a, "duration", document)
+        let region = try zoomRegionArg(a, "region")
+        var fit: ZoomFit?
+        if let name = try stringArg(a, "fit") {
+            guard let parsed = ZoomFit(rawValue: name) else {
+                throw ToolError(
+                    message: "fit must be one of "
+                        + ZoomFit.allCases.map { $0.rawValue }.joined(separator: ", ")
+                        + " (got \"\(name)\").")
+            }
+            fit = parsed
+        }
+        let curve = try curveArg(a, "curve")
+        return try addedActionResult(
+            document, clip, region == nil ? "Zoom Back" : "Zoom to Region",
+            [
+                .addZoomAction(
+                    clip: clip.id, at: at, duration: duration, region: region, fit: fit,
+                    curve: curve)
+            ])
+    }
+
+    /// The tail both action-adding tools share: run the ops, then report the
+    /// action the clip GAINED. Actions are not top-level ids, so
+    /// `created(from:to:)` cannot see them, and the new one is the difference
+    /// between the clip's action ids before and after.
+    private func addedActionResult(
+        _ document: ProjectDocument, _ clip: ClipSnapshot, _ actionName: String,
+        _ ops: [ReelOp]
+    ) throws -> String {
         let before = clip.actions.map { $0.id }
-        try performGroupedEdit(
-            document, "Add Action", [.addAction(clip: clip.id, at: at, duration: duration)])
-        // Actions are not top-level ids, so `created(from:to:)` cannot see
-        // them; the new one is whatever the clip gained.
+        try performGroupedEdit(document, actionName, ops)
         let after = document.project.snapshot.clip(clip.id)?.actions.map { $0.id } ?? []
         var result: [String: Any] = ["ok": true, "clip": Int(clip.id)]
         let added = after.filter { !before.contains($0) }.map { Int($0) }
         if !added.isEmpty { result["new_actions"] = added }
         result["project"] = summary(document)
         return try jsonResult(result)
+    }
+
+    /// `add_zoom_action`'s `region`: the rectangle to zoom to, or nil for an
+    /// explicit null, which is a zoom BACK. An ABSENT key is refused — see
+    /// the handler above for why the tool draws a line the op does not.
+    ///
+    /// Its four members are read one at a time through `nestedNumberArg`
+    /// rather than decoded: `patchArg`'s round trip cannot see a wrong TYPE
+    /// one level down (its own doc says why), and a region whose `width`
+    /// arrived as a string would otherwise be a zoom to somewhere nobody
+    /// asked for. An unknown member is refused by name, as the core's
+    /// `deny_unknown_fields` would, but here it can say what the region takes.
+    private func zoomRegionArg(_ a: [String: Any], _ key: String) throws -> ZoomRegion? {
+        guard let raw = a[key] else {
+            throw ToolError(
+                message: "Missing required argument: \(key) — the rectangle to zoom to, as "
+                    + "{x, y, width, height} in SOURCE pixels, where x and y are its CENTRE "
+                    + "measured from the centre of the clip's cropped rect. Pass null to zoom "
+                    + "BACK to the clip's own scale and position.")
+        }
+        if raw is NSNull { return nil }
+        guard let object = raw as? [String: Any] else {
+            throw ToolError(
+                message: "\(key) must be {x, y, width, height} — the region in source pixels, "
+                    + "x and y its centre — or null to zoom back.")
+        }
+        let members = ["x", "y", "width", "height"]
+        if let unknown = object.keys.filter({ !members.contains($0) }).sorted().first {
+            throw ToolError(
+                message: "Unknown \(key) key \"\(unknown)\" — a region is "
+                    + members.joined(separator: ", ") + ".")
+        }
+        var values: [Double] = []
+        for name in members {
+            guard let value = try nestedNumberArg(object, key, name) else {
+                throw ToolError(
+                    message: "\(key).\(name) is missing — a region is all four of "
+                        + members.joined(separator: ", ") + ".")
+            }
+            values.append(value)
+        }
+        return ZoomRegion(x: values[0], y: values[1], width: values[2], height: values[3])
+    }
+
+    /// An action's easing curve, by the name the model spells it with. One
+    /// reader for the two tools that take one, so their refusals say the
+    /// same thing.
+    private func curveArg(_ a: [String: Any], _ key: String) throws -> Curve? {
+        guard let name = try stringArg(a, key) else { return nil }
+        guard let curve = Curve(rawValue: name) else {
+            throw ToolError(
+                message: "\(key) must be one of "
+                    + Curve.allCases.map { $0.rawValue }.joined(separator: ", ")
+                    + " (got \"\(name)\").")
+        }
+        return curve
     }
 
     /// `set_action` — dragging an action's band in the Video tab's action
@@ -690,16 +855,7 @@ extension AgentServer {
         let action = try actionArg(a, "action", clip)
         let start = try optionalTimeArg(a, "start", document)
         let duration = try optionalTimeArg(a, "duration", document)
-        var curve: Curve?
-        if let name = try stringArg(a, "curve") {
-            guard let parsed = Curve(rawValue: name) else {
-                throw ToolError(
-                    message: "curve must be one of "
-                        + Curve.allCases.map { $0.rawValue }.joined(separator: ", ")
-                        + " (got \"\(name)\").")
-            }
-            curve = parsed
-        }
+        let curve = try curveArg(a, "curve")
         guard start != nil || duration != nil || curve != nil else {
             throw ToolError(message: "set_action needs start, duration or curve.")
         }

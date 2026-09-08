@@ -31,7 +31,9 @@
 //! re-exports it, so a grep for its name finds every place a bound is read.
 
 use crate::audio::MAX_GAIN;
-use crate::model::{AudioProps, Color, ShapeProps, TextProps, VideoProps, MAX_FILTERS};
+use crate::model::{
+    AudioProps, Color, ShapeProps, TextProps, VideoProps, MAX_FILTERS, MAX_OBSCURE,
+};
 use crate::time::Ticks;
 
 // ---- bounds --------------------------------------------------------------
@@ -191,6 +193,27 @@ pub(crate) fn check_video(props: &VideoProps, size: Option<(f64, f64)>) -> Resul
         // 1 is "no zoom", so the range starts there: a spotlight that
         // shrank what it points at would be a magnifier held backwards.
         in_range("video.spotlight.zoom", spotlight.zoom, 1.0, SPOT_ZOOM_MAX)?;
+    }
+    // The same budget and the same posture as the filters above: the fifth
+    // region is NAMED, not trimmed. A dropped filter is a control that does
+    // nothing; a dropped region is the face it was drawn over, still on
+    // screen and nobody told.
+    if props.obscure.len() > MAX_OBSCURE {
+        return Err(format!(
+            "video.obscure must hold at most {MAX_OBSCURE} regions, not {}",
+            props.obscure.len()
+        ));
+    }
+    for region in &props.obscure {
+        // The centre may sit outside the layer, for the spotlight's reason
+        // above: half a region running off the edge of the frame is a
+        // legitimate picture, so x and y are only required to be numbers.
+        finite("video.obscure[].x", region.x)?;
+        finite("video.obscure[].y", region.y)?;
+        above("video.obscure[].width", region.width, 0.0)?;
+        above("video.obscure[].height", region.height, 0.0)?;
+        at_least("video.obscure[].feather", region.feather, 0.0)?;
+        in_range("video.obscure[].amount", region.amount, 0.0, 1.0)?;
     }
     Ok(())
 }

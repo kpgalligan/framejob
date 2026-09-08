@@ -1,8 +1,8 @@
 import Metal
 
 /// The M3 effect block of `LayerUniforms`: filters, reflection, spotlight and
-/// the nest clip rectangle (spec §4.2, §7.3), plus the one extra draw a
-/// reflection needs.
+/// the nest clip rectangle (spec §4.2, §7.3), plus phase 3c's obscured
+/// regions and the one extra draw a reflection needs.
 ///
 /// Split out of `Compositor.swift` for size, not for layering — these are the
 /// same uniform block and the same pipeline, and the layout contract at the
@@ -17,6 +17,29 @@ import Metal
 /// the filters' radii all follow that rule, and the shader converts. The one
 /// exception is `clip_rect`, which is in CANVAS pixels because it belongs to
 /// the nest and not to the layer; it is called out again where it is filled.
+///
+/// **What `amount` buys, in numbers.** Two of these effects turn a 0…1
+/// strength into a LENGTH, and the shader's constants are the only statement
+/// of the conversion, so here it is once in prose. A blur —
+/// a `FilterKind.blur` or an `ObscureKind.blur` region alike — puts its outer
+/// tap ring at `amount × 24` source pixels (`kBlurMaxRadius`, thirteen taps,
+/// two staggered hexagons). A pixelate — `FilterKind.pixelate` or an
+/// `ObscureKind.pixelate` region — snaps the sampling point to blocks of
+/// `1 + amount × 63` source pixels a side (`mix(1, kPixelateMaxBlock, amount)`
+/// with `kPixelateMaxBlock` = 64), so **amount 1 is a flat 64 × 64 SOURCE
+/// pixel block** and amount 0 is a block of one pixel, which is no
+/// pixelation at all and which the shader skips. The obscure block reaches
+/// those two maxima through `kObscureMaxBlur` and `kObscureMaxBlock`, which
+/// are aliases of them: an obscured region at amount 1 is exactly the same
+/// filter at amount 1, and a later divergence is one line in the shader.
+///
+/// Two consequences worth knowing before measuring a frame. The block grid is
+/// anchored at the TEXTURE origin and not at the region's corner, so blocks
+/// inside a region are full-size and stable when the region moves while the
+/// region's own edge cuts the blocks it crosses — measure "flat blocks of the
+/// expected size" in a region's interior. And thirteen taps at a 24-pixel
+/// radius is a SOFT blur; the shader's tap-count budget says why it is not
+/// wider, and it is why a region's default kind is `pixelate`.
 ///
 /// **Ranges.** The core already refuses anything out of range —
 /// `check_video` in `props_check.rs` names the dotted key, `clamp_video` in
@@ -73,6 +96,28 @@ extension LayerUniforms {
         spotZoom = clamp(spotlight.zoom, 1, 2)
     }
 
+    /// The obscured regions: up to four boxes on the layer whose contents are
+    /// blurred or pixelated (phase 3c).
+    ///
+    /// The geometry is the spotlight's, field for field — SOURCE pixels
+    /// measured from the centre of the CROPPED rectangle — so a region rides
+    /// with its layer through scale, move and rotation and stays on the face
+    /// it was put on. `apply(spotlight:)` above argues that frame; this is the
+    /// same one, which is why the two share `SpotShape` and the shader shares
+    /// one `regionMask`.
+    ///
+    /// Anything past the fourth is dropped, as a fifth filter is: the uniform
+    /// block carries four region slots and `MAX_OBSCURE` is four for exactly
+    /// that reason, so the core refuses a fifth by name and `clamp_video`
+    /// truncates the evaluated path before this is ever reached.
+    mutating func apply(obscure: [ObscureProps]) {
+        guard !obscure.isEmpty else { return }
+        obscureEnabled = 1
+        for (index, region) in obscure.prefix(ObscureProps.max).enumerated() {
+            setObscure(index, region)
+        }
+    }
+
     /// The rectangle a layer flattened out of a nest is clipped to.
     ///
     /// **CANVAS pixels, absolute, origin at the canvas's top-left corner, y
@@ -116,6 +161,82 @@ extension LayerUniforms {
             filterKind3 = kind
             filterAmount3 = amount
         }
+    }
+
+    /// Writes one region slot, for the same reason `setFilter` above spells
+    /// its four out: neither language can index a struct's fields, and the
+    /// layout contract admits nothing but scalars. The shader's half is
+    /// `obscureSlot`, and the eight assignments below are in the block's own
+    /// order so the two read as the same list.
+    ///
+    /// The clamps are the last line between a recipe from some future version
+    /// and a garbage uniform, not validation — `check_video` refuses these
+    /// ranges by name and `clamp_video` bounds the action path. The floor on
+    /// the box is the one that matters: a zero half-size divides by nothing in
+    /// the ellipse's distance, exactly as it would for the spotlight.
+    private mutating func setObscure(_ index: Int, _ region: ObscureProps) {
+        let shape: Float = region.shape == .ellipse ? 1 : 0
+        let x = Float(region.x)
+        let y = Float(region.y)
+        let w = Float(max(region.width, 0.001))
+        let h = Float(max(region.height, 0.001))
+        let feather = Float(max(region.feather, 0))
+        let kind = Float(region.kind.shaderCode)
+        let amount = unit(region.amount)
+        switch index {
+        case 0:
+            obscure0Shape = shape
+            obscure0X = x
+            obscure0Y = y
+            obscure0W = w
+            obscure0H = h
+            obscure0Feather = feather
+            obscure0Kind = kind
+            obscure0Amount = amount
+        case 1:
+            obscure1Shape = shape
+            obscure1X = x
+            obscure1Y = y
+            obscure1W = w
+            obscure1H = h
+            obscure1Feather = feather
+            obscure1Kind = kind
+            obscure1Amount = amount
+        case 2:
+            obscure2Shape = shape
+            obscure2X = x
+            obscure2Y = y
+            obscure2W = w
+            obscure2H = h
+            obscure2Feather = feather
+            obscure2Kind = kind
+            obscure2Amount = amount
+        default:
+            obscure3Shape = shape
+            obscure3X = x
+            obscure3Y = y
+            obscure3W = w
+            obscure3H = h
+            obscure3Feather = feather
+            obscure3Kind = kind
+            obscure3Amount = amount
+        }
+    }
+}
+
+extension RecipeLayer {
+
+    /// True when anything on this layer reaches for neighbouring pixels, and
+    /// so needs the fragment stage compiled with the tap loop: a blur or
+    /// sharpen filter, or an obscured region that blurs.
+    ///
+    /// It lives on the LAYER because the answer stopped being a property of
+    /// the filter list the moment a region could blur. Both of the shader's
+    /// gather sites are written `kGatherFilters && …`, so a region blur asked
+    /// for on the plain pipeline does not blur — it renders the region
+    /// untouched, with nothing logged.
+    var needsGather: Bool {
+        filters.needsGather || obscure.contains { $0.kind == .blur }
     }
 }
 

@@ -293,6 +293,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         menu.addItem(item("Speed…", #selector(EditorViewController.showSpeedSheet(_:))))
         menu.addItem(
             item("Close Gap", #selector(EditorViewController.closeGapAtPlayhead(_:))))
+        // Road map 2's phase 3a — a cutting command, so it sits with Close Gap
+        // rather than in the identity group below the separator. No key
+        // equivalent, deliberately: every bare letter belongs to the editor's
+        // own `keyDown` (spec §9), and a modifier-less menu key would be
+        // resolved ahead of the first responder and steal it back.
+        menu.addItem(
+            item("Remove Silences…", #selector(EditorViewController.removeSilences(_:))))
         menu.addItem(submenuItem(transitionMenu()))
         menu.addItem(.separator())
         // Identity (format version 3): the clip's own name and its label.

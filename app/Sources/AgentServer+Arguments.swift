@@ -241,6 +241,21 @@ extension AgentServer {
         _ a: [String: Any], _ key: String, _ document: ProjectDocument
     ) throws -> Ticks? {
         guard let raw = a[key], !(raw is NSNull) else { return nil }
+        return try snappedTick(raw, key, document)
+    }
+
+    /// One time value read and SNAPPED to the document's frame grid, named by
+    /// `key` when it cannot be read.
+    ///
+    /// Factored out of `optionalTimeArg` when `rangesArg` below arrived and
+    /// wanted the same thing per element: the snap is spec §6's rule for
+    /// every tick that reaches an op ("never store a sub-frame time",
+    /// core/CLAUDE.md), and a second reader with its own copy of it is the
+    /// exact drift this file exists to prevent. Bucket edges, drag positions
+    /// and hand-written numbers all land on the grid here or nowhere.
+    private func snappedTick(
+        _ raw: Any, _ key: String, _ document: ProjectDocument
+    ) throws -> Ticks {
         guard let number = (raw as? NSNumber)?.doubleValue
             ?? (raw as? String).flatMap(Double.init), number.isFinite,
             number >= -9.0e15, number <= 9.0e15
@@ -249,6 +264,82 @@ extension AgentServer {
         }
         let ticks = Ticks(number.rounded())
         return ReelTime.snapToFrame(ticks, fps: document.project.snapshot.canvas.fps)
+    }
+
+    /// A list of time RANGES — `ripple_delete_ranges`' `ranges`, spelled
+    /// `[[from, to], …]` as the op parses it — with every tick snapped
+    /// through `snappedTick`, the same path `optionalTimeArg` takes.
+    ///
+    /// nil when the key is absent or null. A present-but-empty list comes
+    /// back EMPTY rather than as an error: whether "no ranges" is a mistake
+    /// or a no-op differs by op (the core answers "nothing to do" for this
+    /// one), so the caller decides, as it does for `stringsArg`. A lone pair
+    /// written flat — `[from, to]` rather than `[[from, to]]` — is taken as
+    /// one range, the courtesy `clipsArg` extends to a lone id: a two-element
+    /// array of numbers cannot mean anything else, and refusing it teaches
+    /// nothing.
+    ///
+    /// A REVERSED pair is passed through untouched. `ordered_range` in the
+    /// core puts every pair in order, so a reversed range is the same range,
+    /// and a reader that quietly rewrote its argument would make the result a
+    /// caller reads back disagree with the call it made.
+    ///
+    /// It lives here rather than beside the one tool that reads it today
+    /// because a range list is not one op's private shape — the finding tools
+    /// and any later range op want exactly this reader, and a private copy is
+    /// where the snapping rule would go missing.
+    func rangesArg(
+        _ a: [String: Any], _ key: String, _ document: ProjectDocument
+    ) throws -> [(from: Ticks, to: Ticks)]? {
+        guard let raw = a[key], !(raw is NSNull) else { return nil }
+        guard let array = raw as? [Any] else {
+            throw ToolError(
+                message: "\(key) must be an array of [from, to] pairs, each a time in ticks.")
+        }
+        if array.count == 2, array.allSatisfy({ !($0 is [Any]) }) {
+            return [try rangePair(array, key, document)]
+        }
+        var ranges: [(from: Ticks, to: Ticks)] = []
+        for (index, element) in array.enumerated() {
+            guard let pair = element as? [Any], pair.count == 2 else {
+                throw ToolError(
+                    message: "\(key) must contain [from, to] pairs — two times in ticks each.")
+            }
+            ranges.append(try rangePair(pair, "\(key)[\(index)]", document))
+        }
+        return ranges
+    }
+
+    /// One `[from, to]` element, each end named by its own path so a bad
+    /// value says which end of which pair it was.
+    private func rangePair(
+        _ pair: [Any], _ path: String, _ document: ProjectDocument
+    ) throws -> (from: Ticks, to: Ticks) {
+        let from = try snappedTick(pair[0], "\(path)[0]", document)
+        let to = try snappedTick(pair[1], "\(path)[1]", document)
+        return (from: from, to: to)
+    }
+
+    /// A number one level down inside a shaped argument (`add_zoom_action`'s
+    /// `region`), named by its PATH — `region.width`, not `width`.
+    ///
+    /// `patchArg`'s round trip is the guard against a wrong-typed value at
+    /// the top level, and its own doc says why it cannot recurse: one level
+    /// down every field has a real default, so a member set TO its default
+    /// decodes the same as an absent one. A shaped argument that is not a
+    /// patch has no such excuse — its members are all required — so it reads
+    /// them here, one by one, and a `{"width": "wide"}` is refused rather
+    /// than dropped.
+    func nestedNumberArg(
+        _ object: [String: Any], _ path: String, _ key: String
+    ) throws -> Double? {
+        guard let raw = object[key], !(raw is NSNull) else { return nil }
+        guard let value = Self.numeric(raw)?.doubleValue
+            ?? (raw as? String).flatMap(Double.init), value.isFinite
+        else {
+            throw ToolError(message: "\(path).\(key) must be a number.")
+        }
+        return value
     }
 
     /// A patch object (`set_video` and its siblings) decoded into its typed

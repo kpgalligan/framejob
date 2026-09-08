@@ -11,8 +11,8 @@
 //  moment someone adds a `float2` or a `float4x4` here, the two layouts stop
 //  being obviously equal and the frame silently renders with garbage
 //  uniforms. Add fields at the END, in groups of four (the struct is
-//  deliberately a multiple of 16 bytes — 68 floats, 272 bytes, as of the M3
-//  effect block), and mirror them in Swift in the same order.
+//  deliberately a multiple of 16 bytes — 104 floats, 416 bytes, as of the
+//  obscure block), and mirror them in Swift in the same order.
 //
 
 #include <metal_stdlib>
@@ -42,6 +42,14 @@ constant int kFilterNoir     = 5;
 constant int kFilterVignette = 6;
 constant int kFilterInvert   = 7;
 
+// Obscure kind codes, on the same terms: `ObscureKind.shaderCode` in
+// `ProjectSnapshot.swift` is the model's declaration order plus one, so 0 can
+// mean "this slot holds no region". `ObscureKind` in `model_regions.rs` says a
+// kind may be added at the END and the two here must never be swapped.
+constant int kObscureNone     = 0;
+constant int kObscureBlur     = 1;
+constant int kObscurePixelate = 2;
+
 // What `amount = 1` means for each of the three filters whose strength is a
 // LENGTH. All three are SOURCE pixels, the frame every other length on a
 // layer is measured in (the crop, the corner radius, the shadow's blur and
@@ -52,6 +60,20 @@ constant float kPixelateMaxBlock = 64.0;   // block side at amount 1
 constant float kSharpenRadius    = 1.5;    // unsharp low-pass reach
 // Unsharp gain at amount 1. Past about 2 the halo is louder than the detail.
 constant float kSharpenMaxGain   = 2.0;
+
+// What `amount = 1` means for an OBSCURED region — the same two lengths, by
+// alias rather than by repetition, so "a region at amount 1" is exactly "that
+// filter at amount 1" and nobody has to hold two numbers. They are named
+// separately because the two are answering different questions: a filter's
+// maximum is how strong an effect anyone would want to look at, a region's is
+// how much it can hide, and the day those diverge this is the one line that
+// changes. Know the caveat before raising the blur: thirteen taps at 24
+// source pixels is a SOFT blur — a large password field can still be read
+// through it — and the tap-count budget above refuses a wider kernel, so
+// raising the radius alone buys radial ripple, not privacy. `pixelate` is the
+// kind that actually hides, and it is a region's default for that reason.
+constant float kObscureMaxBlur  = kBlurMaxRadius;
+constant float kObscureMaxBlock = kPixelateMaxBlock;
 
 /// Whether THIS SPECIALIZATION of the fragment stage carries the two filters
 /// that gather neighbouring pixels — blur and sharpen. A function constant and
@@ -136,13 +158,13 @@ struct LayerUniforms {
     // drawn by this pipeline and not by a second, simpler one, which would
     // start agreeing with this one and quietly stop.
     float shadowMask;
-    // ── The M3 effect block (§4.2). `CompositorEffects.swift` fills every
-    // field below and argues each one's meaning; what they DO is the fragment
-    // stage's order of operations, written out above `reelcut_layer_fragment`.
-    // The four reserved floats that used to sit here are the first four of
-    // them: 40 + 28 = 68 floats = 272 bytes, and 272 is 17 × 16, so the tail
-    // is now empty. The next field to land must come with three companions,
-    // or bring the padding back.
+    // ── The M3 effect block (§4.2), and the obscure block after it.
+    // `CompositorEffects.swift` fills every field below and argues each one's
+    // meaning; what they DO is the fragment stage's order of operations,
+    // written out above `reelcut_layer_fragment`. The four reserved floats
+    // that used to sit here are the first four of the M3 block, and the
+    // obscure block brought a tail of three back:
+    // 40 + 28 + 36 = 104 floats = 416 bytes, and 416 is 26 × 16.
     //
     // Four filter slots, applied in slot order. `MAX_FILTERS` in `model.rs`
     // is four BECAUSE this block carries four (kind, amount) pairs — the cap
@@ -188,6 +210,58 @@ struct LayerUniforms {
     float clipW;
     float clipH;
     float clipRotation;         // radians, clockwise, about that centre
+    // ── The obscured regions (phase 3c): up to four boxes on the layer whose
+    // contents are blurred or pixelated. Centre, size and feather are SOURCE
+    // pixels measured from the centre of the CROPPED rectangle — the
+    // spotlight's frame above, field for field, which is why they share
+    // `regionMask` and why `SpotShape` is one enum and not two.
+    //
+    // REGION-MAJOR: all eight of region 0, then region 1, and so on, where
+    // the filter slots above are field-major. A filter's record is two
+    // fields, so field-major fell into runs of four there; an eight-field
+    // record laid out that way would be thirty-two lines nobody could line up
+    // against Compositor.swift's, and reading the two lists side by side is
+    // the ONLY way this contract is ever checked. `MAX_OBSCURE` in
+    // `model_regions.rs` is four BECAUSE there are four slots here.
+    float obscureEnabled;       // 1 when the layer carries at least one region
+    float obscure0Shape;        // 0 = rect, 1 = ellipse, as `spotShape`
+    float obscure0X;            // the region's CENTRE, from the cropped centre
+    float obscure0Y;
+    float obscure0W;
+    float obscure0H;
+    float obscure0Feather;      // source px of ramp across the region's edge
+    float obscure0Kind;         // a kObscure* code; 0 = empty slot
+    float obscure0Amount;       // 0…1
+    float obscure1Shape;
+    float obscure1X;
+    float obscure1Y;
+    float obscure1W;
+    float obscure1H;
+    float obscure1Feather;
+    float obscure1Kind;
+    float obscure1Amount;
+    float obscure2Shape;
+    float obscure2X;
+    float obscure2Y;
+    float obscure2W;
+    float obscure2H;
+    float obscure2Feather;
+    float obscure2Kind;
+    float obscure2Amount;
+    float obscure3Shape;
+    float obscure3X;
+    float obscure3Y;
+    float obscure3W;
+    float obscure3H;
+    float obscure3Feather;
+    float obscure3Kind;
+    float obscure3Amount;
+    // The padding tail, back after the M3 block consumed the last one. Three
+    // floats, so the next field to land can be added on its own; a fourth
+    // needs three companions again.
+    float reserved0;
+    float reserved1;
+    float reserved2;
 };
 
 // Display-space UV back to the texture's own coded space. The inverse of the
@@ -542,16 +616,21 @@ static inline float3 pointFilter(int kind, float amount, float3 rgb, float2 loca
     return rgb;
 }
 
-/// The spotlight region as a 0…1 mask in the layer's own source pixels: 1
+/// A rect-or-ellipse region as a 0…1 mask in the layer's own source pixels: 1
 /// well inside the region, 0 well outside, `feather` pixels of ramp across the
 /// edge. `rel` is the fragment's offset from the region's centre.
 ///
-/// The feather is a PARAMETER and not read from the block, because the dim and
-/// the lens want different ones — see the zoom, which argues why.
-static inline float spotlightMask(float2 rel, constant LayerUniforms &u, float feather) {
-    float2 halfSize = max(float2(u.spotW, u.spotH) * 0.5, float2(1e-3));
+/// EVERY region-shaped effect on a layer comes through here — the spotlight's
+/// dim, the spotlight's lens and each obscured region — because they are all
+/// the same box in the same frame, and one distance field means a region of
+/// one kind and a region of the other with the same numbers cover exactly the
+/// same pixels. `halfSize`, `shape` and `feather` are all PARAMETERS rather
+/// than reads off the block: the caller is the only one that knows which
+/// slot's numbers it wants, and the spotlight's dim and lens want different
+/// ramps from the same box — see the zoom, which argues why.
+static inline float regionMask(float2 rel, float2 halfSize, float shape, float feather) {
     float d;
-    if (u.spotShape > 0.5) {
+    if (shape > 0.5) {
         // Ellipse. |p / halfSize| − 1 is zero on the boundary but is not a
         // distance — along the long axis it is off by the aspect ratio, which
         // would make the feather band that much wider there. Dividing by its
@@ -572,6 +651,139 @@ static inline float spotlightMask(float2 rel, constant LayerUniforms &u, float f
     return clamp(0.5 - d / max(feather, 1e-3), 0.0, 1.0);
 }
 
+/// One obscure slot, unpacked. A LOCAL struct, so it may hold `float2`s: the
+/// layout contract binds the constant buffer and nothing else.
+struct ObscureSlot {
+    float shape;
+    float kind;
+    float feather;
+    float amount;
+    float2 centre;   // offset from the centre of the cropped rect, source px
+    float2 size;
+};
+
+/// Slot `i`. The if-chain is `filterSlot`'s, for the same reason: Metal
+/// cannot index a struct's fields, and the slots are scalars by the layout
+/// contract. It unrolls to nothing when the slots are empty.
+static inline ObscureSlot obscureSlot(constant LayerUniforms &u, int i) {
+    ObscureSlot s;
+    if (i == 0) {
+        s.shape = u.obscure0Shape; s.kind = u.obscure0Kind;
+        s.feather = u.obscure0Feather; s.amount = u.obscure0Amount;
+        s.centre = float2(u.obscure0X, u.obscure0Y);
+        s.size = float2(u.obscure0W, u.obscure0H);
+    } else if (i == 1) {
+        s.shape = u.obscure1Shape; s.kind = u.obscure1Kind;
+        s.feather = u.obscure1Feather; s.amount = u.obscure1Amount;
+        s.centre = float2(u.obscure1X, u.obscure1Y);
+        s.size = float2(u.obscure1W, u.obscure1H);
+    } else if (i == 2) {
+        s.shape = u.obscure2Shape; s.kind = u.obscure2Kind;
+        s.feather = u.obscure2Feather; s.amount = u.obscure2Amount;
+        s.centre = float2(u.obscure2X, u.obscure2Y);
+        s.size = float2(u.obscure2W, u.obscure2H);
+    } else {
+        s.shape = u.obscure3Shape; s.kind = u.obscure3Kind;
+        s.feather = u.obscure3Feather; s.amount = u.obscure3Amount;
+        s.centre = float2(u.obscure3X, u.obscure3Y);
+        s.size = float2(u.obscure3W, u.obscure3H);
+    }
+    return s;
+}
+
+/// What the four regions ask of THIS fragment, folded into one blur and one
+/// pixelation.
+///
+/// `blurRadius` and `block` are the strengths; `blurCover` and `pixelCover`
+/// are how much of each to mix in, 0 outside every region of that kind and 1
+/// well inside one. That split is the whole design: **the feather ramps the
+/// MIX, never the strength**. A block size or a tap radius that varied across
+/// the feather band would tear the grid into visible steps and swim as the
+/// region moved; mixing two settled colours cannot, and it makes `feather`
+/// mean for a region exactly what it means for the spotlight's dim.
+///
+/// Where two regions of ONE kind overlap, the STRONGEST wins per fragment —
+/// blur radii added in quadrature, block sizes taken at the max. That is
+/// `filterPlan`'s own rule for two blurs and two pixelates and it needs no new
+/// vocabulary. Applying each region in slot order with its own sample would be
+/// up to 52 taps for a picture nobody could tell from this one.
+///
+/// The COVER that goes with that strength is each slot's mask weighted by the
+/// slot's own strength — the greatest `strength × mask`, divided by the
+/// greatest strength — and not the bare max of the masks. A bare max lets a
+/// region set to `amount` 0, which the model documents as "there but hides
+/// nothing", pull a NEIGHBOUR's full-strength pixelation up to full cover
+/// inside its own box: a hard-edged square of 64-pixel blocks conjured by
+/// adding a region that hides nothing. Weighting keeps both ends honest — a
+/// slot with no strength contributes no cover, a slot with half the winner's
+/// strength can carry the cover only half way — and it is continuous in
+/// `amount`, where a bare "skip the empty slots" guard would leave a cliff
+/// between amount 0 and amount 0.001. What it maximizes — a strength times the
+/// mix that strength would be applied at — is the same shape of measure the
+/// fragment stage picks the winning KIND with, so the two decisions are one
+/// idea in two places.
+///
+/// Which KIND is applied is the fragment stage's decision, not this one's: it
+/// takes the greater of the two hidings and applies that one ALONE. Both are
+/// planned here because the comparison needs both, and it costs one extra
+/// sample path per fragment however many regions cover it.
+struct ObscurePlan {
+    float blurRadius;   // source px, the outer tap ring
+    float blurCover;    // 0…1 mix factor for the blurred sample
+    float block;        // source px, the pixelation's block side
+    float pixelCover;   // 0…1 mix factor for the snapped sample
+};
+
+static inline ObscurePlan obscurePlan(constant LayerUniforms &u, float2 localPx,
+                                      float2 cropped) {
+    ObscurePlan plan;
+    plan.blurRadius = 0.0;
+    plan.blurCover = 0.0;
+    plan.block = 0.0;
+    plan.pixelCover = 0.0;
+    // The two covers, accumulated as `strength × mask` and divided by the
+    // strongest slot of their kind at the end. A pixelation's strength is
+    // measured from 1 — `mix(1, kObscureMaxBlock, amount)` is the block side
+    // and a block of ONE pixel is the identity — so that an amount of 0 is a
+    // strength of 0 for both kinds and neither can raise a cover.
+    float blurReach = 0.0, blurHidden = 0.0;
+    float blockReach = 0.0, blockHidden = 0.0;
+    for (int i = 0; i < 4; ++i) {
+        ObscureSlot slot = obscureSlot(u, i);
+        int kind = int(slot.kind + 0.5);
+        if (kind == kObscureNone) { continue; }
+        // The region's frame, which is the spotlight's: its centre is an
+        // offset in SOURCE pixels from the centre of the CROPPED rect, and
+        // `localPx` is the fragment measured in exactly those pixels. The
+        // layer's scale and rotation are the vertex stage's business, which
+        // is what makes a region ride with its layer for free.
+        float2 centre = cropped * 0.5 + slot.centre;
+        float m = regionMask(localPx - centre, max(slot.size * 0.5, float2(1e-3)),
+                             slot.shape, slot.feather);
+        if (m <= 0.0) { continue; }
+        float amount = clamp(slot.amount, 0.0, 1.0);
+        if (kind == kObscureBlur) {
+            float r = amount * kObscureMaxBlur;
+            if (r <= 0.0) { continue; }
+            plan.blurRadius = sqrt(plan.blurRadius * plan.blurRadius + r * r);
+            blurReach = max(blurReach, r);
+            blurHidden = max(blurHidden, r * m);
+        } else if (kind == kObscurePixelate) {
+            float b = mix(1.0, kObscureMaxBlock, amount) - 1.0;
+            if (b <= 0.0) { continue; }
+            plan.block = max(plan.block, b + 1.0);
+            blockReach = max(blockReach, b);
+            blockHidden = max(blockHidden, b * m);
+        }
+        // A code this shader does not know — a region out of some later
+        // schema — hides nothing rather than guessing at a kind. It is the
+        // reading a slot holding `kObscureNone` already gets.
+    }
+    plan.blurCover = blurReach > 0.0 ? blurHidden / blurReach : 0.0;
+    plan.pixelCover = blockReach > 0.0 ? blockHidden / blockReach : 0.0;
+    return plan;
+}
+
 // MARK: - The layer fragment stage
 
 // ORDER OF OPERATIONS. Fixed by the M3 contract, and each stage is where it
@@ -583,6 +795,7 @@ static inline float spotlightMask(float2 rel, constant LayerUniforms &u, float f
 //   3. sample, or the slate    `layerSample` — un-premultiply, chroma key
 //                              and spill, brightness/contrast/saturation/hue
 //   4. blur, then sharpen      gather neighbours, each one through (3)
+//  4b. obscure the regions     colour only, and AFTER the sharpen: see below
 //   5. the point filters       sepia, noir, vignette, invert, IN SLOT ORDER
 //   6. spotlight dim           after every colour stage: the dim is a light
 //                              on the layer, not something the filters act on
@@ -607,13 +820,25 @@ static inline float spotlightMask(float2 rel, constant LayerUniforms &u, float f
 // smoothstep across a blur radius: a fraction of a percent of brightness at
 // `kBlurMaxRadius`, well inside the rounding of an 8-bit frame.
 //
+// **Why the obscured regions run at 4b and not at the end.** They must come
+// after the SHARPEN, because the unsharp term is built from the RAW texture
+// and added on top: hide first and a layer that also carries a sharpen filter
+// has the hidden detail put straight back, on that layer only. And they must
+// come before the POINT FILTERS, because a region replaces the colour with a
+// second sample of the same texture, and a sample taken after the point
+// filters would not have been through them — an obscured region on a sepia
+// layer would show as an unsepia'd hole. Between the two is the one place
+// that is right, and the region's own colour is then graded, lit and
+// filtered exactly like the picture around it.
+//
 // **What a layer with no effects costs.** Measured, not asserted. A full-bleed
-// 1080p layer with no filters, no spotlight, no reflection and no clip rect
-// renders in 0.30–0.33 ms, which is what the same layer measured through the
-// pre-M3 shader — the difference is inside the run-to-run spread of the
-// machine's own GPU clocks. All that layer pays is the single comparison below
-// and the seven uniform reads that answer it; everything else is behind that
-// comparison, or compiled out of its pipeline entirely (`kGatherFilters`).
+// 1080p layer with no filters, no spotlight, no reflection, no clip rect and
+// no obscured region renders in 0.30–0.33 ms, which is what the same layer
+// measured through the pre-M3 shader — the difference is inside the
+// run-to-run spread of the machine's own GPU clocks. All that layer pays is
+// the single comparison below and the eight uniform reads that answer it;
+// everything else is behind that comparison, or compiled out of its pipeline
+// entirely (`kGatherFilters`).
 //
 // What each effect DOES cost on that same layer, over the no-effect baseline:
 // a clip rectangle 0.02 ms, a reflection 0.02, a spotlight with its lens 0.04,
@@ -645,7 +870,8 @@ fragment float4 reelcut_layer_fragment(Varyings in [[stage_in]],
     // effect-free layer paying a single comparison, which is what leaves it
     // measuring the same as the pre-M3 shader.
     bool effects = (u.filterKind0 + u.filterKind1 + u.filterKind2 + u.filterKind3
-                    + u.spotEnabled + u.clipEnabled + u.reflectionPass) > 0.5;
+                    + u.spotEnabled + u.clipEnabled + u.reflectionPass
+                    + u.obscureEnabled) > 0.5;
 
     float2 uv = in.uv;
     float spot = 1.0;
@@ -660,7 +886,7 @@ fragment float4 reelcut_layer_fragment(Varyings in [[stage_in]],
         if (u.spotEnabled > 0.5) {
             float2 centre = cropped * 0.5 + float2(u.spotX, u.spotY);
             float2 halfSize = max(float2(u.spotW, u.spotH) * 0.5, float2(1e-3));
-            spot = spotlightMask(localPx - centre, u, u.spotFeather);
+            spot = regionMask(localPx - centre, halfSize, u.spotShape, u.spotFeather);
             // The model's own ceiling is 2 (`SPOT_ZOOM_MAX`) and Swift already
             // clamps to it; 8 here is only a guard against a uniform from some
             // future version, not a second opinion on the range.
@@ -687,7 +913,7 @@ fragment float4 reelcut_layer_fragment(Varyings in [[stage_in]],
                 // light falls off, and the two are not the same question.
                 float ramp = max(u.spotFeather,
                                  max(halfSize.x, halfSize.y) * (1.0 - 1.0 / zoom));
-                float lens = spotlightMask(localPx - centre, u, ramp);
+                float lens = regionMask(localPx - centre, halfSize, u.spotShape, ramp);
                 float k = mix(1.0, 1.0 / zoom, lens);
                 uv += ((centre + (localPx - centre) * k) - localPx) / srcSize;
             }
@@ -747,6 +973,77 @@ fragment float4 reelcut_layer_fragment(Varyings in [[stage_in]],
                          + layerSample(source, samp, uv - float2(0.0, reach.y), u).rgb)
                         * 0.25;
             rgb += plan.sharpen * (sharpCentre - lo);
+        }
+
+        // (4b) The obscured regions. COLOUR ONLY, exactly like the spotlight's
+        // dim below and for one more reason besides: this same fragment stage
+        // draws the layer's shadow silhouette with `shadowMask` raised, so an
+        // effect that touched alpha would change the SHAPE of a shadowed
+        // layer's shadow the moment a region was added. Leaving coverage
+        // alone is also what makes "every pixel outside the region is byte
+        // identical" true, which is the claim the whole feature is proved by.
+        //
+        // The `slate` guard is not optional: on a missing-media layer the
+        // bound texture is a 1×1 white placeholder and `base` came from
+        // `slateColor`, so re-sampling would paint a white block over the
+        // slate's own stripes. The sharpen above guards the same way.
+        if (u.obscureEnabled > 0.5 && u.slate < 0.5) {
+            ObscurePlan hide = obscurePlan(u, localPx, cropped);
+            // Sample with `uv`, mask with `localPx`. `uv` has already been
+            // bent by the spotlight's lens and quantized by a global
+            // pixelate, so sampling it keeps the region showing the same
+            // picture the rest of the layer shows; `localPx` is pure geometry
+            // and is what keeps the region sitting where it was put. It is
+            // the same asymmetry the spotlight's dim has.
+            //
+            // The block grid is anchored at the TEXTURE origin, not at the
+            // region's corner — `filterPlan`'s pixelate is too — so blocks
+            // inside a region are full-size and stay put when the region
+            // moves, at the price of the region's edge cutting the blocks it
+            // crosses. One consequence to know: a layer carrying a global
+            // BLUR shows its pixelated regions unblurred, because this takes
+            // a single raw sample rather than a second thirteen-tap gather.
+            // Twelve extra taps to soften a 64-pixel block is not a trade
+            // worth making, and the coarser of the two is what hides.
+            //
+            // WHICH KIND, decided once for this fragment. Each hiding is a
+            // length in SOURCE pixels times the mix it would be applied at: a
+            // block of side b destroys every detail smaller than b, a blur
+            // whose outer tap ring sits at r spreads detail across a disc 2r
+            // wide, and the mix is in the product because half of a strong
+            // effect can hide less than all of a weak one.
+            //
+            // The greater wins OUTRIGHT and the other is not applied at all,
+            // because both mixes take a fresh sample of the RAW texture:
+            // running the two would let the second paint over what the first
+            // hid. With the blur running second, a region at 5% blur dropped
+            // over a full-strength pixelation used to put the face the blocks
+            // had destroyed back on screen, softened by a pixel — adding a
+            // region made the frame LESS hidden, which for this feature is the
+            // one thing that must never happen. A tie goes to the pixelate,
+            // which destroys where a blur only softens (`kObscureMaxBlur`'s
+            // note says how soft). What it costs is a seam where the winner
+            // changes inside an overlap of two FEATHERED regions of different
+            // kinds; one sample path a fragment is worth that, and the only
+            // way to have both — blurring the pixelated colour — means
+            // snapping all thirteen taps to the block grid as well.
+            float hidePixel = hide.block > 1.0 ? hide.block * hide.pixelCover : 0.0;
+            float hideBlur = kGatherFilters && hide.blurRadius > 0.0
+                ? 2.0 * hide.blurRadius * hide.blurCover : 0.0;
+            if (hideBlur > hidePixel) {
+                // In quadrature with whatever blur the layer already carries,
+                // so a region is always at LEAST as blurred as the picture
+                // around it — a region that came out sharper than its
+                // surroundings would advertise exactly what it was hiding.
+                float r = sqrt(plan.blurRadius * plan.blurRadius
+                               + hide.blurRadius * hide.blurRadius);
+                rgb = mix(rgb, gatherBlur(source, samp, uv, srcSize, r, u).rgb,
+                          hide.blurCover);
+            } else if (hidePixel > 0.0) {
+                float2 px = uv * srcSize;
+                float2 snapped = ((floor(px / hide.block) + 0.5) * hide.block) / srcSize;
+                rgb = mix(rgb, layerSample(source, samp, snapped, u).rgb, hide.pixelCover);
+            }
         }
 
         // (5) The four point filters, in the order the model lists them. A slot

@@ -69,6 +69,10 @@ extension EditorViewController {
         // (EditorViewController+Eyedropper.swift), so this is where it learns
         // that what it was aimed at is no longer selected.
         syncChromaEyedropper()
+        // And so is an armed region mode, for the same reason: it is armed for
+        // ONE clip's layer box (EditorViewController+ZoomRegion.swift), and a
+        // selection change is what tells it that clip is no longer the one.
+        syncRegionMode()
     }
 
     /// Places the canvas rectangle. Called from the base file's

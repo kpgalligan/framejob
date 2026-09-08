@@ -231,6 +231,34 @@ enum FilterKind: String, Codable, CaseIterable {
     }
 }
 
+/// How an obscured region hides what is under it (phase 3c).
+///
+/// Closed at two, and its own type rather than a `FilterKind` restricted to
+/// two of its seven — `ObscureKind` in `model_regions.rs` argues it at length:
+/// a range check saying "kind must be blur or pixelate" is a rule about a
+/// type enforced a long way from it, and there is no neutral obscure kind for
+/// a `"sepia"` out of a hand-written file to fall back to.
+enum ObscureKind: String, Codable, CaseIterable {
+    case blur, pixelate
+
+    var displayName: String {
+        switch self {
+        case .blur: return "Blur"
+        case .pixelate: return "Pixelate"
+        }
+    }
+
+    /// The code the shader's uniform block carries, counted from 1 so 0 can
+    /// mean "this slot holds no region" — `FilterKind.shaderCode`'s rule, for
+    /// the same reason. `Compositor.metal` reads the number, so the case
+    /// order here, in `model_regions.rs` and in the shader's `kObscure*`
+    /// constants is one contract: a kind may be added at the END, never
+    /// inserted.
+    var shaderCode: Int {
+        (ObscureKind.allCases.firstIndex(of: self) ?? 0) + 1
+    }
+}
+
 /// A spotlight's region: the two shapes spec §4.2 names.
 enum SpotShape: String, Codable, CaseIterable {
     case rect, ellipse
@@ -669,6 +697,73 @@ struct SpotlightProps: Codable, Equatable {
     }
 }
 
+/// One obscured region: a box on the layer whose contents are blurred or
+/// pixelated so a bystander, a password field or a notification cannot be
+/// read (schema version 4).
+///
+/// **The geometry is the spotlight's frame, exactly** — `x`/`y` are the
+/// region's CENTRE as an offset in SOURCE pixels from the centre of the
+/// cropped rect, `width` and `height` its size in the same pixels. So a
+/// region rides with its layer through scale, move and rotation and stays on
+/// the face it was put on; nothing here is in canvas pixels. `shape` is
+/// `SpotShape` rather than a second rect/ellipse enum, for the reason
+/// `ObscureRegion` in `model_regions.rs` gives: shared vocabulary has one home.
+struct ObscureProps: Codable, Equatable {
+    let shape: SpotShape
+    let x: Double
+    let y: Double
+    let width: Double
+    let height: Double
+    /// Source pixels the effect is ramped in over; 0 is a hard edge.
+    let feather: Double
+    let kind: ObscureKind
+    /// 0 = the region is there but hides nothing, 1 = its full effect.
+    let amount: Double
+
+    /// The most one layer may carry — `MAX_OBSCURE` in `model_regions.rs`. The
+    /// same shader budget `FilterProps.max` is: the uniform block carries
+    /// four eight-field region slots.
+    static let max = 4
+
+    /// The core's own defaults (`impl Default for ObscureRegion`): the
+    /// spotlight's 480 × 270 box, so the two region controls put the same
+    /// rectangle on screen, pixelated at full strength because a region that
+    /// only half hides has failed at the one job this feature has.
+    init(
+        shape: SpotShape = .rect, x: Double = 0, y: Double = 0, width: Double = 480,
+        height: Double = 270, feather: Double = 20, kind: ObscureKind = .pixelate,
+        amount: Double = 1
+    ) {
+        self.shape = shape
+        self.x = x
+        self.y = y
+        self.width = width
+        self.height = height
+        self.feather = feather
+        self.kind = kind
+        self.amount = amount
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        shape = c.lenient(.shape, SpotShape.rect)
+        x = c.lenient(.x, 0)
+        y = c.lenient(.y, 0)
+        width = c.lenient(.width, 480)
+        height = c.lenient(.height, 270)
+        feather = c.lenient(.feather, 20)
+        kind = c.lenient(.kind, ObscureKind.pixelate)
+        amount = c.lenient(.amount, 1)
+    }
+
+    /// The region as a rect in the same source-pixel space, centred on
+    /// `(x, y)` — `SpotlightProps.box`'s twin, and the seed for the canvas
+    /// handles phase 3c deliberately did not draw.
+    var box: CGRect {
+        CGRect(x: x - width / 2, y: y - height / 2, width: width, height: height)
+    }
+}
+
 /// The pixel half of a clip. `x`/`y` are canvas pixels from the canvas
 /// CENTRE, y down; `scale` 1 = native pixels; `rotation` degrees clockwise.
 struct VideoProps: Codable, Equatable {
@@ -687,13 +782,19 @@ struct VideoProps: Codable, Equatable {
     let filters: [FilterProps]
     let reflection: ReflectionProps?
     let spotlight: SpotlightProps?
+    /// The obscured regions, at most `ObscureProps.max` of them (phase 3c).
+    /// The LAST key of the struct, as it is in `model_props.rs` — an empty
+    /// list is how it is cleared, which is why it is a plain array and not an
+    /// optional.
+    let obscure: [ObscureProps]
 
     init(
         x: Double = 0, y: Double = 0, scale: Double = 1, rotation: Double = 0,
         opacity: Double = 1, crop: CropInsets = .zero, cornerRadius: Double = 0,
         shadow: ShadowProps? = nil, color: ColorAdjust = .identity,
         chroma: ChromaProps? = nil, filters: [FilterProps] = [],
-        reflection: ReflectionProps? = nil, spotlight: SpotlightProps? = nil
+        reflection: ReflectionProps? = nil, spotlight: SpotlightProps? = nil,
+        obscure: [ObscureProps] = []
     ) {
         self.x = x
         self.y = y
@@ -708,6 +809,7 @@ struct VideoProps: Codable, Equatable {
         self.filters = filters
         self.reflection = reflection
         self.spotlight = spotlight
+        self.obscure = obscure
     }
 
     init(from decoder: Decoder) throws {
@@ -725,6 +827,10 @@ struct VideoProps: Codable, Equatable {
         filters = c.lenient(.filters, [])
         reflection = c.lenient(.reflection)
         spotlight = c.lenient(.spotlight)
+        // A version-3 file has no `obscure` key at all, and reads as the
+        // empty list — the same answer `#[serde(default)]` gives the core,
+        // which is why version 4 needs no migrate step.
+        obscure = c.lenient(.obscure, [])
     }
 
     static let identity = VideoProps()
@@ -1448,7 +1554,7 @@ struct ProjectSnapshot: Codable, Equatable {
     /// `RC_FORMAT_VERSION` — the version the core always writes, mirrored
     /// here so a decode that never saw the key still reports the truth. The
     /// C header is the contract; this is a fallback, not a second source.
-    static let formatVersion = 3
+    static let formatVersion = 4
 
     /// The value a failed decode falls back to, so `ReelProject.snapshot`
     /// can stay non-optional and no view needs an "unloaded" state.
@@ -1779,6 +1885,8 @@ struct RecipeLayer: Codable, Equatable {
     let filters: [FilterProps]
     let reflection: ReflectionProps?
     let spotlight: SpotlightProps?
+    /// The obscured regions, at most `ObscureProps.max` of them.
+    let obscure: [ObscureProps]
     /// The rectangle this layer is clipped to; nil unless it came out of a
     /// nest. Always nil today — see `RecipeClipRect`.
     let clipRect: RecipeClipRect?
@@ -1802,6 +1910,7 @@ struct RecipeLayer: Codable, Equatable {
         filters = c.lenient(.filters, [])
         reflection = c.lenient(.reflection)
         spotlight = c.lenient(.spotlight)
+        obscure = c.lenient(.obscure, [])
         clipRect = c.lenient(.clipRect)
         transition = c.lenient(.transition)
     }
@@ -1815,11 +1924,16 @@ struct RecipeLayer: Codable, Equatable {
 
     /// The layer's properties as a `VideoProps`, so the overlay can reuse
     /// `canvasRect` on an evaluated layer instead of the base clip.
+    ///
+    /// Every parameter has a default, so a field left out here is dropped
+    /// SILENTLY on the overlay's path with no diagnostic anywhere: pass
+    /// each new one through as it lands.
     var videoProps: VideoProps {
         VideoProps(
             x: x, y: y, scale: scale, rotation: rotation, opacity: opacity, crop: crop,
             cornerRadius: cornerRadius, shadow: shadow, color: color, chroma: chroma,
-            filters: filters, reflection: reflection, spotlight: spotlight)
+            filters: filters, reflection: reflection, spotlight: spotlight,
+            obscure: obscure)
     }
 }
 

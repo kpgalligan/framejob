@@ -1,5 +1,56 @@
 import AppKit
 
+// MARK: - The modal canvas modes
+
+/// A view whose PRESENCE over the canvas pane IS a mode: the chroma
+/// eyedropper's sheet (below) and the region band
+/// (`EditorViewController+ZoomRegion.swift`). Each covers the whole picture,
+/// swallows every click on it and holds first responder so Esc reaches it, so
+/// **at most one may be armed at a time**.
+///
+/// Nothing else coordinates them: each is found by KIND among
+/// `canvasContainer`'s subviews, and an extension has no stored state in which
+/// either could see the other. So the rule lives in the one place both entry
+/// points have to pass through anyway — `armCanvasMode`, the only code that
+/// installs one of these views — and this protocol is what lets it end the
+/// others without naming them.
+protocol CanvasModalMode: NSView {}
+
+extension EditorViewController {
+    /// Installs a modal canvas mode over the canvas pane and gives it the
+    /// keyboard, ending whichever mode was armed before it.
+    ///
+    /// **Why ending the others is here and not at the call sites.** Arming one
+    /// mode while another was armed used to leave BOTH overlays installed,
+    /// stacked over the same pane: the lower one kept its callbacks, kept its
+    /// `sync…` hook, and was still ready to commit its own edit from a gesture
+    /// aimed at the upper one — which is how arming the eyedropper under an
+    /// armed region band turned the next canvas drag into an unasked-for zoom
+    /// action. One entry point remembered to end its sibling and the other did
+    /// not; from here neither can forget, and a third mode inherits the rule by
+    /// being installed at all.
+    func armCanvasMode(_ mode: CanvasModalMode) {
+        endCanvasModes()
+        mode.translatesAutoresizingMaskIntoConstraints = false
+        canvasContainer.addSubview(mode)
+        NSLayoutConstraint.activate([
+            mode.topAnchor.constraint(equalTo: canvasContainer.topAnchor),
+            mode.bottomAnchor.constraint(equalTo: canvasContainer.bottomAnchor),
+            mode.leadingAnchor.constraint(equalTo: canvasContainer.leadingAnchor),
+            mode.trailingAnchor.constraint(equalTo: canvasContainer.trailingAnchor),
+        ])
+        view.window?.makeFirstResponder(mode)
+        view.window?.invalidateCursorRects(for: mode)
+    }
+
+    /// Ends every armed modal canvas mode. Each `end…` is a no-op when its own
+    /// mode is not armed, so this is the whole cost of a new mode: one line.
+    private func endCanvasModes() {
+        endChromaEyedropper()
+        endRegionMode()
+    }
+}
+
 /// The canvas eyedropper for the chroma key (spec §4.3): the Video pane's
 /// "Pick from Canvas" arms it, the next click on the preview samples the
 /// pixel under the pointer, and that colour becomes the selection's key.
@@ -66,16 +117,10 @@ extension EditorViewController {
         // One-line forwards only (app/CLAUDE.md).
         picker.onPick = { [weak self] point in self?.chromaKeyPicked(at: point) }
         picker.onCancel = { [weak self] in self?.endChromaEyedropper() }
-        picker.translatesAutoresizingMaskIntoConstraints = false
-        canvasContainer.addSubview(picker)
-        NSLayoutConstraint.activate([
-            picker.topAnchor.constraint(equalTo: canvasContainer.topAnchor),
-            picker.bottomAnchor.constraint(equalTo: canvasContainer.bottomAnchor),
-            picker.leadingAnchor.constraint(equalTo: canvasContainer.leadingAnchor),
-            picker.trailingAnchor.constraint(equalTo: canvasContainer.trailingAnchor),
-        ])
-        view.window?.makeFirstResponder(picker)
-        view.window?.invalidateCursorRects(for: picker)
+        // The one door in: it ends an armed region mode on the way (the
+        // inspector stays clickable under a canvas overlay, so the button that
+        // arms this can be pressed with the band already up).
+        armCanvasMode(picker)
     }
 
     /// Disarms it, from Esc, from a second press of the button, from a
@@ -185,7 +230,7 @@ extension EditorViewController {
 /// canvas, what is under it, and what to do about it are all the view
 /// controller's — this is the same division `CanvasOverlayView` keeps with
 /// `PreviewCanvasView`.
-final class CanvasEyedropperView: NSView {
+final class CanvasEyedropperView: NSView, CanvasModalMode {
     let session: CanvasEyedropperSession
     /// The picked point in WINDOW coordinates.
     var onPick: ((CGPoint) -> Void)?
