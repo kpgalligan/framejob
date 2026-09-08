@@ -42,14 +42,23 @@ full text.
   check enforces it. A gesture that is only a `move_clip` (nudge) needs
   nothing; a composite the UI offers as one command (blurred background,
   zoom back, normalise clip) gets a tool that performs the same composite.
-- **`edit_clip.rs` is over the size cap**, still, and `edit_track.rs` with
-  it. `model.rs` no longer is: phase 0 brought it down from 1330 to 940 by
-  moving the lookups and `validate` to `model_query.rs`, and phase 2 took
-  it to 462 by moving the §5.2 property types (`VideoProps` and its
-  friends) into `model_props.rs` — the cut this bullet used to promise —
-  and moved `edit_props.rs`'s range checks into `props_check.rs` the same
-  way, so phases 3, 4 and 6 have room for their fields. `core/CLAUDE.md`
-  names the next cuts. No new op goes into `edit_clip.rs`.
+- **A file at the size cap gives something up BEFORE it takes anything
+  on.** Four phases have now paid that rule rather than argued with it:
+  phase 0 took `model.rs` from 1330 to 940 (`model_query.rs`), phase 2 to
+  462 (`model_props.rs`) and moved `edit_props.rs`'s range checks out
+  (`props_check.rs`), phase 3 cut the region vocabulary out when
+  `video.obscure` pushed `model_props.rs` to 633 (`model_regions.rs`), and
+  phase 5 moved the override reading out of `export.rs` — about 120 lines —
+  BEFORE adding two rows to it (`export_overrides.rs`). Over the ~600 cap
+  today, named here so a phase picks its cut rather than discovering the
+  debt: `edit_clip.rs` 1226 — no new op goes in it — `edit.rs` 730,
+  `edit_track.rs` 674 and `edit_paste.rs` exactly at 600. `edit.rs` is the
+  one the cap cannot govern: its module doc IS the op table, so it grows a
+  row per op by design. **`model_props.rs` is back to 592 and phase 6 adds
+  two fields to it, so phase 6 pays first.** The Swift side carries its own:
+  `Transcriber.swift` 934, `AudioDSP.swift` 890, `LayerRenderers.swift` 845.
+  `core/CLAUDE.md` and `app/CLAUDE.md` hold the running list and name the
+  next cuts.
 - **Frozen files** (`EditorViewController.swift`, `TimelineView.swift`,
   `PreviewCanvasView.swift`, `AgentServer.swift`,
   `InspectorViewController.swift`) take wiring only; each feature below
@@ -63,6 +72,13 @@ full text.
   A frame claim is a BYTE comparison of two PNGs or it is not a proof; a
   check that would pass against a build where the op did nothing is not one
   either, and phase 1's review found two of those in its own script.
+  **The way to know a check can fail is to make it fail.** Phases 3, 4 and 5
+  built deliberately broken binaries and ran the script against each —
+  seven of them for phase 5, which is how that phase learned its proof had
+  to measure the written FILE rather than read the app's own report: a
+  build with the loudness gain dropped still echoed −14.0 LUFS over a file
+  measuring −6.7, and every report-reading check passed. A proof that has
+  never failed is a claim, not a measurement.
 - **The baseline** is `make test` green, `make lint` clean and
   `make typecheck` at 0 errors / 4 deliberate warnings. A phase leaves it
   there.
@@ -83,6 +99,17 @@ worked: one reader per dimension (correctness, the core's rules, the app's
 rules, the gestures, the MCP mirror, the docs), then every finding put to
 sceptics told to refute it, then a regression test for each survivor that
 fails without the fix. Green tests prove the cases someone thought of.
+
+Five phases have now run it and it has never come back empty: five real
+defects in phase 1, six in phase 2, six in phase 3, twelve in phase 4, ten
+in phase 5 — and two of phase 3's and one of phase 5's were blockers that a
+hundred green checks had walked past. Two things about the shape were
+learned rather than designed. **Route a fix by the file it ROOTS in, not by
+the dimension that reported it**: phase 3 handed five survivors to fixers
+who did not own the file and needed a second round to close them. And
+**tell the readers what is already known** — the standing limits, the
+deliberate decisions, the debts — so their attention goes to what nobody
+has looked at rather than to what everyone has.
 
 ## 1. Status
 
@@ -1935,16 +1962,21 @@ normalising and is not a number.
   `set_video` with Fill scale, `x`/`y` 0, crop cleared and
   `filters: [{blur, 1}]` — in one undo step. MCP `add_blurred_background
   {clip}` mirrors the composite.
-- **Filters as action targets.** Phase 3's list rule makes `filters`
-  interpolate per index; this phase lets `set_action_end` carry them and
+- **Filters as action targets.** Phase 3's list rule LANDED and does make
+  `filters` interpolate per index — read it in `actions.rs` before writing
+  against it, because the widened `{kind, shape}` discriminant is confined
+  to list ENTRIES, deliberately, so that no named object's animation
+  changed. This phase lets `set_action_end` carry them and
   the Filters section write through `InspectorBinding` while the playhead
   is inside an action, as every other section does. `clamp_video` already
   bounds them.
 
 `RC_FORMAT_VERSION` 6.
 
-**Where.** `model.rs`, `format.rs` + header, `props_check.rs` (range checks
-for the new fields), `actions.rs`, `Compositor.metal`, `Compositor.swift`,
+**Where.** `model_props.rs` — NOT `model.rs`, which has held only the
+schema's shape since phase 2 — plus `format.rs` + header, `props_check.rs`
+(range checks for the new fields), `actions.rs`, `Compositor.metal`,
+`Compositor.swift`,
 `CompositorEffects.swift`, `LayerRenderers.swift`, `VideoPane.swift`,
 `ShapePane.swift`, `EditorViewController+AddClips.swift` (the two
 background commands), `AppDelegate.swift`, catalog and handlers;
@@ -2000,8 +2032,11 @@ state.*
   progress and Cancel. Last in the phase; drop to the next session if the
   rest ran long.
 
-**Where.** `EditorViewController+SaveFrame.swift`, `export.rs`,
-`ExporterWriter.swift`, `Exporter.swift`, `DocumentPane.swift`, `recipe.rs`
+**Where.** `EditorViewController+SaveFrame.swift`, `export.rs` — whose
+override reading is `export_overrides.rs`'s since phase 5, and which is at
+579 against the cap — `ExporterWriter.swift`, `Exporter.swift` (beside
+`ExporterLoudness.swift` now, and note the export is TWO passes when a
+loudness target is set), `DocumentPane.swift`, `recipe.rs`
 + `ffi_query.rs` + header + `ReelCore.swift` (the recipe options),
 `ExportSheetController.swift`, `ExportPresetsStore.swift`,
 `ExportQueueController.swift`, `AgentServer+Render.swift`, catalog;
@@ -2117,7 +2152,7 @@ handle, `AgentServer+Arguments.swift`, `AgentServer+Project.swift`, catalog.
   frame when the nest clip is at the identity transform.
 - Entering, editing, leaving is exactly one undo step per edit, and undo
   restores the outer frame.
-- A v2 file is untouched; `rc_op_names` is unchanged (scope is an envelope
+- A file of every earlier version is untouched; `rc_op_names` is unchanged (scope is an envelope
   key, not an op).
 
 ## 3. Proposed keys and menu items
@@ -2200,3 +2235,10 @@ change has been read back adversarially and what that found is fixed and
 covered.** A phase is not done because its own tests pass — those test the
 cases whoever wrote them thought of. It is done when someone has gone
 looking for what they did not.
+
+Phases 4 and 5 added a second: **the proof has been made to fail.** A
+script nobody has broken on purpose is a script whose checks are untested,
+and both phases found checks that could not fail — phase 4's own "blank"
+frame was the fully drawn one — by going looking. Build the broken binary,
+watch the check fail, restore, and say in the write-up which mutations you
+ran.
