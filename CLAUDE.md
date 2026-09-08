@@ -28,7 +28,7 @@ Four things in `designs/`, and you want all of them:
 
 ```sh
 make app        # cargo build --release + xcodegen + xcodebuild → build/Build/Products/Release/Reelcut.app
-make test       # cd core && cargo test --release  (358 black-box tests)
+make test       # cd core && cargo test --release  (368 black-box tests)
 make lint       # cargo clippy --all-targets -- -D warnings
 make typecheck  # swiftc -typecheck of app/Sources/*.swift — the ONLY authoritative Swift check
 make project    # xcodegen generate (Reelcut.xcodeproj is generated; project.yml is the source of truth)
@@ -51,7 +51,7 @@ core/                Rust staticlib — the model, the ops, the plan, the recipe
   src/                 model(+_query/_props/_regions) time edit(+_clip/_edge/
                        _insert/_props/_track/_time/_paste/_nest/_action/_zoom)
                        props_check actions transition evaluate recipe nest
-                       audio snap format export(+_size) agent ffi*
+                       audio snap format export(+_size/_overrides) agent ffi*
   tests/               black-box, through the FFI (core/CLAUDE.md)
 app/
   Sources/             AppKit app, programmatic UI (app/CLAUDE.md has the map)
@@ -109,12 +109,12 @@ make app
 
 The log line names the port it actually bound (a taken port falls back to an
 ephemeral one). Then drive it with any MCP client over streamable HTTP at
-`http://127.0.0.1:<port>/mcp` — 70 tools: one per §6 op (53) plus the
-seventeen app-state tools: `open_project`, `new_project`, `save_project`,
+`http://127.0.0.1:<port>/mcp` — 71 tools: one per §6 op (53) plus the
+eighteen app-state tools: `open_project`, `new_project`, `save_project`,
 `get_project`, `import_media`, `import_captions`, `export_captions`,
-`transcribe`, `consolidate_media`, `detect_silence`, `set_playhead`,
-`set_range`, `set_selection`, `undo`, `redo`, `render_frame` and
-`export`.
+`transcribe`, `consolidate_media`, `detect_silence`, `normalize_clip`,
+`set_playhead`, `set_range`, `set_selection`, `undo`, `redo`,
+`render_frame` and `export`.
 `render_frame` writes a PNG and returns its path, so a script can diff it
 against `ffmpeg`-extracted source frames; `export` waits for the file.
 
@@ -192,13 +192,13 @@ did. The harness also pins every
 state, track height, snapping, guides and the Document tab's checkbox) plus
 `AppleShowScrollBars = Always` in the argument domain, so two renders of one
 package are byte-identical on one machine, mouse or no mouse.
-`tools/proof/phase2_chrome.py`, `phase3_chrome.py` and `phase4_chrome.py`
-are the proofs built on it: a pixel diff of two renders, measured against
-rectangles from the layout constants. `expandSections` is what lets one
-photograph a section built `defaultExpanded: false` — phase 4's Animation
-section is the second to need it — and the fact that it was already there
-is worth saying, because a proof that quietly grows its own instrument is
-not a proof.
+`tools/proof/phase2_chrome.py`, `phase3_chrome.py`, `phase4_chrome.py` and
+`phase5_chrome.py` are the proofs built on it: a pixel diff of two renders,
+measured against rectangles from the layout constants. `expandSections` is
+what lets one photograph a section built `defaultExpanded: false` — phase
+4's Animation section is the second to need it — and the fact that it was
+already there is worth saying, because a proof that quietly grows its own
+instrument is not a proof.
 
 **The second form photographs nothing**, and it is here for the reason to
 remember when the next piece of app arithmetic has no caller a script can
@@ -302,9 +302,11 @@ positions still hold.
   a constant-power law normalised to unity at centre (so 0 is an exact
   bypass), and noise reduction delays its track by 512 samples.
   Not started: **filters as animatable action targets** beyond what
-  `clamp_video` already bounds. `AudioProps.mono` is still unimplemented —
-  the tap could fold it, but turning it on would change how existing
-  projects sound.
+  `clamp_video` already bounds. (`AudioProps.mono` was the other thing on
+  this list until road map 2's phase 5a folded it in the tap; the sentence
+  that used to stand here — "turning it on would change how existing
+  projects sound" — is true and is the feature, since only a project that
+  had deliberately asked for mono changes at all.)
   Two measured things worth knowing before you chase them: **audio export is
   not bit-deterministic near a duck ramp edge** (three exports of one
   unchanged project gave two distinct results differing by 38 samples of one
@@ -810,5 +812,144 @@ positions still hold.
   and `phase3_chrome.py` is 33/33 run after run. **A proof that scores
   differently on identical input is an ambiguity to find, not a race to
   out-wait** — app/CLAUDE.md keeps that under `InspectorPane`'s pitfalls.
+- **Road map 2, phase 5 — Sound: done.** No schema change (version 5
+  stands, and `mono` had been in the file since M1), NO new op (`OP_NAMES`
+  is still 53), one new tool (the catalog is **71**), two new export preset
+  rows and two new export overrides.
+  **`AudioProps.mono` finally does something.** The fold is at the head of
+  the tap's Mix stage — after the noise reducer and the compressor, BEFORE
+  the pan — and the order is forced rather than chosen: after a pan the
+  fold is algebraically self-cancelling (`(g_L·x + g_R·x)/2 =
+  ((g_L+g_R)/2)·x`), so the pan would silently degrade into a gain change
+  and read as broken. It averages EVERY channel into all of them with an
+  early return below two, the guard the pan already uses, because the tap
+  is handed the composition track's channel count and folding 0 and 1 of a
+  5.1 source would leave four untouched. Two documents were half-true until
+  this landed and now say so: a pan on a mono-folded clip is a TRUE pan
+  rather than a balance (spec §4.3), and spec §7.2's old sentence — `mono`
+  as "a per-segment flag Swift applies with
+  `AVMutableAudioMixInputParameters` where possible" — described something
+  that API cannot do, since it applies gain over time and cannot combine
+  channels. `mono` rides `AudioClipDSP` beside pan, the compressor and
+  noise reduction, keyed by clip id, and `Playback` already treats a
+  different `audioDSP` as structural, so the rebuild came free. A track
+  whose clips do not ask for mono is bit-identical, which is what makes the
+  feature safe to ship into projects that already exist.
+  **The level meter is the phase's headline deviation, and the road map's
+  design for it cannot be built.** It asks for "a second, read-only
+  `MTAudioProcessingTap` … `kMTAudioProcessingTapCreationFlag_PostEffects`".
+  There is no such thing: `AVMutableAudioMixInputParameters` has exactly ONE
+  `audioTapProcessor`, and `MTAudioProcessingTap.h` requires the PreEffects
+  or the PostEffects flag but not both — so a track already carrying the DSP
+  tap cannot carry a second one, and moving the DSP tap to PostEffects would
+  put the compressor behind the fader and change how every existing project
+  with a compressor sounds. **So the meter reads the tap that already exists
+  and multiplies by the plan's envelope** (`LevelMeter.swift`,
+  `LevelMeterView.swift`): the tap is PreEffects and sees the samples before
+  volume, fades and ducking, and the envelope at that tick is exactly what
+  `CompositionBuilder` hands AVFoundation as volume ramps, so the number is
+  COMPUTED rather than observed and is exact rather than approximate.
+  `SilenceDetector` had already established the rule — a peak is pre-fader,
+  so the level you want is peak × envelope. Do not "fix" it back toward a
+  second tap. Around that: metering is a PLAYBACK build alone
+  (`CompositionBuilder.build`'s `metering`, passed true by
+  `Playback.startRebuild` and nothing else, so every export keeps the audio
+  path it had and a metering build taps EVERY audio track, inert ones
+  included); the push is a 30 Hz run-loop `Timer` armed and disarmed by the
+  rate KVO, not the periodic time observer, which fires only while time
+  moves and would freeze a meter at its last lit value instead of letting it
+  fall; the MODEL publishes a raw per-channel peak and RMS and the VIEW owns
+  the ballistics, which is what lets the proof assert on a number rather
+  than a photograph; and the view sits in the flexible gap immediately LEFT
+  of the zoom cluster with no divider, because the row's fixed content is
+  880 pt against a 900 pt minimum window and a divider's second gap plus its
+  hairline would make 905. Starved below 40 pt it draws nothing, the
+  selection block's own rule. Three tokens (`DS.meterFill` = the clip
+  palette's audio green, `DS.meterTrough`, `DS.meterClip` = the one place
+  the bar spends coral). And it is **the app's first
+  `import Synchronization`** — two relaxed atomic words, because
+  `LevelMeterSink.publish` runs on AVPlayer's render thread where a lock
+  invites priority inversion and `main.async` allocates; that is confined to
+  `LevelMeter.swift` and is an exception of the same class as `async` being
+  confined to `MediaImporter.swift` (app/CLAUDE.md keeps them together).
+  **Normalise Clip** is `AudioNormalize.swift`, a value type — peaks in, ops
+  out, `CaptionLayout`'s shape applied to sound — so the Audio pane's button
+  and the `normalize_clip` tool provably do the same thing; and
+  `MediaPeaks.swift` is the shared arithmetic under it, the four pieces
+  `SilenceDetector` used to keep privately (the bucket size, the
+  project→source mapping through the plan segment's own resolved rate, the
+  floor, and the reversed MIRROR about the media's model duration — nothing
+  ever generates peaks for `cache/reversed/…`). It REPLACES `volume` rather
+  than multiplying it, so a second press is a no-op and comes back as "made
+  no change"; it always writes BASE props even inside an action; it leaves
+  `muted` alone; each clip of a selection gets its OWN gain; and the window
+  comes from the PLAN segment, where "there is no audio segment for this
+  clip" is the ONE test that correctly refuses no media, missing media, no
+  audio track, `enabled.audio` off anywhere, a still and a nested clip. The
+  4× ceiling stands, so a clip under about −13 dBFS is normalised as loud as
+  it goes and the result says where it landed. Reachable from the Audio
+  section's button and Clip ▸ Normalize, no key equivalent.
+  **Loudness on export** is `Loudness.swift` (BS.1770-4: two K-weighting
+  biquads run continuously, 400 ms blocks at 75 % overlap, the −70 LUFS
+  absolute and −10 LU relative gates, true peak through the standard's
+  4-phase 12-tap FIR), and it has no AVFoundation in it, which is what lets
+  it be checked against synthesized tones with no fixture file. An export is
+  **two passes wherever the file holds sound**, normalised or not: the
+  measurement builds its OWN composition (an `AVAudioMix` copy shares the
+  tap, and a tap carries per-instance state), reads 32-bit FLOAT so a mix
+  over full scale is measured honestly — with `canAdd` MEASURING the request
+  and a 16-bit fallback recorded rather than discovered, though on macOS
+  26.5.1 float is accepted — and the write pass applies the gain to the
+  decoded Int16 samples, rounding and saturating, never truncating. With
+  Loudness off the gain path is not entered at all, so an unnormalised
+  export is byte-identical to a pre-phase one BY CONSTRUCTION. The sheet
+  gains ONE row (Off / −14 / −16 / −23 / Custom, with the −1 dBTP ceiling
+  fixed and stated in the hint), the progress sheet says "Measuring
+  loudness…" through pass 1, and every export's last line and the `export`
+  tool's result both report what the file actually holds. **The limit worth
+  knowing before you chase it**: the measurement is float and honest about a
+  hot mix, but the write pass decodes to Int16, which saturates BEFORE the
+  gain — so a mix that clips is measured correctly, normalised down, and
+  still clipped. The gain cannot undo the decode.
+  **WAV and AIFF** are two rows beside `audio_m4a`, 16-bit LPCM at 48 kHz
+  (24-bit deliberately deferred: it would mean widening the decode settings
+  every other preset's encoder consumes, and a silent format mismatch there
+  is a file of noise rather than an error). Both carry a NON-NULL
+  `avf_preset` — `audio_m4a`'s, because a null one is the ImageIO writer's
+  cue and would hand a WAV to `ImageSequenceWriter` — so the field now means
+  only "AVFoundation can write this row", which the header, spec §7.8 and
+  `core/CLAUDE.md` all say. `export.rs` gave something up before it took
+  this on: `describe`, the overrides object and the per-type readers went to
+  a new `core/src/export_overrides.rs` (266), re-exported so the five
+  modules naming `crate::export::describe` were untouched, and `export.rs`
+  came back to 579 with the phase's additions already in it.
+  Measured: `make test` **368** (358 before — ten in `core/tests/export.rs`,
+  which went 20 → 30; `export_size.rs` grew the two rows and no test),
+  `make lint` and `cargo fmt --check` clean, `make typecheck` 0 errors and
+  the same 4 AVFoundation warnings, `make app` building, the catalog at
+  **71 tools** and the startup parity log EMPTY, and phases 1–4 still
+  proving at 66/66, 85/85, 121/121, 8/8, 84/84, 26/26, 33/33 and 59/59.
+  The phase's own scripts are `tools/proof/phase5_proof.py` over MCP —
+  **88/88** — and `phase5_chrome.py` offscreen — **81/81**, of which
+  sections 1–7 (forty-five) are the meter's PICTURE, measured against a
+  reference build of the tree one commit before `LevelMeterView.swift`
+  existed, section 8 (twenty-three) is its MODEL's reading through the
+  harness's third mode, since a meter at rest is all a still frame can hold,
+  and section 9 (thirteen) is the EXPORT GAIN over a probe the script
+  compiles from `Loudness.swift` alone — the file has no AVFoundation in it,
+  so `ExportLoudness.resolve` answers four numbers without a mix, which is
+  what lets the −1 dBTP ceiling be swept across two hundred true peaks
+  instead of sampled at one.
+  **That cross-build comparison is scoped to the TIMELINE BAR**, and
+  deliberately: the reference tree ages, so a whole-window comparison would
+  fail the first time phase 6 adds an inspector section, with the meter
+  untouched and every earlier phase's script expected to re-run unchanged.
+  Section 3b stages exactly that (the same reference render against a
+  current one whose playhead has moved) and all five of the script's chrome
+  mutations were re-measured at the new scoping, so the row costs it
+  nothing. The harness's reference build is guarded the same way: one
+  GENERAL `-D HARNESS_REFERENCE_BUILD` flag that every future non-render
+  mode goes behind, a fallback to the reference commit's own `main.swift`,
+  and a scored FAILURE rather than a `sys.exit` when neither builds.
 
 Keep this file current as code lands.

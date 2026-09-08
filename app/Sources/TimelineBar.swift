@@ -13,6 +13,11 @@ enum TimelineBar {
     /// What `TimelineView` has to hold on to after the bar is built: the
     /// block it pushes a selection into and the two option controls it asks
     /// to re-read themselves.
+    ///
+    /// The level meter is deliberately NOT here. It subscribes to
+    /// `LevelMeter.shared` itself, so nothing has to push into it and the
+    /// frozen `TimelineView` and `EditorViewController` gain neither a stored
+    /// handle nor a fan-out line for it.
     struct Parts {
         let view: NSView
         let selection: TimelineSelectionBlock
@@ -58,9 +63,24 @@ enum TimelineBar {
         spacer.setContentCompressionResistancePriority(
             NSLayoutConstraint.Priority(1), for: .horizontal)
 
+        // The meter goes in the flexible gap, immediately left of the zoom
+        // cluster, rather than last: placing it after S/M/L would shift the
+        // zoom cluster and the size control 130-odd points left, and both are
+        // two phases of muscle memory old. Here nothing that shipped moves at
+        // any window width, because the meter carries the spacer's own
+        // priority-1 hugging and compression resistance and absorbs slack up
+        // to its own cap.
+        //
+        // It gets NO divider before it, and that is arithmetic rather than
+        // taste: the row's fixed content measures 880 pt against a 900 pt
+        // minimum window, one more stack gap for the meter makes 892, and a
+        // divider's second gap plus its hairline would make 905 — broken
+        // constraints at the minimum window, which nothing in this project
+        // asserts on and no proof would catch. The meter compresses to
+        // nothing and stops drawing instead (`LevelMeterView.draw`).
         let row = NSStackView(views: [
             selection, DividerView(length: 18), actions, DividerView(length: 18), snap, spacer,
-            zoomCluster(owner: owner), DividerView(length: 18), size,
+            LevelMeterView(), zoomCluster(owner: owner), DividerView(length: 18), size,
         ])
         row.translatesAutoresizingMaskIntoConstraints = false
         row.orientation = .horizontal

@@ -45,6 +45,15 @@ import UniformTypeIdentifiers
 /// every `ExportError` — is shared, because the sheet cannot tell which one
 /// it got.
 ///
+/// **Two passes, since phase 5.** An export that carries sound MEASURES its
+/// mix before it writes it (`Loudness.swift`), which is what lets the final
+/// line report "Peak −1.0 dBTP · −14.0 LUFS" for every export and what
+/// chooses the gain for one that asked to be normalised. That pass is
+/// **`ExporterLoudness.swift`** — this class's own extension, cut out when this
+/// file went past its size cap and otherwise unchanged — and its header carries
+/// the rest of the argument: what the pass costs, why it builds a composition
+/// of its own rather than sharing this one's mix, and why it reads float.
+///
 /// **Deprecations.** `copyCGImage(at:actualTime:)` on
 /// `AVAssetImageGenerator` is deprecated in favour of an `async` replacement.
 /// Deliberately not taken: `async`/`await` is confined to
@@ -118,9 +127,55 @@ final class Exporter {
     private var recipeKey: Int?
     private var progressHandler: ((Double) -> Void)?
     private var completionHandler: ((Result<URL, any Error>) -> Void)?
+
+    /// Guards everything the measurement pass and the main thread both touch.
+    /// `ExportWriter` has the same three members for the same reason, and
+    /// this is that discipline copied rather than a second one invented:
+    /// `cancelRequested` used to be main-thread-only state, and a measure
+    /// loop on `buildQueue` that reads it would make it a data race the
+    /// moment the pass became cancellable.
+    ///
+    /// It and the four members below are internal only so that the pass that
+    /// reads them can be — `ExporterLoudness.swift` is an extension of this
+    /// class in another file. Nothing outside those two files may take it.
+    let lock = NSLock()
     /// Set by `cancel()`. Checked once the build lands, because a cancel
-    /// during the build has no writer to stop yet.
+    /// during the build has no writer to stop yet, and again per sample
+    /// buffer of the measurement.
     private var cancelRequested = false
+    /// 0…1 through the measurement pass.
+    private var measureProgress: Double = 0
+    /// The reader the measurement is blocked in. Cancelling it is what wakes
+    /// a `copyNextSampleBuffer` that is waiting on a slow volume — the same
+    /// trick `ExportWriter.cancel` plays on its pumps.
+    var measureReader: AVAssetReader?
+
+    /// The share of the progress bar the measurement pass owns, decided
+    /// before the build so the mapping cannot move under the sheet. A
+    /// measurement really is about half of an audio-only export's work and a
+    /// rounding error beside a movie's video encode, and a bar that claims
+    /// otherwise is worse than one that is coarse.
+    private var measureShare: Double = 0
+    /// The measurement, held from the pass until `finish` publishes it.
+    private var pendingLoudness: ExportLoudness?
+
+    /// What this export's sound measured, and what the gain (if any) made of
+    /// it — nil for a format with no audio, and until `finish` has run.
+    ///
+    /// Set in `finish`, which is documented below as the one exit, and NOT
+    /// cleared by it: both consumers read it off the `Exporter` they already
+    /// hold, after the completion has fired (the progress sheet in
+    /// `finished(_:)`, the agent's `export` on its own stack). Widening the
+    /// pipeline's `Result<URL, any Error>` instead would drag
+    /// `ImageSequenceWriter` into a concept it has no audio to have.
+    private(set) var loudnessReport: ExportLoudness?
+
+    /// Bytes for the measurement's sample buffers, grown once. Raw and
+    /// 16-byte aligned rather than an `[UInt8]`, because the samples are
+    /// bound to `Float` or `Int16` and an array of bytes promises neither
+    /// alignment. Touched only on `buildQueue`.
+    var scratchStorage: UnsafeMutableRawPointer?
+    var scratchCapacity = 0
 
     init() {}
 
@@ -131,6 +186,7 @@ final class Exporter {
     deinit {
         timer?.invalidate()
         if let key = recipeKey { RecipeSource.shared.unregister(key) }
+        scratchStorage?.deallocate()
     }
 
     // MARK: - Exporting
@@ -147,7 +203,10 @@ final class Exporter {
         progress: @escaping (Double) -> Void,
         completion: @escaping (Result<URL, any Error>) -> Void
     ) {
-        cancelRequested = false
+        setCancelRequested(false)
+        setMeasureProgress(0)
+        loudnessReport = nil
+        pendingLoudness = nil
         progressHandler = progress
         completionHandler = completion
 
@@ -168,20 +227,39 @@ final class Exporter {
         recipeKey = key
         RecipeSource.shared.set(project, for: key)
 
+        measureShare = Exporter.measuresLoudness(settings)
+            ? (settings.isAudioOnly ? 0.5 : 0.1) : 0
+        // The timer starts BEFORE the build rather than with the writer,
+        // because the measurement pass is the first thing with a fraction to
+        // report and, on an audio-only export, half the wait.
+        startProgressTimer()
+
         let planJSON = project.planJSON
         buildQueue.async { [weak self] in
-            let result = Result {
+            let build = {
                 try CompositionBuilder.build(
                     plan: plan, planJSON: planJSON, urls: urls, recipeKey: key)
             }
+            let result = Result(catching: build)
             // Read here, not on the main thread: the markers come off the
             // SNAPSHOT, and on a handle nothing has looked at yet that is the
             // first decode of the whole project JSON.
             let chapters = ExportChapter.list(from: project.snapshot.markers)
+            var loudness: ExportLoudness?
+            if case .success = result, Exporter.measuresLoudness(settings), let self = self,
+                !self.isCancelled
+            {
+                // A composition of its own for the measurement (see the type
+                // doc): the same plan, the same media, a fresh `AVAudioMix`
+                // with fresh taps, and a video composition nothing reads.
+                if let measured = try? build() {
+                    loudness = self.measureLoudness(measured, settings: settings)
+                }
+            }
             DispatchQueue.main.async { [weak self] in
                 self?.startWriting(
                     result, project: project, urls: urls, chapters: chapters,
-                    settings: settings, to: url)
+                    settings: settings, loudness: loudness, to: url)
             }
         }
     }
@@ -190,8 +268,19 @@ final class Exporter {
     /// to call before the composition has finished building — that is what
     /// `cancelRequested` is for.
     func cancel() {
-        cancelRequested = true
+        setCancelRequested(true)
+        lock.lock()
+        let reader = measureReader
+        lock.unlock()
+        reader?.cancelReading()
         writer?.cancel()
+    }
+
+    /// Whether this export measures its sound at all. Everything but the two
+    /// image formats, which hold no audio track in the file format itself —
+    /// the same fact the core reports as `audio: false` for those rows.
+    private static func measuresLoudness(_ settings: ExportSettings) -> Bool {
+        !settings.isImageSequence
     }
 
     /// True between `export` and its completion.
@@ -205,10 +294,12 @@ final class Exporter {
     /// `ExporterImageSequence.swift`).
     private func startWriting(
         _ result: Result<BuiltComposition, any Error>, project: ReelProject,
-        urls: [UInt32: URL], chapters: [ExportChapter], settings: ExportSettings, to url: URL
+        urls: [UInt32: URL], chapters: [ExportChapter], settings: ExportSettings,
+        loudness: ExportLoudness?, to url: URL
     ) {
         guard completionHandler != nil else { return }
-        guard !cancelRequested else {
+        pendingLoudness = loudness
+        guard !isCancelled else {
             finish(.failure(ExportError.cancelled))
             return
         }
@@ -239,16 +330,18 @@ final class Exporter {
             return
         }
         self.writer = writer
-
-        // The documented progress-timer seam (app/CLAUDE.md). A run-loop
-        // timer, not a dispatch source, so it stops deterministically the
-        // moment the write finishes.
-        timer = Timer.scheduledTimer(
-            withTimeInterval: Exporter.progressInterval, repeats: true
-        ) { [weak self] _ in
-            self?.pollProgress()
+        // The gain is not part of choosing a pipeline, so it is handed over
+        // after the pick rather than through it: `Exporter.pipeline` stays
+        // the one place that decides WHICH pipeline writes a file, and a
+        // gain only ever exists for settings that pick resolves to the
+        // `AVAssetWriter` path — `measuresLoudness` refuses the image rows,
+        // which are the only ones it does not.
+        if let loudness = loudness, !loudness.isUnity {
+            (writer as? ExportWriter)?.normalizeAudio(byLinearGain: Float(loudness.linearGain))
         }
-        progressHandler?(0)
+
+        startProgressTimer()
+        progressHandler?(measureShare)
         // The pipeline calls back on the main thread, exactly once. The bar
         // is driven to full here rather than left wherever the last sample
         // put it, so a consumer that watches only `progress` still sees the
@@ -260,15 +353,55 @@ final class Exporter {
         }
     }
 
+    /// The documented progress-timer seam (app/CLAUDE.md). A run-loop timer,
+    /// not a dispatch source, so it stops deterministically the moment the
+    /// write finishes. Idempotent: `export` starts it for the measurement
+    /// and `startWriting` for the write, and only one runs.
+    private func startProgressTimer() {
+        guard timer == nil else { return }
+        timer = Timer.scheduledTimer(
+            withTimeInterval: Exporter.progressInterval, repeats: true
+        ) { [weak self] _ in
+            self?.pollProgress()
+        }
+    }
+
     private func pollProgress() {
-        guard let writer = writer else { return }
-        progressHandler?(writer.progress)
+        progressHandler?(currentProgress)
+    }
+
+    /// The bar: the measurement's share first, the write's the rest of the
+    /// way. `measureShare` is 0 for a format with no sound, so an export
+    /// that measures nothing reports exactly what it reported before.
+    private var currentProgress: Double {
+        if let writer = writer {
+            return measureShare + writer.progress * (1 - measureShare)
+        }
+        lock.lock()
+        defer { lock.unlock() }
+        return measureProgress * measureShare
+    }
+
+    /// What the sheet should say while this runs, or nil for its own
+    /// wording. Only the measurement has a phase of its own: the build
+    /// before it is "Preparing…" and everything after it is "Writing…",
+    /// which is what the sheet already says. The live READER is the test
+    /// rather than a flag of its own, so the label appears exactly while
+    /// samples are being measured and not for the build that precedes them.
+    var phaseDescription: String? {
+        lock.lock()
+        defer { lock.unlock() }
+        return measureReader == nil ? nil : "Measuring loudness…"
     }
 
     /// The one exit. Tears down the timer and the recipe slot before the
     /// caller hears anything, so a completion handler that starts another
-    /// export finds this one fully unwound.
+    /// export finds this one fully unwound. The measurement is PUBLISHED
+    /// here rather than cleared: both callers read it after their completion
+    /// has fired.
     private func finish(_ result: Result<URL, any Error>) {
+        loudnessReport = pendingLoudness
+        pendingLoudness = nil
         timer?.invalidate()
         timer = nil
         if let key = recipeKey {
@@ -280,6 +413,28 @@ final class Exporter {
         completionHandler = nil
         progressHandler = nil
         completion?(result)
+    }
+
+    // MARK: - Shared state
+
+    /// The three accessors over `lock`. Two are internal for the same reason
+    /// it is: `ExporterLoudness.swift` checks the first per sample buffer.
+    var isCancelled: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return cancelRequested
+    }
+
+    private func setCancelRequested(_ value: Bool) {
+        lock.lock()
+        cancelRequested = value
+        lock.unlock()
+    }
+
+    func setMeasureProgress(_ value: Double) {
+        lock.lock()
+        measureProgress = value
+        lock.unlock()
     }
 
     // MARK: - Settings → AVFoundation
@@ -326,7 +481,14 @@ final class Exporter {
     }
 
     /// The output file type: the core's UTI when it gave one, else the
-    /// container name mapped to the four this build writes.
+    /// container name mapped to the six this build writes.
+    ///
+    /// The fallback is only ever reached by a core that gave no `file_type`,
+    /// which none of the shipped rows does. It carries `wav` and `aiff` all
+    /// the same, for the symmetry rather than the need: the two LPCM rows
+    /// resolve through their UTI like every other row, and a reader who
+    /// finds them missing from this list would reasonably conclude they take
+    /// a different path.
     static func fileType(for settings: ExportSettings) -> AVFileType? {
         if let raw = settings.fileType, !raw.isEmpty { return AVFileType(rawValue: raw) }
         switch settings.container.lowercased() {
@@ -334,6 +496,8 @@ final class Exporter {
         case "mp4": return .mp4
         case "m4v": return .m4v
         case "m4a": return .m4a
+        case "wav": return .wav
+        case "aiff": return .aiff
         default: return nil
         }
     }

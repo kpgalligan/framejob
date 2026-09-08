@@ -47,10 +47,18 @@ struct ExportChapter: Equatable {
 /// that `Playback` plays and `Exporter.renderFrame` samples — the custom
 /// `Compositor` runs here exactly as it does on screen, from the same frame
 /// recipes, through the same `RecipeSource` slot, and so do the audio mix's
-/// processing taps (`addAudio`). Nothing in this file draws a pixel or mixes a
-/// sample; it moves what AVFoundation composed into an encoder and adds the
-/// three things a preset name cannot express: a chapter track, explicit
-/// bitrates, and an output size the sheet actually promised.
+/// processing taps (`addAudio`). Nothing in this file draws a pixel; it moves
+/// what AVFoundation composed into an encoder and adds the three things a
+/// preset name cannot express: a chapter track, explicit bitrates, and an
+/// output size the sheet actually promised.
+///
+/// **The one sample it touches** is the loudness normalisation's gain — one
+/// scalar multiply over the decoded 16-bit mix, applied here because this is
+/// where the export's samples exist and nowhere else: it is export-only by
+/// definition, so the preview and the file still share one description of
+/// the sound (the mix, the ramps and the taps) and differ only by a number
+/// the export was asked for. `Exporter` measured that number a moment
+/// earlier; `Loudness.swift` holds both halves of the arithmetic.
 ///
 /// **Why the read is a reader and not a second render.** The alternative —
 /// driving the compositor by hand over an `AVAssetImageGenerator`, one frame
@@ -111,6 +119,23 @@ final class ExportWriter {
     /// Called once, on the main thread, and then dropped.
     private var completion: ((Result<URL, any Error>) -> Void)?
 
+    /// The loudness normalisation's gain, as a linear multiplier on the
+    /// decoded 16-bit samples. 1 means there is none, and 1 is not a
+    /// multiply by one: `pump` never enters the gain path at all, so an
+    /// export that was not normalised is byte-identical to one from before
+    /// this file knew what loudness was — by construction rather than by
+    /// argument.
+    ///
+    /// Written once, on the main thread, between `init` and `start`; read
+    /// only on `audioQueue` afterwards. Not under the lock for that reason
+    /// and no other.
+    private var audioGain: Float = 1
+    private let gainKernel = LoudnessInt16Gain()
+    /// One sample buffer's samples, copied out and back. Grown on the audio
+    /// pump's own queue, in practice once.
+    private var gainScratch: UnsafeMutablePointer<Int16>?
+    private var gainScratchCount = 0
+
     /// Builds the reader, the writer and every track, or throws the
     /// `Exporter.ExportError` the sheet should show. Nothing is read or
     /// written until `start`.
@@ -136,11 +161,31 @@ final class ExportWriter {
 
         try addVideo(settings: settings)
         try addAudio(settings: settings)
-        addChapters(chapters)
+        addChapters(chapters, settings: settings)
     }
 
     @available(*, unavailable) required init?(coder: NSCoder) {
         fatalError("ExportWriter does not support NSCoder")
+    }
+
+    deinit { gainScratch?.deallocate() }
+
+    /// Multiplies every audio sample by `gain` on the way to the encoder —
+    /// the second half of a loudness-normalised export (`Exporter`'s
+    /// measurement pass is the first).
+    ///
+    /// Main thread, after `init` and before `start`: the gain is the
+    /// measurement's answer, and the measurement runs on the build queue
+    /// while this object is being constructed. `Exporter.startWriting` is
+    /// the one caller.
+    ///
+    /// A non-finite or non-positive gain is ignored rather than obeyed. A
+    /// gain is a number derived from a measurement, and a measurement of
+    /// digital silence is −∞; multiplying a file by that would be a silent
+    /// export reported as a success.
+    func normalizeAudio(byLinearGain gain: Float) {
+        guard gain.isFinite, gain > 0 else { return }
+        audioGain = gain
     }
 
     // MARK: - Tracks
@@ -221,6 +266,11 @@ final class ExportWriter {
         let output = AVAssetReaderAudioMixOutput(
             audioTracks: tracks, audioSettings: Self.decodedAudioSettings)
         output.audioMix = built.audioMix
+        // AVFoundation's own default, set here because the loudness gain
+        // rewrites these buffers IN PLACE and a shared one would be a
+        // surprise the other reader in this tree
+        // (`MediaImporter.peaks`, which turns it off) makes plausible.
+        output.alwaysCopiesSampleData = true
         guard reader.canAdd(output) else {
             throw Exporter.ExportError.failed("The audio mix could not be read for export.")
         }
@@ -246,9 +296,18 @@ final class ExportWriter {
     /// Additive, never fatal: a build of macOS that will not take the text
     /// track loses the chapters, not the movie. The track is marked disabled
     /// so no player tries to draw the names over the picture.
-    private func addChapters(_ chapters: [ExportChapter]) {
-        guard !chapters.isEmpty, let host = videoInput ?? audioInput,
-            let format = Self.textFormat()
+    ///
+    /// **A container that cannot hold a chapter track is refused HERE, not
+    /// left to `canAdd`.** A chapter list is a second track associated with
+    /// the first, which is a QuickTime-family idea; a RIFF or an IFF file is
+    /// a header followed by samples with nowhere to put one. `canAdd` is the
+    /// wrong guard for that because the failure it would let through is the
+    /// expensive one: a `true` followed by a refusal at `finishWriting`
+    /// loses the whole file, which is exactly what a malformed text format
+    /// description already cost once (see `textFormat`).
+    private func addChapters(_ chapters: [ExportChapter], settings: ExportSettings) {
+        guard Self.carriesChapters(settings), !chapters.isEmpty,
+            let host = videoInput ?? audioInput, let format = Self.textFormat()
         else { return }
         let samples = Self.chapterSamples(chapters, in: range, format: format)
         guard !samples.isEmpty else { return }
@@ -292,10 +351,12 @@ final class ExportWriter {
             pump(input, from: output, on: videoQueue, group: group, tracksProgress: true)
         }
         if let input = audioInput, let output = audioOutput {
-            // Audio drives the bar only when there is no picture to drive it.
+            // Audio drives the bar only when there is no picture to drive it,
+            // and it is the only pump that can carry a gain.
             pump(
                 input, from: output, on: audioQueue, group: group,
-                tracksProgress: videoInput == nil)
+                tracksProgress: videoInput == nil,
+                gain: audioGain == 1 ? nil : audioGain)
         }
         if let input = chapterInput {
             pumpChapters(input, on: chapterQueue, group: group)
@@ -331,9 +392,13 @@ final class ExportWriter {
     /// `requestMediaDataWhenReady` re-enters this block whenever the encoder
     /// has room, so the "have I already finished?" flag lives outside it and
     /// is only ever touched on `queue`, which is serial.
+    ///
+    /// `gain` is nil for every pump but the audio one, and nil for the audio
+    /// one too unless the export asked to be normalised — which is what
+    /// keeps an ordinary export on exactly the samples it had before.
     private func pump(
         _ input: AVAssetWriterInput, from output: AVAssetReaderOutput, on queue: DispatchQueue,
-        group: DispatchGroup, tracksProgress: Bool
+        group: DispatchGroup, tracksProgress: Bool, gain: Float? = nil
     ) {
         group.enter()
         var finished = false
@@ -369,6 +434,18 @@ final class ExportWriter {
                 // this file. The reader clips to `timeRange`, so this is a
                 // boundary frame, not a common case.
                 guard time.isNumeric, time >= .zero else { continue }
+                // Before `retimed`, which returns a copy SHARING this
+                // buffer's samples (and, for an export that starts at zero,
+                // this very buffer): gaining the original gains whatever
+                // comes back, and gaining afterwards would depend on which
+                // of the two it was.
+                if let gain = gain, !self.applyGain(gain, to: sample) {
+                    self.stopped(
+                        with: Exporter.ExportError.failed(
+                            "The loudness gain could not be applied to a sample."))
+                    stop()
+                    return
+                }
                 guard let rebased = Self.retimed(sample, by: self.range.start) else {
                     self.stopped(
                         with: Exporter.ExportError.failed(
@@ -420,6 +497,40 @@ final class ExportWriter {
                 }
             }
         }
+    }
+
+    // MARK: - The loudness gain
+
+    /// Multiplies one audio sample buffer's 16-bit samples by `gain`, in
+    /// place. `audioQueue` only. False is a real failure — the caller stops
+    /// the export rather than appending ungained audio, because a file that
+    /// is half normalised is worse than one that is not written.
+    ///
+    /// Out and back through `CMBlockBufferCopyDataBytes` /
+    /// `CMBlockBufferReplaceDataBytes` rather than a pointer into the block:
+    /// a `CMBlockBuffer` may be several non-contiguous chunks, and both of
+    /// those walk them where `CMBlockBufferGetDataPointer` hands back the
+    /// first one and silently truncates (the trap `MediaImporter.peaks`
+    /// records). Two memcpys per buffer, no allocation after the first.
+    private func applyGain(_ gain: Float, to sample: CMSampleBuffer) -> Bool {
+        guard let block = CMSampleBufferGetDataBuffer(sample) else { return false }
+        let count = CMBlockBufferGetDataLength(block) / MemoryLayout<Int16>.size
+        guard count > 0 else { return true }
+        let bytes = count * MemoryLayout<Int16>.size
+        if gainScratchCount < count {
+            gainScratch?.deallocate()
+            gainScratch = .allocate(capacity: count)
+            gainScratchCount = count
+        }
+        guard let scratch = gainScratch else { return false }
+        guard CMBlockBufferCopyDataBytes(
+            block, atOffset: 0, dataLength: bytes, destination: scratch)
+            == kCMBlockBufferNoErr
+        else { return false }
+        guard gainKernel.scale(scratch, count: count, gain: gain) else { return false }
+        return CMBlockBufferReplaceDataBytes(
+            with: scratch, blockBuffer: block, offsetIntoDestination: 0, dataLength: bytes)
+            == kCMBlockBufferNoErr
     }
 
     // MARK: - Finishing
@@ -632,6 +743,16 @@ final class ExportWriter {
     /// What comes OUT of the mix: 16-bit interleaved LPCM. The same format
     /// the ProRes path writes, and one every encoder here takes without a
     /// conversion in between.
+    ///
+    /// **It SATURATES, and it saturates before the loudness gain**, which is
+    /// the one place the two passes of a normalised export part company: the
+    /// measurement reads the same mix as 32-bit float (`ExporterLoudness`),
+    /// so a mix past full scale is measured whole and written clipped. The
+    /// alternative is decoding float here, and that changes the format
+    /// description every encoder in this file consumes — hence every existing
+    /// export's bytes — for a case a normalised export is turning DOWN
+    /// anyway. So the difference is reported rather than removed:
+    /// `ExportLoudness.mixClipped` is what says the figures are the mix's.
     private static let decodedAudioSettings: [String: Any] = [
         AVFormatIDKey: Int(kAudioFormatLinearPCM),
         AVSampleRateKey: 48000,
@@ -642,20 +763,55 @@ final class ExportWriter {
         AVLinearPCMIsNonInterleaved: false,
     ]
 
-    /// The encoder settings for the sound: LPCM under ProRes, so a master
-    /// stays a master, and AAC everywhere else. `settings.audioBitrate` when
-    /// the core resolved one, else 192 kbps — stereo AAC's transparent-enough
-    /// rate and what the M1 presets landed on.
+    /// The encoder settings for the sound: LPCM where the row asks for it, so
+    /// a master stays a master, and AAC everywhere else. `settings.audioBitrate`
+    /// when the core resolved one, else 192 kbps — stereo AAC's
+    /// transparent-enough rate and what the M1 presets landed on.
+    ///
+    /// **Two codecs mean LPCM, and the CONTAINER decides the byte order.**
+    /// ProRes has since M2 (§7.8 pairs the profile with uncompressed sound),
+    /// and phase 5's `audio_wav` / `audio_aiff` rows carry the codec `lpcm`
+    /// outright. The dictionary handed to the encoder is then literally
+    /// `decodedAudioSettings` — the same one the mix is read through, so
+    /// nothing is converted on the way — except for AIFF, which is
+    /// big-endian by definition where WAV and QuickTime are little. Getting
+    /// that flag wrong is not a subtle bug, and it was measured rather than
+    /// reasoned about: on macOS 26.5.1 `AVAssetWriter.canAdd` answers FALSE
+    /// for AAC settings into a `.wav` and FALSE for a little-endian LPCM
+    /// dictionary into an `.aiff`, so either mistake reaches the user as
+    /// `.presetUnavailable` for a format the table advertises. With the
+    /// branch as written, one twenty-second tone came out of both rows the
+    /// same size and decoded to identical PCM, sample for sample.
+    ///
+    /// A row whose codec is `lpcm` in a container this build has no rule for
+    /// still gets little-endian LPCM rather than AAC, because AAC in an
+    /// uncompressed container is the failure that reads as
+    /// `.presetUnavailable` and sends the reader looking at the preset table.
     private static func audioSettings(_ settings: ExportSettings) -> [String: Any] {
-        if settings.codec.lowercased().hasPrefix("prores") {
-            return decodedAudioSettings
+        let codec = settings.codec.lowercased()
+        guard codec == "lpcm" || codec.hasPrefix("prores") else {
+            return [
+                AVFormatIDKey: Int(kAudioFormatMPEG4AAC),
+                AVSampleRateKey: 48000,
+                AVNumberOfChannelsKey: 2,
+                AVEncoderBitRateKey: settings.audioBitrate.map { max(1, $0) } ?? 192_000,
+            ]
         }
-        return [
-            AVFormatIDKey: Int(kAudioFormatMPEG4AAC),
-            AVSampleRateKey: 48000,
-            AVNumberOfChannelsKey: 2,
-            AVEncoderBitRateKey: settings.audioBitrate.map { max(1, $0) } ?? 192_000,
-        ]
+        guard settings.container.lowercased() == "aiff" else { return decodedAudioSettings }
+        var bigEndian = decodedAudioSettings
+        bigEndian[AVLinearPCMIsBigEndianKey] = true
+        return bigEndian
+    }
+
+    /// Whether this container can hold a chapter track (see `addChapters`).
+    /// The QuickTime family and nothing else: a chapter list is a text track
+    /// associated with the movie's own, and WAV, AIFF and the two image
+    /// formats have no track to associate it with.
+    private static func carriesChapters(_ settings: ExportSettings) -> Bool {
+        switch settings.container.lowercased() {
+        case "mov", "quicktime", "mp4", "m4v", "m4a": return true
+        default: return false
+        }
     }
 
     // MARK: - Chapter samples

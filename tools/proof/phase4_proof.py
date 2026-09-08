@@ -83,8 +83,8 @@ CANVAS = (640, 360)
 # The whole catalog after phase 4: 53 ops (`core/src/edit.rs`'s OP_NAMES) plus
 # the 17 tools that mirror no op. The EXACT count belongs to the newest
 # phase's script — it is the only thing that tells a stale binary on the port
-# from the build under test — so this is the assertion phases 1, 2 and 3 hand
-# over as they become floors.
+# from the build under test — so this is the assertion phases 1, 2 and 3 handed
+# over, and which phase 5 took over in its turn when normalize_clip made it 71.
 TOOLS = 70
 
 failures = []
@@ -345,10 +345,11 @@ class Session:
 def catalog_part(mcp):
     print("catalog")
     names = mcp.tools()
-    # The EXACT count, which phase 3 held until this phase landed: it is the
-    # guard against a stale binary on the port, and there is nowhere else for
-    # it to live once phase 3's assertion becomes a floor.
-    check(len(names) == TOOLS, f"the catalog holds exactly {TOOLS} tools (got {len(names)})")
+    # Phase 4 found 70 — transcribe and export_captions over phase 3's 68 — and
+    # held the EXACT count until phase 5 added normalize_clip and took it over,
+    # exactly as the comment on TOOLS said it would. A floor still catches a
+    # binary older than this phase, which is what the check is for.
+    check(len(names) >= TOOLS, f"the catalog holds phase 4's {TOOLS} tools or more (got {len(names)})")
     for tool in ["transcribe", "export_captions"]:
         check(tool in names, f"{tool} is a tool")
 

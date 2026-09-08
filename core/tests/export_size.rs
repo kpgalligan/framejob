@@ -47,9 +47,18 @@ fn row(id: &str, name: &str, width: i64, height: i64) -> Row {
     (id.to_string(), name.to_string(), width, height)
 }
 
-/// The movie formats, which all list the same sizes — the audio-only row
-/// included, on the terms `rc_export_settings` reports a width for it.
-const MOVIE_FORMATS: [&str; 4] = ["h264", "hevc", "prores_422", "audio_m4a"];
+/// The movie formats, which all list the same sizes — the three
+/// audio-only rows included, on the terms `rc_export_settings` reports a
+/// width for them. Only the two image formats list anything else, and only
+/// because they are the only rows carrying a cap.
+const MOVIE_FORMATS: [&str; 6] = [
+    "h264",
+    "hevc",
+    "prores_422",
+    "audio_m4a",
+    "audio_wav",
+    "audio_aiff",
+];
 
 /// The sizes for `preset` against `handle` as the rows of the array, or
 /// the message.
@@ -203,14 +212,16 @@ fn the_image_formats_lead_with_their_cap_and_the_document_comes_second() {
 }
 
 #[test]
-fn the_audio_only_format_lists_what_h264_lists() {
+fn the_audio_only_formats_list_what_h264_lists() {
     // One rule for every movie container; the sheet disables the control
     // for a file with no picture, the list does not pretend there is
-    // nothing to disable.
+    // nothing to disable. WAV and AIFF are here for the road map's own
+    // words — the new rows come "with `audio_m4a`'s size rows" — which is
+    // a claim about this list and is checked rather than assumed.
     for (width, height) in [(1600, 900), (1080, 1920), (480, 270)] {
         let handle = document(width, height);
         let h264 = listed(&handle, "h264");
-        for preset in ["audio_m4a", "hevc", "prores_422"] {
+        for preset in ["audio_m4a", "audio_wav", "audio_aiff", "hevc", "prores_422"] {
             assert_eq!(
                 listed(&handle, preset),
                 h264,

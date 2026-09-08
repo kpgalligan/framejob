@@ -13,6 +13,15 @@ struct BuiltComposition {
     /// string, never re-encoded and never decoded first — a re-encode can
     /// reorder keys and make an identical plan look structural.
     let planJSON: String
+    /// One entry per audio track on a METERING build, empty otherwise: the
+    /// sink that track's tap writes its levels into, and the envelope the
+    /// reader multiplies them by. They ride here rather than in a fourth
+    /// process-wide mirror beside `RecipeSource`, `AudioDSPSource` and
+    /// `ReverseSource` because, unlike those three, nothing on the far side of
+    /// a `recipeKey` needs them: the only reader is the `Playback` that
+    /// asked for the build and already holds this object, so the sinks' life
+    /// is exactly the composition's and no lock is involved at all.
+    let meters: [LevelMeterTrack]
 }
 
 /// Plan JSON → `AVMutableComposition` + `AVMutableVideoComposition` +
@@ -54,8 +63,18 @@ enum CompositionBuilder {
     /// are left as empty time. `recipeKey` is the `RecipeSource` slot the
     /// compositor reads this document's frame recipes from, and travels on
     /// every instruction so two open documents can never read each other's.
+    ///
+    /// **`metering` is the preview's alone.** It is passed true by
+    /// `Playback.startRebuild` and by nothing else, so an export and a
+    /// rendered frame build exactly the audio path they built before the level
+    /// meter existed — which is what lets "with `mono` off the export is
+    /// byte-identical to a pre-phase export" be a claim about the mono fold
+    /// and nothing else. A metering build gives EVERY audio track a tap, the
+    /// inert ones included, because a meter that lights only on the tracks
+    /// that happen to carry a compressor is worse than no meter.
     static func build(
-        plan: CompositionPlan, planJSON: String, urls: [UInt32: URL], recipeKey: Int
+        plan: CompositionPlan, planJSON: String, urls: [UInt32: URL], recipeKey: Int,
+        metering: Bool = false
     ) throws -> BuiltComposition {
         let composition = AVMutableComposition()
         var assets: [UInt32: AVURLAsset] = [:]
@@ -84,16 +103,23 @@ enum CompositionBuilder {
         // does for a volume change — volume IS in the plan, as ramps.
         let dsp = AudioDSPSource.shared.parameters(for: recipeKey)
         var inputParameters: [AVAudioMixInputParameters] = []
+        var meters: [LevelMeterTrack] = []
         for planTrack in plan.audioTracks {
             let track = try makeTrack(in: composition, mediaType: .audio, id: planTrack.id)
             try fill(
                 track, from: planTrack, mediaType: .audio, urls: urls, reverse: reverse,
                 assets: &assets, reversedAssets: &reversedAssets)
+            let sink = metering ? LevelMeterSink() : nil
+            if let sink = sink {
+                meters.append(
+                    LevelMeterTrack(id: planTrack.id, ramps: planTrack.ramps, sink: sink))
+            }
             inputParameters.append(
                 audioParameters(
                     for: track, plan: planTrack,
                     dsp: dsp.isEmpty
-                        ? nil : AudioTrackDSP(planTrack: planTrack, parameters: dsp)))
+                        ? nil : AudioTrackDSP(planTrack: planTrack, parameters: dsp),
+                    meter: sink))
         }
 
         // Source orientation is read once per media and then attached per
@@ -132,7 +158,7 @@ enum CompositionBuilder {
 
         return BuiltComposition(
             composition: composition, videoComposition: videoComposition, audioMix: audioMix,
-            planJSON: planJSON)
+            planJSON: planJSON, meters: meters)
     }
 
     // MARK: - The media-less timeline
@@ -420,25 +446,31 @@ enum CompositionBuilder {
 
     /// One input-parameter block per composition audio track: the plan's
     /// piecewise-linear envelope as volume ramps, the time-pitch algorithm its
-    /// segments asked for, and — when any clip on the track asks for one — the
-    /// processing tap that runs pan, the compressor and noise reduction
-    /// (`AudioTap.swift`).
+    /// segments asked for, and — when any clip on the track asks for one, or
+    /// when this build is metering — the processing tap that runs pan, the
+    /// mono fold, the compressor and noise reduction (`AudioTap.swift`).
     ///
-    /// **A track with nothing to do still gets no tap.** `dsp` is nil, or its
-    /// `isActive` is false, for every project that does not use the three M3
-    /// audio properties, and the object built here is then exactly the one
-    /// this function built before they existed. A pass-through tap measures
-    /// bit-transparent, so this is a cost-and-clarity decision rather than a
-    /// fidelity one — but it does mean an untouched project's audio needs no
-    /// argument about transparency at all.
+    /// **A track with nothing to do still gets no tap**, on an export. `dsp`
+    /// is nil, or its `isActive` is false, for every project that does not use
+    /// the four sample-level audio properties, and the object built here is
+    /// then exactly the one this function built before they existed. A
+    /// pass-through tap measures bit-transparent, so this is a
+    /// cost-and-clarity decision rather than a fidelity one — but it does mean
+    /// an untouched project's audio needs no argument about transparency at
+    /// all. A metering build breaks that rule deliberately and only for the
+    /// preview, where there is no file to be identical to.
     ///
-    /// `mono` is still NOT expressed here. It could be now — the tap could
-    /// fold the channels — but it is not this slice's field to turn on, and a
-    /// project that has been saving `mono: true` and hearing stereo since M2
-    /// should not start sounding different as a side effect of the pan
-    /// landing. Spec §7.2 still describes the flag as carried and unused.
+    /// **`mono` IS expressed now**, in the tap, at the head of the Mix stage
+    /// (`AudioDSPChain.process`). It could not be expressed here in any case:
+    /// `AVMutableAudioMixInputParameters` applies gain over time and cannot
+    /// combine channels, which is why spec §7.2's old sentence about a
+    /// per-segment flag "Swift applies with `AVMutableAudioMixInputParameters`
+    /// where possible" described something the API cannot do — and the plan
+    /// carries no such flag either. A project that saved `mono: true` before
+    /// this landed does now sound different, which is the feature.
     private static func audioParameters(
-        for track: AVMutableCompositionTrack, plan: PlanTrack, dsp: AudioTrackDSP?
+        for track: AVMutableCompositionTrack, plan: PlanTrack, dsp: AudioTrackDSP?,
+        meter: LevelMeterSink?
     ) -> AVAudioMixInputParameters {
         let parameters = AVMutableAudioMixInputParameters(track: track)
         if let pitch = plan.segments.compactMap({ $0.pitch }).first {
@@ -454,7 +486,7 @@ enum CompositionBuilder {
                 fromStartVolume: Float(ramp.from), toEndVolume: Float(ramp.to),
                 timeRange: CMTimeRange(start: time(ramp.start), duration: time(ramp.duration)))
         }
-        if let dsp = dsp, let tap = AudioTap.make(for: dsp) {
+        if let tap = AudioTap.make(for: dsp, meter: meter) {
             parameters.audioTapProcessor = tap
         }
         return parameters

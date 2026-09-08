@@ -27,6 +27,7 @@ pub mod edit_track;
 pub mod edit_zoom;
 pub mod evaluate;
 pub mod export;
+pub mod export_overrides;
 pub mod export_size;
 pub mod ffi;
 pub mod ffi_agent;

@@ -13,15 +13,32 @@ import AppKit
 /// correct: no rebuild, just one forced frame. Different means the timeline's
 /// shape changed and only a new `AVPlayerItem` can express it.
 ///
+/// It also drives the level meter, because it is the object that owns the
+/// player, the rate KVO and both teardown doors: a metering composition build
+/// (the only one in the app) hangs a `LevelMeterSink` on every audio track's
+/// tap, and a 30 Hz run-loop timer — armed and disarmed by the rate KVO —
+/// reads them, multiplies by the plan's envelope and publishes one reading to
+/// `LevelMeter.shared`. See `LevelMeter.swift` for why the meter is computed
+/// from the DSP tap rather than observed from a second one.
+///
 /// AppKit-facing and main-thread only. The one GCD seam is the rebuild queue
-/// (app/CLAUDE.md); the 80 ms live debounce is a run-loop `Timer`, not a
-/// dispatch source, so it cancels deterministically.
+/// (app/CLAUDE.md); the 80 ms live debounce and the meter's read are run-loop
+/// `Timer`s, not dispatch sources, so they cancel deterministically.
 final class Playback {
 
     /// How long a live gesture must be quiet before a structural rebuild is
     /// worth doing. Long enough that a drag across ten frames rebuilds once,
     /// short enough that the preview never feels detached (§7.6).
     static let liveRebuildDelay: TimeInterval = 0.08
+
+    /// How often the level meter is re-read while the transport is moving.
+    ///
+    /// It is a READ rate, not a measurement rate: the taps publish once per
+    /// buffer, which is 12–20 Hz on the paths this app has measured (4096
+    /// frames is 85 ms at 48 kHz), so 30 Hz merely makes sure a new buffer is
+    /// picked up within a frame of arriving. `Exporter.progressInterval` is
+    /// the same idea at a slower cadence.
+    static let meterInterval: TimeInterval = 1.0 / 30
 
     /// The layer `PreviewCanvasView` puts under its overlay (§11: an
     /// `AVPlayerLayer`, not a self-driven `MTKView`, so A/V sync and
@@ -64,6 +81,11 @@ final class Playback {
     /// Bumped per rebuild so a slow build that finishes after a newer one
     /// started is discarded instead of replacing a fresher item.
     private var generation = 0
+    /// The level meter's 30 Hz read. Nil whenever the transport is stopped —
+    /// the rate KVO arms and disarms it — so an idle editor pays nothing for
+    /// having a meter, exactly as it pays nothing for the periodic time
+    /// observer AVFoundation stops delivering.
+    private var meterTimer: Timer?
 
     private var canvasSize = CGSize(width: 1920, height: 1080)
     private var isSeeking = false
@@ -89,7 +111,17 @@ final class Playback {
         rateObservation = player.observe(\.rate, options: [.new]) { [weak self] player, _ in
             guard let self = self else { return }
             let rate = player.rate
-            self.onMain { self.onRateChanged?(rate) }
+            self.onMain {
+                // The meter is gated HERE and not on the periodic time
+                // observer, which fires only while time is moving: a meter
+                // driven by that would freeze at its last lit value the moment
+                // playback stopped instead of falling to silence. The rate KVO
+                // is the only thing that reliably learns the transport
+                // stopped, including when AVFoundation stops it itself at the
+                // end of an item or on a stall.
+                if rate == 0 { self.stopMetering() } else { self.startMetering() }
+                self.onRateChanged?(rate)
+            }
         }
     }
 
@@ -101,6 +133,12 @@ final class Playback {
         if let timeObserver = timeObserver { player.removeTimeObserver(timeObserver) }
         rateObservation?.invalidate()
         debounceTimer?.invalidate()
+        // Both teardown doors have to close the meter, or a window that went
+        // away leaves the shared model lit at whatever it last read.
+        // `ObjectIdentifier(self)` rather than `self`: nothing may retain — or
+        // resurrect — an object that is already deinitialising.
+        meterTimer?.invalidate()
+        LevelMeter.shared.publish(.silent, from: ObjectIdentifier(self))
     }
 
     /// Stops everything and drops the item. `ProjectDocument` calls this when
@@ -110,6 +148,7 @@ final class Playback {
         debounceTimer?.invalidate()
         debounceTimer = nil
         pending = nil
+        stopMetering()
         player.pause()
         player.replaceCurrentItem(with: nil)
         built = nil
@@ -136,10 +175,11 @@ final class Playback {
     ///    always rebuilds.
     ///
     /// **The audio DSP counts as structural too**, which is the one addition
-    /// to that rule. Pan, the compressor and noise reduction are the only
-    /// clip properties the compositor cannot express, so unlike every other
-    /// property they are not picked up by re-reading `RecipeSource`: they are
-    /// frozen into the composition's taps when it is built (`AudioTap.swift`).
+    /// to that rule. Pan, the mono fold, the compressor and noise reduction
+    /// are the only clip properties the compositor cannot express, so unlike
+    /// every other property they are not picked up by re-reading
+    /// `RecipeSource`: they are frozen into the composition's taps when it is
+    /// built (`AudioTap.swift`).
     /// That is not a special case so much as the case volume is already in —
     /// volume reaches AVFoundation as the plan's ramps, so changing it has
     /// always rebuilt — and it costs one rebuild per parameter change,
@@ -216,8 +256,12 @@ final class Playback {
         let audioDSP = request.audioDSP
         rebuildQueue.async { [weak self] in
             let result = Result {
+                // The ONE metering build in the app. An export and a rendered
+                // frame build the audio path they always built; the meter has
+                // no consumer there and a tap on a track that had none would
+                // put an unmeasured object in the write path.
                 try CompositionBuilder.build(
-                    plan: plan, planJSON: planJSON, urls: urls, recipeKey: key)
+                    plan: plan, planJSON: planJSON, urls: urls, recipeKey: key, metering: true)
             }
             DispatchQueue.main.async { [weak self] in
                 self?.finishRebuild(result, generation: generation, audioDSP: audioDSP)
@@ -344,6 +388,61 @@ final class Playback {
         guard step > 0, n != 0 else { return }
         pause()
         seek(to: max(0, currentTime + Ticks(n) * step))
+    }
+
+    // MARK: - The level meter
+
+    /// The transport's levels, right now: every metered track's last buffer,
+    /// each multiplied by the mix envelope over it, summed.
+    ///
+    /// **The envelope is the multiply that makes the number post-fader.** The
+    /// taps are `PreEffects`, so what they measured is the track before
+    /// volume, the fades and ducking — and the plan's ramps are exactly what
+    /// `CompositionBuilder` handed AVFoundation to apply downstream of them.
+    /// `LevelMeter.swift` argues why the meter must be computed this way
+    /// rather than observed from a second tap.
+    ///
+    /// It is read at the PLAYHEAD's tick, while the buffer the taps last
+    /// published is a little ahead of it — the audio path renders in front of
+    /// the picture. The two differ by under one buffer, so on a fade the
+    /// displayed level lags the applied gain by up to 85 ms, which is under
+    /// this meter's own resolution and far under the eye's.
+    func meterReading() -> LevelMeterReading {
+        guard let meters = built?.meters, !meters.isEmpty else { return .silent }
+        let t = currentTime
+        var total = LevelMeterReading.silent
+        for track in meters {
+            let gain = Float(LevelMeterEnvelope.value(track.ramps, at: t))
+            total = total.adding(track.sink.read().scaled(by: gain))
+        }
+        return total
+    }
+
+    /// Armed by the rate KVO when the transport starts moving. A run-loop
+    /// `Timer`, not a dispatch source, for the reason this file's header gives
+    /// for the debounce: it cancels deterministically, and app/CLAUDE.md's
+    /// five `DispatchQueue` seams are not to grow a sixth.
+    private func startMetering() {
+        guard meterTimer == nil else { return }
+        meterTimer = Timer.scheduledTimer(
+            withTimeInterval: Playback.meterInterval, repeats: true
+        ) { [weak self] _ in
+            guard let self = self else { return }
+            LevelMeter.shared.publish(self.meterReading(), from: ObjectIdentifier(self))
+        }
+    }
+
+    /// Disarmed on every stop, with a final zero. Nothing is pulled through
+    /// the taps at rate 0, so the last buffer's peak would otherwise sit lit
+    /// on the meter for as long as the window was open — which reads as a bug
+    /// rather than as a paused transport. The sinks are cleared as well, so a
+    /// resumed preview does not flash the peak it paused on before its first
+    /// buffer arrives.
+    private func stopMetering() {
+        meterTimer?.invalidate()
+        meterTimer = nil
+        built?.meters.forEach { $0.sink.clear() }
+        LevelMeter.shared.publish(.silent, from: ObjectIdentifier(self))
     }
 
     // MARK: - Observers

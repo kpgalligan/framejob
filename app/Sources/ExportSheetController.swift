@@ -85,6 +85,11 @@ final class ExportSheetController: NSViewController {
     private let heightField = NSTextField(string: "")
     private let ratePopup = NSPopUpButton(frame: .zero, pullsDown: false)
     private let qualityPopup = NSPopUpButton(frame: .zero, pullsDown: false)
+    /// Off, three targets, then "Custom…" — and the field beside it, live
+    /// only for that last row, the same shape the Size popup and its two
+    /// fields already have.
+    private let loudnessPopup = NSPopUpButton(frame: .zero, pullsDown: false)
+    private let loudnessField = NSTextField(string: "")
     private let rangePopup = NSPopUpButton(frame: .zero, pullsDown: false)
     private let summaryLabel = NSTextField(wrappingLabelWithString: "")
     private let footnote = sheetFootnote("")
@@ -101,6 +106,32 @@ final class ExportSheetController: NSViewController {
     /// outside it by name (`AgentServer+Render.swift`), and one constant is
     /// how the sheet and the tool cannot disagree.
     static let sizeRange = 16...8192
+
+    // MARK: - Loudness
+
+    /// The Loudness popup's rows after "Off", in menu order: the integrated
+    /// target each asks the export to be normalised to.
+    ///
+    /// −14 LUFS is where every streaming service has settled (Spotify,
+    /// YouTube and Apple Music all normalise to within a decibel of it), −16
+    /// is the podcast convention for stereo, and −23 is EBU R 128, which is
+    /// broadcast delivery in Europe and what "LUFS" meant before streaming
+    /// took the word. Anything else is "Custom…" and the field beside it.
+    private static let loudnessTargets: [Double] = [-14, -16, -23]
+
+    /// The true-peak ceiling every normalised export is capped against, in
+    /// dBTP. FIXED in phase 5 rather than made a control: five presets and
+    /// one broadcast-standard ceiling is what people actually pick, the sheet
+    /// is already six control rows deep, and the `export` tool keeps
+    /// `peak_dbtp` for a script that needs −0.3 or −2.0. The hint says the
+    /// number, so a fixed value is visible rather than folklore.
+    static let peakCeilingDBTP: Double = -1
+
+    /// What the core will take: `export_overrides.rs`'s own bounds for
+    /// `loudness_lufs`, spelled here so the field's formatter refuses what
+    /// the core would refuse rather than sending it and reading the message
+    /// back.
+    private static let loudnessRange: ClosedRange<Double> = -70...0
 
     // MARK: - Quality
 
@@ -188,11 +219,14 @@ final class ExportSheetController: NSViewController {
             return ExportSheetController.isFrameSequence(container: preset.container)
         }
 
-        /// ProRes is a fixed-rate intra codec: the profile decides the data
-        /// rate, and §7.8's preset pairs it with LPCM audio, so neither
-        /// number is the sheet's to name.
+        /// A row whose data rate is not the sheet's to name. ProRes is a
+        /// fixed-rate intra codec — the profile decides — and §7.8's preset
+        /// pairs it with LPCM audio; the two LPCM audio rows are
+        /// uncompressed by definition, so offering either of them an AAC bit
+        /// rate would be a control that changes nothing about the file.
         private var fixedRate: Bool {
-            preset?.codec.lowercased().hasPrefix("prores") ?? false
+            let codec = preset?.codec.lowercased() ?? ""
+            return codec.hasPrefix("prores") || codec == "lpcm"
         }
 
         private var hasVideo: Bool { preset.map { !$0.audioOnly } ?? false }
@@ -202,6 +236,14 @@ final class ExportSheetController: NSViewController {
         var videoBitrate: Bool { hasVideo && !frameSequence && !fixedRate }
         var audioBitrate: Bool { preset != nil && !frameSequence && !fixedRate }
         var quality: Bool { videoBitrate || audioBitrate }
+
+        /// Loudness normalisation is a gain on the mixed sound, so it
+        /// applies to every row that HAS sound — which is every row but the
+        /// two frame sequences. Deliberately not gated by `fixedRate` (ProRes
+        /// carries LPCM audio and takes a gain like anything else) nor by
+        /// `hasVideo` (the three audio-only rows are exactly where a
+        /// delivery target matters most).
+        var loudness: Bool { preset != nil && !frameSequence }
     }
 
     /// GIF and APNG. Spelled once, and taken from the container rather than
@@ -289,6 +331,27 @@ final class ExportSheetController: NSViewController {
         qualityPopup.action = #selector(qualityChanged(_:))
         qualityPopup.widthAnchor.constraint(equalToConstant: 200).isActive = true
 
+        loudnessPopup.addItem(withTitle: "Off")
+        loudnessPopup.addItems(withTitles: Self.loudnessTargets.map { Self.loudnessTitle($0) })
+        loudnessPopup.addItem(withTitle: "Custom…")
+        loudnessPopup.font = DS.sans(13)
+        loudnessPopup.target = self
+        loudnessPopup.action = #selector(loudnessChanged(_:))
+        loudnessPopup.widthAnchor.constraint(equalToConstant: 186).isActive = true
+
+        let loudnessFormatter = NumberFormatter()
+        loudnessFormatter.numberStyle = .decimal
+        loudnessFormatter.allowsFloats = true
+        loudnessFormatter.maximumFractionDigits = 1
+        loudnessFormatter.minimum = NSNumber(value: Self.loudnessRange.lowerBound)
+        loudnessFormatter.maximum = NSNumber(value: Self.loudnessRange.upperBound)
+        loudnessField.formatter = loudnessFormatter
+        loudnessField.delegate = self
+        loudnessField.alignment = .right
+        loudnessField.placeholderString = "LUFS"
+        loudnessField.widthAnchor.constraint(equalToConstant: 64).isActive = true
+        DSField.style(loudnessField)
+
         rangePopup.addItem(withTitle: "Whole project")
         if range != nil { rangePopup.addItem(withTitle: "In/out range") }
         rangePopup.font = DS.sans(13)
@@ -311,6 +374,10 @@ final class ExportSheetController: NSViewController {
             [NSGridCell.emptyContentView, sizeRow()],
             [fieldLabel("Frame rate:"), ratePopup],
             [fieldLabel("Quality:"), qualityPopup],
+            // ONE row, popup and field together: 186 + 6 + 64 fits the 258
+            // points the 420-wide card leaves beside a 106 label column,
+            // where the Size popup's 240 does not.
+            [fieldLabel("Loudness:"), loudnessRow()],
             [fieldLabel("Range:"), rangePopup],
         ])
         grid.rowSpacing = 10
@@ -333,7 +400,9 @@ final class ExportSheetController: NSViewController {
             title: "Export",
             hint: "The format decides the codec and the container. Size, frame rate and "
                 + "range start as the document's and quality as the format's; a GIF or an "
-                + "APNG starts at its own cap and rate.",
+                + "APNG starts at its own cap and rate. Loudness normalises the whole mix "
+                + "by one gain — no limiter — capped so its true peak stays under "
+                + "−1 dBTP.",
             content: content,
             buttonRow: makeButtonRow(
                 cancel: cancelButton, apply: exportButton, leading: [footnote]))
@@ -350,6 +419,26 @@ final class ExportSheetController: NSViewController {
         stack.alignment = .centerY
         stack.spacing = 6
         return stack
+    }
+
+    private func loudnessRow() -> NSStackView {
+        let stack = NSStackView(views: [loudnessPopup, loudnessField])
+        stack.orientation = .horizontal
+        stack.alignment = .centerY
+        stack.spacing = 6
+        return stack
+    }
+
+    /// A target as its menu row reads. The two named tiers say who asks for
+    /// them, because "−14" and "−23" mean nothing to someone who has not met
+    /// them before and everything to someone who has.
+    private static func loudnessTitle(_ target: Double) -> String {
+        let value = String(format: "%.0f", target).replacingOccurrences(of: "-", with: "−")
+        switch target {
+        case -14: return "\(value) LUFS (streaming)"
+        case -23: return "\(value) LUFS (broadcast)"
+        default: return "\(value) LUFS"
+        }
     }
 
     /// Lists the core's rows for the current format, refills the Size popup
@@ -427,6 +516,15 @@ final class ExportSheetController: NSViewController {
             syncReadout()
             return
         }
+        // The same rule for the Custom loudness field, and for the same
+        // reason: an empty field is not a target, and reading it as one would
+        // export at whatever the clamp's floor happens to be.
+        if isCustomLoudness, currentApplies.loudness, loudnessField.stringValue.isEmpty {
+            resolved = nil
+            resolveError = "Type a loudness target in LUFS, or pick one from the list."
+            syncReadout()
+            return
+        }
         do {
             resolved = try ReelExport.settings(
                 project, preset: preset.id, overrides: overrides())
@@ -467,6 +565,28 @@ final class ExportSheetController: NSViewController {
         let index = qualityPopup.indexOfSelectedItem - 1
         guard currentApplies.quality, index >= 0, index < Self.tiers.count else { return nil }
         return Self.tiers[index]
+    }
+
+    /// True while the Loudness popup's last item, "Custom…", is chosen.
+    private var isCustomLoudness: Bool {
+        loudnessPopup.indexOfSelectedItem == Self.loudnessTargets.count + 1
+    }
+
+    /// The integrated target to normalise to, or nil for "Off" — index 0 of
+    /// the popup, on the Quality row's established rule that the first item
+    /// is no override at all. Nil too for a format with no sound, so a target
+    /// picked for a movie cannot follow the user into a GIF.
+    private var currentLoudness: Double? {
+        guard currentApplies.loudness else { return nil }
+        let index = loudnessPopup.indexOfSelectedItem
+        if index >= 1, index <= Self.loudnessTargets.count {
+            return Self.loudnessTargets[index - 1]
+        }
+        guard isCustomLoudness, !loudnessField.stringValue.isEmpty else { return nil }
+        let value = loudnessField.doubleValue
+        guard value.isFinite else { return nil }
+        return min(
+            max(value, Self.loudnessRange.lowerBound), Self.loudnessRange.upperBound)
     }
 
     /// The size override, or nil when the Size popup is on its first row.
@@ -543,6 +663,16 @@ final class ExportSheetController: NSViewController {
                 overrides["audio_bitrate"] = tier.audioBitsPerSecond
             }
         }
+        // Both loudness keys together, always: the core refuses a
+        // `peak_dbtp` with no `loudness_lufs` by name, because normalisation
+        // is gain-only and a ceiling with nothing to cap would be a key
+        // accepted, echoed and silently inert
+        // (`export_overrides.rs::loudness`). The ceiling is fixed at
+        // −1 dBTP in this phase and the hint says so.
+        if let target = currentLoudness {
+            overrides["loudness_lufs"] = target
+            overrides["peak_dbtp"] = Self.peakCeilingDBTP
+        }
         // The core reads the range as ONE nested object (`export.rs`), and
         // ignores override keys it does not know — so `start` and `duration`
         // spelled at the top level exported the whole project instead of the
@@ -584,6 +714,17 @@ final class ExportSheetController: NSViewController {
         ratePopup.isEnabled = applies.frameRate
         qualityPopup.isEnabled = applies.quality
         syncQualityTitles(applies)
+        loudnessPopup.isEnabled = applies.loudness
+        loudnessField.isEnabled = applies.loudness && isCustomLoudness
+        loudnessField.textColor = loudnessField.isEnabled ? DS.textStrong : DS.textMuted
+        if !isCustomLoudness {
+            // The field mirrors the row that is chosen, exactly as the size
+            // fields mirror the core's answer, so picking "Custom…" starts
+            // from the number that was in force a moment before. "Off" has no
+            // number of its own, so it shows the first target — the one
+            // Custom is most likely to be an adjustment of.
+            loudnessField.doubleValue = currentLoudness ?? Self.loudnessTargets[0]
+        }
 
         guard let settings = resolved else {
             summaryLabel.stringValue = resolveError ?? "These settings are not available."
@@ -668,6 +809,14 @@ final class ExportSheetController: NSViewController {
         if currentTier != nil, settings.videoBitrate == nil, settings.audioBitrate == nil {
             parts.append("format's own rate")
         }
+        // The core's echo, not the popup's row: a build whose
+        // `export_settings` has never heard of `loudness_lufs` drops the key
+        // silently, and the footnote must not then promise a normalisation
+        // the file will not have.
+        if let target = settings.loudnessLufs {
+            parts.append(
+                String(format: "%g LUFS", target).replacingOccurrences(of: "-", with: "−"))
+        }
         return parts.joined(separator: " · ")
     }
 
@@ -708,6 +857,10 @@ final class ExportSheetController: NSViewController {
     }
 
     @objc private func qualityChanged(_ sender: Any?) {
+        resolve()
+    }
+
+    @objc private func loudnessChanged(_ sender: Any?) {
         resolve()
     }
 
@@ -787,12 +940,13 @@ final class ExportSheetController: NSViewController {
 // MARK: - Size fields
 
 extension ExportSheetController: NSTextFieldDelegate {
-    /// A custom size is re-resolved on commit, not per keystroke: every
-    /// resolve is an FFI round trip, and a half-typed "19" is not a size
-    /// anyone means. A commit is Return, Tab, a click into the other field,
-    /// or `exportClicked` ending the edit on its way to the save panel.
+    /// A custom size or a custom loudness target is re-resolved on commit,
+    /// not per keystroke: every resolve is an FFI round trip, and a
+    /// half-typed "19" is not a size anyone means. A commit is Return, Tab, a
+    /// click into another field, or `exportClicked` ending the edit on its
+    /// way to the save panel.
     func controlTextDidEndEditing(_ obj: Notification) {
-        guard isCustomSize else { return }
+        guard isCustomSize || isCustomLoudness else { return }
         resolve()
     }
 }
@@ -895,7 +1049,13 @@ final class ExportProgressSheetController: NSViewController {
         let clamped = min(max(value, 0), 1)
         bar.doubleValue = clamped
         percentLabel.stringValue = "\(Int((clamped * 100).rounded())) %"
-        if clamped > 0 {
+        // The exporter names its own phase while it has one. Without this the
+        // label would claim to be writing a file during the loudness
+        // measurement — which on an audio-only export is half the wait, and
+        // the half where nothing is on disk yet.
+        if let phase = exporter.phaseDescription {
+            statusLabel.stringValue = phase
+        } else if clamped > 0 {
             statusLabel.stringValue = "Writing “\(destination.lastPathComponent)”…"
         }
     }
@@ -909,7 +1069,11 @@ final class ExportProgressSheetController: NSViewController {
         case .success(let url):
             bar.doubleValue = 1
             percentLabel.stringValue = "100 %"
-            statusLabel.stringValue = "Exported “\(url.lastPathComponent)”."
+            // What the file actually holds, normalised or not: the export
+            // measured its own mix on the way through, so the numbers are a
+            // report rather than a promise.
+            let measured = exporter.loudnessReport.map { " \($0.summary)." } ?? ""
+            statusLabel.stringValue = "Exported “\(url.lastPathComponent)”.\(measured)"
             statusLabel.textColor = DS.textStrong
             stopButton.title = "Close"
             revealButton.isHidden = false

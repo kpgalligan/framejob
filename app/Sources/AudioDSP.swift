@@ -1,16 +1,17 @@
 import Accelerate
 import Foundation
 
-/// The three sample-level audio effects the model carries and AVFoundation
-/// cannot express: pan, the compressor and broadband noise reduction
-/// (spec §4.2, §5.2's `AudioProps`).
+/// The four sample-level audio effects the model carries and AVFoundation
+/// cannot express: pan, the mono fold, the compressor and broadband noise
+/// reduction (spec §4.2, §5.2's `AudioProps`).
 ///
 /// **Why this file has no AVFoundation in it.** Volume, the fades and ducking
 /// are a gain CURVE, so `audio.rs` folds them into one envelope per
 /// composition track and `AVMutableAudioMixInputParameters` plays it back as
-/// volume ramps. These three cannot be a curve: pan needs two channels to
-/// write to, and the compressor and the noise reducer are functions of the
-/// samples rather than of the clock. So they are real DSP, they run in Swift,
+/// volume ramps. These four cannot be a curve: pan and the mono fold need
+/// every channel at once to write to, and the compressor and the noise reducer
+/// are functions of the samples rather than of the clock. So they are real
+/// DSP, they run in Swift,
 /// and they live here — plain buffers in, plain buffers out, no player, no
 /// reader, no tap. `AudioTap.swift` is the only file that knows where the
 /// buffers come from, which is what lets the SAME code serve the preview and
@@ -24,7 +25,8 @@ import Foundation
 /// `maxFrames` the chain was built with.
 ///
 /// **Transparency is a property of the CALLER, not of these types.** With
-/// pan 0, no compressor and noise reduction 0 the chain is still a chain, and
+/// pan 0, mono off, no compressor and noise reduction 0 the chain is still a
+/// chain, and
 /// running audio through the noise reducer's FFT round trip would change the
 /// low bits even though it changes nothing audible. So `CompositionBuilder`
 /// installs no tap at all on a track whose every clip is inert
@@ -91,12 +93,37 @@ struct AudioClipDSP: Equatable {
     var compressor: AudioCompressorSettings?
     /// 0 off … 1 the most subtraction this build will do.
     var noiseReduction: Double
+    /// `AudioProps.mono`: average every channel into all of them. It rides
+    /// here rather than in the plan because the plan carries nothing a
+    /// property edit changes, and because the per-clip sample-level settings
+    /// already travel this way, keyed by clip id.
+    var mono: Bool
+    /// The same fold, asked for by a nest clip this one is INSIDE, and run at
+    /// the tail of the chain rather than at the head of the Mix stage.
+    ///
+    /// **Why it is a second flag rather than the same one.** A nest clip's
+    /// `mono` is a statement about the nest's MIX, and the mix is a sum: the
+    /// fold is linear, so folding every contributor separately and adding
+    /// them gives exactly the same samples as adding them and folding once —
+    /// but only if each contributor is folded after everything IT does to its
+    /// own channels. Folding at the head instead would put the inner clip's
+    /// own pan after the nest's fold, and a hard-left clip inside a folded
+    /// nest would come out hard left, which is not mono at all. The plan's
+    /// envelope is a scalar per track and applies to every channel equally,
+    /// so it commutes with the fold and may stay downstream of the tap.
+    var enclosingMono: Bool
 
-    init(pan: Double = 0, compressor: AudioCompressorSettings? = nil, noiseReduction: Double = 0) {
+    init(
+        pan: Double = 0, compressor: AudioCompressorSettings? = nil, noiseReduction: Double = 0,
+        mono: Bool = false, enclosingMono: Bool = false
+    ) {
         self.pan = pan.isFinite ? Swift.min(Swift.max(pan, -1), 1) : 0
         self.compressor = compressor
         self.noiseReduction =
             noiseReduction.isFinite ? Swift.min(Swift.max(noiseReduction, 0), 1) : 0
+        // No clamping: a bool has no range.
+        self.mono = mono
+        self.enclosingMono = enclosingMono
     }
 
     /// The settings that change nothing. A composition track on which every
@@ -109,7 +136,9 @@ struct AudioClipDSP: Equatable {
     /// centre, so 0 and "nearly 0" differ by nothing audible, and treating a
     /// hand-written 1e-18 as active costs one silent multiply rather than a
     /// wrong answer.
-    var isInert: Bool { pan == 0 && compressor == nil && noiseReduction <= 0 }
+    var isInert: Bool {
+        pan == 0 && compressor == nil && noiseReduction <= 0 && !mono && !enclosingMono
+    }
 }
 
 // MARK: - Pan
@@ -136,6 +165,17 @@ struct AudioClipDSP: Equatable {
 /// stereo bus does; it leans it. That is what every editor's clip-level pan
 /// does, and folding to mono first to get a "true" pan would throw away the
 /// stereo the clip was recorded with.
+///
+/// **On a clip that asks for `mono` it is a TRUE pan**, and that is the
+/// honest description rather than a special case: the fold runs at the head of
+/// the Mix stage, immediately before this, so both channels hold the same
+/// signal and leaning them moves one source between two speakers. It is also
+/// why the fold cannot go after the pan — `(g_L·x + g_R·x)/2 = ((g_L+g_R)/2)·x`
+/// is the same signal in both channels at every pan position, so the control
+/// would degrade into a gain change and read as broken. A fold an enclosing
+/// NEST clip asks for DOES run after this pan, and is not that case: it folds
+/// the nest's mix, and flattening whatever panning happens inside the nest is
+/// precisely what that means (`AudioDSPChain`).
 ///
 /// **A mono composition track cannot be panned at all** — measured, not
 /// assumed: a tap on a track whose source is mono is prepared with one
@@ -677,7 +717,8 @@ final class AudioNoiseReductionStage {
 // MARK: - The chain
 
 /// One composition audio track's effect chain: noise reduction, then the
-/// compressor, then the pan.
+/// compressor, then the Mix stage — the mono fold, then the pan, then the
+/// fold an enclosing NEST clip asked for.
 ///
 /// **That order is the order a channel strip has**, and each step is there
 /// because of the one before it. Cleaning first means the compressor is not
@@ -686,13 +727,32 @@ final class AudioNoiseReductionStage {
 /// Panning last means the reduction is computed on the signal as it was
 /// recorded, not on a channel the pan has already leaned.
 ///
+/// **The fold is at the head of the Mix stage, after the compressor and
+/// before the pan.** After the pan it would undo it (see `AudioPanLaw`);
+/// before the noise reducer it would hand both reducers identical input,
+/// which invites the false optimisation of running one and copying — and a
+/// stage that stopped being fed would click the moment mono came off at a
+/// cut, because mono is a per-CLIP setting and the reducers are stateful.
+/// Where it is, it also makes `AudioPane`'s Mix section — which holds `mono`
+/// and `pan`, in that order — literally the DSP order, which that pane
+/// already claims for the other three sections.
+///
+/// **A NEST clip's fold is the one thing that runs after the pan**, and it is
+/// not an exception to the paragraph above: it belongs to a different clip.
+/// It stands for a fold of the whole nest's MIX, and a mix is a sum, so
+/// folding each contributor at the very end of its own chain sums to exactly
+/// the same samples (`AudioClipDSP.enclosingMono` argues it). Running it at
+/// the head with the clip's own would fold BEFORE the inner clip's pan and
+/// leave a hard-panned clip hard-panned inside a nest the user folded.
+///
 /// The clip's own volume, its fades and any ducking are NOT here: `audio.rs`
 /// folds those into the plan's envelope and `AVMutableAudioMixInputParameters`
 /// applies them as volume ramps, which — measured — happen downstream of a
 /// tap created with `kMTAudioProcessingTapCreationFlag_PreEffects`. So the
 /// full order the samples actually see is
-/// noise reduction → compressor → pan → volume/fades/ducking, which puts the
-/// compressor before the fader exactly as an insert should be.
+/// noise reduction → compressor → the clip's fold → pan → an enclosing nest's
+/// fold → volume/fades/ducking, which puts the compressor before the fader
+/// exactly as an insert should be.
 final class AudioDSPChain {
     let channelCount: Int
     private let compressor: AudioCompressorStage
@@ -755,17 +815,76 @@ final class AudioDSPChain {
 
         compressor.process(channels, count: count, frames: frames, settings: params.compressor)
 
-        // Pan needs somewhere to pan TO. A mono composition track is prepared
-        // with one channel and is widened to stereo downstream of the tap, so
-        // there is nothing here to lean; the pan is silently inaudible on such
-        // a clip rather than turning into a volume change, which is what
-        // applying half a pan law to a single channel would be.
+        // The head of the Mix stage. The branch is not entered at all for a
+        // clip that does not ask for mono — not multiplied by one, not folded
+        // with a weight of zero — which is what makes an untouched track's
+        // samples bit-identical to the build before this landed, by
+        // construction rather than by argument.
+        if params.mono, count >= 2 { fold(channels, count: count, frames: frames) }
+
+        pan(channels, count: count, frames: frames, position: params.pan)
+
+        // The tail: the fold a nest clip ABOVE this one asked for, after
+        // everything this clip does to its own channels, which is what makes
+        // the sum of the folded contributors the fold of the sum.
+        if params.enclosingMono, count >= 2 { fold(channels, count: count, frames: frames) }
+    }
+
+    /// The pan, in place. Its own method only so the tail fold above it is
+    /// reachable: every early return here used to end `process`.
+    ///
+    /// Pan needs somewhere to pan TO. A mono composition track is prepared
+    /// with one channel and is widened to stereo downstream of the tap, so
+    /// there is nothing here to lean; the pan is silently inaudible on such a
+    /// clip rather than turning into a volume change, which is what applying
+    /// half a pan law to a single channel would be.
+    private func pan(
+        _ channels: UnsafeMutableBufferPointer<UnsafeMutablePointer<Float>?>, count: Int,
+        frames: Int, position: Double
+    ) {
         guard count >= 2 else { return }
-        let gains = AudioPanLaw.gains(params.pan)
+        let gains = AudioPanLaw.gains(position)
         guard gains.left != 1 || gains.right != 1 else { return }
         var left = gains.left
         var right = gains.right
         if let data = channels[0] { vDSP_vsmul(data, 1, &left, data, 1, vDSP_Length(frames)) }
         if let data = channels[1] { vDSP_vsmul(data, 1, &right, data, 1, vDSP_Length(frames)) }
+    }
+
+    /// Averages EVERY channel and writes the average to all of them.
+    ///
+    /// **Every channel, not L and R.** `prepare` is handed the COMPOSITION
+    /// track's channel count, so a 5.1 source gives 6; folding only channels 0
+    /// and 1 would leave four untouched and produce something that is neither
+    /// mono nor the original. At two channels this is exactly (L+R)/2.
+    ///
+    /// Allocation-free and stateless: `count` linear passes plus `count − 1`
+    /// copies over at most `maxFrames` floats, which is two orders of
+    /// magnitude under one noise-reduction frame. The accumulator is the first
+    /// channel that actually has a buffer, and the divisor counts only the
+    /// channels that contributed — a null buffer must not quietly attenuate
+    /// the rest.
+    private func fold(
+        _ channels: UnsafeMutableBufferPointer<UnsafeMutablePointer<Float>?>, count: Int,
+        frames: Int
+    ) {
+        var accumulator: UnsafeMutablePointer<Float>?
+        var summed = 0
+        for channel in 0..<count {
+            guard let data = channels[channel] else { continue }
+            summed += 1
+            guard let into = accumulator else {
+                accumulator = data
+                continue
+            }
+            vDSP_vadd(into, 1, data, 1, into, 1, vDSP_Length(frames))
+        }
+        guard let into = accumulator, summed >= 2 else { return }
+        var scale = 1 / Float(summed)
+        vDSP_vsmul(into, 1, &scale, into, 1, vDSP_Length(frames))
+        for channel in 0..<count {
+            guard let data = channels[channel], data != into else { continue }
+            data.update(from: into, count: frames)
+        }
     }
 }

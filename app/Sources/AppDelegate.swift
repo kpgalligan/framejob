@@ -297,6 +297,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             item(
                 "Detach Audio", #selector(EditorViewController.detachAudio(_:)), "d",
                 [.command, .option]))
+        // Road map 2's phase 5c, next to Detach Audio because those two are
+        // the Clip menu's only sound commands. It duplicates the Audio
+        // section's button deliberately (contract D-C8): a command reachable
+        // from a pane alone can be lost — Add Shape's lesson — and a menu item
+        // is what gives the `normalize_clip` mirror a UI path to name.
+        //
+        // No key equivalent: spec §9's "proposed, not yet bound" table claims
+        // no row for phase 5, and a modifier-less menu key would be resolved
+        // ahead of the first responder and steal a letter the editor's own
+        // `keyDown` owns (the reason spelled out at Remove Silences… below).
+        //
+        // The title is the button's title and the string `AgentCatalog`'s
+        // `normalize_clip` description names as this command's UI path. Three
+        // spellings of one command is how the halves drift.
+        menu.addItem(item("Normalize", #selector(EditorViewController.normalizeClips(_:))))
         menu.addItem(
             item(
                 "Add Action", #selector(EditorViewController.addActionAtPlayhead(_:)), "k",

@@ -81,15 +81,30 @@ normative: §5.2 is the project schema, §6 the op table, §7 the architecture.
   and out durations. The core computes how far along a reveal is, once per
   frame, so the preview, a rendered frame and an export cannot disagree
   about it.
+- **Sound.** The four sample-level audio properties — pan, mix to mono, a
+  compressor and noise reduction — run in one processing tap per composition
+  audio track, and the preview and the export share it. **Normalize** (the
+  Volume section's button, Clip ▸ Normalize) sets a clip's volume so its own
+  loudest moment lands at −1 dBFS, measured from the waveform cache over the
+  part of the file that actually plays; it replaces the volume rather than
+  multiplying it, so pressing it twice changes nothing. A two-channel
+  **level meter** in the timeline bar shows the mix while it plays — peak
+  over RMS, with a clip cell — computed as the tap's own measurement times
+  the mix envelope, which is the same rule Remove Silences uses. And an
+  export can be **normalised to a loudness target**: BS.1770-4 integrated
+  loudness and true peak, measured on a first pass over the real mix, then
+  one gain (no limiter) capped so the true peak stays under −1 dBTP. Every
+  export reports what its sound measured, normalised or not.
 - **Playback** over an `AVComposition` built from the core's composition plan,
   with a Metal compositor drawing every frame from the core's frame recipe.
   A property-only edit re-renders the paused frame without rebuilding the
   player (the plan JSON is compared as a string).
 - **Export** through an `AVAssetWriter` over the same composition, the
-  format (H.264, HEVC, ProRes 422, M4A, GIF, APNG) and the size chosen
-  separately and both resolved by the core — the default size is the
-  document's own, or for a GIF or APNG the format's cap fitted to it — plus
-  an offline single-frame render used for verification.
+  format (H.264, HEVC, ProRes 422, M4A, WAV, AIFF, GIF, APNG) and the size
+  chosen separately and both resolved by the core — the default size is the
+  document's own, or for a GIF or APNG the format's cap fitted to it — and
+  an optional loudness target over it, plus an offline single-frame render
+  used for verification.
 - **MCP agent** (below): one tool per edit op, plus open/new/save/read,
   import, playhead, frame render and export.
 
@@ -101,9 +116,11 @@ volume/fade/duck/detach, freeze frame, speed, the in/out range and the agent —
 and **M2 and M3 are now done too**: chapters on export, nests, filters,
 reflection, spotlight, reverse, the audio DSP, GIF/APNG export, SRT captions,
 Consolidate Media and ffmpeg-assisted import. Beyond the spec,
-`designs/reelcut-roadmap-2.md`'s phases 0 through 4 have landed — the
-groundwork, the cutting moves, clip identity, the screencast trio, and now
-captions in both directions with the built-in text animations.
+`designs/reelcut-roadmap-2.md`'s phases 0 through 5 have landed — the
+groundwork, the cutting moves, clip identity, the screencast trio, captions
+in both directions with the built-in text animations, and now sound: the
+mono fold, a level meter, Normalize Clip, loudness on export and the two
+uncompressed audio formats.
 `CLAUDE.md` carries the milestone record and `designs/reelcut-roadmap.md`
 what still needs a person at the machine.
 
@@ -144,12 +161,15 @@ Makefile              Build orchestration
 | `MediaImporter.swift` | `AVURLAsset` probing (the one file allowed `async`/`await`), thumbnails, waveform peaks |
 | `CompositionBuilder.swift` · `Compositor.swift` · `LayerRenderers.swift` · `Playback.swift` | plan → `AVComposition`; the `AVVideoCompositing` Metal pipeline; text/shape/image textures and the three text reveals the recipe asks for; the player and its rebuild-vs-refresh rule |
 | `CaptionImporter.swift` · `CaptionLayout.swift` · `Transcriber.swift` · `CaptionExporter.swift` | captions in and out: the SubRip grammar, the placement every producer shares, on-device speech recognition and the cue builder over it, and the `.srt` / `.vtt` writer |
-| `Exporter.swift` · `ExportSheetController.swift` | writing a file, and rendering one frame offline |
+| `Exporter.swift` · `ExportSheetController.swift` · `ExporterWriter.swift` | writing a file — two passes wherever it holds sound, the first measuring loudness — and rendering one frame offline |
+| `AudioTap.swift` · `AudioDSP.swift` · `LevelMeter.swift` · `LevelMeterView.swift` | the sample-level audio the plan cannot carry (noise reduction, the compressor, the mono fold, the pan) and the level meter's model and its one view |
+| `MediaPeaks.swift` · `AudioNormalize.swift` · `SilenceDetector.swift` | the waveform cache and the two questions asked of it: a clip's own peak (Normalize) and peak × envelope (the quiet spans) |
+| `Loudness.swift` | BS.1770-4 integrated loudness and true peak, the export gain that follows, and the 16-bit scaler that applies it |
 | `TimelineLayout.swift` · `TimelineSessions.swift` · `TimelineView.swift` | all tick↔point arithmetic; the gesture session structs; the timeline view |
 | `CanvasSessions.swift` · `PreviewCanvasView.swift` | canvas geometry and gestures; the preview and its overlay |
 | `InspectorPane.swift` · `InspectorViewController.swift` · `ClipPane` `MediaPane` `DocumentPane` (with `VideoPane` `AudioPane` `TextPane` `ShapePane` as section factories) | the binding that knows about actions, one file per tab, and the sections the Clip tab composes |
 | `EditorViewController.swift` + `EditorViewController+{Timeline,Canvas,Inspector,Export}.swift` | wiring in the base file, features in extensions |
-| `AgentServer.swift` + `AgentServer+{Arguments,Project,Clips,Tracks,Media,Render,History,Silence,Captions}.swift` · `AgentCatalog.swift` | the MCP endpoint, its handlers, and the tool catalog |
+| `AgentServer.swift` + `AgentServer+{Arguments,Project,Clips,Tracks,Media,Render,History,Silence,Captions,Audio}.swift` · `AgentCatalog.swift` | the MCP endpoint, its handlers, and the tool catalog |
 | `AppDelegate.swift` · `EditorWindowController.swift` · `WelcomeWindowController.swift` · `main.swift` | menus (nil-target selectors), window, welcome |
 | `SpeedSheetController.swift` · `RelinkSheetController.swift` · `SilenceSheetController.swift` (with `SilenceDetector.swift` behind it) · `TranscribeSheetController.swift` | the remaining dialogs |
 | `Theme.swift` · `Controls.swift` · `OptionControls.swift` · `Sheets.swift` · `EditorChrome.swift` · `FileDropView.swift` | shared chrome, copied from Rasterize |
@@ -229,12 +249,13 @@ here.
 | `transcribe {clips?, language?, place?}` | on-device speech recognition into caption clips (File ▸ Generate Captions…). Returns the cues in ticks whether or not it places them, and `place: false` changes nothing at all. macOS gates speech recognition and this tool never asks: without the grant it refuses with the status named, since the system prompt needs a frontmost app and an agent-driven one never is |
 | `export_captions {track?, path, format?}` | one text track out as `.srt` or `.vtt` (File ▸ Export Captions…). The track is never guessed — with no all-text track, or more than one, it refuses and lists the candidates |
 | `detect_silence {clips?, threshold_db?, min_length?, padding?}` | the quiet spans of the timeline, which `ripple_delete_ranges` then cuts — the same detector Clip ▸ Remove Silences… uses, so an agent and the sheet propose the same cuts. It changes nothing; loudness is the waveform peak times the mix envelope, so mute and solo are already in the answer |
+| `normalize_clip {clips, peak_db?}` | sets each clip's volume so its own loudest moment lands at `peak_db` (default −1 dBFS) — the Volume section's Normalize button and Clip ▸ Normalize. Measured from the waveform cache over the part that plays, so it knows nothing about the volume, fades, ducking, mute or solo already on the clip; it replaces the volume rather than multiplying it, writes the clip's base level even inside an action, and leaves `muted` alone. One gain per clip, one undo step, and what it could not measure comes back under `skipped` |
 | `set_playhead {t}` | moves the playhead and seeks the preview |
 | `set_range {start?, end?}` | the in/out range (I / O / ⌥X); no bounds clears it |
 | `set_selection {clips?}` | the timeline selection (a click); no clips clears it |
 | `undo` · `redo` | one step each (⌘Z / ⇧⌘Z), reporting the step's name |
 | `render_frame {t, max_width?}` | **the verification hook** |
-| `export {preset, path, size?, range?, video_bitrate?, audio_bitrate?}` | writes a file and waits for it; `preset` is the encoding, `size` a Size-popup row (`document`, `1080p`, …) or `[width, height]`, default the document's size (a GIF or APNG's cap); `range: "in_out"` scopes it to the in/out range; the bitrates are the sheet's Quality popup in bits per second |
+| `export {preset, path, size?, range?, video_bitrate?, audio_bitrate?, loudness_lufs?, peak_dbtp?}` | writes a file and waits for it; `preset` is the encoding, `size` a Size-popup row (`document`, `1080p`, …) or `[width, height]`, default the document's size (a GIF or APNG's cap); `range: "in_out"` scopes it to the in/out range; the bitrates are the sheet's Quality popup in bits per second; `loudness_lufs` normalises the whole mix by one gain to that integrated target and `peak_dbtp` is the ceiling that gain is capped against (a ceiling with no target is refused — there would be nothing to cap). The result reports what the file's sound MEASURED, asked for or not |
 
 `set_range`, `set_selection`, `undo` and `redo` exist so that spec §10's own
 verifications —

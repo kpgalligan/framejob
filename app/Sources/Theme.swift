@@ -74,6 +74,21 @@ enum DS {
     /// how many spans are under it.
     static var timelineCandidateShade: NSColor { coral.withAlphaComponent(0.24) }
 
+    /// The timeline bar's output level meter (`LevelMeterView`). The fill is
+    /// the clip palette's audio green — the app's one "this is sound" ink, so
+    /// a meter reads as the same family as the clips it is summing — over a
+    /// neutral trough that has to sit quietly in both appearances, which is
+    /// why the trough is semantic and the fill is not.
+    ///
+    /// Coral is load-bearing (`playhead`, `marquee`, the brand mark) so the
+    /// meter spends it on the ONE thing in a meter that means stop: the clip
+    /// cell. There is deliberately no amber step — a green/amber/red ladder
+    /// would be three more fixed inks with no precedent in this palette, and
+    /// the number that matters is the over.
+    static var meterFill: NSColor { clipAudio }
+    static var meterTrough: NSColor { .quaternaryLabelColor }
+    static var meterClip: NSColor { coral }
+
     // MARK: - Type
 
     /// Source Sans 3 for UI text; system face when the vendored font is

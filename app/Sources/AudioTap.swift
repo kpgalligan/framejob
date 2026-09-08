@@ -33,7 +33,24 @@ import Foundation
 /// back as volume ramps. Those apply downstream of a tap created with
 /// `kMTAudioProcessingTapCreationFlag_PreEffects`, so the compressor sees the
 /// clip at its recorded level rather than at the level the fader is passing —
-/// an insert before the fader, which is where a compressor belongs.
+/// an insert before the fader, which is where a compressor belongs. What IS
+/// here is everything the plan cannot carry: pan, the mono fold, the
+/// compressor and noise reduction.
+///
+/// **The tap also meters, and it is the only thing that can.** A meter wants
+/// the mix level, which would be a PostEffects tap — but
+/// `AVMutableAudioMixInputParameters` has exactly one `audioTapProcessor` and
+/// the two flags are exclusive, so a track carrying this one cannot carry a
+/// second, and moving this one to PostEffects would put the compressor behind
+/// the fader and change how every project with a compressor sounds. So a
+/// METERING build (playback only, `CompositionBuilder.build(metering:)`) hands
+/// every audio track a `LevelMeterSink` — including the tracks that ask for no
+/// processing at all and would otherwise carry no tap, or the meter would
+/// light only on tracks that happen to have a compressor — and the reader
+/// multiplies by the plan's envelope to get the post-fader number.
+/// `LevelMeter.swift` argues the whole of that; the part that belongs here is
+/// that metering never reaches an EXPORT, so every export keeps exactly the
+/// audio path it had.
 
 // MARK: - The schedule
 
@@ -78,6 +95,18 @@ struct AudioTrackDSP: Equatable {
         isActive = !spans.isEmpty
         usesNoiseReduction = spans.contains { $0.dsp.noiseReduction > 0 }
     }
+
+    private init() {
+        spans = []
+        isActive = false
+        usesNoiseReduction = false
+    }
+
+    /// A track that asks for no processing at all. What a METERING-only tap is
+    /// built with: it still has to fetch and hand on its source audio, and it
+    /// still has to measure it, but no chain is built for it and no sample is
+    /// touched.
+    static let inert = AudioTrackDSP()
 }
 
 // MARK: - Parameters, and where they come from
@@ -101,8 +130,40 @@ struct AudioDSPParameters: Equatable {
     /// does, and `Project.clips` and `Nest.clips` share one id space, so one
     /// flat dictionary covers both.
     ///
+    /// **A nest CLIP is not in the dictionary, and its own `mono` is carried
+    /// down instead.** The plan replaced a nest with the clips inside it
+    /// (`nest.rs`), so an audio segment always names the INNERMOST clip and
+    /// nothing could ever look a nest clip's entry up — a `mono` written on
+    /// one would be accepted by the core, kept by the checkbox, saved with
+    /// the project and silently fold nothing, which is what it did until this
+    /// walk existed. So every clip inside a folded nest is marked
+    /// `enclosingMono` and folds at the tail of its own chain, which sums to
+    /// exactly the fold of the nest's mix (`AudioClipDSP.enclosingMono`).
+    /// A nest inside a folded nest is walked too: an outer fold applies to
+    /// everything within, and folding twice is folding once.
+    ///
+    /// **The nest clip's other three do NOT travel, and two of them cannot.**
+    /// The compressor and the noise reducer are not linear, so running either
+    /// on each contributor is a different sound from running it on the mix —
+    /// bus compression is the whole reason a bus has a compressor — and the
+    /// reducer would also delay each inner track by its own 512 samples. Pan
+    /// is linear and could ride down the same walk, but two pans do not
+    /// compose into one number (`AudioClipDSP` carries one `pan`, and the
+    /// product of two constant-power pairs is no single position), and
+    /// turning it on would change how projects that already carry a nest pan
+    /// sound — the decision M3 recorded for `mono` itself, which phase 5
+    /// took deliberately and one at a time. So a nest clip's pan, compressor
+    /// and noise reduction reach nothing, exactly as they did in M3.
+    ///
+    /// **One limit the id space imposes:** two nest clips may show the SAME
+    /// nest, and the dictionary is keyed by clip id while the plan's segments
+    /// carry no instance path, so a fold asked for by one of them folds both.
+    /// Folding is the choice that makes the control do what it says on the
+    /// clip that asked; the alternative — fold only when every nest clip
+    /// showing the nest agrees — makes the checkbox do nothing at all.
+    ///
     /// **Base properties only, never through actions.** A clip's numbers can
-    /// be animated (`actions.rs` lerps any of them), and these three are not
+    /// be animated (`actions.rs` lerps any of them), and none of the four is
     /// read at the animated value: the plan carries no per-tick audio, the
     /// tap would have to evaluate the action itself, and evaluation is Rust's
     /// job. Ducking already works this way — `audio.rs`'s `duckers()` reads
@@ -112,7 +173,10 @@ struct AudioDSPParameters: Equatable {
         var clips: [UInt32: AudioClipDSP] = [:]
         func collect(_ list: [ClipSnapshot]) {
             for clip in list {
-                guard let audio = clip.audio else { continue }
+                // A nest clip's own entry could never be looked up: its id
+                // names no audio segment. `fold` below is where its `mono`
+                // goes instead.
+                guard clip.source.nestID == nil, let audio = clip.audio else { continue }
                 let dsp = AudioClipDSP(
                     pan: audio.pan,
                     compressor: audio.compressor.map {
@@ -122,15 +186,54 @@ struct AudioDSPParameters: Equatable {
                             releaseSeconds: AudioDSPParameters.seconds($0.release),
                             makeupDB: $0.makeupDb)
                     },
-                    noiseReduction: audio.noiseReduction)
+                    noiseReduction: audio.noiseReduction,
+                    mono: audio.mono)
                 guard !dsp.isInert else { continue }
                 clips[clip.id] = dsp
             }
         }
         collect(snapshot.clips)
         for nest in snapshot.nests { collect(nest.clips) }
+
+        // Marks everything `nestID` stands for, however deep. Bounded by the
+        // core's `MAX_NEST_DEPTH` (8, `format.rs`) rather than trusted to
+        // terminate: `validate` refuses a deeper — and so a circular — nest,
+        // but this walk reads a decoded snapshot and a walk that can be
+        // handed a cycle is a walk that must be bounded.
+        func fold(contentsOf nestID: UInt32, depth: Int) {
+            guard depth <= AudioDSPParameters.nestDepthCap, let nest = snapshot.nest(nestID)
+            else { return }
+            for clip in nest.clips {
+                if let inner = clip.source.nestID {
+                    fold(contentsOf: inner, depth: depth + 1)
+                    continue
+                }
+                // Every clip inside, not only the ones carrying audio props:
+                // which of them gets an audio segment is `evaluate.rs`'s rule
+                // (the media has sound, and `enabled.audio` holds all the way
+                // up), not one Swift may restate, and an entry the tap never
+                // looks up costs a dictionary slot and nothing else.
+                var dsp = clips[clip.id] ?? .inert
+                dsp.enclosingMono = true
+                clips[clip.id] = dsp
+            }
+        }
+        func foldMonoNests(_ list: [ClipSnapshot]) {
+            for clip in list where clip.audio?.mono == true {
+                guard let nestID = clip.source.nestID else { continue }
+                fold(contentsOf: nestID, depth: 1)
+            }
+        }
+        foldMonoNests(snapshot.clips)
+        for nest in snapshot.nests { foldMonoNests(nest.clips) }
         self.clips = clips
     }
+
+    /// `format.rs`'s `MAX_NEST_DEPTH`. Duplicated rather than bridged: the
+    /// FFI carries no constant for it, and a walk one level shallower than
+    /// the core allows would silently stop folding, so the number is written
+    /// where a reader comparing the two files can see it.
+    private static let nestDepthCap = 8
 
     /// Ticks → seconds, the one place the compressor's two times cross that
     /// boundary.
@@ -227,6 +330,12 @@ final class AudioDSPSource {
 /// object's life is exactly the tap's.
 final class AudioTapContext {
     private let track: AudioTrackDSP
+    /// Where this track's levels are published, on a metering (playback)
+    /// build; nil on every export and on every rendered frame. Written on the
+    /// audio thread with two relaxed atomic stores and nothing else — see
+    /// `LevelMeter.swift` for why it is not the `NSLock` the rest of the app
+    /// publishes across threads with.
+    private let meter: LevelMeterSink?
     private var chain: AudioDSPChain?
     /// The channel base pointers, refilled per buffer. A stored array so no
     /// allocation happens on the audio thread.
@@ -246,8 +355,9 @@ final class AudioTapContext {
     /// at 48 kHz) and far shorter than any jump a scrub makes.
     private static let seekTolerance: Ticks = ReelTime.perSecond / 10
 
-    init(track: AudioTrackDSP) {
+    init(track: AudioTrackDSP, meter: LevelMeterSink?) {
         self.track = track
+        self.meter = meter
     }
 
     @available(*, unavailable) required init?(coder: NSCoder) {
@@ -264,7 +374,14 @@ final class AudioTapContext {
     /// chain is simply not built and the track passes through untouched:
     /// reading interleaved stereo as if it were one channel would apply the
     /// left gain to both and process half the buffer, which is a corrupted
-    /// export rather than a missing feature.
+    /// export rather than a missing feature. The METER is refused by the same
+    /// guard and for the same reason — an interleaved buffer read as planar
+    /// would meter half a channel — so a track in an unexpected format shows
+    /// no level rather than a wrong one.
+    ///
+    /// `channels` being non-empty is what says the format was accepted; a
+    /// metering-only track has no chain but still has that array, so
+    /// everything that must not run in an unusable format is gated on it.
     func prepare(
         channelCount: Int, sampleRate: Double, maxFrames: Int,
         formatFlags: AudioFormatFlags, bitsPerChannel: UInt32
@@ -274,11 +391,18 @@ final class AudioTapContext {
         guard float, planar, bitsPerChannel == 32, channelCount > 0 else {
             chain = nil
             channels = []
+            meter?.clear()
             return
         }
-        chain = AudioDSPChain(
-            channelCount: channelCount, sampleRate: sampleRate, maxFrames: maxFrames,
-            usesNoiseReduction: track.usesNoiseReduction)
+        // No chain at all for a metering-only track: the compressor stage
+        // alone allocates three buffers of `maxFrames`, and running it with no
+        // settings would still be a multiply per sample per channel for a
+        // track that asked for nothing.
+        chain = track.isActive
+            ? AudioDSPChain(
+                channelCount: channelCount, sampleRate: sampleRate, maxFrames: maxFrames,
+                usesNoiseReduction: track.usesNoiseReduction)
+            : nil
         channels = Array(repeating: nil, count: channelCount)
         self.sampleRate = sampleRate >= 1 ? Ticks(sampleRate) : 48000
         position = 0
@@ -287,6 +411,7 @@ final class AudioTapContext {
     func unprepare() {
         chain = nil
         channels = []
+        meter?.clear()
     }
 
     /// `process`: run the chain over one buffer of already-fetched audio.
@@ -298,38 +423,55 @@ final class AudioTapContext {
         _ bufferList: UnsafeMutablePointer<AudioBufferList>, frames: Int, time: CMTime,
         startOfStream: Bool
     ) {
-        guard let chain = chain, frames > 0 else { return }
+        guard frames > 0, !channels.isEmpty else { return }
         let start = time.isNumeric ? CompositionBuilder.ticks(time) : position
-        // A seek, a loop or a fresh stream: the compressor's envelope and the
-        // reducer's delay line belong to the position we just left.
-        if startOfStream || abs(start - position) > Self.seekTolerance {
-            chain.reset()
-        }
-
         let list = UnsafeMutableAudioBufferListPointer(bufferList)
         let count = min(list.count, channels.count)
         guard count > 0 else { return }
 
-        // A buffer that straddles a cut is processed in runs, so a clip's pan
-        // begins exactly at its own first sample rather than up to a buffer
-        // early. The stages keep their state across the boundary — they are
-        // track inserts, not per-clip effects.
-        var offset = 0
-        while offset < frames {
-            let run = self.run(from: start + ticks(frames: offset), remaining: frames - offset)
-            guard run.length > 0 else { break }
-            for index in 0..<count {
-                channels[index] = list[index].mData?
-                    .assumingMemoryBound(to: Float.self).advanced(by: offset)
+        if let chain = chain {
+            // A seek, a loop or a fresh stream: the compressor's envelope and
+            // the reducer's delay line belong to the position we just left.
+            if startOfStream || abs(start - position) > Self.seekTolerance {
+                chain.reset()
             }
-            channels.withUnsafeMutableBufferPointer { pointers in
-                chain.process(
-                    UnsafeMutableBufferPointer(rebasing: pointers[0..<count]),
-                    frames: run.length, params: run.dsp)
+
+            // A buffer that straddles a cut is processed in runs, so a clip's
+            // pan begins exactly at its own first sample rather than up to a
+            // buffer early. The stages keep their state across the boundary —
+            // they are track inserts, not per-clip effects.
+            var offset = 0
+            while offset < frames {
+                let run = self.run(from: start + ticks(frames: offset), remaining: frames - offset)
+                guard run.length > 0 else { break }
+                for index in 0..<count {
+                    channels[index] = list[index].mData?
+                        .assumingMemoryBound(to: Float.self).advanced(by: offset)
+                }
+                channels.withUnsafeMutableBufferPointer { pointers in
+                    chain.process(
+                        UnsafeMutableBufferPointer(rebasing: pointers[0..<count]),
+                        frames: run.length, params: run.dsp)
+                }
+                offset += run.length
             }
-            offset += run.length
         }
         position = start + ticks(frames: frames)
+
+        // AFTER the chain, and over the whole buffer rather than per run: what
+        // the meter is asked for is the level this track hands the mix, and
+        // the pan and the compressor have moved it. The run loop above left
+        // `channels` pointing into the LAST run, so the base pointers are
+        // written back before the sink reads them.
+        guard let meter = meter else { return }
+        for index in 0..<count {
+            channels[index] = list[index].mData?.assumingMemoryBound(to: Float.self)
+        }
+        channels.withUnsafeMutableBufferPointer { pointers in
+            meter.measure(
+                UnsafeMutableBufferPointer(rebasing: pointers[0..<count]), count: count,
+                frames: frames)
+        }
     }
 
     private func ticks(frames: Int) -> Ticks {
@@ -378,14 +520,22 @@ final class AudioTapContext {
 
 /// Builds the `MTAudioProcessingTap` for one composition audio track.
 enum AudioTap {
-    /// nil when the track needs no processing, or when MediaToolbox refuses to
-    /// make a tap — in which case the track plays and exports unprocessed,
-    /// which is the old behaviour rather than a failed build.
-    static func make(for track: AudioTrackDSP) -> MTAudioProcessingTap? {
-        guard track.isActive else { return nil }
+    /// nil when the track needs no processing AND is not being metered, or
+    /// when MediaToolbox refuses to make a tap — in which case the track plays
+    /// and exports unprocessed and unmetered, which is the old behaviour
+    /// rather than a failed build.
+    ///
+    /// A `meter` alone is enough to earn a tap: a metering build wants a level
+    /// from every audio track, including the ones no clip has asked anything
+    /// of. That tap builds no chain and touches no sample — it fetches its
+    /// source audio, hands it straight on, and measures it.
+    static func make(for track: AudioTrackDSP?, meter: LevelMeterSink?) -> MTAudioProcessingTap? {
+        let track = track ?? .inert
+        guard track.isActive || meter != nil else { return nil }
         // Retained here, released in `finalize` (or below, if no tap is made):
         // the tap owns the context and outlives every Swift reference to it.
-        let context = Unmanaged.passRetained(AudioTapContext(track: track)).toOpaque()
+        let context = Unmanaged.passRetained(
+            AudioTapContext(track: track, meter: meter)).toOpaque()
         var callbacks = MTAudioProcessingTapCallbacks(
             version: kMTAudioProcessingTapCallbacksVersion_0,
             clientInfo: context,

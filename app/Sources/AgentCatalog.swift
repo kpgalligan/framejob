@@ -566,6 +566,40 @@ extension AgentServer {
                     ],
                 ]),
             tool(
+                "normalize_clip",
+                "Sets each clip's audio volume so its own loudest moment lands at peak_db — "
+                    + "the Normalize button in the Clip tab's Volume section, and Clip ▸ "
+                    + "Normalize. The level is measured from the clip's cached waveform over "
+                    + "the part of it that actually plays, which is PRE-FADER: it knows "
+                    + "nothing about the volume, fades, ducking, mute or solo already on the "
+                    + "clip, because normalise is a statement about the material and not "
+                    + "about the mix. Three things follow, and each is a decision rather than "
+                    + "an accident. It REPLACES volume rather than multiplying it, so a "
+                    + "second call changes nothing (and comes back as \"made no change\", "
+                    + "which is that working). It writes the clip's BASE volume even when the "
+                    + "playhead is inside an action, since it is about the whole clip — a "
+                    + "clip whose volume is animated is normalised underneath and then "
+                    + "overridden for the action's span. And it leaves muted alone: a mute is "
+                    + "a switch, not a level. Each clip gets its OWN gain, so this does not "
+                    + "match levels across a selection. One undo step however many clips. "
+                    + "The model's volume ceiling is 4×, so a clip quieter than about "
+                    + "-13 dBFS cannot reach -1: it is still normalised, as loud as it goes, "
+                    + "and result_db says where it landed. A clip that plays no sound, one "
+                    + "that is silent over the part that plays, and one whose waveform has "
+                    + "not been analysed yet are each reported by name under skipped and the "
+                    + "rest are still normalised.",
+                [
+                    "clips": clipsProperty,
+                    "peak_db": [
+                        "type": "number", "minimum": -60, "maximum": 0,
+                        "description": "Where the loudest moment should land, in dBFS. "
+                            + "Default -1, which is what the button uses: hot enough to use "
+                            + "the format, with a decibel of room for the inter-sample peaks "
+                            + "a lossy encoder can add. Above 0 is a request to clip and is "
+                            + "refused rather than clamped.",
+                    ],
+                ], required: ["clips"]),
+            tool(
                 "lift_range",
                 "Cuts a time range out and LEAVES the hole — ⌫ with an in/out range and nothing "
                     + "selected. Every unlocked clip is split at both bounds and the middles "
@@ -1279,8 +1313,9 @@ extension AgentServer {
             tool(
                 "export",
                 "Writes the timeline to a file and waits for it to finish — ⌘E, the export "
-                    + "sheet's five controls (format, size, frame rate, quality, range) in the "
-                    + "sheet's own vocabulary, all but the frame rate — this exports at the "
+                    + "sheet's six controls (format, size, frame rate, quality, loudness, "
+                    + "range) in the sheet's own vocabulary, all but the frame rate — this "
+                    + "exports at the "
                     + "document's rate, or on gif and apng at the format's own rate (12.5 and "
                     + "25 fps). The preset is the ENCODING only and the size a separate "
                     + "choice defaulting to the document's own, or on gif and apng to the "
@@ -1289,7 +1324,12 @@ extension AgentServer {
                     + "exporter the sheet uses, so an agent export and a menu export cannot "
                     + "disagree. An existing file at the path is replaced, and the "
                     + "container's extension is added when the path has none. The result "
-                    + "reports the settings that were used and the file's size.",
+                    + "reports the settings that were used, the file's size, and — for every "
+                    + "format that carries sound, normalised or not — what that sound "
+                    + "MEASURED on the way through, under loudness: integrated_lufs, "
+                    + "true_peak_dbtp and the gain_db that was applied. Those are read off "
+                    + "the mix that was written, so they are what the file holds rather than "
+                    + "what was asked for.",
                 [
                     "preset": [
                         "type": "string",
@@ -1342,7 +1382,29 @@ extension AgentServer {
                         "type": "integer", "minimum": 1,
                         "description": "Target AAC rate in BITS per second (192000 is "
                             + "192 kbps) — the sheet's Quality popup. Omit for the preset's "
-                            + "own. Ignored where the sound is not AAC (ProRes writes LPCM).",
+                            + "own. Ignored where the sound is not AAC: ProRes, WAV and AIFF "
+                            + "all write LPCM, whose rate is its sample format.",
+                    ],
+                    "loudness_lufs": [
+                        "type": "number", "minimum": -70, "maximum": 0,
+                        "description": "Normalise the whole mix to this integrated loudness, "
+                            + "in LUFS — the sheet's Loudness popup, whose rows are -14 "
+                            + "(streaming), -16 (podcast) and -23 (EBU R 128 broadcast). The "
+                            + "export measures itself first and then applies ONE gain to "
+                            + "everything, so relative levels inside the timeline are "
+                            + "untouched and no limiter is involved. Omit not to normalise: "
+                            + "the export still measures and still reports. Ignored where "
+                            + "there is no sound to measure (gif, apng).",
+                    ],
+                    "peak_dbtp": [
+                        "type": "number", "minimum": -20, "maximum": 0,
+                        "description": "The true-peak ceiling that gain is capped against, in "
+                            + "dBTP. The sheet fixes it at -1 and this is the knob for "
+                            + "anything else. Because normalisation is gain-only, a ceiling "
+                            + "with no loudness_lufs beside it would have nothing to cap and "
+                            + "is REFUSED rather than accepted and left inert. When the "
+                            + "ceiling bites, the file lands quieter than the target asked "
+                            + "for and the result's capped_by_peak says so.",
                     ],
                 ], required: ["preset", "path"]),
         ]

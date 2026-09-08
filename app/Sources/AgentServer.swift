@@ -160,7 +160,15 @@ final class AgentServer {
     /// and `start()` checks the two sets match on every launch.
     ///
     /// One entry per row of the op table (spec §6, and the module doc of
-    /// `core/src/edit.rs`) plus the eight project-level tools of spec §7.9.
+    /// `core/src/edit.rs`) plus the eighteen tools that are not ops: the
+    /// project-level ones spec §7.9 names, the four view-state and history
+    /// mirrors beside them (`set_range`, `set_selection`, `undo`, `redo`), and
+    /// the composites later phases added — `detect_silence`, `transcribe`,
+    /// `import_captions`, `export_captions`, `normalize_clip`. The count is
+    /// not decoration: `start()`'s parity check reads the core's own
+    /// `rc_op_names` and holds an explicit allow-list for the ops that
+    /// deliberately have no tool, so a new tool that is not an op belongs in
+    /// that sentence as well as in this table.
     private static let handlers: [String: (AgentServer) -> ([String: Any]) throws -> String] = [
         // Projects (AgentServer+Project.swift)
         "open_project": { $0.openProject },
@@ -218,6 +226,8 @@ final class AgentServer {
         "remove_action": { $0.removeAction },
         // Silence detection (AgentServer+Silence.swift)
         "detect_silence": { $0.detectSilence },
+        // Sound (AgentServer+Audio.swift)
+        "normalize_clip": { $0.normalizeClip },
         // Captions (AgentServer+Captions.swift)
         "transcribe": { $0.transcribe },
         "export_captions": { $0.exportCaptions },

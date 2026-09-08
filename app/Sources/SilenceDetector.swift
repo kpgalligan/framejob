@@ -50,6 +50,15 @@ import Foundation
 /// * a **segment** maps project time to source time at the speed the plan
 ///   already resolved (`duration / sourceDuration`);
 /// * a **span** this answers with is PROJECT time, snapped to the frame grid.
+///
+/// The first two of those, and the reversed mirror they need, are
+/// `MediaPeaks`' since road map 2 phase 5c: Normalise Clip asks the cache the
+/// same question this does, and a second copy of the arithmetic would have
+/// been the third project-to-source conversion in the app. **The envelope
+/// followed them**, once phase 5's level meter had written its own copy of the
+/// piecewise-linear ramp search: `MediaPeaks.envelope` is the app's one
+/// spelling of the mix rule and this file is one of its two readers. Nothing
+/// about the numbers changed when either moved.
 enum SilenceDetector {
 
     // MARK: - Vocabulary
@@ -164,6 +173,8 @@ enum SilenceDetector {
         let peaks: [Float]?
         /// The media's model duration when the clip plays BACKWARDS, which is
         /// the pivot `ReverseRenderer` mirrors about; nil otherwise.
+        /// `MediaPeaks.reversedPivot` works it out and says why it cannot be
+        /// read off the plan.
         let reversedPivot: Ticks?
         /// True when the track envelope is not identically zero over the
         /// segment. It is BOTH scopes' membership test, not just its
@@ -231,42 +242,21 @@ enum SilenceDetector {
         let snapshot = document.project.snapshot
         let cacheDirectory = document.cacheDirectory
 
-        // One read per media, however many segments cite it: `loadPeaks` is a
-        // whole-file `Data(contentsOf:)` and a forty-minute screencast is a
-        // megabyte of floats.
-        var loaded: [UInt32: [Float]] = [:]
-        var missing: Set<UInt32> = []
-        func peaks(for media: UInt32) -> [Float]? {
-            if let cached = loaded[media] { return cached }
-            if missing.contains(media) { return nil }
-            guard let cacheDirectory = cacheDirectory,
-                  let read = MediaImporter.loadPeaks(for: media, in: cacheDirectory)
-            else {
-                missing.insert(media)
-                return nil
-            }
-            loaded[media] = read
-            return read
-        }
+        // One read per media, however many segments cite it — `MediaPeaks.Loader`
+        // is that memo, and its `pending` set is what this reports as "still
+        // analysing".
+        let loader = MediaPeaks.Loader(cacheDirectory: cacheDirectory)
 
         var voices: [Voice] = []
         for track in plan.audioTracks {
             for segment in track.segments where segment.duration > 0 {
                 let span = (segment.start, segment.start + segment.duration)
-                // `reversed` is deliberately NOT in the plan (a reversed clip
-                // and a forward one must produce byte-identical plan JSON, or
-                // the rebuild-vs-refresh test breaks), so it is read back off
-                // the clip — which answers nil for a clip inside a nest,
-                // because `Project::clip` searches the top level only. Such a
-                // clip is analysed unmirrored: a recorded limit, not a bug,
-                // and one the selection scope cannot name either.
-                let clip = snapshot.clip(segment.clip)
-                let pivot: Ticks? = (clip?.source.isReversed ?? false)
-                    ? snapshot.media(segment.media)?.duration : nil
                 voices.append(
                     Voice(
-                        segment: segment, ramps: track.ramps, peaks: peaks(for: segment.media),
-                        reversedPivot: pivot, audible: isAudible(track.ramps, over: span)))
+                        segment: segment, ramps: track.ramps,
+                        peaks: loader.peaks(for: segment.media),
+                        reversedPivot: MediaPeaks.reversedPivot(for: segment, in: snapshot),
+                        audible: isAudible(track.ramps, over: span)))
             }
         }
         // The walls. Top-level clips only, which is exactly right: a nest
@@ -284,17 +274,10 @@ enum SilenceDetector {
         }
         return Input(
             snapshot: snapshot, selection: selection ?? document.selection,
-            pendingMedia: missing.sorted(), voices: voices, nests: nests)
+            pendingMedia: loader.pending.sorted(), voices: voices, nests: nests)
     }
 
     // MARK: - Detection
-
-    /// One bucket of the peaks cache, in ticks of SOURCE time. Exactly 6000,
-    /// and written as the division rather than as the number because
-    /// `peakBucketsPerSecond` and `perSecond` each have exactly one home.
-    static var bucketTicks: Ticks {
-        ReelTime.perSecond / Ticks(MediaImporter.peakBucketsPerSecond)
-    }
 
     /// The quiet spans, in project ticks, snapped to the frame grid.
     ///
@@ -336,7 +319,7 @@ enum SilenceDetector {
                 protectedNests: [])
         }
 
-        let step = bucketTicks
+        let step = MediaPeaks.bucketTicks
         let limit = Double(AudioDSP.gain(fromDecibels: Float(settings.thresholdDB)))
         let ordered = scoped.sorted { $0.segment.start < $1.segment.start }
         let domainStart = max(0, ordered.map { $0.segment.start }.min() ?? 0)
@@ -497,91 +480,16 @@ enum SilenceDetector {
     /// whole reason the test is written against the plan.
     private static func level(of voice: Voice, from: Ticks, to: Ticks, step: Ticks) -> Double {
         let gain = max(
-            envelope(voice.ramps, at: from), envelope(voice.ramps, at: max(from, to - 1)))
+            MediaPeaks.envelope(voice.ramps, at: from),
+            MediaPeaks.envelope(voice.ramps, at: max(from, to - 1)))
         guard gain > 0 else { return 0 }
         // No peaks on disk yet: never quiet. Treating a missing cache as
         // silence would propose deleting the whole clip, which is the one
         // failure this feature must not have.
         guard let peaks = voice.peaks else { return .infinity }
-        return Double(peakMagnitude(peaks, voice: voice, from: from, to: to)) * gain
-    }
-
-    /// The loudest bucket the project span `[from, to)` reads, or 0 when it
-    /// falls outside the file the cache was built from.
-    private static func peakMagnitude(
-        _ peaks: [Float], voice: Voice, from: Ticks, to: Ticks
-    ) -> Float {
-        let segment = voice.segment
-        guard segment.duration > 0, segment.sourceDuration > 0, !peaks.isEmpty else { return 0 }
-        let first = sourceTick(segment, at: from)
-        let last = max(first, sourceTick(segment, at: to) - 1)
-
-        // A reversed clip's `in` is measured in the REVERSED stream, and the
-        // only peaks file that exists is of the FORWARD one — nothing ever
-        // generates peaks for `cache/reversed/…`, which is not a media entry.
-        // So the window is mirrored about the media's model duration, the
-        // pivot `ReverseRenderer` renders against.
-        var lo = first
-        var hi = last
-        if let pivot = voice.reversedPivot {
-            lo = pivot - last
-            hi = pivot - first
-        }
-
-        let lower = max(0, bucketIndex(lo))
-        let upper = min(peaks.count - 1, bucketIndex(hi))
-        guard lower <= upper else { return 0 }
-        var loudest: Float = 0
-        for index in lower...upper { loudest = max(loudest, peaks[index]) }
-        return loudest
-    }
-
-    /// Source time under a project tick, at the rate the plan resolved:
-    /// `sourceDuration / duration` IS the speed, exactly, with no second
-    /// rounding of `clip.speed` here.
-    private static func sourceTick(_ segment: PlanSegment, at t: Ticks) -> Ticks {
-        guard segment.duration > 0 else { return segment.sourceIn }
-        let offset =
-            Double(t - segment.start) * Double(segment.sourceDuration) / Double(segment.duration)
-        guard offset.isFinite else { return segment.sourceIn }
-        return segment.sourceIn + TimelineLayout.ticks(clamping: offset.rounded(.down))
-    }
-
-    /// `floor(tick / bucket)`, correct for a negative tick — which a mirrored
-    /// reversed window produces when the clip runs past the media's start.
-    /// Swift's integer division truncates toward zero, so the negative half
-    /// has to be spelled out.
-    private static func bucketIndex(_ tick: Ticks) -> Int {
-        let bucket = bucketTicks
-        guard bucket > 0 else { return 0 }
-        let quotient = tick >= 0 ? tick / bucket : -((-tick + bucket - 1) / bucket)
-        return Int(max(min(quotient, Ticks(Int.max)), Ticks(Int.min)))
-    }
-
-    /// The mix envelope at a project tick, interpolated piecewise-linearly
-    /// from the plan's ramps. 1 when a track carries none (a video track's
-    /// `ramps` is nil), which is the same thing `audio.rs` means by an
-    /// unmodified track.
-    private static func envelope(_ ramps: [PlanRamp]?, at t: Ticks) -> Double {
-        guard let ramps = ramps, !ramps.isEmpty else { return 1 }
-        var low = 0
-        var high = ramps.count - 1
-        var found = -1
-        while low <= high {
-            let mid = (low + high) / 2
-            if ramps[mid].start <= t {
-                found = mid
-                low = mid + 1
-            } else {
-                high = mid - 1
-            }
-        }
-        guard found >= 0 else { return ramps[0].from }
-        let ramp = ramps[found]
-        guard ramp.duration > 0 else { return ramp.to }
-        guard t < ramp.start + ramp.duration else { return ramp.to }
-        let fraction = Double(t - ramp.start) / Double(ramp.duration)
-        return ramp.from + (ramp.to - ramp.from) * fraction
+        let magnitude = MediaPeaks.peak(
+            peaks, over: voice.segment, from: from, to: to, reversedPivot: voice.reversedPivot)
+        return Double(magnitude) * gain
     }
 
     /// Whether a track's envelope is anything but zero across a span. The

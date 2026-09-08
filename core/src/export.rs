@@ -25,11 +25,24 @@
 //! The preset table is the single source of truth: [`presets`] serializes
 //! it for the picker and [`Project::export_settings`] resolves against the
 //! same rows, so a preset cannot exist in the menu and not in the resolver.
+//!
+//! How an override value is READ and REFUSED is `export_overrides.rs` —
+//! the vocabulary, where this file is the table and the resolution.
 
 use serde_json::{Map, Value};
 
+use crate::export_overrides::{
+    boolean, fps as fps_override, loudness, object, positive_u32, range as range_override,
+};
 use crate::model::Project;
-use crate::time::{self, Fps, Ticks};
+use crate::time::{self, Fps};
+
+/// Re-exported at its old path. Five modules outside this one
+/// (`edit.rs`, `edit_props.rs`, `edit_action.rs`, `edit_paste.rs`,
+/// `edit_track.rs`) name `crate::export::describe` for their own error
+/// messages — it was never really an export function — so the phase-5 cut
+/// that moved it into `export_overrides.rs` costs them nothing.
+pub(crate) use crate::export_overrides::describe;
 
 // ---- the preset table ----------------------------------------------------
 
@@ -41,6 +54,8 @@ enum Container {
     Mov,
     Mp4,
     M4a,
+    Wav,
+    Aiff,
     Gif,
     Apng,
 }
@@ -51,6 +66,8 @@ impl Container {
             Container::Mov => "mov",
             Container::Mp4 => "mp4",
             Container::M4a => "m4a",
+            Container::Wav => "wav",
+            Container::Aiff => "aiff",
             Container::Gif => "gif",
             Container::Apng => "apng",
         }
@@ -69,11 +86,18 @@ impl Container {
     /// An APNG is written to an ordinary PNG destination — the animation
     /// lives in `acTL`/`fcTL` chunks inside a file that is still a PNG — so
     /// its type identifier is PNG's, not one of its own.
+    ///
+    /// The two LPCM rows' identifiers are exactly `AVFileType.wav` and
+    /// `AVFileType.aiff`'s raw values, which is what lets
+    /// `Exporter.fileType(for:)` resolve them from this string alone
+    /// rather than growing a container list of its own.
     fn file_type(self) -> &'static str {
         match self {
             Container::Mov => "com.apple.quicktime-movie",
             Container::Mp4 => "public.mpeg-4",
             Container::M4a => "com.apple.m4a-audio",
+            Container::Wav => "com.microsoft.waveform-audio",
+            Container::Aiff => "public.aiff-audio",
             Container::Gif => "com.compuserve.gif",
             Container::Apng => "public.png",
         }
@@ -84,15 +108,19 @@ impl Container {
     /// lets a player start before the file is fully fetched. A ProRes MOV
     /// is an editing master handed to another application, where the
     /// rewrite pass buys nothing. GIF and APNG have no `moov` atom and
-    /// nothing to move: a viewer already starts on the first frame.
+    /// nothing to move: a viewer already starts on the first frame, and
+    /// neither do WAV and AIFF — a RIFF or an IFF file is a header
+    /// followed by samples, with no index to relocate, so the flag would
+    /// be a request the writer has nothing to do about.
     fn optimizes_for_network(self) -> bool {
         matches!(self, Container::Mp4 | Container::M4a)
     }
 
-    /// Whether the container can hold sound. Every movie container can and
-    /// M4A is nothing else; GIF and APNG are picture formats with no audio
-    /// track in the file format at all, so `audio: false` for those is a
-    /// fact about the container rather than a decision about the project.
+    /// Whether the container can hold sound. Every movie container can,
+    /// and M4A, WAV and AIFF are nothing else; GIF and APNG are picture
+    /// formats with no audio track in the file format at all, so
+    /// `audio: false` for those is a fact about the container rather than
+    /// a decision about the project.
     fn carries_audio(self) -> bool {
         !matches!(self, Container::Gif | Container::Apng)
     }
@@ -106,12 +134,13 @@ pub(crate) struct Preset {
     name: &'static str,
     container: Container,
     pub(crate) codec: &'static str,
-    /// False for the audio-only preset; every other row carries video.
+    /// False for the three audio-only presets; every other row carries
+    /// video.
     video: bool,
     /// `None` means "the project's canvas size", which is what every movie
     /// row wants: a preset is an encoding, and the size is the document's
     /// unless a `width`/`height` override says otherwise. The resolver
-    /// fills the canvas in for the audio-only row too, so every settings
+    /// fills the canvas in for the audio-only rows too, so every settings
     /// object carries a width. Only the two image rows pin one — the cap
     /// `Project::export_sizes` lists as their default.
     pub(crate) size: Option<(u32, u32)>,
@@ -121,6 +150,20 @@ pub(crate) struct Preset {
     fps: Option<Fps>,
     /// The `AVAssetExportSession` preset name, verbatim; `None` for a
     /// container AVFoundation cannot write.
+    ///
+    /// Since phase 5 the field means only **"AVFoundation can write this
+    /// row"**, and the name itself is a record rather than an instruction.
+    /// Nothing has run a session since M2, but `null` here is still the
+    /// one thing routing an export to the ImageIO writer
+    /// (`ExportSettings.isImageSequence` is literally `avPreset == nil`),
+    /// so a row that AVFoundation writes must carry SOME name even when
+    /// AVFoundation has no name for it. There is no `AVAssetExportPreset`
+    /// for LPCM in a WAV or an AIFF, so those two rows carry the audio-only
+    /// name `audio_m4a` carries: it is the closest true statement
+    /// available — "an audio-only file AVFoundation writes" — and a null
+    /// there would hand a WAV to `ImageSequenceWriter`, which would refuse
+    /// it as an unknown image container and report a format this table
+    /// advertises as unsupported.
     avf_preset: Option<&'static str>,
 }
 
@@ -156,7 +199,9 @@ pub(crate) struct Preset {
 /// session any more (§7.8), so on the Swift side the name is only the
 /// signal that AVFoundation can write the row at all; the two image rows
 /// carry none, which is the signal to write them frame by frame through
-/// ImageIO instead.
+/// ImageIO instead. The two LPCM rows repeat `audio_m4a`'s name for the
+/// same reason and with the field doc's caveat: AVFoundation has no
+/// session preset for LPCM, and a null would route a WAV to ImageIO.
 ///
 /// **No row carries a default bitrate, deliberately.** On the session path
 /// the preset name IS the ladder — `AVAssetExportSession` exposes no way to
@@ -168,7 +213,7 @@ pub(crate) struct Preset {
 /// bitrate to set. A bitrate is therefore something the user asks for — the
 /// `video_bitrate` / `audio_bitrate` overrides — never something a preset
 /// assumes on their behalf.
-const PRESETS: [Preset; 6] = [
+const PRESETS: [Preset; 8] = [
     // The default (see above). The ids are the `export` tool's vocabulary
     // and every script that calls it spells them, so a row is named for
     // the encoding alone — `h264`, not `h264_document` — because the size
@@ -208,6 +253,48 @@ const PRESETS: [Preset; 6] = [
         name: "Audio only (M4A)",
         container: Container::M4a,
         codec: "aac",
+        video: false,
+        size: None,
+        fps: None,
+        avf_preset: Some("AVAssetExportPresetAppleM4A"),
+    },
+    // The two uncompressed audio rows (road map 2, phase 5). M4A is what
+    // you send; these are what you hand to someone else's tool — a mix
+    // going out to a mastering engineer, a bed going into a podcast
+    // editor, a stem a DAW will re-encode anyway — where a second lossy
+    // generation is the one thing you cannot take back.
+    //
+    // The codec is `lpcm`, not a container spelling, because the container
+    // and the codec are separate questions here and `ExportWriter` has to
+    // answer the codec one to pick its `AVAssetWriterInput` settings: the
+    // decoded mix is already 16-bit little-endian interleaved 48 kHz LPCM
+    // (it is what the ProRes row writes), so a WAV is that dictionary
+    // written straight out and an AIFF is the same samples big-endian,
+    // which the CONTAINER decides.
+    //
+    // 16-bit, and 24 deliberately deferred: 24 would mean widening the
+    // decode settings the mix is read through, which is the same
+    // dictionary every other preset's encoder consumes, and a silent
+    // format mismatch there is a file of noise rather than an error. A
+    // depth is a request rather than a row when it comes (an `audio_bits`
+    // override beside the bitrates), and it needs measuring first.
+    Preset {
+        id: "audio_wav",
+        name: "Audio only (WAV)",
+        container: Container::Wav,
+        codec: "lpcm",
+        video: false,
+        size: None,
+        fps: None,
+        // Not a lie the resolver tells: see `avf_preset`'s field doc. The
+        // name says "AVFoundation writes this row", and nothing more.
+        avf_preset: Some("AVAssetExportPresetAppleM4A"),
+    },
+    Preset {
+        id: "audio_aiff",
+        name: "Audio only (AIFF)",
+        container: Container::Aiff,
+        codec: "lpcm",
         video: false,
         size: None,
         fps: None,
@@ -328,54 +415,6 @@ pub(crate) fn preset(id: &str) -> Result<&'static Preset, String> {
         .ok_or_else(|| format!("unknown export preset \"{id}\""))
 }
 
-// ---- override reading ----------------------------------------------------
-
-/// A JSON value as short text for an error message, truncated on a char
-/// boundary so a pasted megabyte of JSON cannot become the error string.
-pub(crate) fn describe(value: &Value) -> String {
-    let text = value.to_string();
-    if text.chars().count() <= 40 {
-        text
-    } else {
-        format!("{} …", text.chars().take(40).collect::<String>())
-    }
-}
-
-/// An override field, or `None` when absent or explicitly null (null means
-/// "use the preset", so a caller can build one overrides object and leave
-/// the fields it does not care about).
-fn field<'a>(overrides: Option<&'a Value>, key: &str) -> Option<&'a Value> {
-    overrides.and_then(|o| o.get(key)).filter(|v| !v.is_null())
-}
-
-/// A strictly positive integer override — the pixel dimensions and the two
-/// bitrates, which want the identical check. `u64::MAX` is not the ceiling
-/// on purpose: a bitrate is bits per second, and `u32`'s 4.3 Gbit/s is an
-/// order of magnitude past anything deliverable (ProRes 422 at 4K is about
-/// 0.7), so the same bound that keeps a width sane keeps a bitrate honest.
-/// Zero and negative both land in the error arm, which names the value.
-fn positive_u32(overrides: Option<&Value>, key: &str) -> Result<Option<u32>, String> {
-    let Some(value) = field(overrides, key) else {
-        return Ok(None);
-    };
-    match value.as_u64() {
-        Some(n) if n > 0 && n <= u64::from(u32::MAX) => Ok(Some(n as u32)),
-        _ => Err(format!(
-            "export {key} must be a positive integer, not {}",
-            describe(value)
-        )),
-    }
-}
-
-fn ticks(value: &Value, what: &str) -> Result<Ticks, String> {
-    value.as_i64().ok_or_else(|| {
-        format!(
-            "export {what} must be an integer number of ticks, not {}",
-            describe(value)
-        )
-    })
-}
-
 // ---- resolution ----------------------------------------------------------
 
 impl Project {
@@ -384,10 +423,13 @@ impl Project {
     /// (`rc_export_settings`).
     ///
     /// Overrides may set `width`, `height`, `fps` (`[num, den]`), `range`
-    /// (`{"start", "duration"}` in ticks), `optimize_for_network` and the
-    /// two bitrates `video_bitrate` / `audio_bitrate` (bits per second,
-    /// strictly positive); anything else in the object is ignored, so a
-    /// newer UI can send fields this build does not know.
+    /// (`{"start", "duration"}` in ticks), `optimize_for_network`, the two
+    /// bitrates `video_bitrate` / `audio_bitrate` (bits per second,
+    /// strictly positive) and the two loudness figures `loudness_lufs` /
+    /// `peak_dbtp`; anything else in the object is ignored, so a newer UI
+    /// can send fields this build does not know. Each is read and refused
+    /// by `export_overrides.rs`, which is where the spelling of every one
+    /// of them lives.
     ///
     /// A bitrate is emitted only when it was asked for. There is no default
     /// to fall back on (see [`PRESETS`]), and an absent key says exactly
@@ -397,6 +439,12 @@ impl Project {
     /// on the same principle that reports a width for the audio-only row:
     /// one rule for reading overrides, and the format flags say what the
     /// output can actually carry.
+    ///
+    /// The two loudness figures follow the bitrates exactly — emitted only
+    /// when asked for, accepted by every preset — with one difference the
+    /// reader states and argues: a `peak_dbtp` with no `loudness_lufs` is
+    /// an `Err`, because normalisation is gain-only and a ceiling with
+    /// nothing to cap would be a key accepted, echoed and silently inert.
     ///
     /// The range is snapped to the export's frame grid and clamped to the
     /// project, because an `AVAssetExportSession` `timeRange` that begins
@@ -414,17 +462,7 @@ impl Project {
     ) -> Result<Value, String> {
         let preset = preset(preset_id)?;
 
-        let overrides = match overrides {
-            None => None,
-            Some(Value::Null) => None,
-            Some(value) if value.is_object() => Some(value),
-            Some(value) => {
-                return Err(format!(
-                    "export overrides must be a json object, not {}",
-                    describe(value)
-                ))
-            }
-        };
+        let overrides = object(overrides)?;
 
         // Size: the preset's cap if it has one, else the canvas — a movie
         // preset renders at whatever the project composites at, and a size
@@ -449,56 +487,10 @@ impl Project {
         // The preset's rate, else the canvas — the image-sequence presets
         // cap the rate for the same reason they cap the size, and every
         // movie preset exports at the rate the project was cut at.
-        let fps = match field(overrides, "fps") {
-            None => preset.fps.unwrap_or(self.canvas.fps),
-            Some(value) => {
-                let terms = value.as_array().and_then(|a| {
-                    match (
-                        a.first().and_then(Value::as_u64),
-                        a.get(1).and_then(Value::as_u64),
-                    ) {
-                        (Some(num), Some(den)) if a.len() == 2 => Some((num, den)),
-                        _ => None,
-                    }
-                });
-                match terms {
-                    Some((num, den))
-                        if num > 0
-                            && den > 0
-                            && num <= u64::from(u32::MAX)
-                            && den <= u64::from(u32::MAX) =>
-                    {
-                        Fps {
-                            num: num as u32,
-                            den: den as u32,
-                        }
-                    }
-                    _ => {
-                        return Err(format!(
-                            "export fps must be [num, den] with non-zero terms, not {}",
-                            describe(value)
-                        ))
-                    }
-                }
-            }
-        };
+        let fps = fps_override(overrides, preset.fps.unwrap_or(self.canvas.fps))?;
 
         let project_duration = self.duration();
-        let (mut start, mut duration) = (0, project_duration);
-        if let Some(range) = field(overrides, "range") {
-            if !range.is_object() {
-                return Err(format!(
-                    "export range must be a json object with start and duration, not {}",
-                    describe(range)
-                ));
-            }
-            if let Some(value) = field(Some(range), "start") {
-                start = ticks(value, "range start")?;
-            }
-            if let Some(value) = field(Some(range), "duration") {
-                duration = ticks(value, "range duration")?;
-            }
-        }
+        let (mut start, mut duration) = range_override(overrides, (0, project_duration))?;
         // Snap first, then clamp: snapping can only move a bound by less
         // than a frame, so clamping afterwards cannot be undone by it.
         start = time::snap_to_frame(start, fps).clamp(0, project_duration);
@@ -516,15 +508,18 @@ impl Project {
         let video_bitrate = positive_u32(overrides, "video_bitrate")?;
         let audio_bitrate = positive_u32(overrides, "audio_bitrate")?;
 
-        let optimize = match field(overrides, "optimize_for_network") {
-            None => preset.container.optimizes_for_network(),
-            Some(value) => value.as_bool().ok_or_else(|| {
-                format!(
-                    "export optimize_for_network must be true or false, not {}",
-                    describe(value)
-                )
-            })?,
-        };
+        // The integrated loudness target and the true-peak ceiling that
+        // caps the gain it asks for, on the bitrates' terms: emitted only
+        // when asked for, so an absent `loudness_lufs` reaches Swift as an
+        // absent key and means "do not normalise". The reader is the one
+        // place their bounds and their pairing rule live.
+        let (loudness_lufs, peak_dbtp) = loudness(overrides)?;
+
+        let optimize = boolean(
+            overrides,
+            "optimize_for_network",
+            preset.container.optimizes_for_network(),
+        )?;
 
         let mut range = Map::new();
         range.insert("start".to_string(), Value::from(start));
@@ -562,6 +557,12 @@ impl Project {
         }
         if let Some(bps) = audio_bitrate {
             out.insert("audio_bitrate".to_string(), Value::from(bps));
+        }
+        if let Some(lufs) = loudness_lufs {
+            out.insert("loudness_lufs".to_string(), Value::from(lufs));
+        }
+        if let Some(dbtp) = peak_dbtp {
+            out.insert("peak_dbtp".to_string(), Value::from(dbtp));
         }
         out.insert("range".to_string(), Value::Object(range));
         // Audio is offered whenever the container can hold it: a project

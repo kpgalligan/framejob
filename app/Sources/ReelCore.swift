@@ -373,6 +373,18 @@ struct ExportSettings: Decodable, Equatable {
     let optimizeForNetwork: Bool
     let videoBitrate: Int?
     let audioBitrate: Int?
+    /// The integrated loudness target the written file is normalised to, in
+    /// LUFS (`export_overrides.rs`'s `loudness_lufs`, −70…0), or nil for "do
+    /// not normalise" — which is what an ABSENT key means, the same rule the
+    /// two bitrates follow. The export sheet's Loudness popup and the
+    /// `export` tool are the two callers that set it.
+    let loudnessLufs: Double?
+    /// The true-peak ceiling the normalising gain is capped against, in dBTP
+    /// (`peak_dbtp`, −20…0). The core refuses one with no `loudnessLufs`
+    /// beside it, so this is nil whenever that is; nil WITH a target is a
+    /// script's "no ceiling but full scale", and `ExportLoudness.resolve`
+    /// supplies 0 dBTP for it.
+    let peakDbtp: Double?
 
     /// Spelled out rather than synthesized because two keys do not follow
     /// from the property names: the core nests the resolved range under
@@ -382,10 +394,17 @@ struct ExportSettings: Decodable, Equatable {
     /// range — which disabled the export sheet's Export button and made the
     /// agent's `export` report `"duration": 0` — and threw the core's
     /// AVFoundation preset away.
+    ///
+    /// The two loudness keys are NOT of that kind: `loudness_lufs` and
+    /// `peak_dbtp` convert to `loudnessLufs` and `peakDbtp` on their own.
+    /// They are listed for the reason every other well-behaved key is —
+    /// a `CodingKeys` enum is exhaustive, and a case left out is a field
+    /// that silently decodes as nil.
     private enum CodingKeys: String, CodingKey {
         case preset, container, codec, width, height, fps, range
         case avPreset = "avfPreset"
         case fileType, optimizeForNetwork, videoBitrate, audioBitrate
+        case loudnessLufs, peakDbtp
     }
 
     private enum RangeKeys: String, CodingKey {
@@ -408,6 +427,8 @@ struct ExportSettings: Decodable, Equatable {
         optimizeForNetwork = c.lenient(.optimizeForNetwork, true)
         videoBitrate = c.lenient(.videoBitrate)
         audioBitrate = c.lenient(.audioBitrate)
+        loudnessLufs = c.lenient(.loudnessLufs)
+        peakDbtp = c.lenient(.peakDbtp)
     }
 
     var renderSize: CGSize { CGSize(width: width, height: height) }
@@ -454,10 +475,13 @@ enum ReelExport {
         return sizes
     }
 
-    /// Resolves `preset` plus optional `overrides` (size, fps, range, and the
-    /// two bitrates the Quality popup writes) against the project. Throws
-    /// with the core's message for an unknown preset or bad overrides, so the
-    /// sheet can show it verbatim.
+    /// Resolves `preset` plus optional `overrides` (size, fps, range, the two
+    /// bitrates the Quality popup writes and the two loudness figures its
+    /// Loudness popup does) against the project. Throws with the core's
+    /// message for an unknown preset or bad overrides, so the sheet can show
+    /// it verbatim — including the one PAIRING rule among them, that a
+    /// `peak_dbtp` with no `loudness_lufs` is refused rather than accepted
+    /// and left inert (`export_overrides.rs`).
     static func settings(
         _ p: ReelProject, preset: String, overrides: [String: Any]? = nil
     ) throws -> ExportSettings {

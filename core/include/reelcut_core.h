@@ -158,7 +158,17 @@ bool rc_timecode_parse(const char *s, uint32_t fps_num, uint32_t fps_den, int64_
    ENCODING — a container and a codec — with no size of its own, so that an
    export is at the document's size unless a size is asked for. The two
    image formats are the exception and carry the cap 7.8 argues. The FIRST
-   row is the default the export sheet opens on. */
+   row is the default the export sheet opens on.
+
+   Three of the rows are audio only: `audio_m4a` (AAC) is what you send,
+   and `audio_wav` / `audio_aiff` are 16-bit LPCM at 48 kHz — what you hand
+   to somebody else's tool, where a second lossy generation is the one
+   thing you cannot take back. A row's `avf_preset` means only
+   "AVFoundation can write this row": `null` is what routes an export to
+   the frame-by-frame ImageIO writer (the two image formats), and since
+   AVFoundation publishes no LPCM export preset the two new rows repeat the
+   M4A row's name rather than carrying a null that would hand a WAV to the
+   image writer. Read it as a record, never as an instruction. */
 char *rc_export_presets(void);
 
 /* The output sizes the export sheet offers for `preset_id` against this
@@ -177,7 +187,34 @@ char *rc_export_sizes(const RcProject *p, const char *preset_id, char **err_out)
 
 /* A preset plus optional `overrides_json` resolved against the project into
  * concrete settings. NULL with a message through `err_out` for an unknown
- * preset or bad overrides. */
+ * preset or bad overrides.
+ *
+ * The overrides are `width` and `height` in pixels (each strictly
+ * positive, and each alone leaves the other the document's), `fps`,
+ * `range`, `optimize_for_network`, the two bitrates in bits per second
+ * (`video_bitrate`, `audio_bitrate`) and the two loudness figures
+ * (`loudness_lufs`, the integrated target an export is normalised to,
+ * -70..0; `peak_dbtp`, the true-peak ceiling the gain is capped against,
+ * -20..0). Absent and explicit null both mean "use the preset", an
+ * unknown key is ignored so a newer UI still gets an export, and a value
+ * out of range or of the wrong type is an error naming the key and the
+ * value. One pairing rule, and it is the table's only one: a `peak_dbtp`
+ * with no `loudness_lufs` is an error, because normalisation is gain-only
+ * and a ceiling with nothing to cap would be accepted, echoed and
+ * silently inert. Neither loudness key appears in the resolved settings
+ * unless it was asked for.
+ *
+ * Note what is NOT in that list: there is no `size` key. A size is two
+ * numbers here. `rc_export_sizes`' row ids ("1080p", "document") are the
+ * SHEET's vocabulary and a caller resolves one into `width` and `height`
+ * before calling this.
+ *
+ * The paragraph above is checked rather than trusted: `core/tests/export.rs`
+ * reads its backticked keys back out of THIS file and sends each one a
+ * value no reader accepts, so a key named there that nothing reads fails
+ * the suite. It has to be checked, because the ignore-unknown rule is
+ * exactly what makes a wrong name silent — settings that resolve, at the
+ * document's size, reported ok. */
 char *rc_export_settings(const RcProject *p, const char *preset_id, const char *overrides_json,
                          char **err_out);
 

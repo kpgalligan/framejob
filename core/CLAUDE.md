@@ -162,7 +162,25 @@ lockstep are in the root `CLAUDE.md`; the full design is
   `RC_MAX_*` in the header), read-any-version / write-current.
 - `export.rs` — presets (one per encoding; the two image caps are the only
   sizes in the table) and settings resolution. `preset(id)` is the one
-  lookup both resolvers share.
+  lookup both resolvers share. A row's `avf_preset` means only "AVFoundation
+  can write this row" since road map 2's phase 5 — `null` is what routes an
+  export to the ImageIO writer, so the two LPCM rows (`audio_wav`,
+  `audio_aiff`) repeat `audio_m4a`'s name rather than carrying a null
+  AVFoundation has no LPCM name to fill.
+- `export_overrides.rs` — how an override value is READ and REFUSED, where
+  `export.rs` is the table and the resolution: `describe`, the overrides
+  object itself, and the readers for a positive integer, a boolean, a rate,
+  a range and a decibel figure, each refusing with a message that names the
+  key and the value. Cut out of `export.rs` in road map 2's phase 5, and
+  cut THERE for `props_check.rs`'s reason — how a value is spelled is a
+  fact about the vocabulary, not about the resolution; nothing in it knows
+  which preset asked or what the canvas is. `describe` was never an export
+  function at all (five modules import it for their own messages), so
+  `export.rs` re-exports it and `crate::export::describe` still resolves.
+  The one rule with an exception is the loudness pair: `peak_dbtp` without
+  `loudness_lufs` is an `Err`, because normalisation is gain-only and a
+  ceiling with nothing to cap would be the crate's first key accepted,
+  echoed and silently inert.
 - `export_size.rs` — `export_sizes(preset)`: the sizes the export sheet
   offers for a document and a format — the format's cap, the document's
   own size, then the standard sizes named by their SHORT edge and fitted to
@@ -204,8 +222,22 @@ singular now delegates to rather than duplicating), `edit_zoom.rs` 390 —
 the new module the geometry went into rather than a fifth function in
 `edit_action.rs` — and `recipe.rs` 567, up from 331 when phase 4c put the
 reveal there (`Reveal`, `ramp`, `text_hash`, and the prose arguing why the
-hash covers the answer). Those four are the files to weigh a phase-5 or
-phase-6 addition against next.
+hash covers the answer). Those four are the files to weigh a phase-6
+addition against next.
+
+**`export.rs` paid the rule in phase 5 and is the worked example.** It
+stood at 578 against the cap, and phase 5 owed it two container variants,
+two preset rows, a decibel validator, two override reads and two echo
+lines — about 690. So it gave something up BEFORE it took anything on:
+`describe`, the overrides object and every per-type reader went out to
+`export_overrides.rs` (266), and `export.rs` came back to **579** with the
+phase's additions already in it. The cut is by CONCERN, `props_check.rs`'s
+own: how a value is SPELLED and what makes it a refusal is a fact about
+the vocabulary, where the table and the resolution are `export.rs`.
+Nothing in the new file knows which preset asked or what the canvas is.
+And the re-export is what made the cut free — five modules name
+`crate::export::describe` for their own messages, so `export.rs` re-exports
+it and not one of them changed.
 
 `model.rs` is OFF the list: it came DOWN from 1330 to 940 when the lookups
 and `validate` moved to `model_query.rs` (454), and to 462 in road map 2's

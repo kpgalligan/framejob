@@ -1,8 +1,8 @@
 import AppKit
 
 /// The Clip tab's AUDIO sections (spec §4.3): volume with its dB read-out,
-/// mute, the two fades, ducking, noise reduction, the compressor, pan,
-/// mix-to-mono and Detach Audio.
+/// Normalize and mute, the two fades, ducking, noise reduction, the
+/// compressor, pan, mix-to-mono and Detach Audio.
 ///
 /// **This pane is never shown**: since the six tabs became three it is a
 /// factory `ClipPane` holds and calls, last in the Clip tab, whenever at least
@@ -10,7 +10,10 @@ import AppKit
 ///
 /// Everything here is one `set_audio` patch over the selection, except Detach
 /// Audio, which is a clip-level op the editor already owns (⌥⌘D) — the pane
-/// hands it back through `onCommand` rather than re-implementing it.
+/// hands it back through `onCommand` rather than re-implementing it — and
+/// Normalize, which is a `set_audio` PER CLIP because each clip gets its own
+/// measured gain (`normalize()` says why it cannot go through
+/// `InspectorBinding.ops(audio:)`).
 ///
 /// The last three sections are in SIGNAL ORDER rather than in order of
 /// familiarity: noise reduction, then the compressor, then the pan in Mix, is
@@ -24,6 +27,32 @@ final class AudioPane: InspectorPaneView {
 
     func volumeSection() -> InspectorSection {
         let binding = self.binding
+        // The button lives in Volume rather than in a section of its own: it
+        // writes the clip's volume and nothing else, and `ClipPane.makeSections`
+        // would need editing for a seventh section — which is the omission
+        // nothing type-checks and which has now bitten two phases in a row.
+        let normalize = OptionButtonControl(
+            title: "Normalize",
+            action: { [weak self] in self?.normalize() },
+            enabled: { !AudioPane.normalizable(binding).isEmpty }, onEdit: {})
+        // Two of the three sentences are the limits, and they are here because
+        // this is where somebody meets them: the tool's description says the
+        // same three things (road map 2 phase 5c, D-C3). The level is spelled
+        // with the typographic minus the sheets use, and read off the constant
+        // so that changing the target changes the sentence. The nest clause is
+        // a fourth limit and is here for the same reason turned around: a nest
+        // alone leaves the button disabled, but a nest picked BESIDE an
+        // ordinary clip leaves it enabled and the nest quietly not asked
+        // about, which is the one thing about the press the others do not say.
+        let level = String(format: "%.0f dBFS", AudioNormalize.defaultPeakDB)
+            .replacingOccurrences(of: "-", with: "−")
+        let tip: String =
+            "Set each selected clip's volume so its loudest moment reaches " + level
+            + ". It REPLACES the volume rather than adding to it, so pressing it twice "
+            + "changes nothing; it writes the clip's base level even while the playhead "
+            + "is inside an action; and it leaves Mute alone. A nest is skipped: its "
+            + "level lives in the clips inside it, not in the nest."
+        normalize.toolTip = tip
         return InspectorSection(
             id: "audio.volume", title: "Volume",
             summary: {
@@ -56,7 +85,60 @@ final class AudioPane: InspectorPaneView {
                     read: { binding.audioProps.muted },
                     ops: { binding.ops(audio: AudioPatch(muted: $0)) },
                     mixed: { binding.mixedAudio { $0.muted } }),
+                inspectorButtonRow([normalize]),
             ])
+    }
+
+    /// Normalize Clip's UI half: measure, then commit as ONE undo step.
+    ///
+    /// All of the arithmetic is `AudioNormalize`'s, which is the point — the
+    /// agent's `normalize_clip` calls the same two functions, so the button and
+    /// the tool cannot drift apart, and the gains are testable with no window
+    /// open.
+    ///
+    /// It does NOT go through `binding.ops(audio:)`, and that is deliberate.
+    /// `InspectorBinding.split` does two things every other control here wants
+    /// and this one must not inherit: it folds every clip outside an action
+    /// into ONE `set_audio` with many ids and one shared patch — but each clip
+    /// gets its own measured gain — and it re-routes a clip the playhead is
+    /// inside an action of into `set_action_end`, where Normalize means the
+    /// clip's BASE level and never an action's end state. So the ops are built
+    /// per clip, the shape `SpeedSheetController` already uses for a per-clip
+    /// computed result.
+    ///
+    /// The scope is `normalizable` rather than the raw selection, so a shape,
+    /// a silent movie or a nest picked alongside is simply not asked about
+    /// instead of coming back as a refusal the user did not cause.
+    ///
+    /// **A run that can normalise nothing beeps**, and so does a second press
+    /// on an already-normalised selection: `apply` refuses an empty op list,
+    /// and `ProjectDocument.applyEdit` refuses an identity edit — the recorded
+    /// consequence `SpeedSheetController` carries for the same reason. The
+    /// button is not the place that explains WHY a clip was skipped; the tool
+    /// reports each reason by name under `skipped`.
+    /// The selected clips Normalize is offered for, which is `audioClips`
+    /// minus the ones `AudioNormalize` could only refuse.
+    ///
+    /// It is not `audioClips` because a NEST is in that list and must not be
+    /// in this one: a nest clip carrying anything audible has audio properties
+    /// of its own, so every other control in this section is right to be live
+    /// on it, but the plan flattens a nest and the clip has no segment — so
+    /// Normalize on a nest can only beep. `AudioNormalize.canOffer` is the one
+    /// home of that rule; the Clip menu's validator asks it the same question,
+    /// or the two would disagree about the same selection.
+    static func normalizable(_ binding: InspectorBinding) -> [ClipSnapshot] {
+        binding.audioClips.filter { AudioNormalize.canOffer($0, in: binding.snapshot) }
+    }
+
+    private func normalize() {
+        guard let document = binding.document,
+              let input = AudioNormalize.read(
+                from: document, clips: AudioPane.normalizable(binding).map { $0.id })
+        else {
+            NSSound.beep()
+            return
+        }
+        binding.apply("Normalize", AudioNormalize.plan(input).ops)
     }
 
     // MARK: Fades

@@ -51,8 +51,22 @@ lockstep are in the root `CLAUDE.md`; the full design is
   of a glyph at a time inherits the rule.
 - `Playback.swift` · `CompositionBuilder.swift` · `Compositor.swift` ·
   `CompositorEffects.swift` · `MediaImporter.swift` ·
-  `Exporter.swift` · `ExporterWriter.swift` · `ExporterImageSequence.swift` —
-  the AVFoundation/Metal side; see spec §7.5–7.8. `CompositorEffects.swift`
+  `Exporter.swift` · `ExporterLoudness.swift` · `ExporterWriter.swift` ·
+  `ExporterImageSequence.swift` —
+  the AVFoundation/Metal side; see spec §7.5–7.8. Two phase-5 facts about
+  the last four: an export is TWO passes wherever the file holds sound —
+  a measurement build of its own (a mix copy would share the tap, and a tap
+  carries per-instance state), reading 32-bit FLOAT so a mix over full scale
+  is measured honestly, then the ordinary write with the gain applied to the
+  decoded Int16 samples. `ExporterLoudness.swift` IS that first pass, a pure
+  move out of `Exporter.swift` when the second one took it past the ~600-line
+  cap, which is why `Exporter`'s `lock`, `measureReader`, `scratchStorage`,
+  `scratchCapacity` and its two accessors are internal rather than private —
+  stored properties cannot live in an extension. And
+  `CompositionBuilder.build`'s `metering` flag
+  is passed true by `Playback.startRebuild` and by nothing else, so an
+  export and a rendered frame build exactly the audio path they built before
+  the level meter existed. `CompositorEffects.swift`
   holds the M3 effect logic so `Compositor.swift` grew only the uniform
   fields; the uniform block's field ORDER is a contract with
   `Resources/Shaders/Compositor.metal` and is checked nowhere but by reading
@@ -237,7 +251,11 @@ lockstep are in the root `CLAUDE.md`; the full design is
   needs that gap, and a proof that scores differently run to run is the
   symptom to recognise: a stable-but-different render is an ambiguity, not a
   race, and no amount of waiting will settle it.
-- `ExportSheetController.swift` (the export card and its progress sheet),
+- `ExportSheetController.swift` (the export card — six control rows since
+  phase 5's Loudness popup, whose −1 dBTP ceiling is FIXED and stated in the
+  hint rather than made a seventh — and its progress sheet, which says
+  "Measuring loudness…" through pass 1 and reports the measured peak and
+  loudness on its last line, normalised or not),
   `SpeedSheetController.swift`, `RelinkSheetController.swift`,
   `TranscribeSheetController.swift` (settings, then its own progress card,
   because a second sheet presented out of the first one's action is
@@ -251,7 +269,7 @@ lockstep are in the root `CLAUDE.md`; the full design is
 - `AgentCatalog.swift` — the MCP tool catalog; a startup check enforces that
   catalog names match the dispatch registry (it traps in debug and logs in
   Release, because `make app` builds Release). The handlers live in
-  `AgentServer+Project/Clips/Tracks/Media/Render/History/Silence/Captions.swift`
+  `AgentServer+Project/Clips/Tracks/Media/Render/History/Silence/Captions/Audio.swift`
   and their shared
   argument vocabulary in `AgentServer+Arguments.swift` — `intArg`,
   `doubleArg`, `boolArg`, `stringArg`, `stringsArg` (an optional list of
@@ -346,6 +364,55 @@ lockstep are in the root `CLAUDE.md`; the full design is
   its callbacks on an `OperationQueue` that defaults to the app's MAIN
   one, and a recognition is seconds to minutes of work that must not
   freeze the UI.
+- **Sound**, five files road map 2's phase 5 added, all of them arithmetic
+  with one view among them.
+  `MediaPeaks.swift` is the cached waveform and the ONE way to ask it
+  about a source window: the bucket size, the project→source tick mapping
+  taken from the plan segment's own resolved rate (never
+  `TimelineView.sourceTime`, which multiplies by `clip.speed` and rounds
+  the rate a second time), the floor for the bucket index, and the
+  reversed MIRROR — a reversed clip's `in` is measured in a stream no
+  peaks file exists for, so the window is mirrored about the media's model
+  duration. All four were `private static` inside `SilenceDetector` until
+  a second caller needed them, and a third copy is the drift the rule
+  exists to stop.
+  `AudioNormalize.swift` is Normalize Clip as a value type — peaks in, ops
+  out, `CaptionLayout`'s shape applied to sound — so the Audio pane's
+  button and the `normalize_clip` tool provably do the same thing. It
+  measures PRE-FADER (normalise is a statement about the material, where
+  `SilenceDetector` asks what the ear hears and multiplies by the
+  envelope), takes its window from the PLAN segment (one test —
+  "this clip has no audio segment" — correctly refuses no media, missing
+  media, no audio track, `enabled.audio` off anywhere, a still and a
+  nested clip), REPLACES `volume` rather than multiplying it so a second
+  press is a no-op, and always writes BASE props even inside an action.
+  `LevelMeter.swift` is the meter's model and `LevelMeterView.swift` its
+  one view, subscribed directly to the process-wide `LevelMeter.shared` so
+  that neither frozen file gained a stored handle or a fan-out line.
+  **The meter reads the DSP tap that already exists and multiplies by the
+  plan's envelope**; the road map's second `PostEffects` tap cannot be
+  built, because `AVMutableAudioMixInputParameters` has exactly one
+  `audioTapProcessor` and the flags are exclusive. Do not "fix" it back.
+  Two more rules here: the MODEL publishes a raw measurement and the VIEW
+  owns the ballistics (peak hold, fall, clip dwell), which is what lets a
+  proof assert on the number without photographing a window; and the view
+  has ONE resting appearance and starts no free-running animation, because
+  the offscreen harness writes only when two consecutive captures agree.
+  `Loudness.swift` is BS.1770-4 and the export gain — plain float buffers
+  in, a value type out, no player and no reader, `AudioDSP.swift`'s rule
+  applied to measurement, which is what lets the meter be checked against
+  synthesized tones with no fixture file. Its coefficients are quoted from
+  the recommendation at 48 kHz and it REFUSES any other rate rather than
+  filtering with the wrong numbers.
+  **`import Synchronization` is confined to `LevelMeter.swift`**, and it is
+  an exception of the same class as `async` being confined to
+  `MediaImporter.swift` (see Hygiene). `LevelMeterSink.publish` runs inside
+  the tap's process callback on AVPlayer's render thread, where nothing may
+  lock and nothing may allocate — a lock can block on a lower-priority
+  thread that holds it and a `main.async` allocates, and both fail as an
+  occasional glitch nobody can reproduce — so the sink is two 64-bit words
+  written and read with relaxed atomic stores. Every other cross-thread
+  value in `app/Sources` stays an `NSLock` or a main hop.
 - `EditorViewController+Edge.swift` — the cutting moves (spec §6's `slip`,
   `roll`, `close_gap`, `insert_clip`, `overwrite_clip`) plus the `,` / `.`
   nudge and Select All on Track. `lift_range` is the odd one out: it is the
@@ -366,7 +433,9 @@ lockstep are in the root `CLAUDE.md`; the full design is
   **It reads the PLAN, not the peaks alone**: a peak bucket is pre-fader,
   so the level it asks about is `peak × envelope`, and because `audio.rs`
   expresses mute and solo as a ZERO envelope both fall out for free with no
-  second Swift copy of `silenced` to drift from the first.
+  second Swift copy of `silenced` to drift from the first. Since phase 5c
+  the peak arithmetic it used to keep privately is `MediaPeaks.swift`'s and
+  it calls it.
   **Pitfall the review found:** that same zero envelope makes a silenced
   voice pass the quiet test at EVERY tick while still covering its span, so
   it is dropped from both scopes rather than counted — in scope it would
@@ -452,7 +521,9 @@ lockstep are in the root `CLAUDE.md`; the full design is
   `designs/design_handoff_reelcut/`, spec §3–§4.4):
   `EditorViewController+Toolbar.swift` (the 44 pt row; the frozen file keeps
   only the stored views, which are internal for exactly that reason),
-  `TimelineBar.swift` (the 36 pt bar and its selection block),
+  `TimelineBar.swift` (the 36 pt bar, its selection block, and — since
+  phase 5b — the level meter in the flexible gap left of the zoom cluster,
+  where the arithmetic for "no divider before it" is written down),
   `TimelineClipDrawing.swift` (a clip is one object — body, name strip,
   filmstrip under a tint wash, waveform, grips, transition zone),
   `ClipPane.swift` (the Clip tab: the selection header, and
@@ -535,6 +606,12 @@ transcription, which is what `Transcriber.swift` uses (spec §11);
 progress timer, and — since phase 4 — `Transcriber`'s serial work queue with
 the `OperationQueue` the recogniser delivers its callbacks on, which is not
 optional: `SFSpeechRecognizer.queue` defaults to the app's MAIN queue).
+**`import Synchronization` is allowed only inside `LevelMeter.swift`** — the
+same shape of exception, and phase 5's. Its `publish` runs on AVPlayer's
+audio render thread inside the tap's process callback, where a lock invites
+priority inversion and `main.async` allocates; two relaxed atomic words are
+what a wait-free publish costs. Nothing else earns it by asking, and every
+other cross-thread value here is an `NSLock` or a main hop.
 Colors/fonts/metrics come from `DS` tokens; shared controls
 go in `Controls.swift`. Refusals beep (`NSSound.beep()`), errors never
 crash. 4-space indent, ~100 columns.

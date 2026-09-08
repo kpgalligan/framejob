@@ -103,6 +103,22 @@ timing is not.) Phase 4's other fixture is a `.srt` file, and
 proof that authors its own expected bytes cannot be reading a file somebody
 edited by hand.
 
+**Phase 5 adds NOTHING to `media/`** — `phase5_proof.py` writes its own seven
+fixtures into `work/fixtures/` on every run, and that is deliberate rather
+than lazy. Every claim it makes is about a LEVEL, so the amplitude and the
+phase of each signal have to be exact and have to be visible beside the check
+that leans on them: they are one `aevalsrc` expression per channel, listed in
+that script's `FIXTURE_EXPRESSIONS`, and they are rewritten on each run
+because a fixture that could be stale is a fixture that could be lying. Two
+of the seven cannot be written any other way. The mono fold needs a file
+whose channels DIFFER (440 Hz at half scale left, 880 Hz at a quarter right)
+or "left equals right" is a tautology; the true-peak invariant needs a 12 kHz
+sine at exactly 45°, whose every sample sits 3.01 dB under its real
+amplitude. Worth knowing if you write another: `amerge` of two mono sines
+does not give you a stereo pair at the amplitudes you asked for — it lands
+18 dB down — and lavfi needs the expression SINGLE-QUOTED inside the filter
+description, or the commas in `between(t,0,1.5)` are read as more options.
+
 Then launch YOUR OWN instance on YOUR OWN port and only ever kill that one
 (`pgrep -f "MacOS/Reelcut"` lists them; another session may have one running):
 
@@ -115,6 +131,7 @@ python3 tools/proof/phase2_proof.py 4823
 python3 tools/proof/phase3_proof.py 4823
 python3 tools/proof/phase3_silence_scope.py 4823
 python3 tools/proof/phase4_proof.py 4823
+python3 tools/proof/phase5_proof.py 4823
 ```
 
 The last line is `<n>/<n> checks passed`, and the exit status is non-zero if
@@ -124,10 +141,11 @@ startup parity check would complain — `grep "Reelcut: " /tmp/reelcut-4823.log`
 must print nothing before a proof run means anything.
 
 **The EXACT tool count belongs to the newest phase's script**, because it is
-what tells a stale binary on the port from the build under test: phase 4
-asserts 70, and phases 1, 2 and 3 keep floors (63, 65 and 68) so a later
-phase's tools never fail an older proof. When phase 5 lands, the exact count
-moves to its script and phase 4's becomes a floor too. It is not decoration:
+what tells a stale binary on the port from the build under test: phase 5
+asserts 71, and phases 1 to 4 keep floors (63, 65, 68 and 70) so a later
+phase's tools never fail an older proof. That handover has now happened once
+exactly as it was written down — phase 5 added `normalize_clip`, took the
+exact count, and phase 4's `check` became a `>=`. It is not decoration:
 the phase-4 count was checked against the two new tools taken out of the
 catalog and the registry together, where it reads 68 — and it is not the
 only check that notices. `check` never stops a run, so that build goes on to
@@ -313,6 +331,174 @@ is the whole of what removing a catalog row and a registry row is over MCP
 (`AgentServer.dispatch`) — so the count above is what the script prints, not
 what a reader worked out from it.
 
+`phase5_proof.py` covers the catalog COUNT (71, the exact one) and phase 5's
+sound. It NEEDS ffmpeg, twice over: to write its fixtures, and to decode
+every export to raw PCM. **Nothing in it is believed because the app said
+so.** That is the whole design of it, and 5d is why: `ExportLoudness` reports
+"what was measured, plus the gain that was applied", so a build whose writer
+dropped the gain reports −14.0 LUFS over a file that still holds −6.7, and
+every check that read the report back would pass. So the script carries its
+own BS.1770-4 — the two K-weighting biquads, the 400 ms blocks at 75 %
+overlap, both gates, and the Annex 2 true-peak interpolator — transcribed
+from the Recommendation rather than from `Loudness.swift`, and it measures
+the WRITTEN FILE.
+
+**The meter is deliberately not here**, and the script's docstring says so
+rather than reaching for something adjacent: `LevelMeter` publishes to a view
+and has no MCP surface at all, so no call could read a level off it, and
+adding a tool so that a proof could exist would be the proof deciding the
+product's API. The contract's −20 dBFS claim is a unit-style check against
+that type; its resting appearance is what `phase5_chrome.py` photographs.
+
+**Mono** is three claims off the asymmetric fixture: with `mono` on the left
+channel equals the right SAMPLE FOR SAMPLE, each of those samples is the MEAN
+of the two channels the same timeline writes unfolded (within one 16-bit LSB
+— the fold happens in float, ahead of the quantisation the unfolded file
+already carries), and setting `mono` and clearing it again writes a file
+BYTE-IDENTICAL to the one taken before it was ever set. The middle one is not
+decoration: a fold that copied the left channel over the right passes the
+first and fails only that.
+
+**Normalise** is read back off the tool and then measured on a file: a
+−6 dBFS tone normalises to a WAV whose loudest sample is −1 dBFS ±0.1, and a
+−40 dBFS tone — which the model's 4× volume ceiling cannot lift that far —
+lands at the −27.95 the result CLAIMED rather than at the −1 it was asked
+for, which is the check a build reporting the requested level fails. Then the
+refusals by name (a silent clip, a clip whose peaks file the script deleted
+off the package, an id that is not a clip, a `peak_db` above 0), the
+`skipped` list in a mixed call, and the reversed mirror — measured with a
+fixture loud in its first half and quiet in its second, trimmed to its first
+1.4 s forwards and backwards, which must read 20 dB apart and reads the same
+number twice on a build with the mirror taken out. One thing worth knowing
+before adding a check: `cache/peaks/<id>.bin` is written by a fire-and-forget
+task, so `Session.media` WAITS for it — a normalise issued in the same breath
+as the import legitimately answers "still being analysed", which is how that
+refusal is reached on purpose (by deleting the file) rather than by accident.
+
+**Loudness** carries two different tolerances, and the difference is the
+point. Integrated loudness is asserted to **±0.1 LU** between the app's
+report and this script's own pass over the file, and to ±0.5 LU against the
+target — two correct implementations over identical samples agree to about
+1e-14, so the tight one is real. **True peak gets ±0.3 dB and two
+invariants**, because BS.1770-4's true peak is an ESTIMATE: it is a 4×
+oversampling FIR whose Annex 2 allows ±0.4 dB against the real inter-sample
+maximum, and two correct implementations differing in tap alignment or in
+where they quantise will not agree the way two loudness passes do. A
+tolerance alone would pass against a build that reported the SAMPLE peak and
+called it true, so it is joined by the two claims that fail such a build:
+true peak is never below sample peak, and a 45° fs/4 sine reads at least
+2.5 dB above its own sample peak. Beside that sits the standing limit
+CLAUDE.md records — **audio export is not bit-deterministic near a duck ramp
+edge** (three exports of one project gave two results differing by 38 samples
+of one 16-bit LSB in an 8 ms window at a release edge) — so every fixture
+here is duck-free and fade-free, and the byte-identity claims need no
+tolerance at all. The ceiling is proved where it BITES: a −20 LUFS programme
+with one 10 ms burst near full scale has a 19 dB peak-to-loudness ratio, so
+−14 LUFS is capped by the −1 dBTP ceiling, the file lands 6 dB below the
+target, and the script's own oversampling pass over it agrees the peak is
+under −1.
+
+**WAV and AIFF**: ffprobe reads both as 48 kHz stereo PCM — `pcm_s16le` in
+the RIFF, `pcm_s16be` in the IFF, which is the container's decision and not
+the encoder's — and the two files of one project decode to IDENTICAL PCM.
+That neither is routed to `ImageSequenceWriter` is said three ways: both
+carry a `loudness` block, which `Exporter.measuresLoudness` withholds from
+every image sequence (the same project exported as GIF reports none); and a
+21 s timeline, 630 frames at 30 fps, exports as WAV with all 21 seconds of
+samples in it, past that writer's 600-frame cap.
+
+Mutation-tested against **seven** deliberate breakages, one build each, and
+the interesting thing is which checks each one reaches. The mono fold skipped
+(three fail, all in 5a); the fold turned into "copy the left channel over the
+right" (ONE fails — the mean); the reversed mirror returning nil and
+`Result.resultDB` reporting the requested level instead of the reached one
+(three: the mirror, the clamp's claim, and the export that contradicts it);
+the loudness gain dropped in `ExportWriter` and true peak reported as sample
+peak (EIGHT — and this is the run that justifies the whole design, because
+the app still reported −14.0035 LUFS over a file this script measured at
+−6.7035, and reported a true peak of −1.0027 over a file whose peak was
+−0.4442, so every check that read the report agreed with it); the
+`peak_dbtp`-without-`loudness_lufs` rule removed from `export_overrides.rs`
+(one). The last two are the routing, and they ABORT rather than fail, which
+is the honest shape of that breakage: with `audio_wav`'s `avf_preset` nulled
+every export in the script throws `"wav" is not a container this build can
+write` and the run stops after the ten catalog checks, and with only
+`audio_aiff` nulled it gets to 62/62 and stops at 5e's AIFF export. A row
+handed to the image writer cannot be exported at all, so there is nothing
+left to measure about it.
+
+`phase5_chrome.py` is the other half, and phase 5 splits between the two more
+sharply than any phase so far: four of its five features are AUDIO, which a
+still frame can hold no opinion about, so everything above is the MCP
+script's and what is left for the offscreen renderer is the one thing the
+phase draws — the output level meter in the timeline bar. Its sections 1 to 7
+(forty-five checks) are byte comparisons of harness PNGs measured against
+`TimelineBar`'s own layout constants, and its new instrument is WHAT it
+compares against: the second PNG is built from the tree BEFORE the meter
+existed — the parent of the commit that added `LevelMeterView.swift`,
+extracted with `git archive` and compiled by the same swiftc line, so the two
+binaries differ by the phase's `app/Sources` changes and nothing else. At
+1440 in both appearances, and at 1080 and 1600, the TIMELINE BAR differs in
+exactly one 120 × 12 rectangle and nowhere else in the row; at the 900 pt
+minimum it does not differ at all, because the meter VANISHES rather than
+push a control that shipped.
+
+**The comparison is scoped to that bar, and that is what lets this script
+keep running.** A cross-build comparison holds the current tree against one
+that ages: phase 6's inspector sections and phase 7's export chrome would
+each make a whole-window comparison fail with the meter untouched, and every
+earlier phase's script is meant to re-run unchanged. So sections 3, 5 and 6
+score only what changed inside the row the meter went into, print what
+changed elsewhere without scoring it, and **section 3b stages the future** —
+the reference render against a current one whose playhead has moved, which
+changes the toolbar's timecode and the ruler and nothing the bar draws, so
+the window differs in four places while the bar still differs in exactly the
+meter's 4 704 pixels. All five of the script's chrome mutations are bar-local
+and it re-measured every one of them at the new scoping, so the row costs it
+nothing; a phase that redraws the bar ITSELF has to re-baseline this
+comparison, and section 3's rectangle measurements are what will say so. The
+reference build is guarded the same way: it is compiled with the current
+`harness/main.swift` under the GENERAL `-D HARNESS_REFERENCE_BUILD` flag —
+every future non-render mode goes behind the same `#if`, which is why the
+flag is not named after the meter — falls back to the reference commit's own
+`main.swift` when the current one will not compile against that tree, and
+reports a build it cannot make at all as a scored FAILURE rather than
+exiting, so a rotted instrument cannot take the model checks down with it.
+
+Its section 8 (twenty-three checks) is the METER'S READING and
+is not a picture at all: the contract's −20 dBFS claim is about the model,
+the harness has no player so a lit meter could not be photographed, and the
+ballistics that would light it belong to the view. It goes through a third
+harness mode, `harness meter <request.json> <out.json>`, in `cues`' shape and
+for `cues`' reason — the code it calls has no other caller a script can
+reach, since nothing in the app reaches the meter without a playing
+transport. One of the twenty-three hands that mode four magnitudes (`store`)
+rather than a buffer, because the invariant it asks about — RMS never above
+peak, which `LevelMeterReading.init` restores across the sink's two atomic
+words — is one no real buffer can break, so a check over a measured tone
+stays green against a build with the clamp deleted.
+
+Its section 9 (thirteen checks) is the EXPORT GAIN, and it needs a third
+instrument again: not the harness, which draws chrome, but a probe the
+script writes and compiles from `app/Sources/Loudness.swift` ALONE — that
+file has no AVFoundation in it, so `ExportLoudness.resolve` can be handed a
+measured programme as four numbers and answer without a mix, a writer or a
+file. That is what lets the ceiling be SWEPT rather than sampled: two
+hundred true peaks a thousandth of a decibel apart, at the −1 dBTP ceiling
+and at the default 0, and every resolved gain lands the shifted peak at or
+under it — where a round-to-NEAREST quantisation of the same gain puts
+ninety-two of the two hundred OVER, which is the check's whole point, since
+one hand-picked case would land on the right side by luck. The other three
+claims are the ones a real export cannot stage on purpose: a non-finite true
+peak is no headroom rather than infinite headroom (a −40 LUFS programme
+carrying an infinity is not boosted 26 dB), it still permits an
+ATTENUATION, and it does not read as "Silent", which is what a bare
+`isFinite` guard makes of it; and a mix measured PAST full scale says in its
+summary that it clipped before it was written, while one that merely came
+close does not. The last pair is the limit CLAUDE.md records — the write
+pass decodes to Int16, which saturates before the gain reaches it — made
+visible in the sentence the user reads rather than left in a paragraph.
+
 `media/` and `work/` are ignored: the movies are regenerable from the lines
 above and the projects are rebuilt on every run. Phase 2's packages are
 named `<name>-<pid>.reelcut` rather than `<name>.reelcut`, and each run
@@ -326,7 +512,10 @@ way and its two exports are not: an export path is never matched against an
 open document, so `cut-before.mp4` and `cut-after.mp4` are overwritten rather
 than accumulated. Phase 4 splits the same way — packages per pid, and the
 caption files it reads and writes at fixed names, since a `.srt` is neither
-read nor written through the document machinery.
+read nor written through the document machinery. Phase 5 puts the pid on its
+EXPORTS as well as on its packages, because half its claims are byte
+comparisons between two files and a second run must never find the first
+run's; its fixtures live under `work/fixtures/` and are rewritten every time.
 
 ## The offscreen harness (no running app)
 
@@ -400,6 +589,28 @@ before a package is opened or a default is pinned, the way `welcome` is, and
 every render argument keeps the position it had — added, not rearranged,
 because `phase2_chrome.py`, `phase3_chrome.py` and `phase4_chrome.py` all
 depend on that order.
+
+Phase 5 took a THIRD mode, in the same shape and for the same reason:
+
+```
+harness meter <request.json> <out.json>
+```
+
+pushes buffers of samples this script authored through the level meter's
+MODEL and writes back what it published. Nothing in the app reaches that
+model without a PLAYING transport — `Playback` installs the metering sinks on
+a build that only playback makes — so every chrome render photographs a meter
+at rest and a lit one cannot be photographed at all; and the number belongs
+to the model while the ballistics that would light it belong to the view. It
+renders nothing and changes no render argument. A track in its request may
+carry `store` — four magnitudes written straight into `LevelMeterSink` —
+instead of `samples`, which is the only way to hand the model an RMS above a
+peak, the skew its clamp exists for. **The mode compiles out under
+`-D HARNESS_REFERENCE_BUILD`**, and the next phase to add a mode naming a
+type an older tree lacks puts it behind that same flag: `phase5_chrome.py`
+builds a reference harness out of an older `app/Sources` and passes exactly
+one flag, so a per-phase name would leave that build failing the day it was
+invented.
 
 `phase4_chrome.py` is the same shape again (`python3
 tools/proof/phase4_chrome.py`, no port, no media; renders in

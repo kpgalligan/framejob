@@ -43,7 +43,7 @@
 //                      but its header — its rows cannot be seen at all. Each
 //                      id here pins its key to "not collapsed".
 //
-// A SECOND MODE, which renders nothing:
+// TWO MORE MODES, which render nothing:
 //
 //   harness cues <words.json> <out.json>
 //
@@ -65,9 +65,97 @@
 // a render: no window, no pinned defaults, no fonts, no appearance. It is
 // answered before any of that is set up, the way `welcome` is answered before
 // a package is opened, and every render argument below keeps the position it
-// had — `phase2_chrome.py`, `phase3_chrome.py` and `phase4_chrome.py` all
-// depend on that order, so this file grows by addition and never by
-// rearrangement.
+// had — `phase2_chrome.py`, `phase3_chrome.py`, `phase4_chrome.py` and
+// `phase5_chrome.py` all depend on that order, so this file grows by addition
+// and never by rearrangement.
+//
+//   harness meter <request.json> <out.json>
+//
+// measures buffers of samples through the level meter's MODEL (road map 2
+// phase 5b: `LevelMeterSink`, `LevelMeterReading`, `LevelMeterEnvelope`,
+// `LevelMeter`) and writes what the model published. It is here for the cue
+// mode's reason, one step further on: nothing in the app reaches the meter
+// without a PLAYING transport — `Playback` installs the sinks on a metering
+// composition build and reads them off a 30 Hz timer — and an offscreen
+// process has no player, no output device and no window, so over MCP and in
+// every chrome render the meter is silent by construction. The measurement
+// itself is arithmetic over plain float buffers with no AVFoundation in it at
+// all (`LevelMeter.swift`'s header says why the model was separated from the
+// view for exactly this), so the way to test it is to hand it buffers, and
+// this is the one place from which that can be done.
+//
+// **Phase 5 first tried to reach it WITHOUT touching this file**, by compiling
+// `app/Sources/LevelMeter.swift` on its own against a two-type stand-in — and
+// that is worth recording, because it worked until wave 6 moved
+// `LevelMeterEnvelope`'s search into `MediaPeaks.envelope` so the app would
+// have one spelling of the plan's mix rule instead of two. `MediaPeaks` needs
+// `ProjectSnapshot`, `ReelTime` and `MediaImporter`, and a stand-in for THAT
+// would be a proof measuring its own arithmetic rather than the app's. So the
+// mode is here, where every type is the real one.
+//
+// `request.json` is
+//
+//   {"at": 300000, "then_stop": "same"|"other"|null,
+//    "tracks": [{"id": 1, "samples": "tone.f32", "channels": 2, "frames": 4096,
+//                "ramps": [{"start": 0, "duration": 600000,
+//                           "from": 0.0, "to": 1.0}]}]}
+//
+// and `samples` names a raw little-endian float32 file holding `channels ×
+// frames` samples, PLANAR — channel 0's frames, then channel 1's — which is
+// the shape `AudioTap` hands `LevelMeterSink.measure` off the composition
+// track's buffer list. The signal is a FILE rather than numbers in the JSON
+// because the caller must author it: a tone this program synthesized would be
+// a fixture nobody could check, and the phase's claim is that a −20 dBFS tone
+// SOMEBODY ELSE wrote reads as −20 dBFS here. `ramps` is the plan's envelope
+// over that track (absent or null = the plan gave none = unity, `audio.rs`'s
+// meaning of an unmodified track) and `at` is the playhead tick it is read at.
+//
+// A track may carry `"store": {"peak_left": …, "peak_right": …, "rms_left": …,
+// "rms_right": …}` INSTEAD of `samples`, and then those four magnitudes go
+// straight into `LevelMeterSink.store` with nothing measured. It is there for
+// the one reading a buffer cannot produce — an RMS above a peak, which is what
+// the two relaxed words being written and read separately can hand a reader —
+// and the struct's own doc says why a check over a measured buffer cannot
+// stand in for it.
+//
+// The output carries, per track, the sink's own `raw` reading, the `gain` the
+// envelope is applying at `at`, and the `scaled` product; then `published`,
+// which is read back off `LevelMeter.shared` AFTER the total has been
+// published into it, so it is the model's answer and not a local variable's.
+// Each reading is reported as linear magnitude AND in dBFS, the model's own
+// accessors, because the phase's tolerance is stated in dB.
+//
+// The fold from per-track readings to the total is `Playback.meterReading()`'s
+// own three lines, and they are QUOTED here rather than called for the one
+// reason `meterReading` cannot be called at all: it reads `built`, the
+// AVFoundation composition, which needs a player. Everything they are made of
+// — `LevelMeterEnvelope.value`, `.scaled(by:)`, `.adding(_:)` — is the model's
+// and is what is under test; if that loop ever grows a rule, this copy has to
+// grow it too, and `phase5_chrome.py` says so where it reports the number.
+//
+// **The mode compiles out under `-D HARNESS_REFERENCE_BUILD`**, and that flag
+// exists for one caller: `phase5_chrome.py` builds a SECOND harness out of an
+// older `app/Sources` — the tree from before the level meter existed — and
+// compares the two renders, which is the only way to say "this is what the
+// phase added to the chrome, and this is all of it". That older tree has none
+// of the meter's types in it. With the flag, every other line of this file,
+// the whole render path included, is the same source compiled twice, so a
+// byte comparison between the two binaries is a comparison of the APP and
+// never of two instruments.
+//
+// **The flag is GENERAL, and its name says so on purpose.** It was
+// `HARNESS_WITHOUT_METER` for the length of phase 5 and that was the wrong
+// name: the next phase to add a mode naming a type an older tree lacks would
+// either have to guard it with a flag about the level meter or invent a
+// second one, and a reference build passing only the flags it happens to know
+// would stop compiling the day it did not. So there is ONE flag, meaning "this
+// is a reference build against an older `app/Sources`; compile out every mode
+// that names a type newer than the tree" — put every future non-render mode
+// inside the same `#if !HARNESS_REFERENCE_BUILD` rather than pinning that
+// tree's copy of this file, which would let the instrument drift a phase at a
+// time. (`build_reference` will fall back to the reference commit's own
+// `main.swift` if this one refuses to compile against it, and says so in its
+// report — but that fallback is the apology, not the plan.)
 //
 // `words.json` is `{"fps": [30, 1], "words": [{"text": "…", "start": 0,
 // "end": 300000}, …]}`, in TICKS rather than seconds, because the rules are
@@ -225,6 +313,180 @@ enum Harness {
             .write(to: output)
     }
 
+    #if !HARNESS_REFERENCE_BUILD
+    /// The level meter's model, run over buffers from a file — the third mode
+    /// of the header, and the only way `LevelMeterSink` can be reached without
+    /// a playing transport.
+    ///
+    /// Like the cue mode, everything here is a translation: a planar float
+    /// file into the pointers `AudioTap` hands the sink, and the readings back
+    /// into JSON. The one thing that is not a translation is the fold, and it
+    /// is `Playback.meterReading()`'s, quoted (the header says why it cannot
+    /// be called): each track's last buffer, multiplied by the mix envelope
+    /// over it at `at`, summed — which is what makes the number POST-fader
+    /// even though every tap is PreEffects.
+    static func meter(from input: URL, to output: URL) throws {
+        struct Request: Decodable {
+            /// Four magnitudes written STRAIGHT into the sink, instead of a
+            /// file being measured into it.
+            ///
+            /// It exists for one claim, and for a claim no measured buffer can
+            /// carry: `rms ≤ peak` is arithmetic over any real buffer, so a
+            /// check that a measured reading obeys it passes against a build
+            /// whose clamp has been deleted. The skew the clamp is actually
+            /// there for comes from the crossing — `LevelMeterSink` stores peak
+            /// and RMS in two separate relaxed words and reads them back
+            /// separately, so a reader can catch this buffer's RMS beside the
+            /// previous, quieter buffer's peak. This is the only way to hand
+            /// the model that pair.
+            struct Store: Decodable {
+                let peakLeft: Float
+                let peakRight: Float
+                let rmsLeft: Float
+                let rmsRight: Float
+
+                enum CodingKeys: String, CodingKey {
+                    case peakLeft = "peak_left"
+                    case peakRight = "peak_right"
+                    case rmsLeft = "rms_left"
+                    case rmsRight = "rms_right"
+                }
+            }
+
+            struct Track: Decodable {
+                let id: Int?
+                /// A raw little-endian float32 file of `channels × frames`
+                /// samples, planar. Relative paths resolve against the
+                /// request's own directory. Absent only when `store` is given.
+                let samples: String?
+                let channels: Int?
+                let frames: Int?
+                /// Decoded by `PlanRamp`'s OWN decoder — the one the plan
+                /// itself arrives through — rather than rebuilt from four
+                /// numbers here, which its hand-written `init(from:)` would
+                /// not have allowed anyway.
+                let ramps: [PlanRamp]?
+                /// Set instead of `samples` to write the sink directly.
+                let store: Store?
+            }
+            let at: Ticks?
+            /// After the total is published, publish silence from the SAME
+            /// transport identity or from ANOTHER one — the model's one guard
+            /// (a second document's stop may not blank a live meter).
+            let thenStop: String?
+            let tracks: [Track]
+
+            enum CodingKeys: String, CodingKey {
+                case at, tracks
+                case thenStop = "then_stop"
+            }
+        }
+        let request = try JSONDecoder().decode(Request.self, from: Data(contentsOf: input))
+        let at = request.at ?? 0
+
+        /// One reading, both ways round: linear magnitude (what the samples
+        /// are) and dBFS (what the phase's tolerance is written in).
+        func describe(_ reading: LevelMeterReading) -> [String: Any] {
+            [
+                "peak_left": Double(reading.peakLeft),
+                "peak_right": Double(reading.peakRight),
+                "rms_left": Double(reading.rmsLeft),
+                "rms_right": Double(reading.rmsRight),
+                "peak_left_db": Double(reading.peakLeftDB),
+                "peak_right_db": Double(reading.peakRightDB),
+                "rms_left_db": Double(reading.rmsLeftDB),
+                "rms_right_db": Double(reading.rmsRightDB),
+                "peak_db": Double(reading.peakDB),
+                "is_silent": reading.isSilent,
+            ]
+        }
+
+        var rows: [[String: Any]] = []
+        var total = LevelMeterReading.silent
+        for (index, track) in request.tracks.enumerated() {
+            let sink = LevelMeterSink()
+            if let stored = track.store {
+                // The audio thread's own two stores, called directly — the one
+                // path that can put a skewed pair in front of the model.
+                sink.store(
+                    peakLeft: stored.peakLeft, peakRight: stored.peakRight,
+                    rmsLeft: stored.rmsLeft, rmsRight: stored.rmsRight)
+            } else {
+                guard let samples = track.samples,
+                    let channels = track.channels, let frames = track.frames
+                else {
+                    throw NSError(
+                        domain: "harness", code: 5,
+                        userInfo: [
+                            NSLocalizedDescriptionKey:
+                                "track \(index) has neither `samples` with `channels` "
+                                + "and `frames` nor `store`"
+                        ])
+                }
+                let url = URL(
+                    fileURLWithPath: samples,
+                    relativeTo: input.deletingLastPathComponent())
+                let data = try Data(contentsOf: url)
+                let wanted = channels * frames * MemoryLayout<Float>.size
+                guard channels > 0, frames > 0, data.count >= wanted else {
+                    throw NSError(
+                        domain: "harness", code: 5,
+                        userInfo: [
+                            NSLocalizedDescriptionKey:
+                                "\(url.lastPathComponent) holds \(data.count) bytes, "
+                                + "\(channels) × \(frames) floats want \(wanted)"
+                        ])
+                }
+                // The planar file becomes one base pointer per channel, which
+                // is exactly what the tap rebases out of the buffer list.
+                data.withUnsafeBytes { raw in
+                    let base = raw.bindMemory(to: Float.self).baseAddress
+                    var pointers: [UnsafeMutablePointer<Float>?] = (0..<channels).map {
+                        UnsafeMutablePointer(mutating: base?.advanced(by: $0 * frames))
+                    }
+                    pointers.withUnsafeMutableBufferPointer { buffer in
+                        sink.measure(buffer, count: channels, frames: frames)
+                    }
+                }
+            }
+            let metered = LevelMeterTrack(id: track.id ?? index, ramps: track.ramps, sink: sink)
+
+            // Playback.meterReading()'s own three lines.
+            let gain = Float(LevelMeterEnvelope.value(metered.ramps, at: at))
+            let raw = metered.sink.read()
+            let scaled = raw.scaled(by: gain)
+            total = total.adding(scaled)
+
+            rows.append([
+                "id": metered.id, "gain": Double(gain),
+                "raw": describe(raw), "scaled": describe(scaled),
+            ])
+        }
+
+        // The publish, and the read BACK — `published` is the model's own
+        // state, not the local total, so a model that dropped a publish on the
+        // floor would be caught here rather than flattered.
+        let transport = ObjectIdentifier(Harness.self)
+        LevelMeter.shared.publish(total, from: transport)
+        var json: [String: Any] = [
+            "at": at,
+            "tracks": rows,
+            "total": describe(total),
+            "published": describe(LevelMeter.shared.reading),
+            "floor_db": Double(LevelMeterMath.floorDB),
+        ]
+        if let stop = request.thenStop {
+            let other = ObjectIdentifier(NSObject.self)
+            LevelMeter.shared.publish(.silent, from: stop == "same" ? transport : other)
+            json["stopped_from"] = stop
+            json["published_after_stop"] = describe(LevelMeter.shared.reading)
+        }
+        try JSONSerialization
+            .data(withJSONObject: json, options: [.prettyPrinted, .sortedKeys])
+            .write(to: output)
+    }
+    #endif
+
     /// One capture of the view, as PNG bytes.
     private static func capture(_ view: NSView) throws -> Data {
         view.layoutSubtreeIfNeeded()
@@ -290,15 +552,16 @@ guard arguments.count >= 4 else {
         ("usage: harness <project.reelcut|welcome> <out.png> <light|dark> "
             + "[w] [h] [selectIndex] [playheadSec] [sizeIndex 0-2] [clip|media|document] "
             + "[candidateSpans] [expandSections]\n"
-            + "       harness cues <words.json> <out.json>\n")
+            + "       harness cues <words.json> <out.json>\n"
+            + "       harness meter <request.json> <out.json>\n")
             .data(using: .utf8)!)
     exit(64)
 }
 
-// The cue mode, answered first and answered here: it opens no package, wakes
-// no AppKit and reads no defaults, so none of the setup below it applies. Its
-// three arguments sit inside the render form's own count, so the guard above
-// serves both and no render argument moved.
+// The two non-rendering modes, answered first and answered here: neither opens
+// a package, wakes AppKit or reads a default, so none of the setup below them
+// applies. Their three arguments sit inside the render form's own count, so
+// the guard above serves all three and no render argument moved.
 if arguments[1] == "cues" {
     do {
         try Harness.cues(
@@ -309,6 +572,23 @@ if arguments[1] == "cues" {
         FileHandle.standardError.write("cues failed: \(error)\n".data(using: .utf8)!)
         exit(4)
     }
+}
+if arguments[1] == "meter" {
+    #if HARNESS_REFERENCE_BUILD
+    FileHandle.standardError.write(
+        "meter: this harness was built -D HARNESS_REFERENCE_BUILD\n".data(using: .utf8)!)
+    exit(5)
+    #else
+    do {
+        try Harness.meter(
+            from: URL(fileURLWithPath: arguments[2]), to: URL(fileURLWithPath: arguments[3]))
+        print("wrote \(arguments[3])")
+        exit(0)
+    } catch {
+        FileHandle.standardError.write("meter failed: \(error)\n".data(using: .utf8)!)
+        exit(5)
+    }
+    #endif
 }
 
 let projectURL = URL(fileURLWithPath: arguments[1])

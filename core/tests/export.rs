@@ -35,6 +35,25 @@
 //!    row carries a size, so 1920 × 1080 comes from `width`/`height` — the
 //!    way the sheet's Size popup and the tool's `size` reach the resolver —
 //!    and each axis alone leaves the other the document's.
+//! 8. **The two uncompressed audio rows.** WAV and AIFF are audio-only
+//!    like M4A and carry a NON-NULL `avf_preset`, because null is the
+//!    ImageIO writer's cue and a WAV handed to `ImageSequenceWriter` would
+//!    be refused as an unknown image container — a format this table
+//!    advertises failing with a GIF-shaped error. So the assertion here is
+//!    the one the symptom would not give you: they are not image
+//!    sequences.
+//! 9. **The two loudness overrides.** `loudness_lufs` and `peak_dbtp`
+//!    behave exactly as the bitrates do — absent unless asked for, echoed
+//!    when they are, accepted by presets that cannot use them, refused by
+//!    a message naming the value — with the single documented exception
+//!    that a ceiling with no target is an error rather than an inert key.
+//! 10. **The header's list of overrides.** `rc_export_settings`' comment in
+//!     `core/include/reelcut_core.h` enumerates every key it takes, and an
+//!     FFI caller is entitled to trust it — so every key named there is
+//!     read back out of the header and probed. Point 5's permissiveness is
+//!     exactly what makes this necessary: a key the header names and
+//!     nothing reads is dropped in silence, and the caller gets an export
+//!     at settings they did not ask for, reported ok.
 //!
 //! The sizes the sheet offers are `core/tests/export_size.rs`.
 
@@ -42,7 +61,7 @@ mod common;
 
 use serde_json::{json, Map, Value};
 
-use common::{array, assert_contains, at, expect_string, flag, int, parse_json, text, Handle};
+use common::{array, assert_contains, at, expect_string, flag, int, num, parse_json, text, Handle};
 use reelcut_core::ffi_query::rc_export_presets;
 
 /// One second in ticks (spec §5.1).
@@ -77,11 +96,13 @@ struct Expected {
 /// The menu, in menu order: one row per encoding, and the ids are the
 /// `export` tool's vocabulary. H.264 comes first because the first row is
 /// the default (`first_preset_is_the_default_and_exports_at_the_document_size`)
-/// and MP4/H.264 is the file everything plays; the two image formats come
-/// last: they are the specialist rows, and everything above them is a
-/// movie. The old size-carrying ids (`h264_1080p`, `hevc_4k`…) are gone
-/// without aliases — `an_unknown_preset_errors_and_names_it` pins that.
-const EXPECTED: [Expected; 6] = [
+/// and MP4/H.264 is the file everything plays; the three sound-only rows
+/// sit together after the movies, and the two image formats come last:
+/// they are the specialist rows, and everything above them is a file with
+/// a timeline in it. The old size-carrying ids (`h264_1080p`, `hevc_4k`…)
+/// are gone without aliases — `an_unknown_preset_errors_and_names_it`
+/// pins that.
+const EXPECTED: [Expected; 8] = [
     Expected {
         id: "h264",
         container: "mp4",
@@ -124,6 +145,38 @@ const EXPECTED: [Expected; 6] = [
         video: false,
         audio: true,
         file_type: "com.apple.m4a-audio",
+        avf_preset: Some("AVAssetExportPresetAppleM4A"),
+    },
+    // The two uncompressed rows: 16-bit LPCM at 48 kHz, the mix written
+    // out rather than encoded, for handing to somebody else's tool. Their
+    // UTIs are `AVFileType.wav` and `AVFileType.aiff`'s raw values, so
+    // `Exporter.fileType(for:)` resolves them from `file_type` alone.
+    //
+    // The session preset is `audio_m4a`'s, and NOT because a WAV is an
+    // M4A. AVFoundation has no `AVAssetExportPreset` for LPCM, and null in
+    // that field is the one thing that routes an export to ImageIO, so a
+    // null here would hand a WAV to the animated-GIF writer. §7.8 says the
+    // name now means only "AVFoundation can write this row".
+    Expected {
+        id: "audio_wav",
+        container: "wav",
+        codec: "lpcm",
+        size: None,
+        fps: None,
+        video: false,
+        audio: true,
+        file_type: "com.microsoft.waveform-audio",
+        avf_preset: Some("AVAssetExportPresetAppleM4A"),
+    },
+    Expected {
+        id: "audio_aiff",
+        container: "aiff",
+        codec: "lpcm",
+        size: None,
+        fps: None,
+        video: false,
+        audio: true,
+        file_type: "public.aiff-audio",
         avf_preset: Some("AVAssetExportPresetAppleM4A"),
     },
     Expected {
@@ -389,6 +442,13 @@ fn every_preset_in_the_menu_resolves_to_what_it_advertised() {
             "{} invented a bitrate nobody asked for: {out}",
             want.id
         );
+        // Same rule, and the stakes are higher: an invented `loudness_lufs`
+        // is not a bigger file, it is every export silently gain-changed.
+        assert!(
+            out.get("loudness_lufs").is_none() && out.get("peak_dbtp").is_none(),
+            "{} invented a loudness target nobody asked for: {out}",
+            want.id
+        );
     }
 }
 
@@ -560,6 +620,105 @@ fn an_override_still_beats_the_image_preset() {
     );
 }
 
+// ---- the uncompressed audio rows -----------------------------------------
+
+/// The two ids exactly as the `export` tool and the Format popup spell
+/// them.
+const LPCM_ROWS: [&str; 2] = ["audio_wav", "audio_aiff"];
+
+/// The defect this file exists to catch for these two rows, and the one
+/// their symptom would not name: a null `avf_preset` is `ExportSettings`'s
+/// literal definition of an image sequence, so a WAV row that carried one
+/// would be handed to `ImageSequenceWriter`, refused by an
+/// `ImageSequenceFormat(container: "wav")` that has never heard of WAV, and
+/// reported as an unsupported file type for a format the menu offers. The
+/// assertion is therefore on the null itself, in both the menu and the
+/// resolved settings, and not on anything downstream of it.
+#[test]
+fn the_uncompressed_audio_rows_are_not_image_sequences() {
+    let handle = project();
+    let rows = preset_rows();
+    for id in LPCM_ROWS {
+        let row = rows
+            .iter()
+            .find(|row| text(row, "/id") == id)
+            .unwrap_or_else(|| panic!("{id} is not in the menu"));
+        assert!(
+            !at(row, "/avf_preset").is_null(),
+            "{id} carries a null session preset, which is Swift's cue to write it frame by \
+             frame through ImageIO: {row}"
+        );
+
+        let out = settings(&handle, id, None);
+        assert!(
+            !at(&out, "/avf_preset").is_null(),
+            "{id} resolves to a null session preset: {out}"
+        );
+        // The image rows are the ones a null belongs to, and they still
+        // have it — so the assertion above is about these two rows and not
+        // about the field having quietly stopped being nullable.
+        for image in ["gif", "apng"] {
+            assert!(
+                at(&settings(&handle, image, None), "/avf_preset").is_null(),
+                "{image} stopped naming the ImageIO path, so {id}'s check proves nothing"
+            );
+        }
+    }
+}
+
+/// Sound and nothing else, on M4A's terms: `video: false`, `audio: true`,
+/// and no `moov` atom to move — a RIFF or an IFF file is a header followed
+/// by samples.
+#[test]
+fn the_uncompressed_audio_rows_carry_sound_and_no_picture() {
+    let handle = project();
+    for id in LPCM_ROWS {
+        let out = settings(&handle, id, None);
+        assert!(!flag(&out, "/video"), "{id} claims to carry pictures");
+        assert!(flag(&out, "/audio"), "{id} claims it cannot hold sound");
+        assert!(
+            !flag(&out, "/optimize_for_network"),
+            "{id} asked for a moov-atom rewrite it has no moov atom for"
+        );
+    }
+}
+
+/// A preset is an encoding, and these two carry no size of their own — so
+/// they report the document's, the way `audio_m4a` does, and a size
+/// override reaches them as it reaches every other row. (The Size popup's
+/// own list for them is `core/tests/export_size.rs`, which sweeps them
+/// beside `audio_m4a`.) The rate is the document's too: nothing about
+/// LPCM caps a frame rate the file has no frames for.
+#[test]
+fn the_uncompressed_audio_rows_size_themselves_from_the_document() {
+    let handle = project();
+    let m4a = settings(&handle, "audio_m4a", None);
+    for id in LPCM_ROWS {
+        let out = settings(&handle, id, None);
+        assert_eq!(
+            (int(&out, "/width"), int(&out, "/height")),
+            (CANVAS_WIDTH, CANVAS_HEIGHT),
+            "{id} did not report the document size"
+        );
+        assert_eq!(fps_of(&out), fps_of(&m4a), "{id} rate");
+        assert_eq!(
+            int(&out, "/range/duration"),
+            int(&m4a, "/range/duration"),
+            "{id} length"
+        );
+
+        // A width is a request the sheet greys out and a script may still
+        // send; it is honoured and never fitted, because fitting is the
+        // image formats' rule and these rows are not image formats.
+        let sized = settings(&handle, id, Some(&json!({"width": 1920, "height": 1080})));
+        assert_eq!(
+            (int(&sized, "/width"), int(&sized, "/height")),
+            (1920, 1080),
+            "{id} size override"
+        );
+    }
+}
+
 // ---- bitrates ------------------------------------------------------------
 
 #[test]
@@ -663,6 +822,170 @@ fn a_bitrate_is_accepted_by_every_preset_that_cannot_use_one() {
     assert!(!flag(&m4a, "/video"));
 }
 
+// ---- loudness ------------------------------------------------------------
+
+#[test]
+fn the_loudness_overrides_round_trip_exactly() {
+    let handle = project();
+    // The three the sheet's popup offers and the ceiling it always sends,
+    // plus a fractional target, which is the point of these being floats:
+    // −14.5 LUFS is a real request and a bitrate-shaped integer check
+    // would refuse it.
+    for target in [-14.0, -16.0, -23.0, -14.5, -0.5] {
+        let out = settings(
+            &handle,
+            "audio_wav",
+            Some(&json!({"loudness_lufs": target, "peak_dbtp": -1.0})),
+        );
+        assert_eq!(num(&out, "/loudness_lufs"), target);
+        assert_eq!(num(&out, "/peak_dbtp"), -1.0);
+    }
+
+    // A target alone is the common case — the ceiling is fixed in the
+    // sheet — and must not summon a ceiling that was never asked for. It
+    // is Swift that decides what an absent ceiling means, exactly as an
+    // absent bitrate is the encoder's own ladder.
+    let target_only = settings(&handle, "h264", Some(&json!({"loudness_lufs": -14.0})));
+    assert_eq!(num(&target_only, "/loudness_lufs"), -14.0);
+    assert!(
+        target_only.get("peak_dbtp").is_none(),
+        "a loudness target pulled a ceiling in with it: {target_only}"
+    );
+
+    // An integer target is a number like any other: JSON does not
+    // distinguish -14 from -14.0 and neither may the reader.
+    let whole = settings(&handle, "h264", Some(&json!({"loudness_lufs": -14})));
+    assert_eq!(num(&whole, "/loudness_lufs"), -14.0);
+
+    // Both bounds are inclusive, so the refusals below are about the value
+    // and not about the bound being off by one.
+    let edges = settings(
+        &handle,
+        "h264",
+        Some(&json!({"loudness_lufs": -70.0, "peak_dbtp": -20.0})),
+    );
+    assert_eq!(num(&edges, "/loudness_lufs"), -70.0);
+    assert_eq!(num(&edges, "/peak_dbtp"), -20.0);
+    let top = settings(
+        &handle,
+        "h264",
+        Some(&json!({"loudness_lufs": 0, "peak_dbtp": 0})),
+    );
+    assert_eq!(num(&top, "/loudness_lufs"), 0.0);
+    assert_eq!(num(&top, "/peak_dbtp"), 0.0);
+}
+
+#[test]
+fn a_null_loudness_target_means_no_normalisation() {
+    let handle = project();
+    // Null is the documented "leave this one alone" for every override, so
+    // a sheet whose Loudness popup is on Off can send the key nulled — and
+    // a null ceiling beside a null target must not trip the pairing rule.
+    let out = settings(
+        &handle,
+        "audio_wav",
+        Some(&json!({"loudness_lufs": null, "peak_dbtp": null})),
+    );
+    assert_eq!(out, settings(&handle, "audio_wav", None));
+    assert!(out.get("loudness_lufs").is_none(), "{out}");
+}
+
+#[test]
+fn a_loudness_figure_that_is_not_a_decibel_in_range_errors() {
+    let handle = project();
+    // Each key with the values it must refuse: past either end of its own
+    // range, and every JSON type that is not a number. A bool is here
+    // because `serde_json`'s `as_f64` is the only type check and it has to
+    // be the one that catches it.
+    for (key, bad) in [
+        ("loudness_lufs", json!(-70.25)),
+        ("loudness_lufs", json!(-999.5)),
+        ("loudness_lufs", json!(0.25)),
+        ("loudness_lufs", json!(12.5)),
+        ("loudness_lufs", json!("-14 LUFS")),
+        ("loudness_lufs", json!(true)),
+        ("loudness_lufs", json!([-14.0])),
+        ("loudness_lufs", json!({"target": -14.0})),
+        ("peak_dbtp", json!(-20.25)),
+        ("peak_dbtp", json!(-99.5)),
+        ("peak_dbtp", json!(0.25)),
+        ("peak_dbtp", json!(12.5)),
+        ("peak_dbtp", json!("-1 dBTP")),
+        ("peak_dbtp", json!(true)),
+    ] {
+        // A ceiling needs a target to be legal at all, so the bad ceilings
+        // are sent with a good target: otherwise the pairing rule would
+        // refuse them first and this test would prove nothing about the
+        // range.
+        let mut overrides = one(key, bad.clone());
+        if key == "peak_dbtp" {
+            overrides
+                .as_object_mut()
+                .expect("one() builds an object")
+                .insert("loudness_lufs".to_string(), json!(-14.0));
+        }
+        let msg = refusal(&handle, "audio_wav", &overrides);
+        assert_contains(&msg, key);
+        assert_contains(&msg, &bad.to_string());
+    }
+}
+
+/// The one place an override refuses because of what ANOTHER override
+/// says, and the reason it is worth the exception: normalisation is
+/// gain-only with no limiter, so the ceiling exists solely to cap a gain a
+/// target computed. Asked for alone it would be accepted, echoed and
+/// silently do nothing — the one failure shape this table has no
+/// precedent for.
+#[test]
+fn a_peak_ceiling_with_no_target_is_refused_by_name() {
+    let handle = project();
+    let msg = refusal(&handle, "audio_wav", &json!({"peak_dbtp": -1.0}));
+    assert_contains(&msg, "peak_dbtp");
+    assert_contains(&msg, "loudness_lufs");
+
+    // An explicitly null target is the same as an absent one everywhere
+    // else, and is here too.
+    let msg = refusal(
+        &handle,
+        "audio_wav",
+        &json!({"peak_dbtp": -1.0, "loudness_lufs": null}),
+    );
+    assert_contains(&msg, "peak_dbtp");
+
+    // And with a target it resolves, so the refusal is about the pairing
+    // and not about the ceiling being unwelcome.
+    let out = settings(
+        &handle,
+        "audio_wav",
+        Some(&json!({"peak_dbtp": -1.0, "loudness_lufs": -16.0})),
+    );
+    assert_eq!(num(&out, "/peak_dbtp"), -1.0);
+}
+
+#[test]
+fn a_loudness_target_is_accepted_by_every_preset_that_cannot_use_one() {
+    let handle = project();
+    // The bitrates' rule, and the same reason: one rule for reading
+    // overrides, and the format flags say what the output can carry. A GIF
+    // has no audio track to normalise, and that is `audio: false`'s job to
+    // say — not this reader's.
+    let gif = settings(&handle, "gif", Some(&json!({"loudness_lufs": -14.0})));
+    assert_eq!(num(&gif, "/loudness_lufs"), -14.0);
+    assert!(!flag(&gif, "/audio"));
+
+    // And every row in the menu takes one, so the sheet may send the key
+    // without asking which format is selected.
+    for want in EXPECTED.iter() {
+        let out = settings(
+            &handle,
+            want.id,
+            Some(&json!({"loudness_lufs": -23.0, "peak_dbtp": -1.0})),
+        );
+        assert_eq!(num(&out, "/loudness_lufs"), -23.0, "{}", want.id);
+        assert_eq!(num(&out, "/peak_dbtp"), -1.0, "{}", want.id);
+    }
+}
+
 // ---- overrides in general ------------------------------------------------
 
 #[test]
@@ -678,6 +1001,61 @@ fn an_override_key_this_build_does_not_know_is_ignored() {
         Some(&json!({"quality": "best", "bitrate": 8_000_000, "codec": "av1"})),
     );
     assert_eq!(out, plain);
+}
+
+/// The two readers phase 5's cut moved out of `export.rs` and into
+/// `export_overrides.rs` with no test standing under them. Neither
+/// behaviour is new; this exists so the move is provably not a change, and
+/// so the next reader added beside them inherits a place to be checked.
+#[test]
+fn the_rate_and_the_network_flag_are_read_the_way_they_always_were() {
+    let handle = project();
+
+    // A rate is two non-zero terms and nothing else. A one-term array, a
+    // three-term one, a zero either side and a bare number are all the
+    // shapes a caller actually sends by mistake.
+    for bad in [
+        json!([30]),
+        json!([30, 1, 1]),
+        json!([0, 1]),
+        json!([30, 0]),
+        json!(30),
+        json!("30"),
+        json!({"num": 30, "den": 1}),
+    ] {
+        let msg = refusal(&handle, "h264", &one("fps", bad.clone()));
+        assert_contains(&msg, "export fps");
+        assert_contains(&msg, &bad.to_string());
+    }
+    // And a legal rate is taken, so the refusals are about the value.
+    assert_eq!(
+        fps_of(&settings(&handle, "h264", Some(&json!({"fps": [24, 1]})))),
+        (24, 1)
+    );
+
+    // The network flag is a boolean, both ways, and overrides the
+    // container's own default in both directions — MP4 defaults on, MOV
+    // defaults off.
+    for (preset, default) in [("h264", true), ("prores_422", false)] {
+        assert_eq!(
+            flag(&settings(&handle, preset, None), "/optimize_for_network"),
+            default,
+            "{preset} default"
+        );
+        for asked in [true, false] {
+            let out = settings(
+                &handle,
+                preset,
+                Some(&json!({"optimize_for_network": asked})),
+            );
+            assert_eq!(flag(&out, "/optimize_for_network"), asked, "{preset}");
+        }
+    }
+    for bad in [json!("yes"), json!(1), json!(0), json!([true])] {
+        let msg = refusal(&handle, "h264", &one("optimize_for_network", bad.clone()));
+        assert_contains(&msg, "optimize_for_network");
+        assert_contains(&msg, &bad.to_string());
+    }
 }
 
 #[test]
@@ -855,6 +1233,87 @@ fn every_settings_object_carries_every_key_swift_decodes() {
             2,
             "{} rate is not [num, den]",
             want.id
+        );
+    }
+}
+
+// ---- the header's list of overrides --------------------------------------
+
+/// The override keys the C header names, read out of the header itself.
+///
+/// The header is the contract — the three-file lockstep in the root
+/// `CLAUDE.md` — so it, not a list written out again here, decides what
+/// has to be readable. `model_tests.rs` reads the export NAMES out of it
+/// for the null-safety sweep on the same principle.
+///
+/// The enumeration is the paragraph beginning "The overrides are", which
+/// ends at the comment's next blank line; every backticked word in it is a
+/// key. Nothing outside that paragraph is parsed, which is what lets the
+/// sentence below it say there is no `size` key without the sentence being
+/// read as declaring one.
+fn override_keys_named_in_the_header() -> Vec<String> {
+    let path = concat!(env!("CARGO_MANIFEST_DIR"), "/include/reelcut_core.h");
+    let header = std::fs::read_to_string(path).expect("the C header must be readable");
+
+    let mut paragraph = String::new();
+    for line in header
+        .lines()
+        .map(str::trim_start)
+        .skip_while(|line| !line.contains("The overrides are"))
+    {
+        // ` *` alone is the blank line that ends the paragraph.
+        let body = line.trim_start_matches('*').trim();
+        if body.is_empty() {
+            break;
+        }
+        paragraph.push_str(body);
+        paragraph.push(' ');
+    }
+    assert!(
+        paragraph.contains("The overrides are"),
+        "rc_export_settings' comment no longer enumerates its overrides — \
+         the paragraph beginning \"The overrides are\" is what this test reads"
+    );
+
+    let mut keys: Vec<String> = paragraph
+        .split('`')
+        .skip(1)
+        .step_by(2)
+        .map(str::to_string)
+        .collect();
+    keys.sort();
+    keys.dedup();
+    keys
+}
+
+/// Every key the header advertises is a key `export_settings` actually
+/// reads. This exists because of rule 2 in `export_overrides.rs` — an
+/// unknown key is dropped in SILENCE — which makes a wrong name in the
+/// header the one failure the file's rules cannot report: an FFI caller
+/// who spells a size the way the header told them to would get settings
+/// that resolve, at the document's size, with `ok` and no message. So the
+/// probe is a value no reader accepts: an `Err` naming the key proves
+/// something read it, and an `Ok` proves nothing did.
+#[test]
+fn every_override_the_header_names_is_one_the_resolver_reads() {
+    let handle = project();
+    let keys = override_keys_named_in_the_header();
+    assert!(
+        keys.len() >= 8,
+        "the header parse found only {} override keys, which cannot be right: {keys:?}",
+        keys.len()
+    );
+    for key in &keys {
+        let msg = refusal(&handle, "h264", &one(key, json!("not a legal value")));
+        assert_contains(&msg, key);
+    }
+    // And the paragraph still names the keys a caller most needs, so a
+    // parse that quietly found the wrong text cannot pass by finding
+    // nothing wrong with it.
+    for expected in ["width", "height", "fps", "range", "loudness_lufs"] {
+        assert!(
+            keys.iter().any(|key| key == expected),
+            "the header no longer names {expected}, so this test is reading the wrong text: {keys:?}"
         );
     }
 }

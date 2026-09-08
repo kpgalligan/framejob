@@ -59,7 +59,7 @@ WORK = os.path.join(HERE, "work")
 
 SEC = 600_000
 # One peaks bucket, in ticks: `ReelTime.perSecond / MediaImporter.peakBucketsPerSecond`
-# (`SilenceDetector.bucketTicks`). The detector's resolution, and the tolerance
+# (`MediaPeaks.bucketTicks`). The detector's resolution, and the tolerance
 # CONTRACT §6 allows a detected span.
 BUCKET = 6_000
 

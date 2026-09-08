@@ -87,7 +87,7 @@ metrics; this section is the summary.
 │        1080 × 1920 · 25 fps                           │ ▸ SPEED         1.00×  │
 │                                                       │ ▸ TIMING  00:00:21:00  │
 ├───────────────────────────────────────────────────────┴────────────────────────┤
-│ ▌clipA.mov     │ ✂ ⇥ ⇤ ⌫ ◆ ⧉ Aa ▭ │ Snap ●        ⊖ ──o── ⊕ ⇔ │ [S][M][L]     │
+│ ▌clipA.mov     │ ✂ ⇥ ⇤ ⌫ ◆ ⧉ Aa ▭ │ Snap ●  ▁▃▅▂  ⊖ ──o── ⊕ ⇔ │ [S][M][L]     │
 │  V1 · video    │                                                               │
 ├────────────────────────────────────────────────────────────────────────────────┤
 │          ┆0:00      0:10   ▼  0:20      0:30      0:40      0:50      1:00     │
@@ -103,7 +103,7 @@ metrics; this section is the summary.
 | Toolbar | 44 pt | fixed | transport, timecode, canvas zoom, safe guides, Export |
 | Preview canvas | flexible | — | the composition at canvas size, letterboxed in the void |
 | Inspector | 304 pt | 280–440, collapsible (⌥⌘I) | three tabs + collapsible sections |
-| Timeline bar | 36 pt | fixed | the selection block, the clip actions, snap, zoom, S/M/L |
+| Timeline bar | 36 pt | fixed | the selection block, the clip actions, snap, the output level meter, zoom, S/M/L |
 | Timeline | 300 pt | 140 pt – 60 % of window | ruler, track headers + lanes |
 
 The toolbar carries only what applies to the whole document at all times —
@@ -327,26 +327,48 @@ Chroma key — or to a media source, which is Speed.
 **Audio sections** — clips whose media has an audio track and whose audio
 is enabled.
 
-- Volume % (0–400, dB shown), Mute.
+- Volume % (0–400, dB shown), Mute, and **Normalize** — one press sets the
+  clip's volume so its own loudest moment lands at −1 dBFS, measured from
+  the waveform cache over the source window that actually plays. It
+  REPLACES the volume rather than multiplying it (so pressing twice changes
+  nothing), writes the clip's BASE volume even when the playhead is inside
+  an action, leaves `muted` alone, and gives each clip of a selection its
+  own gain. A clip quieter than about −13 dBFS cannot reach −1 through the
+  model's 4× ceiling: it is normalised as loud as it goes and the result
+  says where it landed. Also Clip ▸ Normalize.
 - Fade in / fade out in seconds (also the corner handles on the clip).
 - Ducking: "lower other audio to N % while this clip plays", with
   attack / release. a screencast editor's rule: for the whole clip extent, not
   voice activity. Realised as volume ramps folded into the other clips'
   envelopes by the core.
-- Mix to mono. Detach Audio (⌥⌘D; also Clip menu).
+- Mix to mono — a fold, not a gain, so it is sample work like the three
+  below and lives with them at the head of the tap's Mix stage (§7.2). It
+  averages EVERY channel of the composition track and writes the average to
+  all of them, and it is inert below two channels. Detach Audio (⌥⌘D; also
+  Clip menu).
 - Volume actions share the Actions table.
 - M3 — Pan, "Smooth volume levels" (compressor), "Remove background
-  noise". Unlike everything above, these three cannot be a gain curve, so
+  noise". Unlike everything above, these three — and Mix to mono, which
+  joined them in road map 2's phase 5 — cannot be a gain curve, so
   they are not folded into the core's envelope: they are sample work, done
   in Swift by one `MTAudioProcessingTap` per composition audio track, and
   the SAME tap serves the preview and the export (the mix reaches both
   `AVPlayerItem.audioMix` and `AVAssetReaderAudioMixOutput.audioMix`, and
   taps were measured to run on each). A track no clip of which uses them
-  gets no tap and is bit-identical to before they existed.
+  gets no tap and is bit-identical to before they existed — on an EXPORT,
+  which is where that promise is worth something. A preview build made for
+  the level meter (§4.4) taps every audio track, inert ones included,
+  because a meter that lights only on the tracks carrying a compressor is
+  worse than none; there is no file there to be identical to.
   - Pan is a balance: one gain per channel, constant power across the
     sweep and unity at the centre, so 0 is exactly a bypass and a hard
     pan is +3 dB in the channel it goes to. Inaudible on a clip whose
-    source is mono — the widening to stereo happens after the tap.
+    source is mono — the widening to stereo happens after the tap. **On a
+    clip that also asks for Mix to mono it is a TRUE pan**, because the
+    fold runs first and both channels then carry the same signal; that
+    ordering is forced rather than chosen, since folding AFTER a pan is
+    algebraically a gain change — `(g_L·x + g_R·x)/2 = ((g_L+g_R)/2)·x` —
+    and would make the pan control read as broken.
   - The compressor is a channel-strip insert on the track, ahead of the
     fader: its envelope carries across a cut and the volume, fades and
     ducking apply after it. Its attack and release are ticks in the
@@ -474,8 +496,25 @@ header column and ruler are floating subviews pinned in `scroll(_:)`).
   Duplicate (⌘D), Add Text (T), Add Shape. The last four came down from the
   window toolbar. Add Shape is here rather than nowhere because it has no
   menu item anywhere in the app.
-- **Snap** (N), then the zoom cluster — minus, the slider, plus, Fit (⇧Z) —
-  and the **S / M / L** track size.
+- **Snap** (N), then the **output level meter**, then the zoom cluster —
+  minus, the slider, plus, Fit (⇧Z) — and the **S / M / L** track size.
+
+**The level meter** (road map 2's phase 5, `LevelMeterView`) is a
+120 × 12 pt two-channel meter in the flexible gap left of the zoom cluster:
+a peak tick over an RMS fill per channel on a −60…0 dB scale, with a clip
+cell at the right end that is the one place the bar spends coral. It sits
+there rather than last so that nothing which shipped moves at any window
+width, and it carries no divider — the row's fixed content is 880 pt
+against a 900 pt minimum window, and a divider's gap and hairline would
+overrun it. Starved below 40 pt it draws NOTHING, the selection block's own
+rule. It shows the MIX, not a track, which is why it is not in a track
+header; it is fed while the transport is moving and falls to silence when
+it stops, and at rest it is one fixed appearance (which is what lets the
+offscreen harness photograph it). The number it draws is the DSP tap's
+measurement times the plan's envelope at that instant — §7.2's "a peak is
+pre-fader" rule, the same one `detect_silence` uses — because a
+composition track has exactly one `audioTapProcessor` and a second,
+post-fader tap cannot be built.
 
 **Track size** picks a ROW of lane heights and a track's KIND picks the
 column: text 30 / 44 / 58, video 54 / 84 / 116, audio 40 / 60 / 82. A track
@@ -703,6 +742,14 @@ angles degrees, opacity/volume 0–1 (volume may exceed 1, up to 4).
 - `audio.duck`: `{ "level": 0.2, "attack": 300000, "release": 600000 }`.
 - `audio.pan` (M3) is -1 (hard left) to +1 (hard right);
   `audio.noise_reduction` (M3) is 0 (off) to 1.
+- `audio.mono` has been in the schema since M1 and was IGNORED until road
+  map 2's phase 5: it is a fold, not a gain, so it belongs with pan and the
+  compressor in the tap (§7.2) rather than in the plan, and nothing folded
+  it there. It now averages every channel of the composition track into all
+  of them, at the head of the Mix stage. No migration and no version bump:
+  the key already existed and already defaulted false, so only a project
+  that had deliberately set it changes — and changes to what it always
+  asked for.
 - `audio.compressor` (M3): `null` or `{ "threshold_db": -18, "ratio": 3,
   "attack": 6000, "release": 120000, "makeup_db": 0 }` — "smooth volume
   levels". Unlike ducking, this cannot be expressed as a gain curve, so
@@ -1180,9 +1227,16 @@ every edit and compares).
   solo inside a nest
   is judged among that nest's tracks alone, and a timeline solo on some
   other track silences a whole nest through the nest clip's own stage, by
-  the same multiply. `mono` is a per-segment flag Swift applies
-  with `AVMutableAudioMixInputParameters` where possible (else ignored in
-  M2, noted).
+  the same multiply. **`mono` is not in the plan at all** and never was:
+  `AVMutableAudioMixInputParameters` applies gain over time and cannot
+  combine channels, so the flag this paragraph used to promise ("a
+  per-segment flag Swift applies with `AVMutableAudioMixInputParameters`
+  where possible") described something the API cannot do — and nothing
+  applied it, from M2 until road map 2's phase 5. It is sample work, so it
+  travels the way pan, the compressor and noise reduction do (§4.3): per
+  clip, beside the plan, into the processing tap, where it is the head of
+  the Mix stage. A project that saved `mono: true` before phase 5 does now
+  sound different, which is the feature.
 - **Instructions** tile `[0, duration]` with no gaps or overlaps (an
   AVFoundation requirement); a boundary wherever the set of visible
   layers changes — which includes every **inner** clip edge of a nest,
@@ -1316,7 +1370,10 @@ Asked once per frame by the compositor, and by the overlay for hit-testing.
 | `LayerRenderers.swift` | text (Core Text) and shape (Core Graphics) descriptions → premultiplied BGRA `MTLTexture`s, LRU-cached by hash; reports measured text sizes to the overlay; draws the recipe's `reveal` for the three §5.2 text animations, over a layout cache so a reveal can never reflow the box |
 | `CaptionImporter.swift` · `CaptionLayout.swift` · `Transcriber.swift` · `CaptionExporter.swift` | captions in both directions: the SubRip grammar; the placement every producer shares (the frame grid, the overlap trim, the Caption preset, the new front-most track); on-device speech recognition and the cue builder over it; and the `.srt` / `.vtt` writer |
 | `MediaImporter.swift` | `AVURLAsset` probing (the **one** place `async`/`await` is allowed — AVFoundation's loading API is async-only going forward), thumbnails via `AVAssetImageGenerator`, peaks via `AVAssetReader` + vDSP, cache files in the package |
-| `Exporter.swift` | picks the pipeline for the core's settings — `ExportWriter` (`AVAssetReader`/`AVAssetWriter`: chapters, explicit bitrates) or the ImageIO frame sequence for GIF/APNG — reports progress, and renders one frame offline for `render_frame` |
+| `Exporter.swift` | picks the pipeline for the core's settings — `ExportWriter` (`AVAssetReader`/`AVAssetWriter`: chapters, explicit bitrates, the loudness gain) or the ImageIO frame sequence for GIF/APNG — runs the loudness MEASUREMENT pass ahead of the write, reports progress, and renders one frame offline for `render_frame` |
+| `AudioTap.swift` · `AudioDSP.swift` · `LevelMeter.swift` · `LevelMeterView.swift` | the sample-level audio the plan cannot carry: one `MTAudioProcessingTap` per composition audio track running noise reduction, the compressor and the Mix stage (the mono fold, then the pan), and the level meter's model and its one view — the model publishing a raw per-channel peak and RMS lock-free off the render thread, the view owning the ballistics |
+| `MediaPeaks.swift` · `AudioNormalize.swift` · `SilenceDetector.swift` | the waveform cache and the two questions asked of it: `MediaPeaks` is the one mapping from a plan segment's source window to peak buckets (the reversed mirror included), `AudioNormalize` turns a clip's peak into a `set_audio` op (Normalize, `normalize_clip`) and `SilenceDetector` turns peak × envelope into the quiet spans |
+| `Loudness.swift` | BS.1770-4 integrated loudness and true peak over plain float buffers — no AVFoundation, no player, no tap — plus the export gain that follows from a measurement and the 16-bit scaler that applies it |
 | `TimelineView.swift` | custom `NSView` in an `NSScrollView`; drawing from the snapshot; gesture sessions (`ClipDragSession`, `TrimSession`, `RangeSession`, `MarkerDragSession`) as structs; `on*` closures to the VC |
 | `PreviewCanvasView.swift` | `AVPlayerLayer` under a transparent overlay `NSView`; `CanvasSession` structs for move/scale/rotate/crop; handle drawing |
 | `InspectorViewController.swift` + `VideoPane` / `AudioPane` / `TextPane` / `ShapePane` / `MediaPane` / `DocumentPane` | one file per tab, descriptor-driven controls from `OptionControls.swift` |
@@ -1397,7 +1454,8 @@ WebM, AVI and VP9/AV1 are not opened (§11).
 
 Presets (`rc_export_presets`), in menu order, are ENCODINGS — a container
 and a codec, with no size of their own: `h264` H.264 (MP4), `hevc` HEVC
-(MP4), `prores_422` ProRes 422 (MOV), `audio_m4a` Audio only (M4A), `gif`
+(MP4), `prores_422` ProRes 422 (MOV), `audio_m4a` Audio only (M4A),
+`audio_wav` Audio only (WAV), `audio_aiff` Audio only (AIFF), `gif`
 Animated GIF, `apng` Animated PNG. The size is a separate choice whose
 default is the document's own size, so a 1440p or a vertical project does
 not come out at 1920 × 1080 because a row said so; the two image formats
@@ -1424,14 +1482,22 @@ every row's numbers are the canvas fitted inside that box, never upscaled
 disables the control. The agent's `export` takes the same ids in its
 `size`, or an explicit `[width, height]` (the sheet's "Custom…").
 `rc_export_settings` resolves a preset plus overrides (size, fps, range =
-whole or in/out, `optimize_for_network`, and the two bitrates below) to
+whole or in/out, `optimize_for_network`, the two bitrates below and the two
+loudness figures below them) to
 concrete settings, no size override meaning the preset's cap where it has
 one and the canvas otherwise. Each preset AVFoundation can write still
 carries an `AVAssetExportSession` preset name
 (`AVAssetExportPresetHighestQuality`, `…HEVCHighestQuality`,
 `…AppleProRes422LPCM`, `…AppleM4A`) — that mapping is what names the
 codec and tier, and `avf_preset: null` is how a preset says AVFoundation
-cannot write it at all. But **nothing runs a session any
+cannot write it at all. Since phase 5 the field means **only** that: the
+name is a record, not an instruction, because `null` is what routes an
+export to the ImageIO writer and AVFoundation has no `AVAssetExportPreset`
+for LPCM, so `audio_wav` and `audio_aiff` repeat `audio_m4a`'s name — the
+closest true statement available, "an audio-only file AVFoundation
+writes". A null there would hand a WAV to `ImageSequenceWriter` and report
+a format this table advertises as an unsupported file type. But
+**nothing runs a session any
 more**: M2's `AVAssetWriter` path REPLACED it rather than joining it, for
 the reason the whole design exists — two writers would make the chapter
 track, the explicit bitrates and the output size conditional on which one
@@ -1450,6 +1516,85 @@ path the preset name IS the bitrate ladder, and on the writer path
 VideoToolbox's size-derived rate beats any constant the table could hold.
 Absent therefore means "the encoder decides", which is exactly what
 `ExportSettings.videoBitrate == nil` says on the Swift side.
+
+**WAV and AIFF.** Two uncompressed rows beside `audio_m4a`, for the file
+you hand to somebody else's tool rather than the one you send: 16-bit LPCM
+at 48 kHz, which is what the mix is already decoded to (it is what the
+ProRes row writes), so a WAV is that written straight out and an AIFF is
+the same samples big-endian — the CONTAINER decides the endianness, and
+`codec: "lpcm"` is what the writer branches on to reach LPCM settings at
+all. Both are `video: false` with the audio-only row's size list and the
+document's rate, and neither optimizes for network use: a RIFF or an IFF
+file is a header followed by samples, with no index to relocate. 24-bit is
+deliberately deferred — it would mean widening the decode settings the mix
+is read through, which every other preset's encoder consumes, and a silent
+format mismatch there is a file of noise rather than an error; a depth is
+a request rather than a row when it comes, and needs measuring first.
+
+**Loudness.** `loudness_lufs` (−70…0, BS.1770-4's own absolute gate at the
+bottom) is the integrated target an export is normalised to, and
+`peak_dbtp` (−20…0) is the true-peak ceiling the gain is capped against.
+They are overrides on the bitrates' terms — no preset carries one, each
+appears in the resolved settings only when asked for, each is accepted by
+formats that cannot use it, and a value outside its range or of the wrong
+type is an error naming it — with one exception the resolver states and
+argues: **a `peak_dbtp` with no `loudness_lufs` is an error.**
+Normalisation is gain-only with no limiter, so the ceiling exists solely
+to cap a gain that a target computed; alone it would mean peak
+normalisation, a different feature, and would otherwise be the first key
+in this table accepted, echoed and silently inert.
+
+**How an export is normalised** (the Swift half; `Loudness.swift`,
+`Exporter.swift`, `ExporterWriter.swift`). The measurement is BS.1770-4 —
+two K-weighting biquads run continuously over the programme, 400 ms
+gating blocks at 75 % overlap, the −70 LUFS absolute gate then the −10 LU
+relative gate, and true peak through the standard's 4-phase 12-tap
+interpolating FIR — with the coefficients transcribed from the
+recommendation at its published 48 kHz and the meter REFUSING any other
+rate rather than filtering with the wrong numbers. It is arithmetic over
+plain float buffers with no AVFoundation in it, which is what lets it be
+checked against synthesized tones: the EBU Tech 3341 cases are specified
+signals, so the self-checks need no fixture file.
+
+An export is therefore **two passes, and the first one runs on every
+export that has any sound at all** — not only a normalised one. The final
+progress line and the `export` tool's result both report what the file
+actually holds ("Peak −1.0 dBTP · −14.0 LUFS"), which is what makes the
+target a claim anyone can check rather than a number repeated back; the
+price is one extra decode, about a tenth of a picture export's wall time
+and roughly a doubling of an audio-only one's, and the progress sheet says
+"Measuring loudness…" while it happens rather than sitting at 0 under a
+label that claims it is writing. GIF and APNG measure nothing: those
+containers hold no audio track, which is the same fact the core reports as
+`audio: false`.
+
+Pass 1 builds its OWN composition. An `AVAudioMix` copy shares the
+`MTAudioProcessingTap` its input parameters hold, and a tap carries
+per-instance state (the compressor's envelope, the noise reducer's delay
+line), so two readers over one mix would interleave into one tap's state;
+a second build costs one more pass on the build queue and removes the
+argument. It reads **32-bit float**, because Int16 saturates and a mix
+hotter than full scale is exactly the material loudness normalisation
+exists for — its true peak would otherwise be pinned at 0 dBTP by the
+decode rather than by the signal. Nothing in this tree had asked an
+`AVAssetReaderAudioMixOutput` for float before, so the request is MEASURED
+with `canAdd` and falls back to the writer's own 16-bit dictionary if it is
+refused (measured on macOS 26.5.1: it is accepted). Pass 2 is the ordinary
+write, with the gain `target − measured`, capped so the shifted true peak
+stays under the ceiling, applied to the decoded 16-bit samples on the way
+to the encoder — rounding and saturating, never truncating, since
+truncation biases toward zero and shows as DC on quiet material. **With
+Loudness off the gain path is not entered at all**, so an unnormalised
+export is byte-identical to a pre-phase one by construction rather than by
+argument.
+
+The limit that falls out of the two domains is worth stating rather than
+discovering: the measurement is float and honest about a mix over full
+scale, but the WRITE pass decodes to Int16, which saturates BEFORE the gain
+is applied. So a mix that clips is measured correctly, normalised down, and
+still clipped in the file — the gain cannot undo the decode. Turning a hot
+mix down at the clips is the fix; the ceiling only stops the gain pushing
+one INTO clipping.
 
 **GIF and APNG.** AVFoundation writes neither, so their rows resolve to
 `avf_preset: null` — the signal to write the file frame by frame through
@@ -1523,11 +1668,20 @@ unique — and it edits nothing, so it registers no undo step either.
 `render_frame {t, max_width?}` → PNG (the verification hook: the
 compositor renders offline through an `AVAssetImageGenerator` over the
 same composition + video composition), and
-`export {preset, path, size?, range?, video_bitrate?, audio_bitrate?}` —
-the export sheet's five controls in the sheet's own vocabulary (all but
-the frame rate: the tool exports at the document's, or on GIF and APNG at
-the format's cap), so an agent export and a menu export can ask for the
-same file. Handlers
+`normalize_clip {clips, peak_db?}` (road map 2's phase 5 — the mirror of
+the Audio section's Normalize button and Clip ▸ Normalize; it is a
+composite the UI offers as one command, not an op, and it reports each
+clip's measured peak and the volume it wrote, with what it could not
+measure under `skipped`), and
+`export {preset, path, size?, range?, video_bitrate?, audio_bitrate?,
+loudness_lufs?, peak_dbtp?}` — the export sheet's six controls in the
+sheet's own vocabulary (all but the frame rate: the tool exports at the
+document's, or on GIF and APNG at the format's cap), so an agent export
+and a menu export can ask for the same file. Its result carries what the
+file's sound MEASURED — integrated loudness, true peak and the gain that
+was applied — for every export that has any, asked for or not, which is
+`detect_silence`'s posture applied to the writer and is what makes the
+±0.5 LU claim checkable over MCP. Handlers
 use `performGroupedEdit` so off-event edits get their own undo group
 (Rasterize's `AgentServer.performGroupedEdit`). Default port 4817; env
 `RC_AGENT_PORT`; launch flag `-AgentServerEnabled YES`.
@@ -1561,6 +1715,7 @@ concern is a new module with its own `impl Project` block.
 | `snap.rs` | candidates and `resolve` |
 | `format.rs` | `RC_FORMAT_VERSION`, the `MAX_*` reader caps (`RC_MAX_*` in the header), read-any-version / write-current |
 | `export.rs` | presets (one per encoding) and settings resolution |
+| `export_overrides.rs` | how an override value is READ and REFUSED, where `export.rs` is the table and the resolution: `describe`, the overrides object itself, and the readers for a positive integer, a boolean, a rate, a range and a decibel figure, each refusing with a message naming the key and the value. Cut out of `export.rs` under the size rule (road map 2, phase 5) and cut THERE for `props_check.rs`'s reason — how a value is spelled is a fact about the vocabulary, not about the resolution. `describe` was never an export function (five edit modules import it for their own messages), so `export.rs` re-exports it under the old path |
 | `export_size.rs` | `export_sizes(preset)`: the Size popup's rows — the document's size, an image format's cap, the standard sizes fitted to the document's aspect by the short-edge rule — and `fit_within`, the rule for what a size means on an image format, which `export_settings` applies too |
 | `agent.rs` | MCP server (copied) |
 | `ffi.rs` / `ffi_edit.rs` / `ffi_query.rs` / `ffi_agent.rs` / `ffi_util.rs` | thin shims; `ffi_util` holds `catch_unwind` + `err_out` + CString helpers (copy Rasterize's) |
@@ -1700,7 +1855,11 @@ Export…),
 Edit (Undo, Redo, Cut, Copy, Paste, Paste Attributes, Duplicate, Delete,
 Ripple Delete, Insert at Playhead, Overwrite at Playhead, Select All,
 Select After Playhead, Select All on Track), Clip (Split, Trim Start, Trim
-End, Freeze Frame, Detach Audio, Add Action, Speed…, Close Gap, Remove
+End, Freeze Frame, Detach Audio, Normalize (road map 2's phase 5, beside
+Detach Audio because those two are the menu's only sound commands; no key
+equivalent, and it duplicates the Audio section's button deliberately —
+a command reachable from a pane alone can be lost), Add Action, Speed…,
+Close Gap, Remove
 Silences…, Transition ▸, Rename…, Label ▸ (the six colours and None),
 Nest, Un-nest), Track (New Track,
 Remove Track, Remove Empty Tracks, Hide/Mute/Lock/Solo), Mark (Add Marker,
