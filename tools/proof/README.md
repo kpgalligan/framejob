@@ -119,6 +119,25 @@ does not give you a stereo pair at the amplitudes you asked for — it lands
 18 dB down — and lavfi needs the expression SINGLE-QUOTED inside the filter
 description, or the commas in `between(t,0,1.5)` are read as more options.
 
+**Phase 6 adds nothing to `media/` either, and for a sharper reason than
+phase 5's.** Every absolute claim it makes is a claim about a BYTE in a
+PNG, so its fixture is two full-canvas SHAPE clips on two tracks with flat
+fills and no stroke — exact by construction, deterministic, and with
+nothing loading asynchronously. There is no media in the blend checks at
+all, which is what `video.blend` belonging to the LAYER rather than to a
+source kind buys. One `qtrle` movie is written into `work/` per run as a
+cross-check that a decoded picture behaves the same way, and the line has
+one trap in it:
+
+```sh
+ffmpeg -y -f lavfi -i "color=c=0x808080:size=640x360:rate=30:duration=5,format=rgb24" \
+  -c:v qtrle grey80.mov
+```
+
+The `format=rgb24` must be INSIDE the filter chain. `-pix_fmt rgb24` on the
+OUTPUT gives 0x7E where the card asks for 0x80, and a blend proof measured
+against 126 instead of 128 fails arithmetic it got right.
+
 Then launch YOUR OWN instance on YOUR OWN port and only ever kill that one
 (`pgrep -f "MacOS/Reelcut"` lists them; another session may have one running):
 
@@ -132,6 +151,7 @@ python3 tools/proof/phase3_proof.py 4823
 python3 tools/proof/phase3_silence_scope.py 4823
 python3 tools/proof/phase4_proof.py 4823
 python3 tools/proof/phase5_proof.py 4823
+python3 tools/proof/phase6_proof.py 4823
 ```
 
 The last line is `<n>/<n> checks passed`, and the exit status is non-zero if
@@ -141,11 +161,13 @@ startup parity check would complain — `grep "Reelcut: " /tmp/reelcut-4823.log`
 must print nothing before a proof run means anything.
 
 **The EXACT tool count belongs to the newest phase's script**, because it is
-what tells a stale binary on the port from the build under test: phase 5
-asserts 71, and phases 1 to 4 keep floors (63, 65, 68 and 70) so a later
-phase's tools never fail an older proof. That handover has now happened once
-exactly as it was written down — phase 5 added `normalize_clip`, took the
-exact count, and phase 4's `check` became a `>=`. It is not decoration:
+what tells a stale binary on the port from the build under test: phase 6
+asserts 73, and phases 1 to 5 keep floors (63, 65, 68, 70 and 71) so a later
+phase's tools never fail an older proof. That handover has now happened
+twice, each time exactly as it was written down — phase 5 added
+`normalize_clip`, took the exact count, and phase 4's `check` became a `>=`;
+phase 6 added `add_background` and `add_blurred_background`, took the count
+at 73, and phase 5's became a `>=` in the same commit. It is not decoration:
 the phase-4 count was checked against the two new tools taken out of the
 catalog and the registry together, where it reads 68 — and it is not the
 only check that notices. `check` never stops a run, so that build goes on to
@@ -170,8 +192,9 @@ instance and start a new one rather than reading a hang as a proof failure.
 `phase2_proof.py` covers the catalog floor (65), phase 2's own schema keys —
 `name`, `label` and `solo`, which arrived at version 3 — through a saved
 `project.json` and a hand-made version-2 fixture, both read back from disk
-(the saved file's version assertion is the CURRENT one, 4, not 3: an older
-file must open, but what this build writes is what this build writes),
+(the saved file's version assertion is the CURRENT one, 6, not 3: an older
+file must open, but what this build writes is what this build writes, so
+that number moves with every bump and three phases' scripts carry it),
 `set_clip`'s patch rules and refusals, `paste_attributes` (what
 travels, what stays, the frame, one undo step) and solo — the last as
 exports: with the SAME two-tone project, soloing the back track decodes
@@ -209,6 +232,15 @@ halves the changed area's offset from the canvas centre, clearing the list
 returns the frame byte-identically, and the list rule is asserted on the
 FRAME: an entry whose fields agree interpolates to the midpoint still, and
 one whose `shape` disagrees holds the start state and switches at the end.
+Its **schema half is where a later bump shows up**, and phase 6 is the
+worked example: the saved `project.json`'s version assertion is the CURRENT
+one, and the claim that used to read "obscure is the LAST key of every video
+object" now reads "obscure, then blend". Appending `video.blend` falsified
+the literal wording BY DESIGN, so the claim moved rather than went away —
+what it pins is that a new key lands at the END and never in the middle,
+which is the whole of what the append-only rule rests on. A phase that
+appends to the video object again moves it again; one that appends anywhere
+else leaves it alone.
 
 `phase3_silence_scope.py` is the SCOPE half of Remove Silences, split out
 because it needs a fixture the other script's cannot be: two tracks holding
@@ -301,8 +333,10 @@ reveals at the same instant, and one cache serves both — so if the core's
 content hash did not cover the reveal the second layer would be handed the
 first layer's texture. It reads 216 columns against 108; with the reveal
 taken back out of `recipe.rs`'s `text_hash` it reads 216 against 216.
-The schema half is the saved `project.json` (version 5, `animation` the LAST
-key of every text object), a hand-made version-4 fixture that opens and
+The schema half is the saved `project.json` (version 6 since phase 6 bumped
+it, `animation` still the LAST key of every text object — version 6's two
+keys landed on the VIDEO and SHAPE objects, so this claim is untouched by
+it), a hand-made version-4 fixture that opens and
 reads a null animation, and the two refusals — a kind outside the closed
 enum, and a negative `in` or `out` named by its dotted key.
 
@@ -310,7 +344,10 @@ Every one of those checks was MUTATION-TESTED against four deliberate
 breakages, which is what makes the score mean anything: the reveal taken
 out of the content hash, `TextProps.animation` moved off the end, the
 `text.animation` range checks deleted and `RC_FORMAT_VERSION` put back to 4
-(six checks fail, and only those six); `Reveal::of` returning "all of it"
+(six checks fail, and only those six — measured against a tree whose current
+version was 5, so re-running that one today means putting it back to 5, not
+to 4: the version assertions here name the CURRENT version and phase 6 took
+it to 6); `Reveal::of` returning "all of it"
 always (thirteen when it was run, and the two prose reveal-0 blanks added
 since fail under it too — a build with no reveal draws the whole text at
 reveal 0, which is exactly why those blanks are taken with the animation SET
@@ -426,6 +463,190 @@ write` and the run stops after the ten catalog checks, and with only
 `audio_aiff` nulled it gets to 62/62 and stops at 5e's AIFF export. A row
 handed to the image writer cannot be exported at all, so there is nothing
 left to measure about it.
+
+`phase6_proof.py` covers the catalog COUNT (73, the exact one — phase 6 is
+the newest phase, so the duty is its) and phase 6's four parts. It needs no
+ffmpeg for the blend and gradient claims and uses it only for the one
+`qtrle` cross-check card and for the PCM comparison 6c owes.
+
+**Its section 0 is the FIXTURE, scored as checks rather than assumed**, and
+that is the design decision the rest of the script rests on. Every absolute
+number here is a byte in a PNG, and black is the one value every colour
+transform fixes — so existing evidence proves nothing about a mid-tone. The
+script builds a canvas at exactly 128/255 grey, renders, and asserts a
+corner pixel reads (128, 128, 128, 255); then 64 and 192. **If one drifts,
+the FIXTURE fails by name** and the blend checks are not blamed for a
+pipeline that moved under them. Every blend expectation is then written
+TWICE: once as the formula over the two MEASURED card bytes
+(`round(a*b/255)`), which is the real claim about the shader, and once as
+the road map's literal 64 / 192 / 255, which is the claim about the
+fixture. A wrong formula fails both; a drifting pipeline fails only the
+second, and the two are told apart by which line goes red.
+
+**There is no headroom in the ±1/255 tolerance and it is already spent.**
+`round(128 × 128 / 255)` is 64 against `0.25 × 255` = 63.75, so a pipeline
+that drifted by one would take the multiply check with it — which is what
+section 0 exists to catch first. And the thing not to "fix" while reading
+those numbers: **this compositor blends in the ENCODED sRGB space,
+deliberately** — nothing uses an `_srgb` format, so "multiply of 50 % grey
+over 50 % grey is 25 %" is a statement about encoded values and is false in
+linear light. That sentence is in the script's docstring, in
+`Compositor.metal` and in spec §7.5, because it is the one thing about this
+compositor a competent reader will try to correct.
+
+**One check in it exists because of one line of Swift, and it is not the
+one that was written for the job.** Metal builds a programmable-blend
+pipeline with fixed-function blending still enabled — no error, no warning
+— and the finished pixel is then blended a second time. What decides
+whether that SHOWS is the DESTINATION's alpha and not the layer's: the
+fragment stage returns the finished composite, whose alpha is
+`as + ab·(1 - as)`, and over an opaque backdrop that is 1 whatever the
+source's own alpha is, so `oneMinusSourceAlpha` is 0 and the second blend
+contributes exactly nothing. Section 6's **blended layer at 50 % opacity**
+over an opaque backdrop is therefore a real check of a real thing — the
+composite at a partial source alpha is `mix(dst, blend(src, dst), 0.5)` —
+and is BLIND to the double blend, as is every other fixture in the script,
+all of which put a full-canvas opaque card underneath. The mutation run is
+how that was learned, not reading. **Section 6b is the check that fails**:
+a transparent canvas, a translucent card as the destination, and a second
+card at half opacity blended over it, read on the ALPHA channel, where the
+mutant lands 32/255 high while the colour moves by two. It is the only
+place in this script that reads alpha.
+
+**A blended layer with a SHADOW** (section 4) must have shadow pixels
+byte-identical to the same project at `blend: "normal"` while its own
+pixels differ, and what it pins is that the shadow's own DRAW stays
+fixed-function source-over. It is NOT a guard on `maskState`, and the fear
+that used to be written here — the mask pass draws coverage into a texture
+cleared to transparent black, so a `multiply` over that is 0 everywhere and
+every blended layer's shadow vanishes — is false. That is true of a naive
+`src · dst` and false of the premultiplied composite the shader runs, whose
+`(1 - ab)·src` term reduces the formula to `src` exactly at `ab` = 0 for
+all eight modes; a build passing `state` where `maskState` belongs renders
+every shadow correctly and this section stays green. The separation is
+DEFENSIVE and worth keeping — it names what the mask pass means, and a
+future formula without that term would make the hazard real — but no
+document here should call it a bug being held back.
+
+The rest reads as the feature does. The eight modes at the centre pixel,
+each against its own formula — and overlay is measured with a **192 source
+over a 64 base**, not at 128 over 128, because at 128 the branch condition
+sits on the knife edge (128/255 = 0.50196 takes the screen half and gives
+128.498, which rounds either way depending on where the comparison is
+written), and because 96 is a number an unblended backdrop cannot produce
+where 64 is. `blend: "normal"` renders byte-identical to the same project
+before the key was ever set, taken IN-SCRIPT by set-and-clear the way phase
+5 took `mono`'s baseline. Every frame of a cross-dissolve overlap with a
+`multiply` on one half is byte-identical to the same project at `normal`,
+which is the renderer's half of the core's transition rule — the core's own
+half is a test in `core/tests/evaluate_tests.rs` reading the layer's
+`blend` at a tick inside the overlap, which is the check a
+renderer-side rule could not have had. And the refusals: `set_video
+{blend}` on a nest clip named, `{blend: "normal"}` on one answering "changes
+nothing", and a misspelt mode refused by name.
+
+**Gradients** are measured the same way: a single flat-colour gradient
+byte-identical to the same solid fill (the cleanest thing the
+clip-to-the-path decision buys), a linear ramp monotonic per column and
+hitting its stop colours at the ends, at 45° landing the first stop on the
+bottom-left corner and the last on the top-right, a radial one reading its
+first stop at the centre and its last at both edge midpoints, a gradient on
+a `line` changing nothing at all, a three-component stop colour accepted, a
+one-stop gradient refused by name, and an UNSORTED stop list ACCEPTED and
+drawn as the sorted ramp — that last one pinned deliberately, so a later
+reader does not "fix" the core's missing ordering check into a refusal and
+break a drag half way through. The stale-cache check is phase 4's text
+lesson applied to a shape: change only the gradient and the frame must
+change, which is what would catch a Swift side keying its texture on
+anything narrower than the recipe's hash.
+
+**The two background commands need a PCM comparison and not just a frame**,
+and that is the check the road map's own proof would have missed. Its
+wording — "renders byte-identically to the same ops applied by hand over
+MCP" — passes with the bug present on BOTH sides, because the bug is
+inaudible in a still frame: a blurred copy that kept `enabled.audio` plays
+the same recording twice, about +6 dB with comb filtering, and would move
+`detect_silence`'s and the level meter's numbers too. So the copy's
+`enabled.audio` is read back as FALSE, the copy is checked for no actions
+and no `transition_in`, the whole thing is ONE undo step, and an export of
+the project with the backdrop decodes sample-for-sample equal to an export
+without it.
+
+**6d's oracle** is the road map's: an action from `blur 0` to `blur 1`,
+linear, rendered at its midpoint is BYTE-identical to a static `blur 0.5`
+on an otherwise identical project. Beside it are the two regressions phase 6
+closed — an edit to one filter inside an action must not flatten its
+neighbour's ramp, and an earlier action that changed the filter COUNT must
+not make an ordinary dial rewrite the clip's base stack — and the partial
+entry `{"filters": [{"amount": 1}]}`, refused by index now rather than
+silently becoming a blur.
+
+`phase6_chrome.py` is the offscreen half (`python3
+tools/proof/phase6_chrome.py`, no port, no media; renders in
+`work/chrome6/`), and what it may claim is bounded by what the harness can
+see: `build.sh` is a swiftc line over `app/Sources` and never compiles
+`Compositor.metal` at all, and the preview well renders BLACK offscreen
+because a Metal layer has no drawable — so **no claim about a blend's or a
+gradient's PICTURE may be made there**, and its docstring says so first.
+The temptation is larger here than it was in phases 3 and 4, because a
+gradient IS a picture; the section that edits one is not. What it
+photographs is the chrome: the **Blend popup** in Transform, bound to
+`video.blend` and measured as the row directly below Opacity by arithmetic
+over `DS.controlHeight` and `InspectorMetrics.rowSpacing`, and as eight
+distinct drawings of one row; the **computed note** — that it appears for a
+non-normal mode over a black canvas with nothing behind, that a non-black
+canvas and a visible clip behind each suppress it, and that a HIDDEN track
+and a clip with its video switched off do NOT, which is the difference
+between "is there a layer" and "does anything draw"; the **Gradient
+section** under its own id, below Fill, shut by the design, as many rows
+tall as it has stops; and its rows **disabled for `line` and `arrow`** and
+the Angle row disabled for `radial`.
+
+**Colours are SOLVED, never hard-coded**, which `phase3_chrome.py`
+established and this script needs twice over: a harness PNG carries the
+display's ICC profile, and the note is drawn in `DS.accent`, which is
+`NSColor.controlAccentColor` — a colour the person at the machine chooses
+in System Settings. So the disabled rows are measured as
+`disabled = background + α × (enabled − background)` solved per component
+over every pixel two renders disagree about, against an ALIGNED pair (a
+filled rectangle and a filled line have the same body height, so the rows
+sit at the same y and every changed pixel is a change of DRAWING rather
+than of position). The answer comes back 0.42 twice, from two different
+pairs, which is `InspectorPane`'s own constant — and no colour is written
+down anywhere in the file.
+
+**Its section 7 needs an instrument the script builds**, and the reason
+generalises: a menu lives in `NSApp.mainMenu` and is never drawn into a
+window, so a harness that renders a window cannot photograph one at any
+size, and `AppDelegate.buildMainMenu()` is private with the app as its only
+caller. So the script writes a forty-line `main.swift`, compiles it against
+`app/Sources` with `build.sh`'s own swiftc line, and reads the menu the
+delegate actually builds — plus the answers
+`EditorViewController.validateUserInterfaceItem` gives for the three new
+selectors over four selections. `phase5_chrome.py` established that shape
+with its `Loudness.swift` probe; this one compiles the whole module,
+because a menu item names a selector on the editor and the delegate names
+every other class in the app. It is cached on modification times like the
+harness, and a build it cannot make is a scored FAILURE rather than an
+exit, so a rotted instrument cannot take the rest of the score down.
+
+Two things it deliberately does not claim, both worth knowing before
+someone tries to add them. **The popup's LIST**: a closed `NSPopUpButton`
+draws the selected item's title and nothing else, and a menu cannot be
+opened offscreen — that the rows are `BlendMode.allCases` in the enum's
+order, and that the order is the shader's discriminant, is the core's and
+`phase6_proof.py`'s. **Which VERB the note uses**: reading "reads black
+here" against "changes nothing here" off a PNG needs OCR, so what is
+measured is that the seven notes are seven DIFFERENT drawings — the
+sentence names the mode rather than standing still.
+
+One thing about this phase is worth doing EARLY rather than at the end, and
+phase 6 is the second phase to learn it: **re-run `phase4_chrome.py` as
+soon as the Blend row exists.** That row makes Transform seven rows and
+pushes every section below it down about 29 pt, and phase 4's script chose
+its window height by arithmetic over the section stack — so a failure there
+is the row landing, not the row being wrong, and finding that out after
+everything else has been written costs a day.
 
 `phase5_chrome.py` is the other half, and phase 5 splits between the two more
 sharply than any phase so far: four of its five features are AUDIO, which a

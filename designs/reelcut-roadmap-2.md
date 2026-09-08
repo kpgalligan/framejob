@@ -121,7 +121,7 @@ has looked at rather than to what everyone has.
 | 3 | The screencast trio | 2 | v4 | **done** 2026-09-07 (`ac7f849`) |
 | 4 | Words | 2 | v5 | **done** 2026-09-08 (`8ec3be5`) |
 | 5 | Sound | 1–2 | — | **done** 2026-09-08 (`65d43ae`) |
-| 6 | Looks | 1–2 | v6 | not started |
+| 6 | Looks | 1–2 | v6 | **done** 2026-09-08 (`<commit>`) |
 | 7 | Output | 1–2 | — | not started |
 | 8 | Viewing and finding | 1 | — | not started |
 | 9 | Inside the nest | 2 | — | not started |
@@ -140,7 +140,7 @@ invents a second one:
 | `edit_clip.rs::whole_media_length` | how long a clip showing the whole of a media is, snapped. `add_clip`, `insert_clip` and `overwrite_clip` share it. |
 | `time.rs::snap_up_to_frame` / `snap_down_to_frame` | directional frame snapping, for a clamp BOUND — which cannot be rounded to the nearest frame without letting a caller past what it protects. |
 | `edit_time.rs::ordered_range` / `clear_range` | "put a range in order" and "empty it on every unlocked track", shared by `lift_range` and `ripple_delete_range`. Phase 3's `ripple_delete_ranges` is a loop over the second. |
-| `ProjectDocument.targetTrack` | the one rule for "which track does a command with no track argument act on": the first selected clip's, else the front-most. Phase 6's Add Background… wants it. |
+| `ProjectDocument.targetTrack` | the one rule for "which track does a command with no track argument act on": the first selected clip's, else the front-most. Phase 6's background commands turned out NOT to want it — a backdrop goes on a NEW track at index 0, which is the only place "behind everything" is true whatever the stack holds — so it is still waiting for its second caller. |
 | `ProjectDocument.selectedMedia` | the Media tab's selected row, clamped like the other view state. Phase 8's Media-tab work builds on this rather than adding another. |
 | `EditorViewController+Edge.swift` | carries an `extension TimelineView` as well as the controller's, which is how a gesture is added without touching the frozen view. Phases 3 and 9 need the same trick. |
 | `tools/proof/` | the MCP client, the per-phase proof scripts, and `harness/` — the offscreen chrome renderer, for any claim about what the chrome SHOWS. |
@@ -151,7 +151,7 @@ invents a second one:
 | `AgentServer+Arguments.stringsArg` | an optional list of strings from a tool call, a lone string counting as one. Phase 4's caption options and phase 7's export options want it. |
 | `actions.rs`'s LIST rule | an end patch interpolates a list per index when the lengths match and each pair of entries agrees on its discrete fields, and switches at the end otherwise — the crate's rule, not one list's, and confined to list ENTRIES so no named object's animation changed. Phase 6's filter work is the one that asked for it; anything else that adds an array of objects gets it free. |
 | `model_regions.rs` | the ONE region frame — `x`/`y` a CENTRE in source pixels from the cropped rect's centre, `width`/`height` its size — and the one `SpotShape` every region is drawn with. A later region joins these rather than declaring a second frame or a second two-shape enum. |
-| `edit_zoom.rs`'s placement equation | the solve from a rectangle in that frame to an action's `scale`/`x`/`y`, rotation and crop included, with the scale clamped before the offsets follow it. Phase 6's Add Background… and any later "zoom to selection" cite it rather than re-deriving. |
+| `edit_zoom.rs`'s placement equation | the solve from a rectangle in that frame to an action's `scale`/`x`/`y`, rotation and crop included, with the scale clamped before the offsets follow it. Phase 6's `fill_scale` took the clamp-before-the-offsets rule from it; any later "zoom to selection" cites the whole equation rather than re-deriving it. |
 | `SilenceDetector.Input.read` | the seam that takes a snapshot, a plan, a selection and the peak files off the document ONCE, after which everything is arithmetic over values — which is what lets a sheet re-detect synchronously and an agent run the same code. Phase 5's meters and phase 8's search want the same shape. |
 | `TimelineView+Candidates.swift` | the third `extension TimelineView`, and the precedent for adding a WASH under the clips: a stored property with a `didSet`, two one-line draw calls in the frozen file, the bodies outside it. An overlay view cannot do it — the ruler fills its own bounds opaquely first. |
 | `EditorViewController+ZoomRegion.swift` / `CanvasRegionView` | the second modal canvas mode, and the shape of one: an overlay whose PRESENCE is the mode, one-line closures back to the controller, a key that TOGGLES (an overlay that has lost focus cannot be dismissed by Esc), and an auto-close beside `syncChromaEyedropper`. Installed through `armCanvasMode`, which ends every OTHER armed mode first — a third mode inherits that by being installed at all, where each arming path remembering the others was the review's defect. |
@@ -161,9 +161,16 @@ invents a second one:
 | `tools/proof/harness/`'s settle capture | the harness writes a PNG only when two consecutive captures are byte-identical. A fixed spin count was a guess about how long the last relayout takes, and this is the answer to the question instead. It is NOT what makes a render reproducible, and phase 4's gate is where that was learned: a settle cannot separate two STABLE layouts, and the bistability under it was an ambiguous constraint in `InspectorPane.swift` (the row below). Both are wanted; only one of them is the determinism. |
 | `InspectorPane`'s 249 | a pane's low-priority bottom pin sits ONE below `.defaultLow`, because an `InspectorSection` keeps the default 250 and a TIE let the solver stretch a section instead of moving the pane's bottom — an ambiguity with no wrong answer to report, decided per PROCESS. Any later constraint that competes with a subview's own hugging needs the same one-point gap, and the symptom to recognise is a proof that scores differently on identical input. |
 | `MediaPeaks.swift` | the ONE way to ask the waveform cache about a source window: the bucket size, the project→source tick mapping taken from the plan segment's own resolved rate, the floor for the index, and the reversed MIRROR about the media's model duration. `SilenceDetector` and `AudioNormalize` both call it; a third caller joins them rather than copying, which is what the app's two disagreeing project→source conversions are the warning about. |
-| `AudioNormalize.swift` | the shape of a UI command whose ARITHMETIC has to be provable: a value type, measurements in and ops out, called identically by a pane button and an MCP tool, with per-job failures reported under `skipped` rather than thrown. `CaptionLayout` is the same shape for captions; phase 6's Add Background… and phase 7's Save Frame… can be a third. |
+| `AudioNormalize.swift` | the shape of a UI command whose ARITHMETIC has to be provable: a value type, measurements in and ops out, called identically by a pane button and an MCP tool, with per-job failures reported under `skipped` rather than thrown. `CaptionLayout` is the same shape for captions; phase 7's Save Frame… can be a third. Phase 6's Add Background… was expected to be one and turned out not to need it: the arithmetic went into the CORE as an op (`edit_background.rs`), which is the other answer whenever the derived values are core vocabulary rather than platform measurements. |
 | `Loudness.swift` | measurement with NO AVFoundation in it — plain buffers in, a value type out — which is what lets a meter be checked against synthesized tones rather than a fixture file, and what lets the export own the question of where the samples come from. Any later analysis (a phase-8 waveform search, a second loudness scale) belongs on those terms. |
 | `LevelMeter.swift` | a raw measurement crossing from a real-time thread, and the ballistics kept OUT of it: the model publishes what was measured, a view owns hold and decay, and a proof asserts on the model. It is also the app's one `import Synchronization` and the argument for when a lock-free publish is the right answer (a render thread that may not lock and may not allocate). |
+| `Compositor.metal`'s `blendPremultiplied` | the ONE home of a blend FORMULA — the core says which mode, nothing in it computes a colour. It keeps the destination-ALPHA term rather than assuming an opaque canvas, which is phase 7's ProRes 4444 inheriting a correct formula instead of a wrong one; and the rule beside it is the trap: a programmable-blend pipeline MUST be built with fixed-function blending disabled, Metal builds one either way without complaining, and the double blend is invisible at alpha 1. |
+| `MetalRenderer.pipelineState(gather:blend:)` / `maskState` | two INDEPENDENT specializations of one fragment stage, so four layer states and not a hierarchy — and the shadow's mask pass takes the gather one WITHOUT the blend, because a mask asks about the layer's SHAPE, which no blend mode changes. That separation is DEFENSIVE and not load-bearing, which the mutation run established against every document that had said otherwise: a `multiply` over the cleared mask is NOT 0, because the premultiplied composite's `(1 - ab)·src` term reduces the whole formula to `src` at `ab` = 0 for all eight modes. Keep it — it costs nothing, it names what the mask pass means, and a formula without that term would make the hazard real — but do not restate the vanishing shadow as a bug it holds back. A third specialization joins this rather than branching inside the shader; anything else that draws a layer's SHAPE rather than its ink takes `maskState`. |
+| `recipe.rs`'s forced `normal` | the precedent for the recipe OVERRIDING a model value rather than only evaluating it, and the two tests it has to pass: everything that draws reads one description, and the rule is provable by a core test reading a layer at a tick. The visible cost is stated where it lands — the inspector shows the model's value while an overlap draws `normal` — because a rule that makes two honest readings disagree has to say so. |
+| `edit_clip.rs::fill_scale` | Fit's sibling, and the three differences one sentence explains: Fit is a rescue and Fill is a requirement, so it ignores `canvas.fit_new_clips`, scales UP as readily as down, and clamps to `SCALE_MAX` at the source rather than leaving a caller to. Anything that must leave no canvas showing calls it. |
+| `edit_background.rs`'s "what a copy does NOT keep" | the four things a derived clip drops and why each one is a wrong picture or a wrong SOUND if it is carried — the audio switch first, because it is INVISIBLE in a still frame and every frame proof passes with it wrong. Any later op that clones a clip somewhere else starts from that list. |
+| `InspectorBinding.editedList` | the list a WRITE of a list-valued key must be built from and measured against: the ACTION's own end list where there is one, the clip's base list otherwise — never the evaluated one every `read:` uses. Two defects came out of the one-line version of this; a third list-valued property joins it rather than reading `videoProps` directly. |
+| `AgentServer+Clips.gradientArg` | the shape of a hand-built reader for a nested object in a patch, and what it buys: a misspelt key inside `gradient` is refused BY NAME, which `shadow`, `chroma`, `obscure` and `animation` cannot manage because they go through the generic decoder. A new nested object that matters is worth reading by hand. |
 
 ## 2. Phases
 
@@ -1992,6 +1999,490 @@ background commands), `AppDelegate.swift`, catalog and handlers;
 - An action from `blur 0` → `blur 1` renders at its midpoint byte-identical
   to a static `blur 0.5` (with `ease` linear).
 
+**What landed.** All four parts, at schema version 6 (`video.blend` and
+`shape.gradient`, both defaulted, no migration step), TWO new ops
+(`OP_NAMES` 53 → **55**) and two new tools (the catalog is **73**) — plus
+the following, where the code differs from the plan above or settled what
+it left open. **Seven deviations, and the first is not a detail about
+mechanism but about what this phase actually did:**
+
+- **6d was already shipped, and this phase did not write it.**
+  `set_action_end` has carried `video.filters` since M3 (`d3fbaa0`),
+  phase 3's list rule already interpolates them per index, `structural`
+  already routes an add or a remove to the base props (`ac7f849`), and
+  `core/tests/schema_v2.rs` already carried green tests for it under its
+  own `// ---- interpolation ----` banner. So the honest description of
+  6d's session is PROOF, two residual defects and one refusal made loud,
+  and it is written that way here on purpose: a phase
+  that quietly claims code it did not write is worse than one that
+  reports a short session, and the next reader who takes "filters as
+  action targets" for a phase-6 feature will go looking for a commit that
+  does not exist. What the phase owed was the road map's own oracle — an
+  action `blur 0 → blur 1` rendered at its midpoint byte-identical to a
+  static `blur 0.5` — and these three, which 6d is what makes reachable:
+  - **Editing ONE filter inside an action re-pinned every other filter's
+    end value.** `filtersSection` built its array from
+    `binding.videoProps.filters`, which INSIDE an action is the EVALUATED
+    list, and `actions.rs`'s `merge` replaces an array whole rather than
+    entry by entry. With a base of `[blur 0.2, sepia 0.3]` and an end
+    patch of `[blur 1.0, sepia 0.3]`, dialling the sepia at the midpoint
+    re-sent the blur at 0.6 and its ramp was silently flattened. The fix
+    is `InspectorBinding.editedList`: a write reads the list it is about
+    to REPLACE — the action's own end `filters` where the end patch
+    carries one, the clip's base list otherwise — while every `read:`
+    stays on the evaluated value, so the section still shows the
+    playhead's picture.
+  - **`structural` was one action short of true.** Its doc said "nothing
+    the inspector does can put a different length into an end patch", and
+    with TWO actions on a clip and the earlier one's end patch changing
+    the filter COUNT, the evaluated list at a playhead inside the second
+    is longer than the base — so comparing a new length against the base
+    classified an ordinary dial as structural and rewrote the clip's BASE
+    stack, changing every frame before the first action. Not reachable
+    from the UI alone (a length change always goes to base, which is the
+    guarantee); reachable from MCP or a hand-written file. Same three
+    lines, same reader, and the sentence in the doc is corrected rather
+    than deleted: with the pair in force the section can only write the
+    length it can see, and nothing is promised about a length
+    `set_action_end` put there.
+  - **One refusal made loud rather than silent.**
+    `{"filters": [{"amount": 1.0}]}` is the core's own documented idiom
+    for "the same filter, more of it" and the most natural thing an agent
+    will write. Over MCP it could not work: `FilterProps` has no
+    optionals, so the decoder filled the missing `kind` with `blur`, a
+    `sepia` base animated and then switched to a blur, and the caller was
+    told it had worked (measured). `checkVideoEnums` now refuses an entry
+    missing either key, naming the index — and `filters` joined
+    `app/CLAUDE.md`'s list of nested objects the MCP decoder REPLACES,
+    which is the one member of that family the list had omitted. The
+    related wart is pinned as known rather than fixed: a partial entry in
+    an end patch interpolates smoothly and then takes
+    `FilterProps::default()` for every key it omitted at the switch,
+    because `merge` replaces a list rather than merging it. Filters have
+    had that since M3 and obscure regions since phase 3c.
+
+- **The two background commands are CORE OPS, not app-side composites**,
+  in a new `core/src/edit_background.rs` (401). The road map calls Add
+  Blurred Background "a composite over existing ops" and its "Where" list
+  names neither `edit.rs` nor a new core module; the argument was run both
+  ways and the collating reader adjudicated it the other way, so it is
+  worth carrying. Four things decided it. **The road map's own recipe
+  cannot be built**: it says "the clip's payload `paste`d onto it", and
+  `clipboardPayload` is `private` and writes no `nests` key, so a blurred
+  background of a nest clip comes back refused — once the recipe has to
+  change, the plan of record's authority on the MECHANISM is spent.
+  **The replacement recipe loses the source window**: re-placing the media
+  with `add_clip` gives the WHOLE media, so the backdrop of a trimmed clip
+  shows different frames from the foreground and drifts out of sync, which
+  is the one thing this feature may not do; repairing it means a
+  `trim_start` and a `trim_end` in Swift over arithmetic the core owns.
+  **`duplicate` is no way out either** — it lands its copy one selection
+  span later on the SAME track, where it can collide with a neighbour, be
+  refused, or silently acquire a cross dissolve for a reason the user
+  never asked about. And **in the core it is `clip.clone()` with six
+  VIDEO fields overwritten** — `scale`, `x`, `y`, `crop`, `filters` and
+  `blend`, the last of them added by the phase's own review — over
+  vocabulary the app lacks: the source's pixel
+  size, `edit_clip.rs`'s new `fill_scale` and the `SCALE_MAX` clamp on it,
+  which Swift's own fill arithmetic does not have and is already wrong
+  past ×10 without. `insert_clip`, `overwrite_clip` and `add_zoom_action`
+  are the standing precedent and they name the rule: **a composite becomes
+  an op when composing it out of existing ops carries a constraint that no
+  single half states**, and frame-exact sync with the source clip is
+  exactly such a constraint.
+
+- **`add_background` is a second op the road map did not name, and Add
+  Background is a SUBMENU rather than one dialog.** The road map has Add
+  Background… making "a canvas-sized rectangle, or the chosen image, on a
+  new track at index 0" and gives no op for it, which would have left the
+  colour plate as app-side clip-building beside a core op that does the
+  same work for the blurred copy. It is one op with three optional
+  arguments instead (`media`, `color`, `duration`), and its no-argument
+  form is exactly what the menu's Solid Color row sends. The menu follows:
+  Solid Color takes no dialog at all — hence no ellipsis — because a plate
+  is re-coloured afterwards in the Shape section's own Fill row, which is
+  also how phase 6b's gradient becomes reachable for a background, since
+  the whole argument for keeping the canvas background a colour is that a
+  full-canvas gradient is a shape clip on the back track. Image… is a
+  standard `NSOpenPanel`, and its two ops go through ONE `applyEdit` list,
+  the app learning the minted media id the way `makeProject(around:)`
+  already does: apply `add_media`, read `snapshot.media.last`, build the
+  second op. Applying the same op to the same base mints the same id every
+  time — `next_id` is a single counter — which is what makes
+  simulate-then-apply sound, and this is the first use of that technique
+  outside `makeProject`.
+
+- **The CORE forces `normal` under a transition, not the renderer.** The
+  metal scout put the rule in the shader, which is where it looks like it
+  belongs. The outgoing half of a dissolve carries a weight correction
+  that is the exact algebraic INVERSE of the fixed-function destination
+  factor its incoming partner is about to apply, so a non-normal blend on
+  either half invalidates it — and `add_clip` onto an overlap gives the
+  new clip a `cross_dissolve` BY DEFAULT, so that wrong picture is a
+  minute away from anyone trying the feature. `recipe.rs::layer` emits
+  `"normal"` for any layer whose `transition` is non-null, for phase 4's
+  `Reveal` argument read again: everything that draws a frame reads one
+  description, so preview, `render_frame` and both export writers cannot
+  disagree — and it is the only version PROVABLE the way this project
+  asks, because a core test can read the layer's `blend` at a tick inside
+  the overlap where the shader's version needs a byte comparison of two
+  PNGs. The consequence is stated out loud in three places, since from
+  either side alone it reads as a bug: **the recipe's `blend` is what
+  DRAWS, and the inspector reads the MODEL's value through `clip_state`**,
+  so during an overlap the popup says `multiply` and the frame composites
+  `normal`. Both are honest — the clip multiplies, and this frame does
+  not.
+
+- **The nest refusal fires on a non-normal MERGED value only.** The road
+  map says `set_video {blend}` on a nest clip is an `Err` naming that, and
+  taken literally that refuses any MENTION of the key — which would fail
+  an all-or-nothing `paste_attributes` of an ordinary look onto a nest
+  clip, over a value that changes nothing, because a paste replaces the
+  video group WHOLE. So `{"blend": "normal"}` on a nest clip is the
+  identity and answers `None`, and one `check_blend` in `edit_props.rs`
+  (not `props_check.rs`, whose stated concern is the vocabulary and which
+  never sees a clip) serves both the patch path and `check_group`, so the
+  two give the identical sentence. The op check is not the whole story:
+  `set_action_end` validates nothing beyond "is it an object", so
+  `clamp_video` gained an `is_nest` argument and forces `BlendMode::Normal`
+  in the evaluator, which closes the recipe, `clip_state` and both export
+  writers at once — something no per-op check can do. A blend on a clip
+  INSIDE a nest is ALLOWED and blends against the canvas below the WHOLE
+  nest. It is the FOURTH item in `nest.rs`'s `Frame` doc, beside the two
+  that were already there — a nest clip's opacity multiplying each inner
+  layer separately, and only the innermost `clip_rect` surviving — and the
+  third, which had been true since M3 with nothing recording it: a nest
+  clip's OWN per-pixel properties reach no layer at all. Spec §5.3 carries
+  the same four.
+
+- **The default plate is WHITE, not black.** The canvas background is
+  already black, so a black rectangle is a command that appears to do
+  nothing — the worst first impression a menu item can make. White is
+  visible, it is the neutral plate, and it is the IDENTITY for `multiply`,
+  which is the mode a person tries first and the one that renders black
+  over the default canvas with nothing under it.
+
+- **`model_text.rs` is the cut `model_props.rs` paid, not the shape
+  vocabulary.** The file stood at 592 against the ~600 cap and phase 6
+  owed it two property families, so it gave something up BEFORE it took
+  anything on — `core/CLAUDE.md`'s rule, and the cut both that file and
+  this road map had named in advance. The text vocabulary went out
+  (`TextProps`, `TextAlign`, `TextVAlign`, `Outline`, `Backdrop`,
+  `TextAnimation`, `TextAnimationKind`), 252 lines, re-exported whole so
+  not one `crate::model::X` or `crate::model_props::X` path changed, and
+  the seam is nameable: text is the one property group the model cannot
+  MEASURE, because only the platform can lay a string out and the size
+  comes back the other way through a cache. The shape vocabulary was the
+  alternative and was refused: it leaves about 27 lines of headroom, and
+  `Gradient` belongs beside the `ShapeProps` that holds it. `model_props.rs`
+  is at **600** with phase 6's additions in it — AT the line, so it takes
+  nothing further without another cut, which is the same warning phase 3
+  handed phase 6.
+
+Beside the deviations, five things the next reader needs and one measured
+number:
+
+- **The shader refactor came first, alone, and the proofs were re-run
+  before the blend uniform existed.** Metal cannot call one `fragment`
+  function from another, so the whole body of `reelcut_layer_fragment`
+  moved into a `static inline layerColorPremultiplied` helper and both
+  entry points forward to it — the plain one returning its colour for the
+  fixed-function stage, `reelcut_layer_blend_fragment` reading the
+  destination through `float4 dst [[color(0)]]` and combining it itself.
+  Both keep the `kGatherFilters` specialization, so there are FOUR layer
+  pipelines and the shadow's quad is the fifth. A 1-LSB drift in the plain
+  path was the phase's second-biggest risk, and landing the refactor by
+  itself is what makes its absence attributable: every `render_frame` byte
+  comparison in phases 1–5 passed before a line of blend code existed.
+- **Blending is DISABLED on the two blend pipelines, and nothing in the
+  toolchain enforces it.** Metal builds a programmable-blend pipeline with
+  fixed-function blending still on — no error, no validation warning, no
+  log — and at alpha 1 the double blend is invisible, because
+  `oneMinusSourceAlpha` is 0. **What decides that is the DESTINATION's
+  alpha and not the layer's, and this phase got it backwards first.** The
+  fragment stage returns the finished composite, whose alpha is
+  `as + ab·(1 - as)`; over an OPAQUE destination that is 1 whatever `as`
+  is, so a half-opacity layer over an opaque backdrop shows nothing either.
+  The check written for the job — a translucent LAYER over an opaque
+  backdrop — therefore **passed against a build with the guard deleted, as
+  did every other check in the script**, because every other fixture puts a
+  full-canvas opaque card underneath and all of them were blind to it too. What catches
+  it is a translucent DESTINATION plus a source that does not cover it:
+  the alpha then reads 223 where it should read 191, while the colour moves
+  by two. `phase6_proof.py`'s section 6b is that check and is the only one
+  in the script that reads the alpha channel. **The mutation run is the
+  only reason any of this is known**, and the script's own `blended`
+  docstring had stated the alpha rule two hundred lines above the check
+  that depended on getting it wrong. The uniform cost was zero bytes:
+  `reserved0` became `blendMode`, the block stays 104 floats / 416 bytes,
+  and the padding tail is TWO floats now rather than three.
+- **`maskState` takes the layer's gather specialization WITHOUT its blend,
+  and it is DEFENSIVE rather than load-bearing — which the mutation run
+  established against every document that had said otherwise, this one
+  included.** The claim everybody made, from the scouting pass through the
+  builder's doc comment to `app/CLAUDE.md`'s rule two, was that a shadow's
+  silhouette pass draws coverage into a texture cleared to transparent
+  black, so a `multiply` over that empty destination is 0 everywhere and a
+  blended layer's shadow silently vanishes. **It does not.** That is true of
+  a naive `src · dst` and false of the premultiplied composite the shader
+  actually runs, whose `(1 - ab)·src` term carries the source through an
+  empty destination untouched: at `ab` = 0 the whole formula reduces to
+  `src` exactly, for all eight modes, `add` included — the same property
+  that lets a corner radius and a nest's clip rectangle work, read from the
+  other side. A build that passes `state` here renders every shadow
+  correctly and fails NOTHING. The separation stays because it costs
+  nothing, because it names what the mask pass means, and because a future
+  formula without that term would make the hazard real; it is not holding a
+  bug back today, and no document should say it is. The shadow's own DRAW
+  stays fixed-function source-over whatever the mode, because a shadow is
+  light falling on the backdrop and not the layer's ink; and the REFLECTION
+  goes the other way and inherits the blend, since it is part of the layer. All three are written into `encodeShadow`'s and
+  `encodeReflection`'s docs.
+- **The compositor blends in the ENCODED sRGB space, deliberately**, and
+  the sentence stands in three places — `Compositor.metal`'s
+  order-of-operations comment, `phase6_proof.py`'s docstring and spec
+  §7.5 — because it is the one thing about this compositor a competent
+  reader will try to "fix". Nothing in the pipeline uses an `_srgb`
+  format, so every stage works on stored 8-bit values and so does the
+  blend; "multiply of 50 % grey over 50 % grey is 25 %" is a statement
+  about ENCODED values and is false in linear light, where the answer is
+  about **61**/255 — three steps below the 64 the encoded multiply gives
+  (60.95 against 64.25 unrounded), which is three times the ±1/255 every
+  blend check allows itself, so the two readings cannot both pass. Getting
+  that number wrong in one copy of a sentence declared to stand in three is
+  its own warning: the sentence exists to stop a reader "fixing" the
+  shader, and a reader who checks the arithmetic and finds it off stops
+  believing the sentence. Wrapping the blend in a linearise/encode pair
+  would change every blended pixel, break the proof's measured numbers and
+  make the compositor disagree with itself, since the grade, the filters
+  and the transitions have all worked in encoded space since M1.
+- **A gradient is painted by CLIPPING to the path**, not through a
+  transparency layer — and the measurement under that decision is the
+  scout's re-taken, because the scout's did not hold. A one-colour opaque
+  gradient is byte-identical to `fillPath()` wherever a pixel is FULLY
+  COVERED — a rectangle on integral bounds, at 0°, 45°, 137° and radial
+  alike, not one component differing — and within one LSB wherever it is
+  not: 200 of a 64 × 64 ellipse's 4096 pixels, every one of them on the
+  antialiased edge and none of them opaque, plus every pixel of a
+  translucent plate, plus every pixel of a colour 8 bits cannot hold,
+  because `CGGradient` DITHERS. The clause that did not survive is "the
+  antialiased edge included"; the CONCLUSION does, and it is the one the
+  decision rests on — a transparency layer buys a full-size buffer and a
+  rounding step of its own and would not close that last LSB either. The
+  consequence for a later phase is stated where it lands
+  (`LayerRenderers.paint`'s doc): a proof that wants a BYTE comparison out
+  of a gradient has to ask it of a rectangle on integral bounds in a colour
+  of the form k/255, which is what G1 asks and why every fill in that
+  fixture is one. A linear ramp projects the box onto its direction, so the
+  end stops land exactly on the box's edges at EVERY angle; a radial one is
+  the inscribed ellipse for both area kinds; the stroke keeps
+  `stroke.color`, since a stop's opacity is its own alpha and the swatch
+  panel already edits it; and the texture key needed nothing, because
+  `recipe.rs`'s `Source::Shape` arm hashes `json(&shape)` WHOLE and the
+  gradient rides inside it — the phase-4 text lesson arriving already
+  answered, and still proved by measurement rather than by reading.
+- **What a blend costs**, measured on the same layer and the same way M3's
+  effect costs were: against a baseline reproducing at 0.293–0.295 ms,
+  `add` 0.02 ms, `multiply`, `darken` and `difference` 0.07, `screen`
+  0.08, `overlay` 0.09. Most of that is the FORMULA and not the tile read —
+  the same blend pipeline asked for `normal`, which reads the destination
+  and takes the early return, costs 0.02, exactly what `add` costs, and
+  `add` skips the divisions too. So a destination read is 0.02 ms and the
+  un-premultiply pair plus the mode is the other 0.05, which is worth
+  knowing before anyone tries to save a reciprocal by assuming an opaque
+  destination.
+
+Two size payments and one sweep, none of them the phase's feature and all
+of them its work:
+
+- **`LayerRenderers.swift` paid before it took the gradient on**, like
+  `model_props.rs`: 845 lines, with the text machinery — the layout
+  caches, the attributed string and the three reveals — out to a new
+  `LayerRenderersText.swift` (577), leaving 467 with the gradient already
+  in it. **The two background handlers went into a new
+  `AgentServer+Background.swift` (89)** rather than into
+  `AgentServer+Clips.swift`, which is long over any cap and grew this
+  phase anyway, to 1170, for the gradient reader and the two new enum
+  checks.
+- **The version sweep has a trap, and it is one bump older than this
+  phase.** `{"version": 6}` was the tree's "too new, refuse" fixture in
+  `schema_v3.rs` and `model_tests.rs`; the moment `RC_FORMAT_VERSION`
+  reached 6 those three tests stopped testing the gate and started
+  testing that a current file opens. They are at **7** now, and the
+  comment beside each says "one past the current version" rather than
+  naming a number, so the next bump does not have to rediscover it. Two
+  other sites were not substitutions either: `schema_v3.rs`'s gate
+  hard-codes both numbers inside a literal message string, and
+  `schema_v4.rs` asserted BY LITERAL TEXT that `obscure` closes the video
+  object, which appending `blend` falsifies by design — that assertion
+  moved to the pair rather than being deleted, because what it is really
+  pinning is that a new key lands at the END, which is what the whole
+  append-only rule rests on. The same correction was made in
+  `tools/proof/phase3_proof.py`.
+- **One correction to this phase's own contract, found by the builder who
+  wrote the shader.** Its check B2 — "overlay with a base of 64, expecting
+  96" — is exact only for a **192** source (2 × 0.753 × 0.251 = 0.378 →
+  96); a 128 source over a 64 base gives 64, which is arithmetically right
+  and a WEAK check, because 64 is also what an unblended backdrop reads.
+  The fixture is 192 over 64.
+
+- **The inspector says what the trap is, and only when it is live.** Every
+  mode but `normal` is a function of two colours, so a layer with nothing
+  behind it over the default black canvas either reads black (`multiply`,
+  `darken`, `overlay` all collapse against 0) or changes nothing at all
+  (`screen`, `add`, `lighten`, `difference` are the identity against 0) —
+  and neither looks like a mode that is working. The Transform section's
+  note is COMPUTED: it appears only when the canvas background really is
+  black and nothing visible really is behind the clip, and it names which
+  of the two failures is on screen. The popup's tooltip carries the whole
+  of it and the answer, which is Clip ▸ Add Background. The action note
+  still outranks it — where an edit LANDS matters more than what it looks
+  like — and `blend` is an ORDINARY animatable key, deliberately not one
+  `structural` pulls out: `structural`'s own doc already settles the
+  identical case for a filter's `kind`, and that function stays about
+  LENGTH alone.
+
+**Proved** on 2026-09-08. Core: `make test` **436 passed / 0 failed** — 368
+before, plus 17 in a new `core/tests/schema_v6.rs`, 41 in a new
+`core/tests/background.rs` (34 at the landing and 7 more from the review —
+one per behavioural fix, each mutation-checked), 6 in `evaluate_tests.rs`
+(the recipe's `blend`, the transition rule frame by frame, a nest clip
+evaluating to `normal` however the blend got there, and that a `shape` end
+patch is STORED and INERT, which is the claim two documents had wrong) and 4
+in `schema_v2.rs` — which is where 6d's
+tests go, under that file's existing `// ---- interpolation ----` banner and
+NOT in `schema_v6.rs`, because the filter list is version 2's feature and
+`schema_v6.rs` has to stay honest about the two keys version 6 actually
+adds. `make lint` and `cargo fmt --check` clean, `make typecheck` 0 errors
+and the same 4 AVFoundation deprecation warnings, `make app` building, the
+catalog at **73 tools** (55 ops plus the eighteen app-state tools) and the
+startup parity log EMPTY.
+
+Phases 1–5 re-ran unchanged at `phase1_proof.py` **66/66**,
+`phase2_proof.py` **85/85**, `phase2_chrome.py` **26/26**,
+`phase3_proof.py` **121/121**, `phase3_silence_scope.py` **8/8**,
+`phase3_chrome.py` **33/33**, `phase4_proof.py` **84/84**,
+`phase4_chrome.py` **59/59**, `phase5_proof.py` **88/88** and
+`phase5_chrome.py` **81/81** — and the one worth naming is the first
+group, because **every `render_frame` byte comparison in them passed after
+the fragment stage was refactored into a shared `static inline` helper**,
+which is what says the plain layer path did not drift by a bit. That is
+attributable only because the refactor landed ALONE and the proofs were
+re-run before the blend uniform existed. Four of those ten scripts changed
+in this phase and none of them by a check: nine `RC_FORMAT_VERSION`
+assertions went 5 → 6, `phase3_proof.py`'s "obscure is the LAST key of
+every video object" became "obscure, then blend" (falsified BY DESIGN, and
+what it pins is that a new key lands at the END), and `phase5_proof.py`'s
+exact tool count became a floor, exactly as phase 4 handed it to phase 5.
+
+The phase's own scripts go beside them — `tools/proof/phase6_proof.py`
+over MCP at **167/167** and `tools/proof/phase6_chrome.py` offscreen at
+**70/70**. They split where the phase does, and the split is sharper here
+than anywhere: **phase 6's two features are PIXELS**, and the offscreen
+harness can photograph neither, because `build.sh` never compiles
+`Compositor.metal` and the preview well renders black with no drawable. So
+every claim about a blend or a gradient is the MCP script's, and what is
+left offscreen is the chrome around them — which is not a small half: the
+Blend row's position by arithmetic over the layout constants, the computed
+note appearing and being suppressed by each of the four things that should
+and should not, the Gradient section's height per stop, the 0.42 disabled
+alpha SOLVED twice out of two different aligned pairs rather than read off
+a token, and — through a probe it compiles for the purpose, because a menu
+is never drawn into a window — the two Clip-menu items, the submenu's two
+rows, the absence of a key equivalent and the validator's answers over four
+selections.
+
+What the MCP script claims, and the three decisions inside it worth
+carrying: **the fixture is scored, not assumed** (a canvas at exactly
+128/255 grey read back as 128, then 64 and 192, so a drifting pipeline
+fails by NAME and the blend checks are not blamed for it — there is no
+headroom left in the ±1/255 tolerance, since `round(128 × 128 / 255)` is 64
+against 63.75); **every blend expectation is written twice**, once as the
+formula over the two MEASURED card bytes and once as the road map's literal
+64 / 192 / 255, so a wrong formula fails both and a drifted fixture fails
+only the second; and **the fixture is SHAPE CLIPS**, two full-canvas cards
+on two tracks with no media at all, which is what `video.blend` belonging
+to the layer rather than to a source kind buys. One of its checks exists because of one
+line of Swift and nothing else would notice it: a blended layer over a
+TRANSLUCENT destination (section 6b), which is the only fixture in the
+script that fails when the blend pipelines are built with fixed-function
+blending left enabled. The two checks that were WRITTEN for that job and
+cannot do it are recorded above, because both survived their mutant: the
+partial-opacity one, which is blind because an opaque destination forces
+the composite's alpha to 1; and the SHADOW one, which is blind because a
+blend over the cleared mask reduces to the source exactly. Overlay is measured at **192 over 64 expecting 96**, not at 128
+over 128: at 128 the branch condition sits on the knife edge (128/255 =
+0.50196 takes the screen half and gives 128.498, rounding either way
+depending on where the comparison is written), and 96 is a number an
+unblended backdrop cannot produce where 64 is. And 6c's audio is a
+**sample-for-sample PCM comparison**, planned from the start, because the
+road map's own check for it — "byte-identical to the same ops applied by
+hand" — passes with the bug present on BOTH sides: a blurred copy that kept
+its audio is inaudible in a still frame and doubles the recording in the
+mix.
+
+**The mutants, and what they found.** Seven were run against the built
+binary, each as a real `make app` and a fresh process — and the harness
+itself had to be fixed first, which is the finding worth carrying forward:
+the proof drives a RUNNING app, so a mutant that rebuilds without
+restarting the process scores exactly what the clean build scored. The
+first run reported a CLEAN SWEEP for a build with `u.blendMode` deleted.
+**A mutation harness that does not restart the app gives a false all-clear
+on every mutant it runs.**
+
+| mutant | verdict |
+|---|---|
+| `u.blendMode` never written | 28 checks fail |
+| the core's transition-forces-normal rule deleted | 2 fail — the two overlap comparisons, with the two "the MODEL still says `multiply`" lines staying green, which is what tells this from a model-side mutant |
+| the gradient dropped from the shape texture cache key | 11 fail |
+| `add_background`'s default plate turned black | 2 fail |
+| `enabled.audio` left TRUE on the blurred copy | 6 fail — **after** the script was fixed; see below |
+| fixed-function blending left ENABLED on the blend pipelines | **SURVIVED every check** — the hole was the proof's, not the build's; section 6b is the answer |
+| `maskState` left as `state` | **SURVIVED every check** — not a hole; the claim was wrong |
+
+**A verdict here is named checks and never a fraction**, and that rule was
+bought rather than assumed. The two survivors were measured against two
+DIFFERENT lengths of `phase6_proof.py` — 160 checks when the blending guard
+was run, 163 once section 6b had answered it, 164 as the phase closed — so
+the two fractions this table carried while it was being written were both
+stale before anyone read them, and a next session running the script would
+have found four checks it could not account for. Against the script as it
+stands the blending mutant fails section 6b's two ALPHA checks and nothing
+else (measured on the mutant: the alpha reads 223 where it must read 191,
+while the colour moves by two), and the `maskState` mutant fails nothing at
+all. `phase6_proof.py`'s own 6b comment states the rule where the next
+reader of a mutant verdict will hit it.
+
+Three things came out of it that reading could not have produced. The two
+survivors are written up above. The third: **`enabled.audio` was detected
+as a TRACEBACK rather than as a failing check.** The section switches the
+copy's audio back on to show its own identity is not a tautology, and under
+that mutant the switch is already on, so the core answers "made no change"
+and the client raises — aborting the script with every later section unrun.
+It asserts the switch is off first now and tolerates the identity. A proof
+that crashes on the bug it is hunting reports less than one that scores.
+
+Two mutants were themselves wrong before they were right, which is worth
+saying because a bad mutant reads exactly like a weak check. Enabling
+fixed-function blending by setting `isBlendingEnabled = true` is a NO-OP:
+the line sits above `guard blending else { return descriptor }`, so the
+four factors are still skipped, and Metal's defaults are `one`/`zero` —
+the identity. And the first version of section 6b landed exactly on a
+rounding boundary (`127.5 + ab·255/2` is a half for an even backdrop byte),
+which is the hazard this script's own docstring warns about for the colour
+channels; it is within one now, which costs nothing when the value being
+excluded is thirty-two away.
+
+Still owed by a person at the machine — the half no headless run reaches:
+(1) that a blend mode looks like the mode it names on real footage rather
+than on flat cards, which is a judgement about pictures and not about
+bytes; (2) that a gradient's ramp is smooth on screen rather than banded,
+which an 8-bit canvas can genuinely get wrong and no per-column
+monotonicity check would catch; and (3) that Add Blurred Background reads
+as the screencast look it exists for — the right blur at the right scale —
+which is taste, and the one number in it (`filters: [{blur, 1.0}]`) is a
+default somebody should sit with before it is treated as settled.
+
 ---
 
 ### Phase 7 — Output
@@ -2198,9 +2689,20 @@ deliberately — a command reachable from a pane alone can be lost (Add
 Shape's lesson), and a menu item is what gives the `normalize_clip`
 mirror a UI path to name.
 
-Still to come: Clip gains Add Background…, Add Blurred
-Background, Open / Close Nest; File gains Save Frame…; View gains Preview
-Quality ▸ and Preview Window; Window gains Export Queue.
+**Landed in phase 6**: Clip ▸ Add Background ▸ (Solid Color · Image…) and
+Clip ▸ Add Blurred Background, in a group of their own after the Transition
+submenu because neither edits the selection — both put a clip on a new
+back-most track. Add Background is a SUBMENU rather than the road map's one
+dialog: its two rows are two commands and not two settings of one, since
+Solid Color takes no dialog at all (hence no ellipsis) and is re-coloured
+afterwards in the Shape section's Fill row, which is also how a full-canvas
+gradient is reached, while Image… is a standard open panel. Neither takes a
+key equivalent, for the reason phases 4 and 5 record: every bare letter
+belongs to the editor's own `keyDown`, and a modifier-less menu key is
+resolved ahead of the first responder.
+
+Still to come: Clip gains Open / Close Nest; File gains Save Frame…; View
+gains Preview Quality ▸ and Preview Window; Window gains Export Queue.
 
 ## 4. Considered and left out
 

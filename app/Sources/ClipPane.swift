@@ -112,7 +112,9 @@ final class ClipPane: InspectorPaneView {
         if shapePane.allShape {
             sections.append(contentsOf: [
                 shapePane.shapeSection(), shapePane.strokeSection(), shapePane.fillSection(),
-                shapePane.arrowSection(),
+                // Immediately after Fill, because a gradient REPLACES a fill
+                // when it is set and the two rows are read together.
+                shapePane.gradientSection(), shapePane.arrowSection(),
             ])
         }
         // `allSourcePixels` asks about the SOURCE KIND, so it says yes to an

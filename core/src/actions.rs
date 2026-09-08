@@ -28,8 +28,8 @@ use serde_json::{Map, Number, Value};
 
 use crate::audio::MAX_GAIN;
 use crate::model::{
-    Action, AudioProps, Clip, Curve, Project, ShapeProps, TextProps, VideoProps, MAX_FILTERS,
-    MAX_OBSCURE,
+    Action, AudioProps, BlendMode, Clip, Curve, Project, ShapeProps, Source, TextProps, VideoProps,
+    MAX_FILTERS, MAX_OBSCURE,
 };
 use crate::props_check::{
     COMPRESSOR_MAKEUP_MAX_DB, COMPRESSOR_RATIO_MAX, COMPRESSOR_THRESHOLD_MIN_DB, SCALE_MAX,
@@ -337,7 +337,10 @@ fn finite_or(value: f64, neutral: f64) -> f64 {
     }
 }
 
-fn clamp_video(mut props: VideoProps) -> VideoProps {
+/// `is_nest` is what a NEST clip's evaluated props are held to, and it is
+/// the only thing here that is not a range: a nest cannot blend (format
+/// version 6), and this is where that holds for good.
+fn clamp_video(mut props: VideoProps, is_nest: bool) -> VideoProps {
     props.x = finite_or(props.x, 0.0);
     props.y = finite_or(props.y, 0.0);
     props.scale = bounded(props.scale, SCALE_MIN, SCALE_MAX, 1.0);
@@ -413,6 +416,21 @@ fn clamp_video(mut props: VideoProps) -> VideoProps {
         // a filter's 0 is. An amount that arrived as a NaN and resolved to
         // "hides nothing" would quietly publish the face it was drawn over.
         region.amount = bounded(region.amount, 0.0, 1.0, 1.0);
+    }
+    // The nest rule, closed here rather than only at the op. `set_video`
+    // refuses a blend on a nest clip by name (`edit_props.rs`'s
+    // `check_blend`), but an action's `end` patch validates nothing beyond
+    // "is it an object", so `set_action_end {"video": {"blend": "multiply"}}`
+    // would otherwise sail past every check the op path has and reach the
+    // uniform block anyway. Forcing it in the evaluator closes the recipe,
+    // `clip_state` and both export writers at once, which no per-op check
+    // can — this is the ONE place an evaluated value is produced.
+    //
+    // Why a nest cannot blend at all is `check_blend`'s doc: a nest is
+    // flattened into one layer per clip inside it, so there is no composite
+    // of its own for a blend to combine with the canvas.
+    if is_nest {
+        props.blend = BlendMode::Normal;
     }
     props
 }
@@ -506,7 +524,10 @@ impl Project {
         });
 
         Evaluated {
-            video: clamp_video(evaluated_video),
+            // The clip is in hand here, so the one non-range bound
+            // `clamp_video` applies — a nest may not blend — is decided from
+            // the source rather than guessed from the props.
+            video: clamp_video(evaluated_video, matches!(clip.source, Source::Nest { .. })),
             audio: clamp_audio(evaluated_audio),
             text: evaluated_text,
             // Shapes are not animatable in version 1: the §5.4 patch is a

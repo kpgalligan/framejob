@@ -16,6 +16,7 @@ pub mod agent;
 pub mod audio;
 pub mod edit;
 pub mod edit_action;
+pub mod edit_background;
 pub mod edit_clip;
 pub mod edit_edge;
 pub mod edit_insert;
@@ -38,6 +39,7 @@ pub mod model;
 pub mod model_props;
 pub mod model_query;
 pub mod model_regions;
+pub mod model_text;
 pub mod nest;
 pub mod props_check;
 pub mod recipe;
@@ -54,11 +56,12 @@ pub use crate::format::{
     MAX_CLIPS, MAX_MARKERS, MAX_MEDIA, MAX_NEST_DEPTH, MAX_TRACKS, RC_FORMAT_VERSION,
 };
 pub use crate::model::{
-    Action, AudioProps, Backdrop, Canvas, Chroma, Clip, Color, ColorAdjust, Compressor, Crop,
-    Curve, Duck, Enabled, Filter, FilterKind, Marker, Media, MediaKind, Nest, ObscureKind,
-    ObscureRegion, Outline, Project, Reflection, Shadow, ShapeKind, ShapeProps, Source, SpotShape,
-    Spotlight, Stroke, TextAlign, TextAnimation, TextAnimationKind, TextProps, TextVAlign, Track,
-    Transition, TransitionKind, VideoProps, MAX_FILTERS, MAX_OBSCURE,
+    Action, AudioProps, Backdrop, BlendMode, Canvas, Chroma, Clip, Color, ColorAdjust, Compressor,
+    Crop, Curve, Duck, Enabled, Filter, FilterKind, Gradient, GradientKind, GradientStop, Marker,
+    Media, MediaKind, Nest, ObscureKind, ObscureRegion, Outline, Project, Reflection, Shadow,
+    ShapeKind, ShapeProps, Source, SpotShape, Spotlight, Stroke, TextAlign, TextAnimation,
+    TextAnimationKind, TextProps, TextVAlign, Track, Transition, TransitionKind, VideoProps,
+    MAX_FILTERS, MAX_GRADIENT_STOPS, MAX_OBSCURE,
 };
 pub use crate::time::{Fps, Ticks, TIMESCALE};
 pub use crate::transition::Overlap;

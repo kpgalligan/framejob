@@ -19,7 +19,7 @@ extension AgentServer {
     /// edit it did not.
     static let videoPatchKeys: Set<String> = [
         "x", "y", "scale", "rotation", "opacity", "crop", "corner_radius", "shadow", "color",
-        "chroma", "filters", "reflection", "spotlight", "obscure",
+        "chroma", "filters", "reflection", "spotlight", "obscure", "blend",
     ]
     static let audioPatchKeys: Set<String> = [
         "volume", "muted", "fade_in", "fade_out", "duck", "mono", "keep_pitch", "pan",
@@ -31,7 +31,7 @@ extension AgentServer {
     ]
     static let shapePatchKeys: Set<String> = [
         "kind", "width", "height", "stroke", "fill", "arrow_start", "arrow_end", "radius",
-        "from", "to",
+        "from", "to", "gradient",
     ]
     /// The fifth patch's two keys: a clip's own name and its label
     /// (`ClipPatch`, spec §5.2's `name` and `label`).
@@ -525,7 +525,8 @@ extension AgentServer {
         return try editResult(document, "Video Properties", [.setVideo(clips: clips, patch: patch)])
     }
 
-    /// The four string ENUMS a video patch can carry, checked by hand.
+    /// The five string ENUMS a video patch can carry, checked by hand, plus
+    /// the one PARTIAL entry the decoder cannot report.
     ///
     /// `patchArg`'s round-trip test catches a value the patch could not read,
     /// but only at the top level, and its own doc says why it cannot recurse:
@@ -541,16 +542,63 @@ extension AgentServer {
     ///
     /// So the closed sets are checked here, against the enums themselves —
     /// no new list to fall out of step with, and the refusal names the value.
+    ///
+    /// **A filter entry is checked for COMPLETENESS as well**, and it is the
+    /// same defect one step further on. `{"filters": [{"amount": 1.0}]}` is the
+    /// core's own documented idiom for "the same filter, more of it" — an end
+    /// patch's entries are merged over the base ones — and it is the most
+    /// natural thing an agent will write. Over MCP it cannot work: `FilterProps`
+    /// has no optionals, so the decoder fills the missing `kind` with `blur`,
+    /// a `sepia` base animates and then switches to a blur, and the caller is
+    /// told it worked (measured). Two lines refusing the partial entry by index
+    /// are worth more than a wrong picture reported as success, and there is no
+    /// second reading of it: the key is either there or it is not.
     private static func checkVideoEnums(_ object: [String: Any], _ path: String) throws {
         if let filters = object["filters"] as? [[String: Any]] {
             let known = FilterKind.allCases.map { $0.rawValue }
             for (i, filter) in filters.enumerated() {
-                guard let kind = filter["kind"] else { continue }
+                guard let kind = filter["kind"], let amount = filter["amount"],
+                    !(kind is NSNull), !(amount is NSNull)
+                else {
+                    throw ToolError(
+                        message: "\(path).filters[\(i)] must name both kind and amount. An "
+                            + "entry missing either is COMPLETED from the defaults (a blur at "
+                            + "half strength) rather than merged over the filter already "
+                            + "there, so the one that lands is not the one you meant.")
+                }
                 guard let name = kind as? String, FilterKind(rawValue: name) != nil else {
                     throw ToolError(
                         message: "\(path).filters[\(i)].kind is not a filter — it must "
                             + "be one of " + known.joined(separator: ", ") + ".")
                 }
+            }
+        }
+        // `video.blend` (format version 6). A top-level key rather than a
+        // nested one, so — unlike the four above — `patchArg`'s round trip
+        // DOES catch a misspelling here: `VideoPatch.blend` is a single
+        // optional read through the fallback-less `lenient` (`ReelCore.swift`
+        // argues that pairing at length), so `"muliply"` decodes to nil,
+        // exactly as an absent key does, the without-the-key decode comes back
+        // equal, and `set_video` refuses `patch.blend` by name before this
+        // function is ever called.
+        //
+        // The arm is still load-bearing, at the two doors that round trip does
+        // not reach. `set_action_end` is the first: `checkActionPatch` runs
+        // ahead of `patchArg` there, and even afterwards the top-level round
+        // trip cannot see inside a group — `ActionPatch(video: VideoPatch())`
+        // is not equal to `ActionPatch(video: nil)`, so a video group holding
+        // nothing but a misspelt key survives it and would go to the core as
+        // `{"video": {}}`. An explicit `{"blend": null}` is the second:
+        // `patchArg`'s loop exempts nulls by design, so this is what answers
+        // one — and refusing it is right, because `blend` has no null form at
+        // all (`normal` is how a blend is cleared) and a caller who wrote one
+        // meant something the key cannot mean.
+        if let blend = object["blend"] {
+            let known = BlendMode.allCases.map { $0.rawValue }
+            guard let name = blend as? String, BlendMode(rawValue: name) != nil else {
+                throw ToolError(
+                    message: "\(path).blend is not a blend mode — it must be one of "
+                        + known.joined(separator: ", ") + ".")
             }
         }
         if let spotlight = object["spotlight"] as? [String: Any], let shape = spotlight["shape"] {
@@ -1012,7 +1060,106 @@ extension AgentServer {
         }
         patch.from = try unitPoint(object, "from")
         patch.to = try unitPoint(object, "to")
+        patch.gradient = try gradientArg(object, "gradient")
         return patch
+    }
+
+    /// `shape.gradient` (format version 6), three-state like `stroke`: absent
+    /// leaves the fill alone, null clears the gradient and brings the flat
+    /// `fill` back out from under it, an object sets it.
+    ///
+    /// **Hand-read, and that buys something no other nested object in a patch
+    /// has.** `withOpaqueColors` — the helper that fills in a three-component
+    /// colour's alpha for every other patch — recurses into nested
+    /// DICTIONARIES but not into arrays of them, so a stop written
+    /// `{"at": 0, "color": [0, 0, 0]}` would reach serde as a three-element
+    /// array and come back "invalid length 3", naming neither the key nor the
+    /// patch. Widening that helper is the wrong fix: it sits on every patch
+    /// shape and would change behaviour well outside this feature. It never
+    /// sees this object anyway, because `ShapePatch` is the one patch built by
+    /// hand rather than decoded — so the stops are read here, by name, taking
+    /// three or four components exactly as `colorArg` does.
+    ///
+    /// The win worth writing down: because the reader is hand-built, a
+    /// MISSPELT key inside `gradient` is refused BY NAME. `shadow` (since M3),
+    /// `chroma`, an `obscure` region and `animation` cannot manage that — they
+    /// go through the generic decoder, which drops the unknown key silently
+    /// and sends every key the caller omitted as its own default. `gradient`
+    /// is the first nested object in a patch that names its own mistakes. It
+    /// is still a REPLACEMENT rather than a merge, like all of them, so a
+    /// caller sends every key it wants.
+    ///
+    /// What is NOT decided here is the RANGE of anything: the stop count, the
+    /// 0–1 range of `at` and the finiteness of `angle` are `props_check.rs`'s,
+    /// and its messages name the field the same way this one does. (A colour
+    /// component is the exception in the other direction — `colorArg` clamps
+    /// it to 0–1 before the core ever sees it, exactly as it does for every
+    /// other colour argument in the app.) `kind` is checked here because a
+    /// lenient decode would turn an unknown geometry into `linear` and report
+    /// success — the same hole `checkVideoEnums` closes for a filter.
+    private func gradientArg(_ object: [String: Any], _ key: String) throws -> Gradient?? {
+        guard let raw = object[key] else { return nil }
+        if raw is NSNull { return .some(nil) }
+        guard let gradient = raw as? [String: Any] else {
+            throw ToolError(
+                message: "\(key) must be null or {\"kind\": \"linear\", \"stops\": "
+                    + "[{\"at\": 0, \"color\": [r, g, b, a]}, …], \"angle\": 0}.")
+        }
+        let allowed: Set<String> = ["kind", "stops", "angle"]
+        let unknown = gradient.keys.filter { !allowed.contains($0) }.sorted()
+        if let first = unknown.first {
+            throw ToolError(
+                message: "Unknown \(key) key \"\(first)\" — allowed keys are "
+                    + allowed.sorted().joined(separator: ", ") + ".")
+        }
+        var kind = Gradient().kind
+        if let name = try stringArg(gradient, "kind") {
+            guard let read = GradientKind(rawValue: name) else {
+                throw ToolError(
+                    message: "\(key).kind must be one of "
+                        + GradientKind.allCases.map { $0.rawValue }.joined(separator: ", ")
+                        + " (got \"\(name)\").")
+            }
+            kind = read
+        }
+        // Every key defaults, the way the core's `#[serde(default)]` on the
+        // container and on a stop makes them default, so `{"gradient": {}}`
+        // means here exactly what it means in a hand-written op: the type's
+        // own default, black to white, left to right. That is the feature's
+        // first impression and it must not depend on which door it came
+        // through.
+        var stops = Gradient.defaultStops
+        if let raw = gradient["stops"] {
+            guard let entries = raw as? [Any] else {
+                throw ToolError(
+                    message: "\(key).stops must be an array of {\"at\": 0–1, \"color\": "
+                        + "[r, g, b, a]} — two or more of them, since one stop is a flat "
+                        + "colour and fill already spells that.")
+            }
+            stops = []
+            for (i, entry) in entries.enumerated() {
+                guard let stop = entry as? [String: Any] else {
+                    throw ToolError(
+                        message: "\(key).stops[\(i)] must be {\"at\": 0–1, \"color\": "
+                            + "[r, g, b, a]}.")
+                }
+                let stopKeys: Set<String> = ["at", "color"]
+                if let first = stop.keys.filter({ !stopKeys.contains($0) }).sorted().first {
+                    throw ToolError(
+                        message: "Unknown \(key).stops[\(i)] key \"\(first)\" — allowed keys "
+                            + "are at, color.")
+                }
+                let fallback = GradientStop()
+                stops.append(
+                    GradientStop(
+                        at: try doubleArg(stop, "at") ?? fallback.at,
+                        color: try colorArg(stop, "color") ?? fallback.color))
+            }
+        }
+        return .some(
+            Gradient(
+                kind: kind, stops: stops,
+                angle: try doubleArg(gradient, "angle") ?? Gradient().angle))
     }
 
     /// A `from` / `to` endpoint: unit coordinates in the shape's box, for

@@ -268,8 +268,23 @@ a source that has pixels of its own — Crop, Corner radius, Colour and
 Chroma key — or to a media source, which is Speed.
 
 - *Transform*: Scale % (1–1000), Position X / Y in canvas pixels (origin
-  at canvas center, X right, Y down), Rotation °, Opacity %. Buttons:
-  Fit to canvas, Fill canvas.
+  at canvas center, X right, Y down), Rotation °, Opacity %, and — format
+  version 6 — **Blend**, a popup over the eight modes of §5.2's
+  `video.blend`, beside Opacity because the two are the same question
+  about how this layer meets what is under it. Buttons: Fit to canvas,
+  Fill canvas. The one trap the feature has is answered in place rather
+  than in a manual: every mode but `normal` is a function of TWO colours,
+  so a layer with nothing behind it over the default black canvas either
+  reads black (`multiply`, `darken`, `overlay` all collapse against 0) or
+  changes nothing at all (`screen`, `add`, `lighten`, `difference` are the
+  identity against 0). The section's note is COMPUTED — it appears only
+  when there really is no visible layer behind the clip and the canvas
+  background really is black, and it names which of the two failures is on
+  screen — and the popup's tooltip carries the whole of it and the answer,
+  which is Clip ▸ Add Background. `blend` is an ORDINARY animatable key,
+  deliberately not one the list rule's structural exception pulls out: a
+  discrete value inside an action holds and switches at the end, which is
+  what §5.4 says a discrete value does.
 - *Crop*: left / top / right / bottom in source pixels; a "Crop on
   canvas" button enters crop mode.
 - *Corner radius* px, applied to the cropped rectangle before rotation.
@@ -407,6 +422,15 @@ is enabled.
 - Kind: rectangle, rounded rectangle, ellipse, line, arrow. Stroke width
   and color, fill color and opacity, arrowheads at start / end, corner
   radius, Shadow.
+- Format version 6: *Gradient* — a Kind popup (Linear, Radial), an Angle
+  row disabled for Radial, the stop list as an at-and-colour row apiece
+  with Add and Remove, and a Reset that sends `{"gradient": null}` and so
+  brings the flat fill back. Every row is DISABLED for `line` and `arrow`,
+  which have no area to fill and keep their stroke colour — the field is
+  still stored and range-checked on them (§5.2), exactly as `radius` is on
+  every kind. Every key of `gradient` is re-sent on every write, because a
+  patch of a nested object is a REPLACEMENT (§5.2) and a key left out
+  comes back as its default.
 - M3: *Spotlight* — which darkens the canvas outside a rectangle or
   ellipse, with an optional 1.2–2× zoom of the region — is a
   `video.spotlight` prop and appears in the **Video** pane, not here.
@@ -624,7 +648,7 @@ grid (`rc_time_snap_to_frame`, round-to-nearest); sources keep their own
 rate and AVFoundation picks the source frame. Frame rates are rationals
 `[num, den]` everywhere.
 
-### 5.2 Project — the JSON schema (format version 5)
+### 5.2 Project — the JSON schema (format version 6)
 
 The Rust value, serialized by serde. Small, no pixels. All times are
 ticks, all positions canvas pixels, colors `[r, g, b, a]` floats 0–1,
@@ -632,7 +656,7 @@ angles degrees, opacity/volume 0–1 (volume may exceed 1, up to 4).
 
 ```json
 {
-  "version": 5,
+  "version": 6,
   "canvas": { "width": 1920, "height": 1080, "fps": [30, 1],
               "background": [0, 0, 0, 1], "fit_new_clips": true,
               "timecode_frames": true },
@@ -658,7 +682,7 @@ angles degrees, opacity/volume 0–1 (volume may exceed 1, up to 4).
                  "color": { "brightness": 0, "contrast": 0, "saturation": 0, "hue": 0 },
                  "chroma": null,
                  "filters": [], "reflection": null, "spotlight": null,
-                 "obscure": [] },
+                 "obscure": [], "blend": "normal" },
       "audio": { "volume": 1.0, "muted": false, "fade_in": 0, "fade_out": 0,
                  "duck": null, "mono": false, "keep_pitch": true,
                  "pan": 0, "compressor": null, "noise_reduction": 0 },
@@ -739,6 +763,25 @@ angles degrees, opacity/volume 0–1 (volume may exceed 1, up to 4).
   make a frame less hidden, and a region at `amount` 0 is there and changes
   nothing. Written through `set_video` like any other video
   property — there is no obscure op.
+- `video.blend` (format version 6): how this layer COMBINES with what is
+  already on the canvas — `normal`, `multiply`, `screen`, `add`,
+  `overlay`, `darken`, `lighten`, `difference`, a closed vocabulary
+  refused by serde on the way in. `normal` is source-over and the default,
+  which is what every project drew before the key existed, so an absent
+  key, a zeroed uniform block and a recipe from an older core all mean the
+  same picture. **The declaration order in `model_props.rs` is a
+  contract** — it is the shader discriminant, as `ObscureKind`'s is, and
+  `normal` is 0 with no `+1` offset, because a layer has exactly one blend
+  mode and there is no empty slot to reserve. A mode may be added at the
+  end; the eight may not be reordered. It belongs to the LAYER and not to
+  a source kind: media, image, still, text and shape all draw through one
+  fragment stage, so all five blend. Two rules are not in the schema and
+  are stated where they hold — a clip mid-TRANSITION always draws
+  `normal`, which the CORE forces into the recipe (§7.3), and a NEST clip
+  may not carry a blend at all, which is an op's refusal
+  (`edit_props.rs`'s `check_blend`) rather than a vocabulary one, since
+  the value is legal and it is the clip that refuses it. A blend on a clip
+  INSIDE a nest is allowed, and §5.3 records what it blends against.
 - `audio.duck`: `{ "level": 0.2, "attack": 300000, "release": 600000 }`.
 - `audio.pan` (M3) is -1 (hard left) to +1 (hard right);
   `audio.noise_reduction` (M3) is 0 (off) to 1.
@@ -785,8 +828,44 @@ angles degrees, opacity/volume 0–1 (volume may exceed 1, up to 4).
 - `shape`: `{ "kind": "arrow", "width": 320, "height": 120,
   "stroke": { "width": 6, "color": [...] }, "fill": null | [...],
   "arrow_start": false, "arrow_end": true, "radius": 0,
-  "from": [0, 1], "to": [1, 0] }` — `from`/`to` are unit coordinates in the
-  box, for line and arrow only.
+  "from": [0, 1], "to": [1, 0], "gradient": null }` — `from`/`to` are unit
+  coordinates in the box, for line and arrow only.
+- `shape.gradient` (format version 6): `null` — the common case — or
+  `{ "kind": "linear" | "radial", "stops": [{ "at": 0..1,
+  "color": [r,g,b,a] }, …], "angle": 0 }`, drawn by
+  `LayerRenderers.renderShape` with `CGGradient` and taking precedence
+  over `fill` while it is non-null. **Setting one does not clear `fill`**:
+  both persist, so `{"gradient": null}` is an exact inverse — the
+  section's Reset brings the colour back out from under it — and the
+  precedence rule stays in one statable place instead of becoming a side
+  effect of whichever op wrote last. Between **2 and 8 stops**
+  (`MAX_GRADIENT_STOPS`), named rather than trimmed: one stop is a solid
+  and `fill` already spells that, and the ceiling is 8 where
+  `video.filters`' and `video.obscure`'s are 4 because those two are
+  SHADER SLOTS — the uniform block carries exactly four of each — while a
+  gradient is drawn on the CPU, where nothing downstream has slots at all.
+  `angle` is degrees from the RIGHT, counter-clockwise (`video.shadow`'s
+  convention, the crate's only one); it is meaningless for `radial` and is
+  stored and range-checked there anyway, so flipping the kind and back
+  does not lose it. `{"gradient": {}}` is the type's own default — linear,
+  angle 0, black at 0 to white at 1 — which is the feature's first
+  impression and is what the inspector's Add sends.
+  **The stops are deliberately NOT checked for order.** `CGGradient`
+  requires monotonic locations or its output is undefined, so a refusal
+  looks like the tidy answer; it has a failure mode nobody would accept,
+  because dragging one stop past another is how a gradient is edited and
+  the drag would stop working half way through. `video.filters` is the
+  precedent — an ordered list the core does not police — and the fix
+  belongs where the requirement is, so the RENDERER sorts before it draws.
+  The question is a RENDER-time one and only that: `shape` is not among
+  the groups an action's end patch may carry (§5.4), so no gradient is ever
+  interpolated and an unsorted stop list is only ever drawn.
+  `line` and `arrow` have no area and IGNORE a gradient entirely — stored,
+  range-checked, not drawn, with the inspector's rows disabled for them,
+  which is exactly `shape.radius`'s precedent (every kind carries it, only
+  the rectangle reads it). Refusing it per kind would mean the kind popup
+  had to clear the field on its way past, and a value a popup deleted is
+  work nobody can get back.
 - `actions[].end` is a patch: any subset of `video`, `audio`, `text` keys.
   `curve` ∈ `linear`, `ease_in`, `ease_out`, `ease_in_out`.
 - `transition_in`: `null` or `{ "kind": "cross_dissolve" | "fade_black" |
@@ -877,6 +956,27 @@ angles degrees, opacity/volume 0–1 (volume may exceed 1, up to 4).
   and every such layer carries the nest's canvas rect as its `clip_rect`
   (§7.3). Fold and clip are both similarity transforms, so the
   composition is exact and no intermediate render target is needed.
+  Four honest limits fall out of the flattening, and `video.blend` (format
+  version 6) is what got the last two written down — the fourth arrived
+  with it, and the third had been true since M3 with nothing recording it.
+  A nest clip's `opacity` multiplies each inner layer separately rather
+  than fading the group as one picture; only the innermost `clip_rect` is
+  carried; **a nest clip's own PER-PIXEL properties reach no layer at
+  all** — its filters, colour controls, chroma key, shadow, reflection,
+  spotlight, hidden regions and blend, because `recipe.rs::layer` reads
+  every one of those off the INNER clip and a nest clip never becomes a
+  layer; and **a blend on a clip INSIDE a nest blends against the canvas
+  below the WHOLE nest**, not against the nest's own layers under it,
+  because there is no offscreen composite of the nest for it to meet. All
+  four are the same fact read four ways — there is no such thing as "the
+  nest's picture" — and the answer to all four is the offscreen pass the
+  flattening exists to avoid. Two ops refuse rather than let the third be
+  silent: the nest CLIP is refused a blend outright (§5.2, §6) and
+  `add_blurred_background` refuses a nest clip, whose copy would come out
+  sharp. The rest are allowed and recorded instead, because a clip inside
+  a group is still a layer of its own and the common case — a group over
+  one backdrop — draws exactly what the popup promises. `nest.rs`'s
+  `Frame` doc carries the same four.
 
 ### 5.4 Actions
 
@@ -1024,6 +1124,8 @@ or animates back); "error" = `Err`.
 |---|---|
 | `add_clip {track, media, at}` | Whole media as one clip at `at`; source in 0; Fit scale if `fit_new_clips` and the source exceeds the canvas. Refuses if the overlap rule fails. |
 | `add_text_clip {track, at, duration=5 s, text?}` / `add_shape_clip {…, shape?}` | Same placement rules; default text is the Title preset centered, default shape the rectangle — except that `shape.kind = "arrow"` is created with `arrow_end` on, since an arrow with no head is a diagonal line. `text` and `shape` are **patch objects** in the `set_text` / `set_shape` shape, merged over that default — not a bare string or kind — so an explicit `arrow_end: false` still wins. (The MCP tools additionally accept a bare string as shorthand: the words for `text`, a kind name for `shape`.) |
+| `add_background {media?, color?=white, duration?=the timeline's length}` | A backdrop on a NEW back-most track, starting at 0 and named "Background". With `media`, that file placed as `add_clip` would place it but for its SCALE — the right source kind, audio props when it has sound, and a FILL scale where `add_clip` takes a Fit one, because a plate that leaves the canvas showing down one side has failed at the one thing a background is for; with `color`, or with neither, a canvas-sized filled rectangle with no stroke at scale 1. The plate default is WHITE, not black: the canvas is already black, so a black plate is a command that appears to do nothing. `Err` for `media` and `color` together, an unknown media, a media with no pictures, a colour outside 0–1, or a duration under a frame. A full-canvas GRADIENT is this clip and a `set_shape {gradient}` after it — the canvas background stays one colour (§5.2). |
+| `add_blurred_background {clip}` | The screencast backdrop: `clip` copied onto a NEW back-most track at the same start, duration, speed and source window — so the two play the same frames — scaled to FILL the canvas, centred, uncropped, blended `normal` and blurred at full strength. The copy is muted (`enabled` becomes `{video: true, audio: false}`, `detach_audio`'s pair read the other way) and drops its `audio.duck` — the one field of that group that lowers OTHER material, so a copy keeping it would duck the mix including the clip it came from — along with its transition, its actions and its label; it is named "Blurred Background". `Err` for an unknown clip, a NEST (flattening drops a nest clip's own filters, so the copy would come out sharp), a source with no pixel size (text, audio-only), or a clip with no video properties. Both of these mint TWO objects — a track and the clip on it — and the TRACK takes the `next_id` the call was made with, the clip the one after. |
 | `insert_clip {track, media, at}` | The INSERT edit: the clip `at` is strictly inside on `track` is split, every unlocked track opens by the media's whole length (`insert_time`), then the media lands at `at`. Only the destination track is cut — a straddler on another track rides the shift whole, which is what keeps a bed unbroken. One op, so one undo step and one tool. Refuses when the clip could not be placed after the room was made, which is what a locked destination track gives. |
 | `overwrite_clip {track, media, at}` | The OVERWRITE edit: `[at, at + media length)` is cleared on `track` ALONE — cut at both bounds, whatever is left inside removed — and the media lands there. Nothing shifts and no other track is touched; the named track is cleared whether or not it is locked, exactly as `ripple_delete` removes the clips it was given. |
 | `move_clip {clips, delta, track}` | Shifts by `delta` ticks (may be negative; clamps at 0) and optionally to another track (all selected clips keep their relative track offsets). **Overlap rule** on the destination track: a clip may overlap at most one neighbour on each side, and each overlap must be ≤ half of the shorter of the two clips; anything else refuses. An overlap is a transition; a clip that gains a predecessor overlap gets `transition_in = cross_dissolve` if it had none. |
@@ -1048,7 +1150,7 @@ or animates back); "error" = `Err`.
 | `paste_attributes {clips, payload, groups?}` | Copies the payload's EARLIEST clip's property groups onto each clip (at one start the front-most, then the lower id — never the array's first, which is Copy's creation order) — `payload` is the same Copy payload `paste` takes, and only that clip's `video`, `audio`, `text` and `shape` are read; its ids, times, media rows and nests do not matter and nothing is minted. A group is REPLACED whole, never merged: video and audio whole, transform included (`audio.muted` and `keep_pitch` travel — they are properties like opacity); text but its `content`; a shape but its `kind`, `width`, `height`, `from` and `to`. `groups` ∈ `video`, `audio`, `text`, `shape`: absent, it means every group BOTH sides have, silently skipping the rest; a NAMED group the payload clip lacks, or a target lacks, is an **error**, all-or-nothing, and so is a copied value the inspector would refuse — each copied group passes the patches' range checks. Speed, enabled, actions, the transition, the source and the clip's own name and label stay. Refuses when nothing changes, and on an empty `groups` list. |
 | `nest {clips, name?}` | Collapses the selection into ONE clip showing a nest (§5.2), on the front-most track the selection occupied, running from the earliest start to the latest end. The clips move whole — ids, props, actions, transitions — keeping their relative times (the earliest starts at 0 inside) and their track order, onto fresh tracks of the nest's own that copy the source tracks' names and their hidden/muted/locked/solo state (a copied solo is then judged among the nest's own tracks, §5.2). The nest's canvas is frozen at the project's current size, so a later `set_canvas` cannot re-lay-out what is inside it. Media is untouched: a nest references the project's `media[]` in the same one id space. Refuses on an empty selection, on a selection of one nest clip, and when the nest clip would break the overlap rule against what was left behind. |
 | `unnest {clip}` | The inverse: the nest's clips return at `clip.start + their own start` with fresh ids (as `split` then a re-join mints fresh ones), on tracks counted back from the nest clip's own — the nest's front-most track lands where the nest clip was — with tracks missing behind added, and the nest clip goes. A clip the overlap rule refuses lands on a new track in front, as `paste` does, so a group can always be opened. A nest clip trimmed shorter than its contents gives **all** of them back: there is no in point on a nest, so this is the inverse of `nest`, not of the trim. The nest is dropped from `nests[]` when no clip anywhere still shows it. An **error** when `clip` is not a nest clip. |
-| `set_video {clips, patch}` / `set_audio` / `set_text` / `set_shape` | Merge the patch into the base props. Refuses if nothing changes. |
+| `set_video {clips, patch}` / `set_audio` / `set_text` / `set_shape` | Merge the patch into the base props. Refuses if nothing changes. One value is refused by the CLIP rather than by the vocabulary: `video.blend` on a nest clip is an **error** naming it (format version 6), because a nest is flattened rather than composited offscreen and there is no group picture for a blend to combine with. It fires on the MERGED value only, so `{"blend": "normal"}` on a nest clip is the identity and refuses instead — otherwise an all-or-nothing `paste_attributes` of an ordinary look onto a nest clip would fail over a value that changes nothing. `set_action_end` validates nothing, so the same rule is enforced again in the evaluator (§5.4's `clamp_video`), which closes the recipe, `clip_state` and both export writers at once. |
 | `set_clip {clips, patch: {name?: string \| null, label?: string \| null}}` | The fifth patch op: sets or clears the clip's own name and label (§5.2). Inside the patch an absent key keeps, `null` clears, and so does an empty string — after the trim a name gets on its way in — because an unnamed clip is `null`, not `""`. Any other key is an **error**, checked before the clip ids. A patch and not two top-level arguments, because the op envelope reads an absent optional and an explicit `null` as the same thing, and "keep" and "clear" have to differ here. A `split`, `duplicate`, `detach_audio` or `paste` carries both along (they clone the clip); `paste_attributes` never does. Refuses if nothing changes. |
 | `set_enabled {clip, video?, audio?}` | Visibility/mute per clip. |
 | `set_transition {clip, kind|null}` | Sets `transition_in`. `set_transition_duration {clip, duration}` moves the clip so the overlap equals `duration` (subject to the overlap rule). |
@@ -1260,7 +1362,7 @@ Asked once per frame by the compositor, and by the overlay for hit-testing.
       "source_size": [1920, 1080],
       "crop": { "l": 0, "t": 0, "r": 0, "b": 0 },
       "x": 0, "y": 0, "scale": 1.0, "rotation": 0, "opacity": 1.0,
-      "corner_radius": 0, "shadow": null,
+      "blend": "normal", "corner_radius": 0, "shadow": null,
       "color": { "brightness": 0, "contrast": 0, "saturation": 0, "hue": 0 },
       "chroma": null,
       "filters": [], "reflection": null, "spotlight": null, "obscure": [],
@@ -1322,6 +1424,29 @@ Asked once per frame by the compositor, and by the overlay for hit-testing.
   knowing before it is read as a bug: a tent whose `in` is tiny but not
   zero reports `"in"` from its first frame to its last, while the departure
   is what is actually holding the amount down.
+- `blend` (format version 6) is the layer's `video.blend`, spelled as the
+  schema spells it — and it is the one property here the recipe may
+  OVERRIDE rather than merely evaluate. **A layer whose `transition` is
+  non-null is emitted as `"normal"` whatever the clip says**, and the CORE
+  decides that, not the renderer. The reason is the transition weight in
+  §7.5's fragment stage (step 8 of `Compositor.metal`'s order of
+  operations): the
+  outgoing half of a dissolve divides its weight by the attenuation the
+  incoming pass is about to apply, which is the exact algebraic inverse of
+  a FIXED-FUNCTION destination factor, so a programmable blend on either
+  half invalidates it — and `add_clip` onto an overlap gives the new clip
+  a `cross_dissolve` by default, so that wrong picture is a minute away
+  from anyone trying the feature. It is decided here for `reveal`'s
+  reason, read again: everything that draws a frame reads this one
+  description, so preview, `render_frame` and both export writers cannot
+  disagree about it, and a core test can read the layer's `blend` at a
+  tick inside the overlap where a renderer-side rule would need two PNGs.
+  The consequence is worth saying out loud, because from either side alone
+  it reads as a bug: **the recipe's `blend` is what DRAWS, while the
+  inspector reads the MODEL's value through `clip_state`**, so during an
+  overlap the popup says `multiply` and the frame composites `normal`.
+  Both are honest — the clip multiplies, and this frame does not.
+
 - `source_size` is the media pixel size, or `null` for text (the renderer
   knows) and the box size for shapes.
 - `filters`, `reflection` and `spotlight` (M3) and `obscure` (format
@@ -1367,7 +1492,7 @@ Asked once per frame by the compositor, and by the overlay for hit-testing.
 | `Playback.swift` | `AVPlayer` + `AVPlayerItem` over the plan; the rebuild-vs-refresh decision (§7.6); coalesced exact seeks; JKL rates; loop range; `preferredMaximumResolution` = canvas size |
 | `CompositionBuilder.swift` | plan JSON → `AVMutableComposition` + `AVMutableAudioMix` + `AVMutableVideoComposition` (+ `CompositionInstruction`) |
 | `Compositor.swift` | the `AVVideoCompositing` class and its Metal pipeline (§7.5) |
-| `LayerRenderers.swift` | text (Core Text) and shape (Core Graphics) descriptions → premultiplied BGRA `MTLTexture`s, LRU-cached by hash; reports measured text sizes to the overlay; draws the recipe's `reveal` for the three §5.2 text animations, over a layout cache so a reveal can never reflow the box |
+| `LayerRenderers.swift` · `LayerRenderersText.swift` | text (Core Text) and shape (Core Graphics) descriptions → premultiplied BGRA `MTLTexture`s, LRU-cached by hash; reports measured text sizes to the overlay; draws a shape's `gradient` (format version 6) by CLIPPING to the path and running `CGGradient`, sorting the stops the core deliberately does not police (§5.2). The TEXT half — the layout caches, the attributed string and the three §5.2 reveals drawn over the recipe's `reveal`, so a reveal can never reflow the box — went out to `LayerRenderersText.swift` under the size rule when phase 6 came to add the gradient |
 | `CaptionImporter.swift` · `CaptionLayout.swift` · `Transcriber.swift` · `CaptionExporter.swift` | captions in both directions: the SubRip grammar; the placement every producer shares (the frame grid, the overlap trim, the Caption preset, the new front-most track); on-device speech recognition and the cue builder over it; and the `.srt` / `.vtt` writer |
 | `MediaImporter.swift` | `AVURLAsset` probing (the **one** place `async`/`await` is allowed — AVFoundation's loading API is async-only going forward), thumbnails via `AVAssetImageGenerator`, peaks via `AVAssetReader` + vDSP, cache files in the package |
 | `Exporter.swift` | picks the pipeline for the core's settings — `ExportWriter` (`AVAssetReader`/`AVAssetWriter`: chapters, explicit bitrates, the loudness gain) or the ImageIO frame sequence for GIF/APNG — runs the loudness MEASUREMENT pass ahead of the write, reports progress, and renders one frame offline for `render_frame` |
@@ -1379,7 +1504,7 @@ Asked once per frame by the compositor, and by the overlay for hit-testing.
 | `InspectorViewController.swift` + `VideoPane` / `AudioPane` / `TextPane` / `ShapePane` / `MediaPane` / `DocumentPane` | one file per tab, descriptor-driven controls from `OptionControls.swift` |
 | `EditorViewController.swift` + `EditorViewController+<Feature>.swift` | wiring only in the base file; features in extensions (Rasterize's frozen-file rule) |
 | `AppDelegate.swift` · `EditorWindowController.swift` · `WelcomeWindowController.swift` · `main.swift` | menus (nil-target selectors), window, welcome |
-| `AgentServer.swift` · `AgentCatalog.swift` | MCP mirrors of every op, plus `open_project`, `import_media`, `render_frame` |
+| `AgentServer.swift` · `AgentServer+<Feature>.swift` · `AgentCatalog.swift` | MCP mirrors of every op, plus `open_project`, `import_media`, `render_frame`. One handler file per feature area, the frozen `AgentServer.swift` keeping only the registry rows |
 | `Theme.swift` · `Controls.swift` · `OptionControls.swift` · `Sheets.swift` | copied from Rasterize |
 
 ### 7.5 Compositor
@@ -1395,19 +1520,90 @@ Asked once per frame by the compositor, and by the overlay for hit-testing.
   (§7.6) at `request.compositionTime`; encode; on completion
   `request.finish(withComposedVideoFrame:)`. `cancelAllPendingVideoCompositionRequests`
   flushes the queue. Errors call `finish(with:)`, never crash.
-- **One pipeline, one pass per layer.** The vertex stage places a quad
-  from a per-layer uniform block (canvas size, center, source size, scale,
-  rotation, crop window as UV bounds); the fragment stage samples with
-  the crop window, applies the corner-radius mask (a rounded-rect SDF in
-  source pixels), brightness/contrast/saturation/hue, chroma key (M3),
-  and opacity, and outputs premultiplied BGRA blended source-over.
-  Text and shape textures are already premultiplied and take the same
-  path. Missing media draws a slate.
+- **One pass per layer, and FIVE pipelines from three fragment
+  functions.** The vertex stage places a quad from a per-layer uniform
+  block (canvas size, center, source size, scale, rotation, crop window as
+  UV bounds); the fragment stage samples with the crop window and runs the
+  order of operations written out at the head of `Compositor.metal` —
+  the corner-radius mask (a rounded-rect SDF in source pixels),
+  brightness/contrast/saturation/hue, chroma key (M3), the filters, the
+  hidden regions (format version 4), the spotlight, coverage, the
+  transition weight and opacity — and outputs premultiplied BGRA. Text and
+  shape textures are already premultiplied and take the same path. Missing
+  media draws a slate.
+  Two independent specializations of that stage give four layer states,
+  and the shadow's quad is the fifth. **`kGatherFilters`** is a function
+  constant: a layer that needs a neighbourhood filter (blur, sharpen) or a
+  blurred hidden region compiles the gather loops in, and every other
+  layer has them compiled OUT rather than branched around.
+  **`reelcut_layer_blend_fragment`** is the second entry point, added at
+  format version 6: it reads the destination through `float4 dst
+  [[color(0)]]` — programmable blending, which needs no ping-pong target
+  on Apple Silicon — and computes `video.blend`'s combination itself,
+  where the plain entry point returns its colour and lets the
+  fixed-function stage apply source-over. Both share one `static inline`
+  helper carrying the whole stage, because Metal cannot call one
+  `fragment` function from another; a `normal` layer's pixels therefore do
+  not depend on which of the two drew it, since the general formula
+  reduces algebraically to the fixed-function factors.
+  **The two blend pipelines are built with fixed-function blending
+  DISABLED, and that is a correctness requirement nothing in the toolchain
+  enforces.** Metal builds a programmable-blend pipeline with blending
+  still on — no error, no validation warning — and the double blend is
+  invisible over an OPAQUE destination, because the fragment stage returns
+  the finished composite, whose alpha is `as + ab·(1 - as)` = 1 over any
+  opaque backdrop, and `oneMinusSourceAlpha` is then 0 whatever the layer's
+  own opacity is. **What decides it is the DESTINATION's alpha, not the
+  layer's**, and phase 6 got that backwards first: the partial-opacity
+  check written for the job passed against a build with the guard deleted,
+  as did every other fixture in the script, all of which put an opaque card
+  underneath. It takes a destination alpha below one AND a source that does
+  not cover it — `tools/proof/phase6_proof.py`'s section 6b, the one check
+  in that script that reads the ALPHA channel, where the mutant lands 32/255
+  high while the colour moves by two.
+- **This compositor blends in the ENCODED sRGB space, deliberately.**
+  Nothing in the pipeline uses an `_srgb` pixel format — the attachment is
+  `.bgra8Unorm` — so every stage works on stored 8-bit values, and so does
+  the blend. "Multiply of 50 % grey over 50 % grey is 25 %" is a statement
+  about ENCODED values and is FALSE in linear light, where the answer is
+  about **61**/255 — three steps below the 64 the encoded multiply gives
+  (60.95 against 64.25 unrounded), and three times the ±1/255 the proof's
+  blend checks allow themselves, so the two readings cannot both pass. The
+  number is part of the sentence: a reader who checks it and finds it wrong
+  stops believing the paragraph it is in. A reader who knows colour will
+  want to wrap the blend in a linearise/encode pair: that would change
+  every blended pixel, break the
+  measured 64 / 192 / 255 the proof asserts, and make the compositor
+  disagree with itself, since the grade, the filters and the transitions
+  have all worked in encoded space since M1. If linear light is ever
+  wanted it is a decision for the WHOLE pipeline, not for one stage. The
+  same sentence stands in `Compositor.metal`'s order-of-operations comment
+  and in `tools/proof/phase6_proof.py`'s docstring, because it is the one
+  thing about this compositor a competent reader will try to "fix".
 - **Transitions** are one pass over the pair: dissolve = both with
   progress-weighted opacity; fade black/white = out fades to the color
   then in fades from it; push/slide = offset by progress; wipe = a UV
-  threshold; zoom = scale ramp. Shadows (M3) render the layer's alpha to
-  a small offscreen texture, blur with `MPSImageGaussianBlur`, draw first.
+  threshold; zoom = scale ramp. A layer mid-transition always draws
+  `normal`, and the core is what says so (§7.3), so this shader has no
+  special case for it and none may be added. Shadows (M3) render the
+  layer's alpha to a small offscreen texture, blur with
+  `MPSImageGaussianBlur`, draw first — and the MASK pass takes the layer's
+  gather specialization WITHOUT its blend, because the mask asks about the
+  layer's SHAPE, which no blend mode changes. That separation is DEFENSIVE
+  and not load-bearing, and phase 6's mutation run is what settled it: the
+  natural fear — a `multiply` evaluated over a destination cleared to
+  transparent black is 0 everywhere, so a blended layer's shadow silently
+  vanishes while the layer itself looks right — is true of a naive
+  `src · dst` and FALSE of the premultiplied composite this shader runs,
+  whose `(1 - ab)·src` term carries the source through an empty destination:
+  at `ab` = 0 the formula reduces to `src` exactly, for all eight modes. A
+  build that passes the blend variant here renders every shadow correctly.
+  Keep the separation — it costs nothing, it says what the mask pass means,
+  and a future formula without that term would make the hazard real — but
+  do not restate it as a bug it is holding back. The shadow's own draw stays
+  fixed-function source-over whatever the layer's mode (a shadow is light
+  falling on the backdrop, not the layer's ink), while the REFLECTION
+  inherits the blend, since it is part of the layer.
 - Budget: a 1080p frame in under 8 ms. Textures for image/text/shape
   layers are LRU-cached (64 entries).
 
@@ -1696,8 +1892,9 @@ concern is a new module with its own `impl Project` block.
 |---|---|
 | `lib.rs` | declarations and re-exports only |
 | `model.rs` | the §5.2 types and serde derives, and the serde defaults that say what an absent key means — the schema's SHAPE, and nothing else |
-| `model_props.rs` | the §5.2 per-clip property types — `VideoProps`, `Crop`, `Shadow`, `ColorAdjust`, `Chroma`, `Filter`, `Reflection`, `AudioProps`, `Compressor`, `Duck`, `TextProps`, `Outline`, `Backdrop`, `TextAnimation`, `ShapeProps`, `Stroke` and their enums, with their defaults: the schema's VOCABULARY where `model.rs` is its shape. Cut out under the size rule (road map 2, phase 2) and re-exported whole by `model.rs`, so every `crate::model::X` path still resolves |
+| `model_props.rs` | the §5.2 per-clip property types — `VideoProps`, `Crop`, `Shadow`, `ColorAdjust`, `Chroma`, `Filter`, `Reflection`, `BlendMode`, `AudioProps`, `Compressor`, `Duck`, `ShapeProps`, `Stroke`, `Gradient`, `GradientKind`, `GradientStop` and their enums, with their defaults: the schema's VOCABULARY where `model.rs` is its shape. Cut out under the size rule (road map 2, phase 2) and re-exported whole by `model.rs`, so every `crate::model::X` path still resolves. It has since paid the same rule TWICE itself, both times BEFORE the phase that owed it took anything on: the region types went to `model_regions.rs` in phase 3c and the text vocabulary to `model_text.rs` in phase 6, and it re-exports both, so no path anywhere changed either time |
 | `model_regions.rs` | the boxes drawn ON the picture — `Spotlight`, `ObscureRegion`, the `SpotShape` both are drawn with and the `MAX_OBSCURE` budget on the second. One concern, not three adjacent ones: they share one coordinate frame (`x`/`y` the region's CENTRE, an offset in SOURCE pixels from the centre of the layer's CROPPED rect; `width`/`height` its size in the same pixels — which is what carries a region with its layer through scale, move and rotation) and one shape enum. Cut out of `model_props.rs` under the size rule (road map 2, phase 3c) and re-exported whole by it, so every `crate::model::X` path still resolves; the FIELDS holding them (`VideoProps.spotlight`, `VideoProps.obscure`) stay with the video group |
+| `model_text.rs` | the text vocabulary — `TextProps`, the `TextAlign` and `TextVAlign` it is placed by, the `Outline` and `Backdrop` drawn with it, and the `TextAnimation` and `TextAnimationKind` that reveal it. Cut out of `model_props.rs` under the size rule (road map 2, phase 6) and re-exported whole by it, and cut HERE because text is the one property group the model cannot MEASURE: every other group is quantities the core bounds, interpolates and solves against, while only the platform can lay a string out and the size comes back the other way through a cache (§5.3, §11). `TextAnimationKind`'s declaration order is NOT load-bearing — the recipe carries a reveal's kind by NAME — where `ObscureKind`'s and `BlendMode`'s are shader discriminants; the JSON spelling of every variant is, so a rename needs a migration step |
 | `model_query.rs` | reading a project: `Project::new`, id allocation, the `clip` / `track` / `media` / `marker` / `nest` lookups, `clips_on`, `duration`, `validate` with its nesting walk, and the three source-window measurements (`content_length`, `source_head`, `source_length`) every placement op clamps against |
 | `time.rs` | `Ticks`, `TIMESCALE`, `Fps`, frame snapping, timecode format/parse (non-drop `HH:MM:SS:FF` and `HH:MM:SS.mmm`) |
 | `edit.rs` | the op enum + serde, `apply(&self, op) -> Result<Option<Project>, String>`; **its module doc is the op schema table** |
@@ -1706,7 +1903,8 @@ concern is a new module with its own `impl Project` block.
 | `edit_edge.rs` / `edit_insert.rs` | the cutting moves that keep something fixed on purpose: `slip` and `roll` (the clip's place, and the pair's outer edges); `insert_clip` and `overwrite_clip` (the other tracks, and the timeline's total length) |
 | `edit_action.rs` / `edit_nest.rs` / `edit_paste.rs` | the ops with a concern of their own: actions (the no-overlap rule); `nest` / `unnest`; `paste` (making another document's clips fit) and `paste_attributes` (the same payload's earliest clip's property groups copied onto clips already placed — replaced whole, never merged) |
 | `edit_zoom.rs` | `add_zoom_action`, the screencast zoom (road map 2, phase 3b) — the one op whose substance is geometry rather than bookkeeping, which is why it is not a fifth function in `edit_action.rs`. **Its module doc is the placement equation**: the two frames (Q, `model_regions.rs`'s source pixels from the cropped rect's centre; C, canvas pixels) and the solve that turns a rectangle drawn on the picture into the `scale` / `x` / `y` an action's end patch carries, rotation and crop included. Composes `add_action` + `set_action` + `set_action_end`, so a drag is one undo step and every `add_action` refusal is inherited rather than copied |
-| `actions.rs` | evaluation and interpolation, `clip_state(clip, t)`, and `clamp_video`, the last line of defence §5.4 describes. §5.4's LIST rule is stated here once and applies to every array of objects in the schema (`video.filters`, `video.obscure`), neither of which carries a line of its own code; the widened discriminant set is confined to list ENTRIES, so `video.spotlight`'s animation is what it has always been |
+| `edit_background.rs` | `add_background` and `add_blurred_background`, what goes BEHIND the picture (road map 2, phase 6c) — a plate (a colour, or an image) or a blurred copy of a clip, each ONE clip on a NEW track at index 0, so there is no overlap to check and one undo step takes it all away. They are core OPS rather than app-side composites, which the road map had planned, because the composite carries a constraint no half of it states: the blurred copy must show the same frames as its original, which means its source WINDOW, where `add_clip` gives the whole media and `duplicate` lands the copy somewhere else on the same track. In the core it is `clip.clone()` with six VIDEO fields overwritten — `scale`, `x`, `y`, `crop`, `filters`, `blend` — over vocabulary the app lacks: the source's pixel size, `edit_clip.rs`'s `fill_scale` and the `SCALE_MAX` clamp on it. `insert_clip`, `overwrite_clip` and `add_zoom_action` are the standing precedent for that rule |
+| `actions.rs` | evaluation and interpolation, `clip_state(clip, t)`, and `clamp_video`, the last line of defence §5.4 describes. §5.4's LIST rule is stated here once and applies to every array of objects in the schema (`video.filters`, `video.obscure`), neither of which carries a line of its own code; the widened discriminant set is confined to list ENTRIES, so `video.spotlight`'s animation is what it has always been. `clamp_video` also carries the one bound that is not a range — a NEST clip's evaluated `blend` is forced to `normal` (format version 6) — because `set_action_end` validates nothing beyond "is it an object", and closing it in the evaluator closes the recipe, `clip_state` and both export writers at once, which no per-op check can |
 | `transition.rs` | overlap detection, the overlap rule, progress at *t* |
 | `evaluate.rs` | `composition_plan()` (A/B assignment, instruction tiling) and the `assign()` the recipe shares with it |
 | `recipe.rs` | `frame_recipe(t)`: the layer list at one instant — like every walk over what plays, it consumes `nest.rs`'s instances. Also where a `text.animation` becomes a NUMBER: the `reveal`, its phase and its kind (§7.3), computed here so everything that draws reads one description, and folded into the layer's content hash so a per-frame picture cannot be served a stale texture |
@@ -1860,7 +2058,14 @@ Detach Audio because those two are the menu's only sound commands; no key
 equivalent, and it duplicates the Audio section's button deliberately —
 a command reachable from a pane alone can be lost), Add Action, Speed…,
 Close Gap, Remove
-Silences…, Transition ▸, Rename…, Label ▸ (the six colours and None),
+Silences…, Transition ▸, Add Background ▸ (Solid Color · Image… — road map
+2's phase 6c, a submenu rather than one dialog because the two are
+different commands: the colour takes no dialog at all and is re-coloured
+afterwards in the Shape section's Fill row, which is also how a
+full-canvas gradient is reached, while the image needs a file chooser) and
+Add Blurred Background, in a group of their own since neither edits the
+selection — both put a clip on a new back-most track — and neither takes a
+key equivalent, Rename…, Label ▸ (the six colours and None),
 Nest, Un-nest), Track (New Track,
 Remove Track, Remove Empty Tracks, Hide/Mute/Lock/Solo), Mark (Add Marker,
 Set In, Set Out, Clear Range, Next/Previous Marker), View (Zoom, Fit,

@@ -35,7 +35,9 @@ use serde_json::{Map, Value};
 
 use crate::actions::Evaluated;
 use crate::evaluate::{json, number, Assignment};
-use crate::model::{Clip, Project, Source, TextAnimation, TextAnimationKind, TransitionKind};
+use crate::model::{
+    BlendMode, Clip, Project, Source, TextAnimation, TextAnimationKind, TransitionKind,
+};
 use crate::nest::{Frame, Instance};
 use crate::time::Ticks;
 use crate::transition;
@@ -338,6 +340,37 @@ impl Project {
         out.insert("scale".to_string(), number(placed.scale));
         out.insert("rotation".to_string(), number(placed.rotation));
         out.insert("opacity".to_string(), number(placed.opacity));
+        // How this layer combines with what is already on the canvas
+        // (format version 6) — and the ONE place that answer is overridden.
+        //
+        // A transition forces `normal`. The outgoing half of a dissolve
+        // carries a weight correction that is the exact algebraic inverse of
+        // the destination factor its incoming partner is about to apply, so
+        // the pair sums to the picture either clip would have drawn alone,
+        // and any non-normal blend on either half invalidates it. `add_clip`
+        // onto an overlap gives the new clip a `cross_dissolve` by DEFAULT,
+        // so that wrong picture is a minute away from anyone trying this.
+        //
+        // The CORE decides it, not the renderer, for [`Reveal`]'s reason
+        // read again: everything that draws a frame reads this one
+        // description, so preview, `render_frame` and both export writers
+        // cannot disagree — and it is the only version PROVABLE the way this
+        // project asks, a core test reading the layer's `blend` at a tick
+        // inside the overlap where the shader's version needs two PNGs.
+        //
+        // Said out loud, because from either side alone it reads as a bug:
+        // **the recipe's `blend` is what DRAWS, and the inspector reads the
+        // MODEL's value through `clip_state`**, so during an overlap the
+        // popup says `multiply` while the frame composites `normal`. Both
+        // are honest — the clip multiplies, and this frame does not.
+        out.insert(
+            "blend".to_string(),
+            if transition.is_null() {
+                json(&video.blend)
+            } else {
+                json(&BlendMode::Normal)
+            },
+        );
         out.insert("corner_radius".to_string(), number(video.corner_radius));
         out.insert("shadow".to_string(), json(&video.shadow));
         out.insert("color".to_string(), json(&video.color));

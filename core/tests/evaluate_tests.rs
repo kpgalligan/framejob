@@ -1930,6 +1930,239 @@ fn transition_progress_runs_from_zero_to_one() {
     assert!(previous > 0.999, "the last tick of the overlap is near 1");
 }
 
+// ---- blend modes ---------------------------------------------------------
+
+/// [`transition_project`] with `blend` set on both clips — what a blended
+/// layer under a dissolve actually looks like in practice, since `add_clip`
+/// onto an overlap hands out a `cross_dissolve` without being asked and a
+/// person who set a blend and then dragged two clips together has exactly
+/// this project.
+fn blended_transition_project(mode: &str) -> Value {
+    let mut project = transition_project();
+    project["clips"][0]["video"] = json!({ "blend": mode });
+    project["clips"][1]["video"] = json!({ "blend": mode });
+    project
+}
+
+#[test]
+fn a_layer_carries_its_blend_mode_and_defaults_to_normal() {
+    let handle = Handle::from_value(&one_clip_project(10 * SEC));
+    assert_eq!(
+        layer_of(&handle.recipe(SEC), 11)["blend"],
+        json!("normal"),
+        "every layer carries the key, and a project that never heard of it \
+         composites exactly as it always did"
+    );
+
+    let blended = handle.apply(&json!({
+        "op": "set_video", "clips": [11], "patch": { "blend": "multiply" }
+    }));
+    assert_eq!(
+        layer_of(&blended.recipe(SEC), 11)["blend"],
+        json!("multiply"),
+        "and a layer that asked for one carries what it asked for"
+    );
+}
+
+#[test]
+fn a_transition_forces_normal_and_the_model_keeps_its_own_value() {
+    // The recipe's ONE override (spec §7.3), and the reason it lives in the
+    // core rather than in the shader: the outgoing half of a dissolve
+    // carries a weight correction that is the exact algebraic inverse of the
+    // destination factor its incoming partner is about to apply, so any
+    // non-normal blend on either half stops the pair summing to the picture
+    // either clip would have drawn alone.
+    //
+    // Written here, the claim is a value read at a tick. Written in the
+    // renderer it could only ever have been two PNGs compared byte for byte,
+    // which is the whole argument for whose rule it is.
+    let handle = Handle::from_value(&blended_transition_project("multiply"));
+
+    // Outside the overlap each clip composites the way it was set.
+    assert_eq!(
+        layer_of(&handle.recipe(4 * SEC), 11)["blend"],
+        json!("multiply")
+    );
+    assert_eq!(
+        layer_of(&handle.recipe(7 * SEC), 12)["blend"],
+        json!("multiply")
+    );
+
+    // Inside it, both halves composite normally.
+    let inside = handle.recipe(5 * SEC + SEC / 2);
+    assert_eq!(layer_ids(&inside), vec![11, 12]);
+    for clip in [11, 12] {
+        let layer = layer_of(&inside, clip);
+        assert_eq!(
+            layer["transition"]["kind"],
+            json!("push_left"),
+            "clip {clip} is in the transition"
+        );
+        assert_eq!(
+            layer["blend"],
+            json!("normal"),
+            "clip {clip} is set to multiply and must composite normally for \
+             as long as the transition lasts"
+        );
+    }
+
+    // And the MODEL is untouched. The inspector reads `clip_state`, which
+    // goes on reporting what the clip is SET to, so the popup and the frame
+    // legitimately disagree for exactly the length of the overlap — the
+    // honest report of both facts, not a bug in either.
+    let inspector = handle
+        .clip_state(11, 5 * SEC + SEC / 2)
+        .expect("clip 11 exists");
+    assert_eq!(inspector["video"]["blend"], json!("multiply"));
+}
+
+#[test]
+fn every_frame_of_an_overlap_composites_normally() {
+    // The sweep, because the rule is about the WHOLE overlap and not about
+    // one convenient tick: its first frame, its last, and the frames
+    // between. `tools/proof/phase6_proof.py`'s B5 makes the same claim in
+    // pixels; this is the one that can name the frame that broke it.
+    let handle = Handle::from_value(&blended_transition_project("screen"));
+    let start = 5 * SEC;
+    for step in [0, FRAME_30, SEC / 2, SEC - FRAME_30, SEC - 1] {
+        let recipe = handle.recipe(start + step);
+        for clip in [11, 12] {
+            assert_eq!(
+                layer_of(&recipe, clip)["blend"],
+                json!("normal"),
+                "clip {clip} at +{step} into the overlap"
+            );
+        }
+    }
+    // One frame past the overlap the survivor has its blend back.
+    assert_eq!(
+        layer_of(&handle.recipe(6 * SEC), 12)["blend"],
+        json!("screen"),
+        "the override lasts exactly as long as the transition does"
+    );
+}
+
+/// A nest clip (id 3, 2 s to 5 s) showing a nest whose one inner clip (id
+/// 11) is text, with a blend written on BOTH and an action on the nest clip
+/// carrying a third one in its `end` patch.
+///
+/// Written out by hand rather than built from ops, and that is the point:
+/// `set_video` refuses a blend on a nest clip by name, and no op can name a
+/// clip INSIDE a nest at all, so a file like this is what a hand-written
+/// project or a lenient `set_action_end` produces — which is exactly the
+/// input the evaluator's own guard exists for.
+fn nest_with_blends(outer: &str, action_end: &str, inner: &str) -> Value {
+    json!({
+        "version": 2,
+        "canvas": {
+            "width": 1920, "height": 1080, "fps": [30, 1],
+            "background": [0.0, 0.0, 0.0, 1.0],
+            "fit_new_clips": true, "timecode_frames": true
+        },
+        "media": [],
+        "tracks": [track(2)],
+        "clips": [{
+            "id": 3, "track": 2, "start": 2 * SEC, "duration": 3 * SEC,
+            "source": { "kind": "nest", "project": 4 },
+            "video": { "blend": outer },
+            "actions": [{
+                "id": 6, "start": 0, "duration": 2 * SEC, "curve": "linear",
+                "end": { "video": { "blend": action_end } }
+            }]
+        }],
+        "markers": [],
+        "next_id": 12,
+        "nests": [{
+            "id": 4, "name": "Nest 4", "width": 1920, "height": 1080,
+            "tracks": [track(5)],
+            "clips": [{
+                "id": 11, "track": 5, "start": 0, "duration": 10 * SEC,
+                "source": { "kind": "text" },
+                "video": { "blend": inner },
+                "text": { "content": "Hello" }
+            }]
+        }]
+    })
+}
+
+#[test]
+fn a_nest_clip_evaluates_to_normal_however_the_blend_got_there() {
+    // The back door `set_video`'s refusal cannot close. An action's `end`
+    // patch validates nothing beyond "is it an object" — leniency that is
+    // deliberate, so a half-written animation stays editable — so a blend
+    // reaches a nest clip through `set_action_end` or straight out of a
+    // hand-written file whatever the op path says. `clamp_video` holds the
+    // line in the ONE place an evaluated value is produced, which closes the
+    // recipe, `clip_state` and both export writers at once.
+    //
+    // Why a nest may not blend at all: it is FLATTENED into one layer per
+    // clip inside it, so there is no composite of its own to combine with
+    // what is under it, and "blend every one of them separately" is a
+    // different picture from the one the popup promises.
+    let handle = Handle::from_value(&nest_with_blends("multiply", "difference", "screen"));
+
+    // Before the action, inside it, and after it has ended.
+    for t in [2 * SEC, 3 * SEC, 4 * SEC + SEC / 2] {
+        let state = handle.clip_state(3, t).expect("the nest clip exists");
+        assert_eq!(
+            state["video"]["blend"],
+            json!("normal"),
+            "the nest clip's evaluated blend at {t}"
+        );
+    }
+
+    // The clips INSIDE it are untouched by the rule: a nested layer blends
+    // against the canvas below the WHOLE nest, which is an honest limit of
+    // flattening rather than a reason to refuse it.
+    assert_eq!(
+        layer_of(&handle.recipe(3 * SEC), 11)["blend"],
+        json!("screen"),
+        "a clip inside a nest keeps the blend it was given"
+    );
+}
+
+#[test]
+fn a_transition_inherited_into_a_nest_forces_normal_on_the_layers_inside() {
+    // The override is written against the layer's `transition`, whatever
+    // put it there — and a nested layer's can be INHERITED, from the
+    // nearest nest clip above it that has one, because a dissolve into a
+    // nest has to dissolve everything the nest draws. The weight correction
+    // is the same correction and it is invalidated the same way, so a
+    // blended caption inside a dissolving group has to composite normally
+    // too. Nothing in [`Project::layer`] special-cases the two, which is
+    // the point of asking the question here.
+    let mut project = nest_with_blends("normal", "normal", "screen");
+    project["clips"][0]["transition_in"] = json!({ "kind": "cross_dissolve" });
+    // A neighbour for it to dissolve from: 0–3 s against the nest clip's
+    // 2–5 s, so the overlap is 2–3 s.
+    project["clips"].as_array_mut().expect("clips").push(json!({
+        "id": 7, "track": 2, "start": 0, "duration": 3 * SEC,
+        "source": { "kind": "text" }, "video": {},
+        "text": { "content": "Before" }
+    }));
+    let handle = Handle::from_value(&project);
+
+    let inside = handle.recipe(2 * SEC + SEC / 2);
+    let nested = layer_of(&inside, 11);
+    assert_eq!(
+        nested["transition"]["kind"],
+        json!("cross_dissolve"),
+        "the nested layer inherited the nest clip's transition"
+    );
+    assert_eq!(
+        nested["blend"],
+        json!("normal"),
+        "and an inherited transition forces normal exactly as its own would"
+    );
+
+    // Past the overlap the same layer has its blend back, which is what
+    // says the rule is the transition's and not the nest's.
+    assert_eq!(
+        layer_of(&handle.recipe(4 * SEC), 11)["blend"],
+        json!("screen")
+    );
+}
+
 // ---- totality ------------------------------------------------------------
 
 #[test]
@@ -2120,5 +2353,99 @@ fn an_out_of_range_action_patch_is_clamped_before_it_reaches_the_recipe() {
     assert!(
         num(&mid, "/scale") <= 10.0,
         "an interpolated scale must stay at or under SCALE_MAX"
+    );
+}
+
+// ---- shapes are not animatable ------------------------------------------
+
+/// A `shape` end patch is INERT, and this test exists because two documents
+/// said otherwise.
+///
+/// `props_check.rs`'s argument for leaving gradient stops unordered used to
+/// close with "it also falls out well for actions: two gradients of equal
+/// length interpolate per index under the crate's list rule" — and spec §5.2
+/// carried the same sentence. No gradient can interpolate: `evaluate_clip`
+/// builds its merge state from `video`, `audio` and `text` only, and sets
+/// `Evaluated.shape` to the clip's own props untouched (§5.4, and
+/// `actions.rs` says so in as many words). The phase-6 review caught the
+/// claim; nothing pinned it, so a later reader tidying `actions.rs` could
+/// have made it true by accident and nothing would have gone red.
+///
+/// The patch below asks for a gradient AND a width, so the test fails
+/// whether a future `shape` arm interpolates a list or merges a scalar.
+#[test]
+fn a_shape_end_patch_changes_nothing_because_shapes_do_not_animate() {
+    let mut clip = json!({
+        "id": 11, "track": 2, "start": 0, "duration": 6_000_000,
+        "source": { "kind": "shape" },
+        "video": {},
+        "shape": {
+            "kind": "rectangle", "width": 320.0, "height": 120.0,
+            "gradient": { "kind": "linear", "angle": 0.0, "stops": [
+                { "at": 0.0, "color": [0.0, 0.0, 0.0, 1.0] },
+                { "at": 1.0, "color": [1.0, 1.0, 1.0, 1.0] }
+            ] }
+        }
+    });
+    clip["actions"] = json!([{
+        "id": 3, "start": 0, "duration": 3_000_000, "curve": "linear",
+        "end": { "shape": {
+            "width": 640.0,
+            "gradient": { "kind": "radial", "angle": 90.0, "stops": [
+                { "at": 0.0, "color": [1.0, 0.0, 0.0, 1.0] },
+                { "at": 1.0, "color": [0.0, 0.0, 1.0, 1.0] }
+            ] }
+        } }
+    }]);
+    let handle = Handle::from_value(&project(vec![], vec![track(2)], vec![clip], 12));
+
+    // FIRST: the patch survived the read, so what follows is "stored and
+    // inert" and not "silently dropped on the way in". An action's `end` is
+    // the ONE place the crate allows unknown keys (`edit.rs`'s module doc),
+    // so a `shape` patch is kept whole — and without this assertion the rest
+    // of the test would pass just as well against a build that threw it away,
+    // which is the vacuous shape this project calls a non-check.
+    let stored = handle.value();
+    assert_eq!(
+        num(&stored, "/clips/0/actions/0/end/shape/width"),
+        640.0,
+        "the end patch must be STORED, or the inertness below proves nothing"
+    );
+
+    // The state at the action's END, where a patch that did anything would
+    // have fully landed, equals the state before it started — key for key.
+    let before = handle.clip_state(11, 0).expect("clip 11 at 0");
+    let after = handle
+        .clip_state(11, 3_000_000)
+        .expect("clip 11 at the action's end");
+    assert_eq!(
+        at(&before, "/shape"),
+        at(&after, "/shape"),
+        "a shape end patch must be inert: shapes are not animatable"
+    );
+    assert_eq!(
+        num(&after, "/shape/width"),
+        320.0,
+        "the width must not move"
+    );
+    assert_eq!(
+        text(&after, "/shape/gradient/kind"),
+        "linear",
+        "the gradient's kind must not switch at the end the way a video list would"
+    );
+
+    // And the same through the RECIPE, which is what actually draws: the
+    // shape description a layer carries is the clip's own.
+    let start = layer_of(&handle.recipe(0), 11);
+    let end = layer_of(&handle.recipe(3_000_000), 11);
+    assert_eq!(
+        at(&start, "/source/shape"),
+        at(&end, "/source/shape"),
+        "the layer's shape description must not move either"
+    );
+    assert_eq!(
+        text(&start, "/source/hash"),
+        text(&end, "/source/hash"),
+        "and the content hash with it, or Swift would rebuild an identical texture"
     );
 }

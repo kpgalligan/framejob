@@ -28,7 +28,7 @@ Four things in `designs/`, and you want all of them:
 
 ```sh
 make app        # cargo build --release + xcodegen + xcodebuild → build/Build/Products/Release/Reelcut.app
-make test       # cd core && cargo test --release  (368 black-box tests)
+make test       # cd core && cargo test --release  (436 black-box tests)
 make lint       # cargo clippy --all-targets -- -D warnings
 make typecheck  # swiftc -typecheck of app/Sources/*.swift — the ONLY authoritative Swift check
 make project    # xcodegen generate (Reelcut.xcodeproj is generated; project.yml is the source of truth)
@@ -48,10 +48,11 @@ new and yours.
 ```
 core/                Rust staticlib — the model, the ops, the plan, the recipe,
   include/…_core.h     export settings, the generic MCP server. THE FFI CONTRACT
-  src/                 model(+_query/_props/_regions) time edit(+_clip/_edge/
-                       _insert/_props/_track/_time/_paste/_nest/_action/_zoom)
-                       props_check actions transition evaluate recipe nest
-                       audio snap format export(+_size/_overrides) agent ffi*
+  src/                 model(+_query/_props/_regions/_text) time edit(+_clip/
+                       _edge/_insert/_props/_track/_time/_paste/_nest/_action/
+                       _zoom/_background) props_check actions transition
+                       evaluate recipe nest audio snap format
+                       export(+_size/_overrides) agent ffi*
   tests/               black-box, through the FFI (core/CLAUDE.md)
 app/
   Sources/             AppKit app, programmatic UI (app/CLAUDE.md has the map)
@@ -109,7 +110,7 @@ make app
 
 The log line names the port it actually bound (a taken port falls back to an
 ephemeral one). Then drive it with any MCP client over streamable HTTP at
-`http://127.0.0.1:<port>/mcp` — 71 tools: one per §6 op (53) plus the
+`http://127.0.0.1:<port>/mcp` — 73 tools: one per §6 op (55) plus the
 eighteen app-state tools: `open_project`, `new_project`, `save_project`,
 `get_project`, `import_media`, `import_captions`, `export_captions`,
 `transcribe`, `consolidate_media`, `detect_silence`, `normalize_clip`,
@@ -192,25 +193,38 @@ did. The harness also pins every
 state, track height, snapping, guides and the Document tab's checkbox) plus
 `AppleShowScrollBars = Always` in the argument domain, so two renders of one
 package are byte-identical on one machine, mouse or no mouse.
-`tools/proof/phase2_chrome.py`, `phase3_chrome.py`, `phase4_chrome.py` and
-`phase5_chrome.py` are the proofs built on it: a pixel diff of two renders,
-measured against rectangles from the layout constants. `expandSections` is
-what lets one photograph a section built `defaultExpanded: false` — phase
-4's Animation section is the second to need it — and the fact that it was
-already there is worth saying, because a proof that quietly grows its own
-instrument is not a proof.
+`tools/proof/phase2_chrome.py`, `phase3_chrome.py`, `phase4_chrome.py`,
+`phase5_chrome.py` and `phase6_chrome.py` are the proofs built on it: a
+pixel diff of two renders, measured against rectangles from the layout
+constants. `expandSections` is what lets one photograph a section built
+`defaultExpanded: false` — phase 4's Animation section is the second to
+need it — and the fact that it was already there is worth saying, because a
+proof that quietly grows its own instrument is not a proof.
 
 **The second form photographs nothing**, and it is here for the reason to
 remember when the next piece of app arithmetic has no caller a script can
 reach. `CaptionCues` — the four rules that turn recognised words into cues
 (phase 4a) — is Swift, and in the app nothing reaches it until a recogniser
-has produced words, which needs a grant. The harness is the ONE binary in
-the tree that links `app/Sources` from outside the app, so it grew a mode
-that runs the builder over a word list from a file and writes the cues as
-JSON, and `phase4_chrome.py`'s section 8 asserts the four rules over its
-answer at their boundaries. The mode was ADDED beside the render arguments
-rather than folded into them, so every earlier chrome script's argument
-positions still hold.
+has produced words, which needs a grant. The harness links `app/Sources`
+from outside the app — at the time the only thing in the tree that did — so
+it grew a mode that runs the builder over a word list from a file and
+writes the cues as JSON, and `phase4_chrome.py`'s section 8 asserts the
+four rules over its answer at their boundaries. The mode was ADDED beside
+the render arguments rather than folded into them, so every earlier chrome
+script's argument positions still hold.
+
+Two later scripts took the same route rather than photographing something
+they cannot: `phase5_chrome.py` compiles a probe out of `Loudness.swift`
+alone, and **`phase6_chrome.py` compiles one out of the WHOLE of
+`app/Sources`** — a fifty-line `main.swift` over `harness/build.sh`'s own
+`swiftc` line — because a menu lives in `NSApp.mainMenu` and is never drawn
+into a window, so no render at any size can show a Clip-menu item or the
+answer `validateUserInterfaceItem` gives for it. Both cache on modification
+times the way the harness does, and a probe that will not build is a scored
+FAILURE rather than an exit, so a rotted instrument cannot take the rest of
+the score down with it. **When the thing to check is app ARITHMETIC or app
+STRUCTURE with no caller a script can reach, the answer is a probe against
+`app/Sources` and not a photograph.**
 
 ## Milestone status
 
@@ -253,7 +267,7 @@ positions still hold.
   600 frames rather than truncate. The export sheet's Quality row and the
   `export` tool's `video_bitrate` / `audio_bitrate` write the core's two
   override keys in bits per second.
-  **The schema is version 5** (`RC_FORMAT_VERSION` in `core/src/format.rs`
+  **The schema is version 6** (`RC_FORMAT_VERSION` in `core/src/format.rs`
   and the header). Version 2 was M3's: filters, reflection, spotlight,
   `Source::Media.reversed`, audio pan / compressor / noise reduction, and
   `Project.nests` all persist, and a version-1 file still opens — including
@@ -262,8 +276,8 @@ positions still hold.
   empty `Nest`. Version 3 is road map 2's phase 2 — a clip's `name` and
   `label`, a track's `solo` — and has no migrate step, since all three
   default (`format.rs` says why it bumps anyway); version 4 is phase 3's
-  `video.obscure` and version 5 phase 4's `text.animation`, both on the
-  same terms.
+  `video.obscure`, version 5 phase 4's `text.animation` and version 6
+  phase 6's `video.blend` and `shape.gradient`, all on the same terms.
   **Filters, reflection and spotlight render**, through three new passes in
   `Compositor.metal` (blur/sharpen/pixelate fold into the sample, the four
   point filters run in slot order after) with their inspector sections in
@@ -301,9 +315,13 @@ positions still hold.
   `MTAudioProcessingTap` on the mix, which playback and export share. Pan is
   a constant-power law normalised to unity at centre (so 0 is an exact
   bypass), and noise reduction delays its track by 512 samples.
-  Not started: **filters as animatable action targets** beyond what
-  `clamp_video` already bounds. (`AudioProps.mono` was the other thing on
-  this list until road map 2's phase 5a folded it in the tap; the sentence
+  Nothing on this list is open any more, and the LAST entry was never open:
+  **filters as animatable action targets** were routed by M3 itself and
+  bounded by `structural` in phase 3, so road map 2's phase 6 found 6d
+  already shipped and spent that budget on proof and two residual defects
+  instead. That is what a stale "not started" line costs — it is what made
+  the road map plan the same work twice. (`AudioProps.mono` was the other
+  entry until road map 2's phase 5a folded it in the tap; the sentence
   that used to stand here — "turning it on would change how existing
   projects sound" — is true and is the feature, since only a project that
   had deliberately asked for mono changes at all.)
@@ -951,5 +969,167 @@ positions still hold.
   GENERAL `-D HARNESS_REFERENCE_BUILD` flag that every future non-render
   mode goes behind, a fallback to the reference commit's own `main.swift`,
   and a scored FAILURE rather than a `sys.exit` when neither builds.
+
+- **Road map 2, phase 6 — Looks: done.** Two schema keys at version 6, TWO
+  new ops (`OP_NAMES` 53 → **55**), two new tools (the catalog is **73**),
+  and one part of the phase that turned out to be already shipped.
+  **`video.blend`** (`core/src/model_props.rs`) is how a layer combines
+  with what is already on the canvas — `normal`, `multiply`, `screen`,
+  `add`, `overlay`, `darken`, `lighten`, `difference`, the LAST key of
+  `VideoProps`. Its **declaration order is a contract**: it is the shader
+  discriminant, as `ObscureKind`'s is, `ProjectSnapshot.swift` derives
+  `shaderCode` from the case index, and `normal` is 0 with **no `+1`**,
+  unlike the filter and obscure discriminants where 0 buys "empty slot".
+  There is nothing to reserve — a layer has exactly one mode — and
+  reserving it would cost the property that makes the field safe to add to
+  a shipped schema: a zeroed uniform block, a recipe from an older core and
+  a file with no `blend` key must all render source-over, which is what
+  every project drew before the key existed. It belongs to the LAYER and
+  not to a source kind, so media, image, still, text and shape all blend
+  through one fragment stage — which is what lets the proof use shape cards
+  and no media at all.
+  **`shape.gradient`** is `null` or `{kind, stops, angle}` — linear or
+  radial, 2 to `MAX_GRADIENT_STOPS` = **8** stops, `angle` degrees from the
+  RIGHT counter-clockwise (`Shadow.angle`'s convention, the crate's only
+  one) — the last key of `ShapeProps`, taking precedence over `fill` while
+  it is non-null WITHOUT clearing it, so `{gradient: null}` is an exact
+  inverse and the section's Reset brings the colour back. The cap is 8
+  where `MAX_FILTERS` and `MAX_OBSCURE` are 4 because those two are SHADER
+  SLOTS and this is not a budget at all: `LayerRenderers.renderShape` hands
+  the stops to `CGGradient` on the CPU. **The stops are deliberately not
+  order-checked** — `CGGradient` needs monotonic locations, but a refusal
+  would make dragging one stop past another stop working mid-gesture, so
+  the RENDERER sorts, `video.filters` is the precedent, and the proof pins
+  that an unsorted list is accepted and draws the sorted ramp so nobody
+  "fixes" it into a refusal later. `line` and `arrow` have no area and
+  ignore it entirely — stored, range-checked, not drawn, rows disabled —
+  which is `shape.radius`'s precedent exactly. Both fields default, so
+  version 6 has **no migrate step**, and `format.rs`'s paragraph restates
+  the argument in its own words rather than pointing at version 5's: this
+  version's loss is quieter still, because a dropped blend removes nothing
+  from the picture — the layer is still drawn, just source-over.
+  **The renderer is five pipelines from three fragment functions.** Metal
+  cannot call one `fragment` from another, so the whole layer stage moved
+  into a `static inline layerColorPremultiplied` helper and
+  `reelcut_layer_blend_fragment` joined it, reading the destination through
+  `float4 dst [[color(0)]]` — programmable blending, no ping-pong target —
+  and computing the combination itself; both keep the `kGatherFilters`
+  specialization, so four layer states plus the shadow's quad. The refactor
+  landed ALONE and phases 1–5 were re-run before a line of blend code
+  existed, which is what makes "the plain path did not drift by a bit"
+  attributable. `reserved0` became `blendMode`, so the uniform block is
+  still 104 floats / 416 bytes and the padding tail is **two**.
+  Three things live there, all measured — two traps and one fear the
+  mutation run killed. **The two blend pipelines MUST be built with
+  fixed-function blending off**, which Metal enforces nowhere and mentions
+  never; and **what decides whether the double blend SHOWS is the
+  DESTINATION's alpha, not the layer's**. The fragment stage returns the
+  finished composite, whose alpha is `as + ab·(1 - as)` — 1 over any opaque
+  backdrop, so `oneMinusSourceAlpha` is 0 and an opaque fixture is blind at
+  every opacity, half included. The partial-opacity check written for the
+  job passed against the broken build; `phase6_proof.py`'s section 6b — a
+  translucent DESTINATION, read on the ALPHA channel — is the one that
+  fails. **A shadow's mask pass still takes `maskState` and not `state`**,
+  because the mask asks about the layer's SHAPE and no blend mode changes
+  that — but it is DEFENSIVE rather than load-bearing, and the reason
+  everybody gave for it is false: a `multiply` over a destination cleared
+  to 0 is NOT 0, since the premultiplied composite's `(1 - ab)·src` term
+  reduces the whole formula to `src` at `ab` = 0 for all eight modes, and a
+  build passing `state` renders every shadow correctly. Keep the
+  separation — it costs nothing and it names what the mask pass means — and
+  do not repeat the vanishing shadow. And **this compositor blends in the
+  ENCODED sRGB space, deliberately** — nothing uses an `_srgb` format, so
+  "multiply of 50 % grey over 50 % grey is 25 %" is a statement about
+  encoded values and is false in linear light, where the answer is about
+  61/255; a linearise/encode pair would change every blended pixel and make
+  the compositor disagree with itself. That sentence is in
+  `Compositor.metal`, in the proof's docstring and in spec §7.5. The
+  shadow's own DRAW stays fixed-function source-over whatever the mode; the
+  REFLECTION inherits the blend.
+  **A transition forces `normal`, and the CORE says so** —
+  `recipe.rs::layer` emits it for any layer whose `transition` is non-null,
+  because the outgoing dissolve's weight correction is the exact algebraic
+  inverse of the fixed-function destination factor its partner applies, and
+  `add_clip` onto an overlap mints a `cross_dissolve` by default. Do not
+  add a second opinion in Swift. The consequence, said out loud because
+  from either side it reads as a bug: **the recipe's `blend` is what DRAWS
+  and the inspector reads the MODEL's value**, so during an overlap the
+  popup says `multiply` while the frame composites `normal`. A **nest clip
+  cannot blend at all** (`edit_props.rs`'s `check_blend`, refusing only a
+  non-normal MERGED value so `paste_attributes` of an ordinary look still
+  works), and `clamp_video` gained an `is_nest` argument to close the
+  `set_action_end` back door. A blend on a clip INSIDE a nest is allowed
+  and blends against the canvas below the WHOLE nest — an honest limit of
+  the same class as a nest's opacity multiplying each inner layer
+  separately.
+  **The two background ops are `core/src/edit_background.rs`** (401) and
+  they are OPS rather than the app-side composite the road map planned,
+  because that composite cannot be built (the clipboard payload carries no
+  `nests` key) and its repair loses the source WINDOW, so a blurred
+  backdrop of a trimmed clip would show different frames from the
+  foreground. `add_background` puts a plate — a colour, or a media at FILL
+  scale, because a plate that leaves the canvas showing down one side has
+  failed at the one thing a background is for — on a NEW back-most track
+  for the timeline's length; the default is **white, not black**, since the
+  canvas is already black and a black plate is a command that appears to do
+  nothing. `add_blurred_background` clones the clip onto a new back-most
+  track at `fill_scale` (`edit_clip.rs`'s new sibling of `fit_scale`,
+  clamped at the source), centred, uncropped, blended `normal` and blurred
+  at 1.0 — and DROPS five things, each a wrong picture or a wrong sound if
+  carried: `enabled.audio` (or the mix plays one recording twice, which no
+  still frame can see), `audio.duck` (the one field of that group that
+  lowers OTHER material, so a copy keeping it would duck the mix including
+  the clip it came from), the transition, the actions and the label. It
+  refuses a NEST outright, because the flattening drops a nest clip's own
+  filters and the copy would come out sharp. Both mint TWO objects and the
+  TRACK takes the lower id. Clip ▸ Add Background ▸ Solid Color · Image… is a submenu, not
+  a dialog; neither item takes a key equivalent.
+  **6d was already shipped** — `set_action_end` has carried
+  `video.filters` since M3 and `structural` since phase 3 — so the phase's
+  work there was PROOF plus two real defects: an edit to ONE filter inside
+  an action re-pinned every other filter's end value (the section built its
+  array from the EVALUATED list and `merge` replaces an array whole), and
+  `structural` compared a new length against the clip's BASE list while the
+  section read the evaluated one, so with two actions on a clip an ordinary
+  dial could rewrite the base stack. Both are `InspectorBinding.editedList`
+  now: **a write reads the list it is about to REPLACE** — the action's own
+  end list, else the base — while every `read:` stays evaluated. Beside
+  them, `{"filters": [{"amount": 1}]}` over MCP used to reach the core as a
+  BLUR (the decoder fills a missing `kind`) and be reported as success;
+  `checkVideoEnums` refuses a partial entry by index now.
+  **`gradient` is the first nested object in a patch whose misspelt keys
+  are refused BY NAME**, because `shapePatchArg` is hand-built where
+  `shadow`, `chroma`, `obscure` and `animation` go through the generic
+  decoder that silently replaces. Two size payments came first, both
+  before the feature they paid for: `model_props.rs` gave the text
+  vocabulary to `core/src/model_text.rs` (252) and is at **600** with phase
+  6's additions in it — AT the line, taking nothing further without another
+  cut — and `LayerRenderers.swift` gave the text machinery to
+  `LayerRenderersText.swift` (577) before the gradient went in, leaving
+  467. The two background handlers went into a new
+  `AgentServer+Background.swift` (89) rather than into
+  `AgentServer+Clips.swift`, which grew to 1170 anyway.
+  One thing to know before the next bump: **`{"version": 6}` was the tree's
+  "too new, refuse" fixture** in `schema_v3.rs` and `model_tests.rs`, so
+  those three tests are at **7** now and each comment says "one past the
+  current version" rather than a number.
+  Measured: `make test` **428** (368 before — `schema_v6.rs` 17,
+  `background.rs` 34, `evaluate_tests.rs` +5 and `schema_v2.rs` +4, which is
+  where 6d's tests go because the filter list is version 2's feature),
+  `make lint` and `cargo fmt --check` clean, `make typecheck` 0 errors and
+  the same 4 AVFoundation warnings, `make app` building, the catalog at
+  **73 tools** and the startup parity log EMPTY, and phases 1–5 still
+  proving at 66/66, 85/85, 121/121, 8/8, 84/84, 88/88, 26/26, 33/33, 59/59
+  and 81/81 — the first group AFTER the fragment stage was refactored, which
+  is what says the plain layer path did not drift. The phase's own scripts
+  are `tools/proof/phase6_proof.py` over MCP at **167/167** and
+  `phase6_chrome.py` offscreen at **70/70**; the split is sharper than any
+  previous phase's, because phase 6's two features are PIXELS and the
+  offscreen harness can photograph neither — `build.sh` never compiles
+  `Compositor.metal` and the preview well is black with no drawable — so
+  every blend and gradient claim is the MCP script's and the chrome script
+  measures the Blend row, the computed note, the Gradient section and, over
+  a probe it compiles because a menu is never drawn into a window, the two
+  Clip-menu items and their validator.
 
 Keep this file current as code lands.

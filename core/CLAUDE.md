@@ -13,18 +13,42 @@ lockstep are in the root `CLAUDE.md`; the full design is
   its tracks, clips, sources, actions, markers and nests.
 - `model_props.rs` — the schema's VOCABULARY: the §5.2 per-clip property
   types (`VideoProps`, `Crop`, `Shadow`, `ColorAdjust`, `Chroma`,
-  `Filter`, `Reflection`, `AudioProps`, `Compressor`, `Duck`, `TextProps`,
-  `Outline`, `Backdrop`, `TextAnimation`, `ShapeProps`, `Stroke` and their
-  enums) with their
+  `Filter`, `Reflection`, `BlendMode`, `AudioProps`, `Compressor`, `Duck`,
+  `ShapeProps`, `Stroke`, `Gradient`, `GradientKind`, `GradientStop` and
+  their enums) with their
   defaults. Re-exported whole by `model.rs`, so every `crate::model::X`
   path and the `lib.rs` re-exports are unchanged; it is a separate file
   because of the size rule, not a separate concern.
+  `BlendMode`'s declaration ORDER **is** load-bearing — it is the shader
+  discriminant, as `ObscureKind`'s is: `ProjectSnapshot.swift` derives
+  `shaderCode` from the case index and `Compositor.metal` compares against
+  integer constants in the same order, so a mode may be appended and the
+  eight may never be reordered. `Normal` is 0 with no `+1`, unlike the
+  filter and obscure discriminants where 0 is reserved for "empty slot":
+  a layer has exactly one blend mode, and 0 meaning source-over is what
+  makes a zeroed uniform block, a recipe from an older core and a file
+  with no `blend` key all render what every project drew before the key
+  existed.
+- `model_text.rs` — the text vocabulary: `TextProps`, the `TextAlign` and
+  `TextVAlign` it is placed by, the `Outline` and `Backdrop` drawn with
+  it, and the `TextAnimation` and `TextAnimationKind` that reveal it. Cut
+  out of `model_props.rs` in road map 2's phase 6, when that file stood at
+  592 owing `video.blend` and `shape.gradient`, and cut HERE because text is
+  the one property group the model cannot MEASURE: every other group is
+  quantities the core bounds, interpolates and solves geometry against,
+  while only the platform can lay a string out and the measurement comes
+  back the other way, through a cache the renderer fills. Nothing in this
+  file is ever a measured size, and that is a standing rule rather than an
+  omission. Re-exported whole by `model_props.rs`, which `model.rs`
+  re-exports whole in turn, so `crate::model::TextProps` and every other
+  path is unchanged; `VideoProps.blend` and `ShapeProps.gradient`, the
+  fields phase 6 added, stay with their own groups.
   `TextAnimationKind` is closed at three for `ObscureKind`'s reason — each
   variant is a different drawing routine and there is no neutral one to
   fall back to — but its declaration ORDER is not load-bearing, where
-  `ObscureKind`'s is a shader discriminant: the recipe carries a reveal's
-  kind by NAME. The JSON spelling of a variant still is, so a rename needs
-  a migration step.
+  `ObscureKind`'s and `BlendMode`'s are shader discriminants: the recipe
+  carries a reveal's kind by NAME. The JSON spelling of a variant still
+  is, so a rename needs a migration step.
 - `model_regions.rs` — the boxes drawn ON the picture: `Spotlight`,
   `ObscureRegion`, the `SpotShape` both are drawn with and the
   `MAX_OBSCURE` budget on the second. Cut out of `model_props.rs` in road
@@ -53,9 +77,15 @@ lockstep are in the root `CLAUDE.md`; the full design is
   schema table** (the `adjust.rs` pattern in Rasterize) and
   `app/Sources/ReelCore.swift`'s typed builders mirror it.
 - `edit_clip.rs` / `edit_props.rs` / `edit_track.rs` / `edit_time.rs` — the
-  §6 ops in `impl Project` blocks: clip placement; the five property
+  §6 ops in `impl Project` blocks: clip placement (with `fit_scale` and,
+  since phase 6, its sibling `fill_scale` — Fit is a RESCUE for oversized
+  footage and Fill is a REQUIREMENT, so Fill ignores `canvas.fit_new_clips`,
+  scales up as readily as down, and clamps to `SCALE_MAX` here rather than
+  leaving a caller to); the five property
   patches (the four groups, and `set_clip` for the clip's own name and
-  label) and `Group`, the vocabulary the patches and `paste_attributes`
+  label), `check_blend` — the one check that is about a CLIP rather than a
+  value, refusing a non-normal blend on a nest clip — and `Group`, the
+  vocabulary the patches and `paste_attributes`
   share; tracks, markers, canvas, media; ripple, insert time, range delete
   (one range or several — `ripple_delete_ranges` merges its pairs and cuts
   right to left as ONE edit, and the singular delegates to it), freeze
@@ -71,7 +101,16 @@ lockstep are in the root `CLAUDE.md`; the full design is
   produced the struct it reads. `Project::check_group` (still in
   `edit_props.rs`) is how a patch and a `paste_attributes` copy run the
   same check, so a hand-written payload cannot smuggle in a value the
-  inspector would refuse.
+  inspector would refuse. `check_shape`'s `shape.gradient` arm (format
+  version 6) is where the file's one deliberate ABSENCE is argued: the
+  stops are checked for count, range and colour and NOT for order, because
+  `CGGradient` needs monotonic locations but a refusal would make dragging
+  one stop past another stop working half way through the gesture — so the
+  renderer sorts, `video.filters` is the precedent for an ordered list the
+  core does not police, and the comment says so where the check would have
+  gone. One check does NOT live here at all: `check_blend`, which refuses
+  a blend mode on a nest clip, is `edit_props.rs`'s, because it is a fact
+  about the CLIP and nothing in this file is handed one.
 - `edit_edge.rs` / `edit_insert.rs` — the cutting moves that keep something
   fixed on purpose: `slip` and `roll` (the clip's place, and the pair's
   outer edges), `insert_clip` and `overwrite_clip` (the other tracks, and
@@ -103,6 +142,33 @@ lockstep are in the root `CLAUDE.md`; the full design is
   refusal `add_action` documents is inherited rather than re-copied; the
   canvas band, the inspector's button and the MCP tool all reach the same
   arithmetic here rather than deriving it three times.
+- `edit_background.rs` — `add_background` and `add_blurred_background`,
+  what goes BEHIND the picture (road map 2, phase 6c): a plate (a colour,
+  or an image) or a blurred copy of a clip, each ONE clip on a NEW track
+  at index 0 — not on the back-most EXISTING track, because a fresh track
+  is the only place "behind everything" is true whatever the stack already
+  holds, and it means no overlap to check and one undo step to take it all
+  away. They are OPS rather than the app-side composite the road map
+  planned, and the module doc argues it: the proposed recipe cannot be
+  built (the clipboard payload carries no `nests` key), its repair with
+  `add_clip` loses the source WINDOW so a backdrop drifts out of sync with
+  the clip it copies, and here it is `clip.clone()` with six VIDEO fields
+  overwritten — `scale`, `x`, `y`, `crop`, `filters`, `blend` — over
+  vocabulary the app lacks: the source's pixel size,
+  `edit_clip.rs`'s `fill_scale`, and the `SCALE_MAX` clamp on it. The rule
+  `insert_clip`, `overwrite_clip` and `add_zoom_action` already name: a
+  composite becomes an op when composing it carries a constraint no single
+  half states. The doc's second half is what a blurred copy does NOT keep —
+  its audio switch and its `audio.duck` (first, because both are INVISIBLE
+  in a still frame and a frame proof passes with them wrong: the switch
+  plays one recording twice, and a duck is not gated by the switch, so a
+  copy carrying one would duck the whole mix including the clip it came
+  from), its transition, its actions and its label. It refuses a NEST by
+  name for the reason `nest.rs`'s `Frame` doc gives as its third limit —
+  the flattening drops a nest clip's own filters, so the copy would come
+  out sharp — and `add_background`'s media plate takes `fill_scale` where
+  `add_clip` takes Fit, since a plate leaving the canvas showing down one
+  side has failed at its one job.
 - `actions.rs` — action evaluation and interpolation; `clip_state`; and
   `clamp_video`, the evaluator's last line of defence, which bounds every
   value an end patch can carry (`set_action_end` is deliberately lenient,
@@ -120,6 +186,14 @@ lockstep are in the root `CLAUDE.md`; the full design is
   would have frozen the geometry of every spotlight animation: a silent
   change to shipped behaviour, which `core/tests/schema_v2.rs` now pins
   against.
+  `clamp_video` carries one bound that is not a range: a NEST clip's
+  evaluated `blend` is forced to `normal` (format version 6). It takes an
+  `is_nest` argument for it, decided from the clip's source at the one
+  call site, because `set_action_end` validates nothing beyond "is it an
+  object" and an end patch would otherwise carry a blend onto a nest clip
+  past every check the op path has. Closing it in the evaluator closes the
+  recipe, `clip_state` and both export writers at once, which no per-op
+  check can.
 - `transition.rs` — overlap detection, the overlap rule, progress at *t*.
 - `evaluate.rs` — `composition_plan()` (A/B assignment, instruction
   tiling) and the `assign()` the recipe shares with it.
@@ -147,6 +221,20 @@ lockstep are in the root `CLAUDE.md`; the full design is
   from its first frame to its last. `evaluate_tests.rs` sweeps ten timings
   frame by frame and asserts that the phase turns only where the frame
   before it was fully revealed.
+  It is also where a layer's `blend` is emitted, and the ONE place a model
+  value is deliberately OVERRIDDEN rather than only evaluated: a layer
+  whose `transition` is non-null is written as `"normal"` whatever the
+  clip says, because the outgoing half of a dissolve divides its weight by
+  the attenuation the incoming pass applies, which is the exact algebraic
+  inverse of a FIXED-FUNCTION destination factor — and `add_clip` onto an
+  overlap mints a `cross_dissolve` by default, so the wrong picture is a
+  minute away. The decision is the core's for `Reveal`'s reason: one
+  description, so preview, `render_frame` and both export writers cannot
+  disagree, and a core test can read the layer's `blend` at a tick inside
+  the overlap where the shader's version would need two PNGs. Say the
+  consequence rather than hiding it — the recipe's `blend` is what DRAWS
+  while the inspector reads the MODEL's value through `clip_state`, so the
+  two legitimately differ during an overlap.
 - `nest.rs` — flattening a nest into the clips it stands for, and the
   transform they inherit. Every walk over "what actually plays" goes
   through it: `evaluate.rs`, `recipe.rs` and `audio.rs` all consume its
@@ -202,28 +290,30 @@ banner section is the signal to split. Every module keeps a `//!` doc;
 numeric/algorithmic choices get prose "why" comments.
 
 Three modules are over the cap today and are known debt, not licence:
-`edit_clip.rs` (1226 — the placement ops are one concern and every further
+`edit_clip.rs` (1252 — the placement ops are one concern and every further
 cut fragments it; the action ops were the M3 cut, into `edit_action.rs`),
-`edit.rs` (730 — a module doc that IS the op table and grows a row per op,
-which is what took it over in phase 3) and `edit_track.rs` (674 — tracks,
-markers, canvas and media, four small concerns in one block). Do not add to
+`edit.rs` (760 — a module doc that IS the op table and grows a row per op,
+which is what took it over in phase 3 and what phase 6's two background
+rows added to again) and `edit_track.rs` (674 — tracks, markers, canvas and
+media, four small concerns in one block). Do not add to
 any of them without taking something out: a new placement op goes in a new
 module (`edit_edge.rs`, `edit_insert.rs`), a new op with a concern of its
-own goes in one too (`edit_zoom.rs` was phase 3's), and the next cut in
+own goes in one too (`edit_zoom.rs` was phase 3's and
+`edit_background.rs` phase 6's), and the next cut in
 `edit_track.rs` is `set_canvas` with its `rescale` / `resnap` /
-`check_dimension` helpers into an `edit_canvas.rs`. One more sits exactly
-at the line and takes nothing without a cut of its own: `edit_paste.rs`
-(600).
+`check_dimension` helpers into an `edit_canvas.rs`.
 
-Phase 3's other growth stayed comfortably under, and phase 4 put a fourth
-file beside them: `actions.rs` is 552 (the list rule and `clamp_video`'s
-region block), `edit_time.rs` 526 (`ripple_delete_ranges`, which the
-singular now delegates to rather than duplicating), `edit_zoom.rs` 390 —
-the new module the geometry went into rather than a fifth function in
-`edit_action.rs` — and `recipe.rs` 567, up from 331 when phase 4c put the
-reveal there (`Reveal`, `ramp`, `text_hash`, and the prose arguing why the
-hash covers the answer). Those four are the files to weigh a phase-6
-addition against next.
+**Three modules now sit exactly AT the line and take nothing further
+without a cut of their own**: `edit_paste.rs` (600), `recipe.rs` (600 —
+331 before phase 4c put the reveal there, 567 after it, and 600 once phase
+6 added the layer's `blend` and the argument for forcing it) and
+`model_props.rs` (600, which is the worked example below). The others
+phase 6 touched are still under: `actions.rs` 573 (the list rule,
+`clamp_video`'s region block and its nest-blend bound), `props_check.rs`
+350 (the gradient's four checks and the ordering check it argues instead
+of making), `edit_props.rs` 450 (`check_blend`), `edit_time.rs` 526 and
+`edit_zoom.rs` 390. Those, and the three at the line, are the files to
+weigh a phase-7 addition against next.
 
 **`export.rs` paid the rule in phase 5 and is the worked example.** It
 stood at 578 against the cap, and phase 5 owed it two container variants,
@@ -249,15 +339,18 @@ walk to `nest.rs`. `model_props.rs` then paid the rule itself: 531 at the
 phase-2 cut, 633 once phase 3c added `video.obscure`'s types, and 498 once
 the region vocabulary went out to `model_regions.rs` (218).
 
-**`model_props.rs` is at 592 today** — `TextAnimation` and
-`TextAnimationKind` (phase 4c) put ninety-four lines back — which is under
-the cap and close enough to it to be the same warning phase 3 got: a file
-at the line gives something up BEFORE it takes anything on, and phase 6
-adds properties to this one. The cut when it comes is by CONCERN, the way
-`model_regions.rs` was: the text vocabulary (`TextProps`, `Outline`,
-`Backdrop`, `TextAnimation`, `TextAlign`, `TextVAlign`,
-`TextAnimationKind`) is the obvious one, and it is roughly two hundred
-lines.
+**`model_props.rs` made that cut in phase 6 and is at 600 today.** It stood
+at 592 and owed `video.blend` and `shape.gradient`, so it gave something up
+BEFORE it took anything on — the warning phase 3 had already handed it, and
+the cut both this file and the road map had named in advance. The text
+vocabulary (`TextProps`, `TextAlign`, `TextVAlign`, `Outline`, `Backdrop`,
+`TextAnimation`, `TextAnimationKind`) went to `model_text.rs` (252),
+re-exported whole, and the seam is nameable rather than convenient: text is
+the one property group the model cannot MEASURE. The shape vocabulary was
+the alternative and was refused — it leaves about 27 lines of headroom, and
+`Gradient` belongs beside the `ShapeProps` that holds it. So the file is
+back AT the line with the phase's additions in it, and the next phase to
+add a property here owes it another cut first.
 
 **One implementation per algorithm.** Before writing time math, find the
 existing implementation and route through it. Shared constants have exactly
@@ -288,20 +381,37 @@ Export names mirror the Rust method exactly.
 **Format changes.** Any change to persisted project state bumps
 `RC_FORMAT_VERSION` in `format.rs` **and** the `#define` in
 `core/include/reelcut_core.h`; the reader must keep accepting every prior
-version; the writer enforces the reader's caps. The version is 5. A bump
+version; the writer enforces the reader's caps. The version is 6. A bump
 whose new fields all carry a serde default needs no migrate step —
 version 3 (a clip's `name` and `label`, a track's `solo`), version 4
-(`video.obscure`, the hidden regions of phase 3c) and version 5
-(`text.animation`, phase 4c's reveal) have none, and
+(`video.obscure`, the hidden regions of phase 3c), version 5
+(`text.animation`, phase 4c's reveal) and version 6 (`video.blend` and
+`shape.gradient`, phase 6's two looks) have none, and
 `format.rs`'s MIGRATION HOOK comment says so — but they still bump, so an
 older build refuses a file whose fields it would otherwise silently drop;
 a bump that changes a field's SHAPE adds a step there (`migrate_1_to_2`).
 It is the fields needing NO migration whose loss is the quietest, which is
-why `format.rs`'s version-5 paragraph restates the argument rather than
-pointing back at version 3's: unknown keys are ignored at every level by
+why `format.rs`'s version-5 and version-6 paragraphs each restate the
+argument in their own words rather than pointing back at version 3's:
+unknown keys are ignored at every level by
 design, so without the gate an older build would open the file, drop every
-animation on read, and write the loss back on the next save with the text
-still on screen.
+animation — or every blend and every gradient — on read, and write the loss
+back on the next save with the text still on screen. Version 6's is quieter
+still, and its paragraph says so: a dropped blend takes nothing OUT of the
+picture, since the layer is still drawn, just source-over.
+
+**And a trap the bump to 6 walked into, recorded so the next one does
+not.** `{"version": 6}` was the tree's "too new, refuse" fixture in
+`core/tests/schema_v3.rs` and `core/tests/model_tests.rs`; the moment
+`RC_FORMAT_VERSION` reached 6 those three tests stopped testing the gate
+and started testing that a CURRENT file opens — green either way. They are
+at 7 now, and the comment beside each says "one past the current version"
+rather than naming a number. Two more sites in that sweep are not
+substitutions: `schema_v3.rs`'s gate hard-codes both numbers inside a
+literal message string, and `schema_v4.rs` asserted BY LITERAL TEXT that
+`obscure` closes the video object, which appending `blend` falsifies by
+design — that assertion moved onto the pair rather than being deleted,
+because what it pins is that a new key lands at the END.
 Either way a `schema_vN.rs` test opens the previous versions' fixtures
 and reads the new keys' ORDER off the written text, since a parsed
 `serde_json::Value` sorts them.

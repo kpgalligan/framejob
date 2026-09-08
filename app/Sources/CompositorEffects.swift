@@ -238,6 +238,22 @@ extension RecipeLayer {
     var needsGather: Bool {
         filters.needsGather || obscure.contains { $0.kind == .blur }
     }
+
+    /// True when this layer must be drawn by the fragment stage that READS
+    /// the destination — `reelcut_layer_blend_fragment`, on a pipeline with
+    /// fixed-function blending disabled (format version 6).
+    ///
+    /// `normal` is not merely the default here, it is the fast path: the
+    /// general formula in `blendPremultiplied` reduces algebraically to the
+    /// fixed-function factors at `normal`, so a layer that says `normal` gets
+    /// exactly the pixels it always got, from exactly the pipeline it always
+    /// used, and a project that has never heard of blend modes touches none
+    /// of this. The recipe also arrives at `normal` for any layer inside a
+    /// TRANSITION, which the core decides (`recipe.rs::layer`) — so this
+    /// predicate needs no clause about overlaps either.
+    var needsBlend: Bool {
+        blend != .normal
+    }
 }
 
 extension Collection where Element == FilterProps {
@@ -255,18 +271,25 @@ extension Collection where Element == FilterProps {
 
 extension MetalRenderer {
 
-    /// The layer fragment stage, specialized on `kGatherFilters`.
+    /// A layer fragment stage, specialized on `kGatherFilters`.
     ///
     /// The shader declares that constant with no default, which means the
     /// UNSPECIALIZED function cannot build a pipeline at all — Metal refuses
-    /// it at validation. So this is the only way the fragment function is ever
-    /// made, and both of the renderer's layer pipelines come through here.
-    static func layerFragment(_ library: MTLLibrary, gather: Bool) -> MTLFunction? {
+    /// it at validation. So this is the only way a layer fragment function is
+    /// ever made, and all FOUR of the renderer's layer pipelines come through
+    /// here: two entry points × two specializations.
+    ///
+    /// `name` defaults to the plain entry point rather than being required,
+    /// because the gather flag is the axis that has always been here and the
+    /// blend entry point is the exception; the two call sites that want it
+    /// name it, which is also what makes them findable.
+    static func layerFragment(
+        _ library: MTLLibrary, name: String = "reelcut_layer_fragment", gather: Bool
+    ) -> MTLFunction? {
         let values = MTLFunctionConstantValues()
         var flag = gather
         values.setConstantValue(&flag, type: .bool, index: 0)
-        return try? library.makeFunction(
-            name: "reelcut_layer_fragment", constantValues: values)
+        return try? library.makeFunction(name: name, constantValues: values)
     }
 
     /// A layer's reflection: ONE extra draw of the same pipeline, the same
@@ -289,6 +312,17 @@ extension MetalRenderer {
     /// than after everything. A reflection therefore never picks up what sits
     /// on top of its own layer, which is the same trade every real-time
     /// reflection makes.
+    ///
+    /// **A reflection INHERITS its layer's blend mode** (format version 6),
+    /// and that is the deliberate answer rather than the free one, though it
+    /// happens to also be free: this draw uses whatever pipeline the caller
+    /// has already bound, which is the layer's own. It is a mirror of the
+    /// layer's ink, so it should meet the backdrop the way the ink does — a
+    /// screened layer's reflection screens, a multiplied one multiplies. That
+    /// is the opposite of the choice a SHADOW makes (`encodeShadow`), and the
+    /// two are opposite for the same reason: a shadow is light falling on the
+    /// backdrop and belongs to the scene, a reflection is the layer seen
+    /// again and belongs to the layer.
     func encodeReflection(
         uniforms: LayerUniforms, texture: MTLTexture, encoder: MTLRenderCommandEncoder
     ) {

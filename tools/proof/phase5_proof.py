@@ -543,10 +543,14 @@ def catalog_part(mcp):
     what phase 5 added to the catalog."""
     print("catalog")
     names = mcp.tools()
+    # A FLOOR, not an equality. It was `==` while phase 5 was the newest
+    # phase, because the exact count is the only thing that tells a stale
+    # binary on the port from the build under test — but that job belongs to
+    # whichever phase is newest, and phase 6 took it over with two background
+    # tools. Phase 4 handed the same duty to phase 5 the same way.
     check(
-        len(names) == TOOLS,
-        f"the catalog holds exactly phase 5's {TOOLS} tools (got {len(names)}) — the "
-        "guard against a stale binary on the port",
+        len(names) >= TOOLS,
+        f"the catalog holds phase 5's {TOOLS} tools or more (got {len(names)})",
     )
     check("normalize_clip" in names, "normalize_clip is a tool")
 

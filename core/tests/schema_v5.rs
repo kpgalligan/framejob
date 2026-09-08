@@ -7,7 +7,9 @@
 //!
 //! - **Every older file still opens.** The field is an `Option` and
 //!   defaults to `None`, so there is no migration step and a version-1, -2,
-//!   -3 or -4 file reads back with no animation at all, stamped version 5.
+//!   -3 or -4 file reads back with no animation at all, stamped at the
+//!   current version — 6 since phase 6, which is why the assertions below
+//!   name it rather than 5.
 //!   The BUMP is still the point, and this is the version where it looks
 //!   most like paperwork: unknown keys are ignored at every level by design
 //!   (`model.rs`'s module doc), so without the version gate a version-4
@@ -91,7 +93,7 @@ fn one_clip(version: u32) -> Value {
 
 /// [`one_clip`] at the current version — the handle the op tests patch.
 fn plain() -> Handle {
-    Handle::from_value(&one_clip(5))
+    Handle::from_value(&one_clip(6))
 }
 
 /// Every field away from its default: a word fade rather than the default
@@ -117,7 +119,7 @@ fn set_text(patch: Value) -> Value {
 // ---- reading older files -------------------------------------------------
 
 fn assert_no_animation(project: &Value) {
-    assert_eq!(at(project, "/version"), &json!(5));
+    assert_eq!(at(project, "/version"), &json!(6));
     assert_eq!(at(project, "/clips/0/text/animation"), &Value::Null);
     // The neighbours a version-5 reader adds nothing to, so a file that
     // gained an absent animation gained ONLY that.
@@ -149,7 +151,7 @@ fn every_older_version_reads_the_same_way() {
 #[test]
 fn the_animation_round_trips_exactly() {
     let written = Handle::from_value(&animated()).value();
-    assert_eq!(at(&written, "/version"), &json!(5));
+    assert_eq!(at(&written, "/version"), &json!(6));
 
     let animation = at(&written, "/clips/0/text/animation");
     assert_eq!(text(animation, "/kind"), "word_fade");

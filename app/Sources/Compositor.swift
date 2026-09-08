@@ -323,7 +323,8 @@ struct LayerUniforms {
     // list.
     //
     // The M3 block's 28 begin with the four floats that used to be
-    // `reserved0…3`; the obscure block's 36 restore a padding tail of three.
+    // `reserved0…3`; the obscure block's 36 restored a padding tail of three,
+    // of which phase 6's `blendMode` spent the first, leaving TWO.
     // 40 + 28 + 36 = 104 floats = 416 bytes, and 416 is 26 × 16.
     var filterKind0: Float = 0
     var filterKind1: Float = 0
@@ -400,10 +401,21 @@ struct LayerUniforms {
     var obscure3Feather: Float = 0
     var obscure3Kind: Float = 0
     var obscure3Amount: Float = 0
-    // The padding tail, back after the M3 block consumed the last one. Three
-    // floats, so the next field to land can be added on its own; a fourth
-    // needs three companions again.
-    var reserved0: Float = 0
+    /// How this layer combines with what is already on the canvas: a
+    /// `BlendMode.shaderCode` (format version 6). It took the FIRST of the
+    /// three floats the obscure block's padding tail left behind, so phase 6
+    /// added zero bytes to this struct — which is what that tail is for.
+    ///
+    /// Read only by `reelcut_layer_blend_fragment`, which is the pipeline a
+    /// layer gets when this is not 0. Every other draw — including every
+    /// shadow MASK pass, whatever the layer's mode — goes through the plain
+    /// entry point, which never looks at it.
+    var blendMode: Float = 0
+    // The padding tail, one float shorter than it was. TWO floats now, so
+    // the next field to land can be added on its own; a THIRD needs three
+    // companions again. They keep their names rather than being renumbered
+    // from zero, so the two lists still read as one — `Compositor.metal`
+    // says why.
     var reserved1: Float = 0
     var reserved2: Float = 0
 }
@@ -542,6 +554,17 @@ final class MetalRenderer {
     /// measurement that made this a second pipeline instead of a branch, and
     /// `Collection.needsGather` for which layers get it.
     private let gatherPipeline: MTLRenderPipelineState
+    /// The two blend specializations (format version 6): the same two
+    /// fragment stages compiled from `reelcut_layer_blend_fragment`, which
+    /// reads the destination through `[[color(0)]]` and computes the
+    /// combination itself. Built with `blending: false`, which is the whole
+    /// correctness argument — see `pipelineDescriptor`.
+    ///
+    /// Five pipelines, then, from three fragment functions: plain, plain +
+    /// gather, blend, blend + gather, and the shadow. `pipelineState(gather:
+    /// blend:)` picks one of the first four per layer.
+    private let blendPipeline: MTLRenderPipelineState
+    private let blendGatherPipeline: MTLRenderPipelineState
     /// The full-canvas quad that draws one blurred mask as a shadow (§7.5).
     private let shadowPipeline: MTLRenderPipelineState
     private let sampler: MTLSamplerState
@@ -595,6 +618,10 @@ final class MetalRenderer {
             let vertexFunction = library.makeFunction(name: "reelcut_layer_vertex"),
             let fragmentFunction = MetalRenderer.layerFragment(library, gather: false),
             let gatherFunction = MetalRenderer.layerFragment(library, gather: true),
+            let blendFunction = MetalRenderer.layerFragment(
+                library, name: "reelcut_layer_blend_fragment", gather: false),
+            let blendGatherFunction = MetalRenderer.layerFragment(
+                library, name: "reelcut_layer_blend_fragment", gather: true),
             let shadowVertex = library.makeFunction(name: "reelcut_shadow_vertex"),
             let shadowFragment = library.makeFunction(name: "reelcut_shadow_fragment")
         else { return nil }
@@ -608,6 +635,18 @@ final class MetalRenderer {
                 descriptor: MetalRenderer.pipelineDescriptor(
                     label: "Reelcut layer, gathering", vertex: vertexFunction,
                     fragment: gatherFunction)),
+            // Blending OFF on both blend states: the fragment stage returns
+            // the finished pixel, and a fixed-function pass over it would
+            // blend the frame twice. Metal accepts the pipeline either way and
+            // says nothing — see `pipelineDescriptor`.
+            let blendPipeline = try? device.makeRenderPipelineState(
+                descriptor: MetalRenderer.pipelineDescriptor(
+                    label: "Reelcut layer, blending", vertex: vertexFunction,
+                    fragment: blendFunction, blending: false)),
+            let blendGatherPipeline = try? device.makeRenderPipelineState(
+                descriptor: MetalRenderer.pipelineDescriptor(
+                    label: "Reelcut layer, blending and gathering", vertex: vertexFunction,
+                    fragment: blendGatherFunction, blending: false)),
             let shadowPipeline = try? device.makeRenderPipelineState(
                 descriptor: MetalRenderer.pipelineDescriptor(
                     label: "Reelcut shadow", vertex: shadowVertex, fragment: shadowFragment))
@@ -647,6 +686,8 @@ final class MetalRenderer {
         self.commandQueue = commandQueue
         self.pipeline = pipeline
         self.gatherPipeline = gatherPipeline
+        self.blendPipeline = blendPipeline
+        self.blendGatherPipeline = blendGatherPipeline
         self.shadowPipeline = shadowPipeline
         self.sampler = sampler
         self.textureCache = cache
@@ -659,19 +700,33 @@ final class MetalRenderer {
         fatalError("MetalRenderer does not support NSCoder")
     }
 
-    /// The compositor's ONE blend mode, in descriptor form: source-over on
-    /// PREMULTIPLIED colour, so the source factor is one and not source alpha.
-    /// Both pipelines are built from this — a shadow is just another layer,
-    /// drawn under its own.
+    /// The compositor's FIXED-FUNCTION blend, in descriptor form: source-over
+    /// on PREMULTIPLIED colour, so the source factor is one and not source
+    /// alpha. All five pipelines come through here and three of them take it
+    /// as written — a shadow is just another layer, drawn under its own.
+    ///
+    /// **`blending: false` is for a programmable-blend pipeline, and it is a
+    /// correctness requirement rather than an optimisation.**
+    /// `reelcut_layer_blend_fragment` reads the destination itself and returns
+    /// the finished pixel, so leaving the fixed-function stage on would blend
+    /// that finished pixel into the destination a SECOND time. Metal builds
+    /// the pipeline either way — no error, no validation warning, no log —
+    /// and at alpha 1 the double blend is invisible, because
+    /// `oneMinusSourceAlpha` is 0 and the second pass is the identity. It only
+    /// shows on a TRANSLUCENT blended layer. Nothing in the toolchain enforces
+    /// this and no opaque test catches it, which is why the proof carries a
+    /// partial-opacity check (B6) whose only job is to fail when this line is
+    /// wrong.
     private static func pipelineDescriptor(
-        label: String, vertex: MTLFunction, fragment: MTLFunction
+        label: String, vertex: MTLFunction, fragment: MTLFunction, blending: Bool = true
     ) -> MTLRenderPipelineDescriptor {
         let descriptor = MTLRenderPipelineDescriptor()
         descriptor.label = label
         descriptor.vertexFunction = vertex
         descriptor.fragmentFunction = fragment
         descriptor.colorAttachments[0].pixelFormat = .bgra8Unorm
-        descriptor.colorAttachments[0].isBlendingEnabled = true
+        descriptor.colorAttachments[0].isBlendingEnabled = blending
+        guard blending else { return descriptor }
         descriptor.colorAttachments[0].rgbBlendOperation = .add
         descriptor.colorAttachments[0].alphaBlendOperation = .add
         descriptor.colorAttachments[0].sourceRGBBlendFactor = .one
@@ -679,6 +734,19 @@ final class MetalRenderer {
         descriptor.colorAttachments[0].destinationRGBBlendFactor = .oneMinusSourceAlpha
         descriptor.colorAttachments[0].destinationAlphaBlendFactor = .oneMinusSourceAlpha
         return descriptor
+    }
+
+    /// One of the four layer pipelines. Two independent specializations, so
+    /// four states rather than a hierarchy: `gather` is a function constant
+    /// (`kGatherFilters`, whose measurement is in the shader) and `blend`
+    /// picks the entry point that reads the destination.
+    private func pipelineState(gather: Bool, blend: Bool) -> MTLRenderPipelineState {
+        switch (gather, blend) {
+        case (false, false): return pipeline
+        case (true, false): return gatherPipeline
+        case (false, true): return blendPipeline
+        case (true, true): return blendGatherPipeline
+        }
     }
 
     /// Drops the `CVMetalTexture`s wrapping the previous render context's
@@ -754,11 +822,22 @@ final class MetalRenderer {
             // blurs gathers exactly as a blur filter does — and both gather
             // sites in the shader are compiled out of the other pipeline, so
             // getting this wrong renders the region plain and silently.
-            let state = layer.needsGather ? gatherPipeline : pipeline
+            //
+            // A non-normal blend mode picks the other entry point on the same
+            // two specializations (format version 6), so the two questions are
+            // independent and there are four states.
+            let state = pipelineState(gather: layer.needsGather, blend: layer.needsBlend)
+            // The SHADOW's mask pass takes the same specialization WITHOUT
+            // the blend — see `encodeShadow`, which argues it at length. The
+            // one-line version: the mask is coverage, not ink. It is
+            // defensive and not load-bearing — a blend over the cleared mask
+            // reduces to the source exactly — and `encodeShadow` says how
+            // that was measured.
+            let maskState = layer.needsGather ? gatherPipeline : pipeline
             if let shadow = layer.shadow {
                 encodeShadow(
                     shadow, uniforms: uniforms, texture: texture, canvas: canvas,
-                    state: state, pass: &pass)
+                    maskState: maskState, pass: &pass)
             }
             // Cheap when the pass is already open, which for an unshadowed
             // layer it always is: the encoder, the pipeline state and the
@@ -907,9 +986,44 @@ final class MetalRenderer {
     /// that two shadows cannot overlap on the GPU. That is the right trade at
     /// two or three shadows in a frame, and the reason to revisit it is
     /// thirty.
+    ///
+    /// **`maskState` is the layer's specialization WITHOUT its blend.** The
+    /// mask is a question about the layer's SHAPE, which no blend mode
+    /// changes, so it takes the gather specialization alone.
+    ///
+    /// **It is defensive rather than load-bearing, and that was MEASURED —
+    /// the obvious fear about it is wrong.** The fear, which this comment
+    /// used to state as fact: step 1 draws coverage into a mask texture
+    /// cleared to transparent black, so a `multiply` over that empty
+    /// destination would be 0 everywhere and the shadow of every blended
+    /// layer would silently vanish. It does not. That is true of a NAIVE
+    /// `src · dst` and false of the premultiplied composite the shader
+    /// actually runs, whose `(1 - ab)·src` term carries the source through an
+    /// empty destination untouched: at `ab` = 0 the whole formula reduces to
+    /// `src` exactly, for all eight modes, `add` included. It is the same
+    /// property that lets a corner radius and a nest's clip rectangle work —
+    /// a fully transparent fragment leaves the destination alone — read from
+    /// the other side.
+    ///
+    /// So a build that passes `state` here renders every shadow correctly and
+    /// `phase6_proof.py` scores 163/163 against it. The separation stays
+    /// because it costs nothing, because it says what the mask pass means,
+    /// and because a future formula without that term would make the hazard
+    /// real again — not because it is holding a bug back today.
+    ///
+    /// **The shadow's own DRAW stays fixed-function source-over**, on
+    /// `shadowPipeline`, whatever the layer's mode. A shadow is light falling
+    /// on the backdrop, not the layer's ink: a screened layer casting a
+    /// screened shadow would brighten what is behind it twice, and a
+    /// difference-blended one would cast a shadow that inverts the frame. It
+    /// also keeps the shadow of a blended layer identical to the shadow of the
+    /// same layer at `normal`, which is what the proof measures (B4).
+    ///
+    /// (The third member of that family, the REFLECTION, goes the other way
+    /// and inherits the blend — `encodeReflection` says why.)
     private func encodeShadow(
         _ shadow: ShadowProps, uniforms: LayerUniforms, texture: MTLTexture,
-        canvas: RecipeCanvas, state: MTLRenderPipelineState, pass: inout DestinationPass
+        canvas: RecipeCanvas, maskState: MTLRenderPipelineState, pass: inout DestinationPass
     ) {
         func component(_ index: Int) -> Float {
             index < shadow.color.count ? Float(min(max(shadow.color[index], 0), 1))
@@ -934,7 +1048,7 @@ final class MetalRenderer {
         guard
             let silhouette = shadowSilhouette(
                 uniforms: uniforms, texture: texture, sigma: sigma, canvas: canvas,
-                state: state, pass: &pass),
+                maskState: maskState, pass: &pass),
             let encoder = pass.open()
         else { return }
 
@@ -981,7 +1095,7 @@ final class MetalRenderer {
     /// the reason `DestinationPass` exists.
     private func shadowSilhouette(
         uniforms: LayerUniforms, texture: MTLTexture, sigma: Float, canvas: RecipeCanvas,
-        state: MTLRenderPipelineState, pass: inout DestinationPass
+        maskState: MTLRenderPipelineState, pass: inout DestinationPass
     ) -> MTLTexture? {
         let width = max(1, canvas.width)
         let height = max(1, canvas.height)
@@ -999,10 +1113,11 @@ final class MetalRenderer {
         guard let encoder = pass.buffer.makeRenderCommandEncoder(descriptor: descriptor) else {
             return nil
         }
-        // The layer's OWN specialization, so a blurred layer casts the
+        // The layer's OWN gather specialization, so a blurred layer casts the
         // silhouette its blur actually leaves — the mask is only correct by
-        // construction while it is the same fragment stage as the layer.
-        encoder.setRenderPipelineState(state)
+        // construction while it is the same fragment stage as the layer. Its
+        // BLEND is deliberately not carried over; `encodeShadow` argues that.
+        encoder.setRenderPipelineState(maskState)
         encoder.setFragmentSamplerState(sampler, index: 0)
         encoder.setVertexBytes(&u, length: MemoryLayout<LayerUniforms>.stride, index: 0)
         encoder.setFragmentBytes(&u, length: MemoryLayout<LayerUniforms>.stride, index: 0)
@@ -1099,6 +1214,18 @@ final class MetalRenderer {
             u.chromaSoftness = Float(max(0, chroma.softness))
             u.chromaSpill = Float(min(max(chroma.spill, 0), 1))
         }
+        // How this layer combines with what is already on the canvas (format
+        // version 6). One line, and NO transition special case: the CORE
+        // already emitted `normal` for any layer inside an overlap
+        // (`recipe.rs::layer`), so by the time a recipe reaches here the
+        // question is settled. A reader who knows about the dissolve's weight
+        // divisor — which is the algebraic inverse of a fixed-function
+        // destination factor and which any programmable blend would
+        // invalidate — will come looking for the guard right here; it is one
+        // layer down, in the description every renderer reads, so preview,
+        // `render_frame` and both export writers cannot disagree about it.
+        // Adding a second opinion here would be a rule with two owners.
+        u.blendMode = Float(layer.blend.shaderCode)
         // The M3 effect block and the obscured regions after it, all in
         // `CompositorEffects.swift`.
         u.apply(filters: layer.filters)

@@ -205,6 +205,27 @@ enum ShapeKind: String, Codable, CaseIterable {
     var isLinear: Bool { self == .line || self == .arrow }
 }
 
+/// A gradient fill's geometry (format version 6). Closed at two for
+/// `ObscureKind`'s reason, which `model_props.rs` argues: each is a
+/// different `CGGradient` call taking different arguments, not a parameter
+/// of a shared one, so an unknown kind is a value nothing downstream could
+/// repair and there is no neutral geometry to fall back to.
+///
+/// Nothing derives a NUMBER from this order — a gradient is drawn on the CPU
+/// by `LayerRenderers.renderShape` and never reaches a shader, unlike
+/// `BlendMode` — but each raw value is persisted, so a kind may be added at
+/// the end and a rename is a migration.
+enum GradientKind: String, Codable, CaseIterable {
+    case linear, radial
+
+    var displayName: String {
+        switch self {
+        case .linear: return "Linear"
+        case .radial: return "Radial"
+        }
+    }
+}
+
 /// The image filters of spec §4.2 (M3). Every one is a few lines in
 /// `Compositor.metal`'s single pass — a filter needing its own render target
 /// is not one of these.
@@ -257,6 +278,60 @@ enum ObscureKind: String, Codable, CaseIterable {
     var shaderCode: Int {
         (ObscureKind.allCases.firstIndex(of: self) ?? 0) + 1
     }
+}
+
+/// How a layer combines with what is already on the canvas (format version
+/// 6). Eight modes: `normal`, which is source-over and is what every project
+/// drew before the key existed; six separable blends the fragment stage
+/// computes from one source and one destination fragment; and `add`, which
+/// is plus-lighter rather than a separable blend at all. The formulas live
+/// once, in `Compositor.metal`'s `blendPremultiplied` — nothing on this side
+/// computes a colour, it only says WHICH.
+///
+/// It belongs to the LAYER and not to a source kind: media, image, still,
+/// text and shape all draw through one fragment stage, so all five blend.
+/// The one clip that cannot is a NEST, and that is an op's refusal
+/// (`edit_props.rs`'s `check_blend`) rather than a schema one — a nest is
+/// flattened rather than composited offscreen, so a blend on it would
+/// combine each inner layer separately against whatever was already there.
+///
+/// **The case order IS a contract**, `FilterKind`'s and `ObscureKind`'s rule
+/// read again: `shaderCode` below is the case INDEX, `Compositor.metal`
+/// compares against `kBlend*` constants in this order, and
+/// `model_props.rs`'s `BlendMode` declares the same eight in the same order.
+/// A mode may be added at the END; these eight may never be reordered or
+/// removed, and a rename is a migration, since the raw values are persisted.
+enum BlendMode: String, Codable, CaseIterable {
+    case normal, multiply, screen, add, overlay, darken, lighten, difference
+
+    var displayName: String {
+        switch self {
+        case .normal: return "Normal"
+        case .multiply: return "Multiply"
+        case .screen: return "Screen"
+        case .add: return "Add"
+        case .overlay: return "Overlay"
+        case .darken: return "Darken"
+        case .lighten: return "Lighten"
+        case .difference: return "Difference"
+        }
+    }
+
+    /// The code the shader's uniform block carries: the case INDEX, with no
+    /// `+1` — unlike `FilterKind.shaderCode` and `ObscureKind.shaderCode`,
+    /// where 0 is reserved to mean "this slot holds no filter, no region".
+    ///
+    /// There is nothing to reserve here, because a layer has exactly one
+    /// blend mode and so there is no empty slot to spell. And reserving one
+    /// would cost the property that makes this field safe to add to a
+    /// SHIPPED schema: three different absences must all draw what the app
+    /// drew before phase 6, and each of them arrives as a zero. A uniform
+    /// block whose `blendMode` Swift never wrote is zeroed; a recipe from an
+    /// older core carries no `blend` key and `RecipeLayer` decodes
+    /// `.normal`; a project file written before version 6 has none either
+    /// and serde answers `BlendMode::Normal`. Zero is source-over, so all
+    /// three render exactly as they always did with no code in between.
+    var shaderCode: Int { BlendMode.allCases.firstIndex(of: self) ?? 0 }
 }
 
 /// A spotlight's region: the two shapes spec §4.2 names.
@@ -811,10 +886,16 @@ struct VideoProps: Codable, Equatable {
     let reflection: ReflectionProps?
     let spotlight: SpotlightProps?
     /// The obscured regions, at most `ObscureProps.max` of them (phase 3c).
-    /// The LAST key of the struct, as it is in `model_props.rs` — an empty
-    /// list is how it is cleared, which is why it is a plain array and not an
-    /// optional.
+    /// An empty list is how they are cleared, which is why this is a plain
+    /// array and not an optional.
     let obscure: [ObscureProps]
+    /// How this layer combines with what is already on the canvas (format
+    /// version 6). Now the LAST key of the struct, as it is in
+    /// `model_props.rs` — `obscure` held that place until phase 6, and a new
+    /// key landing at the END is the whole of the append-only rule the two
+    /// shader discriminants rest on. `.normal` is source-over, so it is both
+    /// the default and how a blend is cleared; there is no null form.
+    let blend: BlendMode
 
     init(
         x: Double = 0, y: Double = 0, scale: Double = 1, rotation: Double = 0,
@@ -822,7 +903,7 @@ struct VideoProps: Codable, Equatable {
         shadow: ShadowProps? = nil, color: ColorAdjust = .identity,
         chroma: ChromaProps? = nil, filters: [FilterProps] = [],
         reflection: ReflectionProps? = nil, spotlight: SpotlightProps? = nil,
-        obscure: [ObscureProps] = []
+        obscure: [ObscureProps] = [], blend: BlendMode = .normal
     ) {
         self.x = x
         self.y = y
@@ -838,6 +919,7 @@ struct VideoProps: Codable, Equatable {
         self.reflection = reflection
         self.spotlight = spotlight
         self.obscure = obscure
+        self.blend = blend
     }
 
     init(from decoder: Decoder) throws {
@@ -859,6 +941,10 @@ struct VideoProps: Codable, Equatable {
         // empty list — the same answer `#[serde(default)]` gives the core,
         // which is why version 4 needs no migrate step.
         obscure = c.lenient(.obscure, [])
+        // And a version-5 file has no `blend` key, which reads as `.normal`
+        // — source-over, what the app drew before the key existed. Same
+        // shape of argument, same reason version 6 needs no migrate step.
+        blend = c.lenient(.blend, BlendMode.normal)
     }
 
     static let identity = VideoProps()
@@ -1148,6 +1234,123 @@ struct StrokeProps: Codable, Equatable {
     }
 }
 
+/// One colour of a gradient, and where along the ramp it sits.
+struct GradientStop: Codable, Equatable {
+    /// 0–1 along the gradient.
+    let at: Double
+    let color: RGBA
+
+    /// The core's `GradientStop::default()`: opaque black at the ramp's
+    /// origin. It is what the model's container-level `#[serde(default)]`
+    /// fills in, so `{"at": 0.75}` gets a colour and `{"color": […]}` gets a
+    /// position rather than a schema error — which is why the fallbacks
+    /// below have to be these two and not the enclosing `Gradient`'s.
+    init(at: Double = 0, color: RGBA = [0, 0, 0, 1]) {
+        self.at = at
+        self.color = color
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        at = c.lenient(.at, 0)
+        color = c.lenient(.color, [0, 0, 0, 1])
+    }
+}
+
+/// A shape's gradient fill (format version 6) — what `ShapeProps.fill`'s
+/// single colour becomes when a flat plate is not enough: a sky behind a
+/// title, a brand ramp, the wash on the full-canvas background clip
+/// `add_background` puts on the back track.
+///
+/// Three rules travel with the type, all of them `model_props.rs`'s and none
+/// of them local to this file:
+///
+///  - **It takes precedence over `fill` and does not CLEAR it.** Both
+///    persist and the renderer prefers the gradient while it is non-nil,
+///    which makes `{"gradient": null}` an exact inverse — the inspector's
+///    Reset puts the colour underneath back rather than leaving an invisible
+///    shape — and keeps the precedence rule in one statable place instead of
+///    spreading it as a side effect of whichever op wrote last.
+///  - **The stops are NOT required to be sorted**, and that is a decision
+///    rather than an omission: `CGGradient`'s `locations` must be monotonic,
+///    so the RENDERER sorts (`sortedStops` below), where a refusal in the
+///    core would make dragging one stop past another stop working
+///    mid-gesture. It falls out well for actions too — two gradients of
+///    equal length interpolate per index under the list rule, and an
+///    interpolation that crosses two stops still renders monotonically.
+///  - **`line` and `arrow` ignore it entirely** — stored, range-checked, not
+///    drawn, with the inspector's rows disabled for them. That is
+///    `ShapeProps.radius`'s precedent exactly: every kind carries it, only
+///    the rectangle reads it. Refusing the field per kind would mean the
+///    kind popup had to clear it on the way past, and a value a popup
+///    deleted is work nobody can get back.
+///
+/// At most `Gradient.maxStops` of them. That cap is 8 where `FilterProps.max`
+/// and `ObscureProps.max` are both 4, and the difference is not an
+/// inconsistency to tidy: those two are SHADER SLOTS — the uniform block
+/// carries exactly four of each — while a gradient never reaches the
+/// fragment stage at all, since `LayerRenderers.renderShape` hands the stops
+/// to `CGGradient` on the CPU, which takes as many as it is given.
+struct Gradient: Codable, Equatable {
+    let kind: GradientKind
+    let stops: [GradientStop]
+    /// Degrees from the RIGHT, counter-clockwise — `ShadowProps.angle`'s
+    /// convention, which is the crate's only one. Meaningless for `radial`;
+    /// stored all the same, so flipping the kind and back does not lose it.
+    let angle: Double
+
+    /// The most stops one gradient may carry — `MAX_GRADIENT_STOPS` in
+    /// `model_props.rs`, which NAMES the overflow rather than trimming it.
+    /// Spelled on the CONTAINER, where `FilterProps.max` and
+    /// `ObscureProps.max` are spelled on the element: unlike either of those
+    /// it is not a shader budget but a limit on the list one `CGGradient`
+    /// call is handed, so it belongs to the gradient rather than to a stop.
+    static let maxStops = 8
+
+    /// `Gradient::default()`'s stops, held apart from the initializer so the
+    /// decoder's fallback and the memberwise default are provably the same
+    /// two colours rather than two lists that have to be kept in step.
+    static let defaultStops = [
+        GradientStop(at: 0, color: [0, 0, 0, 1]),
+        GradientStop(at: 1, color: [1, 1, 1, 1]),
+    ]
+
+    /// The core's `Gradient::default()`: black to white, left to right.
+    ///
+    /// The feature's whole first impression rather than a formality — the
+    /// model's container-level `#[serde(default)]` over a null base means
+    /// `{"gradient": {}}`, which is what the inspector's Add and the most
+    /// natural agent write both send, produces exactly this. Black and white
+    /// are the two colours that cannot be mistaken for footage, for the
+    /// canvas or for each other in either appearance, and angle 0 is to the
+    /// RIGHT, so the ramp runs the way a left-to-right reader expects.
+    init(
+        kind: GradientKind = .linear, stops: [GradientStop] = Gradient.defaultStops,
+        angle: Double = 0
+    ) {
+        self.kind = kind
+        self.stops = stops
+        self.angle = angle
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        kind = c.lenient(.kind, GradientKind.linear)
+        stops = c.lenient(.stops, Gradient.defaultStops)
+        angle = c.lenient(.angle, 0)
+    }
+
+    /// The stops in ramp order — the one form `CGGradient` accepts, and the
+    /// reason the model can afford not to police the order it was given. The
+    /// sort is stable, so two stops at one position keep the order they were
+    /// written in and the picture does not flip mid-drag.
+    var sortedStops: [GradientStop] {
+        stops.enumerated().sorted {
+            $0.element.at == $1.element.at ? $0.offset < $1.offset : $0.element.at < $1.element.at
+        }.map { $0.element }
+    }
+}
+
 /// A shape clip's description. `width`/`height` are the box in source
 /// pixels — the shape's "source size" for §5.3 placement.
 struct ShapeProps: Codable, Equatable {
@@ -1163,12 +1366,16 @@ struct ShapeProps: Codable, Equatable {
     /// UNIT coordinates in the box, `line` and `arrow` only.
     let from: [Double]
     let to: [Double]
+    /// A gradient fill, drawn INSTEAD of `fill` while it is non-nil and the
+    /// kind has an area (format version 6). The LAST key of the struct, as
+    /// it is in `model_props.rs`.
+    let gradient: Gradient?
 
     init(
         kind: ShapeKind = .rectangle, width: Double = 320, height: Double = 120,
         stroke: StrokeProps? = nil, fill: RGBA? = nil, arrowStart: Bool = false,
         arrowEnd: Bool = false, radius: Double = 0,
-        from: [Double] = [0, 0.5], to: [Double] = [1, 0.5]
+        from: [Double] = [0, 0.5], to: [Double] = [1, 0.5], gradient: Gradient? = nil
     ) {
         self.kind = kind
         self.width = width
@@ -1180,6 +1387,7 @@ struct ShapeProps: Codable, Equatable {
         self.radius = radius
         self.from = from
         self.to = to
+        self.gradient = gradient
     }
 
     init(from decoder: Decoder) throws {
@@ -1194,6 +1402,7 @@ struct ShapeProps: Codable, Equatable {
         radius = c.lenient(.radius, 0)
         from = c.lenient(.from, [0, 0.5])
         to = c.lenient(.to, [1, 0.5])
+        gradient = c.lenient(.gradient)
     }
 
     var boxSize: CGSize { CGSize(width: width, height: height) }
@@ -2029,6 +2238,23 @@ struct RecipeLayer: Codable, Equatable {
     let scale: Double
     let rotation: Double
     let opacity: Double
+    /// How this layer combines with what is already on the canvas, in the
+    /// recipe's own key order (format version 6).
+    ///
+    /// **The recipe's blend is what DRAWS, and it is not always the clip's.**
+    /// A layer carrying a transition is emitted as `normal` whatever the
+    /// model says, because the outgoing half of a dissolve carries a weight
+    /// correction that is the exact algebraic inverse of the destination
+    /// factor its incoming partner is about to apply, and a non-normal blend
+    /// on either half invalidates it. The CORE decides that, in
+    /// `recipe.rs::layer`, so preview, `render_frame` and both export
+    /// writers cannot disagree — which means nothing on this side may
+    /// second-guess it. The inspector reads the MODEL's value through
+    /// `clip_state`, so during an overlap the popup says `multiply` while
+    /// the frame composites `normal`; both are honest, and a reader who
+    /// knows about the dissolve divisor should look for the rule in
+    /// `recipe.rs` rather than here or in `Compositor.swift`.
+    let blend: BlendMode
     let cornerRadius: Double
     let shadow: ShadowProps?
     let color: ColorAdjust
@@ -2055,6 +2281,9 @@ struct RecipeLayer: Codable, Equatable {
         scale = c.lenient(.scale, 1)
         rotation = c.lenient(.rotation, 0)
         opacity = c.lenient(.opacity, 1)
+        // A recipe from a core older than version 6 carries no `blend` key,
+        // and reads as source-over — the picture that build drew.
+        blend = c.lenient(.blend, BlendMode.normal)
         cornerRadius = c.lenient(.cornerRadius, 0)
         shadow = c.lenient(.shadow)
         color = c.lenient(.color, ColorAdjust.identity)
@@ -2085,7 +2314,7 @@ struct RecipeLayer: Codable, Equatable {
             x: x, y: y, scale: scale, rotation: rotation, opacity: opacity, crop: crop,
             cornerRadius: cornerRadius, shadow: shadow, color: color, chroma: chroma,
             filters: filters, reflection: reflection, spotlight: spotlight,
-            obscure: obscure)
+            obscure: obscure, blend: blend)
     }
 }
 

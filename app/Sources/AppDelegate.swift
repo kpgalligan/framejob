@@ -328,6 +328,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             item("Remove Silences…", #selector(EditorViewController.removeSilences(_:))))
         menu.addItem(submenuItem(transitionMenu()))
         menu.addItem(.separator())
+        // Road map 2's phase 6c — what goes BEHIND the picture, in a group of
+        // its own because neither item edits the selection: both put a clip on
+        // a new back-most track (`core/src/edit_background.rs`).
+        //
+        // Add Background is a SUBMENU rather than one dialog. Its two rows are
+        // two different commands, not two settings of one: Solid Color takes
+        // no dialog at all — hence no ellipsis — because the plate is
+        // re-coloured in the Clip tab's Fill row afterwards, which is also how
+        // a full-canvas gradient is reached, while Image… is an open panel.
+        //
+        // Neither takes a key equivalent, and neither claims a row in spec
+        // §9's "proposed, not yet bound" table: every bare letter belongs to
+        // the editor's own `keyDown`, and a modifier-less menu key would be
+        // resolved ahead of the first responder and steal it back (the reason
+        // recorded at Remove Silences… above).
+        menu.addItem(submenuItem(backgroundMenu()))
+        menu.addItem(
+            item(
+                "Add Blurred Background",
+                #selector(EditorViewController.addBlurredBackground(_:))))
+        menu.addItem(.separator())
         // Identity (format version 3): the clip's own name and its label.
         menu.addItem(
             item(
@@ -338,6 +359,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         menu.addItem(item("Nest", #selector(EditorViewController.nestClips(_:)), "g"))
         menu.addItem(
             item("Un-nest", #selector(EditorViewController.unnestClips(_:)), "g", [.command, .shift]))
+        return menu
+    }
+
+    /// Clip ▸ Add Background ▸ — the two ways to make a plate, which are two
+    /// commands rather than one command with a source popup: the picture needs
+    /// a file chooser and the colour needs nothing at all. Not built from an
+    /// enum, so no tags: the ops themselves differ only in an argument, but
+    /// the paths to them do not.
+    private func backgroundMenu() -> NSMenu {
+        let menu = NSMenu(title: "Add Background")
+        menu.addItem(
+            item("Solid Color", #selector(EditorViewController.addSolidColorBackground(_:))))
+        menu.addItem(item("Image…", #selector(EditorViewController.addImageBackground(_:))))
         return menu
     }
 

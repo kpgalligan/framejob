@@ -185,6 +185,9 @@ final class AgentServer {
         "add_clip": { $0.addClip },
         "add_text_clip": { $0.addTextClip },
         "add_shape_clip": { $0.addShapeClip },
+        // Backgrounds (AgentServer+Background.swift)
+        "add_background": { $0.addBackground },
+        "add_blurred_background": { $0.addBlurredBackground },
         "insert_clip": { $0.insertClip },
         "overwrite_clip": { $0.overwriteClip },
         "move_clip": { $0.moveClip },

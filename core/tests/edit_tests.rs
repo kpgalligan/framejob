@@ -613,6 +613,15 @@ fn op_table() -> Vec<Value> {
         json!({"op": "freeze_frame", "clip": 10, "at": 3000000}),
         json!({"op": "detach_audio", "clip": 10}),
         json!({"op": "duplicate", "clips": [10]}),
+        // The two backdrop ops each mint a track as well as a clip, which is
+        // why they sit beside `detach_audio` rather than with `add_clip`:
+        // what the coverage check below wants from them is only that the
+        // envelope parses and the dispatch arrives. `add_background` is given
+        // no arguments on purpose — every one of them is optional, and the
+        // no-argument form is the one the menu's Solid Color row sends.
+        // `core/tests/background.rs` is where either op's answer is measured.
+        json!({"op": "add_background"}),
+        json!({"op": "add_blurred_background", "clip": 10}),
         // The payload's own semantics are `paste.rs`'s business; this row is
         // only here to keep the coverage check below honest.
         json!({"op": "paste", "at": 24000000,

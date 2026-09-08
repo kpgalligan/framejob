@@ -22,7 +22,8 @@ lockstep are in the root `CLAUDE.md`; the full design is
   are re-clamped to live ids by `clampViewState`, and `selectedMedia` lives
   here rather than on `MediaPane` because that pane is rebuilt whole
   whenever the media list changes.
-- `LayerRenderers.swift` — text and shape descriptions to textures, and
+- `LayerRenderers.swift` · `LayerRenderersText.swift` — text and shape
+  descriptions to textures, and
   since format version 5 the three text REVEALS (spec §5.2's
   `text.animation`). It draws what the recipe's `reveal` / `reveal_phase` /
   `reveal_kind` say and computes nothing: the core owns the number
@@ -49,6 +50,33 @@ lockstep are in the root `CLAUDE.md`; the full design is
   exactly as it does in the finished glyph, and the buffer would buy a
   rounding step and an allocation. Anything else here that draws one piece
   of a glyph at a time inherits the rule.
+  **The TEXT half is `LayerRenderersText.swift` since phase 6** — the two
+  caches, the attributed string, the measurement and the three reveals —
+  because `LayerRenderers.swift` stood at 845 and the gradient was about to
+  land on it; the shape half kept the file and is 467 with the gradient in
+  it. Static stored properties are legal in a class extension, so only
+  `bitmap` and `upload` widened to internal.
+  **A shape's `gradient` (format version 6)** is drawn in `renderShape` by
+  CLIPPING to the path and running `CGGradient` inside one `saveGState` —
+  measured byte-identical to `fillPath()` over a 64 × 64 ellipse,
+  antialiased edge included, so a transparency layer would buy a full-size
+  buffer and a rounding step for nothing. Three things about it are load
+  bearing. **The renderer SORTS the stops**, because the core deliberately
+  does not police their order (a refusal would make dragging one stop past
+  another stop working mid-gesture), and `CGGradient`'s output is undefined
+  without monotonic locations — so this is the one place that requirement
+  is met and it may not be moved back into a refusal. A linear ramp
+  PROJECTS the stroke-inset box onto its direction, so the end stops land
+  exactly on the box's edges at every angle, and the angle is degrees from
+  the RIGHT counter-clockwise, the crate's one convention, which in this
+  y-UP context is `(cos θ, sin θ)` with no minus. A radial one is the
+  INSCRIBED ellipse for both area kinds, guarded against the negative-width
+  rect a stroke wider than the box makes. `line` and `arrow` ignore a
+  gradient entirely and keep `stroke.color`. The texture key needed no
+  work and that is worth knowing rather than assuming: `recipe.rs`'s
+  `Source::Shape` arm hashes the whole shape description, so the gradient
+  is already inside `cacheHash` — the phase-4 text lesson arriving already
+  answered, and still proved by measurement.
 - `Playback.swift` · `CompositionBuilder.swift` · `Compositor.swift` ·
   `CompositorEffects.swift` · `MediaImporter.swift` ·
   `Exporter.swift` · `ExporterLoudness.swift` · `ExporterWriter.swift` ·
@@ -75,6 +103,57 @@ lockstep are in the root `CLAUDE.md`; the full design is
   REGION-MAJOR — all eight fields of region 0, then region 1 — in the
   model's own field order, so the two files read as one list and a reader
   can check the contract by eye, which is the only way it is ever checked.
+  Format version 6 added `video.blend` for **zero bytes**: `reserved0`
+  became `blendMode`, the block is still 104 floats, and the padding tail
+  is **two** floats now rather than three — so the next field to land can
+  be added alone and a THIRD needs three companions again. The two
+  survivors keep their `reserved1` / `reserved2` names rather than being
+  renumbered from zero, so the Swift and Metal lists still read as one.
+  **The compositor is FIVE pipelines from three fragment functions**, and
+  two of them carry rules a reader will otherwise undo. The layer stage has
+  two INDEPENDENT specializations — `kGatherFilters`, a function constant
+  that compiles the neighbourhood loops in or out, and
+  `reelcut_layer_blend_fragment`, the entry point that reads the
+  destination through `float4 dst [[color(0)]]` and computes
+  `video.blend`'s combination itself — so four layer states, plus the
+  shadow's quad. Both entry points forward to one `static inline` helper
+  holding the whole stage, because Metal cannot call one `fragment`
+  function from another.
+  **Rule one: a programmable-blend pipeline MUST be built with
+  `isBlendingEnabled = false`**, or the finished pixel is blended a second
+  time by the fixed-function stage. Metal builds it either way — no error,
+  no validation warning, nothing in the log — and at alpha 1 the double
+  blend is INVISIBLE, because `oneMinusSourceAlpha` is 0. **What decides
+  that is the DESTINATION's alpha and not the layer's**, and the phase got
+  it backwards first: the fragment stage returns the finished composite,
+  whose alpha is `as + ab·(1 - as)`, and over an OPAQUE destination that is
+  1 whatever `as` is — so a half-opacity layer over an opaque backdrop
+  shows nothing either. It takes a destination alpha below one AND a source
+  that does not cover it, where the alpha lands 32/255 high while the
+  colour moves by two. `phase6_proof.py`'s section 6b is that check and is
+  the only one in the script that reads the alpha channel; the
+  partial-opacity check written for the job first (section 6, a translucent
+  LAYER over an opaque backdrop) scored 160/160 against the broken build.
+  **Rule two: a shadow's silhouette pass takes `maskState` — the layer's
+  gather specialization WITHOUT its blend — because the mask asks about the
+  layer's SHAPE, which no blend mode changes.** It is DEFENSIVE and not
+  load-bearing, and that was measured rather than assumed. The natural fear
+  — step 1 draws coverage into a texture cleared to transparent black, so a
+  `multiply` over an empty destination is 0 everywhere and every blended
+  layer's shadow silently vanishes — is true of a naive `src · dst` and
+  FALSE of the premultiplied composite the shader runs, whose `(1 - ab)·src`
+  term carries the source through an empty destination: at `ab` = 0 the
+  formula reduces to `src` exactly, for all eight modes. A build passing
+  `state` here renders every shadow correctly and scores 163/163. Keep the
+  separation — it costs nothing, it says what the mask pass means, and a
+  formula without that term would make the hazard real — but do not repeat
+  the claim that it is holding a bug back. The
+  shadow's own DRAW stays fixed-function source-over whatever the mode (a
+  shadow is light falling on the backdrop, not the layer's ink), while the
+  REFLECTION goes the other way and inherits the blend, since it is part of
+  the layer. And a layer mid-TRANSITION always blends `normal`, which the
+  CORE emits (`recipe.rs`), so this side has no special case for it and
+  must not grow one.
   `CompositorEffects.swift`'s header doc is where the amount→length
   mappings are written down (a blur's outer tap ring at `amount × 24`
   source pixels; a pixelate's block at `1 + amount × 63`, so amount 1 is a
@@ -207,11 +286,22 @@ lockstep are in the root `CLAUDE.md`; the full design is
   knows reads are evaluated inside an action and that writes there set
   `set_action_end`, with the ONE exception `structural(video:for:)` pulls
   out: a list-valued key (`filters`, `obscure`) whose new LENGTH differs
-  from the clip's own goes to the BASE props wherever the playhead is,
+  from `editedList`'s goes to the BASE props wherever the playhead is,
   because `actions.rs`'s list rule interpolates per index only while the
   lengths match — an appended region written into an end patch is invisible
   for the whole span, does not even grow a row, and is then dropped by the
-  next write of that list) + `ClipPane.swift` for the Clip tab,
+  next write of that list.
+  **`editedList` is phase 6's, and both halves of it were defects.** A
+  WRITE of a list-valued key must be built from, and measured against, the
+  list it is about to REPLACE — the ACTION's own end list where the end
+  patch carries one, the clip's base list otherwise — and never the
+  EVALUATED list every `read:` closure uses. Building the array from the
+  evaluated one re-pinned every entry the user did not touch at whatever it
+  read at the playhead, silently flattening a neighbour's ramp; measuring a
+  new length against the BASE alone misfired with two actions on a clip,
+  where an earlier end patch had already changed the count, and rewrote the
+  clip's base stack. A third list-valued property joins this rather than
+  reading `videoProps` directly) + `ClipPane.swift` for the Clip tab,
   `MediaPane.swift` and `DocumentPane.swift` for the other two, with
   `VideoPane.swift`,
   `AudioPane.swift`, `TextPane.swift` and `ShapePane.swift` surviving as the
@@ -269,7 +359,7 @@ lockstep are in the root `CLAUDE.md`; the full design is
 - `AgentCatalog.swift` — the MCP tool catalog; a startup check enforces that
   catalog names match the dispatch registry (it traps in debug and logs in
   Release, because `make app` builds Release). The handlers live in
-  `AgentServer+Project/Clips/Tracks/Media/Render/History/Silence/Captions/Audio.swift`
+  `AgentServer+Project/Clips/Tracks/Media/Render/History/Silence/Captions/Audio/Background.swift`
   and their shared
   argument vocabulary in `AgentServer+Arguments.swift` — `intArg`,
   `doubleArg`, `boolArg`, `stringArg`, `stringsArg` (an optional list of
@@ -300,13 +390,32 @@ lockstep are in the root `CLAUDE.md`; the full design is
   its typed struct and re-serialised, so an unknown key inside one is
   dropped where the core would have named it, and a known key the caller
   omitted is sent as that struct's DEFAULT — which resets the field. That
-  is `shadow`, `chroma`, `duck`, every `obscure` entry and now
-  `animation`: the core
+  is `shadow`, `chroma`, `duck`, every `obscure` entry, every `filters`
+  entry and `animation`: the core
   refuses both (`deny_unknown_fields`), the decoder simply gets there
   first, so a patch of a nested object is a REPLACEMENT and has to be sent
   whole. `AgentCatalog`'s text-patch sentence spells that out for
   `animation` in the tool's own words, because a key left out of one comes
   back as a 1 s typewriter rather than as what the clip had.
+  `filters` is the member of that family the list used to omit, and the
+  omission had teeth: `{"filters": [{"amount": 1.0}]}` is the core's own
+  idiom for "the same filter, more of it", `FilterProps` has no optionals,
+  so the decoder filled the missing `kind` with `blur`, a `sepia` base
+  animated and then switched to a blur, and the caller was told it had
+  worked. `checkVideoEnums` refuses a partial filter entry by index now.
+  **`shape.gradient` (format version 6) is the one exception in the whole
+  family, and it is the READER's doing rather than the decoder's.**
+  `ShapePatch` is built by hand (`shapePatchArg`), so `gradientArg` walks
+  `stops` by name, takes three or four colour components exactly as
+  `colorArg` does, and refuses a MISSPELT key inside `gradient` BY NAME —
+  which `shadow` (since M3), `obscure` (since phase 3) and `animation`
+  (since phase 4) cannot do. It is still a replacement rather than a merge,
+  like all of them, so a caller sends every key it wants. Note what was NOT
+  done for it: `AgentServer+Arguments.withOpaqueColors` recurses into
+  nested dictionaries but not into arrays of them, so it would have refused
+  a three-component stop colour with a serde message naming neither the key
+  nor the patch — and widening that helper is the wrong fix, because it
+  sits on every patch shape in the app. It never sees this object anyway.
   Beyond the §6 ops the catalog carries the app-state tools spec §7.9 names
   plus `set_range`, `set_selection`, `undo` and `redo` — the mirrors of
   I/O/⌥X, a timeline or canvas click, and ⌘Z/⇧⌘Z, without which the "one edit
@@ -332,9 +441,16 @@ lockstep are in the root `CLAUDE.md`; the full design is
   back to a default rather than throwing, so `{"kind": "glow"}` inside an
   `obscure` region would silently become `pixelate` and the caller be told
   it worked. `AgentServer.checkVideoEnums` is what closes that, and it
-  checks the FOUR string enums a video patch can carry and no more:
-  `filters[].kind`, `spotlight.shape` and now `obscure[].shape` and
-  `obscure[].kind`, each against its own `allCases`. Nothing else in a
+  checks the FIVE string enums a video patch can carry and no more:
+  `filters[].kind`, `spotlight.shape`, `obscure[].shape`, `obscure[].kind`
+  and — format version 6 — `blend`, each against its own `allCases`.
+  `blend` is a TOP-LEVEL key, so `patchArg`'s round trip looks as though it
+  ought to catch a misspelling and does not: `BlendMode` decodes leniently
+  to `normal` like every other enum in `ProjectSnapshot`, and a patch
+  carrying `normal` is not equal to one carrying nothing, so the
+  "would have been ignored" test passes and `"muliply"` reaches the core as
+  source-over. It also checks a filter entry for COMPLETENESS, which is the
+  same defect one step on. Nothing else in a
   video patch is an enum — `chroma` is a colour and three numbers — so a
   new enum inside a patch has to be added by hand. `checkTextEnums` is its
   sibling and guards the one a TEXT patch carries, `animation.kind`; both

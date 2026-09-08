@@ -1184,6 +1184,47 @@ final class InspectorBinding {
     /// so this is always the base description.
     func shape(_ clip: ClipSnapshot) -> ShapeProps { clip.shape ?? ShapeProps() }
 
+    /// The list a WRITE of a list-valued video key must be built from — and
+    /// the length `structural` below must measure a new one against.
+    ///
+    /// `video(_:)` answers what the playhead SHOWS, which is what every `read:`
+    /// closure in the inspector wants and what every row displays. It is the
+    /// wrong list to build an EDIT out of. Inside an action a write lands on
+    /// the action's END patch, and `actions.rs`'s `merge` replaces an array
+    /// whole rather than entry by entry, so an array built from the
+    /// interpolated values pins every entry the user did not touch at whatever
+    /// it happened to read at the playhead: with a base of
+    /// `[blur 0.2, sepia 0.3]` and an end of `[blur 1.0, sepia 0.3]`, dialling
+    /// the sepia at the midpoint re-sends the blur at 0.6 and its ramp is
+    /// silently flattened.
+    ///
+    /// So a write reads the list it is about to REPLACE — the action's own end
+    /// `filters` or `obscure` when the end patch carries one, and the clip's
+    /// base list when it does not. The same answer is what a new length has to
+    /// be compared against, for the same reason read the other way: that array
+    /// is the one an end patch must match to interpolate at all, and comparing
+    /// against the base alone made the section rewrite the clip's base stack
+    /// whenever an earlier action had already changed the count.
+    ///
+    /// Note what this is NOT: it is not the list at the action's START, which
+    /// is the truly exact answer and needs a second `clip_state` call at a
+    /// time nothing else in the inspector asks about. The pair above agrees
+    /// with it in every case the inspector can produce, because the section
+    /// can only ever write the length it can see.
+    func editedList<T>(
+        _ clip: ClipSnapshot, action end: (VideoPatch) -> [T]?, base: (VideoProps) -> [T]
+    ) -> [T] {
+        if let inside = action(clip), let list = inside.end.video.flatMap(end) { return list }
+        return base(clip.videoProps)
+    }
+
+    /// The same list for the selection: the FIRST video clip's, which is the
+    /// clip every row in a section already reads.
+    func editedList<T>(action end: (VideoPatch) -> [T]?, base: (VideoProps) -> [T]) -> [T] {
+        guard let clip = videoClips.first else { return [] }
+        return editedList(clip, action: end, base: base)
+    }
+
     /// The values the fields show: the FIRST applicable clip's, evaluated.
     var videoProps: VideoProps { videoClips.first.map { video($0) } ?? .identity }
     var audioProps: AudioProps { audioClips.first.map { audio($0) } ?? AudioProps() }
@@ -1243,10 +1284,21 @@ final class InspectorBinding {
     /// which is what phase 3c's list rule exists for: a region's `amount`
     /// ramped from 0 to 1 is exactly that, and it works.
     ///
-    /// The length is compared against the clip's OWN list rather than the
-    /// evaluated one, because the base list is what an end patch has to match
-    /// to interpolate at all — and with this rule in force nothing the
-    /// inspector does can put a different length into an end patch.
+    /// The length is compared against `editedList` above — the action's own
+    /// end list where there is one, the clip's base list otherwise — and never
+    /// against the EVALUATED list the section reads, because that array is the
+    /// one an end patch has to match to interpolate at all.
+    ///
+    /// **The sentence that used to stand here said "nothing the inspector does
+    /// can put a different length into an end patch", and it was one action
+    /// short of true.** With two actions on a clip and the first one's end
+    /// patch changing the filter COUNT, the evaluated list at a playhead
+    /// inside the SECOND action is longer than the base, so a comparison
+    /// against the base classified an ordinary dial as structural and wrote
+    /// the clip's base stack — changing every frame before the first action.
+    /// With the pair above the section can only ever write the length it can
+    /// see, so the guarantee holds; what it cannot promise is anything about a
+    /// length a hand-written file or a `set_action_end` call put there.
     ///
     /// Do not fold this back into the single `set_action_end` it looks like.
     /// The two writes are the same shape from here and behave nothing alike
@@ -1275,11 +1327,15 @@ final class InspectorBinding {
     {
         var base = VideoPatch()
         var animatable = patch
-        if let filters = patch.filters, filters.count != clip.videoProps.filters.count {
+        if let filters = patch.filters,
+            filters.count != editedList(clip, action: { $0.filters }, base: { $0.filters }).count
+        {
             base.filters = filters
             animatable.filters = nil
         }
-        if let obscure = patch.obscure, obscure.count != clip.videoProps.obscure.count {
+        if let obscure = patch.obscure,
+            obscure.count != editedList(clip, action: { $0.obscure }, base: { $0.obscure }).count
+        {
             base.obscure = obscure
             animatable.obscure = nil
         }

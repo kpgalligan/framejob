@@ -28,7 +28,14 @@
 //!   absent. An absent optional and an explicit `null` mean the same thing.
 //! - **A new id is the project's `next_id` from BEFORE the call.** An op
 //!   returns a project, not a value, so a caller that needs the id of the
-//!   clip, track, marker or media it just added reads `next_id` first.
+//!   clip, track, marker or media it just added reads `next_id` first. An
+//!   op minting MORE than one gives them ids in the order it CREATES them —
+//!   the rule is that order and never a closed list of such ops, which was
+//!   wrong on the third of them: `add_background` and
+//!   `add_blurred_background` create the TRACK and then the clip on it;
+//!   `detach_audio` on a bottom-track clip does the same and then re-mints
+//!   an id per action it carried; `nest` mints the nest, a track per track
+//!   it swallows, then the nest clip.
 //! - Unknown keys are an error, in the envelope and in every property
 //!   patch: a typo in a hand-written op or an agent call is a mistake to
 //!   report, not a silent no-op. The one exception is an action's `end`
@@ -46,6 +53,8 @@
 //! | `add_clip` | `track: u32, media: u32, at: ticks` | Whole media as one clip at `at`; source in 0, Fit scale when `canvas.fit_new_clips` and the source exceeds the canvas. |
 //! | `add_text_clip` | `track: u32, at: ticks, duration?: ticks = 5 s, text?: object` | The Title preset, centered; `text` patches it exactly as `set_text` would. |
 //! | `add_shape_clip` | `track: u32, at: ticks, duration?: ticks = 5 s, shape?: object` | The default rectangle — an `arrow` kind gets `arrow_end` on, since a headless arrow is a diagonal line; `shape` patches that preset exactly as `set_shape` would, so an explicit `arrow_end: false` still wins. |
+//! | `add_background` | `media?: u32, color?: [f64; 4] = white, duration?: ticks = the timeline's length` | A backdrop on a NEW back-most track, starting at 0 and named "Background". With `media`, that file placed as `add_clip` would place it but for its SCALE — the right source kind, audio props when it has sound, and a FILL scale where `add_clip` takes a Fit one, because a plate that leaves the canvas showing down one side has failed at the one thing a background is for; with `color`, or with neither, a canvas-sized filled rectangle with no stroke at scale 1. The plate default is WHITE, not black: the canvas is already black, so a black plate is a command that appears to do nothing. `Err` for `media` and `color` together, an unknown media, a media with no pictures, a colour outside 0–1, or a duration under a frame. |
+//! | `add_blurred_background` | `clip: u32` | The screencast backdrop: `clip` copied onto a NEW back-most track at the same start, duration, speed and source window — so the two play the same frames — scaled to FILL the canvas, centred, uncropped, blended `normal` and blurred at full strength. The copy is muted (`enabled` becomes `{video: true, audio: false}`, `detach_audio`'s pair read the other way) and drops its `audio.duck` — the one field of that group that lowers OTHER material, so a copy keeping it would duck the mix including the clip it came from — along with its transition, its actions and its label; it is named "Blurred Background". `Err` for an unknown clip, a NEST (flattening drops a nest clip's own filters, so the copy would come out sharp), a source with no pixel size (text, audio-only), or a clip with no video properties. |
 //! | `insert_clip` | `track: u32, media: u32, at: ticks` | The insert edit: the clip `at` is strictly inside on `track` is split, every unlocked track opens by the media's whole length, then that media lands at `at`. Only the destination track is cut — straddlers elsewhere ride the shift whole. |
 //! | `overwrite_clip` | `track: u32, media: u32, at: ticks` | The overwrite edit: `[at, at + media length)` is cleared on `track` ALONE — cut at both bounds, the middles removed — and the media lands there. Nothing shifts and no other track is touched. |
 //! | `move_clip` | `clips: [u32], delta: ticks, track?: u32` | Shifts the selection by `delta`, clamped so the earliest clip stops at 0; `track` retargets by track-index delta, keeping relative offsets. |
@@ -155,10 +164,12 @@ use crate::time::{Fps, Ticks};
 /// Kept next to [`Op`] so a mistyped op can be answered with the list
 /// instead of a bare parse error — models and users both mistype op names,
 /// and the alternative is a serde message written in variant-speak.
-pub const OP_NAMES: [&str; 53] = [
+pub const OP_NAMES: [&str; 55] = [
     "add_clip",
     "add_text_clip",
     "add_shape_clip",
+    "add_background",
+    "add_blurred_background",
     "insert_clip",
     "overwrite_clip",
     "move_clip",
@@ -238,6 +249,23 @@ pub enum Op {
         duration: Option<Ticks>,
         #[serde(default)]
         shape: Option<Value>,
+    },
+    /// `media` and `color` are alternatives, not a pair: a plate is either
+    /// a picture or a colour, and naming both is an `Err` rather than a
+    /// precedence rule nobody would remember. Both carry a serde default so
+    /// that an absent key and an explicit `null` mean the same thing (the
+    /// envelope's rule), which is what makes the no-argument call — the
+    /// "Solid Color" command — legal and white.
+    AddBackground {
+        #[serde(default)]
+        media: Option<u32>,
+        #[serde(default)]
+        color: Option<Color>,
+        #[serde(default)]
+        duration: Option<Ticks>,
+    },
+    AddBlurredBackground {
+        clip: u32,
     },
     InsertClip {
         track: u32,
@@ -599,6 +627,12 @@ impl Project {
                 duration,
                 shape,
             } => self.add_shape_clip(*track, *at, *duration, shape.as_ref()),
+            Op::AddBackground {
+                media,
+                color,
+                duration,
+            } => self.add_background(*media, *color, *duration),
+            Op::AddBlurredBackground { clip } => self.add_blurred_background(*clip),
             Op::InsertClip { track, media, at } => self.insert_clip(*track, *media, *at),
             Op::OverwriteClip { track, media, at } => self.overwrite_clip(*track, *media, *at),
             Op::MoveClip {

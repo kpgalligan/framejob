@@ -621,6 +621,75 @@ extension ReelOp {
         addShapeClip(track: track, at: at, duration: duration, shape: ShapePatch(kind: shape))
     }
 
+    /// A backdrop on a NEW back-most track, starting at 0 and named
+    /// "Background" — Clip ▸ Add Background ▸ Solid Color and ▸ Image….
+    ///
+    /// With `media`, that file is placed as `add_clip` would place it: the
+    /// right source kind, Fit scale, audio props when it has sound. With
+    /// `color`, or with NEITHER, it is a canvas-sized filled rectangle with
+    /// no stroke at scale 1 — and the plate's default colour is WHITE, not
+    /// black, because the canvas is already black and a black plate is a
+    /// command that appears to do nothing. `duration` defaults to the
+    /// timeline's own length.
+    ///
+    /// Every argument is optional, so the no-argument call IS the Solid
+    /// Color row: it asks for a white plate the length of the cut, which
+    /// the user then re-colours in the inspector's Fill row — and that Fill
+    /// row is also how a full-canvas GRADIENT is reached, a gradient being
+    /// a shape's fill and this clip being a shape.
+    ///
+    /// A `media` plate takes a FILL scale where `add_clip` takes a Fit one:
+    /// a plate that leaves the canvas showing down one side has failed at the
+    /// one thing a background is for, and it is the same scale
+    /// `add_blurred_background` gives its copy, so the two commands agree.
+    ///
+    /// Errors on `media` and `color` together (they are alternatives, and a
+    /// caller that named both meant one of them), an unknown media, a media
+    /// with no pictures, a colour outside 0–1, or a duration under a frame.
+    static func addBackground(
+        media: UInt32? = nil, color: RGBA? = nil, duration: Ticks? = nil
+    ) -> ReelOp {
+        var a = OpArgs()
+        a.put("media", media)
+        a.put("color", color)
+        a.put("duration", duration)
+        return ReelOp(name: "add_background", args: a.values)
+    }
+
+    /// The screencast backdrop — Clip ▸ Add Blurred Background. `clip` is
+    /// copied onto a NEW back-most track at the same start, duration, speed
+    /// and source window, so the two play the same frames, then scaled to
+    /// FILL the canvas, centred, uncropped, and blurred at full strength.
+    ///
+    /// The copy is muted — its `enabled` becomes `{video: true, audio:
+    /// false}`, `detach_audio`'s pair read the other way round — and it
+    /// composites `normal` however the clip in front of it blends, because a
+    /// plate blends with the CANVAS and a mode chosen for the picture would
+    /// make the back-most layer multiply itself into black. It drops its
+    /// `audio.duck`, its transition, its actions and its label; it is named
+    /// "Blurred Background".
+    ///
+    /// Muting it is the reason this is one op and not a paste: the copy
+    /// carries the same media at the same in point, so a mix that played both
+    /// would play one source twice, which no still frame can see. **The duck
+    /// goes for the same reason one field further in**, and the phase-6
+    /// review is what found it: a duck is the one member of the audio group
+    /// that lowers OTHER material, and `duckers()` gathers it without asking
+    /// whether the clip can be heard — so a muted copy keeping one would duck
+    /// the whole mix, the clip it was copied from included. Everything else is
+    /// kept, the source window most of all, which is what a re-place through
+    /// `add_clip` would have lost.
+    ///
+    /// Errors on an unknown clip, a NEST (a nest clip's own filters are
+    /// dropped by the flattening, so the copy would come out sharp), a source
+    /// with no pixel size (a text clip, an audio-only one) or a clip carrying
+    /// no video properties.
+    static func addBlurredBackground(clip: UInt32) -> ReelOp {
+        var a = OpArgs()
+        a.put("clip", clip)
+        return ReelOp(name: "add_blurred_background", args: a.values)
+    }
+
     /// The insert edit: makes room for the whole media at `at` on `track`
     /// — the clip `at` is inside on that track is cut first, then every
     /// unlocked track opens by the media's length — and places it. One op,
@@ -1419,6 +1488,21 @@ extension StrokeProps {
     var dictionary: [String: Any] { ["width": width, "color": color] }
 }
 
+extension GradientStop {
+    var dictionary: [String: Any] { ["at": at, "color": color] }
+}
+
+extension Gradient {
+    /// The stops go out in the order they are HELD, not `sortedStops` — the
+    /// model does not police the order and the renderer sorts on the way to
+    /// `CGGradient`, so sorting here would silently rewrite a list the user
+    /// is in the middle of dragging through and make a stop jump back under
+    /// the pointer.
+    var dictionary: [String: Any] {
+        ["kind": kind.rawValue, "stops": stops.map { $0.dictionary }, "angle": angle]
+    }
+}
+
 // MARK: - Typed patches
 
 /// A sparse patch of video properties. Every field is optional and only the
@@ -1442,6 +1526,21 @@ extension StrokeProps {
 /// or re-ordering a region is one whole-array `set_video`. A second rule for
 /// the second list would be a rule to remember; there is one rule, and it is
 /// "a list is replaced whole".
+///
+/// **`blend` is a single optional too, and the pairing with `lenient` is
+/// LOAD-BEARING** (phase 6). `VideoProps.blend` is a plain `BlendMode` with
+/// no null form — `.normal` is how a blend is cleared — so nothing here
+/// needs the third state. But the choice also decides whether a MISSPELT
+/// mode is caught: `AgentServer.patchArg` refuses a key by name when
+/// re-decoding the patch without it changes nothing, and `lenient(.blend)`
+/// answers nil for a value it cannot read, which is exactly what an absent
+/// key answers — so `{"blend": "muliply"}` is refused by name. Written as a
+/// `BlendMode??` read through `nullable` it would decode to `.some(nil)`,
+/// differ from absent, pass the round trip, and reach the core as an
+/// explicit null the caller never wrote: here a serde complaint about a
+/// null, and on a field that DOES take one a silent clear — which is the
+/// gap app/CLAUDE.md records against the ten `T??` patch fields. Either
+/// way the one thing never named is the typo.
 struct VideoPatch: Codable, Equatable {
     var x: Double?
     var y: Double?
@@ -1457,13 +1556,15 @@ struct VideoPatch: Codable, Equatable {
     var reflection: ReflectionProps??
     var spotlight: SpotlightProps??
     var obscure: [ObscureProps]?
+    var blend: BlendMode?
 
     init(
         x: Double? = nil, y: Double? = nil, scale: Double? = nil, rotation: Double? = nil,
         opacity: Double? = nil, crop: CropInsets? = nil, cornerRadius: Double? = nil,
         shadow: ShadowProps?? = nil, color: ColorAdjust? = nil, chroma: ChromaProps?? = nil,
         filters: [FilterProps]? = nil, reflection: ReflectionProps?? = nil,
-        spotlight: SpotlightProps?? = nil, obscure: [ObscureProps]? = nil
+        spotlight: SpotlightProps?? = nil, obscure: [ObscureProps]? = nil,
+        blend: BlendMode? = nil
     ) {
         self.x = x
         self.y = y
@@ -1479,6 +1580,7 @@ struct VideoPatch: Codable, Equatable {
         self.reflection = reflection
         self.spotlight = spotlight
         self.obscure = obscure
+        self.blend = blend
     }
 
     init(from decoder: Decoder) throws {
@@ -1497,6 +1599,8 @@ struct VideoPatch: Codable, Equatable {
         reflection = c.nullable(.reflection)
         spotlight = c.nullable(.spotlight)
         obscure = c.lenient(.obscure)
+        // `lenient`, never `nullable` — the struct doc says what that buys.
+        blend = c.lenient(.blend)
     }
 
     var dictionary: [String: Any] {
@@ -1539,6 +1643,7 @@ struct VideoPatch: Codable, Equatable {
             }
         }
         if let obscure = obscure { d["obscure"] = obscure.map { $0.dictionary } }
+        if let blend = blend { d["blend"] = blend.rawValue }
         return d
     }
 
@@ -1721,6 +1826,22 @@ struct TextPatch: Codable, Equatable {
 /// A sparse patch of shape properties. Not `Codable`: unlike the other
 /// three it never appears inside an action's end patch (§5.4 patches cover
 /// video, audio and text only).
+///
+/// **`gradient` is a three-state double optional**, `stroke` and `fill`'s
+/// shape (phase 6): the model field is an `Option<Gradient>`, so `nil`
+/// leaves it alone, `.some(nil)` sends the explicit null that CLEARS it —
+/// which is the inspector's Reset, and the exact inverse of setting one,
+/// since a gradient never clears the `fill` underneath it — and
+/// `.some(value)` sets it.
+///
+/// It is a nested object, so it inherits the replacement rule the MCP path
+/// records for `shadow` and `obscure`: a key left out of it comes back as
+/// its default rather than as what the shape had, so every writer sends the
+/// whole gradient. What it does NOT inherit is the SILENCE. The other
+/// nested objects are dropped into a typed struct by the generic decoder,
+/// which gets to a misspelt key before the core's `deny_unknown_fields`
+/// can name it; this patch is the one read by hand in `AgentServer`, so a
+/// key misspelt inside a gradient can be refused by name there.
 struct ShapePatch: Equatable {
     var kind: ShapeKind?
     var width: Double?
@@ -1732,11 +1853,13 @@ struct ShapePatch: Equatable {
     var radius: Double?
     var from: [Double]?
     var to: [Double]?
+    var gradient: Gradient??
 
     init(
         kind: ShapeKind? = nil, width: Double? = nil, height: Double? = nil,
         stroke: StrokeProps?? = nil, fill: RGBA?? = nil, arrowStart: Bool? = nil,
-        arrowEnd: Bool? = nil, radius: Double? = nil, from: [Double]? = nil, to: [Double]? = nil
+        arrowEnd: Bool? = nil, radius: Double? = nil, from: [Double]? = nil,
+        to: [Double]? = nil, gradient: Gradient?? = nil
     ) {
         self.kind = kind
         self.width = width
@@ -1748,6 +1871,7 @@ struct ShapePatch: Equatable {
         self.radius = radius
         self.from = from
         self.to = to
+        self.gradient = gradient
     }
 
     var dictionary: [String: Any] {
@@ -1770,6 +1894,13 @@ struct ShapePatch: Equatable {
         if let radius = radius { d["radius"] = radius }
         if let from = from { d["from"] = from }
         if let to = to { d["to"] = to }
+        if let gradient = gradient {
+            if let gradient = gradient {
+                d["gradient"] = gradient.dictionary
+            } else {
+                d["gradient"] = NSNull()
+            }
+        }
         return d
     }
 

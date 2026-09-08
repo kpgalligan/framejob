@@ -95,6 +95,22 @@ normative: §5.2 is the project schema, §6 the op table, §7 the architecture.
   loudness and true peak, measured on a first pass over the real mix, then
   one gain (no limiter) capped so the true peak stays under −1 dBTP. Every
   export reports what its sound measured, normalised or not.
+- **Looks.** Every layer has a **blend mode** — normal, multiply, screen,
+  add, overlay, darken, lighten, difference — in the Transform section
+  beside Opacity, and it works on any kind of clip: a shape card over a
+  screen recording is a tint, a screened white blob is a glow. A blend
+  needs something UNDER it, so the section says so when there is nothing
+  there (over the empty black canvas multiply reads black and screen
+  changes nothing), and **Clip ▸ Add Background** is the answer: a plate on
+  a new back-most track, a colour or an image, running the timeline's
+  length. **Clip ▸ Add Blurred Background** is the screencast move — the
+  selected clip copied behind itself, blown up to fill the canvas and
+  blurred, playing exactly the same frames because it keeps the same source
+  window, and muted so the mix does not play the recording twice. Shapes
+  can be filled with a **gradient** instead of a flat colour, linear or
+  radial, up to eight stops, at any angle. And a filter can be
+  **animated**: an action's end state carries the filter stack, so a blur
+  can ramp up across a clip like any other property.
 - **Playback** over an `AVComposition` built from the core's composition plan,
   with a Metal compositor drawing every frame from the core's frame recipe.
   A property-only edit re-renders the paused frame without rebuilding the
@@ -116,11 +132,12 @@ volume/fade/duck/detach, freeze frame, speed, the in/out range and the agent —
 and **M2 and M3 are now done too**: chapters on export, nests, filters,
 reflection, spotlight, reverse, the audio DSP, GIF/APNG export, SRT captions,
 Consolidate Media and ffmpeg-assisted import. Beyond the spec,
-`designs/reelcut-roadmap-2.md`'s phases 0 through 5 have landed — the
+`designs/reelcut-roadmap-2.md`'s phases 0 through 6 have landed — the
 groundwork, the cutting moves, clip identity, the screencast trio, captions
-in both directions with the built-in text animations, and now sound: the
-mono fold, a level meter, Normalize Clip, loudness on export and the two
-uncompressed audio formats.
+in both directions with the built-in text animations, sound (the mono fold,
+a level meter, Normalize Clip, loudness on export and the two uncompressed
+audio formats), and now looks: blend modes, gradient fills, the two
+background commands and filters as animation targets.
 `CLAUDE.md` carries the milestone record and `designs/reelcut-roadmap.md`
 what still needs a person at the machine.
 
@@ -159,7 +176,7 @@ Makefile              Build orchestration
 | `ProjectSnapshot.swift` | the `Codable` mirror of the §5.2 project JSON, the plan and the recipe, plus the §5.3 placement maths |
 | `ProjectDocument.swift` | NSDocument, `.reelcut` package read/write, and the single mutation point (`applyEdit`, the live-edit trio, undo as a handle stack) |
 | `MediaImporter.swift` | `AVURLAsset` probing (the one file allowed `async`/`await`), thumbnails, waveform peaks |
-| `CompositionBuilder.swift` · `Compositor.swift` · `LayerRenderers.swift` · `Playback.swift` | plan → `AVComposition`; the `AVVideoCompositing` Metal pipeline; text/shape/image textures and the three text reveals the recipe asks for; the player and its rebuild-vs-refresh rule |
+| `CompositionBuilder.swift` · `Compositor.swift` · `LayerRenderers.swift` · `LayerRenderersText.swift` · `Playback.swift` | plan → `AVComposition`; the `AVVideoCompositing` Metal pipeline — five states from three fragment functions, one of them reading the destination so a layer can blend; text/shape/image textures, a shape's gradient and the three text reveals the recipe asks for; the player and its rebuild-vs-refresh rule |
 | `CaptionImporter.swift` · `CaptionLayout.swift` · `Transcriber.swift` · `CaptionExporter.swift` | captions in and out: the SubRip grammar, the placement every producer shares, on-device speech recognition and the cue builder over it, and the `.srt` / `.vtt` writer |
 | `Exporter.swift` · `ExportSheetController.swift` · `ExporterWriter.swift` | writing a file — two passes wherever it holds sound, the first measuring loudness — and rendering one frame offline |
 | `AudioTap.swift` · `AudioDSP.swift` · `LevelMeter.swift` · `LevelMeterView.swift` | the sample-level audio the plan cannot carry (noise reduction, the compressor, the mono fold, the pan) and the level meter's model and its one view |
@@ -169,7 +186,7 @@ Makefile              Build orchestration
 | `CanvasSessions.swift` · `PreviewCanvasView.swift` | canvas geometry and gestures; the preview and its overlay |
 | `InspectorPane.swift` · `InspectorViewController.swift` · `ClipPane` `MediaPane` `DocumentPane` (with `VideoPane` `AudioPane` `TextPane` `ShapePane` as section factories) | the binding that knows about actions, one file per tab, and the sections the Clip tab composes |
 | `EditorViewController.swift` + `EditorViewController+{Timeline,Canvas,Inspector,Export}.swift` | wiring in the base file, features in extensions |
-| `AgentServer.swift` + `AgentServer+{Arguments,Project,Clips,Tracks,Media,Render,History,Silence,Captions,Audio}.swift` · `AgentCatalog.swift` | the MCP endpoint, its handlers, and the tool catalog |
+| `AgentServer.swift` + `AgentServer+{Arguments,Project,Clips,Tracks,Media,Render,History,Silence,Captions,Audio,Background}.swift` · `AgentCatalog.swift` | the MCP endpoint, its handlers, and the tool catalog |
 | `AppDelegate.swift` · `EditorWindowController.swift` · `WelcomeWindowController.swift` · `main.swift` | menus (nil-target selectors), window, welcome |
 | `SpeedSheetController.swift` · `RelinkSheetController.swift` · `SilenceSheetController.swift` (with `SilenceDetector.swift` behind it) · `TranscribeSheetController.swift` | the remaining dialogs |
 | `Theme.swift` · `Controls.swift` · `OptionControls.swift` · `Sheets.swift` · `EditorChrome.swift` · `FileDropView.swift` | shared chrome, copied from Rasterize |
@@ -222,7 +239,8 @@ runs. It is off by default.
 
 **One tool per row of the op table** in spec §6 and the module doc of
 `core/src/edit.rs`, with the same name and the same argument names —
-`add_clip`, `add_text_clip`, `add_shape_clip`, `insert_clip`,
+`add_clip`, `add_text_clip`, `add_shape_clip`, `add_background`,
+`add_blurred_background`, `insert_clip`,
 `overwrite_clip`, `move_clip`, `trim_start`, `trim_end`, `rate_stretch`,
 `slip`, `roll`, `split`, `delete`, `ripple_delete`, `ripple_delete_range`,
 `ripple_delete_ranges`, `lift_range`, `insert_time`, `close_gap`,

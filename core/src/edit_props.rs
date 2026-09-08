@@ -32,7 +32,10 @@
 //! The bounds themselves, and the four checks against them, are
 //! `props_check.rs`'s (the inspector's numbers, spec §4.3): a value that
 //! passes there is a value a control can show, and a merge here is stored
-//! only once its group has passed.
+//! only once its group has passed. Exactly one check stays behind —
+//! [`check_blend`], which refuses a blend mode on a nest clip — because it
+//! is a fact about the CLIP and not about the vocabulary, and nothing in
+//! `props_check.rs` is handed a clip to ask.
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -40,8 +43,8 @@ use serde_json::Value;
 use crate::actions::{self, MAX_PATCH_DEPTH};
 use crate::export::describe;
 use crate::model::{
-    AudioProps, Chroma, Clip, Compressor, Filter, ObscureRegion, Project, Reflection, Shadow,
-    ShapeProps, Source, Spotlight, TextProps, VideoProps,
+    AudioProps, BlendMode, Chroma, Clip, Compressor, Filter, ObscureRegion, Project, Reflection,
+    Shadow, ShapeProps, Source, Spotlight, TextProps, VideoProps,
 };
 use crate::props_check::{check_audio, check_shape, check_text, check_video};
 
@@ -73,7 +76,8 @@ impl Group {
     /// A fully-populated instance of the group, serialized: every optional
     /// sub-object present, so the key check can see inside `shadow`,
     /// `chroma`, `reflection`, `spotlight`, `duck`, `compressor`,
-    /// `outline`, `backdrop`, `animation` and `stroke` even when the clip
+    /// `outline`, `backdrop`, `animation`, `stroke` and `gradient` even when
+    /// the clip
     /// currently has `null` there — and one `filters` entry and one `obscure` region, so
     /// it can see inside the elements of the two arrays of objects too.
     /// Both entries are load-bearing: `check_keys` reads the FIRST element
@@ -81,6 +85,10 @@ impl Group {
     /// given, so a list left at its empty default would hand it no
     /// reference at all and a misspelling inside a region would be dropped
     /// in silence — the very failure the array arm was written for.
+    /// `Gradient::default()` earns its place twice over for that reason: it
+    /// is the only optional sub-object that CONTAINS an array of objects,
+    /// and its own default carries two stops, so `stops[].at` and
+    /// `stops[].color` get a reference without this arm naming them.
     fn template(self) -> Value {
         match self {
             Group::Video => actions::to_json(&VideoProps {
@@ -107,6 +115,7 @@ impl Group {
             Group::Shape => actions::to_json(&ShapeProps {
                 stroke: Some(crate::model::Stroke::default()),
                 fill: Some([0.0, 0.0, 0.0, 1.0]),
+                gradient: Some(crate::model::Gradient::default()),
                 ..ShapeProps::default()
             }),
         }
@@ -174,6 +183,44 @@ pub(crate) fn merge_group(base: &Value, patch: &Value, group: Group) -> Result<V
     }
     check_keys(patch, &group.template(), group, "", 0)?;
     Ok(actions::merge(base, patch))
+}
+
+/// The one check a video group cannot make on its own: a NEST clip may not
+/// carry a blend mode (format version 6).
+///
+/// A nest is FLATTENED rather than composited offscreen (`nest.rs`), so
+/// there is no such thing as "the nest's picture" for a blend to combine
+/// with what is under it — each clip inside contributes its own layer, and a
+/// blend on the nest clip could only mean "blend every one of them
+/// separately against whatever happens to be below". That is a different
+/// picture from the one the popup promises, and a wrong picture is worse
+/// than a refusal.
+///
+/// **Only a non-normal MERGED value fires**, which is not leniency for its
+/// own sake. `paste_attributes` replaces the video group WHOLE, so a check
+/// on any MENTION of the key would fail an all-or-nothing paste of an
+/// ordinary look — one that never touched blend — onto a nest clip, for a
+/// value that changes nothing. `{"blend": "normal"}` on a nest clip is
+/// therefore the identity and answers `None` through the usual `finish`.
+///
+/// It lives HERE rather than in `props_check.rs` because it is not a fact
+/// about the vocabulary: the value is perfectly legal and it is the CLIP it
+/// was written onto that refuses it, where `props_check.rs` never sees a
+/// clip. Both callers — the patch path and `paste_attributes`' `check_group`
+/// — run this one function, so the two give the identical message.
+///
+/// It is not the whole story either: `set_action_end` validates nothing but
+/// "is it an object", so an end patch can still carry a blend onto a nest
+/// clip. `actions.rs`'s `clamp_video` is what closes that door, for the
+/// recipe, `clip_state` and both export writers at once.
+fn check_blend(clip: &Clip, props: &VideoProps) -> Result<(), String> {
+    if props.blend != BlendMode::Normal && matches!(clip.source, Source::Nest { .. }) {
+        return Err(format!(
+            "clip {} shows a nest and cannot take a blend mode",
+            clip.id
+        ));
+    }
+    Ok(())
 }
 
 // ---- the ops -------------------------------------------------------------
@@ -296,7 +343,14 @@ impl Project {
     pub(crate) fn check_group(&self, clip: &Clip, group: Group) -> Result<(), String> {
         match group {
             Group::Video => match &clip.video {
-                Some(video) => check_video(video, self.source_size(clip)),
+                // The vocabulary's ranges, then the one rule that is about
+                // this CLIP rather than about the values — so a payload
+                // pasted onto a nest clip is refused with the same sentence
+                // `set_video` would have used.
+                Some(video) => {
+                    check_video(video, self.source_size(clip))?;
+                    check_blend(clip, video)
+                }
                 None => Ok(()),
             },
             Group::Audio => clip.audio.as_ref().map_or(Ok(()), check_audio),
@@ -346,6 +400,7 @@ impl Project {
                     let props: VideoProps = serde_json::from_value(merged)
                         .map_err(|e| format!("video patch does not match the schema: {e}"))?;
                     check_video(&props, self.source_size(&clip))?;
+                    check_blend(&clip, &props)?;
                     if let Some(slot) = next.clip_mut(id) {
                         slot.video = Some(props);
                     }

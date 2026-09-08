@@ -59,7 +59,30 @@ use crate::model::{Canvas, Project};
 /// both work in ordinary text clips through the ops that already existed,
 /// and the per-frame reveal the animation produces is computed by
 /// [`crate::recipe`] and never stored.
-pub const RC_FORMAT_VERSION: u32 = 5;
+///
+/// Version 6 is looks (road map 2, phase 6): two keys, and this time on two
+/// different groups. [`crate::model::VideoProps::blend`] is how a layer
+/// combines with the canvas under it — a [`crate::model::BlendMode`], eight
+/// of them, `Normal` being the source-over every project drew before the
+/// key existed — and [`crate::model::ShapeProps::gradient`] is an optional
+/// [`crate::model::Gradient`] that takes precedence over a shape's flat
+/// `fill`. Both default (`Normal` and `None`), so a version-5 file reads
+/// unchanged and there is no migration step.
+///
+/// The bump is the point all the same, and the argument is written out here
+/// rather than pointed at because a defaulted field is exactly the case
+/// where it looks like paperwork. Unknown keys are ignored at every level by
+/// design (`model.rs`'s module doc). So a version-5 build handed a version-6
+/// file with no gate would OPEN it, drop every blend mode and every gradient
+/// silently on read — the project still opens, the clips are all there, the
+/// shapes are still shapes — and then write that loss back over the original
+/// on the next save. What makes this version's loss quieter still than
+/// version 5's is that a dropped blend does not remove anything from the
+/// picture: the layer is still drawn, just source-over, so there is nothing
+/// missing to notice. Nothing else phase 6 added persists a new key:
+/// `add_background` and `add_blurred_background` build ordinary clips out of
+/// schema that already existed.
+pub const RC_FORMAT_VERSION: u32 = 6;
 
 /// Reader caps, mirrored by the `RC_MAX_*` defines in the C header. They
 /// exist so a corrupt or generated file cannot make the app allocate
@@ -233,7 +256,7 @@ pub fn read(json: &str) -> Result<Project, String> {
 
     // MIGRATION HOOK. Each bump adds one step here, applied in order from
     // `version` up to RC_FORMAT_VERSION, rewriting `value` in place before
-    // it is deserialized. Versions 3, 4 and 5 needed no rewrite — every
+    // it is deserialized. Versions 3, 4, 5 and 6 needed no rewrite — every
     // field any of them added carries a serde default — so none has a
     // line; the next version that changes a field's SHAPE adds its own
     // below.

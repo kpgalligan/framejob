@@ -9,17 +9,21 @@
 //! - **Every older file still opens.** The list carries a serde default —
 //!   the empty one — so there is no migration step and a version-1, -2 or
 //!   -3 file reads back with no regions at all, stamped at the current
-//!   version — 5 since phase 4c, which is why the assertions below name it
+//!   version — 6 since phase 6, which is why the assertions below name it
 //!   rather than 4. The
 //!   BUMP is still the point: unknown keys are ignored at every level by
 //!   design (`model.rs`'s module doc), so without the version gate a
 //!   version-3 build would open a version-4 file, drop every region, and
 //!   write the loss back over the original on the next save. That gate is
 //!   `schema_v3.rs`'s claim and is not restated here.
-//! - **`obscure` is the LAST key of the `video` object**, read off the
-//!   written TEXT, because a parsed `Value` sorts its keys and cannot tell.
-//!   Declaration order is key order, so a version-3 file diffed against a
-//!   version-4 one differs by a trailing key rather than by a re-ordering.
+//! - **`obscure` is where version 4 appended it in the `video` object**,
+//!   read off the written TEXT, because a parsed `Value` sorts its keys and
+//!   cannot tell. Declaration order is key order, so a version-3 file
+//!   diffed against a version-4 one differs by a trailing key rather than
+//!   by a re-ordering. It was the LAST key until version 6 appended
+//!   `blend` after it, which is what "append only" looks like from the
+//!   inside, and the test now pins that pair rather than the closing
+//!   brace.
 //! - **A region added with nothing said takes the documented defaults** —
 //!   the spotlight's 480 × 270 box, pixelated at full strength. Those two
 //!   are the schema's only opinionated numbers here and the whole feature
@@ -121,7 +125,7 @@ fn hidden() -> Value {
 // ---- reading older files -------------------------------------------------
 
 fn assert_no_regions(project: &Value) {
-    assert_eq!(at(project, "/version"), &json!(5));
+    assert_eq!(at(project, "/version"), &json!(6));
     assert_eq!(at(project, "/clips/0/video/obscure"), &json!([]));
     // The neighbours a version-4 reader adds nothing to, so a file that
     // gained an empty list gained ONLY that.
@@ -141,7 +145,7 @@ fn a_version_three_file_reads_with_no_hidden_regions() {
 fn a_version_two_file_and_a_version_one_file_read_the_same_way() {
     // The migration chain still runs underneath: a version-1 file reaches
     // the current version through `migrate_1_to_2` and then through nothing
-    // at all, because no version since — 3, 4 or 5 — has needed a rewrite.
+    // at all, because no version since — 3, 4, 5 or 6 — has needed a rewrite.
     assert_no_regions(&Handle::from_value(&one_clip(2)).value());
     assert_no_regions(&Handle::from_value(&one_clip(1)).value());
 }
@@ -151,7 +155,7 @@ fn a_version_two_file_and_a_version_one_file_read_the_same_way() {
 #[test]
 fn the_regions_round_trip_exactly() {
     let written = Handle::from_value(&hidden()).value();
-    assert_eq!(at(&written, "/version"), &json!(5));
+    assert_eq!(at(&written, "/version"), &json!(6));
 
     let regions = array(&written, "/clips/0/video/obscure");
     assert_eq!(regions.len(), 2, "both regions survived");
@@ -185,11 +189,12 @@ fn the_regions_round_trip_exactly() {
 }
 
 #[test]
-fn obscure_is_the_last_key_of_the_video_object() {
-    // Declaration order IS key order, and `obscure` is the last field of
-    // `VideoProps`, so a version-3 file diffed against a version-4 one
-    // differs by a trailing key rather than by a re-ordering. Read off the
-    // written TEXT, because a `Value` sorts its keys and cannot tell.
+fn obscure_is_the_last_key_version_four_added_to_the_video_object() {
+    // Declaration order IS key order, and `obscure` was the last field of
+    // `VideoProps` when version 4 added it, so a version-3 file diffed
+    // against a version-4 one differs by a trailing key rather than by a
+    // re-ordering. Read off the written TEXT, because a `Value` sorts its
+    // keys and cannot tell.
     let first = Handle::from_value(&hidden()).to_json();
     let position = |needle: &str| {
         first
@@ -198,12 +203,15 @@ fn obscure_is_the_last_key_of_the_video_object() {
     };
     assert!(position("\"filters\"") < position("\"spotlight\""));
     assert!(position("\"spotlight\"") < position("\"obscure\""));
-    // ...and it CLOSES the object: the last region's closing brace, the
-    // array's closing bracket and the video object's closing brace, with
-    // nothing between them.
+    // ...and nothing version 4 knew about follows it. It no longer CLOSES
+    // the object — version 6 appended `blend` after it, which is what
+    // "append only" looks like from the inside — so the claim is that the
+    // region list still ends where it did and the new key sits immediately
+    // after: the last region's closing brace, the array's closing bracket,
+    // then `blend` and the video object's own brace.
     assert!(
-        first.contains("\"amount\": 0.25\n          }\n        ]\n      }"),
-        "obscure does not close the video object:\n{first}"
+        first.contains("\"amount\": 0.25\n          }\n        ],\n        \"blend\""),
+        "obscure is not where version 4 left it:\n{first}"
     );
 
     // A second trip through the text is byte-identical to the first, which

@@ -63,6 +63,23 @@ const SPOT_SHAPES: [&str; 2] = ["rect", "ellipse"];
 /// which is why the sweep below looks INSIDE `video.obscure` for them
 /// rather than trusting a search of the written text.
 const OBSCURE_KINDS: [&str; 2] = ["blur", "pixelate"];
+/// `BlendMode`, format version 6, in DECLARATION order — which is the
+/// shader discriminant's order, so this list doubles as the statement of
+/// it. `normal` is first and is 0.
+const BLEND_MODES: [&str; 8] = [
+    "normal",
+    "multiply",
+    "screen",
+    "add",
+    "overlay",
+    "darken",
+    "lighten",
+    "difference",
+];
+/// `GradientKind`, format version 6. Both spellings are unique in the
+/// written text, unlike the obscure kinds, so the sweep below can find
+/// them by search.
+const GRADIENT_KINDS: [&str; 2] = ["linear", "radial"];
 const CURVES: [&str; 4] = ["linear", "ease_in", "ease_out", "ease_in_out"];
 
 // ---- the schema round trip -----------------------------------------------
@@ -129,7 +146,8 @@ fn full_project() -> Value {
               "height": 320.0, "feather": 36.0, "kind": "blur", "amount": 0.75 },
             { "shape": "rect", "x": 310.0, "y": -80.0, "width": 640.0,
               "height": 96.0, "feather": 0.0, "kind": "pixelate", "amount": 0.25 }
-        ]
+        ],
+        "blend": "screen"
     });
     clip10["audio"] = json!({
         "volume": 1.25, "muted": false, "fade_in": 300_000, "fade_out": 600_000,
@@ -181,7 +199,8 @@ fn full_project() -> Value {
         "filters": [],
         "reflection": null,
         "spotlight": null,
-        "obscure": []
+        "obscure": [],
+        "blend": "normal"
     });
 
     // Clip 21: an image, with the audio group absent (`null`) even though
@@ -248,7 +267,32 @@ fn full_project() -> Value {
                     json!([0.2, 0.4, 0.8, 0.5])
                 },
                 "arrow_start": false, "arrow_end": true, "radius": 16.0,
-                "from": [0.0, 1.0], "to": [1.0, 0.0]
+                "from": [0.0, 1.0], "to": [1.0, 0.0],
+                // The rectangle takes a linear gradient and the ellipse a
+                // radial one, so both kinds round-trip; the line and the
+                // arrow leave it null, so both halves of the option are
+                // covered the way `stroke` and `fill` already are. Every
+                // field is away from its default, stops included.
+                "gradient": match *kind {
+                    "rectangle" => json!({
+                        "kind": "linear",
+                        "stops": [
+                            { "at": 0.0, "color": [1.0, 0.0, 0.0, 1.0] },
+                            { "at": 0.25, "color": [1.0, 1.0, 0.0, 0.75] },
+                            { "at": 1.0, "color": [0.0, 0.0, 1.0, 0.5] }
+                        ],
+                        "angle": 45.0
+                    }),
+                    "ellipse" => json!({
+                        "kind": "radial",
+                        "stops": [
+                            { "at": 0.1, "color": [1.0, 1.0, 1.0, 1.0] },
+                            { "at": 0.9, "color": [0.0, 0.0, 0.0, 0.0] }
+                        ],
+                        "angle": 0.0
+                    }),
+                    _ => Value::Null,
+                }
             });
             clip
         })
@@ -267,6 +311,25 @@ fn full_project() -> Value {
                 json!({ "kind": "media", "media": 1, "in": 0 }),
             );
             clip["transition_in"] = json!({ "kind": kind });
+            clip
+        })
+        .collect();
+
+    // Clips 80-87: one per BlendMode. Eight modes and only three clips
+    // above carry a video group, so the sweep needs a generated set of its
+    // own — the same answer the transition kinds got, for the same reason.
+    let blend_clips: Vec<Value> = BLEND_MODES
+        .iter()
+        .enumerate()
+        .map(|(i, mode)| {
+            let mut clip = base_clip(
+                80 + i as u64,
+                4,
+                30_000_000 + 600_000 * i as i64,
+                600_000,
+                json!({ "kind": "image", "media": 3 }),
+            );
+            clip["video"] = json!({ "blend": mode });
             clip
         })
         .collect();
@@ -304,16 +367,18 @@ fn full_project() -> Value {
         "reflection": null,
         "spotlight": { "shape": "ellipse", "x": 0.0, "y": 0.0, "width": 320.0,
                        "height": 320.0, "feather": 0.0, "dim": 1.0, "zoom": 1.0 },
-        "obscure": []
+        "obscure": [],
+        "blend": "difference"
     });
 
     let mut clips = vec![clip10, clip20, clip21, clip22, clip41, clip42, clip43];
     clips.extend(shape_clips);
     clips.extend(transition_clips);
+    clips.extend(blend_clips);
     clips.push(clip40);
 
     json!({
-        "version": 5,
+        "version": 6,
         "canvas": {
             "width": 1280, "height": 720, "fps": [30000, 1001],
             "background": [0.1, 0.2, 0.3, 1.0],
@@ -483,6 +548,16 @@ fn every_enum_variant_is_covered_by_the_round_trip() {
     for shape in SPOT_SHAPES {
         assert_contains(&written, &format!("\"shape\": \"{shape}\""));
     }
+    // `BlendMode` and `GradientKind`, format version 6. The blend is a key
+    // of its own, so it is searched by key; a gradient's kind is spelled
+    // `kind` like every other discriminant, and both of its spellings are
+    // unique in the written text.
+    for mode in BLEND_MODES {
+        assert_contains(&written, &format!("\"blend\": \"{mode}\""));
+    }
+    for kind in GRADIENT_KINDS {
+        assert_contains(&written, &format!("\"kind\": \"{kind}\""));
+    }
 
     for curve in CURVES {
         assert_contains(&written, &format!("\"curve\": \"{curve}\""));
@@ -529,7 +604,7 @@ fn a_new_project_is_the_documented_empty_project() {
     assert_eq!(
         project.value(),
         json!({
-            "version": 5,
+            "version": 6,
             "canvas": {
                 "width": 1280, "height": 720, "fps": [30000, 1001],
                 "background": [0.0, 0.0, 0.0, 1.0],
@@ -565,7 +640,7 @@ fn an_empty_object_is_an_empty_project() {
     assert_eq!(
         project,
         json!({
-            "version": 5,
+            "version": 6,
             "canvas": {
                 "width": 1920, "height": 1080, "fps": [30, 1],
                 "background": [0.0, 0.0, 0.0, 1.0],
@@ -600,7 +675,7 @@ fn omitted_optional_keys_take_the_documented_defaults() {
     }))
     .value();
 
-    assert_eq!(at(&project, "/version"), &json!(5));
+    assert_eq!(at(&project, "/version"), &json!(6));
     // A file that never heard of nests reads as one with none, which is
     // what "every new field carries a serde default" buys.
     assert_eq!(at(&project, "/nests"), &json!([]));
@@ -662,7 +737,7 @@ fn empty_property_objects_take_the_documented_defaults() {
                          "reflection": {}, "spotlight": {} },
               "audio": { "duck": {}, "compressor": {} },
               "text": { "outline": {}, "backdrop": {} },
-              "shape": { "stroke": {} } }
+              "shape": { "stroke": {}, "gradient": {} } }
         ],
         "next_id": 4
     }))
@@ -676,7 +751,8 @@ fn empty_property_objects_take_the_documented_defaults() {
             "corner_radius": 0.0, "shadow": null,
             "color": { "brightness": 0.0, "contrast": 0.0, "saturation": 0.0, "hue": 0.0 },
             "chroma": null,
-            "filters": [], "reflection": null, "spotlight": null, "obscure": []
+            "filters": [], "reflection": null, "spotlight": null, "obscure": [],
+            "blend": "normal"
         }),
         "VideoProps defaults"
     );
@@ -706,7 +782,8 @@ fn empty_property_objects_take_the_documented_defaults() {
             "kind": "rectangle", "width": 320.0, "height": 120.0,
             "stroke": { "width": 6.0, "color": [1.0, 1.0, 1.0, 1.0] },
             "fill": null, "arrow_start": false, "arrow_end": false,
-            "radius": 0.0, "from": [0.0, 1.0], "to": [1.0, 0.0]
+            "radius": 0.0, "from": [0.0, 1.0], "to": [1.0, 0.0],
+            "gradient": null
         }),
         "ShapeProps defaults"
     );
@@ -764,6 +841,21 @@ fn empty_property_objects_take_the_documented_defaults() {
         at(&project, "/clips/1/shape/stroke"),
         &json!({ "width": 6.0, "color": [1.0, 1.0, 1.0, 1.0] }),
         "Stroke defaults"
+    );
+    assert_eq!(
+        at(&project, "/clips/1/shape/gradient"),
+        // Black to white, left to right: `{"gradient": {}}` is what the
+        // inspector's Add and the most natural agent patch both send, so
+        // this IS the feature's first impression rather than a formality.
+        &json!({
+            "kind": "linear",
+            "stops": [
+                { "at": 0.0, "color": [0.0, 0.0, 0.0, 1.0] },
+                { "at": 1.0, "color": [1.0, 1.0, 1.0, 1.0] }
+            ],
+            "angle": 0.0
+        }),
+        "Gradient defaults"
     );
 }
 
@@ -856,10 +948,16 @@ fn an_unknown_source_kind_is_a_schema_error() {
 
 #[test]
 fn a_newer_format_version_is_refused_and_says_so() {
-    let msg = Handle::try_from_value(&json!({ "version": 6 }))
+    // 7 is ONE PAST the current version, and it moves with every bump: the
+    // moment RC_FORMAT_VERSION reaches the number written here the test
+    // stops exercising the gate and starts asserting that a current file
+    // opens, which is a different claim entirely. The comment says "one
+    // past the current version" rather than naming a number, so the next
+    // bump does not have to rediscover that.
+    let msg = Handle::try_from_value(&json!({ "version": 7 }))
         .expect_err("a newer format version must be refused");
-    assert_contains(&msg, "version 6 is newer than this build understands");
-    assert_contains(&msg, "(version 5)");
+    assert_contains(&msg, "version 7 is newer than this build understands");
+    assert_contains(&msg, "(version 6)");
     assert_contains(&msg, "update Reelcut");
 
     // The gate reads the RAW json, so it has to cope with however the
@@ -867,9 +965,10 @@ fn a_newer_format_version_is_refused_and_says_so() {
     // as a JSON float is the case that would otherwise slip past `as_u64`,
     // fall back to "current", and reach the user as a schema error about a
     // field this build has never heard of.
-    let msg = Handle::try_from_value(&json!({ "version": 6.0 }))
+    // One past the current version again, written as a float.
+    let msg = Handle::try_from_value(&json!({ "version": 7.0 }))
         .expect_err("a newer format version written as a float must be refused");
-    assert_contains(&msg, "version 6 is newer than this build understands");
+    assert_contains(&msg, "version 7 is newer than this build understands");
 
     // A version that is not a number at all is named rather than ignored.
     let msg = Handle::try_from_value(&json!({ "version": "two" }))
@@ -881,15 +980,15 @@ fn a_newer_format_version_is_refused_and_says_so() {
 fn every_prior_version_is_accepted_and_the_writer_stamps_the_current_one() {
     // The reader's promise (spec §5.6): a file from an older build opens,
     // and what comes back out is the current version.
-    for version in [1, 2, 3, 4, 5] {
+    for version in [1, 2, 3, 4, 5, 6] {
         assert_eq!(
             Handle::from_value(&json!({ "version": version })).value()["version"],
-            json!(5),
+            json!(6),
             "version {version} did not read back as the current version"
         );
     }
     // Absent, the version defaults to current rather than to 0.
-    assert_eq!(Handle::from_json("{}").value()["version"], json!(5));
+    assert_eq!(Handle::from_json("{}").value()["version"], json!(6));
 }
 
 #[test]

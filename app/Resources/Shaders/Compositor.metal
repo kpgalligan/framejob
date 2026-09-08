@@ -50,6 +50,28 @@ constant int kObscureNone     = 0;
 constant int kObscureBlur     = 1;
 constant int kObscurePixelate = 2;
 
+// Blend mode codes (format version 6). Mirrors `BlendMode.shaderCode` in
+// `ProjectSnapshot.swift`, which is `BlendMode`'s declaration order in
+// `model_props.rs` — with NO `+1`, unlike the two lists above. There is
+// nothing to reserve, because a layer has exactly one blend mode rather than
+// four slots that may be empty, and 0 meaning `normal` is the property that
+// makes the field safe to have added to a shipped schema: a zeroed uniform
+// block, a recipe emitted by a core that predates the key, and a project file
+// with no `blend` in it all render source-over, which is what every frame
+// drew before phase 6.
+//
+// **APPEND ONLY.** This order is a contract with two other files, and it is
+// checked nowhere but by reading the three side by side. A mode may be added
+// at the END; the eight here may never be reordered or removed.
+constant int kBlendNormal     = 0;
+constant int kBlendMultiply   = 1;
+constant int kBlendScreen     = 2;
+constant int kBlendAdd        = 3;
+constant int kBlendOverlay    = 4;
+constant int kBlendDarken     = 5;
+constant int kBlendLighten    = 6;
+constant int kBlendDifference = 7;
+
 // What `amount = 1` means for each of the three filters whose strength is a
 // LENGTH. All three are SOURCE pixels, the frame every other length on a
 // layer is measured in (the crop, the corner radius, the shadow's blur and
@@ -161,9 +183,10 @@ struct LayerUniforms {
     // ── The M3 effect block (§4.2), and the obscure block after it.
     // `CompositorEffects.swift` fills every field below and argues each one's
     // meaning; what they DO is the fragment stage's order of operations,
-    // written out above `reelcut_layer_fragment`. The four reserved floats
-    // that used to sit here are the first four of the M3 block, and the
-    // obscure block brought a tail of three back:
+    // written out above `layerColorPremultiplied`. The four reserved floats
+    // that used to sit here are the first four of the M3 block; the obscure
+    // block brought a tail of three back, and phase 6's `blendMode` spent the
+    // first of those, leaving TWO:
     // 40 + 28 + 36 = 104 floats = 416 bytes, and 416 is 26 × 16.
     //
     // Four filter slots, applied in slot order. `MAX_FILTERS` in `model.rs`
@@ -256,10 +279,23 @@ struct LayerUniforms {
     float obscure3Feather;
     float obscure3Kind;
     float obscure3Amount;
-    // The padding tail, back after the M3 block consumed the last one. Three
-    // floats, so the next field to land can be added on its own; a fourth
-    // needs three companions again.
-    float reserved0;
+    // How this layer combines with what is already on the canvas: a kBlend*
+    // code (format version 6). It took the FIRST of the three reserved floats
+    // the obscure block left behind, so phase 6 added zero bytes to this
+    // struct — which is what that tail exists for.
+    //
+    // Read only by `reelcut_layer_blend_fragment`. The plain entry point
+    // never looks at it, and a layer whose mode is `normal` is drawn by the
+    // plain one, so this field is 0 on nearly every draw of nearly every
+    // frame.
+    float blendMode;
+    // The padding tail, one float shorter than it was. TWO floats now, so the
+    // next field to land can be added on its own; a THIRD needs three
+    // companions again, because the struct is deliberately a multiple of 16
+    // bytes. They keep the names they had rather than being renumbered from
+    // zero: the number in a `reservedN` is its position in the ORIGINAL tail,
+    // so a reader comparing this list against a GPU capture or an older diff
+    // finds the same name at the same offset.
     float reserved1;
     float reserved2;
 };
@@ -803,6 +839,45 @@ static inline ObscurePlan obscurePlan(constant LayerUniforms &u, float2 localPx,
 //   8. transition weight
 //   9. opacity, then the reflection's fade
 //  10. premultiply out
+//  11. blend                   ONLY on the blend specialization, which reads
+//                              the destination through `[[color(0)]]` and
+//                              computes the combination itself — see
+//                              `blendPremultiplied` and the note below
+//
+// **Step 11 is not in this function**, and cannot be: the stage below ends at
+// step 10 and hands its premultiplied colour to whichever entry point called
+// it. A `normal` layer's entry point returns it and the PIPELINE combines it
+// with `(one, one_minus_source_alpha)`; a blended layer's reads the
+// destination and combines it here. The two are the same function at
+// `normal` — the general formula reduces to the fixed-function factors
+// algebraically, which is written out over `blendPremultiplied` — so nothing
+// about a `normal` layer's pixels depends on which one drew it.
+//
+// **A layer mid-TRANSITION always blends normal, and the CORE is what says
+// so.** `recipe.rs::layer` emits `"normal"` for any layer whose `transition`
+// is non-null, so the uniform arrives at 0 and this shader has no special
+// case for it — do not add one here. The reason is step 8: the outgoing half
+// of a dissolve divides its weight by the attenuation the incoming pass is
+// about to apply, which is the exact algebraic inverse of a FIXED-FUNCTION
+// destination factor, and a programmable blend on either half invalidates it.
+// The decision lives in the core because everything that draws a frame reads
+// that one description, so preview, `render_frame` and both export writers
+// cannot disagree — and because a core test can read the layer's `blend` at a
+// tick inside the overlap, where a renderer-side rule would need two PNGs.
+// The visible consequence, said out loud because from here it reads as a bug:
+// the inspector shows the MODEL's value while an overlap draws `normal`.
+//
+// **This compositor blends in the ENCODED sRGB space, deliberately.** Nothing
+// in the pipeline uses an `_srgb` pixel format — the attachment is
+// `.bgra8Unorm` — so every stage above works on stored 8-bit values, and step
+// 11 works on the same ones. "Multiply of 50 % grey over 50 % grey is 25 %"
+// is a statement about ENCODED values and is false in linear light, where the
+// answer is about 22 %. A reader who knows colour will want to put a
+// linearise/encode pair around the blend; that would change every blended
+// pixel, break the proof's measured 64 / 192 / 255, and make the compositor
+// disagree with itself, since the grade, the filters and the transitions have
+// all worked in encoded space since M1. If linear light is ever wanted it is
+// a decision for the WHOLE pipeline, not for this one stage.
 //
 // **Why the neighbourhood filters do not run in slot order.** Blur, sharpen
 // and pixelate reach for neighbouring pixels, and in a single pass a second
@@ -845,10 +920,32 @@ static inline ObscurePlan obscurePlan(constant LayerUniforms &u, float2 localPx,
 // a pixelate 0.03, four point filters together 0.08, a sharpen 0.18, a blur
 // 0.46. Every one of them at once measured 1.05 ms — an eighth of the 8 ms the
 // spec gives the whole compositor.
-fragment float4 reelcut_layer_fragment(Varyings in [[stage_in]],
-                                       constant LayerUniforms &u [[buffer(0)]],
-                                       texture2d<float> source [[texture(0)]],
-                                       sampler samp [[sampler(0)]]) {
+//
+// A BLEND MODE (format version 6), measured the same way — same layer, 200
+// frames a sample, three interleaved runs, the baseline reproducing at
+// 0.293–0.295 ms: `add` 0.02 ms, `multiply`, `darken` and `difference` 0.07,
+// `screen` 0.08, `overlay` 0.09. Most of that is the FORMULA and not the tile
+// read: the same blend pipeline asked for `normal` — which reads the
+// destination and then takes the early return, dividing nothing — costs 0.02,
+// which is exactly what `add` costs, and `add` skips the divisions too. So a
+// destination read is 0.02 and the un-premultiply pair plus the mode is the
+// other 0.05, which is worth knowing before anyone tries to save one of the
+// two reciprocals by assuming an opaque destination.
+//
+// **Why the whole stage is a helper and not the entry point.** Metal cannot
+// call one `fragment` function from another, and phase 6 needs two entry
+// points that differ only in what they do with the answer — one that hands
+// the premultiplied colour to fixed-function source-over, and one that reads
+// the destination and blends it here. So the stage below is an ordinary
+// `static inline` function and both entry points forward to it. It is the
+// same body, in the same order, with the same expressions: the refactor was
+// landed and phases 1–5 re-proved BEFORE any blend code existed, so a
+// one-LSB drift in the plain path could be attributed to the move rather
+// than to the feature.
+static inline float4 layerColorPremultiplied(Varyings in,
+                                             constant LayerUniforms &u,
+                                             texture2d<float> source,
+                                             sampler samp) {
     float2 srcSize = max(float2(u.sourceWidth, u.sourceHeight), float2(1.0));
     float2 cropped = max(srcSize - float2(u.cropL + u.cropR, u.cropT + u.cropB), float2(1.0));
 
@@ -1174,9 +1271,137 @@ fragment float4 reelcut_layer_fragment(Varyings in [[stage_in]],
         return float4(alpha);
     }
     rgb = clamp(rgb, 0.0, 1.0);
-    // PREMULTIPLIED out: the pipeline blends source-over with
-    // (one, one_minus_source_alpha), which is only correct premultiplied.
+    // PREMULTIPLIED out: the plain pipeline blends source-over with
+    // (one, one_minus_source_alpha), which is only correct premultiplied —
+    // and `blendPremultiplied` takes premultiplied operands for the same
+    // reason, so both entry points below want exactly this value.
     return float4(rgb * alpha, alpha);
+}
+
+// The layer stage as every layer before phase 6 drew it: the premultiplied
+// colour handed straight to the pipeline's fixed-function source-over. Every
+// layer whose blend mode is `normal` still comes through here, and so does
+// every shadow MASK pass, whatever the layer's mode (`encodeShadow`).
+fragment float4 reelcut_layer_fragment(Varyings in [[stage_in]],
+                                       constant LayerUniforms &u [[buffer(0)]],
+                                       texture2d<float> source [[texture(0)]],
+                                       sampler samp [[sampler(0)]]) {
+    return layerColorPremultiplied(in, u, source, samp);
+}
+
+/// Step 11: one layer's colour combined with the destination under a
+/// `kBlend*` mode. Both operands are PREMULTIPLIED — `src` is what the stage
+/// above returns and `dst` is what the attachment holds — and so is the
+/// result, because the pipeline that runs this has fixed-function blending
+/// DISABLED and whatever comes back here is written to the tile verbatim.
+///
+/// With `as = src.a`, `ab = dst.a` and the straight colours
+/// `Cs = src.rgb/as`, `Cb = dst.rgb/ab`, the six separable modes are the
+/// W3C compositing formula:
+///
+///     rgb = (1-as)·dst.rgb + (1-ab)·src.rgb + as·ab·B(Cs, Cb)
+///     a   = as + ab·(1-as)
+///
+/// with `B` the mode's own two-colour function. Three properties of that
+/// shape are worth knowing, because each one is a thing that could have gone
+/// wrong and did not:
+///
+/// · **`normal` reduces to the fixed-function factors.** Put `B = Cs` in and
+///   the middle two terms collapse: `(1-ab)·as·Cs + as·ab·Cs = as·Cs =
+///   src.rgb`, leaving `rgb = src.rgb + (1-as)·dst.rgb`, which is exactly
+///   `(one, one_minus_source_alpha)`. The plain path and this one are
+///   provably the same function at `normal`, which is what lets the fast
+///   path stay fixed-function without the two drifting apart.
+/// · **A fully transparent fragment leaves the destination alone.** At
+///   `as = 0` a premultiplied `src.rgb` is 0 — which is what a `clip_rect`,
+///   a corner radius or a crop leaves behind — so `Cs` is 0, the last two
+///   terms vanish and `rgb = dst.rgb`, `a = ab`, to the bit. Coverage still
+///   works, and a blended layer flattened out of a NEST cannot paint outside
+///   its nest.
+/// · **The destination-alpha term is kept** rather than assumed to be 1. It
+///   costs one multiply on a path nothing else is close to saturating, and
+///   the frame is not always opaque: phase 7 wants a transparent canvas for
+///   ProRes 4444, and a formula written for `ab = 1` would be wrong there in
+///   a way nobody would think to look for.
+///
+/// `add` is NOT a separable blend and does not go through that formula at
+/// all: it is plus-lighter, `min(src + dst, 1)` on both the colour and the
+/// alpha, which is what makes a glow add light to the frame rather than
+/// average with it.
+///
+/// The general path needs no final clamp. Every `B` above lands in 0…1 for
+/// operands in 0…1, `Cs` and `Cb` are bounded because both inputs are
+/// well-formed premultiplied pixels (`rgb <= a`, which source-over
+/// preserves), and the three weights `(1-as)`, `(1-ab)·as` and `as·ab` sum to
+/// EXACTLY 1 — the result is a convex combination of three values that are
+/// each already in range. The `max(a, 1e-4)` guards divide a zero by a zero,
+/// not a colour by a small number.
+static inline float4 blendPremultiplied(int mode, float4 src, float4 dst) {
+    // `normal` first and on its own: it is the mode nearly every blended
+    // frame's OTHER layers are in, and this is the fixed-function formula
+    // spelled out, so a blend pipeline that happened to draw one is still
+    // exactly source-over.
+    if (mode == kBlendNormal) {
+        return float4(src.rgb + dst.rgb * (1.0 - src.a),
+                      src.a + dst.a * (1.0 - src.a));
+    }
+    // Plus-lighter, before the separable machinery, because it shares none
+    // of it — no un-premultiply, no destination-alpha weighting.
+    if (mode == kBlendAdd) {
+        return float4(min(src.rgb + dst.rgb, 1.0), min(src.a + dst.a, 1.0));
+    }
+
+    float as = src.a;
+    float ab = dst.a;
+    float3 Cs = src.rgb / max(as, 1e-4);
+    float3 Cb = dst.rgb / max(ab, 1e-4);
+    float3 B = Cs;
+    if (mode == kBlendMultiply) {
+        B = Cs * Cb;
+    } else if (mode == kBlendScreen) {
+        B = Cs + Cb - Cs * Cb;
+    } else if (mode == kBlendOverlay) {
+        // HardLight with the operands swapped, which is what `overlay` is.
+        // The comparison is on the BACKDROP and it is `<=`, so a backdrop at
+        // 128/255 — which is 0.50196 and not 0.5 — takes the screen half.
+        // That is not a detail: it is why the proof measures overlay with a
+        // BASE of 64 rather than of 128 — a 192 source over a 64 base gives
+        // 2 × 0.753 × 0.251 = 96.4, which reads back as 96 and cannot round
+        // either way, where 128 over 128 lands on 128.5 and can.
+        B = select(1.0 - 2.0 * (1.0 - Cs) * (1.0 - Cb), 2.0 * Cs * Cb, Cb <= 0.5);
+    } else if (mode == kBlendDarken) {
+        B = min(Cs, Cb);
+    } else if (mode == kBlendLighten) {
+        B = max(Cs, Cb);
+    } else if (mode == kBlendDifference) {
+        B = abs(Cs - Cb);
+    }
+    return float4((1.0 - as) * dst.rgb + (1.0 - ab) * src.rgb + as * ab * B,
+                  as + ab * (1.0 - as));
+}
+
+/// The same layer stage, for a layer whose blend mode is not `normal`: it
+/// READS the destination through `[[color(0)]]` and returns the combination
+/// itself. `MetalRenderer` builds this one with `isBlendingEnabled = false`,
+/// so what comes back is written to the tile as it stands.
+///
+/// **There is deliberately no `shadowMask` guard here**, and that is a
+/// decision rather than an omission. A shadow's MASK pass must never bind
+/// this pipeline at all — `MetalRenderer.render` computes a separate
+/// `maskState` for exactly that reason, because a `multiply` against a
+/// cleared, empty destination is 0 and a blended layer's shadow would simply
+/// vanish. A guard here would make that Swift-side decision unobservable:
+/// the mutant that passes the blend state to `encodeShadow` would still
+/// produce a correct mask, and the check that proves the shadow survives a
+/// blend (proof B4) would pass against a build that had it wrong. The
+/// invariant is worth more than the insurance.
+fragment float4 reelcut_layer_blend_fragment(Varyings in [[stage_in]],
+                                             constant LayerUniforms &u [[buffer(0)]],
+                                             texture2d<float> source [[texture(0)]],
+                                             sampler samp [[sampler(0)]],
+                                             float4 dst [[color(0)]]) {
+    float4 src = layerColorPremultiplied(in, u, source, samp);
+    return blendPremultiplied(int(u.blendMode + 0.5), src, dst);
 }
 
 // MARK: - The shadow pass (spec §7.5)

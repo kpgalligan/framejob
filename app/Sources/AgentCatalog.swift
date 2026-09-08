@@ -78,6 +78,24 @@ extension AgentServer {
             + "px the effect ramps in over, and the centre and the box are SOURCE px from the "
             + "cropped rect's centre, the same frame the spotlight uses. Like filters it is "
             + "replaced whole rather than merged, so send the whole array and [] to clear it)"
+        // `video.blend`'s clause, its own explicitly-typed local for the
+        // reason `obscureClause` is: the mode names are a non-literal operand
+        // and the video chain below already carries one.
+        //
+        // The trap is named in the text rather than left to be discovered,
+        // because it is the first thing a caller meets: over the empty canvas
+        // half the modes render BLACK and the other half do nothing at all, so
+        // a blend set on the only clip in a project looks broken either way.
+        let blendNames = BlendMode.allCases.map { $0.rawValue }
+        let blendClause: String =
+            ", blend (how this layer combines with what is already on the canvas: "
+            + "\(blendNames.joined(separator: "|")) — normal is source-over, which is what "
+            + "every project drew before this key existed. A blend needs something UNDER it: "
+            + "over the empty canvas multiply, darken and overlay read black while screen, "
+            + "add, lighten and difference change nothing, so add_background is usually the "
+            + "call before this one. It is forced to normal for the length of a cross "
+            + "dissolve, whose own weighting requires it, so what the frame shows there can "
+            + "legitimately differ from the value get_project reports)"
         // The three patch vocabularies, written once: every property group of
         // spec §5.2, with the ranges the ops enforce. A patch MERGES, so a key
         // left out keeps its current value and a key set to null clears an
@@ -104,6 +122,7 @@ extension AgentServer {
             + "the box are SOURCE px from the cropped rect's centre, dim is how much darker it "
             + "is OUTSIDE and zoom 1–2 magnifies what is inside)"
             + obscureClause
+            + blendClause
             + ". A colour is [r, g, b] or "
             + "[r, g, b, a], each 0–1; chroma's key is the one that takes no alpha."
         let audioPatchDescription =
@@ -130,6 +149,23 @@ extension AgentServer {
             + "radius}), width (null for auto-sizing, or a wrap width in px)"
             + animationClause
             + ". A colour is [r, g, b] or [r, g, b, a], each 0–1."
+        // `shape.gradient`'s clause, its own local for the budget reason the
+        // other hoisted clauses give — and worth a line of its own, because it
+        // is the one patch member that names its own mistakes: the shape patch
+        // is built by hand rather than decoded, so a key misspelt INSIDE
+        // gradient is refused by name, which shadow, chroma and an obscure
+        // region cannot manage.
+        let gradientKindNames = GradientKind.allCases.map { $0.rawValue }
+        let gradientClause: String =
+            ", gradient (null, or {kind: \(gradientKindNames.joined(separator: "|")), "
+            + "stops: [{at, color}], angle} — a gradient FILL, which takes precedence over "
+            + "fill while it is set and leaves it in place, so {\"gradient\": null} restores "
+            + "the colour underneath. 2 to \(Gradient.maxStops) stops, each at 0–1 along the "
+            + "ramp; the stops need NOT be sorted, and the renderer sorts them. angle is "
+            + "degrees from the RIGHT turning counter-clockwise, the convention shadow's angle "
+            + "uses, and means nothing for radial, which is an ellipse inscribed in the box. "
+            + "line and arrow have no area and ignore it. Like stroke it is an OBJECT and is "
+            + "REPLACED whole rather than merged, so send every key you want)"
         // Interpolated rather than concatenated: a `+` chain this long with
         // a non-literal operand in it is what tips the whole `catalog`
         // literal past the type checker's budget.
@@ -138,8 +174,9 @@ extension AgentServer {
             + "(\(shapeNames.joined(separator: "|"))), width, height (the box, in source px), "
             + "stroke (null or {width, color}), fill (null or a colour), radius (rectangle "
             + "corners), arrow_start, arrow_end, and from / to — the endpoints of a line or "
-            + "arrow as UNIT coordinates in its box, e.g. from [0, 1] to [1, 0]. A colour is "
-            + "[r, g, b] or [r, g, b, a], each 0–1."
+            + "arrow as UNIT coordinates in its box, e.g. from [0, 1] to [1, 0]"
+            + gradientClause
+            + ". A colour is [r, g, b] or [r, g, b, a], each 0–1."
         // The fifth patch, `set_clip`'s. The label names are `ClipLabel`'s —
         // the one home of the marker-colour vocabulary — read rather than
         // restated, and typed for the same budget reason as the four above.
@@ -368,6 +405,53 @@ extension AgentServer {
                             + "arrow_end: false for a bare diagonal.",
                     ],
                 ], required: ["track", "at"]),
+            tool(
+                "add_background",
+                "Puts a backdrop on a NEW back-most track, starting at 0 and running the "
+                    + "timeline's length — Clip ▸ Add Background. With no arguments at all it "
+                    + "is a canvas-sized WHITE rectangle, which is what the menu's Solid Color "
+                    + "row sends: white rather than black because the canvas is already black, "
+                    + "so a black plate would be a command that appears to do nothing. Give it "
+                    + "a color to paint the plate another colour, or a media to put that "
+                    + "picture there instead, at FILL scale — where add_clip would Fit it, "
+                    + "because a plate that leaves the canvas showing down one side has "
+                    + "failed at the one thing a background is for. A full-canvas GRADIENT is this "
+                    + "clip and a set_shape {gradient} after it. media and color are "
+                    + "alternatives: passing both is an error, and so is a duration under one "
+                    + "frame or a media with no pictures.",
+                [
+                    "media": [
+                        "type": "integer",
+                        "description": "Media id to show as the background — get_project lists "
+                            + "them and import_media adds a file. Omit for a colour plate. A "
+                            + "timed media is NOT clamped to its own length, so a short movie "
+                            + "used here shows nothing for the rest of the timeline.",
+                    ],
+                    "color": colorProperty("The plate's colour; white when omitted"),
+                    "duration": [
+                        "type": "integer",
+                        "description": "Length \(ticks) Default: the whole timeline's length, "
+                            + "and never less than one frame.",
+                    ],
+                ]),
+            tool(
+                "add_blurred_background",
+                "The screencast backdrop — Clip ▸ Add Blurred Background. `clip` is copied "
+                    + "onto a NEW back-most track at the same start, duration, speed and "
+                    + "source window, so the two play exactly the same frames, and the copy is "
+                    + "scaled to FILL the canvas, centred, uncropped, blended normal and "
+                    + "blurred at full strength. It is MUTED — its enabled becomes {video: "
+                    + "true, audio: false}, or the mix would play one recording twice — and it "
+                    + "drops the original's audio.duck along with its transition, actions and "
+                    + "label. The duck goes because it is the one field of that group that "
+                    + "lowers OTHER material: a copy keeping it would duck the whole mix, "
+                    + "including the clip it was copied from. It is named \"Blurred "
+                    + "Background\". Two objects are created, so new_tracks and new_clips both "
+                    + "come back and the TRACK holds the lower id. An error for a NEST (the "
+                    + "flattening drops a nest clip's own filters, so the copy would come out "
+                    + "sharp), a source with no pixel size (a text clip, an audio-only one), "
+                    + "or a clip carrying no video properties.",
+                ["clip": clipProperty], required: ["clip"]),
             tool(
                 "insert_clip",
                 "The INSERT edit — Edit ▸ Insert at Playhead, or ⌥-dropping a Media-tab row. "

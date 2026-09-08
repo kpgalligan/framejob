@@ -339,12 +339,35 @@ pub(crate) struct ClipRect {
 /// so a nested layer's flattened placement is not an approximation of what
 /// rendering the nest to an offscreen buffer and transforming that would
 /// give: it is the same picture, with no intermediate render target and no
-/// resampling. Two things do NOT survive the flattening, and both are noted
-/// in the recipe's own docs: a nest clip's `opacity` multiplies each inner
-/// layer separately rather than the composite (so inner layers that overlap
-/// each other show through), and only the innermost `clip_rect` is carried,
-/// because the recipe gives a layer one rectangle and the intersection of
-/// two rotated rectangles is not one.
+/// resampling. **Four things do NOT survive the flattening**, and the first
+/// two are noted in the recipe's own docs:
+///
+/// 1. A nest clip's `opacity` multiplies each inner layer separately rather
+///    than the composite, so inner layers that overlap each other show
+///    through.
+/// 2. Only the innermost `clip_rect` is carried, because the recipe gives a
+///    layer one rectangle and the intersection of two rotated rectangles is
+///    not one.
+/// 3. **A nest clip's own PER-PIXEL properties reach no layer at all.**
+///    What folds down is what this struct holds — x, y, scale, rotation,
+///    opacity, and the crop, as the nest's clipping rect. Everything else
+///    in the nest clip's `video` group is dropped: its filters, its colour
+///    controls, its chroma key, its shadow, its reflection, its spotlight,
+///    its hidden regions and its blend. A nest clip never becomes a layer,
+///    so `recipe.rs::layer` reads every one of those off the INNER clip and
+///    never off the container. Two ops refuse rather than let that be
+///    silent — `edit_props.rs`'s `check_blend` on `video.blend`, backed by
+///    `clamp_video` for an end patch, and `edit_background.rs`'s
+///    `add_blurred_background`, whose whole product is a filter — and the
+///    rest are dropped without a word, which is a debt this doc records
+///    rather than a rule it states.
+/// 4. **A blend on a clip INSIDE a nest composites against the whole
+///    canvas**, not against the nest's own picture, for the same reason
+///    there is no intermediate render target: the layer is placed on the
+///    project canvas and blends with whatever is already there, including
+///    everything painted behind the nest clip. It is allowed, because
+///    refusing it would make grouping change how a look reads; it is an
+///    honest limit (spec §5.3), not an oversight.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) struct Frame {
     pub x: f64,

@@ -30,6 +30,21 @@
 //! because of it. `actions.rs`'s `ENTRY_DISCRIMINANTS` argues why those two
 //! answers differ; these are the tests that would fail if a later hand
 //! collapsed them into one.
+//!
+//! It outgrew version 2 a second time in road map 2's phase 6d, on the same
+//! terms. 6d is "filters as animatable action targets", and every mechanism
+//! it names — `set_action_end` carrying `video.filters`, the list rule
+//! interpolating them per index, an add or a remove going to the base props
+//! instead — was already shipped and already green HERE, so the phase's
+//! core work was the coverage those four tests did not have: the oracle
+//! (a filter animated to its midpoint IS the props a direct edit writes),
+//! the two-action case that makes the inspector's `structural` rule one
+//! action short of true, why a write-side list has to be read from the
+//! ACTION's end patch rather than from the evaluated value, and the
+//! partial-entry wart pinned as known. They are here rather than in
+//! `schema_v6.rs` because the filter list is version 2's feature: version 6
+//! adds `video.blend` and `shape.gradient` and that file has to stay honest
+//! about which two keys it is testing.
 
 mod common;
 
@@ -155,7 +170,7 @@ fn a_version_one_file_reads_with_the_new_fields_at_their_defaults() {
     }))
     .value();
 
-    assert_eq!(at(&project, "/version"), &json!(5));
+    assert_eq!(at(&project, "/version"), &json!(6));
     assert_eq!(at(&project, "/nests"), &json!([]));
     assert_eq!(at(&project, "/clips/0/video/filters"), &json!([]));
     assert_eq!(at(&project, "/clips/0/video/reflection"), &Value::Null);
@@ -811,6 +826,213 @@ fn a_region_outside_its_ranges_is_clamped_rather_than_refused() {
     close(num(&ended, "/video/obscure/0/height"), 1.0, "height");
     close(num(&ended, "/video/obscure/0/feather"), 0.0, "feather");
     close(num(&ended, "/video/obscure/0/amount"), 1.0, "amount");
+}
+
+/// Two actions on one clip: 1–2 s and 3–5 s, both linear, each with its own
+/// `end` patch. The point of the pair is the instant AFTER the first has
+/// ended and INSIDE the second, where the evaluated state is the base with
+/// the first action's patch already merged into it — which is where an
+/// evaluated list stops having the base list's shape.
+fn two_actions(video: Value, first_end: Value, second_end: Value) -> Handle {
+    let mut project = one_clip(video, json!({}));
+    project["clips"][0]["actions"] = json!([
+        { "id": 21, "start": SEC, "duration": SEC, "curve": "linear", "end": first_end },
+        { "id": 22, "start": 3 * SEC, "duration": 2 * SEC, "curve": "linear", "end": second_end }
+    ]);
+    project["next_id"] = json!(23);
+    Handle::from_value(&project)
+}
+
+#[test]
+fn a_filter_animated_to_its_midpoint_is_the_props_a_direct_edit_writes() {
+    // The oracle road map 2's phase 6d asks for, in the form a core test
+    // can put it: an action running `blur 0 -> blur 1` evaluated at its
+    // midpoint is the same video group a static `blur 0.5` carries.
+    //
+    // `tools/proof/phase6_proof.py` makes the picture half of this claim, a
+    // byte comparison of two rendered PNGs. This half is STRONGER than the
+    // picture, not weaker: it compares the whole evaluated group key for
+    // key, so a phase that got the filter right and quietly moved something
+    // else — an opacity, a crop edge — fails here and renders identically
+    // there.
+    let midway = animated(
+        json!({ "filters": [{ "kind": "blur", "amount": 0.0 }] }),
+        json!({}),
+        json!({ "video": { "filters": [{ "kind": "blur", "amount": 1.0 }] } }),
+    );
+    let directly = plain().apply(&json!({
+        "op": "set_video", "clips": [11],
+        "patch": { "filters": [{ "kind": "blur", "amount": 0.5 }] }
+    }));
+
+    assert_eq!(
+        state(&midway, 3 * SEC)["video"],
+        state(&directly, 3 * SEC)["video"],
+        "an action at its midpoint evaluates to exactly the props a direct \
+         edit writes — the same uniform block, key for key"
+    );
+}
+
+#[test]
+fn an_earlier_action_can_make_the_evaluated_filter_list_longer_than_the_base() {
+    // The case that makes the inspector's `structural` rule one action
+    // short of true, pinned in the core where it can be seen without an app.
+    //
+    // `structural` (`app/Sources/InspectorPane.swift`) routes a change to
+    // the NUMBER of filters onto the clip's base props rather than into an
+    // action's end patch, because a list of a different length cannot
+    // interpolate and an end patch would swallow it. It decides "different
+    // length" against the clip's BASE list, and its doc reads as a
+    // guarantee that nothing the inspector does can put another length into
+    // an end patch. That is true of one action and false of two: an earlier
+    // action whose end patch ADDS a filter leaves every later instant
+    // evaluating a longer list than the base, and the section reads the
+    // evaluated one.
+    let handle = two_actions(
+        json!({ "filters": [{ "kind": "blur", "amount": 0.2 }] }),
+        json!({ "video": { "filters": [
+            { "kind": "blur", "amount": 0.2 },
+            { "kind": "vignette", "amount": 0.5 }
+        ] } }),
+        json!({ "video": { "filters": [
+            { "kind": "blur", "amount": 1.0 },
+            { "kind": "vignette", "amount": 1.0 }
+        ] } }),
+    );
+
+    let written = handle.value();
+    let base = array(&written, "/clips/0/video/filters");
+    assert_eq!(base.len(), 1, "the clip's own list is one filter long");
+
+    // 4 s is inside the second action and past the end of the first.
+    let inside = state(&handle, 4 * SEC);
+    assert_eq!(
+        array(&inside, "/video/filters").len(),
+        2,
+        "the evaluated list is two long, because the first action's end \
+         patch is already merged in"
+    );
+    // And it is a real animation, not a switch: both entries are moving.
+    close(num(&inside, "/video/filters/0/amount"), 0.6, "blur at 4 s");
+    close(
+        num(&inside, "/video/filters/1/amount"),
+        0.75,
+        "vignette at 4 s",
+    );
+}
+
+#[test]
+fn an_end_patch_rewritten_from_the_evaluated_list_flattens_its_neighbours_ramp() {
+    // Why a write-side list reader has to read the ACTION's end patch and
+    // not the evaluated value, stated as arithmetic.
+    //
+    // An end patch REPLACES a list rather than merging into it (the crate's
+    // list rule, `actions.rs` on `lerp`), so whatever list is written
+    // becomes every entry's destination. Build that list from what the
+    // playhead is showing and every OTHER filter's destination is silently
+    // reset to wherever it happened to be at that instant — its ramp
+    // flattened, with nothing on screen to say so.
+    let handle = animated(
+        json!({ "filters": [
+            { "kind": "blur", "amount": 0.2 },
+            { "kind": "sepia", "amount": 0.3 }
+        ] }),
+        json!({}),
+        json!({ "video": { "filters": [
+            { "kind": "blur", "amount": 1.0 },
+            { "kind": "sepia", "amount": 0.3 }
+        ] } }),
+    );
+    let halfway = state(&handle, 3 * SEC);
+    close(
+        num(&halfway, "/video/filters/0/amount"),
+        0.6,
+        "blur halfway",
+    );
+
+    // What a section reading the EVALUATED list sends when the sepia row is
+    // dragged to 0.8 at the midpoint: the blur's 0.6 travels with it.
+    let from_evaluated = handle.apply(&json!({
+        "op": "set_action_end", "clip": 11, "action": 21,
+        "patch": { "video": { "filters": [
+            { "kind": "blur", "amount": 0.6 },
+            { "kind": "sepia", "amount": 0.8 }
+        ] } }
+    }));
+    close(
+        num(&state(&from_evaluated, 4 * SEC), "/video/filters/0/amount"),
+        0.6,
+        "the blur's destination has been rewritten to where it stood",
+    );
+
+    // What the same drag sends when the list comes from the action's own
+    // end patch: only the row the user touched moves.
+    let from_the_action = handle.apply(&json!({
+        "op": "set_action_end", "clip": 11, "action": 21,
+        "patch": { "video": { "filters": [
+            { "kind": "blur", "amount": 1.0 },
+            { "kind": "sepia", "amount": 0.8 }
+        ] } }
+    }));
+    let ended = state(&from_the_action, 4 * SEC);
+    close(
+        num(&ended, "/video/filters/0/amount"),
+        1.0,
+        "the blur still arrives where it was told to",
+    );
+    close(
+        num(&ended, "/video/filters/1/amount"),
+        0.8,
+        "sepia arrives too",
+    );
+}
+
+#[test]
+fn a_partial_filter_entry_interpolates_and_then_takes_the_types_own_defaults() {
+    // A KNOWN wart, pinned so nobody reads it as a regression later.
+    //
+    // `{"filters": [{"amount": 1.0}]}` is the core's documented idiom for
+    // "same filter, more of it", and while the action runs it does exactly
+    // that — the entry's other keys hold, because the patch side names none
+    // of them. At the switch the whole list becomes the PATCH's list, and
+    // the keys the patch left out come from `Filter::default()`, which is a
+    // half-strength BLUR. So a sepia animated this way ends as a blur.
+    //
+    // Filters have had this since M3 and `video.obscure` inherited it in
+    // phase 3; the cause is that `merge` replaces a list rather than merging
+    // it, and the fix would be a per-index merge whose correspondence is
+    // exactly the thing the list rule refuses to invent. The MCP path
+    // refuses the shape outright instead (phase 6's `checkVideoEnums`), so
+    // what survives here is the hand-written file.
+    let handle = animated(
+        json!({ "filters": [{ "kind": "sepia", "amount": 0.3 }] }),
+        json!({}),
+        json!({ "video": { "filters": [{ "amount": 1.0 }] } }),
+    );
+
+    let halfway = state(&handle, 3 * SEC);
+    assert_eq!(
+        text(&halfway, "/video/filters/0/kind"),
+        "sepia",
+        "the kind holds while the action runs"
+    );
+    close(
+        num(&halfway, "/video/filters/0/amount"),
+        0.65,
+        "amount halfway",
+    );
+
+    let ended = state(&handle, 4 * SEC);
+    assert_eq!(
+        text(&ended, "/video/filters/0/kind"),
+        "blur",
+        "at the switch the omitted key takes Filter::default()'s"
+    );
+    close(
+        num(&ended, "/video/filters/0/amount"),
+        1.0,
+        "amount at the end",
+    );
 }
 
 // ---- nests: the schema and its invariants --------------------------------

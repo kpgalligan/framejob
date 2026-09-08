@@ -32,7 +32,8 @@
 
 use crate::audio::MAX_GAIN;
 use crate::model::{
-    AudioProps, Color, ShapeProps, TextProps, VideoProps, MAX_FILTERS, MAX_OBSCURE,
+    AudioProps, Color, ShapeProps, TextProps, VideoProps, MAX_FILTERS, MAX_GRADIENT_STOPS,
+    MAX_OBSCURE,
 };
 use crate::time::Ticks;
 
@@ -300,6 +301,55 @@ pub(crate) fn check_shape(props: &ShapeProps) -> Result<(), String> {
         for coordinate in point {
             finite("shape.from/to", *coordinate)?;
         }
+    }
+    if let Some(gradient) = &props.gradient {
+        // Two stops is the floor because ONE stop is a solid colour, and
+        // `shape.fill` already spells a solid colour. `CGGradient` would
+        // happily draw a single stop, which is exactly why the refusal is
+        // here: a control that quietly becomes a different control is worse
+        // than one that says no.
+        if gradient.stops.len() < 2 {
+            return Err(format!(
+                "shape.gradient.stops must hold at least 2 stops, not {}",
+                gradient.stops.len()
+            ));
+        }
+        // The ceiling is NAMED rather than trimmed, the posture `MAX_FILTERS`
+        // and `MAX_OBSCURE` take — but it is 8 where both of those are 4, and
+        // `MAX_GRADIENT_STOPS`' own doc argues why: those two are shader
+        // slots and this one is not a budget at all.
+        if gradient.stops.len() > MAX_GRADIENT_STOPS {
+            return Err(format!(
+                "shape.gradient.stops must hold at most {MAX_GRADIENT_STOPS} stops, not {}",
+                gradient.stops.len()
+            ));
+        }
+        // There is deliberately NO ordering check here, and it is the one
+        // absence in this module worth writing down. `CGGradient` requires
+        // monotonic locations or its output is undefined, so the temptation
+        // is to refuse an unsorted list — but a refusal has a failure mode
+        // nobody would accept: dragging one stop past another is how a
+        // gradient is edited, and the drag would stop working halfway
+        // through. `video.filters` is the precedent — an ordered list the
+        // core does not police — and the fix belongs where the requirement
+        // is, so `LayerRenderers.renderShape` sorts before it draws.
+        // And the question is a RENDER-time one only, which is what keeps
+        // the answer small: a gradient is never interpolated, because shape
+        // props are not animatable at all (`actions.rs::evaluate_clip`
+        // builds its merge state from `video`, `audio` and `text`, and
+        // passes `shape` through untouched — spec §5.4). So an unsorted list is
+        // only ever DRAWN, once, by a renderer that sorts it first. Do not
+        // read this as "the list rule handles it"; there is no list rule in
+        // play here, and if shapes ever become animatable the ordering
+        // question has to be asked again against `lerp`.
+        for stop in &gradient.stops {
+            in_range("shape.gradient.stops[].at", stop.at, 0.0, 1.0)?;
+            color_ok("shape.gradient.stops[].color", &stop.color)?;
+        }
+        // Finite and nothing more, exactly as `video.shadow.angle` is: the
+        // value is named and never clamped, and wrapping it into 0..360 here
+        // would silently rewrite the number a person typed.
+        finite("shape.gradient.angle", gradient.angle)?;
     }
     Ok(())
 }

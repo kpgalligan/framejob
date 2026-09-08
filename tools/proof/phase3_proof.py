@@ -1311,12 +1311,22 @@ def schema_part(mcp):
         text = handle.read()
     root = json.loads(text)
     check(
-        root["version"] == 5,
-        f"the saved project.json is version 5 (got {root['version']})",
+        root["version"] == 6,
+        f"the saved project.json is version 6 (got {root['version']})",
     )
+    # Version 4 put `obscure` last and this check pinned it there. Version 6
+    # appended `blend` after it, which FALSIFIES that wording on purpose — so
+    # the claim moves rather than goes away, because what it is really pinning
+    # is that a new key lands at the END and never in the middle. That is the
+    # whole of the append-only rule, and it is what lets a v3 file diffed
+    # against a v6 one differ by a trailing key rather than by a re-ordering.
     check(
-        all(list(c["video"].keys())[-1] == "obscure" for c in root["clips"] if c["video"]),
-        "and obscure is the LAST key of every video object",
+        all(
+            list(c["video"].keys())[-2:] == ["obscure", "blend"]
+            for c in root["clips"]
+            if c["video"]
+        ),
+        "and obscure is still where version 4 left it, with version 6's blend appended after it",
     )
     check(
         len(root["clips"][0]["video"]["obscure"]) == 1
@@ -1342,7 +1352,7 @@ def schema_part(mcp):
     )
     v3 = Session(mcp, "obscure-v3", open_from=fixture)
     project = v3.project()
-    check(project["version"] == 5, "a version-3 file opens and reports version 5")
+    check(project["version"] == 6, "a version-3 file opens and reports version 6")
     check(
         all(c["video"]["obscure"] == [] for c in project["clips"] if c["video"]),
         "and every clip reads an EMPTY region list",

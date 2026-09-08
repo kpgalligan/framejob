@@ -1065,7 +1065,7 @@ def schema_part(mcp, session):
     with open(os.path.join(session.path, "project.json"), encoding="utf-8") as handle:
         text = handle.read()
     root = json.loads(text)
-    check(root["version"] == 5, f"the saved project.json is version 5 (got {root['version']})")
+    check(root["version"] == 6, f"the saved project.json is version 6 (got {root['version']})")
     check(
         all(list(c["text"].keys())[-1] == "animation" for c in root["clips"] if c["text"]),
         "and animation is the LAST key of every text object",
@@ -1093,7 +1093,7 @@ def schema_part(mcp, session):
     )
     v4 = Session(mcp, "textanim-v4", open_from=fixture)
     project = v4.project()
-    check(project["version"] == 5, "a version-4 file opens and reports version 5")
+    check(project["version"] == 6, "a version-4 file opens and reports version 6")
     check(
         all(c["text"]["animation"] is None for c in project["clips"] if c["text"]),
         "and every text clip reads a NULL animation",

@@ -1,7 +1,8 @@
 //! The per-clip property types of spec §5.2 — the `video`, `audio`, `text`
 //! and `shape` groups a [`crate::model::Clip`] carries, and every struct
-//! and enum inside them but the region types, which are
-//! `model_regions.rs`'s and are re-exported below.
+//! and enum inside them but two families, both re-exported below: the
+//! region types, which are `model_regions.rs`'s, and the text types, which
+//! are `model_text.rs`'s.
 //!
 //! Split out of `model.rs` under the size rule (core/CLAUDE.md: a module
 //! over ~600 lines gives something up before it takes anything on), and
@@ -12,18 +13,25 @@
 //! what the compositor's uniforms are read from. Reading one is reading the
 //! schema's SHAPE; reading the other is reading its VOCABULARY.
 //!
-//! It has since paid the same rule once itself: road map 2's phase 3c added
-//! `video.obscure` and its two types, which took the file to 633 lines, so
-//! the boxes drawn ON the picture — [`Spotlight`], [`ObscureRegion`],
-//! [`SpotShape`] and [`MAX_OBSCURE`] — went out to `model_regions.rs`
-//! before the phase took anything else on. They share one coordinate frame
-//! and one shape enum, which is the seam; that module's doc states the
-//! frame.
+//! It has since paid the same rule TWICE itself, and both payments were
+//! made before the phase that owed them took anything on. Road map 2's
+//! phase 3c added `video.obscure` and its two types, which took the file to
+//! 633 lines, so the boxes drawn ON the picture — [`Spotlight`],
+//! [`ObscureRegion`], [`SpotShape`] and [`MAX_OBSCURE`] — went out to
+//! `model_regions.rs` first; they share one coordinate frame and one shape
+//! enum, which is the seam, and that module's doc states the frame. Phase 6
+//! arrived at 592 owing `video.blend` and `shape.gradient`, so the text
+//! vocabulary — [`TextProps`], [`TextAlign`], [`TextVAlign`], [`Outline`],
+//! [`Backdrop`], [`TextAnimation`] and [`TextAnimationKind`] — went out to
+//! `model_text.rs` in the same way. Its seam is the one property group the
+//! model cannot MEASURE, because only the platform can lay text out; that
+//! module's doc states it.
 //!
-//! Every path stays as it was, through both cuts: `model.rs` re-exports
-//! this whole module with `pub use crate::model_props::*` and this module
-//! re-exports `model_regions.rs` the same way, so `crate::model::VideoProps`,
-//! `crate::model::Spotlight` and the crate-root re-exports in `lib.rs` are
+//! Every path stays as it was, through all three cuts: `model.rs`
+//! re-exports this whole module with `pub use crate::model_props::*` and
+//! this module re-exports the other two the same way, so
+//! `crate::model::VideoProps`, `crate::model::Spotlight`,
+//! `crate::model::TextProps` and the crate-root re-exports in `lib.rs` are
 //! all untouched. The rules are `model.rs`'s too — the field names ARE the
 //! JSON keys, declaration order IS key order, every type is
 //! `#[serde(default)]` over a hand-written [`Default`] that says what an
@@ -42,6 +50,16 @@ use crate::time::{Ticks, TIMESCALE};
 /// module's doc for the frame they share, which is why they are a file of
 /// their own.
 pub use crate::model_regions::*;
+
+/// The text types — [`TextProps`], the [`TextAlign`] and [`TextVAlign`] it
+/// is placed by, its optional [`Outline`] and [`Backdrop`], and the
+/// [`TextAnimation`] and [`TextAnimationKind`] that reveal it — live in
+/// `model_text.rs` and are re-exported whole, so every
+/// `crate::model_props::TextProps` path (and, through `model.rs`'s own
+/// glob, every `crate::model::TextProps` one) still resolves. See that
+/// module's doc for the seam they share — text is the one group the model
+/// cannot measure — which is why they are a file of their own.
+pub use crate::model_text::*;
 
 // ---- video properties ----------------------------------------------------
 
@@ -69,6 +87,13 @@ pub struct VideoProps {
     pub spotlight: Option<Spotlight>,
     /// Hidden regions, at most [`MAX_OBSCURE`] of them (format version 4).
     pub obscure: Vec<ObscureRegion>,
+    /// How this layer combines with what is already on the canvas
+    /// (format version 6). `Normal` is source-over, which is what every
+    /// project drew before the key existed. It belongs to the LAYER, not to
+    /// a source kind — media, image, still, text and shape all draw through
+    /// one fragment stage — with the nest clip an op's refusal rather than
+    /// a schema one (`edit_props.rs`'s `check_blend`).
+    pub blend: BlendMode,
 }
 
 impl Default for VideoProps {
@@ -88,6 +113,7 @@ impl Default for VideoProps {
             reflection: None,
             spotlight: None,
             obscure: Vec::new(),
+            blend: BlendMode::Normal,
         }
     }
 }
@@ -239,6 +265,44 @@ impl Default for Reflection {
     }
 }
 
+/// How a layer combines with what is already on the canvas (format version
+/// 6, road map 2's phase 6) — what turns a shape clip into a tint, a glow
+/// or a matte instead of a sticker. Eight modes: `Normal`, six separable
+/// blends the fragment stage computes from one source and one destination
+/// fragment, and `Add`, which is plus-lighter rather than a separable
+/// blend at all. The formulas live once, in `Compositor.metal`'s
+/// `blendPremultiplied`; nothing in the core computes a colour, it only
+/// says WHICH (spec §7).
+///
+/// **Declaration order IS a contract.** It is the shader discriminant, the
+/// way [`crate::model::ObscureKind`]'s is: `ProjectSnapshot.swift` derives
+/// `shaderCode` from the case index and `Compositor.metal` compares against
+/// integer constants in this order. A mode may be added at the END; the
+/// eight here may never be reordered or removed. The JSON spelling of each
+/// is persisted as well, so a rename needs a migration step.
+///
+/// `Normal` is 0 with no `+1` offset, unlike the filter and obscure
+/// discriminants, where 0 is reserved for "empty slot". There is nothing to
+/// reserve — a layer has exactly one blend mode — and reserving it would
+/// cost the property that makes this field safe to add to a shipped schema:
+/// a zeroed uniform block, a recipe emitted by an older core and a file
+/// with no `blend` key must all render source-over, which is what every
+/// project drew before the key existed. Three absences, one value, no code
+/// in between.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BlendMode {
+    #[default]
+    Normal,
+    Multiply,
+    Screen,
+    Add,
+    Overlay,
+    Darken,
+    Lighten,
+    Difference,
+}
+
 // ---- audio properties ----------------------------------------------------
 
 /// `volume` is a linear gain and may exceed 1, up to 4 (spec §5.2).
@@ -336,196 +400,6 @@ impl Default for Duck {
     }
 }
 
-// ---- text ----------------------------------------------------------------
-
-/// A text layer's description. The model never stores a measured size —
-/// only the platform can lay text out, and it reports the size back to the
-/// overlay through a cache (spec §5.3, §11).
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(default)]
-pub struct TextProps {
-    pub content: String,
-    pub font: String,
-    pub size: f64,
-    pub color: Color,
-    pub align: TextAlign,
-    pub valign: TextVAlign,
-    /// Multiplier on the font's natural line height.
-    pub line_spacing: f64,
-    /// Extra letter spacing, in points.
-    pub tracking: f64,
-    pub outline: Option<Outline>,
-    pub backdrop: Option<Backdrop>,
-    /// Wrapping width in canvas pixels; `None` lays out on one line.
-    pub width: Option<f64>,
-    /// How the words arrive and how they leave, or `None` for text that is
-    /// simply there for the length of its clip (format version 5).
-    pub animation: Option<TextAnimation>,
-}
-
-impl Default for TextProps {
-    /// The Title preset: white, centered, at the spec's example font.
-    fn default() -> Self {
-        TextProps {
-            content: String::new(),
-            font: "SourceSans3-SemiBold".to_string(),
-            size: 72.0,
-            color: [1.0, 1.0, 1.0, 1.0],
-            align: TextAlign::Center,
-            valign: TextVAlign::Middle,
-            line_spacing: 1.0,
-            tracking: 0.0,
-            outline: None,
-            backdrop: None,
-            width: None,
-            animation: None,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum TextAlign {
-    Left,
-    #[default]
-    Center,
-    Right,
-}
-
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum TextVAlign {
-    Top,
-    #[default]
-    Middle,
-    Bottom,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
-#[serde(default)]
-pub struct Outline {
-    pub width: f64,
-    pub color: Color,
-}
-
-impl Default for Outline {
-    fn default() -> Self {
-        Outline {
-            width: 2.0,
-            color: [0.0, 0.0, 0.0, 1.0],
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
-#[serde(default)]
-pub struct Backdrop {
-    pub color: Color,
-    pub padding: f64,
-    pub radius: f64,
-}
-
-impl Default for Backdrop {
-    /// A translucent black plate — the readable default behind white text.
-    fn default() -> Self {
-        Backdrop {
-            color: [0.0, 0.0, 0.0, 0.6],
-            padding: 12.0,
-            radius: 8.0,
-        }
-    }
-}
-
-/// How a text layer arrives and how it leaves (format version 5, road map
-/// 2's phase 4c).
-///
-/// Three keys and no fourth. `in` and `out` are DURATIONS, not times: the
-/// reveal runs for `in` from the clip's own first frame, and the un-reveal
-/// for `out` back from its own last one — the clip's, never the instance's,
-/// which is the rule `recipe.rs` already states for clip time, so a nest
-/// clip's edge cuts a nested caption off mid-reveal rather than making it
-/// un-reveal early. Either may be 0, meaning that end of the animation
-/// simply does not happen.
-///
-/// There is deliberately no curve field. The shape of the motion is
-/// already in the kind — a typewriter's step per character, a word fade's
-/// stagger, a line rise's per-line offset — and easing between two
-/// arbitrary values is what the action system is for (spec §5.4). A curve
-/// can be added later as a defaulted fourth key with no migration step,
-/// which is the test this crate applies to leaving a field out.
-///
-/// Nothing here is a measurement of pixels or of time inside the reveal:
-/// the model says what the animation IS, `recipe.rs` turns it into one
-/// number per frame, and the platform draws it (spec §7). That is also why
-/// the discriminant is called `kind` and not, say, `style`:
-/// `actions.rs`'s object rule holds two objects that both name a DIFFERING
-/// `kind` until the interpolation is over, so an action that moves a clip
-/// from a typewriter to a line rise switches at the end instead of
-/// interpolating an `in` between two animations that do not measure the
-/// same thing.
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
-#[serde(default)]
-pub struct TextAnimation {
-    pub kind: TextAnimationKind,
-    /// How long the reveal takes, from the clip's first frame.
-    #[serde(rename = "in")]
-    pub r#in: Ticks,
-    /// How long the un-reveal takes, measured back from the clip's last
-    /// frame.
-    pub out: Ticks,
-}
-
-impl Default for TextAnimation {
-    /// A one-second typewriter that does not un-reveal — the animation a
-    /// user gets for switching the section on and saying nothing else.
-    ///
-    /// The kind is the typewriter for [`Filter::default`]'s reason: a
-    /// default has to be visibly SOMETHING the moment it is turned on, or
-    /// the control reads as broken, and of the three this is the one
-    /// everybody can already name before they see it. One second is that
-    /// same test applied to the duration — long enough to read as typing
-    /// rather than as a cut, short enough that a three-second caption is
-    /// not still arriving when it is due to leave.
-    ///
-    /// `out` is 0 because most text is cut away rather than un-typed. An
-    /// un-reveal is a deliberate choice about the end of a shot, and a
-    /// default that quietly took a second back off the end of every
-    /// animated title would be a surprise rather than a convenience.
-    fn default() -> Self {
-        TextAnimation {
-            kind: TextAnimationKind::Typewriter,
-            r#in: TIMESCALE,
-            out: 0,
-        }
-    }
-}
-
-/// The three reveals of spec §4.3, closed at three.
-///
-/// Closed for [`ObscureKind`]'s reason: each one is a distinct drawing
-/// routine in `LayerRenderers.renderText`, not a parameter of a shared
-/// one — a prefix of the glyphs, a per-word alpha ramp, a per-line offset
-/// and alpha — so an unknown kind is a value nothing downstream could
-/// repair, and there is no neutral animation to fall back to the way a
-/// filter's `amount` can fall back to 0. Refusing it at the serde boundary
-/// makes the illegal state unrepresentable.
-///
-/// A kind may be added at the END. Nothing derives a number from the
-/// declaration order here — the recipe carries the kind by NAME, unlike
-/// [`ObscureKind`], whose order is a shader discriminant — but the JSON
-/// spelling of each variant is persisted, so a variant may not be renamed
-/// without a migration step.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum TextAnimationKind {
-    /// The default, and [`TextAnimation::default`] says why: the one
-    /// reveal a user can name before they have seen it.
-    #[default]
-    Typewriter,
-    WordFade,
-    LineRise,
-}
-
 // ---- shapes --------------------------------------------------------------
 
 /// A shape layer. A rounded rectangle is [`ShapeKind::Rectangle`] with a
@@ -544,6 +418,10 @@ pub struct ShapeProps {
     pub radius: f64,
     pub from: [f64; 2],
     pub to: [f64; 2],
+    /// A gradient fill, taking precedence over `fill` when set
+    /// (format version 6). Ignored on `Line` and `Arrow`, which have no
+    /// area.
+    pub gradient: Option<Gradient>,
 }
 
 impl Default for ShapeProps {
@@ -561,6 +439,7 @@ impl Default for ShapeProps {
             radius: 0.0,
             from: [0.0, 1.0],
             to: [1.0, 0.0],
+            gradient: None,
         }
     }
 }
@@ -587,6 +466,135 @@ impl Default for Stroke {
         Stroke {
             width: 6.0,
             color: [1.0, 1.0, 1.0, 1.0],
+        }
+    }
+}
+
+/// The most stops one gradient may carry. NOT a shader budget, which is why
+/// it is 8 where [`MAX_FILTERS`] and [`MAX_OBSCURE`] are both 4: those two
+/// are SLOTS — the uniform block carries exactly four `(kind, amount)` pairs
+/// and exactly four regions, and a fifth of either has nowhere to go — while
+/// a gradient never reaches the fragment stage at all, since
+/// `LayerRenderers.renderShape` hands the stops to `CGGradient` on the CPU,
+/// which takes as many as it is given. Four here would be a real limitation
+/// (a sunset, a spectrum, a brand ramp) bought for no technical reason, and
+/// a cap that turns out too high costs nothing where one that turns out too
+/// low is reported as a bug. It is NAMED rather than trimmed all the same,
+/// the posture the other two take: a stop silently dropped from the next
+/// write is a colour the user placed and can no longer see.
+pub const MAX_GRADIENT_STOPS: usize = 8;
+
+/// A gradient fill for a shape (format version 6, road map 2's phase 6) —
+/// what `shape.fill`'s single colour becomes when a flat plate is not
+/// enough: a sky behind a title, a brand ramp, the wash on the full-canvas
+/// background clip `edit_background.rs` puts on the back track.
+///
+/// **Setting a gradient does not clear `fill`.** Both persist and the
+/// RENDERER prefers the gradient while it is non-null, which makes
+/// `{"gradient": null}` an exact inverse — the inspector's Reset restores
+/// the colour underneath rather than leaving an invisible shape — and keeps
+/// the precedence rule in one statable place instead of spreading it as a
+/// side effect of whichever op wrote last. The stops are NOT required to be
+/// sorted, and that too is a decision rather than an omission:
+/// `props_check.rs` argues the missing check where it would have gone, and
+/// the renderer sorts.
+///
+/// [`ShapeKind::Line`] and [`ShapeKind::Arrow`] have no area, so they ignore
+/// a gradient entirely: stored, range-checked, not drawn, with the
+/// inspector's rows disabled for them. That is `radius`'s precedent exactly —
+/// every kind carries it, only the rectangle reads it — and worth restating,
+/// because refusing the field per kind looks tidier: it would mean the kind
+/// popup had to CLEAR the field on its way past, and a value a popup deleted
+/// is work nobody can get back.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Gradient {
+    pub kind: GradientKind,
+    pub stops: Vec<GradientStop>,
+    /// Degrees from the RIGHT, counter-clockwise — [`Shadow`]'s `angle`
+    /// convention, which is the crate's only one. Meaningless for
+    /// [`GradientKind::Radial`]; stored and range-checked there all the
+    /// same, so flipping a gradient's kind and back does not lose it.
+    pub angle: f64,
+}
+
+impl Default for Gradient {
+    /// Black to white, left to right.
+    ///
+    /// The feature's whole first impression, not a formality: the
+    /// container-level `#[serde(default)]` over a `null` base means
+    /// `{"gradient": {}}` — the inspector's Add, and the most natural thing
+    /// an agent will write — produces exactly this. So it follows
+    /// [`Filter::default`]'s rule and
+    /// [`ObscureRegion::default`]'s, that a default must be visibly
+    /// SOMETHING the moment it is switched on or the control reads as
+    /// broken, taken as far as it goes: black and white are the two colours
+    /// that cannot be mistaken for footage, for the canvas or for each
+    /// other in either appearance, and every gradient anybody actually
+    /// wants is two swatch clicks away. Angle 0 is to the RIGHT (see the
+    /// field), so the ramp runs the way a left-to-right reader expects, and
+    /// the kind is `Linear`, the one the angle means anything to.
+    fn default() -> Self {
+        Gradient {
+            kind: GradientKind::Linear,
+            stops: vec![
+                GradientStop {
+                    at: 0.0,
+                    color: [0.0, 0.0, 0.0, 1.0],
+                },
+                GradientStop {
+                    at: 1.0,
+                    color: [1.0, 1.0, 1.0, 1.0],
+                },
+            ],
+            angle: 0.0,
+        }
+    }
+}
+
+/// The two gradient geometries, closed for [`crate::model::ObscureKind`]'s
+/// reason: each is a different `CGGradient` call taking different
+/// arguments, not a parameter of a shared one, so an unknown kind is a
+/// value nothing downstream could repair and there is no neutral geometry
+/// to fall back to. Refusing it at the serde boundary makes the illegal
+/// state unrepresentable.
+///
+/// A kind may be added at the END. Nothing derives a number from the order
+/// — this enum never reaches a shader, unlike [`BlendMode`] — but each
+/// variant's JSON spelling is persisted, so a rename needs a migration
+/// step.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum GradientKind {
+    #[default]
+    Linear,
+    Radial,
+}
+
+/// One colour, and where along the ramp it sits.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct GradientStop {
+    /// 0–1 along the gradient.
+    pub at: f64,
+    pub color: Color,
+}
+
+impl Default for GradientStop {
+    /// Opaque black at the start of the ramp. This one does a different job
+    /// from [`Gradient::default`]: it is what the container-level
+    /// `#[serde(default)]` fills in, so `{"at": 0.75}` gets a colour and
+    /// `{"color": [1, 0, 0, 1]}` gets a position rather than a schema
+    /// error. A stop the inspector ADDS is never this one — a new row lands
+    /// between its neighbours, which the model cannot do, having no idea
+    /// which row was clicked. Black is what the crate reaches for whenever
+    /// a colour must exist before anybody has chosen one
+    /// ([`Outline::default`], [`Shadow::default`]); 0 is the ramp's own
+    /// origin, the one position that needs no argument.
+    fn default() -> Self {
+        GradientStop {
+            at: 0.0,
+            color: [0.0, 0.0, 0.0, 1.0],
         }
     }
 }
