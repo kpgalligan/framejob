@@ -1379,6 +1379,18 @@ extension BackdropProps {
     var dictionary: [String: Any] { ["color": color, "padding": padding, "radius": radius] }
 }
 
+extension TextAnimation {
+    /// `in` and `out` are DURATIONS in ticks, not times, and the first of them
+    /// is a Swift keyword — which is why the Swift properties are
+    /// `inDuration` / `outDuration` and the model's key names are written out
+    /// here. The spelling is a contract with `core/src/model_props.rs`'s
+    /// `#[serde(rename = "in")]`, the same one `TextAnimation.CodingKeys`
+    /// keeps on the way back.
+    var dictionary: [String: Any] {
+        ["kind": kind.rawValue, "in": inDuration, "out": outDuration]
+    }
+}
+
 extension StrokeProps {
     var dictionary: [String: Any] { ["width": width, "color": color] }
 }
@@ -1583,6 +1595,13 @@ struct AudioPatch: Codable, Equatable {
 /// A sparse patch of text properties. `width` is three-state as well: nil
 /// leaves the box alone, `.some(nil)` restores auto-sizing, `.some(w)` fixes
 /// the width and wraps.
+///
+/// `animation` (format version 5) is three-state for the same reason and
+/// with one extra trap of its own: it is an OBJECT, so `.some(a)` REPLACES
+/// the whole animation rather than merging into it — a key the caller left
+/// out of the object arrives as `TextAnimation`'s own default, not as the
+/// clip's current value. `AgentCatalog`'s text-patch sentence says so, and
+/// app/CLAUDE.md records the general rule for every nested object in a patch.
 struct TextPatch: Codable, Equatable {
     var content: String?
     var font: String?
@@ -1595,12 +1614,15 @@ struct TextPatch: Codable, Equatable {
     var outline: OutlineProps??
     var backdrop: BackdropProps??
     var width: Double??
+    /// LAST, as `animation` is the last key of the model's `TextProps` — the
+    /// two orders are read side by side often enough to be worth keeping.
+    var animation: TextAnimation??
 
     init(
         content: String? = nil, font: String? = nil, size: Double? = nil, color: RGBA? = nil,
         align: String? = nil, valign: String? = nil, lineSpacing: Double? = nil,
         tracking: Double? = nil, outline: OutlineProps?? = nil, backdrop: BackdropProps?? = nil,
-        width: Double?? = nil
+        width: Double?? = nil, animation: TextAnimation?? = nil
     ) {
         self.content = content
         self.font = font
@@ -1613,6 +1635,7 @@ struct TextPatch: Codable, Equatable {
         self.outline = outline
         self.backdrop = backdrop
         self.width = width
+        self.animation = animation
     }
 
     init(from decoder: Decoder) throws {
@@ -1628,6 +1651,7 @@ struct TextPatch: Codable, Equatable {
         outline = c.nullable(.outline)
         backdrop = c.nullable(.backdrop)
         width = c.nullable(.width)
+        animation = c.nullable(.animation)
     }
 
     var dictionary: [String: Any] {
@@ -1656,6 +1680,13 @@ struct TextPatch: Codable, Equatable {
         }
         if let width = width {
             if let width = width { d["width"] = width } else { d["width"] = NSNull() }
+        }
+        if let animation = animation {
+            if let animation = animation {
+                d["animation"] = animation.dictionary
+            } else {
+                d["animation"] = NSNull()
+            }
         }
         return d
     }

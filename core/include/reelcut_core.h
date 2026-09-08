@@ -45,11 +45,12 @@ extern "C" {
  * reversed media, and audio pan / compressor / noise reduction. Version 3
  * is clip identity: a clip's `name` and `label`, and a track's `solo`.
  * Version 4 is `video.obscure`, the regions of a layer hidden behind a
- * blur or a pixelation. Neither of the last two needed a migration step —
- * every field they added carries a serde default — but an older build must
- * still refuse the newer file rather than silently drop what it cannot
- * read, which is what the version is for. */
-#define RC_FORMAT_VERSION 4
+ * blur or a pixelation. Version 5 is `text.animation`, the reveal a text
+ * layer arrives and leaves with. None of the last three needed a migration
+ * step — every field they added carries a serde default — but an older
+ * build must still refuse the newer file rather than silently drop what it
+ * cannot read, which is what the version is for. */
+#define RC_FORMAT_VERSION 5
 
 /* Reader caps enforced by the writer, so every file this build produces can
  * be read back (the `MAX_*` constants in core/src/format.rs). A nest's tracks and clips

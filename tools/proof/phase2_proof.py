@@ -313,7 +313,7 @@ def main():
     s.save()
     text = project_json(s.path)
     root = json.loads(text)
-    check('"version": 4' in text and root["version"] == 4, "the saved project.json is version 4")
+    check('"version": 5' in text and root["version"] == 5, "the saved project.json is version 5")
     check(
         all(list(c.keys())[-2:] == ["name", "label"] for c in root["clips"]),
         "every clip object ends with name then label",
@@ -334,7 +334,7 @@ def main():
     check(
         (clip["name"], clip["label"]) == ("Talk", "blue")
         and reopened.tracks()[front]["solo"] is True
-        and reopened.project()["version"] == 4,
+        and reopened.project()["version"] == 5,
         "a byte copy of the package opens from disk with name, label and solo intact",
     )
 
@@ -355,7 +355,7 @@ def main():
     )
     v2 = Session(mcp, "schema-v2", open_from=fixture)
     project = v2.project()
-    check(project["version"] == 4, "a version-2 file opens and reports version 4")
+    check(project["version"] == 5, "a version-2 file opens and reports version 5")
     check(
         {c["id"] for c in project["clips"]} == {a, t}
         and [tr["id"] for tr in project["tracks"]] == [back, front],
@@ -368,7 +368,7 @@ def main():
     check(all(tr["solo"] is False for tr in project["tracks"]), "every track reads solo false")
     v2.save()
     root = json.loads(project_json(v2.path))
-    check(root["version"] == 4, "saving it writes version 4")
+    check(root["version"] == 5, "saving it writes version 5")
     check(
         all(list(c.keys())[-2:] == ["name", "label"] for c in root["clips"])
         and all(list(tr.keys())[-1] == "solo" for tr in root["tracks"]),

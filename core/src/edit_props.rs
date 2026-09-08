@@ -73,8 +73,8 @@ impl Group {
     /// A fully-populated instance of the group, serialized: every optional
     /// sub-object present, so the key check can see inside `shadow`,
     /// `chroma`, `reflection`, `spotlight`, `duck`, `compressor`,
-    /// `outline`, `backdrop` and `stroke` even when the clip currently has
-    /// `null` there — and one `filters` entry and one `obscure` region, so
+    /// `outline`, `backdrop`, `animation` and `stroke` even when the clip
+    /// currently has `null` there — and one `filters` entry and one `obscure` region, so
     /// it can see inside the elements of the two arrays of objects too.
     /// Both entries are load-bearing: `check_keys` reads the FIRST element
     /// of the template's array as the reference for every element it is
@@ -101,6 +101,7 @@ impl Group {
                 outline: Some(crate::model::Outline::default()),
                 backdrop: Some(crate::model::Backdrop::default()),
                 width: Some(0.0),
+                animation: Some(crate::model::TextAnimation::default()),
                 ..TextProps::default()
             }),
             Group::Shape => actions::to_json(&ShapeProps {

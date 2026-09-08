@@ -21,12 +21,21 @@
 //! fold is [`Frame`]'s, and it is exact — every transform involved is
 //! a similarity — so no intermediate render target is needed and the
 //! compositor draws a nested layer with the same pass it draws any other.
+//!
+//! ### A text animation becomes a number here
+//!
+//! `text.animation` (spec §5.2) says what the animation IS; this file turns
+//! it into what is showing NOW — a `reveal` in 0..1, a `reveal_phase` and a
+//! `reveal_kind` — because everything that draws a frame reads this one
+//! description and nothing else, so preview, `render_frame` and an export
+//! cannot disagree about it. See [`Reveal`], and [`text_hash`] for why the
+//! layer's content hash has to cover the answer.
 
 use serde_json::{Map, Value};
 
 use crate::actions::Evaluated;
 use crate::evaluate::{json, number, Assignment};
-use crate::model::{Clip, Project, Source, TransitionKind};
+use crate::model::{Clip, Project, Source, TextAnimation, TextAnimationKind, TransitionKind};
 use crate::nest::{Frame, Instance};
 use crate::time::Ticks;
 use crate::transition;
@@ -55,6 +64,190 @@ fn fnv1a(bytes: &[u8]) -> u64 {
 /// always hash the same and share one texture.
 fn content_hash(description: &Value) -> String {
     format!("{:016x}", fnv1a(description.to_string().as_bytes()))
+}
+
+/// How much of a text layer is showing at one instant, and which half of
+/// its animation is showing it (spec §5.2's `text.animation`, §7.3).
+///
+/// The core decides this and the platform only draws it, which is the whole
+/// reason it is computed here: preview, `render_frame` and both export
+/// writers read ONE recipe, so they cannot disagree about how far a reveal
+/// has got. It is derived from an animation, a clip time and a duration and
+/// from nothing else — no clip, no instance — so a layer the core
+/// synthesizes rather than reads off a clip can simply not have one.
+#[derive(Debug, Clone, Copy)]
+struct Reveal {
+    /// 0 (nothing showing) through 1 (all of it), the un-reveal folded in.
+    amount: f64,
+    /// `"in"` while the arrival is what is holding the amount back, `"out"`
+    /// once the departure is, and `None` for a layer with no animation at
+    /// all — whose amount is always 1. A TENT is the exception and
+    /// [`Reveal::of`] argues it: a clip too short to complete its arrival
+    /// keeps one word for its whole life.
+    ///
+    /// The word is not decoration: one number cannot say whether a
+    /// typewriter is typing or un-typing, and a line rise falls rather than
+    /// rises on the way out. `transition`'s `role` is the same idea one
+    /// function away, and adding this later would be a change to a shipped
+    /// recipe key rather than a new one.
+    phase: Option<&'static str>,
+    /// Which of the three reveals this is, or `None` for a layer with no
+    /// animation.
+    ///
+    /// It is carried because the description no longer is: the recipe
+    /// strips `animation` out of the text it hands over (see
+    /// [`Project::layer_source`]), so this is the renderer's ONLY word for
+    /// which drawing routine to run — each kind is a different routine, not
+    /// a parameter of a shared one. Carried by NAME, as the schema spells
+    /// it, so the recipe never depends on the enum's declaration order.
+    kind: Option<TextAnimationKind>,
+}
+
+impl Reveal {
+    /// A layer with no animation: all of it, all of the time.
+    const WHOLE: Reveal = Reveal {
+        amount: 1.0,
+        phase: None,
+        kind: None,
+    };
+
+    /// The reveal `clip_t` ticks into a clip that is `duration` long.
+    ///
+    /// Both halves are measured against the CLIP's own duration, never the
+    /// instance's visible span — the rule [`Project::layer`] already states
+    /// for clip time. A nest clip's edge therefore cuts a nested caption off
+    /// mid-reveal instead of making it un-reveal early, and the two halves
+    /// of one animation are measured on one clock rather than two.
+    ///
+    /// The two ramps are combined with `min`, so `in + out > duration`
+    /// degrades rather than refusing: the reveal becomes a tent that never
+    /// reaches 1, stays inside 0..1 and simply shows a short clip a partial
+    /// reveal. Nothing here refuses, and nothing clamps the animation to
+    /// fit — a range check is a fact about the vocabulary
+    /// (`props_check.rs`), while "these two numbers are too big for THIS
+    /// clip" is a fact about a clip, which a later trim could invalidate
+    /// anyway.
+    ///
+    /// A tent keeps ONE phase for its whole life, and that is the second
+    /// half of the same argument: the phase is what the renderer staggers
+    /// by, so the instant the word turns is an instant the picture mirrors,
+    /// and a tent has no instant where mirroring is invisible. The `plateau`
+    /// comment below has it in full.
+    fn of(animation: Option<&TextAnimation>, clip_t: Ticks, duration: Ticks) -> Reveal {
+        let animation = match animation {
+            Some(animation) => animation,
+            None => return Reveal::WHOLE,
+        };
+        let arriving = ramp(clip_t, animation.r#in);
+        // The departure is measured back from the clip's EXCLUSIVE end, so
+        // it reaches 0 one frame past the last frame anybody draws: the
+        // last frame of an un-revealing clip still shows a sliver, which is
+        // right — the clip is gone on the next one.
+        let leaving = ramp(duration.saturating_sub(clip_t), animation.out);
+
+        // The phase is not a label on the amount: it is the ORDER the
+        // renderer staggers by. `LayerRenderers.staggerIndex` counts a
+        // word_fade's words and a line_rise's lines from the other end while
+        // a layer is leaving, so that the first word in is the first word
+        // out. The word turning therefore MIRRORS the picture end for end,
+        // and the only amount at which that is invisible is 1, where every
+        // item is whole whichever end the stagger counted from.
+        //
+        // The two ramps meet at 1 only when the animation fits — when there
+        // is a plateau between them, `in + out <= duration`. A TENT has
+        // none: its ramps cross below 1, and turning the word at that peak
+        // would swap a four-word cue's alphas from [1, 1, .83, .33] to
+        // [.33, .83, 1, 1] between two consecutive frames whose amount did
+        // not change at all. So a tent — which D-C7 lets degrade rather than
+        // refuse — un-arrives the way it arrived, keeping the phase it began
+        // in. That is the arrival's, unless the arrival is instant, which
+        // makes the clip nothing but a departure and gives it no order to
+        // contradict.
+        let plateau = animation.r#in.saturating_add(animation.out) <= duration;
+        let departing = if plateau {
+            // A tie is the arrival's: it covers the whole middle of a clip
+            // that is fully revealed and not yet leaving, and the first
+            // instant of an out phase, which is on the plateau and draws the
+            // same picture either way.
+            leaving < arriving
+        } else {
+            animation.r#in <= 0
+        };
+
+        Reveal {
+            amount: arriving.min(leaving),
+            phase: Some(if departing { "out" } else { "in" }),
+            kind: Some(animation.kind),
+        }
+    }
+}
+
+/// One phase's progress: how far `elapsed` has got through `over`, bounded
+/// to 0..1.
+///
+/// A phase of zero length is complete from the start rather than a division
+/// by zero, and so is a NEGATIVE one — which only an action end patch or a
+/// hand-written file can produce, since `set_action_end` is deliberately
+/// lenient and `clamp_video` does not touch text. This is where an absurd
+/// value is caught, because this is where it is consumed.
+fn ramp(elapsed: Ticks, over: Ticks) -> f64 {
+    if over <= 0 {
+        return 1.0;
+    }
+    let progress = elapsed.max(0) as f64 / over as f64;
+    // Both sides are integers, so today this cannot be anything but finite.
+    // The guard is one comparison and it fails toward SHOWING the text,
+    // where `number()` would turn a non-finite amount into 0.0 and show
+    // none of it.
+    if progress.is_finite() {
+        progress.clamp(0.0, 1.0)
+    } else {
+        1.0
+    }
+}
+
+/// The cache key for a text layer: its description, and the reveal when
+/// there is one.
+///
+/// The reveal changes the PIXELS, and this hash is the only thing standing
+/// between a per-frame value and a stale texture — Swift caches a rendered
+/// paragraph under `"text:" + hash` and consults nothing else — so a frame
+/// at one reveal must not be able to collide with the same text at another.
+/// A reveal that changed the picture without changing the key would render
+/// correctly in a single `render_frame` and freeze during playback, with no
+/// error anywhere.
+///
+/// All THREE computed keys go in, not just the amount: a word fade and a
+/// typewriter half done are two different pictures of the same text, and so
+/// are a half-arrived and a half-departed line rise.
+///
+/// A layer with NO animation hashes the bare description, byte for byte as
+/// it did before format version 5, so no shipped project's texture cache
+/// behaves differently after this phase. An ANIMATED layer keeps its own
+/// key even at amount 1: whether a full reveal draws exactly what no
+/// animation draws is the renderer's promise, and a cache key must not lean
+/// on one.
+fn text_hash(description: &Value, reveal: &Reveal) -> String {
+    match reveal.phase {
+        None => content_hash(description),
+        Some(phase) => {
+            let mut keyed = Map::new();
+            keyed.insert("text".to_string(), description.clone());
+            keyed.insert("reveal".to_string(), number(reveal.amount));
+            keyed.insert("reveal_phase".to_string(), Value::from(phase));
+            keyed.insert("reveal_kind".to_string(), reveal_kind(reveal));
+            content_hash(&Value::Object(keyed))
+        }
+    }
+}
+
+/// The reveal's kind as the recipe carries it: the schema's own spelling of
+/// the variant, or `null` for a layer with no animation.
+fn reveal_kind(reveal: &Reveal) -> Value {
+    match reveal.kind {
+        Some(kind) => json(&kind),
+        None => Value::Null,
+    }
 }
 
 impl Project {
@@ -106,10 +299,13 @@ impl Project {
         // Clip time: 0 is the clip's first frame, which is what actions are
         // measured in (spec §5.4). The clip's own first frame, not the
         // instance's — a nest clip's edge cuts a nested clip short without
-        // rebasing the animation on it.
-        let evaluated = self.evaluate_clip(instance.clip, instance.clip_time(t));
+        // rebasing the animation on it. Held in a local rather than
+        // recomputed below, so a text reveal and the actions that produced
+        // the props it reveals run off one clock.
+        let clip_t = instance.clip_time(t);
+        let evaluated = self.evaluate_clip(instance.clip, clip_t);
         let video = &evaluated.video;
-        let (source, source_size) = self.layer_source(instance, &evaluated, assignment);
+        let (source, source_size) = self.layer_source(instance, &evaluated, clip_t, assignment);
         let frame = self.frame_of(instance, t);
         let placed = frame.place(video);
 
@@ -256,6 +452,7 @@ impl Project {
         &self,
         instance: &Instance,
         evaluated: &Evaluated,
+        clip_t: Ticks,
         assignment: &Assignment,
     ) -> (Value, Value) {
         let media_size = |media: u32| -> Value {
@@ -296,11 +493,50 @@ impl Project {
                 // A text clip with no description is malformed rather than
                 // impossible; the defaults keep the recipe renderable.
                 let text = evaluated.text.clone().unwrap_or_default();
-                let description = json(&text);
+                let reveal = Reveal::of(text.animation.as_ref(), clip_t, clip.duration);
+                let mut description = json(&text);
+                // The animation is STRIPPED from the description carried
+                // here: the computed reveal below is the only account of it
+                // a renderer gets. Left in, it would be a second one — and
+                // the wrong one, since nothing downstream has the clip time
+                // to evaluate it against. Removing it also keeps an
+                // unanimated clip's hash byte-identical to what it was
+                // before format version 5. The inspector reads the
+                // animation FIELD through `clip_state`; this description is
+                // what draws.
+                if let Some(map) = description.as_object_mut() {
+                    map.remove("animation");
+                }
                 let mut source = Map::new();
                 source.insert("kind".to_string(), Value::from("text"));
-                source.insert("hash".to_string(), Value::from(content_hash(&description)));
+                source.insert(
+                    "hash".to_string(),
+                    Value::from(text_hash(&description, &reveal)),
+                );
                 source.insert("text".to_string(), description);
+                // The three computed keys ride INSIDE the source object,
+                // where the kind-specific description already lives, and
+                // all three are emitted on every text layer whether it
+                // animates or not: an absent key would mean two things — no
+                // animation here, or an older core that never computed one
+                // — which is the argument `obscure` settled one layer up. A
+                // layer-level key instead would put a null on every layer
+                // that can never carry one.
+                //
+                // Together they are the WHOLE of what a renderer is told
+                // about the animation: which routine (`reveal_kind`), how
+                // far (`reveal`), and which way (`reveal_phase`). The two
+                // nulls always travel together — no kind means no phase
+                // means an amount of 1.
+                source.insert("reveal".to_string(), number(reveal.amount));
+                source.insert(
+                    "reveal_phase".to_string(),
+                    match reveal.phase {
+                        Some(phase) => Value::from(phase),
+                        None => Value::Null,
+                    },
+                );
+                source.insert("reveal_kind".to_string(), reveal_kind(&reveal));
                 // Only the platform can lay text out, so the model has no
                 // size to report (spec §5.3, §11).
                 (Value::Object(source), Value::Null)

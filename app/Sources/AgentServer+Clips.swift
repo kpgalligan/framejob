@@ -27,7 +27,7 @@ extension AgentServer {
     ]
     static let textPatchKeys: Set<String> = [
         "content", "font", "size", "color", "align", "valign", "line_spacing", "tracking",
-        "outline", "backdrop", "width",
+        "outline", "backdrop", "width", "animation",
     ]
     static let shapePatchKeys: Set<String> = [
         "kind", "width", "height", "stroke", "fill", "arrow_start", "arrow_end", "radius",
@@ -106,12 +106,19 @@ extension AgentServer {
     private func textArg(_ a: [String: Any], _ key: String) throws -> TextPatch? {
         guard let raw = a[key], !(raw is NSNull) else { return nil }
         if let words = raw as? String { return TextPatch(content: words) }
-        guard raw is [String: Any] else {
+        guard let object = raw as? [String: Any] else {
             throw ToolError(
                 message: "\(key) must be the words, or a set_text patch object — e.g. "
                     + "\"Chapter One\" or {\"content\": \"Chapter One\", \"size\": 96}.")
         }
-        return try patchArg(a, key, TextPatch.self, allowed: Self.textPatchKeys)
+        let patch = try patchArg(a, key, TextPatch.self, allowed: Self.textPatchKeys)
+        // This is the OTHER door a text patch comes through, so it needs the
+        // enum check `set_text` runs — `patchArg`'s round trip cannot see
+        // inside a `T??` field, and `TextAnimationKind` decodes leniently, so
+        // {"animation": {"kind": "fade"}} would reach the core as a
+        // typewriter and the caller be told the clip they asked for was made.
+        try Self.checkTextEnums(object, key)
+        return patch
     }
 
     /// `add_shape_clip`'s `shape`, the same way: the `set_shape` patch the
@@ -581,6 +588,26 @@ extension AgentServer {
         }
     }
 
+    /// The one closed vocabulary a text patch carries: `animation.kind`.
+    ///
+    /// `TextAnimationKind` decodes leniently on this side, so `"fade"` would
+    /// read as `typewriter` and a caller would be told an animation they did
+    /// not ask for had been applied — the same hole `checkVideoEnums` closes
+    /// for a filter, a spotlight and an obscure region. The core's own serde
+    /// refuses the string outright, but only once the patch reaches it, and
+    /// `patchArg`'s round-trip guard cannot see inside a `T??` field.
+    private static func checkTextEnums(_ object: [String: Any], _ path: String) throws {
+        guard let animation = object["animation"] as? [String: Any],
+            let kind = animation["kind"]
+        else { return }
+        let known = TextAnimationKind.allCases.map { $0.rawValue }
+        guard let name = kind as? String, TextAnimationKind(rawValue: name) != nil else {
+            throw ToolError(
+                message: "\(path).animation.kind is not a text animation — it must be one of "
+                    + known.joined(separator: ", ") + ".")
+        }
+    }
+
     /// `set_audio` — the Audio tab (`AudioPane`) and the timeline's fade
     /// handles (`FadeHandleSession`).
     func setAudio(_ a: [String: Any]) throws -> String {
@@ -599,6 +626,7 @@ extension AgentServer {
         let document = try target(a)
         let clips = try clipsArg(a, "clips", document)
         let patch = try patchArg(a, "patch", TextPatch.self, allowed: Self.textPatchKeys)
+        try Self.checkTextEnums(a["patch"] as? [String: Any] ?? [:], "patch")
         guard !patch.isEmpty else {
             throw ToolError(message: "patch names nothing to change.")
         }
@@ -922,9 +950,10 @@ extension AgentServer {
                     message: "Unknown \(key).\(name) key \"\(first)\" — allowed keys are "
                         + allowed.sorted().joined(separator: ", ") + ".")
             }
-            // An action's end state carries the same video patch `set_video`
-            // does, so it carries the same two lenient enums.
+            // An action's end state carries the same patches `set_video` and
+            // `set_text` do, so it carries the same lenient enums.
             if name == "video" { try Self.checkVideoEnums(nested, "\(key).\(name)") }
+            if name == "text" { try Self.checkTextEnums(nested, "\(key).\(name)") }
         }
     }
 

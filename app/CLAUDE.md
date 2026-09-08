@@ -22,8 +22,35 @@ lockstep are in the root `CLAUDE.md`; the full design is
   are re-clamped to live ids by `clampViewState`, and `selectedMedia` lives
   here rather than on `MediaPane` because that pane is rebuilt whole
   whenever the media list changes.
+- `LayerRenderers.swift` — text and shape descriptions to textures, and
+  since format version 5 the three text REVEALS (spec §5.2's
+  `text.animation`). It draws what the recipe's `reveal` / `reveal_phase` /
+  `reveal_kind` say and computes nothing: the core owns the number
+  (`recipe.rs`), and the layer's `hash` already covers it, so
+  `RecipeSourceRef.cacheHash` stays the WHOLE texture key and nothing here
+  may append to it. Two rules hold the drawing together: the LAYOUT is
+  always the full text's, cached in `layoutCache` beside `sizeCache` and
+  keyed WITHOUT the reveal, so an animation can never reflow the box or
+  walk the overlay's handles; and `reveal = 1` (or no animation) takes the
+  original single `CTFrameDraw` path rather than the span machinery, which
+  is what makes a full reveal byte-identical to no animation at all.
+  `wordOverlap` (0.5) and `lineRiseFraction` (0.35) are named constants,
+  not schema — whatever is chosen there ships as the animation's identity.
+  **And a third, which the review put there: a line drawn at a PARTIAL
+  alpha goes inside a transparency layer.** An outlined glyph is filled and
+  THEN stroked — `attributedString` sets a negative `.strokeWidth`, Core
+  Text's spelling of "fill and stroke" — and `CGContext.setAlpha` applies
+  to each of those draws separately, so the inner half of the stroke lands
+  on ink the fill already laid down and composites twice: at reveal 0.5 the
+  outline sat at 0.75, and a black outline on a white word read as a grey
+  halo for the whole ramp. A transparency layer makes the two draws one
+  composite, which is what the shader had always given a texture faded
+  WHOLE. An opaque line skips it — at alpha 1 the stroke covers the fill
+  exactly as it does in the finished glyph, and the buffer would buy a
+  rounding step and an allocation. Anything else here that draws one piece
+  of a glyph at a time inherits the rule.
 - `Playback.swift` · `CompositionBuilder.swift` · `Compositor.swift` ·
-  `CompositorEffects.swift` · `LayerRenderers.swift` · `MediaImporter.swift` ·
+  `CompositorEffects.swift` · `MediaImporter.swift` ·
   `Exporter.swift` · `ExporterWriter.swift` · `ExporterImageSequence.swift` —
   the AVFoundation/Metal side; see spec §7.5–7.8. `CompositorEffects.swift`
   holds the M3 effect logic so `Compositor.swift` grew only the uniform
@@ -52,12 +79,85 @@ lockstep are in the root `CLAUDE.md`; the full design is
   opt-in ffmpeg step behind it (spec §7.7, §11). `async`/`await` is confined
   to `MediaImporter.swift`; `FFmpegRewrap` runs `Process` on a serial queue,
   never on a cooperative thread, because ffmpeg blocks the thread it is on.
-- `CaptionImporter.swift` (File ▸ Import Captions…) · `MediaConsolidator.swift`
+- `MediaConsolidator.swift`
   with `EditorViewController+Consolidate.swift` (File ▸ Consolidate Media…) —
-  the two §5.6 file features. Consolidate writes inside the package behind
+  the §5.6 file feature. Consolidate writes inside the package behind
   NSDocument's back, so it MUST tell
   `ProjectDocument.packageContentsDidChangeOnDisk()` afterwards, or every
   later save is refused as "changed by another application".
+- **Captions**, four files and one shape: a caption is an ordinary text
+  clip, which is what makes burn-in free, so every producer ends at the
+  same placement code.
+  `CaptionLayout.swift` is that placement and ONLY placement — snap to the
+  frame grid, give a collapsed cue its frame back, sort, trim an
+  overlapping cue back to ABUT its successor (never a gap: `b.start ==
+  a.end` is not an overlap and mints no transition), drop what is left
+  shorter than a frame, and place the survivors on a new front-most track
+  in the Caption preset, which is the one placement the overlap rule can
+  never refuse. Every refusal keeps the `tag` its producer gave it, so a
+  file says `line 12` and a transcript says `clip 7`.
+  `CaptionImporter.swift` (File ▸ Import Captions…) is now the SubRip
+  grammar and nothing else. **The four cue rules are NOT in either of
+  them** — ≤ 2 lines, ≤ 42 characters a line, ≤ 6 s a cue, a frame between
+  cues live in `CaptionCues` at the foot of `CaptionLayout.swift`, because
+  only a producer that has to INVENT line breaks needs them: an SRT brings
+  its own, and moving the rules into the shared path would silently re-wrap
+  every caption file that imports correctly today and break 4b's round
+  trip.
+  `Transcriber.swift` (File ▸ Generate Captions…, `transcribe`) is the
+  recogniser: `SFSpeechRecognizer` through its CALLBACK API (spec §11 — no
+  second `async` exception), over each clip's source window EXTRACTED to a
+  temporary mono 16 kHz WAV in `NSTemporaryDirectory()`, never the media
+  file and never inside the package. Two queues, and the second is not
+  optional: `SFSpeechRecognizer.queue` defaults to the app's MAIN queue,
+  which would make an off-main tool's wait depend on the main runloop being
+  free. The framework's roughly one-minute ceiling per task is REPORTED —
+  a run that stopped early says where — rather than chunked around.
+  Two rules the review put there, and neither is local: **"has sound" is
+  `enabled.audio` and not the media's** audio track, because Detach Audio
+  leaves the picture clip with the switch off and an audio-only twin over
+  the SAME media beside it, so asking the file would transcribe one
+  recording twice and place two identical cues at one time; and **one
+  job's failure is one job's problem** — an extraction that fails (a file
+  whose audio track is shorter than its picture, trimmed into the tail) is
+  reported under `problems` and the run carries on, where throwing would
+  discard every cue the earlier clips had produced. Cancellation is the
+  exception and stays a throw: it means place nothing.
+  `TranscribeSheetController.swift` is one sheet in two states (settings,
+  then its own progress card, `ConsolidateProgressSheetController`'s shape),
+  and is the ONLY place the app calls `requestAuthorization`: the system
+  prompt needs a frontmost app, so the tool reads
+  `authorizationStatus()` and refuses instead (`Transcriber.canAsk`, which
+  is `FFmpegRewrap.canAsk`'s argument). The ORDER of the tool's refusals is
+  load-bearing and the review is what put it in that order: the caller's
+  own mistakes — an id naming nothing, a scope with nothing audible, a
+  language tag the framework has never heard of — are answered FIRST, so
+  they stay reachable with no grant; the grant next; and only then whether
+  this Mac has a downloaded MODEL for the language, which is a question an
+  ungranted Mac cannot be asked and must not be sent to System Settings
+  over. That ordering is also the only reason a headless proof can measure
+  anything about `transcribe` at all.
+  `CaptionExporter.swift` (File ▸ Export Captions…, `export_captions`)
+  writes `.srt` and `.vtt` out of one track's text clips; it never guesses
+  the track — a candidate is a track whose clips are ALL text, and none or
+  several means refuse and NAME them. Its round trip returns every cue to
+  the TICK it was written from at every ordinary rate: a timestamp is
+  rounded to the nearest millisecond, 300 ticks at most, and half a frame
+  is 10,000 ticks even at 30 fps, so the snap on the way back in can only
+  find the frame the cue left. What needs a whole-millisecond frame (25 and
+  50 fps) is byte identity with the FILE, and then only for a file whose
+  times are already on the frame grid — which is why the proof fixture is
+  at 25 fps and why the same fixture at 30 fps must NOT come back, rather
+  than carrying a tolerance.
+  **Pitfall, and it is not the exporter's alone:**
+  `NSPopUpButton.addItem(withTitle:)` REMOVES an existing row carrying the
+  same title before adding the new one — three rows, two of them reading
+  alike, come back as two — so a popup built from model objects must carry
+  the object in `representedObject` and be read from `selectedItem`, never
+  by `indexOfSelectedItem`. The save panel's track popup did the latter,
+  and two caption tracks renamed alike would have exported a DIFFERENT
+  track and reported success; `Candidate.menuTitle` now spells the track id
+  into the title as well, so nothing is dropped either.
 - `EditorViewController.swift`, `TimelineView.swift`,
   `PreviewCanvasView.swift`, `AgentServer.swift` — **frozen at current
   size.** Any change adding more than ~50 lines goes in an extension file
@@ -75,7 +175,13 @@ lockstep are in the root `CLAUDE.md`; the full design is
   (`pickChromaKey` is the precedent; `zoomToRegion`, `zoomBack` and
   `placeObscureRegion` followed it). The forward block is for commands
   whose body lives at the foot of a NON-extension feature file, which is
-  what `importCaptions` and `removeSilences` are.
+  what `importCaptions`, `removeSilences`, `generateCaptions`
+  (`TranscribeSheetController.swift`) and `exportCaptions`
+  (`CaptionExporter.swift`) are — each of those carries its validator arm
+  down there with it, and the arm is load-bearing rather than decoration:
+  without one the item falls through to `validateUserInterfaceItem`'s
+  closing `return true` and is enabled on a timeline where it can only
+  beep.
   **And a second:** `handleEditorCharacter`'s bare-key `switch` matches in
   SOURCE order, so a new `case "x"` must go BELOW any
   `case "x" where <modifier>` above it. A bare `case "z"` placed first
@@ -100,29 +206,53 @@ lockstep are in the root `CLAUDE.md`; the full design is
   `clip | media | document`, all always live, and the old
   disabled-tab / preferred-tab / pin apparatus is gone — which sections
   appear is `ClipPane.makeSections()`'s answer.
-  **Pitfall:** an `InspectorSection`'s `UserDefaults` key records COLLAPSED,
-  so an untouched section has no stored value and `defaultExpanded` applies;
+  **Pitfall:** a section factory is not a section until `makeSections()`
+  CALLS it. Nothing type-checks the omission — an unused method on a pane
+  is legal Swift — so a new group can be written, documented, mirrored over
+  MCP and invisible in the app, which has now happened in two consecutive
+  phases (`VideoPane.obscureSection`, `TextPane.animationSection`). Adding
+  a section is two edits, and the second one is in `ClipPane.swift`.
+  **And a second:** an `InspectorSection`'s `UserDefaults` key records
+  COLLAPSED, so an untouched section has no stored value and
+  `defaultExpanded` applies;
   never flip that polarity or every saved panel inverts. And section ids are
   shared across contexts (`video.speed` is the Speed group for a video clip
   and the first group an audio-only one gets), so a "open the first section"
   rule has to walk until it finds one the user has not stored.
-  **And a second:** a field's `refresh` is skipped while its field editor is
+  **And a third:** a field's `refresh` is skipped while its field editor is
   attached, which it still is inside `controlTextDidEndEditing` (after
   Return or Tab AppKit even re-attaches it), so every refresh a commit runs
   is skipped — `InspectorNameField` and the timecode field set their
   `stringValue` directly as the commit ends, or a cleared name would keep
   showing blank while the strip shows the fallback.
+  **And a fourth:** `InspectorPaneView`'s low-priority bottom pin is 249,
+  one BELOW `.defaultLow`, and the one point is the whole point. An
+  `InspectorSection` sets no hugging priority, so it keeps AppKit's default
+  250; at 250 the pin tied with it, and "give the pane its content's height"
+  and "stretch a section past its rows" cost the solver the same. Auto
+  Layout reports nothing for a tie — it just picks, per PROCESS, so the
+  offscreen harness wrote two different PNGs for one package and
+  `phase3_chrome.py` scored anywhere from 29 to 33 out of 33 on identical
+  input. Any constraint here that competes with a subview's own hugging
+  needs that gap, and a proof that scores differently run to run is the
+  symptom to recognise: a stable-but-different render is an ambiguity, not a
+  race, and no amount of waiting will settle it.
 - `ExportSheetController.swift` (the export card and its progress sheet),
-  `SpeedSheetController.swift`, `RelinkSheetController.swift` — the
-  dialogs, all built from `Sheets.swift`'s `makeSheetView` pieces and put
-  up by `EditorViewController+Export.swift`. A sheet captures a project
+  `SpeedSheetController.swift`, `RelinkSheetController.swift`,
+  `TranscribeSheetController.swift` (settings, then its own progress card,
+  because a second sheet presented out of the first one's action is
+  refused — `ReverseProgressSheetController.viewDidDisappear` records it) —
+  the dialogs, all built from `Sheets.swift`'s `makeSheetView` pieces. The
+  first three are put up by `EditorViewController+Export.swift`; the
+  transcribe sheet puts itself up, from the `generateCaptionsCommand` at
+  its own foot, the shape `SilenceSheetController` set. A sheet captures a project
   handle and trusts it, which is safe because every editor action
   validates false while one is attached.
 - `AgentCatalog.swift` — the MCP tool catalog; a startup check enforces that
   catalog names match the dispatch registry (it traps in debug and logs in
   Release, because `make app` builds Release). The handlers live in
-  `AgentServer+Project/Clips/Tracks/Media/Render/History/Silence.swift` and
-  their shared
+  `AgentServer+Project/Clips/Tracks/Media/Render/History/Silence/Captions.swift`
+  and their shared
   argument vocabulary in `AgentServer+Arguments.swift` — `intArg`,
   `doubleArg`, `boolArg`, `stringArg`, `stringsArg` (an optional list of
   strings, a lone string counting as a one-element list; emptiness and
@@ -140,19 +270,25 @@ lockstep are in the root `CLAUDE.md`; the full design is
   decoder in `ProjectSnapshot.swift` swallows every decode error and
   answers `.some(nil)`, so `{"label": 7}` decodes as a CLEAR and passes.
   `set_clip`'s handler adds a per-key type check (`checkClipPatchTypes`)
-  after it; the other nine `T??` patch fields still have the gap —
+  after it; the other TEN `T??` patch fields still have the gap —
   `VideoPatch.shadow` / `chroma` / `reflection` / `spotlight`,
   `AudioPatch.duck` / `compressor`, `TextPatch.outline` / `backdrop` /
-  `width` — and on the object-valued ones a wrong type CLEARS the effect.
+  `width` / `animation` — and on the object-valued ones a wrong type
+  CLEARS the effect. (`ShapePatch` is not in that count: it is the one
+  patch built by hand rather than decoded, so `stroke` and `fill` refuse a
+  wrong type by name.)
   A second thing that round trip cannot do, older than phase 3 and
   measured again by its proof: a nested OBJECT in a patch is decoded into
   its typed struct and re-serialised, so an unknown key inside one is
   dropped where the core would have named it, and a known key the caller
   omitted is sent as that struct's DEFAULT — which resets the field. That
-  is `shadow`, `chroma`, `duck` and now every `obscure` entry: the core
+  is `shadow`, `chroma`, `duck`, every `obscure` entry and now
+  `animation`: the core
   refuses both (`deny_unknown_fields`), the decoder simply gets there
   first, so a patch of a nested object is a REPLACEMENT and has to be sent
-  whole.
+  whole. `AgentCatalog`'s text-patch sentence spells that out for
+  `animation` in the tool's own words, because a key left out of one comes
+  back as a 1 s typewriter rather than as what the clip had.
   Beyond the §6 ops the catalog carries the app-state tools spec §7.9 names
   plus `set_range`, `set_selection`, `undo` and `redo` — the mirrors of
   I/O/⌥X, a timeline or canvas click, and ⌘Z/⇧⌘Z, without which the "one edit
@@ -182,7 +318,21 @@ lockstep are in the root `CLAUDE.md`; the full design is
   `filters[].kind`, `spotlight.shape` and now `obscure[].shape` and
   `obscure[].kind`, each against its own `allCases`. Nothing else in a
   video patch is an enum — `chroma` is a colour and three numbers — so a
-  new enum inside a patch has to be added to it by hand.
+  new enum inside a patch has to be added by hand. `checkTextEnums` is its
+  sibling and guards the one a TEXT patch carries, `animation.kind`; both
+  are run again per group by `checkActionPatch`, since an action's end
+  state carries the same patches. `align` and `valign` are not in either,
+  because they are plain strings in the schema rather than Swift enums.
+  **A check like these belongs at every DOOR a patch comes through, not at
+  the one it was written for.** `add_text_clip` takes the same `set_text`
+  patch (a bare string being shorthand for `{"content": …}`) and was the
+  one entrance that never ran `checkTextEnums`, so
+  `{"animation": {"kind": "fade"}}` reached the core as a typewriter and
+  the caller was told the clip they asked for had been made. `textArg` runs
+  it now, on the RAW object rather than on the decoded patch, which is the
+  only place the misspelling still exists; `add_shape_clip` is the pattern
+  beside it. A new composite op that carries a property group inherits the
+  same duty.
   `AgentServer.offMainTools` names the few handlers that run on the server
   thread instead of the main one — they wait on the main thread (an async
   probe's completion, NSDocument's save) or on a long decode, so hopping first
@@ -190,7 +340,12 @@ lockstep are in the root `CLAUDE.md`; the full design is
   `AgentServer.onMain`. The criterion is "waits for something the main
   thread must deliver", not "touches the disk": `detect_silence` reads a
   few hundred KB of peak files and does one arithmetic pass, and stays
-  ON-main for that reason, as `consolidate_media` and `import_captions` do.
+  ON-main for that reason, as `consolidate_media`, `import_captions` and
+  `export_captions` do. `transcribe` is the newest member and is the
+  criterion read the other way twice over: the Speech framework delivers
+  its callbacks on an `OperationQueue` that defaults to the app's MAIN
+  one, and a recognition is seconds to minutes of work that must not
+  freeze the UI.
 - `EditorViewController+Edge.swift` — the cutting moves (spec §6's `slip`,
   `roll`, `close_gap`, `insert_clip`, `overwrite_clip`) plus the `,` / `.`
   nudge and Select All on Track. `lift_range` is the odd one out: it is the
@@ -372,9 +527,14 @@ non-NSCoder class: `@available(*, unavailable) required init?(coder:)
 retained closures, never `unowned`. Main-thread AppKit. `async`/`await` is
 allowed **only inside `MediaImporter.swift`** (AVFoundation's loading API is
 async-only going forward) — and nothing else earns the exception by asking:
-speech recognition uses `SFSpeechRecognizer`'s callback API for exactly this
-reason (spec §11); `DispatchQueue` only at the documented seams
+speech recognition landed in phase 4 and did not, because
+`SFSpeechRecognizer`'s callback and delegate API is complete for a
+transcription, which is what `Transcriber.swift` uses (spec §11);
+`DispatchQueue` only at the documented seams
 (the compositor's render queue, the composition rebuild, import, the export
-progress timer). Colors/fonts/metrics come from `DS` tokens; shared controls
+progress timer, and — since phase 4 — `Transcriber`'s serial work queue with
+the `OperationQueue` the recogniser delivers its callbacks on, which is not
+optional: `SFSpeechRecognizer.queue` defaults to the app's MAIN queue).
+Colors/fonts/metrics come from `DS` tokens; shared controls
 go in `Controls.swift`. Refusals beep (`NSSound.beep()`), errors never
 crash. 4-space indent, ~100 columns.

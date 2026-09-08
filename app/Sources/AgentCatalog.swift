@@ -111,12 +111,25 @@ extension AgentServer {
             + "fade_out (ticks), duck (null or {level, attack, release}), mono, keep_pitch, "
             + "pan (-1 hard left … +1 hard right), compressor (null or {threshold_db, ratio, "
             + "attack, release, makeup_db} — the two times in ticks), noise_reduction (0–1)."
-        let textPatchDescription =
+        // `text.animation`'s clause, its own explicitly-typed local for the
+        // reason `obscureClause` is: the kind names are a non-literal operand
+        // and the text chain is long enough already.
+        let animationNames = TextAnimationKind.allCases.map { $0.rawValue }
+        let animationClause: String =
+            ", animation (null or {kind: \(animationNames.joined(separator: "|")), in, out} — "
+            + "how the words arrive and leave. in and out are DURATIONS in ticks measured from "
+            + "the clip's own first and last frame, not times; either may be 0 for no ramp at "
+            + "that end, and in + out longer than the clip simply shows a partial reveal. Like "
+            + "shadow and backdrop it is an OBJECT and is REPLACED whole rather than merged, so "
+            + "send every key you want: one you leave out arrives as its default, a 1 s "
+            + "typewriter with no un-reveal)"
+        let textPatchDescription: String =
             "Text properties to merge. Keys: content, font (a PostScript name), size (px), "
             + "color, align (left|center|right), valign (top|middle|bottom), line_spacing, "
             + "tracking, outline (null or {width, color}), backdrop (null or {color, padding, "
-            + "radius}), width (null for auto-sizing, or a wrap width in px). A colour is "
-            + "[r, g, b] or [r, g, b, a], each 0–1."
+            + "radius}), width (null for auto-sizing, or a wrap width in px)"
+            + animationClause
+            + ". A colour is [r, g, b] or [r, g, b, a], each 0–1."
         // Interpolated rather than concatenated: a `+` chain this long with
         // a non-literal operand in it is what tips the whole `catalog`
         // literal past the type checker's budget.
@@ -172,6 +185,16 @@ extension AgentServer {
             "items": ["type": "string", "enum": Self.attributeGroups] as [String: Any],
             "description": "Which property groups travel. Default: every group both clips "
                 + "have; an empty list is refused.",
+        ]
+        // `export_captions`' container list, read off the exporter's own enum
+        // rather than restated, and hoisted for the budget reason above.
+        let captionFormatNames = CaptionExporter.Format.allCases.map { $0.rawValue }
+        let captionFormatProperty: [String: Any] = [
+            "type": "string", "enum": captionFormatNames,
+            "description": "srt (SubRip) or vtt (WebVTT). Default: the path's own extension "
+                + "when it is one of those, else srt. An explicit format WINS, and the path's "
+                + "extension is replaced rather than appended to — the result reports the file "
+                + "that was really written.",
         ]
 
         let catalog: [[String: Any]] = [
@@ -1137,6 +1160,100 @@ extension AgentServer {
                         "description": "Remove the clips using it too (default false).",
                     ],
                 ], required: ["media"]),
+
+            // MARK: Captions
+            //
+            // `import_captions` is up in Media with the other file readers;
+            // these two are the app-state tools of spec §7.9 that make and
+            // write captions rather than reading a file into the project.
+
+            tool(
+                "transcribe",
+                "Transcribes clips with ON-DEVICE speech recognition and lays the result out as "
+                    + "TEXT CLIPS, one per cue, on a new track of its own — File ▸ Generate "
+                    + "Captions…. They are ordinary text clips in the Caption preset, exactly "
+                    + "what import_captions makes, so they render in the preview, in "
+                    + "render_frame and in an export (burn-in) and can be retimed with "
+                    + "move_clip or restyled with set_text. Cues are at most two lines of 42 "
+                    + "characters and at most 6 s, with a frame between them. THE GRANT: macOS "
+                    + "gates speech recognition, and this tool never asks for it — the system "
+                    + "prompt needs the app to be frontmost and an agent-driven app never is, "
+                    + "so without the grant the call is refused with the authorization status "
+                    + "named and nothing is changed; somebody has to run File ▸ Generate "
+                    + "Captions… once from the app. Recognition also stops after about a "
+                    + "minute per clip: when it does, the result says so under truncated with "
+                    + "the time it stopped at, rather than ending quietly. The result carries "
+                    + "the cues themselves in TICKS whether or not they were placed, and "
+                    + "reports under skipped every clip you named that cannot be transcribed.",
+                [
+                    "clips": [
+                        "type": "array", "items": ["type": "integer"], "minItems": 1,
+                        "description": "Transcribe only these clips — the sheet's scope. Omit "
+                            + "for every clip in the project that has recorded sound. Only a "
+                            + "clip playing a movie or sound file can be transcribed, and not "
+                            + "one played in REVERSE, whose words would come out backwards; a "
+                            + "clip you name that cannot be is reported under skipped.",
+                    ],
+                    "language": [
+                        "type": "string",
+                        "description": "A language tag, e.g. en-US. Default: this Mac's own "
+                            + "language. The two ways a tag can be wrong are two different "
+                            + "problems with two different fixes, so they are refused "
+                            + "SEPARATELY and the message says which you have. A tag speech "
+                            + "recognition has never heard of is a misspelling: it is refused "
+                            + "with the tags it does know, and answered before the grant is "
+                            + "even read, so you get that answer on a machine nobody has "
+                            + "granted yet. A tag it knows that this Mac has no on-device "
+                            + "MODEL for is a download instead: that refusal names System "
+                            + "Settings ▸ Keyboard ▸ Dictation and lists the languages ready "
+                            + "here, and it comes after the grant, because an ungranted Mac "
+                            + "cannot be asked which models it has.",
+                    ],
+                    "place": [
+                        "type": "boolean",
+                        "description": "Place the cues as text clips (default true), as ONE "
+                            + "undo step. false returns the cues and changes nothing at all — "
+                            + "no edit, no undo step — which is the way to check a transcript "
+                            + "before committing to it.",
+                    ],
+                ]),
+            tool(
+                "export_captions",
+                "Writes one text track out as a subtitle file — File ▸ Export Captions…. Every "
+                    + "text clip on the track becomes one cue at the time it sits at, in the "
+                    + "order they play. THE TRACK IS NEVER GUESSED: the default is the single "
+                    + "track whose clips are ALL text clips, and with none or with more than "
+                    + "one the call is refused and the candidates listed by id and name — "
+                    + "writing the wrong track and reporting success is the failure this rule "
+                    + "prevents. WebVTT escapes &, < and > where SubRip does not, so on text "
+                    + "containing none of the three the two files differ only by the WEBVTT "
+                    + "header, the missing index lines and a . where SubRip writes a , in the "
+                    + "timestamps. A round trip back through import_captions returns every cue "
+                    + "to the TICK it was written from, at every ordinary frame rate: a "
+                    + "timestamp is rounded to the nearest millisecond, at most 300 ticks, and "
+                    + "half a frame is 10,000 ticks even at 30 fps, so the snap on the way "
+                    + "back in lands on the frame the cue left. What is not exact is the "
+                    + "FILE: import_captions snaps every cue to the frame grid, so a source "
+                    + "whose times are off that grid comes back written onto it — at 30 fps "
+                    + "00:00:04,120 returns as 00:00:04,133 — and byte identity with the file "
+                    + "you imported needs cue times already on the grid AND a frame that is a "
+                    + "whole number of milliseconds, which is 25 or 50 fps. Nothing is edited "
+                    + "and no undo step is registered.",
+                [
+                    "track": [
+                        "type": "integer",
+                        "description": "The track to write. Omit when the project has exactly "
+                            + "one all-text track; a track that is not one of the candidates "
+                            + "is refused by name, since a clip with no words would export as "
+                            + "a blank cue.",
+                    ],
+                    "path": [
+                        "type": "string",
+                        "description": "Where to write, e.g. ~/Movies/talk.srt. The folder "
+                            + "must exist.",
+                    ],
+                    "format": captionFormatProperty,
+                ], required: ["path"]),
 
             // MARK: Rendering and export
 

@@ -1311,8 +1311,8 @@ def schema_part(mcp):
         text = handle.read()
     root = json.loads(text)
     check(
-        root["version"] == 4,
-        f"the saved project.json is version 4 (got {root['version']})",
+        root["version"] == 5,
+        f"the saved project.json is version 5 (got {root['version']})",
     )
     check(
         all(list(c["video"].keys())[-1] == "obscure" for c in root["clips"] if c["video"]),
@@ -1342,7 +1342,7 @@ def schema_part(mcp):
     )
     v3 = Session(mcp, "obscure-v3", open_from=fixture)
     project = v3.project()
-    check(project["version"] == 4, "a version-3 file opens and reports version 4")
+    check(project["version"] == 5, "a version-3 file opens and reports version 5")
     check(
         all(c["video"]["obscure"] == [] for c in project["clips"] if c["video"]),
         "and every clip reads an EMPTY region list",
@@ -1382,13 +1382,14 @@ def main():
 
     print("catalog")
     names = mcp.tools()
-    # THE EXACT COUNT, which belongs to the newest phase's script by the
-    # convention phase2_proof.py states in its own comment: it is what tells a
-    # stale binary on the port from the build under test. Phase 2 found 65 and
-    # now keeps a floor; phase 3 adds ripple_delete_ranges, add_zoom_action and
-    # detect_silence. When phase 4 lands, the exact count moves to its script
-    # and this line becomes a floor.
-    check(len(names) == 68, f"the catalog is exactly phase 3's 68 tools (got {len(names)})")
+    # A floor, not the count, by the convention phase2_proof.py states in its
+    # own comment: the EXACT count belongs to the newest phase's script, since
+    # it is what tells a stale binary on the port from the build under test.
+    # Phase 3 found 68 — ripple_delete_ranges, add_zoom_action and
+    # detect_silence over phase 2's 65 — and held the exact count until phase 4
+    # added transcribe and export_captions and took it over, exactly as this
+    # line said it would.
+    check(len(names) >= 68, f"the catalog holds phase 3's 68 tools or more (got {len(names)})")
     for tool in ["ripple_delete_ranges", "add_zoom_action", "detect_silence"]:
         check(tool in names, f"{tool} is a tool")
 

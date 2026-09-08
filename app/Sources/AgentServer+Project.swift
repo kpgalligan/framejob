@@ -145,8 +145,15 @@ extension AgentServer {
     /// The extensions `destinationURL` will REPLACE: the containers this app
     /// writes, its own package, and the media extensions a caller is most
     /// likely to type out of habit. Everything else is part of the name.
+    ///
+    /// `srt` and `vtt` joined the list when `export_captions` landed, because
+    /// after it they satisfy the set's own description: they are containers
+    /// this app writes. Without them `export_captions {path: "talk.srt",
+    /// format: "vtt"}` would write `talk.srt.vtt`, which is exactly the
+    /// doubled name the paragraph above says the replacement exists to
+    /// prevent.
     private static let replaceableExtensions: Set<String> = [
-        "mov", "mp4", "m4v", "m4a", "mp3", "wav", "aif", "aiff", "caf", "reelcut",
+        "mov", "mp4", "m4v", "m4a", "mp3", "wav", "aif", "aiff", "caf", "reelcut", "srt", "vtt",
     ]
 
     static func destinationURL(_ path: String, extension ext: String) -> URL {

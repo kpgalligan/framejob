@@ -271,6 +271,17 @@ pub(crate) fn check_text(props: &TextProps) -> Result<(), String> {
     if let Some(width) = props.width {
         above("text.width", width, 0.0)?;
     }
+    if let Some(animation) = &props.animation {
+        // Both are durations, so 0 is legal — it means that end of the
+        // animation does not happen — and a negative one is a sign
+        // mistake, not a request to run the reveal backwards. `Ticks` is an
+        // `i64`, so "finite" is the type's job and only the sign is left
+        // for a check to make. The KIND needs none: serde refuses an
+        // unknown variant on the way in, which is what closing the enum
+        // bought (`model_props.rs`).
+        ticks_positive_or_zero("text.animation.in", animation.r#in)?;
+        ticks_positive_or_zero("text.animation.out", animation.out)?;
+    }
     Ok(())
 }
 

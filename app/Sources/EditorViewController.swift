@@ -823,6 +823,12 @@ final class EditorViewController: NSViewController {
     /// and a second declaration in this file would be a redeclaration, not a
     /// forward.
     @objc func removeSilences(_ sender: Any?) { removeSilencesCommand() }
+    /// File ▸ Generate Captions… — the body and its validator are at the foot
+    /// of TranscribeSheetController.swift, and File ▸ Export Captions…' are at
+    /// the foot of CaptionExporter.swift: the same rule as Import Captions'
+    /// and Remove Silences', a command living beside the feature it opens.
+    @objc func generateCaptions(_ sender: Any?) { generateCaptionsCommand() }
+    @objc func exportCaptions(_ sender: Any?) { exportCaptionsCommand() }
 }
 
 // MARK: - Timecode field
@@ -960,10 +966,22 @@ extension EditorViewController: NSUserInterfaceValidations {
             if let answer = validateTimelineAction(action) { return answer }
             if let answer = validateEdgeAction(action) { return answer }
             if let answer = validateIdentityAction(action, item: item) { return answer }
-            // The one arm whose file is not an `EditorViewController+…`:
-            // Remove Silences' body and validator live at the foot of
-            // SilenceSheetController.swift, beside the sheet.
+            // The arms whose files are not `EditorViewController+…`: Remove
+            // Silences' body and validator live at the foot of
+            // SilenceSheetController.swift, beside the sheet, and phase 4's
+            // two caption commands follow the same rule from the feet of
+            // TranscribeSheetController.swift and CaptionExporter.swift.
+            //
+            // Both caption arms are load-bearing, not decoration. Without
+            // them the two items fall through to `return true` and are
+            // enabled on a timeline where they can only beep — Generate
+            // Captions… on a project with no audible media clip, Export
+            // Captions… on one with no all-text track. Each arm asks the
+            // cheap snapshot question its command's own guard asks, so the
+            // menu and the command can never disagree.
             if let answer = validateSilenceAction(action) { return answer }
+            if let answer = validateTranscribeAction(action) { return answer }
+            if let answer = validateCaptionExportAction(action) { return answer }
         }
         return true
     }

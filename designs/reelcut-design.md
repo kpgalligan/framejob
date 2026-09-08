@@ -365,10 +365,20 @@ is enabled.
 - Outline (width, color); Backdrop (fill, opacity, padding, corner
   radius); Shadow (shared section).
 - Box: auto-size, or fixed width with wrapping.
+- Animation on position / opacity / scale is Actions, like every other
+  property. The built-in REVEALS are their own thing and are
+  `text.animation` (format version 5): an *Animation* section of three
+  controls — a kind popup (None, Typewriter, Word Fade, Line Rise), In and
+  Out — written through `set_text` as one whole object, since a patch of a
+  nested object is a replacement (§5.2). In and Out are DURATIONS measured
+  from the clip's own first and last frame, not times.
+  The section cannot show the reveal's PROGRESS, and deliberately does not
+  try: how far along a reveal is, is a fact about the frame under the
+  playhead rather than about the clip, and the core computes it per frame
+  into the recipe (§7.3) so the preview, `render_frame` and an export
+  cannot disagree about it.
 - Presets: Title, Subtitle, Lower third, Caption — set face, size,
   backdrop and position in one click.
-- Animation is Actions on position / opacity / scale. Built-in text
-  animations (typewriter, per-word fade) are M3.
 
 **Shape sections**
 
@@ -401,6 +411,34 @@ saying what it does.
   makes burn-in on export free: a caption is an ordinary text clip, so it
   retimes, restyles and renders like one. Malformed entries are reported
   with their line numbers rather than skipped in silence.
+- File ▸ Generate Captions… (road map 2's phase 4)
+  makes the same clips out of SPEECH, on this Mac: a sheet picks the
+  language and the scope (the selection, the in/out range, or everything
+  with sound), and the same card becomes its own progress bar while it
+  runs. It transcribes each clip's own source window, extracted to a
+  temporary audio file — never the media file as it sits, and never the
+  whole of a long recording for the sake of a short clip. macOS gates
+  speech recognition behind a grant, and this sheet is the one place the
+  app asks for it. Recognition stops after about a minute per clip, which
+  is the framework's own ceiling: when it does, the run SAYS where it
+  stopped rather than presenting a truncated transcript as the whole of
+  what was said. Cues are at most two lines of 42 characters, at most six
+  seconds, with at least a frame between them.
+- File ▸ Export Captions… writes one track of text clips back out as
+  SubRip (`.srt`) or WebVTT (`.vtt`) — the clips' own times and words, so
+  a caption retimed by dragging exports where it was dragged to. The track
+  is never guessed: a candidate is a track whose clips are ALL text, and
+  with none or with more than one the command names the candidates and
+  offers a popup instead of choosing. A cue written out and read back in
+  lands on the TICK it left, at every ordinary frame rate: `format_timecode`
+  rounds to the nearest millisecond, which is at most 300 ticks, and half a
+  frame is 10,000 ticks even at 30 fps, so the snap on the way back in can
+  only find the frame the cue came from. What is not exact is the FILE.
+  Import snaps every cue to the frame grid, so a source whose times are off
+  that grid comes back written onto it — at 30 fps `00:00:04,120` returns as
+  `00:00:04,133` — and byte identity with the file you imported needs cue
+  times already on the grid AND a frame that is a whole number of
+  milliseconds, which is 25 or 50 fps.
 
 **Document tab** — a summary group first (Resolution, Frame rate, Duration,
 Tracks, Background as read-outs on an 86 pt label column), then the editable
@@ -547,7 +585,7 @@ grid (`rc_time_snap_to_frame`, round-to-nearest); sources keep their own
 rate and AVFoundation picks the source frame. Frame rates are rationals
 `[num, den]` everywhere.
 
-### 5.2 Project — the JSON schema (format version 4)
+### 5.2 Project — the JSON schema (format version 5)
 
 The Rust value, serialized by serde. Small, no pixels. All times are
 ticks, all positions canvas pixels, colors `[r, g, b, a]` floats 0–1,
@@ -555,7 +593,7 @@ angles degrees, opacity/volume 0–1 (volume may exceed 1, up to 4).
 
 ```json
 {
-  "version": 4,
+  "version": 5,
   "canvas": { "width": 1920, "height": 1080, "fps": [30, 1],
               "background": [0, 0, 0, 1], "fit_new_clips": true,
               "timecode_frames": true },
@@ -673,7 +711,30 @@ angles degrees, opacity/volume 0–1 (volume may exceed 1, up to 4).
   "align": "center", "valign": "middle", "line_spacing": 1.0, "tracking": 0,
   "outline": null | { "width": 2, "color": [...] },
   "backdrop": null | { "color": [...], "padding": 12, "radius": 8 },
-  "width": null | 800 }`.
+  "width": null | 800,
+  "animation": null | { "kind": "typewriter", "in": 600000, "out": 0 } }`.
+- `text.animation` (format version 5): how the words ARRIVE and how they
+  LEAVE, or `null` — the common case — for text that is simply there for
+  the length of its clip. `kind` ∈ `typewriter`, `word_fade`, `line_rise`,
+  a closed vocabulary like `video.obscure`'s `kind` and refused on the way
+  in if it is anything else, because each one is a different drawing
+  routine and there is no neutral reveal to fall back to. `in` and `out`
+  are DURATIONS, not times: the reveal runs for `in` from the clip's own
+  first frame and the un-reveal for `out` back from its own last one,
+  either of them 0 for "that end does not happen". An animation that says
+  nothing is a one-second typewriter that does not un-reveal.
+  Both halves measure against the CLIP's own duration, never the visible
+  span of the instance drawing it, which is the rule clip time already
+  follows (§7.3) — a nest clip's edge cuts a nested caption off mid-reveal
+  rather than making it un-reveal early. `in + out` longer than the clip
+  does not refuse: the reveal is the smaller of the two ramps, so a short
+  clip shows a partial reveal — and keeps ONE phase for the whole of its
+  life, which §7.3 argues — and nothing has to be clamped to a length a
+  later trim could change. There is deliberately no curve field — the
+  shape of the motion is in the kind, and easing between two arbitrary
+  values is what actions are for (§5.4) — and no per-frame number: the
+  core computes that into the recipe (§7.3), so the model says what the
+  animation IS and nothing about where it has got to.
 - `shape`: `{ "kind": "arrow", "width": 320, "height": 120,
   "stroke": { "width": 6, "color": [...] }, "fill": null | [...],
   "arrow_start": false, "arrow_end": true, "radius": 0,
@@ -795,6 +856,14 @@ named object whose `shape` is a property of it — an action that moves that
 spotlight from a rect to an ellipse still interpolates its geometry, as it
 always did.
 
+The object rule is why `text.animation`'s discriminant is spelled `kind`
+(format version 5): an action from a typewriter to a line rise switches at
+the end, where an action between two typewriters of different lengths
+interpolates their `in` and `out`. That second one is legal and rarely what
+anybody wants — the two numbers are the animation's own timebase, so
+sliding them mid-reveal moves the ground under it — which is a caution, not
+a rule the ops enforce.
+
 An action's end patch is deliberately **lenient** — `set_action_end` merges
 whatever it is given, so a half-written animation stays editable — while
 `set_video` and its siblings are **strict** and name an out-of-range value.
@@ -885,6 +954,13 @@ and moved into place only on success, so a cancel can never leave a
 half-reversed file that later looks finished. Rendering it means creating a
 directory inside the package, so `ProjectDocument.packageContentsDidChangeOnDisk()`
 is called afterwards for the reason Consolidate calls it.
+
+**Transcription extracts are not a cache entry at all.** Generating
+captions (§4.3, §7.9) writes each clip's own source window to a temporary
+audio file and deletes it when the run ends: it goes to
+`NSTemporaryDirectory()`, never into the package. A reverse is kept because
+re-making it is minutes of work; an extract is seconds of work whose whole
+product is the words, which are already in the project as clips.
 
 `fileWrapper(ofType:)` is a whitelist of `project.json`, `cache/` and
 `media/`: a directory not named there is DELETED by the next save.
@@ -1137,7 +1213,8 @@ Asked once per frame by the compositor, and by the overlay for hit-testing.
       "clip_rect": null,
       "transition": null },
     { "clip": 23,
-      "source": { "kind": "text", "hash": "9f3c…", "text": { …resolved text props… } },
+      "source": { "kind": "text", "hash": "9f3c…", "text": { …resolved text props… },
+                  "reveal": 0.4, "reveal_phase": "in", "reveal_kind": "typewriter" },
       "source_size": null,
       "x": -560, "y": -380, "scale": 1.0, "rotation": 0, "opacity": 0.72, … },
     { "clip": 31, "source": { "kind": "track", "track_id": 2 }, …,
@@ -1151,6 +1228,46 @@ Asked once per frame by the compositor, and by the overlay for hit-testing.
   `image` (`media` id — Swift decodes with ImageIO and caches the
   texture), `text` / `shape` (the resolved description plus a stable
   content hash Swift caches textures by), `missing` (draw a slate).
+- A text layer's source object carries THREE more keys (format version 5),
+  and all three are present on every text layer whether it animates or not,
+  because an absent key would mean two things — no animation here, or an
+  older core that never computed one. `reveal` is 0 (nothing showing)
+  through 1 (all of it), and is 1.0 with no animation; `reveal_phase` is
+  `"in"` while the arrival is what holds the reveal back, `"out"` once the
+  departure is — with the one exception the next bullet is about — and
+  `null` with no animation; `reveal_kind` is
+  `text.animation`'s own `kind`, spelled as the schema spells it, or
+  `null`. Together they are the WHOLE of what a renderer is told about the
+  animation — which routine, how far, and which way — and the recipe
+  STRIPS `animation` out of the `text` description beside them so there
+  cannot be a second answer: nothing downstream has the clip time to
+  evaluate one against. **The CORE computes them**, from the animation and
+  the clip's own time, which is what makes the preview, `render_frame` and
+  both export writers agree by construction: they read one recipe. The
+  layer's `hash` covers all three, so a half-revealed frame can never be
+  served the whole text's cached texture — and a layer with NO animation
+  hashes exactly what it hashed before version 5, so no shipped project's
+  texture cache behaves differently.
+- **`reveal_phase` is the ORDER the renderer draws in, not a label on the
+  amount**, and where those two readings part the order wins. `word_fade`
+  and `line_rise` stagger their words and lines from the OTHER end while a
+  layer is leaving, so that the first word in is the first word out; the
+  frame on which the phase turns is therefore a frame on which the picture
+  mirrors end for end, and the one amount at which that mirror is invisible
+  is 1, where every item is whole whichever end the count started from. An
+  animation that FITS its clip (`in + out <= duration`) reaches 1: its two
+  ramps have a plateau between them and the phase turns on it, a tie going
+  to the arrival, so the mirroring never shows. A TENT — `in + out >
+  duration`, which §5.2 lets degrade rather than refuse — has no plateau:
+  its ramps cross BELOW 1, and turning there would swap a four-word cue's
+  alphas from `[1, 1, .83, .33]` to `[.33, .83, 1, 1]` between two
+  consecutive frames whose reveal did not change. So a tent keeps the phase
+  it began in for the whole of its life. That is the arrival's, unless `in`
+  is 0, which makes the clip nothing but a departure and leaves the stagger
+  no arrival order to contradict. The limit that falls out of it is worth
+  knowing before it is read as a bug: a tent whose `in` is tiny but not
+  zero reports `"in"` from its first frame to its last, while the departure
+  is what is actually holding the amount down.
 - `source_size` is the media pixel size, or `null` for text (the renderer
   knows) and the box size for shapes.
 - `filters`, `reflection` and `spotlight` (M3) and `obscure` (format
@@ -1196,7 +1313,8 @@ Asked once per frame by the compositor, and by the overlay for hit-testing.
 | `Playback.swift` | `AVPlayer` + `AVPlayerItem` over the plan; the rebuild-vs-refresh decision (§7.6); coalesced exact seeks; JKL rates; loop range; `preferredMaximumResolution` = canvas size |
 | `CompositionBuilder.swift` | plan JSON → `AVMutableComposition` + `AVMutableAudioMix` + `AVMutableVideoComposition` (+ `CompositionInstruction`) |
 | `Compositor.swift` | the `AVVideoCompositing` class and its Metal pipeline (§7.5) |
-| `LayerRenderers.swift` | text (Core Text) and shape (Core Graphics) descriptions → premultiplied BGRA `MTLTexture`s, LRU-cached by hash; reports measured text sizes to the overlay |
+| `LayerRenderers.swift` | text (Core Text) and shape (Core Graphics) descriptions → premultiplied BGRA `MTLTexture`s, LRU-cached by hash; reports measured text sizes to the overlay; draws the recipe's `reveal` for the three §5.2 text animations, over a layout cache so a reveal can never reflow the box |
+| `CaptionImporter.swift` · `CaptionLayout.swift` · `Transcriber.swift` · `CaptionExporter.swift` | captions in both directions: the SubRip grammar; the placement every producer shares (the frame grid, the overlap trim, the Caption preset, the new front-most track); on-device speech recognition and the cue builder over it; and the `.srt` / `.vtt` writer |
 | `MediaImporter.swift` | `AVURLAsset` probing (the **one** place `async`/`await` is allowed — AVFoundation's loading API is async-only going forward), thumbnails via `AVAssetImageGenerator`, peaks via `AVAssetReader` + vDSP, cache files in the package |
 | `Exporter.swift` | picks the pipeline for the core's settings — `ExportWriter` (`AVAssetReader`/`AVAssetWriter`: chapters, explicit bitrates) or the ImageIO frame sequence for GIF/APNG — reports progress, and renders one frame offline for `render_frame` |
 | `TimelineView.swift` | custom `NSView` in an `NSScrollView`; drawing from the snapshot; gesture sessions (`ClipDragSession`, `TrimSession`, `RangeSession`, `MarkerDragSession`) as structs; `on*` closures to the VC |
@@ -1385,6 +1503,23 @@ voiceover under it — and a NEST, whose sound counts toward the test but
 which no candidate may intersect, because `Source::Nest` has no in point
 and splitting a nest clip strands its tail (§4.4's round trip is how the
 dead air inside one is reached),
+`transcribe {clips?, language?, place?}` and
+`export_captions {track?, path, format?}` (road map 2's phase 4 — the
+mirrors of File ▸ Generate Captions… and File ▸ Export Captions…).
+`transcribe` returns the cues in TICKS whether or not it placed them —
+`place: false` is a read, like `detect_silence`, and registers no undo
+step — and reports every named clip it could not read under `skipped`.
+Two refusals are unlike anything else in the catalog. macOS gates speech
+recognition, and this tool never asks: it REFUSES with the authorization
+status named, because the system prompt needs a frontmost app and an
+agent-driven one never is (`target`'s own fact, read across), so the grant
+has to have been given once from the sheet. And its work can stop short of
+the answer rather than fail: a run cut off by the framework's one-minute
+ceiling reports `truncated` with the second it stopped at, instead of
+presenting a partial transcript as the whole of what was said. `export_captions` never guesses its track: with no all-text track,
+or more than one, it refuses and lists the candidates by id and name — the
+posture `remove_media` and `export` already take when an answer is not
+unique — and it edits nothing, so it registers no undo step either.
 `render_frame {t, max_width?}` → PNG (the verification hook: the
 compositor renders offline through an `AVAssetImageGenerator` over the
 same composition + video composition), and
@@ -1407,7 +1542,7 @@ concern is a new module with its own `impl Project` block.
 |---|---|
 | `lib.rs` | declarations and re-exports only |
 | `model.rs` | the §5.2 types and serde derives, and the serde defaults that say what an absent key means — the schema's SHAPE, and nothing else |
-| `model_props.rs` | the §5.2 per-clip property types — `VideoProps`, `Crop`, `Shadow`, `ColorAdjust`, `Chroma`, `Filter`, `Reflection`, `AudioProps`, `Compressor`, `Duck`, `TextProps`, `Outline`, `Backdrop`, `ShapeProps`, `Stroke` and their enums, with their defaults: the schema's VOCABULARY where `model.rs` is its shape. Cut out under the size rule (road map 2, phase 2) and re-exported whole by `model.rs`, so every `crate::model::X` path still resolves |
+| `model_props.rs` | the §5.2 per-clip property types — `VideoProps`, `Crop`, `Shadow`, `ColorAdjust`, `Chroma`, `Filter`, `Reflection`, `AudioProps`, `Compressor`, `Duck`, `TextProps`, `Outline`, `Backdrop`, `TextAnimation`, `ShapeProps`, `Stroke` and their enums, with their defaults: the schema's VOCABULARY where `model.rs` is its shape. Cut out under the size rule (road map 2, phase 2) and re-exported whole by `model.rs`, so every `crate::model::X` path still resolves |
 | `model_regions.rs` | the boxes drawn ON the picture — `Spotlight`, `ObscureRegion`, the `SpotShape` both are drawn with and the `MAX_OBSCURE` budget on the second. One concern, not three adjacent ones: they share one coordinate frame (`x`/`y` the region's CENTRE, an offset in SOURCE pixels from the centre of the layer's CROPPED rect; `width`/`height` its size in the same pixels — which is what carries a region with its layer through scale, move and rotation) and one shape enum. Cut out of `model_props.rs` under the size rule (road map 2, phase 3c) and re-exported whole by it, so every `crate::model::X` path still resolves; the FIELDS holding them (`VideoProps.spotlight`, `VideoProps.obscure`) stay with the video group |
 | `model_query.rs` | reading a project: `Project::new`, id allocation, the `clip` / `track` / `media` / `marker` / `nest` lookups, `clips_on`, `duration`, `validate` with its nesting walk, and the three source-window measurements (`content_length`, `source_head`, `source_length`) every placement op clamps against |
 | `time.rs` | `Ticks`, `TIMESCALE`, `Fps`, frame snapping, timecode format/parse (non-drop `HH:MM:SS:FF` and `HH:MM:SS.mmm`) |
@@ -1420,7 +1555,7 @@ concern is a new module with its own `impl Project` block.
 | `actions.rs` | evaluation and interpolation, `clip_state(clip, t)`, and `clamp_video`, the last line of defence §5.4 describes. §5.4's LIST rule is stated here once and applies to every array of objects in the schema (`video.filters`, `video.obscure`), neither of which carries a line of its own code; the widened discriminant set is confined to list ENTRIES, so `video.spotlight`'s animation is what it has always been |
 | `transition.rs` | overlap detection, the overlap rule, progress at *t* |
 | `evaluate.rs` | `composition_plan()` (A/B assignment, instruction tiling) and the `assign()` the recipe shares with it |
-| `recipe.rs` | `frame_recipe(t)`: the layer list at one instant — like every walk over what plays, it consumes `nest.rs`'s instances |
+| `recipe.rs` | `frame_recipe(t)`: the layer list at one instant — like every walk over what plays, it consumes `nest.rs`'s instances. Also where a `text.animation` becomes a NUMBER: the `reveal`, its phase and its kind (§7.3), computed here so everything that draws reads one description, and folded into the layer's content hash so a per-frame picture cannot be served a stale texture |
 | `nest.rs` | flattening a nest: the walk that turns a nest clip into the clips it stands for, and the transform they inherit |
 | `audio.rs` | envelopes: fades, volume actions, ducking, mute and solo — solo judged per container (the timeline, or a nest's own tracks) in `Voice::of` against that container's track set, never in the plan |
 | `snap.rs` | candidates and `resolve` |
@@ -1557,7 +1692,11 @@ a key, nothing more.
 | ⌘↓ / ⌘↑ | Open / close nest | 9 |
 
 Menus: File (New Project, Open…, Open Recent, Close, Save, Save As…,
-Add Media…, Import Captions… (M3), Consolidate Media… (M3), Export…),
+Add Media…, Import Captions… (M3), Generate Captions… and Export
+Captions… (road map 2's phase 4 — the three caption items sit
+together, in the order a caption track comes into being and leaves again,
+and none of them takes a key equivalent), Consolidate Media… (M3),
+Export…),
 Edit (Undo, Redo, Cut, Copy, Paste, Paste Attributes, Duplicate, Delete,
 Ripple Delete, Insert at Playhead, Overwrite at Playhead, Select All,
 Select After Playhead, Select All on Track), Clip (Split, Trim Start, Trim
@@ -1690,12 +1829,27 @@ assisted import.
 - **No left panel.** Media is an inspector tab. Revisit if libraries grow
   past a few dozen files.
 - **`async`/`await` is allowed only in `MediaImporter`.** Everything else
-  keeps Rasterize's synchronous AppKit discipline. Speech recognition, when
-  it lands, does NOT earn a second exception: `SFSpeechRecognizer`'s
+  keeps Rasterize's synchronous AppKit discipline. Speech recognition did
+  NOT earn a second exception when it landed: `SFSpeechRecognizer`'s
   callback API is complete for what a transcription needs (a result handler
-  per hypothesis and a final one), so `Transcriber.swift` uses it and the
-  rule stands. `SpeechAnalyzer`, the macOS 26 replacement, is `async`-only
-  and would earn the argument again — but only when the deployment target
-  moves, and then as one more named file, never as a general licence.
+  per hypothesis and a final one, plus a delegate method per second of
+  audio processed for the progress bar), so `Transcriber.swift` uses it and
+  the rule stands. `SpeechAnalyzer`, the macOS 26 replacement, is
+  `async`-only and would earn the argument again — but only when the
+  deployment target moves, and then as one more named file, never as a
+  general licence.
+- **Transcription reads EXTRACTED audio, not the media file.** Each clip's
+  own source window is written to a temporary mono 16 kHz WAV and the
+  recogniser is handed that. Whether `SFSpeechURLRecognitionRequest` can
+  read an arbitrary `.mov` is a question nothing in the framework's
+  documentation answers and nothing here can measure — the grant needed to
+  try it cannot be obtained by an app that is never frontmost — and a
+  design that works on the `say -o` fixtures and fails on every real clip
+  is the worst failure shape available. It pays twice besides: the work is
+  bounded to what the timeline uses (a 20 s clip of a 30-minute recording
+  is 20 seconds of recognition), and the time mapping loses its `in` term
+  entirely. The framework's roughly one-minute ceiling per task is
+  REPORTED, not chunked around; chunking at the silences `detect_silence`
+  already finds is the recorded follow-up.
 - **Media is referenced, not copied**, by path + bookmark (not
   security-scoped; the app is not sandboxed). Consolidate is M3.

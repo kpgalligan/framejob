@@ -320,6 +320,34 @@ enum TransitionKind: String, Codable, CaseIterable {
     }
 }
 
+/// The three text reveals of spec §4.3 (format version 5), closed at three.
+///
+/// `model_props.rs` argues the closure: each kind is a distinct drawing
+/// routine in `LayerRenderers.renderText` — a prefix of the glyphs, a
+/// per-word alpha ramp, a per-line offset and alpha — not a parameter of a
+/// shared one, so there is no neutral kind to fall back to the way a
+/// filter's `amount` falls back to 0. The core refuses an unknown one at the
+/// serde boundary; HERE the lenient decode answers nil instead, which reads
+/// as "no animation" and draws the whole text — the failure direction that
+/// shows the words rather than hiding them.
+///
+/// The key decoding strategy converts KEYS and never VALUES, so the two
+/// multi-word cases carry their snake_case spelling by hand, as `Curve` and
+/// `TransitionKind` do.
+enum TextAnimationKind: String, Codable, CaseIterable {
+    case typewriter
+    case wordFade = "word_fade"
+    case lineRise = "line_rise"
+
+    var displayName: String {
+        switch self {
+        case .typewriter: return "Typewriter"
+        case .wordFade: return "Word Fade"
+        case .lineRise: return "Line Rise"
+        }
+    }
+}
+
 // MARK: - Canvas
 
 /// The document's fixed canvas (spec §5.2 `canvas`).
@@ -984,6 +1012,62 @@ struct BackdropProps: Codable, Equatable {
     }
 }
 
+/// How a text layer arrives and how it leaves (format version 5).
+///
+/// Three keys and no fourth: `in` and `out` are DURATIONS, not times — the
+/// reveal runs for `in` from the clip's own first frame and the un-reveal for
+/// `out` back from its own last one, either of them 0 for "that end does not
+/// happen". `model_props.rs` argues the missing curve field: the shape of the
+/// motion is already in the kind, and easing between two arbitrary values is
+/// what the action system is for.
+///
+/// Nothing in the app derives the reveal from THIS. The core turns it into
+/// one number per frame and the recipe carries that number
+/// (`RecipeReveal`); this type is what the inspector reads and writes, and
+/// the recipe deliberately strips it out of the description it hands the
+/// renderer so there can only ever be one answer to "how far along is it".
+///
+/// `in` is a Swift keyword, so the two durations are spelled out here and the
+/// model's own key names live in `CodingKeys` — `ClipSource`'s arrangement,
+/// for its reason. The key spelling is the contract with
+/// `core/src/model_props.rs`'s `#[serde(rename = "in")]`; the property name
+/// is this side's business alone.
+struct TextAnimation: Codable, Equatable {
+    let kind: TextAnimationKind
+    /// How long the reveal takes, from the clip's first frame (the model's
+    /// `in`).
+    let inDuration: Ticks
+    /// How long the un-reveal takes, back from the clip's last frame (the
+    /// model's `out`).
+    let outDuration: Ticks
+
+    /// The core's own default (`TextAnimation::default`): a one-second
+    /// typewriter that does not un-reveal. Mirrored rather than derived, so
+    /// switching the inspector's popup on writes exactly what the core would
+    /// have defaulted to had the key simply appeared.
+    init(
+        kind: TextAnimationKind = .typewriter, inDuration: Ticks = Ticks(ReelTime.perSecond),
+        outDuration: Ticks = 0
+    ) {
+        self.kind = kind
+        self.inDuration = inDuration
+        self.outDuration = outDuration
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case kind
+        case inDuration = "in"
+        case outDuration = "out"
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        kind = c.lenient(.kind, TextAnimationKind.typewriter)
+        inDuration = c.lenient(.inDuration, Ticks(ReelTime.perSecond))
+        outDuration = c.lenient(.outDuration, 0)
+    }
+}
+
 /// A text clip's description. The model NEVER stores the measured layout
 /// size — only `LayerRenderers` knows it, and it reports it to the canvas
 /// overlay through a hash-keyed cache (§5.3, §11).
@@ -1003,12 +1087,18 @@ struct TextProps: Codable, Equatable {
     let backdrop: BackdropProps?
     /// Fixed box width in canvas pixels; nil auto-sizes to the content.
     let width: Double?
+    /// How the words arrive and leave, or nil for text that is simply there
+    /// for the length of its clip (format version 5). LAST, as it is in the
+    /// model, and absent from `LayerRenderers.layoutKey` on purpose: an
+    /// animation cannot move a glyph, and a per-frame value in that key
+    /// would churn the measured-size cache and walk the overlay's handles.
+    let animation: TextAnimation?
 
     init(
         content: String = "", font: String = "SourceSans3-SemiBold", size: Double = 72,
         color: RGBA = [1, 1, 1, 1], align: String = "center", valign: String = "middle",
         lineSpacing: Double = 1, tracking: Double = 0, outline: OutlineProps? = nil,
-        backdrop: BackdropProps? = nil, width: Double? = nil
+        backdrop: BackdropProps? = nil, width: Double? = nil, animation: TextAnimation? = nil
     ) {
         self.content = content
         self.font = font
@@ -1021,6 +1111,7 @@ struct TextProps: Codable, Equatable {
         self.outline = outline
         self.backdrop = backdrop
         self.width = width
+        self.animation = animation
     }
 
     init(from decoder: Decoder) throws {
@@ -1036,6 +1127,7 @@ struct TextProps: Codable, Equatable {
         outline = c.lenient(.outline)
         backdrop = c.lenient(.backdrop)
         width = c.lenient(.width)
+        animation = c.lenient(.animation)
     }
 }
 
@@ -1554,7 +1646,7 @@ struct ProjectSnapshot: Codable, Equatable {
     /// `RC_FORMAT_VERSION` — the version the core always writes, mirrored
     /// here so a decode that never saw the key still reports the truth. The
     /// C header is the contract; this is a fallback, not a second source.
-    static let formatVersion = 4
+    static let formatVersion = 5
 
     /// The value a failed decode falls back to, so `ReelProject.snapshot`
     /// can stay non-optional and no view needs an "unloaded" state.
@@ -1723,6 +1815,49 @@ struct RecipeCanvas: Codable, Equatable {
     var size: CGSize { CGSize(width: width, height: height) }
 }
 
+/// A text layer's computed reveal (§7.3): how much of the text is showing at
+/// this instant, which way it is going, and which of the three animations is
+/// showing it.
+///
+/// The CORE computes all three, from `text.animation` and the clip's own
+/// time, which is what makes a `render_frame` and an export of the same frame
+/// agree by construction — they read one recipe. The layer's `hash` covers
+/// them, so the texture cache key IS the picture, and the recipe strips
+/// `animation` out of the description it carries: this is the renderer's only
+/// account of the animation, and there is deliberately no second one.
+///
+/// Not `Codable`: the three keys are SIBLINGS of `hash` and `text` inside the
+/// tagged source object rather than a nested object, so `RecipeSourceRef`
+/// reads them off its own container. Grouping them here is for the renderer's
+/// sake, not the wire's.
+struct RecipeReveal: Equatable {
+    /// 0 (nothing showing) through 1 (all of it), the un-reveal folded in.
+    let amount: Double
+    /// "in" while the arrival is holding the amount back, "out" once the
+    /// departure is, nil with no animation. `RecipeTransition.role`'s shape,
+    /// for its reason: one number cannot say which way it is going.
+    let phase: String?
+    /// Which drawing routine, or nil for a layer with no animation — which
+    /// is also what an unreadable or unknown kind decodes to, so a newer
+    /// core's fourth reveal draws the whole text rather than the wrong
+    /// animation.
+    let kind: TextAnimationKind?
+
+    init(amount: Double = 1, phase: String? = nil, kind: TextAnimationKind? = nil) {
+        self.amount = amount
+        self.phase = phase
+        self.kind = kind
+    }
+
+    /// A layer with no animation: all of it, all of the time. The core's
+    /// `Reveal::WHOLE`, and the fallback for a recipe this build cannot read
+    /// — the failure direction that shows the words.
+    static let whole = RecipeReveal()
+
+    /// Whether the departure is what is holding the amount back.
+    var isLeaving: Bool { phase == "out" }
+}
+
 /// Where a recipe layer's pixels come from. Internally tagged by `kind`.
 enum RecipeSourceRef: Codable, Equatable {
     /// A composition video track, named by the same id `CompositionBuilder`
@@ -1730,17 +1865,22 @@ enum RecipeSourceRef: Codable, Equatable {
     case track(Int)
     /// A still image file; Swift decodes with ImageIO and caches the texture.
     case image(UInt32)
-    /// Resolved text plus a stable content hash to cache the texture by.
-    case text(hash: String, props: TextProps)
+    /// Resolved text, its computed reveal, and a stable content hash to cache
+    /// the texture by — one hash over BOTH, so a half-revealed frame can
+    /// never collide with the whole text's texture.
+    case text(hash: String, props: TextProps, reveal: RecipeReveal)
     case shape(hash: String, props: ShapeProps)
     /// The media could not be resolved — draw a slate.
     case missing
 
     private enum CodingKeys: String, CodingKey {
-        case kind, media, hash, text, shape
+        case kind, media, hash, text, shape, reveal
         // `track_id` converts to `trackId`, not `trackID`; spell it the way
-        // the converter does or this key silently never matches.
+        // the converter does or this key silently never matches. The same
+        // goes for the two reveal keys: the core writes `reveal_phase` and
+        // `reveal_kind`, which the converter hands over camel-cased.
         case trackID = "trackId"
+        case revealPhase, revealKind
     }
 
     init(from decoder: Decoder) throws {
@@ -1752,7 +1892,14 @@ enum RecipeSourceRef: Codable, Equatable {
         case "image":
             self = .image(c.lenient(.media, 0))
         case "text":
-            self = .text(hash: c.lenient(.hash, ""), props: c.lenient(.text, TextProps()))
+            // The amount falls back to 1 and the kind to nil, so a recipe
+            // this build cannot read draws the whole text rather than none
+            // of it.
+            self = .text(
+                hash: c.lenient(.hash, ""), props: c.lenient(.text, TextProps()),
+                reveal: RecipeReveal(
+                    amount: c.lenient(.reveal, 1), phase: c.lenient(.revealPhase),
+                    kind: c.lenient(.revealKind)))
         case "shape":
             self = .shape(hash: c.lenient(.hash, ""), props: c.lenient(.shape, ShapeProps()))
         default:
@@ -1769,10 +1916,13 @@ enum RecipeSourceRef: Codable, Equatable {
         case .image(let id):
             try c.encode("image", forKey: .kind)
             try c.encode(id, forKey: .media)
-        case .text(let hash, let props):
+        case .text(let hash, let props, let reveal):
             try c.encode("text", forKey: .kind)
             try c.encode(hash, forKey: .hash)
             try c.encode(props, forKey: .text)
+            try c.encode(reveal.amount, forKey: .reveal)
+            try c.encode(reveal.phase, forKey: .revealPhase)
+            try c.encode(reveal.kind, forKey: .revealKind)
         case .shape(let hash, let props):
             try c.encode("shape", forKey: .kind)
             try c.encode(hash, forKey: .hash)
@@ -1783,10 +1933,12 @@ enum RecipeSourceRef: Codable, Equatable {
     }
 
     /// The texture-cache key for the kinds `LayerRenderers` rasterizes;
-    /// nil for track sources, which come from the decoder.
+    /// nil for track sources, which come from the decoder. For text the core
+    /// has already folded the reveal into this string, so it stays the WHOLE
+    /// key — nothing here may append anything of its own to it.
     var cacheHash: String? {
         switch self {
-        case .text(let hash, _), .shape(let hash, _): return hash
+        case .text(let hash, _, _), .shape(let hash, _): return hash
         case .track, .image, .missing: return nil
         }
     }

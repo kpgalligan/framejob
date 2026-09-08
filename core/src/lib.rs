@@ -56,8 +56,8 @@ pub use crate::model::{
     Action, AudioProps, Backdrop, Canvas, Chroma, Clip, Color, ColorAdjust, Compressor, Crop,
     Curve, Duck, Enabled, Filter, FilterKind, Marker, Media, MediaKind, Nest, ObscureKind,
     ObscureRegion, Outline, Project, Reflection, Shadow, ShapeKind, ShapeProps, Source, SpotShape,
-    Spotlight, Stroke, TextAlign, TextProps, TextVAlign, Track, Transition, TransitionKind,
-    VideoProps, MAX_FILTERS, MAX_OBSCURE,
+    Spotlight, Stroke, TextAlign, TextAnimation, TextAnimationKind, TextProps, TextVAlign, Track,
+    Transition, TransitionKind, VideoProps, MAX_FILTERS, MAX_OBSCURE,
 };
 pub use crate::time::{Fps, Ticks, TIMESCALE};
 pub use crate::transition::Overlap;

@@ -28,7 +28,7 @@ Four things in `designs/`, and you want all of them:
 
 ```sh
 make app        # cargo build --release + xcodegen + xcodebuild → build/Build/Products/Release/Reelcut.app
-make test       # cd core && cargo test --release  (338 black-box tests)
+make test       # cd core && cargo test --release  (358 black-box tests)
 make lint       # cargo clippy --all-targets -- -D warnings
 make typecheck  # swiftc -typecheck of app/Sources/*.swift — the ONLY authoritative Swift check
 make project    # xcodegen generate (Reelcut.xcodeproj is generated; project.yml is the source of truth)
@@ -109,11 +109,12 @@ make app
 
 The log line names the port it actually bound (a taken port falls back to an
 ephemeral one). Then drive it with any MCP client over streamable HTTP at
-`http://127.0.0.1:<port>/mcp` — 68 tools: one per §6 op (53) plus
-`open_project`, `new_project`, `save_project`, `get_project`,
-`import_media`, `import_captions`,
-`consolidate_media`, `detect_silence`, `set_playhead`, `set_range`,
-`set_selection`, `undo`, `redo`, `render_frame` and `export`.
+`http://127.0.0.1:<port>/mcp` — 70 tools: one per §6 op (53) plus the
+seventeen app-state tools: `open_project`, `new_project`, `save_project`,
+`get_project`, `import_media`, `import_captions`, `export_captions`,
+`transcribe`, `consolidate_media`, `detect_silence`, `set_playhead`,
+`set_range`, `set_selection`, `undo`, `redo`, `render_frame` and
+`export`.
 `render_frame` writes a PNG and returns its path, so a script can diff it
 against `ffmpeg`-extracted source frames; `export` waits for the file.
 
@@ -145,9 +146,28 @@ it is in the tree: **`tools/proof/harness/`** compiles every file in
 `app/Sources` except `main.swift` with a `main.swift` of its own, links
 `core/target/release/libreelcut_core.a`, opens a `.reelcut` package through
 `ProjectDocument.read(from:ofType:)`, puts an `EditorViewController` in an
-`NSWindow`, spins the runloop a few turns and `cacheDisplay(in:to:)`s the
+`NSWindow`, and `cacheDisplay(in:to:)`s the
 content view into a PNG — the same paint path the window uses, no TCC grant,
 either appearance on demand, and how the redesign was checked.
+
+It captures on SETTLE, not after a fixed number of runloop turns: capture,
+spin, capture again, and write only when two consecutive captures are
+byte-identical (40 turns, then a warning and the last capture). A spin count
+is a guess about how long the last relayout takes, and asking the layout is
+better than guessing whatever else is true.
+
+**That is not what makes a render reproducible, and the distinction cost
+phase 4 a gate.** The settle was landed as the cure for a bistable
+inspector — the Actions pane sometimes at its intrinsic height and sometimes
+stretched, a render deterministic within a process and different across
+processes — and it cured nothing, because a settle can only wait out a
+layout that is still MOVING and both of those had already stopped. The
+cause was an ambiguous constraint (`InspectorPane.swift`: a bottom pin at
+`.defaultLow` tying with a section's own default hugging of 250, so the
+solver could stretch a section or move the pane's bottom for the same
+price), and it is fixed there, at 249. **Identical, stable, DIFFERENT
+output across processes is an ambiguity to find, not a race to out-wait** —
+reach for Auto Layout priorities, not for more turns.
 
 ```sh
 tools/proof/harness/build.sh     # ~30 s into tools/proof/work/harness/, skipped when fresh
@@ -155,6 +175,7 @@ tools/proof/harness/build.sh     # ~30 s into tools/proof/work/harness/, skipped
 tools/proof/work/harness/harness <project.reelcut|welcome> <out.png> <light|dark> \
     [w] [h] [selectIndex] [playheadSec] [sizeIndex 0-2] [clip|media|document] \
     [candidateSpans] [expandSections]
+tools/proof/work/harness/harness cues <words.json> <out.json>
 ```
 
 The PNG is at the main display's backing scale (2880×1724 for the default
@@ -171,9 +192,25 @@ did. The harness also pins every
 state, track height, snapping, guides and the Document tab's checkbox) plus
 `AppleShowScrollBars = Always` in the argument domain, so two renders of one
 package are byte-identical on one machine, mouse or no mouse.
-`tools/proof/phase2_chrome.py` and `phase3_chrome.py` are the proofs built on
-it: a pixel diff of two renders, measured against rectangles from the layout
-constants.
+`tools/proof/phase2_chrome.py`, `phase3_chrome.py` and `phase4_chrome.py`
+are the proofs built on it: a pixel diff of two renders, measured against
+rectangles from the layout constants. `expandSections` is what lets one
+photograph a section built `defaultExpanded: false` — phase 4's Animation
+section is the second to need it — and the fact that it was already there
+is worth saying, because a proof that quietly grows its own instrument is
+not a proof.
+
+**The second form photographs nothing**, and it is here for the reason to
+remember when the next piece of app arithmetic has no caller a script can
+reach. `CaptionCues` — the four rules that turn recognised words into cues
+(phase 4a) — is Swift, and in the app nothing reaches it until a recogniser
+has produced words, which needs a grant. The harness is the ONE binary in
+the tree that links `app/Sources` from outside the app, so it grew a mode
+that runs the builder over a word list from a file and writes the cues as
+JSON, and `phase4_chrome.py`'s section 8 asserts the four rules over its
+answer at their boundaries. The mode was ADDED beside the render arguments
+rather than folded into them, so every earlier chrome script's argument
+positions still hold.
 
 ## Milestone status
 
@@ -216,7 +253,7 @@ constants.
   600 frames rather than truncate. The export sheet's Quality row and the
   `export` tool's `video_bitrate` / `audio_bitrate` write the core's two
   override keys in bits per second.
-  **The schema is version 4** (`RC_FORMAT_VERSION` in `core/src/format.rs`
+  **The schema is version 5** (`RC_FORMAT_VERSION` in `core/src/format.rs`
   and the header). Version 2 was M3's: filters, reflection, spotlight,
   `Source::Media.reversed`, audio pan / compressor / noise reduction, and
   `Project.nests` all persist, and a version-1 file still opens — including
@@ -225,7 +262,8 @@ constants.
   empty `Nest`. Version 3 is road map 2's phase 2 — a clip's `name` and
   `label`, a track's `solo` — and has no migrate step, since all three
   default (`format.rs` says why it bumps anyway); version 4 is phase 3's
-  `video.obscure`, on the same terms.
+  `video.obscure` and version 5 phase 4's `text.animation`, both on the
+  same terms.
   **Filters, reflection and spotlight render**, through three new passes in
   `Compositor.metal` (blur/sharpen/pixelate fold into the sample, the four
   point filters run in slot order after) with their inspector sections in
@@ -605,5 +643,172 @@ constants.
   is DROPPED where the core would have named it and a known key the caller
   omitted is sent as its DEFAULT, which resets that field — `shadow` since
   M3, `obscure` now.
+- **Road map 2, phase 4 — Words: done.** One schema key at version 5, NO
+  new op, two tools (so the catalog is 70 and `OP_NAMES` is still 53), and
+  captions in both directions.
+  **`text.animation`** (`core/src/model_props.rs`) is `null` or
+  `{kind, in, out}` — `typewriter`, `word_fade`, `line_rise` — as the LAST
+  key of the text object, defaulting to `null` and, inside an animation
+  that says nothing, to a one-second typewriter that does not un-reveal.
+  `in` and `out` are DURATIONS from the clip's own first and last frame,
+  not times. Every field defaults, so version 5 has no migrate step;
+  `format.rs`'s paragraph restates the argument rather than pointing at
+  version 4's, because a defaulted field is exactly the case where the bump
+  looks like paperwork — unknown keys are ignored at every level by design,
+  so without the gate a version-4 build would open the file, drop every
+  animation on read and write the loss back on the next save with the text
+  still on screen. `TextAnimationKind` is closed at three like
+  `ObscureKind`, but its declaration ORDER is not load-bearing: the recipe
+  carries the kind by NAME, where `ObscureKind`'s order is a shader
+  discriminant.
+  **The reveal is computed by the CORE** (`recipe.rs`, 567 — up from 331)
+  and rides INSIDE a text layer's `source` object beside `hash` and `text`,
+  as THREE keys emitted on every text layer whether it animates or not:
+  `reveal` (0–1, 1.0 with no animation), `reveal_phase`
+  (`"in"`/`"out"`/null — one number cannot say whether a typewriter is
+  typing or un-typing, and a line rise falls rather than rises on the way
+  out) and `reveal_kind` (the kind by name, or null). **`reveal_phase` is
+  the ORDER the renderer draws in, not a label on the amount**, and the
+  review is what settled that: `word_fade` and `line_rise` count their
+  stagger from the other end while leaving, so the frame the phase turns on
+  is a frame the picture mirrors on, and the one amount at which that is
+  invisible is 1. An animation that fits its clip has a plateau to turn on
+  (ties go to the arrival); a TENT — `in + out > duration`, which degrades
+  rather than refusing — crosses BELOW 1 and used to flip there, so it now
+  keeps the phase it began in for its whole life, the arrival's unless `in`
+  is 0. The documented limit: a tent whose `in` is tiny but not zero reads
+  `"in"` from its first frame to its last. The third key is a
+  DEVIATION from the plan — road map 2's phase-4 section argues it — and it
+  is forced by the decision beside it: the recipe STRIPS `animation` out of
+  the text description it carries — so the computed reveal is the
+  renderer's only account of it, and an unanimated clip's hash stays byte
+  for byte what it was — which leaves nothing else to say which of three
+  drawing routines to run. The hash COVERS all three, and that is what
+  stops an animating layer being served a stale texture: Swift caches a
+  paragraph under `"text:" + hash` and consults nothing else, so a reveal
+  that changed the picture without changing the key would render correctly
+  in a single `render_frame` and freeze during playback. Both halves
+  measure against the CLIP's own duration, never the instance's visible
+  end (`layer()`'s existing rule for clip time), so a nest clip's edge cuts
+  a nested caption off mid-reveal rather than making it un-reveal early;
+  and `in + out` longer than the clip DEGRADES to the smaller of the two
+  ramps rather than refusing, because "too big for THIS clip" is a fact
+  about a clip and not about the vocabulary, and a later trim would
+  invalidate it anyway.
+  **Swift draws it** in `LayerRenderers.renderText`: a grapheme-cluster
+  prefix (typewriter), per-word alpha with a `wordOverlap` 0.5 stagger
+  (word_fade), a per-line rise of `lineRiseFraction` 0.35 of the line's own
+  height, masked by the box (line_rise), the backdrop at full opacity in
+  every kind because it is the readability plate and not the words. The
+  layout is ALWAYS the full text's, now built once into a `layoutCache`
+  beside `sizeCache` and keyed without the reveal — `renderText` used to
+  build a second framesetter over what `measure` had already framed — and
+  `reveal = 1` takes the original single `CTFrameDraw` rather than the span
+  machinery, which is what makes a full reveal byte-identical to no
+  animation. The inspector's Animation section is `TextPane.swift`; it
+  re-sends all three keys on every row, since a patch of a nested object is
+  a REPLACEMENT.
+  **Auto captions** are `Transcriber.swift` (File ▸ Generate Captions…,
+  `TranscribeSheetController.swift`, and the off-main `transcribe` tool),
+  and the plan's other deviation is that they transcribe EXTRACTED audio —
+  each clip's own source window written to a temporary mono 16 kHz WAV,
+  never the media file and never inside the package. Whether
+  `SFSpeechURLRecognitionRequest` can read an arbitrary `.mov` is
+  unanswerable here (the grant needs a frontmost app), and a design that
+  works on the `say -o` fixtures and fails on every real clip is the worst
+  failure shape available; it also bounds the work to what the timeline
+  uses and leaves the time mapping with no `in` term at all. Three refusals
+  are deliberate: the tool never calls `requestAuthorization` — the SHEET
+  does, because a person opened it — and names the status instead; a
+  reversed clip is refused with the non-media sources, because its words
+  would come out backwards; and a transcript that would exceed `MAX_CLIPS`
+  is refused in the LAYOUT, naming the cue count and the room left, where
+  `check_caps` would have refused it with a message about clips. The
+  framework's roughly one-minute ceiling per task is REPORTED, not chunked
+  around: a run that stopped early answers `truncated` with the second it
+  stopped at.
+  **`CaptionLayout.swift`** is the placement both producers share, and it
+  is placement ONLY. The road map says the four cue rules (≤ 2 lines, ≤ 42
+  characters, ≤ 6 s, a frame between cues) are "factored out of
+  `CaptionImporter.swift`"; NONE of them was ever in that file — an SRT
+  brings its own line breaks — so they live in `CaptionCues` beside the
+  layout, called only by the producer that has to invent line breaks.
+  Moving them into the shared path would have silently re-wrapped every
+  caption file that imports correctly today.
+  **Caption export** is `CaptionExporter.swift` (File ▸ Export Captions…,
+  `export_captions`): one track of text clips as `.srt` or `.vtt`, the
+  track never guessed — a candidate is a track whose clips are ALL text,
+  and none or several refuses and NAMES them. VTT escapes `&`, `<` and `>`
+  and SubRip does not, so the two files are byte-siblings only for text
+  holding none of the three; `srt` and `vtt` joined
+  `AgentServer.replaceableExtensions`, or `{path: "talk.srt", format:
+  "vtt"}` would have written `talk.srt.vtt`. A cue's TIMES survive the
+  round trip at every ordinary rate: `format_timecode` rounds ticks to the
+  nearest millisecond, 300 ticks at most, the importer turns a whole
+  millisecond back into exactly 600 × ms ticks, and half a frame is 10,000
+  ticks even at 30 fps, so the snap on the way back in can only find the
+  frame the cue left. What a whole-millisecond frame buys is byte identity
+  with the FILE — import snaps every cue to the grid, so a source written
+  off it comes back written onto it — and the proof fixture is at 25 fps
+  because 40 ms is a whole millisecond AND its times sit on that grid,
+  which is what lets the claim be a byte comparison. The same fixture is
+  imported at 30 fps as the other half of it, where the file must NOT come
+  back and a second trip through the grid must move nothing: a tolerance
+  instead of the pair would have passed against a build where the exporter
+  did nothing.
+  The three File-menu caption items sit together in the order a caption
+  track comes into being and leaves again, and none takes a key
+  equivalent.
+  Measured: `make test` 358 (338 before — `schema_v5.rs` 11 and
+  `evaluate_tests.rs` +9, plus `model_tests.rs`'s fixture, which grew the
+  key and no test), `make lint` and `cargo fmt --check` clean,
+  `make typecheck` 0 errors and the same 4 AVFoundation warnings,
+  `make app` building, the catalog at 70 tools and the startup parity log
+  EMPTY, and phases 1–3 still proving at 66/66, 85/85, 121/121, 8/8, 26/26
+  and 33/33. The phase's own scripts are `tools/proof/phase4_proof.py`
+  over MCP at **84/84** and `phase4_chrome.py` offscreen at **59/59** (the
+  Animation section's rows — the preview well is black offscreen, so no
+  reveal can be photographed); road map 2's phase-4 section carries what
+  each one claims and the honest limit behind them. Transcription needs a
+  TCC grant a headless run cannot obtain, so what the proof asserts about
+  4a is that the grant-less refusals are exact — the caller's own mistakes
+  answered above the grant, the grant's own sentence below them — and that
+  a refused run places nothing. **The cue builder is proved in the
+  HARNESS, not over MCP** — `CaptionCues` is Swift and nothing in a running
+  app reaches it without a recogniser, so the harness grew a `cues` mode
+  for it and `phase4_chrome.py`'s section 8 runs the four rules over word
+  lists at their boundaries ("Seeing the chrome" says why that is the only
+  binary that can). Until that landed the rules had no caller a script
+  could reach, whatever these documents said.
+  **Reviewed by eight readers, twelve findings fixed** — road map 2's
+  phase-4 section lists the nine worth reading. The ones with teeth: a
+  tent's `reveal_phase` flipped between two frames carrying the same
+  reveal (the phase is the renderer's ORDER, not a label on the amount);
+  an outlined glyph at a partial alpha composited its fill and its stroke
+  SEPARATELY, so the outline sat at 0.75 while the word was at 0.5; one
+  clip's failed audio extraction threw away a whole transcription and
+  every earlier clip's cues with it; Generate Captions transcribed a clip
+  whose audio is switched OFF, so Detach Audio doubled every caption; and
+  `NSPopUpButton.addItem(withTitle:)` silently REMOVES a row with the same
+  title, so the Export Captions panel could write a different track's
+  captions and report success.
+  Two things worth knowing before you touch the area, neither a defect of
+  this phase: **`animation` is a nested object in a patch**, so it inherits
+  the MCP decoder's replacement rule — a key left out of it comes back as
+  the default 1 s typewriter, not as what the clip had — and **the
+  offscreen harness was flaky, for a reason the phase guessed wrong**. It
+  was blamed on linking `Speech.framework` and answered with a settle
+  capture (see "Seeing the chrome"), which is worth keeping but fixed
+  nothing: at the gate `phase3_chrome.py` still scored 29–33 out of 33 on
+  identical input, because a settle waits out a layout that is still MOVING
+  and this one had stopped — in two different places, once per process. The
+  cause was an ambiguous constraint in `InspectorPane.swift`, where the
+  pane's low-priority bottom pin at `.defaultLow` tied with an
+  `InspectorSection`'s own default hugging of 250, so stretching a section
+  and moving the pane's bottom cost the solver exactly the same. The pin is
+  249 now; twelve harness renders of one package come back byte-identical
+  and `phase3_chrome.py` is 33/33 run after run. **A proof that scores
+  differently on identical input is an ambiguity to find, not a race to
+  out-wait** — app/CLAUDE.md keeps that under `InspectorPane`'s pitfalls.
 
 Keep this file current as code lands.

@@ -106,7 +106,7 @@ final class ClipPane: InspectorPaneView {
             sections.append(contentsOf: [
                 textPane.contentSection(), textPane.fontSection(), textPane.styleSection(),
                 textPane.outlineSection(), textPane.backdropSection(), textPane.boxSection(),
-                textPane.presetSection(),
+                textPane.animationSection(), textPane.presetSection(),
             ])
         }
         if shapePane.allShape {

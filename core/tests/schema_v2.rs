@@ -155,7 +155,7 @@ fn a_version_one_file_reads_with_the_new_fields_at_their_defaults() {
     }))
     .value();
 
-    assert_eq!(at(&project, "/version"), &json!(4));
+    assert_eq!(at(&project, "/version"), &json!(5));
     assert_eq!(at(&project, "/nests"), &json!([]));
     assert_eq!(at(&project, "/clips/0/video/filters"), &json!([]));
     assert_eq!(at(&project, "/clips/0/video/reflection"), &Value::Null);

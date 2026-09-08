@@ -61,10 +61,19 @@ final class AgentServer {
     /// `new_project` on NSDocument's asynchronous save, both of which a
     /// main-thread wait would deadlock against; `render_frame` and `export`
     /// block on decode and encode, and freezing the UI for a whole write is
-    /// not acceptable. Each hops back through `onMain` for every document
-    /// touch, so the single-mutation-point rule is untouched.
+    /// not acceptable. `transcribe` waits on a recognition task — whose
+    /// callbacks the Speech framework delivers on an `OperationQueue` that
+    /// defaults to the app's MAIN one — after extracting the clip's audio, so
+    /// it is `import_media`'s case twice over. Each hops back through `onMain`
+    /// for every document touch, so the single-mutation-point rule is
+    /// untouched.
+    ///
+    /// The criterion is NOT "touches the disk", which is why
+    /// `detect_silence`, `consolidate_media`, `import_captions` and
+    /// `export_captions` are all absent: each reads or writes a file on the
+    /// main thread and each says so in its own handler.
     static let offMainTools: Set<String> = [
-        "import_media", "render_frame", "export", "save_project", "new_project",
+        "import_media", "render_frame", "export", "save_project", "new_project", "transcribe",
     ]
 
     // MARK: - Lifecycle
@@ -209,6 +218,9 @@ final class AgentServer {
         "remove_action": { $0.removeAction },
         // Silence detection (AgentServer+Silence.swift)
         "detect_silence": { $0.detectSilence },
+        // Captions (AgentServer+Captions.swift)
+        "transcribe": { $0.transcribe },
+        "export_captions": { $0.exportCaptions },
         // Tracks, markers and the canvas (AgentServer+Tracks.swift)
         "add_track": { $0.addTrack },
         "remove_track": { $0.removeTrack },

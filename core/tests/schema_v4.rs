@@ -8,7 +8,9 @@
 //!
 //! - **Every older file still opens.** The list carries a serde default —
 //!   the empty one — so there is no migration step and a version-1, -2 or
-//!   -3 file reads back with no regions at all, stamped version 4. The
+//!   -3 file reads back with no regions at all, stamped at the current
+//!   version — 5 since phase 4c, which is why the assertions below name it
+//!   rather than 4. The
 //!   BUMP is still the point: unknown keys are ignored at every level by
 //!   design (`model.rs`'s module doc), so without the version gate a
 //!   version-3 build would open a version-4 file, drop every region, and
@@ -119,7 +121,7 @@ fn hidden() -> Value {
 // ---- reading older files -------------------------------------------------
 
 fn assert_no_regions(project: &Value) {
-    assert_eq!(at(project, "/version"), &json!(4));
+    assert_eq!(at(project, "/version"), &json!(5));
     assert_eq!(at(project, "/clips/0/video/obscure"), &json!([]));
     // The neighbours a version-4 reader adds nothing to, so a file that
     // gained an empty list gained ONLY that.
@@ -138,8 +140,8 @@ fn a_version_three_file_reads_with_no_hidden_regions() {
 #[test]
 fn a_version_two_file_and_a_version_one_file_read_the_same_way() {
     // The migration chain still runs underneath: a version-1 file reaches
-    // version 4 through `migrate_1_to_2` and then through nothing at all,
-    // because neither version 3 nor version 4 needed a rewrite.
+    // the current version through `migrate_1_to_2` and then through nothing
+    // at all, because no version since — 3, 4 or 5 — has needed a rewrite.
     assert_no_regions(&Handle::from_value(&one_clip(2)).value());
     assert_no_regions(&Handle::from_value(&one_clip(1)).value());
 }
@@ -149,7 +151,7 @@ fn a_version_two_file_and_a_version_one_file_read_the_same_way() {
 #[test]
 fn the_regions_round_trip_exactly() {
     let written = Handle::from_value(&hidden()).value();
-    assert_eq!(at(&written, "/version"), &json!(4));
+    assert_eq!(at(&written, "/version"), &json!(5));
 
     let regions = array(&written, "/clips/0/video/obscure");
     assert_eq!(regions.len(), 2, "both regions survived");

@@ -1,7 +1,7 @@
 # Reelcut — road map 2: beyond the spec
 
-**Status: phases 0–3 are done — §1's table below carries the commit of each,
-which is the one place they live; the rest is not. Pick up at phase 4.**
+**Status: phases 0–4 are done — §1's table below carries the commit of each,
+which is the one place they live; the rest is not. Pick up at phase 5.**
 Spec §10's three milestones are done
 (`reelcut-roadmap.md` records how each was proved). This is the plan for
 what a capable editor still lacks, found by reading the op table, the menus,
@@ -92,7 +92,7 @@ fails without the fix. Green tests prove the cases someone thought of.
 | 1 | Cutting moves | 1–2 | — | **done** 2026-09-06 (`4fb72c6`) |
 | 2 | Clip identity | 1 | v3 | **done** 2026-09-07 (`c1b5188`) |
 | 3 | The screencast trio | 2 | v4 | **done** 2026-09-07 (`ac7f849`) |
-| 4 | Words | 2 | v5 | not started |
+| 4 | Words | 2 | v5 | **done** 2026-09-08 (`<commit>`) |
 | 5 | Sound | 1–2 | — | not started |
 | 6 | Looks | 1–2 | v6 | not started |
 | 7 | Output | 1–2 | — | not started |
@@ -104,7 +104,7 @@ nothing that later phases need; 6 depends on 3's list-interpolation rule; 9
 is last because it is the largest and touches every op at once. Any other
 order works if that one dependency is kept.
 
-**What phases 0–3 left behind for the rest**, so no later phase
+**What phases 0–4 left behind for the rest**, so no later phase
 invents a second one:
 
 | | |
@@ -129,6 +129,10 @@ invents a second one:
 | `TimelineView+Candidates.swift` | the third `extension TimelineView`, and the precedent for adding a WASH under the clips: a stored property with a `didSet`, two one-line draw calls in the frozen file, the bodies outside it. An overlay view cannot do it — the ruler fills its own bounds opaquely first. |
 | `EditorViewController+ZoomRegion.swift` / `CanvasRegionView` | the second modal canvas mode, and the shape of one: an overlay whose PRESENCE is the mode, one-line closures back to the controller, a key that TOGGLES (an overlay that has lost focus cannot be dismissed by Esc), and an auto-close beside `syncChromaEyedropper`. Installed through `armCanvasMode`, which ends every OTHER armed mode first — a third mode inherits that by being installed at all, where each arming path remembering the others was the review's defect. |
 | `AgentServer+Arguments.rangesArg` / `nestedNumberArg` | a list of `[from, to]` pairs and a number one level down, each named by its path and each snapped through the same helper the scalar readers use. |
+| `CaptionLayout.swift` | cues in, ops out: the frame grid, the abutting trim, the Caption preset and the new front-most track, plus `Problem`'s producer-spelled `tag`. Anything that makes captions — a file, a transcript, phase 8's search-and-caption if it ever exists — ends here rather than laying clips out itself. Its `CaptionCues` neighbour holds the four cue RULES, which only a producer inventing line breaks calls. |
+| `recipe.rs`'s `Reveal` | the shape of "a per-frame number the core computes for the platform to draw": derived from the model and a clip time and from nothing else, emitted unconditionally so an absent key never means two things, carried by NAME not by ordinal, and folded into the layer's content hash because Swift's texture cache keys on that hash alone. Any later per-frame value the renderer needs joins this rather than inventing a second channel. |
+| `tools/proof/harness/`'s settle capture | the harness writes a PNG only when two consecutive captures are byte-identical. A fixed spin count was a guess about how long the last relayout takes, and this is the answer to the question instead. It is NOT what makes a render reproducible, and phase 4's gate is where that was learned: a settle cannot separate two STABLE layouts, and the bistability under it was an ambiguous constraint in `InspectorPane.swift` (the row below). Both are wanted; only one of them is the determinism. |
+| `InspectorPane`'s 249 | a pane's low-priority bottom pin sits ONE below `.defaultLow`, because an `InspectorSection` keeps the default 250 and a TIE let the solver stretch a section instead of moving the pane's bottom — an ambiguity with no wrong answer to report, decided per PROCESS. Any later constraint that competes with a subview's own hugging needs the same one-point gap, and the symptom to recognise is a proof that scores differently on identical input. |
 
 ## 2. Phases
 
@@ -1140,6 +1144,397 @@ header, `recipe.rs`, `LayerRenderers.swift`, `TextPane.swift`,
   pixel columns only left of the midpoint; `reveal = 1` is byte-identical
   to no animation; the recipe at `clip.start + in` reports `reveal = 1`.
 
+**What landed.** All three parts, at version 5, with the one schema key,
+the two tools, the three drawing routines and every path into them — plus
+the following, where the code differs from the plan above or settled what
+it left open. Five of them matter enough to read before touching the area:
+
+- **The recipe carries a THIRD computed key, `reveal_kind`**, which neither
+  the plan above nor the phase's contract named. It is forced by the
+  decision beside it: the recipe STRIPS `animation` out of the text
+  description it hands over, because leaving it in would give
+  `LayerRenderers` two accounts of the animation — the computed reveal
+  (right) and the props (wrong, since nothing downstream has the clip time
+  to evaluate them against) — and it is what keeps an unanimated clip's
+  content hash byte-identical to what it was before version 5. With the
+  description stripped, nothing else could say WHICH of three drawing
+  routines to run: each kind is a different routine, not a parameter of a
+  shared one. So a text layer's `source` object carries `reveal`,
+  `reveal_phase` and `reveal_kind`, all three emitted unconditionally
+  (`obscure`'s precedent: an absent key would mean two things), and the
+  kind travels by NAME, so the recipe never depends on the enum's
+  declaration order — which is why `TextAnimationKind`'s order, unlike
+  `ObscureKind`'s, is not load-bearing.
+- **Transcription reads EXTRACTED audio, not the media file.** The plan
+  above assumes `SFSpeechURLRecognitionRequest` can read a project's
+  `.mov`. Nothing in the framework's documentation promises it, its error
+  vocabulary has a code for exactly that failure, and the question cannot
+  be settled here: the grant needed to try it wants a frontmost app, which
+  an agent-driven one never is. A design that works on the `say -o`
+  fixtures and fails on every real clip is the worst failure shape
+  available, so each job's SOURCE WINDOW is written to a temporary mono
+  16 kHz WAV in `NSTemporaryDirectory()` — never in the package (spec
+  §5.6) — and the recogniser is handed that. It pays twice besides: the
+  work is bounded to what the timeline uses (a 20 s clip of a 30-minute
+  recording is 20 seconds of recognition), and the mapping loses its `in`
+  term entirely, becoming `clip.start + ticks(t) / speed`.
+- **The four cue rules did NOT move into the shared layout.** The plan says
+  they are "factored out of `CaptionImporter.swift`"; none of them was ever
+  in that file. An SRT supplies its own line breaks, `text.width` does the
+  wrapping at render time, and the importer bounds no cue's length — so
+  moving them into `CaptionLayout` would have silently re-wrapped and
+  re-timed every caption file that imports correctly today, and broken 4b's
+  round trip outright. `CaptionLayout` therefore holds what the importer
+  actually did (the frame grid, the collapsed-cue frame, the sort, the
+  abutting trim, the drop-and-report, the new front-most track, the Caption
+  preset) and the four rules live in `CaptionCues` beside it, called only
+  by the producer that has to INVENT line breaks. The gap of at least one
+  frame is the load-bearing one: it is what keeps the layout's trim pass
+  from ever firing on a transcript, and a whole frame survives being
+  snapped to the grid.
+- **The one-minute ceiling is REPORTED, not worked around.**
+  `SFSpeechRecognizer.h` says the framework stops tasks longer than a
+  minute; the paragraph is written about the network service and nothing
+  exempts on-device file recognition. Phase 4 does not chunk. When the last
+  word lands more than two seconds before the end of the extract, the
+  outcome carries a truncation with the second it stopped at, the sheet
+  says so in words and the tool reports it under `truncated` with a note.
+  A caption run that quietly stops at sixty seconds and says nothing is the
+  failure this rule exists to prevent; chunking at the silences phase 3 can
+  already find is the recorded follow-up, not this phase's work.
+- **`transcribe` refuses the grant; the SHEET asks for it.**
+  `SFSpeechRecognizer.authorizationStatus()` is a synchronous read, so the
+  tool's refusal is instant and carries the fix — run File ▸ Generate
+  Captions… once from the app — while `requestAuthorization` needs a
+  frontmost app and would hold the handler open to its ceiling. It is
+  `FFmpegRewrap.canAsk`'s question with `canAsk`'s answer. The ORDER of the
+  handler's refusals is deliberate and is what makes the grant-less
+  machine's behaviour provable: the caller's own mistakes (an id naming
+  nothing, a scope with nothing audible) are answered first, then the
+  grant, then the language — because a machine with no downloaded dictation
+  models would otherwise answer "no languages" where the true answer is
+  "you have not granted this yet".
+
+And the smaller settlements, each argued where it lives:
+
+- **No new op and no new Rust module.** 4c is carried by `set_text`'s
+  patch and 4a places through `add_track` + `add_text_clip` as one grouped
+  edit, so `OP_NAMES` is still 53 and spec §7.10's table needed no row.
+  The reveal went into `recipe.rs` (331 → 567), which is now the file to
+  weigh the next addition against.
+- **`text.animation` has three keys and no curve.** The shape of the motion
+  is already in the kind — a step per character, a stagger, a per-line
+  offset — and easing between two arbitrary values is what the action
+  system is for. A curve can be added later as a defaulted fourth key with
+  no migration step, which is this crate's test for leaving a field out.
+- **Overlapping phases degrade; they do not refuse.** With `in + out >
+  duration` the reveal is the MINIMUM of the two ramps, so it stays in 0..1
+  and a short clip simply shows a partial reveal. No range check bounds
+  them against a clip: a range check is a fact about the vocabulary, and
+  "these two numbers are too big for THIS clip" is a fact about a clip that
+  a later trim could invalidate anyway. `props_check.rs` checks only the
+  sign; the absurd values are caught where the reveal is CONSUMED.
+- **Both halves measure against the CLIP's own duration**, never the
+  instance's visible end — `layer()`'s existing rule for clip time — so a
+  nest clip's edge cuts a nested caption off mid-reveal rather than making
+  it un-reveal early, and one animation is measured on one clock.
+- **The renderer gained a layout cache** (`LayerRenderers.layoutCache`,
+  bounded like `sizeCache` and an order of magnitude tighter, since a
+  `CTFrame` holds every glyph where a `CGSize` is two numbers).
+  `renderText` used to build a SECOND framesetter over the string
+  `measure` had already framed: two objects that had to agree, rebuilt on
+  every frame of an animation. The key deliberately excludes the reveal, so
+  "the reveal cannot reflow the layout" is structural rather than a rule —
+  and `reveal = 1` is not merely equal to no animation, it takes the same
+  single `CTFrameDraw`, which is what makes the byte-identity claim
+  something other than a coincidence of the span machinery.
+- **`word_fade` and `line_rise` reverse their stagger while LEAVING**, so
+  the first word in is the first word out; reversing the amount alone would
+  run the animation backwards and read as a rewind. That is what
+  `reveal_phase` is carried for. The typewriter ignores the phase — its
+  un-reveal is a shrinking prefix, which already IS the reverse of a
+  growing one — and the backdrop stays at full opacity in every kind,
+  because it is the readability plate rather than the words.
+- **And because the stagger is what the phase names, `reveal_phase` is the
+  ORDER the renderer draws in rather than a label on the amount** — which
+  the review found, and which is now `Reveal::of`'s shape. The frame
+  on which the phase turns is a frame on which the picture mirrors end for
+  end, so it may only turn where the mirror is INVISIBLE, and the one
+  amount at which it is, is 1. An animation that fits its clip has a
+  plateau between its ramps to turn on, ties going to the arrival. A TENT
+  does not: with `in + out > duration` the ramps cross BELOW 1, and the
+  phase used to flip there, swapping a four-word cue's alphas from
+  `[1, 1, .83, .33]` to `[.33, .83, 1, 1]` between two consecutive frames
+  carrying the same reveal. A tent now keeps the phase it began in for the
+  whole of its life — the arrival's, unless `in` is 0, which makes the clip
+  nothing but a departure and leaves the stagger no arrival order to
+  contradict. The limit that falls out of it is documented rather than
+  fixed: a tent whose `in` is tiny but not zero reports `"in"` from its
+  first frame to its last, while it is the departure holding the amount
+  down. `the_phase_turns_only_where_both_orders_draw_the_same_picture`
+  sweeps ten timings frame by frame and asserts the rule directly; a
+  four-word `word_fade` is what it is written about.
+- **`CaptionImporter` gained a refusal it did not have**: a file holding
+  more captions than the project has room for is refused in the LAYOUT,
+  naming the cue count and the room left, where `check_caps` would have
+  refused it later with a message about clips that tells a caption user
+  nothing. A transcript is refused the same way, by the same code.
+- **The two tools went into a new `AgentServer+Captions.swift`**, not into
+  `AgentServer+Media.swift` as the plan says — `AgentServer+Silence.swift`'s
+  reason: neither is an op's mirror, both have a concern of their own, and
+  the argument for how each is threaded belongs beside the code it
+  explains. `transcribe` is in `offMainTools` (the Speech framework
+  delivers its callbacks on an `OperationQueue` that defaults to the app's
+  MAIN one, so a main-thread wait would deadlock as `import_media`'s probe
+  would); `export_captions` is not, on `import_captions`' own argument in
+  the opposite direction.
+- **`srt` and `vtt` joined `AgentServer.replaceableExtensions`**, whose
+  comment calls the set "the containers this app writes" — after 4b they
+  are. Without them `export_captions {path: "talk.srt", format: "vtt"}`
+  would have written `talk.srt.vtt`, the doubled name that set exists to
+  prevent.
+- **A cue's TIMES round-trip at every rate; the FILE is what needs a
+  whole-millisecond frame.** Those are two claims and the phase first wrote
+  them as one. `format_timecode` rounds ticks to the nearest millisecond,
+  300 ticks at most, and `CaptionImporter.ticks(fromTimestamp:)` turns a
+  whole millisecond back into exactly 600 × ms ticks — so the snap on the
+  way back in is hunting for a frame boundary at most 300 ticks away, where
+  half a frame is 10,000 ticks even at 30 fps. Every cue therefore lands on
+  the tick it was written from, at 25, 30, 50 or 60 fps alike. What a
+  whole-millisecond frame (25 and 50 fps) buys is byte identity with a file
+  somebody ELSE wrote, and then only for a file whose times are already on
+  the frame grid, since import snaps every cue to it and a 30 fps snap
+  writes `00:00:04,120` back as `00:00:04,133`. The proof fixture is at 25
+  fps for exactly that — its times are whole 40 ms frames, so the claim can
+  be a byte comparison — and the SAME fixture is imported at 30 fps as the
+  other half of it, where the file must not come back and a second trip
+  through the grid must move nothing. A tolerance in place of the pair
+  would have been a check that passes against a build where the exporter
+  did nothing.
+- **None of the three File-menu caption items takes a key equivalent.**
+  §9's "proposed, not yet bound" table claims no row for phase 4, and a
+  modifier-less menu key is resolved ahead of the first responder and would
+  steal a letter the editor's own `keyDown` owns — the reason already
+  recorded beside Remove Silences…
+- **`model_props.rs` is at 592** after `TextAnimation` and
+  `TextAnimationKind`, under the 600-line cap but close enough to it to be
+  the same warning phase 3 got. Phase 6 adds properties to that file and
+  should cut first; the text vocabulary is the obvious ~190-line concern to
+  take out, the way `model_regions.rs` came out.
+- **The offscreen harness now captures on SETTLE** — capture, spin,
+  capture, write only when two consecutive captures are byte-identical. A
+  fixed spin count is a guess about how long the last relayout takes, and
+  this replaces the guess with the question's own answer. It is worth
+  keeping on its own merits, and it is NOT what made `phase3_chrome.py`
+  stop wobbling.
+- **The wobble was an ambiguous constraint, and the fix is in the app.**
+  The symptom was read correctly during the phase — the inspector's Actions
+  pane sometimes at its intrinsic height and sometimes stretched, a render
+  deterministic within a process and BISTABLE across processes, about two
+  runs in five of `phase3_chrome.py` failing a check about something else —
+  and the cause was guessed at wrongly: it was blamed on linking
+  `Speech.framework`, and the settle capture was landed as the cure. It was
+  not one. A settle waits for a layout that is still moving; both of these
+  layouts had stopped. At the gate `phase3_chrome.py` still scored 29, 30,
+  31 or 33 out of 33 on identical input, twelve harness renders of one
+  package still gave two distinct PNGs (nine one way, three the other), and
+  `SWIFT_DETERMINISTIC_HASHING=1` changed nothing. The real cause is in
+  `InspectorPane.swift`: the pane's bottom pin was `.defaultLow` and an
+  `InspectorSection` sets no hugging priority, so it keeps the default 250
+  — a dead tie, in which "give the pane its content's height" and "stretch
+  one section past its rows" cost the solver exactly the same and nothing
+  chose between them. Dropping the pin to 249 makes the stretch strictly
+  dearer, which is what the constraint's own comment always meant. Measured
+  after: twelve identical renders out of twelve, and `phase3_chrome.py`
+  33/33 five runs running. The lesson is the one the road map keeps
+  relearning — a fix that is not measured against the symptom is a guess
+  wearing a fix's clothes, and this one shipped a real improvement to the
+  harness while leaving the defect it named untouched.
+- **A section is not a section until `ClipPane.makeSections()` calls it.**
+  `TextPane.animationSection` was written, documented and mirrored, and
+  invisible in the app until the wiring was added after the gate — the
+  second consecutive phase in which a pane's new group was defined and not
+  called (`VideoPane.obscureSection` was phase 3's). Nothing type-checks
+  the omission, so adding a section is two edits and the second is in
+  another file. Recorded in app/CLAUDE.md as a pitfall.
+
+Two limits worth knowing before chasing them, neither introduced here:
+`animation` is a nested OBJECT in a patch, so it inherits the MCP
+decoder's replacement rule — a key left out of it comes back as
+`TextAnimation`'s default 1 s typewriter, not as what the clip had, which
+is why the catalog's text-patch sentence says to send all three; and an
+action's end patch can interpolate `in` and `out`, sliding an animation's
+own timebase mid-reveal, which is legal, rarely wanted, and a caution
+rather than a rule the ops enforce — where two animations naming DIFFERENT
+kinds hold and switch whole at the end instead, §5.4's object rule.
+
+**Proved** on 2026-09-08. Core: `make test` **358 passed / 0 failed** — 338
+before, plus `core/tests/schema_v5.rs` (11) and nine recipe tests in
+`evaluate_tests.rs`; `model_tests.rs`'s fixture grew the key and no test.
+`make lint` and `cargo fmt --check` clean, `make typecheck` 0 errors and
+the same 4 AVFoundation deprecation warnings, `make app` building, the
+catalog at **70 tools** (53 ops, unchanged, plus seventeen app-state
+tools) and the startup parity log EMPTY.
+
+Honesty first about 4a: transcription needs a TCC grant a headless run
+cannot obtain, so the proof asserts what it CAN. Without the grant,
+`transcribe` refuses with the exact authorization message and places
+nothing — that refusal is itself a check, and it is why the handler
+answers the caller's own mistakes before it looks at the grant.
+
+The cue BUILDER's rules are pure arithmetic over a word list, so they need
+no recogniser and no grant — but for a while nothing ran them, and the
+documents said otherwise. `CaptionCues` is Swift, and in the app nothing
+reaches it until a recogniser has produced words, so the MCP proof cannot
+call it at all. The one binary in the tree that links `app/Sources` outside
+the app is the offscreen HARNESS, which is why the rules are proved there:
+`tools/proof/harness/` grew a second mode (`harness cues <words.json>
+<out.json>`, ADDED beside the render arguments rather than rearranging
+them, so every earlier chrome script's argument positions still hold), and
+`phase4_chrome.py`'s section 8 asserts the four rules over its answer at
+their BOUNDARIES — a word longer than a line, a list of one word, a pause
+longer than a cue may be, two words at the same instant, a line of exactly
+42 characters, a cue of exactly 6 s, and the frame of gap surviving the
+snap to the grid at two rates and five offsets from it — plus that every
+word comes back once and none is invented, which all four rules together
+would not catch. That section is not a picture, and it says so: it is in a
+chrome script because the harness is, and it changes no render argument.
+
+A fixture is at `tools/proof/media/speech.mov` — 5.2 s, a navy card over
+`say`'s rendering of "The quick brown fox jumps over the lazy dog. Pack my
+box with five dozen liquor jugs." — for the person who runs it with the
+grant.
+
+The phase's own scripts go beside the earlier phases' —
+`tools/proof/phase4_proof.py` over MCP at **84/84**, and
+`phase4_chrome.py` offscreen at **59/59**: the Animation section in the
+Clip tab, its summary and its three rows, that a text animation changes
+nothing else in the window, and section 8's cue builder. Nothing about the
+PICTURE is claimed there — the preview well renders black offscreen, so no
+reveal can be photographed. The earlier phases re-ran unchanged at
+`phase1_proof.py` **66/66**,
+`phase2_proof.py` **85/85**, `phase2_chrome.py` **26/26**,
+`phase3_proof.py` **121/121**, `phase3_silence_scope.py` **8/8** and
+`phase3_chrome.py` **33/33**.
+
+Still owed by a person at the machine — the half no headless run reaches:
+(1) File ▸ Generate Captions… with the grant given: the language popup
+lists only on-device languages, the scope rows match the selection and the
+range, the card turns into its own progress bar, Cancel leaves no clips,
+and a clip whose speech runs past a minute says where it stopped;
+(2) the three reveals in MOTION at 60 fps rather than as still frames —
+the texture cache is keyed per reveal, so what a person is checking is that
+playback does not stutter or freeze on a caption track;
+(3) that a generated caption is legible over real footage in the Caption
+preset, which is a judgement about type and not about pixels.
+
+**Reviewed, and twelve findings fixed.** The change was then read by eight
+readers, each with its own brief, who returned 27 findings; every one was
+put to three sceptics told to refute it, and twelve survived. All twelve
+were fixed, each now covered by a test or a proof check that fails without
+the fix wherever one can be written. The nine worth reading before touching
+the area:
+
+1. **A tent's `reveal_phase` FLIPPED between two frames carrying the same
+   reveal.** The word was written as a label on the AMOUNT — which ramp is
+   holding it back — and `word_fade` and `line_rise` count their stagger
+   from the other end while a layer is leaving, so the frame the phase
+   turns on is a frame the picture mirrors on. Where the ramps meet at 1
+   that mirror is invisible; where `in + out > duration` they cross BELOW
+   1 and it is a visible jump with no change in the reveal behind it.
+   `Reveal::of` now makes the phase the ORDER the renderer draws in and a
+   tent keeps the one it began in — the settlement above states the rule
+   and the limit that comes with it, and
+   `the_phase_turns_only_where_both_orders_draw_the_same_picture` sweeps
+   ten timings frame by frame, three of which are tents whose ramps cross
+   on the way through and none of which the old rule survives.
+2. **An outlined glyph at a partial alpha composited its fill and its
+   stroke SEPARATELY.** `attributedString` sets a NEGATIVE `.strokeWidth`,
+   which is Core Text's spelling of "fill and stroke", and
+   `CGContext.setAlpha` applies to each of those two draws; the inner half
+   of the stroke lands on ink the fill has already laid down, so at a
+   reveal of 0.5 the outline sat at 0.75 and a black outline on a white
+   word read as a heavy grey halo for the whole ramp, snapping to a crisp
+   edge only at 1. Nothing before this phase could see it, because a text
+   texture had only ever been faded WHOLE, in the shader, where the
+   per-clip opacity meets the FINISHED pixels once. A partial line now
+   draws inside a transparency layer, which is that same "once"; an opaque
+   line skips it and takes the plain draw. The proof measures an outlined
+   word whose outline is the canvas's own background colour, so a correct
+   fade inks nothing the finished word does not — and the check would pass
+   against a build that dropped the outline entirely, which is why it is
+   paired with one that says the outline is there.
+3. **One clip's failed extraction threw the whole transcription away.** A
+   run is a LIST of clips and the extraction of any one of them can fail on
+   a file whose audio track is shorter than its picture — which screen and
+   phone recordings routinely are, trimmed into the tail where only
+   pictures are left. Throwing there discarded every cue the earlier clips
+   had already produced and named only the clip that failed: minutes of
+   somebody's compute lost to one bad tail. A job's failure is now that
+   job's problem, reported under `problems` with the run carrying on, and
+   an empty run tells "no speech was recognised" apart from "the audio
+   could not be read", because only one of those is a claim about the
+   speaking. Cancellation stays a real throw: it means place nothing.
+4. **Generate Captions transcribed a clip whose audio is switched OFF**, so
+   Detach Audio doubled every caption. "Has sound" was asked of the MEDIA,
+   and `enabled.audio` is the other half of the question — `audio.rs` gives
+   such a clip no voice at all, so the timeline plays nothing for it. Detach
+   leaves the picture clip with `enabled.audio` false and puts an
+   audio-only twin with the SAME media, `in`, `start` and `speed` on the
+   track below, so the ordinary way of getting at a recording's sound made
+   the recogniser hear it twice, place two identical cues at one time, and
+   then report the pile-up it had made as captions that had to be
+   shortened. A clip with its audio off is now skipped with a reason.
+5. **`NSPopUpButton.addItem(withTitle:)` REMOVES an existing row with the
+   same title** before adding the new one — measured: three rows, two of
+   them reading alike, come back as two. The Export Captions panel indexed
+   its popup by `indexOfSelectedItem`, so two caption tracks a person had
+   renamed alike (`edit_track.rs` accepts any name) would have written a
+   DIFFERENT track's captions and reported the write as a success. The rows
+   carry the track id in `representedObject` now, and `Candidate.menuTitle`
+   spells the id into the title as well, so nothing is dropped and nothing
+   is ambiguous to read.
+6. **`add_text_clip` was the one text-patch door that never ran
+   `checkTextEnums`.** `TextAnimationKind` decodes leniently on the Swift
+   side and `patchArg`'s round-trip guard cannot see inside a `T??` field,
+   so `{"animation": {"kind": "fade"}}` reached the core as a TYPEWRITER
+   and the caller was told the clip they asked for had been made. It is the
+   same hole `checkVideoEnums` closes for a filter, a spotlight and an
+   obscure region, at the one door a text patch has besides `set_text` —
+   and the check runs on the RAW object, since the decoded patch is where
+   the misspelling has already become a typewriter.
+7. **A misspelled language tag was answered with the grant.** Every
+   `language` argument alike fell through to the authorization refusal on a
+   machine with no grant, and to "this Mac has no model for that" on one
+   with it — so a caller whose only problem was a typo was sent off to
+   System Settings to download a language they may already have had. The question is two questions with two different
+   fixes, and they are now asked on either side of the grant: whether the
+   framework knows the tag at all is a model question, reads the same at
+   every authorization status and is answered FIRST, with the tags it does
+   know listed; whether this Mac has the on-device MODEL is a question
+   about downloads and is asked after. The ordering is also what makes the
+   grant-less refusals provable, which is the only part of `transcribe` a
+   headless run reaches at all.
+8. **`export_captions`' own description had the round-trip arithmetic
+   backwards**, telling an agent a cue "can come back a frame away" at
+   30 fps and so talking a caller out of a round trip that is in fact
+   exact. The re-derivation is the settlement above; the tool now says that
+   the TIMES survive at every ordinary rate and that the FILE is what needs
+   a whole-millisecond frame, and `phase4_proof.py` checks the description
+   against what its own 4b section measures, so the two cannot drift apart
+   again.
+9. **A check in the phase's own proof could not fail.** The `word_fade` and
+   `line_rise` "half way through, it is neither the static frame nor the
+   empty one" checks took their empty frame off the CLEARED clip, whose
+   reveal is 1 at every t (`Reveal::WHOLE`) — so the blank was the
+   fully-drawn frame and the check was one comparison written twice. Each
+   kind's blank is now taken at reveal 0 with its animation SET, and the
+   fact that the blank is flat and is not the static frame is itself
+   asserted. A proof's own vacuity is the failure that costs a score its
+   meaning, which is why it is listed with the code.
+
+The rest were smaller and each is argued where it lives.
+
 ---
 
 ### Phase 5 — Sound
@@ -1423,7 +1818,10 @@ row into §9.
 Phases 1, 2 and 3's rows have been promoted into spec §9's bound table and
 are struck from this one; what is left is what is still only a claim on a
 key. Phase 3 took `Z` — bare, to arm and disarm the canvas region mode,
-with ⇧Z still Fit Timeline.
+with ⇧Z still Fit Timeline. Phase 4 took NO key: its three commands are
+File-menu items, and a modifier-less menu key is resolved ahead of the
+first responder, so one would steal a letter the editor's own `keyDown`
+owns.
 
 | Keys | Action | Phase |
 |---|---|---|
@@ -1442,12 +1840,15 @@ current track, the header's S being the everyday path. **Landed in phase
 3**: Clip ▸ Remove Silences…, with no key equivalent and in the cutting
 group beside Close Gap. Zoom to Region and Zoom Back got no menu items on
 purpose — `Z` and the Video sections' two buttons are the paths, `C`'s
-crop mode being the precedent for a bare-key canvas mode.
+crop mode being the precedent for a bare-key canvas mode. **Landed in
+phase 4**: File ▸ Generate Captions… and File ▸ Export Captions…, both
+without a key equivalent and both directly under Import Captions…, so the
+three caption items read in the order a caption track comes into being and
+leaves again.
 
 Still to come: Clip gains Add Background…, Add Blurred
-Background, Open / Close Nest; File gains Generate Captions…, Export
-Captions…, Save Frame…; View gains Preview Quality ▸ and Preview Window;
-Window gains Export Queue.
+Background, Open / Close Nest; File gains Save Frame…; View gains Preview
+Quality ▸ and Preview Window; Window gains Export Queue.
 
 ## 4. Considered and left out
 

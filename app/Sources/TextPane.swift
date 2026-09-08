@@ -1,7 +1,8 @@
 import AppKit
 
 /// The Clip tab's TEXT sections (spec §4.3): content, face, colour,
-/// alignment, spacing, outline, backdrop, the box mode, and the four presets.
+/// alignment, spacing, outline, backdrop, the box mode, how the words arrive
+/// and leave, and the four presets.
 ///
 /// **This pane is never shown**: since the six tabs became three it is a
 /// factory `ClipPane` holds and calls, right after Transform, when EVERY
@@ -295,6 +296,95 @@ final class TextPane: InspectorPaneView {
                     read: currentWidth,
                     ops: { binding.ops(text: TextPatch(width: .some($0))) },
                     enabled: fixed),
+            ])
+    }
+
+    // MARK: Animation
+
+    /// How the words arrive and how they leave (§4.3, format version 5).
+    ///
+    /// Three controls for three keys: which reveal, how long it takes to
+    /// arrive, and how long it takes to leave. The core turns them into one
+    /// number per frame — nothing here draws or times anything, and the
+    /// section cannot show the reveal's progress, because the progress is a
+    /// fact about the frame under the playhead and not about the clip.
+    ///
+    /// `animation` is a whole OBJECT in the patch, so every row re-sends all
+    /// three keys: a patch of a nested object is a REPLACEMENT, and a key
+    /// left out would come back as that struct's default and silently reset
+    /// what the user did not touch (`app/CLAUDE.md`). Turning the popup to
+    /// None sends an explicit null, which is the model's "no animation".
+    ///
+    /// One thing worth knowing before animating this section from an action:
+    /// `in` and `out` are numbers, so an action END patch would interpolate
+    /// them and slide the animation's own timebase mid-reveal. The kind is a
+    /// string and switches at the end, which is the sane half.
+    func animationSection() -> InspectorSection {
+        let binding = self.binding
+        let kinds = TextAnimationKind.allCases
+        let items = ["None"] + kinds.map { $0.displayName }
+        func current() -> TextAnimation { binding.textProps.animation ?? TextAnimation() }
+        func on() -> Bool { binding.textProps.animation != nil }
+        func ticks(_ seconds: Double) -> Ticks {
+            ReelTime.snapToFrame(ReelTime.ticks(seconds: max(seconds, 0)), fps: binding.canvas.fps)
+        }
+        func ops(_ next: TextAnimation) -> [ReelOp] {
+            binding.ops(text: TextPatch(animation: .some(next)))
+        }
+        return InspectorSection(
+            id: "text.animation", title: "Animation",
+            summary: {
+                guard let animation = binding.textProps.animation else { return "off" }
+                return animation.kind.displayName.lowercased()
+                    + String(format: " · %.2f s", ReelTime.seconds(animation.inDuration))
+            },
+            note: { binding.actionNote },
+            reset: { binding.apply("Animation", text: TextPatch(animation: .some(nil))) },
+            defaultExpanded: false,
+            rows: [
+                inspectorPopupRow(
+                    "Reveal", binding, name: "Text Animation", items: items,
+                    read: {
+                        guard let kind = binding.textProps.animation?.kind else { return 0 }
+                        return (kinds.firstIndex(of: kind) ?? 0) + 1
+                    },
+                    ops: { index in
+                        guard index > 0, kinds.indices.contains(index - 1) else {
+                            return binding.ops(text: TextPatch(animation: .some(nil)))
+                        }
+                        // The durations as they stand: switching the reveal
+                        // must not reset the timing the user chose for it.
+                        let animation = current()
+                        return ops(
+                            TextAnimation(
+                                kind: kinds[index - 1], inDuration: animation.inDuration,
+                                outDuration: animation.outDuration))
+                    },
+                    mixed: { binding.mixedText { $0.animation?.kind } }),
+                inspectorValueRow(
+                    "In", binding, name: "Animation In", unit: " s", decimals: 2, min: 0, max: 10,
+                    quick: [0, 0.25, 0.5, 1, 2],
+                    read: { ReelTime.seconds(current().inDuration) },
+                    ops: { value in
+                        ops(
+                            TextAnimation(
+                                kind: current().kind, inDuration: ticks(value),
+                                outDuration: current().outDuration))
+                    },
+                    mixed: { binding.mixedText { $0.animation?.inDuration } },
+                    enabled: on),
+                inspectorValueRow(
+                    "Out", binding, name: "Animation Out", unit: " s", decimals: 2, min: 0,
+                    max: 10, quick: [0, 0.25, 0.5, 1, 2],
+                    read: { ReelTime.seconds(current().outDuration) },
+                    ops: { value in
+                        ops(
+                            TextAnimation(
+                                kind: current().kind, inDuration: current().inDuration,
+                                outDuration: ticks(value)))
+                    },
+                    mixed: { binding.mixedText { $0.animation?.outDuration } },
+                    enabled: on),
             ])
     }
 

@@ -14,11 +14,15 @@ as work lands.
 Published as a page (the pre-M3 version, kept for the phase plan it describes):
 <https://claude.ai/code/artifact/be6e91de-48f2-413e-a5f1-a4a91a01a0a1>
 
-## 1. Where things stand
+## 1. Where things stood at M3's close
 
 `make test` 203 passing · `make lint` clean · `make typecheck` 0 errors,
 4 warnings (AVFoundation deprecations, deliberate) · `make app` succeeded ·
 57 MCP tools · format version 2.
+
+**Those are M3's numbers, kept as the record of that moment and not updated
+since** — this document is the record of M1–M3, and road map 2 has moved all
+of them. `CLAUDE.md` and `reelcut-roadmap-2.md` carry the current ones.
 
 **Verified by driving the built binary and comparing rendered frames or
 measured audio** — the standard this project holds itself to, and the reason

@@ -57,6 +57,15 @@ targets:
         NSHighResolutionCapable: true
         ATSApplicationFontsPath: Fonts
         NSHumanReadableCopyright: ""
+        # File ▸ Generate Captions… (Transcriber.swift). NOT optional and not
+        # a nicety: SFSpeechRecognizer.h says an app whose Info.plist lacks
+        # this key CRASHES the moment it calls requestAuthorization. app/
+        # Info.plist is generated and git-ignored, so this block is the only
+        # place it can live. No microphone key — an
+        # SFSpeechURLRecognitionRequest reads a file.
+        NSSpeechRecognitionUsageDescription:
+          Reelcut transcribes the audio of clips you choose, on this Mac, to write captions.
+          Nothing is sent anywhere.
         UTExportedTypeDeclarations:
           - UTTypeIdentifier: com.kgalligan.reelcut-project
             UTTypeDescription: Reelcut Project

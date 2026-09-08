@@ -70,6 +70,17 @@ normative: §5.2 is the project schema, §6 the op table, §7 the architecture.
   to four blurred or pixelated regions per clip, each drawn on the canvas
   or typed into the inspector, each riding with its layer through every
   scale, move and rotation, and each animatable like any other property.
+- **Words.** Captions go in and out: File ▸ Import Captions… reads a
+  SubRip file, **Generate Captions…** writes one from the clip's own audio
+  with on-device speech recognition (a language, a scope, a progress bar,
+  and a grant macOS asks you for once), and **Export Captions…** writes a
+  track back out as `.srt` or `.vtt`. A caption is an ordinary text clip
+  either way, which is what makes burn-in on export free and lets you drag
+  one to retime it. Text clips also arrive and leave under their own power:
+  a **typewriter**, a **word fade** or a **line rise**, with separate in
+  and out durations. The core computes how far along a reveal is, once per
+  frame, so the preview, a rendered frame and an export cannot disagree
+  about it.
 - **Playback** over an `AVComposition` built from the core's composition plan,
   with a Metal compositor drawing every frame from the core's frame recipe.
   A property-only edit re-renders the paused frame without rebuilding the
@@ -89,9 +100,12 @@ landed with it — text, shapes, transitions, audio
 volume/fade/duck/detach, freeze frame, speed, the in/out range and the agent —
 and **M2 and M3 are now done too**: chapters on export, nests, filters,
 reflection, spotlight, reverse, the audio DSP, GIF/APNG export, SRT captions,
-Consolidate Media and ffmpeg-assisted import. `CLAUDE.md` carries the
-milestone record and `designs/reelcut-roadmap.md` what still needs a person
-at the machine.
+Consolidate Media and ffmpeg-assisted import. Beyond the spec,
+`designs/reelcut-roadmap-2.md`'s phases 0 through 4 have landed — the
+groundwork, the cutting moves, clip identity, the screencast trio, and now
+captions in both directions with the built-in text animations.
+`CLAUDE.md` carries the milestone record and `designs/reelcut-roadmap.md`
+what still needs a person at the machine.
 
 What has actually been checked, and what has not: the model, the ops, the
 composition plan, the frame recipe, the compositor, save/open and export were
@@ -128,15 +142,16 @@ Makefile              Build orchestration
 | `ProjectSnapshot.swift` | the `Codable` mirror of the §5.2 project JSON, the plan and the recipe, plus the §5.3 placement maths |
 | `ProjectDocument.swift` | NSDocument, `.reelcut` package read/write, and the single mutation point (`applyEdit`, the live-edit trio, undo as a handle stack) |
 | `MediaImporter.swift` | `AVURLAsset` probing (the one file allowed `async`/`await`), thumbnails, waveform peaks |
-| `CompositionBuilder.swift` · `Compositor.swift` · `LayerRenderers.swift` · `Playback.swift` | plan → `AVComposition`; the `AVVideoCompositing` Metal pipeline; text/shape/image textures; the player and its rebuild-vs-refresh rule |
+| `CompositionBuilder.swift` · `Compositor.swift` · `LayerRenderers.swift` · `Playback.swift` | plan → `AVComposition`; the `AVVideoCompositing` Metal pipeline; text/shape/image textures and the three text reveals the recipe asks for; the player and its rebuild-vs-refresh rule |
+| `CaptionImporter.swift` · `CaptionLayout.swift` · `Transcriber.swift` · `CaptionExporter.swift` | captions in and out: the SubRip grammar, the placement every producer shares, on-device speech recognition and the cue builder over it, and the `.srt` / `.vtt` writer |
 | `Exporter.swift` · `ExportSheetController.swift` | writing a file, and rendering one frame offline |
 | `TimelineLayout.swift` · `TimelineSessions.swift` · `TimelineView.swift` | all tick↔point arithmetic; the gesture session structs; the timeline view |
 | `CanvasSessions.swift` · `PreviewCanvasView.swift` | canvas geometry and gestures; the preview and its overlay |
 | `InspectorPane.swift` · `InspectorViewController.swift` · `ClipPane` `MediaPane` `DocumentPane` (with `VideoPane` `AudioPane` `TextPane` `ShapePane` as section factories) | the binding that knows about actions, one file per tab, and the sections the Clip tab composes |
 | `EditorViewController.swift` + `EditorViewController+{Timeline,Canvas,Inspector,Export}.swift` | wiring in the base file, features in extensions |
-| `AgentServer.swift` + `AgentServer+{Arguments,Project,Clips,Tracks,Media,Render,History,Silence}.swift` · `AgentCatalog.swift` | the MCP endpoint, its handlers, and the tool catalog |
+| `AgentServer.swift` + `AgentServer+{Arguments,Project,Clips,Tracks,Media,Render,History,Silence,Captions}.swift` · `AgentCatalog.swift` | the MCP endpoint, its handlers, and the tool catalog |
 | `AppDelegate.swift` · `EditorWindowController.swift` · `WelcomeWindowController.swift` · `main.swift` | menus (nil-target selectors), window, welcome |
-| `SpeedSheetController.swift` · `RelinkSheetController.swift` · `SilenceSheetController.swift` (with `SilenceDetector.swift` behind it) | the remaining dialogs |
+| `SpeedSheetController.swift` · `RelinkSheetController.swift` · `SilenceSheetController.swift` (with `SilenceDetector.swift` behind it) · `TranscribeSheetController.swift` | the remaining dialogs |
 | `Theme.swift` · `Controls.swift` · `OptionControls.swift` · `Sheets.swift` · `EditorChrome.swift` · `FileDropView.swift` | shared chrome, copied from Rasterize |
 
 ## Building
@@ -211,6 +226,8 @@ here.
 | `import_media {path}` | probes a file and returns the **new media id**; `add_clip` then places it |
 | `import_captions {path, track?}` | an SRT file as text clips (File ▸ Import Captions…) |
 | `consolidate_media {}` | copies every referenced file into the package (File ▸ Consolidate Media…) |
+| `transcribe {clips?, language?, place?}` | on-device speech recognition into caption clips (File ▸ Generate Captions…). Returns the cues in ticks whether or not it places them, and `place: false` changes nothing at all. macOS gates speech recognition and this tool never asks: without the grant it refuses with the status named, since the system prompt needs a frontmost app and an agent-driven one never is |
+| `export_captions {track?, path, format?}` | one text track out as `.srt` or `.vtt` (File ▸ Export Captions…). The track is never guessed — with no all-text track, or more than one, it refuses and lists the candidates |
 | `detect_silence {clips?, threshold_db?, min_length?, padding?}` | the quiet spans of the timeline, which `ripple_delete_ranges` then cuts — the same detector Clip ▸ Remove Silences… uses, so an agent and the sheet propose the same cuts. It changes nothing; loudness is the waveform peak times the mix envelope, so mute and solo are already in the answer |
 | `set_playhead {t}` | moves the playhead and seeks the preview |
 | `set_range {start?, end?}` | the in/out range (I / O / ⌥X); no bounds clears it |

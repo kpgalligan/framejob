@@ -84,7 +84,7 @@ fn identified() -> Value {
 }
 
 fn assert_identity_defaults(project: &Value) {
-    assert_eq!(at(project, "/version"), &json!(4));
+    assert_eq!(at(project, "/version"), &json!(5));
     assert_eq!(at(project, "/clips/0/name"), &Value::Null);
     assert_eq!(at(project, "/clips/0/label"), &Value::Null);
     assert_eq!(at(project, "/tracks/0/solo"), &json!(false));
@@ -110,11 +110,11 @@ fn a_version_one_file_reads_the_same_way() {
 
 #[test]
 fn a_file_one_version_newer_is_refused_with_the_exact_message() {
-    let msg = Handle::try_from_value(&json!({ "version": 5 }))
+    let msg = Handle::try_from_value(&json!({ "version": 6 }))
         .expect_err("a newer format version must be refused");
     assert_eq!(
         msg,
-        "project format version 5 is newer than this build understands (version 4); \
+        "project format version 6 is newer than this build understands (version 5); \
          update Reelcut to open it"
     );
 }
@@ -127,7 +127,7 @@ fn name_label_and_solo_round_trip_exactly() {
     // spaces: trimming is `set_clip`'s job, and a reader that tidied would
     // rewrite a file just by opening it.
     let written = Handle::from_value(&identified()).value();
-    assert_eq!(at(&written, "/version"), &json!(4));
+    assert_eq!(at(&written, "/version"), &json!(5));
     assert_eq!(text(&written, "/clips/0/name"), NAME);
     assert_eq!(text(&written, "/clips/0/label"), "blue");
     assert!(flag(&written, "/tracks/0/solo"));

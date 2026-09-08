@@ -41,7 +41,25 @@ use crate::model::{Canvas, Project};
 /// key: `ripple_delete_ranges` only removes time, and `add_zoom_action`
 /// writes an ordinary [`crate::model::Action`] whose `end` patch is schema
 /// that already existed.
-pub const RC_FORMAT_VERSION: u32 = 4;
+///
+/// Version 5 is text animations (road map 2, phase 4c):
+/// [`crate::model::TextProps::animation`], the kind of reveal a text layer
+/// arrives and leaves with and how long each half takes. The field is an
+/// `Option` and defaults to `None`, so a version-4 file reads unchanged and
+/// there is no migration step for it either. The bump is there for
+/// versions 3 and 4's reason exactly, and it is worth restating rather than
+/// pointing at, because a defaulted field is precisely the case where the
+/// bump looks like paperwork: unknown keys are ignored at every level by
+/// design (`model.rs`'s module doc), so without the version gate a
+/// version-4 build would open a version-5 file, drop every animation on
+/// read, and write the loss back over the original on the next save —
+/// silently, since the project still opens and the text is still there. It
+/// is the fields that need NO migration whose loss is quietest. Nothing
+/// else phase 4 added persists a new key: auto captions and caption export
+/// both work in ordinary text clips through the ops that already existed,
+/// and the per-frame reveal the animation produces is computed by
+/// [`crate::recipe`] and never stored.
+pub const RC_FORMAT_VERSION: u32 = 5;
 
 /// Reader caps, mirrored by the `RC_MAX_*` defines in the C header. They
 /// exist so a corrupt or generated file cannot make the app allocate
@@ -215,9 +233,10 @@ pub fn read(json: &str) -> Result<Project, String> {
 
     // MIGRATION HOOK. Each bump adds one step here, applied in order from
     // `version` up to RC_FORMAT_VERSION, rewriting `value` in place before
-    // it is deserialized. Versions 3 and 4 needed no rewrite — every field
-    // either added carries a serde default — so neither has a line; the
-    // next version that changes a field's SHAPE adds its own below.
+    // it is deserialized. Versions 3, 4 and 5 needed no rewrite — every
+    // field any of them added carries a serde default — so none has a
+    // line; the next version that changes a field's SHAPE adds its own
+    // below.
     if version < 2 {
         migrate_1_to_2(&mut value);
     }

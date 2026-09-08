@@ -834,8 +834,9 @@ final class MetalRenderer {
             else { return .slate(layer.sourceSizeCG ?? CGSize(width: 640, height: 360)) }
             return .textured(
                 rendered.texture, rendered.size, premultiplied: true, orientation: 0)
-        case .text(let hash, let props):
-            guard let rendered = renderers.text(props, hash: hash) else { return .absent }
+        case .text(let hash, let props, let reveal):
+            guard let rendered = renderers.text(props, hash: hash, reveal: reveal)
+            else { return .absent }
             return .textured(
                 rendered.texture, rendered.size, premultiplied: true, orientation: 0)
         case .shape(let hash, let props):

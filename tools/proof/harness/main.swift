@@ -43,6 +43,43 @@
 //                      but its header — its rows cannot be seen at all. Each
 //                      id here pins its key to "not collapsed".
 //
+// A SECOND MODE, which renders nothing:
+//
+//   harness cues <words.json> <out.json>
+//
+// reads a word list and writes the cues `CaptionCues.build` makes of it. It
+// belongs in this program and nowhere else, for one reason: this is the only
+// binary in the tree that links `app/Sources` outside the app, and the four
+// cue rules — at most two lines, at most 42 characters a line, at most six
+// seconds a cue, at least a frame of gap between cues — cannot be reached any
+// other way without a person at the machine. Nothing in the app calls
+// `CaptionCues` until a recogniser has produced words, and
+// `SFSpeechRecognizer` will not produce any without a Speech Recognition
+// grant that only a frontmost app can be given, so over MCP those rules are
+// unreachable and `phase4_proof.py` says so out loud rather than pretending
+// otherwise. The arithmetic itself has no `Speech` in it at all — words with
+// times in, cues out — so the way to test it is to hand it words with times,
+// and this is the one place from which that can be done.
+//
+// It is a MODE and not a fifth render argument because it shares nothing with
+// a render: no window, no pinned defaults, no fonts, no appearance. It is
+// answered before any of that is set up, the way `welcome` is answered before
+// a package is opened, and every render argument below keeps the position it
+// had — `phase2_chrome.py`, `phase3_chrome.py` and `phase4_chrome.py` all
+// depend on that order, so this file grows by addition and never by
+// rearrangement.
+//
+// `words.json` is `{"fps": [30, 1], "words": [{"text": "…", "start": 0,
+// "end": 300000}, …]}`, in TICKS rather than seconds, because the rules are
+// measured in ticks and a frame at 30 fps is 20 000 of them and 0.0333… of a
+// second: a fixture written in seconds could not say "exactly one frame"
+// exactly. `fps` defaults to 30/1 and is what the gap is one frame OF. The
+// output is `{"fps", "frame", "cues"}`, and each cue carries its `start`,
+// `end`, `text` and `tag` plus `snapped_start` and `snapped_end` — those two
+// times put on the frame grid by the same `ReelTime.snapToFrame` that
+// `CaptionLayout.place` will call on them next, since the gap rule's whole
+// point is that it is still there after the snap.
+//
 // Determinism: the app persists its pane sizes, the inspector's collapsed
 // state, the track height, snapping and the Document tab's one checkbox in
 // `UserDefaults`, and a bare binary shares the "harness" defaults domain
@@ -138,7 +175,58 @@ enum Harness {
         }
     }
 
-    static func png(_ view: NSView, to url: URL) throws {
+    /// The cue builder, run over a word list from a file — the second mode of
+    /// the header, and the only way `CaptionCues.build` can be reached without
+    /// a Speech Recognition grant.
+    ///
+    /// Everything here is a translation: JSON into `CaptionCues.Word`s, the
+    /// cues back into JSON. Nothing is computed that the app does not compute,
+    /// which is the point — a proof that re-implemented the rules in order to
+    /// check them would be checking itself. The one addition is the pair of
+    /// snapped times, and even those are `ReelTime.snapToFrame`'s over
+    /// `CaptionLayout.place`'s own `max(0, start)`: they are the first thing
+    /// the placement does to a cue, before it has had any say of its own about
+    /// one shorter than a frame or one that overlaps its successor.
+    static func cues(from input: URL, to output: URL) throws {
+        struct Request: Decodable {
+            struct Word: Decodable {
+                let text: String
+                let start: Ticks
+                let end: Ticks
+            }
+            /// `[num, den]`, the model's own spelling of a rate (§5.2).
+            let fps: [Int]?
+            let words: [Word]
+        }
+        let request = try JSONDecoder().decode(Request.self, from: Data(contentsOf: input))
+        let rate = request.fps ?? [30, 1]
+        let fps = Fps(num: rate.first ?? 30, den: rate.count > 1 ? rate[1] : 1)
+        // `max(_, 1)` is `CaptionLayout.place`'s own guard against a
+        // degenerate rate, and the builder is handed the same number the
+        // placement will use.
+        let frame = max(fps.frameDuration, 1)
+        let built = CaptionCues.build(
+            from: request.words.map {
+                CaptionCues.Word(text: $0.text, start: $0.start, end: $0.end)
+            }, frame: frame)
+        let rows = built.map { cue -> [String: Any] in
+            [
+                "start": cue.start,
+                "end": cue.end,
+                "snapped_start": ReelTime.snapToFrame(max(0, cue.start), fps: fps),
+                "snapped_end": ReelTime.snapToFrame(cue.end, fps: fps),
+                "text": cue.text,
+                "tag": cue.tag,
+            ]
+        }
+        let json: [String: Any] = ["fps": [fps.num, fps.den], "frame": frame, "cues": rows]
+        try JSONSerialization
+            .data(withJSONObject: json, options: [.prettyPrinted, .sortedKeys])
+            .write(to: output)
+    }
+
+    /// One capture of the view, as PNG bytes.
+    private static func capture(_ view: NSView) throws -> Data {
         view.layoutSubtreeIfNeeded()
         view.displayIfNeeded()
         guard let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else {
@@ -148,7 +236,51 @@ enum Harness {
         guard let data = rep.representation(using: .png, properties: [:]) else {
             throw NSError(domain: "harness", code: 2)
         }
-        try data.write(to: url)
+        return data
+    }
+
+    /// Captures the view once it has STOPPED MOVING, rather than after a fixed
+    /// number of runloop turns.
+    ///
+    /// A fixed spin count is a guess about how long the last relayout takes,
+    /// and waiting for the answer is better than guessing at it whatever else
+    /// is true.
+    ///
+    /// It is NOT, however, what makes a render reproducible, and the history
+    /// is worth keeping so nobody re-reads it the same way. This was landed
+    /// in phase 4 as the cure for a bistable inspector — the Actions pane
+    /// sometimes at its intrinsic height and sometimes stretched, a render
+    /// deterministic within a process and different across processes — and it
+    /// cured nothing, because a settle can only wait out a layout that is
+    /// still MOVING and both of those layouts had already stopped. The cause
+    /// was an ambiguous constraint in `InspectorPane.swift` (a bottom pin at
+    /// `.defaultLow` tying with a section's own default hugging of 250), and
+    /// it is fixed there. Keep this loop for what it actually buys — no magic
+    /// number to re-tune when a view is added — and do not reach for it again
+    /// when two runs disagree: identical, stable, DIFFERENT output is an
+    /// ambiguity to find, not a race to out-wait.
+    ///
+    /// So the instrument waits for its subject: capture, spin, capture again,
+    /// and only write when two consecutive captures are byte-identical. A
+    /// layout that has stopped changing produces the same bytes twice; one
+    /// still settling does not. The bound is generous because the cost of an
+    /// extra turn is milliseconds and the cost of a flaky proof is a person
+    /// re-running it and learning to distrust it.
+    static func png(_ view: NSView, to url: URL) throws {
+        var previous = try capture(view)
+        for _ in 0..<40 {
+            RunLoop.current.run(until: Date().addingTimeInterval(0.02))
+            view.layoutSubtreeIfNeeded()
+            let next = try capture(view)
+            if next == previous {
+                try next.write(to: url)
+                return
+            }
+            previous = next
+        }
+        FileHandle.standardError.write(
+            "warning: the layout never settled; writing the last capture\n".data(using: .utf8)!)
+        try previous.write(to: url)
     }
 }
 
@@ -156,10 +288,29 @@ let arguments = CommandLine.arguments
 guard arguments.count >= 4 else {
     FileHandle.standardError.write(
         ("usage: harness <project.reelcut|welcome> <out.png> <light|dark> "
-            + "[w] [h] [selectIndex] [playheadSec] [sizeIndex 0-2] [clip|media|document]\n")
+            + "[w] [h] [selectIndex] [playheadSec] [sizeIndex 0-2] [clip|media|document] "
+            + "[candidateSpans] [expandSections]\n"
+            + "       harness cues <words.json> <out.json>\n")
             .data(using: .utf8)!)
     exit(64)
 }
+
+// The cue mode, answered first and answered here: it opens no package, wakes
+// no AppKit and reads no defaults, so none of the setup below it applies. Its
+// three arguments sit inside the render form's own count, so the guard above
+// serves both and no render argument moved.
+if arguments[1] == "cues" {
+    do {
+        try Harness.cues(
+            from: URL(fileURLWithPath: arguments[2]), to: URL(fileURLWithPath: arguments[3]))
+        print("wrote \(arguments[3])")
+        exit(0)
+    } catch {
+        FileHandle.standardError.write("cues failed: \(error)\n".data(using: .utf8)!)
+        exit(4)
+    }
+}
+
 let projectURL = URL(fileURLWithPath: arguments[1])
 let outURL = URL(fileURLWithPath: arguments[2])
 let appearanceName: NSAppearance.Name = arguments[3] == "dark" ? .darkAqua : .aqua

@@ -206,8 +206,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             item(
                 "Add Media…", #selector(EditorViewController.addMediaFiles(_:)), "i",
                 [.command, .shift]))
+        // The three caption items sit together, in the order a caption track
+        // comes into being and leaves again: read one in, make one from
+        // speech, write one back out. None of the three takes a key
+        // equivalent — spec §9's "proposed, not yet bound" table claims no
+        // row for phase 4, and a modifier-less menu key would be resolved
+        // ahead of the first responder and steal a letter the editor's own
+        // `keyDown` owns (the reason recorded at Remove Silences… below).
         menu.addItem(
             item("Import Captions…", #selector(EditorViewController.importCaptions(_:))))
+        menu.addItem(
+            item("Generate Captions…", #selector(EditorViewController.generateCaptions(_:))))
+        menu.addItem(
+            item("Export Captions…", #selector(EditorViewController.exportCaptions(_:))))
         menu.addItem(
             item("Consolidate Media…", #selector(EditorViewController.consolidateMedia(_:))))
         menu.addItem(.separator())

@@ -84,6 +84,25 @@ ffmpeg's rounding rather than the detector's. The tone lands around
 does, since the proof reaches its "everything is quiet" case with a threshold
 of 0 dBFS rather than one pitched near the tone.
 
+Phase 4 adds a recording of SPEECH — `speech.mov`, a navy card over `say`'s
+rendering of two pangrams — for the person who runs the caption proof with
+the Speech Recognition grant. Nothing a script can reach needs it (see
+`phase4_proof.py` below), so it is the one fixture here that exists for a
+human:
+
+```sh
+say -o speech.aiff "The quick brown fox jumps over the lazy dog. \
+Pack my box with five dozen liquor jugs."
+ffmpeg -y -f lavfi -i "color=c=navy:size=640x360:rate=30" -i speech.aiff \
+  -shortest -pix_fmt yuv420p -c:v libx264 -c:a pcm_s16le -ac 2 speech.mov
+```
+
+(5.2 s; `say`'s own voice and rate, so the words are the fixture and the
+timing is not.) Phase 4's other fixture is a `.srt` file, and
+`phase4_proof.py` WRITES it: it is the thing being compared against, and a
+proof that authors its own expected bytes cannot be reading a file somebody
+edited by hand.
+
 Then launch YOUR OWN instance on YOUR OWN port and only ever kill that one
 (`pgrep -f "MacOS/Reelcut"` lists them; another session may have one running):
 
@@ -95,6 +114,7 @@ python3 tools/proof/phase1_proof.py 4823
 python3 tools/proof/phase2_proof.py 4823
 python3 tools/proof/phase3_proof.py 4823
 python3 tools/proof/phase3_silence_scope.py 4823
+python3 tools/proof/phase4_proof.py 4823
 ```
 
 The last line is `<n>/<n> checks passed`, and the exit status is non-zero if
@@ -104,10 +124,15 @@ startup parity check would complain — `grep "Reelcut: " /tmp/reelcut-4823.log`
 must print nothing before a proof run means anything.
 
 **The EXACT tool count belongs to the newest phase's script**, because it is
-what tells a stale binary on the port from the build under test: phase 3
-asserts 68, and phases 1 and 2 keep floors (63 and 65) so a later phase's
-tools never fail an older proof. When phase 4 lands, the exact count moves to
-its script and phase 3's becomes a floor too.
+what tells a stale binary on the port from the build under test: phase 4
+asserts 70, and phases 1, 2 and 3 keep floors (63, 65 and 68) so a later
+phase's tools never fail an older proof. When phase 5 lands, the exact count
+moves to its script and phase 4's becomes a floor too. It is not decoration:
+the phase-4 count was checked against the two new tools taken out of the
+catalog and the registry together, where it reads 68 — and it is not the
+only check that notices. `check` never stops a run, so that build goes on to
+fail every check that names either tool and then ABORTS at 4b's first
+`export_captions`; the mutation paragraph below has the whole list.
 
 **Relaunch the instance between proof sessions.** Nothing closes a document —
 there is no such tool — so every project a proof makes stays open, and each
@@ -185,6 +210,109 @@ Both failing checks answer `[[padding, 10 s − padding]]` on a build without
 the fix, so neither can pass against one. It needs no ffmpeg — nothing here
 is exported — and runs against the same instance as the rest.
 
+`phase4_proof.py` covers the catalog COUNT (70, the exact one) and phase 4's
+three parts. It needs no ffmpeg: nothing in it is exported to a movie.
+
+**Auto captions, honestly.** Speech recognition is gated by a TCC grant an
+agent-driven app can never obtain — the system prompt needs the app to be
+frontmost — so the recogniser is out of reach of every script, and the proof
+says so rather than pretending otherwise. What it DOES assert is the whole
+path around it: the three ineligible sources of the contract's D-A7 are each
+refused by name with the reason that belongs to them (a text clip, a
+REVERSED clip, a clip of a silent movie), a timeline with nothing audible in
+it is refused as that rather than as a scope, and then the grant itself —
+`transcribe` refuses with the exact sentence, NAMES the framework's status
+word inside it (`notDetermined` here), leaves the project JSON unchanged and
+pushes no undo step. That the scope refusals are reachable at all is the
+claim: the handler answers the caller's own mistakes BEFORE it reads the
+grant, and a build with those two guards swapped answers all four with the
+authorization sentence. What is NOT reachable HERE is the cue builder — the
+≤ 2 lines, ≤ 42 characters, ≤ 6 s and one-frame-gap rules of `CaptionCues` —
+because nothing in a running app calls it until a recogniser has produced
+words, and no MCP call can make one. Those four rules are proved in
+`phase4_chrome.py`'s section 8 instead, over the offscreen harness, which is
+the one binary that can call `CaptionCues.build` directly; the paragraph on
+that script says how.
+
+**With the grant**, which means opening the app yourself once and running
+File ▸ Generate Captions… so macOS can ask: import `media/speech.mov`, run
+`transcribe` over it, and the two pangrams should come back as text clips on
+a new "Captions" track, in order, none longer than 6 s or wider than two
+42-character lines, each starting at least a frame after the one before, and
+`render_frame` inside a cue should show its words burnt into the picture.
+`transcribe {place: false}` returns the same cues and changes nothing.
+
+**Caption export** is where the measurement is. The `.srt` fixture is
+written by the script at **25 fps**, where a frame is 40 ms exactly, so
+every cue time survives the snap to the frame grid and the round trip —
+import, export, and the two files are compared BYTE FOR BYTE. The same
+fixture at 30 fps must NOT come back (40 ms is 1.2 frames there, and
+`00:00:00,440` returns as `00:00:00,433`), and that half is what makes the
+first half a proof rather than a tautology: an exporter that echoed its
+input file would pass at 25 and fail at 30. The `.vtt` is DERIVED from the
+SubRip in the script — header, no index lines, `.` for `,` — and compared
+byte for byte too, on text containing no `&`, `<` or `>`, which WebVTT
+escapes and SubRip does not. Then the refusals: no text track, two all-text
+tracks (refused with both candidates named by id and name), a named track
+holding a movie, a format outside the two containers, and a `.srt` path
+asked for as `vtt`, which must write `talk.vtt` and not `talk.srt.vtt`.
+
+**Text animations**, every claim off a rendered PNG. The text is one
+left-aligned line of the bundled MONOSPACED font with an even character
+count and no spaces, and the font is the whole point: at reveal 0.5 a
+monospaced prefix inks EXACTLY half the columns the whole line inks and at
+0.25 exactly a quarter, so the check needs no tolerance and a proportional
+font would fail it on correct code. Measured, against a reveal-0 frame taken
+per KIND with the animation SET — never off a cleared clip, whose reveal is
+1 at every t, so a blank taken there would be the static frame a second time
+and "neither the static frame nor the empty one" would be one comparison
+written twice: `reveal = 1` is byte-identical to no animation at all for all
+three kinds, reveal 0 draws nothing at all for each of them, a half-typed
+line inks columns only LEFT of the whole line's midpoint and starts at the
+same column it does, every pixel where the half-typed frame differs from the
+whole one lies to the RIGHT of what it has typed, `word_fade` and
+`line_rise` each change the frame at their midpoint, an out-only animation
+is whole at the clip's first frame and changed half way through its ramp
+(measured against the same kind's empty frame, so "not empty" is a claim
+about pixels that are still drawn), and clearing the
+animation returns the frame byte-identically. The **stale-texture guard** is
+measured in ONE frame rather than two, because a `render_frame` builds its
+own compositor and therefore its own texture cache: two clips with an
+IDENTICAL text description, started half a second apart, are at different
+reveals at the same instant, and one cache serves both — so if the core's
+content hash did not cover the reveal the second layer would be handed the
+first layer's texture. It reads 216 columns against 108; with the reveal
+taken back out of `recipe.rs`'s `text_hash` it reads 216 against 216.
+The schema half is the saved `project.json` (version 5, `animation` the LAST
+key of every text object), a hand-made version-4 fixture that opens and
+reads a null animation, and the two refusals — a kind outside the closed
+enum, and a negative `in` or `out` named by its dotted key.
+
+Every one of those checks was MUTATION-TESTED against four deliberate
+breakages, which is what makes the score mean anything: the reveal taken
+out of the content hash, `TextProps.animation` moved off the end, the
+`text.animation` range checks deleted and `RC_FORMAT_VERSION` put back to 4
+(six checks fail, and only those six); `Reveal::of` returning "all of it"
+always (thirteen when it was run, and the two prose reveal-0 blanks added
+since fail under it too — a build with no reveal draws the whole text at
+reveal 0, which is exactly why those blanks are taken with the animation SET
+and not off the cleared clip, whose reveal is 1 at every t); the grant read
+before the scope, a cue's line breaks joined with a space,
+`format(for:requested:)` ignoring its argument, `resolveTrack` guessing at an
+ambiguity and `ramp` clamped to 0.95 (eighteen); and the two tools taken out
+of the catalog and the registry, which is not the three checks it looks like
+but SIXTEEN and an abort — the exact count, both "is a tool" checks, the six
+schema checks that read `schema_of`'s stand-in (three per missing tool, which
+is what that docstring means), `export_captions`' description check, and
+every scope and grant refusal in 4a, where `transcribe` comes back "Unknown
+tool"; the run then stops at 4b's first `export_captions`, the one call to
+either tool that is not wrapped in `error()`. That last one was re-measured
+through a PROXY rather than a fourth build — the two rows dropped from
+`tools/list` and either call answered `Unknown tool: <name>` in band, which
+is the whole of what removing a catalog row and a registry row is over MCP
+(`AgentServer.dispatch`) — so the count above is what the script prints, not
+what a reader worked out from it.
+
 `media/` and `work/` are ignored: the movies are regenerable from the lines
 above and the projects are rebuilt on every run. Phase 2's packages are
 named `<name>-<pid>.reelcut` rather than `<name>.reelcut`, and each run
@@ -196,7 +324,9 @@ survive a third run). A fresh path per run keeps a third phase-2 run against
 one instance as honest as the first. Phase 3's packages are named the same
 way and its two exports are not: an export path is never matched against an
 open document, so `cut-before.mp4` and `cut-after.mp4` are overwritten rather
-than accumulated.
+than accumulated. Phase 4 splits the same way — packages per pid, and the
+caption files it reads and writes at fixed names, since a `.srt` is neither
+read nor written through the document machinery.
 
 ## The offscreen harness (no running app)
 
@@ -207,8 +337,18 @@ PNG — `harness/build.sh` builds it into `work/harness/` (about 30 s, skipped
 when the binary is newer than the sources and the staticlib; `--force`
 rebuilds) and pins every `UserDefaults` key the chrome reads — the
 persisted view state, the Document tab's `ReelcutInspectorRescaleClips`
-checkbox and `AppleShowScrollBars` — in the argument domain, so two renders
-of one package are byte-identical on one machine. `phase2_chrome.py` is the
+checkbox and `AppleShowScrollBars` — in the argument domain, and captures on
+SETTLE rather than after a fixed number of runloop turns, so two renders of
+one package are byte-identical on one machine. Neither of those is what
+earns the byte identity on its own: the harness spent phase 4 writing two
+different PNGs for one package (nine renders one way, three the other, in
+twelve) because of an ambiguous constraint in the app —
+`InspectorPane.swift`'s bottom pin tying with a section's own hugging — and
+`phase3_chrome.py` scored anywhere from 29 to 33 out of 33 as a result. If a
+chrome proof ever starts wobbling again, that is the shape to look for
+first: a render that is stable within a process and different across
+processes is an Auto Layout ambiguity, and no amount of extra spinning will
+settle it. `phase2_chrome.py` is the
 proof that uses it: it writes six one-text-clip packages by hand under
 `work/`, renders each, decodes the PNGs in pure Python and measures where
 the changed pixels landed against rectangles from the layout constants —
@@ -237,3 +377,88 @@ different backgrounds — that it is `DS.timelineCandidateShade`'s 0.24 and not
 Obscure section's summary tracks the list while the open one grows by
 exactly six rows per region. Nothing about the PICTURE is claimed: the
 preview well renders black offscreen.
+
+Phase 4 needed something else again, and took a second MODE rather than a
+twelfth argument, because it renders nothing at all:
+
+```
+harness cues <words.json> <out.json>
+```
+
+reads `{"fps": [30, 1], "words": [{"text": "…", "start": 0, "end": 300000}]}`
+— TICKS, because a frame at 30 fps is 20 000 of them and 0.0333… of a
+second, and a fixture in seconds could not say "exactly one frame" exactly —
+and writes the cues `CaptionCues.build` makes of that list, each with its
+`start`, `end`, `text`, `tag` and the pair of times `ReelTime.snapToFrame`
+puts on the frame grid next. It belongs to the harness because the harness
+is the only binary in the tree that links `app/Sources` outside the app, and
+that is the ONLY way the four cue rules can be reached without a person at
+the machine: in the app nothing calls `CaptionCues` until a recogniser has
+produced words, and `SFSpeechRecognizer` produces none without a Speech
+Recognition grant only a frontmost app can be given. The mode is answered
+before a package is opened or a default is pinned, the way `welcome` is, and
+every render argument keeps the position it had — added, not rearranged,
+because `phase2_chrome.py`, `phase3_chrome.py` and `phase4_chrome.py` all
+depend on that order.
+
+`phase4_chrome.py` is the same shape again (`python3
+tools/proof/phase4_chrome.py`, no port, no media; renders in
+`work/chrome4/`) for its first seven sections, and needs no new harness
+argument for them — phase 3's `expandSections` already reaches a section
+built `defaultExpanded: false`, and `text.animation`'s is built that way
+too. Of phase 4's three parts the harness can PHOTOGRAPH exactly one: the
+TextPane **Animation** section.
+Auto captions need a TCC grant no headless run can obtain, and the reveal
+itself is a PICTURE, so the typewriter's prefix, the word fade's per-word
+alpha and the line rise's offset belong to `phase4_proof.py` and are not
+claimed here at all. What is measured is that the section exists in the
+Clip tab under its own id, that it is exactly three rows tall, that its
+summary and each of its three rows read the data they are bound to, that a
+shape clip does not get it, and that setting a text animation changes
+NOTHING else in the window. **The window is 1440 × 1100**, and the height
+is measured rather than picked: Animation is the eighth of a text clip's
+sixteen sections, so at phase 2's 862 pt window it is below the fold and
+every comparison comes back at zero changed pixels — a score of checks that
+cannot fail — while at 1300 and above opening a section moves the sections
+ABOVE it too and the downward-shift arithmetic stops being pure. The eight
+packages are written by hand around one clip (a version-4 file with no
+`animation` key, an explicit `null`, one per kind, one moving only `in`,
+one moving only `out`, and a shape clip), so nothing loads asynchronously;
+the shape pair is the one exception to the window height and renders at 862,
+for the reason the note on `SHAPE_HEIGHT` gives.
+
+**Section 8 is not a picture**, and it is in this script because the harness
+is: over the `cues` mode above it runs 4a's **cue builder** — the ≤ 2 lines,
+≤ 42 characters, ≤ 6 s and one-frame-gap rules of `CaptionCues` — over
+twenty word lists, which is the only way those rules can be reached without
+the Speech Recognition grant (`phase4_proof.py` says so from the other
+side). Each rule is asserted at its BOUNDARY rather than in the middle,
+because a rule tested in the middle passes against `<` where the code says
+`<=`: a word of 60 characters comes back whole rather than hyphenated, a
+list of one word keeps its own times, two words at the same instant both
+survive into one cue, a line of exactly 42 characters stays one line while
+43 breaks, a word ending exactly 6 s after its cue began still joins it
+while one tick later starts a new one, a ten-second pause splits, thirty
+words on one short line break at 5.95 s (so only the length rule can have
+broken them), and the one frame of gap comes out EXACTLY one frame — at 30
+and 25 fps, at five offsets from the frame grid, and still exactly one frame
+after `ReelTime.snapToFrame` has moved both ends, which is the claim that
+matters, since a gap the snap ate would be trimmed to an abutting pair by
+`CaptionLayout.place` and retime the transcript. Over all twenty lists, no
+cue is over two lines, no multi-word line over 42 characters, no cue over
+six seconds, no pair under a frame apart, and every word comes back once and
+none is invented.
+
+The chrome's forty checks were mutation-tested against five deliberately
+broken builds compiled outside the repository: dropping `animationSection()`
+from `ClipPane` (17/40), giving the section another id (30/40), pointing the
+header summary at `out` instead of `in` (38/40), swapping the In and Out
+rows (37/40), and making the two value rows ignore `enabled: on` (37/40) —
+five edits to `ClipPane` and `TextPane`, which is why the denominator is
+forty and not the whole score. Section 8's nineteen were mutation-tested the
+same way against five mutations of `CaptionLayout.swift`: the 42-character
+rule written `<` (18/19, and the one that fell is the exactly-42 boundary
+check — the whole argument for testing an edge), the six-second test widened
+to never fire (15/19), the frame of gap dropped so cues merely abut (15/19),
+a third line allowed (16/19), and an over-long word truncated to 42
+characters (17/19).

@@ -26,7 +26,7 @@ mod common;
 
 use serde_json::{json, Value};
 
-use common::{array, flag, int, num, parse_json, text, Handle};
+use common::{array, at, flag, int, num, parse_json, text, Handle};
 use reelcut_core::model::Project;
 use reelcut_core::{Clip, Enabled, Fps, Source, VideoProps};
 
@@ -1144,6 +1144,453 @@ fn a_string_switches_only_at_the_action_end() {
         array(&plan, "/instructions")[0]["required_track_ids"],
         json!([])
     );
+}
+
+// ---- text animations: the computed reveal --------------------------------
+//
+// `text.animation` says what the animation IS (format version 5, and
+// `schema_v5.rs` owns its shape and its ranges); the recipe says what is
+// SHOWING at one instant — `source.reveal`, 0 through 1, `source.reveal_phase`,
+// "in", "out" or null, and `source.reveal_kind`, which of the three routines
+// is drawing. Everything that draws a frame reads that one description, so
+// this is the only place the arithmetic exists and the only place it can be
+// asserted: no MCP tool returns a recipe, and the pixels are the platform's.
+//
+// Every number below is the ramp rule done on paper against tick counts
+// chosen to come out exactly in binary floating point.
+
+/// A 10 s text clip on track 2, `animation` spliced into its text group when
+/// it is not null. The text group is spelled out rather than defaulted so
+/// the description the hash is taken over is one this file can write down.
+fn text_clip(id: u32, start: i64, duration: i64, animation: Value) -> Value {
+    let mut clip = json!({
+        "id": id,
+        "track": 2,
+        "start": start,
+        "duration": duration,
+        "source": { "kind": "text" },
+        "video": {},
+        "text": { "content": "Hello" }
+    });
+    if !animation.is_null() {
+        clip["text"]["animation"] = animation;
+    }
+    clip
+}
+
+/// A typewriter that arrives over `arrive` and leaves over `leave`. The
+/// AMOUNT is the same arithmetic for all three kinds — the core computes one
+/// number and the renderer decides what to draw with it — so the ramp tests
+/// below all use this one and say so; the kind matters only where it is
+/// asserted directly.
+fn typewriter(arrive: i64, leave: i64) -> Value {
+    json!({ "kind": "typewriter", "in": arrive, "out": leave })
+}
+
+/// The same timings under a different kind, for the claims that are about
+/// the kind rather than the ramp.
+fn word_fade(arrive: i64, leave: i64) -> Value {
+    json!({ "kind": "word_fade", "in": arrive, "out": leave })
+}
+
+/// One text clip, alone, at `start`.
+fn text_project(clip: Value, next_id: u32) -> Handle {
+    Handle::from_value(&project(vec![], vec![track(2)], vec![clip], next_id))
+}
+
+/// The reveal and its phase on clip `id`'s layer at project time `t`.
+fn reveal_of(handle: &Handle, id: i64, t: i64) -> (f64, Value) {
+    let layer = layer_of(&handle.recipe(t), id);
+    assert_eq!(layer["source"]["kind"], json!("text"));
+    (
+        num(&layer, "/source/reveal"),
+        at(&layer, "/source/reveal_phase").clone(),
+    )
+}
+
+/// The reveal's kind on clip `id`'s layer at project time `t`.
+fn reveal_kind_of(handle: &Handle, id: i64, t: i64) -> Value {
+    at(&layer_of(&handle.recipe(t), id), "/source/reveal_kind").clone()
+}
+
+/// The texture cache key on clip `id`'s layer at project time `t`.
+fn hash_of(handle: &Handle, id: i64, t: i64) -> String {
+    text(&layer_of(&handle.recipe(t), id), "/source/hash").to_string()
+}
+
+/// FNV-1a, 64-bit, hex — the algorithm `recipe.rs` documents, written out
+/// again here because an oracle that imported the implementation would only
+/// prove the implementation equals itself. The claim it serves is that the
+/// hash is taken over a description this test can spell out in full.
+fn fnv1a_hex(bytes: &[u8]) -> String {
+    let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
+    for byte in bytes {
+        hash ^= u64::from(*byte);
+        hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+    }
+    format!("{hash:016x}")
+}
+
+/// [`text_clip`]'s text group, serialized exactly as a core WITHOUT
+/// `text.animation` wrote it: every field of `TextProps` at its default but
+/// `content`, keys in the order `serde_json` puts a map in — sorted, since
+/// the crate does not enable `preserve_order`.
+///
+/// This literal is the whole of the byte-identity claim. It was written from
+/// the struct, not copied from a run.
+const DESCRIPTION_BEFORE_VERSION_5: &str = concat!(
+    r#"{"align":"center","backdrop":null,"color":[1.0,1.0,1.0,1.0],"#,
+    r#""content":"Hello","font":"SourceSans3-SemiBold","line_spacing":1.0,"#,
+    r#""outline":null,"size":72.0,"tracking":0.0,"valign":"middle","width":null}"#
+);
+
+#[test]
+fn an_unanimated_text_layer_shows_all_of_itself_and_hashes_as_it_always_did() {
+    let handle = text_project(text_clip(11, 0, 10 * SEC, Value::Null), 12);
+
+    // All three keys are emitted whether the clip animates or not: an absent
+    // one would mean two things — no animation here, or an older core that
+    // never computed a reveal — which is the argument `obscure` settled. The
+    // two nulls travel together, and the amount is then 1.
+    for t in [0, 5 * SEC] {
+        assert_eq!(reveal_of(&handle, 11, t), (1.0, json!(null)));
+        assert_eq!(reveal_kind_of(&handle, 11, t), json!(null));
+    }
+
+    // The description carries no `animation` key at all, so a renderer has
+    // exactly one account of the animation: the computed reveal.
+    let layer = layer_of(&handle.recipe(0), 11);
+    assert_eq!(
+        at(&layer, "/source/text").get("animation"),
+        None,
+        "the recipe must not carry the animation field itself"
+    );
+
+    // The byte-identity claim: an unanimated clip's cache key is the hash of
+    // the description a version-4 core wrote, to the byte, so no shipped
+    // project's texture cache behaves differently after this phase.
+    assert_eq!(
+        hash_of(&handle, 11, 0),
+        fnv1a_hex(DESCRIPTION_BEFORE_VERSION_5.as_bytes()),
+        "the hash of an unanimated text layer is the hash of its bare description"
+    );
+    assert_eq!(hash_of(&handle, 11, 0), hash_of(&handle, 11, 5 * SEC));
+
+    // And no other source kind grows the keys — they live inside the text
+    // source, where the kind-specific description is, not on the layer.
+    let media = Handle::from_value(&one_clip_project(10 * SEC));
+    let source = at(&layer_of(&media.recipe(SEC), 11), "/source").clone();
+    assert_eq!(source.get("reveal"), None);
+    assert_eq!(source.get("reveal_phase"), None);
+    assert_eq!(source.get("reveal_kind"), None);
+}
+
+#[test]
+fn the_kind_travels_with_the_reveal_and_is_part_of_the_cache_key() {
+    // The description no longer carries `animation`, so `reveal_kind` is the
+    // renderer's only word for WHICH routine to run — each of the three is a
+    // different drawing routine, not a parameter of a shared one.
+    let typed = text_project(text_clip(11, 0, 10 * SEC, typewriter(4 * SEC, 0)), 12);
+    let faded = text_project(text_clip(11, 0, 10 * SEC, word_fade(4 * SEC, 0)), 12);
+
+    assert_eq!(reveal_kind_of(&typed, 11, SEC), json!("typewriter"));
+    assert_eq!(reveal_kind_of(&faded, 11, SEC), json!("word_fade"));
+
+    // Same text, same amount, same phase, different picture — so the two
+    // must not share a cached texture either.
+    assert_eq!(reveal_of(&typed, 11, SEC), reveal_of(&faded, 11, SEC));
+    assert_ne!(
+        hash_of(&typed, 11, SEC),
+        hash_of(&faded, 11, SEC),
+        "two kinds half done are two pictures and cannot share a texture"
+    );
+}
+
+#[test]
+fn the_reveal_runs_from_nothing_at_the_first_frame_to_all_of_it_at_in() {
+    // Two seconds of typewriter on a clip that starts at 3 s, so the test
+    // also fails if the ramp is measured from project time rather than from
+    // the clip's own first frame.
+    let start = 3 * SEC;
+    let handle = text_project(text_clip(11, start, 10 * SEC, typewriter(2 * SEC, 0)), 12);
+
+    assert_eq!(
+        reveal_of(&handle, 11, start),
+        (0.0, json!("in")),
+        "nothing is showing on the clip's first frame"
+    );
+    assert_eq!(reveal_of(&handle, 11, start + SEC), (0.5, json!("in")));
+
+    // One tick short of the arrival it is not there yet: 1_199_999/1_200_000.
+    let (nearly, _) = reveal_of(&handle, 11, start + 2 * SEC - 1);
+    assert!(
+        nearly < 1.0 && nearly > 0.999_999,
+        "one tick before `in` the reveal is not yet complete, got {nearly}"
+    );
+
+    assert_eq!(
+        reveal_of(&handle, 11, start + 2 * SEC),
+        (1.0, json!("in")),
+        "the reveal is complete exactly at `in`"
+    );
+    // `out` is 0, so the text never leaves: it stays whole to the last frame.
+    assert_eq!(reveal_of(&handle, 11, start + 5 * SEC), (1.0, json!("in")));
+    assert_eq!(
+        reveal_of(&handle, 11, start + 10 * SEC - FRAME_30),
+        (1.0, json!("in"))
+    );
+}
+
+#[test]
+fn the_un_reveal_runs_back_from_the_clips_own_last_frame() {
+    // No arrival at all and a two-second departure. A zero-length phase is
+    // complete from the first frame rather than a division by zero.
+    let start = 3 * SEC;
+    let handle = text_project(text_clip(11, start, 10 * SEC, typewriter(0, 2 * SEC)), 12);
+
+    assert_eq!(
+        reveal_of(&handle, 11, start),
+        (1.0, json!("in")),
+        "an arrival of zero is over before the first frame is drawn"
+    );
+    assert_eq!(
+        reveal_of(&handle, 11, start + 8 * SEC),
+        (1.0, json!("in")),
+        "the departure has not bitten yet at exactly `duration - out`"
+    );
+    assert_eq!(
+        reveal_of(&handle, 11, start + 9 * SEC),
+        (0.5, json!("out")),
+        "one second left of a two-second departure: half gone, and the phase has turned"
+    );
+
+    // The departure is measured back from the clip's EXCLUSIVE end, so it
+    // reaches 0 one tick past the last tick anybody draws: 1/1_200_000.
+    let (last, phase) = reveal_of(&handle, 11, start + 10 * SEC - 1);
+    assert_eq!(phase, json!("out"));
+    assert!(
+        last > 0.0 && last < 1e-6,
+        "the last tick of an un-revealing clip still shows a sliver, got {last}"
+    );
+}
+
+/// One nest clip (id 3) at 2 s for 3 s over a nest (id 4) whose own track
+/// carries a 10 s animated text clip (id 11) at its time 0. The nest clip is
+/// deliberately SHORTER than what is inside it, so the inner clip is visible
+/// for 2 s – 5 s of project time and its own last 7 s are never drawn.
+fn nested_text(animation: Value) -> Handle {
+    Handle::from_value(&json!({
+        "version": 2,
+        "canvas": {
+            "width": 1920, "height": 1080, "fps": [30, 1],
+            "background": [0.0, 0.0, 0.0, 1.0],
+            "fit_new_clips": true, "timecode_frames": true
+        },
+        "media": [],
+        "tracks": [track(2)],
+        "clips": [{
+            "id": 3, "track": 2, "start": 2 * SEC, "duration": 3 * SEC,
+            "source": { "kind": "nest", "project": 4 },
+            "video": {}
+        }],
+        "markers": [],
+        "next_id": 12,
+        "nests": [{
+            "id": 4, "name": "Nest 4", "width": 1920, "height": 1080,
+            "tracks": [track(5)],
+            "clips": [{
+                "id": 11, "track": 5, "start": 0, "duration": 10 * SEC,
+                "source": { "kind": "text" },
+                "video": {},
+                "text": { "content": "Hello", "animation": animation }
+            }]
+        }]
+    }))
+}
+
+#[test]
+fn a_nested_text_clip_animates_on_its_own_clock() {
+    // Four seconds each way on a clip whose enclosing nest clip only shows
+    // its first three. Measured against the INSTANCE this would read 0.25 on
+    // the way out at the same instant, so the assertion below is the one
+    // that tells the two clocks apart.
+    let handle = nested_text(typewriter(4 * SEC, 4 * SEC));
+
+    assert_eq!(
+        reveal_of(&handle, 11, 4 * SEC),
+        (0.5, json!("in")),
+        "two seconds into a four-second arrival, still arriving"
+    );
+
+    // The last frame the nest clip lets through is 3 s − one frame into the
+    // inner clip: 1_780_000 / 2_400_000, still on the way in. A nest clip's
+    // edge cuts a caption off mid-reveal rather than making it leave early.
+    let (cut_off, phase) = reveal_of(&handle, 11, 5 * SEC - FRAME_30);
+    assert_eq!(phase, json!("in"));
+    assert!(
+        (cut_off - 1_780_000.0 / 2_400_000.0).abs() < EPS,
+        "the reveal at the nest clip's last frame is the clip's own, got {cut_off}"
+    );
+
+    // And the instance is gone at the nest clip's end, mid-animation.
+    assert_eq!(array(&handle.recipe(5 * SEC), "/layers").len(), 0);
+}
+
+#[test]
+fn two_phases_longer_than_the_clip_make_a_tent_rather_than_a_refusal() {
+    // Eight seconds each way on a ten-second clip. The reveal is the minimum
+    // of the two ramps, so it degrades to a tent that never reaches 1 — no
+    // refusal, no clamp, and a clip trimmed under an animation that used to
+    // fit simply shows a partial reveal.
+    let handle = text_project(text_clip(11, 0, 10 * SEC, typewriter(8 * SEC, 8 * SEC)), 12);
+
+    assert_eq!(reveal_of(&handle, 11, 4 * SEC), (0.5, json!("in")));
+    assert_eq!(
+        reveal_of(&handle, 11, 5 * SEC),
+        (0.625, json!("in")),
+        "the peak: 5/8 either way, and a tie belongs to the arrival"
+    );
+    assert_eq!(
+        reveal_of(&handle, 11, 6 * SEC),
+        (0.5, json!("in")),
+        "past the peak the departure holds the amount back, but the WORD does \
+         not turn: a tent that never arrived cannot begin to leave"
+    );
+
+    // Whatever the numbers, the amount stays inside 0..1 on every frame the
+    // clip is drawn — the property that lets the renderer treat it as an
+    // alpha without checking it.
+    let mut frame = 0;
+    while frame < 10 * SEC {
+        let (amount, phase) = reveal_of(&handle, 11, frame);
+        assert!(
+            (0.0..=1.0).contains(&amount),
+            "the reveal at {frame} is {amount}, outside 0..1"
+        );
+        assert!(phase == json!("in") || phase == json!("out"));
+        frame += FRAME_30;
+    }
+}
+
+#[test]
+fn the_phase_turns_only_where_both_orders_draw_the_same_picture() {
+    // The phase is the ORDER the renderer staggers by — `staggerIndex`
+    // counts a word_fade's words and a line_rise's lines from the other end
+    // while a layer is leaving — so the frame on which the word turns is a
+    // frame on which the picture MIRRORS end for end. The only amount at
+    // which that mirror is invisible is 1, where every item is whole
+    // whichever end the count started from.
+    //
+    // So: on every frame of every timing, if the phase differs from the
+    // previous frame's, the previous frame was fully revealed. Without it a
+    // tent turns at its peak and a four-word cue swaps [1, 1, .83, .33] for
+    // [.33, .83, 1, 1] in one frame, at an amount that did not change.
+    //
+    // The pairs below are frame-aligned on purpose: the plateau of a fitting
+    // animation is `[in, duration - out]`, and a frame lands on its far end
+    // only if `duration - out` is on the grid, which is the arithmetic the
+    // claim is about rather than a fact about these numbers.
+    const DURATION: i64 = 10 * SEC;
+    let timings = [
+        (2 * SEC, 2 * SEC),   // fits, with a plateau in the middle
+        (5 * SEC, 5 * SEC),   // fits exactly: the plateau is one instant
+        (0, 3 * SEC),         // a departure only
+        (3 * SEC, 0),         // an arrival only
+        (8 * SEC, 8 * SEC),   // a tent, crossing at 0.625
+        (9 * SEC, 4 * SEC),   // a lopsided tent, crossing on the way up
+        (4 * SEC, 9 * SEC),   // and the other way about
+        (0, 15 * SEC),        // longer than the clip, and nothing but leaving
+        (15 * SEC, 0),        // longer than the clip, and nothing but arriving
+        (FRAME_30, FRAME_30), // one frame each way, the shortest that draws
+    ];
+
+    for (arrive, leave) in timings {
+        let handle = text_project(text_clip(11, 0, DURATION, word_fade(arrive, leave)), 12);
+        let mut previous: Option<(f64, Value)> = None;
+        let mut frame = 0;
+        while frame < DURATION {
+            let (amount, phase) = reveal_of(&handle, 11, frame);
+            if let Some((was_amount, was_phase)) = previous {
+                if was_phase != phase {
+                    assert_eq!(
+                        was_amount, 1.0,
+                        "in {arrive}/{leave} the phase turned at {frame}, from \
+                         {was_phase} to {phase}, with the frame before it at \
+                         {was_amount}: the words mirror on a picture that is \
+                         not whole"
+                    );
+                }
+            }
+            previous = Some((amount, phase));
+            frame += FRAME_30;
+        }
+    }
+}
+
+#[test]
+fn a_tent_that_is_all_departure_still_reports_itself_leaving() {
+    // A tent holds the phase it began in, and an arrival of zero begins in
+    // the departure: an `out` longer than the whole clip is a caption that
+    // starts half gone and goes, with no arrival order for the stagger to
+    // contradict. Reading this one as "in" would run its words out
+    // last-first — the fix for the tent must not silence a departure.
+    let handle = text_project(text_clip(11, 0, 10 * SEC, word_fade(0, 20 * SEC)), 12);
+
+    assert_eq!(
+        reveal_of(&handle, 11, 0),
+        (0.5, json!("out")),
+        "half the departure is already spent on the clip's first frame"
+    );
+    assert_eq!(reveal_of(&handle, 11, 5 * SEC), (0.25, json!("out")));
+}
+
+#[test]
+fn the_hash_follows_the_reveal_so_no_frame_can_reuse_a_stale_texture() {
+    // The layer's hash is the only thing standing between a per-frame value
+    // and a stale texture: Swift caches a rendered paragraph under
+    // "text:" + hash and consults nothing else, so two frames that draw
+    // different pictures must not share a key.
+    let handle = text_project(text_clip(11, 0, 10 * SEC, typewriter(4 * SEC, 4 * SEC)), 12);
+
+    assert_ne!(
+        hash_of(&handle, 11, SEC),
+        hash_of(&handle, 11, 2 * SEC),
+        "two amounts inside one ramp must not share a cached texture"
+    );
+
+    // ... and the DESCRIPTION is identical at those two instants, which is
+    // why the hash cannot be taken over the description alone.
+    let description = |t: i64| at(&layer_of(&handle.recipe(t), 11), "/source/text").clone();
+    assert_eq!(description(SEC), description(2 * SEC));
+
+    // The same amount in the two different phases is two different pictures
+    // — a typewriter typing is not one un-typing — so the phase is in the
+    // key too. Both of these are 0.5.
+    assert_eq!(
+        num(&layer_of(&handle.recipe(2 * SEC), 11), "/source/reveal"),
+        0.5
+    );
+    assert_eq!(
+        num(&layer_of(&handle.recipe(8 * SEC), 11), "/source/reveal"),
+        0.5
+    );
+    assert_ne!(
+        hash_of(&handle, 11, 2 * SEC),
+        hash_of(&handle, 11, 8 * SEC),
+        "an arriving half and a departing half must not share a cached texture"
+    );
+
+    // Nothing changes for the whole middle of a clip that has arrived and is
+    // not yet leaving, so a fully revealed frame costs one cache entry, not
+    // one per frame.
+    let still = text_project(text_clip(11, 0, 10 * SEC, typewriter(2 * SEC, 0)), 12);
+    assert_eq!(hash_of(&still, 11, 5 * SEC), hash_of(&still, 11, 6 * SEC));
+
+    // An animated layer keeps its own key even when it is fully revealed:
+    // whether a full reveal draws exactly what no animation draws is the
+    // renderer's promise, and a cache key does not lean on one.
+    let plain = text_project(text_clip(11, 0, 10 * SEC, Value::Null), 12);
+    assert_ne!(hash_of(&still, 11, 5 * SEC), hash_of(&plain, 11, 5 * SEC));
 }
 
 // ---- layer order, hidden and muted tracks --------------------------------

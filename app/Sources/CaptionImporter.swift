@@ -40,6 +40,13 @@ import UniformTypeIdentifiers
 /// Times snap to the canvas frame grid like every other time in this app
 /// (spec §5.1), which is also why a caption may end up one frame shorter
 /// than the file says.
+///
+/// **What is here is the SubRip grammar and nothing else.** Everything from
+/// the frame grid onwards — snapping, the overlap trim, the Caption preset,
+/// the new front-most track and the probe that learns the new clips' ids —
+/// is `CaptionLayout`, so `Transcriber.swift` lays a transcript out exactly
+/// as a file is laid out. `plan(for:in:track:)` below is the whole seam:
+/// read, parse, hand the cues over, rewrap the error with the file's name.
 enum CaptionImporter {
 
     // MARK: - What a file parses into
@@ -56,12 +63,19 @@ enum CaptionImporter {
         let text: String
     }
 
-    /// A block the parser refused, or a cue placement gave up on.
-    struct Problem: Equatable {
-        let line: Int
-        let reason: String
+    /// A block the parser refused, or a cue placement gave up on — the
+    /// shared type, whose `tag` this file always spells `"line <n>"`, so
+    /// `description` reads `"line 12: no caption text"` exactly as it did
+    /// when the line number was a field of its own.
+    typealias Problem = CaptionLayout.Problem
 
-        var description: String { "line \(line): \(reason)" }
+    /// What an import will do, before anything is applied. The layout's, so
+    /// a transcript and a file produce the same shape of answer.
+    typealias Plan = CaptionLayout.Plan
+
+    /// A refusal naming the line it came from.
+    private static func problem(line: Int, reason: String) -> Problem {
+        Problem(tag: "line \(line)", reason: reason)
     }
 
     struct ParsedFile: Equatable {
@@ -77,54 +91,15 @@ enum CaptionImporter {
         case problem(Problem)
     }
 
-    /// What an import will do, before anything is applied: the ops, and
-    /// everything the caller has to tell the user about.
-    struct Plan {
-        /// One `add_track` (unless placing on an existing track), one
-        /// `add_text_clip` per surviving cue, and one `set_video` putting
-        /// the whole batch where the Caption preset lives.
-        let ops: [ReelOp]
-        /// Clips this plan really creates — smaller than `cues` if the core
-        /// refused a placement on a track the caller chose.
-        let clips: Int
-        /// Cues that survived parsing and placement.
-        let cues: Int
-        /// Cues shortened because the next one started before they ended.
-        let trimmed: Int
-        let problems: [Problem]
-        /// The name of the track created for these captions; nil when the
-        /// caller named a track to place them on instead.
-        let trackName: String?
-
-        /// The human report: what was adjusted and what was skipped. Empty
-        /// when the file imported cleanly, which is the signal to say
-        /// nothing at all.
-        var report: String {
-            var lines: [String] = []
-            if trimmed > 0 {
-                lines.append(
-                    "\(trimmed) caption\(trimmed == 1 ? "" : "s") overlapped the next one and "
-                        + "\(trimmed == 1 ? "was" : "were") shortened to fit.")
-            }
-            if !problems.isEmpty {
-                lines.append(
-                    "\(problems.count) entr\(problems.count == 1 ? "y was" : "ies were") "
-                        + "skipped:")
-                lines.append(contentsOf: problems.prefix(8).map { "    • " + $0.description })
-                if problems.count > 8 {
-                    lines.append("    • …and \(problems.count - 8) more.")
-                }
-            }
-            return lines.joined(separator: "\n")
-        }
-    }
-
     /// Why an import produced nothing. Every case carries the file, because
-    /// an agent may have named a path the user never saw.
+    /// an agent may have named a path the user never saw — which is also why
+    /// `CaptionLayout.LayoutError`, whose producer is not always a file, is
+    /// caught and rewrapped into these rather than thrown through.
     enum CaptionError: LocalizedError {
         case unreadable(URL)
         case noCues(URL, [Problem])
         case refused(URL)
+        case tooMany(URL, cues: Int, room: Int)
 
         var errorDescription: String? {
             switch self {
@@ -137,6 +112,10 @@ enum CaptionImporter {
             case .refused(let url):
                 return "The captions in “\(url.lastPathComponent)” could not be placed on the "
                     + "timeline."
+            case .tooMany(let url, let cues, let room):
+                return "“\(url.lastPathComponent)” holds \(cues) captions, more than this "
+                    + "project has room for: \(room) more clip\(room == 1 ? "" : "s") would "
+                    + "fit, out of \(Int(RC_MAX_CLIPS))."
             }
         }
     }
@@ -202,39 +181,39 @@ enum CaptionImporter {
     private static func cue(from block: [String], firstLine: Int) -> Block {
         guard let offset = block.firstIndex(where: { $0.contains("-->") }) else {
             return .problem(
-                Problem(line: firstLine, reason: "no “-->” timing line in this entry"))
+                problem(line: firstLine, reason: "no “-->” timing line in this entry"))
         }
         let timingLine = firstLine + offset
         if offset > 1 {
             return .problem(
-                Problem(line: firstLine, reason: "\(offset) lines before the timing line"))
+                problem(line: firstLine, reason: "\(offset) lines before the timing line"))
         }
         let number = offset == 1 ? Int(block[0].trimmingCharacters(in: .whitespaces)) : nil
 
         let halves = block[offset].components(separatedBy: "-->")
         guard halves.count == 2 else {
-            return .problem(Problem(line: timingLine, reason: "two “-->” in one timing line"))
+            return .problem(problem(line: timingLine, reason: "two “-->” in one timing line"))
         }
         guard let start = ticks(fromTimestamp: halves[0]) else {
             return .problem(
-                Problem(
+                problem(
                     line: timingLine,
                     reason: "“\(trimmed(halves[0]))” is not a HH:MM:SS,mmm time"))
         }
         guard let end = ticks(fromTimestamp: halves[1]) else {
             return .problem(
-                Problem(
+                problem(
                     line: timingLine,
                     reason: "“\(trimmed(halves[1]))” is not a HH:MM:SS,mmm time"))
         }
         guard end > start else {
-            return .problem(Problem(line: timingLine, reason: "ends at or before it starts"))
+            return .problem(problem(line: timingLine, reason: "ends at or before it starts"))
         }
 
         let body = block.dropFirst(offset + 1).map { plainText($0) }
         let text = body.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else {
-            return .problem(Problem(line: timingLine, reason: "no caption text"))
+            return .problem(problem(line: timingLine, reason: "no caption text"))
         }
         return .cue(Cue(index: number, line: timingLine, start: start, end: end, text: text))
     }
@@ -352,136 +331,37 @@ enum CaptionImporter {
 
     // MARK: - Placement
 
-    /// A cue once the frame grid and its neighbours have had their say.
-    private struct Placed {
-        let line: Int
-        let start: Ticks
-        var end: Ticks
-        let text: String
-    }
-
-    /// The Caption preset of §4.2 — the same row the Text pane's Presets
-    /// section applies, looked up by name so the two cannot drift. The
-    /// fallback is that row's own values, and exists only so a rename in
-    /// `TextPane` is a wrong style rather than a crash.
-    static var captionPreset: TextPreset {
-        TextPreset.all.first { $0.name == "Caption" }
-            ?? TextPreset(
-                name: "Caption", font: "SourceSans3-Regular", sizeFraction: 0.035, xFraction: 0,
-                yFraction: 0.38, align: "center",
-                backdrop: BackdropProps(color: [0, 0, 0, 0.6], padding: 12, radius: 8))
-    }
-
-    /// How much of the canvas width a caption may fill before it wraps.
-    /// Unlike the Text pane's presets this plan DOES fix a box width: a
-    /// caption's words come out of a file rather than from someone watching
-    /// the canvas, so a long line has to wrap itself.
-    private static let wrapFraction = 0.8
-
     /// Everything an import will do, computed against `project` and applied
     /// by nobody: the UI commits it through `ProjectDocument`, the agent
     /// through `AgentServer.editResult`.
+    ///
+    /// The whole of the placement is `CaptionLayout.place` — this is the
+    /// SubRip half handing its cues over, and the file name being put back
+    /// into the refusals so the alert and the tool's error string say which
+    /// file they are about.
     ///
     /// `track` places on an existing track; absent, the captions get a new
     /// front-most track of their own, which is the only placement that can
     /// never be refused by the overlap rule.
     static func plan(for url: URL, in project: ReelProject, track: UInt32? = nil) throws -> Plan {
         let parsed = parse(try text(of: url))
-        let snapshot = project.snapshot
-        let canvas = snapshot.canvas
-        let frame = max(canvas.fps.frameDuration, 1)
         guard !parsed.cues.isEmpty else {
             throw CaptionError.noCues(url, parsed.problems)
         }
-
-        // Snap, then give a cue that snapped to nothing its one frame back,
-        // THEN resolve overlaps — in that order, so an overlap the minimum
-        // length introduces is still one the overlap pass fixes.
-        var placed = parsed.cues.map { cue -> Placed in
-            let start = ReelTime.snapToFrame(max(0, cue.start), fps: canvas.fps)
-            let end = ReelTime.snapToFrame(cue.end, fps: canvas.fps)
-            return Placed(line: cue.line, start: start, end: max(end, start + frame),
-                          text: cue.text)
+        let cues = parsed.cues.map {
+            CaptionLayout.Cue(start: $0.start, end: $0.end, text: $0.text, tag: "line \($0.line)")
         }
-        placed.sort { $0.start == $1.start ? $0.line < $1.line : $0.start < $1.start }
-
-        // Captions are one track, so two cues on screen at once cannot both
-        // be honoured: the later one wins its start and the earlier one is
-        // cut back to it. That is also what the overlap rule (§6) would
-        // otherwise refuse the placement over.
-        var trimmed = 0
-        for index in placed.indices.dropLast() where placed[index].end > placed[index + 1].start {
-            placed[index].end = placed[index + 1].start
-            trimmed += 1
+        do {
+            return try CaptionLayout.place(
+                cues, problems: parsed.problems, in: project, track: track)
+        } catch let error as CaptionLayout.LayoutError {
+            switch error {
+            case .noCues(let problems): throw CaptionError.noCues(url, problems)
+            case .refused: throw CaptionError.refused(url)
+            case .tooMany(let cues, let room):
+                throw CaptionError.tooMany(url, cues: cues, room: room)
+            }
         }
-        var problems = parsed.problems
-        for cue in placed where cue.end - cue.start < frame {
-            problems.append(
-                Problem(line: cue.line, reason: "starts less than a frame before the next caption"))
-        }
-        let kept = placed.filter { $0.end - $0.start >= frame }
-        guard !kept.isEmpty else { throw CaptionError.noCues(url, problems) }
-
-        var ops: [ReelOp] = []
-        let destination: UInt32
-        let name = trackName(in: snapshot)
-        if let track = track {
-            destination = track
-        } else {
-            // A new id is `next_id` from BEFORE the op — the documented
-            // contract of the one JSON entry point (§6), since an op returns
-            // a project rather than an id. Index `tracks.count` is the front
-            // of the stack, so captions draw over everything.
-            destination = snapshot.nextId
-            ops.append(.addTrack(index: snapshot.tracks.count, name: name))
-        }
-
-        let preset = captionPreset
-        let height = Double(canvas.height)
-        var base = TextPatch(
-            font: preset.font, size: (height * preset.sizeFraction).rounded(),
-            align: preset.align, valign: "middle", backdrop: .some(preset.backdrop),
-            width: .some(Double(canvas.width) * wrapFraction))
-        for cue in kept {
-            base.content = cue.text
-            ops.append(
-                .addTextClip(
-                    track: destination, at: cue.start, duration: cue.end - cue.start, text: base))
-        }
-
-        // The preset's position is a `set_video` patch, and a patch needs
-        // ids the ops have not minted yet — so the batch is applied PURELY
-        // first and the ids read off the throwaway result. Applying the same
-        // ops to the same handle mints the same ids, which is what makes
-        // appending the patch to this very list correct
-        // (`EditorViewController+AddClips.swift` does the same for one clip).
-        guard let probed = try project.applying(ops) else { throw CaptionError.refused(url) }
-        let before = Set(snapshot.clips.map { $0.id })
-        let created = probed.snapshot.clips.map { $0.id }.filter { !before.contains($0) }
-        guard !created.isEmpty else { throw CaptionError.refused(url) }
-        ops.append(
-            .setVideo(
-                clips: created,
-                patch: VideoPatch(
-                    x: preset.xFraction * Double(canvas.width), y: preset.yFraction * height,
-                    opacity: 1)))
-
-        return Plan(
-            ops: ops, clips: created.count, cues: kept.count, trimmed: trimmed,
-            problems: problems, trackName: track == nil ? name : nil)
-    }
-
-    /// "Captions", then "Captions 2" — so two imported files are tellable
-    /// apart in the track header.
-    private static func trackName(in snapshot: ProjectSnapshot) -> String {
-        let taken = Set(snapshot.tracks.map { $0.name })
-        var name = "Captions"
-        var suffix = 2
-        while taken.contains(name) {
-            name = "Captions \(suffix)"
-            suffix += 1
-        }
-        return name
     }
 }
 

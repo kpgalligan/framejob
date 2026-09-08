@@ -358,6 +358,9 @@ pub struct TextProps {
     pub backdrop: Option<Backdrop>,
     /// Wrapping width in canvas pixels; `None` lays out on one line.
     pub width: Option<f64>,
+    /// How the words arrive and how they leave, or `None` for text that is
+    /// simply there for the length of its clip (format version 5).
+    pub animation: Option<TextAnimation>,
 }
 
 impl Default for TextProps {
@@ -375,6 +378,7 @@ impl Default for TextProps {
             outline: None,
             backdrop: None,
             width: None,
+            animation: None,
         }
     }
 }
@@ -430,6 +434,96 @@ impl Default for Backdrop {
             radius: 8.0,
         }
     }
+}
+
+/// How a text layer arrives and how it leaves (format version 5, road map
+/// 2's phase 4c).
+///
+/// Three keys and no fourth. `in` and `out` are DURATIONS, not times: the
+/// reveal runs for `in` from the clip's own first frame, and the un-reveal
+/// for `out` back from its own last one — the clip's, never the instance's,
+/// which is the rule `recipe.rs` already states for clip time, so a nest
+/// clip's edge cuts a nested caption off mid-reveal rather than making it
+/// un-reveal early. Either may be 0, meaning that end of the animation
+/// simply does not happen.
+///
+/// There is deliberately no curve field. The shape of the motion is
+/// already in the kind — a typewriter's step per character, a word fade's
+/// stagger, a line rise's per-line offset — and easing between two
+/// arbitrary values is what the action system is for (spec §5.4). A curve
+/// can be added later as a defaulted fourth key with no migration step,
+/// which is the test this crate applies to leaving a field out.
+///
+/// Nothing here is a measurement of pixels or of time inside the reveal:
+/// the model says what the animation IS, `recipe.rs` turns it into one
+/// number per frame, and the platform draws it (spec §7). That is also why
+/// the discriminant is called `kind` and not, say, `style`:
+/// `actions.rs`'s object rule holds two objects that both name a DIFFERING
+/// `kind` until the interpolation is over, so an action that moves a clip
+/// from a typewriter to a line rise switches at the end instead of
+/// interpolating an `in` between two animations that do not measure the
+/// same thing.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct TextAnimation {
+    pub kind: TextAnimationKind,
+    /// How long the reveal takes, from the clip's first frame.
+    #[serde(rename = "in")]
+    pub r#in: Ticks,
+    /// How long the un-reveal takes, measured back from the clip's last
+    /// frame.
+    pub out: Ticks,
+}
+
+impl Default for TextAnimation {
+    /// A one-second typewriter that does not un-reveal — the animation a
+    /// user gets for switching the section on and saying nothing else.
+    ///
+    /// The kind is the typewriter for [`Filter::default`]'s reason: a
+    /// default has to be visibly SOMETHING the moment it is turned on, or
+    /// the control reads as broken, and of the three this is the one
+    /// everybody can already name before they see it. One second is that
+    /// same test applied to the duration — long enough to read as typing
+    /// rather than as a cut, short enough that a three-second caption is
+    /// not still arriving when it is due to leave.
+    ///
+    /// `out` is 0 because most text is cut away rather than un-typed. An
+    /// un-reveal is a deliberate choice about the end of a shot, and a
+    /// default that quietly took a second back off the end of every
+    /// animated title would be a surprise rather than a convenience.
+    fn default() -> Self {
+        TextAnimation {
+            kind: TextAnimationKind::Typewriter,
+            r#in: TIMESCALE,
+            out: 0,
+        }
+    }
+}
+
+/// The three reveals of spec §4.3, closed at three.
+///
+/// Closed for [`ObscureKind`]'s reason: each one is a distinct drawing
+/// routine in `LayerRenderers.renderText`, not a parameter of a shared
+/// one — a prefix of the glyphs, a per-word alpha ramp, a per-line offset
+/// and alpha — so an unknown kind is a value nothing downstream could
+/// repair, and there is no neutral animation to fall back to the way a
+/// filter's `amount` can fall back to 0. Refusing it at the serde boundary
+/// makes the illegal state unrepresentable.
+///
+/// A kind may be added at the END. Nothing derives a number from the
+/// declaration order here — the recipe carries the kind by NAME, unlike
+/// [`ObscureKind`], whose order is a shader discriminant — but the JSON
+/// spelling of each variant is persisted, so a variant may not be renamed
+/// without a migration step.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TextAnimationKind {
+    /// The default, and [`TextAnimation::default`] says why: the one
+    /// reveal a user can name before they have seen it.
+    #[default]
+    Typewriter,
+    WordFade,
+    LineRise,
 }
 
 // ---- shapes --------------------------------------------------------------

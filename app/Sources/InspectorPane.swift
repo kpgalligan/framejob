@@ -1444,8 +1444,23 @@ class InspectorPaneView: NSView, InspectorPane {
         // the visible area" once `InspectorViewController` adds its own
         // minimum (a pane that stopped at its content would leave the Media
         // tab's Finder-drop target the size of its rows).
+        //
+        // That `==` sits ONE BELOW `.defaultLow`, and the one is load-bearing.
+        // An `InspectorSection` sets no hugging priority, so it keeps the
+        // default 250 — and at 250 the pin TIED with it: the solver could pay
+        // the same price to satisfy "the stack reaches the bottom" by giving
+        // the pane its content's height (right) or by STRETCHING one section
+        // past its rows (wrong), and nothing in the constraint set chose. It
+        // picked per PROCESS, so a render was reproducible within a run and
+        // bistable across runs — `phase3_chrome.py` scored 29, 30, 31 or 33
+        // out of 33 on identical input, and the offscreen harness wrote two
+        // distinct PNGs for one package (measured: 9 renders one way, 3 the
+        // other, in twelve). At 249 the stretch is strictly the dearer answer,
+        // so the sections stay at their intrinsic heights and the pane's
+        // bottom moves instead — which is what the paragraph above always
+        // meant. Do not "tidy" it back to `.defaultLow`.
         let hug = stack.bottomAnchor.constraint(equalTo: bottomAnchor)
-        hug.priority = .defaultLow
+        hug.priority = NSLayoutConstraint.Priority(rawValue: 249)
         NSLayoutConstraint.activate([
             stack.topAnchor.constraint(equalTo: topAnchor),
             stack.leadingAnchor.constraint(equalTo: leadingAnchor),

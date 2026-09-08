@@ -14,10 +14,17 @@ lockstep are in the root `CLAUDE.md`; the full design is
 - `model_props.rs` — the schema's VOCABULARY: the §5.2 per-clip property
   types (`VideoProps`, `Crop`, `Shadow`, `ColorAdjust`, `Chroma`,
   `Filter`, `Reflection`, `AudioProps`, `Compressor`, `Duck`, `TextProps`,
-  `Outline`, `Backdrop`, `ShapeProps`, `Stroke` and their enums) with their
+  `Outline`, `Backdrop`, `TextAnimation`, `ShapeProps`, `Stroke` and their
+  enums) with their
   defaults. Re-exported whole by `model.rs`, so every `crate::model::X`
   path and the `lib.rs` re-exports are unchanged; it is a separate file
   because of the size rule, not a separate concern.
+  `TextAnimationKind` is closed at three for `ObscureKind`'s reason — each
+  variant is a different drawing routine and there is no neutral one to
+  fall back to — but its declaration ORDER is not load-bearing, where
+  `ObscureKind`'s is a shader discriminant: the recipe carries a reveal's
+  kind by NAME. The JSON spelling of a variant still is, so a rename needs
+  a migration step.
 - `model_regions.rs` — the boxes drawn ON the picture: `Spotlight`,
   `ObscureRegion`, the `SpotShape` both are drawn with and the
   `MAX_OBSCURE` budget on the second. Cut out of `model_props.rs` in road
@@ -116,7 +123,30 @@ lockstep are in the root `CLAUDE.md`; the full design is
 - `transition.rs` — overlap detection, the overlap rule, progress at *t*.
 - `evaluate.rs` — `composition_plan()` (A/B assignment, instruction
   tiling) and the `assign()` the recipe shares with it.
-- `recipe.rs` — `frame_recipe(t)`: the layer list at one instant.
+- `recipe.rs` — `frame_recipe(t)`: the layer list at one instant. Also
+  where a `text.animation` becomes a NUMBER: `Reveal::of` turns the
+  animation, the clip time and the clip's own duration into the `reveal`,
+  `reveal_phase` and `reveal_kind` a text layer's source object carries
+  (spec §7.3), and `text_hash` folds all three into that layer's content
+  hash — the only thing between a per-frame picture and Swift's
+  hash-keyed texture cache. The recipe STRIPS `animation` out of the text
+  description it hands over, so the computed reveal is the renderer's one
+  account of it; a layer with no animation hashes the bare description,
+  byte for byte as it did before version 5.
+  **The phase is the ORDER the renderer draws in, not a label on the
+  amount**, and `Reveal::of` is shaped by that: `word_fade` and
+  `line_rise` count their stagger from the far end while a layer is
+  leaving, so the frame the phase turns on is a frame the picture mirrors
+  on, and the one amount at which the mirror is invisible is 1. The turn
+  therefore belongs to the PLATEAU an animation that fits its clip has
+  between its two ramps (`in + out <= duration`; a tie goes to the
+  arrival). A tent has none — its ramps cross below 1 — so it keeps the
+  phase it began in for its whole life, the arrival's unless `in` is 0,
+  which leaves the clip nothing but a departure. The limit is documented
+  rather than fixed: a tent whose `in` is tiny but not zero reports `"in"`
+  from its first frame to its last. `evaluate_tests.rs` sweeps ten timings
+  frame by frame and asserts that the phase turns only where the frame
+  before it was fully revealed.
 - `nest.rs` — flattening a nest into the clips it stands for, and the
   transform they inherit. Every walk over "what actually plays" goes
   through it: `evaluate.rs`, `recipe.rs` and `audio.rs` all consume its
@@ -167,24 +197,35 @@ own goes in one too (`edit_zoom.rs` was phase 3's), and the next cut in
 at the line and takes nothing without a cut of its own: `edit_paste.rs`
 (600).
 
-Phase 3's other growth stayed comfortably under: `actions.rs` is 552 (the
-list rule and `clamp_video`'s region block), `edit_time.rs` 526
-(`ripple_delete_ranges`, which the singular now delegates to rather than
-duplicating), and `edit_zoom.rs` 390 — the new module the geometry went
-into rather than a fifth function in `edit_action.rs`. Those three are the
-files to weigh a phase-4 or phase-6 addition against next.
+Phase 3's other growth stayed comfortably under, and phase 4 put a fourth
+file beside them: `actions.rs` is 552 (the list rule and `clamp_video`'s
+region block), `edit_time.rs` 526 (`ripple_delete_ranges`, which the
+singular now delegates to rather than duplicating), `edit_zoom.rs` 390 —
+the new module the geometry went into rather than a fifth function in
+`edit_action.rs` — and `recipe.rs` 567, up from 331 when phase 4c put the
+reveal there (`Reveal`, `ramp`, `text_hash`, and the prose arguing why the
+hash covers the answer). Those four are the files to weigh a phase-5 or
+phase-6 addition against next.
 
 `model.rs` is OFF the list: it came DOWN from 1330 to 940 when the lookups
 and `validate` moved to `model_query.rs` (454), and to 462 in road map 2's
 phase 2 when the §5.2 property types moved to `model_props.rs`;
-`edit_props.rs` (394) came back under the cap in the same phase when its
-range checks moved to `props_check.rs` (294); `evaluate.rs` (588) came off
+`edit_props.rs` (395) came back under the cap in the same phase when its
+range checks moved to `props_check.rs` (305); `evaluate.rs` (588) came off
 the list the same way, its recipe half moving to `recipe.rs` and the nest
 walk to `nest.rs`. `model_props.rs` then paid the rule itself: 531 at the
 phase-2 cut, 633 once phase 3c added `video.obscure`'s types, and 498 once
-the region vocabulary went out to `model_regions.rs` (218) — a file over
-the cap gives something up BEFORE it takes anything on, and phases 4 and 6
-both add properties to it.
+the region vocabulary went out to `model_regions.rs` (218).
+
+**`model_props.rs` is at 592 today** — `TextAnimation` and
+`TextAnimationKind` (phase 4c) put ninety-four lines back — which is under
+the cap and close enough to it to be the same warning phase 3 got: a file
+at the line gives something up BEFORE it takes anything on, and phase 6
+adds properties to this one. The cut when it comes is by CONCERN, the way
+`model_regions.rs` was: the text vocabulary (`TextProps`, `Outline`,
+`Backdrop`, `TextAnimation`, `TextAlign`, `TextVAlign`,
+`TextAnimationKind`) is the obvious one, and it is roughly two hundred
+lines.
 
 **One implementation per algorithm.** Before writing time math, find the
 existing implementation and route through it. Shared constants have exactly
@@ -215,13 +256,20 @@ Export names mirror the Rust method exactly.
 **Format changes.** Any change to persisted project state bumps
 `RC_FORMAT_VERSION` in `format.rs` **and** the `#define` in
 `core/include/reelcut_core.h`; the reader must keep accepting every prior
-version; the writer enforces the reader's caps. The version is 4. A bump
+version; the writer enforces the reader's caps. The version is 5. A bump
 whose new fields all carry a serde default needs no migrate step —
-version 3 (a clip's `name` and `label`, a track's `solo`) and version 4
-(`video.obscure`, the hidden regions of phase 3c) have none, and
+version 3 (a clip's `name` and `label`, a track's `solo`), version 4
+(`video.obscure`, the hidden regions of phase 3c) and version 5
+(`text.animation`, phase 4c's reveal) have none, and
 `format.rs`'s MIGRATION HOOK comment says so — but they still bump, so an
 older build refuses a file whose fields it would otherwise silently drop;
 a bump that changes a field's SHAPE adds a step there (`migrate_1_to_2`).
+It is the fields needing NO migration whose loss is the quietest, which is
+why `format.rs`'s version-5 paragraph restates the argument rather than
+pointing back at version 3's: unknown keys are ignored at every level by
+design, so without the gate an older build would open the file, drop every
+animation on read, and write the loss back on the next save with the text
+still on screen.
 Either way a `schema_vN.rs` test opens the previous versions' fixtures
 and reads the new keys' ORDER off the written text, since a parsed
 `serde_json::Value` sorts them.
