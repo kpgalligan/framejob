@@ -390,6 +390,25 @@ lockstep are in the root `CLAUDE.md`; the full design is
   needs that gap, and a proof that scores differently run to run is the
   symptom to recognise: a stable-but-different render is an ambiguity, not a
   race, and no amount of waiting will settle it.
+- `MediaPane.swift` · `MediaRowView.swift` — the Media tab (§4.3) and one row
+  of it. The pane is the LIST: its one `InspectorSection`, the two chrome
+  bands that overhang the section inset, the Finder drop onto the panel, and
+  the six commands a row calls back into (`select`, `place`, `reveal`,
+  `relink`, `remove`, `drop`), every one of which applies an edit through
+  `binding` and is therefore the pane's business and never a row's. The row
+  is one FILE and the DRAG it starts.
+  **The cut fell below the drag rather than under the row's closing brace**,
+  which is the only decision in it: the private pasteboard type, the two
+  enums that name where a row may land, `MediaDragSession`, and the
+  `TimelineView` / `PreviewCanvasView` drop targets all went with the row,
+  because a drag source and the vocabulary it drags with are one sentence and
+  a file boundary through the middle of one is not a seam. It is the size
+  payment the pane owed at 822 lines against the ~600 cap before phase 8's
+  search field, sort popup, unused-only filter and Reveal in Timeline item —
+  three of which land on the pane and one on the row, so both halves got the
+  room they are about to need. It cost NO visibility, unlike the splits
+  above: a type carries its own scope, so every `private` member travelled
+  with its privacy intact and nothing widened.
 - `ExportSheetController.swift` · `ExportSheetOptions.swift` ·
   `ExportSheetResolve.swift` · `ExportSheetPresets.swift` (the export card —
   **eight control rows since phase 7's Preset row and Burn in timecode
@@ -670,8 +689,8 @@ lockstep are in the root `CLAUDE.md`; the full design is
   beside the ⌘⌫ ripple it pairs with. It carries an
   `extension TimelineView` as well as the controller's, because the two ⌥⇧
   drags are begun from there — the same split `TimelineClipDrawing.swift`
-  and `MediaPane.swift`'s drop targets use, and the reason `dragSnapper` and
-  `makeSnapper` are internal.
+  and `MediaRowView.swift`'s drop targets use, and the reason `dragSnapper`
+  and `makeSnapper` are internal.
 - `SilenceDetector.swift` · `SilenceSheetController.swift` ·
   `TimelineView+Candidates.swift` — Remove Silences (Clip ▸ Remove
   Silences…, and the `detect_silence` tool). The detector is pure
