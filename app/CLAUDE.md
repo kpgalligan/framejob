@@ -6,12 +6,30 @@ lockstep are in the root `CLAUDE.md`; the full design is
 
 ## File map
 
-- `ReelCore.swift` — the **only** home for `rc_*` calls: `ReelProject`
-  (handle + lazily decoded `ProjectSnapshot`), the typed op builders that
-  mirror `core/src/edit.rs`'s op table, timecode, snapping, export presets,
-  sizes and settings (`ExportPreset`, `ExportSize`, `ExportSettings`),
-  and `RecipeSource`. `deinit` frees the Rust allocation. There is no
-  untyped op-JSON call site anywhere else.
+- `ReelCore.swift` · `ReelOps.swift` — the FFI and the op vocabulary, one file
+  until road map 2's phase 9 made it pay the ~600-line cap it had been over
+  since M2.
+  `ReelCore.swift` is still the **only** home for `rc_*` calls: `ReelProject`
+  (handle + lazily decoded `ProjectSnapshot`), timecode, snapping, export
+  presets, sizes and settings (`ExportPreset`, `ExportSize`,
+  `ExportSettings`), `RecipeSource`, and the op ARGUMENTS an edit is built out
+  of — `MediaDescriptor`, the `dictionary` extensions on the §5.2 property
+  types, and the four typed patches. `deinit` frees the Rust allocation.
+  `ReelOps.swift` holds `OpArgs`, `ReelOp` and the typed op builders that
+  mirror `core/src/edit.rs`'s op table. There is no untyped op-JSON call site
+  anywhere else.
+  **The STRUCT went with its factories rather than with the handle**, and
+  phase 9 is the argument: it adds a `scope` to an op and folds it into
+  `json`, which is one edit to `ReelOp` and to whichever of the fifty-odd
+  factories set it, while the handle's half of the same phase is an
+  `rc_project_scoped` wrapper — so each file gets exactly one of them, and
+  neither half of one edit lands across a boundary. `ReelOp.coreNames()` is
+  the ONE member that stayed behind, because it reads `rc_op_names()` and the
+  root `CLAUDE.md`'s rule admits no second file; it sits in an
+  `extension ReelOp` of its own. Unlike `ExporterLoudness.swift` and
+  `ExportSheetOptions.swift` the cut cost NO visibility: `OpArgs` is
+  `private`, every one of its users is a factory, so it travelled with them
+  and is still `private`.
 - `ProjectSnapshot.swift` — the `Codable` mirror of the §5.2 project JSON:
   the read-only view every view draws from.
 - `ProjectDocument.swift` — NSDocument, `.reelcut` package read/write, and

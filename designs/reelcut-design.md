@@ -1275,9 +1275,13 @@ The Swift wrapper `ReelCore.swift` is the only file that calls `rc_*`.
 `ReelProject` owns a handle and lazily decodes `rc_project_to_json` into a
 `Codable` `ProjectSnapshot` — the typed, read-only view every Swift view
 draws from. Writes are typed Swift methods (`func split(clips:at:)`) that
-build the op JSON; there is no untyped call site outside `ReelCore.swift`.
-The op schema table lives in the module doc of `edit.rs` (the `adjust.rs`
-"module doc is the schema" pattern) and `ReelCore.swift` mirrors it.
+build the op JSON, and they live in `ReelOps.swift` — cut out of
+`ReelCore.swift` under the size rule when road map 2's phase 9 came to add
+`scope` to the op envelope, so the struct and the ~55 writers that set its
+fields are one edit rather than two. There is no untyped call site outside
+those two files. The op schema table lives in the module doc of `edit.rs`
+(the `adjust.rs` "module doc is the schema" pattern) and `ReelOps.swift`
+mirrors it.
 
 `rc_project_frame_recipe_opts`'s Swift half is `RecipeOptions`, a value type
 in `ReelCore.swift`, taken by `ReelProject.recipe(at:options:)` and

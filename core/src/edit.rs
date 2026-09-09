@@ -7,7 +7,7 @@
 //! semantics live in `edit_clip.rs`, `edit_props.rs`, `edit_track.rs` and
 //! `edit_time.rs`.
 //!
-//! **The table below IS the op schema.** `app/Sources/ReelCore.swift`'s
+//! **The table below IS the op schema.** `app/Sources/ReelOps.swift`'s
 //! typed builders and `AgentCatalog.swift`'s MCP tools both mirror it, so
 //! it is the one place an argument name or a default is written down.
 //!

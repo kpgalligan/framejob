@@ -75,7 +75,9 @@ lockstep are in the root `CLAUDE.md`; the full design is
   format/parse (non-drop `HH:MM:SS:FF` and `HH:MM:SS.mmm`).
 - `edit.rs` — the op enum + serde and `apply`. **Its module doc IS the op
   schema table** (the `adjust.rs` pattern in Rasterize) and
-  `app/Sources/ReelCore.swift`'s typed builders mirror it.
+  `app/Sources/ReelOps.swift`'s typed builders mirror it (they were in
+  `ReelCore.swift` until road map 2's phase 9 paid that file's size toll;
+  `ReelCore.swift` is still the only file that calls `rc_*`).
 - `edit_clip.rs` / `edit_props.rs` / `edit_track.rs` / `edit_time.rs` — the
   §6 ops in `impl Project` blocks: clip placement (with `fit_scale` and,
   since phase 6, its sibling `fill_scale` — Fit is a RESCUE for oversized

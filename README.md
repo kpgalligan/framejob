@@ -206,7 +206,7 @@ Makefile              Build orchestration
 
 | File(s) | Owns |
 |---|---|
-| `ReelCore.swift` | the **only** `rc_*` caller: `ReelProject` (handle + lazy snapshot), the typed `ReelOp` builders, `ReelTime`, `ReelSnap`, `ReelExport`, `RecipeSource` |
+| `ReelCore.swift` · `ReelOps.swift` | the FFI and the op vocabulary: `ReelCore.swift` is the **only** `rc_*` caller (`ReelProject` — handle + lazy snapshot — `ReelTime`, `ReelSnap`, `ReelExport`, `RecipeSource`, and the op-argument types), `ReelOps.swift` holds `ReelOp` and the typed op builders |
 | `ProjectSnapshot.swift` | the `Codable` mirror of the §5.2 project JSON, the plan and the recipe, plus the §5.3 placement maths |
 | `ProjectDocument.swift` | NSDocument, `.reelcut` package read/write, and the single mutation point (`applyEdit`, the live-edit trio, undo as a handle stack) |
 | `MediaImporter.swift` | `AVURLAsset` probing (the one file allowed `async`/`await`), thumbnails, waveform peaks |

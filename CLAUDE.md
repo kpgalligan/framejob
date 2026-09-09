@@ -80,7 +80,7 @@ for the side you are editing before writing code; do not duplicate it here.
   `RC_FORMAT_VERSION` in both `core/src/format.rs` and the header.
 - **`app/Sources/ReelCore.swift` is the only file that calls `rc_*`.** Edits
   are JSON ops through `rc_project_apply`. The op table is the module doc of
-  `core/src/edit.rs`; `ReelCore.swift`'s typed builders and
+  `core/src/edit.rs`; `ReelOps.swift`'s typed builders and
   `AgentCatalog.swift`'s tools both mirror it, and spec §6 mirrors it again —
   change one, change all four.
 - **Every edit is pure and returns `Option`** (identity or a documented
