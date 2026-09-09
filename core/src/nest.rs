@@ -313,8 +313,17 @@ pub(crate) fn rotate(x: f64, y: f64, degrees: f64) -> (f64, f64) {
 /// `rotation` in degrees clockwise (spec §7.3, `clip_rect`).
 ///
 /// That frame is not the canvas-centre one a layer's `x`/`y` use: it is the
-/// space the fragment stage's position already arrives in, so the compositor
-/// tests a fragment against it without a change of basis.
+/// canvas's own top-left frame, which is what makes the rectangle cheap to
+/// test — but the fragment stage does NOT arrive in it, and the sentence
+/// that used to say so here cost road map 2's phase 8 a blocker. A fragment
+/// arrives in DESTINATION pixels, which equalled canvas pixels for as long
+/// as nothing but the canvas size was ever asked of the renderer; Preview
+/// Quality asks for less, and a rectangle in canvas pixels tested against a
+/// halved coordinate is magnified about the origin, which erased three
+/// quarters of a nest at Half and all of it at Quarter. Swift now carries
+/// canvas-pixels-per-destination-pixel in the uniform block and the shader
+/// converts once. Nothing here changed; the RENDERER's side of the contract
+/// did, and this paragraph is the contract.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 pub(crate) struct ClipRect {
     pub x: f64,

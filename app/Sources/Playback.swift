@@ -21,6 +21,13 @@ import AppKit
 /// `LevelMeter.shared`. See `LevelMeter.swift` for why the meter is computed
 /// from the DSP tap rather than observed from a second one.
 ///
+/// Road map 2's phase 8 hung two more things off the player, and both are here
+/// because both are about the PLAYER rather than about the document: View ▸
+/// Preview Quality, which scales the render size of the player's composition
+/// alone (a `mutableCopy()`, so the shared builder and therefore the export
+/// path are untouched), and `makePreviewLayer()`, the one door through which a
+/// second `AVPlayerLayer` is made — which is what lets `player` stay private.
+///
 /// AppKit-facing and main-thread only. The one GCD seam is the rebuild queue
 /// (app/CLAUDE.md); the 80 ms live debounce and the meter's read are run-loop
 /// `Timer`s, not dispatch sources, so they cancel deterministically.
@@ -88,6 +95,12 @@ final class Playback {
     private var meterTimer: Timer?
 
     private var canvasSize = CGSize(width: 1920, height: 1080)
+    /// View ▸ Preview Quality (road map 2's phase 8a). Persisted, so it is read
+    /// here rather than pushed in by the editor: this object owns the player,
+    /// and the setting is a fact about the player and not about the document.
+    /// `EditorViewController+PreviewQuality.swift` holds the enum, the aspect
+    /// rule and the menu.
+    private(set) var previewQuality = PreviewQuality.stored()
     private var isSeeking = false
     private var pendingSeek: Ticks?
     private var lastKnownTime: Ticks = 0
@@ -228,6 +241,90 @@ final class Playback {
         seek(to: currentTime)
     }
 
+    // MARK: - Preview quality and the second layer (road map 2's phase 8)
+
+    /// View ▸ Preview Quality ▸ — Full, Half or Quarter of the canvas, for the
+    /// PLAYER's composition alone.
+    ///
+    /// The setting has to survive two different moments, which is why it is
+    /// stored as well as applied: with an item on the player it is a
+    /// re-assignment (`AVPlayerItem.videoComposition` is a COPY property, so
+    /// mutating the retained `AVMutableVideoComposition` in place would change
+    /// nothing about the live item), and with no item — an empty timeline, or
+    /// a rebuild still on the queue — there is nothing to re-assign and
+    /// `finishRebuild` applies it to the item it is about to install. Both go
+    /// through `previewComposition`, so the two paths cannot drift.
+    ///
+    /// Not routed through `update(project:urls:isLive:)`, deliberately: that
+    /// function short-circuits on the plan JSON and the audio DSP, neither of
+    /// which a quality change touches, and teaching it a third term would make
+    /// every property edit compare one more thing for a setting that changes
+    /// once in a session. Not `invalidate()` either — the editor's forced
+    /// rebuild path pauses the transport and blanks the preview, which is a
+    /// heavy price for what is one property assignment.
+    func setPreviewQuality(_ quality: PreviewQuality) {
+        guard quality != previewQuality else { return }
+        previewQuality = quality
+        quality.store()
+        guard let item = player.currentItem, let built = built else { return }
+        item.videoComposition = previewComposition(built.videoComposition)
+        // A paused preview would otherwise keep the frame it has until the
+        // next seek: the item's composition changed, but nothing asked it for
+        // a picture. The same trick a property-only edit uses.
+        refreshPausedFrame()
+    }
+
+    /// The composition to hand the player: the one the plan built at Full, and
+    /// a `mutableCopy()` with a smaller `renderSize` otherwise.
+    ///
+    /// **The copy is the whole design.** `CompositionBuilder.build` is shared
+    /// by the preview, both export passes and the offline one-frame render, so
+    /// scaling there — even behind an argument — would put the export within
+    /// one wrong parameter of the preview's setting. Copying here means the
+    /// export path never sees a scaled composition at all;
+    /// `ExportWriter.videoComposition(_:settings:)` does exactly this to
+    /// `frameDuration` for the same reason.
+    ///
+    /// It reads the size off the BUILT composition every time rather than
+    /// remembering one, so it is idempotent: two quality changes in a row both
+    /// scale the pristine canvas size and never a size already scaled.
+    ///
+    /// The copy carries the plan's `RecipeInstruction`s through, which is worth
+    /// saying because they are a CUSTOM class rather than one of AVFoundation's
+    /// (`Compositor.swift`): `AVPlayerItem.videoComposition` is itself a `copy`
+    /// property, so every item this file has ever installed already went
+    /// through the same copy, and `ExportWriter` has copied the same
+    /// composition for its frame-rate override since phase 7.
+    ///
+    /// At Full — and at any quality a coprime canvas degrades to Full — the
+    /// guard returns the builder's own object with no copy made at all, so a
+    /// preview at the default setting is byte for byte the preview this file
+    /// built before the setting existed.
+    private func previewComposition(_ base: AVVideoComposition) -> AVVideoComposition {
+        let wanted = previewQuality.renderSize(for: base.renderSize)
+        guard wanted != base.renderSize,
+            let copy = base.mutableCopy() as? AVMutableVideoComposition
+        else { return base }
+        copy.renderSize = wanted
+        return copy
+    }
+
+    /// A second `AVPlayerLayer` on this document's player, for the preview
+    /// window (`PreviewWindowController.swift`).
+    ///
+    /// The factory exists so `player` can stay `private`: one place in the app
+    /// knows a second layer on one player is legal, and it is the object that
+    /// owns the player. The archived AVFoundation Programming Guide says it is
+    /// NOT — "only the most recently created such layer will display any video
+    /// content onscreen" — and that is measured false on macOS 26.5.1;
+    /// `PreviewWindowController`'s doc carries the measurement, because that is
+    /// where somebody would go to "fix" this back into one moved layer.
+    func makePreviewLayer() -> AVPlayerLayer {
+        let layer = AVPlayerLayer(player: player)
+        layer.videoGravity = .resizeAspect
+        return layer
+    }
+
     // MARK: - Rebuilding
 
     private func startRebuild() {
@@ -283,7 +380,10 @@ final class Playback {
             let time = currentTime
             let rate = player.rate
             let item = AVPlayerItem(asset: composition.composition)
-            item.videoComposition = composition.videoComposition
+            // Through `previewComposition`, or a structural rebuild would put
+            // the preview silently back to Full: the item is new, and the
+            // quality lives on this object rather than in the plan.
+            item.videoComposition = previewComposition(composition.videoComposition)
             item.audioMix = composition.audioMix
             // Decoding above the canvas size is wasted work — the compositor
             // renders at the canvas size no matter what the source is (§7.6).

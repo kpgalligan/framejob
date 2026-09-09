@@ -3,12 +3,34 @@ import UniformTypeIdentifiers
 
 /// The Media tab (spec §4.3): every imported file with its thumbnail, name,
 /// duration, dimensions, rate and badges; Add Media… (⇧⌘I); Finder drops onto
-/// the panel; a drag from a row to a timeline track or onto the canvas; and
-/// the row menu — Reveal in Finder, Relink…, Remove.
+/// the panel; a drag from a row to a timeline track or onto the canvas; the
+/// find band road map 2's phase 8c added — a search, a sort and an "unused
+/// only" switch (`MediaListFilter.swift`) — and the row menu: Insert at
+/// Playhead, Overwrite at Playhead, Reveal in Timeline, Reveal in Finder,
+/// Relink…, Remove.
 ///
 /// There is no left panel in this app (§11), so this list IS the library.
 /// Files are referenced, never copied (path + bookmark, §11), which is why a
 /// row can be "missing" and why Relink… lives here.
+///
+/// **The find band does not rebuild the pane, and that is the whole design of
+/// it.** `InspectorPaneView.rebuild()` removes every arranged subview and
+/// asks `makeSections()` for a new set, `InspectorViewController.refresh` runs
+/// it whenever `structureSignature` changes, and nothing in the inspector
+/// preserves the first responder across one — so a search field built inside
+/// `makeSections()` with the filtered set in the signature would be destroyed
+/// by the first keystroke that changed the list, taking the field editor and
+/// the caret with it (measured: removing a text field's ancestor leaves
+/// `currentEditor()` nil and the window itself as first responder). So the
+/// signature stays what it always was — a statement about the MODEL's shape —
+/// and `arrange()` applies the search, the sort and the switch to the rows
+/// that are already built, by hiding and re-ordering the list stack's
+/// arranged subviews. Both are measured, not assumed: an `isHidden` arranged
+/// subview leaves an `NSStackView`'s layout entirely (four 20 pt rows measure
+/// 89 pt, three of them 66), and `insertArrangedSubview(_:at:)` MOVES a view
+/// that is already arranged rather than duplicating it (the subview count
+/// does not change) while leaving the window's first responder and the
+/// caret's offset exactly where they were.
 final class MediaPane: InspectorPaneView {
     override var tab: InspectorTab { .media }
 
@@ -16,8 +38,41 @@ final class MediaPane: InspectorPaneView {
     /// nothing imported yet, which is when Add Media… matters most.
     override var emptyMessage: String? { nil }
 
-    private var rows: [MediaRowView] = []
+    /// The rows, in the order the model lists them, each with the id it
+    /// draws. The id is kept beside the view rather than read back off it so
+    /// that `arrange()` can look the CURRENT entry up in the snapshot: a
+    /// relink changes a file's name without changing this pane's signature,
+    /// and a cached `MediaSnapshot` would sort and search against the name
+    /// the row no longer shows.
+    ///
+    /// Internal rather than private for one caller: `select(_:)` redraws them
+    /// and lives in `MediaPaneCommands.swift`, which is where the row's seven
+    /// commands went when this file crossed the size cap. That is the whole
+    /// cost of the split.
+    var rows: [(media: UInt32, view: MediaRowView)] = []
 
+    /// The find band's state. View state, not persisted, and not part of the
+    /// signature below — `MediaListFilter` argues both.
+    private var filter = MediaListFilter()
+
+    /// The three things `arrange()` changes without a rebuild. Weak, because
+    /// the view hierarchy owns them and a rebuild replaces all three;
+    /// `InspectorPaneView.rebuild()` holds the previous generation one build
+    /// longer, so a stale strong reference here would outlive the pane's own
+    /// rule about that.
+    private weak var listStack: NSStackView?
+    private weak var tallyLabel: InspectorRowLabel?
+    private weak var noMatchesRow: NSView?
+
+    /// The order `arrange()` last put the rows in, so it can leave the stack
+    /// alone when nothing has moved — it runs on every refresh, and a live
+    /// canvas drag refreshes this panel thirty times a second.
+    private var arrangedOrder: [UInt32] = []
+
+    /// The MODEL's shape: which media exist and whether each one's file is
+    /// there. Deliberately says nothing about the search text, the sort or
+    /// the unused-only switch — see the class doc: putting the filtered set
+    /// in here is precisely the bug this pane is built to avoid.
     override var structureSignature: String {
         let media = binding.snapshot.media.map { entry -> String in
             "\(entry.id):\(mediaURL(for: entry) == nil ? "missing" : "ok")"
@@ -55,22 +110,37 @@ final class MediaPane: InspectorPaneView {
     /// forking that.
     override func makeSections() -> [InspectorSection] {
         rows = []
+        listStack = nil
+        noMatchesRow = nil
+        arrangedOrder = []
         var content: [NSView] = [actionRow()]
         if binding.snapshot.media.isEmpty {
+            // No find band with nothing to find: the band would be three dead
+            // controls over a line saying the list is empty, and the pane is
+            // rebuilt the moment the first file lands.
             content.append(
                 inspectorRow(nil, [InspectorRowLabel("Drop files here, or use Add Media….")]))
         } else {
+            content.append(findRow())
             content.append(listView())
+            content.append(noMatchesView())
         }
         content.append(footerRow())
+        // The rows exist and the band's controls hold the state, so the
+        // filter can be applied to this build before it is ever shown — which
+        // is what carries a search across the rebuild an import causes.
+        arrange()
         return [InspectorSection(id: "media.files", title: "Media", rows: content)]
     }
 
     /// Add Media…, its ⇧⌘I hint, and the item count at the trailing edge.
     ///
-    /// The count is a plain label rather than an `OptionControl`: it changes
-    /// only when the media list does, and the list is part of
-    /// `structureSignature`, so the whole pane is rebuilt around it.
+    /// The count used to be a plain label built once per rebuild, because it
+    /// changed only when the media list did. It changes with the FILTER now —
+    /// "3 of 40 items" is the one line that stops a narrowed list reading as a
+    /// lost library — so the label is held and `arrange()` writes it. It is
+    /// still not an `OptionControl`: those read the model, and this reads the
+    /// pane's own view state.
     private func actionRow() -> NSView {
         let add = OptionButtonControl(
             title: "Add Media…",
@@ -81,21 +151,83 @@ final class MediaPane: InspectorPaneView {
         add.toolTip = "Import files into this project (⇧⌘I)"
 
         let count = binding.snapshot.media.count
-        let tally: String
-        switch count {
-        case 0: tally = "No media"
-        case 1: tally = "1 item"
-        default: tally = "\(count) items"
-        }
+        let label = MediaPane.caption(MediaPane.tally(shown: count, of: count))
+        tallyLabel = label
         return MediaPane.bar(
             height: 38, border: .bottom,
-            views: [
-                add, MediaPane.caption("⇧⌘I"), MediaPane.spacer(), MediaPane.caption(tally),
+            views: [add, MediaPane.caption("⇧⌘I"), MediaPane.spacer(), label])
+    }
+
+    /// The item count, and the one place it is spelled.
+    ///
+    /// **One rule, not two**, and the shape is the fix. This used to return
+    /// early with `"\(shown) of \(total) items"` whenever the list was
+    /// narrowed and only then fall through to a `switch` that spelled "No
+    /// media" / "1 item" / "N items" — so the plural logic lived in the ONE
+    /// branch that could never reach `total == 1`, and a one-file library
+    /// with the search on read "0 of 1 items". Splitting a spelling across
+    /// two branches is what invites that back, so the noun is built once and
+    /// the narrowed line is that same noun with a prefix.
+    ///
+    /// The plural agrees with `total`, because `total` is the count the noun
+    /// qualifies: "0 of 1 item" is one item, none of it shown. (English is
+    /// not universal about that — "0 items" is plural where "1 item" is not,
+    /// which is exactly why the number the noun belongs to has to be named
+    /// rather than assumed.)
+    private static func tally(shown: Int, of total: Int) -> String {
+        if total == 0 { return "No media" }
+        let items = total == 1 ? "1 item" : "\(total) items"
+        return shown == total ? items : "\(shown) of \(items)"
+    }
+
+    /// The find band: the search field on its own line, the sort popup and
+    /// the unused-only switch under it.
+    ///
+    /// **Two lines because three controls do not fit on one**, measured
+    /// rather than felt: the popup is 116 pt (the `InspectorMetrics` width
+    /// that holds "Import Order" in `DS.mono(11)` with its chevron), the
+    /// checkbox is 77 (13 pt box, 6 pt gap, 58 pt of `DS.sans(11)`), and the
+    /// field wants about 110 to show its own placeholder — 319 pt against the
+    /// 284 the default 304 pt panel leaves inside the section inset, and 260
+    /// at the 280 pt minimum width. One line "fits" only at a width nobody is
+    /// guaranteed to have, and the failure mode is the search box shrinking
+    /// to nothing while the two controls beside it stay whole.
+    private func findRow() -> NSView {
+        let controls = MediaListFilter.controls(
+            current: { [weak self] in self?.filter ?? MediaListFilter() },
+            apply: { [weak self] next in self?.apply(next) })
+        return MediaPane.bar(
+            height: 60, border: .bottom,
+            lines: [
+                [controls.search],
+                [MediaPane.caption("Sort"), controls.sort, MediaPane.spacer(),
+                 controls.unusedOnly],
             ])
+    }
+
+    /// A control wrote a new filter: keep it and re-arrange, unless it says
+    /// exactly what the old one said (every keystroke in the search field
+    /// arrives here, and most of them are `guard`ed out by this line).
+    ///
+    /// The controls are refreshed on the way out because
+    /// `OptionCheckboxControl` and `OptionPopupControl` redraw from
+    /// `refresh()` alone: they write through their closure and trust the panel
+    /// to come back round, which it does for a document edit and does not for
+    /// view state. It belongs here rather than in `arrange()` — this is the
+    /// path a control WROTE on, and on the other two paths the panel has
+    /// refreshed them already.
+    private func apply(_ next: MediaListFilter) {
+        guard next != filter else { return }
+        filter = next
+        arrange()
+        refreshOptionControls(in: self)
     }
 
     /// The rows themselves, in their own stack so they sit 3 pt apart — the
     /// section's own row spacing is 6 and is shared with every other pane.
+    ///
+    /// Built in the MODEL's order every time; `arrange()` is what puts them in
+    /// the sort's order, and it runs before this build is ever on screen.
     private func listView() -> NSView {
         let stack = NSStackView()
         stack.orientation = .vertical
@@ -103,11 +235,80 @@ final class MediaPane: InspectorPaneView {
         stack.spacing = 3
         for media in binding.snapshot.media {
             let row = MediaRowView(media: media.id, pane: self)
-            rows.append(row)
+            rows.append((media: media.id, view: row))
             stack.addArrangedSubview(row)
             row.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
         }
+        listStack = stack
         return stack
+    }
+
+    /// The line under a list every row of which the filter has hidden. Built
+    /// with the list and shown by `arrange()`, because a filter change must
+    /// not rebuild anything — and a list that has silently gone blank is the
+    /// worst thing a search can do to a library.
+    ///
+    /// The sentence measures 191 pt in `DS.sans(11)` against the 264 pt a row
+    /// has in the default panel and 240 at the 280 pt minimum, so it is whole
+    /// at every width — the footer's own line records what happens when that
+    /// is not checked.
+    private func noMatchesView() -> NSView {
+        let row = inspectorRow(
+            nil, [InspectorRowLabel("No media matches the search or the filter.")])
+        row.isHidden = true
+        noMatchesRow = row
+        return row
+    }
+
+    /// The search, the sort and the unused-only switch applied to the rows
+    /// this pane already holds — no rebuild, so the field being typed into
+    /// keeps its caret (the class doc says why that is the point).
+    ///
+    /// The order is applied to EVERY row and the hiding to every row
+    /// separately: moving a row and hiding one are different jobs, and a
+    /// hidden row that keeps its place in the sort comes back where it
+    /// belongs when the search is cleared. Nothing is written that does not
+    /// have to be — this runs on every refresh, including a live gesture's
+    /// thirty a second.
+    private func arrange() {
+        let snapshot = binding.snapshot
+        let order = filter.ordered(snapshot.media)
+        if let stack = listStack, order != arrangedOrder {
+            var index = 0
+            for id in order {
+                guard let row = rows.first(where: { $0.media == id })?.view else { continue }
+                stack.insertArrangedSubview(row, at: index)
+                index += 1
+            }
+            arrangedOrder = order
+        }
+        var shown = 0
+        for row in rows {
+            let visible = snapshot.media(row.media).map { filter.admits($0, in: snapshot) } ?? false
+            if row.view.isHidden == visible { row.view.isHidden = !visible }
+            if visible { shown += 1 }
+        }
+        let empty = shown == 0 && !rows.isEmpty
+        if noMatchesRow?.isHidden == empty { noMatchesRow?.isHidden = !empty }
+        let tally = MediaPane.tally(shown: shown, of: snapshot.media.count)
+        if tallyLabel?.stringValue != tally { tallyLabel?.stringValue = tally }
+        refreshOptionControls(in: self)
+    }
+
+    /// The panel's own per-change refresh, plus a re-arrangement.
+    ///
+    /// The second half is not tidiness: "unused only" is a question about the
+    /// CLIPS, and deleting the last clip that used a file changes no part of
+    /// `structureSignature` — the media list is the same list — so without
+    /// this the row that has just become unused would not appear until
+    /// something else rebuilt the pane. A relink from one present file to
+    /// another is the same shape: the name the sort reads changes and the
+    /// signature does not. Everything above writes only what it has to, so
+    /// the ordinary case — nothing moved, nothing hidden, the same count —
+    /// costs one sort and a walk of a few dozen rows.
+    override func refresh() {
+        super.refresh()
+        arrange()
     }
 
     /// Consolidate belongs beside the list it acts on: this pane is where the
@@ -195,14 +396,48 @@ final class MediaPane: InspectorPaneView {
     /// offscreen (layer-backed root → scroll view → pane stack → section
     /// stack → row), where the bar paints the full panel width.
     private static func bar(height: CGFloat, border: BarView.Border, views: [NSView]) -> NSView {
+        bar(height: height, border: border, lines: [views])
+    }
+
+    /// The same band with more than one LINE of controls in it — phase 8c's
+    /// find band, which needs two.
+    ///
+    /// One band rather than two stacked ones: two would each carry a hairline
+    /// and each take one of the section's 7 pt row gaps, which is 15 pt of
+    /// chrome and a second rule for no extra meaning. A single line is still
+    /// built exactly as it was — the horizontal stack IS the content, with no
+    /// wrapper around it — so the two existing bands are laid out to the pixel
+    /// they always were.
+    private static func bar(
+        height: CGFloat, border: BarView.Border, lines: [[NSView]]
+    ) -> NSView {
         let row = NSView()
         let bar = BarView(border: border)
         bar.translatesAutoresizingMaskIntoConstraints = false
         row.addSubview(bar)
-        let stack = NSStackView(views: views)
-        stack.orientation = .horizontal
-        stack.alignment = .centerY
-        stack.spacing = 8
+        let rows = lines.map { views -> NSStackView in
+            let line = NSStackView(views: views)
+            line.orientation = .horizontal
+            line.alignment = .centerY
+            line.spacing = 8
+            return line
+        }
+        let stack: NSView
+        if rows.count == 1 {
+            stack = rows[0]
+        } else {
+            let column = NSStackView(views: rows)
+            column.orientation = .vertical
+            column.alignment = .leading
+            column.spacing = 6
+            // Each line spans the band, so a spacer on any of them pushes to
+            // the same trailing edge and a flexible field on another fills the
+            // same width.
+            for line in rows {
+                line.widthAnchor.constraint(equalTo: column.widthAnchor).isActive = true
+            }
+            stack = column
+        }
         stack.translatesAutoresizingMaskIntoConstraints = false
         bar.addSubview(stack)
         let inset = InspectorMetrics.inset
@@ -223,7 +458,7 @@ final class MediaPane: InspectorPaneView {
     /// (`MediaImporter` posts repeatedly as they arrive), so this only marks
     /// the rows dirty — never a rebuild.
     @objc private func cacheChanged(_ note: Notification) {
-        for row in rows { row.invalidateThumbnail() }
+        for row in rows { row.view.invalidateThumbnail() }
     }
 
     // MARK: - Finder drops
@@ -247,143 +482,5 @@ final class MediaPane: InspectorPaneView {
         guard !urls.isEmpty else { return false }
         inspector?.onImportFiles?(urls)
         return true
-    }
-
-    // MARK: - Row commands
-
-    /// Where a dragged row landed. Returns false when the drop is refused, so
-    /// the drag springs back rather than silently doing nothing.
-    func drop(_ media: UInt32, on destination: NSView, target: MediaDropTarget) -> Bool {
-        // A drag started in ANOTHER document's panel must not edit this one:
-        // the session carries the source row, and the two windows differ.
-        guard destination.window === window, window != nil else { return false }
-        guard binding.snapshot.media(media) != nil else { return false }
-        let fps = binding.canvas.fps
-        switch target {
-        case .track(let track, let at, let mode):
-            let when = ReelTime.snapToFrame(max(at, 0), fps: fps)
-            switch mode {
-            case .add:
-                binding.apply("Add Clip", [.addClip(track: track, media: media, at: when)])
-            case .insert:
-                binding.apply("Insert", [.insertClip(track: track, media: media, at: when)])
-            case .overwrite:
-                binding.apply(
-                    "Overwrite", [.overwriteClip(track: track, media: media, at: when)])
-            }
-        case .canvas:
-            let at = ReelTime.snapToFrame(max(binding.playhead, 0), fps: fps)
-            let index = binding.snapshot.tracks.count
-            // `add_track` returns a project, not an id (§11's one entry
-            // point), so the id is learned from a PURE trial application
-            // before the real edit runs.
-            let existing = Set(binding.snapshot.tracks.map { $0.id })
-            let probed = inspector?.onProbe?([.addTrack(index: index)])
-            guard let track = probed?.tracks.first(where: { !existing.contains($0.id) })?.id else {
-                guard let top = binding.snapshot.tracks.last?.id else { return false }
-                binding.apply("Add Clip", [.addClip(track: top, media: media, at: at)])
-                return true
-            }
-            binding.apply(
-                "Add Clip",
-                [.addTrack(index: index), .addClip(track: track, media: media, at: at)])
-        }
-        return true
-    }
-
-    /// A row was clicked: it becomes the document's selected media, which is
-    /// what Edit ▸ Insert / Overwrite at Playhead act on. View state, so it
-    /// neither dirties the document nor registers an undo step.
-    func select(_ media: UInt32) {
-        guard let document = binding.document, document.selectedMedia != media else { return }
-        document.selectedMedia = media
-        // Only the rows draw the selection, and the Edit menu asks for it
-        // when it validates, so a redraw is the whole of the update.
-        rows.forEach { $0.needsDisplay = true }
-    }
-
-    /// The row menu's Insert / Overwrite at Playhead. The same two ops the
-    /// Edit menu runs, on the row that was right-clicked.
-    func place(_ media: UInt32, insert: Bool) {
-        select(media)
-        guard binding.snapshot.media(media) != nil,
-              let track = binding.document?.targetTrack
-        else {
-            NSSound.beep()
-            return
-        }
-        let at = ReelTime.snapToFrame(max(binding.playhead, 0), fps: binding.canvas.fps)
-        binding.apply(
-            insert ? "Insert" : "Overwrite",
-            [
-                insert
-                    ? .insertClip(track: track, media: media, at: at)
-                    : .overwriteClip(track: track, media: media, at: at)
-            ])
-    }
-
-    /// The row menu's Reveal in Finder.
-    func reveal(_ media: UInt32) {
-        guard let entry = binding.snapshot.media(media), let url = mediaURL(for: entry) else {
-            NSSound.beep()
-            return
-        }
-        NSWorkspace.shared.activateFileViewerSelecting([url])
-    }
-
-    /// Relink… — the offer a project whose media has moved opens with (§5.6).
-    func relink(_ media: UInt32) {
-        guard let entry = binding.snapshot.media(media), let window = window else {
-            NSSound.beep()
-            return
-        }
-        let binding = self.binding
-        let panel = NSOpenPanel()
-        panel.allowsMultipleSelection = false
-        panel.canChooseDirectories = false
-        panel.message = "Choose the file for “\(entry.name)”."
-        panel.beginSheetModal(for: window) { response in
-            guard response == .OK, let url = panel.url else { return }
-            // A sheet's completion is not an AppKit event: the grouped entry
-            // point is mandatory here (app/CLAUDE.md's undo pitfall).
-            binding.applyGrouped(
-                "Relink Media",
-                [
-                    .relinkMedia(
-                        media: media, path: url.path, bookmark: bookmarkString(for: url))
-                ])
-        }
-    }
-
-    /// Remove — refused while the media is in use, with the "and its clips"
-    /// offer §4.3 asks for.
-    func remove(_ media: UInt32) {
-        guard let entry = binding.snapshot.media(media) else {
-            NSSound.beep()
-            return
-        }
-        let users = binding.snapshot.clips.filter { $0.source.mediaID == media }
-        guard !users.isEmpty else {
-            binding.apply("Remove Media", [.removeMedia(media: media)])
-            return
-        }
-        guard let window = window else {
-            NSSound.beep()
-            return
-        }
-        let binding = self.binding
-        let alert = NSAlert()
-        alert.messageText = "Remove “\(entry.name)”?"
-        alert.informativeText =
-            users.count == 1
-            ? "It is used by 1 clip, which will be removed with it."
-            : "It is used by \(users.count) clips, which will be removed with it."
-        alert.addButton(withTitle: "Remove and Delete Clips")
-        alert.addButton(withTitle: "Cancel")
-        alert.beginSheetModal(for: window) { response in
-            guard response == .alertFirstButtonReturn else { return }
-            binding.applyGrouped(
-                "Remove Media", [.removeMedia(media: media, withClips: true)])
-        }
     }
 }

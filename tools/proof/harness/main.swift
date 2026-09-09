@@ -17,7 +17,7 @@
 //
 //   harness <project.reelcut|welcome> <out.png> <light|dark>
 //           [w] [h] [selectIndex] [playheadSec] [sizeIndex 0-2] [clip|media|document]
-//           [candidateSpans] [expandSections]
+//           [candidateSpans] [expandSections] [mediaFilter]
 //
 // `selectIndex` picks the clip at that index in START order (-1 for none).
 // The PNG is written at the main screen's backing scale (2x on a Retina
@@ -42,6 +42,36 @@
 //                      built `defaultExpanded: false` therefore shows nothing
 //                      but its header — its rows cannot be seen at all. Each
 //                      id here pins its key to "not collapsed".
+//   `mediaFilter`      the Media tab's find band (road map 2 phase 8c):
+//                      `search|order|unusedOnly`, e.g. "beta|1|0" or
+//                      "|3|1". `search` is the text (empty = leave the field
+//                      alone), `order` is `MediaListFilter.Order`'s raw value
+//                      0–3 (empty = leave), `unusedOnly` is "1" to turn the
+//                      switch on. Added for `tools/proof/phase8_chrome.py`
+//                      and APPENDED, so every earlier caller's positions hold.
+//
+//                      It is here for `candidateSpans`' reason exactly: the
+//                      band's state is view state no package carries, and the
+//                      only thing that writes it in the app is a person typing
+//                      into a field and clicking two controls, neither of which
+//                      an offscreen render can do. Without it the NARROWED
+//                      pane — a filtered list, "2 of 6 items", the "No media
+//                      matches" line — cannot be photographed at all, and the
+//                      narrowed pane is the whole of what phase 8c added.
+//
+//                      **It drives the app's own controls and sets nothing
+//                      itself**: `MediaPane.filter` is private and stays that
+//                      way, so this walks the pane for the three views
+//                      `MediaListFilter.controls` built and calls what AppKit
+//                      would have called — `controlTextDidChange(_:)` on the
+//                      search field after its `stringValue` is set,
+//                      `itemPicked:` on the popup (the selector its own menu
+//                      items carry; a popped-up `NSMenu` cannot be chosen from
+//                      offscreen), and `mouseDown(with:)` on the checkbox. So
+//                      what the render shows went through `apply` and
+//                      `arrange()` the way a keystroke does. The field is NOT
+//                      made first responder: a caret blinks, and a blinking
+//                      caret would make the settle capture below a race.
 //
 // TWO MORE MODES, which render nothing:
 //
@@ -178,7 +208,11 @@
 // sizes) can change the next run's answer. Two renders of one package are
 // byte-identical; `tools/proof/phase2_chrome.py` checks that first. The
 // keys the app reads and the chrome does NOT draw (`ReelcutCompositorTiming`,
-// `RCFFmpegImport`, `RCFFmpegPath`) are left alone.
+// `RCFFmpegImport`, `RCFFmpegPath`) are left alone — with the exception
+// `pinDefaults` argues one key at a time: a key nothing draws is pinned anyway
+// when ORDINARY USE of the app writes it, since the render would then start
+// moving with whatever the developer last did the day some chrome grew a
+// readout of it. `ReelcutExportChoice` (phase 7) and phase 8's two are those.
 import AppKit
 import CoreText
 
@@ -232,6 +266,27 @@ enum Harness {
             // that (identical, stable, DIFFERENT output across processes) is
             // the one phase 4 spent a gate learning to read.
             "ReelcutExportChoice": "",
+            // View ▸ Preview Quality (`PreviewQuality.defaultsKey`, phase 8a).
+            // 0 is Full, which is what `integer(forKey:)` of an absent key
+            // reads as and what `PreviewQuality.stored()` answers for one.
+            // NOTHING the harness photographs reads it — it scales the
+            // PLAYER's video composition, and the preview well is black
+            // offscreen because a Metal layer has no drawable there — so this
+            // is pinned for the `ReelcutExportChoice` reason above it rather
+            // than for a render: it is written by ORDINARY USE of the app on
+            // the machine that runs the proofs, so the day the chrome grows a
+            // readout of the current quality (a toolbar badge, say) the renders
+            // would start moving with whatever the developer last chose.
+            "ReelcutPreviewQuality": 0,
+            // The preview window's saved frame (phase 8b). AppKit spells the
+            // key `"NSWindow Frame " + setFrameAutosaveName`'s name — measured,
+            // not assumed — and "" is what an unsaved frame reads as, which is
+            // the first-run window: `setFrameUsingName` answers false and the
+            // panel centres itself. Pinned on the same terms as the two above:
+            // the harness renders the EDITOR's content view and never makes a
+            // preview window at all, but ordinary use of the app writes this
+            // key on every move and resize of one.
+            "NSWindow Frame ReelcutPreviewWindow": "",
             "AgentServerEnabled": false,
             // AppKit picks legacy (16 pt, always visible) or overlay scrollers
             // by whether a MOUSE is attached, and the inspector pane is 16 pt
@@ -257,6 +312,84 @@ enum Harness {
         where key.hasPrefix("ReelcutInspectorSection.") {
             defaults.removeObject(forKey: key)
         }
+    }
+
+    /// Every descendant of `view` of one type, in front-to-back subview
+    /// order. The Media tab's find band holds exactly one of each of the
+    /// three types `applyMediaFilter` looks for, and it asserts that.
+    static func descendants<T: NSView>(_ type: T.Type, in view: NSView) -> [T] {
+        var found: [T] = []
+        for subview in view.subviews {
+            if let hit = subview as? T { found.append(hit) }
+            found.append(contentsOf: descendants(type, in: subview))
+        }
+        return found
+    }
+
+    /// The Media tab's find band, driven through the app's own controls —
+    /// see the header for why this exists and why it does not touch
+    /// `MediaPane.filter`.
+    ///
+    /// A part that names nothing leaves that control alone, so "beta||" and
+    /// "beta" are the same request. A control this cannot find is a WARNING
+    /// on stderr rather than a silent no-op: a render that quietly ignored
+    /// the argument would come back as the resting band, which is exactly the
+    /// picture the caller is comparing against.
+    static func applyMediaFilter(_ spec: String, in controller: EditorViewController) {
+        let parts = spec.split(separator: "|", omittingEmptySubsequences: false).map(String.init)
+        let search = parts.count > 0 ? parts[0] : ""
+        let order = parts.count > 1 ? Int(parts[1]) : nil
+        let unused = parts.count > 2 && parts[2] == "1"
+        guard let pane = descendants(MediaPane.self, in: controller.view).first else {
+            warn("mediaFilter: the Media tab is not showing a MediaPane")
+            return
+        }
+        if !search.isEmpty {
+            guard let field = descendants(MediaSearchField.self, in: pane).first else {
+                warn("mediaFilter: no MediaSearchField in the pane")
+                return
+            }
+            field.stringValue = search
+            // What AppKit calls when the field editor changes, and the only
+            // thing `MediaSearchField` does with it.
+            field.controlTextDidChange(
+                Notification(name: NSControl.textDidChangeNotification, object: field))
+        }
+        if let order = order {
+            let popups = descendants(OptionPopupControl.self, in: pane)
+            guard popups.count == 1 else {
+                warn("mediaFilter: expected one OptionPopupControl, found \(popups.count)")
+                return
+            }
+            let item = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+            item.tag = order
+            let picked = NSSelectorFromString("itemPicked:")
+            guard popups[0].responds(to: picked) else {
+                warn("mediaFilter: OptionPopupControl no longer answers itemPicked:")
+                return
+            }
+            popups[0].perform(picked, with: item)
+        }
+        if unused {
+            let boxes = descendants(OptionCheckboxControl.self, in: pane)
+            guard boxes.count == 1 else {
+                warn("mediaFilter: expected one OptionCheckboxControl, found \(boxes.count)")
+                return
+            }
+            guard let event = NSEvent.mouseEvent(
+                with: .leftMouseDown, location: .zero, modifierFlags: [],
+                timestamp: 0, windowNumber: controller.view.window?.windowNumber ?? 0,
+                context: nil, eventNumber: 0, clickCount: 1, pressure: 1)
+            else {
+                warn("mediaFilter: could not synthesize a mouse event")
+                return
+            }
+            boxes[0].mouseDown(with: event)
+        }
+    }
+
+    static func warn(_ message: String) {
+        FileHandle.standardError.write("warning: \(message)\n".data(using: .utf8)!)
     }
 
     /// A comma-separated argument. "-" and "" both mean nothing, so an
@@ -569,7 +702,7 @@ guard arguments.count >= 4 else {
     FileHandle.standardError.write(
         ("usage: harness <project.reelcut|welcome> <out.png> <light|dark> "
             + "[w] [h] [selectIndex] [playheadSec] [sizeIndex 0-2] [clip|media|document] "
-            + "[candidateSpans] [expandSections]\n"
+            + "[candidateSpans] [expandSections] [mediaFilter]\n"
             + "       harness cues <words.json> <out.json>\n"
             + "       harness meter <request.json> <out.json>\n")
             .data(using: .utf8)!)
@@ -623,6 +756,10 @@ let tabName = arguments.count > 9 ? arguments[9] : "clip"
 /// Two more pieces of view state a package cannot carry — see the header.
 let candidateSpans = Harness.spans(arguments.count > 10 ? arguments[10] : "-")
 let expandSections = Harness.list(arguments.count > 11 ? arguments[11] : "-")
+/// The Media tab's find band — the twelfth argument, appended for
+/// `phase8_chrome.py`. See the header: view state a package cannot carry, and
+/// the only thing that writes it in the app is a person at the controls.
+let mediaFilterSpec = arguments.count > 12 && arguments[12] != "-" ? arguments[12] : ""
 
 Harness.pinDefaults(sizeIndex: sizeIndex, expand: expandSections)
 let app = NSApplication.shared
@@ -693,6 +830,15 @@ default: break
 for _ in 0..<4 {
     RunLoop.current.run(until: Date().addingTimeInterval(0.05))
     controller.view.layoutSubtreeIfNeeded()
+}
+// The find band, after the pane it lives in exists — a control cannot be
+// driven before it has been built, and `select(.media)` is what builds it.
+if !mediaFilterSpec.isEmpty {
+    Harness.applyMediaFilter(mediaFilterSpec, in: controller)
+    for _ in 0..<4 {
+        RunLoop.current.run(until: Date().addingTimeInterval(0.05))
+        controller.view.layoutSubtreeIfNeeded()
+    }
 }
 do {
     try Harness.png(controller.view, to: outURL)

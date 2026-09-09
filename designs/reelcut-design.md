@@ -436,8 +436,22 @@ is enabled.
   `video.spotlight` prop and appears in the **Video** pane, not here.
 
 **Media tab** — a 38 pt action row (Add Media…, its ⇧⌘I hint, a right-aligned
-item count), the list, then a 40 pt footer holding Consolidate… and a line
-saying what it does.
+item count), a 60 pt **find band**, the list, then a 40 pt footer holding
+Consolidate… and a line saying what it does.
+
+- The find band is two lines: a search field across the top (name contains,
+  case- and diacritic-insensitive, as you type), then a Sort popup — **Import
+  Order** · Name · Duration · Kind — and an "Unused only" switch. It is two
+  lines rather than one because the three controls measure 319 pt against the
+  284 the panel leaves at its default width. The row spells "Import Order"
+  and not "Added" because nothing records when a file arrived: `Media` has no
+  timestamp, and what exists is the array's own insertion order, which is
+  also ascending id order for any project built by ops. The action row's
+  count becomes "N of M items" while anything is narrowing.
+- None of the three is persisted, and the band never rebuilds the pane: the
+  rows it already built are hidden and re-ordered in place, because
+  `InspectorPaneView.rebuild()` destroys the field editor and the caret with
+  it. A search is an act of finding, not a preference.
 
 - Every imported file as a 52 pt row: a 34 × 38 pt thumbnail, the name at
   12 pt, a mono 10 pt meta line of duration, dimensions and fps, an
@@ -445,8 +459,14 @@ saying what it does.
   Finder onto the panel, the canvas, or the timeline.
 - Drag from the list to a timeline track (drops at the cursor) or onto
   the canvas (appends on a new top track at the playhead).
-- Right-click: Reveal in Finder, Relink…, Remove (refuses while in use and
-  offers "Remove and delete its clips").
+- Right-click: Reveal in Finder, **Reveal in Timeline**, Relink…, Remove
+  (refuses while in use and offers "Remove and delete its clips"). Reveal in
+  Timeline selects the clips whose source is that file and scrolls the
+  timeline to the earliest of them; it is disabled for a file whose only
+  users are INSIDE a nest, because the selection holds top-level clip ids
+  alone. "Is this file used" is one question with one answer
+  (`MediaUsage.swift`), and it walks the nests the way the core's
+  `every_clip()` does — Remove and the `remove_media` tool ask it too.
 - Files are referenced (path + `URL.bookmarkData()`; the app is not
   sandboxed, so no security scope), never copied. File ▸ Consolidate
   Media… — and the pane's own Consolidate… button — copies them into the
@@ -1472,8 +1492,14 @@ Asked once per frame by the compositor, and by the overlay for hit-testing.
   rotated rectangle in CANVAS pixels the layer is clipped to, with `x`/`y`
   the rectangle's CENTRE measured from the canvas's top-left corner and
   `rotation` in degrees clockwise. That frame is not the canvas-centre one
-  a layer's own `x`/`y` use; it is the space the fragment stage's position
-  already arrives in, which is the whole reason for it. Only a nested layer
+  a layer's own `x`/`y` use; it is the canvas's own top-left frame. It used
+  to say here that this is "the space the fragment stage's position already
+  arrives in" — that was true only while every render target was the canvas
+  size, and road map 2's phase 8a (Preview Quality) made it false and cost
+  the phase a blocker: a fragment arrives in DESTINATION pixels, so a
+  canvas-pixel rectangle tested against a halved coordinate is magnified
+  about the origin. The renderer now carries the ratio and converts
+  (§7.5). Only a nested layer
   sets it — clipped to its nest's canvas rect — and everything else emits
   `null`.
 - **A nest contributes one layer per drawing clip inside it** (§5.3), never
@@ -1559,7 +1585,7 @@ pass nothing, because each wants the picture rather than a deliverable.
 |---|---|
 | `ReelCore.swift` | the **only** `rc_*` caller; `ReelProject` (handle + lazy `ProjectSnapshot`), typed op builders, `RecipeSource` |
 | `ProjectDocument.swift` | NSDocument, `.reelcut` package read/write, the single mutation point (`applyEdit`, live-edit trio), undo as a handle stack, dirty counting |
-| `Playback.swift` | `AVPlayer` + `AVPlayerItem` over the plan; the rebuild-vs-refresh decision (§7.6); coalesced exact seeks; JKL rates; loop range; `preferredMaximumResolution` = canvas size |
+| `Playback.swift` · `EditorViewController+PreviewQuality.swift` · `PreviewWindowController.swift` | `AVPlayer` + `AVPlayerItem` over the plan; the rebuild-vs-refresh decision (§7.6); coalesced exact seeks; JKL rates; loop range; `preferredMaximumResolution` = canvas size. **Preview Quality** (View ▸ Preview Quality ▸ Full / Half / Quarter) scales the PLAYER's render size on a `mutableCopy()` of the built video composition, so `CompositionBuilder.build` is untouched and the export and `render_frame` paths are UNREACHABLE from the setting rather than merely unchanged by it; the size always carries the canvas's EXACT aspect (`m · (w/g, h/g)`, `g = gcd(w,h)`, `m = ceil(g/divisor)`), falling back to the next coarser exact size and finally to Full for a coprime canvas, because the overlay maps every drag handle through `AVPlayerLayer.videoRect`. **Preview Window** (⇧⌘P) is a second `AVPlayerLayer` on the SAME player in an `NSPanel` — a panel because a titled window becomes MAIN and every ⌘-item whose action is on `EditorViewController` then resolves to nothing |
 | `CompositionBuilder.swift` | plan JSON → `AVMutableComposition` + `AVMutableAudioMix` + `AVMutableVideoComposition` (+ `CompositionInstruction`) |
 | `Compositor.swift` | the `AVVideoCompositing` class and its Metal pipeline (§7.5) |
 | `LayerRenderers.swift` · `LayerRenderersText.swift` | text (Core Text) and shape (Core Graphics) descriptions → premultiplied BGRA `MTLTexture`s, LRU-cached by hash; reports measured text sizes to the overlay; draws a shape's `gradient` (format version 6) by CLIPPING to the path and running `CGGradient`, sorting the stops the core deliberately does not police (§5.2). The TEXT half — the layout caches, the attributed string and the three §5.2 reveals drawn over the recipe's `reveal`, so a reveal can never reflow the box — went out to `LayerRenderersText.swift` under the size rule when phase 6 came to add the gradient |
@@ -1569,6 +1595,7 @@ pass nothing, because each wants the picture rather than a deliverable.
 | `ExporterSettings.swift` | the resolved settings in AVFoundation's vocabulary — the time range, the fallback session preset, the file type, the UTI, the extension, `isAudioOnly` — cut out of `Exporter.swift` under the size rule when phase 7 gave `export` and `renderFrame` a `RecipeOptions` argument; `renderFrame` stayed behind because it is the app's only `copyCGImage` call and the build baseline names that warning by file |
 | `FrameWriter.swift` | a CGImage and a format in, a written file out (PNG / JPEG / HEIC) — the ONE writer File ▸ Save Frame… and `render_frame` both call, which is what makes their PNGs byte-identical by construction rather than by luck; PNG passes NIL destination properties, and JPEG flattens a transparent canvas onto black because the container has no alpha |
 | `AudioTap.swift` · `AudioDSP.swift` · `LevelMeter.swift` · `LevelMeterView.swift` | the sample-level audio the plan cannot carry: one `MTAudioProcessingTap` per composition audio track running noise reduction, the compressor and the Mix stage (the mono fold, then the pan), and the level meter's model and its one view — the model publishing a raw per-channel peak and RMS lock-free off the render thread, the view owning the ballistics |
+| `MediaPane.swift` · `MediaRowView.swift` · `MediaListFilter.swift` · `MediaPaneCommands.swift` · `MediaUsage.swift` · `MediaReveal.swift` | the Media tab (§4.3): the pane and its find band, the row and the drag it sources, the filter as a VALUE (search, order, unused-only), the seven commands a row calls back into, the ONE answer to "is this file used" — which walks the nests the way the core's `every_clip()` does, and which Remove and `remove_media` ask too — and the reveal, which selects and then scrolls |
 | `MediaPeaks.swift` · `AudioNormalize.swift` · `SilenceDetector.swift` | the waveform cache and the two questions asked of it: `MediaPeaks` is the one mapping from a plan segment's source window to peak buckets (the reversed mirror included), `AudioNormalize` turns a clip's peak into a `set_audio` op (Normalize, `normalize_clip`) and `SilenceDetector` turns peak × envelope into the quiet spans |
 | `Loudness.swift` | BS.1770-4 integrated loudness and true peak over plain float buffers — no AVFoundation, no player, no tap — plus the export gain that follows from a measurement and the 16-bit scaler that applies it |
 | `TimelineView.swift` | custom `NSView` in an `NSScrollView`; drawing from the snapshot; gesture sessions (`ClipDragSession`, `TrimSession`, `RangeSession`, `MarkerDragSession`) as structs; `on*` closures to the VC |
@@ -2154,6 +2181,7 @@ a clean `make lint` before finishing Rust work.
 | ⌘E | Export… |
 | ⌥⌘E | Save Frame… — the frame under the playhead as a PNG, JPEG or HEIC still (road map 2's phase 7a). Export…'s still-image sibling, under the same letter |
 | ⌥⌘I | Toggle inspector |
+| ⇧⌘P | Preview Window — a second window showing the same picture as the canvas, with no overlay (road map 2's phase 8b). A TOGGLE: the item carries a checkmark and the key both opens the window and puts it away |
 | `,` / `.` (⇧ ×10) | Nudge the selection one frame |
 | ⌥-drag clip | Duplicate |
 | ⌥⇧-drag clip | Slip — the source under a fixed clip |
@@ -2172,7 +2200,6 @@ a key, nothing more.
 
 | Keys | Action | Phase |
 |---|---|---|
-| ⇧⌘P | Preview Window | 8 |
 | ⌘↓ / ⌘↑ | Open / close nest | 9 |
 
 Menus: File (New Project, Open…, Open Recent, Close, Save, Save As…,
@@ -2208,7 +2235,18 @@ key equivalent, Rename…, Label ▸ (the six colours and None),
 Nest, Un-nest), Track (New Track,
 Remove Track, Remove Empty Tracks, Hide/Mute/Lock/Solo), Mark (Add Marker,
 Set In, Set Out, Clear Range, Next/Previous Marker), View (Zoom, Fit,
-Snapping, Safe Areas, Inspector, Timeline Track Height), Window (Minimize,
+Snapping, Safe Areas, Inspector, Timeline Track Height, and — road map 2's
+phase 8, in a group of their own after a separator because both are about the
+PREVIEW rather than about the editor's panes — Preview Quality ▸ (Full · Half ·
+Quarter, a tagged submenu with a checkmark for the current row and no key
+equivalents: it scales the render size of the PLAYER's video composition alone,
+always at the canvas's exact aspect ratio, and export and `render_frame` are
+unreachable from it) and Preview Window ⇧⌘P (a second `AVPlayerLayer` on the
+same player in an `NSPanel` — a panel because a titled window would become MAIN
+and every ⌘-item whose action lives on the editor would stop resolving while
+the preview was focused; its window sets `isExcludedFromWindowsMenu` for the
+export queue's reason and autosaves its frame, which the queue's deliberately
+does not, so it stays on the display it was put on)), Window (Minimize,
 Zoom, Export Queue — road map 2's phase 7e, the export sheet's Add to Queue
 button's other end, with no key equivalent because §9's "proposed, not yet
 bound" table claims no row for it and every bare letter belongs to the

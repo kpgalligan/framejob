@@ -130,6 +130,17 @@ normative: §5.2 is the project schema, §6 the op table, §7 the architecture.
   one. And **Window ▸ Export Queue** lines exports up and runs them one at a
   time: a queued job holds the timeline as it was when you confirmed it, so
   you can keep editing, undo, or close the document while it writes.
+- **Viewing and finding.** **View ▸ Preview Quality ▸** Full / Half / Quarter
+  draws the PREVIEW at a fraction of the canvas and lets the layer scale it
+  back up — the export and a rendered frame never see the setting, so what
+  you ship is unchanged whatever you are watching. **View ▸ Preview Window**
+  (⇧⌘P) puts a second, chrome-free picture in its own window for a second
+  display; it is the same player, not a second one, so the two can never
+  drift apart. And the **Media tab** now finds things: a search field, a sort
+  (import order, name, duration, kind), an **Unused only** switch, and
+  **Reveal in Timeline** on a file's context menu, which selects the clips
+  that use it and scrolls to them. "Used" counts clips inside a nest, which
+  is also what Remove now asks before it refuses.
 - **Playback** over an `AVComposition` built from the core's composition plan,
   with a Metal compositor drawing every frame from the core's frame recipe.
   A property-only edit re-renders the paused frame without rebuilding the
@@ -156,9 +167,11 @@ groundwork, the cutting moves, clip identity, the screencast trio, captions
 in both directions with the built-in text animations, sound (the mono fold,
 a level meter, Normalize Clip, loudness on export and the two uncompressed
 audio formats), looks (blend modes, gradient fills, the two background
-commands and filters as animation targets), and now output: Save Frame…,
-ProRes 4444 with a real alpha channel, the timecode burn-in, remembered and
-named export settings, and the export queue.
+commands and filters as animation targets), output (Save Frame…, ProRes 4444
+with a real alpha channel, the timecode burn-in, remembered and named export
+settings, and the export queue), and now viewing and finding: preview
+quality, a second preview window, and a Media tab you can search, sort and
+filter.
 `CLAUDE.md` carries the milestone record and `designs/reelcut-roadmap.md`
 what still needs a person at the machine.
 
@@ -206,8 +219,9 @@ Makefile              Build orchestration
 | `MediaPeaks.swift` · `AudioNormalize.swift` · `SilenceDetector.swift` | the waveform cache and the two questions asked of it: a clip's own peak (Normalize) and peak × envelope (the quiet spans) |
 | `Loudness.swift` | BS.1770-4 integrated loudness and true peak, the export gain that follows, and the 16-bit scaler that applies it |
 | `TimelineLayout.swift` · `TimelineSessions.swift` · `TimelineView.swift` | all tick↔point arithmetic; the gesture session structs; the timeline view |
-| `CanvasSessions.swift` · `PreviewCanvasView.swift` | canvas geometry and gestures; the preview and its overlay |
+| `CanvasSessions.swift` · `PreviewCanvasView.swift` · `EditorViewController+PreviewQuality.swift` · `PreviewWindowController.swift` | canvas geometry and gestures; the preview and its overlay; the preview's render size (View ▸ Preview Quality, applied to a copy of the player's composition so the export path cannot see it) and the second preview window, an `NSPanel` carrying a second layer on the same player |
 | `InspectorPane.swift` · `InspectorViewController.swift` · `ClipPane` `MediaPane` `DocumentPane` (with `VideoPane` `AudioPane` `TextPane` `ShapePane` as section factories) | the binding that knows about actions, one file per tab, and the sections the Clip tab composes |
+| `MediaRowView.swift` · `MediaListFilter.swift` · `MediaPaneCommands.swift` · `MediaUsage.swift` · `MediaReveal.swift` | the Media tab around its pane: the row and the drag it sources, the find band as a value, the row's commands, the one answer to "is this file used" (which walks the nests), and Reveal in Timeline |
 | `EditorViewController.swift` + `EditorViewController+{Timeline,Canvas,Inspector,Export}.swift` | wiring in the base file, features in extensions |
 | `AgentServer.swift` + `AgentServer+{Arguments,Project,Clips,Tracks,Media,Render,History,Silence,Captions,Audio,Background}.swift` · `AgentCatalog.swift` | the MCP endpoint, its handlers, and the tool catalog |
 | `AppDelegate.swift` · `EditorWindowController.swift` · `WelcomeWindowController.swift` · `main.swift` | menus (nil-target selectors), window, welcome |

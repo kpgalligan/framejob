@@ -125,13 +125,15 @@ extension LayerUniforms {
     /// use, and not source pixels. A nest clips its flattened layers to ITS
     /// canvas rectangle, and those layers each carry the nest clip's
     /// transform folded into their own (contract §4), so the canvas is the
-    /// only frame all of them share. It is also the space `[[position]]`
-    /// arrives in, so the shader's test needs no conversion at all.
+    /// only frame all of them share.
     ///
-    /// Nothing sets this yet: `evaluate.rs` emits `null` for every layer until
-    /// nests land. It is implemented now because a half-implemented clip is
-    /// worse than none — a nest that drew outside its own canvas would look
-    /// like a compositor bug rather than a missing feature.
+    /// **It is NOT the space `[[position]]` arrives in**, which this comment
+    /// claimed until phase 8d and which was true only while the destination
+    /// was always the canvas. The fragment stage converts, through
+    /// `LayerUniforms.canvasPerDestX` / `Y`; at Half a nest rendered as a
+    /// rectangle magnified about the canvas origin and at Quarter it vanished.
+    /// Nothing here changes for it — the rectangle is written in the frame the
+    /// core emits it in, and the conversion is the shader's.
     mutating func apply(clipRect: RecipeClipRect?) {
         guard let clipRect = clipRect else { return }
         clipEnabled = 1

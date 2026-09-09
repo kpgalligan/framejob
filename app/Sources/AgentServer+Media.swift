@@ -281,11 +281,19 @@ extension AgentServer {
     /// `remove_media` — the Media tab's row menu (`MediaPane.remove`). Media
     /// still in use refuses without `with_clips`, which is the alert's second
     /// button.
+    ///
+    /// The count is `clipsUsing`, which walks the NESTS as well as the
+    /// timeline, because that is the set the core refuses against
+    /// (`every_clip()`) and the set `with_clips: true` deletes. Filtering
+    /// `snapshot.clips` here — what this line used to do — let a file used
+    /// only inside a compound clip past this guard, to be refused by the core
+    /// with `Ok(None)` and reported as a bare "refused" with no reason in it.
+    /// One spelling of the question now, in `MediaUsage.swift`.
     func removeMedia(_ a: [String: Any]) throws -> String {
         let document = try target(a)
         let media = try mediaArg(a, "media", document)
         let withClips = try boolArg(a, "with_clips")
-        let users = document.project.snapshot.clips.filter { $0.source.mediaID == media.id }.count
+        let users = document.project.snapshot.clipsUsing(media.id).count
         if users > 0, withClips != true {
             throw ToolError(
                 message: "\(media.name) is used by \(users) clip" + (users == 1 ? "" : "s")

@@ -358,7 +358,11 @@ final class TimelineView: NSView, NSTextFieldDelegate {
         scroll(toX: 0)
     }
 
-    private func scroll(toX x: CGFloat) {
+    /// Internal, not private: `MediaReveal.swift` scrolls a clip found in the
+    /// Media tab into view and must land it where `revealPlayhead` lands the
+    /// playhead. The body stays here (this file is frozen at wiring), the
+    /// caller is one line in an extension.
+    func scroll(toX x: CGFloat) {
         let clip = scrollView.contentView
         let maxX = max(layout.contentWidth - clip.bounds.width, 0)
         clip.scroll(to: NSPoint(x: min(max(x, 0), maxX), y: clip.bounds.minY))

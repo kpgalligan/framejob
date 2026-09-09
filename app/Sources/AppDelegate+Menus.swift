@@ -14,9 +14,10 @@ import AppKit
 /// implements for the selectors named here.
 ///
 /// The cut is the size payment `AppDelegate.swift` owed at 625 lines against
-/// app/CLAUDE.md's ~600 cap, taken BEFORE the View menu grows a Preview
-/// Quality submenu and a Preview Window item, which is the order
-/// `ExportSheetOptions.swift` and `ExporterSettings.swift` were both taken in.
+/// app/CLAUDE.md's ~600 cap, taken BEFORE the View menu grew phase 8's Preview
+/// Quality submenu and Preview Window item — which it now has, and which is the
+/// order `ExportSheetOptions.swift` and `ExporterSettings.swift` were both
+/// taken in.
 /// It is a pure move: the same declarations, in the same order, with the same
 /// bodies.
 ///
@@ -399,6 +400,17 @@ extension AppDelegate {
                 "Hide Inspector", #selector(EditorViewController.toggleInspector(_:)), "i",
                 [.command, .option]))
         menu.addItem(submenuItem(trackHeightMenu()))
+        menu.addItem(.separator())
+        // Road map 2's phase 8: a group of their own, because both are about
+        // the PREVIEW rather than about the editor's own panes. Preview
+        // Quality carries the checkmark for the current row, like Timeline
+        // Track Height above it; Preview Window carries one for whether the
+        // panel is on screen, like Snapping and Safe Areas.
+        menu.addItem(submenuItem(previewQualityMenu()))
+        menu.addItem(
+            item(
+                "Preview Window", #selector(EditorViewController.togglePreviewWindow(_:)), "p",
+                [.command, .shift]))
         return menu
     }
 
@@ -407,6 +419,22 @@ extension AppDelegate {
         for (index, title) in ["Small", "Medium", "Large"].enumerated() {
             menu.addItem(
                 tagged(title, #selector(EditorViewController.setTrackHeight(_:)), index))
+        }
+        return menu
+    }
+
+    /// The rows are `PreviewQuality`'s own, tagged with its raw values, so the
+    /// menu cannot list a quality the enum does not have or spell one
+    /// differently from the checkmark that validates it. No key equivalents:
+    /// every bare letter belongs to the editor's `keyDown`, and this is a
+    /// setting somebody changes once.
+    private func previewQualityMenu() -> NSMenu {
+        let menu = NSMenu(title: "Preview Quality")
+        for quality in PreviewQuality.allCases {
+            menu.addItem(
+                tagged(
+                    quality.title, #selector(EditorViewController.setPreviewQuality(_:)),
+                    quality.rawValue))
         }
         return menu
     }

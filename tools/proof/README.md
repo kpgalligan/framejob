@@ -162,11 +162,15 @@ python3 tools/proof/phase4_proof.py 4823
 python3 tools/proof/phase5_proof.py 4823
 python3 tools/proof/phase6_proof.py 4823
 python3 tools/proof/phase7_proof.py 4823
+python3 tools/proof/phase8_proof.py 4823
 ```
 
 The offscreen scripts take no port and are run on their own —
 `python3 tools/proof/phase2_chrome.py` and its successors through
-`phase7_chrome.py`; each paragraph below says what its own one renders into.
+`phase8_chrome.py`; each paragraph below says what its own one renders into.
+`phase8_chrome.py` is the one that puts WINDOWS on screen — its `dispatch`
+mode activates a probe for about a second, because a key window is the thing
+it measures.
 
 The last line is `<n>/<n> checks passed`, and the exit status is non-zero if
 any failed. The log's second line names the port the app actually bound (a
@@ -184,7 +188,10 @@ phase 6 added `add_background` and `add_blurred_background`, took the count
 at 73, and phase 5's became a `>=` in the same commit; and phase 7 is the
 first handover that cost NOTHING, because it adds no tool at all — its
 surface is new ARGUMENTS on two tools that already existed, so phase 6's own
-`TOOLS = 73` is still an exact assertion and needed no edit. It is not
+`TOOLS = 73` is still an exact assertion and needed no edit. Phase 8 is the
+second such handover and cost nothing either — its three features have no
+tool at all, by design — so THREE scripts now assert 73 exactly and a stale
+binary on the port is caught by whichever is run first. It is not
 decoration:
 the phase-4 count was checked against the two new tools taken out of the
 catalog and the registry together, where it reads 68 — and it is not the
@@ -947,6 +954,134 @@ one that fails in three. It cost the mutation runner the same lesson, one level
 up: the first batch was aborted by an unhandled `TimeoutExpired` on that very
 mutant.
 
+`phase8_proof.py` is phase 8's MCP half (`python3 tools/proof/phase8_proof.py
+4861`, six sections, 79 checks), and phase 8 is the first phase whose features
+have NO MCP surface at all: View ▸ Preview Quality edits nothing, the preview
+window is an `NSPanel` and a second `AVPlayerLayer`, and the Media tab's
+search, sort and "unused only" are a pane's own state. Adding a tool so that a
+proof could exist would be the proof deciding the product's API — settled for
+phase 5's level meter, inherited by phase 7's export queue, inherited again
+here — so the file is two claims made with two different instruments, plus the
+one answer phase 8 did change over the wire.
+
+**It is the only script here that LAUNCHES Reelcut**, and section 1 is why.
+`PreviewQuality.stored()` reads `UserDefaults.standard`, so a quality can be
+put into a running app through the ARGUMENT DOMAIN at launch, exactly as
+`-ApplePersistenceIgnoreState` and `-AgentServerEnabled` already travel. So the
+section starts TWO instances of the binary under test on `PORT + 1` and
+`PORT + 2` — one with the key absent (Full), one with `-ReelcutPreviewQuality 2`
+(Quarter) — builds the identical fixture through both, and byte-compares what
+comes out: three `render_frame` PNGs, an `apng` and a `gif` (both go through
+`ExporterImageSequence.swift`, which has no clock in it), and a `prores_422`
+compared on DECODED PIXELS, because phase 7 measured the six header bytes that
+make a byte comparison of two `.mov` files a comparison of two clocks. It kills
+only the two pids it started — `subprocess.Popen`'s own, SIGTERM then
+SIGKILL — and nothing in the file reads `pgrep`. **Section 0 scores the launch
+mechanism before section 1 leans on it**, phase 7's shape for its two ffmpeg
+instruments: a build in which the argument never reached the app would make
+every byte comparison pass by rendering the same quality twice, and no check
+inside section 1 could tell. It EXTRACTS `enum PreviewQuality` from the app's
+own source, compiles it, and runs it bare and with the argument — and pins the
+trap under it, which is that an argument-domain value arrives as a **String**,
+so `stored()`'s `object(forKey:) != nil` then `integer(forKey:)` spelling is
+load-bearing and an `object(forKey:) as? Int` would read Full for every launch
+argument ever passed.
+
+**Section 5 exists because sections 0 and 1 together prove nothing about the
+feature, and that is measured rather than argued.** No MCP call reaches the
+player: `render_frame` builds its own composition and `export` builds two more,
+and none of the three is the item the `AVPlayerLayer` is showing — so section 1
+can say the setting does not LEAK and can never say it DOES anything. A build
+whose `previewComposition` returned its argument unconditionally, the feature
+deleted outright, scored a clean **65/65** against this file before section 5
+was written. So section 5 is a PROBE, in the shape CLAUDE.md states for app
+arithmetic no script can reach: every file in `app/Sources` except its
+`main.swift` compiled against a `main.swift` of the script's own
+(`harness/build.sh`'s swiftc line, cached on modification times, a build it
+cannot make scored as a FAILURE rather than an exit), opening the package the
+section just saved, putting an `EditorViewController` in a window and reading
+the render size of the composition on the player's current item — 640 × 360 at
+Full, 320 × 180 at Half, 160 × 90 at Quarter, each cross-multiplied against the
+canvas so the aspect claim is an INTEGER identity and never a tolerance. The
+same probe drives View ▸ Preview Quality ▸ itself with an `NSMenuItem` carrying
+the row's tag, so the LIVE item's re-assignment is scored in both directions
+(an in-place mutation of the retained composition would leave the player at
+Full, since `AVPlayerItem.videoComposition` is a COPY property), and reads back
+the validator's checkmark. **It is the app's own sources in a second process
+and not the shipped binary** — the standard the offscreen harness sets, said
+out loud rather than implied.
+
+**Section 2 is the one place phase 8 changed an answer an agent can read.**
+"Is this media used" was written twice in Swift and both spellings filtered
+`snapshot.clips` — the TOP LEVEL alone — while the core refuses against
+`every_clip()`, the timeline's clips CHAINED with every nest's. So media used
+only inside a compound clip walked past the Swift guard with a user count of
+zero and was refused by the core with a bare `Ok(None)`, which reaches a caller
+as "Remove Media made no change. Either the project is already in that
+state…". The section builds that exact fixture over the wire — import, a clip,
+`nest` — and asserts the refusal NAMES the file and the count, that the
+reason-less sentence is NOT what comes back, that `with_clips: true` takes the
+entry and the NESTED clip while leaving the nest clip itself on the timeline,
+and that one undo restores the whole project JSON. The check with the sharpest
+teeth is the both-levels one: media used once at the top level AND once inside
+a nest must be refused with "used by **2** clips", which a build counting the
+top level alone still refuses — with the wrong number. Sections 3 and 4 are the
+"nothing else moved" half: the catalog is EXACTLY 73 for the fourth phase
+running (phase 8 adds no op and no tool), no tool name mentions the preview or
+the quality, the parity log is empty for all three instances the run touches,
+the schema is still version 6 in `get_project` and in a saved `project.json`,
+and the three view-state calls an agent has leave the project JSON and the
+frame at one instant byte-identical.
+
+Its fixture is `media/A.mov`, `B.mov` and `C.mov`, all three already in the
+tree — three files rather than one because a second `import_media` of one path
+is an identity edit and is refused. `ffmpeg` is needed for the ProRes decode
+alone; `swiftc` and `core/target/release/libreelcut_core.a` for the two probes,
+whose binaries live in `work/phase8-probe/` and `work/phase8-player/`. Packages
+are `<name>-<pid>.reelcut`, phase 2's rule, and its exports are pid-named,
+phase 5's. Run it against a port that already holds an instance; it launches
+its own two beside it.
+
+Mutation-tested against **four** deliberate breakages, each a copy of a clean
+snapshot with ONE edit in it, the app REBUILT AND RELAUNCHED, and the script
+run from inside the copy — never against the working tree, since a second lane
+was editing the same repository. The copy scored 65/65 before the first edit,
+so nothing below is the copy's own fault, and each mutant was confirmed to
+CHANGE BEHAVIOUR before its score was believed. The preview scale moved into
+`CompositionBuilder.build`, which every path shares — the exact design phase 8a
+exists to prevent — scores **69/79**: all three `render_frame` comparisons,
+both image-sequence exports, the ProRes pixels, and three of section 5's, where
+the double scaling shows as a player at 48 × 27. It is also what proves the
+launch argument reaches `PreviewQuality.stored()` INSIDE a running Reelcut,
+which nothing in a clean run can observe: the Quarter instance renders 160 × 90
+where the Full one renders 640 × 360. `MediaUsage.clipsUsing` losing its nest
+walk scores **75/79**, and reproduces the pre-phase-8 defect exactly — the bare
+"made no change" sentence for nested-only media, and "used by 1 clip" where the
+truth is 2. `previewComposition` returning its argument scores **74/79**,
+taking five of section 5's; **it scored 65/65 — a clean run — against the same
+script before section 5 existed**, which is the whole argument for the probe
+and is why it is recorded here rather than left to be discovered. **The
+survivor is `usesMedia` alone losing its nest walk** (79/79, exactly the
+baseline): it is a REAL behavioural change — a probe over the same sources
+answers `usesMedia` false and `clipsUsing` 1 for the same nested-only file —
+and no tool in the catalog calls that spelling, so nothing over MCP can see it.
+That is the Media tab's "unused only" filter, and it is `phase8_chrome.py`'s to
+kill.
+
+What no script here can claim about phase 8, gathered so it is not spread
+through the sections. Section 5 proves the player is asked for a smaller
+buffer; it says nothing about whether the preview is FASTER, and nothing about
+whether what the scaler puts on screen is the Full frame resampled once rather
+than a different picture — a render size is neither a frame rate nor a pixel.
+Nothing here opens the preview window, so that the second `AVPlayerLayer` shows
+the same frames as the first, and that ⇧⌘P reaches it, are a person's. Nothing
+here narrows the Media list, scrolls to a revealed clip, or asks
+`MediaUsage.usesMedia` and `timelineClipsUsing` anything at all — the surviving
+mutant above is what that costs, and those are the offscreen lane's. And the
+two instances section 1 launches are compared to each other and never to a
+person's eyes: two builds agreeing byte for byte is an isolation claim, not a
+picture.
+
 `media/` and `work/` are ignored: the movies are regenerable from the lines
 above and the projects are rebuilt on every run. Phase 2's packages are
 named `<name>-<pid>.reelcut` rather than `<name>.reelcut`, and each run
@@ -1072,6 +1207,31 @@ builds a reference harness out of an older `app/Sources` and passes exactly
 one flag, so a per-phase name would leave that build failing the day it was
 invented.
 
+Phase 8 took a TWELFTH argument rather than a fourth mode, because what it
+needs is view state on a render and not an answer without one:
+
+```
+harness … [clip|media|document] [candidateSpans] [expandSections] [mediaFilter]
+```
+
+`mediaFilter` is `search|sortIndex|unusedOnly` (`"beta||"`, `"|1|"`,
+`"||1"`) for the Media tab's find band, and it is `candidateSpans`' case
+exactly: the band's state is view state no package carries, and the only
+thing that writes it in the app is a person typing into a field and clicking
+two controls. Without it the harness photographs the RESTING band and nothing
+else — and the resting band is the part of phase 8c that a build with the
+whole filter deleted would still draw. It drives the app's OWN controls
+(`controlTextDidChange(_:)` on the field, `itemPicked:` on the popup,
+`mouseDown(with:)` on the checkbox) and never touches `MediaPane.filter`,
+which is private. APPENDED after `expandSections`, in the shape phase 3 set,
+so every earlier chrome script's argument positions still hold — and
+`phase8_chrome.py` scores that fact out of the harness's own argument
+parsing rather than asserting it from memory. Phase 8 also added two
+`pinDefaults` keys (`ReelcutPreviewQuality` and
+`NSWindow Frame ReelcutPreviewWindow`); all six earlier chrome scripts were
+re-run after they landed and scored 26, 33, 59, 81, 70 and 78 — exactly what
+they scored before, which is what says a pin took nothing away.
+
 `phase4_chrome.py` is the same shape again (`python3
 tools/proof/phase4_chrome.py`, no port, no media; renders in
 `work/chrome4/`) for its first seven sections, and needs no new harness
@@ -1133,3 +1293,154 @@ check — the whole argument for testing an edge), the six-second test widened
 to never fire (15/19), the frame of gap dropped so cues merely abut (15/19),
 a third line allowed (16/19), and an over-long word truncated to 42
 characters (17/19).
+
+
+`phase8_chrome.py` is phase 8's offscreen half (`python3
+tools/proof/phase8_chrome.py`, no port, no media; renders, crops and every
+probe request and answer in `work/chrome8/`), and of the three things phase 8
+adds the harness can photograph exactly one. Preview Quality changes the
+PLAYER's render size and the preview well is black offscreen; Preview Window
+is a SECOND window and the harness captures the editor's content view. So
+seven of its nine sections are PROBES in `phase6_chrome.py`'s and
+`phase7_chrome.py`'s shape — one `main.swift` compiled against the whole of
+`app/Sources` by `build.sh`'s own swiftc line, cached on modification times, a
+build it cannot make scored as a FAILURE rather than an exit — and section 7
+is the Media tab's find band, measured against `MediaPane`'s own constants.
+
+**The probe is inside an `.app` bundle, and exactly one of its six modes needs
+that.** `NSApp.target(forAction:to:from:)` searches the KEY window's responder
+chain and then the MAIN window's, and a process that cannot ACTIVATE has
+neither: measured, a bare swiftc binary under `.prohibited`, `.accessory` and
+`.regular` alike reports `keyWindow` nil and `mainWindow` nil after
+`makeKeyAndOrderFront`, so the panel and a plain window would read IDENTICALLY
+and the check would pass against both. Activation needs a bundle and an
+`NSApplication.run()`, and the `dispatch` mode is launched through `open -W -n`
+because a bare exec of a bundle's executable is handed the focus about one time
+in three. It is therefore **the first script here that puts windows on screen**
+— two, for about a second. Every other mode sets `.prohibited` and orders
+nothing in.
+
+**The check worth the whole file is the dispatch guarantee**, and nothing else
+in this tree would notice the defect it is looking for. Phase 8b's preview
+window is an `NSPanel` rather than an `NSWindow` so that it cannot become MAIN,
+because AppKit resolves a nil-target menu action through the KEY window's chain
+and then the MAIN window's — so a plain window focused over the editor takes
+both and every ⌘-item whose action lives on `EditorViewController` goes dead.
+Section 4 asserts, with the panel key, that ⌘E, ⌘T and ⌘0 still resolve to
+`EditorViewController` and that File ▸ Export… still validates ENABLED. The
+mutation run says exactly what that buys: `NSPanel` → `NSWindow` scores 119/125
+and the answer reads `main "…— Preview"`, all three targets NONE, Export…
+disabled — the build lane's own table reproduced from the other side.
+
+**Section 1 is the subtlest thing in the phase and the reason its fixture list
+is eleven canvases long.** `PreviewQuality.renderSize(for:)` answers
+`m · (w/g, h/g)` for `g = gcd(w, h)` and `m = ceil(g / divisor)`, so the render
+size carries the canvas's aspect EXACTLY — which matters because
+`PreviewCanvasView` maps every drag handle through `AVPlayerLayer.videoRect`,
+and `videoRect` is the aspect of the BUFFER. The aspect claim is an INTEGER
+cross-multiply and never a float tolerance, the rule is re-derived in the
+script rather than read off the answers, a coprime canvas (1001 × 667) must
+come back Full at every row, and no answer may be finer than its row asked for.
+**A 1920 × 1080 fixture alone could not fail any of it**, and the mutation run
+is what proves that rather than the script asserting it: with the whole rule
+replaced by a naive `(w/divisor, h/divisor)` the 1920 × 1080 check still
+PASSES, and the six that fall are 999 × 666, 1001 × 667 and 1366 × 768. That is
+the argument for the odd canvases being in the list at all.
+
+**Section 6b is not a claim about Reelcut**, and it is here because the Media
+pane's no-rebuild design rests on three properties of AppKit that nothing else
+in this suite would notice changing: hiding an arranged subview COLLAPSES it
+out of an `NSStackView`'s layout (four 20 pt rows at 3 pt spacing measure 89 pt,
+three of them 66), `insertArrangedSubview(_:at:)` MOVES an already-arranged view
+rather than duplicating it (all 24 permutations of four rows, checked on the
+LAID-OUT order as well as the arranged one), and a sibling text field keeps
+first responder AND its caret offset across such a permutation while removing
+that field's ancestor loses both. If AppKit ever changes there, the search
+field is destroyed under the caret on the first keystroke and the pane silently
+eats what somebody types.
+
+**One check FAILS against the build this was written for, and it is a real
+defect rather than a broken instrument** — the run scores **124/125**. The
+preview panel's `frameAutosaveName` reads back EMPTY:
+`PreviewWindowController.init` calls `setFrameAutosaveName` BEFORE
+`super.init(window:)`, and `NSWindowController.init(window:)` assigns its own
+`windowFrameAutosaveName` — "" unless somebody set one — to the window it is
+handed, wiping the name. Nothing ever writes `NSWindow Frame
+ReelcutPreviewWindow`, the `setFrameUsingName` restore beside it can never find
+anything, and the panel opens centred every time — the one thing that type's
+own doc says it must not do, since a preview window exists to be put on a
+SECOND display. The mechanism is measured in the same probe on a BARE `NSPanel`
+and a BARE `NSWindowController`, so the reading is about AppKit and not about
+Reelcut, and the probe also reports that re-asking AFTER the controller has
+taken the window answers true and sticks — which is the fix as well as the
+proof. A build that moves the one call scores 125/125 and nothing else here
+moves.
+
+**Two things spoiled section 4 before it worked, and both are recorded because
+each reads exactly like the defect.** A SHEET: `viewDidAppear` calls
+`offerRelinkIfNeeded`, and every media entry in the six-file fixture points at
+a path that does not exist — deliberately, so no thumbnail decode ever runs —
+so the Relink sheet went up and took the key window. The cure is the FIXTURE
+and not a dismissal: the dispatch mode opens a package of one SHAPE clip and no
+media at all, which has a duration for Export… to validate against and nothing
+to relink, and `attachedSheet` is scored so a sheet that comes back is named.
+And a WEAK reference: `EditorViewController.document` is weak and a document
+opened this way is not registered with `NSDocumentController`, so dropping it
+deallocated the document, `validateExportAction`'s first guard refused, and
+File ▸ Export… validated DISABLED with the editor key and every target
+resolving perfectly. The delegate holds the document now and the probe reports
+both preconditions beside the answer. Beyond those, the mode is asked up to
+three times on its PRECONDITION alone (the app active, the editor key AND
+main), because another app activating mid-run takes the focus outright
+(measured); once the precondition holds the first answer is scored, so nothing
+re-rolls a failing guarantee. Every answer also carries
+`Bundle.main.bundlePath`, scored against the bundle the script built —
+`open -n` is asked for a PATH but LaunchServices resolves bundle IDENTIFIERS,
+and a mutation run holds two copies of one bundle under one id, where a mutant
+that was never consulted would read exactly like a survivor.
+
+Mutation-tested against **six** deliberate breakages, each a copy of a clean
+snapshot with ONE edit in it and the script run from inside the copy — never
+against the working tree, since a second lane was editing the same repository.
+Five died and the sixth is the interesting one. `NSPanel` → `NSWindow` (119/125)
+takes the panel's own property and four of section 4's. The naive
+`(w/divisor, h/divisor)` (118/125) takes six of section 1's and leaves
+1920 × 1080 green. `clipsUsing` and `usesMedia` filtering `snapshot.clips`
+alone — the exact mistake `MediaUsage.swift` was written to stop — scores
+121/125 and takes all three usage checks plus "Unused only". A hand-rolled
+`lowercased().contains` for `localizedStandardContains` (122/125) takes the two
+diacritic checks and nothing else, which is what testing a fold at its boundary
+buys. Shrinking the find band from 60 pt to 52 (113/125) takes ELEVEN of
+section 7's, which is the line that says the PHOTOGRAPH half can fail and not
+only the probes. **The survivor is `setFrameUsingName` deleted** (124/125,
+exactly the baseline): the restore is dead code today for the reason the
+standing failure names — nothing ever writes the key it reads — so that line
+cannot be falsified until the autosave defect above is fixed, and the two
+belong in one paragraph.
+
+Its packages (`work/p8-six.reelcut`, `p8-none`, `p8-usage`, `p8-dispatch`)
+and everything under `work/chrome8/` keep fixed names and are rewritten on
+every run, `phase7_chrome.py`'s rule: nothing this script makes is ever handed
+to a running app, since the harness and the probe are fresh processes that
+open a package off disk. **Every media entry in them points at a path that does
+not exist**, which is deliberate — `MediaRowView.loadThumbnailIfNeeded` never
+starts an asynchronous decode for a file it cannot find, so no render changes
+halfway through a settle — and is exactly what put the Relink sheet up over the
+dispatch mode.
+
+What no instrument in this tree can reach, said here rather than left out.
+**Neither preview is DISPLAYING anything**: `displayedPixelBuffer` is nil for
+both layers in a process with nothing on screen, so nothing here claims the two
+windows show the same frame — that needs a person at the machine. The phase's
+own spike measured why the obvious instruments are useless for it —
+`isReadyForDisplay` and `videoRect` read TRUE and plausible for a layer with no
+superlayer at all — and both readings are scored so the next reader does not
+reach for them. **Preview Quality changes no pixel any script here can
+capture**: section 1 is the arithmetic that decides the render size, and that
+the player's composition actually GETS it is `phase8_proof.py`'s to say — not
+over MCP, which reaches no player, but through a probe of its own built the
+same way this file's are. And **the frame the panel would restore cannot be tested end to end**: the
+harness pins `NSWindow Frame ReelcutPreviewWindow` so no render depends on what
+the machine holds, and no script here launches or terminates Reelcut.app, so
+"the preview opens where it was left after a relaunch" is not a sentence any of
+them can say — phase 7's presets paragraph draws the same line.

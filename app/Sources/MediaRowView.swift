@@ -10,15 +10,18 @@ import AppKit
 /// makes the NAME the thing you scan down.
 ///
 /// **Why this is a file of its own.** `MediaPane.swift` stood at 822 lines
-/// against app/CLAUDE.md's ~600 cap, and road map 2's phase 8 comes to give
+/// against app/CLAUDE.md's ~600 cap, and road map 2's phase 8 came to give
 /// the Media tab a search field, a sort popup, an "unused only" filter and a
 /// Reveal in Timeline context item — so the pane had to give something up
 /// before it took any of them on. That is the payment
 /// `LayerRenderersText.swift` made in phase 6 and `ExporterSettings.swift`
 /// and `ExportSheetOptions.swift` made in phase 7, and it is worth noting
-/// that phase 8's four additions land on BOTH sides of this cut: the three
-/// controls are the list's and the context item is a row's, so each half
-/// gets the room it is about to need.
+/// that phase 8's four additions landed on BOTH sides of this cut: the three
+/// controls are the list's and the context item is a row's, so each half got
+/// the room it needed. The room was not ENOUGH — phase 6's warning arriving
+/// again, that a cut's estimate is worth about two thirds of the truth — so
+/// phase 8c cut a second time, and the row commands the pane keeps are
+/// `MediaPaneCommands.swift` now.
 ///
 /// **The cut falls below the DRAG rather than under the row's closing
 /// brace**, which is the one decision in it. A row is a drag source (§4.3),
@@ -327,15 +330,35 @@ final class MediaRowView: NSView, NSDraggingSource {
 
     override func menu(for event: NSEvent) -> NSMenu? {
         let menu = NSMenu()
+        // **The menu enables its own rows.** AppKit's automatic validation
+        // would ask this view for `validateMenuItem(_:)`, and every row but
+        // one is unconditionally live, so turning it off costs nothing and
+        // buys a guarantee: a contextual menu is built at the moment of the
+        // click, which is the moment the answer is wanted, so the enablement
+        // below cannot go stale and does not depend on AppKit choosing to ask.
+        // `SilenceSheetController`'s popup records the same rule for a
+        // different reason — an enabled state set under `autoenablesItems` is
+        // put straight back.
+        menu.autoenablesItems = false
         // Two groups: what to do with the file on the timeline, then what to
         // do with the file. The loop shape cannot express a separator, so the
         // groups are two loops with one between them.
+        //
+        // Reveal in Timeline is DISABLED where the file's only users are
+        // inside a nest: a nested clip has no id a selection can hold
+        // (`MediaUsage.swift`), so the item would select nothing and scroll
+        // nowhere. That case is exactly the one the pane's old top-level-only
+        // usage test could not see.
         for (title, selector) in [
             ("Insert at Playhead", #selector(insertMedia(_:))),
             ("Overwrite at Playhead", #selector(overwriteMedia(_:))),
+            ("Reveal in Timeline", #selector(revealInTimeline(_:))),
         ] {
             let item = NSMenuItem(title: title, action: selector, keyEquivalent: "")
             item.target = self
+            if selector == #selector(revealInTimeline(_:)) {
+                item.isEnabled = pane?.canRevealInTimeline(media) ?? false
+            }
             menu.addItem(item)
         }
         menu.addItem(.separator())
@@ -356,6 +379,12 @@ final class MediaRowView: NSView, NSDraggingSource {
     /// and the row agree afterwards.
     @objc private func insertMedia(_ sender: Any?) { pane?.place(media, insert: true) }
     @objc private func overwriteMedia(_ sender: Any?) { pane?.place(media, insert: false) }
+
+    /// Select the clips that show this file, and scroll the first one into
+    /// view. The pane does both — it is the half that can reach the document
+    /// and the editor — and it switches the panel to the Clip tab on the way,
+    /// which is the panel's own rule for any changed selection.
+    @objc private func revealInTimeline(_ sender: Any?) { pane?.revealInTimeline(media) }
 
     @objc private func revealMedia(_ sender: Any?) { pane?.reveal(media) }
     @objc private func relinkMedia(_ sender: Any?) { pane?.relink(media) }

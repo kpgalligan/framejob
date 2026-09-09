@@ -179,7 +179,7 @@ copies, and the orchestrator is the only one who does.
 | 5 | Sound | 1–2 | — | **done** 2026-09-08 (`65d43ae`) |
 | 6 | Looks | 1–2 | v6 | **done** 2026-09-08 (`d2f7767`) |
 | 7 | Output | 1–2 | — | **done** 2026-09-09 (`a16b0dd`) |
-| 8 | Viewing and finding | 1 | — | not started |
+| 8 | Viewing and finding | 1 | — | **done** 2026-09-09 |
 | 9 | Inside the nest | 2 | — | not started |
 
 Order is by value over dependency. Phases 1–3 pay back first and share
@@ -2848,6 +2848,133 @@ player's composition only), `PreviewWindowController.swift`,
 - Search narrows the list; Reveal in Timeline selects exactly the clips
   whose source is that media.
 
+**What landed**, and where it departed from the plan above.
+
+Three features, no schema change, **no new op and no new MCP tool** — the
+catalog stays at 73, which is deliberate: search, sort and the filter are view
+state (`selectedMedia` has never had a mirror either), Preview Quality changes
+nothing an agent can observe, and Reveal is `set_selection`, which is already a
+tool. Phases 6 and 7 assert `== 73` exactly and still pass.
+
+*Two size tolls first and alone* (`d69de99`): `AppDelegate.swift` 625 → 223
+(`AppDelegate+Menus.swift`) before the View menu grew two items, and
+`MediaPane.swift` 822 → 389 (`MediaRowView.swift`) before the pane grew a find
+band. `MediaPane` then paid a SECOND toll mid-phase (`MediaPaneCommands.swift`)
+— phase 6's warning arriving again, that an estimate of what a feature costs
+here is worth about two thirds of the truth.
+
+**8a — Preview Quality.** The road map's "Where" names `CompositionBuilder.swift`
+and it is not touched at all. There is exactly ONE constructor of
+`AVMutableVideoComposition` in the app, shared by the preview, both export passes
+and the offline frame, so an argument there would leave the export one wrong
+parameter away from the preview's setting; instead `Playback` `mutableCopy()`s
+the built composition and overrides `renderSize` on the copy
+(`ExportWriter.videoComposition`'s shape), which makes the export path
+**unreachable** from the setting rather than merely unchanged by it. The size
+always carries the canvas's EXACT aspect — `m · (w/g, h/g)` with `g = gcd(w,h)`
+and `m = ceil(g/divisor)` — falling back to the next coarser exact size and
+finally to Full for a coprime canvas, because the overlay maps every drag handle
+through `AVPlayerLayer.videoRect`; odd render dimensions were measured LEGAL, so
+the rule is about aspect and not about legality.
+**The road map's proof line "half quality drops the compositor's per-frame time
+(its own log)" could not be built and was dropped.** The log exists but emits
+only after 120 frames in one `Compositor` instance, and `render_frame` builds a
+fresh composition per call. Whether the preview is actually FASTER is unmeasured
+and is a person's to check.
+
+**8b — Preview Window.** The road map's parenthetical "a player drives any
+number of layers" contradicts Apple's archived AVFoundation Programming Guide
+("only the most recently created such layer will display"), so it was SPIKED
+before anything was written: on macOS 26.5.1 two layers on one player, in both
+creation orders, both return a non-nil `displayedPixelBuffer` with byte-identical
+checksums, and releasing the second leaves the first displaying. The archived
+guidance is stale and the road map is right. The spike's other finding is the
+one to carry forward: **`isReadyForDisplay` and `videoRect` are useless as
+instruments here** — a layer with no superlayer at all and a layer in a window
+never ordered in both report `true` with a plausible rect, and
+`displayedPixelBuffer` is the only property that discriminates.
+Two deviations, both measured rather than argued. The window is an **`NSPanel`**,
+because a titled `NSWindow` becomes key AND main and `NSApp.target(forAction:)`
+for every editor selector then resolves to NONE — ⌘E, ⌘T, ⌘0 go dead while the
+preview is focused. And retention is **one stored property on the frozen
+`EditorViewController`**, not `document.addWindowController(_:)`, because AppKit
+only asks a document about saving when the controller closing is the LAST one: a
+probe with a dirty untitled document got a save sheet with one controller and,
+with two, no sheet, a destroyed editor window and a document left open behind a
+panel with nothing to edit in. That is a data-loss shape.
+
+**8c — the Media tab.** The sort row is **"Import Order"**, not the plan's
+"Added": nothing records when a file arrived, and a timestamp would be a
+version-7 bump the phase is declared to avoid. The find band **never rebuilds the
+pane** — `InspectorPaneView.rebuild()` removes every arranged subview and there
+is no first-responder preservation in the inspector, so a field built inside
+`makeSections()` loses its caret on the first keystroke; the pane hides and
+re-orders the rows it already has, and `structureSignature` stays a statement
+about the MODEL. Along the way the phase fixed a live defect it did not go
+looking for: **"is this media used" was written out twice in Swift and both
+spellings missed nests**, so removing a file used only inside a nest gave a bare
+beep with no reason in it. It is one question with one answer now
+(`MediaUsage.swift`), walking the nests the way the core's `every_clip()` does,
+and Remove, the filter and `remove_media` all ask it.
+
+**8d — the blocker the review found, and the lesson under it.**
+`[[position]].xy` in the fragment stage arrives in DESTINATION pixels, and three
+shader tests took it to BE canvas pixels: a nest's `clip_rect`, the drop shadow's
+mask sample, and the outgoing dissolve's partner box. For the app's whole history
+the two were equal — `CompositionBuilder` is the only other writer of
+`renderSize` and always sets it to the canvas — so the assumption was true, was
+written into three comments AND into `core/src/nest.rs` and spec §7.3, and was
+invisible. Preview Quality made the destination smaller and it became a wrong
+PICTURE: three quarters of a nest erased at Half and all of it at Quarter, a
+shadow displaced to the corner or vanishing, a dissolve losing the weight
+correction whose absence "dips the whole frame ~25 % dark at the midpoint".
+`LayerUniforms`' two remaining padding floats became `canvasPerDestX/Y` (the
+block is still 416 bytes and the tail is now EMPTY), `ShadowUniforms` went 8
+floats to 12, and a non-positive ratio reads as 1 so a zeroed block renders what
+it always did. **An invariant that holds because two numbers have always been
+equal is not an invariant** — and phase 8a's own doc had already leaned on the
+shadow mask being canvas-sized, but only to argue that it does not get CHEAPER.
+
+**Measured.** `make test` 456 unchanged (no core change but two doc
+corrections), `make lint` and `cargo fmt --check` clean, `make typecheck` 0
+errors and the same 4 AVFoundation warnings, `make app` building, the catalog at
+73 and the parity log EMPTY. `tools/proof/phase8_proof.py` **79/79** over MCP —
+its headline is two INSTANCES of one binary, one launched
+`-ReelcutPreviewQuality 2`, whose `render_frame` PNGs and `apng`/`gif` exports
+are byte-identical — and `tools/proof/phase8_chrome.py` **144/150** offscreen,
+the six being section 4's dispatch checks, which fail on their own PRECONDITION
+because this machine's console is LOCKED and no process can activate. Phases 1–7
+re-run unchanged: 66, 85, 121, 8, 84, 88, 167, 92 over MCP and 26, 33, 59, 81,
+70, 78 offscreen — the last group AFTER the shader change, which is what says it
+moved no render it was not meant to.
+**Ten mutants across the two scripts.** Two survivors, both reported rather than
+hidden: `MediaUsage.usesMedia` losing its nest walk is invisible to the MCP
+script (no tool calls it — the chrome script kills it), and the panel's frame
+RESTORE is dead code today for a reason worth keeping. The most valuable result
+was a kill that did not happen at first: **`phase8_proof.py` as first written
+scored a clean 65/65 against a build with 8a deleted outright.** Section 5 — a
+probe reading the render size off a real `AVPlayerItem` — is what closes it, and
+both numbers are in the script's docstring, because the survivor is the argument
+for the probe. The aspect rule taught the same lesson from the other side: a
+naive `w/2, h/2` PASSES on 1920×1080, 1280×720, 3840×2160 and 100×100 and fails
+only on 999×666, 1001×667 and 1366×768, so the odd canvases are the check.
+**Reviewed by seven readers against three sceptics each: 33 findings, 19
+survived**, two of them unanimous blockers with the one root cause above. The
+others worth knowing: forwarded bare keys ran editor EDITS while a sheet was
+attached to the editor window (a sheet is WINDOW-modal, so the panel stays
+key — the guard is in `handleEditorKey` now, where both windows inherit it);
+⌘Z / ⇧⌘Z were DEAD while the panel was key, because `undo:` is not an editor
+selector but one `NSWindow` implements itself, so the search stopped at the
+panel's own empty manager — the controller is the panel's delegate now, and the
+type doc's claim that "a panel keeps ⌘Z alive" was a measured falsehood; and the
+Media tab's Relink… was the only one of three relink paths that never
+regenerated caches, so a relinked file got no filmstrip, thumbnail or peaks
+(pre-existing, fixed here).
+Two limits recorded rather than fixed: `ProjectDocument.selectedMedia` can point
+at a row the filter has hidden, and `generateCaches`'s "a cache already on disk
+is not rebuilt" is FALSE — measured, it re-decodes — which is a wrong comment
+and wasted work, not a wrong picture.
+
 ---
 
 ### Phase 9 — Inside the nest
@@ -2915,7 +3042,7 @@ handle, `AgentServer+Arguments.swift`, `AgentServer+Project.swift`, catalog.
 Checked against spec §9 for conflicts; a phase that binds one promotes its
 row into §9.
 
-Phases 1, 2, 3 and 7's rows have been promoted into spec §9's bound table
+Phases 1, 2, 3, 7 and 8's rows have been promoted into spec §9's bound table
 and are struck from this one; what is left is what is still only a claim on
 a key. Phase 3 took `Z` — bare, to arm and disarm the canvas region mode,
 with ⇧Z still Fit Timeline. Phase 4 took NO key: its three commands are
@@ -2926,11 +3053,17 @@ table below claims no row for it, and its one new command duplicates a pane
 button that is already the everyday path. Phase 6 took none. Phase 7 took
 ⌥⌘E for File ▸ Save Frame… — Export…'s letter under a second modifier —
 and its row went into §9 and out of here; Window ▸ Export Queue and the
-export sheet's own new controls take no key at all.
+export sheet's own new controls take no key at all. **Phase 8 took the ⇧⌘P
+this table claimed for it**, for View ▸ Preview Window, and it is a TOGGLE
+rather than an opener — the item carries a checkmark, so one key both opens
+the window and puts it away, which is what Snapping and Safe Areas do with
+theirs. Its neighbour View ▸ Preview Quality ▸ took none, for the reason
+phases 4, 5 and 6 all record: every bare letter belongs to the editor's own
+`keyDown`, and a modifier-less menu key is resolved ahead of the first
+responder.
 
 | Keys | Action | Phase |
 |---|---|---|
-| ⇧⌘P | Preview Window | 8 |
 | ⌘↓ / ⌘↑ | Open / close nest | 9 |
 
 Menus. **Landed in phase 1**: Clip ▸ Close Gap, and Edit ▸ Insert at
@@ -2972,8 +3105,14 @@ no separator between them because a still and a movie are the same command
 asked of two containers; and Window ▸ Export Queue, with no key equivalent
 and `isExcludedFromWindowsMenu` set on its window, or AppKit lists it twice.
 
-Still to come: Clip gains Open / Close Nest; View gains Preview Quality ▸ and
-Preview Window.
+**Landed in phase 8**: View ▸ Preview Quality ▸ (Full · Half · Quarter) and
+View ▸ Preview Window, in a group of their own after a separator below
+Timeline Track Height, because both are about the PREVIEW where everything
+above them is about the editor's own panes. The submenu is built from
+`PreviewQuality.allCases` and tagged with its raw values, so the menu cannot
+list a quality the enum has not got; only Preview Window takes a key.
+
+Still to come: Clip gains Open / Close Nest.
 
 ## 4. Considered and left out
 

@@ -130,7 +130,12 @@ lockstep are in the root `CLAUDE.md`; the full design is
   `CompositionBuilder.build`'s `metering` flag
   is passed true by `Playback.startRebuild` and by nothing else, so an
   export and a rendered frame build exactly the audio path they built before
-  the level meter existed. `CompositorEffects.swift`
+  the level meter existed. **Nothing else may be added to that builder for the
+  PREVIEW's sake**: phase 8a's Preview Quality scales the render size on a
+  `mutableCopy()` inside `Playback` rather than taking a second such argument,
+  which is what keeps the export path unreachable from a preview setting rather
+  than merely unchanged by it (see `EditorViewController+PreviewQuality.swift`
+  below). `CompositorEffects.swift`
   holds the M3 effect logic so `Compositor.swift` grew only the uniform
   fields; the uniform block's field ORDER is a contract with
   `Resources/Shaders/Compositor.metal` and is checked nowhere but by reading
@@ -140,11 +145,32 @@ lockstep are in the root `CLAUDE.md`; the full design is
   model's own field order, so the two files read as one list and a reader
   can check the contract by eye, which is the only way it is ever checked.
   Format version 6 added `video.blend` for **zero bytes**: `reserved0`
-  became `blendMode`, the block is still 104 floats, and the padding tail
-  is **two** floats now rather than three — so the next field to land can
-  be added alone and a THIRD needs three companions again. The two
-  survivors keep their `reserved1` / `reserved2` names rather than being
-  renumbered from zero, so the Swift and Metal lists still read as one.
+  became `blendMode`. Road map 2's phase 8 then spent the rest of the tail:
+  `reserved1` / `reserved2` became **`canvasPerDestX` / `canvasPerDestY`**,
+  canvas pixels per DESTINATION pixel, so the block is still 104 floats
+  (416 bytes) and **the padding tail is now EMPTY** — the next field to
+  land needs three companions, not none. `ShadowUniforms` went 8 floats →
+  **12** (48 bytes) for the same pair, because 10 floats is 40 bytes and
+  not a multiple of 16, which is why two fields cost four.
+  **Zero means one**: the shader reads a non-positive ratio as 1, so a
+  zeroed uniform block renders exactly what every frame rendered before the
+  field existed — `blendMode`-is-0-is-`normal` applied a second time, and
+  the reason the field was safe to add at all.
+  **Why it exists, because it is the shape of a defect that will come
+  back.** `[[position]].xy` arrives in DESTINATION pixels, and three shader
+  tests took it to BE canvas pixels: a nest's `clip_rect`, the drop
+  shadow's mask sample, and the outgoing dissolve's partner box. For the
+  app's whole history the two were equal — `CompositionBuilder` is the only
+  other writer of `renderSize` and always sets it to the canvas — so the
+  assumption was true, was written into three comments AND into
+  `core/src/nest.rs` and spec §7.3, and was invisible. Preview Quality made
+  the destination smaller and it became a wrong PICTURE: three quarters of
+  a nest erased at Half and all of it at Quarter, a shadow displaced to the
+  corner or gone, a dissolve losing its weight correction. The phase's own
+  doc had already leaned on the shadow mask being canvas-sized — but only
+  to argue it does not get CHEAPER. **An invariant that holds because two
+  numbers have always been equal is not an invariant**; name the one you
+  mean.
   **The compositor is FIVE pipelines from three fragment functions**, and
   two of them carry rules a reader will otherwise undo. The layer stage has
   two INDEPENDENT specializations — `kGatherFilters`, a function constant
@@ -390,13 +416,84 @@ lockstep are in the root `CLAUDE.md`; the full design is
   needs that gap, and a proof that scores differently run to run is the
   symptom to recognise: a stable-but-different render is an ambiguity, not a
   race, and no amount of waiting will settle it.
-- `MediaPane.swift` · `MediaRowView.swift` — the Media tab (§4.3) and one row
-  of it. The pane is the LIST: its one `InspectorSection`, the two chrome
-  bands that overhang the section inset, the Finder drop onto the panel, and
-  the six commands a row calls back into (`select`, `place`, `reveal`,
-  `relink`, `remove`, `drop`), every one of which applies an edit through
-  `binding` and is therefore the pane's business and never a row's. The row
-  is one FILE and the DRAG it starts.
+  **And a fifth, which phase 8c had to design around:** `rebuild()` destroys
+  every control in the pane and NOTHING here preserves the first responder, so
+  a control a person TYPES into cannot depend on surviving one — a field
+  rebuilt under the caret loses its field editor and the window becomes first
+  responder (measured). Whatever such a control edits must therefore live
+  outside `structureSignature`, which is a statement about the MODEL's shape,
+  and its effect must be applied to the views that already exist.
+  `MediaPane.arrange()` is the worked example: it hides and re-orders the
+  list's arranged subviews and rebuilds nothing.
+- `MediaPane.swift` · `MediaRowView.swift` · `MediaPaneCommands.swift` ·
+  `MediaListFilter.swift` · `MediaUsage.swift` · `MediaReveal.swift` — the
+  Media tab (§4.3): the list, one row of it, the commands a row calls back
+  into, the find band phase 8c added, the one spelling of "is this media
+  used", and Reveal in Timeline's editor half. The pane is the LIST: its one
+  `InspectorSection`, the three chrome bands that overhang the section inset,
+  the Finder drop onto the panel, and `arrange()`. The row is one FILE and the
+  DRAG it starts. The seven commands a row calls back into (`select`, `place`,
+  `revealInTimeline`, `reveal`, `relink`, `remove`, `drop`) are a third file,
+  because every one of them applies an edit through `binding`, writes view
+  state, or puts a panel up — the pane's business and never a row's — and none
+  of them touches the list's views except `select`, which redraws them
+  (`MediaPane.rows` widened to internal for it, and that is the whole cost of
+  the split).
+  **The find band never rebuilds the pane, and that is the whole design of
+  it** (road map 2's phase 8c: a search by name, a sort, an "unused only"
+  switch). `InspectorPaneView.rebuild()` removes every arranged subview and
+  asks `makeSections()` for new ones, `InspectorViewController.refresh` runs
+  it whenever `structureSignature` changes, and NOTHING in this panel
+  preserves the first responder across one — so a search field built inside
+  `makeSections()` with the filtered set in the signature is destroyed by the
+  first keystroke that changes the list, taking the field editor and the caret
+  with it (measured: remove a text field's ancestor and `currentEditor()` is
+  nil and the window is first responder). So the signature stays a statement
+  about the MODEL's shape — which media exist, and whether each file is
+  there — and `MediaPane.arrange()` applies the search, the sort and the
+  switch to rows that are already built, by hiding and re-ordering the list
+  stack's arranged subviews. Both halves are measured rather than assumed: an
+  `isHidden` arranged subview leaves an `NSStackView`'s layout entirely, and
+  `insertArrangedSubview(_:at:)` MOVES a view that is already arranged (over
+  all 24 permutations of four rows the arranged order, the laid-out order and
+  every row's full-width constraint survive, and the subview count does not
+  change) while leaving the window's first responder and the caret's offset
+  exactly where they were. **Anything this panel ever grows that a person
+  types into inherits the rule**: the rebuild is the hazard, not the typing.
+  `MediaListFilter.swift` is the band as a VALUE — the search text, the order,
+  the switch, and the pure `ordered` / `admits` over them — with the three
+  controls that write it beside it, `AudioNormalize.swift`'s shape; the pane
+  keeps only the layout (two LINES in one band, because the three controls
+  measure 319 pt against the 284 the default panel leaves and the 260 the
+  minimum does). Its state is deliberately NOT persisted, and the file argues
+  it three ways — one of them being that a `UserDefaults` key would have to be
+  pinned in the offscreen harness or every chrome render of this pane would
+  depend on what the machine happened to store.
+  **`MediaUsage.swift` is one spelling of a question Swift used to answer
+  twice, and wrongly both times.** The core refuses `remove_media` against
+  `every_clip()` — the timeline's clips CHAINED with every nest's, not a walk
+  down from the timeline, because a nest nothing points at still holds clips
+  that reference media (one id space, spec §5.2) — and both Swift copies
+  filtered `snapshot.clips` alone. The live cost: removing media used only
+  inside a nest showed no "and its clips" alert, went to the core as a plain
+  `remove_media`, came back `Ok(None)` and reached the user as a bare beep.
+  `clipsUsing` is that set; `timelineClipsUsing` is the narrower one a
+  SELECTION can hold (`clampViewState` intersects with top-level ids), and the
+  difference between the two is exactly what lets Reveal in Timeline validate
+  FALSE for a file whose only users are nested rather than silently doing
+  nothing.
+  Reveal in Timeline itself is the pane writing `document.selection` (view
+  state, the way it writes `selectedMedia`) and sending one selector to the
+  editor; `MediaReveal.swift` publishes it and scrolls. It ACCEPTS being
+  thrown off the Media tab — `InspectorViewController.refresh` shows the Clip
+  tab for any changed non-empty selection — rather than making itself that
+  rule's one exception. `TimelineView.scroll(toX:)` widened to internal for
+  it, the widening the change forces: horizontally a revealed clip lands where
+  `revealPlayhead` lands the playhead, and the body stays in the frozen file.
+  The VERTICAL half needed no widening at all — `content.scrollToVisible`,
+  with the rect grown UPWARD by the ruler's height, because the ruler is a
+  floating subview pinned to the top of the visible rectangle and a lane flush
+  with that edge would sit under it.
   **The cut fell below the drag rather than under the row's closing brace**,
   which is the only decision in it: the private pasteboard type, the two
   enums that name where a row may land, `MediaDragSession`, and the
@@ -409,6 +506,12 @@ lockstep are in the root `CLAUDE.md`; the full design is
   room they are about to need. It cost NO visibility, unlike the splits
   above: a type carries its own scope, so every `private` member travelled
   with its privacy intact and nothing widened.
+  **The room was not enough, which is phase 6's warning arriving again**
+  ("budget the cut against the pessimistic number"): those four additions put
+  the pane back over the cap, so phase 8c paid a SECOND toll and moved the row
+  commands out (`MediaPaneCommands.swift`) — this time for one widening. The
+  pane is 474 lines with the find band in it, the commands 206, the filter
+  value and its controls 248, the usage question 58 and the reveal 87.
 - `ExportSheetController.swift` · `ExportSheetOptions.swift` ·
   `ExportSheetResolve.swift` · `ExportSheetPresets.swift` (the export card —
   **eight control rows since phase 7's Preset row and Burn in timecode
@@ -461,7 +564,18 @@ lockstep are in the root `CLAUDE.md`; the full design is
   transcribe sheet puts itself up, from the `generateCaptionsCommand` at
   its own foot, the shape `SilenceSheetController` set. A sheet captures a project
   handle and trusts it, which is safe because every editor action
-  validates false while one is attached.
+  validates false while one is attached — **and, since phase 8b, because
+  `EditorViewController.handleEditorKey` refuses while one is, which
+  `validateUserInterfaceItem` alone no longer covers.** A sheet is
+  WINDOW-modal, not application-modal (measured: with one attached
+  `NSApp.modalWindow` is nil and the preview panel is still visible and still
+  `canBecomeKey`), so the panel's forwarded bare keys reached the key map
+  without passing a validator: `t` added a text clip behind an open export
+  card that had already captured the project it was about to write, and
+  Remove Silences — which computes its spans ONCE — would have shown a wash
+  and a count for a placement that no longer existed and then rippled those
+  ranges. The guard is one line beside the key map rather than in the panel,
+  so both windows get it from one place.
   **The card has TWO commits since phase 7e** — Export… and Add to Queue, in
   `makeButtonRow`'s `secondary` slot — and they are ONE method (`commit(queue:)`),
   branching only at the handoff, because a queued job is not a second kind of
@@ -508,7 +622,9 @@ lockstep are in the root `CLAUDE.md`; the full design is
   must be. And **`window.isExcludedFromWindowsMenu = true`** — `NSApp.windowsMenu`
   is AppKit's, so without it the Window menu carries "Export Queue" twice.
   It persists NOTHING (no autosave frame, no defaults key), so no chrome proof
-  and no `pinDefaults` entry is affected by it.
+  and no `pinDefaults` entry is affected by it. Phase 8b's preview window went
+  the other way and says why in its own doc: a queue is a list you glance at,
+  and a preview window is furniture you put on a particular display.
 - `AgentCatalog.swift` — the MCP tool catalog; a startup check enforces that
   catalog names match the dispatch registry (it traps in debug and logs in
   Release, because `make app` builds Release). The handlers live in
@@ -698,7 +814,9 @@ lockstep are in the root `CLAUDE.md`; the full design is
   snapshot, a plan, a selection and the peak files off a `ProjectDocument`,
   and everything after it is a function of those — which is what lets the
   sheet re-detect SYNCHRONOUSLY on every control change (the document
-  cannot change under an open sheet) and lets the agent run the same code.
+  cannot change under an open sheet — the validator, and since phase 8b
+  `handleEditorKey`'s own `attachedSheet` guard, which is what closed the
+  preview panel's route past it) and lets the agent run the same code.
   **It reads the PLAN, not the peaks alone**: a peak bucket is pre-fader,
   so the level it asks about is `peak × envelope`, and because `audio.rs`
   expresses mute and solo as a ZERO envelope both fall out for free with no
@@ -801,6 +919,122 @@ lockstep are in the root `CLAUDE.md`; the full design is
   track. Save Frame passes NO burn-in — it omits `renderFrame`'s `options`
   argument and takes the default — while the export sheet, `export` and
   `render_frame` all offer one; a grab is of the picture, not of a deliverable.
+- `EditorViewController+PreviewQuality.swift` · `PreviewWindowController.swift`
+  — road map 2's phase 8a and 8b, two ways of LOOKING at the picture. They are
+  one lane because they share `Playback` and the View menu, and neither is an
+  edit: **neither gets an MCP mirror, and neither may be given one** — the
+  parity rule is for user-visible edits, and phase 7e's export queue is the
+  precedent.
+  **Preview quality** scales the render size of the PLAYER's video composition
+  and nothing else. There is exactly ONE constructor of
+  `AVMutableVideoComposition` in the app (`CompositionBuilder.build`), shared by
+  the preview, both export passes and the offline frame — so rather than give it
+  an argument, `Playback.previewComposition` `mutableCopy()`s what it was handed
+  and overrides `renderSize` on the copy, which is `ExportWriter`'s move for
+  `frameDuration` exactly. The export and `render_frame` paths are then not
+  merely unchanged but UNREACHABLE from the setting, which is the only way that
+  claim is worth anything. Three things about it will otherwise be
+  rediscovered. **`AVPlayerItem.videoComposition` is a COPY property**, so
+  mutating the retained composition after the item exists does nothing at all —
+  the setter re-assigns, and `finishRebuild` re-applies, or a structural rebuild
+  would silently return the preview to Full. **The render size must carry the
+  canvas's EXACT aspect**, because `PreviewCanvasView` maps every drag handle
+  through `AVPlayerLayer.videoRect`, which is the aspect of the BUFFER: measured,
+  a 640 × 360 canvas rendered at 501 × 333 reports `videoRect` at 1.504505
+  against the canvas's 1.777778 and moves every handle in the frame. So the size
+  is `m · (w/g, h/g)` with `g = gcd(w, h)` and `m = ceil(g / divisor)` — the
+  exact fraction when the divisor divides `g`, the next COARSER exact-aspect
+  size when it does not, and Full for a canvas whose dimensions are coprime
+  (1001 × 667). Odd dimensions come out of that rule and are fine — measured, a
+  custom compositor and an `AVPlayerLayer` both take 501 × 333 and 304 × 171
+  exactly — and nothing here may start rounding to even numbers;
+  `ExportWriter.encodedSize` does that for an ENCODER's requirement this path
+  has not got. And **the shadow passes do not get cheaper**:
+  `MetalRenderer.shadowSilhouette` allocates its mask/blur pair at the CANVAS
+  size, so a shadowed layer costs the same at every quality. Decoding is
+  untouched too — `preferredMaximumResolution` stays the canvas size on purpose,
+  since it is the decode ceiling and lowering it would change the frame by more
+  than the resample the menu promises.
+  **The preview window is one more `AVPlayerLayer` on the same player**
+  (`Playback.makePreviewLayer`, the one door, so `player` stays private), and
+  three of its decisions are measurements rather than taste.
+  The archived AVFoundation Programming Guide says a second layer blanks the
+  first; measured false on macOS 26.5.1 in both creation orders, with
+  byte-identical `displayedPixelBuffer` checksums — and in that measurement
+  `isReadyForDisplay` and `videoRect` were USELESS as instruments, both reading
+  true and plausible for a layer with no superlayer at all.
+  **The window is an `NSPanel` and must stay one**: a titled `NSWindow` becomes
+  key AND main, and AppKit resolves a nil-target action through the MAIN
+  window's chain — measured, with a plain window every ⌘-item whose action lives
+  on `EditorViewController` (⌘E, ⌘T, ⌘0) resolves to NOTHING and validates
+  disabled, while with a panel the editor stays main and every one of them
+  keeps working with no forwarding code.
+  **What a panel keeps alive is the items whose action is on the EDITOR's own
+  responder chain, and ⌘Z / ⇧⌘Z are NOT those** — the sentence that used to
+  name ⌘Z in that list was a measured falsehood, and the honest version is the
+  more useful one. Edit ▸ Undo is the bare `Selector(("undo:"))`
+  (`AppDelegate+Menus.swift`) resolved down the KEY window's chain, and
+  `NSWindow` implements `undo:` itself (measured;
+  `NSResponder` does not), so the search stops AT the panel and asks the
+  panel's own manager — a second, empty one, with ⌘Z dead and Edit ▸ Undo
+  greyed out, in the one window the forwarded keys below can edit from. So the
+  controller is the panel's DELEGATE and
+  `windowWillReturnUndoManager` hands back the document's; measured, the panel
+  then shares the editor window's manager (which is the document's through the
+  responder chain — the editor window has no delegate at all and
+  `NSWindowController` implements `windowWillReturnUndoManager:` nowhere), ⌘Z
+  from the panel undoes the document's last step and Edit ▸ Undo validates
+  true. It steals nothing: the panel's delegate was nil and `NSWindowController`
+  neither conforms to `NSWindowDelegate` nor implements one of its methods
+  (all measured), and the editor window's `willCloseNotification` observer is a
+  notification on the OTHER window. **The assignment is an ORDERING**, the
+  second in that init: `NSWindow.undoManager` asks the delegate every time, but
+  the first ask that falls through — no delegate, or a delegate answering
+  nil — mints a manager of the window's own and keeps it for good, the delegate
+  never consulted again. Measured both ways: stripping the delegate and putting
+  it straight back leaves the panel on its own empty manager for the rest of
+  the process, and a bare panel whose delegate answered nil once never came
+  back either. So nothing may ask a panel for its undo manager before the
+  delegate is on it, and `windowWillReturnUndoManager` may never answer nil as
+  a "not right now". **`NSPanel.hidesOnDeactivate` defaults
+  to true** (measured), which would make a second-display preview vanish
+  whenever the person switched apps, so it is set false; full screen works on a
+  panel with `.fullScreenPrimary` (measured — the style mask gains
+  `.fullScreen`) although a panel cannot become main.
+  **The document does NOT own it**, and that is the one place the road map's
+  design was refused: `addWindowController` is tidy, and AppKit only asks a
+  document about SAVING when the LAST window controller closes — measured with a
+  dirty untitled `NSDocument`, one controller gets a save sheet on close and two
+  get NO sheet, a destroyed editor window and a document left open behind a
+  panel with nothing to edit in. So `EditorViewController` holds one stored
+  `previewWindow` (a stored property being exactly what an extension cannot
+  hold), and the controller closes ITSELF on the editor window's
+  `willCloseNotification` rather than waiting to be deallocated, since a window
+  whose controller has gone while it is still on screen is nobody's. It persists
+  its FRAME, which `ExportQueueWindowController` deliberately does not — a
+  preview window is opened to put it on a second display, and one that comes
+  back mid-laptop-screen has failed at its one job — under ONE fixed autosave
+  name, never per-document, or every project would mint another defaults key.
+  Bare transport keys reach it by one `keyDown` handing the event to
+  `EditorViewController.handleEditorKey`, which widened from `private` to
+  internal for exactly that: a second window's responder chain does not contain
+  the editor, and a second copy of the key map is the one thing that could make
+  the two windows' transports disagree. **That map is not only transport** —
+  `t` adds a text clip, `w`/`e` trim, `m` marks, `,`/`.` nudge, `i`/`o` write
+  the range — which is why `handleEditorKey` grew the `attachedSheet` refusal
+  beside its `NSText` one (see the sheet paragraph above); a second copy of the
+  guard in this window would be the same drift the single key map exists to
+  prevent.
+  Sizes, so the next reader picks a cut rather than discovering a debt:
+  `Playback.swift` is **570** with both of these in it (470 before), which is
+  under the ~600 cap and near enough that the next feature to land on it pays
+  one; the two files above are 408 and 191, and the frozen
+  `EditorViewController.swift` took 41 lines — one stored property, two
+  validator-chain lines, `handleEditorKey`'s `attachedSheet` guard, and the
+  paragraphs that argue them, which is the whole of phase 8's footprint in a
+  frozen file. The guard is the one of the four that is not wiring for a
+  feature file: it is a refusal the key map itself owes, put where the map is
+  so both windows inherit it.
 - `TimelineView+Rename.swift` — the inline clip rename (a double-click on a
   clip, Clip ▸ Rename…) over the one editor `TimelineView` keeps for track
   and marker renames; the frozen file holds only the `clicks == 2` hook and

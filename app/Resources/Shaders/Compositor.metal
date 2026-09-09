@@ -224,9 +224,11 @@ struct LayerUniforms {
     float spotZoom;             // 1…2, magnification INSIDE
     // The rectangle a layer flattened out of a nest is clipped to (§7.3's
     // `clip_rect`). ABSOLUTE canvas pixels, y down, origin at the canvas's
-    // top-left corner — the space `[[position]]` already arrives in, so the
-    // test costs no conversion. Nothing sets it yet: the core emits `null`
-    // for every layer until nests land.
+    // top-left corner — which is NOT the space `[[position]]` arrives in
+    // whenever the destination is not the canvas, so the test converts
+    // through `canvasPixels` below (this comment claimed the opposite until
+    // phase 8d, and the claim was true only while `renderSize` was always the
+    // canvas).
     float clipEnabled;
     float clipX;                // the rectangle's CENTRE
     float clipY;
@@ -289,16 +291,47 @@ struct LayerUniforms {
     // plain one, so this field is 0 on nearly every draw of nearly every
     // frame.
     float blendMode;
-    // The padding tail, one float shorter than it was. TWO floats now, so the
-    // next field to land can be added on its own; a THIRD needs three
-    // companions again, because the struct is deliberately a multiple of 16
-    // bytes. They keep the names they had rather than being renumbered from
-    // zero: the number in a `reservedN` is its position in the ORIGINAL tail,
-    // so a reader comparing this list against a GPU capture or an older diff
-    // finds the same name at the same offset.
-    float reserved1;
-    float reserved2;
+    // ── The DESTINATION's size, as CANVAS PIXELS PER DESTINATION PIXEL on
+    // each axis (phase 8d). These spent the last two floats of the padding
+    // tail, so the struct is still 104 floats and the tail is now EMPTY: the
+    // next field to land needs three companions.
+    //
+    // **What they are for.** `[[position]]` is in DESTINATION pixels, and
+    // until phase 8a the destination was always the canvas — `renderSize` was
+    // written once, by `CompositionBuilder`, to the canvas size — so three
+    // stages here read the fragment's position as canvas pixels and said so.
+    // Preview Quality renders the player's composition at a FRACTION of the
+    // canvas (`Playback.previewComposition`), and at Half a nest's clip
+    // rectangle magnified about the canvas origin, a shadow sampled its
+    // canvas-sized mask at a quarter of the frame, and a dissolve applied its
+    // weight correction where its partner was not. So the conversion is
+    // explicit now, at the three sites that need it and nowhere else.
+    //
+    // **ZERO MEANS ONE.** A zeroed uniform block must render exactly what
+    // every frame rendered before this field existed, so 0 is read as "the
+    // destination IS the canvas" rather than as a divide-by-zero to guard
+    // against — see `canvasPixels`. Swift writes canvas ÷ destination, which
+    // is 1 on every export, every `render_frame` and every Full preview, and
+    // 1 on the shadow MASK pass whatever the destination is, because that
+    // pass draws into a canvas-sized target of its own.
+    float canvasPerDestX;
+    float canvasPerDestY;
 };
+
+/// A fragment's `[[position]]` in CANVAS pixels — the frame the nest clip
+/// rectangle, the shadow mask and the dissolve partner box are all measured
+/// in (§5.3, §7.3).
+///
+/// A MULTIPLY and not a divide: Swift resolves canvas ÷ destination once per
+/// layer, so this is two selects and two multiplies, and it is called inside
+/// the branches that need it rather than at the top of the stage — a layer
+/// with no nest rectangle and no dissolve pays nothing for it, which is the
+/// property the cost table above `layerColorPremultiplied` states.
+static inline float2 canvasPixels(float2 position, float2 canvasPerDest) {
+    return position
+        * float2(canvasPerDest.x > 0.0 ? canvasPerDest.x : 1.0,
+                 canvasPerDest.y > 0.0 ? canvasPerDest.y : 1.0);
+}
 
 // Display-space UV back to the texture's own coded space. The inverse of the
 // source's preferred transform, restricted to the quarter turns and the
@@ -1159,18 +1192,26 @@ static inline float4 layerColorPremultiplied(Varyings in,
             rgb *= mix(1.0 - clamp(u.spotDim, 0.0, 1.0), 1.0, spot);
         }
 
-        // (7a) The nest clip rectangle: a rotated box in ABSOLUTE canvas pixels,
-        // which is the space `position` already arrives in — hence no anchor, no
-        // scale and no crop in this test. It is deliberately NOT in the layer's
-        // own space: a nest clips the flattened layers to ITS canvas, and those
-        // layers carry the nest's transform folded into their own, so the only
-        // frame all of them share is the canvas.
+        // (7a) The nest clip rectangle: a rotated box in ABSOLUTE canvas pixels
+        // — hence no anchor, no scale and no crop in this test. It is
+        // deliberately NOT in the layer's own space: a nest clips the flattened
+        // layers to ITS canvas, and those layers carry the nest's transform
+        // folded into their own, so the only frame all of them share is the
+        // canvas. The fragment is converted INTO that frame rather than tested
+        // in the destination's, which is the whole of phase 8d's defect here: a
+        // rectangle in canvas pixels compared against a half-size destination's
+        // position is a rectangle magnified about the canvas origin, and at
+        // Quarter it left the frame entirely.
         if (u.clipEnabled > 0.5) {
-            float2 p = rotate2(in.position.xy - float2(u.clipX, u.clipY), -u.clipRotation);
+            float2 canvasPoint = canvasPixels(
+                in.position.xy, float2(u.canvasPerDestX, u.canvasPerDestY));
+            float2 p = rotate2(canvasPoint - float2(u.clipX, u.clipY), -u.clipRotation);
             float2 e = abs(p) - max(float2(u.clipW, u.clipH), float2(0.0)) * 0.5;
             float d = length(max(e, 0.0)) + min(max(e.x, e.y), 0.0);
-            // One canvas pixel of feather, and a canvas pixel is a screen pixel
-            // here — no 1/scale, unlike the corner radius below.
+            // One CANVAS pixel of feather — no 1/scale, unlike the corner
+            // radius below. At a reduced preview size that is less than a
+            // destination pixel, so the edge is as hard as the resample makes
+            // it, which is the same edge the upsample would have given it.
             alpha *= clamp(0.5 - d, 0.0, 1.0);
         }
 
@@ -1231,7 +1272,17 @@ static inline float4 layerColorPremultiplied(Varyings in,
             // Where the incoming does NOT cover this pixel there is no
             // second multiply, the divisor is 1, and the layer correctly
             // fades to whatever is behind it.
-            float2 canvasPoint = in.position.xy;
+            //
+            // `partnerBox` builds that box in CANVAS pixels, so the fragment
+            // is converted into them — the local was named `canvasPoint` and
+            // assigned the destination's position, which was the same thing
+            // only while `renderSize` was always the canvas. A PiP dissolve
+            // at Half corrected nothing and dipped ~25 % dark across the
+            // whole overlap; two full-frame clips hid it, because a partner
+            // covering the whole canvas is the case where the box's own
+            // edges never fall inside the frame.
+            float2 canvasPoint = canvasPixels(
+                in.position.xy, float2(u.canvasPerDestX, u.canvasPerDestY));
             bool insidePartner =
                 canvasPoint.x >= u.partnerMinX && canvasPoint.x <= u.partnerMaxX &&
                 canvasPoint.y >= u.partnerMinY && canvasPoint.y <= u.partnerMaxY;
@@ -1443,6 +1494,21 @@ struct ShadowUniforms {
     float colorG;
     float colorB;
     float opacity;      // already folded in: the shadow colour's own alpha
+    // Canvas pixels per DESTINATION pixel, `LayerUniforms`' two fields under
+    // the same rule — 0 means the destination is the canvas. This pass needs
+    // them more than any other stage does: the mask it samples is CANVAS
+    // sized whatever the destination is (`shadowSilhouette` allocates it at
+    // the recipe canvas's size, and phase 8a's own doc leaned on that fact —
+    // to argue about COST, without noticing it was also a wrong picture), so
+    // both the sampling coordinate and the offset subtracted from it are in
+    // canvas pixels and the fragment must be converted into them.
+    float canvasPerDestX;
+    float canvasPerDestY;
+    // The padding tail this pair brought with it: 12 floats, 48 bytes, three
+    // times 16. Eight and twelve are multiples of 16 bytes and ten is not,
+    // which is why two fields cost four.
+    float reserved0;
+    float reserved1;
 };
 
 struct ShadowVaryings {
@@ -1463,10 +1529,14 @@ fragment float4 reelcut_shadow_fragment(ShadowVaryings in [[stage_in]],
                                         texture2d<float> mask [[texture(0)]],
                                         sampler samp [[sampler(0)]]) {
     float2 canvas = max(float2(u.canvasWidth, u.canvasHeight), float2(1.0));
-    // `position` is in canvas pixels, y down — the space the mask was
-    // rendered in. Displacing the SAMPLE by -offset moves the shadow by
-    // +offset, which is the direction the model means.
-    float2 uv = (in.position.xy - float2(u.offsetX, u.offsetY)) / canvas;
+    // The mask was rendered in CANVAS pixels, y down, so the fragment is
+    // converted into them before anything is subtracted from it: `position`
+    // is the DESTINATION's, and at Half this whole expression used to reach
+    // only uv 0.5 — a 2× magnified slab of the mask, sitting nowhere near
+    // the layer that cast it. Displacing the SAMPLE by -offset moves the
+    // shadow by +offset, which is the direction the model means.
+    float2 uv = (canvasPixels(in.position.xy, float2(u.canvasPerDestX, u.canvasPerDestY))
+        - float2(u.offsetX, u.offsetY)) / canvas;
     // The sampler clamps to the edge, so a fragment that lands outside the
     // mask would otherwise smear its border row right across the canvas.
     if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) {

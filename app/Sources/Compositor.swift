@@ -420,13 +420,32 @@ struct LayerUniforms {
     /// shadow MASK pass, whatever the layer's mode — goes through the plain
     /// entry point, which never looks at it.
     var blendMode: Float = 0
-    // The padding tail, one float shorter than it was. TWO floats now, so
-    // the next field to land can be added on its own; a THIRD needs three
-    // companions again. They keep their names rather than being renumbered
-    // from zero, so the two lists still read as one — `Compositor.metal`
-    // says why.
-    var reserved1: Float = 0
-    var reserved2: Float = 0
+    /// The DESTINATION's size relative to the canvas, as CANVAS PIXELS PER
+    /// DESTINATION PIXEL on each axis (phase 8d). The two spent what was left
+    /// of the padding tail, so the block is still 104 floats and the tail is
+    /// now EMPTY — the next field to land needs three companions.
+    ///
+    /// **Why the fragment stage needs telling.** `[[position]]` is in
+    /// DESTINATION pixels. Until phase 8a the destination was always the
+    /// canvas — `CompositionBuilder` is the only other writer of `renderSize`
+    /// and always sets it to the canvas — so the shader read a fragment's
+    /// position as canvas pixels at three sites and said so in three
+    /// comments. `Playback.previewComposition` renders the PLAYER's
+    /// composition at a fraction of the canvas, and those three sites then
+    /// measured a canvas-space rectangle against a half-size frame: a nest's
+    /// clip rect magnified about the canvas origin, a shadow sampled its
+    /// canvas-sized mask at a quarter of the frame, and a dissolve corrected
+    /// its weight where the partner was not.
+    ///
+    /// **1 on every export, every `render_frame` and every Full preview**, so
+    /// nothing outside the reduced preview changed a pixel; and 1 on the
+    /// shadow MASK pass whatever the destination is, because that pass draws
+    /// into a canvas-sized target of its own (`shadowSilhouette`). The shader
+    /// reads 0 as 1 for the same reason `blendMode`'s `normal` is 0: a zeroed
+    /// uniform block must render what the pipeline rendered before the field
+    /// existed.
+    var canvasPerDestX: Float = 1
+    var canvasPerDestY: Float = 1
 }
 
 /// The shadow pass's uniform block, mirroring `ShadowUniforms` in
@@ -448,6 +467,18 @@ struct ShadowUniforms {
     var colorB: Float = 0
     /// The shadow's opacity with the shadow colour's own alpha folded in.
     var opacity: Float = 0
+    /// Canvas pixels per DESTINATION pixel, `LayerUniforms`' pair under the
+    /// same rule (0 reads as 1). This pass depends on them more than any
+    /// other: the mask it samples is CANVAS sized whatever the destination
+    /// is, so the sampling coordinate and the offset taken off it are both in
+    /// canvas pixels and the fragment has to be converted into them.
+    var canvasPerDestX: Float = 1
+    var canvasPerDestY: Float = 1
+    /// The tail that pair brought with it: 12 floats, 48 bytes. Eight and
+    /// twelve are multiples of 16 bytes and ten is not, which is why two
+    /// fields cost four.
+    var reserved0: Float = 0
+    var reserved1: Float = 0
 }
 
 /// `TransitionKind` (§5.2) as the shader's code plus its direction vector.
@@ -800,7 +831,11 @@ final class MetalRenderer {
             let partner = layer.transition.flatMap { transition in
                 layers.first { $0.clip == transition.partner }
             }
-            guard var uniforms = self.uniforms(for: layer, canvas: canvas, partner: partner)
+            guard
+                var uniforms = self.uniforms(
+                    for: layer, canvas: canvas,
+                    destination: CGSize(width: target.width, height: target.height),
+                    partner: partner)
             else { continue }
             let texture: MTLTexture
             switch source(for: layer, request: request, instruction: instruction, live: &live) {
@@ -1066,6 +1101,11 @@ final class MetalRenderer {
         var u = ShadowUniforms()
         u.canvasWidth = uniforms.canvasWidth
         u.canvasHeight = uniforms.canvasHeight
+        // The layer's, not the mask pass's: this quad is drawn into the
+        // DESTINATION, and everything it works in — the mask's coordinates
+        // and the offset below — is canvas pixels.
+        u.canvasPerDestX = uniforms.canvasPerDestX
+        u.canvasPerDestY = uniforms.canvasPerDestY
         // The model's angle is DEGREES, 0 pointing right and increasing
         // COUNTER-CLOCKWISE (`model.rs`), while the canvas is y-DOWN — so the
         // y term carries the minus sign that turns a counter-clockwise angle
@@ -1115,6 +1155,15 @@ final class MetalRenderer {
         pass.suspend()
         var u = uniforms
         u.shadowMask = 1
+        // The mask target is CANVAS sized (`shadowPair` above), so this one
+        // pass's `[[position]]` really is in canvas pixels however small the
+        // destination is — the conversion the layer stage now makes must be
+        // the identity here, or the silhouette would be drawn through a
+        // preview's scale factor while the mask it lands in kept its own. It
+        // is written rather than left to `uniforms`, because what makes it
+        // right is the descriptor eight lines below and not the recipe.
+        u.canvasPerDestX = 1
+        u.canvasPerDestY = 1
         let descriptor = MTLRenderPassDescriptor()
         descriptor.colorAttachments[0].texture = surfaces.mask
         descriptor.colorAttachments[0].loadAction = .clear
@@ -1195,13 +1244,26 @@ final class MetalRenderer {
     /// terms: the anchor is the canvas centre plus (x, y) — `canvasAnchor` in
     /// `ProjectSnapshot.swift` computes the same point for the overlay — and
     /// the crop is applied in place around it.
+    ///
+    /// `destination` is the size of the buffer this frame is being drawn
+    /// into, which is `AVVideoComposition.renderSize` and is the CANVAS's size
+    /// on every path but one: `Playback.previewComposition` scales it for
+    /// Preview Quality (phase 8a). The three fragment stages that measure a
+    /// fragment in canvas pixels need the ratio to convert `[[position]]`, and
+    /// `canvasPerDest*` is where they read it — see that pair in
+    /// `LayerUniforms`. It is asked of the destination TEXTURE rather than of
+    /// the recipe, because the texture is the thing `[[position]]` is actually
+    /// in and no second opinion can drift from it.
     private func uniforms(
-        for layer: RecipeLayer, canvas: RecipeCanvas, partner: RecipeLayer? = nil
+        for layer: RecipeLayer, canvas: RecipeCanvas, destination: CGSize,
+        partner: RecipeLayer? = nil
     ) -> LayerUniforms? {
         guard layer.opacity > 0 else { return nil }
         var u = LayerUniforms()
         u.canvasWidth = Float(max(1, canvas.width))
         u.canvasHeight = Float(max(1, canvas.height))
+        u.canvasPerDestX = u.canvasWidth / Float(max(1, destination.width))
+        u.canvasPerDestY = u.canvasHeight / Float(max(1, destination.height))
         u.anchorX = Float(Double(canvas.width) / 2 + layer.x)
         u.anchorY = Float(Double(canvas.height) / 2 + layer.y)
         u.scale = Float(max(layer.scale, 0.0001))

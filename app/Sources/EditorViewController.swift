@@ -63,6 +63,19 @@ final class EditorViewController: NSViewController {
     /// this view tree; `ProjectDocument` never touches it.
     let playback: Playback
 
+    /// View ▸ Preview Window's panel, once it has been asked for (road map 2's
+    /// phase 8b). A stored property is exactly what an extension cannot hold,
+    /// which is why this one line is here and every other line of the feature
+    /// is in `PreviewWindowController.swift`.
+    ///
+    /// It is here rather than on the DOCUMENT, and that is measured rather than
+    /// stylistic: `addWindowController` would make the preview a second window
+    /// controller, and AppKit only asks a document about saving when the LAST
+    /// one closes — so closing the editor with a preview open would skip the
+    /// save prompt on a dirty untitled project. That file's doc carries the
+    /// probe.
+    var previewWindow: PreviewWindowController?
+
     // MARK: - Panes
 
     /// Spec §3's three regions. The containers are stable; their contents are
@@ -656,8 +669,34 @@ final class EditorViewController: NSViewController {
     /// letter must not be stolen from the timecode field or (later) an inline
     /// text clip. Everything with a modifier arrives as a menu key
     /// equivalent instead, which is also where it gets validated.
-    private func handleEditorKey(_ event: NSEvent) -> Bool {
+    ///
+    /// Internal rather than private since road map 2's phase 8b: the preview
+    /// window is a second window, so its content view is not in this
+    /// controller's responder chain and has nowhere to send a bare Space or
+    /// J/K/L. It hands the event here rather than carrying a second copy of the
+    /// map (`PreviewWindowController.swift`), which is the one thing that could
+    /// make the two windows' transports disagree.
+    func handleEditorKey(_ event: NSEvent) -> Bool {
         if view.window?.firstResponder is NSText { return false }
+        // And never while a sheet is attached — the same invariant
+        // `validateUserInterfaceItem` opens with below, because this map is
+        // not only transport: `t` adds a text clip, `w`/`e` trim, `m` marks,
+        // `,`/`.` nudge, `i`/`o` write the range. A sheet captures a project
+        // handle and reads it again later, so the document must not move
+        // under it. Until phase 8b that held here for free and needed no line,
+        // since a sheet takes the editor window's key status and this method
+        // was simply unreachable while one was up. But a sheet is WINDOW-modal
+        // rather than application-modal (measured: with one attached
+        // `NSApp.modalWindow` is nil, and the preview panel is visible and
+        // `canBecomeKey`), and the panel forwards its bare keys straight here,
+        // where no validator stands — `t` added a text clip behind an open
+        // export card that had already captured the project it was about to
+        // write, and Remove Silences, which computes its spans ONCE, would
+        // have rippled ranges that no longer described the timeline. The guard
+        // belongs beside the key map rather than in the panel: both windows
+        // inherit it, no second copy can drift, and the editor's own path pays
+        // nothing for a case it cannot reach.
+        if view.window?.attachedSheet != nil { return false }
         let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
         guard flags.subtracting(.shift).isEmpty else { return false }
         guard let scalar = event.charactersIgnoringModifiers?.unicodeScalars.first else {
@@ -1039,6 +1078,8 @@ extension EditorViewController: NSUserInterfaceValidations {
             if let answer = validateIdentityAction(action, item: item) { return answer }
             if let answer = validateBackgroundAction(action) { return answer }
             if let answer = validateSaveFrameAction(action) { return answer }
+            if let answer = validatePreviewQualityAction(action, item: item) { return answer }
+            if let answer = validatePreviewWindowAction(action, item: item) { return answer }
             // The arms whose files are not `EditorViewController+…`: Remove
             // Silences' body and validator live at the foot of
             // SilenceSheetController.swift, beside the sheet, and phase 4's
