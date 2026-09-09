@@ -179,7 +179,7 @@ copies, and the orchestrator is the only one who does.
 | 5 | Sound | 1–2 | — | **done** 2026-09-08 (`65d43ae`) |
 | 6 | Looks | 1–2 | v6 | **done** 2026-09-08 (`d2f7767`) |
 | 7 | Output | 1–2 | — | **done** 2026-09-09 (`a16b0dd`) |
-| 8 | Viewing and finding | 1 | — | **done** 2026-09-09 |
+| 8 | Viewing and finding | 1 | — | **done** 2026-09-09 (`5f0bc61`) |
 | 9 | Inside the nest | 2 | — | not started |
 
 Order is by value over dependency. Phases 1–3 pay back first and share
