@@ -178,7 +178,7 @@ copies, and the orchestrator is the only one who does.
 | 4 | Words | 2 | v5 | **done** 2026-09-08 (`8ec3be5`) |
 | 5 | Sound | 1–2 | — | **done** 2026-09-08 (`65d43ae`) |
 | 6 | Looks | 1–2 | v6 | **done** 2026-09-08 (`d2f7767`) |
-| 7 | Output | 1–2 | — | **done** 2026-09-09 (`PENDING`) |
+| 7 | Output | 1–2 | — | **done** 2026-09-09 (`a16b0dd`) |
 | 8 | Viewing and finding | 1 | — | not started |
 | 9 | Inside the nest | 2 | — | not started |
 
