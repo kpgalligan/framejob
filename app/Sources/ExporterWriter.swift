@@ -114,6 +114,9 @@ final class ExportWriter {
     private let lock = NSLock()
     private var progressValue: Double = 0
     private var cancelRequested = false
+    /// Whether `start` has reached `reader.startReading()`. `cancel`'s doc
+    /// says why cancelling the reader before that point kills the process.
+    private var started = false
     private var failure: (any Error)?
 
     /// Called once, on the main thread, and then dropped.
@@ -204,6 +207,7 @@ final class ExportWriter {
         // the bundled resource is missing and there is nothing to compose
         // against.
         guard !tracks.isEmpty else { throw Exporter.ExportError.emptyTimeline }
+        try Self.checkAlphaSurvivesTheSize(settings, canvas: built.videoComposition.renderSize)
 
         let output = AVAssetReaderVideoCompositionOutput(
             videoTracks: tracks,
@@ -331,6 +335,19 @@ final class ExportWriter {
     /// refuses to start at all.
     func start(completion: @escaping (Result<URL, any Error>) -> Void) {
         self.completion = completion
+        // A cancel that arrived BEFORE this call is honoured here rather than
+        // forgotten. `cancel()` cannot reach the reader until `started` is
+        // set below, so without this line an export cancelled in the window
+        // between `Exporter.startWriting` publishing the pipeline and this
+        // running would write the whole file and report success.
+        lock.lock()
+        let cancelledAlready = cancelRequested
+        started = !cancelledAlready
+        lock.unlock()
+        guard !cancelledAlready else {
+            report(.failure(Exporter.ExportError.cancelled))
+            return
+        }
         guard writer.startWriting() else {
             report(.failure(writer.error ?? Exporter.ExportError.failed(
                 "The file could not be opened for writing.")))
@@ -367,12 +384,31 @@ final class ExportWriter {
     /// Stops as soon as the pumps notice — within one sample. Safe from any
     /// thread and safe to call twice; cancelling the READER is what wakes a
     /// pump that is blocked inside `copyNextSampleBuffer`.
+    ///
+    /// **`started` is not bookkeeping — it is a crash guard**, and the crash
+    /// is reachable. `reader.cancelReading()` before `reader.startReading()`
+    /// makes the `startReading()` in `start` raise an uncaught
+    /// `NSInternalInconsistencyException`, which kills the process rather
+    /// than failing an export. The window is real: `Exporter.startWriting`
+    /// publishes `self.writer` and then calls `progressHandler` BEFORE
+    /// `writer.start`, so a driver that cancels from inside a progress
+    /// callback lands exactly there — and `measureShare` is a non-zero first
+    /// report for every row that measures loudness, which is every row but
+    /// the image ones. No PERSON can reach it (the sheet's and the queue's
+    /// Cancel buttons are their own events), but the export queue is a
+    /// programmatic driver and the next one will be too. Found by phase 7's
+    /// proof probe, which drove exactly that path.
+    ///
+    /// `cancelRequested` is still set unconditionally, so a cancel in that
+    /// window is not lost: `start` reads it and refuses, and `pump` tests it
+    /// per sample.
     func cancel() {
         lock.lock()
         let alreadyCancelled = cancelRequested
         cancelRequested = true
+        let reachedTheReader = started
         lock.unlock()
-        guard !alreadyCancelled else { return }
+        guard !alreadyCancelled, reachedTheReader else { return }
         reader.cancelReading()
     }
 
@@ -643,6 +679,99 @@ final class ExportWriter {
         return copy
     }
 
+    /// Refuses an alpha-carrying export whose size would have to be PADDED
+    /// (road map 2, phase 7b; `Exporter.ExportError.alphaAspectMismatch`
+    /// carries the argument and the measurement).
+    ///
+    /// The composition renders at the canvas size and
+    /// `AVVideoScalingModeResizeAspect` fits it into the asked-for frame —
+    /// which is right for every other row, and destroys the alpha channel
+    /// when it has to pad: the picture comes back at alpha 0 and the bars at
+    /// alpha 255, the answer inverted. A pure SCALE is safe at any factor,
+    /// up or down, so what is refused is the aspect change and not the
+    /// resize.
+    ///
+    /// The test is the fit itself rather than a ratio comparison, because a
+    /// ratio needs a tolerance nobody can justify and this needs none: fit
+    /// the canvas into the box the way the encoder will, and if what comes
+    /// out is the box, there is no padding.
+    ///
+    /// **The box is `encodedSize`'s and not `settings`', and the difference
+    /// was a hole in this guard.** The encoder is handed
+    /// `AVVideoWidthKey`/`AVVideoHeightKey`, not the size the core resolved,
+    /// and a rounding there moves the BOX the canvas is fitted into — which
+    /// the comparison never saw. An odd-edged transparent document (legal:
+    /// `set_canvas` refuses an odd dimension, `Project::new` and `validate`
+    /// do not, so an odd-sized PNG opened as a document or an odd display
+    /// size gets one) passed at 1001 × 667 and was encoded at 1000 × 666,
+    /// reaching the padding path through the DEFAULT "Document size" row
+    /// with the guard silent. `encodedSize` is what closed it; asking it
+    /// here rather than `settings` is what keeps it closed if a later row
+    /// ever needs a rounding of its own.
+    ///
+    /// One pixel of slack on each edge stays, and it is a deliberate trade
+    /// rather than an oversight. It absorbs `export_size.rs`'s even-rounding
+    /// of a standard row's long edge — `fitted()` can miss the canvas's
+    /// exact aspect by a pixel, and refusing every standard row on such a
+    /// document would be a false refusal for a fault nobody can see. What it
+    /// costs is measured: a one-pixel pad puts ONE edge column at the
+    /// backdrop's alpha instead of the picture's (1001 × 667 fitted into
+    /// 1000 × 666 comes back with its right-hand column opaque where the
+    /// canvas is transparent), where the aspect change this refuses puts
+    /// whole BARS there.
+    private static func checkAlphaSurvivesTheSize(
+        _ settings: ExportSettings, canvas: CGSize
+    ) throws {
+        guard settings.alpha, canvas.width >= 1, canvas.height >= 1,
+            settings.width >= 1, settings.height >= 1
+        else { return }
+        let frame = encodedSize(settings)
+        let want = CGSize(width: frame.width, height: frame.height)
+        let scale = min(want.width / canvas.width, want.height / canvas.height)
+        let fitted = CGSize(width: canvas.width * scale, height: canvas.height * scale)
+        guard abs(fitted.width - want.width) > 1 || abs(fitted.height - want.height) > 1 else {
+            return
+        }
+        // The MESSAGE names the size that was ASKED for, not the box: it
+        // tells the person what to type instead, and a number they never
+        // typed in that sentence would read as the app's own arithmetic.
+        throw Exporter.ExportError.alphaAspectMismatch(
+            width: Int(canvas.width.rounded()), height: Int(canvas.height.rounded()),
+            wantWidth: settings.width, wantHeight: settings.height)
+    }
+
+    /// The frame the ENCODER is given, which is not always the size the core
+    /// resolved — and the ONE place that difference is decided, because a
+    /// second opinion about it is exactly what `checkAlphaSurvivesTheSize`
+    /// was missing.
+    ///
+    /// Dimensions are forced even because H.264 and HEVC require it; the
+    /// standard rows arrive even already (`export_size.rs`), so the rounding
+    /// bites only on a custom size or an odd-edged document.
+    ///
+    /// **ProRes 4444 keeps its odd edges, and that is the fix rather than a
+    /// preference.** Rounding an odd edge down moves the box, so
+    /// `AVVideoScalingModeResizeAspect` pads by the pixel the rounding took
+    /// away — and padding is the one thing an alpha export cannot survive.
+    /// Measured here (macOS 26.5.1, `AVAssetWriter` +
+    /// `AVVideoCodecType.proRes4444`): asked for 1001 × 667 the writer
+    /// accepts it and the file comes back `prores`, `yuva444p12le`,
+    /// 1001 × 667, with the transparent half at alpha 0 and the opaque half
+    /// at 255 — exact at every pixel; asked for 1000 × 666 with the same
+    /// 1001 × 667 picture it comes back with its right-hand column OPAQUE
+    /// where the canvas is transparent. So the one row that cannot afford
+    /// the rounding turns out not to need it.
+    /// Every other row keeps the rounding it has always had, ProRes 422
+    /// included — it does not need it either (measured: 1001 × 667 survives
+    /// as `yuv422p10le`), but changing the bytes a shipped row writes for a
+    /// case no proof covers is not this guard's business.
+    private static func encodedSize(_ settings: ExportSettings) -> (width: Int, height: Int) {
+        guard codecType(for: settings.codec) == .proRes4444 else {
+            return (evenDimension(settings.width), evenDimension(settings.height))
+        }
+        return (max(1, settings.width), max(1, settings.height))
+    }
+
     /// The encoder settings for the picture.
     ///
     /// **Size.** The composition renders at the CANVAS size (§7.2), and the
@@ -653,9 +782,10 @@ final class ExportWriter {
     /// liked, so the sheet's "1920 × 1080" was a wish. Here the encoder is
     /// told the size the sheet promised and `AVVideoScalingModeResizeAspect`
     /// fits the canvas inside it, letterboxing rather than distorting when
-    /// the two aspects differ. Dimensions are forced even because H.264 and
-    /// HEVC require it; the standard rows arrive even already
-    /// (`export_size.rs`), so this bites only on a custom size.
+    /// the two aspects differ. The frame itself is `encodedSize`'s answer —
+    /// the rounding lives there, with the argument for it and for the row
+    /// that is exempt, because `checkAlphaSurvivesTheSize` has to compare
+    /// against the same number.
     ///
     /// **Bitrate.** `settings.videoBitrate` when the core resolved one. When
     /// it did not, a rate computed from the frame — bits per pixel per frame,
@@ -667,10 +797,11 @@ final class ExportWriter {
         guard let codec = codecType(for: settings.codec) else {
             throw Exporter.ExportError.presetUnavailable(presetName(settings))
         }
+        let frame = encodedSize(settings)
         var output: [String: Any] = [
             AVVideoCodecKey: codec,
-            AVVideoWidthKey: evenDimension(settings.width),
-            AVVideoHeightKey: evenDimension(settings.height),
+            AVVideoWidthKey: frame.width,
+            AVVideoHeightKey: frame.height,
             AVVideoScalingModeKey: AVVideoScalingModeResizeAspect,
             // The compositor works in SDR sRGB/709 and tone-maps HDR sources
             // on the way in (§7.5), so tagging the output 709 is a statement
@@ -735,6 +866,7 @@ final class ExportWriter {
     }
 
     /// Even, and never zero — H.264 and HEVC macroblocks come in pairs.
+    /// `encodedSize` is the only caller and says which rows want it.
     private static func evenDimension(_ value: Int) -> Int {
         let clamped = max(2, value)
         return clamped - (clamped % 2)

@@ -233,6 +233,73 @@ extension AgentServer {
                 + "extension is replaced rather than appended to — the result reports the file "
                 + "that was really written.",
         ]
+        // `render_frame`'s three image containers, read off `FrameWriter`'s
+        // own enum rather than restated, and hoisted for the budget reason
+        // above.
+        let frameFormatNames = FrameWriter.Format.allCases.map { $0.rawValue }
+        let frameFormatProperty: [String: Any] = [
+            "type": "string", "enum": frameFormatNames,
+            "description": "The container to write. Default: the path's own extension when it "
+                + "is one of those (.jpg counts as jpeg), else png — so a call with no path "
+                + "and no format writes a PNG, as it always has. An explicit format WINS and "
+                + "the path's extension is REPLACED rather than appended to, so {path: "
+                + "\"shot.jpg\", format: \"png\"} writes shot.png. png and heic keep the "
+                + "canvas's alpha; \(FrameWriter.flattenNote)",
+        ]
+        // The burn-in argument, written ONCE and shared by `render_frame` and
+        // `export`: the two are the same question about the same layer, and
+        // two spellings of it would drift the first time either was edited.
+        let burnInProperty: [String: Any] = [
+            "type": "boolean",
+            "description": "Draw the project timecode over the picture, topmost — the export "
+                + "sheet's Burn in timecode checkbox. Default: false. It is a review copy's "
+                + "reference, so it reads the DOCUMENT'S timecode in the document's own "
+                + "spelling (the toolbar's, non-drop, HH:MM:SS:FF or HH:MM:SS.mmm), and it "
+                + "shows PROJECT time even in a file written from the in/out range: a range "
+                + "export starting at 00:00:10:00 begins at 00:00 carrying a burn-in that "
+                + "reads 00:00:10:00, which is the number a note about that frame needs.",
+        ]
+        // `export`'s two alpha-bearing arguments, hoisted for the budget
+        // reason above and because both had to grow the same sentence.
+        //
+        // **A capability an agent cannot read is a capability it does not
+        // have.** Phase 7b gave the table two rows that keep a transparent
+        // canvas and gave `ExportWriter` a refusal for one of them, and
+        // neither reached the schema — so the tool promised a letterbox where
+        // the build throws, and the row to ask for was named nowhere a caller
+        // could see it. The refusal is `prores_4444`'s alone: `apng` takes
+        // the ImageIO path, which FITS instead of padding.
+        let exportPresetProperty: [String: Any] = [
+            "type": "string",
+            "description": "Export preset id — one per encoding, a container and a codec with "
+                + "no size of its own (that is size's). h264 is what the export sheet opens "
+                + "on. Two rows keep a transparent canvas transparent: prores_4444 (the movie "
+                + "row — see size, which it constrains) and apng. gif is not one of them: it "
+                + "can show a transparent pixel but has no alpha channel, so nothing partial "
+                + "survives it. Pass a wrong one once and the error lists them all.",
+        ]
+        let exportSizeProperty: [String: Any] = [
+            "type": ["string", "array"],
+            "items": ["type": "integer"], "minItems": 2, "maxItems": 2,
+            "description": "Output size — the sheet's Size popup. A row id: document (the "
+                + "default, the document's own size), 1080p, 720p, 1440p or 2160p (the number "
+                + "is the SHORT edge and the long edge follows the document's aspect, rounded "
+                + "to even, so a vertical project's 1080p is 1080 × 1920), or preset for an "
+                + "image format's cap (gif and apng, where it is the default) — or an explicit "
+                + "[width, height] in px, the sheet's Custom…. Every row exists on every "
+                + "document — a 1920 × 1080 project's 1080p is its own size and is listed "
+                + "anyway — so an id means the same thing wherever it is sent; only preset is "
+                + "confined to gif and apng. Omit for the document size or the image format's "
+                + "cap; a wrong id's error lists the ids. A movie is written at exactly the "
+                + "size asked for, letterboxed if the aspect differs — except on prores_4444, "
+                + "where a size of a DIFFERENT ASPECT from the canvas is refused rather than "
+                + "written, because the padding destroys the alpha channel that row is chosen "
+                + "for; every row id is already the document's own aspect, so this only bites "
+                + "on a [width, height] of another shape. On gif and apng a size — the cap, a "
+                + "row, or [width, height] — is a box the picture is fitted inside, aspect "
+                + "kept and never upscaled, and the width and height reported back are the "
+                + "file's: a vertical 1080 × 1920 project's GIF default is 152 × 270.",
+        ]
 
         let catalog: [[String: Any]] = [
 
@@ -1377,12 +1444,14 @@ extension AgentServer {
 
             tool(
                 "render_frame",
-                "Renders one frame of the finished timeline as a PNG so you can SEE the result "
-                    + "— the verification hook. It goes through the same composition and the "
-                    + "same Metal compositor an export does, so this is what the file will "
+                "Renders one frame of the finished timeline as a picture so you can SEE the "
+                    + "result — the verification hook. It goes through the same composition and "
+                    + "the same Metal compositor an export does, so this is what the file will "
                     + "contain at that moment, not a preview of it. The image comes back both "
                     + "as an image block and as a file on disk whose path the text names. Use it "
-                    + "before and after every edit.",
+                    + "before and after every edit. It writes a PNG to a temporary file unless "
+                    + "path or format says otherwise, so a call that names neither is exactly "
+                    + "the call it always was.",
                 [
                     "t": [
                         "type": "integer",
@@ -1390,9 +1459,19 @@ extension AgentServer {
                     ],
                     "max_width": [
                         "type": "integer", "minimum": 16, "maximum": 8192,
-                        "description": "Cap the PNG's width in px, aspect kept and never "
+                        "description": "Cap the image's width in px, aspect kept and never "
                             + "upscaled. Default: the canvas's own size.",
                     ],
+                    "path": [
+                        "type": "string",
+                        "description": "Where to write the file, e.g. ~/Desktop/shot.png. The "
+                            + "folder must exist. Omit for a temporary file; either way the "
+                            + "text block's last sentence names the file that was written. "
+                            + "This is the same writer File ▸ Save Frame… uses, so a PNG "
+                            + "written here and one saved from the menu are byte-identical.",
+                    ],
+                    "format": frameFormatProperty,
+                    "burn_in_timecode": burnInProperty,
                 ]),
             tool(
                 "export",
@@ -1415,39 +1494,13 @@ extension AgentServer {
                     + "the mix that was written, so they are what the file holds rather than "
                     + "what was asked for.",
                 [
-                    "preset": [
-                        "type": "string",
-                        "description": "Export preset id — one per encoding, a container and a "
-                            + "codec with no size of its own (that is size's). h264 is what "
-                            + "the export sheet opens on. Pass a wrong one once and the error "
-                            + "lists them all.",
-                    ],
+                    "preset": exportPresetProperty,
                     "path": [
                         "type": "string",
                         "description": "Where to write, e.g. ~/Movies/cut.mp4. The folder must "
                             + "exist.",
                     ],
-                    "size": [
-                        "type": ["string", "array"],
-                        "items": ["type": "integer"], "minItems": 2, "maxItems": 2,
-                        "description": "Output size — the sheet's Size popup. A row id: document "
-                            + "(the default, the document's own size), 1080p, 720p, 1440p or "
-                            + "2160p (the number is the SHORT edge and the long edge follows "
-                            + "the document's aspect, rounded to even, so a vertical project's "
-                            + "1080p is 1080 × 1920), or preset for an image format's cap (gif "
-                            + "and apng, where it is the default) — or an explicit [width, "
-                            + "height] in px, the sheet's Custom…. Every row exists on every "
-                            + "document — a 1920 × 1080 project's 1080p is its own size and is "
-                            + "listed anyway — so an id means the same thing wherever it is "
-                            + "sent; only preset is confined to gif and apng. Omit for the "
-                            + "document size or the image format's cap; a wrong id's error "
-                            + "lists the ids. A movie is written at exactly the size asked "
-                            + "for, letterboxed if the aspect differs. On gif and apng a size "
-                            + "— the cap, a row, or [width, height] — is a box the picture is "
-                            + "fitted inside, aspect kept and never upscaled, and the width "
-                            + "and height reported back are the file's: a vertical 1080 × "
-                            + "1920 project's GIF default is 152 × 270.",
-                    ],
+                    "size": exportSizeProperty,
                     "range": [
                         "type": "string",
                         "enum": ["project", "in_out"],
@@ -1490,6 +1543,7 @@ extension AgentServer {
                             + "ceiling bites, the file lands quieter than the target asked "
                             + "for and the result's capped_by_peak says so.",
                     ],
+                    "burn_in_timecode": burnInProperty,
                 ], required: ["preset", "path"]),
         ]
         let data = try JSONSerialization.data(withJSONObject: catalog)

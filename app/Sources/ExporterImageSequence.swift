@@ -63,14 +63,27 @@ extension Exporter {
     /// `chapters` reach only the writer. Neither GIF nor APNG has anywhere to
     /// put them, which is the same fact about those containers that
     /// `export.rs` reports as `audio: false` for their rows.
+    ///
+    /// `options` (spec §7.3) is the mirror image: they reach only the IMAGE
+    /// path. The writer needs none, because it never asks for a recipe — it
+    /// reads the composition back, and every frame inside it is composed by
+    /// the compositor against the export's `RecipeSource` key, which
+    /// `Exporter.export` has already published them on. The image path has no
+    /// such composition to read: it renders each frame through
+    /// `Exporter.renderFrame`, which mints a key of its own, so the options
+    /// have to be handed to it as a value. That asymmetry is the whole reason
+    /// this parameter exists, and it is why `ExporterWriter.swift` needed no
+    /// edit for the burn-in at all.
     static func pipeline(
         built: BuiltComposition, project: ReelProject, urls: [UInt32: URL],
-        settings: ExportSettings, chapters: [ExportChapter], to url: URL
+        settings: ExportSettings, chapters: [ExportChapter], options: RecipeOptions,
+        to url: URL
     ) throws -> any ExportPipeline {
         guard settings.isImageSequence else {
             return try ExportWriter(built: built, settings: settings, chapters: chapters, to: url)
         }
-        return try ImageSequenceWriter(project: project, urls: urls, settings: settings, to: url)
+        return try ImageSequenceWriter(
+            project: project, urls: urls, settings: settings, options: options, to: url)
     }
 }
 
@@ -240,6 +253,13 @@ final class ImageSequenceWriter: ExportPipeline {
 
     private let project: ReelProject
     private let urls: [UInt32: URL]
+    /// What the export asked of the PICTURE besides the timeline (spec §7.3),
+    /// carried as a VALUE because this pipeline cannot read it any other way:
+    /// every frame goes through `Exporter.renderFrame`, which registers a
+    /// `RecipeSource` key of its own, so the export's key — where
+    /// `Exporter.export` published these — is one no frame of this file will
+    /// ever be composed against.
+    private let options: RecipeOptions
     private let destination: URL
     private let format: ImageSequenceFormat
     /// Every frame's time in the PROJECT's clock, in order. Precomputed:
@@ -279,7 +299,10 @@ final class ImageSequenceWriter: ExportPipeline {
     /// Resolves the settings into a frame list and opens the destination, or
     /// throws the `Exporter.ExportError` the sheet should show. Nothing is
     /// rendered and nothing is written until `start`.
-    init(project: ReelProject, urls: [UInt32: URL], settings: ExportSettings, to url: URL) throws {
+    init(
+        project: ReelProject, urls: [UInt32: URL], settings: ExportSettings,
+        options: RecipeOptions, to url: URL
+    ) throws {
         guard let format = ImageSequenceFormat(container: settings.container) else {
             throw Exporter.ExportError.fileTypeUnsupported(settings.container)
         }
@@ -305,6 +328,7 @@ final class ImageSequenceWriter: ExportPipeline {
 
         self.project = project
         self.urls = urls
+        self.options = options
         self.destination = url
         self.format = format
         self.fps = settings.fps
@@ -411,7 +435,8 @@ final class ImageSequenceWriter: ExportPipeline {
     /// so a nil is a real failure worth reporting.
     private func append(at time: Ticks) -> (any Error)? {
         guard let image = Exporter.renderFrame(
-            project: project, urls: urls, at: time, maxWidth: Int(frameSize.width))
+            project: project, urls: urls, at: time, maxWidth: Int(frameSize.width),
+            options: options)
         else {
             let timecode = ReelTime.format(time, fps: fps, frames: true)
             return Exporter.ExportError.failed(

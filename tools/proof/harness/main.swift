@@ -214,6 +214,24 @@ enum Harness {
             // so a `document` render moved with the machine's stored value
             // until it was pinned. `false` is `bool(forKey:)` of an absent key.
             "ReelcutInspectorRescaleClips": false,
+            // The export sheet's remembered choice (`ExportChoice`, phase 7).
+            // "" is what `string(forKey:)` of an absent key reads as here —
+            // the store treats an empty string as "nothing remembered" — so
+            // pinning it is pinning the first-run card.
+            //
+            // **Nothing the harness photographs reads this key today**, and
+            // that is worth saying rather than leaving to be rediscovered: the
+            // harness renders the EDITOR's content view, a sheet is not in it,
+            // and a sheet cannot be put up offscreen at all (which is why
+            // phase 3's Remove Silences candidates arrive as an ARGUMENT). It
+            // is pinned anyway because this key is unlike every other one
+            // here — it is written by ORDINARY USE of the app on the machine
+            // that runs the proofs, once per export, so the day any chrome
+            // grows a "last export" affordance the renders would start moving
+            // with whatever the developer last exported, and the symptom of
+            // that (identical, stable, DIFFERENT output across processes) is
+            // the one phase 4 spent a gate learning to read.
+            "ReelcutExportChoice": "",
             "AgentServerEnabled": false,
             // AppKit picks legacy (16 pt, always visible) or overlay scrollers
             // by whether a MOUSE is attached, and the inspector pane is 16 pt

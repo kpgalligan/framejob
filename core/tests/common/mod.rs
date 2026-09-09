@@ -37,7 +37,8 @@ use reelcut_core::ffi::{
 use reelcut_core::ffi_edit::rc_project_apply;
 use reelcut_core::ffi_query::{
     rc_export_settings, rc_export_sizes, rc_project_clip_state, rc_project_composition_plan,
-    rc_project_duration, rc_project_frame_recipe, rc_project_snap_candidates,
+    rc_project_duration, rc_project_frame_recipe, rc_project_frame_recipe_opts,
+    rc_project_snap_candidates,
 };
 use reelcut_core::model::Project;
 
@@ -88,6 +89,10 @@ pub fn assert_contains(haystack: &str, needle: &str) {
 /// Anything a test can hand to an edit: a `serde_json::Value` built with
 /// `json!` for the normal case, or a raw `&str` for the malformed-envelope
 /// cases that must not reach `json!` at all.
+///
+/// [`Handle::recipe_opts`] takes it too, for the same halves of the same
+/// reason: recipe options are a JSON string across the FFI, and the
+/// interesting cases include text that is not JSON.
 pub trait OpText {
     fn op_text(&self) -> String;
 }
@@ -292,13 +297,48 @@ impl Handle {
         parse_json(&text, "rc_project_composition_plan")
     }
 
-    /// The frame recipe at `t` (spec §7.3), parsed.
-    pub fn recipe(&self, t: i64) -> Value {
-        let text = expect_string(
+    /// The frame recipe at `t` (spec §7.3) as the RAW string the FFI
+    /// returned.
+    ///
+    /// `plan_text`'s reason, one export along: the whole point of phase 7's
+    /// options is that an un-optioned recipe is byte for byte what it always
+    /// was, and a re-serialized `Value` would normalize away exactly the
+    /// differences that claim is about.
+    pub fn recipe_text(&self, t: i64) -> String {
+        expect_string(
             unsafe { rc_project_frame_recipe(self.ptr, t) },
             "rc_project_frame_recipe",
-        );
+        )
+    }
+
+    /// The frame recipe at `t` (spec §7.3), parsed.
+    pub fn recipe(&self, t: i64) -> Value {
+        let text = self.recipe_text(t);
         parse_json(&text, "rc_project_frame_recipe")
+    }
+
+    /// The frame recipe at `t` under `opts` — `{"burn_in_timecode": bool}`,
+    /// or any text at all — as the RAW string, or `None` when the export
+    /// answered NULL.
+    ///
+    /// NULL is the ONLY thing this export can say about an `opts_json` it
+    /// cannot read: the queries carry no `err_out` (spec §7.9), so a test
+    /// asserting a refusal here asserts a missing pointer and not a message.
+    pub fn recipe_opts_text(&self, t: i64, opts: &(impl OpText + ?Sized)) -> Option<String> {
+        let text = cstring(&opts.op_text());
+        take_string(unsafe { rc_project_frame_recipe_opts(self.ptr, t, text.as_ptr()) })
+    }
+
+    /// The frame recipe at `t` under `opts`, parsed, asserting the export
+    /// answered.
+    pub fn recipe_opts(&self, t: i64, opts: &(impl OpText + ?Sized)) -> Value {
+        let text = self.recipe_opts_text(t, opts).unwrap_or_else(|| {
+            panic!(
+                "rc_project_frame_recipe_opts returned NULL for {}",
+                opts.op_text()
+            )
+        });
+        parse_json(&text, "rc_project_frame_recipe_opts")
     }
 
     /// One clip's evaluated state at project time `t`; `None` for an

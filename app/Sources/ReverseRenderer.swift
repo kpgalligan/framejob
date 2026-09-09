@@ -187,6 +187,33 @@ enum ReverseStatus: Equatable {
 ///
 /// A key whose handle nobody published is still `.none`: no document claims
 /// that composition, so no clip in it reads from a reversed file.
+///
+/// **And that handle search is only enough while the document has not moved
+/// on, which is what a PIN is for.** The search names a document by the
+/// object it published, and a document publishes a NEW object after every
+/// edit, undo and live drag — `ProjectDocument.projectDidChange` calls
+/// `publishReverseResolution`, which overwrites the document's one entry with
+/// the current handle — and drops the entry outright when it closes. An
+/// export that started a moment ago and finishes a moment later is never
+/// caught by that; a QUEUED export, whose whole contract is that the person
+/// goes back to editing while it waits, is caught by it every time. The
+/// answer was `.none`, and `.none` is the one state this file's `ReverseStatus`
+/// says cannot exist: `CompositionBuilder.fill` finds the clip in neither
+/// `ready` nor `pending`, inserts the FORWARD asset track, and — because the
+/// plan's `source_in` is measured in the REVERSED stream (`Source::Media` in
+/// `core/src/model.rs`) — reads the mirrored window of the forward file, so a
+/// trimmed clip shows different frames entirely. Unslated, unreported, in the
+/// picture and in the sound alike, and measured by the loudness pass too.
+///
+/// So a caller that has captured a resolution and must keep it across an
+/// edit PINS it to the handle it belongs to, and the pin is consulted only
+/// AFTER the handle search fails. The order is deliberate: while the document
+/// still holds that very handle, its own entry is the more current truth
+/// about the disk — a reverse render that finished in the meantime republishes
+/// under the SAME handle — so the pin answers exactly when the document has
+/// moved on or gone, and nothing that worked before it existed behaves
+/// differently. `ExportQueueController` is its one caller today; see
+/// `pin(_:for:)` for what a caller owes.
 final class ReverseSource {
     static let shared = ReverseSource()
 
@@ -198,8 +225,23 @@ final class ReverseSource {
         let resolution: ReverseResolution
     }
 
+    /// A resolution held against one handle for the length of one write.
+    ///
+    /// Unlike `Entry` this RETAINS its project, and the difference is the
+    /// point rather than an oversight: an `Entry` names a document that may
+    /// close, where a pin names the handle a job is writing from right now.
+    /// Holding it makes "a pin can never name a dead object" true here
+    /// instead of true only while the caller happens to be retaining it too,
+    /// and so closes the one way a pin could go wrong — an identity reused by
+    /// a later allocation, answering some other project's frames.
+    private struct Pin {
+        let project: ReelProject
+        let resolution: ReverseResolution
+    }
+
     private let lock = NSLock()
     private var entries: [Int: Entry] = [:]
+    private var pins: [ObjectIdentifier: Pin] = [:]
 
     private init() {}
 
@@ -218,9 +260,59 @@ final class ReverseSource {
         entries.removeValue(forKey: key)
     }
 
-    /// The resolution for the composition being built under `key`: the
-    /// entry published under that key, or the one published for the very
-    /// handle the key was registered with. See the type's own comment.
+    /// The resolution published for one HANDLE, whatever key it was published
+    /// under — what a caller reads when it wants to keep the answer.
+    ///
+    /// Deliberately blind to the pins: this is the CAPTURE, and it must see
+    /// the document's own current answer rather than something an earlier
+    /// capture pinned.
+    func resolution(publishedFor project: ReelProject) -> ReverseResolution {
+        let handle = ObjectIdentifier(project)
+        lock.lock()
+        defer { lock.unlock() }
+        return entries.values.first { $0.project == handle }?.resolution ?? .none
+    }
+
+    /// Holds `resolution` against `project` until `unpin`, so a composition
+    /// built from that handle still finds it after the document has edited,
+    /// undone or closed its way onto a different one.
+    ///
+    /// **What the caller owes: exactly one `unpin` per `pin`, and a pin per
+    /// handle at a time.** The table is keyed by identity, so a second pin of
+    /// one handle replaces the first rather than stacking — the queue holds
+    /// at most one because it runs one job at a time, which is where that
+    /// invariant is stated and kept. A pin never released retains the Rust
+    /// project behind the handle for the life of the process.
+    func pin(_ resolution: ReverseResolution, for project: ReelProject) {
+        lock.lock()
+        defer { lock.unlock() }
+        pins[ObjectIdentifier(project)] = Pin(project: project, resolution: resolution)
+    }
+
+    /// Releases what `pin` held. Safe to call twice and safe to call for a
+    /// handle that was never pinned.
+    func unpin(_ project: ReelProject) {
+        lock.lock()
+        defer { lock.unlock() }
+        pins.removeValue(forKey: ObjectIdentifier(project))
+    }
+
+    /// What is pinned against `project`, or nil. Nothing in the app reads
+    /// this — the resolution lookup below consults the table directly — and
+    /// it is here so that a proof can assert the two halves a rendered frame
+    /// cannot show: that a running job HAS pinned its captured answer, and
+    /// that an idle queue has released every one of them.
+    func pinnedResolution(for project: ReelProject) -> ReverseResolution? {
+        lock.lock()
+        defer { lock.unlock() }
+        return pins[ObjectIdentifier(project)]?.resolution
+    }
+
+    /// The resolution for the composition being built under `key`: the entry
+    /// published under that key, the one published for the very handle the key
+    /// was registered with, or — when the document has moved on from that
+    /// handle — whatever a caller pinned to it. See the type's own comment for
+    /// why the pin comes last.
     func resolution(for key: Int) -> ReverseResolution {
         lock.lock()
         let own = entries[key]
@@ -230,7 +322,10 @@ final class ReverseSource {
         let handle = ObjectIdentifier(project)
         lock.lock()
         defer { lock.unlock() }
-        return entries.values.first { $0.project == handle }?.resolution ?? .none
+        if let published = entries.values.first(where: { $0.project == handle }) {
+            return published.resolution
+        }
+        return pins[handle]?.resolution ?? .none
     }
 }
 

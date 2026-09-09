@@ -36,7 +36,7 @@ use reelcut_core::ffi_edit::rc_project_apply;
 use reelcut_core::ffi_query::{
     rc_export_presets, rc_export_settings, rc_export_sizes, rc_op_names, rc_project_clip_state,
     rc_project_composition_plan, rc_project_duration, rc_project_frame_recipe,
-    rc_project_snap_candidates, rc_snap_resolve,
+    rc_project_frame_recipe_opts, rc_project_snap_candidates, rc_snap_resolve,
 };
 
 /// Every `TransitionKind`, every `ShapeKind`, every `Curve` — the wire
@@ -1857,6 +1857,16 @@ fn sweep_every_export_with_nulls() -> Vec<String> {
 
     assert!(unsafe { rc_project_frame_recipe(ptr::null(), 0) }.is_null());
     cover("rc_project_frame_recipe");
+
+    // A NULL opts_json means the default options, so only the project may be
+    // NULL here — and the pointer is read INSIDE the closure that catches
+    // panics, which is what this pair is really standing over.
+    assert!(unsafe { rc_project_frame_recipe_opts(ptr::null(), 0, ptr::null()) }.is_null());
+    let defaulted =
+        take_string(unsafe { rc_project_frame_recipe_opts(live.as_ptr(), 0, ptr::null()) })
+            .expect("a NULL opts_json is not a failure");
+    assert_contains(&defaulted, "\"layers\"");
+    cover("rc_project_frame_recipe_opts");
 
     assert!(unsafe { rc_project_clip_state(ptr::null(), 1, 0) }.is_null());
     cover("rc_project_clip_state");

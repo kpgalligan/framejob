@@ -29,7 +29,11 @@ final class RecipeInstruction: NSObject, AVVideoCompositionInstructionProtocol {
     /// composition rebuild (§7.6).
     let passthroughTrackID: CMPersistentTrackID = kCMPersistentTrackID_Invalid
 
-    /// The document's `RecipeSource` slot (`ReelCore.swift`).
+    /// The document's `RecipeSource` slot (`ReelCore.swift`) — or an
+    /// export's own, which is a fresh one. It names the project a frame is
+    /// composed from AND, since phase 7, the `RecipeOptions` that project is
+    /// asked with, so an option never has to be threaded through the
+    /// instruction.
     let recipeKey: Int
     /// Media id → file, for `image` layers. Same map `CompositionBuilder`
     /// resolved the composition's assets from.
@@ -192,6 +196,11 @@ final class Compositor: NSObject, AVVideoCompositing {
             return
         }
         let instruction = request.videoCompositionInstruction as? RecipeInstruction
+        // The key is the whole ask: `RecipeSource.recipe(for:at:)` reads the
+        // project AND that key's `RecipeOptions` under one hold, so a burn-in
+        // an export asked for arrives here without this file, the
+        // instruction or `CompositionBuilder` carrying a flag of its own
+        // (spec §7.3). Do not read the two halves separately.
         let recipe = RecipeSource.shared.recipe(
             for: instruction?.recipeKey ?? 0,
             at: CompositionBuilder.ticks(request.compositionTime))

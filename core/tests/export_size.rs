@@ -51,10 +51,17 @@ fn row(id: &str, name: &str, width: i64, height: i64) -> Row {
 /// audio-only rows included, on the terms `rc_export_settings` reports a
 /// width for them. Only the two image formats list anything else, and only
 /// because they are the only rows carrying a cap.
-const MOVIE_FORMATS: [&str; 6] = [
+const MOVIE_FORMATS: [&str; 7] = [
     "h264",
     "hevc",
     "prores_422",
+    // The alpha master (road map 2, phase 7). It carries no cap and is
+    // not an image format, so it lists what every other movie row lists —
+    // and being in this sweep is the check that it stayed that way: a row
+    // that had picked up a `size` of its own would export every project at
+    // that size and would show it here first, in a list whose FIRST row
+    // stopped being the document.
+    "prores_4444",
     "audio_m4a",
     "audio_wav",
     "audio_aiff",
@@ -221,7 +228,14 @@ fn the_audio_only_formats_list_what_h264_lists() {
     for (width, height) in [(1600, 900), (1080, 1920), (480, 270)] {
         let handle = document(width, height);
         let h264 = listed(&handle, "h264");
-        for preset in ["audio_m4a", "audio_wav", "audio_aiff", "hevc", "prores_422"] {
+        for preset in [
+            "audio_m4a",
+            "audio_wav",
+            "audio_aiff",
+            "hevc",
+            "prores_422",
+            "prores_4444",
+        ] {
             assert_eq!(
                 listed(&handle, preset),
                 h264,

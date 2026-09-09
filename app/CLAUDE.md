@@ -79,8 +79,8 @@ lockstep are in the root `CLAUDE.md`; the full design is
   answered, and still proved by measurement.
 - `Playback.swift` · `CompositionBuilder.swift` · `Compositor.swift` ·
   `CompositorEffects.swift` · `MediaImporter.swift` ·
-  `Exporter.swift` · `ExporterLoudness.swift` · `ExporterWriter.swift` ·
-  `ExporterImageSequence.swift` —
+  `Exporter.swift` · `ExporterLoudness.swift` · `ExporterSettings.swift` ·
+  `ExporterWriter.swift` · `ExporterImageSequence.swift` —
   the AVFoundation/Metal side; see spec §7.5–7.8. Two phase-5 facts about
   the last four: an export is TWO passes wherever the file holds sound —
   a measurement build of its own (a mix copy would share the tap, and a tap
@@ -90,7 +90,43 @@ lockstep are in the root `CLAUDE.md`; the full design is
   move out of `Exporter.swift` when the second one took it past the ~600-line
   cap, which is why `Exporter`'s `lock`, `measureReader`, `scratchStorage`,
   `scratchCapacity` and its two accessors are internal rather than private —
-  stored properties cannot live in an extension. And
+  stored properties cannot live in an extension. `ExporterSettings.swift`
+  is the SECOND payment of the same toll, in phase 7, when `export` and
+  `renderFrame` each grew a `RecipeOptions` argument: the resolved settings
+  translated into AVFoundation's vocabulary — the time range, the fallback
+  session preset, the file type, the UTI, the extension, and
+  `ExportSettings.isAudioOnly` — pure functions of a settings value with no
+  export state in them, and half their callers the export SHEET rather than
+  the exporter. **`renderFrame` deliberately did NOT go with them**, though
+  it is the other obvious cut: it is the app's only `copyCGImage` call, and
+  the build baseline names that warning by FILE ("3 in
+  `CompositionBuilder.swift`, 1 in `Exporter.swift`"), so moving it would
+  falsify that sentence in the root `CLAUDE.md` for no gain.
+  **`ExportWriter` refuses an alpha-carrying row at a PADDED size**
+  (`checkAlphaSurvivesTheSize`, phase 7b), and the reason is measured
+  rather than feared: the composition renders at the canvas size and
+  `AVVideoScalingModeResizeAspect` fits it into the asked-for frame, and
+  when that fit has to PAD, the padding path destroys the alpha channel —
+  a 320 × 180 transparent canvas written `prores_4444` at 240 × 240 comes
+  back with the PICTURE at alpha 0 and the letterbox BARS at alpha 255,
+  the answer inverted rather than merely lost. A pure SCALE is correct at
+  every pixel up or down (160 × 90 and 640 × 360 both measured clean), so
+  what is refused is the aspect change and never the resize, and the test
+  is the fit itself rather than a ratio, which would need a tolerance
+  nobody can justify. **The guard tests the box the ENCODER is handed and
+  not the size the core resolved**, which the review caught it failing to
+  do: `videoSettings` rounds every dimension down to even, so an
+  odd-edged transparent document — 1001 × 667 — passed the fit and was then
+  encoded at 1000 × 666, reaching the padding path through the DEFAULT
+  Document-size row with the guard silent. The rounding is one function
+  now (`encodedSize`) and both the guard and the encoder ask it, so the
+  two cannot be made to disagree again. With that closed, "only a
+  hand-typed Custom size reaches it" is true: every row of the Size popup
+  is already fitted to the document's aspect (`export_size.rs`).
+  **The other alpha row does not need the guard and
+  must not grow one** — `apng` takes the ImageIO path, which FITS instead
+  of padding (240 × 240 asked of a 16∶9 canvas writes 240 × 135), so its
+  alpha survives any size. And
   `CompositionBuilder.build`'s `metering` flag
   is passed true by `Playback.startRebuild` and by nothing else, so an
   export and a rendered frame build exactly the audio path they built before
@@ -174,6 +210,17 @@ lockstep are in the root `CLAUDE.md`; the full design is
   opt-in ffmpeg step behind it (spec §7.7, §11). `async`/`await` is confined
   to `MediaImporter.swift`; `FFmpegRewrap` runs `Process` on a serial queue,
   never on a cooperative thread, because ffmpeg blocks the thread it is on.
+  **`AppSupport.swift` is the ONE spelling of
+  `~/Library/Application Support/Reelcut/`**, and the argument for putting
+  anything there is still `FFmpegRewrap.rewrapDirectory`'s doc: there is
+  frequently no package to write into, and the one place a package survives a
+  save is documented as deletable. Two things live under it —
+  `Rewrapped/` and phase 7's `ExportPresets.json` — and a third asks
+  `AppSupport` rather than writing the two path components out again. Every
+  accessor answers a PATH and creates only the Application Support root; the
+  caller creates the leaf, at the moment it has something to put in it, so
+  building a path never litters a Library with folders for features nobody
+  used.
 - `MediaConsolidator.swift`
   with `EditorViewController+Consolidate.swift` (File ▸ Consolidate Media…) —
   the §5.6 file feature. Consolidate writes inside the package behind
@@ -343,9 +390,47 @@ lockstep are in the root `CLAUDE.md`; the full design is
   needs that gap, and a proof that scores differently run to run is the
   symptom to recognise: a stable-but-different render is an ambiguity, not a
   race, and no amount of waiting will settle it.
-- `ExportSheetController.swift` (the export card — six control rows since
-  phase 5's Loudness popup, whose −1 dBTP ceiling is FIXED and stated in the
-  hint rather than made a seventh — and its progress sheet, which says
+- `ExportSheetController.swift` · `ExportSheetOptions.swift` ·
+  `ExportSheetResolve.swift` · `ExportSheetPresets.swift` (the export card —
+  **eight control rows since phase 7's Preset row and Burn in timecode
+  checkbox**, phase 5's Loudness popup being the sixth and its −1 dBTP ceiling
+  still FIXED and stated in the hint rather than made a row of its own —
+  split FOUR ways at the ~600-line cap, three of the cuts made when the file
+  stood at 1114 and the fourth when phase 7's own additions put it back over:
+  the controller BUILDS the controls and commits, `Options` holds what they
+  MEAN before any of them is read (the ranges, the loudness targets and their
+  menu spelling, the quality ladder, `Applies`), `Resolve` reads a selection,
+  asks `rc_export_settings` about it and repaints the card from the answer,
+  and `Presets` owns the saved-preset LIST — the one part of the card with a
+  store behind it and a life longer than the sheet's. The
+  toll is `ExporterLoudness.swift`'s: every stored control and every
+  crossing member is internal, because `private` on an extension member
+  reaches only its own file.
+  **Phase 7's three additions are one idea: the card's controls are a VALUE**
+  (`ExportChoice`, `ExportPresetsStore.swift`). The sheet reopens on the last
+  choice EXPORTED with (not the last one dismissed), a named preset is that
+  same value in a file, and both are written back by one method — `apply(_:)`
+  in `Resolve`, **whose ORDER is load-bearing and is documented there**: the
+  format before `rebuildSizes()` (a programmatic `selectItem` sends no action,
+  so `formatChanged`'s guard never fires) and the size after it (it ends with
+  an unconditional `selectItem(at: 0)`); a size stored as `ExportSize.id` and
+  never an index, because `visibleSizes` drops rows a document already has;
+  "Custom…" chosen before its loudness field is filled, or `syncReadout`
+  overwrites it; and `in_out` degrading to "Whole project" where there is no
+  range. **What a preset stores is the CONTROL CHOICES and not resolved
+  overrides** — the road map's design for it cannot be built, and
+  `ExportPresetsStore.swift` argues why at the top. The Preset popup carries
+  each record in `representedObject`, is read from `selectedItem`, and its
+  menu is built from `NSMenuItem`s rather than `addItem(withTitle:)`, which
+  removes a same-titled row; the gear beside it is a pull-down because the
+  control column is 258 pt and a popup plus two titled buttons is not.
+  The Burn in timecode checkbox is the one control that is NOT an export
+  override: it rides to `Exporter.export` as a `RecipeOptions` — it changes
+  the picture, and `export_overrides.rs` drops an unknown key in silence —
+  and it shows PROJECT time, so a range export starting at 00:00:10:00 writes
+  a file that begins at 00:00 reading 00:00:10:00, which the hint says out
+  loud), `ExportProgressSheetController.swift` (the
+  progress sheet, a separate class and so a free cut, which says
   "Measuring loudness…" through pass 1 and reports the measured peak and
   loudness on its last line, normalised or not),
   `SpeedSheetController.swift`, `RelinkSheetController.swift`,
@@ -358,6 +443,53 @@ lockstep are in the root `CLAUDE.md`; the full design is
   its own foot, the shape `SilenceSheetController` set. A sheet captures a project
   handle and trusts it, which is safe because every editor action
   validates false while one is attached.
+  **The card has TWO commits since phase 7e** — Export… and Add to Queue, in
+  `makeButtonRow`'s `secondary` slot — and they are ONE method (`commit(queue:)`),
+  branching only at the handoff, because a queued job is not a second kind of
+  export but this one held until its turn. Both are enabled by one fact, and
+  only one of them is written: `syncReadout` sets Export…'s state from
+  `resolved`, and `resolveCard()` — which is what every path in the card calls
+  instead of `resolve()` — copies that ANSWER onto Add to Queue rather than
+  reading `resolved` a second time.
+- `ExportQueueController.swift` · `ExportQueueWindowController.swift` — the
+  export queue (Window ▸ Export Queue, road map 2's phase 7e), and the split
+  between them is the feature. **The controller has no AppKit in it**: the job
+  list and its state machine are a thing a probe compiled from `app/Sources`
+  can make, fill, run and read (`AudioNormalize.swift`'s shape, and phase 5's
+  level meter's reason — a window cannot be photographed offscreen or driven
+  over MCP), and the window is a READER of it that holds no job, decides
+  nothing and stops nothing when it closes.
+  **No MCP mirror is owed and none may be added**: the rule is that every
+  user-visible EDIT gets one, a queue edits no project, and an agent can
+  already call `export` N times in sequence — which is what this does, so
+  `export` IS the mirror. A tool added so a proof could exist would be the
+  proof deciding the API (`tools/proof/README.md`).
+  Four things in the controller are load-bearing. **One job at a time, on the
+  MAIN thread, a fresh `Exporter` each** — `Exporter.export` is documented
+  main-thread-only and one-at-a-time, its progress timer must be invalidated
+  on the thread that scheduled it, and an exporter carries per-export state
+  (`recipeKey`, the loudness scratch), so this is a CHAIN and a `DispatchQueue`
+  of exporters would be the wrong shape. **A job is what it will write,
+  captured when it was confirmed**: the `ReelProject` needs no clone (handles
+  are immutable and `Exporter` publishes it on a `RecipeSource` key of its
+  own), and `mediaURLs()` is resolved at ENQUEUE by
+  `EditorViewController.enqueueExport` — it reads bookmarks and the
+  filesystem, so resolving at RUN time would pick up a Relink… or a moved file
+  from after the job was queued. The rule is structural rather than
+  remembered: a job holds a `[UInt32: URL]` and no document to ask again.
+  **A cancelled job's half-written file is removed**, in `finished`, which is
+  `ExportProgressSheetController.finished`'s line repeated so the two agree; a
+  FAILED one's is left, which is that same class's posture. And `isLaunching`
+  turns an early synchronous refusal (`noPlan`, `emptyTimeline` complete
+  before `export` returns) from recursion into a loop.
+  Two in the window. It is deliberately **not `WelcomeWindowController`
+  copied**: that class closes itself on `NSWindow.didBecomeMainNotification`,
+  which here would make the queue vanish the moment the person clicked back
+  into the editor, and its window is deliberately not resizable where a list
+  must be. And **`window.isExcludedFromWindowsMenu = true`** — `NSApp.windowsMenu`
+  is AppKit's, so without it the Window menu carries "Export Queue" twice.
+  It persists NOTHING (no autosave frame, no defaults key), so no chrome proof
+  and no `pinDefaults` entry is affected by it.
 - `AgentCatalog.swift` — the MCP tool catalog; a startup check enforces that
   catalog names match the dispatch registry (it traps in debug and logs in
   Release, because `make app` builds Release). The handlers live in
@@ -597,6 +729,59 @@ lockstep are in the root `CLAUDE.md`; the full design is
   props, the opposite of every other session in `CanvasSessions.swift`,
   because a region is drawn on what is on SCREEN and has to agree with
   `edit_zoom.rs`'s `evaluate_clip(clip, at)`.
+- `FrameWriter.swift` · `EditorViewController+SaveFrame.swift` — File ▸ Save
+  Frame… (⌥⌘E), road map 2's phase 7a, and the split between the two files is
+  the feature. `FrameWriter` is a VALUE TYPE in `AudioNormalize.swift`'s
+  shape — a `CGImage` and a format in, a written URL out, no save panel, no
+  document, no AppKit view — because `render_frame` calls the SAME `write`,
+  which is what makes "Save Frame's PNG is byte-identical to `render_frame`'s"
+  a fact about the code rather than a claim, and the only way the line can be
+  checked at all: a panel cannot be driven over MCP or offscreen, so a proof
+  script can never press the item. Three rules live in it. **PNG's properties
+  dictionary is `nil` and must stay `nil`** — every phase from 1 to 6 compares
+  PNGs written that way, and anything that ADDS metadata changes the file
+  (mutated to `[kCGImagePropertyDPIWidth: 144]` and caught by the extra `pHYs`
+  chunk). It is a GUARD rather than an observation, and the difference is
+  measured: on macOS 26.5.1 an EMPTY dictionary and no dictionary write
+  byte-identical PNGs — same sha256, same 5330 bytes, same chunk list, across
+  two processes — so `[:]` is indistinguishable to any byte comparison this
+  project can make, and the rule stands because the next ImageIO owes us
+  nothing. The one assertion that can see `[:]` at all is structural:
+  `phase7_chrome.py` reads `Format.destinationProperties != nil`.
+  **JPEG flattens onto black** in an opaque bitmap before
+  encoding, at quality 0.9 (a delivery still; `MediaImporter.writeJPEG`'s 0.7
+  is a thumbnail), because JPEG is the one of the three containers that cannot
+  carry alpha and phase 7b makes a transparent canvas reachable — the panel's
+  accessory view says which format keeps alpha as the format is chosen, so the
+  flatten is never silent. And **HEIC is `UTType.heic`, never `public.heif`**:
+  only the former is in `CGImageDestinationCopyTypeIdentifiers()` here, and a
+  destination built over the latter is nil with nothing to say.
+  Two more the review put there. A nil from
+  `CGImageDestinationCreateWithURL` is TWO different failures and used to be
+  reported as one: a format this Mac cannot write (asked of
+  `CGImageDestinationCopyTypeIdentifiers`) versus a file it could not
+  CREATE — a read-only folder, a bad path — and telling somebody "this Mac's
+  image encoders do not offer that format" about a perfectly ordinary PNG is
+  a diagnosis they cannot act on. And the format popup's rename is
+  `FrameWriter.renamed`, a pure function over `Format.acceptedExtensions`
+  rather than a bare `deletingPathExtension`, because the bare one eats
+  whatever follows the last dot in a name somebody typed: a project called
+  "Board v1.2" was offered as "Board v1.jpg". Being a pure function is also
+  what lets a probe reach it — `CaptionExporter.formatChanged` still has the
+  unguarded version and loses the `.2` off a caption file today.
+  The controller half owns only the URL and the thread: the panel copies
+  `CaptionExporter`'s house pattern (an accessory view rather than a second
+  sheet, the format popup rewriting BOTH `allowedContentTypes` and the
+  extension of `nameFieldStringValue` and reading the stem back off the
+  PANEL), the project is read in the completion rather than captured when the
+  panel opened (a panel is not a sheet, so the document stayed editable), and
+  the render goes off-main. Its `validateSaveFrameAction` arm is load-bearing:
+  the honest test is `duration > 0`, the one question `Exporter.renderFrame`
+  refuses on, and a "has a video track" test would wrongly grey out a
+  text-only timeline, which renders through `CompositionBuilder`'s placeholder
+  track. Save Frame passes NO burn-in — it omits `renderFrame`'s `options`
+  argument and takes the default — while the export sheet, `export` and
+  `render_frame` all offer one; a grab is of the picture, not of a deliverable.
 - `TimelineView+Rename.swift` — the inline clip rename (a double-click on a
   clip, Clip ▸ Rename…) over the one editor `TimelineView` keeps for track
   and marker renames; the frozen file holds only the `clicks == 2` hook and
@@ -721,9 +906,19 @@ speech recognition landed in phase 4 and did not, because
 transcription, which is what `Transcriber.swift` uses (spec §11);
 `DispatchQueue` only at the documented seams
 (the compositor's render queue, the composition rebuild, import, the export
-progress timer, and — since phase 4 — `Transcriber`'s serial work queue with
+progress timer, `Transcriber`'s serial work queue (phase 4) with
 the `OperationQueue` the recogniser delivers its callbacks on, which is not
-optional: `SFSpeechRecognizer.queue` defaults to the app's MAIN queue).
+optional: `SFSpeechRecognizer.queue` defaults to the app's MAIN queue, and
+the OFFLINE ONE-FRAME RENDER, which is two queues rather than one:
+`EditorViewController+Eyedropper.swift`'s `eyedropperQueue` for a chroma pick
+and — since phase 7a — `EditorViewController+SaveFrame.swift`'s
+`frameGrabQueue` for Save Frame. `Exporter.renderFrame` opens asset tracks
+and decodes, and its own doc says to call it off the main thread; neither
+belongs on the compositor's build queue, where a grab would sit behind a
+preview rebuild and a rebuild behind a grab. They are two objects because
+each is `private` to its own file, and putting two unrelated commands in one
+line would buy nothing — the seam is the SHAPE, and a third one-frame render
+joins this entry rather than growing the list).
 **`import Synchronization` is allowed only inside `LevelMeter.swift`** — the
 same shape of exception, and phase 5's. Its `publish` runs on AVPlayer's
 audio render thread inside the tap's process callback, where a lock invites

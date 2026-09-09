@@ -126,6 +126,29 @@ char *rc_project_composition_plan(const RcProject *p);
  * frame, and by the canvas overlay for hit-testing and handles. */
 char *rc_project_frame_recipe(const RcProject *p, int64_t t);
 
+/* The same recipe, with the caller's OPTIONS. `opts_json` is
+ * {"burn_in_timecode": bool} — or NULL, which is the defaults and is exactly
+ * what rc_project_frame_recipe asks for, the two being one implementation.
+ *
+ * `burn_in_timecode` APPENDS a text layer (so, last: topmost) showing the
+ * project timecode at `t`, spelled by the document's own timecode_frames, in
+ * a monospaced face on a backdrop, placed at a fraction of the canvas height
+ * below its centre — the core stores no measured text size (spec 5.3, 11), so
+ * a burn-in cannot be anchored to the bottom EDGE of the frame. It is
+ * non-drop, like every timecode this library formats, and on an in/out range
+ * export it reads PROJECT time rather than the time in the file.
+ *
+ * The option lives here rather than in rc_export_settings' overrides because
+ * an unknown override key is IGNORED, so an option posted that way would
+ * vanish and an export would report success on an un-burnt file. It changes
+ * the picture, so it travels with the description of the picture.
+ *
+ * An `opts_json` that is not JSON answers NULL — a query has no err_out. A
+ * key that is absent, of the wrong type, or in a document that is not an
+ * object simply means OFF, so a caller that spells one wrong gets the frame
+ * it would have got before the option existed rather than a black one. */
+char *rc_project_frame_recipe_opts(const RcProject *p, int64_t t, const char *opts_json);
+
 /* One clip's evaluated properties at time `t` (project time), for the
  * inspector. NULL if the clip id is unknown. */
 char *rc_project_clip_state(const RcProject *p, uint32_t clip, int64_t t);
@@ -217,7 +240,23 @@ char *rc_export_sizes(const RcProject *p, const char *preset_id, char **err_out)
  * value no reader accepts, so a key named there that nothing reads fails
  * the suite. It has to be checked, because the ignore-unknown rule is
  * exactly what makes a wrong name silent — settings that resolve, at the
- * document's size, reported ok. */
+ * document's size, reported ok.
+ *
+ * One key of the RESOLVED settings needs its meaning stated, because the
+ * obvious reading of the name is the wrong one: `alpha` is a capability of
+ * the ENCODING — "this row carries an alpha channel" — and is true for
+ * `prores_4444` and `apng`, and for nothing else. It is not "this
+ * project's canvas is translucent". `gif` is false and `apng` is true
+ * although both can show a transparent pixel: APNG has a real fourth
+ * channel and a pixel may be any fraction of opaque, while a GIF
+ * nominates ONE palette index as transparent and has no partial value to
+ * store, so a soft edge against nothing comes out hard.
+ * The settings are one flat object with the same shape for every row, so a
+ * project-derived flag would report it true on an H.264, a GIF and a WAV,
+ * none of which has anywhere to put a fourth channel; it is the same kind
+ * of fact as `audio`, which says what the CONTAINER can hold and not
+ * whether this timeline has any sound in it. A transparent canvas exported
+ * through any other row is composited onto black. */
 char *rc_export_settings(const RcProject *p, const char *preset_id, const char *overrides_json,
                          char **err_out);
 

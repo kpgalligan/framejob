@@ -1233,6 +1233,7 @@ RcProject *rc_project_apply(const RcProject *p, const char *op, char **err_out);
 int64_t rc_project_duration(const RcProject *p);
 char   *rc_project_composition_plan(const RcProject *p);              /* §7.2 */
 char   *rc_project_frame_recipe(const RcProject *p, int64_t t);       /* §7.3 */
+char   *rc_project_frame_recipe_opts(const RcProject *p, int64_t t, const char *opts_json); /* §7.3; {"burn_in_timecode": bool}, NULL = the defaults */
 char   *rc_project_clip_state(const RcProject *p, uint32_t clip, int64_t t); /* evaluated props at t, for the inspector */
 char   *rc_project_snap_candidates(const RcProject *p, const char *exclude_clips_json); /* sorted ticks: clip edges, markers */
 int64_t rc_snap_resolve(const char *candidates_json, int64_t t, int64_t threshold, bool *snapped_out);
@@ -1257,6 +1258,16 @@ draws from. Writes are typed Swift methods (`func split(clips:at:)`) that
 build the op JSON; there is no untyped call site outside `ReelCore.swift`.
 The op schema table lives in the module doc of `edit.rs` (the `adjust.rs`
 "module doc is the schema" pattern) and `ReelCore.swift` mirrors it.
+
+`rc_project_frame_recipe_opts`'s Swift half is `RecipeOptions`, a value type
+in `ReelCore.swift`, taken by `ReelProject.recipe(at:options:)` and
+`recipeJSON(at:options:)` as a defaulted argument: `.none` calls the plain
+`rc_project_frame_recipe` and every other value builds the one-key
+`opts_json`, so an un-optioned recipe stays byte-identical to the shipped one
+on this side of the boundary as well as inside the core. Nothing here decides
+what an option MEANS — the core does — and nothing on this side may fall back
+to the un-optioned export when the optioned one answers NULL, which would
+turn a mis-spelled option into a silently unchanged picture.
 
 ### 7.2 Composition plan
 
@@ -1483,6 +1494,65 @@ Asked once per frame by the compositor, and by the overlay for hit-testing.
 - The recipe is a few KB; parsing it per frame costs tens of microseconds.
   A binary form is a later optimization, not a design change.
 
+**Recipe options** (road map 2, phase 7). `rc_project_frame_recipe_opts`
+takes what a caller wanted BESIDES `t`, as `{"burn_in_timecode": bool}`, and
+`rc_project_frame_recipe` is the same implementation with the defaults, so
+an un-optioned recipe is byte for byte the one this section has always
+described. Nothing here is persisted: these are a question asked of a
+project, not a property of one, so no format version moves when an option is
+added. An option is deliberately NOT an `rc_export_settings` override —
+§7.8's override table IGNORES an unknown key so a newer UI still gets an
+export, so an option sent that way would vanish silently and the export
+would report success on a file it had not changed. An option that changes
+the PICTURE travels with the description of the picture.
+
+- **`burn_in_timecode`** appends ONE text layer — appended, so last, so
+  topmost — to the layer list at every `t`. Its `content` is the project
+  timecode at `t` through the one formatter, honouring the document's own
+  `canvas.timecode_frames`, because a burn-in and the toolbar spelling one
+  instant two ways is exactly what that formatter exists to prevent. It is a
+  text layer like any other: all twenty layer keys, all six source keys,
+  `reveal` 1.0 with a null phase and kind, a monospaced face
+  (`IBMPlexMono-Regular`), a backdrop, no wrapping width and no animation.
+  Its `clip` is 0, since it came from no clip.
+- **Its placement is a FRACTION of the canvas height with `valign: middle`,
+  not "bottom-centre"**, and reading that gap as a bug is the mistake this
+  bullet exists to prevent: a layer's `y` is the offset of the text box's
+  CENTRE (above), and by the standing rule of §5.3 and §11 the core has no
+  measured text size to subtract from a bottom edge. It is placed the way
+  the Caption preset places every caption, at a fraction of the height below
+  the centre, and the box stays symmetric about the point the core can name.
+- Two readings that are not bugs. The timecode is **non-drop**, like every
+  timecode this library formats, so a 29.97 fps burn-in reads about 3.6
+  seconds behind wall clock at one hour — that drift is the definition, and
+  the toolbar has shown it since M1; a burn-in that disagreed with the
+  toolbar would be worse. And it shows **project time, not file time**: an
+  in/out range export rebases its samples by subtracting the range start
+  while the composition time stays project time, so a range export starting
+  at 00:00:10:00 writes a file beginning at 00:00 whose first frame reads
+  00:00:10:00 — which is what a review copy should say, since the number
+  exists to name a moment back on the timeline.
+
+**How an option reaches a frame on the Swift side**, which is two paths and
+not one. `RecipeSource` — the process-wide registry the compositor reads,
+§7.6 — stores options per KEY beside the project, so `Compositor.serve` asks
+for a recipe and gets the one its instruction's key asked for, and nothing in
+the instruction, in `CompositionBuilder` or in `ExporterWriter.swift` carries a
+flag of its own. `Exporter.export` publishes them on the fresh key it mints for
+the write, which is what every frame `ExportWriter` reads back is composed
+against. **But `Exporter.renderFrame` takes them as a PARAMETER as well, and
+that is load-bearing rather than belt-and-braces**: it registers a key of its
+own, and GIF and APNG never go through `ExportWriter` at all — the ImageIO
+pipeline calls it once per frame — so an option travelling only on the
+export's key would leave every image-sequence export silently unchanged. The
+option is stored beside the project rather than folded into it because a
+document publishes a NEW handle after every edit while the ask stays the same;
+an absent entry is the defaults, so every key that never asks answers what it
+answered before options existed. **Who asks:** the export sheet, the `export`
+tool and `render_frame` (the last both for agent parity and because a script
+can photograph a burn-in no other way); the canvas eyedropper and Save Frame
+pass nothing, because each wants the picture rather than a deliverable.
+
 ### 7.4 Swift file map
 
 | File | Owns |
@@ -1496,6 +1566,8 @@ Asked once per frame by the compositor, and by the overlay for hit-testing.
 | `CaptionImporter.swift` · `CaptionLayout.swift` · `Transcriber.swift` · `CaptionExporter.swift` | captions in both directions: the SubRip grammar; the placement every producer shares (the frame grid, the overlap trim, the Caption preset, the new front-most track); on-device speech recognition and the cue builder over it; and the `.srt` / `.vtt` writer |
 | `MediaImporter.swift` | `AVURLAsset` probing (the **one** place `async`/`await` is allowed — AVFoundation's loading API is async-only going forward), thumbnails via `AVAssetImageGenerator`, peaks via `AVAssetReader` + vDSP, cache files in the package |
 | `Exporter.swift` | picks the pipeline for the core's settings — `ExportWriter` (`AVAssetReader`/`AVAssetWriter`: chapters, explicit bitrates, the loudness gain) or the ImageIO frame sequence for GIF/APNG — runs the loudness MEASUREMENT pass ahead of the write, reports progress, and renders one frame offline for `render_frame` |
+| `ExporterSettings.swift` | the resolved settings in AVFoundation's vocabulary — the time range, the fallback session preset, the file type, the UTI, the extension, `isAudioOnly` — cut out of `Exporter.swift` under the size rule when phase 7 gave `export` and `renderFrame` a `RecipeOptions` argument; `renderFrame` stayed behind because it is the app's only `copyCGImage` call and the build baseline names that warning by file |
+| `FrameWriter.swift` | a CGImage and a format in, a written file out (PNG / JPEG / HEIC) — the ONE writer File ▸ Save Frame… and `render_frame` both call, which is what makes their PNGs byte-identical by construction rather than by luck; PNG passes NIL destination properties, and JPEG flattens a transparent canvas onto black because the container has no alpha |
 | `AudioTap.swift` · `AudioDSP.swift` · `LevelMeter.swift` · `LevelMeterView.swift` | the sample-level audio the plan cannot carry: one `MTAudioProcessingTap` per composition audio track running noise reduction, the compressor and the Mix stage (the mono fold, then the pan), and the level meter's model and its one view — the model publishing a raw per-channel peak and RMS lock-free off the render thread, the view owning the ballistics |
 | `MediaPeaks.swift` · `AudioNormalize.swift` · `SilenceDetector.swift` | the waveform cache and the two questions asked of it: `MediaPeaks` is the one mapping from a plan segment's source window to peak buckets (the reversed mirror included), `AudioNormalize` turns a clip's peak into a `set_audio` op (Normalize, `normalize_clip`) and `SilenceDetector` turns peak × envelope into the quiet spans |
 | `Loudness.swift` | BS.1770-4 integrated loudness and true peak over plain float buffers — no AVFoundation, no player, no tap — plus the export gain that follows from a measurement and the 16-bit scaler that applies it |
@@ -1503,6 +1575,7 @@ Asked once per frame by the compositor, and by the overlay for hit-testing.
 | `PreviewCanvasView.swift` | `AVPlayerLayer` under a transparent overlay `NSView`; `CanvasSession` structs for move/scale/rotate/crop; handle drawing |
 | `InspectorViewController.swift` + `VideoPane` / `AudioPane` / `TextPane` / `ShapePane` / `MediaPane` / `DocumentPane` | one file per tab, descriptor-driven controls from `OptionControls.swift` |
 | `EditorViewController.swift` + `EditorViewController+<Feature>.swift` | wiring only in the base file; features in extensions (Rasterize's frozen-file rule) |
+| `ExportQueueController.swift` · `ExportQueueWindowController.swift` | the export queue (Window ▸ Export Queue): the job list and its state machine — one job at a time, on the main thread, a fresh `Exporter` each, every job holding the project handle and the media URLs as they were when it was confirmed — and a window that only reads it. The controller has no AppKit in it, so a probe compiled from `app/Sources` can run two jobs without a window; the queue edits no project, so it gets no MCP tool and `export` is already its mirror |
 | `AppDelegate.swift` · `EditorWindowController.swift` · `WelcomeWindowController.swift` · `main.swift` | menus (nil-target selectors), window, welcome |
 | `AgentServer.swift` · `AgentServer+<Feature>.swift` · `AgentCatalog.swift` | MCP mirrors of every op, plus `open_project`, `import_media`, `render_frame`. One handler file per feature area, the frozen `AgentServer.swift` keeping only the registry rows |
 | `Theme.swift` · `Controls.swift` · `OptionControls.swift` · `Sheets.swift` | copied from Rasterize |
@@ -1650,7 +1723,8 @@ WebM, AVI and VP9/AV1 are not opened (§11).
 
 Presets (`rc_export_presets`), in menu order, are ENCODINGS — a container
 and a codec, with no size of their own: `h264` H.264 (MP4), `hevc` HEVC
-(MP4), `prores_422` ProRes 422 (MOV), `audio_m4a` Audio only (M4A),
+(MP4), `prores_422` ProRes 422 (MOV), `prores_4444` ProRes 4444 (MOV),
+`audio_m4a` Audio only (M4A),
 `audio_wav` Audio only (WAV), `audio_aiff` Audio only (AIFF), `gif`
 Animated GIF, `apng` Animated PNG. The size is a separate choice whose
 default is the document's own size, so a 1440p or a vertical project does
@@ -1684,7 +1758,8 @@ concrete settings, no size override meaning the preset's cap where it has
 one and the canvas otherwise. Each preset AVFoundation can write still
 carries an `AVAssetExportSession` preset name
 (`AVAssetExportPresetHighestQuality`, `…HEVCHighestQuality`,
-`…AppleProRes422LPCM`, `…AppleM4A`) — that mapping is what names the
+`…AppleProRes422LPCM`, `…AppleProRes4444LPCM`, `…AppleM4A`) — that
+mapping is what names the
 codec and tier, and `avf_preset: null` is how a preset says AVFoundation
 cannot write it at all. Since phase 5 the field means **only** that: the
 name is a record, not an instruction, because `null` is what routes an
@@ -1712,6 +1787,44 @@ path the preset name IS the bitrate ladder, and on the writer path
 VideoToolbox's size-derived rate beats any constant the table could hold.
 Absent therefore means "the encoder decides", which is exactly what
 `ExportSettings.videoBitrate == nil` says on the Swift side.
+
+**ProRes 4444, and what `alpha` means.** One row beside `prores_422`
+(road map 2, phase 7) for the file whose next reader is another
+application rather than a viewer: a master or an intermediate — a lower
+third cut over somebody else's footage, a screencast going back into a
+compositor — where the picture has to arrive with its transparency
+intact. It shares 422's container, its colour and its
+editing-master posture (no `moov` rewrite: nothing streams a ProRes) and
+differs in exactly one thing, which is the whole reason it is a row: 422
+cannot carry alpha at any bitrate, and neither can a delivery codec —
+H.264 and HEVC have no alpha in the profiles `ExporterWriter` writes, so
+a transparent canvas exported through one of them is a picture flattened
+onto black with no way back. It sits AFTER 422 because a row's position
+is an invitation and most exports of a finished timeline want the smaller
+file. Its session name is `…AppleProRes4444LPCM` and is NON-null for the
+LPCM rows' reason: a null is the ImageIO writer's cue, and a `mov`
+handed to `ImageSequenceWriter` would be refused as an unknown image
+container.
+
+The resolved settings therefore carry **`alpha`**, and it is a
+CAPABILITY of the encoding — "this row carries an alpha channel", true
+for `prores_4444` and `apng` and nothing else — never "this project's
+canvas is translucent". The settings are one flat object with the same shape for
+every row, so a project-derived flag would report `alpha: true` on an
+H.264, a GIF and a WAV, none of which has anywhere to put a fourth
+channel; it is `audio`'s kind of fact, told `audio`'s way — what the file
+can HOLD, not what this document happens to contain. It is a per-row
+field and not a container question, which is where it differs from
+`audio`: `Container::Mov` hosts 422 and 4444 alike, so a container-level
+answer would have to be wrong for one of them. **`gif` is false and
+`apng` is true**, which is the pair that reads as a mistake and is not:
+both can show a transparent pixel, but APNG has a real fourth channel and
+a pixel may be any fraction of opaque, while a GIF nominates ONE palette
+index as transparent and has no partial value to store — so a flag saying
+yes to both would license a promise of a translucent GIF. A canvas whose background
+alpha is below 1 composites onto black in every other row, and this key
+is what lets the sheet and the `export` tool say so before the file
+exists.
 
 **WAV and AIFF.** Two uncompressed rows beside `audio_m4a`, for the file
 you hand to somebody else's tool rather than the one you send: 16-bit LPCM
@@ -1861,23 +1974,39 @@ presenting a partial transcript as the whole of what was said. `export_captions`
 or more than one, it refuses and lists the candidates by id and name — the
 posture `remove_media` and `export` already take when an answer is not
 unique — and it edits nothing, so it registers no undo step either.
-`render_frame {t, max_width?}` → PNG (the verification hook: the
-compositor renders offline through an `AVAssetImageGenerator` over the
-same composition + video composition), and
+`render_frame {t, max_width?, path?, format?, burn_in_timecode?}` → a PNG,
+JPEG or HEIC (the verification hook: the compositor renders offline through
+an `AVAssetImageGenerator` over the same composition + video composition).
+With no `path` and no `format` it writes a `.png` to a temporary file and
+ends its text `Written to <path>.` exactly as it always has, which five
+proof scripts read the path back out of; an explicit `format` wins over the
+path's own extension and the extension is REPLACED rather than appended to.
+The write is `FrameWriter`'s — the one function File ▸ Save Frame… calls
+too, which is what makes those two files byte-identical by construction
+rather than by luck, and the only way the line can be checked at all, since
+no script can press a save panel. `burn_in_timecode` is the recipe option of
+§7.3 and not an export override, and this tool is the only one that can
+photograph a burn-in, and
 `normalize_clip {clips, peak_db?}` (road map 2's phase 5 — the mirror of
 the Audio section's Normalize button and Clip ▸ Normalize; it is a
 composite the UI offers as one command, not an op, and it reports each
 clip's measured peak and the volume it wrote, with what it could not
 measure under `skipped`), and
 `export {preset, path, size?, range?, video_bitrate?, audio_bitrate?,
-loudness_lufs?, peak_dbtp?}` — the export sheet's six controls in the
-sheet's own vocabulary (all but the frame rate: the tool exports at the
-document's, or on GIF and APNG at the format's cap), so an agent export
-and a menu export can ask for the same file. Its result carries what the
-file's sound MEASURED — integrated loudness, true peak and the gain that
-was applied — for every export that has any, asked for or not, which is
-`detect_silence`'s posture applied to the writer and is what makes the
-±0.5 LU claim checkable over MCP. Handlers
+loudness_lufs?, peak_dbtp?, burn_in_timecode?}` — the export sheet's
+controls in the sheet's own vocabulary (all but the frame rate: the tool
+exports at the document's, or on GIF and APNG at the format's cap), so an
+agent export and a menu export can ask for the same file. Its result
+carries what the file's sound MEASURED — integrated loudness, true peak and
+the gain that was applied — for every export that has any, asked for or
+not, which is `detect_silence`'s posture applied to the writer and is what
+makes the ±0.5 LU claim checkable over MCP.
+`burn_in_timecode` is the one argument of the nine that is not a setting:
+it is a recipe option (§7.3), travelling beside the resolved settings rather
+than inside them, because the override table ignores a key it does not
+know — an option posted that way would vanish without a word and the tool
+would report success on an un-burnt file. The result echoes it back for the
+same reason. Handlers
 use `performGroupedEdit` so off-event edits get their own undo group
 (Rasterize's `AgentServer.performGroupedEdit`). Default port 4817; env
 `RC_AGENT_PORT`; launch flag `-AgentServerEnabled YES`.
@@ -1907,14 +2036,16 @@ concern is a new module with its own `impl Project` block.
 | `actions.rs` | evaluation and interpolation, `clip_state(clip, t)`, and `clamp_video`, the last line of defence §5.4 describes. §5.4's LIST rule is stated here once and applies to every array of objects in the schema (`video.filters`, `video.obscure`), neither of which carries a line of its own code; the widened discriminant set is confined to list ENTRIES, so `video.spotlight`'s animation is what it has always been. `clamp_video` also carries the one bound that is not a range — a NEST clip's evaluated `blend` is forced to `normal` (format version 6) — because `set_action_end` validates nothing beyond "is it an object", and closing it in the evaluator closes the recipe, `clip_state` and both export writers at once, which no per-op check can |
 | `transition.rs` | overlap detection, the overlap rule, progress at *t* |
 | `evaluate.rs` | `composition_plan()` (A/B assignment, instruction tiling) and the `assign()` the recipe shares with it |
-| `recipe.rs` | `frame_recipe(t)`: the layer list at one instant — like every walk over what plays, it consumes `nest.rs`'s instances. Also where a `text.animation` becomes a NUMBER: the `reveal`, its phase and its kind (§7.3), computed here so everything that draws reads one description, and folded into the layer's content hash so a per-frame picture cannot be served a stale texture |
+| `recipe.rs` | `frame_recipe(t)`: the layer list at one instant — like every walk over what plays, it consumes `nest.rs`'s instances — and the keys of each layer in it, `blend` included. `content_hash` and the FNV under it stay here and are `pub(crate)`: a SHAPE layer hashes its description through the same function, so the hash is the recipe's texture-cache primitive rather than a text concern. Phase 7 added `RecipeOptions` (what a caller wanted besides `t`; `frame_recipe(t)` is `frame_recipe_opts(t, defaults)`, one implementation so the two cannot drift) and `RecipeLayer`, the twenty layer keys written in ONE place — the burn-in is a second producer of layers, and a copied skeleton would drift silently, since `RecipeLayer.init(from:)` defaults a missing key with no diagnostic |
+| `recipe_text.rs` | what a text layer SHOWS at one instant: the `reveal`, its phase and its kind (§7.3), computed in the core so everything that draws reads one description, folded into the layer's content hash so a per-frame picture cannot be served a stale texture, and assembled into the layer's `source` object by `text_source`. Cut out of `recipe.rs` under the size rule (road map 2, phase 7) and re-exported by it, so `crate::recipe::text_source` still resolves, and cut HERE because placement is the same question for every layer while text is the one kind that is not finished when its placement is — the model can only state an intent (§5.3, §11), and an ANIMATED intent is not even fixed. `text_source` takes a description, a clip time and a duration and nothing else — no clip, no instance — so a text layer the core synthesizes is a text layer like any other. The cut paid for itself at once: `burn_in_layer`, the timecode layer `burn_in_timecode` appends, is here, with no animation (so `Reveal::WHOLE`), a fraction-of-the-height placement rather than a bottom anchor, and the non-drop and project-time readings §7.3 records |
 | `nest.rs` | flattening a nest: the walk that turns a nest clip into the clips it stands for, and the transform they inherit |
 | `audio.rs` | envelopes: fades, volume actions, ducking, mute and solo — solo judged per container (the timeline, or a nest's own tracks) in `Voice::of` against that container's track set, never in the plan |
 | `snap.rs` | candidates and `resolve` |
 | `format.rs` | `RC_FORMAT_VERSION`, the `MAX_*` reader caps (`RC_MAX_*` in the header), read-any-version / write-current |
-| `export.rs` | presets (one per encoding) and settings resolution |
-| `export_overrides.rs` | how an override value is READ and REFUSED, where `export.rs` is the table and the resolution: `describe`, the overrides object itself, and the readers for a positive integer, a boolean, a rate, a range and a decibel figure, each refusing with a message naming the key and the value. Cut out of `export.rs` under the size rule (road map 2, phase 5) and cut THERE for `props_check.rs`'s reason — how a value is spelled is a fact about the vocabulary, not about the resolution. `describe` was never an export function (five edit modules import it for their own messages), so `export.rs` re-exports it under the old path |
+| `export.rs` | settings resolution: `Project::export_settings`, the one thing that reads a canvas, a duration, a rate and an override and meets a preset row against them. Still the file whose module doc explains the whole export design, and it re-exports `preset` / `presets` (beside `describe`) at their old paths |
+| `export_overrides.rs` | how an override value is READ and REFUSED, where `export_table.rs` is the table and `export.rs` the resolution: `describe`, the overrides object itself, and the readers for a positive integer, a boolean, a rate, a range and a decibel figure, each refusing with a message naming the key and the value. Cut out of `export.rs` under the size rule (road map 2, phase 5) and cut THERE for `props_check.rs`'s reason — how a value is spelled is a fact about the vocabulary, not about the resolution. `describe` was never an export function (five edit modules import it for their own messages), so `export.rs` re-exports it under the old path |
 | `export_size.rs` | `export_sizes(preset)`: the Size popup's rows — the document's size, an image format's cap, the standard sizes fitted to the document's aspect by the short-edge rule — and `fit_within`, the rule for what a size means on an image format, which `export_settings` applies too |
+| `export_table.rs` | the rows themselves — the `Container` enum with the four questions a container answers about ITSELF (extension, UTI, whether a leading index is worth rewriting, whether it can hold sound at all), `Preset`, the `PRESETS` set one row per encoding in menu order, and the `preset(id)` lookup both resolvers share. Cut out of `export.rs` under the size rule (road map 2, phase 7 — the second cut that file has paid, after `export_overrides.rs`) and cut HERE because everything in it is a constant no project can influence, where `export_settings` is the only half handed a `&self`; `export.rs` re-exports both functions, so `crate::export::presets()` and `crate::export::preset(id)` resolve as they did |
 | `agent.rs` | MCP server (copied) |
 | `ffi.rs` / `ffi_edit.rs` / `ffi_query.rs` / `ffi_agent.rs` / `ffi_util.rs` | thin shims; `ffi_util` holds `catch_unwind` + `err_out` + CString helpers (copy Rasterize's) |
 
@@ -2021,6 +2152,7 @@ a clean `make lint` before finishing Rust work.
 | ⇧⌘R | Rename the selected clip — an inline field over its name strip |
 | ⌥⌘V | Paste Attributes — the copied clip's look onto the selection |
 | ⌘E | Export… |
+| ⌥⌘E | Save Frame… — the frame under the playhead as a PNG, JPEG or HEIC still (road map 2's phase 7a). Export…'s still-image sibling, under the same letter |
 | ⌥⌘I | Toggle inspector |
 | `,` / `.` (⇧ ×10) | Nudge the selection one frame |
 | ⌥-drag clip | Duplicate |
@@ -2040,7 +2172,6 @@ a key, nothing more.
 
 | Keys | Action | Phase |
 |---|---|---|
-| ⌥⌘E | Save Frame… | 7 |
 | ⇧⌘P | Preview Window | 8 |
 | ⌘↓ / ⌘↑ | Open / close nest | 9 |
 
@@ -2049,7 +2180,15 @@ Add Media…, Import Captions… (M3), Generate Captions… and Export
 Captions… (road map 2's phase 4 — the three caption items sit
 together, in the order a caption track comes into being and leaves again,
 and none of them takes a key equivalent), Consolidate Media… (M3),
-Export…),
+Export…, Save Frame… (road map 2's phase 7a — the frame under the playhead
+written as a PNG, JPEG or HEIC still, at ⌥⌘E because it is Export…'s
+still-image sibling and belongs under the same letter; the format is chosen
+in the save panel's own accessory view rather than in a sheet, and the panel
+says which of the three keeps the canvas's alpha, because phase 7b makes a
+transparent canvas reachable and JPEG cannot carry one — it flattens onto
+black. One writer serves the menu item and `render_frame` alike
+(`FrameWriter.swift`), which is what makes the two produce the same bytes for
+one frame rather than merely being meant to)),
 Edit (Undo, Redo, Cut, Copy, Paste, Paste Attributes, Duplicate, Delete,
 Ripple Delete, Insert at Playhead, Overwrite at Playhead, Select All,
 Select After Playhead, Select All on Track), Clip (Split, Trim Start, Trim
@@ -2069,7 +2208,14 @@ key equivalent, Rename…, Label ▸ (the six colours and None),
 Nest, Un-nest), Track (New Track,
 Remove Track, Remove Empty Tracks, Hide/Mute/Lock/Solo), Mark (Add Marker,
 Set In, Set Out, Clear Range, Next/Previous Marker), View (Zoom, Fit,
-Snapping, Safe Areas, Inspector, Timeline Track Height), Window, Help.
+Snapping, Safe Areas, Inspector, Timeline Track Height), Window (Minimize,
+Zoom, Export Queue — road map 2's phase 7e, the export sheet's Add to Queue
+button's other end, with no key equivalent because §9's "proposed, not yet
+bound" table claims no row for it and every bare letter belongs to the
+editor's own `keyDown`; the queue's window sets
+`isExcludedFromWindowsMenu`, since this menu is `NSApp.windowsMenu` and
+AppKit would otherwise list it a second time under its own title — Bring All
+to Front), Help.
 All menu items are nil-target selectors validated in
 `validateUserInterfaceItem`.
 

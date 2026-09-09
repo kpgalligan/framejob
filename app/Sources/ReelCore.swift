@@ -56,6 +56,51 @@ extension Fps {
     }
 }
 
+// MARK: - Recipe options
+
+/// What a caller wants of a frame recipe BESIDES the time — the Swift side
+/// of `rc_project_frame_recipe_opts` and of the core's `RecipeOptions`
+/// (spec §7.3, road map 2's phase 7).
+///
+/// **Why an option lives here and not in the export overrides.** It changes
+/// the PICTURE, so it travels with the description of the picture. The
+/// override table (`export_overrides.rs`) ignores a key it does not know, on
+/// purpose, so a newer UI still gets an export — which means an option posted
+/// that way would vanish without a word and the export would report success
+/// on a file it had not changed.
+///
+/// Nothing here is persisted. These are a question asked of a project, not a
+/// property of one, so no format version moves when an option is added.
+///
+/// The default is every option OFF, and that is load-bearing: `none` takes
+/// the plain `rc_project_frame_recipe` path, so a caller that says nothing
+/// gets byte for byte the recipe it got before this type existed.
+struct RecipeOptions: Equatable {
+    /// Append a text layer showing the project timecode at `t` — last in the
+    /// layer list, so topmost. The core builds it (`recipe_text.rs`); this
+    /// side only asks.
+    var burnInTimecode: Bool = false
+
+    /// Every option off: the recipe as it has always been.
+    static let none = RecipeOptions()
+
+    /// The core's `opts_json`, or nil for "ask the un-optioned export".
+    ///
+    /// Spelled by hand rather than encoded. There is one key and it is a
+    /// bool, a recipe is asked for once per composed frame, and
+    /// `JSONSerialization` would allocate a dictionary and a `Data` for a
+    /// twenty-five-byte constant. The key name is written once, here, and is
+    /// the only place in the app that has to match the header's
+    /// `{"burn_in_timecode": bool}`.
+    ///
+    /// A nil is not a failure — it is the argument `rc_project_frame_recipe`
+    /// itself passes, and the core documents the two exports as one
+    /// implementation.
+    var json: String? {
+        burnInTimecode ? "{\"burn_in_timecode\":true}" : nil
+    }
+}
+
 // MARK: - The project handle
 
 /// Owning Swift wrapper around an `RcProject *`. Immutable: nothing here
@@ -155,14 +200,42 @@ final class ReelProject {
     /// The frame recipe at project time `t`: the back-to-front layer list
     /// with every property already evaluated through actions. Asked once per
     /// composed frame and by the canvas overlay for hit-testing.
-    func recipe(at t: Ticks) -> FrameRecipe? {
-        recipeJSON(at: t).flatMap { ReelJSON.decode(FrameRecipe.self, from: $0) }
+    ///
+    /// `options` is what the caller wants BESIDES the time (`RecipeOptions`);
+    /// its default asks exactly what this method asked before phase 7.
+    func recipe(at t: Ticks, options: RecipeOptions = .none) -> FrameRecipe? {
+        recipeJSON(at: t, options: options)
+            .flatMap { ReelJSON.decode(FrameRecipe.self, from: $0) }
     }
 
     /// The same recipe as raw JSON, for the agent's `render_frame` reply and
     /// for debugging a composited frame.
-    func recipeJSON(at t: Ticks) -> String? {
-        takeString(rc_project_frame_recipe(ptr, t))
+    ///
+    /// **Why there are two exports and this picks between them.** The core
+    /// documents `rc_project_frame_recipe` as `rc_project_frame_recipe_opts`
+    /// with the defaults — one implementation, so the two cannot drift — and
+    /// this takes the plain one when there is nothing to ask, because then
+    /// the un-optioned path stays byte-identical to the shipped one BY
+    /// CONSTRUCTION rather than by a core test alone, and no string is built
+    /// per composed frame.
+    ///
+    /// **What a nil means, and what it does not.** The query exports carry no
+    /// `err_out` — a query has nothing to report but its answer — so an
+    /// `opts_json` the core cannot parse comes back as NULL, indistinguishable
+    /// from a NULL project. That is not a hazard this side can reach: the
+    /// string comes from `RecipeOptions.json`, which is a constant, so it is
+    /// always parseable. A nil here therefore keeps the meaning it has always
+    /// had — the core had nothing to say — and every caller already handles
+    /// it: `Compositor` renders the canvas background (a frame past the end
+    /// takes the same path) and `render_frame` refuses. Do NOT add a
+    /// fallback to the un-optioned export for a nil: it would turn a
+    /// mis-spelled option into a silently un-burnt frame, which is the exact
+    /// failure this whole option travels through the recipe to avoid.
+    func recipeJSON(at t: Ticks, options: RecipeOptions = .none) -> String? {
+        guard let opts = options.json else {
+            return takeString(rc_project_frame_recipe(ptr, t))
+        }
+        return takeString(rc_project_frame_recipe_opts(ptr, t, opts))
     }
 
     /// One clip's evaluated properties at project time `t`, for the
@@ -385,6 +458,28 @@ struct ExportSettings: Decodable, Equatable {
     /// script's "no ceiling but full scale", and `ExportLoudness.resolve`
     /// supplies 0 dBTP for it.
     let peakDbtp: Double?
+    /// Whether this ENCODING carries an alpha channel — true for
+    /// `prores_4444` and `apng`, and for nothing else the table offers.
+    ///
+    /// The two rows are not alike and the second one is the one to remember:
+    /// `gif` is FALSE though a GIF can show a transparent pixel, because one
+    /// palette index is not a channel and nothing partial survives it, where
+    /// APNG carries a real fourth channel (`export_table.rs`'s field doc is
+    /// where that argument lives, and the header repeats it). A reader who
+    /// takes this for `prores_4444` alone reads the export sheet's footnote
+    /// and the Document tab's note as bugs — which is what the phase's own
+    /// review found this sentence doing.
+    ///
+    /// **It is a capability of the row, NOT a statement about the project**,
+    /// and the obvious reading of the name is the wrong one. `export_settings`
+    /// resolves one flat object for every row alike, so a flag derived from
+    /// the canvas background would report `alpha: true` on an H.264, a GIF
+    /// and a WAV, none of which can hold one. It follows `audio`'s own
+    /// precedent in `export_table.rs`: "a fact about the CONTAINER rather
+    /// than a decision about the project". A translucent canvas is a
+    /// separate, orthogonal fact, and what this answers is whether the file
+    /// would keep it.
+    let alpha: Bool
 
     /// Spelled out rather than synthesized because two keys do not follow
     /// from the property names: the core nests the resolved range under
@@ -399,12 +494,23 @@ struct ExportSettings: Decodable, Equatable {
     /// `peak_dbtp` convert to `loudnessLufs` and `peakDbtp` on their own.
     /// They are listed for the reason every other well-behaved key is —
     /// a `CodingKeys` enum is exhaustive, and a case left out is a field
-    /// that silently decodes as nil.
+    /// that silently decodes as nil. `alpha` (phase 7) is the newest of
+    /// those, and it decodes as FALSE when left out, which would have read
+    /// as "no row can carry alpha" — a defect that looks like a working
+    /// build.
+    ///
+    /// **Two keys the core emits are still absent, deliberately: `audio` and
+    /// `video`.** Nothing decodes them, so adding cases would add two stored
+    /// properties no reader consults; `isAudioOnly` answers the same question
+    /// from `avPreset` and the container and predates both. `alpha` is the
+    /// first of the three anything actually reads, which is why it is the
+    /// only one here. A future reader of `audio` or `video` adds the case —
+    /// it does not infer the answer from this list's silence.
     private enum CodingKeys: String, CodingKey {
         case preset, container, codec, width, height, fps, range
         case avPreset = "avfPreset"
         case fileType, optimizeForNetwork, videoBitrate, audioBitrate
-        case loudnessLufs, peakDbtp
+        case loudnessLufs, peakDbtp, alpha
     }
 
     private enum RangeKeys: String, CodingKey {
@@ -429,6 +535,15 @@ struct ExportSettings: Decodable, Equatable {
         audioBitrate = c.lenient(.audioBitrate)
         loudnessLufs = c.lenient(.loudnessLufs)
         peakDbtp = c.lenient(.peakDbtp)
+        // False is the safe default: only `prores_4444` and `apng` answer
+        // true, and a core that predates phase 7 does not emit the key at
+        // all. Its silence UNDER-reports — that core has no `prores_4444`
+        // row to describe, but its `apng` row wrote alpha then as it does
+        // now — and under-reporting is the direction that cannot hurt: this
+        // key only ADDS the footnote's "alpha" and ARMS
+        // `ExportWriter.checkAlphaSurvivesTheSize`, so false promises less
+        // than the file holds where true would promise more.
+        alpha = c.lenient(.alpha, false)
     }
 
     var renderSize: CGSize { CGSize(width: width, height: height) }
@@ -1972,12 +2087,24 @@ extension ActionPatch {
 /// own serial queue while the main thread publishes edits. The published
 /// value itself needs no protection: a `ReelProject` handle is read-only
 /// once published, and an edit produces a NEW handle rather than mutating
-/// the old one, so a recipe in flight stays coherent.
+/// the old one, so a recipe in flight stays coherent. `RecipeOptions` is a
+/// value type of two words, so the same sentence covers it.
 final class RecipeSource {
     static let shared = RecipeSource()
 
     private let lock = NSLock()
     private var projects: [Int: ReelProject] = [:]
+    /// What each key wants of its recipes besides the time (phase 7).
+    ///
+    /// **Keyed the same way as the project and stored SEPARATELY from it, on
+    /// purpose.** Options describe the ASK, not the project: a document
+    /// republishes a new handle after every edit, and an export or an
+    /// offline frame that asked for a burn-in must keep getting one across
+    /// that. An absent entry is `RecipeOptions.none`, so a key nobody set
+    /// options on answers exactly what it answered before this dictionary
+    /// existed — which is every key in the app but the ones `Exporter` mints
+    /// for an export and for an offline frame.
+    private var options: [Int: RecipeOptions] = [:]
     private var nextKey = 1
 
     private init() {}
@@ -1999,6 +2126,10 @@ final class RecipeSource {
         lock.lock()
         defer { lock.unlock() }
         projects.removeValue(forKey: key)
+        // The options go with the slot, never before it: `set(nil, for:)`
+        // deliberately leaves them, because a key with no project published
+        // right now is still the same ask.
+        options.removeValue(forKey: key)
     }
 
     /// Publishes the project the compositor should read from now. Called on
@@ -2013,15 +2144,50 @@ final class RecipeSource {
         }
     }
 
-    /// The recipe at `t` for one document. Deliberately does NOT hold the
-    /// lock across the FFI call and the JSON decode — only across the
-    /// dictionary read — so a slow frame never blocks the main thread's
-    /// next publish.
+    /// What `key` wants of its recipes. `RecipeOptions.none` for a key that
+    /// never set any, which is every document's.
+    ///
+    /// Published by whoever owns the key and read on the compositor's queue,
+    /// like the project beside it — and NOT main-thread-only, because
+    /// `Exporter.renderFrame` mints a key, publishes to it and renders on
+    /// whatever thread it was called on (its own doc says off the main one).
+    /// The lock is what covers that, exactly as it already does for `set`.
+    func setOptions(_ newOptions: RecipeOptions, for key: Int) {
+        lock.lock()
+        defer { lock.unlock() }
+        // Store nothing for the default, so the dictionary holds only the
+        // keys that are actually asking for something and "absent means
+        // none" stays a fact rather than a convention.
+        if newOptions == .none {
+            options.removeValue(forKey: key)
+        } else {
+            options[key] = newOptions
+        }
+    }
+
+    /// The options published under `key`, for a caller that has to carry
+    /// them somewhere the compositor cannot reach — an image-sequence write
+    /// renders each frame through a key of its own.
+    func options(for key: Int) -> RecipeOptions {
+        lock.lock()
+        defer { lock.unlock() }
+        return options[key] ?? .none
+    }
+
+    /// The recipe at `t` for one document, WITH whatever that key asked for.
+    ///
+    /// The project and the options are read under ONE hold, which is what
+    /// makes "this key's options" true of the answer rather than of some
+    /// instant near it — and is why the compositor asks for a recipe rather
+    /// than for the two halves. It deliberately does NOT hold the lock
+    /// across the FFI call and the JSON decode — only across the dictionary
+    /// reads — so a slow frame never blocks the main thread's next publish.
     func recipe(for key: Int, at t: Ticks) -> FrameRecipe? {
         lock.lock()
         let project = projects[key]
+        let asked = options[key] ?? .none
         lock.unlock()
-        return project?.recipe(at: t)
+        return project?.recipe(at: t, options: asked)
     }
 
     /// The handle published under `key`, for the mirrors that sit beside this

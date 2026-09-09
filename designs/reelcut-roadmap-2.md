@@ -178,7 +178,7 @@ copies, and the orchestrator is the only one who does.
 | 4 | Words | 2 | v5 | **done** 2026-09-08 (`8ec3be5`) |
 | 5 | Sound | 1–2 | — | **done** 2026-09-08 (`65d43ae`) |
 | 6 | Looks | 1–2 | v6 | **done** 2026-09-08 (`d2f7767`) |
-| 7 | Output | 1–2 | — | not started |
+| 7 | Output | 1–2 | — | **done** 2026-09-09 (`PENDING`) |
 | 8 | Viewing and finding | 1 | — | not started |
 | 9 | Inside the nest | 2 | — | not started |
 
@@ -2606,6 +2606,209 @@ the field this phase adds to it**
   the same resolved settings JSON.
 - Two queued jobs produce files identical to two single exports.
 
+**What landed.** All five parts, with NO project-schema change (version 6
+stands), NO new op (`OP_NAMES` is still 55) and NO new tool (the catalog is
+still **73**) — the first phase whose whole surface is new ARGUMENTS on
+tools that already existed, which is why phase 6's `TOOLS = 73` assertion
+needed no edit. One new FFI export, three files that paid the size rule
+first, and **170 new checks** (169 at the landing; the adversarial review
+added one).
+
+**Three cuts before a line of feature code**, and phase 6's lesson about
+budgeting them against the pessimistic number held: `recipe.rs` 600 → 381
+with its text machinery in a new `core/src/recipe_text.rs` (456 with the
+burn-in in it); `export.rs` 579 → 222 with its table in a new
+`core/src/export_table.rs` (509); and `ExportSheetController.swift`
+1114 → 450 into `ExportSheetOptions.swift`, `ExportSheetResolve.swift` and
+`ExportProgressSheetController.swift`. All three were PURE MOVES, landed
+and gated alone — 436 tests, 0 typecheck errors, the same four warnings —
+so anything that moved afterwards is attributable. Two more files paid it
+mid-phase without being asked: `Exporter.swift`, which was AT 600, gave up
+`ExporterSettings.swift` (127) before taking its `RecipeOptions` argument,
+and `ExportSheetController.swift` gave up `ExportSheetPresets.swift` (242)
+when the preset row would have put it 150 over.
+
+**Save Frame (7a)** is File ▸ Save Frame… ⌥⌘E, and the shape is the point:
+`app/Sources/FrameWriter.swift` is a value type — **a CGImage and a format
+in, a written URL out**, with no panel, no document and no AppKit view in
+it — that BOTH the panel and `render_frame` call. That is what makes "Save
+Frame's PNG is byte-identical to `render_frame`'s" true by construction
+rather than by luck, and construction is the only thing that can carry it:
+a save panel cannot be driven over MCP or put up offscreen, so the road
+map's proof line above is unreachable as a MEASUREMENT and stays so — the
+move made it true, not testable. Say that plainly wherever the proof is
+described, because "Save Frame ≡ `render_frame`" as a section title reads
+as a comparison somebody ran. What the scripts do reach is
+`render_frame`'s two SPELLINGS writing byte-identical files
+(`phase7_proof.py` section 2) and `FrameWriter` called directly on a
+synthetic card (`phase7_chrome.py` section 2); neither touches
+`renderAndWriteFrame`, which is private. PNG keeps a NIL properties dictionary; **JPEG flattens onto BLACK**
+at quality 0.9, deliberately and out loud, because 7b makes a transparent
+canvas reachable in this very phase; HEIC is `UTType.heic` (`public.heif` is
+not registered here). `render_frame` gained `path`, `format` and
+`burn_in_timecode`, and `replaceableExtensions` gained `png`, `jpg`, `jpeg`,
+`heic` and **`gif`** — the last fixing a pre-existing bug where
+`export {path: "x.gif", preset: "apng"}` wrote `x.gif.png`.
+
+**ProRes 4444 (7b)** is a `prores_4444` row and an `alpha` key in the
+resolved settings, and TWO of the road map's sentences about it were wrong.
+"`alpha: true` whenever the canvas background's alpha is below 1" would put
+`alpha: true` on an H.264, a GIF and a WAV, because `export_settings` emits
+one flat object for every row — so **`alpha` is a per-row CAPABILITY**,
+"this encoding carries an alpha channel", on `audio`'s own precedent ("a
+fact about the CONTAINER rather than a decision about the project"). And
+"the Document tab's background well gains an alpha slider" describes work
+that was already shipped: `NSColorPanel.shared.showsAlpha` is set app-wide,
+the swatch draws a checkerboard and `DocumentPane.colorName` already printed
+"Transparent", so a person could set a transparent canvas before this phase
+began. What landed instead is a conditional NOTE in the Document tab, which
+appears only when the background goes translucent and names the rows that
+can keep it. **No Swift writer change was needed at all** —
+`codecType(for:)` already mapped the codec and the reader already asked for
+32BGRA — which a spike established before any model code, along with the
+half nobody had checked: that alpha survives
+`AVAssetReaderVideoCompositionOutput` with a custom compositor, which is the
+path the exporter actually uses.
+
+Two things about `alpha` were found by MEASURING rather than reasoning, and
+both changed the code. **`apng` carries alpha too** — it was written
+`false`, and an APNG of a transparent canvas decodes `pix_fmt=rgba` with its
+corner at alpha 0 — while `gif` stays false although a GIF can also show a
+transparent pixel: APNG has a real fourth channel and a pixel may be any
+fraction of opaque, a GIF nominates ONE palette index and has no partial
+value to store, so a flag saying yes to both would license the sheet to
+promise a translucent GIF. And **a ProRes 4444 export at a PADDED size wrote
+INVERTED alpha** — a 320 × 180 transparent canvas at 240 × 240 came back
+with the picture at alpha 0 and the letterbox bars at alpha 255 — while any
+same-aspect resize, up or down, is correct at every pixel. So
+`ExportWriter.checkAlphaSurvivesTheSize` REFUSES the aspect change by name
+rather than writing a file that is silently wrong in the one respect the row
+exists for; only a hand-typed Custom size can reach it, since every row of
+the Size popup is already fitted to the document's aspect. The other alpha
+row needs no guard and must not grow one: `apng` takes the ImageIO path,
+which FITS instead of padding (240 × 240 asked of a 16∶9 canvas writes
+240 × 135).
+
+**The burn-in (7c)** is a RECIPE option, never an export override —
+`export_overrides.rs` ignores an unknown key silently, so one sent through
+`rc_export_settings` would vanish and the tool would report success on an
+un-burnt file. It travels three ways, and the third is not belt-and-braces:
+the new FFI export `rc_project_frame_recipe_opts`, per-KEY options on
+`RecipeSource`, **and a parameter on `Exporter.renderFrame`** — because GIF
+and APNG never go through `ExportWriter` at all (`ImageSequenceWriter`
+calls `renderFrame` per frame, registering its own key), so plumbing the
+option only through the export's key would leave every image-sequence export
+silently un-burnt. The layer is appended LAST (topmost) so an un-optioned
+`frame_recipe` is byte-identical by construction; it emits all twenty layer
+keys and all six source keys through a factored `RecipeLayer` skeleton that
+`Project::layer` now shares, and the refactor was proved byte-identical
+against a `git worktree` at pre-cut HEAD over eleven ticks of a project
+carrying transitions, an animated text clip, a gradient, an action and a
+nest. Three readings are correct and are stated where a reviewer would
+otherwise file them as bugs: the placement is a FRACTION of canvas height
+(0.44) with `valign: middle`, not a bottom margin, because the core stores
+no measured text size and by standing rule never will; the timecode is
+NON-DROP, so a 29.97 burn-in reads about 3.6 s behind wall clock at an hour,
+which is the definition the toolbar already displays; and it shows PROJECT
+time on an in/out range export, so a range starting at 00:00:10:00 writes a
+file that begins at 00:00 carrying a burn-in reading 00:00:10:00 — which is
+what a review copy should do.
+
+**Remembered settings and presets (7d)**, and the road map's central claim
+here could not be built. It says user presets are "a name → overrides map …
+resolved by the core's `export_settings` like any overrides, so the core
+never learns about them". The ENCODING is not an override — `rc_export_settings`
+takes the preset id as a separate argument and `export_overrides.rs` has no
+`preset` key and would drop one silently — and a resolved map cannot RESTORE
+the sheet, because the Quality popup stores a bits-per-pixel TIER and derives
+a bitrate at pick time while the Size popup stores a ROW ID: given back
+`{width: 1920, height: 1080, video_bitrate: 8000000}` the sheet cannot tell
+"1080p + High" from "Custom 1920 × 1080 + a typed rate", and re-applying an
+absolute bitrate on a differently sized document silently changes what "High"
+meant. **So a stored preset is the CONTROL CHOICES**, resolved through the
+sheet's existing `overrides()`; the half of the sentence that stands is that
+the core never learns about them, and `rc_export_settings` is untouched. The
+restore ORDER is load-bearing and is the phase's most breakable app code: the
+format is selected BEFORE `rebuildSizes()` (a programmatic `selectItem` sends
+no action, so `formatChanged`'s guard will not fire), the size AFTER it (that
+call ends with an unconditional `selectItem(at: 0)`) and by `ExportSize.id`
+never an index, "Custom…" is chosen before the loudness field is filled, and
+a remembered `in_out` degrades to "Whole project" on a document with no range.
+
+**The queue (7e)** runs one job at a time from the MAIN thread with a FRESH
+`Exporter` per job — a chain, not a pool, because `Exporter.export` is
+main-thread-only and its run-loop timer must die on the thread that scheduled
+it; the proof's `all-at-once` mutant showed the alternative, leaving job 1
+orphaned in `.running` for ever, so **two concurrent `Exporter`s deadlock**.
+`mediaURLs()` is captured AT ENQUEUE, because it resolves bookmarks and hits
+the filesystem at call time and resolving at run would pick up a Relink… the
+person did afterwards. `ExportQueueController` has **no AppKit in it** and
+that is the design, not an accident: a queue window cannot be photographed
+offscreen or driven over MCP, and adding a tool purely so a proof could exist
+would be the proof deciding the product's API — so the controller is drivable
+by a probe and the window is a pure reader. It gets **no MCP mirror** and the
+doc says so in three places: the rule is that every user-visible EDIT gets
+one, a queue edits no project, and an agent calling `export` N times in
+sequence already has the capability.
+
+**Measured.** `make test` **456** (436 before — `core/tests/recipe.rs` 15 new
+and `core/tests/export.rs` 30 → 35), `make lint` and `cargo fmt --check`
+clean, `make typecheck` 0 errors and the same 4 AVFoundation warnings,
+`make app` building, the catalog at **73 tools**, `OP_NAMES` at 55, no
+`RC_FORMAT_VERSION` move, and the startup parity log EMPTY on every launch.
+The phase's own scripts are `tools/proof/phase7_proof.py` over MCP at
+**92/92** and `tools/proof/phase7_chrome.py` offscreen at **78/78** (77 at
+the landing; the adversarial review added one check and repaired another that
+could not fail), and
+phases 1–6 all prove unchanged against the final binary: 66/66, 85/85,
+121/121, 8/8, 84/84, 88/88, 167/167 over MCP and 26/26, 33/33, 59/59, 81/81,
+70/70 offscreen — `phase5_chrome.py`'s cross-build comparison among them,
+which names phase 7 by name and is scoped to the timeline bar this phase
+never touched.
+
+**Mutation-tested to twenty-four mutants across the two scripts** — nine for
+the MCP half, fifteen for the probe half — each a build of its own with the
+app RELAUNCHED between them, and every mutant checked for actually mutating
+before it was believed. Four results were worth more than the kills. A
+`recipe_text.rs` given a hard-coded pixel `y` drew correctly on the 360-tall
+fixture and at 0.646 of the frame on the 720-tall one, which is the whole
+argument for rendering the burn-in section at TWO canvas heights. A
+`FrameWriter` whose ADD call was handed `[:]` instead of `nil` SURVIVED, and
+the finding is that it is a no-op on this OS: an empty dictionary and no
+dictionary write byte-identical PNGs here (same sha256, same 5330 bytes, same
+chunk list, across two processes), so no BYTE comparison could catch a
+violation — while `[kCGImagePropertyDPIWidth: 144]` is caught by its `pHYs`
+chunk. The rule stays `nil` as a forward-looking guard rather than as an
+observation, because the next ImageIO owes us nothing, and the one assertion
+that CAN see the difference is structural rather than pixel:
+`phase7_chrome.py` reads `Format.destinationProperties != nil` and asserts
+`[False, True, True]`. Say it that way in all four places — the review found
+the stronger claim ("ImageIO writes different bytes for an empty dictionary")
+still standing in `app/CLAUDE.md` and inside both proof scripts' own check
+text, after `FrameWriter.swift` itself had already been corrected. A queue mutant that deleted the cancelled
+job's `removeItem` SURVIVED, because `AVAssetWriter.cancelWriting()` already
+removes its own part-file, so the check is worded as the OUTCOME and the
+comment now says defence in depth rather than claiming a guarantee it does
+not provide. And the probe's own driving found **a latent crash**:
+`ExportWriter.cancel` reaching `reader.cancelReading()` before
+`reader.startReading()` raises an uncaught exception that kills the process,
+and the window is real because `Exporter.startWriting` calls
+`progressHandler` between publishing the pipeline and starting it. No person
+can reach it — a Cancel button is its own event — but the queue is a
+programmatic driver and the next one will be too, so `cancel` is guarded on
+`started` and `start` now honours a cancel that arrived before it.
+
+Worth knowing, all measured: two ProRes 4444 exports of one unchanged project
+differ in exactly SIX bytes when they land in different seconds (the movie
+header's time fields, one-second resolution) and are identical within one
+second, while H.264 is not byte-deterministic at all — which is why the
+proof's byte claims are made over APNG; ffmpeg's ProRes decode reports the
+compositor's PREMULTIPLIED values as straight while ImageIO un-premultiplies
+PNG and APNG, so a colour comparison between the two formats is only safe
+where alpha is 255; and AppKit BLANKS a duplicate key equivalent within one
+menu, so a Save Frame on a bare ⌘E beside Export…'s would silently have no
+shortcut at all rather than shadowing it.
+
 ---
 
 ### Phase 8 — Viewing and finding
@@ -2712,19 +2915,21 @@ handle, `AgentServer+Arguments.swift`, `AgentServer+Project.swift`, catalog.
 Checked against spec §9 for conflicts; a phase that binds one promotes its
 row into §9.
 
-Phases 1, 2 and 3's rows have been promoted into spec §9's bound table and
-are struck from this one; what is left is what is still only a claim on a
-key. Phase 3 took `Z` — bare, to arm and disarm the canvas region mode,
+Phases 1, 2, 3 and 7's rows have been promoted into spec §9's bound table
+and are struck from this one; what is left is what is still only a claim on
+a key. Phase 3 took `Z` — bare, to arm and disarm the canvas region mode,
 with ⇧Z still Fit Timeline. Phase 4 took NO key: its three commands are
 File-menu items, and a modifier-less menu key is resolved ahead of the
 first responder, so one would steal a letter the editor's own `keyDown`
 owns. Phase 5 took no key either, for the same reason and one more: §9's
 table below claims no row for it, and its one new command duplicates a pane
-button that is already the everyday path.
+button that is already the everyday path. Phase 6 took none. Phase 7 took
+⌥⌘E for File ▸ Save Frame… — Export…'s letter under a second modifier —
+and its row went into §9 and out of here; Window ▸ Export Queue and the
+export sheet's own new controls take no key at all.
 
 | Keys | Action | Phase |
 |---|---|---|
-| ⌥⌘E | Save Frame… | 7 |
 | ⇧⌘P | Preview Window | 8 |
 | ⌘↓ / ⌘↑ | Open / close nest | 9 |
 
@@ -2762,8 +2967,13 @@ key equivalent, for the reason phases 4 and 5 record: every bare letter
 belongs to the editor's own `keyDown`, and a modifier-less menu key is
 resolved ahead of the first responder.
 
-Still to come: Clip gains Open / Close Nest; File gains Save Frame…; View
-gains Preview Quality ▸ and Preview Window; Window gains Export Queue.
+**Landed in phase 7**: File ▸ Save Frame… (⌥⌘E), directly under Export… with
+no separator between them because a still and a movie are the same command
+asked of two containers; and Window ▸ Export Queue, with no key equivalent
+and `isExcludedFromWindowsMenu` set on its window, or AppKit lists it twice.
+
+Still to come: Clip gains Open / Close Nest; View gains Preview Quality ▸ and
+Preview Window.
 
 ## 4. Considered and left out
 

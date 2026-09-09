@@ -212,13 +212,15 @@ enum FFmpegRewrap {
     /// intact — media is *referenced*, not copied into the document — and the
     /// converted file behaves like any other referenced media: move it and the
     /// Media tab badges it missing and offers Relink…
+    ///
+    /// The two path components were spelled here, privately, until road map
+    /// 2's phase 7 needed the same folder for `ExportPresets.json`. They are
+    /// `AppSupport`'s now — one home for `~/Library/Application
+    /// Support/Reelcut/`, which is where the argument above still lives; this
+    /// only names the subfolder. The directory itself is still created by
+    /// `convert`, at the moment there is something to put in it.
     static var rewrapDirectory: URL? {
-        guard let support = try? FileManager.default.url(
-            for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil,
-            create: true)
-        else { return nil }
-        return support.appendingPathComponent("Reelcut", isDirectory: true)
-            .appendingPathComponent("Rewrapped", isDirectory: true)
+        AppSupport.subdirectory("Rewrapped")
     }
 
     /// The converted file's name for `source`: the source's own stem, so the

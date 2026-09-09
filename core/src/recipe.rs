@@ -24,23 +24,43 @@
 //!
 //! ### A text animation becomes a number here
 //!
-//! `text.animation` (spec §5.2) says what the animation IS; this file turns
-//! it into what is showing NOW — a `reveal` in 0..1, a `reveal_phase` and a
-//! `reveal_kind` — because everything that draws a frame reads this one
-//! description and nothing else, so preview, `render_frame` and an export
-//! cannot disagree about it. See [`Reveal`], and [`text_hash`] for why the
-//! layer's content hash has to cover the answer.
+//! `text.animation` (spec §5.2) says what the animation IS; the recipe
+//! turns it into what is showing NOW — a `reveal` in 0..1, a
+//! `reveal_phase` and a `reveal_kind` — because everything that draws a
+//! frame reads this one description and nothing else, so preview,
+//! `render_frame` and an export cannot disagree about it. The arithmetic
+//! is [`crate::recipe_text`]'s, a file away under the size rule; what
+//! stays here is the layer it lands in and the `content_hash` it folds
+//! into.
+//!
+//! ### A recipe can be asked for more than the instant
+//!
+//! [`RecipeOptions`] is what a caller wanted BESIDES `t`, and road map 2's
+//! phase 7 gave it its first member: a timecode burn-in. The option is
+//! served here rather than by the renderer for the reason above read once
+//! more — a burnt frame and a previewed one must be one description — and
+//! the layer it adds is APPENDED, so [`Project::frame_recipe`] with no
+//! options is byte-for-byte the recipe this file emitted before the
+//! argument existed.
 
 use serde_json::{Map, Value};
 
 use crate::actions::Evaluated;
 use crate::evaluate::{json, number, Assignment};
-use crate::model::{
-    BlendMode, Clip, Project, Source, TextAnimation, TextAnimationKind, TransitionKind,
-};
+use crate::model::{BlendMode, Clip, Project, Source, TransitionKind, VideoProps};
 use crate::nest::{Frame, Instance};
+use crate::recipe_text::burn_in_layer;
 use crate::time::Ticks;
 use crate::transition;
+
+/// The text layer's own arithmetic — [`Reveal`], the `text_hash` that
+/// folds it into the cache key, and the [`text_source`] that assembles a
+/// text layer's `source` object — lives in `recipe_text.rs` and is
+/// re-exported here, so `crate::recipe::text_source` resolves as though
+/// the cut had not happened. See that module's doc for the seam: placement
+/// is the same question for every layer, and text is the one kind that is
+/// not finished when its placement is.
+pub(crate) use crate::recipe_text::text_source;
 
 /// FNV-1a, 64-bit. A CACHE KEY, not a security digest: Swift keys its
 /// rendered text and shape textures by this hex string, so all that is
@@ -64,191 +84,153 @@ fn fnv1a(bytes: &[u8]) -> u64 {
 /// serialized `Value` is what makes it canonical: `serde_json` writes an
 /// object's keys in one fixed order, so two clips with identical text
 /// always hash the same and share one texture.
-fn content_hash(description: &Value) -> String {
+pub(crate) fn content_hash(description: &Value) -> String {
     format!("{:016x}", fnv1a(description.to_string().as_bytes()))
 }
 
-/// How much of a text layer is showing at one instant, and which half of
-/// its animation is showing it (spec §5.2's `text.animation`, §7.3).
+// ---- what a caller asked for -------------------------------------------
+
+/// What a recipe was asked for BESIDES the instant (spec §7.3, §7.9's
+/// `rc_project_frame_recipe_opts`).
 ///
-/// The core decides this and the platform only draws it, which is the whole
-/// reason it is computed here: preview, `render_frame` and both export
-/// writers read ONE recipe, so they cannot disagree about how far a reveal
-/// has got. It is derived from an animation, a clip time and a duration and
-/// from nothing else — no clip, no instance — so a layer the core
-/// synthesizes rather than reads off a clip can simply not have one.
-#[derive(Debug, Clone, Copy)]
-struct Reveal {
-    /// 0 (nothing showing) through 1 (all of it), the un-reveal folded in.
-    amount: f64,
-    /// `"in"` while the arrival is what is holding the amount back, `"out"`
-    /// once the departure is, and `None` for a layer with no animation at
-    /// all — whose amount is always 1. A TENT is the exception and
-    /// [`Reveal::of`] argues it: a clip too short to complete its arrival
-    /// keeps one word for its whole life.
-    ///
-    /// The word is not decoration: one number cannot say whether a
-    /// typewriter is typing or un-typing, and a line rise falls rather than
-    /// rises on the way out. `transition`'s `role` is the same idea one
-    /// function away, and adding this later would be a change to a shipped
-    /// recipe key rather than a new one.
-    phase: Option<&'static str>,
-    /// Which of the three reveals this is, or `None` for a layer with no
-    /// animation.
-    ///
-    /// It is carried because the description no longer is: the recipe
-    /// strips `animation` out of the text it hands over (see
-    /// [`Project::layer_source`]), so this is the renderer's ONLY word for
-    /// which drawing routine to run — each kind is a different routine, not
-    /// a parameter of a shared one. Carried by NAME, as the schema spells
-    /// it, so the recipe never depends on the enum's declaration order.
-    kind: Option<TextAnimationKind>,
+/// One member today — the timecode burn-in of road map 2's phase 7 — and a
+/// struct rather than a `bool` argument because the next one (a safe-area
+/// guide, a watermark, an overlay of the plan's segment boundaries) would
+/// otherwise be a second FFI signature and a third. One struct behind one
+/// `opts_json` string is the shape the header already uses for
+/// `rc_export_settings`' `overrides_json`.
+///
+/// **It is deliberately NOT an export override.** `export_overrides.rs`
+/// IGNORES an unknown key so a newer UI still gets an export, so an option
+/// posted through `rc_export_settings` would vanish silently and the
+/// `export` tool would report success on an un-burnt file. An option that
+/// changes the PICTURE has to travel with the thing that describes the
+/// picture.
+///
+/// Nothing here persists. These are a question asked of a project, not a
+/// property of one, so no format version moves when a member is added —
+/// which is the same reason the export overrides are not in the schema
+/// either.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct RecipeOptions {
+    /// Draw the project timecode at `t` over everything else.
+    pub burn_in_timecode: bool,
 }
 
-impl Reveal {
-    /// A layer with no animation: all of it, all of the time.
-    const WHOLE: Reveal = Reveal {
-        amount: 1.0,
-        phase: None,
-        kind: None,
-    };
-
-    /// The reveal `clip_t` ticks into a clip that is `duration` long.
+impl RecipeOptions {
+    /// The options a JSON value asks for. An absent key, a key of the wrong
+    /// type and a document that is not an object at all all mean OFF.
     ///
-    /// Both halves are measured against the CLIP's own duration, never the
-    /// instance's visible span — the rule [`Project::layer`] already states
-    /// for clip time. A nest clip's edge therefore cuts a nested caption off
-    /// mid-reveal instead of making it un-reveal early, and the two halves
-    /// of one animation are measured on one clock rather than two.
+    /// It is read by hand rather than derived, and that is the whole point.
+    /// A `#[serde(default)]` derive would make `{"burn_in_timecode": "yes"}`
+    /// an `Err`, and there is nowhere on this path to put the message: the
+    /// query exports carry no `err_out` (`ffi_query.rs`'s module doc says
+    /// why), so the only two answers available are a recipe and NULL, and
+    /// NULL at frame rate is a black preview. OFF is the picture the caller
+    /// would have got before the option existed, which is the failure
+    /// direction the rest of this file already fails in — `number()` turning
+    /// a non-finite value into 0, `Reveal`'s ramp failing toward SHOWING the
+    /// text.
     ///
-    /// The two ramps are combined with `min`, so `in + out > duration`
-    /// degrades rather than refusing: the reveal becomes a tent that never
-    /// reaches 1, stays inside 0..1 and simply shows a short clip a partial
-    /// reveal. Nothing here refuses, and nothing clamps the animation to
-    /// fit — a range check is a fact about the vocabulary
-    /// (`props_check.rs`), while "these two numbers are too big for THIS
-    /// clip" is a fact about a clip, which a later trim could invalidate
-    /// anyway.
-    ///
-    /// A tent keeps ONE phase for its whole life, and that is the second
-    /// half of the same argument: the phase is what the renderer staggers
-    /// by, so the instant the word turns is an instant the picture mirrors,
-    /// and a tent has no instant where mirroring is invisible. The `plateau`
-    /// comment below has it in full.
-    fn of(animation: Option<&TextAnimation>, clip_t: Ticks, duration: Ticks) -> Reveal {
-        let animation = match animation {
-            Some(animation) => animation,
-            None => return Reveal::WHOLE,
-        };
-        let arriving = ramp(clip_t, animation.r#in);
-        // The departure is measured back from the clip's EXCLUSIVE end, so
-        // it reaches 0 one frame past the last frame anybody draws: the
-        // last frame of an un-revealing clip still shows a sliver, which is
-        // right — the clip is gone on the next one.
-        let leaving = ramp(duration.saturating_sub(clip_t), animation.out);
-
-        // The phase is not a label on the amount: it is the ORDER the
-        // renderer staggers by. `LayerRenderers.staggerIndex` counts a
-        // word_fade's words and a line_rise's lines from the other end while
-        // a layer is leaving, so that the first word in is the first word
-        // out. The word turning therefore MIRRORS the picture end for end,
-        // and the only amount at which that is invisible is 1, where every
-        // item is whole whichever end the stagger counted from.
-        //
-        // The two ramps meet at 1 only when the animation fits — when there
-        // is a plateau between them, `in + out <= duration`. A TENT has
-        // none: its ramps cross below 1, and turning the word at that peak
-        // would swap a four-word cue's alphas from [1, 1, .83, .33] to
-        // [.33, .83, 1, 1] between two consecutive frames whose amount did
-        // not change at all. So a tent — which D-C7 lets degrade rather than
-        // refuse — un-arrives the way it arrived, keeping the phase it began
-        // in. That is the arrival's, unless the arrival is instant, which
-        // makes the clip nothing but a departure and gives it no order to
-        // contradict.
-        let plateau = animation.r#in.saturating_add(animation.out) <= duration;
-        let departing = if plateau {
-            // A tie is the arrival's: it covers the whole middle of a clip
-            // that is fully revealed and not yet leaving, and the first
-            // instant of an out phase, which is on the plateau and draws the
-            // same picture either way.
-            leaving < arriving
-        } else {
-            animation.r#in <= 0
-        };
-
-        Reveal {
-            amount: arriving.min(leaving),
-            phase: Some(if departing { "out" } else { "in" }),
-            kind: Some(animation.kind),
+    /// A mistyped option is still refused BY NAME, one layer up: the MCP
+    /// handler reads it through `AgentServer+Arguments.swift`'s throwing
+    /// `boolArg`, which has a caller to tell. This is the layer that has
+    /// nobody.
+    pub fn of(value: &Value) -> RecipeOptions {
+        RecipeOptions {
+            burn_in_timecode: value
+                .get("burn_in_timecode")
+                .and_then(Value::as_bool)
+                .unwrap_or(false),
         }
     }
 }
 
-/// One phase's progress: how far `elapsed` has got through `over`, bounded
-/// to 0..1.
+// ---- one layer ----------------------------------------------------------
+
+/// The TWENTY keys of a recipe layer (spec §7.3), and the one place they are
+/// written.
 ///
-/// A phase of zero length is complete from the start rather than a division
-/// by zero, and so is a NEGATIVE one — which only an action end patch or a
-/// hand-written file can produce, since `set_action_end` is deliberately
-/// lenient and `clamp_video` does not touch text. This is where an absurd
-/// value is caught, because this is where it is consumed.
-fn ramp(elapsed: Ticks, over: Ticks) -> f64 {
-    if over <= 0 {
-        return 1.0;
-    }
-    let progress = elapsed.max(0) as f64 / over as f64;
-    // Both sides are integers, so today this cannot be anything but finite.
-    // The guard is one comparison and it fails toward SHOWING the text,
-    // where `number()` would turn a non-finite amount into 0.0 and show
-    // none of it.
-    if progress.is_finite() {
-        progress.clamp(0.0, 1.0)
-    } else {
-        1.0
-    }
+/// It is a struct rather than twenty lines inside [`Project::layer`] because
+/// phase 7 gave the recipe a SECOND producer of layers — the burn-in
+/// [`crate::recipe_text::burn_in_layer`] synthesizes, which belongs to no
+/// clip — and a second literal copy of a twenty-key object is a copy that
+/// drifts. It would drift SILENTLY, which is the part worth stating:
+/// `ProjectSnapshot.swift`'s `RecipeLayer.init(from:)` reads every key
+/// leniently and DEFAULTS a missing one with no diagnostic anywhere, so a
+/// layer that forgot `blend` or `obscure` renders wrong rather than failing.
+/// Adding a key here is the whole change; both producers get it.
+///
+/// The fields are what the two producers genuinely differ about. Everything
+/// else is derived: the per-pixel groups all come off `video`, and the
+/// placement and `clip_rect` both come off `placed`, because
+/// [`Frame::place`] carries the rectangle through unchanged.
+pub(crate) struct RecipeLayer<'a> {
+    /// The clip that DRAWS — which for a nested layer is not a clip on the
+    /// timeline, and is [`crate::recipe_text::BURN_IN_CLIP`] for a layer
+    /// that came from no clip at all.
+    pub clip: u32,
+    pub source: Value,
+    pub source_size: Value,
+    /// Where crop, corner radius, the colour controls, the filters, the
+    /// reflection, the spotlight and the obscured regions are read from.
+    /// They are in SOURCE pixels or are per-pixel maths, so a nest's
+    /// transform does not touch them: only the placement is folded.
+    pub video: &'a VideoProps,
+    /// The placement after every nest above this layer has been folded in —
+    /// `x`, `y`, `scale`, `rotation`, `opacity`, and the `clip_rect` the
+    /// innermost nest imposed.
+    pub placed: Frame,
+    /// Passed rather than read off `video`, because this is the one property
+    /// the recipe OVERRIDES: see [`Project::layer`], which forces `normal`
+    /// under a transition.
+    pub blend: BlendMode,
+    pub transition: Value,
 }
 
-/// The cache key for a text layer: its description, and the reveal when
-/// there is one.
-///
-/// The reveal changes the PIXELS, and this hash is the only thing standing
-/// between a per-frame value and a stale texture — Swift caches a rendered
-/// paragraph under `"text:" + hash` and consults nothing else — so a frame
-/// at one reveal must not be able to collide with the same text at another.
-/// A reveal that changed the picture without changing the key would render
-/// correctly in a single `render_frame` and freeze during playback, with no
-/// error anywhere.
-///
-/// All THREE computed keys go in, not just the amount: a word fade and a
-/// typewriter half done are two different pictures of the same text, and so
-/// are a half-arrived and a half-departed line rise.
-///
-/// A layer with NO animation hashes the bare description, byte for byte as
-/// it did before format version 5, so no shipped project's texture cache
-/// behaves differently after this phase. An ANIMATED layer keeps its own
-/// key even at amount 1: whether a full reveal draws exactly what no
-/// animation draws is the renderer's promise, and a cache key must not lean
-/// on one.
-fn text_hash(description: &Value, reveal: &Reveal) -> String {
-    match reveal.phase {
-        None => content_hash(description),
-        Some(phase) => {
-            let mut keyed = Map::new();
-            keyed.insert("text".to_string(), description.clone());
-            keyed.insert("reveal".to_string(), number(reveal.amount));
-            keyed.insert("reveal_phase".to_string(), Value::from(phase));
-            keyed.insert("reveal_kind".to_string(), reveal_kind(reveal));
-            content_hash(&Value::Object(keyed))
-        }
-    }
-}
-
-/// The reveal's kind as the recipe carries it: the schema's own spelling of
-/// the variant, or `null` for a layer with no animation.
-fn reveal_kind(reveal: &Reveal) -> Value {
-    match reveal.kind {
-        Some(kind) => json(&kind),
-        None => Value::Null,
+impl RecipeLayer<'_> {
+    /// The layer as the recipe publishes it.
+    ///
+    /// The insertions below follow the order spec §7.3 lists the keys in,
+    /// for a reader; the ORDER ON THE WIRE is not this one and does not
+    /// depend on it. `serde_json`'s `Map` is a `BTreeMap` in this build, so
+    /// every object comes out sorted by key — which is the property
+    /// [`content_hash`] already leans on ("`serde_json` writes an object's
+    /// keys in one fixed order"), and it means a key inserted in the wrong
+    /// place here is a readability bug and not a wire change.
+    pub(crate) fn object(self) -> Value {
+        let video = self.video;
+        let mut out = Map::new();
+        out.insert("clip".to_string(), Value::from(self.clip));
+        out.insert("source".to_string(), self.source);
+        out.insert("source_size".to_string(), self.source_size);
+        out.insert("crop".to_string(), json(&video.crop));
+        out.insert("x".to_string(), number(self.placed.x));
+        out.insert("y".to_string(), number(self.placed.y));
+        out.insert("scale".to_string(), number(self.placed.scale));
+        out.insert("rotation".to_string(), number(self.placed.rotation));
+        out.insert("opacity".to_string(), number(self.placed.opacity));
+        out.insert("blend".to_string(), json(&self.blend));
+        out.insert("corner_radius".to_string(), number(video.corner_radius));
+        out.insert("shadow".to_string(), json(&video.shadow));
+        out.insert("color".to_string(), json(&video.color));
+        out.insert("chroma".to_string(), json(&video.chroma));
+        out.insert("filters".to_string(), json(&video.filters));
+        out.insert("reflection".to_string(), json(&video.reflection));
+        out.insert("spotlight".to_string(), json(&video.spotlight));
+        out.insert("obscure".to_string(), json(&video.obscure));
+        // The rotated canvas rectangle this layer is clipped to, or null.
+        // Only a layer out of a nest has one — the nest's own canvas rect,
+        // in the place the nest clip put it.
+        out.insert(
+            "clip_rect".to_string(),
+            match self.placed.clip_rect {
+                Some(rect) => json(&rect),
+                None => Value::Null,
+            },
+        );
+        out.insert("transition".to_string(), self.transition);
+        Value::Object(out)
     }
 }
 
@@ -272,14 +254,37 @@ impl Project {
     /// Total: `t` may be negative or past the end, and either simply
     /// produces no layers.
     pub fn frame_recipe(&self, t: Ticks) -> Value {
+        self.frame_recipe_opts(t, RecipeOptions::default())
+    }
+
+    /// [`Project::frame_recipe`] with the caller's [`RecipeOptions`].
+    ///
+    /// There is ONE implementation and `frame_recipe` is a call to it with
+    /// the default options, so the two cannot drift: a key added to a layer
+    /// for one caller is in the other's recipe by construction. That matters
+    /// more here than it usually would, because the un-optioned answer is
+    /// what preview, the overlay's hit-test and every earlier phase's proof
+    /// PNG are built on, and a second copy of this fold is exactly how one
+    /// of them starts drawing a different frame from the other.
+    ///
+    /// The burn-in is APPENDED, last, so it is topmost — a timecode under
+    /// the picture is a timecode nobody can read, and appending is also what
+    /// makes the un-optioned recipe byte-for-byte what it was before the
+    /// argument existed. `core/tests/recipe.rs` asserts both halves: the
+    /// bytes with the option off, and that dropping the last layer of a
+    /// burnt recipe gives back the plain one exactly.
+    pub fn frame_recipe_opts(&self, t: Ticks, opts: RecipeOptions) -> Value {
         let assignment = self.assign();
 
-        let layers: Vec<Value> = self
+        let mut layers: Vec<Value> = self
             .drawing_instances()
             .into_iter()
             .filter(|i| i.covers(t))
             .map(|instance| self.layer(&instance, t, &assignment))
             .collect();
+        if opts.burn_in_timecode {
+            layers.push(burn_in_layer(&self.canvas, t));
+        }
 
         let mut canvas = Map::new();
         canvas.insert("width".to_string(), Value::from(self.canvas.width));
@@ -326,22 +331,10 @@ impl Project {
             None => Value::Null,
         };
 
-        let mut out = Map::new();
-        out.insert("clip".to_string(), Value::from(instance.clip.id));
-        out.insert("source".to_string(), source);
-        out.insert("source_size".to_string(), source_size);
-        // Crop, corner radius, the colour controls, the filters, the
-        // reflection, the spotlight and the obscured regions are all in
-        // SOURCE pixels or are per-pixel maths, so a nest's transform does
-        // not touch them: only the placement is folded.
-        out.insert("crop".to_string(), json(&video.crop));
-        out.insert("x".to_string(), number(placed.x));
-        out.insert("y".to_string(), number(placed.y));
-        out.insert("scale".to_string(), number(placed.scale));
-        out.insert("rotation".to_string(), number(placed.rotation));
-        out.insert("opacity".to_string(), number(placed.opacity));
         // How this layer combines with what is already on the canvas
-        // (format version 6) — and the ONE place that answer is overridden.
+        // (format version 6) — and the ONE place that answer is overridden,
+        // which is why [`RecipeLayer`] takes it rather than reading it off
+        // the props.
         //
         // A transition forces `normal`. The outgoing half of a dissolve
         // carries a weight correction that is the exact algebraic inverse of
@@ -363,34 +356,22 @@ impl Project {
         // MODEL's value through `clip_state`**, so during an overlap the
         // popup says `multiply` while the frame composites `normal`. Both
         // are honest — the clip multiplies, and this frame does not.
-        out.insert(
-            "blend".to_string(),
-            if transition.is_null() {
-                json(&video.blend)
-            } else {
-                json(&BlendMode::Normal)
-            },
-        );
-        out.insert("corner_radius".to_string(), number(video.corner_radius));
-        out.insert("shadow".to_string(), json(&video.shadow));
-        out.insert("color".to_string(), json(&video.color));
-        out.insert("chroma".to_string(), json(&video.chroma));
-        out.insert("filters".to_string(), json(&video.filters));
-        out.insert("reflection".to_string(), json(&video.reflection));
-        out.insert("spotlight".to_string(), json(&video.spotlight));
-        out.insert("obscure".to_string(), json(&video.obscure));
-        // The rotated canvas rectangle this layer is clipped to, or null.
-        // Only a layer out of a nest has one — the nest's own canvas rect,
-        // in the place the nest clip put it.
-        out.insert(
-            "clip_rect".to_string(),
-            match frame.clip_rect {
-                Some(rect) => json(&rect),
-                None => Value::Null,
-            },
-        );
-        out.insert("transition".to_string(), transition);
-        Value::Object(out)
+        let blend = if transition.is_null() {
+            video.blend
+        } else {
+            BlendMode::Normal
+        };
+
+        RecipeLayer {
+            clip: instance.clip.id,
+            source,
+            source_size,
+            video,
+            placed,
+            blend,
+            transition,
+        }
+        .object()
     }
 
     /// The transform every nest clip above this instance composes to, at
@@ -526,53 +507,9 @@ impl Project {
                 // A text clip with no description is malformed rather than
                 // impossible; the defaults keep the recipe renderable.
                 let text = evaluated.text.clone().unwrap_or_default();
-                let reveal = Reveal::of(text.animation.as_ref(), clip_t, clip.duration);
-                let mut description = json(&text);
-                // The animation is STRIPPED from the description carried
-                // here: the computed reveal below is the only account of it
-                // a renderer gets. Left in, it would be a second one — and
-                // the wrong one, since nothing downstream has the clip time
-                // to evaluate it against. Removing it also keeps an
-                // unanimated clip's hash byte-identical to what it was
-                // before format version 5. The inspector reads the
-                // animation FIELD through `clip_state`; this description is
-                // what draws.
-                if let Some(map) = description.as_object_mut() {
-                    map.remove("animation");
-                }
-                let mut source = Map::new();
-                source.insert("kind".to_string(), Value::from("text"));
-                source.insert(
-                    "hash".to_string(),
-                    Value::from(text_hash(&description, &reveal)),
-                );
-                source.insert("text".to_string(), description);
-                // The three computed keys ride INSIDE the source object,
-                // where the kind-specific description already lives, and
-                // all three are emitted on every text layer whether it
-                // animates or not: an absent key would mean two things — no
-                // animation here, or an older core that never computed one
-                // — which is the argument `obscure` settled one layer up. A
-                // layer-level key instead would put a null on every layer
-                // that can never carry one.
-                //
-                // Together they are the WHOLE of what a renderer is told
-                // about the animation: which routine (`reveal_kind`), how
-                // far (`reveal`), and which way (`reveal_phase`). The two
-                // nulls always travel together — no kind means no phase
-                // means an amount of 1.
-                source.insert("reveal".to_string(), number(reveal.amount));
-                source.insert(
-                    "reveal_phase".to_string(),
-                    match reveal.phase {
-                        Some(phase) => Value::from(phase),
-                        None => Value::Null,
-                    },
-                );
-                source.insert("reveal_kind".to_string(), reveal_kind(&reveal));
                 // Only the platform can lay text out, so the model has no
                 // size to report (spec §5.3, §11).
-                (Value::Object(source), Value::Null)
+                (text_source(&text, clip_t, clip.duration), Value::Null)
             }
             Source::Shape => {
                 let shape = evaluated.shape.clone().unwrap_or_default();

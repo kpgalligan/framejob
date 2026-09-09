@@ -111,16 +111,35 @@ normative: §5.2 is the project schema, §6 the op table, §7 the architecture.
   radial, up to eight stops, at any angle. And a filter can be
   **animated**: an action's end state carries the filter stack, so a blur
   can ramp up across a clip like any other property.
+- **Output.** **File ▸ Save Frame…** (⌥⌘E) writes the frame under the
+  playhead as a PNG, JPEG or HEIC still — the same writer `render_frame`
+  uses, so a still saved from the menu and one an agent asked for are the
+  same file. PNG and HEIC keep the canvas's alpha; JPEG cannot, so it
+  flattens onto black and the panel says so as you pick the format.
+  **ProRes 4444** exports a real alpha channel, which is what a transparent
+  canvas is for: set the background's opacity in the Document tab and the
+  note there names the rows that can keep it (ProRes 4444 and APNG; a GIF
+  can only be transparent or not, with nothing in between). **Burn in
+  timecode** draws the document's own timecode over the picture, in the
+  document's own spelling, on an export or a rendered frame — and it reads
+  PROJECT time even in a file written from the in/out range, which is the
+  number a note about that frame needs. The export sheet **remembers what
+  you last chose** and saves **named presets** of it — a preset is the row
+  of controls you picked, not the numbers they resolved to, so one saved on
+  a 1080p document exports 4K at the right rate when you apply it to a 4K
+  one. And **Window ▸ Export Queue** lines exports up and runs them one at a
+  time: a queued job holds the timeline as it was when you confirmed it, so
+  you can keep editing, undo, or close the document while it writes.
 - **Playback** over an `AVComposition` built from the core's composition plan,
   with a Metal compositor drawing every frame from the core's frame recipe.
   A property-only edit re-renders the paused frame without rebuilding the
   player (the plan JSON is compared as a string).
 - **Export** through an `AVAssetWriter` over the same composition, the
-  format (H.264, HEVC, ProRes 422, M4A, WAV, AIFF, GIF, APNG) and the size
-  chosen separately and both resolved by the core — the default size is the
-  document's own, or for a GIF or APNG the format's cap fitted to it — and
-  an optional loudness target over it, plus an offline single-frame render
-  used for verification.
+  format (H.264, HEVC, ProRes 422, ProRes 4444, M4A, WAV, AIFF, GIF, APNG)
+  and the size chosen separately and both resolved by the core — the default
+  size is the document's own, or for a GIF or APNG the format's cap fitted to
+  it — and an optional loudness target and timecode burn-in over it, plus an
+  offline single-frame render used for verification and by File ▸ Save Frame….
 - **MCP agent** (below): one tool per edit op, plus open/new/save/read,
   import, playhead, frame render and export.
 
@@ -132,12 +151,14 @@ volume/fade/duck/detach, freeze frame, speed, the in/out range and the agent —
 and **M2 and M3 are now done too**: chapters on export, nests, filters,
 reflection, spotlight, reverse, the audio DSP, GIF/APNG export, SRT captions,
 Consolidate Media and ffmpeg-assisted import. Beyond the spec,
-`designs/reelcut-roadmap-2.md`'s phases 0 through 6 have landed — the
+`designs/reelcut-roadmap-2.md`'s phases 0 through 7 have landed — the
 groundwork, the cutting moves, clip identity, the screencast trio, captions
 in both directions with the built-in text animations, sound (the mono fold,
 a level meter, Normalize Clip, loudness on export and the two uncompressed
-audio formats), and now looks: blend modes, gradient fills, the two
-background commands and filters as animation targets.
+audio formats), looks (blend modes, gradient fills, the two background
+commands and filters as animation targets), and now output: Save Frame…,
+ProRes 4444 with a real alpha channel, the timecode burn-in, remembered and
+named export settings, and the export queue.
 `CLAUDE.md` carries the milestone record and `designs/reelcut-roadmap.md`
 what still needs a person at the machine.
 
@@ -178,7 +199,9 @@ Makefile              Build orchestration
 | `MediaImporter.swift` | `AVURLAsset` probing (the one file allowed `async`/`await`), thumbnails, waveform peaks |
 | `CompositionBuilder.swift` · `Compositor.swift` · `LayerRenderers.swift` · `LayerRenderersText.swift` · `Playback.swift` | plan → `AVComposition`; the `AVVideoCompositing` Metal pipeline — five states from three fragment functions, one of them reading the destination so a layer can blend; text/shape/image textures, a shape's gradient and the three text reveals the recipe asks for; the player and its rebuild-vs-refresh rule |
 | `CaptionImporter.swift` · `CaptionLayout.swift` · `Transcriber.swift` · `CaptionExporter.swift` | captions in and out: the SubRip grammar, the placement every producer shares, on-device speech recognition and the cue builder over it, and the `.srt` / `.vtt` writer |
-| `Exporter.swift` · `ExportSheetController.swift` · `ExporterWriter.swift` | writing a file — two passes wherever it holds sound, the first measuring loudness — and rendering one frame offline |
+| `Exporter.swift` · `ExporterSettings.swift` · `ExporterWriter.swift` · `ExportSheetController.swift` (with `ExportSheetOptions` `ExportSheetResolve` `ExportSheetPresets` `ExportProgressSheetController`) | writing a file — two passes wherever it holds sound, the first measuring loudness — and rendering one frame offline; the sheet's controls, the resolution behind them and the progress sheet |
+| `FrameWriter.swift` · `EditorViewController+SaveFrame.swift` | one composed frame to a PNG, JPEG or HEIC — a value type with no AppKit in it, called by File ▸ Save Frame… and by `render_frame` alike — and the panel that picks the URL |
+| `ExportPresetsStore.swift` · `ExportQueueController.swift` · `ExportQueueWindowController.swift` · `AppSupport.swift` | the last export choice and the named presets as a value, the queue (one job at a time, each holding the timeline as it was enqueued) and its window, and the one spelling of `~/Library/Application Support/Reelcut/` |
 | `AudioTap.swift` · `AudioDSP.swift` · `LevelMeter.swift` · `LevelMeterView.swift` | the sample-level audio the plan cannot carry (noise reduction, the compressor, the mono fold, the pan) and the level meter's model and its one view |
 | `MediaPeaks.swift` · `AudioNormalize.swift` · `SilenceDetector.swift` | the waveform cache and the two questions asked of it: a clip's own peak (Normalize) and peak × envelope (the quiet spans) |
 | `Loudness.swift` | BS.1770-4 integrated loudness and true peak, the export gain that follows, and the 16-bit scaler that applies it |
@@ -272,8 +295,8 @@ here.
 | `set_range {start?, end?}` | the in/out range (I / O / ⌥X); no bounds clears it |
 | `set_selection {clips?}` | the timeline selection (a click); no clips clears it |
 | `undo` · `redo` | one step each (⌘Z / ⇧⌘Z), reporting the step's name |
-| `render_frame {t, max_width?}` | **the verification hook** |
-| `export {preset, path, size?, range?, video_bitrate?, audio_bitrate?, loudness_lufs?, peak_dbtp?}` | writes a file and waits for it; `preset` is the encoding, `size` a Size-popup row (`document`, `1080p`, …) or `[width, height]`, default the document's size (a GIF or APNG's cap); `range: "in_out"` scopes it to the in/out range; the bitrates are the sheet's Quality popup in bits per second; `loudness_lufs` normalises the whole mix by one gain to that integrated target and `peak_dbtp` is the ceiling that gain is capped against (a ceiling with no target is refused — there would be nothing to cap). The result reports what the file's sound MEASURED, asked for or not |
+| `render_frame {t, max_width?, path?, format?, burn_in_timecode?}` | **the verification hook**. With neither `path` nor `format` it writes a PNG to a temporary file, exactly the call it always was. `format` is `png`, `jpeg` or `heic` and WINS over the path's extension, which is replaced rather than appended to (`{path: "shot.jpg", format: "png"}` writes `shot.png`); `png` and `heic` keep the canvas's alpha and `jpeg` flattens onto black. It is the same writer File ▸ Save Frame… uses, so a still from the menu and one from here are byte-identical. `burn_in_timecode` draws the document's timecode over the picture — the only way a burn-in can be photographed |
+| `export {preset, path, size?, range?, video_bitrate?, audio_bitrate?, loudness_lufs?, peak_dbtp?, burn_in_timecode?}` | writes a file and waits for it; `preset` is the encoding, `size` a Size-popup row (`document`, `1080p`, …) or `[width, height]`, default the document's size (a GIF or APNG's cap); `range: "in_out"` scopes it to the in/out range; the bitrates are the sheet's Quality popup in bits per second; `loudness_lufs` normalises the whole mix by one gain to that integrated target and `peak_dbtp` is the ceiling that gain is capped against (a ceiling with no target is refused — there would be nothing to cap). `burn_in_timecode` draws the document's own timecode over every frame (the export sheet's checkbox), showing PROJECT time even in a file written from the in/out range. The result reports what the file's sound MEASURED, asked for or not, and echoes the burn-in either way |
 
 `set_range`, `set_selection`, `undo` and `redo` exist so that spec §10's own
 verifications —

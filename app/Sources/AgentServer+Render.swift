@@ -1,5 +1,4 @@
 import AppKit
-import ImageIO
 import UniformTypeIdentifiers
 
 /// The agent's two output tools: `render_frame`, the verification hook the
@@ -21,9 +20,33 @@ extension AgentServer {
     /// file would contain at `t` rather than a second opinion about it
     /// (`Exporter.renderFrame`, spec §7.9).
     ///
-    /// The PNG comes back BOTH ways: base64 in an MCP image block, so a model
-    /// can look at the frame, and as a file on disk whose path the result
+    /// The frame comes back BOTH ways: base64 in an MCP image block, so a
+    /// model can look at it, and as a file on disk whose path the result
     /// names, so a test can diff it or a human can open it.
+    ///
+    /// **The write is `FrameWriter`'s, and that is the point of it** (road map
+    /// 2's phase 7a). This handler used to hold its own
+    /// `CGImageDestination` — which made File ▸ Save Frame… and this tool two
+    /// encoders that happened to agree — and now both call one `write`. That
+    /// is what makes "Save Frame's PNG is byte-identical to `render_frame`'s"
+    /// a fact about the code rather than a claim, and it is the only way the
+    /// line can ever be checked: a save panel cannot be driven over MCP or
+    /// offscreen, so no proof script can press the menu item.
+    ///
+    /// **The last sentence of the text block is load-bearing.** A call that
+    /// names neither `path` nor `format` still writes a PNG into the
+    /// temporary directory and still ends "Written to <path>." byte for byte
+    /// as it did before this phase: five proof scripts (phases 1, 2, 3, 4 and
+    /// 6) read the path back out of it with `Written to (\S+\.png)\.` and
+    /// every PNG comparison this project makes hangs off that one regular
+    /// expression. Anything new to say goes BEFORE it.
+    ///
+    /// **`burn_in_timecode` is a recipe option and never an export override**
+    /// (`RecipeOptions`): it changes the picture, so it travels with the
+    /// description of the picture. It is here for parity with `export`, and
+    /// because a burn-in lives only in rendered pixels — this is the one tool
+    /// that can photograph one, so it is the instrument every claim about
+    /// phase 7c's layer is made through.
     func renderFrame(_ a: [String: Any]) throws -> String {
         let context = try onMain { () throws -> (ReelProject, [UInt32: URL], Ticks, CGSize) in
             let document = try self.target(a)
@@ -41,36 +64,142 @@ extension AgentServer {
             }
             maxWidth = requested
         }
+        let options = RecipeOptions(burnInTimecode: try boolArg(a, "burn_in_timecode") ?? false)
+        // Resolved BEFORE the render, so a mistyped folder is answered in a
+        // millisecond rather than after a decode: `exportProject` orders its
+        // own two the same way.
+        let (url, format) = try frameDestination(a, at: time)
         // Off the main thread by construction — `Exporter.renderFrame` opens
         // asset tracks and decodes, and says so.
         guard let image = Exporter.renderFrame(
-            project: project, urls: urls, at: time, maxWidth: maxWidth)
+            project: project, urls: urls, at: time, maxWidth: maxWidth, options: options)
         else {
             throw ToolError(
                 message: "No frame at \(time). Either the time is past the end of the timeline, "
                     + "the media is missing, or the timeline is empty.")
         }
-        let url = FileManager.default.temporaryDirectory
-            .appendingPathComponent("reelcut-frame-\(time)-\(UUID().uuidString.prefix(8)).png")
-        guard let destination = CGImageDestinationCreateWithURL(
-            url as CFURL, UTType.png.identifier as CFString, 1, nil)
-        else {
-            throw ToolError(message: "Could not write a PNG to \(url.path)")
+        do {
+            try FrameWriter.write(image, as: format, to: url)
+        } catch {
+            // `FrameWriter.WriteError` names the path and the format in every
+            // case it has, so the message passes through as it was written.
+            throw ToolError(message: error.localizedDescription)
         }
-        CGImageDestinationAddImage(destination, image, nil)
-        guard CGImageDestinationFinalize(destination),
-            let data = try? Data(contentsOf: url)
-        else {
-            throw ToolError(message: "PNG encoding failed.")
+        guard let data = try? Data(contentsOf: url) else {
+            throw ToolError(message: "Wrote \(url.path) but could not read it back.")
         }
-        let text =
+        var text =
             "Frame at \(time) ticks of a \(Int(canvasSize.width))×\(Int(canvasSize.height)) px "
-            + "canvas, rendered at \(image.width)×\(image.height) px. Written to \(url.path)."
+            + "canvas, rendered at \(image.width)×\(image.height) px"
+        if options.burnInTimecode {
+            text += ", with the project timecode burnt in"
+        }
+        text += "."
+        // Said where the caller can see it rather than only in the schema: a
+        // frame off a transparent canvas (phase 7b) has just lost its alpha,
+        // and a note that arrives with the file is the one that is read.
+        if !format.carriesAlpha {
+            text += " " + FrameWriter.flattenNote
+        }
+        text += " Written to \(url.path)."
         return try callResult(
             content: [
-                ["type": "image", "data": data.base64EncodedString(), "mimeType": "image/png"],
+                [
+                    "type": "image", "data": data.base64EncodedString(),
+                    "mimeType": Self.mimeType(format),
+                ],
                 ["type": "text", "text": text],
             ], isError: false)
+    }
+
+    /// Where `render_frame` writes and in what container — its `path` and
+    /// `format` arguments resolved together, because neither can be read
+    /// without the other.
+    ///
+    /// **No `path` is the case every proof script takes**, and it is exactly
+    /// what it was: a file in the temporary directory named for the tick it
+    /// holds, ending in the format's own extension — `.png` unless a caller
+    /// asked for something else.
+    ///
+    /// With a `path`, the format is `FrameWriter`'s answer and not a second
+    /// opinion: an explicit `format` wins, else the path's own extension, else
+    /// PNG — `export_captions`' rule, one file over. The path then goes
+    /// through `destinationURL`, so a wrong extension is REPLACED rather than
+    /// appended to: `{path: "shot.jpg", format: "png"}` writes `shot.png`, not
+    /// the doubled `shot.jpg.png`, which is why the five image containers
+    /// joined `replaceableExtensions` in this phase.
+    ///
+    /// The folder must already exist and is refused BY NAME when it does not,
+    /// which is `export`'s posture at the same point: a tool that created
+    /// directories would answer a mistyped path by scattering empty ones.
+    private func frameDestination(
+        _ a: [String: Any], at time: Ticks
+    ) throws -> (url: URL, format: FrameWriter.Format) {
+        let requested = try requestedFrameFormat(a)
+        guard let path = try stringArg(a, "path") else {
+            let format = requested ?? .png
+            let name = "reelcut-frame-\(time)-\(UUID().uuidString.prefix(8))"
+            let url = FileManager.default.temporaryDirectory
+                .appendingPathComponent("\(name).\(format.fileExtension)")
+            return (url, format)
+        }
+        // Empty is refused rather than read as absent: a caller that sent a
+        // `path` meant to name a file, and silently writing to a temporary
+        // one instead is a success reported for a file nobody can find.
+        guard !path.isEmpty else {
+            throw ToolError(
+                message: "path must name a file to write — omit it for a temporary one.")
+        }
+        let format = FrameWriter.format(
+            for: URL(fileURLWithPath: (path as NSString).expandingTildeInPath),
+            requested: requested)
+        let url = Self.destinationURL(path, extension: format.fileExtension)
+        let folder = url.deletingLastPathComponent()
+        var isDirectory: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: folder.path, isDirectory: &isDirectory),
+            isDirectory.boolValue
+        else {
+            throw ToolError(message: "There is no folder at \(folder.path) to write into.")
+        }
+        return (url, format)
+    }
+
+    /// The `format` argument, refused BY NAME when it names no container —
+    /// nil when it is absent, which is what lets `FrameWriter.format(for:)`
+    /// fall back to the path. It is `export_captions`' `requestedFormat` with
+    /// three rows instead of two.
+    ///
+    /// `jpg` is read as `jpeg` on purpose. `FrameWriter.Format`'s raw value is
+    /// deliberately NOT its file extension — JPEG has two spellings and
+    /// collapsing them would make one of them wrong — and `format(for:)`
+    /// already reads both off a path, so refusing four letters here that are
+    /// accepted in the argument beside it is an inconsistency a caller meets
+    /// on its first try. The schema still advertises the three canonical
+    /// names, which is what a caller reading the catalog will send.
+    private func requestedFrameFormat(_ a: [String: Any]) throws -> FrameWriter.Format? {
+        guard let name = try stringArg(a, "format") else { return nil }
+        let lowered = name.lowercased()
+        guard let format = FrameWriter.Format(rawValue: lowered == "jpg" ? "jpeg" : lowered)
+        else {
+            let known = FrameWriter.Format.allCases.map { $0.rawValue }
+            throw ToolError(
+                message: "format must be one of " + known.joined(separator: ", ")
+                    + " (got \"\(name)\").")
+        }
+        return format
+    }
+
+    /// The image block's `mimeType`, read off the format's own `UTType`
+    /// rather than switched over a second time here: the block and the file
+    /// are then one decision, and a fourth container would arrive described
+    /// correctly without anybody remembering this line.
+    ///
+    /// All three carry one (measured: `image/png`, `image/jpeg`,
+    /// `image/heic`). The fallback exists only because the API is optional,
+    /// and it is deliberately generic rather than a guess: telling a client
+    /// that a HEIC is a PNG is worse than telling it nothing.
+    private static func mimeType(_ format: FrameWriter.Format) -> String {
+        format.contentType.preferredMIMEType ?? "application/octet-stream"
     }
 
     // MARK: - Export
@@ -87,6 +216,10 @@ extension AgentServer {
     /// Blocks until the file is written, so the model can render, export and
     /// verify in sequence without polling.
     ///
+    /// One argument is NOT a setting and never reaches the core:
+    /// `burn_in_timecode` is a recipe option (`RecipeOptions`), read below
+    /// beside the overrides it deliberately does not join.
+    ///
     /// The result carries the sound the file actually holds — its integrated
     /// loudness and true peak, measured on the way through — for every format
     /// that has any, whether `loudness_lufs` was asked for or not.
@@ -99,6 +232,17 @@ extension AgentServer {
                 message: "range must be \"project\" (the whole timeline) or \"in_out\" "
                     + "(the in/out range set_range set), not \"\(wholeProject)\".")
         }
+        // The export sheet's burn-in checkbox — and read HERE rather than
+        // into `overrides` below, which is the whole of the decision. A
+        // recipe option changes the PICTURE, so it travels with the
+        // description of the picture: `export_overrides.rs` ignores a key it
+        // does not know, on purpose, so a `burn_in_timecode` posted through
+        // `rc_export_settings` would vanish without a word and this tool
+        // would report success on an un-burnt file. It goes to `Exporter`
+        // beside the settings instead (`RecipeOptions`, `Exporter.export`),
+        // which is also what reaches GIF and APNG — those never go through
+        // `ExportWriter` at all.
+        let options = RecipeOptions(burnInTimecode: try boolArg(a, "burn_in_timecode") ?? false)
         let prepared = try onMain {
             () throws -> (ProjectDocument, ReelProject, [UInt32: URL], ExportSettings) in
             let document = try self.target(a)
@@ -188,7 +332,7 @@ extension AgentServer {
             // decoding the same media; the agent's does the same.
             self.editor(document)?.playback.pause()
             exporter.export(
-                project: project, urls: urls, settings: settings, to: url,
+                project: project, urls: urls, settings: settings, to: url, options: options,
                 progress: { _ in }
             ) { result in
                 box.value = result
@@ -227,6 +371,18 @@ extension AgentServer {
             "fps": [settings.fps.num, settings.fps.den],
             "start": settings.start,
             "duration": settings.duration,
+            // Not one of the resolved settings — the core never saw it — but
+            // it is a fact about the file that was written, and every other
+            // key here is one too.
+            //
+            // What it establishes is exactly one link and not the chain: this
+            // is `options.burnInTimecode`, the local decoded a few lines up,
+            // so a caller reading it back knows the argument was READ rather
+            // than dropped in argument reading — the failure `boolArg`'s
+            // refusal covers from the other side. It does NOT say the writer
+            // used it; only a pixel can say that, and
+            // `tools/proof/phase7_proof.py` is where one does.
+            "burn_in_timecode": options.burnInTimecode,
         ]
         if let measured = Self.loudnessResult(exporter.loudnessReport) {
             result["loudness"] = measured

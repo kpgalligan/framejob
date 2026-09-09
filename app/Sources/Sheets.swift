@@ -60,14 +60,34 @@ func makeSheetView(
     return container
 }
 
+/// The sheet's button row: `leading` at the far left (a footnote), then a
+/// spacer, then the trailing cluster.
+///
+/// **`secondary` is a second affirmative button**, left of Cancel and inside
+/// the trailing cluster — a "do something else with this card" beside the
+/// button that does the main thing. It is NOT `leading`, which is where the
+/// footnote lives: an affirmative button at the far left of a dialog reads as
+/// a destructive or a tertiary one, and it would sit under the export sheet's
+/// codec footnote besides. It takes no key equivalent, which is the other half
+/// of the same point — Return belongs to `apply` and Escape to `cancel`, and a
+/// row with two Returns has none.
+///
+/// Its one caller is the export sheet's "Add to Queue" (road map 2's phase 7e,
+/// built and passed in `ExportSheetController.loadView`) — the shipped example
+/// to read before a second dialog takes the slot. The parameter landed a wave
+/// AHEAD of that button, alone, because this file is shared by every dialog in
+/// the app and a change to it is worth making where the type checker can see
+/// every existing call is unchanged; it defaults to nil, so every dialog but
+/// the export card still asks for the two-button row it always had.
 func makeButtonRow(
-    cancel: NSButton, apply: NSButton, leading: [NSView] = []
+    cancel: NSButton, apply: NSButton, secondary: NSButton? = nil, leading: [NSView] = []
 ) -> NSStackView {
     cancel.keyEquivalent = "\u{1b}"
     apply.keyEquivalent = "\r"
     let spacer = NSView()
     spacer.setContentHuggingPriority(.defaultLow - 1, for: .horizontal)
-    let row = NSStackView(views: leading + [spacer, cancel, apply])
+    let trailing: [NSView] = secondary.map { [$0, cancel, apply] } ?? [cancel, apply]
+    let row = NSStackView(views: leading + [spacer] + trailing)
     row.orientation = .horizontal
     row.alignment = .centerY
     row.spacing = 8

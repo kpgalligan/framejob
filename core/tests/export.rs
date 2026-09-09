@@ -47,7 +47,17 @@
 //!    when they are, accepted by presets that cannot use them, refused by
 //!    a message naming the value — with the single documented exception
 //!    that a ceiling with no target is an error rather than an inert key.
-//! 10. **The header's list of overrides.** `rc_export_settings`' comment in
+//! 10. **The two rows with a fourth channel, and `alpha`.** The capability
+//!     that says so is a fact about the ENCODING — true for `prores_4444`
+//!     and for `apng` and for nothing else, the same on a transparent
+//!     canvas as on an opaque one, and not something an override can ask
+//!     for — so the sweep is the whole table twice over rather than a
+//!     check on the new row. `gif` is the row that makes the sweep worth
+//!     writing: it shows a transparent pixel and still answers FALSE,
+//!     because a palette index is not a channel. Beside it, the shape of a
+//!     settings object is pinned key by key: the phase added ONE key, and
+//!     a key that left with it would reach Swift as a silent default.
+//! 11. **The header's list of overrides.** `rc_export_settings`' comment in
 //!     `core/include/reelcut_core.h` enumerates every key it takes, and an
 //!     FFI caller is entitled to trust it — so every key named there is
 //!     read back out of the header and probed. Point 5's permissiveness is
@@ -84,6 +94,12 @@ struct Expected {
     /// Whether the file carries pictures, and whether it can carry sound.
     video: bool,
     audio: bool,
+    /// Whether the ENCODING carries a fourth channel. Written out here as
+    /// a property of the ROW, which is the whole of §7.8's rule for it:
+    /// nothing about a project can move it, so a table written from the
+    /// spec can hold it and an oracle that had to know about a canvas
+    /// could not.
+    alpha: bool,
     /// The UTI of the file — `outputFileType` on the session path, the
     /// ImageIO destination type on the other, and the save panel's content
     /// type on both.
@@ -102,7 +118,7 @@ struct Expected {
 /// a timeline in it. The old size-carrying ids (`h264_1080p`, `hevc_4k`…)
 /// are gone without aliases — `an_unknown_preset_errors_and_names_it`
 /// pins that.
-const EXPECTED: [Expected; 8] = [
+const EXPECTED: [Expected; 9] = [
     Expected {
         id: "h264",
         container: "mp4",
@@ -111,6 +127,7 @@ const EXPECTED: [Expected; 8] = [
         fps: None,
         video: true,
         audio: true,
+        alpha: false,
         file_type: "public.mpeg-4",
         avf_preset: Some("AVAssetExportPresetHighestQuality"),
     },
@@ -122,6 +139,7 @@ const EXPECTED: [Expected; 8] = [
         fps: None,
         video: true,
         audio: true,
+        alpha: false,
         file_type: "public.mpeg-4",
         avf_preset: Some("AVAssetExportPresetHEVCHighestQuality"),
     },
@@ -133,8 +151,27 @@ const EXPECTED: [Expected; 8] = [
         fps: None,
         video: true,
         audio: true,
+        alpha: false,
         file_type: "com.apple.quicktime-movie",
         avf_preset: Some("AVAssetExportPresetAppleProRes422LPCM"),
+    },
+    // The master row, and one of the two `alpha: true` rows. Everything
+    // else about it is 422's — the same container, the same UTI, the same
+    // "an editing master does not stream" answer to network optimization —
+    // which is exactly why it is written out here beside 422 rather than
+    // trusted: the pair differs in one field, and one field is what a
+    // copy-pasted row loses.
+    Expected {
+        id: "prores_4444",
+        container: "mov",
+        codec: "prores4444",
+        size: None,
+        fps: None,
+        video: true,
+        audio: true,
+        alpha: true,
+        file_type: "com.apple.quicktime-movie",
+        avf_preset: Some("AVAssetExportPresetAppleProRes4444LPCM"),
     },
     Expected {
         id: "audio_m4a",
@@ -144,6 +181,7 @@ const EXPECTED: [Expected; 8] = [
         fps: None,
         video: false,
         audio: true,
+        alpha: false,
         file_type: "com.apple.m4a-audio",
         avf_preset: Some("AVAssetExportPresetAppleM4A"),
     },
@@ -165,6 +203,7 @@ const EXPECTED: [Expected; 8] = [
         fps: None,
         video: false,
         audio: true,
+        alpha: false,
         file_type: "com.microsoft.waveform-audio",
         avf_preset: Some("AVAssetExportPresetAppleM4A"),
     },
@@ -176,6 +215,7 @@ const EXPECTED: [Expected; 8] = [
         fps: None,
         video: false,
         audio: true,
+        alpha: false,
         file_type: "public.aiff-audio",
         avf_preset: Some("AVAssetExportPresetAppleM4A"),
     },
@@ -190,6 +230,7 @@ const EXPECTED: [Expected; 8] = [
         fps: Some((25, 2)),
         video: true,
         audio: false,
+        alpha: false,
         file_type: "com.compuserve.gif",
         avf_preset: None,
     },
@@ -203,6 +244,7 @@ const EXPECTED: [Expected; 8] = [
         fps: Some((25, 1)),
         video: true,
         audio: false,
+        alpha: true,
         file_type: "public.png",
         avf_preset: None,
     },
@@ -225,11 +267,22 @@ const PROJECT_DURATION: i64 = 10 * SECOND;
 /// pure function of the canvas and the duration, so this is all the content
 /// any test here needs.
 fn project() -> Handle {
+    project_with_background_alpha(1)
+}
+
+/// The same fixture with the canvas background at `alpha` — 1 opaque, 0
+/// fully transparent. It exists for one claim and is used by one test:
+/// `alpha` in the resolved settings is a fact about the ROW and never
+/// about the document, so the two projects this builds must resolve every
+/// preset to the same flag. Nothing else in export resolution reads the
+/// background at all, which is why every other test takes the opaque one
+/// without saying so.
+fn project_with_background_alpha(alpha: i64) -> Handle {
     let handle = Handle::from_value(&json!({
         "version": 1,
         "canvas": {
             "width": CANVAS_WIDTH, "height": CANVAS_HEIGHT, "fps": [30, 1],
-            "background": [0, 0, 0, 1], "fit_new_clips": true, "timecode_frames": true
+            "background": [0, 0, 0, alpha], "fit_new_clips": true, "timecode_frames": true
         },
         "media": [{
             "id": 1, "path": "/m/talk.mov", "kind": "video", "duration": 60 * SECOND,
@@ -411,6 +464,12 @@ fn every_preset_in_the_menu_resolves_to_what_it_advertised() {
         );
         assert_eq!(flag(&out, "/video"), want.video, "{} video", want.id);
         assert_eq!(flag(&out, "/audio"), want.audio, "{} audio", want.id);
+        // The whole table, not three spot checks: a capability that is
+        // true for one row is a claim about the other eight as much as
+        // about that one, and `alpha` on a row with nowhere to put a
+        // fourth channel would be reported to the sheet and the `export`
+        // tool as a channel the file will carry.
+        assert_eq!(flag(&out, "/alpha"), want.alpha, "{} alpha", want.id);
 
         let (w, h) = want.size.unwrap_or((CANVAS_WIDTH, CANVAS_HEIGHT));
         assert_eq!(
@@ -512,6 +571,283 @@ fn a_size_override_is_how_a_movie_export_leaves_the_document_size() {
             want.id
         );
     }
+}
+
+// ---- ProRes 4444 and the alpha capability --------------------------------
+
+/// The id exactly as the `export` tool and the Format popup spell it.
+const PRORES_4444: &str = "prores_4444";
+
+/// Every key a settings object carried BEFORE road map 2's phase 7 added
+/// `alpha`, written out by hand.
+///
+/// It is the twelve of `every_settings_object_carries_every_key_swift_decodes`'
+/// thirteen that predate the phase, written a second time and for a second
+/// purpose: that test asks whether each key is PRESENT, and this one is the
+/// other half of "the phase added exactly one key" — a claim about what is
+/// ABSENT, which needs the whole set to make. The failure it catches is not
+/// "`alpha` is missing" (the flag readers below catch that loudly) but
+/// "`alpha` arrived and something else left with it", which nothing
+/// downstream reports: `ExportSettings` in `ReelCore.swift` decodes a fixed
+/// list of keys leniently, so a dropped or renamed one is a silent
+/// Swift-side default rather than an error.
+///
+/// **The two lists stay separate whatever `CodingKeys` holds**, and the
+/// reason is what each MEANS, not who has caught up with whom. That one is
+/// the set a Swift-side decode must never find missing, and it grows with
+/// every key Swift learns to read — `alpha` is in it, since
+/// `ExportSettings` gained the case in this same phase. This one is frozen
+/// at the pre-phase shape ON PURPOSE, because it is the base of an
+/// EXACT-SET comparison: `alpha_is_the_only_key_the_settings_grew` appends
+/// `"alpha"` to it and asserts equality, so a list that tracked Swift would
+/// make the next phase's added key invisible to the very test written to
+/// notice it. Do not merge them, and do not "update" this one when a
+/// fourteenth key lands — a new phase writes its own base, or renames this
+/// one. (`audio` and `video` are in the other list and are NOT in
+/// `CodingKeys`, which is the same point from the other side:
+/// the core emits them for the sheet's summary line and the `export`
+/// tool's result, where the writer reads the composition's own tracks and
+/// routes on `avf_preset`.)
+const KEYS_BEFORE_ALPHA: [&str; 12] = [
+    "audio",
+    "avf_preset",
+    "codec",
+    "container",
+    "file_type",
+    "fps",
+    "height",
+    "optimize_for_network",
+    "preset",
+    "range",
+    "video",
+    "width",
+];
+
+/// The four keys that appear only when they were asked for — the two
+/// bitrates and the two loudness figures. They are listed here so the
+/// key-set assertion can be made twice: once with nothing asked for, where
+/// none of them may appear, and once with all four, where exactly these
+/// four join the rest and nothing else does.
+const KEYS_WHEN_ASKED_FOR: [&str; 4] = [
+    "audio_bitrate",
+    "loudness_lufs",
+    "peak_dbtp",
+    "video_bitrate",
+];
+
+/// The keys of a settings object, sorted, for comparing whole shapes.
+fn keys_of(value: &Value) -> Vec<String> {
+    let object = value
+        .as_object()
+        .unwrap_or_else(|| panic!("the settings are not an object: {value}"));
+    let mut keys: Vec<String> = object.keys().cloned().collect();
+    keys.sort();
+    keys
+}
+
+/// The two bitrates and the two loudness figures, all four asked for at
+/// once, so the shape assertion below sees every optional key at the same
+/// time. Every preset accepts all four (§7.8: one rule for reading
+/// overrides, and the format flags say what the output can carry).
+fn every_optional_override() -> Value {
+    json!({
+        "video_bitrate": 8_000_000,
+        "audio_bitrate": 192_000,
+        "loudness_lufs": -14.0,
+        "peak_dbtp": -1.0
+    })
+}
+
+/// The phase added ONE key to the resolved settings and moved nothing
+/// else. Asserted for every row of the table and for both shapes a
+/// settings object comes in — nothing asked for, and every optional key
+/// asked for — so that the four conditional keys are pinned as
+/// conditional in the same breath: absent when nobody asked, and exactly
+/// those four when everybody did. [`KEYS_BEFORE_ALPHA`] says what the
+/// comparison is against and why it is written out twice.
+#[test]
+fn alpha_is_the_only_key_the_settings_grew() {
+    let handle = project();
+    for want in EXPECTED.iter() {
+        let mut plain: Vec<String> = KEYS_BEFORE_ALPHA.iter().map(|k| k.to_string()).collect();
+        plain.push("alpha".to_string());
+        plain.sort();
+        assert_eq!(
+            keys_of(&settings(&handle, want.id, None)),
+            plain,
+            "{}'s settings are not the pre-phase keys plus alpha",
+            want.id
+        );
+
+        let mut full = plain.clone();
+        full.extend(KEYS_WHEN_ASKED_FOR.iter().map(|k| k.to_string()));
+        full.sort();
+        assert_eq!(
+            keys_of(&settings(
+                &handle,
+                want.id,
+                Some(&every_optional_override())
+            )),
+            full,
+            "{} with every optional override is not the same shape plus those four",
+            want.id
+        );
+    }
+}
+
+/// Two rows carry a fourth channel and seven do not. The sweep is the
+/// whole table rather than a spot check on three rows, because `alpha` is
+/// a claim about every row at once: reported true on a row with nowhere to
+/// put it, the export sheet and the `export` tool would both promise a
+/// channel the file cannot hold, and nothing later in the pipeline is in a
+/// position to notice — `ExporterWriter` writes what the codec writes.
+///
+/// The id list is written out here rather than read from [`EXPECTED`]'s
+/// `alpha` field, so this is a second, independent statement of §7.8's
+/// rule and not the oracle checked against itself.
+///
+/// **`apng` is in the list and `gif` is not**, which is the pair worth
+/// pinning: both can show a transparent pixel, so a reader who has
+/// exported one will read this list as an oversight in one direction or
+/// the other. APNG has a real fourth channel and a pixel may be any
+/// fraction of opaque; a GIF nominates ONE palette index as transparent
+/// and has no partial value to store. Both readings were measured against
+/// the built app before this list was written — an `apng` of a
+/// transparent canvas decodes `pix_fmt=rgba` with its corner at alpha 0,
+/// a `gif` of the same timeline has a hard-edged transparent index — and
+/// the flag is what stops the sheet promising a translucent GIF.
+#[test]
+fn only_prores_4444_and_apng_carry_alpha() {
+    let handle = project();
+    let carrying: Vec<&str> = EXPECTED
+        .iter()
+        .map(|want| want.id)
+        .filter(|id| flag(&settings(&handle, id, None), "/alpha"))
+        .collect();
+    assert_eq!(
+        carrying,
+        [PRORES_4444, "apng"],
+        "the rows claiming an alpha channel are not the two that have one"
+    );
+
+    // And the menu offers it, so the id above is reachable from the Format
+    // popup and not only from a script that already knew the spelling.
+    assert!(
+        preset_rows()
+            .iter()
+            .any(|row| text(row, "/id") == PRORES_4444),
+        "{PRORES_4444} resolves but is not in the menu"
+    );
+}
+
+/// A MOV that AVFoundation writes, at the document's own size and rate.
+///
+/// The `avf_preset` assertion is the one whose symptom would not name it:
+/// a null there is `ExportSettings`'s literal definition of an image
+/// sequence, so a `prores_4444` row that carried one would be handed to
+/// `ImageSequenceWriter`, met by an `ImageSequenceFormat(container: "mov")`
+/// that has never heard of MOV, and reported as an unsupported file type
+/// for a format the menu offers. GIF and APNG are checked beside it for
+/// the reason the LPCM rows are: it keeps this an assertion about THIS row
+/// rather than about the field having quietly stopped being nullable.
+#[test]
+fn prores_4444_is_a_mov_avfoundation_writes() {
+    let handle = project();
+    let out = settings(&handle, PRORES_4444, None);
+
+    assert_eq!(text(&out, "/container"), "mov");
+    assert_eq!(text(&out, "/file_type"), "com.apple.quicktime-movie");
+    assert_eq!(
+        text(&out, "/avf_preset"),
+        "AVAssetExportPresetAppleProRes4444LPCM",
+        "the ProRes 4444 row does not name AVFoundation's own preset for it"
+    );
+    for image in ["gif", "apng"] {
+        assert!(
+            at(&settings(&handle, image, None), "/avf_preset").is_null(),
+            "{image} stopped naming the ImageIO path, so {PRORES_4444}'s check proves nothing"
+        );
+    }
+
+    // A preset is an ENCODING: this row carries no size and no rate of its
+    // own, so a master comes out at the document's, and a size override
+    // reaches it unfitted — fitting is the image formats' rule.
+    assert_eq!(
+        (int(&out, "/width"), int(&out, "/height")),
+        (CANVAS_WIDTH, CANVAS_HEIGHT)
+    );
+    assert_eq!(fps_of(&out), (30, 1));
+    let sized = settings(
+        &handle,
+        PRORES_4444,
+        Some(&json!({"width": 1920, "height": 1080})),
+    );
+    assert_eq!(
+        (int(&sized, "/width"), int(&sized, "/height")),
+        (1920, 1080)
+    );
+    // 422's posture, which 4444 shares: nothing streams an editing master,
+    // so there is no `moov` atom worth moving to the front.
+    assert!(!flag(&out, "/optimize_for_network"));
+}
+
+/// **`alpha` is the ENCODING's fact, never the canvas's** (§7.8, and the
+/// decision the road map's own phase-7 sketch had the other way round).
+/// One flat settings object is resolved for every row, so a flag that
+/// answered "the background is translucent" would say `alpha: true` on an
+/// H.264, a GIF and a WAV — three files with nowhere to put a fourth
+/// channel — and would say `alpha: false` on a ProRes 4444 or an APNG
+/// export of an opaque timeline, which carry the channel and simply have
+/// nothing transparent in them this time.
+///
+/// So the same nine rows are resolved against two documents differing
+/// ONLY in the background's alpha, and every flag has to be the same in
+/// both. A build wired to the canvas fails on both halves of this at once.
+#[test]
+fn alpha_is_the_encodings_fact_and_never_the_canvas() {
+    let opaque = project_with_background_alpha(1);
+    let transparent = project_with_background_alpha(0);
+    for want in EXPECTED.iter() {
+        let on_opaque = flag(&settings(&opaque, want.id, None), "/alpha");
+        let on_transparent = flag(&settings(&transparent, want.id, None), "/alpha");
+        assert_eq!(
+            on_opaque, on_transparent,
+            "{}'s alpha moved with the canvas background",
+            want.id
+        );
+        assert_eq!(
+            on_opaque,
+            want.id == PRORES_4444 || want.id == "apng",
+            "{} on an opaque canvas",
+            want.id
+        );
+    }
+}
+
+/// And it is not an override either. `alpha` is a capability the table
+/// states, so a caller cannot ask for one: sending it is the unknown-key
+/// case §7.8 documents (ignored, so a newer UI still gets an export), and
+/// what must NOT happen is the value being honoured — `{"alpha": true}` on
+/// an H.264 would promise a channel the file cannot hold, and
+/// `{"alpha": false}` on a ProRes 4444 would deny one it will write
+/// anyway.
+#[test]
+fn alpha_is_not_an_override() {
+    let handle = project();
+    assert!(
+        !flag(
+            &settings(&handle, "h264", Some(&one("alpha", json!(true)))),
+            "/alpha"
+        ),
+        "h264 accepted an alpha channel it cannot write"
+    );
+    assert!(
+        flag(
+            &settings(&handle, PRORES_4444, Some(&one("alpha", json!(false)))),
+            "/alpha"
+        ),
+        "{PRORES_4444} gave up the channel it writes because an override said so"
+    );
 }
 
 // ---- the image formats ---------------------------------------------------
@@ -1201,11 +1537,21 @@ fn a_range_that_is_not_two_tick_counts_errors() {
 #[test]
 fn every_settings_object_carries_every_key_swift_decodes() {
     let handle = project();
-    // `ExportSettings` in `app/Sources/ReelCore.swift` reads exactly these,
-    // and reads them leniently — a key that vanishes here becomes a silent
-    // default there rather than a decode failure, which is how a
-    // zero-length range once disabled the Export button.
-    const REQUIRED: [&str; 12] = [
+    // Every key `ExportSettings` in `app/Sources/ReelCore.swift` decodes,
+    // and it decodes them leniently — a key that vanishes here becomes a
+    // silent default there rather than a decode failure, which is how a
+    // zero-length range once disabled the Export button. `alpha` (road map
+    // 2's phase 7) is in the list because that type gained the
+    // `CodingKeys` case for it in the same phase, and its lenient default
+    // is FALSE: dropped here, it would reach the sheet as "no row can
+    // carry alpha" — a wrong answer that looks like a working build.
+    //
+    // `audio` and `video` are the two the core emits that Swift does NOT
+    // decode; they are guarded here anyway, because the export tool's
+    // result and the sheet's summary line read them straight off this
+    // object. [`KEYS_BEFORE_ALPHA`] is the sibling list and is deliberately
+    // NOT this one — its doc says why the two must not be merged.
+    const REQUIRED: [&str; 13] = [
         "preset",
         "avf_preset",
         "container",
@@ -1217,6 +1563,7 @@ fn every_settings_object_carries_every_key_swift_decodes() {
         "range",
         "audio",
         "video",
+        "alpha",
         "optimize_for_network",
     ];
     for want in EXPECTED.iter() {

@@ -38,7 +38,16 @@ extension EditorViewController {
     /// the exporter so the write is of the timeline as it was confirmed —
     /// handles are immutable (spec §5.5), so nothing the document does next
     /// can reach the file.
-    func beginExport(settings: ExportSettings, to url: URL) {
+    ///
+    /// `options` is what the export asks of the RECIPE — the timecode burn-in
+    /// and nothing else today. It rides beside `settings` rather than inside
+    /// it because the two are answered by different halves of the core: the
+    /// settings are `rc_export_settings`' reply, and an option smuggled into
+    /// the override table would be ignored without a word
+    /// (`export_overrides.rs`) and the file reported as a success. The default
+    /// is no options at all, so a caller that says nothing exports what it
+    /// always did.
+    func beginExport(settings: ExportSettings, to url: URL, options: RecipeOptions = .none) {
         guard let document = document else {
             NSSound.beep()
             return
@@ -47,7 +56,40 @@ extension EditorViewController {
         presentAsSheet(
             ExportProgressSheetController(
                 project: document.project, urls: document.mediaURLs(), settings: settings,
-                to: url))
+                to: url, options: options))
+    }
+
+    /// Called by `ExportSheetController`'s **Add to Queue** once the save
+    /// panel has a destination — `beginExport`'s sibling, and the one place a
+    /// queued job is built (road map 2's phase 7e).
+    ///
+    /// **The project handle AND the media URLs are read HERE, at the moment
+    /// the destination is known, and that is the whole of what makes a queued
+    /// job immutable.** The handle needs no clone — handles are immutable
+    /// (spec §5.5) and every edit and undo makes a new one, so this one keeps
+    /// the timeline as it was confirmed however the document changes, and
+    /// `Exporter` publishes it on a `RecipeSource` key of its own so even the
+    /// frames the compositor serves the write come from it. `mediaURLs()` is
+    /// the half that would otherwise leak: it resolves each bookmark and asks
+    /// the filesystem whether the file is there, so a job that called it at
+    /// RUN time would silently pick up a Relink… or a moved file from after it
+    /// was queued — the exact change an immutable job exists to exclude. A job
+    /// therefore holds the answer and no document to ask again.
+    ///
+    /// Playback is NOT paused, unlike `beginExport`: a queued job runs behind
+    /// the editor by design, and the person who chose not to wait for it did
+    /// not ask for their preview to stop.
+    func enqueueExport(settings: ExportSettings, to url: URL, options: RecipeOptions = .none) {
+        guard let document = document else {
+            NSSound.beep()
+            return
+        }
+        ExportQueueController.shared.enqueue(
+            project: document.project, urls: document.mediaURLs(), settings: settings,
+            to: url, options: options)
+        // Adding to a queue shows the queue: the job has no sheet of its own,
+        // so this window is the only thing that says it exists.
+        ExportQueueWindowController.shared.show()
     }
 
     // MARK: - Speed

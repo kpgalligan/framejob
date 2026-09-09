@@ -152,8 +152,21 @@ extension AgentServer {
     /// format: "vtt"}` would write `talk.srt.vtt`, which is exactly the
     /// doubled name the paragraph above says the replacement exists to
     /// prevent.
+    ///
+    /// The five image containers joined it in road map 2's phase 7a, on the
+    /// same terms and for two reasons rather than one. The new one:
+    /// `render_frame` takes a `path` and a `format` now (`FrameWriter`), so
+    /// `render_frame {path: "shot.jpg", format: "png"}` would have written
+    /// `shot.jpg.png`. The old one is a REAL BUG this fixes rather than
+    /// prevents — `gif` has been a container this app writes since M3's image
+    /// sequences, and without it `export {path: "loop.gif", preset: "apng"}`
+    /// writes `loop.gif.png` today. Both spellings of JPEG are here because a
+    /// person types both; `heif` is NOT, because this app never writes one
+    /// (`FrameWriter.Format.heic` is `UTType.heic` for the measured reason
+    /// recorded there), so a file called `scene.heif` keeps its name.
     private static let replaceableExtensions: Set<String> = [
         "mov", "mp4", "m4v", "m4a", "mp3", "wav", "aif", "aiff", "caf", "reelcut", "srt", "vtt",
+        "png", "jpg", "jpeg", "heic", "gif",
     ]
 
     static func destinationURL(_ path: String, extension ext: String) -> URL {

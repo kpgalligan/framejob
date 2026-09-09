@@ -1,6 +1,4 @@
 import AVFoundation
-import AppKit
-import UniformTypeIdentifiers
 
 /// Writes the timeline to a file (spec §7.8), and renders one frame offline
 /// for the agent's verification hook.
@@ -17,7 +15,8 @@ import UniformTypeIdentifiers
 /// `AVAssetWriter` path (`ExporterWriter.swift`) has **replaced** it, and this
 /// file is otherwise unchanged — `export`, `cancel`, `finish`, `isRunning`,
 /// the progress timer, every `ExportError`, `renderFrame` and every
-/// settings helper are what they were.
+/// settings helper (`ExporterSettings.swift` since phase 7) are what they
+/// were.
 ///
 /// **Why the writer replaced the session outright rather than joining it.**
 /// The session path cannot express three things the sheet already promises:
@@ -54,11 +53,34 @@ import UniformTypeIdentifiers
 /// the rest of the argument: what the pass costs, why it builds a composition
 /// of its own rather than sharing this one's mix, and why it reads float.
 ///
+/// **Recipe options, since road map 2's phase 7.** `export` and `renderFrame`
+/// each take a `RecipeOptions` (spec §7.3) — what the caller wants of the
+/// PICTURE besides the timeline, today the burnt-in timecode. It is not an
+/// export override and cannot be made one: the core's override table ignores
+/// an unknown key on purpose, so an option sent that way would vanish and the
+/// export would report success on an unchanged file. Both entry points take
+/// it because they are two independent doors to the compositor — `export`
+/// publishes it on this export's `RecipeSource` key, which is what every
+/// frame `ExportWriter` reads back arrives through, while
+/// `ImageSequenceWriter` bypasses the writer entirely and renders each frame
+/// through `renderFrame`, on a key of its own. Both default to `.none`, so
+/// everything that does not ask writes what it wrote before.
+///
+/// **Settings → AVFoundation lives in `ExporterSettings.swift`** — the time
+/// range, the fallback session preset, the file type, the UTI, the extension
+/// and `ExportSettings.isAudioOnly`, an extension of this class in a file of
+/// its own, cut out when phase 7 came to add the options argument and this
+/// file stood at exactly 600 lines. It is the same toll `ExporterLoudness.swift`
+/// paid, and the same shape: pure functions of a settings value, no export
+/// state, half their callers the export SHEET rather than the export.
+///
 /// **Deprecations.** `copyCGImage(at:actualTime:)` on
 /// `AVAssetImageGenerator` is deprecated in favour of an `async` replacement.
 /// Deliberately not taken: `async`/`await` is confined to
 /// `MediaImporter.swift` (app/CLAUDE.md), and spec §7.8 names this exact API.
-/// It is the only deprecation warning in this file.
+/// It is the only deprecation warning in this file, and the build baseline in
+/// the root `CLAUDE.md` names it by file — which is why `renderFrame` stayed
+/// here when the settings helpers went out.
 final class Exporter {
 
     /// Why an export stopped. Every case is reported through `completion` —
@@ -78,6 +100,28 @@ final class Exporter {
         /// The settings named a container this build cannot map to a file
         /// type.
         case fileTypeUnsupported(String)
+        /// An alpha-carrying row was asked for a size of a different ASPECT
+        /// from the canvas, which cannot be written correctly and so is not
+        /// written at all (road map 2, phase 7b). Carries the canvas and the
+        /// asked-for size, in that order.
+        ///
+        /// **Measured, not feared.** `AVVideoScalingModeResizeAspect` pads
+        /// the frame to the asked-for shape, and the padding path destroys
+        /// the alpha channel: a 320 × 180 transparent canvas written
+        /// `prores_4444` at 240 × 240 comes back with the PICTURE at alpha 0
+        /// and the letterbox BARS at alpha 255 — the answer inverted, not
+        /// merely lost. The same canvas at 160 × 90 or 640 × 360 is correct
+        /// at every pixel, so the fault is the padding and nothing else.
+        ///
+        /// It is refused rather than documented because the file would be
+        /// silently wrong in the one respect the row exists for, and this
+        /// codebase's rule for exactly that shape is `codecType(for:)`'s:
+        /// a refusal, never a fallback that puts a file on disk which is not
+        /// the one asked for. Nothing legitimate is blocked by accident —
+        /// every row of the Size popup is fitted to the document's own
+        /// aspect (`export_size.rs`), so only a hand-typed Custom size can
+        /// reach this, and the message says what to type instead.
+        case alphaAspectMismatch(width: Int, height: Int, wantWidth: Int, wantHeight: Int)
         /// The user pressed Cancel. The sheet dismisses without an alert.
         case cancelled
         /// The write ended in a state that is neither completed nor
@@ -95,6 +139,12 @@ final class Exporter {
                 return "This Mac cannot export with the “\(name)” preset."
             case .fileTypeUnsupported(let container):
                 return "“\(container)” is not a container this build can write."
+            case .alphaAspectMismatch(let width, let height, let wantWidth, let wantHeight):
+                return "An export that keeps transparency has to have the canvas's own shape. "
+                    + "This canvas is \(width) × \(height) and \(wantWidth) × \(wantHeight) is a "
+                    + "different shape, so the picture would be padded and the padding loses the "
+                    + "alpha channel. Export at \(width) × \(height), at one of the sizes in the "
+                    + "popup, or at any size with the same proportions."
             case .cancelled:
                 return "The export was cancelled."
             case .failed(let message):
@@ -198,8 +248,25 @@ final class Exporter {
     /// `project` is a handle, and handles are immutable (spec §5.5), so the
     /// export keeps writing the timeline as it was when the sheet was
     /// confirmed no matter what the document does next.
+    ///
+    /// **`options` is what the caller wants of the PICTURE besides the
+    /// timeline** (`RecipeOptions`, spec §7.3) — today, whether to burn the
+    /// timecode in. It is not an export override and could not be one: the
+    /// core's override table ignores a key it does not know, so an option
+    /// posted that way would vanish and this would report success on a file
+    /// it had not changed. It travels two ways from here, and BOTH are
+    /// needed. Published on this export's own `RecipeSource` key, it reaches
+    /// every frame `ExportWriter` reads back through the compositor; handed
+    /// to `Exporter.pipeline`, it reaches `ImageSequenceWriter`, which never
+    /// goes through `ExportWriter` at all and renders each GIF or APNG frame
+    /// through a key of its own. Plumbing only the first would leave every
+    /// image-sequence export silently un-burnt.
+    ///
+    /// The default is `.none`, so a caller that says nothing writes exactly
+    /// the file it wrote before phase 7.
     func export(
         project: ReelProject, urls: [UInt32: URL], settings: ExportSettings, to url: URL,
+        options: RecipeOptions = .none,
         progress: @escaping (Double) -> Void,
         completion: @escaping (Result<URL, any Error>) -> Void
     ) {
@@ -226,6 +293,10 @@ final class Exporter {
         let key = RecipeSource.shared.register()
         recipeKey = key
         RecipeSource.shared.set(project, for: key)
+        // The options belong to the KEY, not to the handle, which is what
+        // makes this enough: `finish` unregisters the key and takes them with
+        // it, and nothing else in the process can be reading it.
+        RecipeSource.shared.setOptions(options, for: key)
 
         measureShare = Exporter.measuresLoudness(settings)
             ? (settings.isAudioOnly ? 0.5 : 0.1) : 0
@@ -320,11 +391,17 @@ final class Exporter {
         // Which pipeline writes it is the settings' decision rather than this
         // file's: `Exporter.pipeline` reads the core's `avf_preset` and hands
         // back either the `AVAssetWriter` path or the ImageIO one.
+        //
+        // The recipe options are read back off the KEY rather than carried
+        // down from `export` as a second copy, so the export has exactly one
+        // record of what it was asked for and the two pipelines cannot end up
+        // disagreeing about it.
+        let options = recipeKey.map { RecipeSource.shared.options(for: $0) } ?? .none
         let writer: any ExportPipeline
         do {
             writer = try Exporter.pipeline(
                 built: built, project: project, urls: urls, settings: settings,
-                chapters: chapters, to: url)
+                chapters: chapters, options: options, to: url)
         } catch {
             finish(.failure(error))
             return
@@ -437,84 +514,6 @@ final class Exporter {
         lock.unlock()
     }
 
-    // MARK: - Settings → AVFoundation
-
-    /// The range to write. The core has already resolved "whole project" or
-    /// "in/out range" into `start` and `duration` (§7.8); a zero duration only
-    /// happens if the project has none, and then the composition's own length
-    /// is the honest answer.
-    static func timeRange(_ settings: ExportSettings, composition: AVComposition) -> CMTimeRange {
-        let start = CompositionBuilder.time(max(0, settings.start))
-        guard settings.duration > 0 else {
-            return CMTimeRange(start: start, duration: composition.duration)
-        }
-        return CMTimeRange(start: start, duration: CompositionBuilder.time(settings.duration))
-    }
-
-    /// The `AVAssetExportSession` preset for settings the core did not name
-    /// one for. Deliberately a fallback rather than the rule: §7.8 makes the
-    /// preset the core's decision, and this only exists so a core that adds a
-    /// preset before this build knows about it still exports something
-    /// sensible instead of refusing.
-    ///
-    /// **Not on the export path any more** — the writer sets the codec, the
-    /// size and the bitrate itself and needs no preset name. Kept because
-    /// `ExportSettings.isAudioOnly` reads `avPreset` against one of these
-    /// names, and as the one record of which fixed-frame session preset a
-    /// codec at a size would have meant, now that the core's rows carry only
-    /// the "highest quality" names (§7.8): the mapping has not left this
-    /// file, only the session has.
-    static func fallbackPreset(for settings: ExportSettings) -> String {
-        if settings.isAudioOnly { return AVAssetExportPresetAppleM4A }
-        switch settings.codec.lowercased() {
-        case "hevc", "h265":
-            return settings.width >= 3840
-                ? AVAssetExportPresetHEVC3840x2160 : AVAssetExportPresetHEVC1920x1080
-        case "prores_422", "prores", "prores422":
-            return AVAssetExportPresetAppleProRes422LPCM
-        default:
-            if settings.width >= 3840 { return AVAssetExportPreset3840x2160 }
-            if settings.width >= 1920 { return AVAssetExportPreset1920x1080 }
-            if settings.width >= 1280 { return AVAssetExportPreset1280x720 }
-            return AVAssetExportPreset960x540
-        }
-    }
-
-    /// The output file type: the core's UTI when it gave one, else the
-    /// container name mapped to the six this build writes.
-    ///
-    /// The fallback is only ever reached by a core that gave no `file_type`,
-    /// which none of the shipped rows does. It carries `wav` and `aiff` all
-    /// the same, for the symmetry rather than the need: the two LPCM rows
-    /// resolve through their UTI like every other row, and a reader who
-    /// finds them missing from this list would reasonably conclude they take
-    /// a different path.
-    static func fileType(for settings: ExportSettings) -> AVFileType? {
-        if let raw = settings.fileType, !raw.isEmpty { return AVFileType(rawValue: raw) }
-        switch settings.container.lowercased() {
-        case "mov", "quicktime": return .mov
-        case "mp4": return .mp4
-        case "m4v": return .m4v
-        case "m4a": return .m4a
-        case "wav": return .wav
-        case "aiff": return .aiff
-        default: return nil
-        }
-    }
-
-    /// The save panel's allowed type. `AVFileType`'s raw values ARE UTIs, so
-    /// this is the same decision as `fileType(for:)` and cannot drift from it.
-    static func contentType(for settings: ExportSettings) -> UTType? {
-        guard let type = fileType(for: settings) else { return nil }
-        return UTType(type.rawValue)
-    }
-
-    /// The extension the save panel appends.
-    static func fileExtension(for settings: ExportSettings) -> String {
-        contentType(for: settings)?.preferredFilenameExtension
-            ?? settings.container.lowercased()
-    }
-
     // MARK: - Offline single frame (spec §7.9's `render_frame`)
 
     /// One composed frame, rendered without a player — the agent's
@@ -530,14 +529,36 @@ final class Exporter {
     /// call it OFF the main thread. Returns nil rather than throwing for
     /// every failure — no plan, nothing to compose, a time past the end.
     ///
-    /// **Limitation**, and the same one `Playback` has: a project whose
-    /// visible clips are all text, shapes or images has no composition
-    /// tracks, and `AVAssetImageGenerator` cannot run over a composition with
-    /// none. Such a project renders in the preview (the compositor draws from
-    /// the recipe) but not here. M2's writer path removes the restriction by
-    /// driving the compositor itself.
+    /// **A timeline of nothing but text, shapes and images renders here.**
+    /// This paragraph used to say the opposite — that such a project has no
+    /// composition tracks, that `AVAssetImageGenerator` cannot run over a
+    /// composition with none, and that it therefore rendered in the preview
+    /// and not here. That was true once and stopped being true two milestones
+    /// ago, while the sentence stayed: `CompositionBuilder.addPlaceholderIfNeeded`
+    /// gives exactly that project an empty video track, whose one job is to
+    /// make every frame time exist for the generator to ask about, and the
+    /// recipe draws the picture as it always did. The guard below says the
+    /// same thing in code four lines from here. Only a genuinely EMPTY
+    /// timeline — `plan.duration == 0` — is refused.
+    ///
+    /// **`options` is a PARAMETER and not something read off the project**
+    /// (`RecipeOptions`, spec §7.3), and that is load-bearing rather than
+    /// belt-and-braces: this method registers a `RecipeSource` key of its
+    /// OWN, so an option published against any other key — an export's, a
+    /// document's — cannot reach the frames it renders. GIF and APNG never
+    /// go through `ExportWriter` at all; `ImageSequenceWriter.append` calls
+    /// this once per frame, and an option that travelled only on the export's
+    /// key would leave every one of those files silently un-burnt.
+    ///
+    /// It defaults to `.none`, which is the right answer for a caller that
+    /// wants the PICTURE rather than a deliverable: the canvas eyedropper
+    /// samples what the canvas shows, and Save Frame grabs the frame. The
+    /// callers that pass something are the export sheet, the `export` tool
+    /// and `render_frame` — the last one both for agent parity and because it
+    /// is the only way a proof script can photograph a burn-in at all.
     static func renderFrame(
-        project: ReelProject, urls: [UInt32: URL], at t: Ticks, maxWidth: Int?
+        project: ReelProject, urls: [UInt32: URL], at t: Ticks, maxWidth: Int?,
+        options: RecipeOptions = .none
     ) -> CGImage? {
         // No videoTracks is NOT a refusal: CompositionBuilder gives a
         // timeline of nothing but text, shapes and images a placeholder track
@@ -547,6 +568,10 @@ final class Exporter {
         let key = RecipeSource.shared.register()
         defer { RecipeSource.shared.unregister(key) }
         RecipeSource.shared.set(project, for: key)
+        // Before the build, not after: the generator may ask for a frame the
+        // moment the composition exists, and a frame composed against this
+        // key's defaults would be one frame short of what was asked for.
+        RecipeSource.shared.setOptions(options, for: key)
 
         let built: BuiltComposition
         do {
@@ -580,21 +605,5 @@ final class Exporter {
         guard CGFloat(maxWidth) < size.width else { return size }
         let scale = CGFloat(maxWidth) / size.width
         return CGSize(width: CGFloat(maxWidth), height: max(1, (size.height * scale).rounded()))
-    }
-}
-
-// MARK: - Audio-only settings
-
-extension ExportSettings {
-    /// True for the "Audio only" preset row (spec §7.8's M4A). Read from the
-    /// resolved settings rather than carried from the `ExportPreset` the sheet
-    /// picked, so the `Exporter` needs nothing but its settings — and so the
-    /// agent's `export {preset, path}` behaves the same as the sheet.
-    var isAudioOnly: Bool {
-        if let preset = avPreset, preset == AVAssetExportPresetAppleM4A { return true }
-        switch container.lowercased() {
-        case "m4a", "mp3", "wav", "aiff", "caf": return true
-        default: return false
-        }
     }
 }

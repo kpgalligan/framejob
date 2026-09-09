@@ -197,30 +197,13 @@ lockstep are in the root `CLAUDE.md`; the full design is
 - `transition.rs` — overlap detection, the overlap rule, progress at *t*.
 - `evaluate.rs` — `composition_plan()` (A/B assignment, instruction
   tiling) and the `assign()` the recipe shares with it.
-- `recipe.rs` — `frame_recipe(t)`: the layer list at one instant. Also
-  where a `text.animation` becomes a NUMBER: `Reveal::of` turns the
-  animation, the clip time and the clip's own duration into the `reveal`,
-  `reveal_phase` and `reveal_kind` a text layer's source object carries
-  (spec §7.3), and `text_hash` folds all three into that layer's content
-  hash — the only thing between a per-frame picture and Swift's
-  hash-keyed texture cache. The recipe STRIPS `animation` out of the text
-  description it hands over, so the computed reveal is the renderer's one
-  account of it; a layer with no animation hashes the bare description,
-  byte for byte as it did before version 5.
-  **The phase is the ORDER the renderer draws in, not a label on the
-  amount**, and `Reveal::of` is shaped by that: `word_fade` and
-  `line_rise` count their stagger from the far end while a layer is
-  leaving, so the frame the phase turns on is a frame the picture mirrors
-  on, and the one amount at which the mirror is invisible is 1. The turn
-  therefore belongs to the PLATEAU an animation that fits its clip has
-  between its two ramps (`in + out <= duration`; a tie goes to the
-  arrival). A tent has none — its ramps cross below 1 — so it keeps the
-  phase it began in for its whole life, the arrival's unless `in` is 0,
-  which leaves the clip nothing but a departure. The limit is documented
-  rather than fixed: a tent whose `in` is tiny but not zero reports `"in"`
-  from its first frame to its last. `evaluate_tests.rs` sweeps ten timings
-  frame by frame and asserts that the phase turns only where the frame
-  before it was fully revealed.
+- `recipe.rs` — `frame_recipe(t)`: the layer list at one instant, and the
+  keys of each layer in it. Where a `text.animation` becomes a NUMBER is
+  `recipe_text.rs` now, below; what stays here is the `Source::Text` arm
+  that digs the description out of an evaluated clip, and `content_hash`
+  with the FNV under it — `pub(crate)` since that cut, because a SHAPE
+  layer hashes its description through the same function, so the hash is
+  the recipe's texture-cache primitive and not a text concern.
   It is also where a layer's `blend` is emitted, and the ONE place a model
   value is deliberately OVERRIDDEN rather than only evaluated: a layer
   whose `transition` is non-null is written as `"normal"` whatever the
@@ -235,6 +218,78 @@ lockstep are in the root `CLAUDE.md`; the full design is
   consequence rather than hiding it — the recipe's `blend` is what DRAWS
   while the inspector reads the MODEL's value through `clip_state`, so the
   two legitimately differ during an overlap.
+  Two things road map 2's phase 7 added here. `RecipeOptions` is what a
+  caller wanted BESIDES `t` — one member, `burn_in_timecode` — and
+  `frame_recipe(t)` is now `frame_recipe_opts(t, RecipeOptions::default())`,
+  ONE implementation so the two cannot drift; an absent, wrongly typed or
+  non-object option means OFF, because the query FFI has no `err_out` and
+  NULL at frame rate is a black preview, and the layer that refuses a
+  mistyped one by NAME is the MCP handler above. It is deliberately NOT an
+  `export_settings` override: that table IGNORES an unknown key, so an
+  option sent that way would vanish and an export would report success on a
+  file it had not changed. And `RecipeLayer` is the twenty keys of a layer
+  written in ONE place, which is what phase 7 owed the file before adding a
+  second producer of layers: `RecipeLayer.init(from:)` on the Swift side
+  DEFAULTS a missing key silently, so a copied skeleton drifts with no
+  diagnostic anywhere.
+  Watch the key ORDER trap when reading it: the insertions follow spec
+  §7.3's listing for a reader, but `serde_json`'s `Map` is a `BTreeMap`
+  here, so every object comes out sorted — which is the property
+  `content_hash` leans on, and it means a key inserted in the wrong place
+  is a readability bug, not a wire change.
+- `recipe_text.rs` — what a text layer SHOWS at one instant: `Reveal::of`
+  turns the animation, the clip time and the clip's own duration into the
+  `reveal`, `reveal_phase` and `reveal_kind` a text layer's source object
+  carries (spec §7.3), `text_hash` folds all three into that layer's
+  content hash — the only thing between a per-frame picture and Swift's
+  hash-keyed texture cache — and `text_source` assembles the source object
+  itself. Cut out of `recipe.rs` under the size rule in road map 2's phase
+  7, when that file stood at exactly 600 owing a burn-in timecode layer,
+  and cut HERE because placement is the same question for every layer
+  while text is the one kind that is not finished when its placement is:
+  the model can only state an intent — `model_text.rs` argues that seam in
+  the schema, and this is the same seam one stage downstream — and an
+  ANIMATED intent is not even fixed, so the recipe must compute a number
+  no property of the clip holds and then get it into the texture cache's
+  KEY. `text_source` takes a description, a clip time and a duration and
+  nothing else — no clip, no instance, no `Evaluated` — so a text layer
+  the core SYNTHESIZES is a text layer like any other; `recipe.rs`
+  re-exports it, so `crate::recipe::text_source` still resolves. The
+  recipe STRIPS `animation` out of the text description it hands over, so
+  the computed reveal is the renderer's one account of it; a layer with no
+  animation hashes the bare description, byte for byte as it did before
+  version 5.
+  **The phase is the ORDER the renderer draws in, not a label on the
+  amount**, and `Reveal::of` is shaped by that: `word_fade` and
+  `line_rise` count their stagger from the far end while a layer is
+  leaving, so the frame the phase turns on is a frame the picture mirrors
+  on, and the one amount at which the mirror is invisible is 1. The turn
+  therefore belongs to the PLATEAU an animation that fits its clip has
+  between its two ramps (`in + out <= duration`; a tie goes to the
+  arrival). A tent has none — its ramps cross below 1 — so it keeps the
+  phase it began in for its whole life, the arrival's unless `in` is 0,
+  which leaves the clip nothing but a departure. The limit is documented
+  rather than fixed: a tent whose `in` is tiny but not zero reports `"in"`
+  from its first frame to its last. `evaluate_tests.rs` sweeps ten timings
+  frame by frame and asserts that the phase turns only where the frame
+  before it was fully revealed.
+  The cut paid for itself immediately: `burn_in_layer` — the timecode
+  burn-in `RecipeOptions.burn_in_timecode` appends, phase 7's own — lives
+  here, because a burn-in IS a text layer and `text_source` takes a
+  description, a clip time and a duration and nothing else. It has no
+  animation, so `Reveal::of` answers `WHOLE` and the two time arguments are
+  never read; `Reveal`'s own doc sentence was written for exactly this, "a
+  layer the core synthesizes rather than reads off a clip can simply not
+  have one". Three things about it a reader will otherwise file as bugs, and
+  the doc comment argues all three at length: its placement is a FRACTION of
+  the canvas height with `valign: middle` and NOT "bottom-centre", because
+  the core has no measured text size to subtract from a bottom edge (spec
+  §5.3, §11) and a layer's `y` is the offset of the box's CENTRE — the
+  Caption preset's `yFraction` is the precedent; the timecode is NON-DROP
+  like every other this crate writes, so a 29.97 burn-in reads ~3.6 s behind
+  wall clock at the hour, which is the definition and is what the toolbar
+  shows; and it reads PROJECT time, so an in/out range export writes a file
+  beginning at 00:00 whose burn-in reads the range's start.
 - `nest.rs` — flattening a nest into the clips it stands for, and the
   transform they inherit. Every walk over "what actually plays" goes
   through it: `evaluate.rs`, `recipe.rs` and `audio.rs` all consume its
@@ -248,15 +303,15 @@ lockstep are in the root `CLAUDE.md`; the full design is
 - `snap.rs` — candidates and `resolve`.
 - `format.rs` — `RC_FORMAT_VERSION`, the `MAX_*` caps (four of them
   `RC_MAX_*` in the header), read-any-version / write-current.
-- `export.rs` — presets (one per encoding; the two image caps are the only
-  sizes in the table) and settings resolution. `preset(id)` is the one
-  lookup both resolvers share. A row's `avf_preset` means only "AVFoundation
-  can write this row" since road map 2's phase 5 — `null` is what routes an
-  export to the ImageIO writer, so the two LPCM rows (`audio_wav`,
-  `audio_aiff`) repeat `audio_m4a`'s name rather than carrying a null
-  AVFoundation has no LPCM name to fill.
+- `export.rs` — settings resolution: `Project::export_settings`, the one
+  thing that reads a canvas, a duration, a rate and an override and meets
+  a preset row against them. Still the file whose module doc explains the
+  whole export design, and it re-exports `preset` and `presets` beside
+  `describe` at their old paths, so nothing outside it had to learn where
+  the pieces went.
 - `export_overrides.rs` — how an override value is READ and REFUSED, where
-  `export.rs` is the table and the resolution: `describe`, the overrides
+  `export_table.rs` is the table and `export.rs` the resolution:
+  `describe`, the overrides
   object itself, and the readers for a positive integer, a boolean, a rate,
   a range and a decibel figure, each refusing with a message that names the
   key and the value. Cut out of `export.rs` in road map 2's phase 5, and
@@ -276,6 +331,39 @@ lockstep are in the root `CLAUDE.md`; the full design is
   hides them. Also `fit_within`, what a size MEANS on an image format (the
   picture fitted inside it, never upscaled), which `export_settings` uses
   so the resolved numbers are the file's.
+- `export_table.rs` — the rows themselves: the `Container` enum with the
+  four questions a container answers about ITSELF (its extension, its UTI,
+  whether a leading index is worth rewriting, whether it can hold sound at
+  all), `Preset`, the `PRESETS` set one row per encoding in menu order, and
+  the `preset(id)` lookup both resolvers share. Cut out of `export.rs` in
+  road map 2's phase 7 — the second cut that file has paid, after
+  `export_overrides.rs` — and cut HERE because everything in it is a
+  constant no project can influence: an APNG's type identifier is PNG's
+  whatever the timeline holds, and GIF caps its size because of what a
+  palettised frame-by-frame format costs. `export.rs` keeps the half with a
+  `&self` and re-exports both functions, so `crate::export::presets()` and
+  `crate::export::preset(id)` resolve as they did. A row's `avf_preset`
+  means only "AVFoundation can write this row" since road map 2's phase 5 —
+  `null` is what routes an export to the ImageIO writer, so the two LPCM
+  rows (`audio_wav`, `audio_aiff`) repeat `audio_m4a`'s name rather than
+  carrying a null AVFoundation has no LPCM name to fill.
+  A row's `alpha` (phase 7, with the `prores_4444` row) is the other
+  capability flag and the one to read carefully: it means "this ENCODING
+  carries an alpha channel", true for `prores_4444` and `apng`, and never "the
+  canvas is translucent" — `export_settings` emits one flat object for
+  every row, so a project-derived flag would say `alpha: true` on an
+  H.264, a GIF and a WAV. It is a `Preset` field where `carries_audio` is
+  a `Container` one, and the difference is the point: a container decides
+  whether a file has an audio track at all, while a fourth channel is the
+  CODEC's, and `Container::Mov` holds both `prores_422`, which cannot
+  carry alpha, and `prores_4444`, which can. The pair that looks wrong and
+  is not: **`gif` is false while `apng` is true**, although both can show a
+  transparent pixel. APNG has a real fourth channel and a pixel may be any
+  fraction of opaque; a GIF nominates ONE palette index as transparent and
+  has no partial value to store, so a soft edge against nothing comes out
+  hard. Both readings were measured against the built app — an `apng` of a
+  transparent canvas decodes `pix_fmt=rgba` with its corner at alpha 0 —
+  rather than reasoned from the format names.
 - `agent.rs` — embedded MCP server (streamable HTTP, tools only).
   **Generic** — knows nothing about video; the host registers the catalog
   and a callback. Copied from Rasterize; do not add domain knowledge.
@@ -303,17 +391,27 @@ own goes in one too (`edit_zoom.rs` was phase 3's and
 `edit_track.rs` is `set_canvas` with its `rescale` / `resnap` /
 `check_dimension` helpers into an `edit_canvas.rs`.
 
-**Three modules now sit exactly AT the line and take nothing further
-without a cut of their own**: `edit_paste.rs` (600), `recipe.rs` (600 —
-331 before phase 4c put the reveal there, 567 after it, and 600 once phase
-6 added the layer's `blend` and the argument for forcing it) and
-`model_props.rs` (600, which is the worked example below). The others
-phase 6 touched are still under: `actions.rs` 573 (the list rule,
-`clamp_video`'s region block and its nest-blend bound), `props_check.rs`
-350 (the gradient's four checks and the ordering check it argues instead
-of making), `edit_props.rs` 450 (`check_blend`), `edit_time.rs` 526 and
-`edit_zoom.rs` 390. Those, and the three at the line, are the files to
-weigh a phase-7 addition against next.
+**Two modules now sit exactly AT the line and take nothing further
+without a cut of their own**: `edit_paste.rs` (600) and `model_props.rs`
+(600, which is the worked example below). `recipe.rs` was the third and
+paid the rule in road map 2's phase 7 the way `export.rs` and
+`model_props.rs` had — 331 before phase 4c put the reveal there, 567
+after it, 600 once phase 6 added the layer's `blend`, and **381** once
+the reveal, the hash over it and a text layer's whole `source` object
+went out to `recipe_text.rs` (306), BEFORE the burn-in layer that phase
+owed it. With the phase's own additions in — `RecipeOptions`, the
+`RecipeLayer` skeleton and `frame_recipe_opts` — it is at **537**, and
+`recipe_text.rs` is at **510** with `burn_in_layer` in it (456 at the
+landing; the review's answer to "does a burn-in clear a caption?" is
+fifty lines of arithmetic under `BURN_IN_Y_FRACTION`, and it says NO):
+both back under the line with room, which is the whole point of paying
+first. The others
+phase 6 touched are still under: `actions.rs` 573
+(the list rule, `clamp_video`'s region block and its nest-blend bound),
+`props_check.rs` 355 (the gradient's four checks and the ordering check
+it argues instead of making), `edit_props.rs` 450 (`check_blend`),
+`edit_time.rs` 526 and `edit_zoom.rs` 390. Those, and the two at the
+line, are the files to weigh a phase-7 addition against next.
 
 **`export.rs` paid the rule in phase 5 and is the worked example.** It
 stood at 578 against the cap, and phase 5 owed it two container variants,
@@ -323,11 +421,29 @@ lines — about 690. So it gave something up BEFORE it took anything on:
 `export_overrides.rs` (266), and `export.rs` came back to **579** with the
 phase's additions already in it. The cut is by CONCERN, `props_check.rs`'s
 own: how a value is SPELLED and what makes it a refusal is a fact about
-the vocabulary, where the table and the resolution are `export.rs`.
+the vocabulary, where the table and the resolution were both
+`export.rs`'s until phase 7 took the table out too (next paragraph).
 Nothing in the new file knows which preset asked or what the canvas is.
 And the re-export is what made the cut free — five modules name
 `crate::export::describe` for their own messages, so `export.rs` re-exports
 it and not one of them changed.
+
+**It paid the rule a SECOND time in phase 7**, before 7b's ProRes 4444 row
+and its `alpha` capability, and the second cut is worth reading beside the
+first: the same file, the same rule, a different nameable seam. The
+`Container` enum and the whole preset table went out to `export_table.rs`
+(422 at the cut, **518** with 7b's `prores_4444` row and the `alpha` field
+in it), leaving `export.rs` at 222, and **241** once the `alpha` echo
+landed beside `audio` and `video` — the resolver, and the module doc that
+explains the design the table serves. Both numbers are given for the
+reason the `recipe.rs` paragraph above gives both of its: a phase-8 author
+weighing an export-table addition is working against 82 lines of headroom,
+not 178. The seam is that everything in the
+table is a constant no project can influence, where `export_settings` is
+the only half handed a `&self`; the visibility it cost is the fields the
+resolver reads and the four `Container` questions it asks, and `presets`
+and `preset` are re-exported, so `ffi_query.rs` and `export_size.rs` were
+untouched.
 
 `model.rs` is OFF the list: it came DOWN from 1330 to 940 when the lookups
 and `validate` moved to `model_query.rs` (454), and to 462 in road map 2's

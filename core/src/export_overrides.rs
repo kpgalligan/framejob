@@ -1,6 +1,6 @@
 //! How an export override is READ and REFUSED — the vocabulary the export
-//! settings resolve from, where `export.rs` is the table and the
-//! resolution.
+//! settings resolve from, where `export_table.rs` is the table and
+//! `export.rs` the resolution.
 //!
 //! Cut out of `export.rs` in road map 2's phase 5, and cut HERE for the
 //! reason `props_check.rs` was cut out of `edit_props.rs`: a rule about

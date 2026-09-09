@@ -40,6 +40,97 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         false
     }
 
+    /// ⌘Q with an export still being written.
+    ///
+    /// **A half-written export is not unsaved work, and the app already has a
+    /// path for the other one.** `NSDocumentController` reviews modified
+    /// documents FIRST — measured, not assumed: a probe whose document
+    /// controller never answers `reviewUnsavedDocuments` never reaches this
+    /// method at all, so implementing it takes nothing away from the document
+    /// review and simply asks a second question after it. The question is
+    /// about work in flight, and its stakes are the opposite way round: there
+    /// is nothing to save and nothing to lose in the model, but there IS a
+    /// file at a path the person chose, and `AVAssetWriter` has not written
+    /// its moov atom into it yet. Quit without asking and they are left with a
+    /// truncated movie that Finder cannot tell from a finished one.
+    ///
+    /// **Scoped to the QUEUE, deliberately, and the scope is the fix's whole
+    /// argument.** Quitting during a sheet export truncates its file exactly
+    /// the same way — the progress sheets go up through `presentAsSheet`,
+    /// which is window-modal, so Quit stays live behind them — and that has
+    /// been true since M1. What phase 7's queue changed is not the outcome but
+    /// the ODDS: it is the first long write in this app with nothing on
+    /// screen, its window is documented as stopping nothing when it closes,
+    /// and `enqueueExport` deliberately does not pause playback, so the person
+    /// goes back to editing and forgets. A sheet is a person watching a bar
+    /// move; ⌘Q there is a deliberate act with the evidence in front of them.
+    /// Covering the sheets too would mean a registry of running `Exporter`s
+    /// that nothing else wants, and asking `attachedSheet` instead would
+    /// prompt about "an export being written" over the export SETTINGS card,
+    /// which is a lie. Left undone on purpose; if a registry ever arrives for
+    /// another reason, this is the second caller.
+    ///
+    /// Answering `.terminateLater` rather than cancelling and quitting at once
+    /// is what makes "Quit Anyway" mean what it says: `cancelAll()` only ASKS
+    /// the exporter to stop, and the half-written file is removed later, in
+    /// `ExportQueueController.finished`. Exiting before that callback would
+    /// leave behind exactly the debris the prompt was raised about.
+    ///
+    /// One consequence of asking SECOND, said out loud because it looks like a
+    /// bug: the document review has already run by the time this is reached,
+    /// so Cancel here leaves an app whose modified documents were saved and
+    /// closed on the way to a quit that then did not happen. That is AppKit's
+    /// order and every delegate that can cancel a termination inherits it;
+    /// nothing is lost, and asking first is not on offer.
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        let queue = ExportQueueController.shared
+        guard !queue.isIdle else { return .terminateNow }
+
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = "An export is still being written."
+        let running = queue.runningJob.map { "“\($0.name)”" } ?? "An export"
+        let waiting = queue.waitingCount
+        alert.informativeText =
+            "\(running) is not finished"
+            + (waiting > 0 ? ", and \(waiting) more \(waiting == 1 ? "is" : "are") waiting" : "")
+            + ". Quitting now stops it and deletes the partly written file."
+        alert.addButton(withTitle: "Quit Anyway")
+        alert.addButton(withTitle: "Cancel")
+        guard alert.runModal() == .alertFirstButtonReturn else { return .terminateCancel }
+
+        queue.cancelAll()
+        if queue.isIdle { return .terminateNow }
+        waitForQueueThenTerminate()
+        return .terminateLater
+    }
+
+    /// Replies to `.terminateLater` once the queue has actually stopped — the
+    /// cancel is asynchronous, and the file is removed on the way out.
+    ///
+    /// The deadline is not tidiness. `replyToApplicationShouldTerminate` is
+    /// the only thing that can end a `.terminateLater`, so an exporter that
+    /// never called back would leave a person unable to quit by any means but
+    /// Force Quit. Five seconds is longer than a cancel has ever taken and
+    /// short enough that nobody reaches for the Dock.
+    private func waitForQueueThenTerminate() {
+        var observer: (any NSObjectProtocol)? = nil
+        var replied = false
+        func reply() {
+            guard !replied else { return }
+            replied = true
+            if let observer = observer { NotificationCenter.default.removeObserver(observer) }
+            NSApp.reply(toApplicationShouldTerminate: true)
+        }
+        observer = NotificationCenter.default.addObserver(
+            forName: ExportQueueController.didChangeNotification,
+            object: ExportQueueController.shared, queue: .main
+        ) { _ in
+            if ExportQueueController.shared.isIdle { reply() }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5) { reply() }
+    }
+
     /// The server holds a pointer to its handler for as long as it runs, and
     /// its thread must be joined before the process goes away.
     func applicationWillTerminate(_ notification: Notification) {
@@ -223,6 +314,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             item("Consolidate Media…", #selector(EditorViewController.consolidateMedia(_:))))
         menu.addItem(.separator())
         menu.addItem(item("Export…", #selector(EditorViewController.exportProject(_:)), "e"))
+        // Save Frame… is the still-image sibling of Export… and sits beside
+        // it under the same letter (road map 2's phase 7a): ⌘E writes the
+        // movie, ⌥⌘E writes the one frame under the playhead. Spec §9's
+        // "proposed, not yet bound" table claimed ⌥⌘E for this phase and the
+        // row has been promoted into the bound table above it. The modifier
+        // matters: a modifier-less menu key equivalent is resolved ahead of
+        // the first responder, which is why the caption items take none, but
+        // ⌥⌘ is nobody's bare key.
+        menu.addItem(
+            item(
+                "Save Frame…", #selector(EditorViewController.saveFrame(_:)), "e",
+                [.command, .option]))
         return menu
     }
 
@@ -488,10 +591,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         return menu
     }
 
+    /// Window ▸ Export Queue (road map 2's phase 7e). The queue outlives its
+    /// window — a running export does not stop when the window is closed — so
+    /// this only shows the one there is.
+    @objc func showExportQueue(_ sender: Any?) {
+        ExportQueueWindowController.shared.show()
+    }
+
+    /// The queue's window sets `isExcludedFromWindowsMenu`, and it has to: this
+    /// menu is `NSApp.windowsMenu`, so AppKit appends a row for every window it
+    /// can see, titled after the window — and "Export Queue" would appear
+    /// twice, once as the item below and once as AppKit's own.
+    ///
+    /// No key equivalent. Spec §9's "proposed, not yet bound" table claims no
+    /// row for phase 7e, and every bare letter belongs to the editor's own
+    /// `keyDown`.
     private func windowMenu() -> NSMenu {
         let menu = NSMenu(title: "Window")
         menu.addItem(item("Minimize", #selector(NSWindow.performMiniaturize(_:)), "m"))
         menu.addItem(item("Zoom", #selector(NSWindow.performZoom(_:))))
+        menu.addItem(.separator())
+        menu.addItem(item("Export Queue", #selector(showExportQueue(_:))))
         menu.addItem(.separator())
         menu.addItem(item("Bring All to Front", #selector(NSApplication.arrangeInFront(_:))))
         return menu

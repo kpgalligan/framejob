@@ -28,7 +28,7 @@ Four things in `designs/`, and you want all of them:
 
 ```sh
 make app        # cargo build --release + xcodegen + xcodebuild → build/Build/Products/Release/Reelcut.app
-make test       # cd core && cargo test --release  (436 black-box tests)
+make test       # cd core && cargo test --release  (456 black-box tests)
 make lint       # cargo clippy --all-targets -- -D warnings
 make typecheck  # swiftc -typecheck of app/Sources/*.swift — the ONLY authoritative Swift check
 make project    # xcodegen generate (Reelcut.xcodeproj is generated; project.yml is the source of truth)
@@ -51,8 +51,8 @@ core/                Rust staticlib — the model, the ops, the plan, the recipe
   src/                 model(+_query/_props/_regions/_text) time edit(+_clip/
                        _edge/_insert/_props/_track/_time/_paste/_nest/_action/
                        _zoom/_background) props_check actions transition
-                       evaluate recipe nest audio snap format
-                       export(+_size/_overrides) agent ffi*
+                       evaluate recipe(+_text) nest audio snap format
+                       export(+_size/_overrides/_table) agent ffi*
   tests/               black-box, through the FFI (core/CLAUDE.md)
 app/
   Sources/             AppKit app, programmatic UI (app/CLAUDE.md has the map)
@@ -1132,5 +1132,84 @@ STRUCTURE with no caller a script can reach, the answer is a probe against
   measures the Blend row, the computed note, the Gradient section and, over
   a probe it compiles because a menu is never drawn into a window, the two
   Clip-menu items and their validator.
+
+- **Road map 2, phase 7 — Output: done.** No project-schema change (version
+  6 stands), NO new op (`OP_NAMES` is still 55) and NO new tool (the catalog
+  is still **73**) — the first phase whose whole surface is new ARGUMENTS on
+  tools that already existed. One new FFI export, three files that paid the
+  size rule before a line of feature code, and 170 new checks.
+  **The cuts first**: `recipe.rs` 600 → 381 (`recipe_text.rs`, 456, which
+  then took the burn-in), `export.rs` 579 → 222 (`export_table.rs`, 509) and
+  `ExportSheetController.swift` 1114 → 450 (`ExportSheetOptions.swift`,
+  `ExportSheetResolve.swift`, `ExportProgressSheetController.swift`), all
+  three PURE MOVES landed and gated alone so anything that moved afterwards
+  is attributable. Two more paid it mid-phase: `Exporter.swift` gave up
+  `ExporterSettings.swift` before taking its `RecipeOptions` argument, and
+  `ExportSheetController.swift` gave up `ExportSheetPresets.swift`.
+  **Save Frame** is File ▸ Save Frame… ⌥⌘E, and the shape is the point:
+  `FrameWriter.swift` is a value type — a CGImage and a format in, a written
+  URL out, no panel and no AppKit view in it — that the panel AND
+  `render_frame` both call, which is what makes their PNGs byte-identical by
+  construction and is the only way the claim can ever be checked, since a
+  save panel cannot be driven over MCP or put up offscreen. PNG keeps a NIL
+  properties dictionary; JPEG flattens onto BLACK at 0.9; HEIC is
+  `UTType.heic`. `render_frame` gained `path`, `format` and
+  `burn_in_timecode`; `replaceableExtensions` gained the five image
+  containers, `gif` among them, which fixes a pre-existing `x.gif.png`.
+  **`prores_4444`** is a row, and `alpha` in the resolved settings is a
+  per-row CAPABILITY — "this encoding carries an alpha channel", true for
+  `prores_4444` AND `apng` — never "the canvas is translucent", which would
+  report true on an H.264, a GIF and a WAV. `gif` is false although a GIF
+  can show a transparent pixel: it has ONE palette index and no partial
+  value, where APNG has a real fourth channel. No writer change was needed
+  (the codec already mapped, the reader already asked for 32BGRA), and the
+  Document tab's alpha control already shipped — what landed there is a
+  conditional note. **Two alpha facts were measured, not reasoned**: `apng`
+  was written `alpha: false` and is now true, and a ProRes 4444 export at a
+  PADDED size wrote INVERTED alpha (the picture at 0, the bars at 255) while
+  any same-aspect resize is correct, so `ExportWriter.checkAlphaSurvivesTheSize`
+  refuses the aspect change by name. `apng` needs no such guard and must not
+  grow one — the ImageIO path FITS instead of padding.
+  **The burn-in** is a RECIPE option and never an export override (an
+  unknown override key is dropped silently, so the tool would report success
+  on an un-burnt file). It travels by `rc_project_frame_recipe_opts`, by
+  per-KEY options on `RecipeSource`, AND as a parameter on
+  `Exporter.renderFrame` — the third is not redundancy: GIF and APNG never
+  reach `ExportWriter`, so the key alone would leave every image-sequence
+  export silently un-burnt. The layer is appended LAST, so an un-optioned
+  recipe is byte-identical by construction, and `Project::layer` now shares
+  its twenty-key skeleton — proved byte-identical against a worktree at
+  pre-cut HEAD. Three readings are correct and stated: the placement is a
+  FRACTION of canvas height with `valign: middle` (the core stores no
+  measured text size), the timecode is NON-DROP, and it shows PROJECT time
+  on an in/out export.
+  **Presets store CONTROL CHOICES**, not resolved overrides — the road map's
+  design could not be built, because the encoding is not an override and a
+  resolved map cannot tell "1080p + High" from "Custom + a typed rate". The
+  restore ORDER in `loadView` is load-bearing: format before
+  `rebuildSizes()`, size after it and by `ExportSize.id` never an index,
+  "Custom…" before the loudness field, `resolve()` last.
+  **The queue** runs one job at a time from the main thread with a fresh
+  `Exporter` each — two concurrent ones DEADLOCK, measured — captures
+  `mediaURLs()` at ENQUEUE, and has no AppKit in `ExportQueueController` by
+  design, so a probe can drive it where no window can be photographed. It
+  gets no MCP mirror: a queue edits no project, and `export` called N times
+  already is the capability.
+  Measured: `make test` **456** (436 before — `core/tests/recipe.rs` 15,
+  `export.rs` 30 → 35), `make lint` and `cargo fmt --check` clean,
+  `make typecheck` 0 errors and the same 4 AVFoundation warnings, the
+  catalog at 73 and the parity log EMPTY. `tools/proof/phase7_proof.py` is
+  **92/92** over MCP and `phase7_chrome.py` **78/78** offscreen, with phases
+  1–6 unchanged against the final binary (66, 85, 121, 8, 84, 88, 167 over
+  MCP; 26, 33, 59, 81, 70, offscreen). Twenty-four mutants across the two
+  scripts; three SURVIVORS were each worth more than a kill — `[:]` for
+  `nil` at the PNG add call is a no-op on this OS (byte-identical files, so
+  the rule stays as a GUARD and no byte comparison can falsify it;
+  `phase7_chrome.py`'s structural read of `destinationProperties != nil` is
+  what catches it), the queue's cancel `removeItem` is defence in
+  depth because `AVAssetWriter.cancelWriting()` already removes its
+  part-file, and the probe's own driving found a latent crash:
+  `ExportWriter.cancel` before `reader.startReading()` killed the process,
+  which is guarded now.
 
 Keep this file current as code lands.

@@ -1,8 +1,8 @@
 //! C FFI: the read-only queries (`rc_project_duration`,
 //! `rc_project_composition_plan`, `rc_project_frame_recipe`,
-//! `rc_project_clip_state`, `rc_project_snap_candidates`,
-//! `rc_snap_resolve`, `rc_op_names` and the three `rc_export_*` queries in
-//! the header).
+//! `rc_project_frame_recipe_opts`, `rc_project_clip_state`,
+//! `rc_project_snap_candidates`, `rc_snap_resolve`, `rc_op_names` and the
+//! three `rc_export_*` queries in the header).
 //!
 //! Thin shims only, all of them pure: a query never changes the project
 //! and never allocates a handle. Every JSON answer here is COMPACT, unlike
@@ -29,6 +29,7 @@ use crate::ffi_util::{
     fallible_op, out_string, project_get, project_json, read_cstr, read_opt_cstr,
 };
 use crate::model::Project;
+use crate::recipe::RecipeOptions;
 use crate::snap;
 use crate::time::Ticks;
 
@@ -67,6 +68,44 @@ pub unsafe extern "C" fn rc_project_composition_plan(p: *const Project) -> *mut 
 #[no_mangle]
 pub unsafe extern "C" fn rc_project_frame_recipe(p: *const Project, t: i64) -> *mut c_char {
     unsafe { project_json(p, |project| Some(project.frame_recipe(t).to_string())) }
+}
+
+/// [`rc_project_frame_recipe`] with the caller's recipe options (spec §7.3;
+/// [`RecipeOptions`]). `opts_json` is `{"burn_in_timecode": bool}` or NULL
+/// for the defaults, and NULL is exactly what
+/// [`rc_project_frame_recipe`] asks for — the two exports are one
+/// implementation, so a plain call to either produces the same bytes.
+///
+/// An `opts_json` that is not JSON at all answers NULL, which is all this
+/// export can say: the queries carry no `err_out` (this module's doc gives
+/// the reason). A key that is ABSENT, of the wrong type, or in a document
+/// that is not an object is not a failure at all — it means OFF, and
+/// [`RecipeOptions::of`] argues why the two are spelled differently.
+///
+/// # Safety
+/// `p` must be NULL or a valid handle from this library that has not been
+/// freed; `opts_json` must be NULL or a valid NUL-terminated C string. The
+/// returned string is freed with [`crate::ffi::rc_string_free`].
+#[no_mangle]
+pub unsafe extern "C" fn rc_project_frame_recipe_opts(
+    p: *const Project,
+    t: i64,
+    opts_json: *const c_char,
+) -> *mut c_char {
+    unsafe {
+        project_json(p, |project| {
+            // Read inside the closure so the whole body, pointer read
+            // included, runs under the one catch_unwind project_json owns —
+            // `rc_project_snap_candidates` above does the same for the same
+            // reason.
+            let text = read_opt_cstr(opts_json, "opts_json").ok()?;
+            let opts = match text {
+                None => RecipeOptions::default(),
+                Some(json) => RecipeOptions::of(&serde_json::from_str::<Value>(&json).ok()?),
+            };
+            Some(project.frame_recipe_opts(t, opts).to_string())
+        })
+    }
 }
 
 /// One clip's evaluated properties at project time `t`, for the inspector.

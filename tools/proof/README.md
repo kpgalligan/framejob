@@ -138,6 +138,15 @@ The `format=rgb24` must be INSIDE the filter chain. `-pix_fmt rgb24` on the
 OUTPUT gives 0x7E where the card asks for 0x80, and a blend proof measured
 against 126 instead of 128 fails arithmetic it got right.
 
+**Phase 7 adds nothing to `media/` either, and `phase7_chrome.py` needs no
+ffmpeg at all.** Every fixture it uses is a shape card written by the script
+into `work/` — one rectangle on one track, nine packages at three canvas sizes —
+and a timeline of
+nothing but shapes exports through `CompositionBuilder`'s placeholder track, so
+there is nothing to decode anywhere in that file. `phase7_proof.py` is the half
+that needs a decoder, because ProRes 4444's alpha is a pixel format only
+`ffprobe` can name.
+
 Then launch YOUR OWN instance on YOUR OWN port and only ever kill that one
 (`pgrep -f "MacOS/Reelcut"` lists them; another session may have one running):
 
@@ -152,7 +161,12 @@ python3 tools/proof/phase3_silence_scope.py 4823
 python3 tools/proof/phase4_proof.py 4823
 python3 tools/proof/phase5_proof.py 4823
 python3 tools/proof/phase6_proof.py 4823
+python3 tools/proof/phase7_proof.py 4823
 ```
+
+The offscreen scripts take no port and are run on their own —
+`python3 tools/proof/phase2_chrome.py` and its successors through
+`phase7_chrome.py`; each paragraph below says what its own one renders into.
 
 The last line is `<n>/<n> checks passed`, and the exit status is non-zero if
 any failed. The log's second line names the port the app actually bound (a
@@ -161,13 +175,17 @@ startup parity check would complain — `grep "Reelcut: " /tmp/reelcut-4823.log`
 must print nothing before a proof run means anything.
 
 **The EXACT tool count belongs to the newest phase's script**, because it is
-what tells a stale binary on the port from the build under test: phase 6
+what tells a stale binary on the port from the build under test: phase 7
 asserts 73, and phases 1 to 5 keep floors (63, 65, 68, 70 and 71) so a later
 phase's tools never fail an older proof. That handover has now happened
-twice, each time exactly as it was written down — phase 5 added
+three times, each time exactly as it was written down — phase 5 added
 `normalize_clip`, took the exact count, and phase 4's `check` became a `>=`;
 phase 6 added `add_background` and `add_blurred_background`, took the count
-at 73, and phase 5's became a `>=` in the same commit. It is not decoration:
+at 73, and phase 5's became a `>=` in the same commit; and phase 7 is the
+first handover that cost NOTHING, because it adds no tool at all — its
+surface is new ARGUMENTS on two tools that already existed, so phase 6's own
+`TOOLS = 73` is still an exact assertion and needed no edit. It is not
+decoration:
 the phase-4 count was checked against the two new tools taken out of the
 catalog and the registry together, where it reads 68 — and it is not the
 only check that notices. `check` never stops a run, so that build goes on to
@@ -720,6 +738,215 @@ close does not. The last pair is the limit CLAUDE.md records — the write
 pass decodes to Int16, which saturates before the gain reaches it — made
 visible in the sentence the user reads rather than left in a paragraph.
 
+`phase7_chrome.py` is phase 7's offscreen half (`python3
+tools/proof/phase7_chrome.py`, no port, no media; renders, written stills,
+exported files and every probe answer in `work/chrome7/`), and it is the first
+chrome script that is mostly NOT a photograph. Phase 7's features are a save
+panel, an export sheet and a window of its own: the harness renders an
+`EditorViewController`'s content view, none of the three is in it, and no sheet
+can be put up offscreen at all. So five of its six sections are PROBES, in
+`phase6_chrome.py`'s shape — one `main.swift` compiled against the whole of
+`app/Sources` by `build.sh`'s own swiftc line, cached on modification times, a
+build it cannot make scored as a FAILURE rather than an exit — with several
+MODES behind one binary, because compiling the module costs a minute and phase
+7's four corners have nothing else in common.
+
+**It builds a SECOND instrument, and that one is worth knowing before anything
+else in the file is read.** A bare swiftc binary has no compiled shader, so
+`MetalRenderer.init` returns nil and every export the probe runs fails with
+"Metal is not available on this system." — which reads exactly like a queue
+defect and is not one. `build_probe` therefore compiles the app's OWN
+`app/Resources/Shaders/Compositor.metal` with `xcrun metal` into a
+`default.metallib` beside the binary, along with the app's `Fonts` (as
+`build.sh` does) and `Blank.mp4`. The answer to the question that raises is
+measured rather than assumed: **`Bundle.main.resourceURL` of a bare executable
+IS the directory the executable is in**, so `CompositionBuilder`'s placeholder
+track finds `Blank.mp4` there and a timeline of nothing but shapes exports —
+which is what lets every fixture in the file be a shape card, and the script
+need no `media/` and no ffmpeg.
+
+**Its byte claims are made over `apng`, and the reason is measured too.** A
+QuickTime movie carries a creation and a modification time at one-second
+resolution: two ProRes 4444 exports of one unchanged project came back 207,679
+bytes each and differed in exactly SIX bytes, all inside the movie header's
+time fields, when they landed in different seconds — and were byte-identical
+when they landed in the same one. So a byte comparison of two `.mov` files is a
+comparison of two clocks. H.264 is not deterministic at all (2,638 / 2,625 /
+2,638 bytes over three exports of one project), which is VideoToolbox's rate
+control rather than a defect, and is why the cancel scenario — the only one
+making no byte claim — is the only place the script uses it. `apng` has no
+clock, goes through `ExporterImageSequence.swift` rather than `ExportWriter`,
+and came back byte-identical across processes every time. ProRes 4444's own
+claims are `phase7_proof.py`'s, where `ffprobe` can read a pixel format.
+
+Sections 1 and 2 are the two things phase 7a put where a probe can reach them.
+The MENU: File ▸ Save Frame… over `saveFrame:`, taking the letter Export…
+already has under ⌥⌘ rather than ⌘ — asserted as FLAGS read off `NSEvent`, so
+"exactly command and option, and neither shift nor control" is a claim rather
+than a number copied into the script — sitting directly under Export… with no
+separator between them, and Window ▸ Export Queue over `showExportQueue:` with
+no key equivalent at all. Then `validateSaveFrameAction`, which is
+load-bearing and not decoration: **false on a zero-duration project and true on
+one with a clip**, `nil` for a selector that is not its own, and the two
+fixtures' durations scored FIRST, because a check whose precondition never held
+would pass against a build whose arm returns `true` unconditionally.
+`FrameWriter` is section 2 — the whole vocabulary read off the type, every
+spelling `format(for:)` accepts including that `heif` is NOT one of them, and
+three files written from one `CGImage` and read back. **The flatten is the
+check that needed a fixture designed for it.** Over PREMULTIPLIED pixels a
+flatten onto black is numerically the IDENTITY (a transparent pixel is already
+0, and `src + dst(1 - a)` at `dst` = 0 is `src`), so a card in that encoding
+cannot tell a build that flattens from one that merely drops the alpha channel.
+The card is therefore STRAIGHT alpha — a transparent white band, a
+half-transparent white band, an opaque one — where an unflattened encode writes
+white and a flattened one writes black, and the sample that separates them is
+scored beside the two that say the picture arrived at all.
+
+Section 4 is the QUEUE, driven through `ExportQueueController` with **no window
+ever ordered front**, which is what that type's AppKit-free design was for. Two
+queued jobs write files byte-identical to two single exports through `Exporter`
+itself; they run ONE at a time and IN ORDER, read off the controller's own
+change notification rather than polled, so a transition between two spins of
+the run loop cannot be missed; a cancelled job's half-written file is deleted
+and the job behind it still runs; and `remove` refuses a job that has not
+finished and takes one that has, after which `clearFinished` drops the row it
+left behind. **That last pair is one probe run and the ORDER inside it is the
+check**: until the review the run removed BOTH finished rows and only then
+asked for a clear, so the clear ran over an already-empty list and answered 0
+whatever its body did — `func clearFinished() {}` would have scored a clean
+run, while Clear Finished in the queue window did nothing and every finished
+row went on holding its `ReelProject`. It removes ONE row now, so the clear is
+asked with exactly one finished job in the list and a gutted body answers 1.
+**The claim worth the section is
+immutability**: the document is EDITED between the enqueue and the run — after
+both jobs are queued and before the run loop has been spun once, so the edit
+precedes the first frame either job composes — and both files still equal the
+PRE-edit singles while a single export of the POST-edit project differs, which
+is the check a build that re-read the document would fail and a build that
+merely looked immutable would pass. Two of the exports differ only in their
+per-job `RecipeOptions`, which is also the one claim about the burn-in a
+GIF or APNG could otherwise lose: an image sequence never goes through
+`ExportWriter` at all, and an option plumbed only through the export's own
+recipe key would leave every one of those files silently un-burnt. Beside it
+the burn-in's PLACEMENT is measured on the exported frames at TWO canvas
+heights, because it is a FRACTION of the canvas (`BURN_IN_Y_FRACTION`, 94 % of
+the way down the frame) and one height cannot say so — 360 is exactly the
+height at which that fraction and a hard-coded 158.4 agree.
+
+**Section 3 is a TWO-PROCESS probe and its docstring says what that does and
+does not buy.** One process writes a choice through `ExportChoice.remember()`
+and a list through `ExportPresetsStore.write()` and exits; a second reads them
+back, and every one of the record's nine fields survives with the name cleared,
+the uniqueness rule comes back trimmed and case-insensitive, and a CORRUPT
+presets file degrades to "no presets" rather than throwing. **The ninth field
+is `custom_size` and it took the review to get it read back**, which is worth
+recording as the shape of gap to look for: every assertion about the presets
+list projected `["name"]`, the remembered record's comparison dict carried
+eight keys while its sentence said nine, and so a decoder with
+`customSize = nil` in it scored a clean run — while a person reapplying a
+preset saved off Custom 3840 × 2160 got the document's own size with the popup
+claiming the preset had been applied. It is pinned in both directions now: the
+remembered record's must come back nil (it was asked with a size ROW, and
+`ExportChoice` calls a record holding both a hand-edited file's state), and the
+"Master" preset's whole record is compared field for field against what was
+saved, beside the record next to it that must not have grown one. What it proves is
+the MECHANISM under the PROBE BINARY's own `UserDefaults` domain, **not under
+Reelcut.app's** — no proof script in this tree has ever launched or terminated
+the app, so "the sheet reopens on last time's choice after a relaunch" is not a
+sentence any of them can say. Two things it touches outside the tree it also
+puts back, and the restoration is scored as a check: the probe's defaults
+domain is its own (`~/Library/Preferences/phase7probe.plist`, keyed on the
+executable name — measured: two runs of one binary share a domain and two
+binaries do not) and its one key is removed at the end, while
+`ExportPresetsStore` writes the REAL
+`~/Library/Application Support/Reelcut/ExportPresets.json`, because its path is
+`AppSupport.directory`'s and `NSHomeDirectory()` ignores `$HOME` on macOS
+(measured) — so the script copies that file aside first and restores it in a
+`finally`.
+
+Section 5 is the one PHOTOGRAPH, and it is the Document tab's transparency
+note. Two OPAQUE canvases (black against white) change the summary line and the
+swatch and MOVE NOTHING, which is the control the rest of the section needs; a
+translucent one pushes the Markers section under Appearance down by an exact
+whole number of points with every row of the band explained and the runner-up
+far worse; the growth is one LABEL row rather than a control row, solved from
+the shift; and nothing above the Appearance header moves at all, so the note is
+inside the section whose value it is about. Its ink is compared against the
+Export button's fill measured in the SAME render — `InspectorNoteLabel` draws
+in `DS.accent`, which is `NSColor.controlAccentColor`, so no colour is written
+down here any more than in phase 3's or phase 6's chrome — and the 0.995
+threshold is pinned from BOTH sides, at 0.99 and at 0.999.
+
+Mutation-tested against **fifteen** deliberate breakages, each a copy of a
+clean snapshot with ONE edit in it and the script run from inside that copy —
+never against the working tree, because a second agent was editing the same
+repository at the time and a proof measured against somebody else's mutant is
+not a measurement. **The scores below are that run's own, out of the 77 checks
+the script carried when it was made; it scores 78 today** — the review added
+the preset's whole-record check and repaired the clear, and neither mutant set
+was re-run against the repair. Thirteen died and the two that lived are the interesting
+half. Dropping `FrameWriter`'s flatten (75/77) and flattening onto WHITE
+instead (75/77) each kill the same two: the transparent band's sample, and the
+one beside it that says the picture arrived at all — which is what the straight-alpha
+card was built for, since ImageIO really does write white there when the
+flatten is gone. Teaching `format(for:)` the spelling `heif` (76/77) kills the
+one check written to forbid it. The validator arm returning `true`
+unconditionally (75/77) kills the zero-duration refusal and the arm's own
+answer. Giving Save Frame plain ⌘E (75/77) kills the letter and the modifier
+pair, and turns up a fact worth keeping: AppKit BLANKS a duplicate key
+equivalent in one menu, so that build's Save Frame came back with no key at all
+rather than with Export…'s — the modifier is not a nicety. Making the queue's
+`remove` take an unfinished job (75/77) kills both halves of that rule; making
+`start` launch every waiting job at once (66/77) kills ELEVEN, which is the
+queue's whole design measured in one line, and leaves job 1 orphaned in
+`.running` for ever, so the run also demonstrates that two concurrent
+`Exporter`s deadlock. Appending a preset instead of replacing it (72/77) fails
+five checks across both processes; letting `remember()` keep the name (75/77)
+fails two. On the chrome side, a `transparencyNote` that never fires (74/77)
+takes the shift, the label-row solve and the accent-ink comparison, and moving
+its threshold from 0.995 to 0.9 (76/77) takes the boundary check alone —
+exactly the one written for it. And handing `ImageSequenceWriter` the default
+`RecipeOptions` (72/77) — the defect the contract names as the one a burn-in
+proof would silently miss — takes five, including both placement checks,
+because nothing is drawn at all.
+
+**The two survivors are both redundant-path mutants, and both are recorded in
+the script rather than papered over.** Deleting `ExportQueueController`'s own
+`removeItem` on a cancelled job scores 77/77, because
+`AVAssetWriter.cancelWriting()` already removes its part-file and
+`ImageSequenceWriter` already removes its own — so that check is worded as the
+OUTCOME (nothing is left behind) and not as a guard on that line, and the line
+stays because it says what the queue intends. Stopping `ExportWriter.cancel`
+from calling `reader.cancelReading()` scores 77/77 for the same shape of
+reason: `Exporter.cancel` also sets `cancelRequested`, which the pump tests per
+sample, and the reader call only wakes a pump blocked inside
+`copyNextSampleBuffer`. **The mutant that DOES kill the cancel checks** — the
+queue marking a running job "Stopping…" and never asking the exporter to
+stop — scores 75/77, taking the cancelled-state check and the one that says the
+queue carries on afterwards. A check nothing can break is worth finding out
+about; a check whose only mutant is redundant is worth rewording rather than
+deleting.
+
+**The run missed two mutants that a READER then found, and both are the same
+shape: a check whose precondition had already been consumed.** `func
+clearFinished() {}` and `customSize = nil` in `ExportChoice`'s decoder would
+each have scored a clean run — the first because the probe emptied the queue
+with `remove` before asking for the clear, the second because every assertion
+about the presets list projected `["name"]`. Neither was among the fifteen, and
+that is the point: a mutant set is a sample of the edits somebody might make,
+not a search for the checks that cannot fail, and nothing but reading a probe
+against its own assertions finds those.
+Both are repaired above, and the repairs are the two checks the numbers in this
+paragraph predate.
+
+The script's own timeouts came out of that run. Every spin is proportionate
+rather than generous — three minutes where two queued `apng` jobs take under a
+second — because a DEADLOCKED queue is a real outcome (the `all-at-once` mutant
+produces one) and a proof that hangs for ten minutes is a worse detection than
+one that fails in three. It cost the mutation runner the same lesson, one level
+up: the first batch was aborted by an unhandled `TimeoutExpired` on that very
+mutant.
+
 `media/` and `work/` are ignored: the movies are regenerable from the lines
 above and the projects are rebuilt on every run. Phase 2's packages are
 named `<name>-<pid>.reelcut` rather than `<name>.reelcut`, and each run
@@ -737,6 +964,18 @@ read nor written through the document machinery. Phase 5 puts the pid on its
 EXPORTS as well as on its packages, because half its claims are byte
 comparisons between two files and a second run must never find the first
 run's; its fixtures live under `work/fixtures/` and are rewritten every time.
+Phase 6 keeps both for the same two reasons. **Phase 7 is split, and the split
+is per SCRIPT rather than per phase** — the sentence that used to stand here
+said the phase needed neither device, which is true of one of its two scripts
+and false of the other. `phase7_chrome.py` needs neither: nothing IT makes is
+ever handed to a running app, because the harness and the probe are fresh
+processes that open a package off disk, so its packages (`work/p7-<name>.reelcut`)
+and everything under `work/chrome7/` keep fixed names and are rewritten on
+every run. `phase7_proof.py` keeps BOTH: it opens twelve documents in the
+running binary through `new_project`, at twelve pid-named package paths, for
+phase 2's measured reason, and its exports and stills are pid-named for phase
+5's. Two runs of either at once would collide, and there is no reason to start
+two.
 
 ## The offscreen harness (no running app)
 

@@ -268,10 +268,107 @@ final class DocumentPane: InspectorPaneView {
 
     // MARK: Appearance
 
+    /// The memo `alphaFormats` fills. Never holds an empty list — see there.
+    private static var alphaFormatCache: [String]?
+
+    /// The export rows that carry an alpha channel, by the CORE's own display
+    /// name, memoized for the process once there is an answer worth keeping.
+    ///
+    /// The names are read rather than spelled, so a row renamed in
+    /// `export_table.rs` renames itself in the note below. Memoizing is sound
+    /// and not a shortcut: `ExportSettings.alpha` is a capability of the ROW
+    /// and never a statement about the project (`ReelCore.swift` argues it at
+    /// length), so one project's answer is every project's — which is exactly
+    /// why the note can be built once at section time instead of asking the
+    /// FFI on every inspector refresh.
+    ///
+    /// **An EMPTY answer is never memoized, and that is not tidiness.** The
+    /// flag is per-ROW but the only way to ASK for it is a per-PROJECT call,
+    /// and that call can fail: `export_settings` refuses a project whose
+    /// duration is zero ("export range is empty"), so on a document nobody has
+    /// put a clip in yet every row throws and the filter answers nothing.
+    /// Caching that would pin `[]` for the life of the process, and the note
+    /// would go on naming no row however much footage arrived afterwards — a
+    /// whole session's worth of a discoverability line saying nothing, bought
+    /// by one glance at the Document tab of an empty project. Re-asking costs
+    /// nine FFI calls per section build, and only in the state where the
+    /// answer is useless.
+    ///
+    /// Internal, not private, and the split is the reason: a render cannot
+    /// read TEXT, so the note is the one thing in this phase's chrome that no
+    /// photograph can check, and `phase7_chrome.py`'s probe calls this and
+    /// `transparencyNote` instead.
+    static func alphaFormats(_ project: ReelProject?) -> [String] {
+        if let cached = alphaFormatCache, !cached.isEmpty { return cached }
+        guard let project = project else { return [] }
+        let names = ReelExport.presets()
+            .filter { (try? ReelExport.settings(project, preset: $0.id))?.alpha == true }
+            .map { $0.name }
+        if !names.isEmpty { alphaFormatCache = names }
+        return names
+    }
+
+    /// The note the Appearance section shows while the canvas background is
+    /// translucent, and nothing at all while it is opaque.
+    ///
+    /// **This is a discoverability line, not plumbing.** A transparent canvas
+    /// has been reachable since M1 — `NSColorPanel.shared.showsAlpha` is set
+    /// app-wide, the swatch draws a checkerboard behind the colour, and the
+    /// Document summary above already reads "Transparent". What was missing is
+    /// the consequence: alpha is a property of the FILE FORMAT, so a canvas
+    /// somebody deliberately made transparent comes back opaque from most
+    /// exports, and there was nowhere in the app that said so before the file
+    /// existed. So the note appears exactly when the fact starts to matter and
+    /// names every row that keeps it.
+    ///
+    /// **Every claim here is POSITIVE — the rows that KEEP the alpha, named,
+    /// never the ones that flatten it.** That is the rule the export sheet's
+    /// footnote follows one file over (`ExportSheetResolve.swift` appends
+    /// "alpha" for a row that carries it and says nothing for one that does
+    /// not), and it is what lets the line survive a table that grows: a new
+    /// row joins the list or is silent, where an enumeration of the rows that
+    /// flatten would be wrong the moment the core added one.
+    ///
+    /// **It names ALL of them and does not count.** The guard here used to be
+    /// `formats.count == 1`, written when `prores_4444` was the only row with
+    /// the flag; `apng` has it too, so that test could never hold again and
+    /// the branch that named a row became unreachable — the note degraded to
+    /// its class sentence on every project, which is the discoverability it
+    /// exists to provide, gone. Counting was the wrong test even at one row:
+    /// what the note wants is a NAME, and the honest question is whether
+    /// there is one.
+    ///
+    /// Short on purpose, and the arithmetic is what decided the wording.
+    /// `InspectorNoteLabel` truncates rather than wraps; its row is 268 pt in
+    /// the default 304 pt pane (`DS.panelWidth` less the scroller and two
+    /// insets) and **244 pt at the 280 pt narrowest a person can drag the
+    /// inspector to**, which is the width that has to be met. Measured in
+    /// `DS.sans(11)` — Source Sans 3, the BUNDLED face, not the system one,
+    /// which is a third wider and would give every number here a different
+    /// answer: the two-row sentence is 229 pt and fits both. A verb does not
+    /// ("Transparent — kept by ProRes 4444 (MOV), Animated PNG." is 265 and
+    /// clips at the narrow end), so the em-dash carries it, exactly as it does
+    /// in the sentence below. **A THIRD alpha row would not fit** — three
+    /// names run to about 295 pt — and the answer then is this method, not the
+    /// caller.
+    static func transparencyNote(_ background: RGBA, formats: [String]) -> String? {
+        guard background.nsColor.alphaComponent < 0.995 else { return nil }
+        // Nothing to name is a real state rather than a bug — `alphaFormats`
+        // asks a per-ROW question through a per-PROJECT call, and a document
+        // with no duration answers nothing — so the class of format is still
+        // worth saying, and it is still said positively.
+        guard !formats.isEmpty else { return "Transparent — needs an alpha format." }
+        return "Transparent — " + formats.joined(separator: ", ") + "."
+    }
+
     private func appearanceSection() -> InspectorSection {
         let binding = self.binding
+        let alphaFormats = DocumentPane.alphaFormats(binding.project)
         return InspectorSection(
             id: "doc.appearance", title: "Appearance",
+            note: {
+                DocumentPane.transparencyNote(binding.canvas.background, formats: alphaFormats)
+            },
             reset: {
                 binding.apply(
                     "Appearance",
