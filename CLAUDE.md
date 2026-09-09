@@ -666,7 +666,7 @@ STRUCTURE with no caller a script can reach, the answer is a probe against
 - **Road map 2, phase 4 — Words: done.** One schema key at version 5, NO
   new op, two tools (so the catalog is 70 and `OP_NAMES` is still 53), and
   captions in both directions.
-  **`text.animation`** (`core/src/model_props.rs`) is `null` or
+  **`text.animation`** (`core/src/model_text.rs` since phase 6) is `null` or
   `{kind, in, out}` — `typewriter`, `word_fade`, `line_rise` — as the LAST
   key of the text object, defaulting to `null` and, inside an animation
   that says nothing, to a one-second typewriter that does not un-reveal.
@@ -1062,7 +1062,7 @@ STRUCTURE with no caller a script can reach, the answer is a probe against
   and blends against the canvas below the WHOLE nest — an honest limit of
   the same class as a nest's opacity multiplying each inner layer
   separately.
-  **The two background ops are `core/src/edit_background.rs`** (401) and
+  **The two background ops are `core/src/edit_background.rs`** (508) and
   they are OPS rather than the app-side composite the road map planned,
   because that composite cannot be built (the clipboard payload carries no
   `nests` key) and its repair loses the source WINDOW, so a blurred
@@ -1108,13 +1108,14 @@ STRUCTURE with no caller a script can reach, the answer is a probe against
   `LayerRenderersText.swift` (577) before the gradient went in, leaving
   467. The two background handlers went into a new
   `AgentServer+Background.swift` (89) rather than into
-  `AgentServer+Clips.swift`, which grew to 1170 anyway.
+  `AgentServer+Clips.swift`, which grew to 1183 anyway.
   One thing to know before the next bump: **`{"version": 6}` was the tree's
   "too new, refuse" fixture** in `schema_v3.rs` and `model_tests.rs`, so
   those three tests are at **7** now and each comment says "one past the
   current version" rather than a number.
-  Measured: `make test` **428** (368 before — `schema_v6.rs` 17,
-  `background.rs` 34, `evaluate_tests.rs` +5 and `schema_v2.rs` +4, which is
+  Measured: `make test` **436** (368 before — `schema_v6.rs` 17,
+  `background.rs` 41 (34 at the landing and 7 more from the review, one per
+  behavioural fix), `evaluate_tests.rs` +6 and `schema_v2.rs` +4, which is
   where 6d's tests go because the filter list is version 2's feature),
   `make lint` and `cargo fmt --check` clean, `make typecheck` 0 errors and
   the same 4 AVFoundation warnings, `make app` building, the catalog at

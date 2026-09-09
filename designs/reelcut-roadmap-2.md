@@ -44,7 +44,7 @@ full text.
   zoom back, normalise clip) gets a tool that performs the same composite.
 - **A file at the size cap gives something up BEFORE it takes anything
   on.** Five phases have now paid that rule rather than argued with it:
-  phase 0 took `model.rs` from 1330 to 940 (`model_query.rs`), phase 2 to
+  phase 0 took `model.rs` from 1329 to 939 (`model_query.rs`), phase 2 to
   462 (`model_props.rs`) and moved `edit_props.rs`'s range checks out
   (`props_check.rs`), phase 3 cut the region vocabulary out when
   `video.obscure` pushed `model_props.rs` to 633 (`model_regions.rs`),
@@ -69,11 +69,16 @@ full text.
   govern: its module doc IS the op table, so it grows a row per op by
   design. **`recipe.rs` is the one phase 7 walks into**, since its "Where"
   names it for the recipe options. The Swift side carries its own, and
-  three of them grew this phase: `ProjectSnapshot.swift` 2484,
-  `ReelCore.swift` 2076, `AgentCatalog.swift` 1498, `VideoPane.swift` 1465,
-  `Compositor.swift` 1311, `AgentServer+Clips.swift` 1183,
-  `Transcriber.swift` 934, `AudioDSP.swift` 890. `core/CLAUDE.md` and
-  `app/CLAUDE.md` hold the running list and name the next cuts.
+  SIX of the eight below grew this phase: `ProjectSnapshot.swift`
+  2255 → 2484, `ReelCore.swift` 1945 → 2076, `InspectorPane.swift`
+  1582 → 1638, `AgentCatalog.swift` 1414 → 1498, `VideoPane.swift`
+  1253 → 1465, `Compositor.swift` 1184 → 1311 and
+  `AgentServer+Clips.swift` 1036 → 1183, against `TimelineView.swift` 1540,
+  `Transcriber.swift` 934 and `AudioDSP.swift` 890, which did not.
+  A phase that adds a property crosses most of that list, which is the
+  argument for paying a cut on the way through rather than at the end.
+  `core/CLAUDE.md` and `app/CLAUDE.md` hold the running list and name the
+  next cuts.
 - **Frozen files** (`EditorViewController.swift`, `TimelineView.swift`,
   `PreviewCanvasView.swift`, `AgentServer.swift`,
   `InspectorViewController.swift`) take wiring only; each feature below
@@ -98,7 +103,7 @@ full text.
   **Phase 6 is the argument for doing it, because two of its seven mutants
   SURVIVED — and both were the checks the phase had specified as the ones
   that would catch exactly those bugs.** A proof reviewed by eight readers,
-  scoring 164/164, was blind to a double-blending pipeline and to a shadow
+  passing every check it had, was blind to a double-blending pipeline and to a shadow
   mask taking the wrong pipeline state. One was a hole (an opaque
   destination forces the composite's alpha to 1, so the "partial opacity"
   fixture could not see it); the other was a claim that was simply FALSE
@@ -219,7 +224,7 @@ invents a second one:
 | `MetalRenderer.pipelineState(gather:blend:)` / `maskState` | two INDEPENDENT specializations of one fragment stage, so four layer states and not a hierarchy — and the shadow's mask pass takes the gather one WITHOUT the blend, because a mask asks about the layer's SHAPE, which no blend mode changes. That separation is DEFENSIVE and not load-bearing, which the mutation run established against every document that had said otherwise: a `multiply` over the cleared mask is NOT 0, because the premultiplied composite's `(1 - ab)·src` term reduces the whole formula to `src` at `ab` = 0 for all eight modes. Keep it — it costs nothing, it names what the mask pass means, and a formula without that term would make the hazard real — but do not restate the vanishing shadow as a bug it holds back. A third specialization joins this rather than branching inside the shader; anything else that draws a layer's SHAPE rather than its ink takes `maskState`. |
 | `recipe.rs`'s forced `normal` | the precedent for the recipe OVERRIDING a model value rather than only evaluating it, and the two tests it has to pass: everything that draws reads one description, and the rule is provable by a core test reading a layer at a tick. The visible cost is stated where it lands — the inspector shows the model's value while an overlap draws `normal` — because a rule that makes two honest readings disagree has to say so. |
 | `edit_clip.rs::fill_scale` | Fit's sibling, and the three differences one sentence explains: Fit is a rescue and Fill is a requirement, so it ignores `canvas.fit_new_clips`, scales UP as readily as down, and clamps to `SCALE_MAX` at the source rather than leaving a caller to. Anything that must leave no canvas showing calls it. |
-| `edit_background.rs`'s "what a copy does NOT keep" | the four things a derived clip drops and why each one is a wrong picture or a wrong SOUND if it is carried — the audio switch first, because it is INVISIBLE in a still frame and every frame proof passes with it wrong. Any later op that clones a clip somewhere else starts from that list. |
+| `edit_background.rs`'s "what a copy does NOT keep" | the five things a derived clip drops and why each one is a wrong picture or a wrong SOUND if it is carried — the audio switch first, because it is INVISIBLE in a still frame and every frame proof passes with it wrong. Any later op that clones a clip somewhere else starts from that list. |
 | `InspectorBinding.editedList` | the list a WRITE of a list-valued key must be built from and measured against: the ACTION's own end list where there is one, the clip's base list otherwise — never the evaluated one every `read:` uses. Two defects came out of the one-line version of this; a third list-valued property joins it rather than reading `videoProps` directly. |
 | `AgentServer+Clips.gradientArg` | the shape of a hand-built reader for a nested object in a patch, and what it buys: a misspelt key inside `gradient` is refused BY NAME, which `shadow`, `chroma`, `obscure` and `animation` cannot manage because they go through the generic decoder. A new nested object that matters is worth reading by hand. |
 
@@ -1405,10 +1410,13 @@ And the smaller settlements, each argued where it lives:
   modifier-less menu key is resolved ahead of the first responder and would
   steal a letter the editor's own `keyDown` owns — the reason already
   recorded beside Remove Silences…
-- **`model_props.rs` is at 592** after `TextAnimation` and
+- **`model_props.rs` was left at 592** after `TextAnimation` and
   `TextAnimationKind`, under the 600-line cap but close enough to it to be
-  the same warning phase 3 got. Phase 6 adds properties to that file and
-  should cut first; the text vocabulary is the obvious ~190-line concern to
+  the same warning phase 3 got — and this is where that warning was paid:
+  phase 6 took the text vocabulary out to `core/src/model_text.rs` (252)
+  before adding a field, so neither type named above lives in
+  `model_props.rs` any more. What the cut bought is recorded in §0, along
+  with what it did not. The text vocabulary was the obvious ~190-line concern to
   take out, the way `model_regions.rs` came out.
 - **The offscreen harness now captures on SETTLE** — capture, spin,
   capture, write only when two consecutive captures are byte-identical. A
@@ -2113,7 +2121,7 @@ mechanism but about what this phase actually did:**
     had that since M3 and obscure regions since phase 3c.
 
 - **The two background commands are CORE OPS, not app-side composites**,
-  in a new `core/src/edit_background.rs` (401). The road map calls Add
+  in a new `core/src/edit_background.rs` (508). The road map calls Add
   Blurred Background "a composite over existing ops" and its "Where" list
   names neither `edit.rs` nor a new core module; the argument was run both
   ways and the collating reader adjudicated it the other way, so it is
@@ -2353,7 +2361,7 @@ of them its work:
   in it. **The two background handlers went into a new
   `AgentServer+Background.swift` (89)** rather than into
   `AgentServer+Clips.swift`, which is long over any cap and grew this
-  phase anyway, to 1170, for the gradient reader and the two new enum
+  phase anyway, to 1183, for the gradient reader and the two new enum
   checks.
 - **The version sweep has a trap, and it is one bump older than this
   phase.** `{"version": 6}` was the tree's "too new, refuse" fixture in
@@ -2494,7 +2502,7 @@ on every mutant it runs.**
 **A verdict here is named checks and never a fraction**, and that rule was
 bought rather than assumed. The two survivors were measured against two
 DIFFERENT lengths of `phase6_proof.py` — 160 checks when the blending guard
-was run, 163 once section 6b had answered it, 164 as the phase closed — so
+was run, 163 once section 6b had answered it, 167 as the phase closed — so
 the two fractions this table carried while it was being written were both
 stale before anyone read them, and a next session running the script would
 have found four checks it could not account for. Against the script as it
@@ -2546,7 +2554,7 @@ state.*
   `EditorViewController+SaveFrame.swift`. MCP: `render_frame` gains
   `path?` so an agent can name the file.
 - **ProRes 4444 with alpha.** A `prores_4444` row in `export.rs` (MOV; the
-  writer already maps the codec at `ExporterWriter.swift:602` and nothing
+  writer already maps the codec in `ExporterWriter.codecType(for:)` and nothing
   can ask for it), with `alpha: true` in the resolved settings whenever the
   canvas background's alpha is below 1. `ExportWriter` reads BGRA with
   alpha and writes `AVVideoCodecType.proRes4444`; the compositor already
@@ -2558,7 +2566,7 @@ state.*
   `rc_project_frame_recipe_opts(handle, t, opts_json)` — a new export, so
   header and `ReelCore.swift` move in lockstep — takes
   `{"burn_in_timecode": true}` and adds a text layer (mono face,
-  bottom-centre, backdrop) whose `content` is `timecode_format(t)`. The
+  bottom-centre, backdrop) whose `content` is `time.rs`'s `format_timecode`. The
   export pipeline passes the option through `RecipeSource`; the `export`
   tool takes `burn_in_timecode`. The per-frame recipe hash churns the text
   texture cache, which is fine at export speed.

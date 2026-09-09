@@ -114,8 +114,12 @@ extension EditorViewController {
         selectClips(addedSince: before, in: document)
     }
 
-    /// Clip ▸ Add Background ▸ Image… — a picture behind everything, at Fit
-    /// scale and the timeline's length.
+    /// Clip ▸ Add Background ▸ Image… — a picture behind everything, at FILL
+    /// scale and the timeline's length. Fill and not Fit, which is where
+    /// `add_clip` would put it: a plate that leaves the canvas showing down
+    /// one side has failed at the one thing a background is for, and it is
+    /// the scale `add_blurred_background` gives its copy, so the two
+    /// commands agree. The phase-6 review is what changed it.
     ///
     /// A standard `NSOpenPanel` over the image UTIs; `CaptionImporter.swift`
     /// is the pattern, down to the reason the edit that follows goes through

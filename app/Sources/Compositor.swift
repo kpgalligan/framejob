@@ -1005,8 +1005,10 @@ final class MetalRenderer {
     /// a fully transparent fragment leaves the destination alone — read from
     /// the other side.
     ///
-    /// So a build that passes `state` here renders every shadow correctly and
-    /// `phase6_proof.py` scores 163/163 against it. The separation stays
+    /// So a build that passes `state` here renders every shadow correctly:
+    /// the mutant that does it fails NO check in `phase6_proof.py`, which is
+    /// the whole finding. (Named checks and not a fraction — a score goes
+    /// stale the next time the script grows, and this one already had.) The separation stays
     /// because it costs nothing, because it says what the mask pass means,
     /// and because a future formula without that term would make the hazard
     /// real again — not because it is holding a bug back today.

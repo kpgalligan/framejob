@@ -1385,16 +1385,23 @@ static inline float4 blendPremultiplied(int mode, float4 src, float4 dst) {
 /// itself. `MetalRenderer` builds this one with `isBlendingEnabled = false`,
 /// so what comes back is written to the tile as it stands.
 ///
-/// **There is deliberately no `shadowMask` guard here**, and that is a
-/// decision rather than an omission. A shadow's MASK pass must never bind
-/// this pipeline at all — `MetalRenderer.render` computes a separate
-/// `maskState` for exactly that reason, because a `multiply` against a
-/// cleared, empty destination is 0 and a blended layer's shadow would simply
-/// vanish. A guard here would make that Swift-side decision unobservable:
-/// the mutant that passes the blend state to `encodeShadow` would still
-/// produce a correct mask, and the check that proves the shadow survives a
-/// blend (proof B4) would pass against a build that had it wrong. The
-/// invariant is worth more than the insurance.
+/// **There is no `shadowMask` guard here because none is needed**, and the
+/// reason is the same term that makes coverage work. A shadow's mask pass
+/// draws into a texture cleared to transparent black, so `ab` is 0, and
+/// `blendPremultiplied` at `ab` = 0 reduces to `(1 - as)·0 + 1·src.rgb + 0`
+/// — the source, exactly, for all eight modes with `add` included. The
+/// silhouette comes out right whichever pipeline draws it.
+///
+/// **This comment used to say the opposite and state it as fact**: that a
+/// `multiply` against a cleared destination is 0, so a blended layer's
+/// shadow would vanish, so `MetalRenderer.render`'s separate `maskState`
+/// was holding a bug back. That is true of a naive `src · dst` and false of
+/// the premultiplied composite above. Phase 6's mutation run settled it —
+/// a build passing `state` to `encodeShadow` renders every shadow correctly
+/// and the proof scores full marks against it — and four other documents
+/// were corrected then; this one, where the formula actually lives, was
+/// missed until an audit found it. `maskState` stays because it costs
+/// nothing and names what a mask pass means, not because it is load-bearing.
 fragment float4 reelcut_layer_blend_fragment(Varyings in [[stage_in]],
                                              constant LayerUniforms &u [[buffer(0)]],
                                              texture2d<float> source [[texture(0)]],

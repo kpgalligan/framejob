@@ -144,7 +144,9 @@ lockstep are in the root `CLAUDE.md`; the full design is
   FALSE of the premultiplied composite the shader runs, whose `(1 - ab)·src`
   term carries the source through an empty destination: at `ab` = 0 the
   formula reduces to `src` exactly, for all eight modes. A build passing
-  `state` here renders every shadow correctly and scores 163/163. Keep the
+  `state` here renders every shadow correctly and fails NO check in
+  `phase6_proof.py` — named checks, never a fraction, which goes stale the
+  next time the script grows and this one already had. Keep the
   separation — it costs nothing, it says what the mask pass means, and a
   formula without that term would make the hazard real — but do not repeat
   the claim that it is holding a bug back. The
