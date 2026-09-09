@@ -1,7 +1,7 @@
 # Reelcut — road map 2: beyond the spec
 
-**Status: phases 0–5 are done — §1's table below carries the commit of each,
-which is the one place they live; the rest is not. Pick up at phase 6.**
+**Status: phases 0–6 are done — §1's table below carries the commit of each,
+which is the one place they live; the rest is not. Pick up at phase 7.**
 Spec §10's three milestones are done
 (`reelcut-roadmap.md` records how each was proved). This is the plan for
 what a capable editor still lacks, found by reading the op table, the menus,
@@ -43,22 +43,37 @@ full text.
   nothing; a composite the UI offers as one command (blurred background,
   zoom back, normalise clip) gets a tool that performs the same composite.
 - **A file at the size cap gives something up BEFORE it takes anything
-  on.** Four phases have now paid that rule rather than argued with it:
+  on.** Five phases have now paid that rule rather than argued with it:
   phase 0 took `model.rs` from 1330 to 940 (`model_query.rs`), phase 2 to
   462 (`model_props.rs`) and moved `edit_props.rs`'s range checks out
   (`props_check.rs`), phase 3 cut the region vocabulary out when
-  `video.obscure` pushed `model_props.rs` to 633 (`model_regions.rs`), and
+  `video.obscure` pushed `model_props.rs` to 633 (`model_regions.rs`),
   phase 5 moved the override reading out of `export.rs` — about 120 lines —
-  BEFORE adding two rows to it (`export_overrides.rs`). Over the ~600 cap
-  today, named here so a phase picks its cut rather than discovering the
-  debt: `edit_clip.rs` 1226 — no new op goes in it — `edit.rs` 730,
-  `edit_track.rs` 674 and `edit_paste.rs` exactly at 600. `edit.rs` is the
-  one the cap cannot govern: its module doc IS the op table, so it grows a
-  row per op by design. **`model_props.rs` is back to 592 and phase 6 adds
-  two fields to it, so phase 6 pays first.** The Swift side carries its own:
-  `Transcriber.swift` 934, `AudioDSP.swift` 890, `LayerRenderers.swift` 845.
-  `core/CLAUDE.md` and `app/CLAUDE.md` hold the running list and name the
-  next cuts.
+  BEFORE adding two rows to it (`export_overrides.rs`), and phase 6 paid
+  TWICE: `model_props.rs` gave up the text vocabulary (`model_text.rs`,
+  252) and `LayerRenderers.swift` gave up the text machinery
+  (`LayerRenderersText.swift`, 577) before either took a new field on.
+
+  **Phase 6 also learned what the rule does not buy.** The cut landed
+  `model_props.rs` at 402 exactly as planned, but version 6's two keys cost
+  198 lines rather than the ~135 estimated — five types, a constant, and
+  the doc density this codebase demands — so it is back at **600, ON the
+  line, and takes nothing further without a cut of its own.** An estimate
+  of what a field costs here is worth about two thirds of the truth;
+  budget the cut against the pessimistic number.
+
+  Over the ~600 cap today, named so a phase picks its cut rather than
+  discovering the debt: `edit_clip.rs` 1252 — no new op goes in it —
+  `edit.rs` 764, `edit_track.rs` 674, and `recipe.rs`, `model_props.rs` and
+  `edit_paste.rs` all exactly at 600. `edit.rs` is the one the cap cannot
+  govern: its module doc IS the op table, so it grows a row per op by
+  design. **`recipe.rs` is the one phase 7 walks into**, since its "Where"
+  names it for the recipe options. The Swift side carries its own, and
+  three of them grew this phase: `ProjectSnapshot.swift` 2484,
+  `ReelCore.swift` 2076, `AgentCatalog.swift` 1498, `VideoPane.swift` 1465,
+  `Compositor.swift` 1311, `AgentServer+Clips.swift` 1183,
+  `Transcriber.swift` 934, `AudioDSP.swift` 890. `core/CLAUDE.md` and
+  `app/CLAUDE.md` hold the running list and name the next cuts.
 - **Frozen files** (`EditorViewController.swift`, `TimelineView.swift`,
   `PreviewCanvasView.swift`, `AgentServer.swift`,
   `InspectorViewController.swift`) take wiring only; each feature below
@@ -72,13 +87,38 @@ full text.
   A frame claim is a BYTE comparison of two PNGs or it is not a proof; a
   check that would pass against a build where the op did nothing is not one
   either, and phase 1's review found two of those in its own script.
-  **The way to know a check can fail is to make it fail.** Phases 3, 4 and 5
+  **The way to know a check can fail is to make it fail.** Phases 3 to 6
   built deliberately broken binaries and ran the script against each —
   seven of them for phase 5, which is how that phase learned its proof had
   to measure the written FILE rather than read the app's own report: a
   build with the loudness gain dropped still echoed −14.0 LUFS over a file
   measuring −6.7, and every report-reading check passed. A proof that has
   never failed is a claim, not a measurement.
+
+  **Phase 6 is the argument for doing it, because two of its seven mutants
+  SURVIVED — and both were the checks the phase had specified as the ones
+  that would catch exactly those bugs.** A proof reviewed by eight readers,
+  scoring 164/164, was blind to a double-blending pipeline and to a shadow
+  mask taking the wrong pipeline state. One was a hole (an opaque
+  destination forces the composite's alpha to 1, so the "partial opacity"
+  fixture could not see it); the other was a claim that was simply FALSE
+  and had been repeated into three documents. Neither reading nor reviewing
+  found them; only breaking the binary did.
+
+  Three practical rules came out of that run, all of them cheap and none of
+  them obvious:
+  1. **Restart the app between mutants.** The proof drives a RUNNING
+     process, so a harness that rebuilds without relaunching scores the
+     clean result every time — the first mutant reported 160/160 for a
+     build with the feature deleted. A mutation harness that does not
+     restart gives a false all-clear on every mutant it runs.
+  2. **Check that the mutant mutates.** Two of phase 6's did not, at first,
+     and a no-op mutant reads exactly like a weak check — one line sat
+     above an early `return` and Metal's default blend factors turned out
+     to be the identity.
+  3. **A crash is a worse detection than a failure.** One mutant aborted
+     the script with a traceback instead of failing a named check, so every
+     later section went unrun. Assert the precondition, then act on it.
 - **The baseline** is `make test` green, `make lint` clean and
   `make typecheck` at 0 errors / 4 deliberate warnings. A phase leaves it
   there.
@@ -100,16 +140,27 @@ rules, the gestures, the MCP mirror, the docs), then every finding put to
 sceptics told to refute it, then a regression test for each survivor that
 fails without the fix. Green tests prove the cases someone thought of.
 
-Five phases have now run it and it has never come back empty: five real
+Six phases have now run it and it has never come back empty: five real
 defects in phase 1, six in phase 2, six in phase 3, twelve in phase 4, ten
-in phase 5 — and two of phase 3's and one of phase 5's were blockers that a
-hundred green checks had walked past. Two things about the shape were
-learned rather than designed. **Route a fix by the file it ROOTS in, not by
-the dimension that reported it**: phase 3 handed five survivors to fixers
-who did not own the file and needed a second round to close them. And
-**tell the readers what is already known** — the standing limits, the
-deliberate decisions, the debts — so their attention goes to what nobody
-has looked at rather than to what everyone has.
+in phase 5, and in phase 6 **forty-five survivors out of fifty-two** put up
+by eight readers against eight sceptics — the largest yet, on the largest
+phase. Two of phase 3's, one of phase 5's and one of phase 6's were blockers
+that a hundred green checks had walked past; phase 6's was a PICTURE command
+that ducked the whole mix, invisible to every frame comparison including the
+one the road map had specified for it.
+
+Three things about the shape were learned rather than designed. **Route a
+fix by the file it ROOTS in, not by the dimension that reported it**: phase
+3 handed five survivors to fixers who did not own the file and needed a
+second round to close them. **Tell the readers what is already known** — the
+standing limits, the deliberate decisions, the debts — so their attention
+goes to what nobody has looked at rather than to what everyone has. And
+phase 6 added the third: **the fixers will move the source of a mirror and
+cannot reach the mirrors.** Its fixer changed `edit.rs`'s op table — legally,
+inside its own lane — and left `AgentCatalog.swift` advertising the old
+scale and `ReelCore.swift` documenting a refusal that no longer existed. A
+fix wave needs a lockstep pass after it, by someone who owns all four
+copies, and the orchestrator is the only one who does.
 
 ## 1. Status
 
@@ -131,7 +182,7 @@ nothing that later phases need; 6 depends on 3's list-interpolation rule; 9
 is last because it is the largest and touches every op at once. Any other
 order works if that one dependency is kept.
 
-**What phases 0–5 left behind for the rest**, so no later phase
+**What phases 0–6 left behind for the rest**, so no later phase
 invents a second one:
 
 | | |
@@ -2527,7 +2578,9 @@ state.*
 override reading is `export_overrides.rs`'s since phase 5, and which is at
 579 against the cap — `ExporterWriter.swift`, `Exporter.swift` (beside
 `ExporterLoudness.swift` now, and note the export is TWO passes when a
-loudness target is set), `DocumentPane.swift`, `recipe.rs`
+loudness target is set), `DocumentPane.swift`, **`recipe.rs`, which phase 6
+left at exactly 600 and which therefore PAYS FIRST — the recipe options are
+the field this phase adds to it**
 + `ffi_query.rs` + header + `ReelCore.swift` (the recipe options),
 `ExportSheetController.swift`, `ExportPresetsStore.swift`,
 `ExportQueueController.swift`, `AgentServer+Render.swift`, catalog;
