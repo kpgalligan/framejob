@@ -181,7 +181,7 @@ copies, and the orchestrator is the only one who does.
 | 6 | Looks | 1–2 | v6 | **done** 2026-09-08 (`d2f7767`) |
 | 7 | Output | 1–2 | — | **done** 2026-09-09 (`a16b0dd`) |
 | 8 | Viewing and finding | 1 | — | **done** 2026-09-09 (`5f0bc61`) |
-| 9 | Inside the nest | 2 | — | **done** 2026-09-10 |
+| 9 | Inside the nest | 2 | — | **done** 2026-09-10 (`046603e`) |
 
 Order is by value over dependency. Phases 1–3 pay back first and share
 nothing that later phases need; 6 depends on 3's list-interpolation rule; 9
