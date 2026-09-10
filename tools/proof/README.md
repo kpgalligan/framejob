@@ -179,7 +179,13 @@ The offscreen scripts take no port and are run on their own —
 `python3 tools/proof/phase2_chrome.py` and its successors through
 `phase8_chrome.py`; each paragraph below says what its own one renders into.
 Phase 9 has no chrome script — `phase9_probe.py` is its second half and is a
-PROBE rather than a photograph, for the reason its own section gives.
+PROBE rather than a photograph, for the reason its own section gives. **What
+that leaves unphotographed is the breadcrumb**, and `designs/reelcut-remaining.md`
+§1b is the open item: the corner is only wrong at a NON-ZERO vertical scroll
+(the header column and the floating ruler do not overlap at rest), and every
+render here is at scroll 0, so a `scope` argument alone would not reach it. The
+instrument that DID measure it — a probe that builds a bare `TimelineView` and
+scrolls it — is in `work/phase9-corner-probe/`, untracked, which is the debt.
 `phase8_chrome.py` is the one that puts WINDOWS on screen — its `dispatch`
 mode activates a probe for about a second, because a key window is the thing
 it measures.
@@ -1100,7 +1106,13 @@ person's eyes: two builds agreeing byte for byte is an isolation claim, not a
 picture.
 
 `phase9_proof.py` is phase 9's MCP half (`python3 tools/proof/phase9_proof.py
-[port] [log path]`, **184/184**, about seven seconds), and it is deliberately
+[port] [log path]`, **184/184**, about seven seconds). **It is 29 checks short
+of what phase 9 measured**, and that is an open debt rather than a boundary:
+the review's fix wave proved two MCP-coherence fixes — the marker refusal on an
+INHERITED scope, and `editResult` reporting the scope the ops were actually
+stamped with — in `work/lane9_marker_scope_mcp.py`, which is untracked. They
+belong here, at or before section 9. `designs/reelcut-remaining.md` §1a carries
+the fold and the two mutants that gate it. Otherwise it is deliberately
 the SMALLER half of the phase: `phase9_probe.py` below already owns everything
 the app decides before a tool call leaves it, so nothing here repeats it and
 the two touch the same ideas from opposite sides — the probe reads the JSON an

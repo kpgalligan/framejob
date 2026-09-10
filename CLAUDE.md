@@ -6,8 +6,15 @@ Rust staticlib core, the same shape as `~/devel/rasterize`.
 **It builds and runs.** M1 (Cut) is done and verified against spec §10; most
 of M2 landed with it.
 
-Four things in `designs/`, and you want all of them:
+Five things in `designs/`, and you want all of them:
 
+- **`designs/reelcut-remaining.md` — what is LEFT, and the only thing here
+  with open work in it. START HERE if you are picking up new work.** Road map
+  2 is complete, so what remains is the debt two large phases left behind: two
+  fixes whose proof instruments are still untracked (§1, the only place the
+  project's own standard was not met), two live defects recorded but not fixed
+  (§2), the size ledger a feature phase consults before it pays its toll (§3),
+  and the checks only a person at the machine can make (§4).
 - `designs/reelcut-design.md` — the normative spec. The schemas (§5), the op
   table (§6) and the architecture (§7) govern any change to either side; §11
   holds decisions already made, which are not to be re-litigated.
