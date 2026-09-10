@@ -56,13 +56,19 @@ import AppKit
 /// click target under what drew as a track header.
 ///
 /// Measured rather than reasoned, because it is a z-order change in a file
-/// that had been drawing correctly for eight phases. Offscreen, a
-/// `TimelineView` of six tracks was rendered with a two-level trail set, at
-/// rest and scrolled: with the headers on top the scrolled corner came out
+/// that had been drawing correctly for eight phases. Offscreen, a bare
+/// `TimelineView` is rendered with a two-level trail set, at rest and
+/// scrolled (`tools/proof/phase9_chrome.py`, over ten text tracks — 490 pt
+/// of content against a 324 pt viewport, so its 62 pt scroll is one the app
+/// can reach): with the headers on top the scrolled corner came out
 /// BYTE-IDENTICAL to the same corner with no trail at all, and with the ruler
 /// on top it comes out byte-identical to the corner AT REST — which is also
 /// what says the swap moves nothing else, since at rest the two bands do not
-/// meet and every render the offscreen harness makes is at rest.
+/// meet and every render the offscreen harness makes is at rest. The
+/// six-track probe this was first measured with OVER-SCROLLED — its 306 pt
+/// of content was shorter than the pane, and `NSClipView.scroll(to:)` does
+/// not clamp — while its z-order pictures held; the tracked script's
+/// `init-order` mutant is what gates the claim now.
 ///
 /// **What the swap does move is an open rename field**, which is a real
 /// subview of the band it edits, and a track's field sits at its ROW's top —

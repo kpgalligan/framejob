@@ -79,14 +79,19 @@ the same comparison with the nest clip at `scale: 0.5`, which must differ in
 most of the region; without it a build whose two renders were the same
 picture for the wrong reason would pass.
 
-**What the live server alone can say** is sections 0 and 4 to 8: the exact
+**What the live server alone can say** is sections 0 and 4 to 9: the exact
 catalog (74 tools, exactly 55 declaring `scope` — that 55 is `rc_op_names`
 read through `AgentCatalog.opNames`, so it is the live core's op count and
 not a number typed here), one undo step per edit with entering and leaving
 contributing none, `set_scope` in all its shapes, the seven refusals reached
-BY MESSAGE, and the wide `Err` arm — the two invariants a view cannot see,
+BY MESSAGE, the wide `Err` arm — the two invariants a view cannot see,
 which are the phase's most surprising contract and which nothing but a
-document at a cap can exercise.
+document at a cap can exercise — and, in section 9, the two things the APP
+decides about a scope that was inherited from `set_scope` rather than asked
+for: the marker ticks it refuses before the edit reaches the core, and the
+landing a result reports under `scope` and `document_ops`. Section 10 pins
+the documented limits, last, because a limit reads best after the behaviour
+it bounds.
 
 **Two of the seven refusals cannot be reached without a fixture, and that
 is a finding rather than a footnote.** `set_marker`, `remove_marker`,
@@ -99,12 +104,16 @@ so all seven reach `core/src/scope.rs`'s own sentence. A proof that had
 skipped that would have scored four passes on messages that say nothing
 about scoping at all.
 
-**What no script in this tree can claim, and this one least of all.** The
+**What this script does not claim, and where those claims live.** The
 gestures and the chrome are untouched here: ⌘↓ / ⌘↑, the double-click that
-enters, and the breadcrumb in the timeline bar's 131 × 21 pt corner are a
-PICTURE, and there is no `phase9_chrome.py` — the probe reads
-`NestScope.names`, which is what the breadcrumb prints, but nobody has
-photographed the corner. Nor can anything here say a nest PLAYS: a scoped
+enters, and the breadcrumb in the ruler's 132 × 22 pt corner (264 × 44 px
+at the Retina scale) are a PICTURE and a click count, and they are
+`phase9_chrome.py`'s (62/62) — a probe that renders a bare `TimelineView`
+SCROLLED and byte-compares that crop, which is what a photograph at scroll 0
+could never show; this sentence used to say there was no such script and
+sized the corner at 131 × 21. The probe below reads `NestScope.names`,
+which is what the breadcrumb prints, and does not photograph it. Nor can
+anything here say a nest PLAYS: a scoped
 composition's audio and its 60 fps are the two things spec §10 has always
 left to a person at the machine. And the identity between the handle
 `rc_project_scoped` returns and the view an edit is applied to is
@@ -497,9 +506,10 @@ def fresh(mcp, width=640, height=360):
 
     Every section starts with one. The app deadlocks somewhere past forty
     open documents and nothing closes one (`tools/proof/README.md`), so the
-    count matters: this script opens thirteen, which is why the README says
-    to relaunch between proof sessions rather than read a hang as a
-    failure."""
+    count matters: this script opens sixteen — ten `new_project`, one per
+    section that builds its own fixture (section 7 builds two), and section
+    8's six `open_project` — which is why the README says to relaunch
+    between proof sessions rather than read a hang as a failure."""
     mcp.call_with("new_project", {})
     mcp.call_with("set_canvas", {"width": width, "height": height})
     return project(mcp)["tracks"][0]["id"]
@@ -1474,7 +1484,221 @@ def versions_part(mcp):
           f"{future!r}")
 
 
-# ---- 9. the documented limits, pinned -------------------------------------
+# ---- 9. an inherited scope: the marker ticks, and the landing -------------
+
+
+def marker_scope_part(mcp):
+    """Phase 9's two MCP-coherence fixes, measured where their evidence
+    belongs. The review's fix wave proved them in
+    `work/lane9_marker_scope_mcp.py`, which was untracked, and a fix with no
+    permanent proof is the shape this tree does not accept; the checks are
+    that script's, sentence for sentence, because their sentences are the
+    fixes' rationale.
+
+    Both are about a scope the caller did not ASK for. `set_scope` opens a
+    nest and every later op inherits it; the core is handed a `scope` key
+    either way and cannot tell an inherited one from an explicit one, so two
+    things are the APP's to decide (`AgentServer+Scope.swift`):
+
+    (a) A marker's time is the TIMELINE's, and inside a nest every tick in a
+        call — `add_marker`'s default `at`, the playhead, most of all — is
+        measured from the nest's own zero. So `add_marker`, and `set_marker`
+        when it carries a `time`, are refused on an inherited scope BEFORE
+        the edit (`checkDocumentLevelTicks`), with the way out in the
+        sentence; `set_marker`'s name, chapter and color mean the same thing
+        in either container and are accepted. An EXPLICIT scope still
+        reaches `core/src/scope.rs`'s own refusal, because asking is a
+        different act from inheriting — section 6 reads that sentence with
+        the nest NAMED, and what is new here is that it is unchanged with
+        the nest OPEN as well.
+
+    (b) A result reports where its ops actually LANDED (`scopeLanding`): the
+        nest they were stamped with under `scope`, and any op the
+        document-level list sent to the DOCUMENT instead under
+        `document_ops`. It used to echo the open view on every result, so a
+        `set_canvas` inside a nest answered `scope: N` while it had changed
+        the document's canvas.
+
+    The fixture is section 10's plus a marker, and the nest clip starts at
+    2 s for the reason it does there: nest-local zero and timeline zero are
+    then two different numbers, so the placement (a) refuses is VISIBLE in
+    the playhead the view reports. The `outer` snapshot is taken before the
+    unscoped checks add and remove a second marker, so it describes the
+    document every later "nothing was placed" is measured against.
+
+    Two mutants gate it, each on a copy of the tree and never the working
+    one (tools/proof/README.md): `checkDocumentLevelTicks` made a no-op fails
+    five of these checks, and `scopeLanding` put back to the unconditional
+    echo fails five others. The README names which."""
+    track = fresh(mcp)
+    # A nest clip that starts at 2 s, so the nest's zero and the timeline's
+    # are two different numbers and the playhead mapping is visible.
+    inner_src = mcp.call_with(
+        "add_shape_clip",
+        {"track": track, "at": 2 * SEC, "duration": 2 * SEC,
+         "shape": {"kind": "rectangle"}})["new_clips"][0]
+    marker = mcp.call_with("add_marker", {"at": SEC, "name": "M"})["new_markers"][0]
+    mcp.call_with("nest", {"clips": [inner_src]})
+    outer = project(mcp)
+    nest_id = outer["nests"][0]["id"]
+    nest_clip = outer["clips"][0]
+    inner = outer["nests"][0]["clips"][0]["id"]
+    check(nest_clip["start"] == 2 * SEC, "fixture: the nest clip starts at 2 s")
+
+    def marker_row(ident):
+        """The timeline's marker with this id, or None. Read by ID and never
+        by index: `add_marker` pushes and nothing sorts, so `markers[0]`
+        would hold today, but a check leaning on that is a check on the
+        array's order and not on the marker."""
+        return next((x for x in project(mcp)["markers"] if x["id"] == ident), None)
+
+    # -- the unscoped path is untouched: no nest open, no scope named --
+    r = mcp.call_with("add_marker", {"at": 3 * SEC, "name": "N"})
+    check("scope" not in r and "document_ops" not in r,
+          f"with no nest open an add_marker result carries neither key: {sorted(r)}")
+    second = r["new_markers"][0]
+    r = mcp.call_with("set_marker", {"marker": second, "time": 3 * SEC + SEC // 2})
+    check("scope" not in r and "document_ops" not in r,
+          "…and neither does a set_marker that moves one")
+    r = mcp.call_with("set_clip", {"clips": [nest_clip["id"]], "patch": {"name": "Group"}})
+    check("scope" not in r and "document_ops" not in r,
+          "…nor an ordinary clip edit on the timeline")
+    mcp.call_with("remove_marker", {"marker": second})
+
+    # -- the mismatch that makes (a) a wrong PLACEMENT --
+    mcp.call_with("set_playhead", {"t": 2 * SEC})
+    mcp.call_with("set_scope", {"nest": nest_id})
+    view = state(mcp)
+    check(view["scope"] == nest_id, f"the nest is open (scope {view['scope']})")
+    check(view["playhead"] == 0,
+          f"the playhead reads {view['playhead']} in here where the timeline's is "
+          f"{2 * SEC} — nest-local, measured from the nest clip's start")
+    check(view["project"]["markers"] == [],
+          "and get_project answers NO markers, so every marker id and time in this call "
+          "came from a container the caller cannot see from in here")
+
+    # -- (a) the two tick-carrying marker tools are refused --
+    before = len(outer["markers"])
+    msg = refusal(mcp, "add_marker", {})
+    check(msg is not None
+          and msg.startswith(f"add_marker has no meaning inside nest {nest_id}"),
+          f"add_marker with no `at` — the one that would have taken the nest-local "
+          f"playhead — is refused with a sentence that opens as the core's does: {msg!r}")
+    check("set_scope with no arguments comes back out" in (msg or ""),
+          "…and the message carries the way out")
+    msg2 = refusal(mcp, "add_marker", {"at": 3 * SEC, "name": "X"})
+    # `is not None` is load-bearing. Under a build whose refusal is gone both
+    # calls SUCCEED, both answers are None, and `None == None` would score
+    # this green — the lane script had it that way, and the refusal mutant
+    # killed one check fewer than it reads as killing.
+    check(msg2 is not None and msg2 == msg,
+          "an explicit `at` is refused identically — every tick in the call is "
+          "the nest's, so naming one changes nothing")
+    msg3 = refusal(mcp, "set_marker", {"marker": marker, "time": 0})
+    check(msg3 is not None
+          and msg3.startswith(f"set_marker's time has no meaning inside nest {nest_id}"),
+          f"set_marker's `time` is refused by ARGUMENT name: {msg3!r}")
+    mcp.call_with("set_scope", {})
+    after = project(mcp)
+    check(len(after["markers"]) == before
+          and [x["time"] for x in after["markers"]] == [x["time"] for x in outer["markers"]],
+          "and nothing was placed: the timeline's markers are exactly what they were")
+    mcp.call_with("set_scope", {"nest": nest_id})
+
+    # -- (a) what is NOT refused, and lands on the document --
+    r = mcp.call_with("set_marker", {"marker": marker, "name": "Renamed"})
+    check("scope" not in r and r.get("document_ops") == ["set_marker"],
+          f"set_marker {{name}} applies in here and the result says it went to the "
+          f"DOCUMENT: scope={r.get('scope')!r} document_ops={r.get('document_ops')!r}")
+    mcp.call_with("set_scope", {})
+    renamed = marker_row(marker)
+    check(renamed is not None and renamed["name"] == "Renamed",
+          "…and the timeline's marker really is renamed")
+    mcp.call_with("set_scope", {"nest": nest_id})
+    r = mcp.call_with("set_marker", {"marker": marker, "chapter": True})
+    check("scope" not in r and r.get("document_ops") == ["set_marker"],
+          "so does set_marker {chapter}")
+    r = mcp.call_with("remove_marker", {"marker": marker})
+    check("scope" not in r and r.get("document_ops") == ["remove_marker"],
+          f"and remove_marker, which names an id and reads no clock: "
+          f"document_ops={r.get('document_ops')!r}")
+    mcp.call_with("undo", {})
+    # That undo is the next group's PRECONDITION as much as a claim of its
+    # own: `markerArg` resolves against the timeline's markers, so a marker
+    # the undo had not put back would make three refusals below answer "No
+    # marker has id" and read as scope refusals gone wrong. Scored, then,
+    # rather than assumed — an op that went to the document undoes ON the
+    # document, renamed and chaptered as it was, with the nest still open.
+    mcp.call_with("set_scope", {})
+    restored = marker_row(marker)
+    check(restored is not None and restored["name"] == "Renamed"
+          and restored["chapter"] is True,
+          "…and undoing it with the nest still open puts the marker back on the DOCUMENT, "
+          "renamed and chaptered as it was")
+    mcp.call_with("set_scope", {"nest": nest_id})
+
+    # -- (a) an EXPLICIT scope still reaches the core --
+    msg = refusal(mcp, "add_marker", {"at": 0, "scope": nest_id})
+    check(msg == f"add_marker has no meaning inside nest {nest_id}",
+          f"add_marker with an explicit scope hears core/src/scope.rs's own sentence, "
+          f"unchanged: {msg!r}")
+    msg = refusal(mcp, "set_marker", {"marker": marker, "name": "x", "scope": nest_id})
+    check(msg == f"set_marker has no meaning inside nest {nest_id}",
+          f"…and so does a set_marker the inherited path ACCEPTS, because asking is a "
+          f"different act from inheriting: {msg!r}")
+    msg = refusal(mcp, "remove_marker", {"marker": marker, "scope": nest_id})
+    check(msg == f"remove_marker has no meaning inside nest {nest_id}",
+          "…and remove_marker")
+
+    # -- (a) the documented cost of the placement --
+    msg = refusal(mcp, "add_marker", {"at": "half past"})
+    check(msg is not None and "add_marker has no meaning" not in msg,
+          f"a call whose `at` is ALSO unreadable hears about the `at` first — the handler "
+          f"reads its arguments before the edit: {msg!r}")
+    check(msg == "at must be a time in ticks (600000 per second).",
+          "…and what it hears is AgentServer+Arguments.swift's own sentence, verbatim, so "
+          "the voice above is the argument reader's and not a third one")
+
+    # -- (b) the echoed scope is what was STAMPED --
+    r = mcp.call_with("set_clip", {"clips": [inner], "patch": {"name": "Inside"}})
+    check(r.get("scope") == nest_id and "document_ops" not in r,
+          f"a scoped edit inherited from the view reports the nest it landed in and "
+          f"nothing else: scope={r.get('scope')!r}")
+    r = mcp.call_with("set_canvas", {"width": 800, "height": 450})
+    check("scope" not in r and r.get("document_ops") == ["set_canvas"],
+          f"a DOCUMENT-level edit inherited from the same view reports no scope and names "
+          f"the op that went to the document — it used to answer scope={nest_id}: "
+          f"{ {k: r[k] for k in ('scope', 'document_ops') if k in r} }")
+    mcp.call_with("set_scope", {})
+    check(project(mcp)["canvas"]["width"] == 800,
+          "…and it really did land on the document's canvas, not the nest's frozen size")
+    check(project(mcp)["nests"][0]["width"] == 640,
+          "…which is still 640, exactly as before")
+    mcp.call_with("set_scope", {"nest": nest_id})
+    spare = mcp.call_with("import_media", {"path": UNUSED_MEDIA})["media"]
+    r = mcp.call_with("remove_media", {"media": spare})
+    check("scope" not in r and r.get("document_ops") == ["remove_media"],
+          f"remove_media inherited answers the same way: {r.get('document_ops')!r}")
+
+    # -- (b) an EXPLICIT scope is echoed as itself --
+    r = mcp.call_with(
+        "set_clip", {"clips": [inner], "patch": {"name": "Named"}, "scope": nest_id})
+    check(r.get("scope") == nest_id and "document_ops" not in r,
+          "an op carrying its own scope reports it")
+    mcp.call_with("set_scope", {})
+    r = mcp.call_with(
+        "set_clip", {"clips": [inner], "patch": {"name": "Again"}, "scope": nest_id})
+    check(r.get("scope") == nest_id and "document_ops" not in r,
+          "…with no nest open at all, which is the case effectiveScope and the stamp agree on")
+    r = mcp.call_with("set_clip", {"clips": [nest_clip["id"]], "patch": {"name": "Outer"}})
+    check("scope" not in r and "document_ops" not in r,
+          "and a plain timeline edit still carries neither key")
+    # Closed already, two calls up; closed again so the section's last act
+    # says so, the way section 10's does.
+    mcp.call_with("set_scope", {})
+
+
+# ---- 10. the documented limits, pinned ------------------------------------
 
 
 def limits_part(mcp):
@@ -1553,7 +1777,9 @@ def main():
     section("7 — the wide Err arm: the caps and the depth, which a view cannot see",
             wide_err_part, mcp)
     section("8 — a file of every earlier version still opens", versions_part, mcp)
-    section("9 — the documented limits, pinned so a change is noticed", limits_part, mcp)
+    section("9 — an inherited scope: the two marker ticks refused, and the landing the "
+            "result reports", marker_scope_part, mcp)
+    section("10 — the documented limits, pinned so a change is noticed", limits_part, mcp)
 
     print(f"\n{checks - len(failures)}/{checks} checks passed")
     for what in failures:
