@@ -46,6 +46,36 @@
 //!   itself, and there an EMPTY string clears too: an unnamed clip is
 //!   `None`, not `""`.
 //!
+//! ### `scope` — the one envelope key that is not an argument
+//!
+//! `{"op": "trim_start", "clip": 6, "to": 600000, "scope": 4}` trims a clip
+//! **inside nest 4**. `scope` is optional, a nest id, and it belongs to the
+//! envelope rather than to any op: with it absent (or `null`, the
+//! envelope's rule) every id in the op resolves against the timeline
+//! exactly as it always did, and with it present every id in the op —
+//! clips, tracks, actions — resolves against that nest's own tracks and
+//! clips. Nothing about an op's arguments changes, and no op gained a
+//! nest-aware code path: [`crate::scope`] builds a VIEW project out of the
+//! nest, runs the op against it unchanged, and merges the answer back. That
+//! module's doc is the view, the merge and everything the merge is
+//! responsible for; `OP_NAMES` is unchanged, because a scope is not an op.
+//!
+//! Times inside a scope are the NEST's own, measured from its zero — the
+//! same times its `clips[]` are written in — not project time. A nest has
+//! no speed, so `t − nest_clip.start` is the whole mapping.
+//!
+//! **Seven ops are an `Err` with a scope**, naming themselves and the nest:
+//! `add_marker`, `set_marker`, `remove_marker` (a nest has no markers of
+//! its own — spec §5.2), `set_canvas` (a nest's size is FROZEN at the size
+//! the parent had when it was made, deliberately, and the rest of a canvas
+//! — the rate, the background, the two switches — is the document's), and
+//! `add_media`, `relink_media`, `remove_media` (a nest references the
+//! parent's `media[]` in the parent's one id space, so a media edit inside
+//! a scope is an edit OUTSIDE it wearing a scope, which is the one thing a
+//! scope exists to prevent). Everything else — all forty-eight — works
+//! inside a nest as it works on the timeline, `nest` and `unnest`
+//! included.
+//!
 //! ### Clips
 //!
 //! | Op | Arguments | Semantics |
@@ -137,6 +167,13 @@
 //! - `Err(message)` — an unknown id, an out-of-range value, a malformed
 //!   envelope. Lowercase, naming the offending value.
 //!
+//! **A `scope` widens the third arm and nothing else.** An op applied
+//! inside a nest can succeed against the view and STILL be refused, because
+//! two invariants are invisible from in there: the caps count the whole
+//! document, and the nesting depth is measured from the timeline down. Both
+//! are checked once, at the end, on the merged parent — see
+//! [`crate::scope`], which states the contract in full.
+//!
 //! **The non-media rule.** `set_speed`, `rate_stretch`, `freeze_frame` and
 //! `slip` return `Err("clip N is not a media clip")` rather than refusing,
 //! because a `clip` argument naming a text or shape clip for a speed op is
@@ -157,6 +194,7 @@ use crate::edit_props::Group;
 use crate::edit_zoom::{ZoomFit, ZoomRegion};
 use crate::export::describe;
 use crate::model::{Color, Curve, Project, TransitionKind};
+use crate::scope;
 use crate::time::{Fps, Ticks};
 
 /// Every op name, in the order of the table above.
@@ -558,6 +596,20 @@ pub enum Op {
     },
 }
 
+/// One parsed envelope: the op, and the nest it applies INSIDE.
+///
+/// A struct rather than a bare [`Op`] because `scope` is the envelope's
+/// key and not any op's argument — it is spelled once, it means the same
+/// thing over all fifty-five, and folding it into the enum would mean
+/// fifty-five copies of one optional field. [`Project::apply_op`] still
+/// takes an `&Op` and knows nothing about nests.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Envelope {
+    pub op: Op,
+    /// The nest every id in `op` resolves against; `None` is the timeline.
+    pub scope: Option<u32>,
+}
+
 /// Parses one op envelope.
 ///
 /// Two passes on purpose. The first reads the `"op"` key out of a generic
@@ -567,8 +619,18 @@ pub enum Op {
 /// terms of the Rust enum rather than the wire format. The second is the
 /// real deserialize, whose errors (missing field, wrong type, unknown
 /// field) are already precise and are quoted under the op's name.
-pub fn parse(op_json: &str) -> Result<Op, String> {
-    let value: Value =
+///
+/// **`"scope"` comes out in that same first pass**, and it has to. [`Op`]
+/// is internally tagged with `deny_unknown_fields` on every variant, so a
+/// key the enum does not declare is an `Err` — that is the property a
+/// misspelt argument is caught by, and it is not one to give up for an
+/// envelope key. A `#[serde(flatten)]` wrapper is not the way round it
+/// either: serde documents `deny_unknown_fields` as unsupported with
+/// `flatten`, and it would silently stop refusing typos. Removing the key
+/// before the typed decode keeps all three — the refusal, all fifty-five
+/// variants, and an envelope key that is not an argument.
+pub fn parse(op_json: &str) -> Result<Envelope, String> {
+    let mut value: Value =
         serde_json::from_str(op_json).map_err(|e| format!("op is not valid json: {e}"))?;
     let Some(object) = value.as_object() else {
         return Err(format!(
@@ -597,15 +659,29 @@ pub fn parse(op_json: &str) -> Result<Op, String> {
             OP_NAMES.join(", ")
         ));
     }
-    serde_json::from_value(value).map_err(|e| format!("op \"{name}\" is not valid: {e}"))
+    let taken = value
+        .as_object_mut()
+        .and_then(|object| object.remove("scope"));
+    let scope = scope::read(taken.as_ref())?;
+    let op =
+        serde_json::from_value(value).map_err(|e| format!("op \"{name}\" is not valid: {e}"))?;
+    Ok(Envelope { op, scope })
 }
 
 impl Project {
     /// Applies one op envelope (the module table) and returns the new
     /// project, `Ok(None)` when it would change nothing, or `Err` when the
     /// envelope or its arguments are invalid.
+    ///
+    /// With a `scope` the op runs inside that nest instead
+    /// ([`crate::scope`]); without one this is the dispatch below and
+    /// nothing more.
     pub fn apply(&self, op_json: &str) -> Result<Option<Project>, String> {
-        self.apply_op(&parse(op_json)?)
+        let envelope = parse(op_json)?;
+        match envelope.scope {
+            None => self.apply_op(&envelope.op),
+            Some(nest) => self.apply_scoped(&envelope.op, nest),
+        }
     }
 
     /// The dispatch table. Deliberately nothing but calls: an op that needs

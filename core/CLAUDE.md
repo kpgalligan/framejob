@@ -78,6 +78,33 @@ lockstep are in the root `CLAUDE.md`; the full design is
   `app/Sources/ReelOps.swift`'s typed builders mirror it (they were in
   `ReelCore.swift` until road map 2's phase 9 paid that file's size toll;
   `ReelCore.swift` is still the only file that calls `rc_*`).
+  `parse` answers an `Envelope` — the op AND the envelope's `scope` — since
+  road map 2's phase 9; `apply_op(&Op)` is unchanged and knows nothing
+  about nests.
+- `scope.rs` — editing INSIDE a nest: the envelope's `scope` key (road map
+  2, phase 9). Its own module because a scope is not an op and not a
+  property of one — it is a change of CONTAINER, and the whole of it is two
+  pure functions plus a refusal list, which belong nowhere near the
+  semantics of any single edit. `Project::apply_scoped` builds a **view
+  project** out of the nest (its tracks and clips at top level, its frozen
+  size as the canvas, the parent's rate, media and `next_id`, no markers),
+  applies the op to it UNCHANGED, and merges the nest's `tracks` and
+  `clips`, `next_id`, `media` and `nests` back. So `Project::clip`
+  keeps its one meaning, no op gained a nest-aware branch, and `OP_NAMES`
+  is still 55.
+  Three things in it are counter-intuitive and each is measured rather than
+  reasoned. **The scoped nest's row stays in the view with its tracks and
+  clips EMPTIED**: leaving it whole doubles every id in `validate`'s one
+  uniqueness sweep, and taking it out entirely dangles every OTHER nest's
+  clip that shows it — which is exactly the nest-inside-a-nest case the
+  phase exists for. **The nests write-back is union first, orphans after**:
+  `unnest`'s `nest_is_shown` cannot see the parent's timeline clips from
+  inside a view, so the view drops a nest a timeline clip still shows, and
+  the merge re-asks the MERGED parent before dropping anything. And a
+  scoped op has a **wider `Err` arm than any other**: the caps and the
+  nesting depth are document-wide and a view is blind to both, so an op can
+  succeed against the view and the scoped apply still return `Err` — the
+  module doc states that three-way contract in full.
 - `edit_clip.rs` / `edit_props.rs` / `edit_track.rs` / `edit_time.rs` — the
   §6 ops in `impl Project` blocks: clip placement (with `fit_scale` and,
   since phase 6, its sibling `fill_scale` — Fit is a RESCUE for oversized
@@ -382,9 +409,10 @@ numeric/algorithmic choices get prose "why" comments.
 Three modules are over the cap today and are known debt, not licence:
 `edit_clip.rs` (1252 — the placement ops are one concern and every further
 cut fragments it; the action ops were the M3 cut, into `edit_action.rs`),
-`edit.rs` (760 — a module doc that IS the op table and grows a row per op,
-which is what took it over in phase 3 and what phase 6's two background
-rows added to again) and `edit_track.rs` (674 — tracks, markers, canvas and
+`edit.rs` (**840** — a module doc that IS the op table and grows a row per
+op, which is what took it over in phase 3, what phase 6's two background
+rows added to again and what phase 9's `scope` section added to a third
+time) and `edit_track.rs` (674 — tracks, markers, canvas and
 media, four small concerns in one block). Do not add to
 any of them without taking something out: a new placement op goes in a new
 module (`edit_edge.rs`, `edit_insert.rs`), a new op with a concern of its
@@ -392,6 +420,16 @@ own goes in one too (`edit_zoom.rs` was phase 3's and
 `edit_background.rs` phase 6's), and the next cut in
 `edit_track.rs` is `set_canvas` with its `rescale` / `resnap` /
 `check_dimension` helpers into an `edit_canvas.rs`.
+
+**`edit.rs` grew 76 lines in phase 9 and only about 26 of them are code** —
+the `Envelope` struct, two lines in `parse` and the dispatch in `apply`;
+everything a scope MEANS went into `scope.rs` (374) rather than here, which
+is the shape to copy the next time the envelope itself grows. The rest is
+the op table's own doc, which is the reason the cap cannot govern this file
+and is the standing exemption above. The next cut here, if one is ever
+forced, is the `Op` enum itself into an `edit_ops.rs`, leaving the doc, the
+parse and the dispatch — but it would make a phase's diff unattributable,
+so it is not a cut to make in the same phase as a feature.
 
 **Two modules now sit exactly AT the line and take nothing further
 without a cut of their own**: `edit_paste.rs` (600) and `model_props.rs`
@@ -537,6 +575,12 @@ and reads the new keys' ORDER off the written text, since a parsed
 **Tests.** All tests are black-box in `core/tests/` (no `#[cfg(test)]` in
 `src/`), exercised **through the FFI** wherever possible, and verified
 against independently written oracles — never golden files. Shared helpers
-live in `tests/common/`; new feature area = new test file. Every new export
+live in `tests/common/`; new feature area = new test file. `content` and
+`contents` are there since road map 2's phase 9 — "the same clips, ids
+aside", stripping every id and ordering by start and track INDEX — because
+a second caller wanted them and a second COPY would have let `nest` /
+`unnest`'s identity claim and `scope`'s oracle be about two different
+notions of sameness. They were `nest.rs`'s private pair; that file's own
+test re-ran unchanged, which is what says the move was pure. Every new export
 gets at least one test plus inclusion in the null-safety sweep. Finish Rust
 work with `cargo fmt` and a clean `make lint`.

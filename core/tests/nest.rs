@@ -29,7 +29,7 @@ mod common;
 
 use serde_json::{json, Value};
 
-use common::{array, assert_contains, at, by_id, flag, int, num, text, Handle};
+use common::{array, assert_contains, at, by_id, contents, flag, int, num, text, Handle};
 
 /// Ticks per second (spec §5.1), written out rather than imported so a
 /// change to `time::TIMESCALE` fails these tests instead of moving with them.
@@ -200,45 +200,6 @@ fn close(actual: f64, expected: f64, what: &str) {
         (actual - expected).abs() < EPS,
         "{what}: expected {expected}, got {actual}"
     );
-}
-
-/// A clip with everything that names an id stripped out — what "the same
-/// clips" means across a `nest` / `unnest` round trip, where every id is
-/// re-minted and the tracks are new objects.
-fn content(clip: &Value) -> Value {
-    let mut out = clip.clone();
-    let object = out.as_object_mut().expect("a clip is an object");
-    object.remove("id");
-    object.remove("track");
-    if let Some(actions) = object.get_mut("actions").and_then(Value::as_array_mut) {
-        for action in actions {
-            if let Some(entry) = action.as_object_mut() {
-                entry.remove("id");
-            }
-        }
-    }
-    out
-}
-
-/// Every clip's content, ordered by start then by the track INDEX it sits
-/// on, so two projects compare equal only if their stacking agrees too.
-fn contents(project: &Value) -> Vec<(i64, usize, Value)> {
-    let order: Vec<i64> = array(project, "/tracks")
-        .iter()
-        .map(|t| int(t, "/id"))
-        .collect();
-    let mut out: Vec<(i64, usize, Value)> = array(project, "/clips")
-        .iter()
-        .map(|c| {
-            let index = order
-                .iter()
-                .position(|id| *id == int(c, "/track"))
-                .unwrap_or(0);
-            (int(c, "/start"), index, content(c))
-        })
-        .collect();
-    out.sort_by(|a, b| (a.0, a.1).cmp(&(b.0, b.1)));
-    out
 }
 
 // ---- the grouping ops ----------------------------------------------------

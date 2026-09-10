@@ -508,3 +508,51 @@ pub fn by_id<'a>(value: &'a Value, pointer: &str, id: u64) -> &'a Value {
         .find(|item| item.get("id").and_then(Value::as_u64) == Some(id))
         .unwrap_or_else(|| panic!("no element with id {id} in {pointer}"))
 }
+
+// ---- comparing clips across a re-minting op ------------------------------
+
+/// A clip with everything that names an id stripped out — what "the same
+/// clips" means across an op that re-mints them.
+///
+/// `nest` / `unnest` is the pair it was written for: every id is fresh on
+/// the way out and the tracks are new objects, so a comparison that kept
+/// them could only ever fail. `scope.rs`'s oracle is the second caller, and
+/// it is the reason this lives here rather than in one test file: "apply
+/// inside a nest, then unnest" and "unnest, then apply at the top level"
+/// have to be compared by the SAME rule the round trip is, or the two
+/// claims are about two different notions of sameness.
+pub fn content(clip: &Value) -> Value {
+    let mut out = clip.clone();
+    let object = out.as_object_mut().expect("a clip is an object");
+    object.remove("id");
+    object.remove("track");
+    if let Some(actions) = object.get_mut("actions").and_then(Value::as_array_mut) {
+        for action in actions {
+            if let Some(entry) = action.as_object_mut() {
+                entry.remove("id");
+            }
+        }
+    }
+    out
+}
+
+/// Every clip's content, ordered by start then by the track INDEX it sits
+/// on, so two projects compare equal only if their stacking agrees too.
+pub fn contents(project: &Value) -> Vec<(i64, usize, Value)> {
+    let order: Vec<i64> = array(project, "/tracks")
+        .iter()
+        .map(|t| int(t, "/id"))
+        .collect();
+    let mut out: Vec<(i64, usize, Value)> = array(project, "/clips")
+        .iter()
+        .map(|c| {
+            let index = order
+                .iter()
+                .position(|id| *id == int(c, "/track"))
+                .unwrap_or(0);
+            (int(c, "/start"), index, content(c))
+        })
+        .collect();
+    out.sort_by(|a, b| (a.0, a.1).cmp(&(b.0, b.1)));
+    out
+}
