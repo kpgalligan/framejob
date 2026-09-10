@@ -126,6 +126,60 @@ pub unsafe extern "C" fn rc_project_clone(p: *const Project) -> *mut Project {
     }
 }
 
+/// The project INSIDE nest `nest_id`, as a new handle — the same view an
+/// op carrying `"scope": nest_id` is applied to (`core/src/scope.rs`).
+///
+/// This is the READ half of a scope, and it exists because a scope has to be
+/// LOOKED at as well as edited: the app plays, plans, renders and snapshots
+/// a nest through this handle while every edit still goes to the parent's
+/// handle with `scope` set. Both halves are [`Project::scoped_view`], which
+/// is why they cannot disagree about what is in a nest — a read view that
+/// drifted from the edit view would make the timeline show one project and
+/// the edits land in another.
+///
+/// The handle is an ordinary immutable `RcProject`: it is freed with
+/// [`rc_project_free`], and applying an op to it edits the VIEW rather than
+/// the document, which is not what any caller wants. Nothing enforces that;
+/// the app holds it for reading only.
+///
+/// NULL with a message through `err_out` for a NULL project or a nest id
+/// this project has not got (`no nest with id N`, the same sentence the edit
+/// path answers). There is no "valid but changes nothing" case here, so a
+/// NULL return ALWAYS carries a message.
+///
+/// # Safety
+/// `p` must be NULL or a valid handle from this library that has not been
+/// freed; `err_out` must be NULL or a valid pointer to writable
+/// `*mut c_char`, whose message the caller frees with [`rc_string_free`].
+/// The returned handle is owned by the caller and is freed with
+/// [`rc_project_free`].
+#[no_mangle]
+pub unsafe extern "C" fn rc_project_scoped(
+    p: *const Project,
+    nest_id: u32,
+    err_out: *mut *mut c_char,
+) -> *mut Project {
+    let body = || {
+        if p.is_null() {
+            return Err("project is NULL".to_string());
+        }
+        let project = unsafe { &*p };
+        let Some(nest) = project.nest(nest_id) else {
+            return Err(format!("no nest with id {nest_id}"));
+        };
+        Ok(project.scoped_view(nest))
+    };
+    unsafe {
+        fallible_op(
+            err_out,
+            "building a scoped project",
+            ptr::null_mut(),
+            body,
+            boxed,
+        )
+    }
+}
+
 /// Releases a project handle. NULL-tolerant.
 ///
 /// # Safety

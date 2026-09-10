@@ -19,7 +19,9 @@ import AppKit
 /// dispatch table, the edit and result helpers, and the trampoline. Every
 /// handler lives in an `AgentServer+<Area>.swift` extension and the argument
 /// vocabulary in `AgentServer+Arguments.swift`, which is why the helpers here
-/// are internal rather than private.
+/// are internal rather than private. The one piece of STATE a call leaves
+/// here is `callScope` — road map 2's phase 9, and the sanctioned reason a
+/// frozen file grows a property: an extension cannot hold one.
 final class AgentServer {
     static let shared = AgentServer()
 
@@ -31,6 +33,31 @@ final class AgentServer {
 
     private(set) var port: UInt16 = 0
     var isRunning: Bool { port != 0 }
+
+    /// The nest the CURRENT tool call ASKED to edit inside — the envelope's
+    /// `scope` (spec §6, `core/src/scope.rs`) — or nil, which means "wherever
+    /// the app is looking" rather than "the timeline" (`effectiveScope`).
+    /// Read once by `dispatch` below, consumed by the id readers in
+    /// `AgentServer+Arguments.swift` and stamped onto every op in
+    /// `performGroupedEdit`; `AgentServer+Scope.swift` is where the whole
+    /// idea is written down.
+    ///
+    /// **A stored property is exactly what an extension cannot hold**, which
+    /// is the sanctioned reason for a frozen file to gain one (app/CLAUDE.md;
+    /// `Exporter`'s `lock` and `scratchStorage` are the precedent). The
+    /// alternative was an arguments dictionary threaded through
+    /// `performGroupedEdit`, `editResult` and fifty-eight handlers, all in
+    /// two files already near the size cap, to carry one optional integer.
+    ///
+    /// **It is safe from races because the server is single-request.**
+    /// `core/src/agent.rs`'s `serve` is one thread running
+    /// `for request in server.incoming_requests()` with the comment "One
+    /// request at a time" on it, and a batched array is `filter_map`ped in
+    /// that same thread — so at most one tool is ever executing, whether it
+    /// hopped to the main thread or (an `offMainTools` member) stayed on the
+    /// server's. `private(set)` keeps the writing to this file, where the one
+    /// write and its `defer` sit together.
+    private(set) var callScope: UInt32?
 
     private init() {}
 
@@ -150,6 +177,19 @@ final class AgentServer {
         guard let handler = Self.handlers[tool] else {
             throw ToolError(message: "Unknown tool: \(tool)")
         }
+        // The envelope's `scope` is read ONCE, here, because this is the only
+        // place that holds both the tool's name and its arguments for all
+        // seventy-four of them — a read inside each handler would be
+        // fifty-eight edit sites across two files, every one of them able to
+        // forget. It is read for exactly the tools whose schema declares it
+        // (`AgentCatalog.opNames`, the core's own op list), so a stray
+        // `scope` on `get_project` or `export` is the ignored extra key it
+        // has always been rather than a silently honoured one. The `defer`
+        // is what makes the property a per-CALL value rather than state: the
+        // next call starts with no scope of its own whatever this one asked
+        // for or threw, and falls back to the view like any other.
+        callScope = Self.opNames.contains(tool) ? try scopeArg(a) : nil
+        defer { callScope = nil }
         return try handler(self)(a)
     }
 
@@ -160,9 +200,10 @@ final class AgentServer {
     /// and `start()` checks the two sets match on every launch.
     ///
     /// One entry per row of the op table (spec §6, and the module doc of
-    /// `core/src/edit.rs`) plus the eighteen tools that are not ops: the
-    /// project-level ones spec §7.9 names, the four view-state and history
-    /// mirrors beside them (`set_range`, `set_selection`, `undo`, `redo`), and
+    /// `core/src/edit.rs`) plus the nineteen tools that are not ops: the
+    /// project-level ones spec §7.9 names, the five view-state and history
+    /// mirrors beside them (`set_range`, `set_selection`, `set_scope`,
+    /// `undo`, `redo`), and
     /// the composites later phases added — `detect_silence`, `transcribe`,
     /// `import_captions`, `export_captions`, `normalize_clip`. The count is
     /// not decoration: `start()`'s parity check reads the core's own
@@ -178,6 +219,8 @@ final class AgentServer {
         "set_playhead": { $0.setPlayhead },
         "set_range": { $0.setRange },
         "set_selection": { $0.setSelection },
+        // The nest being looked into (AgentServer+Scope.swift)
+        "set_scope": { $0.setScope },
         // Undo history (AgentServer+History.swift)
         "undo": { $0.undoEdit },
         "redo": { $0.redoEdit },
@@ -263,7 +306,7 @@ final class AgentServer {
     /// comment saying why it is the exception.
     private static let opsWithoutTools: Set<String> = []
 
-    /// The enforcement behind the table's contract, in three parts:
+    /// The enforcement behind the table's contract, in four parts:
     ///
     /// 1. `catalogJSON()` and `handlers` name exactly the same tools;
     /// 2. every op the CORE declares has a tool — the list read through
@@ -273,7 +316,11 @@ final class AgentServer {
     ///    this check exists to catch;
     /// 3. every tool's `inputSchema` is structurally sound — an object with
     ///    a `properties` map, and nothing named `required` that it does not
-    ///    declare.
+    ///    declare;
+    /// 4. every OP tool declares `scope` — road map 2's phase 9, and the one
+    ///    part that is about a feature rather than about the catalog's shape,
+    ///    so it lives in `AgentServer+Scope.swift` and says there why parts 1
+    ///    to 3 cannot see the omission it catches.
     ///
     /// **What it still cannot see.** Nothing validates a call against
     /// `inputSchema`, and the core publishes op NAMES, not op arguments, so
@@ -298,9 +345,12 @@ final class AgentServer {
             return "agent tool catalog and dispatch table disagree — in catalog but not "
                 + "dispatch: \(missing); in dispatch but not catalog: \(extra)"
         }
-        let ops = ReelOp.coreNames()
+        // The same set the catalog put a `scope` on and the same one
+        // `dispatch` reads a `scope` for, so this check and the behaviour it
+        // is checking cannot be looking at two different op tables.
+        let ops = Self.opNames
         guard !ops.isEmpty else { return "the core reported no op names" }
-        let uncovered = Set(ops).subtracting(catalogNames).subtracting(opsWithoutTools).sorted()
+        let uncovered = ops.subtracting(catalogNames).subtracting(opsWithoutTools).sorted()
         if !uncovered.isEmpty {
             return "the core's op table has ops with no agent tool: \(uncovered) — every row "
                 + "of spec §6 needs a tool, a handler and a comment naming the UI path it "
@@ -310,7 +360,11 @@ final class AgentServer {
         if !stale.isEmpty {
             return "AgentServer.opsWithoutTools names ops the core does not have: \(stale)"
         }
-        return schemaFailure(tools)
+        // Part 4 lives in `AgentServer+Scope.swift` with the rest of the
+        // scope, where parts 1 to 3 stay here with the table they check: it
+        // is the only part that is about one FEATURE rather than about the
+        // catalog's shape, and this file is frozen at wiring.
+        return schemaFailure(tools) ?? Self.scopeFailure(tools, ops)
     }
 
     /// Part 3: the structural check on each tool's declared input. It cannot
@@ -393,6 +447,21 @@ final class AgentServer {
     /// (the agent can make one), where newest is the better guess than
     /// oldest.
     func target(_ a: [String: Any]) throws -> ProjectDocument {
+        let document = try targetDocument(a)
+        // The scope is validated HERE, at the one gate every handler passes
+        // through before it reads a single id, because the order of the two
+        // refusals is part of the contract (`core/src/scope.rs`): a scope
+        // naming no nest is answered by name, ahead of anything else, since
+        // it is the argument that decides which document the caller thinks
+        // it is editing. Doing it in the readers instead would make the
+        // message depend on which argument a handler happens to read first —
+        // `trim_start`'s `clip`, `close_gap`'s `at` — and would leave the
+        // handlers that read no ids at all validating nothing.
+        try checkCallScope(document)
+        return document
+    }
+
+    private func targetDocument(_ a: [String: Any]) throws -> ProjectDocument {
         assert(Thread.isMainThread)
         let documents = openProjects()
         if let wanted = try stringArg(a, "project") {
@@ -480,11 +549,34 @@ final class AgentServer {
     /// off-event pattern (app/CLAUDE.md): an undo registration made outside an
     /// AppKit event otherwise lands in an implicit group AppKit never closes,
     /// silently merging every agent edit into one undo step.
+    ///
+    /// **This is where the call's scope is stamped onto its ops**, and the
+    /// one place: every tool that edits ends here or in `editResult` above
+    /// it, including the two composites that call it directly, so no handler
+    /// has to remember. The rule is `AgentServer+Scope.addressed`, which
+    /// mirrors `ProjectDocument.addressed(_:)` — and it has to be stamped
+    /// BEFORE the trial below, not only at the commit, or a scoped edit would
+    /// be tried against the wrong container and reported as a refusal it
+    /// never suffered. With no scope anywhere it is the identity, which is
+    /// what makes an unscoped call byte-for-byte the call it always was.
+    ///
+    /// It is also where the ops an inherited scope may NOT send are refused,
+    /// for the same reason: this is the one place every editing tool passes
+    /// through. `checkDocumentLevelTicks` is that rule and argues it.
     @discardableResult
     func performGroupedEdit(
         _ document: ProjectDocument, _ actionName: String, _ ops: [ReelOp]
     ) throws -> ProjectSnapshot {
-        let before = document.project.snapshot
+        // `addressed` sends a document-level op UNSCOPED out of a scope it
+        // inherited, which is right for five of the seven and a wrong
+        // PLACEMENT for the two that carry a tick — a marker written from
+        // inside a nest is measured from the nest's zero and lands elsewhere
+        // on the timeline. Refused before the stamp, beside the rule it
+        // guards (`AgentServer+Scope.swift`).
+        try checkDocumentLevelTicks(ops, document)
+        let ops = addressed(ops, document)
+        let handle = document.project
+        let before = handle.snapshot
         do {
             guard try document.project.applying(ops) != nil else {
                 // `Ok(None)` is BOTH tiers of "no new project" (spec §5.5):
@@ -505,6 +597,31 @@ final class AgentServer {
             throw ToolError(message: error.localizedDescription)
         }
         document.performGroupedEdit(actionName, ops)
+        // **The trial promised a change; this is where the promise is
+        // checked**, and it is one pointer comparison because `applyEdit`
+        // replaces the handle only when the core answered with a new project.
+        //
+        // Nothing should ever be able to fire it: the commit applies the same
+        // ops to the same handle the trial just succeeded against. It is here
+        // because the ONE way the two can disagree is over the addressing —
+        // this side stamps a scope, `ProjectDocument.addressed(_:)` stamps
+        // one too, and a disagreement between them is invisible from a tool
+        // result (measured, road map 2's phase 9: an explicit `scope` sent
+        // while a DIFFERENT nest was open in the window was re-addressed to
+        // the open one, failed in the core, put its message in a sheet the
+        // agent cannot see, and the tool answered `ok`). That defect is
+        // CLOSED — `addressed(_:)` now keeps a scope an op already carries,
+        // so an explicit scope outranks the open view — and this guard is the
+        // defence that survives it, because the two stamps still live in two
+        // files. A tool that lies about an edit is worse than one that
+        // refuses, so this refuses.
+        guard document.project !== handle else {
+            throw ToolError(
+                message: "\(actionName) was accepted when it was tried but the document did "
+                    + "not change, so nothing was edited. The ops as the document sent them "
+                    + "were addressed differently from the ops that were tried — check the "
+                    + "scope against what set_scope has open — and the project is untouched.")
+        }
         return before
     }
 
@@ -515,10 +632,20 @@ final class AgentServer {
         _ document: ProjectDocument, _ actionName: String, _ ops: [ReelOp],
         _ fields: [String: Any] = [:]
     ) throws -> String {
+        // A scoped edit changes nothing the `project` summary counts, so
+        // without this an `ok` from inside a nest is indistinguishable from
+        // an `ok` on the timeline that did nothing visible. What says WHERE
+        // it landed is read off the ops as `addressed` STAMPS them and never
+        // off the VIEW — `AgentServer+Scope.scopeLanding` is that account and
+        // argues it, mixed edits included — and it is taken BEFORE the edit,
+        // because how a call was addressed is a fact about the call. Nothing
+        // is added with no scope anywhere, so no existing result grew a key.
+        let landing = scopeLanding(ops, document)
         let before = try performGroupedEdit(document, actionName, ops)
         var result: [String: Any] = ["ok": true]
         result.merge(fields) { _, new in new }
         result.merge(Self.created(from: before, to: document.project.snapshot)) { _, new in new }
+        result.merge(landing) { _, new in new }
         result["project"] = summary(document)
         return try jsonResult(result)
     }
@@ -527,6 +654,24 @@ final class AgentServer {
     /// and a detach all mint clips the caller then wants to name, and there is
     /// one FFI entry point for every op (spec §11) — so no op returns an id
     /// and the difference of the two snapshots is how they are reported.
+    ///
+    /// **Clips and tracks are counted across every container**, the
+    /// timeline's and every nest's, which is `Project::every_clip()`'s rule
+    /// in Swift and is what road map 2's phase 9 needed: a scoped `split`
+    /// mints its two halves INSIDE a nest and a scoped `add_track` mints its
+    /// track there, so a diff of the top level alone answered with nothing at
+    /// all and left the caller to find them by reading the whole project
+    /// back. Markers and media are deliberately still the top level's: a nest
+    /// has neither, and both lists ARE the document's.
+    ///
+    /// It leaves every unscoped clip answer exactly as it was — `nest` moves
+    /// its clips WHOLE, ids and all (`edit_nest.rs`), so the only new clip is
+    /// still the nest clip it minted, and it comes first because the
+    /// timeline's clips are concatenated ahead of the nests'. It does change
+    /// ONE unscoped answer, and for the better: `nest` mints a fresh TRACK
+    /// per source track inside the nest, and those ids — real ids in the
+    /// document's one number space, which `set_track` and `move_track` can
+    /// now name through a scope — used to be reported nowhere.
     static func created(from before: ProjectSnapshot, to after: ProjectSnapshot)
         -> [String: Any] {
         var result: [String: Any] = [:]
@@ -534,9 +679,13 @@ final class AgentServer {
             let existing = Set(old.map { $0.id })
             return new.map { $0.id }.filter { !existing.contains($0) }.map { Int($0) }
         }
-        let clips = added(before.clips, after.clips)
+        let clips = added(
+            before.clips + before.nests.flatMap { $0.clips },
+            after.clips + after.nests.flatMap { $0.clips })
         if !clips.isEmpty { result["new_clips"] = clips }
-        let tracks = added(before.tracks, after.tracks)
+        let tracks = added(
+            before.tracks + before.nests.flatMap { $0.tracks },
+            after.tracks + after.nests.flatMap { $0.tracks })
         if !tracks.isEmpty { result["new_tracks"] = tracks }
         let markers = added(before.markers, after.markers)
         if !markers.isEmpty { result["new_markers"] = markers }

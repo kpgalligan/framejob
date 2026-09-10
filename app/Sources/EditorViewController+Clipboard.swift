@@ -69,11 +69,16 @@ extension EditorViewController {
     /// no clips at all — both of which mean there is nothing to put on the
     /// pasteboard, and the caller beeps.
     private func clipboardPayload(for document: ProjectDocument) -> [String: Any]? {
-        guard let data = document.project.json.data(using: .utf8),
+        // The EDITED project (road map 2's phase 9). Inside a nest the
+        // selected clips are the NEST's, and they are the top level of this
+        // JSON — so a Copy in a nest copies what was picked, and the `track`
+        // depths it rewrites are counted against the nest's own stack, which
+        // is what the paste on the other side will be measured against.
+        guard let data = document.editedProject.json.data(using: .utf8),
               let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let clips = root["clips"] as? [[String: Any]]
         else { return nil }
-        let snapshot = document.project.snapshot
+        let snapshot = document.editedProject.snapshot
         let front = snapshot.tracks.count - 1
         let selection = document.selection
 
@@ -108,7 +113,7 @@ extension EditorViewController {
     /// the document's own timecode (`ReelTime.format`, as everywhere else).
     private func clipboardSummary(for document: ProjectDocument) -> String {
         let clips = selectedClips
-        let canvas = document.project.snapshot.canvas
+        let canvas = document.editedProject.snapshot.canvas
         let frames = canvas.timecodeFrames
         let start = clips.first?.start ?? 0
         let end = clips.map { $0.end }.max() ?? start
@@ -145,13 +150,14 @@ extension EditorViewController {
             NSSound.beep()
             return
         }
-        let before = Set(document.project.snapshot.clips.map { $0.id })
+        let before = Set(document.editedProject.snapshot.clips.map { $0.id })
         document.applyEdit("Paste", .paste(at: document.playhead, payload: payload))
 
         // Comparing id sets rather than trusting ids we predicted: the core
         // mints them, and this stays correct if it ever mints them
         // differently (`EditorViewController+AddClips.swift` does the same).
-        let added = document.project.snapshot.clips.map { $0.id }.filter { !before.contains($0) }
+        let added = document.editedProject.snapshot.clips.map { $0.id }
+            .filter { !before.contains($0) }
         guard !added.isEmpty else { return }
         document.selection = Set(added)
         viewStateDidChange()

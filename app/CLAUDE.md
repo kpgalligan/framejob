@@ -30,16 +30,74 @@ lockstep are in the root `CLAUDE.md`; the full design is
   `ExportSheetOptions.swift` the cut cost NO visibility: `OpArgs` is
   `private`, every one of its users is a factory, so it travelled with them
   and is still `private`.
+  **Phase 9 added two members and one list to `ReelOp`**: `scope`, a `var`
+  with an initial value so the memberwise init defaults it and all ~55
+  factories compiled untouched; `scoped(_:)`, the plain stamp, which the MCP
+  handlers use for their own `scope` argument as well; and
+  `documentLevelNames`, a MIRROR of `core/src/scope.rs`'s `refused_inside` —
+  seven names, checkable by eye. The mirror exists because one edit can
+  legitimately mix the two kinds (a Finder drop inside a nest is `add_media`
+  on the document plus `add_clip` in the nest, as ONE undo step), so
+  `ProjectDocument` sends a document-level op unscoped and everything else
+  scoped. It is not a second opinion about what those ops mean: the core
+  still refuses a scoped one by name, and an agent that asks for one still
+  gets that refusal.
 - `ProjectSnapshot.swift` — the `Codable` mirror of the §5.2 project JSON:
   the read-only view every view draws from.
 - `ProjectDocument.swift` — NSDocument, `.reelcut` package read/write, and
-  the single mutation point (see Undo below). It also holds the four pieces
+  the single mutation point (see Undo below). It also holds the FIVE pieces
   of VIEW state every view agrees on and nothing persists: the playhead, the
-  clip selection, the in/out range and `selectedMedia` (the Media tab's
-  selected row, which Edit ▸ Insert / Overwrite at Playhead place). All four
+  clip selection, the in/out range, `selectedMedia` (the Media tab's
+  selected row, which Edit ▸ Insert / Overwrite at Playhead place) and
+  `nestPath`. All five
   are re-clamped to live ids by `clampViewState`, and `selectedMedia` lives
   here rather than on `MediaPane` because that pane is rebuilt whole
   whenever the media list changes.
+  **`nestPath` is phase 9's, and three things about it are load-bearing.**
+  It is a PATH rather than the nest id the core's `scope` wants, because a
+  nest can be shown by two clips at two different starts — so the id alone
+  cannot say where the nest's zero sits (the playhead maps in and out) or
+  which clip to re-select on the way back. `scope` is its last step's nest.
+  **`editedProject` is a STORED, memoised `rc_project_scoped` handle**, not
+  a computed one: `ReelProject` memoises `json`, `snapshot` and `planJSON`
+  PER HANDLE, so a fresh handle at each of the ~80 read sites would re-run
+  `rc_project_to_json` and a whole snapshot decode at every one. Two reads
+  answering the same object is also what `refreshFromDocument`'s
+  object-identity guard depends on. And **`clampViewState`'s ORDER is the
+  scope first**, then the selection, then `selectedMedia`, then the
+  playhead: the selection clamp measures against whatever container the
+  scope clamp left, so the two cannot be swapped. `applyEdit` changed by
+  exactly one `map` — `addressed(ops)` — and everything else about it,
+  including its three outcomes, is what it was; note that the `catch` arm
+  now also carries the caps and the depth, which a scoped op can fail on
+  where an unscoped one cannot.
+- `EditorViewController+NestScope.swift` · `TimelineView+NestScope.swift` —
+  going inside a nest and coming back out (road map 2's phase 9, spec §4.4):
+  Clip ▸ Open Nest ⌘↓ / Close Nest ⌘↑, the double-click on a nest clip, the
+  playhead mapping, `NestScope`'s pure path arithmetic (`clamped`, `offset`,
+  `names`, `clips`) and the breadcrumb the ruler draws in the corner over the
+  track headers. The frozen `TimelineView.swift` carries two stored
+  properties, two closures, one draw call, one hit-test token and one
+  gesture case — `TimelineView+Candidates.swift`'s split exactly, and for
+  the same reason: `TimelineRulerView.draw` paints the corner LAST, over the
+  ticks that would otherwise slide under the header column, so anything in
+  that square is drawn from inside that method. `revealPlayhead` widened to
+  internal, which the change forces: `setPlayhead` guards on
+  `time != playhead` and a scope change can leave the number equal, so the
+  auto scroll has to be asked for by name.
+  Three things to know before touching it. **A nest clip loses
+  rename-by-double-click** — the open branch sits ABOVE the rename branch in
+  `beginGesture`, the ⌥⇧ slip's precedent — keeping ⇧⌘R, Clip ▸ Rename… and
+  the Clip tab's header field. **The three MARKER commands are off inside a
+  nest**, which is more than polish: a nest has no markers, and the playhead
+  in there is measured from the nest's zero, so `add_marker` sent unscoped
+  (the way `add_media` is) would write one at the wrong project time.
+  `validateNestScopeAction` runs FIRST in the base file's validator chain
+  because it is the only arm that overrides another file's answer, and
+  `addMarkerCommand` carries its own guard for the bare-M path no validator
+  covers. And **the in/out range is cleared on every scope change**
+  (`setNestPath`), because a pair of ticks means one thing inside a nest and
+  another to an export.
 - `LayerRenderers.swift` · `LayerRenderersText.swift` — text and shape
   descriptions to textures, and
   since format version 5 the three text REVEALS (spec §5.2's
@@ -372,6 +430,21 @@ lockstep are in the root `CLAUDE.md`; the full design is
   SOURCE order, so a new `case "x"` must go BELOW any
   `case "x" where <modifier>` above it. A bare `case "z"` placed first
   would swallow ⇧Z and kill Fit Timeline with no compiler warning at all.
+- **The nest scope's footprint in the panes**, phase 9's, said once here
+  because it is a split rather than a file: `InspectorBinding.project` /
+  `snapshot` / `canvas` are the SCOPED project — what the Clip tab reads and
+  writes, since the clip it is showing is inside the nest — while
+  `documentProject` / `documentSnapshot` / `documentCanvas` are the
+  document's, and `DocumentPane.swift` reads only those. That pane is about
+  the FILE: its canvas, its markers, its media count, what its background
+  lets an export carry. `set_canvas` and the two marker ops it writes are
+  document-level and go unscoped, so the tab keeps working with a nest open;
+  reading a scoped snapshot there would mean answering about one project and
+  editing another, visibly so, since a scoped view has NO markers and the
+  nest's frozen size for a canvas. `MediaPaneCommands` asks
+  `documentSnapshot` for exactly one question — "which clips use this file",
+  for Remove's alert, because `remove_media` is document-level too — and the
+  scoped one for everything about placement.
 - `InspectorViewController.swift` (frozen at wiring: the tab strip and which
   pane is shown) + `InspectorPane.swift` (the pane protocol and base, the
   disclosure section with its collapsed-state key and its right-aligned
@@ -646,7 +719,10 @@ lockstep are in the root `CLAUDE.md`; the full design is
 - `AgentCatalog.swift` — the MCP tool catalog; a startup check enforces that
   catalog names match the dispatch registry (it traps in debug and logs in
   Release, because `make app` builds Release). The handlers live in
-  `AgentServer+Project/Clips/Tracks/Media/Render/History/Silence/Captions/Audio/Background.swift`
+  `AgentServer+Project/Clips/Tracks/Media/Render/History/Silence/Captions/Audio/Background/Scope.swift`
+  — `+Scope.swift` being the newest and largest of them (the call's scope,
+  `idScope`, `effectiveScope`, the `set_scope` handler and the parity
+  check's fourth part)
   and their shared
   argument vocabulary in `AgentServer+Arguments.swift` — `intArg`,
   `doubleArg`, `boolArg`, `stringArg`, `stringsArg` (an optional list of
@@ -704,11 +780,13 @@ lockstep are in the root `CLAUDE.md`; the full design is
   nor the patch — and widening that helper is the wrong fix, because it
   sits on every patch shape in the app. It never sees this object anyway.
   Beyond the §6 ops the catalog carries the app-state tools spec §7.9 names
-  plus `set_range`, `set_selection`, `undo` and `redo` — the mirrors of
-  I/O/⌥X, a timeline or canvas click, and ⌘Z/⇧⌘Z, without which the "one edit
-  is one undo step", "the in/out range scopes the export" and "the selection
-  draws handles" properties could not be checked by driving the built app.
-  None of the four is an op, so none registers an undo step.
+  plus `set_range`, `set_selection`, `set_scope`, `undo` and `redo` — the
+  mirrors of I/O/⌥X, a timeline or canvas click, the double-click that opens
+  a nest (Clip ▸ Open Nest, ⌘↓), and ⌘Z/⇧⌘Z, without which the "one edit
+  is one undo step", "the in/out range scopes the export", "the selection
+  draws handles" and "an edit inside a nest lands inside it" properties could
+  not be checked by driving the built app.
+  None of the five is an op, so none registers an undo step.
   `target(_:)` resolves the implicit document: an agent-driven app is never
   the ACTIVE app, so `NSDocumentController.currentDocument` is nil there and
   the fallback must be `NSApp.orderedDocuments`, never `documents.first`

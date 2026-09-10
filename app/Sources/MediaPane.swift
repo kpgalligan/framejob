@@ -271,7 +271,16 @@ final class MediaPane: InspectorPaneView {
     /// have to be — this runs on every refresh, including a live gesture's
     /// thirty a second.
     private func arrange() {
-        let snapshot = binding.snapshot
+        // The DOCUMENT's snapshot, and only one of the three things read off
+        // it needs to be (road map 2's phase 9): `filter.admits` asks
+        // `usesMedia`, and inside a nest a scoped view holds the NEST's clips
+        // at top level and the timeline's nowhere — so a file used only by a
+        // timeline clip would read as unused and "Unused only" would offer to
+        // remove it. `media` itself is the same list either way (the view
+        // carries the parent's `media[]` unchanged), so the order and the
+        // tally are unaffected; this is written as one local so the question
+        // cannot be asked two ways in one method.
+        let snapshot = binding.documentSnapshot
         let order = filter.ordered(snapshot.media)
         if let stack = listStack, order != arrangedOrder {
             var index = 0

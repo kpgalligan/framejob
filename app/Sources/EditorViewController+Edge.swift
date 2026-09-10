@@ -89,7 +89,7 @@ extension EditorViewController {
             NSSound.beep()
             return
         }
-        let frame = max(document.project.snapshot.canvas.fps.frameDuration, 1)
+        let frame = max(document.editedProject.snapshot.canvas.fps.frameDuration, 1)
         document.applyEdit(
             "Nudge Clips",
             .moveClip(clips: Array(document.selection), delta: Ticks(frames) * frame))
@@ -141,7 +141,7 @@ extension EditorViewController {
             NSSound.beep()
             return
         }
-        let ids = document.project.snapshot.clips.filter { $0.track == track }.map { $0.id }
+        let ids = document.editedProject.snapshot.clips.filter { $0.track == track }.map { $0.id }
         guard !ids.isEmpty else {
             NSSound.beep()
             return
@@ -162,7 +162,7 @@ extension EditorViewController {
         guard let document = document else { return false }
         switch action {
         case #selector(closeGapAtPlayhead(_:)), #selector(selectAllClipsOnTrack(_:)):
-            return targetTrack != nil && !document.project.snapshot.clips.isEmpty
+            return targetTrack != nil && !document.editedProject.snapshot.clips.isEmpty
         case #selector(insertMediaAtPlayhead(_:)), #selector(overwriteMediaAtPlayhead(_:)):
             // Live only when the Media tab has a row selected: without one
             // there is nothing to place, and a live item that always beeps

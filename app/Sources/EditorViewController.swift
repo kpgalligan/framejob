@@ -364,12 +364,22 @@ final class EditorViewController: NSViewController {
     /// The one path from a changed project to the preview. `isLive` rides
     /// straight through to `Playback`, which debounces structural rebuilds
     /// during a gesture (spec §7.6).
+    /// **The guard is `editedProject`, not `project`** (road map 2's phase
+    /// 9). It is an object-IDENTITY test, and entering or leaving a nest does
+    /// not replace the document's handle — so with `project` on both sides
+    /// the test is FALSE across a scope change and the player, the
+    /// compositor's `RecipeSource` slot and `AudioDSPSource` would all go on
+    /// showing the outer timeline while the timeline showed the nest.
+    /// `ProjectDocument.editedProject` is memoised per parent handle, so the
+    /// identity test still means what it always meant: two reads with nothing
+    /// changed in between answer the same object.
     func refreshFromDocument(isLive: Bool) {
         guard let document = document else { return }
         applyLoopRange()
-        if publishedProject !== document.project {
-            publishedProject = document.project
-            playback.update(project: document.project, urls: document.mediaURLs(), isLive: isLive)
+        let edited = document.editedProject
+        if publishedProject !== edited {
+            publishedProject = edited
+            playback.update(project: edited, urls: document.mediaURLs(), isLive: isLive)
         }
         layoutCanvas()
         refreshTimecode()
@@ -409,7 +419,7 @@ final class EditorViewController: NSViewController {
         }
         if let range = document?.inOutRange, range.end > range.start {
             playback.loopRange = (start: range.start, duration: range.end - range.start)
-        } else if let duration = document?.project.duration, duration > 0 {
+        } else if let duration = document?.editedProject.duration, duration > 0 {
             playback.loopRange = (start: 0, duration: duration)
         } else {
             playback.loopRange = nil
@@ -423,21 +433,26 @@ final class EditorViewController: NSViewController {
     /// agent all spell a time the same way.
     func refreshTimecode() {
         guard let document = document else { return }
-        let canvas = document.project.snapshot.canvas
+        // The EDITED project throughout the transport: with a nest open the
+        // playhead is measured from the NEST's zero and the duration on the
+        // readout is the nest's, which is what makes the number under the
+        // scrubber agree with the bar the person is dragging.
+        let canvas = document.editedProject.snapshot.canvas
         let frames = canvas.timecodeFrames
         if timecodeField.currentEditor() == nil {
             timecodeField.stringValue = ReelTime.format(
                 document.playhead, fps: canvas.fps, frames: frames)
         }
         durationLabel.stringValue =
-            "/ " + ReelTime.format(document.project.duration, fps: canvas.fps, frames: frames)
+            "/ " + ReelTime.format(document.editedProject.duration, fps: canvas.fps, frames: frames)
     }
 
     /// Moves the playhead and the player together. Every tick reaching an op
     /// is snapped to the frame grid first (spec §6), and so is this one.
     func setPlayhead(_ time: Ticks) {
         guard let document = document else { return }
-        let snapped = ReelTime.snapToFrame(max(0, time), fps: document.project.snapshot.canvas.fps)
+        let snapped = ReelTime.snapToFrame(
+            max(0, time), fps: document.editedProject.snapshot.canvas.fps)
         document.playhead = snapped
         playback.seek(to: snapped)
         refreshTimecode()
@@ -459,7 +474,7 @@ final class EditorViewController: NSViewController {
 
     @objc func goToEnd(_ sender: Any?) {
         playback.pause()
-        setPlayhead(document?.project.duration ?? 0)
+        setPlayhead(document?.editedProject.duration ?? 0)
     }
 
     @objc func previousEditPoint(_ sender: Any?) {
@@ -483,7 +498,7 @@ final class EditorViewController: NSViewController {
     /// chevrons step between.
     private func editPoints() -> [Ticks] {
         guard let document = document else { return [0] }
-        let snapshot = document.project.snapshot
+        let snapshot = document.editedProject.snapshot
         var points: Set<Ticks> = [0, snapshot.duration]
         for clip in snapshot.clips {
             points.insert(clip.start)
@@ -572,7 +587,7 @@ final class EditorViewController: NSViewController {
 
     override func selectAll(_ sender: Any?) {
         guard let document = document else { return }
-        document.selection = Set(document.project.snapshot.clips.map { $0.id })
+        document.selection = Set(document.editedProject.snapshot.clips.map { $0.id })
         viewStateDidChange()
     }
 
@@ -592,13 +607,13 @@ final class EditorViewController: NSViewController {
         guard let document = document else { return }
         let now = document.playhead
         document.selection = Set(
-            document.project.snapshot.clips.filter { $0.start >= now }.map { $0.id })
+            document.editedProject.snapshot.clips.filter { $0.start >= now }.map { $0.id })
         viewStateDidChange()
     }
 
     @objc func setInPoint(_ sender: Any?) {
         guard let document = document else { return }
-        let end = document.inOutRange?.end ?? document.project.duration
+        let end = document.inOutRange?.end ?? document.editedProject.duration
         document.inOutRange = (start: document.playhead, end: max(end, document.playhead))
         viewStateDidChange()
         applyLoopRange()
@@ -774,7 +789,7 @@ final class EditorViewController: NSViewController {
 
     private func stepFrames(_ count: Int) {
         guard let document = document else { return }
-        playback.stepFrames(count, fps: document.project.snapshot.canvas.fps)
+        playback.stepFrames(count, fps: document.editedProject.snapshot.canvas.fps)
         document.playhead = playback.currentTime
         refreshTimecode()
     }
@@ -907,7 +922,7 @@ final class EditorViewController: NSViewController {
     /// name under `skipped`.
     @objc func normalizeClips(_ sender: Any?) {
         guard let document = document else { return }
-        let snapshot = document.project.snapshot
+        let snapshot = document.editedProject.snapshot
         let ids = selectedClips.filter { AudioNormalize.canOffer($0, in: snapshot) }.map { $0.id }
         guard !ids.isEmpty, let input = AudioNormalize.read(from: document, clips: ids) else {
             NSSound.beep()
@@ -928,7 +943,7 @@ extension EditorViewController: NSTextFieldDelegate {
               let document = document
         else { return }
         guard let ticks = ReelTime.parse(
-            field.stringValue, fps: document.project.snapshot.canvas.fps)
+            field.stringValue, fps: document.editedProject.snapshot.canvas.fps)
         else {
             NSSound.beep()
             refreshTimecode()
@@ -1037,7 +1052,7 @@ extension EditorViewController: NSUserInterfaceValidations {
             return canvasZoomIndex != 0
         case #selector(playPause(_:)), #selector(goToStart(_:)), #selector(goToEnd(_:)),
             #selector(previousEditPoint(_:)), #selector(nextEditPoint(_:)):
-            return (document?.project.duration ?? 0) > 0
+            return (document?.editedProject.duration ?? 0) > 0
         case #selector(normalizeClips(_:)):
             // The arm belongs here rather than in a `validate…Action` helper
             // because the command's body is in this file too (above); it is
@@ -1060,13 +1075,18 @@ extension EditorViewController: NSUserInterfaceValidations {
             // own). The Audio pane's button asks the same function through
             // `AudioPane.normalizable`, which is what keeps a greyed button
             // and a live menu item from disagreeing about one selection.
-            guard let snapshot = document?.project.snapshot else { return false }
+            guard let snapshot = document?.editedProject.snapshot else { return false }
             return selectedClips.contains { AudioNormalize.canOffer($0, in: snapshot) }
         default:
             // The canvas, inspector, dialog and clip/track/marker commands
             // answer for themselves; nil means "not one of mine"
             // (EditorViewController+Canvas.swift, +Inspector.swift,
             // +Export.swift, +Timeline.swift, +Nest.swift).
+            // Phase 9's arm goes FIRST, because it is the only one that
+            // overrides another file's answer: it turns the three marker
+            // commands off while a nest is open, and `validateTimelineAction`
+            // below would otherwise answer them.
+            if let answer = validateNestScopeAction(action) { return answer }
             if let answer = validateNestAction(action) { return answer }
             if let answer = validateClipboardAction(action) { return answer }
             if let answer = validateConsolidateAction(action) { return answer }

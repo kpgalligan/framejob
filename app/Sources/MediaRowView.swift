@@ -345,10 +345,13 @@ final class MediaRowView: NSView, NSDraggingSource {
         // groups are two loops with one between them.
         //
         // Reveal in Timeline is DISABLED where the file's only users are
-        // inside a nest: a nested clip has no id a selection can hold
-        // (`MediaUsage.swift`), so the item would select nothing and scroll
-        // nowhere. That case is exactly the one the pane's old top-level-only
-        // usage test could not see.
+        // inside a nest: a nested clip has no id the TIMELINE's selection can
+        // hold (`MediaUsage.swift`), so the item would select nothing and
+        // scroll nowhere. That case is exactly the one the pane's old
+        // top-level-only usage test could not see. Since road map 2's phase 9
+        // there IS a way to reach such a clip — open the nest (⌘↓) and it is
+        // at the top level of the view — but that is a different command from
+        // this one, which reveals on the timeline.
         for (title, selector) in [
             ("Insert at Playhead", #selector(insertMedia(_:))),
             ("Overwrite at Playhead", #selector(overwriteMedia(_:))),

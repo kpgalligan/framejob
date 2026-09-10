@@ -421,7 +421,11 @@ extension EditorViewController {
             NSSound.beep()
             return
         }
-        let snapshot = document.project.snapshot
+        // The open container's, so the track this offers to write is the one
+        // `get_project` is listing — a reader and a writer that disagree
+        // about which timeline they mean is the defect phase 9 closed in
+        // the producers next door.
+        let snapshot = document.editedProject.snapshot
         let candidates = CaptionExporter.candidates(in: snapshot)
         guard !candidates.isEmpty else {
             NSSound.beep()
@@ -461,7 +465,7 @@ extension EditorViewController {
             // a panel is not a sheet, so the document was editable the whole
             // time it was up and what the user sees now is what should land.
             _ = try CaptionExporter.export(
-                from: document.project.snapshot, track: track, to: url, format: format)
+                from: document.editedProject.snapshot, track: track, to: url, format: format)
         } catch {
             let alert = NSAlert(error: error)
             alert.beginSheetModal(for: window, completionHandler: nil)
@@ -478,7 +482,7 @@ extension EditorViewController {
             // is memoized and a validator runs on every menu open, so this
             // costs one pass over the clips per track. The command's own
             // guard is the same answer.
-            return !CaptionExporter.candidates(in: document.project.snapshot).isEmpty
+            return !CaptionExporter.candidates(in: document.editedProject.snapshot).isEmpty
         default:
             return nil
         }

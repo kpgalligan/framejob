@@ -858,11 +858,24 @@ extension AgentServer {
         _ ops: [ReelOp]
     ) throws -> String {
         let before = clip.actions.map { $0.id }
+        // The landing is read BEFORE the edit, like `editResult`'s: how a call
+        // was addressed is a fact about the CALL, and reading it back off a
+        // view the edit could itself have moved would answer about the wrong
+        // thing. It matters here for the same reason it matters there — under
+        // phase 9's rule the ABSENCE of `scope` in a result means "this landed
+        // on the document", so these two tools (`add_action`, `add_zoom_action`)
+        // would otherwise report a nested edit as a document one.
+        let landing = scopeLanding(ops, document)
         try performGroupedEdit(document, actionName, ops)
-        let after = document.project.snapshot.clip(clip.id)?.actions.map { $0.id } ?? []
+        // Read back through `idScope`, not the top level: inside a scope the
+        // clip that just gained an action is one of the nest's, and the
+        // timeline's array has never heard of it — which would answer with an
+        // empty list and report no new action at all.
+        let after = try idScope(document).clip(clip.id)?.actions.map { $0.id } ?? []
         var result: [String: Any] = ["ok": true, "clip": Int(clip.id)]
         let added = after.filter { !before.contains($0) }.map { Int($0) }
         if !added.isEmpty { result["new_actions"] = added }
+        result.merge(landing) { _, new in new }
         result["project"] = summary(document)
         return try jsonResult(result)
     }

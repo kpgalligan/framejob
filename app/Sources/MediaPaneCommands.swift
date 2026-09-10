@@ -210,7 +210,12 @@ extension MediaPane {
             NSSound.beep()
             return
         }
-        let users = binding.snapshot.clipsUsing(media)
+        // The DOCUMENT's clips, never the scoped view's: `remove_media` is a
+        // document-level op (`ReelOp.isDocumentLevel`) and is sent unscoped
+        // even with a nest open, so the "and its clips" count has to be the
+        // whole file's — the timeline's clips chained with every nest's —
+        // or the alert would under-count and the op would refuse.
+        let users = binding.documentSnapshot.clipsUsing(media)
         guard !users.isEmpty else {
             binding.apply("Remove Media", [.removeMedia(media: media)])
             return

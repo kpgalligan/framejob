@@ -1092,7 +1092,28 @@ final class InspectorBinding {
     // MARK: Model access
 
     var document: ProjectDocument? { inspector?.document }
-    var project: ReelProject? { document?.project }
+
+    /// **The project the CLIP tab reads and writes** — the scoped one while a
+    /// nest is open (road map 2's phase 9), so a selected clip inside a nest
+    /// resolves, its evaluated state is asked of a project that has it, and
+    /// the canvas the transform rows measure against is the nest's frozen
+    /// size. At the top level it is `document.project` exactly as before.
+    ///
+    /// The Document and Media tabs deliberately do NOT read it: they are
+    /// about the FILE, whatever container the timeline happens to be showing,
+    /// so they take `documentProject` / `documentSnapshot` below. That split
+    /// is the whole of the scope's footprint in the inspector.
+    var project: ReelProject? { document?.editedProject }
+
+    /// The DOCUMENT, unscoped: what the Document tab's canvas rows, its
+    /// marker list and its export-capability probe read, and what the Media
+    /// tab asks "is this file used anywhere" of. `remove_media` and
+    /// `set_canvas` are document-level ops (`ReelOp.isDocumentLevel`), so a
+    /// pane that wrote them off a scoped snapshot would be answering about
+    /// one project and editing another.
+    var documentProject: ReelProject? { document?.project }
+    var documentSnapshot: ProjectSnapshot { documentProject?.snapshot ?? .empty }
+    var documentCanvas: CanvasSnapshot { documentSnapshot.canvas }
     var snapshot: ProjectSnapshot { project?.snapshot ?? .empty }
     var canvas: CanvasSnapshot { snapshot.canvas }
     var playhead: Ticks { document?.playhead ?? 0 }

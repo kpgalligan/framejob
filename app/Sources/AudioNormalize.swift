@@ -28,8 +28,13 @@ import Foundation
 ///
 /// **Neither nest case is one of them**, and that is why `read` has an arm the
 /// segment test does not need. A clip INSIDE a nest never reaches the segment
-/// test at all: `snapshot.clip(id)` searches the top level, which is all
-/// `Project::clip` searches either, so no op could name one anyway. And a NEST
+/// test WHILE THE NEST IS CLOSED: `snapshot.clip(id)` searches the top level,
+/// which is all `Project::clip` searches either. That used to end the matter
+/// — no op could name such a clip at all — and since road map 2's phase 9 it
+/// does not: OPEN the nest (⌘↓, or `set_scope`) and `read` takes its snapshot
+/// and its plan off `editedProject`, where that clip IS at the top level and
+/// Normalize works on it like any other. The arm below is still needed,
+/// because the clip is still unreachable from OUTSIDE. And a NEST
 /// CLIP is refused ahead of the test, because the test would describe it
 /// wrongly — the plan FLATTENS a nest (`nest.rs`), so the sound a nest clip
 /// plays is carried by segments named for the clips inside it, and the missing
@@ -207,8 +212,11 @@ enum AudioNormalize {
     /// read — the same failure `CompositionBuilder` treats as fatal. A clip
     /// that simply cannot be normalised is a `Problem`, not a nil.
     static func read(from document: ProjectDocument, clips: [UInt32]? = nil) -> Input? {
-        guard let plan = document.project.plan else { return nil }
-        let snapshot = document.project.snapshot
+        // The EDITED project: a clip inside a nest is normalised against the
+        // plan of the project it is IN, which is the only one holding an
+        // audio segment for it (road map 2's phase 9).
+        guard let plan = document.editedProject.plan else { return nil }
+        let snapshot = document.editedProject.snapshot
         let loader = MediaPeaks.Loader(cacheDirectory: document.cacheDirectory)
 
         // Every audio segment in the timeline, indexed by the clip it plays.

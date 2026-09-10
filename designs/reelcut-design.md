@@ -642,16 +642,39 @@ begins, which was the whole complaint.
 - Nest (⌘G): the selected clips collapse into one grey clip standing for
   the group, which then moves, trims, fades and transforms as one thing;
   the new clip is selected. Un-nest (⇧⌘G) opens every nest clip in the
-  selection and selects what came out, in one undo step. **Entering a
-  nest** — double-click it, the timeline and canvas show its contents, a
-  breadcrumb leads back out — is NOT built, and waits on the op table:
-  every clip argument in §6 resolves against the project's own `clips`
-  (`Project::clip`), so no op can name a clip inside a nest, and an
-  inside view could only be read-only. Naming one needs a path-valued
-  `clip` argument or a nest scope on the envelope — the core already has
-  the shape, `Instance::path`. Until then the round trip is the way in:
-  ⇧⌘G, edit, ⌘G, which is the identity on clip content but drops the
-  nest clip's own group-level properties.
+  selection and selects what came out, in one undo step.
+- **Entering a nest**: double-click a nest clip, Clip ▸ Open Nest (⌘↓) or
+  ⌘↑ to come back out. The timeline shows the nest's own tracks and clips
+  at the nest's own zero, the canvas shows it at its frozen size with the
+  outer transform NOT applied — a compound clip is edited on its own
+  terms — and a breadcrumb in the corner over the track headers leads back
+  out ("Timeline › Intro", the last two levels middle-truncated with the
+  full path as its tooltip, and clicking it is ⌘↑). Every edit works in
+  there unchanged: the op carries the envelope's `scope` (§6), which is a
+  nest id, and the core applies it to a VIEW project whose top level is
+  that nest (`core/src/scope.rs`) and returns a whole document, so undo
+  stays one stack of parent handles and one edit is still one step.
+  Entering and leaving are view state — no undo step, no dirty mark — and
+  the playhead maps in and out (`t − nest_clip.start`, the whole mapping:
+  a nest has no speed and no in point), so the frame under it does not
+  move. Leaving re-selects the nest clip.
+  Four things are true in there and are not obvious. Seven ops have no
+  meaning inside a nest and the core refuses a scoped one by name — the
+  three marker ops, `set_canvas` and the three media ops — so the app
+  sends those UNSCOPED instead, which is why File ▸ Add Media…, a Relink,
+  a Remove and the Document tab go on working with a nest open, while the
+  three MARKER commands are turned off (a nest has no markers, and the
+  playhead in there is measured from the wrong zero for one). The in/out
+  range is cleared on the way in and on the way out, because a pair of
+  ticks means one thing inside a nest and another to an export. A scoped
+  edit has a WIDER refusal arm than any other: the clip and track caps and
+  the nesting depth are document-wide and invisible from inside, so an op
+  can be valid against the nest and still come back `too many clips`. And
+  a nest clip gives up rename-by-double-click, keeping ⇧⌘R, Clip ▸
+  Rename… and the Clip tab's header field.
+  The round trip — ⇧⌘G, edit, ⌘G — still works and is still the identity
+  on clip content; what it costs and going inside saves is the nest clip's
+  own transform, opacity, fades and volume.
 - Auto-scroll follows the playhead during playback; pinch and ⌘= / ⌘-
   zoom about the cursor; ⇧Z fits the whole timeline.
 
@@ -1280,10 +1303,14 @@ typedef struct RcProject RcProject;
 RcProject *rc_project_new(uint32_t w, uint32_t h, uint32_t fps_num, uint32_t fps_den);
 RcProject *rc_project_from_json(const char *json, char **err_out);   /* any prior format version */
 char      *rc_project_to_json(const RcProject *p);                   /* current format version */
+RcProject *rc_project_clone(const RcProject *p);
+RcProject *rc_project_scoped(const RcProject *p, uint32_t nest_id, char **err_out); /* the nest as a project — §4.4, the READ half of `scope` */
 void       rc_project_free(RcProject *p);
 void       rc_string_free(char *s);
 
-/* edits — one entry point. `op` is {"op": "<name>", ...args} (§6).
+/* edits — one entry point. `op` is {"op": "<name>", ...args} (§6), plus the
+ * optional envelope key "scope": a nest id, which applies the op INSIDE that
+ * nest and returns a whole project (§4.4).
  * Returns a NEW project; NULL with err_out untouched = the op would change
  * nothing (no undo step); NULL with err_out set = invalid op or arguments. */
 RcProject *rc_project_apply(const RcProject *p, const char *op, char **err_out);
@@ -1321,6 +1348,20 @@ fields are one edit rather than two. There is no untyped call site outside
 those two files. The op schema table lives in the module doc of `edit.rs`
 (the `adjust.rs` "module doc is the schema" pattern) and `ReelOps.swift`
 mirrors it.
+
+`rc_project_scoped` is the READ half of the envelope's `scope`, and it is the
+one export that hands back a handle built out of a project rather than out of
+JSON. An edit inside a nest goes to the PARENT's handle with the op carrying
+`scope`, so undo stays a stack of parent handles; but the timeline, the canvas,
+the player and every snapshot read need a project whose top level IS the nest,
+and that is this. **Both halves are `Project::scoped_view`** — one function, so
+what the app draws and what its edits land in cannot drift apart. Its Swift
+half is `ReelProject.scoped(_:)`, held by `ProjectDocument.editedProject` and
+memoised there against the parent handle it was built from, because a
+`ReelProject` memoises its JSON, its snapshot and its plan per handle and a
+freshly built one would re-decode at every read site. The handle is for
+READING; the one legitimate write against it is a probe, whose result is
+dropped.
 
 `rc_project_frame_recipe_opts`'s Swift half is `RecipeOptions`, a value type
 in `ReelCore.swift`, taken by `ReelProject.recipe(at:options:)` and
@@ -1627,7 +1668,8 @@ pass nothing, because each wants the picture rather than a deliverable.
 | File | Owns |
 |---|---|
 | `ReelCore.swift` | the **only** `rc_*` caller; `ReelProject` (handle + lazy `ProjectSnapshot`), typed op builders, `RecipeSource` |
-| `ProjectDocument.swift` | NSDocument, `.reelcut` package read/write, the single mutation point (`applyEdit`, live-edit trio), undo as a handle stack, dirty counting |
+| `ProjectDocument.swift` | NSDocument, `.reelcut` package read/write, the single mutation point (`applyEdit`, live-edit trio), undo as a handle stack, dirty counting, and the FIVE pieces of view state (playhead, selection, in/out range, `selectedMedia`, `nestPath`). `nestPath` is §4.4's nest scope as the PATH it was entered by — one step per level, each naming the nest and the nest CLIP that showed it, because a nest can be shown by two clips at two different starts. `scope` is its last step's nest and is what every op is stamped with (`ReelOp.scoped(_:)`), except the seven the core refuses inside a nest, which are sent unscoped; `editedProject` is the memoised `rc_project_scoped` handle every view of the TIMELINE draws from, where `project` stays the document for save, export, captions, consolidate and the Document and Media tabs |
+| `EditorViewController+NestScope.swift` · `TimelineView+NestScope.swift` | going inside a nest and coming back out (§4.4): Open / Close Nest, the double-click, the playhead mapping, and the breadcrumb the ruler draws in the corner over the track headers — one stored property, one closure, one draw call, one hit token and one gesture case in the frozen `TimelineView.swift`, `TimelineView+Candidates.swift`'s split exactly |
 | `Playback.swift` · `EditorViewController+PreviewQuality.swift` · `PreviewWindowController.swift` | `AVPlayer` + `AVPlayerItem` over the plan; the rebuild-vs-refresh decision (§7.6); coalesced exact seeks; JKL rates; loop range; `preferredMaximumResolution` = canvas size. **Preview Quality** (View ▸ Preview Quality ▸ Full / Half / Quarter) scales the PLAYER's render size on a `mutableCopy()` of the built video composition, so `CompositionBuilder.build` is untouched and the export and `render_frame` paths are UNREACHABLE from the setting rather than merely unchanged by it; the size always carries the canvas's EXACT aspect (`m · (w/g, h/g)`, `g = gcd(w,h)`, `m = ceil(g/divisor)`), falling back to the next coarser exact size and finally to Full for a coprime canvas, because the overlay maps every drag handle through `AVPlayerLayer.videoRect`. **Preview Window** (⇧⌘P) is a second `AVPlayerLayer` on the SAME player in an `NSPanel` — a panel because a titled window becomes MAIN and every ⌘-item whose action is on `EditorViewController` then resolves to nothing |
 | `CompositionBuilder.swift` | plan JSON → `AVMutableComposition` + `AVMutableAudioMix` + `AVMutableVideoComposition` (+ `CompositionInstruction`) |
 | `Compositor.swift` | the `AVVideoCompositing` class and its Metal pipeline (§7.5) |
@@ -2003,7 +2045,20 @@ size rather than fitting a second time.
 ### 7.9 Agent
 
 `agent.rs` is copied from Rasterize (generic streamable-HTTP MCP, tools
-only). Catalog: one tool per §6 op with the same name and arguments, plus
+only). Catalog: one tool per §6 op with the same name and arguments —
+**each of which also takes `scope`, the envelope key of road map 2's phase
+9** (§6), injected from ONE line in `AgentCatalog.tool(...)` gated on the
+core's own `rc_op_names`, so a new op gets it for free and cannot drift, and
+enforced by a fourth part of the startup parity check, which is the only
+mechanism in the tree that would catch an op tool declaring none. The scope
+is read ONCE per call, at the dispatch, and an op with no `scope` of its own
+follows the nest the app has OPEN — a call and the window agree about which
+container they mean, or `get_project` would list clips the very next op could
+not name. An EXPLICIT scope outranks the open view. Plus
+`set_scope {nest?, clip?}` (the mirror of the double-click and Clip ▸ Open
+Nest, and what lets `render_frame` and `get_project` look inside a nest at
+all; `clip` is the precise spelling, since a nest may be shown by two clips
+at two different starts, and neither argument means the timeline),
 `open_project {path}`, `new_project {path?}`, `import_media {path}` →
 media id, `save_project`, `get_project` → the JSON, `set_playhead`,
 `set_range`, `set_selection` and `undo` / `redo` (the view state and the
@@ -2220,6 +2275,7 @@ a clean `make lint` before finishing Rust work.
 | ⇧⌘N | New track |
 | ⇧⌘I | Add media… |
 | ⌘G / ⇧⌘G | Nest / un-nest (M3) |
+| ⌘↓ / ⌘↑ | Open / close nest (road map 2's phase 9) — go inside the selected nest clip, and come back OUT one level. Two items rather than one toggle, unlike ⇧⌘P: in and out are different distances, since a stack can be eight deep, so a single checkmarked row could not say what it would do |
 | ⇧⌘R | Rename the selected clip — an inline field over its name strip |
 | ⌥⌘V | Paste Attributes — the copied clip's look onto the selection |
 | ⌘E | Export… |
@@ -2232,7 +2288,8 @@ a clean `make lint` before finishing Rust work.
 | ⌥-drag clip edge | Rate stretch |
 | ⌥⇧-drag clip edge | Roll — the hard cut that edge sits on |
 | Double-click an empty lane span | Close that gap |
-| Double-click a clip | Rename it in place |
+| Double-click a clip | Rename it in place — EXCEPT a nest clip, which opens (road map 2's phase 9); rename it with ⇧⌘R, Clip ▸ Rename… or the Clip tab's header field |
+| Click the breadcrumb | Come out one level, while a nest is open — the corner over the track headers, which is inert otherwise |
 | ⌥-drop / ⇧⌥-drop from the Media tab | Insert / overwrite at the drop |
 | ⌥-click a track header | Select every clip on that track |
 | ⌘-drag | Suppress snapping |
@@ -2244,7 +2301,7 @@ a key, nothing more.
 
 | Keys | Action | Phase |
 |---|---|---|
-| ⌘↓ / ⌘↑ | Open / close nest | 9 |
+| — | Nothing. Phase 9 took the ⌘↓ / ⌘↑ this table claimed for it, for Clip ▸ Open Nest and Clip ▸ Close Nest, and the row has been promoted into the bound table above. Carrying a modifier does NOT keep either off the first responder — every main-menu key equivalent is offered the key-down before the window dispatches it, and what a modifier changes is only WHICH field-editor binding it displaces (here `moveToBeginningOfDocument:` / `moveToEndOfDocument:`). So the pair is validated DEAD while text is being edited, the Delete pair's precedent — otherwise ⌘↑ in an inline rename would leave the nest and discard the open field | — |
 
 Menus: File (New Project, Open…, Open Recent, Close, Save, Save As…,
 Add Media…, Import Captions… (M3), Generate Captions… and Export
@@ -2276,7 +2333,9 @@ full-canvas gradient is reached, while the image needs a file chooser) and
 Add Blurred Background, in a group of their own since neither edits the
 selection — both put a clip on a new back-most track — and neither takes a
 key equivalent, Rename…, Label ▸ (the six colours and None),
-Nest, Un-nest), Track (New Track,
+Nest, Un-nest, Open Nest ⌘↓, Close Nest ⌘↑ — road map 2's phase 9, in the
+grouping group because going inside a nest is the third thing you do with
+one), Track (New Track,
 Remove Track, Remove Empty Tracks, Hide/Mute/Lock/Solo), Mark (Add Marker,
 Set In, Set Out, Clear Range, Next/Previous Marker), View (Zoom, Fit,
 Snapping, Safe Areas, Inspector, Timeline Track Height, and — road map 2's

@@ -12,11 +12,30 @@ import Foundation
 /// **Half of it is `AgentCatalog+Clips.swift`**, which holds the forty clip
 /// rows, the five action rows and the patch vocabulary they alone are written
 /// in. That cut is the size payment this file owed at 1552 lines against
-/// app/CLAUDE.md's ~600 cap, taken BEFORE road map 2's phase 9 puts a `scope`
+/// app/CLAUDE.md's ~600 cap, taken BEFORE road map 2's phase 9 put a `scope`
 /// on every op tool's schema and a `set_scope` beside them, and `catalogJSON()`
 /// splices those rows back in at the point they were cut from, so the catalog's
-/// ORDER is what it always was. What stayed here is the helper, the property
-/// every tool carries, and the eight other groups.
+/// ORDER is what it always was. What stayed here is the helper, the two
+/// properties every op tool carries, and the eight other groups.
+///
+/// **The `scope` was the payment's whole point and it cost ONE line.** It is
+/// injected in `tool` below, for every name the core calls an op, so the
+/// fifty-five rows on the other side of the cut got it without being touched
+/// — which is what makes phase 9's diff over there empty and this file's
+/// readable.
+///
+/// **The room was not enough, which is the warning this project keeps
+/// re-learning** ("budget the cut against the pessimistic number", phase 6):
+/// 665 at the cut and 781 with phase 9's `scope` property, `set_scope` row,
+/// `opNames` and the guard on it, so the file is over the cap again and this
+/// is where the debt is written down rather than left to be discovered. The
+/// next cut is named in advance so nobody has to re-derive it: the FILE
+/// groups — Media, Captions, Rendering and export — go to an
+/// `AgentCatalog+Files.swift`, spliced the way the clip rows are, because
+/// every row in them is about a path on disk and none of them shares a
+/// hoisted local with the groups that stay. It is about 300 lines and would
+/// leave this file the helper, the project group, tracks, markers and the
+/// canvas.
 extension AgentServer {
     /// One tool. Every tool gets `project` for free: with several projects
     /// open a call would otherwise be ambiguous, and the property costs
@@ -31,6 +50,26 @@ extension AgentServer {
     ) -> [String: Any] {
         var schema = properties
         schema["project"] = Self.projectProperty
+        // Road map 2's phase 9: every §6 OP also takes the envelope's
+        // `scope`, and it is injected HERE for the reason `project` is —
+        // one edit site instead of fifty-five, and the op somebody adds in
+        // phase 10 cannot arrive with a tool that silently lacks it.
+        //
+        // Op-ness is the CORE's answer (`Self.opNames`, read through
+        // `rc_op_names`) and never a list kept in this file: the startup
+        // parity check already reads that list to insist every op has a
+        // tool, and a second spelling of it is exactly the drift this
+        // file's contract exists to prevent. It also draws the line
+        // correctly without an exception list — `detect_silence` and
+        // `normalize_clip` are composites rather than ops, and
+        // `AgentServer+Scope.swift` argues why neither takes a scope.
+        //
+        // It OVERWRITES a `scope` a caller wrote into `properties`, exactly
+        // as `project` does. Nothing does today, and the near miss is worth
+        // naming: `detect_silence` answers a RESULT key called `scope` —
+        // which set of clips it measured — and takes no argument by that
+        // name, so the two spellings never meet in one schema.
+        if Self.opNames.contains(name) { schema["scope"] = Self.scopeProperty }
         return [
             "name": name,
             "description": description,
@@ -40,10 +79,64 @@ extension AgentServer {
         ]
     }
 
+    /// Every op the CORE declares, read once through `rc_op_names`
+    /// (`ReelOp.coreNames()` → `OP_NAMES` in `core/src/edit.rs`).
+    ///
+    /// Three consumers, which is the whole reason it is hoisted out of
+    /// `tool`: this file puts a `scope` on exactly these tools' schemas,
+    /// `AgentServer.dispatch` reads a `scope` ARGUMENT for exactly these
+    /// tools, and the startup parity check asks that each of them has a tool
+    /// AND that the tool declares the property. One list, so the three
+    /// cannot disagree — and a `static let`, so the FFI call and the JSON
+    /// decode behind it happen once per process instead of seventy-four
+    /// times per catalog build.
+    ///
+    /// **An empty answer is a silent catastrophe, so it is not allowed to be
+    /// silent.** `coreNames()` answers `[]` when the FFI call or the decode
+    /// fails, and an empty set here gives NO tool a `scope`, gives the
+    /// dispatch nothing to read one for, and still builds a catalog in which
+    /// every tool works — a server that starts clean and cannot reach inside
+    /// a nest at all. `catalogJSON()` refuses to build on it (below); the
+    /// parity check's own "the core reported no op names" is the second net
+    /// and cannot be the first, because by the time it runs the catalog has
+    /// been built and Release only logs.
+    static let opNames: Set<String> = Set(ReelOp.coreNames())
+
     private static let projectProperty: [String: Any] = [
         "type": "string",
         "description": "Path of the open project to act on, as get_project reports it; omit "
             + "for the frontmost one.",
+    ]
+
+    /// The envelope's one non-argument key (spec §6's preamble,
+    /// `core/src/scope.rs`), carried by every op tool and by nothing else.
+    private static let scopeProperty: [String: Any] = [
+        "type": "integer", "minimum": 0,
+        "description": "Edit INSIDE a nest, by nest id — get_project lists them under nests, "
+            + "and a nest clip's source.project names the one it shows. With it, every id in "
+            + "this call — clips, tracks, actions — is looked up in THAT nest's own tracks "
+            + "and clips instead of the timeline's, and every time is the nest's own, "
+            + "measured from its zero (a nest has no speed, so the whole mapping is t minus "
+            + "the nest clip's start); media ids are unaffected, because a nest shares the "
+            + "document's media. The op itself is unchanged and one call is still one undo "
+            + "step. Omit it to edit whatever the app has OPEN — the timeline, or the nest "
+            + "set_scope entered, exactly as an edit made by hand goes where the window is "
+            + "looking — so this argument is how you act on a container you are not looking "
+            + "at, and get_project always says which one you are in. Seven ops have no "
+            + "meaning inside a nest and refuse by name when you ask for one: add_marker, "
+            + "set_marker, remove_marker, set_canvas, add_media, relink_media, remove_media. "
+            + "Those seven behave DIFFERENTLY when the scope is inherited from set_scope "
+            + "rather than asked for here, and the result says which: five of them, plus "
+            + "set_marker's name / chapter / color and remove_marker, simply land on the "
+            + "DOCUMENT and are named under document_ops. The two that carry a TIME — "
+            + "add_marker, and set_marker with a time — are refused instead, because a "
+            + "marker is at project time while the playhead inside a nest is not, so the "
+            + "tick you would send means the wrong frame. Leave the nest (set_scope with "
+            + "no arguments) or pass the tick in project time. "
+            + "And read the result rather than assuming it landed: an edit can be perfectly "
+            + "valid inside the nest and still be refused for the whole DOCUMENT's sake, "
+            + "since the clip and track caps and the 8-deep nesting limit are counted across "
+            + "every container at once.",
     ]
 
     /// The sentence every time argument carries. Ticks are the model's own
@@ -53,6 +146,20 @@ extension AgentServer {
         + "Rounded to the project's frame grid."
 
     func catalogJSON() throws -> String {
+        // The op list is what puts a `scope` on every op tool's schema
+        // (`tool` above), so an empty one builds a catalog that looks right
+        // and cannot name a nest: every call carrying a scope would be
+        // dropped on the way in and then refused as a clip id the timeline
+        // has not got, which reads as a core bug rather than as a failed
+        // FFI read. Refuse to build the catalog at all — `start()`
+        // propagates this, so the server does not come up and the menu item
+        // says why, which is a failure an operator can act on.
+        guard !Self.opNames.isEmpty else {
+            throw ToolFailure(
+                message: "The core reported no op names (rc_op_names), so no tool could be "
+                    + "given the scope argument that edits inside a nest. The agent server "
+                    + "was not started.")
+        }
         let ticks = Self.ticksNote
         let trackProperty: [String: Any] = [
             "type": "integer", "description": "Track id (get_project lists them).",
@@ -226,6 +333,41 @@ extension AgentServer {
                         "description": "Clip ids to select (get_project lists them). Omit or "
                             + "pass an empty array to select nothing.",
                     ]
+                ]),
+            tool(
+                "set_scope",
+                "Opens a nest so the app is LOOKING INSIDE it — double-clicking a nest clip "
+                    + "in the timeline (Clip ▸ Open Nest, ⌘↓; Close Nest, ⌘↑). View state "
+                    + "like the playhead and the selection: no op runs, nothing is undoable "
+                    + "and the project is untouched. What it changes is what the app shows "
+                    + "and therefore what get_project and render_frame answer — while a nest "
+                    + "is open those report and draw that nest's own tracks, clips and frozen "
+                    + "canvas rather than the timeline's, which is the only way to SEE what "
+                    + "an edit inside one did. Name the nest, or the clip that shows it; call "
+                    + "it with neither to come back out. While a nest is open every op you "
+                    + "send lands INSIDE it unless the op's own scope argument says "
+                    + "otherwise, exactly as an edit made by hand goes where the window is "
+                    + "looking — so this is the setting to change first and the one to "
+                    + "clear when you are done. Editing inside a nest does not require it: "
+                    + "an op carrying scope works from wherever you are.",
+                [
+                    "nest": [
+                        "type": "integer",
+                        "description": "The nest to open, by id (get_project lists them under "
+                            + "nests). It has to be shown by a clip on the TIMELINE: this is "
+                            + "the view, and the app cannot show its way into a nest the "
+                            + "timeline does not reach — an op's own scope still can. Where "
+                            + "two clips show one nest the earliest is entered, ties going to "
+                            + "the lower id.",
+                    ],
+                    "clip": [
+                        "type": "integer",
+                        "description": "The nest CLIP to open — the precise spelling, and "
+                            + "what a double-click sends: it names the nest and the start the "
+                            + "times inside are measured from, which two clips showing one "
+                            + "nest do not share. A clip that shows no nest is refused by "
+                            + "name. Pass this or nest, not both.",
+                    ],
                 ]),
             tool(
                 "undo",

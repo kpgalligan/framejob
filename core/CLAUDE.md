@@ -92,6 +92,15 @@ lockstep are in the root `CLAUDE.md`; the full design is
   `clips`, `next_id`, `media` and `nests` back. So `Project::clip`
   keeps its one meaning, no op gained a nest-aware branch, and `OP_NAMES`
   is still 55.
+  **The READ half is `rc_project_scoped`** (`ffi.rs`, beside
+  `rc_project_clone` — the phase's one new export, and deliberately NOT in
+  `ffi_query.rs`, whose module doc says a query never allocates a handle and
+  has no `err_out`). It hands back a new immutable handle for the same view,
+  so the app plays, plans, renders and snapshots what is inside a nest. It
+  CALLS `scoped_view` rather than building a second view, which is the whole
+  reason that function is `pub(crate)` and not private: a read view differing
+  from the edit view would make the timeline show one project while the edits
+  landed in another.
   Three things in it are counter-intuitive and each is measured rather than
   reasoned. **The scoped nest's row stays in the view with its tracks and
   clips EMPTIED**: leaving it whole doubles every id in `validate`'s one

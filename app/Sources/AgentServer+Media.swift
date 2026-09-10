@@ -113,7 +113,12 @@ extension AgentServer {
         }
         let plan: CaptionImporter.Plan
         do {
-            plan = try CaptionImporter.plan(for: url, in: document.project, track: track)
+            // The EDITED project, like its three siblings (the File-menu
+            // importer, `Transcriber` and the `transcribe` tool): the ops
+            // this plan produces are addressed to whatever nest is open, so
+            // reading the document here would measure a placement against
+            // the timeline and land the clips inside the nest.
+            plan = try CaptionImporter.plan(for: url, in: document.editedProject, track: track)
         } catch {
             throw ToolError(message: error.localizedDescription)
         }

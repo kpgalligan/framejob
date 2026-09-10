@@ -32,7 +32,7 @@ extension EditorViewController {
     @objc func revealSelectionInTimeline(_ sender: Any?) {
         viewStateDidChange()
         guard let document = document, let timeline = timeline else { return }
-        let selected = document.project.snapshot.clips.filter {
+        let selected = document.editedProject.snapshot.clips.filter {
             document.selection.contains($0.id)
         }
         guard let first = selected.min(by: { ($0.start, $0.id) < ($1.start, $1.id) }) else {

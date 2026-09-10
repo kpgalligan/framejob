@@ -96,7 +96,7 @@ extension EditorViewController {
         guard let document = document else { return nil }
         let probed: ReelProject?
         do {
-            probed = try document.project.applying(ops)
+            probed = try document.editedProject.applying(ops)
         } catch {
             return nil
         }

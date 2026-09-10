@@ -71,6 +71,49 @@ final class ProjectDocument: NSDocument {
 
     /// The in/out range (§4.4) when one is set. Scopes the playback loop,
     /// ripple-delete-range and export.
+    ///
+    /// **A range belongs to the container that was open when it was set, and
+    /// it never leaves that container** — road map 2's phase 9, and this is
+    /// the one place the rule is written down because a pair of bare ticks
+    /// carries nothing that would say otherwise. Two halves:
+    ///
+    ///  - It is CLEARED on every scope change, both kinds: the deliberate one
+    ///    (`setNestPath`, whose doc argues it) and the one an undo can force
+    ///    (`clampViewState` truncating a path whose nest has gone). So a range
+    ///    is never read in a container other than the one it was set in.
+    ///  - **No export takes a range while `scope != nil`.** Inside a nest the
+    ///    range scopes the loop and a ripple delete in the NEST's own time,
+    ///    which is why `validateNestScopeAction` leaves I and O live in there;
+    ///    an export writes the whole timeline whatever the timeline is
+    ///    showing, so a nest-local pair of ticks is not a thing it can spend.
+    ///    Both readers of this property for an export must therefore ask
+    ///    `scope` first — `ExportSheetController.init`, which simply captures
+    ///    no range, so the card's Range popup is the disabled "Whole project"
+    ///    it already is on a document that has none; and the `export` tool's
+    ///    handler (`AgentServer+Render.swift`), which owes the same answer in
+    ///    a sentence.
+    ///
+    /// **Refusing rather than mapping is the decision, and the mapping is the
+    /// thing that looks right and is not.** `NestScope.offset(of:in:)` maps a
+    /// nest-local TIME to project time exactly — a nest has no in point and no
+    /// speed (`core/src/nest.rs`) — so re-basing the pair at capture reads as
+    /// the obvious repair. It is unsound for a RANGE for two reasons the
+    /// playhead does not have. A nest clip is trimmed: a two-second clip can
+    /// show the first two seconds of a ten-second nest, so a range set at
+    /// 5 s–8 s inside it maps onto project time where the nest's content is
+    /// not on screen at all, and the export would write a passage the person
+    /// never saw. The playhead can land out there too, but a person watching
+    /// the canvas SEES that frame before they act on it, where a range is
+    /// spent unseen at the commit. And a nest can be shown by TWO clips at two
+    /// different starts (which is why `nestPath` is a path at all), so a
+    /// mapped range would quietly mean "as shown by the clip I happened to
+    /// enter through" — a fact the range does not record and the sheet cannot
+    /// show.
+    ///
+    /// What the refusal costs is nothing: ⌘↑ leaves the nest, which clears the
+    /// range in any case, and the range an export wants is then set on the
+    /// timeline, where the ruler shows it over the clips that will actually be
+    /// written.
     var inOutRange: (start: Ticks, end: Ticks)?
 
     /// The track a command with no track argument of its own acts on: the
@@ -82,7 +125,10 @@ final class ProjectDocument: NSDocument {
     /// and the row cannot reach the editor. Two spellings of the rule would
     /// let one menu item land the clip on a different track from the other.
     var targetTrack: UInt32? {
-        let snapshot = project.snapshot
+        // The edited project: with a nest open, "the track a command with no
+        // track argument acts on" is one of the NEST's, and the op that names
+        // it carries the scope.
+        let snapshot = editedProject.snapshot
         if let clip = snapshot.clips.first(where: { selection.contains($0.id) }) {
             return clip.track
         }
@@ -99,6 +145,118 @@ final class ProjectDocument: NSDocument {
     /// private. Like the other three, it is view state: not undoable, not
     /// persisted, and re-clamped to ids that still exist.
     var selectedMedia: UInt32?
+
+    // MARK: - View state: the nest the timeline is looking inside
+
+    /// The path from the timeline INTO the nest being edited — one step per
+    /// level entered, empty at the top (road map 2's phase 9, spec §4.4).
+    ///
+    /// **The fifth piece of view state**, and it is a PATH rather than the
+    /// nest id the core wants for two reasons. A nest can be shown by two
+    /// clips at two different starts, so the id alone does not say where the
+    /// nest's zero sits in the container's time — and the playhead has to map
+    /// in and out so the frame under it does not jump. And entering a nest
+    /// inside a nest is the ordinary case, so leaving has to know which
+    /// container to come back to and which clip to re-select there.
+    ///
+    /// Set only through `setNestPath(_:playhead:selection:)`, which is where
+    /// the three pieces that must move together do. Like the other four it is
+    /// not undoable, not persisted, and re-clamped to ids that still exist —
+    /// `clampViewState` truncates it at the first step whose nest or nest
+    /// clip has gone, which an undo past a ⌘G can do.
+    private(set) var nestPath: [NestScopeStep] = []
+
+    /// The nest every edit resolves its ids inside — the core's `scope`
+    /// (`core/src/scope.rs`) — or nil for the timeline.
+    var scope: UInt32? { nestPath.last?.nest }
+
+    /// The scoped handle, memoised against the parent it was built from.
+    ///
+    /// It has to be STORED. `ReelProject` memoises `json`, `snapshot` and
+    /// `planJSON` PER HANDLE, so a computed `editedProject` would mint a new
+    /// handle at each of the ~80 read sites and re-run `rc_project_to_json`
+    /// and a whole `ProjectSnapshot` decode at every one of them.
+    private var scopedCache: (parent: ReelProject, nest: UInt32, view: ReelProject)?
+
+    /// **The project every view of the TIMELINE draws from, and the one every
+    /// edit is measured against**: the scoped handle while a nest is open,
+    /// `project` otherwise.
+    ///
+    /// The split is the whole shape of the feature, so it is worth saying
+    /// which side each caller is on. `editedProject` is for anything that
+    /// looks at, or acts on, *what is being edited*: the timeline, the canvas,
+    /// the player, the Clip tab, the selection, the snap candidates, the
+    /// probes — and **Save Frame and `render_frame`**, which are the canvas
+    /// written to a file. `project` stays the DOCUMENT for everything whose
+    /// subject is the file — save, export, captions, consolidate, transcribe,
+    /// the Document tab and the Media tab — because an export must always
+    /// write the whole timeline whatever the timeline happens to be showing.
+    ///
+    /// **Save Frame moved to this side, and the reason it did is the test for
+    /// every future caller.** The question is not "does this write a file" —
+    /// a frame grab writes one — but "which TIME BASE is this thing's
+    /// argument in". `playhead` is nest-local while a scope is open, and Save
+    /// Frame renders at the playhead, so on the `project` side it composed
+    /// the timeline at a tick counted from inside a nest and wrote a picture
+    /// nobody asked for: no error, no refusal, and a file that disagreed with
+    /// both the canvas and `render_frame`
+    /// (`EditorViewController+SaveFrame.swift` carries the argument). An
+    /// export is on the other side for the matching reason and not by
+    /// analogy: its argument is a RANGE, and the rule at `inOutRange` is that
+    /// there is never a nest-local one for it to be handed.
+    ///
+    /// A nil from `scoped(_:)` (a nest id that has gone) falls back to the
+    /// parent rather than trapping. `clampViewState` clears such a path
+    /// before anything reads one, so this arm is a race with an undo and not
+    /// a state the app rests in — and the clamp runs on BOTH doors that can
+    /// take the nest away, the edit/undo one (`projectDidChange`) and the
+    /// revert (`read(from:ofType:)`). Missing the second is what this arm
+    /// looks like when it is load-bearing rather than defensive: `scope`
+    /// still names a nest, this falls back to the timeline, and every edit
+    /// goes out carrying a scope the core answers "no nest with id 40" —
+    /// measured, which is why the clamp is on that path too.
+    var editedProject: ReelProject {
+        guard let nest = scope else { return project }
+        if let cached = scopedCache, cached.parent === project, cached.nest == nest {
+            return cached.view
+        }
+        guard let view = project.scoped(nest) else { return project }
+        scopedCache = (project, nest, view)
+        return view
+    }
+
+    /// Enters, leaves or re-roots the nest scope, with the playhead and the
+    /// selection that belong with it.
+    ///
+    /// The three move TOGETHER by construction, which is the point of one
+    /// entry: the playhead is measured from the innermost container's own
+    /// zero (`t − nest_clip.start`, `core/src/nest.rs`'s whole mapping), and
+    /// a selection means clip ids in whichever container is open — so setting
+    /// any one of them alone leaves the other two describing a different
+    /// project for one refresh.
+    ///
+    /// **Not an undo step and not a change to the document** (spec §5.2's
+    /// last bullet: this is view state). But the handle every view draws from
+    /// changes, so it republishes and posts exactly as an edit does —
+    /// `projectDidChange()` is what puts the scoped project on the
+    /// compositor's `RecipeSource` slot and makes the editor rebuild the
+    /// player against it.
+    /// The in/out range is CLEARED, and that is the fourth thing this method
+    /// moves. A range is a pair of ticks with no container attached, and it
+    /// means two different things on either side of the door: inside a nest
+    /// it scopes the loop and a ripple delete in the nest's own time, while
+    /// outside it also scopes the EXPORT, which always writes the whole
+    /// timeline. Carrying one across would silently re-base it. Refusing to
+    /// set one inside a nest was the alternative and is worse — a range is
+    /// the natural way to work on a passage of anything.
+    func setNestPath(_ path: [NestScopeStep], playhead: Ticks, selection: Set<UInt32>) {
+        nestPath = path
+        scopedCache = nil
+        self.playhead = playhead
+        self.selection = selection
+        inOutRange = nil
+        projectDidChange()
+    }
 
     // MARK: - Types
 
@@ -295,12 +453,44 @@ final class ProjectDocument: NSDocument {
         return url?.pathExtension.lowercased() == projectFileExtension
     }
 
+    /// The two readers, and then the view state.
+    ///
+    /// **The clamp is here rather than in either reader**, and it is what
+    /// keeps the nest scope honest across File ▸ Revert to Saved — the one
+    /// path on which a document's project is replaced by a project it has no
+    /// relation to, with the person still standing inside a nest. Each reader
+    /// resets the four pieces of view state that have an obvious zero
+    /// (playhead, selection, range, `selectedMedia`); the fifth, `nestPath`,
+    /// has no such zero — it is a path whose steps either survive in the file
+    /// that was just read or do not — and `clampViewState` is the ONE place
+    /// that knows how to answer that, in the order the other clamps depend
+    /// on. Writing `nestPath = []` in both readers instead would be a second
+    /// opinion about the scope in the two places least likely to be updated
+    /// when the rule changes.
+    ///
+    /// It is safe against a freshly-read document, which is worth stating
+    /// because "call the clamp" is only the better answer if the clamp does
+    /// nothing else surprising here. Every other arm of it is already a
+    /// no-op: the selection is empty (`if !selection.isEmpty` guards),
+    /// `selectedMedia` is nil, the playhead is 0. What is left is the scope
+    /// arm — a truncation to the valid prefix, which on a revert to an
+    /// unrelated file is the empty path and on the ordinary revert (the same
+    /// file, so the same nest and clip ids) is the path the person was in,
+    /// which is continuity rather than staleness. And the MEMO is repaired
+    /// with no line of its own: `clampViewState` reads `editedProject`
+    /// unconditionally, so a `scopedCache` still holding the discarded parent
+    /// is replaced there. It could not have been SERVED in any case — the
+    /// accessor's guard is `cached.parent === project`, and the tuple holds
+    /// the old handle alive, so its address cannot have been reused by the
+    /// new one — but stale bytes pointing at a document that is gone are not
+    /// a thing to leave lying around.
     override func read(from url: URL, ofType typeName: String) throws {
         if Self.isProjectType(typeName, url: url) {
             try readPackage(at: url)
         } else {
             try readMediaFile(at: url)
         }
+        clampViewState()
     }
 
     /// The `.reelcut` package (spec §5.6). Only `project.json` is read: the
@@ -319,6 +509,10 @@ final class ProjectDocument: NSDocument {
                 message: "\(url.lastPathComponent) does not contain a readable project.json.")
         }
         project = Self.reanchoringConsolidatedMedia(try ReelProject.from(json: text), package: url)
+        // Four of the five pieces of view state; the fifth is `nestPath`, and
+        // it is `read(from:ofType:)`'s `clampViewState()` rather than a line
+        // here — that method's doc says why the scope cannot be zeroed in
+        // this file.
         playhead = 0
         selection = []
         inOutRange = nil
@@ -383,6 +577,10 @@ final class ProjectDocument: NSDocument {
         fileType = Self.projectTypeIdentifier
         let descriptor = try MediaImporter.probeBlocking(url: url)
         project = try Self.makeProject(around: descriptor)
+        // The same four, and the same note: `nestPath` is cleared by
+        // `read(from:ofType:)`'s clamp. A file-import read is always a fresh
+        // document, so the path is empty already — the line is not here
+        // because the rule has one home, not because this path is special.
         playhead = 0
         selection = []
         inOutRange = nil
@@ -859,6 +1057,50 @@ final class ProjectDocument: NSDocument {
 
     // MARK: - Editing
 
+    /// Stamps the open nest onto the ops of one edit — the ONE place a scope
+    /// is put on an op, and therefore the whole of "an edit inside a nest"
+    /// on this side (road map 2's phase 9).
+    ///
+    /// **The contract this changes is one `map`.** `applyEdit` still applies
+    /// its ops to the PARENT handle and still gets a whole parent project
+    /// back, so undo is still a stack of parent handles, the change count is
+    /// unchanged and every one of `applyEdit`'s three outcomes means what it
+    /// meant. All that is different is that each op is addressed at the nest
+    /// first. `updateLiveEdit` does the same to its own ops for the same
+    /// reason — a drag inside a nest is a drag — and `performGroupedEdit`
+    /// gets it for free, because it calls `applyEdit`.
+    ///
+    /// **A document-level op is sent UNSCOPED** (`ReelOp.isDocumentLevel`,
+    /// which argues it where the seven names are). One edit can mix the two
+    /// kinds — a Finder drop inside a nest is an `add_media` on the
+    /// document's one media list plus an `add_clip` in the nest, as one undo
+    /// step — and the core applies the ops of an edit in sequence to the same
+    /// parent handle, so mixing them costs nothing.
+    ///
+    /// **A scoped edit can fail where an unscoped one cannot**, and the
+    /// `catch` below is what surfaces it: the clip and track caps and the
+    /// nesting depth are document-wide and invisible from inside a nest, so
+    /// an op that is perfectly valid against the nest still comes back
+    /// `too many clips` / `too many tracks` / `nests are more than 8 deep`
+    /// (`core/src/scope.rs` states that contract). It reaches the user as the
+    /// core's own message, like any other invalid edit — never swallowed as
+    /// "changed nothing", which would make ⌘G inside a deep stack look like a
+    /// no-op.
+    /// **An op that already CARRIES a scope keeps it.** This is the seam with
+    /// the agent, and it was a measured defect before the clause existed: an
+    /// MCP caller may name a nest explicitly, and the window may have a
+    /// DIFFERENT one open. Without the guard, `scoped(_:)` — which overwrites
+    /// unconditionally, by design, so the app's own gestures need no
+    /// bookkeeping — silently re-addressed such a call to the open nest, and
+    /// the edit landed in the wrong container while the tool answered `ok`.
+    /// (The refusal it should have produced went to an error SHEET on the
+    /// window, where no agent can see it.) An explicit scope is the caller's
+    /// statement about which container they mean, and it outranks the view.
+    private func addressed(_ ops: [ReelOp]) -> [ReelOp] {
+        guard let nest = scope else { return ops }
+        return ops.map { $0.isDocumentLevel || $0.scope != nil ? $0 : $0.scoped(nest) }
+    }
+
     /// Applies one op as one undo step.
     func applyEdit(_ actionName: String, _ op: ReelOp) {
         applyEdit(actionName, [op])
@@ -876,7 +1118,7 @@ final class ProjectDocument: NSDocument {
         let current = project
         let updated: ReelProject?
         do {
-            updated = try current.applying(ops)
+            updated = try current.applying(addressed(ops))
         } catch {
             present(error)
             return
@@ -951,7 +1193,7 @@ final class ProjectDocument: NSDocument {
         guard let base = liveEditBase else { return }
         let updated: ReelProject?
         do {
-            updated = try base.applying(ops)
+            updated = try base.applying(addressed(ops))
         } catch {
             // A refused tick is normal mid-gesture (a drag that has strayed
             // past the source bound): keep the last good frame, do not
@@ -1007,7 +1249,12 @@ final class ProjectDocument: NSDocument {
     /// nothing else would ever publish for it.
     private func projectDidChange(isLive: Bool = false) {
         clampViewState()
-        RecipeSource.shared.set(project, for: recipeKey)
+        // The EDITED project: this slot is what the compositor draws the
+        // PREVIEW from, and with a nest open the preview shows the nest at
+        // its own frozen size, on its own terms (spec §4.4). Export publishes
+        // on a `RecipeSource` key of its own and is unaffected — an export
+        // always writes the whole timeline.
+        RecipeSource.shared.set(editedProject, for: recipeKey)
         // Before the notification, for the same reason the recipe is: the
         // editor rebuilds the composition off the back of it, and a build that
         // read a stale resolution would play a just-reversed clip forwards.
@@ -1020,8 +1267,48 @@ final class ProjectDocument: NSDocument {
     /// Keeps the non-undoable view state honest about a model that just
     /// changed under it: a deleted or undone-away clip must not stay
     /// selected, and the playhead never goes negative.
+    /// **The order is load-bearing** and is the phase-9 addition to this
+    /// method. The scope goes first, because every measurement after it is
+    /// taken against whatever container the scope clamp left: clamping the
+    /// selection against a nest that has just been undone away would empty
+    /// it, and clamping it against the timeline while a stale path still
+    /// says "inside nest 4" would empty it the other way. Then the
+    /// selection, then `selectedMedia`, then the playhead.
+    ///
+    /// The selection is intersected with the EDITED project's clips, which
+    /// is what stops the first edit inside a nest wiping it: at the top level
+    /// `editedProject` is `project` and this is the rule it always was.
+    /// `selectedMedia` is asked of the DOCUMENT, because a media row is the
+    /// document's whatever is open (the scoped view carries the parent's
+    /// `media[]` unchanged, so the two answers agree — it is written this way
+    /// to say which one is meant).
+    ///
+    /// A truncated path leaves the playhead where it was, reinterpreted in
+    /// the container the truncation landed in. That is a small, deliberate
+    /// inaccuracy on one path — an undo past the ⌘G that made the nest — and
+    /// the honest alternative is not available: the offsets that would map it
+    /// back out are the starts of clips that have just ceased to exist.
+    ///
+    /// **The in/out range is not reinterpreted; it goes.** This is the OTHER
+    /// way the scope changes — `setNestPath` is the deliberate one and clears
+    /// the range for the reason its own doc gives — and the rule at
+    /// `inOutRange` is that a range never leaves the container it was set in,
+    /// so both doors have to close it. The playhead can be left because a
+    /// person can SEE where it landed and move it; a range is a pair of ticks
+    /// that is next spent, unseen, by a ripple delete or an export, and one
+    /// left behind after a truncation is measured from a zero that no longer
+    /// exists. Cleared only when the path actually moved, so the ordinary
+    /// edit — which is every call to this method — leaves it alone.
     private func clampViewState() {
-        let ids = Set(project.snapshot.clips.map { $0.id })
+        if !nestPath.isEmpty {
+            let clamped = NestScope.clamped(nestPath, in: project.snapshot)
+            if clamped != nestPath {
+                nestPath = clamped
+                scopedCache = nil
+                inOutRange = nil
+            }
+        }
+        let ids = Set(editedProject.snapshot.clips.map { $0.id })
         if !selection.isEmpty {
             selection.formIntersection(ids)
         }

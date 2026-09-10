@@ -1351,3 +1351,214 @@ fn a_file_from_an_earlier_version_edits_through_a_scope() {
         );
     }
 }
+
+// ---- the read half: `rc_project_scoped` ----------------------------------
+//
+// A scope has to be LOOKED at as well as edited. `rc_project_scoped` hands
+// the view over as an ordinary immutable handle so the app can play, plan,
+// render and snapshot what is inside a nest while its edits still go to the
+// parent's handle with `scope` set (spec §7.1, §7.4).
+//
+// The claim that matters is not that the export answers something plausible;
+// it is that it answers the SAME project the edit path applies its op to.
+// One function builds both (`Project::scoped_view`), and the first test
+// below is what says so from the outside, without reading the source: a read
+// view edited directly and an edit made through a scope and then read back
+// come out equal, key for key.
+
+#[test]
+fn the_read_view_is_the_project_a_scoped_op_is_applied_to() {
+    let base = one_nest();
+
+    // The read view, edited with a PLAIN op — no scope, because inside this
+    // handle the nest's clips are already the top level.
+    let read = base
+        .scoped(4)
+        .apply(&json!({"op": "trim_end", "clip": 6, "to": SEC}))
+        .value();
+
+    // The same edit made the app's way — through the parent, with a scope —
+    // and then read back out of the merged parent.
+    let edited = base
+        .apply(&json!({"op": "trim_end", "clip": 6, "to": SEC, "scope": 4}))
+        .scoped(4)
+        .value();
+
+    assert_eq!(
+        read, edited,
+        "the read view and the edit view are one function"
+    );
+}
+
+#[test]
+fn the_read_view_is_the_nest_at_the_top_level() {
+    let view = one_nest().scoped(4).value();
+
+    // Its tracks and clips are the nest's, by id — not the timeline's.
+    assert_eq!(
+        array(&view, "/tracks")
+            .iter()
+            .map(|t| int(t, "/id"))
+            .collect::<Vec<_>>(),
+        vec![5]
+    );
+    assert_eq!(
+        array(&view, "/clips")
+            .iter()
+            .map(|c| int(c, "/id"))
+            .collect::<Vec<_>>(),
+        vec![6, 7]
+    );
+    // The nest clip that SHOWS the nest is nowhere in it: it belongs to the
+    // container, which is the whole point of going in.
+    assert!(array(&view, "/clips").iter().all(|c| int(c, "/id") != 3));
+
+    // The media is the parent's, in the parent's one id space, so a clip
+    // inside can still name a file (spec §5.2).
+    assert_eq!(
+        array(&view, "/media")
+            .iter()
+            .map(|m| int(m, "/id"))
+            .collect::<Vec<_>>(),
+        vec![1]
+    );
+
+    // No markers: a nest has none, and the timeline's are project time.
+    assert!(array(&view, "/markers").is_empty());
+
+    // One id space, so the counter is the document's — which is what makes
+    // an id minted inside unique across the whole file.
+    assert_eq!(int(&view, "/next_id"), 8);
+}
+
+#[test]
+fn the_read_views_canvas_is_the_nests_size_at_the_documents_rate() {
+    // The half of a canvas a nest HAS is its frozen size; the half it has
+    // not — the rate, the background and the two switches — comes from the
+    // parent, and the rate matters most: there is one frame grid.
+    let base = Handle::from_value(&project(
+        vec![video_media(1, "/fixtures/1.mov")],
+        vec![track(2)],
+        vec![nest_clip(3, 2, 0, 2 * SEC, 4)],
+        vec![],
+        vec![nest(
+            4,
+            640,
+            360,
+            vec![track(5)],
+            vec![media_clip(6, 5, 0, 2 * SEC, 1)],
+        )],
+        8,
+    ));
+    let view = base.scoped(4).value();
+    assert_eq!(int(&view, "/canvas/width"), 640);
+    assert_eq!(int(&view, "/canvas/height"), 360);
+    assert_eq!(
+        view.pointer("/canvas/fps"),
+        base.value().pointer("/canvas/fps"),
+        "the rate is the document's"
+    );
+    assert_eq!(
+        view.pointer("/canvas/background"),
+        base.value().pointer("/canvas/background")
+    );
+    assert_eq!(
+        view.pointer("/canvas/fit_new_clips"),
+        base.value().pointer("/canvas/fit_new_clips")
+    );
+    assert_eq!(
+        view.pointer("/canvas/timecode_frames"),
+        base.value().pointer("/canvas/timecode_frames")
+    );
+}
+
+#[test]
+fn the_read_view_keeps_the_scoped_nests_row_and_empties_it() {
+    // `core/src/scope.rs` argues this at length and it is the one shape a
+    // reader will otherwise "tidy up": the row has to stay, or a nest clip
+    // elsewhere in the document dangles; its contents have to go, or every
+    // id in it is counted twice by `validate`'s one uniqueness sweep. The
+    // export answers a live handle, so the fact that it parsed at all is
+    // half the proof; this pins the shape.
+    let view = one_nest().scoped(4).value();
+    let row = nest_of(&view, 4);
+    assert!(
+        array(&row, "/tracks").is_empty(),
+        "the scoped row is emptied"
+    );
+    assert!(
+        array(&row, "/clips").is_empty(),
+        "the scoped row is emptied"
+    );
+    assert_eq!(int(&row, "/width"), 1920, "and keeps everything else");
+}
+
+#[test]
+fn a_read_view_of_a_nest_inside_a_nest_keeps_the_other_nests_whole() {
+    // The case the phase exists for. Scoping into the OUTER nest leaves the
+    // inner one whole, because a clip in the view shows it; scoping into the
+    // inner one leaves the outer one whole for the same reason it leaves
+    // every other nest whole.
+    let base = inner_nest(false);
+    let outer = base.scoped(10).value();
+    let inner = nest_of(&outer, 20);
+    assert!(
+        !array(&inner, "/clips").is_empty(),
+        "the nest a view's own clip shows is whole"
+    );
+    assert_eq!(nest_ids(&outer), vec![10, 20]);
+
+    let deep = base.scoped(20).value();
+    let outer_row = nest_of(&deep, 10);
+    assert!(
+        !array(&outer_row, "/clips").is_empty(),
+        "the nest that shows this one is whole"
+    );
+    assert!(array(&nest_of(&deep, 20), "/clips").is_empty());
+}
+
+#[test]
+fn a_read_view_answers_the_questions_the_app_asks_a_project() {
+    // The point of a handle rather than a JSON blob: everything the editor
+    // draws from goes through the query exports, and they take a project.
+    let view = one_nest().scoped(4);
+
+    // The nest's own duration, measured from the nest's zero — NOT the
+    // timeline's, and not the nest clip's.
+    assert_eq!(view.duration(), 4 * SEC);
+
+    // A plan and a recipe, naming the clips inside. The recipe at 1 s is the
+    // media clip's, which on the timeline would be one layer inside a
+    // flattened nest instead.
+    let recipe = view.recipe(SEC);
+    let layers = array(&recipe, "/layers");
+    assert_eq!(layers.len(), 1);
+    assert_eq!(int(&layers[0], "/clip"), 6);
+    assert!(!view.plan_text().is_empty());
+}
+
+#[test]
+fn a_read_view_of_an_unknown_nest_is_the_edit_paths_own_sentence() {
+    // Byte for byte the message `apply` answers, because the two are the
+    // same refusal about the same argument and a caller that learned one
+    // must not have to learn the other.
+    let base = one_nest();
+    let read = base.try_scoped(99).expect_err("no nest 99");
+    assert_contains(&read, "no nest with id 99");
+    let edited = base.errors(&json!({"op": "trim_end", "clip": 6, "to": SEC, "scope": 99}));
+    assert_eq!(read, edited);
+}
+
+#[test]
+fn a_read_view_does_not_disturb_the_project_it_came_from() {
+    // The handle is a new project, not a window onto this one: it is dropped
+    // at the end of this test while `base` is read afterwards, which under
+    // Miri or a double-free would not survive.
+    let base = one_nest();
+    let before = base.value();
+    {
+        let view = base.scoped(4);
+        assert_eq!(view.duration(), 4 * SEC);
+    }
+    assert_eq!(base.value(), before);
+}

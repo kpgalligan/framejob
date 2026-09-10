@@ -281,7 +281,15 @@ impl Project {
     }
 
     /// The nest as a project — the table in this module's doc.
-    fn scoped_view(&self, nest: &Nest) -> Project {
+    ///
+    /// `pub(crate)` for [`crate::ffi::rc_project_scoped`], which hands the
+    /// SAME view to the app as a read-only handle so the timeline, the
+    /// canvas, the plan and the player can all be pointed inside a nest. It
+    /// is one function on purpose: a second builder that drifted would make
+    /// the app draw one project and its edits land in another, which is the
+    /// exact failure `core/CLAUDE.md`'s "one implementation per algorithm"
+    /// is for.
+    pub(crate) fn scoped_view(&self, nest: &Nest) -> Project {
         Project {
             version: self.version,
             canvas: Canvas {

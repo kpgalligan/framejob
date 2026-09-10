@@ -424,7 +424,7 @@ extension EditorViewController {
             // than shared because that one lives on a VIEW and a controller
             // reaching into the timeline for a model question is the wrong
             // direction. The sheet's own guard is the exact answer.
-            let snapshot = document.project.snapshot
+            let snapshot = document.editedProject.snapshot
             return snapshot.clips.contains { clip in
                 guard clip.enabled.audio else { return false }
                 if case .nest = clip.source { return clip.audio != nil }

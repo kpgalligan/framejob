@@ -13,7 +13,12 @@ extension AgentServer {
     /// timeline; the menu command inserts at `tracks.count`, the front.
     func addTrack(_ a: [String: Any]) throws -> String {
         let document = try target(a)
-        let count = document.project.snapshot.tracks.count
+        // The CONTAINER's tracks, not the document's (road map 2's phase 9):
+        // inside a `scope` the index names a place in the nest's own stack,
+        // and bounding it by the timeline's count would refuse a legal index
+        // or accept one past the end. `idScope` is the same answer the id
+        // readers give.
+        let count = try idScope(document).tracks.count
         let index = try intArg(a, "index") ?? count
         guard index >= 0, index <= count else {
             throw ToolError(
@@ -32,7 +37,7 @@ extension AgentServer {
         let document = try target(a)
         let track = try trackArg(a, "track", document)
         let withClips = try boolArg(a, "with_clips")
-        let clips = document.project.snapshot.clips(onTrack: track.id).count
+        let clips = try idScope(document).clips(onTrack: track.id).count
         if clips > 0, withClips != true {
             throw ToolError(
                 message: "Track \(track.id) (\"\(track.name)\") still holds \(clips) clip"
@@ -47,7 +52,7 @@ extension AgentServer {
     func moveTrack(_ a: [String: Any]) throws -> String {
         let document = try target(a)
         let track = try trackArg(a, "track", document)
-        let count = document.project.snapshot.tracks.count
+        let count = try idScope(document).tracks.count
         guard let index = try intArg(a, "index"), index >= 0, index < max(count, 1) else {
             throw ToolError(message: "index must be 0…\(max(count - 1, 0)).")
         }
@@ -95,6 +100,14 @@ extension AgentServer {
     /// `add_marker` — M (`addMarkerCommand`). Markers snap to frames and two
     /// may not share a time, so a second marker on the same frame is the
     /// core's refusal.
+    ///
+    /// **`at` defaults to the playhead, and inside an open nest the playhead
+    /// is the NEST's** — which is why this tool is refused in there at all,
+    /// by `checkDocumentLevelTicks` on the way to the edit rather than here:
+    /// a marker is a chapter point on the exported file and the file is the
+    /// timeline's. The app greys the M key's menu item out for the same
+    /// reason. An explicit `scope` still reaches the core and hears the
+    /// core's own sentence.
     func addMarker(_ a: [String: Any]) throws -> String {
         let document = try target(a)
         let at = try optionalTimeArg(a, "at", document) ?? document.playhead
@@ -109,6 +122,16 @@ extension AgentServer {
 
     /// `set_marker` — dragging a marker in the ruler (`MarkerDragSession`) and
     /// the Document tab's marker table (rename, chapter checkbox).
+    ///
+    /// **Those two UI paths part company inside a nest, and this tool follows
+    /// them.** No marker is drawn in the ruler in there (the timeline reads
+    /// the scoped project, which has no markers at all), so there is no drag
+    /// to mirror and a `time` sent from inside would be measured from the
+    /// nest's zero — `checkDocumentLevelTicks` refuses exactly that argument.
+    /// The Document tab, which is about the FILE, goes on renaming and
+    /// chaptering with a nest open, so `name`, `chapter` and `color` are
+    /// accepted in there and land on the document, which is where the marker
+    /// is.
     func setMarker(_ a: [String: Any]) throws -> String {
         let document = try target(a)
         let marker = try markerArg(a, "marker", document)
@@ -128,6 +151,13 @@ extension AgentServer {
     }
 
     /// `remove_marker` — the Document tab's marker-row Remove button.
+    ///
+    /// **It is the marker tool that is NOT refused inside an open nest**, and
+    /// the reason is the whole shape of the rule next door: it names an id and
+    /// reads no clock, so there is no zero for it to be measured from. The
+    /// Remove button beside it is live with a nest open for the same reason.
+    /// `markerArg` resolves the id against the TIMELINE's markers on purpose
+    /// and says so.
     func removeMarker(_ a: [String: Any]) throws -> String {
         let document = try target(a)
         let marker = try markerArg(a, "marker", document)

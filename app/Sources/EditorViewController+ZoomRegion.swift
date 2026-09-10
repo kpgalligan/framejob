@@ -136,7 +136,7 @@ extension EditorViewController {
     /// builder sends the null so a saved call says which it meant.
     private func zoomBackCommand() {
         guard let document = document, let box = regionTarget(),
-              let clip = document.project.snapshot.clip(box.id)
+              let clip = document.editedProject.snapshot.clip(box.id)
         else {
             NSSound.beep()
             return
@@ -160,7 +160,7 @@ extension EditorViewController {
     private func regionTarget() -> CanvasLayerBox? {
         guard let document = document, document.selection.count == 1,
               let id = document.selection.first,
-              let clip = document.project.snapshot.clip(id), clip.contains(document.playhead),
+              let clip = document.editedProject.snapshot.clip(id), clip.contains(document.playhead),
               let box = previewCanvas?.box(for: id), !box.locked
         else { return nil }
         return box
@@ -230,7 +230,7 @@ extension EditorViewController {
     /// held, and no `curve`, so the core's `ease_in_out` applies rather than
     /// `Curve.default`'s `linear`.
     private func commitZoom(_ session: ZoomRegionSession, region: ZoomRegion) {
-        guard let document = document, let clip = document.project.snapshot.clip(session.clip),
+        guard let document = document, let clip = document.editedProject.snapshot.clip(session.clip),
               clip.contains(document.playhead)
         else {
             NSSound.beep()

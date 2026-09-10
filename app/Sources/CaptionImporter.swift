@@ -394,7 +394,15 @@ extension EditorViewController {
     {
         let plan: CaptionImporter.Plan
         do {
-            plan = try CaptionImporter.plan(for: url, in: document.project)
+            // **The EDITED project, not the document.** A caption plan
+            // measures a placement — the frame grid, the overlap trim, the
+            // new front-most track — and road map 2's phase 9 addresses the
+            // ops it produces to whatever nest is open. Reading the document
+            // here and writing into the nest there is one gesture computing
+            // against one container and landing in another, which is the
+            // shape `SilenceDetector` and `AudioNormalize` were moved off
+            // in the same phase. A producer reads the container it writes.
+            plan = try CaptionImporter.plan(for: url, in: document.editedProject)
         } catch {
             let alert = NSAlert(error: error)
             alert.beginSheetModal(for: window, completionHandler: nil)

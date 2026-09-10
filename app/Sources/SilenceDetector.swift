@@ -33,10 +33,13 @@ import Foundation
 /// PROTECTS a span, exactly as any other sound does (it is what the ear
 /// hears, and a loud nest keeps a tick out of a run), but no candidate may
 /// INTERSECT one: `Input.nests` is the list of walls and `excludingNests`
-/// cuts every run against them. The dead air inside a nest is reached by
-/// un-nesting it, cutting, and nesting again — the same round trip every
-/// other edit inside a nest takes (spec §4.4), and the same limit D-A10
-/// already records for the selection scope.
+/// cuts every run against them. **The dead air inside a nest is reached by
+/// OPENING it** (⌘↓, or `set_scope`) — `Input.read` takes its snapshot and
+/// its plan off `editedProject`, so with a nest open the walls are the ones
+/// inside it and the runs are its own. Road map 2's phase 9 made that the
+/// everyday path; the round trip (⇧⌘G, cut, ⌘G) still works and is no longer
+/// the only way in. What has NOT changed is the rule above: whichever
+/// container is open, a candidate may not intersect a nest IN it.
 ///
 /// Nothing here is AppKit, a view or a document beyond one read: `Input.read`
 /// is the seam that takes a snapshot, a plan, a selection and the peak files
@@ -238,8 +241,12 @@ enum SilenceDetector {
     /// nil is answered only when the core emitted a plan this build cannot
     /// read — the same failure `CompositionBuilder` treats as fatal.
     static func read(from document: ProjectDocument, selection: Set<UInt32>? = nil) -> Input? {
-        guard let plan = document.project.plan else { return nil }
-        let snapshot = document.project.snapshot
+        // The EDITED project (road map 2's phase 9): with a nest open the
+        // scope, the plan and the ranges `ripple_delete_ranges` is sent are
+        // all the NEST's, in the nest's own time, and the op carries the
+        // scope. At the top level this is `document.project` as before.
+        guard let plan = document.editedProject.plan else { return nil }
+        let snapshot = document.editedProject.snapshot
         let cacheDirectory = document.cacheDirectory
 
         // One read per media, however many segments cite it — `MediaPeaks.Loader`

@@ -46,7 +46,10 @@ final class SpeedSheetController: NSViewController, NSTextFieldDelegate {
     init(document: ProjectDocument, clips: [UInt32]) {
         self.document = document
         self.clips = clips
-        let snapshot = document.project.snapshot
+        // The EDITED project: this sheet is opened on the SELECTION, and with
+        // a nest open the selection is the nest's clips (road map 2's phase
+        // 9). At the top level it is `document.project` as before.
+        let snapshot = document.editedProject.snapshot
         let speeds = clips.compactMap { snapshot.clip($0)?.speed }
         let first = speeds.first ?? 1
         let uniform = speeds.allSatisfy { $0 == first } && first > 0
@@ -152,7 +155,7 @@ final class SpeedSheetController: NSViewController, NSTextFieldDelegate {
     /// shorter than its source), and the new length is that over the new rate
     /// — the op's own arithmetic, spelled once.
     private func syncReadout() {
-        guard let snapshot = document?.project.snapshot else {
+        guard let snapshot = document?.editedProject.snapshot else {
             durationLabel.stringValue = ""
             return
         }

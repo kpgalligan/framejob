@@ -96,9 +96,28 @@ final class ExportSheetController: NSViewController {
     /// held only "Custom…" would export the fields' clamped floor, 16 × 16,
     /// as if someone had asked for it.
     var sizesError: String?
-    /// The in/out range at open time, if the document has one. Captured
-    /// because the sheet blocks every edit while it is up, so it cannot move.
+    /// The in/out range at open time, if the document has one AND the card
+    /// may spend it. Captured because the sheet blocks every edit while it is
+    /// up, so it cannot move.
+    ///
+    /// Nil while a nest is open, which is the rule
+    /// `ProjectDocument.inOutRange` states and argues: a range belongs to the
+    /// container it was set in, an export always writes the whole timeline,
+    /// and a nest-local pair of ticks is not timeline time. Nil is a state
+    /// every path on this card already handles — the Range popup carries only
+    /// "Whole project" and is disabled, `apply(_:)` degrades a remembered
+    /// `in_out` to it, and `overrides()` writes no `range` key — so honouring
+    /// the rule is this one capture and no special case anywhere below.
     let range: (start: Ticks, end: Ticks)?
+
+    /// Whether the document HAS a live range that the nest scope is what
+    /// suppressed, as against there being no range at all.
+    ///
+    /// The card cannot tell those two apart — both are a disabled Range popup
+    /// reading "Whole project" — and only one of them would surprise the
+    /// person who set the range a moment ago, so this is what lets that one
+    /// say why (`loadView`).
+    private let rangeIsTheNests: Bool
 
     /// The named presets a person has saved: this card's copy of the store,
     /// read when the sheet opens and RE-READ at every write
@@ -164,11 +183,15 @@ final class ExportSheetController: NSViewController {
     init(editor: EditorViewController) {
         self.editor = editor
         self.presets = ReelExport.presets()
-        if let bounds = editor.document?.inOutRange, bounds.end > bounds.start {
-            self.range = bounds
-        } else {
-            self.range = nil
-        }
+        // `scope == nil` is the first half of the test, not an afterthought:
+        // see the property's doc above and the rule at
+        // `ProjectDocument.inOutRange`. A range set inside a nest is the
+        // nest's, and this card writes the timeline.
+        let bounds = editor.document?.inOutRange
+        let live = bounds.map { $0.end > $0.start } ?? false
+        let scoped = editor.document?.scope != nil
+        self.range = live && !scoped ? bounds : nil
+        self.rangeIsTheNests = live && scoped
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -257,6 +280,23 @@ final class ExportSheetController: NSViewController {
         rangePopup.action = #selector(rangeOrRateChanged(_:))
         rangePopup.isEnabled = range != nil
         rangePopup.widthAnchor.constraint(equalToConstant: 150).isActive = true
+        // A disabled Range popup ordinarily means "this document has no
+        // range". Inside a nest it means something else — "the range there is
+        // belongs to the nest you are editing inside" — and the two are the
+        // same picture, so the one that would surprise somebody carries the
+        // sentence. A tooltip rather than a row: an "In/out range" row that
+        // refused the moment it was picked would be a control lying about
+        // what it does, and the card's `hint` is one paragraph written for
+        // every export rather than for this session's. The tooltip lands
+        // because this is a stock `NSPopUpButton` — the app's dead-tooltip
+        // pitfall is about custom controls that clear their own tracking
+        // areas and take `NSToolTipManager`'s with them.
+        if rangeIsTheNests {
+            rangePopup.toolTip =
+                "The in/out range belongs to the nest you are editing inside. An export "
+                + "writes the whole timeline, so it cannot use it — leave the nest (⌘↑) "
+                + "and set a range on the timeline."
+        }
 
         burnInCheckbox.font = DS.sans(13)
         burnInCheckbox.target = self

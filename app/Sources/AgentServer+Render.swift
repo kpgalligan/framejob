@@ -18,7 +18,9 @@ extension AgentServer {
     /// `AVAssetImageGenerator` over the SAME `AVComposition` +
     /// `AVVideoComposition` an export writes, so what comes back is what the
     /// file would contain at `t` rather than a second opinion about it
-    /// (`Exporter.renderFrame`, spec §7.9).
+    /// (`Exporter.renderFrame`, spec §7.9). It is the PREVIEW it twins and
+    /// not the export, which decides what it renders while a nest is open —
+    /// see the body.
     ///
     /// The frame comes back BOTH ways: base64 in an MCP image block, so a
     /// model can look at it, and as a file on disk whose path the result
@@ -51,9 +53,19 @@ extension AgentServer {
         let context = try onMain { () throws -> (ReelProject, [UInt32: URL], Ticks, CGSize) in
             let document = try self.target(a)
             let t = try self.optionalTimeArg(a, "t", document) ?? document.playhead
+            // `editedProject`, not `project` — road map 2's phase 9. With a
+            // nest open (`set_scope`) this renders THAT nest at its own
+            // frozen canvas, from its own zero, with the outer transform not
+            // applied: the same picture the preview panel is showing, which
+            // is what makes a scoped edit checkable at all. It is the one
+            // place in this file that side of the split is taken; `export`
+            // below stays the DOCUMENT's, because an export writes the whole
+            // timeline whatever the timeline happens to be showing. With no
+            // nest open the two are the same handle and every earlier
+            // phase's frame comparison is unaffected.
             return (
-                document.project, document.mediaURLs(), max(0, t),
-                document.project.snapshot.canvas.size
+                document.editedProject, document.mediaURLs(), max(0, t),
+                document.editedProject.snapshot.canvas.size
             )
         }
         let (project, urls, time, canvasSize) = context

@@ -163,7 +163,7 @@ extension AgentServer {
             let plan: CaptionLayout.Plan
             do {
                 plan = try CaptionLayout.place(
-                    outcome.cues, problems: problems, in: document.project)
+                    outcome.cues, problems: problems, in: document.editedProject)
             } catch {
                 throw ToolError(message: error.localizedDescription)
             }
@@ -184,7 +184,13 @@ extension AgentServer {
     private func transcriptionScope(
         _ a: [String: Any], _ document: ProjectDocument
     ) throws -> TranscriptionScope {
-        let snapshot = document.project.snapshot
+        // The OPEN container's, because the ops this run produces are
+        // addressed to it (road map 2's phase 9). Reading the document and
+        // writing into the nest is one gesture measuring against one timeline
+        // and landing in another; `SilenceDetector` and `AudioNormalize` were
+        // moved off that shape in the same phase, and File ▸ Generate
+        // Captions… reads the same handle for the same reason.
+        let snapshot = document.editedProject.snapshot
         let named = try optionalClipsArg(a, "clips", document)
         let clips = named.map { ids in ids.compactMap { snapshot.clip($0) } } ?? snapshot.clips
         let outcome = Transcriber.jobs(for: clips, in: snapshot, urls: document.mediaURLs())
@@ -343,7 +349,9 @@ extension AgentServer {
     /// `replaceableExtensions`.
     func exportCaptions(_ a: [String: Any]) throws -> String {
         let document = try target(a)
-        let snapshot = document.project.snapshot
+        // The open container's, so the track this writes is the one
+        // `get_project` is listing.
+        let snapshot = document.editedProject.snapshot
         let path = try requiredString(a, "path")
         let expanded = (path as NSString).expandingTildeInPath
         let format = CaptionExporter.format(

@@ -73,13 +73,31 @@ struct ReelOp {
     let name: String
     let args: [String: Any]
 
+    /// The nest this op resolves its ids INSIDE, or nil for the timeline —
+    /// the envelope's `scope` key (`core/src/scope.rs`, spec §6), which is
+    /// not an argument of any op and is spelled once for all fifty-five.
+    ///
+    /// It is a `var` with an initial value so the memberwise initialiser
+    /// defaults it, which is what let every factory below stay untouched: an
+    /// op is BUILT at the timeline's terms and then re-addressed by
+    /// `scoped(_:)` at the one place that knows which container the edit is
+    /// for (`ProjectDocument`).
+    var scope: UInt32? = nil
+
     /// The op as the JSON `rc_project_apply` takes. Keys are sorted so two
     /// equal ops compare equal as strings. `"{}"` — which the core rejects
     /// as an unknown op — if a value were not JSON-representable, which the
     /// typed factories make impossible.
+    ///
+    /// An absent scope writes no key at all rather than an explicit null.
+    /// The core reads the two the same way (`scope::read`), but a key that
+    /// is only ever there when it means something keeps every unscoped op's
+    /// JSON byte for byte what it was — which is what makes the whole phase
+    /// invisible to a project that never enters a nest.
     var json: String {
         var object = args
         object["op"] = name
+        if let scope = scope { object["scope"] = scope }
         guard JSONSerialization.isValidJSONObject(object),
               let data = try? JSONSerialization.data(
                 withJSONObject: object, options: [.sortedKeys]),
@@ -87,6 +105,60 @@ struct ReelOp {
         else { return "{}" }
         return text
     }
+}
+
+// MARK: - Scope
+
+extension ReelOp {
+    /// Returns this op carrying `scope`, or self when `nest` is nil.
+    ///
+    /// The one spelling of "this edit is about what is inside that nest".
+    /// Every path that reaches the core goes through it —
+    /// `ProjectDocument.applyEdit`, `updateLiveEdit`, `performGroupedEdit`
+    /// and the MCP handlers' own `scope` argument — so an op's container is
+    /// decided once, at the moment it is sent, and never by the factory that
+    /// built it.
+    func scoped(_ nest: UInt32?) -> ReelOp {
+        guard let nest = nest else { return self }
+        var copy = self
+        copy.scope = nest
+        return copy
+    }
+
+    /// The seven ops `core/src/scope.rs`'s `refused_inside` answers
+    /// `"<op> has no meaning inside nest N"` to.
+    ///
+    /// **The core owns this list and this is a mirror of it**, in the same
+    /// sense that `AgentCatalog.swift` mirrors the op table: change one,
+    /// change both. It is seven names rather than a rule, so it can be
+    /// checked by eye, and it is written here rather than at a call site
+    /// because two copies of it is what would drift.
+    ///
+    /// It exists for a reason the road map did not anticipate. A scope is
+    /// stamped on every op of an edit uniformly, and one edit can legitimately
+    /// mix the two kinds: a Finder drop inside a nest is `add_media` — an act
+    /// on the DOCUMENT's one media list, in the document's one id space — plus
+    /// an `add_clip` that belongs in the nest, as ONE undo step
+    /// (`EditorViewController+AddClips.swift`). Stamping the scope on both
+    /// makes the whole drop an error; stamping it on neither drops the clip on
+    /// the timeline. So `ProjectDocument` sends a document-level op UNSCOPED
+    /// and everything else scoped, which is also why File ▸ Add Media…, a
+    /// Relink and a Remove go on working with a nest open instead of being
+    /// greyed out.
+    ///
+    /// Nothing here is a second opinion about what those ops MEAN: the core
+    /// refuses a scoped one by name either way, and an agent that asks for one
+    /// with a `scope` still gets that refusal, because `scoped(_:)` above is
+    /// the plain stamp and this list is consulted only by the app's own edit
+    /// paths.
+    static let documentLevelNames: Set<String> = [
+        "add_marker", "set_marker", "remove_marker", "set_canvas", "add_media", "relink_media",
+        "remove_media",
+    ]
+
+    /// True for one of the seven above — an edit about the document rather
+    /// than about whatever container the timeline is looking at.
+    var isDocumentLevel: Bool { Self.documentLevelNames.contains(name) }
 }
 
 // MARK: - Op factories: clips

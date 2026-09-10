@@ -185,7 +185,8 @@ CANVAS = (640, 360)
 # three features edits anything (`EditorViewController+PreviewQuality.swift`
 # argues it for 8a, `MediaReveal.swift` for 8c's selection). The EXACT count
 # belongs to the newest phase's script (README) — it is what tells a stale
-# binary on the port from the build under test.
+# binary on the port from the build under test — and phase 9's `set_scope`
+# took it, so this is a floor now, as phase 6's and phase 7's are.
 TOOLS = 73
 
 # What this build writes. Phase 8 declares "no schema; view state
@@ -688,8 +689,8 @@ def isolation_part(mcp):
           "one with the preview-quality key absent, one launched at Quarter")
     for tag, instance in (("full", full), ("quarter", quarter)):
         names = instance.mcp.tools()
-        check(len(names) == TOOLS,
-              f"the {tag} instance serves {len(names)} tools, the build under test's {TOOLS}")
+        check(len(names) >= TOOLS,
+              f"the {tag} instance serves {len(names)} tools, phase 8's {TOOLS} or more")
 
     a = Session(full.mcp, "phase8-full")
     b = Session(quarter.mcp, "phase8-quarter")
@@ -877,10 +878,10 @@ def usage_part(mcp):
 
 def catalog_part(mcp):
     names = mcp.tools()
-    check(len(names) == TOOLS,
-          f"the catalog holds EXACTLY {TOOLS} tools (got {len(names)}) — phase 8 adds no "
-          "op and no tool, so this is phase 6's number for the third phase running, and "
-          "it is what tells a stale binary on the port from the build under test")
+    check(len(names) >= TOOLS,
+          f"the catalog holds phase 8's {TOOLS} tools or more (got {len(names)}) — phase 8 "
+          "adds no op and no tool, so this was phase 6's number for the third phase "
+          "running, and phase 9's set_scope is what turned it into a floor")
     check(not [n for n in names if "preview" in n or "quality" in n],
           "and no tool mentions the preview or the quality: the parity rule owes a "
           "mirror to every user-visible EDIT (spec §7.9) and phase 8a edits nothing — "

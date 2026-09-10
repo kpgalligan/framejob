@@ -203,8 +203,11 @@ CANVAS = (640, 360)
 # count belongs to the NEWEST phase's script, because it is the only thing
 # that tells a stale binary on the port from the build under test; phases 1
 # to 5 keep floors (63, 65, 68, 70, 71) so a later phase's tools never fail
-# an older proof. When phase 7 lands, this assertion moves to its script and
-# this one becomes a floor.
+# an older proof. Phase 9 is where that handover finally cost something:
+# `set_scope` is the first tool added since phase 6, so the exact count moved
+# to phase 9's script and this one — and phases 7 and 8, which had both
+# inherited the number rather than raised it — became floors in the same
+# change.
 TOOLS = 73
 
 # What this build writes. An older file must still OPEN — that is
@@ -1668,10 +1671,10 @@ def actions_part(mcp):
 def catalog_part(mcp):
     print("\n18 — the catalog, and what this build writes")
     names = mcp.tools()
-    check(len(names) == TOOLS,
-          f"the catalog holds EXACTLY {TOOLS} tools (got {len(names)}) — the newest "
-          "phase owns the exact count, which is what tells a stale binary on the port "
-          "from the build under test")
+    check(len(names) >= TOOLS,
+          f"the catalog holds phase 6's {TOOLS} tools or more (got {len(names)}) — the "
+          "newest phase owns the EXACT count, and phase 9's set_scope is what turned this "
+          "one into a floor")
     for tool in ["add_background", "add_blurred_background"]:
         check(tool in names, f"`{tool}` is a tool")
 

@@ -40,6 +40,30 @@ final class TimelineView: NSView, NSTextFieldDelegate {
         }
     }
 
+    /// The nest scope's trail — "Timeline", then one component per level
+    /// entered — drawn in the corner over the track headers and clicked to
+    /// come back out (road map 2's phase 9, `TimelineView+NestScope.swift`).
+    /// Empty at the top level, which is what makes the corner inert again.
+    ///
+    /// Like `candidateSpans` it is NOT part of `update(...)`: a scope is view
+    /// state that belongs to the controller, and the snapshot this view is
+    /// handed while one is open is already the nest's, so it carries no trace
+    /// of where it came from.
+    var breadcrumb: [String] = [] {
+        didSet {
+            guard breadcrumb != oldValue else { return }
+            ruler.needsDisplay = true
+            syncBreadcrumbTooltip()
+        }
+    }
+
+    /// Clicking the breadcrumb: the level to come back OUT to, counted the
+    /// way `ProjectDocument.nestPath` counts — 0 is the timeline.
+    var onBreadcrumb: ((Int) -> Void)?
+
+    /// Double-clicking a nest clip: go inside it.
+    var onOpenNest: ((UInt32) -> Void)?
+
     /// Snapping (N) and the track height live on the controller — the menu,
     /// this toolbar and the canvas all have to read one flag — so they are
     /// pushed in and pushed back out through closures.
@@ -162,8 +186,17 @@ final class TimelineView: NSView, NSTextFieldDelegate {
         content.timeline = self
         ruler.timeline = self
         headers.timeline = self
-        content.addSubview(ruler)
+        // ORDER, not habit: the header column goes in FIRST so the ruler
+        // floats ABOVE it. The two bands overlap in exactly one square — the
+        // 132 × 22 corner, and only once the pane has been scrolled
+        // VERTICALLY — and that square is the RULER's: it fills it, borders
+        // it and draws the nest breadcrumb in it, and the hit test answers
+        // `.breadcrumb` for it. `TimelineView+NestScope.swift` carries the
+        // argument and what was measured; the one line to keep in mind here
+        // is that an open rename field is a real subview of a band, so
+        // `beginRename` raises whichever band holds it.
         content.addSubview(headers)
+        content.addSubview(ruler)
 
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         scrollView.hasVerticalScroller = true
@@ -300,6 +333,10 @@ final class TimelineView: NSView, NSTextFieldDelegate {
             height: max(layout.contentHeight - TimelineLayout.rulerHeight, 0))
         ruler.needsDisplay = true
         headers.needsDisplay = true
+        // The breadcrumb's tooltip is a RECT on the content view in content
+        // coordinates, and the corner it covers moves with the scroll like
+        // everything else pinned here.
+        syncBreadcrumbTooltip()
     }
 
     @objc private func clipViewMoved(_ note: Notification) {
@@ -371,7 +408,13 @@ final class TimelineView: NSView, NSTextFieldDelegate {
     }
 
     /// Auto-scroll: keeps the playhead in view while it runs (spec §4.4).
-    private func revealPlayhead() {
+    ///
+    /// Internal, not private, for `EditorViewController+NestScope.swift`:
+    /// entering or leaving a nest re-roots the whole view, and `setPlayhead`
+    /// above guards on `time != playhead` — which a scope change can leave
+    /// equal — so that one caller has to ask for the reveal by name. The body
+    /// stays here (this file is frozen at wiring), as `scroll(toX:)`'s does.
+    func revealPlayhead() {
         let clip = scrollView.contentView
         let x = layout.x(for: playhead)
         let left = clip.bounds.minX + TimelineLayout.headerWidth + 24
@@ -429,6 +472,18 @@ final class TimelineView: NSView, NSTextFieldDelegate {
         field.drawsBackground = true
         field.focusRingType = .none
         field.delegate = self
+        // While a field is open, the band that HOLDS it is the front-most
+        // band — or a track's field, which sits at its ROW's top, disappears
+        // under the ruler on the top, partly scrolled row (`init` above and
+        // `TimelineView+NestScope.swift` for why the ruler is up there; that
+        // file argues why this is unconditional and what it costs).
+        // `endRename` gives the corner back.
+        //
+        // Before the field is added, never after:
+        // `addSubview(_:positioned:relativeTo:)` MOVES a view that is already
+        // a subview, which would take the field editor out of the hierarchy
+        // and end the editing it had just been given.
+        if host !== content { content.addSubview(host, positioned: .above, relativeTo: nil) }
         host.addSubview(field)
         renameField = field
         renameRelocate = relocate
@@ -451,6 +506,10 @@ final class TimelineView: NSView, NSTextFieldDelegate {
         renameField = nil
         renameCommit = nil
         renameRelocate = nil
+        // The corner belongs to the ruler again, whether or not `beginRename`
+        // raised a band over it: this is the one place the order is restored,
+        // and it runs only when a field was actually open.
+        content.addSubview(ruler, positioned: .above, relativeTo: headers)
         // Removing the view that holds the field editor ends its editing —
         // the commit below runs from inside that — and AppKit then hands
         // first responder to the WINDOW, after the callback restored the
@@ -496,6 +555,15 @@ final class TimelineView: NSView, NSTextFieldDelegate {
         case .none, .corner:
             break
 
+        case .breadcrumb(let level):
+            // The FIRST press only. AppKit delivers a double-click as two
+            // mouse-downs (clickCount 1, then 2), and this cell is a BUTTON
+            // that has already acted on the first: the trail is one component
+            // shorter by the time the second arrives, `cornerHit` reads the
+            // NEW trail, and the pair came out two levels for one gesture
+            // (`TimelineView+NestScope.swift`).
+            if clicks < 2 { onBreadcrumb?(level) }
+
         case .ruler(let time):
             var session = PlayheadSession(time: time, wasPlaying: false)
             dragSnapper = makeSnapper(excluding: [], suppressed: suppressed)
@@ -535,6 +603,18 @@ final class TimelineView: NSView, NSTextFieldDelegate {
             // selection on the way into its own slip.
             if flags.contains(.option), flags.contains(.shift) {
                 beginSlip(id, at: point, flags: flags)
+                break
+            }
+            // A double-click on a NEST clip goes INSIDE it (road map 2's
+            // phase 9) — above the rename branch, so opening wins where both
+            // could apply, which is the stronger meaning of the gesture in
+            // every editor that has both. The consequence is a REMOVAL and is
+            // said out loud in `EditorViewController+NestScope.swift`: a nest
+            // clip loses rename-by-double-click, keeping ⇧⌘R, Clip ▸ Rename…
+            // and the Clip tab's header field. Like the ⌥⇧ slip above it
+            // short-circuits before `selectClip`.
+            if clicks == 2, snapshot.clip(id)?.source.nestID != nil {
+                onOpenNest?(id)
                 break
             }
             // A double-click renames (TimelineView+Rename.swift) — also
@@ -1090,7 +1170,7 @@ final class TimelineContentView: NSView {
         let snapshot = owner.snapshot
 
         if point.y >= owner.pinnedY, point.y < owner.pinnedY + TimelineLayout.rulerHeight {
-            if point.x < owner.pinnedX + TimelineLayout.headerWidth { return .corner }
+            if point.x < owner.pinnedX + TimelineLayout.headerWidth { return owner.cornerHit }
             for marker in snapshot.markers
             where abs(layout.x(for: marker.time) - point.x) <= 6 {
                 return .marker(marker.id)
@@ -1357,6 +1437,7 @@ final class TimelineRulerView: NSView {
         DS.border.setFill()
         NSRect(x: corner.maxX - 1, y: 0, width: 1, height: bounds.height).fill()
         NSRect(x: 0, y: bounds.height - 1, width: bounds.width, height: 1).fill()
+        drawBreadcrumb(owner: owner, in: corner)
 
         drawPlayheadHead(owner: owner, layout: layout)
     }

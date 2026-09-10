@@ -162,6 +162,44 @@ final class ReelProject {
         rc_project_clone(ptr).map { ReelProject(owning: $0) }
     }
 
+    /// The project INSIDE nest `id` — its tracks and clips at the top level,
+    /// its frozen size as the canvas, this document's rate, media, nests and
+    /// next id, and no markers (`core/src/scope.rs`, spec §7.4).
+    ///
+    /// **The READ half of a scope, and the reason the whole feature is
+    /// possible.** An edit inside a nest goes to THIS handle with the op
+    /// carrying `scope` (`ReelOp.scoped(_:)`), and what comes back is a whole
+    /// parent project, so undo is still a stack of parent handles. But the
+    /// timeline, the canvas, the player and every snapshot read need a
+    /// project whose top level IS the nest, and that is this. The core builds
+    /// both out of one function, so what the app draws and what its edits
+    /// land in cannot drift apart — a second view builder on this side would
+    /// be exactly that drift.
+    ///
+    /// The answer is an ordinary immutable handle, memoised the same way, and
+    /// **it is for reading**. Applying an op to it would edit the VIEW and
+    /// throw the parent away; nothing enforces that, and
+    /// `ProjectDocument.editedProject` is the one place it is held.
+    /// The exception is a PROBE — `applying` on a scoped handle with plain
+    /// ops is how a gesture learns the ids the core is about to mint inside a
+    /// nest, and it is legitimate for the reason every probe is: the result
+    /// is dropped (`EditorViewController+Timeline.swift`).
+    ///
+    /// nil for a nest id this project has not got. The core's message
+    /// (`no nest with id N`) is dropped rather than thrown, because every
+    /// caller here is a VIEW asking about view state it has already clamped
+    /// — `ProjectDocument.clampViewState` clears a scope whose nest is gone
+    /// before anything reads one — so a nil is a race with an undo, not a
+    /// user-facing failure, and it falls back to the parent.
+    func scoped(_ id: UInt32) -> ReelProject? {
+        var err: UnsafeMutablePointer<CChar>? = nil
+        guard let handle = rc_project_scoped(ptr, id, &err) else {
+            _ = takeErrorMessage(err, fallback: "")
+            return nil
+        }
+        return ReelProject(owning: handle)
+    }
+
     /// The project as JSON at the current format version — the bytes
     /// `ProjectDocument` writes into the package. The core is the only
     /// writer of the file format; nothing re-encodes a `ProjectSnapshot`.

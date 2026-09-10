@@ -26,8 +26,9 @@ use serde_json::{json, Value};
 
 use common::{array, assert_contains, at, cstring, expect_string, take_string, Handle};
 use reelcut_core::ffi::{
-    rc_project_clone, rc_project_free, rc_project_from_json, rc_project_new, rc_project_to_json,
-    rc_string_free, rc_time_snap_to_frame, rc_timecode_format, rc_timecode_parse,
+    rc_project_clone, rc_project_free, rc_project_from_json, rc_project_new, rc_project_scoped,
+    rc_project_to_json, rc_string_free, rc_time_snap_to_frame, rc_timecode_format,
+    rc_timecode_parse,
 };
 use reelcut_core::ffi_agent::{
     rc_agent_server_start, rc_agent_server_stop, rc_agent_string_create,
@@ -1834,6 +1835,17 @@ fn sweep_every_export_with_nulls() -> Vec<String> {
 
     assert!(unsafe { rc_project_clone(ptr::null()) }.is_null());
     cover("rc_project_clone");
+
+    // rc_project_scoped — a NULL project is a caller bug, so it sets
+    // err_out rather than answering a bare NULL: this export has no "valid
+    // but changes nothing" case, and a caller cannot tell "no such nest"
+    // from "you passed nothing" without a message. A NULL err_out is still
+    // tolerated, which is the other half of the pair.
+    let mut err: *mut c_char = ptr::null_mut();
+    assert!(unsafe { rc_project_scoped(ptr::null(), 1, &mut err) }.is_null());
+    assert_eq!(take_string(err).as_deref(), Some("project is NULL"));
+    assert!(unsafe { rc_project_scoped(ptr::null(), 1, ptr::null_mut()) }.is_null());
+    cover("rc_project_scoped");
 
     unsafe { rc_project_free(ptr::null_mut()) };
     cover("rc_project_free");

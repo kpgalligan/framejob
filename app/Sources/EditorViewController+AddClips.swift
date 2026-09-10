@@ -51,7 +51,13 @@ extension EditorViewController {
     /// version that works is the one applied.
     private func addGeneratedClip(named name: String, _ make: (UInt32, Ticks) -> ReelOp) {
         guard let document = document else { return }
-        let before = document.project.snapshot
+        // The EDITED project throughout, here and in every other command in
+        // this file that places a clip: with a nest open the front track is
+        // the NEST's front track, the overlap probe has to be run against the
+        // nest, and the id set the selection is read back out of is the
+        // nest's (road map 2's phase 9). `add_media` is the one exception and
+        // is called out where it happens.
+        let before = document.editedProject.snapshot
         let at = document.playhead
 
         var ops: [ReelOp] = []
@@ -59,7 +65,7 @@ extension EditorViewController {
         // `None` of a documented refusal. Either way the front track will not
         // take this clip, so both take the new-track path.
         if let front = before.tracks.last?.id,
-            (try? document.project.applying(make(front, at))) != nil
+            (try? document.editedProject.applying(make(front, at))) != nil
         {
             ops = [make(front, at)]
         } else {
@@ -80,7 +86,8 @@ extension EditorViewController {
     /// reads the snapshot BEFORE it edits.
     private func selectClips(addedSince before: ProjectSnapshot, in document: ProjectDocument) {
         let existing = Set(before.clips.map { $0.id })
-        let added = document.project.snapshot.clips.map { $0.id }.filter { !existing.contains($0) }
+        let added = document.editedProject.snapshot.clips.map { $0.id }
+            .filter { !existing.contains($0) }
         guard !added.isEmpty else { return }
         document.selection = Set(added)
         viewStateDidChange()
@@ -109,7 +116,7 @@ extension EditorViewController {
             NSSound.beep()
             return
         }
-        let before = document.project.snapshot
+        let before = document.editedProject.snapshot
         document.applyEdit("Add Background", [.addBackground()])
         selectClips(addedSince: before, in: document)
     }
@@ -194,7 +201,7 @@ extension EditorViewController {
     private func placeImageBackground(
         _ descriptor: MediaDescriptor, into document: ProjectDocument, in window: NSWindow
     ) {
-        let before = document.project.snapshot
+        let before = document.editedProject.snapshot
         let add = ReelOp.addMedia(descriptor: descriptor)
         let media: UInt32
         do {
@@ -203,6 +210,10 @@ extension EditorViewController {
             // than the sentence below, which would report "could not be
             // added" and name none of it. A `try?` here spent the one thing
             // the core said.
+            // The DOCUMENT's handle, not the edited one: `add_media` is a
+            // document-level op sent unscoped (`ReelOp.isDocumentLevel`), so
+            // the probe that learns the id it will mint has to be run against
+            // the same project the real op will land in.
             guard let id = try Self.backgroundMedia(for: descriptor, in: document.project) else {
                 let alert = NSAlert()
                 alert.messageText = "Could Not Add the Picture"
@@ -283,7 +294,7 @@ extension EditorViewController {
             NSSound.beep()
             return
         }
-        let before = document.project.snapshot
+        let before = document.editedProject.snapshot
         document.applyEdit("Add Blurred Background", [.addBlurredBackground(clip: clip.id)])
         // The backdrop, not the clip it was made from: what a person does next
         // is dial its blur or its scale, and the foreground clip is one click
@@ -306,7 +317,7 @@ extension EditorViewController {
             // `validateUserInterfaceItem` has checked it already.
             return true
         case #selector(addBlurredBackground(_:)):
-            guard let snapshot = document?.project.snapshot, selectedClips.count == 1,
+            guard let snapshot = document?.editedProject.snapshot, selectedClips.count == 1,
                 let clip = selectedClips.first
             else { return false }
             // The op's own refusals, asked here so the item DIMS rather than

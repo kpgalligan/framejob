@@ -130,6 +130,16 @@ normative: §5.2 is the project schema, §6 the op table, §7 the architecture.
   one. And **Window ▸ Export Queue** lines exports up and runs them one at a
   time: a queued job holds the timeline as it was when you confirmed it, so
   you can keep editing, undo, or close the document while it writes.
+- **Inside a nest.** Double-click a nest clip, or **Clip ▸ Open Nest** (⌘↓),
+  and the timeline, the canvas and the inspector all show what is inside it;
+  ⌘↑ comes back out, and a breadcrumb at the left of the ruler says where you
+  are. Every edit works in there — trim, slip, split, a property, a new
+  clip — because an op now carries a **scope** naming the nest, and the core
+  applies it to a view in which that nest's clips ARE the timeline. Entering
+  and leaving are not undo steps; each edit is exactly one. The round trip
+  (⇧⌘G, edit, ⌘G) still works and is still the way to change a nest's own
+  frame. Three things stay the document's, and say so if you ask for them
+  inside a nest: markers, the canvas, and the media list.
 - **Viewing and finding.** **View ▸ Preview Quality ▸** Full / Half / Quarter
   draws the PREVIEW at a fraction of the canvas and lets the layer scale it
   back up — the export and a rendered frame never see the setting, so what
@@ -169,9 +179,10 @@ a level meter, Normalize Clip, loudness on export and the two uncompressed
 audio formats), looks (blend modes, gradient fills, the two background
 commands and filters as animation targets), output (Save Frame…, ProRes 4444
 with a real alpha channel, the timecode burn-in, remembered and named export
-settings, and the export queue), and now viewing and finding: preview
-quality, a second preview window, and a Media tab you can search, sort and
-filter.
+settings, and the export queue), viewing and finding (preview quality, a
+second preview window, and a Media tab you can search, sort and filter), and
+now the last of them: editing INSIDE a nest, which the spec designed and left
+and which every op reaches through one envelope key.
 `CLAUDE.md` carries the milestone record and `designs/reelcut-roadmap.md`
 what still needs a person at the machine.
 
@@ -275,7 +286,15 @@ runs. It is off by default.
 ### The tools
 
 **One tool per row of the op table** in spec §6 and the module doc of
-`core/src/edit.rs`, with the same name and the same argument names —
+`core/src/edit.rs`, with the same name and the same argument names — and each
+of them also takes **`scope`**, a nest id, which applies that one op inside
+that nest (`core/src/scope.rs`). Seven refuse it by name, because they have
+no meaning in there: the three marker ops, `set_canvas` and the three media
+ops. And a scoped op can fail where an unscoped one cannot, which is worth
+knowing before reading a result: the clip and track caps and the nesting
+depth are document-wide and invisible from inside a nest, so an op that is
+perfectly valid against the nest still comes back "too many clips" or "nests
+are more than 8 deep". The ops themselves:
 `add_clip`, `add_text_clip`, `add_shape_clip`, `add_background`,
 `add_blurred_background`, `insert_clip`,
 `overwrite_clip`, `move_clip`, `trim_start`, `trim_end`, `rate_stretch`,
@@ -308,15 +327,16 @@ here.
 | `set_playhead {t}` | moves the playhead and seeks the preview |
 | `set_range {start?, end?}` | the in/out range (I / O / ⌥X); no bounds clears it |
 | `set_selection {clips?}` | the timeline selection (a click); no clips clears it |
+| `set_scope {nest?, clip?}` | opens a nest to look and edit inside it — the mirror of double-clicking a nest clip and of Clip ▸ Open Nest (⌘↓). At most one argument, and NEITHER means the timeline: send it with no arguments to come back out. `clip` is the precise spelling, since one nest can be shown by two clips at two different starts. With a nest open `get_project` lists ITS clips, `render_frame` draws it at its own frozen size, and every op lands inside it — the same view a person gets. Every op tool also takes `scope` directly, which names a nest for one call and outranks whatever is open |
 | `undo` · `redo` | one step each (⌘Z / ⇧⌘Z), reporting the step's name |
 | `render_frame {t, max_width?, path?, format?, burn_in_timecode?}` | **the verification hook**. With neither `path` nor `format` it writes a PNG to a temporary file, exactly the call it always was. `format` is `png`, `jpeg` or `heic` and WINS over the path's extension, which is replaced rather than appended to (`{path: "shot.jpg", format: "png"}` writes `shot.png`); `png` and `heic` keep the canvas's alpha and `jpeg` flattens onto black. It is the same writer File ▸ Save Frame… uses, so a still from the menu and one from here are byte-identical. `burn_in_timecode` draws the document's timecode over the picture — the only way a burn-in can be photographed |
 | `export {preset, path, size?, range?, video_bitrate?, audio_bitrate?, loudness_lufs?, peak_dbtp?, burn_in_timecode?}` | writes a file and waits for it; `preset` is the encoding, `size` a Size-popup row (`document`, `1080p`, …) or `[width, height]`, default the document's size (a GIF or APNG's cap); `range: "in_out"` scopes it to the in/out range; the bitrates are the sheet's Quality popup in bits per second; `loudness_lufs` normalises the whole mix by one gain to that integrated target and `peak_dbtp` is the ceiling that gain is capped against (a ceiling with no target is refused — there would be nothing to cap). `burn_in_timecode` draws the document's own timecode over every frame (the export sheet's checkbox), showing PROJECT time even in a file written from the in/out range. The result reports what the file's sound MEASURED, asked for or not, and echoes the burn-in either way |
 
-`set_range`, `set_selection`, `undo` and `redo` exist so that spec §10's own
-verifications —
+`set_range`, `set_selection`, `set_scope`, `undo` and `redo` exist so that
+spec §10's own verifications —
 "every op is one undo step and undo restores the frame", "the in/out range
-scopes the export" — can be checked by driving the built app, which is how
-this project is verified.
+scopes the export", "an edit inside a nest lands inside it" — can be checked
+by driving the built app, which is how this project is verified.
 
 Every tool takes an optional `project` (the path `get_project` reports); with
 it omitted the call goes to the frontmost open document.

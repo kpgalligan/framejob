@@ -165,7 +165,11 @@ extension EditorViewController {
               let session = chromaEyedropper?.session
         else { return }
         let target = canvas.viewToCanvas(canvas.convert(point, from: nil))
-        let snapshot = document.project.snapshot.canvas
+        // The EDITED project's canvas: inside a nest the preview IS the
+        // nest, at its own frozen size, so the rectangle a point is mapped
+        // into and the frame that is rendered to sample it must both be that
+        // one (road map 2's phase 9).
+        let snapshot = document.editedProject.snapshot.canvas
         let size = snapshot.size
         guard target.x >= 0, target.y >= 0, target.x < size.width, target.y < size.height else {
             // The void around the canvas. The mode stays armed — a click that
@@ -182,8 +186,8 @@ extension EditorViewController {
         // Both of its "no" answers — a refusal, meaning no clip had anything
         // to suppress, and a throw — leave the document's own handle as the
         // right frame to sample, which is what `try?` collapses them to.
-        let project = (try? document.project.applying([session.suppression]))
-            ?? document.project
+        let project = (try? document.editedProject.applying([session.suppression]))
+            ?? document.editedProject
         EditorViewController.eyedropperQueue.async { [weak self] in
             let frame = Exporter.renderFrame(
                 project: project, urls: urls, at: time, maxWidth: nil)

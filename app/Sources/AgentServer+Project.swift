@@ -192,27 +192,45 @@ extension AgentServer {
     /// in/out range live in Swift (§5.2's last bullet).
     func getProject(_ a: [String: Any]) throws -> String {
         let document = try target(a)
+        // The EDITED project (road map 2's phase 9): with a nest open
+        // (`set_scope`) this reports the nest as a project — its tracks and
+        // clips at the top level, its frozen size as the canvas — which is
+        // what the app is showing and what a scoped op's ids resolve
+        // against, so an agent reads the ids it is about to name. With no
+        // nest open it is the same handle it always was, byte for byte.
+        let project = document.editedProject
         var result: [String: Any] = [:]
-        if let data = document.project.json.data(using: .utf8),
+        if let data = project.json.data(using: .utf8),
             let object = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] {
             result["project"] = object
         } else {
-            result["project_json"] = document.project.json
+            result["project_json"] = project.json
         }
         result["path"] = Self.path(of: document) ?? NSNull()
         result["name"] = document.displayName ?? "Untitled"
         result["unsaved_changes"] = document.isDocumentEdited
-        result["duration"] = document.project.duration
+        result["duration"] = project.duration
         result["playhead"] = document.playhead
         result["selection"] = document.selection.sorted().map { Int($0) }
         if let range = document.inOutRange {
             result["in_out_range"] = ["start": range.start, "end": range.end]
         }
+        result.merge(scopeReport(document)) { _, new in new }
         let missing = document.missingMedia.map { Int($0.id) }
         if !missing.isEmpty { result["missing_media"] = missing }
         result["note"] =
             "Times are ticks at 600000 per second. tracks[0] is the BACK of the layer stack; "
             + "clip ids, track ids, marker ids and media ids share one number space."
+        if document.scope != nil {
+            result["note"] =
+                (result["note"] as? String ?? "")
+                + " A nest is OPEN (set_scope), so project is that NEST seen as a project: its "
+                + "own tracks and clips at the top level, its frozen size as the canvas, times "
+                + "from its own zero, no markers, and its own row under nests deliberately "
+                + "emptied because its contents are the top level here. media and nests are "
+                + "still the document's — one id space. Send scope with an op to edit in here; "
+                + "set_scope with no arguments comes back out."
+        }
         return try jsonResult(result)
     }
 
@@ -285,6 +303,15 @@ extension AgentServer {
     /// every inspector pane act on the SELECTION, so without this nothing
     /// they do could be driven or checked by driving the app — which is why
     /// spec §10 step 8 stayed unverified.
+    ///
+    /// **Its ids mean the OPEN container** (road map 2's phase 9), and it
+    /// gets that from `clipsArg` without a line of its own: a selection is
+    /// clip ids in whichever container the app is looking at
+    /// (`ProjectDocument.setNestPath` moves the two together), so with a nest
+    /// open this selects inside it and cannot name a clip on the timeline.
+    /// That is the same rule `effectiveScope` gives every other tool, read
+    /// for a tool that has no `scope` argument of its own to override it
+    /// with — the way in is `set_scope`, which is where a view is chosen.
     func setSelection(_ a: [String: Any]) throws -> String {
         let document = try target(a)
         var ids: [UInt32] = []

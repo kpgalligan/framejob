@@ -13,6 +13,18 @@ final class DocumentPane: InspectorPaneView {
     /// `UserDefaults` and rides along with the next size edit.
     static let rescaleClipsKey = "ReelcutInspectorRescaleClips"
 
+    /// **This whole pane reads `binding.documentSnapshot` / `documentCanvas`
+    /// / `documentProject` and never `binding.snapshot`** (road map 2's phase
+    /// 9). The Clip tab follows the nest scope, because the clip it is
+    /// showing is inside one; this tab is about the FILE — its canvas, its
+    /// markers, its media count, what its background lets an export carry —
+    /// and every one of those is the document's whatever container the
+    /// timeline happens to be showing. `set_canvas` and the two marker ops it
+    /// writes are document-level (`ReelOp.isDocumentLevel`), so they are sent
+    /// unscoped and go on working with a nest open; reading a scoped snapshot
+    /// here would mean answering about one project and editing another — and
+    /// visibly so, since a scoped view has NO markers and the nest's frozen
+    /// size for a canvas.
     override var tab: InspectorTab { .document }
 
     /// The Document tab always has something to show.
@@ -20,8 +32,8 @@ final class DocumentPane: InspectorPaneView {
 
     /// The markers list is a table, so its rows are part of the shape.
     override var structureSignature: String {
-        let markers = binding.snapshot.markers.map { String($0.id) }.joined(separator: ".")
-        return "doc|\(binding.snapshot.media.count)|\(markers)"
+        let markers = binding.documentSnapshot.markers.map { String($0.id) }.joined(separator: ".")
+        return "doc|\(binding.documentSnapshot.media.count)|\(markers)"
     }
 
     override func makeSections() -> [InspectorSection] {
@@ -51,17 +63,17 @@ final class DocumentPane: InspectorPaneView {
             id: "doc.summary", title: "Document",
             rows: [
                 summaryRow("Resolution") {
-                    "\(binding.canvas.width) × \(binding.canvas.height)"
+                    "\(binding.documentCanvas.width) × \(binding.documentCanvas.height)"
                 },
-                summaryRow("Frame rate") { "\(binding.canvas.fps.displayName) fps" },
+                summaryRow("Frame rate") { "\(binding.documentCanvas.fps.displayName) fps" },
                 summaryRow("Duration") {
                     ReelTime.format(
-                        binding.snapshot.duration, fps: binding.canvas.fps,
-                        frames: binding.canvas.timecodeFrames)
+                        binding.documentSnapshot.duration, fps: binding.documentCanvas.fps,
+                        frames: binding.documentCanvas.timecodeFrames)
                 },
-                summaryRow("Tracks") { String(binding.snapshot.tracks.count) },
+                summaryRow("Tracks") { String(binding.documentSnapshot.tracks.count) },
                 summaryRow("Background") {
-                    DocumentPane.colorName(binding.canvas.background)
+                    DocumentPane.colorName(binding.documentCanvas.background)
                 },
             ])
     }
@@ -117,7 +129,7 @@ final class DocumentPane: InspectorPaneView {
     /// The source size offered as a preset: the first media entry with real
     /// pixels (§4.3's "source size").
     private var sourceSize: (width: Int, height: Int)? {
-        guard let media = binding.snapshot.media.first(where: { $0.width > 0 && $0.height > 0 })
+        guard let media = binding.documentSnapshot.media.first(where: { $0.width > 0 && $0.height > 0 })
         else { return nil }
         return (media.width, media.height)
     }
@@ -145,7 +157,7 @@ final class DocumentPane: InspectorPaneView {
         let popup = OptionPopupControl(
             width: 168, items: items,
             read: { [weak self] in
-                let canvas = binding.canvas
+                let canvas = binding.documentCanvas
                 if let index = presets.firstIndex(where: {
                     $0.width == canvas.width && $0.height == canvas.height
                 }) {
@@ -184,16 +196,16 @@ final class DocumentPane: InspectorPaneView {
                 inspectorValueRow(
                     "Width", binding, name: "Canvas Size", unit: " px", decimals: 0, min: 16,
                     max: 16384, slider: false, width: InspectorMetrics.wideFieldWidth,
-                    read: { Double(binding.canvas.width) },
+                    read: { Double(binding.documentCanvas.width) },
                     ops: { value in
-                        sizeOps(width: Int(value.rounded()), height: binding.canvas.height)
+                        sizeOps(width: Int(value.rounded()), height: binding.documentCanvas.height)
                     }),
                 inspectorValueRow(
                     "Height", binding, name: "Canvas Size", unit: " px", decimals: 0, min: 16,
                     max: 16384, slider: false, width: InspectorMetrics.wideFieldWidth,
-                    read: { Double(binding.canvas.height) },
+                    read: { Double(binding.documentCanvas.height) },
                     ops: { value in
-                        sizeOps(width: binding.canvas.width, height: Int(value.rounded()))
+                        sizeOps(width: binding.documentCanvas.width, height: Int(value.rounded()))
                     }),
                 inspectorRow(
                     nil,
@@ -224,7 +236,7 @@ final class DocumentPane: InspectorPaneView {
         let popup = OptionPopupControl(
             width: 168, items: items,
             read: {
-                let fps = binding.canvas.fps
+                let fps = binding.documentCanvas.fps
                 return rates.firstIndex { $0.num == fps.num && $0.den == fps.den } ?? 0
             },
             write: { [weak self] index in
@@ -247,8 +259,8 @@ final class DocumentPane: InspectorPaneView {
                     [
                         inspectorReadout {
                             ReelTime.format(
-                                binding.snapshot.duration, fps: binding.canvas.fps,
-                                frames: binding.canvas.timecodeFrames)
+                                binding.documentSnapshot.duration, fps: binding.documentCanvas.fps,
+                                frames: binding.documentCanvas.timecodeFrames)
                         }
                     ]),
             ])
@@ -256,7 +268,7 @@ final class DocumentPane: InspectorPaneView {
 
     /// The rate of the earliest clip's media — "match first clip" (§4.3).
     private func firstClipRate() -> Fps? {
-        let snapshot = binding.snapshot
+        let snapshot = binding.documentSnapshot
         let clips = snapshot.clips.sorted { $0.start < $1.start }
         for clip in clips {
             guard let media = snapshot.media(for: clip), media.hasVideo, media.fps.double > 0
@@ -363,11 +375,11 @@ final class DocumentPane: InspectorPaneView {
 
     private func appearanceSection() -> InspectorSection {
         let binding = self.binding
-        let alphaFormats = DocumentPane.alphaFormats(binding.project)
+        let alphaFormats = DocumentPane.alphaFormats(binding.documentProject)
         return InspectorSection(
             id: "doc.appearance", title: "Appearance",
             note: {
-                DocumentPane.transparencyNote(binding.canvas.background, formats: alphaFormats)
+                DocumentPane.transparencyNote(binding.documentCanvas.background, formats: alphaFormats)
             },
             reset: {
                 binding.apply(
@@ -380,16 +392,16 @@ final class DocumentPane: InspectorPaneView {
             rows: [
                 inspectorColorRow(
                     "Background", binding, name: "Background",
-                    read: { binding.canvas.background },
+                    read: { binding.documentCanvas.background },
                     ops: { [.setCanvas(background: $0)] }),
                 inspectorPopupRow(
                     "Timecode", binding, name: "Timecode Format",
                     items: ["Frames", "Milliseconds"], width: 132,
-                    read: { binding.canvas.timecodeFrames ? 0 : 1 },
+                    read: { binding.documentCanvas.timecodeFrames ? 0 : 1 },
                     ops: { [.setCanvas(timecodeFrames: $0 == 0)] }),
                 inspectorCheckRow(
                     "Fit new clips to canvas", binding, name: "Fit New Clips",
-                    read: { binding.canvas.fitNewClips },
+                    read: { binding.documentCanvas.fitNewClips },
                     ops: { [.setCanvas(fitNewClips: $0)] }),
             ])
     }
@@ -398,7 +410,7 @@ final class DocumentPane: InspectorPaneView {
 
     private func markersSection() -> InspectorSection {
         var rows: [NSView] = []
-        let markers = binding.snapshot.markers.sorted { $0.time < $1.time }
+        let markers = binding.documentSnapshot.markers.sorted { $0.time < $1.time }
         for marker in markers {
             rows.append(markerRow(marker.id))
             rows.append(markerActionRow(marker.id))
@@ -413,11 +425,11 @@ final class DocumentPane: InspectorPaneView {
     /// moves under the panel, and only the value changed — no rebuild.
     private func markerRow(_ id: UInt32) -> NSView {
         let binding = self.binding
-        func marker() -> MarkerSnapshot? { binding.snapshot.marker(id) }
+        func marker() -> MarkerSnapshot? { binding.documentSnapshot.marker(id) }
         let time = inspectorReadout(width: 78) {
             guard let marker = marker() else { return "—" }
             return ReelTime.format(
-                marker.time, fps: binding.canvas.fps, frames: binding.canvas.timecodeFrames)
+                marker.time, fps: binding.documentCanvas.fps, frames: binding.documentCanvas.timecodeFrames)
         }
         let name = InspectorNameField(
             read: { marker()?.name ?? "" },
@@ -434,7 +446,7 @@ final class DocumentPane: InspectorPaneView {
 
     private func markerActionRow(_ id: UInt32) -> NSView {
         let binding = self.binding
-        func marker() -> MarkerSnapshot? { binding.snapshot.marker(id) }
+        func marker() -> MarkerSnapshot? { binding.documentSnapshot.marker(id) }
         let chapter = OptionCheckboxControl(
             label: "Chapter",
             read: { marker()?.chapter ?? false },
@@ -443,14 +455,30 @@ final class DocumentPane: InspectorPaneView {
             },
             enabled: { true },
             onEdit: { binding.edited() })
+        // **Go is the one control in this row that carries a TIME, and so the
+        // one disabled inside a nest** (road map 2's phase 9). A marker's
+        // `time` is PROJECT time; `onSeek` writes `document.playhead`, which
+        // with a nest open is measured from the NEST's zero — so the button
+        // would move the playhead to a nest-local tick numerically equal to a
+        // project one, i.e. an unrelated frame, silently. Chapter, Delete and
+        // the name field beside it read no clock and stay live, which is the
+        // same split the MCP side makes (`AgentServer+Scope.swift` refuses
+        // `add_marker` and `set_marker`'s TIME while letting the rest through)
+        // and the same one `validateNestScopeAction` makes in the Clip menu.
+        // Leaving the nest is the way to use it; the tooltip says so.
+        let scoped = { binding.document?.scope != nil }
         let jump = OptionButtonControl(
             title: "Go",
             action: { [weak self] in
-                guard let time = marker()?.time else { return }
+                guard !scoped(), let time = marker()?.time else { return }
                 self?.inspector?.onSeek?(time)
             },
-            enabled: { true }, onEdit: {})
-        jump.toolTip = "Move the playhead to this marker"
+            enabled: { !scoped() }, onEdit: {})
+        jump.toolTip =
+            scoped()
+            ? "A marker is at project time, and the playhead inside a nest is not — "
+                + "leave the nest (⌘↑) to jump to it"
+            : "Move the playhead to this marker"
         let remove = OptionButtonControl(
             title: "Delete",
             action: { binding.apply("Remove Marker", [.removeMarker(marker: id)]) },

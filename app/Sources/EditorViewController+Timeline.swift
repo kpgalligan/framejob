@@ -45,6 +45,8 @@ extension EditorViewController {
         timeline.onSnapCandidates = { [weak self] clips in self?.timelineCandidates(clips) ?? [] }
         timeline.onSnappingToggled = { [weak self] in self?.toggleSnapping(nil) }
         timeline.onTrackHeightChanged = { [weak self] index in self?.applyTrackHeight(index) }
+        timeline.onBreadcrumb = { [weak self] level in self?.leaveAllNests(to: level) }
+        timeline.onOpenNest = { [weak self] id in self?.openNest(clipID: id) }
 
         timeline.snappingEnabled = snappingEnabled
         timeline.trackHeightIndex = trackHeight
@@ -57,12 +59,20 @@ extension EditorViewController {
     /// through `onSnapCandidates` instead.
     func refreshTimeline(isLive: Bool) {
         guard let document = document, let timeline = timeline else { return }
+        // The EDITED project (road map 2's phase 9): with a nest open the
+        // timeline shows the NEST's tracks and clips, at its own zero, and
+        // every op it builds out of that snapshot is stamped with the scope
+        // on its way through `ProjectDocument.applyEdit`. At the top level
+        // this is `document.project` and nothing about the push changed.
         timeline.update(
-            snapshot: document.project.snapshot,
+            snapshot: document.editedProject.snapshot,
             selection: document.selection,
             playhead: document.playhead,
             inOutRange: document.inOutRange,
             cacheDirectory: document.cacheDirectory)
+        // The trail is NOT part of `update(...)`: it describes where the
+        // snapshot came FROM, which the snapshot itself cannot say.
+        timeline.breadcrumb = nestBreadcrumb()
     }
 
     /// Playhead → timeline. Separate from `refreshTimeline` because playback
@@ -117,7 +127,14 @@ extension EditorViewController {
         guard let document = document else { return nil }
         let probed: ReelProject?
         do {
-            probed = try document.project.applying(ops)
+            // The SCOPED handle with PLAIN ops, which is the shape a probe
+            // wants inside a nest and the only one that answers correctly:
+            // the view carries the document's own `next_id`, so the ids it
+            // mints are the ids the real scoped edit will mint, and they come
+            // back at the view's top level where the gesture looks for them.
+            // Probing the parent with scoped ops would answer a parent
+            // project whose top level is the timeline's clips.
+            probed = try document.editedProject.applying(ops)
         } catch {
             return nil
         }
@@ -125,7 +142,7 @@ extension EditorViewController {
     }
 
     private func timelineCandidates(_ clips: [UInt32]) -> [Ticks] {
-        document?.project.snapCandidates(excluding: clips) ?? []
+        document?.editedProject.snapCandidates(excluding: clips) ?? []
     }
 
     // MARK: - Selection helpers
@@ -134,7 +151,7 @@ extension EditorViewController {
     var selectedClips: [ClipSnapshot] {
         guard let document = document else { return [] }
         let ids = document.selection
-        return document.project.snapshot.clips.filter { ids.contains($0.id) }
+        return document.editedProject.snapshot.clips.filter { ids.contains($0.id) }
             .sorted { $0.start < $1.start }
     }
 
@@ -142,7 +159,7 @@ extension EditorViewController {
     /// clip, else the front-most (spec §4.4 puts that on top).
     var currentTrack: TrackSnapshot? {
         guard let document = document else { return nil }
-        let snapshot = document.project.snapshot
+        let snapshot = document.editedProject.snapshot
         if let clip = selectedClips.first, let track = snapshot.track(clip.track) { return track }
         return snapshot.tracks.last
     }
@@ -254,7 +271,7 @@ extension EditorViewController {
     func newTrackCommand() {
         guard let document = document else { return }
         document.applyEdit(
-            "New Track", .addTrack(index: document.project.snapshot.tracks.count))
+            "New Track", .addTrack(index: document.editedProject.snapshot.tracks.count))
     }
 
     /// A non-empty track refuses to go without `with_clips`, so the clips it
@@ -264,7 +281,7 @@ extension EditorViewController {
             NSSound.beep()
             return
         }
-        let clips = document.project.snapshot.clips(onTrack: track.id)
+        let clips = document.editedProject.snapshot.clips(onTrack: track.id)
         guard !clips.isEmpty else {
             document.applyEdit("Remove Track", .removeTrack(track: track.id))
             return
@@ -321,6 +338,16 @@ extension EditorViewController {
     /// marker on the same frame is the core's refusal (a beep), not ours.
     func addMarkerCommand() {
         guard let document = document else { return }
+        // Not inside a nest. A nest has no markers (`core/src/scope.rs`
+        // refuses all three marker ops by name), and the playhead here is
+        // NEST-local, so the op would have to be sent unscoped at a tick
+        // measured from the wrong zero. The menu item validates false
+        // (`validateNestScopeAction`); this is the bare-M path's own guard,
+        // which no validator covers.
+        guard document.scope == nil else {
+            NSSound.beep()
+            return
+        }
         document.applyEdit("Add Marker", .addMarker(at: document.playhead))
     }
 
@@ -376,7 +403,7 @@ extension EditorViewController {
             #selector(freezeFrame(_:)):
             return !clipsUnderPlayhead.isEmpty
         case #selector(splitAtPlayhead(_:)):
-            return !document.project.snapshot.clips.isEmpty
+            return !document.editedProject.snapshot.clips.isEmpty
         case #selector(removeTrack(_:)), #selector(toggleTrackHidden(_:)),
             #selector(toggleTrackMuted(_:)), #selector(toggleTrackLocked(_:)):
             return currentTrack != nil

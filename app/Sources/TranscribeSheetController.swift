@@ -84,7 +84,10 @@ final class TranscribeSheetController: NSViewController {
 
     init(document: ProjectDocument) {
         self.document = document
-        self.snapshot = document.project.snapshot
+        // The container the cues will LAND in, not the document — see
+        // `CaptionImporter.plan`'s paragraph. A scope cannot change under
+        // an open sheet, so capturing it here is as safe as the rest.
+        self.snapshot = document.editedProject.snapshot
         self.mediaURLs = document.mediaURLs()
         self.selection = document.selection
         self.inOutRange = document.inOutRange
@@ -412,7 +415,7 @@ final class TranscribeSheetController: NSViewController {
         let plan: CaptionLayout.Plan
         do {
             plan = try CaptionLayout.place(
-                result.cues, problems: result.problems, in: document.project)
+                result.cues, problems: result.problems, in: document.editedProject)
         } catch {
             statusLabel.stringValue = error.localizedDescription
             statusLabel.textColor = DS.textStrong
@@ -478,7 +481,7 @@ extension EditorViewController {
             NSSound.beep()
             return
         }
-        guard Transcriber.hasTranscribableClip(in: document.project.snapshot) else {
+        guard Transcriber.hasTranscribableClip(in: document.editedProject.snapshot) else {
             NSSound.beep()
             return
         }
@@ -494,7 +497,7 @@ extension EditorViewController {
         guard let document = document else { return false }
         switch action {
         case #selector(EditorViewController.generateCaptions(_:)):
-            return Transcriber.hasTranscribableClip(in: document.project.snapshot)
+            return Transcriber.hasTranscribableClip(in: document.editedProject.snapshot)
         default:
             return nil
         }

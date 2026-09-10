@@ -125,7 +125,7 @@ final class InspectorViewController: NSViewController {
     var selectedClips: [ClipSnapshot] {
         guard let document = document else { return [] }
         let ids = document.selection
-        return document.project.snapshot.clips.filter { ids.contains($0.id) }
+        return document.editedProject.snapshot.clips.filter { ids.contains($0.id) }
             .sorted { $0.start < $1.start }
     }
 

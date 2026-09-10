@@ -9,6 +9,17 @@ import AppKit
 /// It lives beside `AgentServer.swift` rather than inside it because that file
 /// is frozen at wiring (app/CLAUDE.md) and this is the piece every
 /// `AgentServer+<Area>` handler builds on.
+///
+/// **Since road map 2's phase 9 the id lookups answer about a CONTAINER**,
+/// not about the timeline: the call's `scope` decides, and `idScope`
+/// (`AgentServer+Scope.swift`) is what they ask. The change is entirely
+/// inside their bodies — every one of them already took `_ document:
+/// ProjectDocument`, so not one of the sixty call sites moved, and there is
+/// no half-converted state in which some ops can name a nested clip and
+/// others cannot. `scopeArg` below is the envelope key itself; `timeArg`,
+/// `optionalTimeArg`, `snappedTick` and `rangesArg` need nothing at all,
+/// because they snap against `canvas.fps` and a view keeps the document's
+/// rate (`core/src/scope.rs`: there is only one frame grid).
 extension AgentServer {
     /// The shared body of the four scalar readers: nil when `key` is absent
     /// or null, the value when `read` recognises it, and a `ToolError`
@@ -112,6 +123,46 @@ extension AgentServer {
         return values
     }
 
+    /// The envelope's `scope` (spec §6, `core/src/scope.rs`): a nest id, or
+    /// nil for absent and for an explicit null, which the envelope reads the
+    /// same way.
+    ///
+    /// It is `scope::read`'s Swift twin and answers in the core's own words,
+    /// deliberately. A negative number, a fraction, a numeric STRING and a
+    /// bool all land in the refusal — where `intArg` would take the string
+    /// and the bool — because a scope decides which CONTAINER an edit lands
+    /// in, and guessing at one is the last thing to do. Read once per call,
+    /// by `AgentServer.dispatch`, and only for a tool whose schema declares
+    /// it.
+    func scopeArg(_ a: [String: Any]) throws -> UInt32? {
+        guard let raw = a["scope"], !(raw is NSNull) else { return nil }
+        guard let number = Self.numeric(raw), number.doubleValue >= 0,
+            number.doubleValue <= Double(UInt32.max),
+            number.doubleValue == number.doubleValue.rounded()
+        else {
+            throw ToolError(message: "scope must be a nest id, not \(Self.describe(raw))")
+        }
+        return UInt32(number.doubleValue)
+    }
+
+    /// A value as short text for a message — `describe` in
+    /// `core/src/export_overrides.rs`, in Swift, truncated for its reason: a
+    /// caller who passed a whole object where an id belongs must not turn the
+    /// refusal into a megabyte.
+    ///
+    /// A JSON boolean is spelled out, and that is not cosmetic: `true`
+    /// arrives as an `NSNumber` (which is why `numeric` above exists at all),
+    /// and `String(describing:)` renders it "1" — so "scope must be a nest
+    /// id, not 1" would be the answer to `scope: true`, naming a value that
+    /// IS a plausible id and hiding the mistake that was made.
+    static func describe(_ raw: Any) -> String {
+        if let number = raw as? NSNumber, CFGetTypeID(number) == CFBooleanGetTypeID() {
+            return number.boolValue ? "true" : "false"
+        }
+        let text = (raw as? String).map { "\"\($0)\"" } ?? String(describing: raw)
+        return text.count <= 40 ? text : String(text.prefix(40)) + " …"
+    }
+
     /// An id argument. Ids are unique across kinds in one project (spec §5.2),
     /// so this only checks the range; the lookups below check existence.
     func idArg(_ a: [String: Any], _ key: String) throws -> UInt32 {
@@ -124,12 +175,22 @@ extension AgentServer {
         return UInt32(value)
     }
 
+    /// A clip id, checked against the container the call is editing.
+    ///
+    /// **The container is the phase-9 change and it is entirely in the
+    /// BODY**: `idScope` answers the timeline's clips, or — inside a
+    /// `scope` — the nest's own (`AgentServer+Scope.swift`), so all sixty
+    /// call sites of the six id readers were untouched and cannot be
+    /// half-converted. Without it a `trim_start {clip: <inside the nest>,
+    /// scope: 4}` was refused by the APP, with "No clip has id 17", before
+    /// the core ever saw the scope.
     func clipArg(
         _ a: [String: Any], _ key: String = "clip", _ document: ProjectDocument
     ) throws -> ClipSnapshot {
         let id = try idArg(a, key)
-        guard let clip = document.project.snapshot.clip(id) else {
-            throw ToolError(message: "No clip has id \(id). get_project lists the clips.")
+        let scope = try idScope(document)
+        guard let clip = scope.clip(id) else {
+            throw ToolError(message: scope.noSuchId("clip", id))
         }
         return clip
     }
@@ -163,7 +224,7 @@ extension AgentServer {
         guard !raw.isEmpty else {
             throw ToolError(message: "\(key) is empty — name at least one clip.")
         }
-        let snapshot = document.project.snapshot
+        let scope = try idScope(document)
         var ids: [UInt32] = []
         for value in raw {
             guard let number = (value as? NSNumber)?.intValue ?? (value as? String).flatMap(Int.init),
@@ -172,8 +233,8 @@ extension AgentServer {
                 throw ToolError(message: "\(key) must contain clip ids (integers).")
             }
             let id = UInt32(number)
-            guard snapshot.clip(id) != nil else {
-                throw ToolError(message: "No clip has id \(id). get_project lists the clips.")
+            guard scope.clip(id) != nil else {
+                throw ToolError(message: scope.noSuchId("clip", id))
             }
             ids.append(id)
         }
@@ -184,12 +245,20 @@ extension AgentServer {
         _ a: [String: Any], _ key: String = "track", _ document: ProjectDocument
     ) throws -> TrackSnapshot {
         let id = try idArg(a, key)
-        guard let track = document.project.snapshot.track(id) else {
-            throw ToolError(message: "No track has id \(id). get_project lists the tracks.")
+        let scope = try idScope(document)
+        guard let track = scope.track(id) else {
+            throw ToolError(message: scope.noSuchId("track", id))
         }
         return track
     }
 
+    /// **Media is deliberately NOT scoped**, and it is the one id reader
+    /// that is not. A nest references the parent's `media[]` in the parent's
+    /// one id space (spec §5.2), and `scoped_view` hands the view that very
+    /// list — so the timeline's media IS the nest's, and an `add_clip`
+    /// inside a nest names a file exactly as it does outside one. Narrowing
+    /// this to "the media the nest's clips use" would refuse a file that has
+    /// not been used in there YET, which is every file the first time.
     func mediaArg(
         _ a: [String: Any], _ key: String = "media", _ document: ProjectDocument
     ) throws -> MediaSnapshot {
@@ -202,6 +271,14 @@ extension AgentServer {
         return media
     }
 
+    /// **Markers are not scoped either, and here the reason is the message.**
+    /// A nest has no `markers[]` at all, so `scoped_view` gives the view
+    /// none — but the only two tools that read this argument are `set_marker`
+    /// and `remove_marker`, both of which the core refuses inside a scope BY
+    /// NAME ("set_marker has no meaning inside nest 4"). Looking the id up in
+    /// an empty list would answer "No marker has id 12" first and hide the
+    /// sentence that actually explains the refusal, so the timeline's markers
+    /// stay the ones this resolves against and the core gets to answer.
     func markerArg(
         _ a: [String: Any], _ key: String = "marker", _ document: ProjectDocument
     ) throws -> MarkerSnapshot {
@@ -212,6 +289,9 @@ extension AgentServer {
         return marker
     }
 
+    /// An action id, checked against the clip that holds it — so it is
+    /// scoped by construction, since the clip came from `clipArg` above and
+    /// a nest's clips carry their own actions with them.
     func actionArg(
         _ a: [String: Any], _ key: String = "action", _ clip: ClipSnapshot
     ) throws -> ActionSnapshot {

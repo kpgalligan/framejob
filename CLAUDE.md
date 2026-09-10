@@ -13,12 +13,13 @@ Four things in `designs/`, and you want all of them:
   holds decisions already made, which are not to be re-litigated.
 - `designs/reelcut-roadmap.md` — the record of M1–M3: what proved each
   piece, what still needs a person at the machine, and the known limits.
-- **`designs/reelcut-roadmap-2.md` — what to build next, in ten phases**
+- **`designs/reelcut-roadmap-2.md` — the record of ten phases, ALL NOW DONE**
   (cutting moves, clip identity, the screencast trio, captions and text
   animations, sound, looks, output, viewing, and entering a nest), each
-  naming its ops, schema bump, files, MCP mirrors and the proof that closes
-  it. **Start here if you are picking up new work**, and update its status
-  table as phases land.
+  naming its ops, schema bump, files, MCP mirrors, the proof that closed it,
+  and — written after the fact — where its own plan could not be built as
+  specified. Its §1 table carries every commit; its §4 is what was
+  deliberately left out, which is where a third road map would start.
 - `designs/design_handoff_reelcut/` — the chrome cleanup and the identity,
   now SHIPPED. Its `README.md` is the normative source for the redesign's
   metrics (spec §3–§4.4 summarises them); the two `.dc.html` files are
@@ -28,7 +29,7 @@ Four things in `designs/`, and you want all of them:
 
 ```sh
 make app        # cargo build --release + xcodegen + xcodebuild → build/Build/Products/Release/Reelcut.app
-make test       # cd core && cargo test --release  (456 black-box tests)
+make test       # cd core && cargo test --release  (494 black-box tests)
 make lint       # cargo clippy --all-targets -- -D warnings
 make typecheck  # swiftc -typecheck of app/Sources/*.swift — the ONLY authoritative Swift check
 make project    # xcodegen generate (Reelcut.xcodeproj is generated; project.yml is the source of truth)
@@ -88,12 +89,15 @@ for the side you are editing before writing code; do not duplicate it here.
   point and undo is its stack of handles.
 - **Every user-visible edit gets an MCP mirror** (spec §7.9): a handler, a
   catalog entry, and a comment naming the UI path. The startup parity check
-  in `AgentServer.start()` enforces catalog names against handler names,
-  every op in the core's table against the tools (read through `rc_op_names`,
-  with an explicit allow-list for ops that deliberately have none), and each
-  tool's schema shape. It cannot see argument TYPES — the throwing helpers in
-  `AgentServer+Arguments.swift` are the guard for those, `patchArg` included:
-  a value a patch could not read is refused by name, never dropped.
+  in `AgentServer.start()` has FOUR parts: catalog names against handler
+  names, every op in the core's table against the tools (read through
+  `rc_op_names`, with an explicit allow-list for ops that deliberately have
+  none), each tool's schema shape, and — since road map 2's phase 9 — that
+  every op tool's schema declares `scope`, which is the only mechanism in the
+  tree that would catch the 56th op somebody adds without one. It cannot see
+  argument TYPES — the throwing helpers in `AgentServer+Arguments.swift` are
+  the guard for those, `patchArg` included: a value a patch could not read is
+  refused by name, never dropped.
 
 ## Verifying a build
 
@@ -110,11 +114,12 @@ make app
 
 The log line names the port it actually bound (a taken port falls back to an
 ephemeral one). Then drive it with any MCP client over streamable HTTP at
-`http://127.0.0.1:<port>/mcp` — 73 tools: one per §6 op (55) plus the
-eighteen app-state tools: `open_project`, `new_project`, `save_project`,
+`http://127.0.0.1:<port>/mcp` — 74 tools: one per §6 op (55, each of which
+also takes the `scope` envelope key since road map 2's phase 9) plus the
+nineteen app-state tools: `open_project`, `new_project`, `save_project`,
 `get_project`, `import_media`, `import_captions`, `export_captions`,
 `transcribe`, `consolidate_media`, `detect_silence`, `normalize_clip`,
-`set_playhead`, `set_range`, `set_selection`, `undo`, `redo`,
+`set_playhead`, `set_range`, `set_selection`, `set_scope`, `undo`, `redo`,
 `render_frame` and `export`.
 `render_frame` writes a PNG and returns its path, so a script can diff it
 against `ffmpeg`-extracted source frames; `export` waits for the file.
@@ -300,12 +305,18 @@ STRUCTURE with no caller a script can reach, the answer is a probe against
   the nest clip's own volume/mute multiplies what is under it. Measured
   against the built app: nesting a timeline renders a byte-identical frame,
   and `nest` → `unnest` returns the clip content unchanged (fresh ids, like
-  split/join). ⌘G / ⇧⌘G are `EditorViewController+Nest.swift`. **You cannot
-  edit inside a nest**, and the block is in the core, not the view: every
-  `clip` argument in the op table resolves through `Project::clip`, which
-  searches `self.clips` only, so no op can name a nested clip. The round trip
-  (⇧⌘G, edit, ⌘G) is the way in until an op can name one — that file's module
-  doc argues it at length, and spec §4.4 records it.
+  split/join). ⌘G / ⇧⌘G are `EditorViewController+Nest.swift`.
+  **You CAN edit inside a nest, since road map 2's phase 9** — this
+  paragraph used to say you could not, and the sentence is kept in the
+  negative here because it names the block that was removed. The block was in
+  the core: every `clip` argument in the op table resolves through
+  `Project::clip`, which searches `self.clips` only, so no op could name a
+  nested clip. `Project::clip` STILL searches only that, and still means what
+  it always did — phase 9's answer was not to teach 55 ops about nests but to
+  give the op a SCOPE, which builds a view project in which the nest's clips
+  ARE the top level (`core/src/scope.rs`). The round trip (⇧⌘G, edit, ⌘G) is
+  still available and still costs the nest clip's own group-level
+  properties; spec §4.4 now records what exists rather than what waited.
   **Reverse is in** (`ReverseRenderer.swift`): `Source::Media.reversed` is
   resolved to `cache/reversed/<media id>-<digest>.mov` inside the package,
   rendered on demand behind a progress sheet, substituted per CLIP by
@@ -1314,5 +1325,86 @@ STRUCTURE with no caller a script can reach, the answer is a probe against
   the filter has hidden, and `ProjectDocument.generateCaches`'s "a cache
   already on disk is not rebuilt" is FALSE — measured, it re-decodes — which
   is a wrong comment and wasted work, not a wrong picture.
+
+- **Road map 2, phase 9 — Inside the nest: done.** The largest item, and the
+  one the spec designed and left (§4.4). No schema change (v6 stands), NO new
+  op (`OP_NAMES` is still 55), ONE new tool (`set_scope`; the catalog is
+  **74**) and ONE new FFI export. **Road map 2 is now complete.**
+  Every op's clip argument used to resolve through `Project::clip`, which
+  searches the top level only. The answer was NOT to teach 55 ops about nests
+  but to give the op a **scope**: `scope?: u32` is an envelope key on
+  `rc_project_apply`, and with one the core builds a VIEW project from the
+  named nest, applies the op to it UNCHANGED, and merges back
+  (`core/src/scope.rs`). **`Project::clip` still means exactly what it always
+  did** — in the view, the nest's clips ARE the top level.
+  **The envelope could not simply gain a key.** `Op` is internally tagged with
+  `deny_unknown_fields`, so a top-level `scope` is an unknown field for all 55
+  variants (measured against the shipped build first), and `#[serde(flatten)]`
+  is not the way round it — serde does not support the two together. `parse`
+  was already a two-pass parse holding the envelope as a `Value` to read
+  `"op"`; it takes `scope` out in that same pass and answers an `Envelope`.
+  **THE VIEW'S SHAPE, and the part that is counter-intuitive**: canvas SIZE =
+  the nest's frozen size, the rest of the canvas = the parent's;
+  `tracks`/`clips` = the nest's; `media` = the parent's; `markers` = none;
+  `next_id` = the parent's; and `nests` = the parent's **with the scoped nest's
+  own tracks and clips EMPTIED — kept, not removed.** Leaving the row whole
+  doubles every id in `validate`'s one uniqueness sweep; taking it out dangles
+  every OTHER nest's reference to it, which is exactly the nest-inside-a-nest
+  case the phase exists for. That second half was found by a FAILING TEST and
+  by no reader.
+  **THE ERR ARM IS WIDER THAN ANY UNSCOPED OP'S.** `check_caps` sums the
+  timeline's clips with every nest's and `check_nesting` starts every walk at
+  level 1, so neither can be seen from inside a view; both are checked once, on
+  the MERGED parent. **An op can be perfectly valid inside the nest and the
+  scoped apply still return `Err`** — do not assume a valid scoped edit landed.
+  **Seven ops refuse a scope** by name — the three marker ops, `set_canvas`,
+  and the three media ops — and `refused_inside` is an EXHAUSTIVE 55-arm match,
+  so a later phase's op will not compile until it is classified.
+  **`rc_project_scoped`** (`ffi.rs`, beside `rc_project_clone`, NOT in
+  `ffi_query.rs` whose doc says a query never allocates a handle) is the READ
+  half: the app plays, plans, renders and snapshots what is inside. It CALLS
+  `scoped_view` rather than building a second view — a read view differing from
+  the edit view would make the timeline show one project while the edits landed
+  in another.
+  **The app** holds a `nestPath` — a stack of (nest, clip) steps and NOT a bare
+  nest id, because a nest can be shown by TWO clips at two different starts — a
+  STORED memoised scoped handle (`ReelProject` memoises per handle; ~78 read
+  sites would otherwise re-decode), and one accessor `editedProject`, with
+  `project` still meaning the PARENT for save, export and consolidate.
+  `clampViewState` clears a dead scope FIRST and then the selection, and that
+  order is load-bearing. ⌘↓ / ⌘↑ and a double-click enter and leave (a nest
+  clip loses rename-by-double-click); a breadcrumb sits in the ruler's corner.
+  **The rule the review carved out, and the one to remember: a nest-local
+  number spent as project time.** Three survivors were that shape — Save Frame
+  rendered the DOCUMENT at a nest-local playhead, an in/out range set inside a
+  nest was exported as project time, and `add_marker` over MCP placed at a
+  nest-local tick while the UI had already refused exactly that. So: **a
+  producer reads the container it writes into** (the captions group was the
+  same defect in four more files), and **a range belongs to the container it
+  was set in and never leaves it** — refused rather than mapped, because a nest
+  clip is TRIMMED and a mapped range can name content that was never on screen.
+  Two more with teeth: a REVERT left `nestPath` and the memo pointing at a
+  discarded document, after which EVERY edit was refused with `no nest with
+  id N`; and the breadcrumb was invisible whenever the timeline was scrolled,
+  because the header column sat ABOVE the floating ruler — **wrong for eight
+  phases at the top level too**, and invisible to every proof script, since
+  every harness render is at scroll 0.
+  Measured: `make test` **494**, `make lint` and `cargo fmt --check` clean,
+  `make typecheck` 0 errors and the same 4 AVFoundation warnings, `make app`
+  building, the catalog at 74 and the parity log EMPTY (the check has FOUR
+  parts now — the fourth asserts every op tool declares `scope`, and is the
+  only mechanism that would catch the 56th op added without one).
+  `tools/proof/phase9_proof.py` **184/184** over MCP — its spine is the oracle,
+  "apply inside with `scope`, then `unnest`" equals "`unnest`, then apply at
+  top level" over fourteen ops, ids aside, with every row ALSO asserted to
+  differ from the untouched round trip — and `phase9_probe.py` **48/48** over a
+  probe compiled from the whole of `app/Sources`. Phases 1–8 re-run unchanged:
+  66, 85, 121, 8, 84, 88, 167, 92, 79 over MCP and 26, 33, 59, 81, 70, 78, 150
+  offscreen. **Twenty-four mutants, two survivors, both reported.** The core's
+  survivor was EQUIVALENT there and the MCP script KILLED it, because
+  `get_project` inside a scope reports the view — a view somebody can look at
+  is a contract. And the mutant giving the view the PARENT's canvas would have
+  SURVIVED the frame-region comparison alone, since inner and outer then have
+  the same size and the comparison degenerates into a whole-frame identity.
 
 Keep this file current as code lands.

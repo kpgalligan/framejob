@@ -289,6 +289,33 @@ extension AppDelegate {
         menu.addItem(item("Nest", #selector(EditorViewController.nestClips(_:)), "g"))
         menu.addItem(
             item("Un-nest", #selector(EditorViewController.unnestClips(_:)), "g", [.command, .shift]))
+        // Road map 2's phase 9, in the grouping group because going inside a
+        // nest is the third thing you do with one. ⌘↓ and ⌘↑ are the pair
+        // spec §9's "proposed, not yet bound" table claimed for this phase
+        // and the row has been promoted into the bound table above it.
+        //
+        // **A modifier does not keep a menu key equivalent out of the first
+        // responder's way**, and this comment claimed it did until the phase
+        // was read back. `NSApplication.sendEvent` offers every main-menu
+        // equivalent the key-down BEFORE the window dispatches it, modifier
+        // or none; what the modifier changes is only WHICH of the field
+        // editor's bindings is displaced — here `moveToBeginningOfDocument:`
+        // and `moveToEndOfDocument:`. So this pair is validated DEAD while
+        // text is being edited, the bare ⌫ above's rule exactly
+        // (`EditorViewController+NestScope.swift`'s
+        // `validateNestScopeAction`). What a modifier-less letter would cost
+        // on top of that is the editor's own `keyDown` map, which owns every
+        // bare key (spec §9) and is the reason phases 4, 5 and 6 took no key
+        // equivalent at all.
+        //
+        // Two items rather than one toggle, unlike View ▸ Preview Window: in
+        // and out are different distances — ⌘↑ comes out ONE level of a stack
+        // that can be eight deep — so a single checkmarked row could not say
+        // what it would do.
+        menu.addItem(
+            item("Open Nest", #selector(EditorViewController.openNest(_:)), "\u{F701}", [.command]))
+        menu.addItem(
+            item("Close Nest", #selector(EditorViewController.closeNest(_:)), "\u{F700}", [.command]))
         return menu
     }
 

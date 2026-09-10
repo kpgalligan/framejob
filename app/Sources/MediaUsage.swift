@@ -47,11 +47,14 @@ extension ProjectSnapshot {
     /// Not a narrower version of the same question — a different question,
     /// and the reason the two are separate methods rather than one with a
     /// flag. `ProjectDocument.clampViewState` intersects the selection with
-    /// top-level clip ids, and every op resolves its `clip` argument through
-    /// `Project::clip`, which searches `self.clips` alone (spec §4.4), so a
-    /// nested clip has no id a selection may carry. Reveal in Timeline
-    /// validates FALSE rather than selecting nothing when this is empty and
-    /// `clipsUsing` is not.
+    /// the ids of whatever container is OPEN, so a nested clip has no id the
+    /// TIMELINE's selection may carry — which is the case Reveal in Timeline
+    /// has to answer, since it reveals on the timeline. (Road map 2's phase 9
+    /// made such a clip nameable by an op, through a scope, and openable by a
+    /// person; what it did not do is let one selection span two containers,
+    /// and this method is about that.) Reveal in Timeline validates FALSE
+    /// rather than selecting nothing when this is empty and `clipsUsing` is
+    /// not — the honest answer being "open the nest first".
     func timelineClipsUsing(_ media: UInt32) -> [ClipSnapshot] {
         clips.filter { $0.source.mediaID == media }
     }

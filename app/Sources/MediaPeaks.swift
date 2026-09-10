@@ -138,8 +138,12 @@ enum MediaPeaks {
     /// forward one must produce byte-identical plan JSON, or the
     /// rebuild-vs-refresh test breaks), so it is read back off the clip — which
     /// answers nil for a clip inside a nest, because `Project::clip` searches
-    /// the top level only. Such a clip is measured unmirrored: a recorded
-    /// limit, not a bug, and one no op can address either.
+    /// the top level only. Such a clip is measured unmirrored while the nest
+    /// is CLOSED — a recorded limit, not a bug, and one with an escape since
+    /// road map 2's phase 9: OPEN the nest (⌘↓) and the scoped view puts that
+    /// clip at the top level, where the pivot is found. The limit is
+    /// conditional now, not permanent; this sentence used to say no op could
+    /// address it, which was true until an op could name a nested clip.
     static func reversedPivot(for segment: PlanSegment, in snapshot: ProjectSnapshot) -> Ticks? {
         guard snapshot.clip(segment.clip)?.source.isReversed == true else { return nil }
         return snapshot.media(segment.media)?.duration

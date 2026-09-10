@@ -11,6 +11,27 @@ import AppKit
 /// command does. Anything about the picture that ends up in this file instead
 /// of in `FrameWriter.swift` is a place the menu and the agent can drift.
 ///
+/// **The picture is the EDITED project's, and so is the time it is asked
+/// for** (road map 2's phase 9). Inside a nest `document.playhead` is measured
+/// from the NEST's own zero — `setNestPath` subtracts the nest clip's start —
+/// while `document.project` is still the timeline, so a command that spends
+/// one in the other names a frame nobody asked for: the timeline at a tick
+/// counted from somewhere inside it. Two ticks, two containers, no error.
+/// Rendering `document.editedProject` at that same tick needs no mapping at
+/// all, because the tick is already in that project's time base, and it
+/// restores the identity this file was split for: `render_frame` renders
+/// `editedProject` at `document.playhead` too (`AgentServer+Render.swift`),
+/// so the menu item and the tool still write one frame's bytes and both write
+/// the frame the canvas is showing. With no nest open the two handles are the
+/// same object and nothing about this command changes.
+///
+/// That puts Save Frame on the `editedProject` side of the split
+/// `ProjectDocument.editedProject` documents, where an EXPORT stays on the
+/// `project` side, and the two are not in tension: an export's subject is the
+/// FILE, which is always the whole timeline, and a frame grab's subject is
+/// the PICTURE, which is whatever is on the canvas. The canvas is the thing a
+/// person is looking at when they reach for ⌥⌘E.
+///
 /// **The render is off-main.** `Exporter.renderFrame` opens asset tracks and
 /// decodes, and its own doc says to call it off the main thread;
 /// `EditorViewController+Eyedropper.swift` is the seam this copies (:77-81 for
@@ -57,10 +78,14 @@ extension EditorViewController {
     /// `removeSilencesCommand`'s rule: a save panel whose only possible answer
     /// is "there is nothing at the playhead to save" should not open at all.
     /// The test is the validator's — a zero-duration project is the one
-    /// `Exporter.renderFrame` answers nil for.
+    /// `Exporter.renderFrame` answers nil for — and it is asked of the project
+    /// that will be RENDERED, which inside a nest is the nest: a person who
+    /// has emptied the nest they are inside is looking at a blank canvas, and
+    /// the timeline's own duration would open a panel for a frame that cannot
+    /// be composed.
     func saveFrameCommand() {
         guard let document = document, let window = view.window,
-              window.attachedSheet == nil, document.project.duration > 0
+              window.attachedSheet == nil, document.editedProject.duration > 0
         else {
             NSSound.beep()
             return
@@ -73,11 +98,21 @@ extension EditorViewController {
         // choice, it is spelled into the name they are about to edit, and a
         // frame grab whose file disagrees with its own filename is worse than
         // one taken a moment early — so unlike the project below, the playhead
-        // is not re-read when the panel comes back.
+        // is not re-read when the panel comes back. It is left exactly as the
+        // document holds it, which inside a nest means the nest's own time
+        // (see the type doc): the render below is handed the same container,
+        // so there is nothing to map, and the timecode in the name is the one
+        // the toolbar and the ruler were showing when ⌥⌘E was pressed.
         let time = max(0, document.playhead)
+        // The canvas the time is MEASURED in, for the same reason. A nest
+        // borrows the parent's `fps` and `timecode_frames` (`core/src/
+        // scope.rs`'s table — only the width and height are the nest's), so
+        // the two canvases spell a tick identically and this line changes no
+        // name; it is written this way to say which container the tick came
+        // from, so the next person to touch it does not have to work it out.
         let stem = frameStem(
             base: (base as NSString).deletingPathExtension, at: time,
-            canvas: document.project.snapshot.canvas)
+            canvas: document.editedProject.snapshot.canvas)
         let panel = NSSavePanel()
         panel.nameFieldStringValue = "\(stem).\(FrameWriter.Format.png.fileExtension)"
         panel.canCreateDirectories = true
@@ -130,11 +165,23 @@ extension EditorViewController {
     /// thread and a sheet does not stop it), and what the project says NOW is
     /// what should land. The `t` it is asked about came the other way, from
     /// the command — see `saveFrameCommand`, where the reason is written down.
+    ///
+    /// It is the EDITED project, which is the whole of phase 9's correction
+    /// here and is argued in the type doc: `time` is measured in whatever
+    /// container is open, so this is the one handle it can be spent against.
+    /// One seam is left open by that pairing and is named rather than
+    /// guarded: an agent's `set_scope` between the panel opening and its OK
+    /// would spend the old container's tick in the new container. It is the
+    /// agent-only half of a race this method already documents for edits, the
+    /// window-modal panel rules the person out, and the honest guard for it
+    /// would be a second opinion here about which container a tick belongs
+    /// to — which is `ProjectDocument`'s to hold, and holding it twice is
+    /// what made this file wrong in the first place.
     private func renderAndWriteFrame(
         from document: ProjectDocument, at time: Ticks, format: FrameWriter.Format,
         to url: URL, in window: NSWindow
     ) {
-        let project = document.project
+        let project = document.editedProject
         let urls = document.mediaURLs()
         EditorViewController.frameGrabQueue.async { [weak self] in
             let result: Result<URL, Error>
@@ -177,9 +224,17 @@ extension EditorViewController {
     /// all text, shapes or images DOES render (`CompositionBuilder` gives it a
     /// placeholder track), so a "has a video track" test would grey out a
     /// command that works.
+    ///
+    /// It asks the EDITED project, matching the command and the render: with
+    /// a nest open the frame that would be written is the nest's, so an
+    /// emptied nest inside a full timeline is exactly the case the arm exists
+    /// for. `editedProject` is memoised per parent handle
+    /// (`ProjectDocument`), so asking it from a validator — which runs on
+    /// every menu update — costs a pointer comparison after the first call,
+    /// and at the top level it IS `project`.
     func validateSaveFrameAction(_ action: Selector) -> Bool? {
         guard action == #selector(EditorViewController.saveFrame(_:)) else { return nil }
-        return (document?.project.duration ?? 0) > 0
+        return (document?.editedProject.duration ?? 0) > 0
     }
 }
 

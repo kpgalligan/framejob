@@ -163,11 +163,23 @@ python3 tools/proof/phase5_proof.py 4823
 python3 tools/proof/phase6_proof.py 4823
 python3 tools/proof/phase7_proof.py 4823
 python3 tools/proof/phase8_proof.py 4823
+python3 tools/proof/phase9_proof.py 4823
 ```
+
+**Phase 9 takes a SECOND argument**, the log path, defaulting to
+`/tmp/reelcut-<port>.log` — the path the launch line above writes. It is the
+only script that reads the log itself: the startup parity check logs and does
+not refuse, so phase 9's fourth part (every op tool declares `scope`) would
+leave a clean-looking server on the port, and the count of scope-declaring
+tools is re-derived over the wire beside it. **Phase 9 adds nothing to
+`media/` and needs no ffmpeg**; it reads `A.mov`, `AV.mov` and `B.mov`, which
+are already there.
 
 The offscreen scripts take no port and are run on their own —
 `python3 tools/proof/phase2_chrome.py` and its successors through
 `phase8_chrome.py`; each paragraph below says what its own one renders into.
+Phase 9 has no chrome script — `phase9_probe.py` is its second half and is a
+PROBE rather than a photograph, for the reason its own section gives.
 `phase8_chrome.py` is the one that puts WINDOWS on screen — its `dispatch`
 mode activates a probe for about a second, because a key window is the thing
 it measures.
@@ -179,20 +191,25 @@ startup parity check would complain — `grep "Reelcut: " /tmp/reelcut-4823.log`
 must print nothing before a proof run means anything.
 
 **The EXACT tool count belongs to the newest phase's script**, because it is
-what tells a stale binary on the port from the build under test: phase 7
-asserts 73, and phases 1 to 5 keep floors (63, 65, 68, 70 and 71) so a later
-phase's tools never fail an older proof. That handover has now happened
-three times, each time exactly as it was written down — phase 5 added
+what tells a stale binary on the port from the build under test: phase 9
+asserts **74**, and phases 1 to 8 keep floors (63, 65, 68, 70, 71, 73, 73 and
+73) so a later phase's tools never fail an older proof. That handover has now
+happened four times, each time exactly as it was written down — phase 5 added
 `normalize_clip`, took the exact count, and phase 4's `check` became a `>=`;
 phase 6 added `add_background` and `add_blurred_background`, took the count
-at 73, and phase 5's became a `>=` in the same commit; and phase 7 is the
-first handover that cost NOTHING, because it adds no tool at all — its
+at 73, and phase 5's became a `>=` in the same commit; and phase 7 was the
+first handover that cost NOTHING, because it added no tool at all — its
 surface is new ARGUMENTS on two tools that already existed, so phase 6's own
-`TOOLS = 73` is still an exact assertion and needed no edit. Phase 8 is the
-second such handover and cost nothing either — its three features have no
-tool at all, by design — so THREE scripts now assert 73 exactly and a stale
-binary on the port is caught by whichever is run first. It is not
-decoration:
+`TOOLS = 73` stayed an exact assertion and needed no edit. Phase 8 was the
+second such handover and cost nothing either, its three features having no
+tool at all by design, so for two phases running THREE scripts asserted 73
+exactly. **Phase 9 is what that cost.** `set_scope` is one new tool — view
+state, not an op — so the count moved to 74 and all THREE of those exact
+assertions had to become floors in one commit, where every earlier handover
+touched one script. The sentence to take from it is not that three edits are
+expensive but that an exact count left standing in an old script ACCUMULATES:
+the next phase to add a tool pays for every script that took the number while
+it was still current. It is not decoration:
 the phase-4 count was checked against the two new tools taken out of the
 catalog and the registry together, where it reads 68 — and it is not the
 only check that notices. `check` never stops a run, so that build goes on to
@@ -1082,6 +1099,138 @@ two instances section 1 launches are compared to each other and never to a
 person's eyes: two builds agreeing byte for byte is an isolation claim, not a
 picture.
 
+`phase9_proof.py` is phase 9's MCP half (`python3 tools/proof/phase9_proof.py
+[port] [log path]`, **184/184**, about seven seconds), and it is deliberately
+the SMALLER half of the phase: `phase9_probe.py` below already owns everything
+the app decides before a tool call leaves it, so nothing here repeats it and
+the two touch the same ideas from opposite sides — the probe reads the JSON an
+op leaves with, this reads what a document that got one looks like afterwards.
+Ten sections. **The oracle is the phase's own, and the sameness in it is not
+this script's to define**: `content` and `contents` are
+`core/tests/common/mod.rs`'s pair transcribed key for key — strip `id`, `track`
+and each action's `id`, key each clip by its start and by the INDEX of the
+track it sits on, sort — which is where that pair lives BECAUSE this script
+wanted it too, and a looser rule invented here would make `nest`/`unnest`'s
+identity claim and phase 9's two different claims wearing one sentence. The
+table is the road map's seven plus twenty-five more, thirty-two rows, and each
+is scored TWICE: the two halves agree, AND each differs from the untouched
+round trip — without the second, a build in which the scoped op silently did
+nothing would agree perfectly with one in which the top-level op silently did
+nothing and thirty-two rows would pass green. The extra rows are chosen for
+what they alone could get wrong: the three that mint a TRACK inside the nest
+(`detach_audio`, `add_background`, `add_blurred_background`), the two that
+SOLVE against a canvas (`add_zoom_action`, `add_background`), the one that
+reads the SOURCE's pixel size, the four that read a plan segment, the range
+family and the two transition ops. Its fixture never changes the canvas for
+exactly that reason, and the nest clip starts at 0 so both halves can send the
+same time arguments — the core fixture's two reasons, restated because a
+reader here cannot see that file.
+
+**"The corresponding region of the outer frame" is an arithmetic and the
+docstring spells it out.** A nest is composited at its frozen size and placed
+as one layer, so at the identity transform the fold contributes scale 1 and no
+offset and the region is the centred `nest.width × nest.height` rectangle —
+1:1, unresampled. Two things make it exact rather than approximate: the
+comparison is a byte comparison of decoded pixels, all four channels, every
+pixel; and the centre never falls between them, because `set_canvas` refuses an
+odd dimension by name and a nest's frozen size IS a canvas size, so
+`canvas − nest` is even in both axes for any project the ops can build. So it
+is not a claim that holds at one size, and section 3 makes it at three —
+640 × 360 (the whole frame), 1280 × 720, and 1000 × 800, which is neither a
+multiple of the nest nor its aspect — with 0 of 230,400 pixels differing each
+time, over content that includes a shape BIGGER than the nest's canvas so that
+the recipe's `clip_rect` (which cuts the outer render) is compared against the
+view's own canvas edge (which cuts the inner one) exactly where they act. The
+control is the same comparison at `scale: 0.5`, which differs in 198,045 of
+230,400.
+
+**Section 7 is the wide `Err` arm**, the phase's most surprising contract and
+the one nothing but a document AT a cap can exercise: 63 tracks counted across
+the timeline and every nest, then a scoped `add_track` into a nest holding
+one — which SUCCEEDS at 64 and is an `Err` at 65, naming the DOCUMENT's total
+although the view it was applied to holds two — and eight levels of nesting
+built one scoped `nest` at a time, whose ninth is `nests are more than 8 deep`.
+Both check the document is unchanged afterwards.
+
+Two things the script found that were not in anyone's plan. **Four of the seven
+refusals cannot be reached without a fixture**: `set_marker`, `remove_marker`,
+`relink_media` and `remove_media` are answered by the APP's own id readers
+before the core is asked anything, and `add_media` by its descriptor reader, so
+a project with no markers and no media scores four passes on messages that say
+nothing about scoping at all. Section 6 therefore carries a marker, a media in
+use and a media in NOBODY's use (a media in use is refused for being in use,
+ahead of the scope), and copies the media row back as a descriptor. And the
+`set_range` limit road map 2 records is measurable rather than merely stated:
+inside a nest whose own duration is 1,200,000, `set_range {start: 0}` defaults
+its end to the DOCUMENT's 2,400,000 where `set_playhead` is nest-local. Section
+9 pins it — a limit nobody measures is a limit nobody knows has moved — and
+pins beside it that the range is cleared on the way OUT as well as in.
+
+Mutation-tested against **nine** deliberate breakages, each in a copy of the
+tree under `/tmp` with ONE edit in it, `make app` run and the app RELAUNCHED
+before each score, and the script run from inside the copy — never against the
+working tree, since a second lane was editing the same repository. The copy
+scored 184/184 clean before and after every mutant, and each patch was verified
+to have changed the file before its score was believed. **Eight killed.**
+`refused_inside` answering `None` for everything: **176/184**, seven — and the
+detail worth keeping is that `add_marker` and `remove_media` then answer OK and
+change nothing, because the merge discards markers and the view's media never
+mattered, which is exactly the "reports success, did nothing" failure the
+refusal list exists to prevent. `apply_scoped` judging the VIEW instead of the
+merged parent: **180/184**, four, and the 65th track leaves a document its own
+writer will not serialise. The view composited at the PARENT's canvas size:
+**180/184** — and here the region comparison ALONE would have survived, because
+inner and outer then have the same size and the comparison degenerates into a
+whole-frame identity; the render-size checks beside it are what kill it, which
+is the argument for having both. `effectiveScope` dropping `?? document.scope`:
+**177/179**. `merge_scope` not writing `media` back: **182/183**, and the one
+failure is section 2's paste, which answers `clip 9 in nest 5 refers to unknown
+media 8` — the sentence `core/src/scope.rs`'s own doc predicts. The view
+carrying the parent's MARKERS: **183/184**, and this one is worth reading twice
+because the core wave recorded the same mutant as EQUIVALENT: the merge
+discards what the view did to them, so no core test can see it, but
+`get_project` inside a scope REPORTS the view, so over the wire the markers
+that should not be there are visible. A view somebody can look at is a
+contract, and this is the check that makes it one. The open view overwriting an
+op's explicit scope — the seam defect the orchestrator measured and fixed, put
+back: **182/184**. And the scoped nest's row keeping its own clips in the view:
+**81/120**, thirty-nine failures and every scoped op refused as a duplicate id.
+**The survivor is `merge_scope` dropping the "union first, orphans after" rule**
+(184/184, exactly the baseline). It is a real behavioural change and an honest
+gap: it bites only when `unnest` runs INSIDE a scope on an inner nest that a
+TIMELINE clip also shows, and nothing here stages two clips sharing one nest.
+`core/tests/scope.rs` owns it —
+`unnest_inside_a_scope_keeps_a_nest_a_timeline_clip_still_shows` — and the
+merge is core-side, so an MCP mirror would be redundancy rather than reach.
+
+What no script can claim about phase 9, gathered so it is not spread through
+the sections. The gestures and the chrome are untouched: ⌘↓ / ⌘↑, the
+double-click that enters, and the breadcrumb in the timeline bar's
+131 × 21 pt corner are a PICTURE, and there is no `phase9_chrome.py` — the
+probe reads `NestScope.names`, which is what the breadcrumb prints, but nobody
+has photographed the corner. Nothing here says a nest PLAYS: a scoped
+composition's audio and its 60 fps are the two things spec §10 has always left
+to a person at the machine. The identity between the handle `rc_project_scoped`
+returns and the view an edit is applied to is `core/tests/scope.rs`'s claim,
+made in-process against one `scoped_view`; what this file adds is that the app,
+the renderer and the tools all agree with that handle once it is open. And
+three sections EXIT EARLY under a mutant that breaks scoping outright, which is
+why `double-ids` scores out of 120 rather than 184 — `scoped_edit` turns the
+first refused op of a section into a scored failure and stops, because a crash
+is a worse detection than a failure and a section that raised would leave every
+claim below it unrun.
+
+`media/A.mov`, `AV.mov` and `B.mov` are all it reads and it writes nothing to
+`media/`: `AV.mov` is the oracle's media clip (eight of the thirty-two rows
+mean nothing on a shape), `A.mov` is section 6's media in nobody's use, and
+`B.mov` is only ever a PATH inside a paste payload. Its version packages are
+`work/phase9-v<n>.reelcut` at FIXED names, which is safe for phase 2's reason
+inverted — they are never saved through the document machinery, only read — and
+it opens FIFTEEN documents in the instance (nine `new_project`, one per
+section that needs a clean fixture, and six `open_project`), so the relaunch
+rule below is not optional for it: two runs on one process is thirty, and the
+deadlock is somewhere past forty. No `ffmpeg`, no `swiftc`, no window server grant.
+
 `media/` and `work/` are ignored: the movies are regenerable from the lines
 above and the projects are rebuilt on every run. Phase 2's packages are
 named `<name>-<pid>.reelcut` rather than `<name>.reelcut`, and each run
@@ -1444,3 +1593,53 @@ harness pins `NSWindow Frame ReelcutPreviewWindow` so no render depends on what
 the machine holds, and no script here launches or terminates Reelcut.app, so
 "the preview opens where it was left after a relaunch" is not a sentence any of
 them can say — phase 7's presets paragraph draws the same line.
+
+## Phase 9 — inside the nest, the app half (`phase9_probe.py`)
+
+`python3 tools/proof/phase9_probe.py`, **48/48**. No port, no window server
+grant, no media: it is a probe against the WHOLE of `app/Sources`, built with
+`harness/build.sh`'s own swiftc line and cached on modification times the way
+the harness is, and a build failure is a scored FAILURE rather than an exit.
+That is `phase5_chrome.py`'s and `phase6_chrome.py`'s instrument, and this
+file's header argues why it is the right one three times over: an op's
+ENVELOPE — the `scope` key `ReelOp.scoped(_:)` writes — never appears in
+anything a tool call can read back, `ReelOp.isDocumentLevel` is a list whose
+whole content is a refusal the core would otherwise make (so a build with it
+empty and a build with it right differ only in an error sheet), and
+`NestScope`'s path arithmetic is pure Swift whose interesting cases are the
+ones nobody can stage by hand — an undo that removes an inner nest while its
+scope is open.
+
+Four sections. **The envelope**: an unscoped op writes no `scope` key at all
+rather than an explicit null, which is what keeps every op a project that
+never enters a nest sends byte for byte what it was; `scoped(40)` adds it and
+changes nothing else; `scoped(nil)` is the identity; and exactly the seven ops
+`core/src/scope.rs` refuses inside a nest are the seven this side sends
+unscoped. **The handle** (`rc_project_scoped` through `ReelProject.scoped`):
+its clips and tracks are the nest's with the nest clip that shows it absent,
+its canvas is the nest's frozen size at the DOCUMENT's rate, it has no markers
+where the document has one, its duration is measured from the nest's own zero,
+a nest one level deeper scopes too, an unknown nest is a nil, and the parent
+handle is undisturbed. **The path**: the offsets sum each step's nest clip
+start in its OWN container, the names read "Timeline › Intro › Deeper" off the
+CLIPS rather than the nests, and `clamped` TRUNCATES at the first bad step —
+keeping the good prefix, so an undo that removes an inner nest leaves the
+person in the outer one they are also in rather than throwing them out to the
+timeline. **The document**: entering swaps `editedProject` without touching
+`project`, the playhead maps in and back out so the frame under it does not
+move, the in/out range is cleared both ways, `editedProject` is MEMOISED (two
+reads answer the same object, which is what `refreshFromDocument`'s identity
+guard depends on), a scoped edit lands in the nest and leaves the timeline
+clip alone in one undo step, and a document-level op sent with a nest open
+lands on the DOCUMENT rather than coming back as a refusal.
+
+Made to fail, the rule phases 4 and 5 added. Dropping the one line of
+`ReelOp.json` that writes the key scores **45/48** and takes three: the
+envelope check, "an edit with a scope open lands INSIDE the nest" (the op then
+names a clip the timeline has not got and changes nothing) and "one op is one
+undo step". Sending every op scoped — `isDocumentLevel` ignored — plus
+dropping `setNestPath`'s `inOutRange = nil` scores **46/48** and takes exactly
+the two checks those two lines exist for. The PICTURE half of this phase is
+not here and cannot be: the breadcrumb is drawn inside the frozen ruler's
+`draw`, and a scope is view state the harness has no argument for, so a
+photograph of the corner needs a harness argument this phase did not add.

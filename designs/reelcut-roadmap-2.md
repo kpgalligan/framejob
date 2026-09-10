@@ -1,7 +1,8 @@
 # Reelcut — road map 2: beyond the spec
 
-**Status: phases 0–6 are done — §1's table below carries the commit of each,
-which is the one place they live; the rest is not. Pick up at phase 7.**
+**Status: ALL TEN PHASES ARE DONE** — §1's table below carries the commit of
+each, which is the one place they live. There is nothing here left to pick up;
+what a next road map would be for is in §4, "Considered and left out".
 Spec §10's three milestones are done
 (`reelcut-roadmap.md` records how each was proved). This is the plan for
 what a capable editor still lacks, found by reading the op table, the menus,
@@ -180,7 +181,7 @@ copies, and the orchestrator is the only one who does.
 | 6 | Looks | 1–2 | v6 | **done** 2026-09-08 (`d2f7767`) |
 | 7 | Output | 1–2 | — | **done** 2026-09-09 (`a16b0dd`) |
 | 8 | Viewing and finding | 1 | — | **done** 2026-09-09 (`5f0bc61`) |
-| 9 | Inside the nest | 2 | — | not started |
+| 9 | Inside the nest | 2 | — | **done** 2026-09-10 |
 
 Order is by value over dependency. Phases 1–3 pay back first and share
 nothing that later phases need; 6 depends on 3's list-interpolation rule; 9
@@ -3037,6 +3038,112 @@ handle, `AgentServer+Arguments.swift`, `AgentServer+Project.swift`, catalog.
 - A file of every earlier version is untouched; `rc_op_names` is unchanged (scope is an envelope
   key, not an op).
 
+**What landed**, and the five places the plan above could not be built as written.
+
+No schema change (v6 stands), NO new op (`OP_NAMES` is still 55) and ONE new
+tool (`set_scope`; the catalog is **74**, and phases 6, 7 and 8's exact `== 73`
+assertions became floors in the same change). One new FFI export. Two size
+tolls paid first and alone (`b410125`): `AgentCatalog.swift` 1552 → 665 and
+`ReelCore.swift` 2242 → 1446.
+
+**(1) The envelope could not simply gain a key.** `Op` is internally tagged
+with `deny_unknown_fields`, so a top-level `scope` is an unknown field for all
+55 variants — measured against the shipped build before a line was written —
+and `#[serde(flatten)]` is not the way round it, since serde does not support
+the two together. `parse` was ALREADY a two-pass parse holding the envelope as
+a `Value` to read `"op"`; it takes `scope` out in that same pass and answers an
+`Envelope`. All 55 variants and `apply_op(&Op)` are untouched.
+
+**(2) The view's `nests` could not be "the parent's".** Every clip of the
+scoped nest would be inserted into `validate`'s one id set twice, so the FIRST
+op inside a scope would be an `Err`. **And the obvious repair — filter the
+scoped nest OUT — is also wrong**, which a failing test found and no reader
+did: `check_clips` resolves every `Source::Nest` in EVERY container, so scoping
+into a nest that ANOTHER nest shows leaves that other nest's clip naming a nest
+the view has not got (`clip 172 in nest 170 refers to unknown nest 180`). The
+answer is to KEEP the row and EMPTY its tracks and clips.
+
+**(3) Caps are not "the parent's, as today".** `check_caps` sums the
+timeline's with every nest's, and a view holds the nest's clips at top level
+and the timeline's nowhere — so its totals are strictly LOWER and an op refused
+at the parent's cap would be accepted inside a scope, surfacing at SAVE. Same
+for depth: `check_nesting` starts every walk at level 1. Both are checked ONCE,
+on the MERGED parent, which gives the phase its most surprising contract:
+**an op can be perfectly valid inside the nest and the scoped apply still
+returns `Err`.**
+
+**(4) `media` was missing from the write-back**, and `paste` appends to it, so
+a paste inside a scope would have named a media the parent has not got.
+
+**(5) A nest DROP must never be applied from the view.** `unnest`'s
+`nest_is_shown` asks `every_clip()`, which in a view cannot see the parent's
+timeline clips, so un-nesting an inner nest a TIMELINE clip also shows would
+judge it unused and leave that clip dangling. The merge takes the UNION and
+collects orphans against the merged parent afterwards.
+
+**And one entry deleted from the plan**: "`nest` of the whole scope into
+itself" is not a case. `nest` mints a fresh id and puts the new clip INSIDE the
+scoped nest, so nothing points at its own container; it is a legal extra level
+bounded by `MAX_NEST_DEPTH`, and there is a test saying so. The refusal list is
+the three marker ops, `set_canvas` and the three media ops — SEVEN names, and
+`refused_inside` is an exhaustive 55-arm match so a later phase's op will not
+compile until it is classified.
+
+**The app.** `nestPath` is a PATH of (nest, clip) steps, not a bare nest id,
+because a nest can be shown by TWO clips at two different starts. The scoped
+handle is STORED and memoised (`ReelProject` memoises per handle, and ~78 read
+sites would otherwise re-decode). One named accessor, `editedProject`, and the
+flipped sites are enumerated — `project` still means the PARENT for save,
+export, consolidate. `clampViewState` clears a dead scope FIRST, then the
+selection, and the order is load-bearing. Double-click enters (a nest clip
+loses rename-by-double-click; ⇧⌘R and the Clip tab's header field remain).
+
+**Reviewed by six readers against three sceptics each: 34 findings, 13
+survived.** Three were the same shape and are worth carrying forward as one
+lesson: **a nest-local number spent as project time.** Save Frame rendered the
+DOCUMENT at a nest-local playhead (a wrong picture, and it broke the one-writer
+identity phase 7 built `FrameWriter` for); an in/out range set inside a nest was
+spent by the export card as project time; and `add_marker`/`set_marker` over
+MCP placed at a nest-local tick while the UI had already refused exactly that.
+The rule now written down: **a producer reads the container it writes into**,
+and a range belongs to the container it was set in and never leaves it —
+refusing rather than mapping, because a nest clip is TRIMMED, so a mapped range
+can name content that was never on screen. The captions group was the same
+defect in four more files and is fixed.
+Two others with teeth: a REVERT left `nestPath` and the memo pointing at a
+discarded document — worse than it read, since every subsequent edit was then
+refused with `no nest with id N` — and the breadcrumb was invisible whenever
+the timeline was scrolled vertically, because the header column sat ABOVE the
+floating ruler. That z-order was wrong for EIGHT PHASES at the top level too:
+scrolled, the corner showed the top sliver of a track header. No proof script
+could see it, because every harness render is at scroll 0.
+
+**Measured.** `make test` 456 → **494**, `make lint` and `cargo fmt --check`
+clean, `make typecheck` 0 errors and the same 4 AVFoundation warnings,
+`make app` building, the catalog at 74 and the parity log EMPTY.
+`tools/proof/phase9_proof.py` **184/184** over MCP and
+`tools/proof/phase9_probe.py` **48/48** against a probe compiled from the whole
+of `app/Sources` (the op envelope, `isDocumentLevel` and `NestScope`'s
+arithmetic have no caller a running binary can reach). Phases 1–8 all re-run
+unchanged: 66, 85, 121, 8, 84, 88, 167, 92, 79 over MCP and 26, 33, 59, 81, 70,
+78, 150 offscreen.
+**Twenty-four mutants across the two halves** — 15 in the core wave, 9 in the
+proof — with two survivors, both reported. The core's survivor is equivalent (a
+view carrying the parent's markers changes nothing the core can see) and the
+MCP script then KILLED it, because `get_project` inside a scope reports the
+view: a view somebody can look at is a contract. The proof's own survivor is an
+honest gap — the merge's orphan rule bites only when `unnest` runs inside a
+scope on a nest a timeline clip also shows, which the script does not stage,
+and `core/tests/scope.rs` owns it. Two kills are worth repeating: the mutant
+that gave the view the PARENT's canvas would have SURVIVED the region
+comparison alone, because inner and outer then have the same size and the
+comparison degenerates into a whole-frame identity — the render-size checks
+beside it are what caught it; and the mutant putting the seam defect back is
+caught not by a wrong picture but by an outright refusal, which is the shape a
+guard should have.
+
+---
+
 ## 3. Proposed keys and menu items
 
 Checked against spec §9 for conflicts; a phase that binds one promotes its
@@ -3112,7 +3219,19 @@ above them is about the editor's own panes. The submenu is built from
 `PreviewQuality.allCases` and tagged with its raw values, so the menu cannot
 list a quality the enum has not got; only Preview Window takes a key.
 
-Still to come: Clip gains Open / Close Nest.
+**Landed in phase 9**: Clip ▸ Open Nest (⌘↓) and Clip ▸ Close Nest (⌘↑), in
+the grouping group beside Group / Ungroup, as two items rather than one toggle
+— a person reaching for ⌘↑ wants OUT, and a toggle makes them read the menu to
+find out which way it will go. Double-clicking a nest clip enters it too, which
+costs a nest clip its rename-by-double-click (⇧⌘R and the Clip tab's header
+field remain). Both items are validated DEAD while text is being edited, the
+Delete pair's precedent: carrying a modifier does not keep a menu key off the
+first responder — every main-menu equivalent is offered the key-down first —
+and without the guard ⌘↑ in an inline rename would leave the nest and discard
+the open field.
+
+Nothing is still to come. Every row of this table has been promoted or
+struck.
 
 ## 4. Considered and left out
 

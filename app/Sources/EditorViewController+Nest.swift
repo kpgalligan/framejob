@@ -18,46 +18,39 @@ import AppKit
 /// and would be a third place to be wrong the day the core mints ids
 /// differently.
 ///
-/// ## There is no way INTO a nest in this build, and that is deliberate
+/// ## The way in is next door
 ///
 /// The gesture this file looks like it should carry — double-click a nest
 /// clip, the timeline and canvas show its contents, a breadcrumb leads back
-/// out — is NOT here. It is not an oversight and not a corner left rough; it
-/// is blocked, and the block is in the core:
+/// out — is `EditorViewController+NestScope.swift`'s, and it exists (road map
+/// 2's phase 9). It is worth reading what USED to be written here, because it
+/// was true and it is what changed:
 ///
-/// - **No op can address a clip inside a nest.** Every clip argument in the
+/// - **No op could address a clip inside a nest.** Every clip argument in the
 ///   op table resolves through `Project::clip`, which searches `self.clips`
-///   and nothing else (`core/src/model.rs`). A nest's clips live in
-///   `Nest::clips`, a different vector, so `move_clip`, `trim_start`,
-///   `split`, `delete`, `set_video` — all of them — answer `no clip has id N`
-///   for one.
-/// - So an inside view could only ever be READ-ONLY, and read-only is worse
-///   than absent here. `TimelineView` builds its ops out of the snapshot it
-///   is handed; point it at a nest's contents and every drag, trim, split and
-///   delete emits an op naming an id the core refuses — an error sheet per
-///   gesture. Turning those into polite refusals instead means disabling
-///   eight gesture paths inside a file app/CLAUDE.md freezes at wiring.
-/// - And it would not be coherent even then. The canvas draws
-///   `frame_recipe` at PROJECT time, and a nest's layers are flattened into
-///   that recipe in place (`core/src/nest.rs`) — there is no recipe for a
-///   nest on its own. The timeline would show the nest's contents while the
-///   canvas went on showing the whole project.
+///   and nothing else, and a nest's clips live in `Nest::clips`. So an inside
+///   view could only ever have been READ-ONLY, which is worse than absent:
+///   `TimelineView` builds its ops out of the snapshot it is handed, so every
+///   drag, trim, split and delete would have emitted an op naming an id the
+///   core refuses.
+/// - What the feature needed first was a way to NAME a nested clip, and this
+///   file said so: "an op-table decision (a path-valued `clip` argument, or a
+///   `nest` scope on the envelope), not a new idea". It is the second of
+///   those. `core/src/scope.rs` gives the ENVELOPE a `scope`, and the op is
+///   applied to a view project whose top level is the nest — so
+///   `Project::clip` kept its one meaning, no op gained a branch, and
+///   `rc_project_scoped` hands the same view to the app to draw from.
 ///
-/// What the feature needs first is a way to NAME a nested clip in an op. The
-/// core already has the shape for it — `Instance::path`, the chain of
-/// enclosing nest clip ids, which is what the composition plan keys its
-/// clip → track map by — so the missing piece is an op-table decision (a
-/// path-valued `clip` argument, or a `nest` scope on the envelope), not a new
-/// idea. That is a core change with its own row in spec §6, and this file is
-/// not where it lands.
+/// The round trip — ⇧⌘G, edit, ⌘G — still works and is still the identity on
+/// clip content. What it costs, and what going inside now saves, is the nest
+/// CLIP's own transform, opacity, fades and volume: the group-level
+/// properties, which an unnest throws away and a scope leaves alone.
 ///
-/// Until then the round trip IS the way in: ⇧⌘G opens a group, edit, ⌘G
-/// closes it again. `unnest` then `nest` is the identity on clip content, ids
-/// aside, which is what makes that honest advice rather than a workaround.
-/// The one thing it does not carry across is the nest CLIP's own transform,
-/// opacity, fades and volume — the group-level properties — which is exactly
-/// what entering a nest would preserve, and worth saying out loud when the
-/// gesture is built.
+/// Both commands here work INSIDE a nest, with no code of their own for it:
+/// they read `document.editedProject` and their ops are stamped with the
+/// scope by `ProjectDocument.applyEdit`, so ⌘G in a nest makes a nest in a
+/// nest — a legal extra level, bounded by `MAX_NEST_DEPTH` on the merged
+/// parent like any other.
 extension EditorViewController {
 
     // MARK: - Nest
@@ -81,7 +74,7 @@ extension EditorViewController {
             NSSound.beep()
             return
         }
-        let before = Set(document.project.snapshot.clips.map { $0.id })
+        let before = Set(document.editedProject.snapshot.clips.map { $0.id })
         document.applyEdit("Nest", .nest(clips: clips))
         selectClipsAdded(since: before, in: document)
     }
@@ -105,7 +98,7 @@ extension EditorViewController {
             NSSound.beep()
             return
         }
-        let before = Set(document.project.snapshot.clips.map { $0.id })
+        let before = Set(document.editedProject.snapshot.clips.map { $0.id })
         document.applyEdit(
             nests.count == 1 ? "Un-nest" : "Un-nest Clips",
             nests.map { ReelOp.unnest(clip: $0.id) })
@@ -121,7 +114,8 @@ extension EditorViewController {
     /// selection is left as `ProjectDocument.clampViewState` left it, which
     /// for a refusal is untouched.
     private func selectClipsAdded(since before: Set<UInt32>, in document: ProjectDocument) {
-        let added = document.project.snapshot.clips.map { $0.id }.filter { !before.contains($0) }
+        let added = document.editedProject.snapshot.clips.map { $0.id }
+            .filter { !before.contains($0) }
         guard !added.isEmpty else { return }
         document.selection = Set(added)
         viewStateDidChange()

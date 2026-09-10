@@ -87,12 +87,42 @@ char *rc_project_to_json(const RcProject *p);
 /* Deep-copies the handle. NULL-tolerant. */
 RcProject *rc_project_clone(const RcProject *p);
 
+/* The project INSIDE nest `nest_id`, as a new handle: its tracks and clips at
+ * the top level, its frozen size as the canvas, the parent's rate, media,
+ * nests and next id, and no markers. The SAME view an op carrying
+ * `"scope": nest_id` is applied to (core/src/scope.rs), so what the host
+ * draws from this handle and what its edits land in cannot disagree.
+ *
+ * The READ half of a scope: the host plays, plans, renders and snapshots a
+ * nest through this handle while every edit still goes to the PARENT handle
+ * with `scope` set. Applying an op to this handle edits the view rather than
+ * the document, which is not what any caller wants; nothing enforces it.
+ *
+ * NULL with a message through `err_out` for a NULL project or a nest id this
+ * project has not got ("no nest with id N"). There is no "valid but changes
+ * nothing" case here, so a NULL return ALWAYS carries a message. The handle
+ * is freed with rc_project_free. */
+RcProject *rc_project_scoped(const RcProject *p, uint32_t nest_id, char **err_out);
+
 void rc_project_free(RcProject *p);
 
 /* ----------------------------------------------------------------- edits */
 
 /* THE one edit entry point. `op` is `{"op": "<name>", ...args}` — the table
  * in the module doc of core/src/edit.rs and spec section 6.
+ *
+ * One key of that object is NOT an argument: `"scope"`, an optional nest id
+ * (core/src/scope.rs, spec section 6). With it the op is applied INSIDE that
+ * nest — its tracks and clips at the top level, its own zero as time zero —
+ * and the result is still a whole project, so undo stays a stack of these
+ * handles. Absent and null both mean the timeline. Seven ops have no meaning
+ * in a nest and are an error naming themselves and it (the three marker ops,
+ * set_canvas, and the three media ops), and a scoped op has a WIDER error
+ * arm than an unscoped one: the clip and track caps and the nesting depth are
+ * document-wide and invisible from inside a nest, so an op can be valid
+ * against the nest and still come back "too many clips", "too many tracks" or
+ * "nests are more than 8 deep at nest N". A caller must not assume a valid
+ * scoped edit landed.
  *
  * Returns a NEW project on success. Returns NULL in two distinguishable
  * cases:

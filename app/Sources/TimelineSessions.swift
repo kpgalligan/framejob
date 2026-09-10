@@ -28,6 +28,12 @@ enum TimelineHit: Equatable {
     case marker(UInt32)
     /// The square where the header column and the ruler cross — inert.
     case corner
+    /// The same square while a nest is open, where it carries the breadcrumb
+    /// out (road map 2's phase 9). A separate case rather than a flag on
+    /// `corner`, so `beginGesture`'s `case .none, .corner: break` keeps
+    /// meaning exactly what it says and the click is swallowed in the one
+    /// state where there is nothing to go back to.
+    case breadcrumb(level: Int)
     case header(row: Int)
     case headerButton(row: Int, button: TimelineHeaderButton)
     case clip(UInt32)

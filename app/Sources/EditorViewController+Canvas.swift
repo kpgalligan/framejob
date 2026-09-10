@@ -61,8 +61,12 @@ extension EditorViewController {
     func refreshCanvas(isLive: Bool) {
         guard let document = document, let canvas = previewCanvas else { return }
         canvas.snappingEnabled = snappingEnabled
+        // The EDITED project (road map 2's phase 9): its canvas IS the
+        // nest's frozen size, so a nest is composed on its own terms with the
+        // OUTER transform not applied, and its `frame_recipe` is the nest's
+        // layers rather than the timeline's with a flattened nest among them.
         canvas.update(
-            project: document.project, selection: document.selection,
+            project: document.editedProject, selection: document.selection,
             playhead: document.playhead)
         // Selection travels on this same channel (`viewStateDidChange`), and
         // an armed eyedropper is armed for particular clips

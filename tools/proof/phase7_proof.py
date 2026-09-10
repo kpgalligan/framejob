@@ -165,8 +165,9 @@ CANVAS = (640, 360)
 # The whole catalog after phase 7 — unchanged from phase 6's. Phase 7 adds
 # no op and no tool: `render_frame` and `export` each grew arguments, which
 # the startup parity check cannot see and section 5 reads off `tools/list`
-# instead. The EXACT count belongs to the newest phase's script (README), so
-# it is asserted here; phase 6's says the same number.
+# instead. The EXACT count belongs to the newest phase's script (README), and
+# phase 9's `set_scope` took it: this is a floor now, as phase 6's and phase
+# 8's are, so a later phase's tools cannot fail an older proof.
 TOOLS = 73
 
 # `AgentServer+Render.swift`'s sentence, read the way five earlier scripts
@@ -1066,10 +1067,10 @@ def export_part(mcp):
 
 def catalog_part(mcp):
     names = mcp.tools()
-    check(len(names) == TOOLS,
-          f"the catalog holds EXACTLY {TOOLS} tools (got {len(names)}) — phase 7 adds no op "
-          "and no tool, so the count it inherits is the count it asserts, and it is what "
-          "tells a stale binary on the port from the build under test")
+    check(len(names) >= TOOLS,
+          f"the catalog holds phase 7's {TOOLS} tools or more (got {len(names)}) — phase 7 "
+          "adds no op and no tool, so it inherited the count rather than raising it, and "
+          "phase 9's set_scope is what turned the assertion into a floor")
 
     schemas = {t["name"]: t for t in mcp._request("tools/list", {})["tools"]}
 

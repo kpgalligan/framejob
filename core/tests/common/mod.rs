@@ -31,8 +31,8 @@ use std::ptr;
 use serde_json::Value;
 
 use reelcut_core::ffi::{
-    rc_project_clone, rc_project_free, rc_project_from_json, rc_project_new, rc_project_to_json,
-    rc_string_free,
+    rc_project_clone, rc_project_free, rc_project_from_json, rc_project_new, rc_project_scoped,
+    rc_project_to_json, rc_string_free,
 };
 use reelcut_core::ffi_edit::rc_project_apply;
 use reelcut_core::ffi_query::{
@@ -183,6 +183,38 @@ impl Handle {
         let ptr = unsafe { rc_project_clone(self.ptr) };
         assert!(!ptr.is_null(), "rc_project_clone returned NULL");
         Handle { ptr }
+    }
+
+    /// `rc_project_scoped` — the nest as its own project, asserting it built.
+    ///
+    /// The READ half of a scope: the same view an op carrying
+    /// `"scope": nest` is applied to, handed over as an ordinary handle, so
+    /// a test can ask this project the questions the app asks it — the
+    /// canvas, the clips, the plan, the recipe — rather than inferring them
+    /// from what an edit did.
+    pub fn scoped(&self, nest: u32) -> Handle {
+        match self.try_scoped(nest) {
+            Ok(handle) => handle,
+            Err(msg) => panic!("this nest was expected to scope, but: {msg}"),
+        }
+    }
+
+    /// The same with its failure message, for the tests that assert a
+    /// refusal. Unlike an edit this export has no "valid but changes
+    /// nothing" case, so a NULL return always carries one.
+    pub fn try_scoped(&self, nest: u32) -> Result<Handle, String> {
+        let mut err: *mut c_char = ptr::null_mut();
+        let ptr_ = unsafe { rc_project_scoped(self.ptr, nest, &mut err) };
+        if ptr_.is_null() {
+            let msg =
+                take_string(err).expect("rc_project_scoped returned NULL without setting err_out");
+            return Err(msg);
+        }
+        assert!(
+            err.is_null(),
+            "rc_project_scoped returned a handle AND set err_out"
+        );
+        Ok(Handle { ptr: ptr_ })
     }
 
     /// The project as the pretty JSON that goes in the file.
