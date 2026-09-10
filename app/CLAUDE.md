@@ -308,10 +308,25 @@ lockstep are in the root `CLAUDE.md`; the full design is
   hid; and a slot's share of a cover is weighted by its own strength, so a
   region at `amount` 0 — "there but hides nothing" — cannot pull a
   neighbour's effect to full strength inside its own box.
-- `MediaImporter.swift` · `FFmpegRewrap.swift` — the import funnel and the
-  opt-in ffmpeg step behind it (spec §7.7, §11). `async`/`await` is confined
-  to `MediaImporter.swift`; `FFmpegRewrap` runs `Process` on a serial queue,
-  never on a cooperative thread, because ffmpeg blocks the thread it is on.
+- `MediaImporter.swift` · `MediaCacheFiles.swift` · `FFmpegRewrap.swift` — the
+  import funnel, the await-free half of its cache, and the opt-in ffmpeg step
+  behind it (spec §7.7, §11). `async`/`await` is confined to
+  `MediaImporter.swift`, and that rule is what decided the cut:
+  `MediaCacheFiles.swift` is an `extension MediaImporter` holding where the
+  two caches live and how they are read and written — the two path helpers
+  and the three constants beside them, `loadThumbnail`, `thumbnailCount`,
+  `loadPeaks`, `.mediaCacheDidChange` with its four keys, and the plumbing
+  `thumbnails` and `peaks` stand on — none of which awaits, so every
+  `MediaImporter.x` call site in the tree is untouched, while
+  `generateCaches`, `thumbnails` and `peaks`, the three that do await, kept
+  the file that holds the exception. A PURE MOVE landed alone, the toll for
+  §2a's fix on the cache code, paid at 619 lines against the ~600 cap
+  (515 and 144 after it); it cost three widenings — `ensureDirectory`,
+  `writeJPEG` and `postCacheChange`, `private` → internal — because the two
+  async writers call them and `private` does not cross a file. The one
+  `Task` in the new file (`postCacheChange`'s main hop) awaits nothing.
+  `FFmpegRewrap` runs `Process` on a serial queue, never on a cooperative
+  thread, because ffmpeg blocks the thread it is on.
   **`AppSupport.swift` is the ONE spelling of
   `~/Library/Application Support/Reelcut/`**, and the argument for putting
   anything there is still `FFmpegRewrap.rewrapDirectory`'s doc: there is
