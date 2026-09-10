@@ -71,6 +71,12 @@ lockstep are in the root `CLAUDE.md`; the full design is
   including its three outcomes, is what it was; note that the `catch` arm
   now also carries the caps and the depth, which a scoped op can fail on
   where an unscoped one cannot.
+  `ProjectDocument+DisplayStem.swift` is the document's title as a file
+  STEM — `displayStem`, a trailing `.reelcut` removed and nothing else — an
+  `extension ProjectDocument` in its own file because the base file is far
+  over the ~600-line cap and should not take on code (comments it may — the
+  cache marker's doc rewrite added four lines there); the `FrameWriter`
+  row says which three panels read it and what proves it.
 - `EditorViewController+NestScope.swift` · `TimelineView+NestScope.swift` —
   going inside a nest and coming back out (road map 2's phase 9, spec §4.4):
   Clip ▸ Open Nest ⌘↓ / Close Nest ⌘↑, the double-click on a nest clip, the
@@ -85,6 +91,11 @@ lockstep are in the root `CLAUDE.md`; the full design is
   internal, which the change forces: `setPlayhead` guards on
   `time != playhead` and a scope change can leave the number equal, so the
   auto scroll has to be asked for by name.
+  The corner's z-order — the ruler ABOVE the header column, which only
+  matters once the pane has scrolled — is photographed SCROLLED by
+  `tools/proof/phase9_chrome.py`, the one instrument in the tree that
+  renders a scrolled `TimelineView`; a claim about that order is gated by
+  its `init-order` mutant (52/62), which no render at scroll 0 can be.
   Three things to know before touching it. **A nest clip loses
   rename-by-double-click** — the open branch sits ABOVE the rename branch in
   `beginGesture`, the ⌥⇧ slip's precedent — keeping ⇧⌘R, Clip ▸ Rename… and
@@ -315,18 +326,67 @@ lockstep are in the root `CLAUDE.md`; the full design is
   `MediaCacheFiles.swift` is an `extension MediaImporter` holding where the
   two caches live and how they are read and written — the two path helpers
   and the three constants beside them, `loadThumbnail`, `thumbnailCount`,
-  `loadPeaks`, `.mediaCacheDidChange` with its four keys, and the plumbing
+  `loadPeaks`, `.mediaCacheDidChange` with its keys, and the plumbing
   `thumbnails` and `peaks` stand on — none of which awaits, so every
   `MediaImporter.x` call site in the tree is untouched, while
   `generateCaches`, `thumbnails` and `peaks`, the three that do await, kept
-  the file that holds the exception. A PURE MOVE landed alone, the toll for
-  §2a's fix on the cache code, paid at 619 lines against the ~600 cap
-  (515 and 144 after it); it cost three widenings — `ensureDirectory`,
-  `writeJPEG` and `postCacheChange`, `private` → internal — because the two
-  async writers call them and `private` does not cross a file. The one
-  `Task` in the new file (`postCacheChange`'s main hop) awaits nothing.
-  `FFmpegRewrap` runs `Process` on a serial queue, never on a cooperative
-  thread, because ffmpeg blocks the thread it is on.
+  the file that holds the exception. The cut was a PURE MOVE landed alone
+  (`3e5b598`), the toll for the completion marker that followed it, paid at
+  619 lines against the ~600 cap; it cost three widenings —
+  `ensureDirectory`, `writeJPEG` and `postCacheChange`, `private` →
+  internal — because the two async writers call them and `private` does not
+  cross a file. **The completion marker lives in the new file too**
+  (spec §5.6): `CacheStamp` (the source's size and modification second plus
+  the record fields and constants that size a cache — no path, and its doc
+  argues why), the two marker paths (`thumbs/<id>/complete.json`,
+  `peaks/<id>.complete.json`), `readStamp` / `writeStamp`, `clearThumbnails`
+  and `clearPeaks` (marker first, then the old frames or the old `.bin`;
+  each answers whether it removed anything), `stripHolds` (the vouching
+  rule below), `PeakBuckets` (the bucket arithmetic, await-free — it moved
+  here when the fixes took `MediaImporter.swift` to 644, and a `.bin` from
+  the moved code is byte-identical to one the pre-move binary wrote),
+  `replacedKey`, `writeJPEG` now answering whether the frame landed, and
+  `CacheLedger`, which runs the passes for one media one at a time IN CALL
+  ORDER — an `NSLock`, not an actor, because each pass carries the URL the
+  media resolved to when it was asked for, and an actor reached from
+  synchronous code through a `Task` hop cannot promise two hops from one
+  thread arrive in order. `generateCaches`'s task awaits the previous pass,
+  computes the stamp ONCE and hands it to both halves (so a no-op costs a
+  stat, a marker read per half and a `fileExists`, and the two markers
+  cannot disagree about one file); `thumbnails` and `peaks` compare it with
+  their marker at the head and return without decoding or posting when it
+  matches. Otherwise the stale marker goes first, the old frames or the old
+  `.bin` second — and a withdrawn `.bin` is POSTED at once, so no reader
+  measures the previous file's sound while the new one is read; a `peaks`
+  post can now mean withdrawn as well as landed — the marker is written
+  LAST, and only for a strip the pass can vouch for: `stripHolds` — at least
+  one frame landed, and every frame the pass wrote is still in the directory
+  when the loop ends. That rule is what closes the case the first landing
+  missed: a save of a TITLED document while a pass runs swaps the package
+  under it (frames written between NSDocument's listing and the swap are
+  lost, later ones land by path in the new package), and a reader that
+  fails on every frame; both leave no marker and the next open rebuilds, as
+  every strip did before markers existed. `replaced` rides the FIRST post
+  of a replacing pass only — nothing of the old film is on disk once
+  `clearThumbnails` returns, so every tile memoised after that post is the
+  new film's — and an image whose decode fails after the clear posts it
+  too. After the fixes: 586 and 490. **Pitfall**: `TimelineCaches.invalidate`
+  clears only MISSES for thumbs — right while a strip fills in, wrong once
+  it has been replaced — so the timeline reads `replaced` off the
+  notification and drops that media's decoded HITS only then; a pass that
+  replaced a strip but did not say so would leave the old film on screen
+  until the 800-entry drop. Two limits, recorded and not fixed: `relink_media`
+  never re-probes, so a relink to a file of another length sizes the new
+  strip from the old `duration`; and the ledger's price is that a pass stuck
+  inside one AVFoundation call (a stalled network volume) holds every later
+  pass for that media, a relink away from the stalled file included — the
+  escape (skip the wait when the URL differs) does not help a stuck call and
+  reintroduces the interleave for a merely slow one, so it was argued and
+  not built. And one residual window the pass cannot close: `stripHolds`'
+  listing and the marker's write are two steps, so a swap landing between
+  them (one directory read wide) would still certify holes. The one `Task`
+  in the new file (`postCacheChange`'s main hop) awaits nothing. `FFmpegRewrap` runs `Process` on a serial queue, never on a
+  cooperative thread, because ffmpeg blocks the thread it is on.
   **`AppSupport.swift` is the ONE spelling of
   `~/Library/Application Support/Reelcut/`**, and the argument for putting
   anything there is still `FFmpegRewrap.rewrapDirectory`'s doc: there is
@@ -408,6 +468,11 @@ lockstep are in the root `CLAUDE.md`; the full design is
   times are already on the frame grid — which is why the proof fixture is
   at 25 fps and why the same fixture at 30 fps must NOT come back, rather
   than carrying a tolerance.
+  Its save panel's format popup renames through `CaptionExporter.renamed`
+  over `knownExtensions` = `{srt, vtt}` (`FrameWriter.renamed`'s six lines
+  with `rawValue` for `fileExtension`; the `FrameWriter` row below carries
+  the argument, the sibling helper and the probe), and seeds the field from
+  `ProjectDocument.displayStem`, never a bare `deletingPathExtension`.
   **Pitfall, and it is not the exporter's alone:**
   `NSPopUpButton.addItem(withTitle:)` REMOVES an existing row carrying the
   same title before adding the new one — three rows, two of them reading
@@ -1015,8 +1080,30 @@ lockstep are in the root `CLAUDE.md`; the full design is
   rather than a bare `deletingPathExtension`, because the bare one eats
   whatever follows the last dot in a name somebody typed: a project called
   "Board v1.2" was offered as "Board v1.jpg". Being a pure function is also
-  what lets a probe reach it — `CaptionExporter.formatChanged` still has the
-  unguarded version and loses the `.2` off a caption file today.
+  what lets a probe reach it, and `tools/proof/remaining_probe.py` now does
+  (nine names, its 1b) — this sentence used to say a probe could, and none
+  did. The same defect had two more homes, both closed on the same shape
+  and proved in the same probe's section 1 — 63 checks when it landed, and
+  three named mutants scored against those 63 (`caption-bare` 59,
+  `stem-bare` 60, `site-unwired` 60); the probe has grown since and prints a
+  larger total: the
+  caption popup's rename is `CaptionExporter.renamed` over
+  `knownExtensions` = `{srt, vtt}` — the caption formats' own set, a SUBSET
+  of `AgentServer.replaceableExtensions` (pinned by the probe's 1f, which
+  builds its rows FROM the set and calls `destinationURL`; the `no-vtt`
+  mutant is what showed the tree had never asked a `.vtt` path for SubRip)
+  and never `FrameWriter`'s image set — and the title-bar stem that all three panels (Export…, Save
+  Frame…, Export Captions…) put an extension after is
+  `ProjectDocument.displayStem`
+  (`ProjectDocument+DisplayStem.swift`), whose set is `{reelcut}` only,
+  since it strips the DOCUMENT's extension off a title and nothing else;
+  `exportCaptionsCommand`, `saveFrameCommand`'s `frameStem` base and
+  `ExportSheetController.suggestedName` all read it. The recorded limit: a
+  caption name carrying another of the app's own containers parts company
+  with MCP — `chart.png` under SubRip is `chart.png.srt` in the panel and
+  `chart.srt` over MCP, since `png` is replaceable in `destinationURL` and
+  not a caption spelling — and widening the set would be the bare strip
+  with a longer list.
   The controller half owns only the URL and the thread: the panel copies
   `CaptionExporter`'s house pattern (an accessory view rather than a second
   sheet, the format popup rewriting BOTH `allowedContentTypes` and the

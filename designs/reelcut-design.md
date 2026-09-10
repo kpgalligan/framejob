@@ -1084,7 +1084,9 @@ Talk.reelcut/
   project.json          # §5.2; RC_FORMAT_VERSION bumps on any schema change
   cache/                # regenerable; never required to open
     thumbs/<media id>/<index>.jpg
+    thumbs/<media id>/complete.json    # completion marker, written LAST (below)
     peaks/<media id>.bin        # f32 max-magnitude per bucket, 100 buckets/s
+    peaks/<media id>.complete.json     # its marker, a sidecar; the .bin keeps its name
     reversed/<media id>-<digest>.mov   # pre-rendered reverse (M3)
   media/                # only after Consolidate (M3)
 ```
@@ -1144,6 +1146,37 @@ and moved into place only on success, so a cancel can never leave a
 half-reversed file that later looks finished. Rendering it means creating a
 directory inside the package, so `ProjectDocument.packageContentsDidChangeOnDisk()`
 is called afterwards for the reason Consolidate calls it.
+
+**Completion markers** are what make "a cache already on disk is not
+rebuilt" a true sentence rather than a hope. A filmstrip or a waveform pass
+writes its marker LAST — `thumbs/<id>/complete.json` inside the strip's own
+directory, `peaks/<id>.complete.json` beside the `.bin` — holding the
+source file's byte size and modification second plus the media-record
+fields that size the cache (duration, width, height, has video, has audio)
+and the generator's own constants, so a change to any of them invalidates
+every old cache. A pass begins by comparing that marker with the file the
+media resolves to NOW and returns without decoding when they match; a
+missing, partial (no marker: a first save mid-pass, a process that died) or
+mismatched cache (Relink…, a file edited in place) is deleted and rebuilt —
+the old frames and the old `.bin` go BEFORE the rebuild starts, and a
+withdrawn waveform is announced at once, so nothing reads the previous
+file's sound while the new one is measured — and the rebuild says so in
+`.mediaCacheDidChange`, which is what lets the timeline drop the old film's
+tiles it had already decoded. A pass writes its marker only for a strip it
+can vouch for: at least one frame landed, and every frame it wrote is still
+there when the loop ends (an in-place save while a pass runs swaps the
+package under it, and a frame written between the save's listing and the
+swap is lost — a strip with such a hole gets no marker and is rebuilt at the
+next open, as every strip was before markers existed). The marker
+carries NO path, deliberately and unlike the digest above: a reverse names a
+file in a directory shared with other sources and must tell them apart,
+while a marker sits inside one media's own cache with nothing to
+disambiguate — and leaving the path out is what lets a moved package, a
+consolidated copy and a copy on another disk keep every filmstrip. It is not
+a content hash, for the reason the digest gives. Passes for one media run
+one at a time and in the order they were asked for, so two sources can never
+interleave under one marker; a queued pass re-reads the marker when its turn
+comes and usually finds nothing to do.
 
 **Transcription extracts are not a cache entry at all.** Generating
 captions (§4.3, §7.9) writes each clip's own source window to a temporary
@@ -1824,7 +1857,9 @@ among the common rates, else `[round(fps × 1000), 1000]`), alpha
 descriptor for `add_media`. Thumbnails: 160 px tall, one per second up to
 600, JPEG in `cache/thumbs`. Peaks: mono float, 100 buckets/s, in
 `cache/peaks`. Both run in the background after import and the timeline
-redraws as they land. Image files (PNG/JPEG/HEIC) are probed with ImageIO
+redraws as they land — and both are SKIPPED when the cache's completion
+marker matches the file (§5.6); a relinked, changed, partial or unmarked
+cache is rebuilt. Image files (PNG/JPEG/HEIC) are probed with ImageIO
 and become `kind: image` media.
 
 Formats AVFoundation opens on macOS 15: MOV, MP4, M4V, M4A, MP3, AAC, WAV,

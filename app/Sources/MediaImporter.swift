@@ -340,14 +340,69 @@ enum MediaImporter {
     // MARK: - Cache generation
 
     /// Kicks off both caches in the background and returns immediately —
-    /// the synchronous entry point the import path and document-open path
-    /// call. The work is detached so a cancelled import (the document
-    /// closing) never blocks; the caches are regenerable, so a half-written
-    /// one is simply regenerated next time.
+    /// the synchronous entry point every call site uses: the open path, the
+    /// import path, the three relink paths, Consolidate and Add Background,
+    /// all through `ProjectDocument.generateCaches`'s whole-media loop. That
+    /// loop is cheap to run over media whose caches are done: the task stats
+    /// the file ONCE into a `CacheStamp` (`MediaCacheFiles.swift`) and hands
+    /// it to both halves, each of which reads its completion marker and
+    /// returns when the two are equal — one stat, a marker read per half and
+    /// a `fileExists` for the `.bin` per media with nothing to do, and a
+    /// decode only for one whose file is new, changed, or whose last pass
+    /// never finished. One stamp for both halves is also what keeps the two
+    /// markers from disagreeing when the file changes between them. A nil
+    /// stamp (the file cannot be stat'ed) is enqueued and runs like any
+    /// other: it can neither skip nor mark, and running is the conservative
+    /// direction — the cache is made, and nothing certifies it.
+    ///
+    /// Nothing cancels the task — not the document closing, not a save — so
+    /// a half-written strip is never a cancelled one. It is one of three,
+    /// and since a marker is written after the last frame and never before,
+    /// all three leave a strip with no marker for the next call to rebuild.
+    /// A FIRST SAVE while a pass runs: the task keeps writing into the
+    /// temporary directory it captured while `fileWrapper(ofType:)` copies
+    /// into the package only the frames that had landed, and nothing re-runs
+    /// the pass after a save. Process death. And a save of a TITLED document
+    /// straddling a pass, which SWAPS the package under it: NSDocument lists
+    /// `thumbs/<id>/` once for its lazy wrapper and swaps the new package in,
+    /// so a frame written between the listing and the swap goes with the old
+    /// directory while every frame after the swap lands by path in the new
+    /// one — holes the pass will never fill, which a marker written by path
+    /// would have certified for ever. `thumbnails` therefore checks, before
+    /// its marker, that every frame it wrote is still there (`stripHolds`)
+    /// and writes none when any is missing.
+    ///
+    /// One pass per (cache directory, media id) at a time. Two passes for
+    /// one media can be asked for in quick succession — open then relink,
+    /// relink twice, import then Consolidate — and used to run concurrently:
+    /// each thumbnail is written whole (ImageIO stages and renames), but
+    /// frames from two SOURCES could interleave in one `thumbs/<id>/`, and
+    /// under a marker the later-finishing pass would certify the mixed strip
+    /// until the source next changed. So the new task awaits the previous
+    /// pass's before it runs, and because each pass re-checks the marker at
+    /// its head, a queued redundant pass costs the no-op price above. The
+    /// bookkeeping is `CacheLedger` (`MediaCacheFiles.swift`, where nothing
+    /// awaits); the awaiting is here, inside the task, so this stays
+    /// synchronous. The tasks run in the order they were asked for, which
+    /// is load-bearing — the ledger's doc says why. The ledger's price: a
+    /// pass that never completes (a stalled network volume) holds every
+    /// later pass for that media behind it, a relink AWAY from the stalled
+    /// file included, where before the ledger the relink's pass ran beside
+    /// it and finished. The escape — cancel the previous pass when the URL
+    /// differs — is not built: it cannot reach a pass stuck inside one
+    /// AVFoundation call, and for a pass that is merely slow it brings back
+    /// the interleave the ledger exists to prevent.
     static func generateCaches(for media: MediaSnapshot, url: URL, in cacheDir: URL) {
-        Task.detached(priority: .utility) {
-            await thumbnails(for: media, url: url, into: cacheDir)
-            await peaks(for: media, url: url, into: cacheDir)
+        CacheLedger.shared.enqueue(cacheDir: cacheDir, media: media.id) { previous, done in
+            Task.detached(priority: .utility) {
+                await previous?.value
+                // After the await: the stamp is of the file as THIS pass
+                // finds it, not as it was when the pass was asked for.
+                let stamp = CacheStamp.stamp(for: media, url: url)
+                await thumbnails(for: media, url: url, stamp: stamp, into: cacheDir)
+                await peaks(for: media, url: url, stamp: stamp, into: cacheDir)
+                done()
+            }
         }
     }
 
@@ -361,19 +416,54 @@ enum MediaImporter {
     /// Tolerance is deliberately half a second in both directions: a
     /// filmstrip wants the nearest keyframe, not an exact frame, and zero
     /// tolerance here makes a long clip take minutes instead of seconds.
-    static func thumbnails(for media: MediaSnapshot, url: URL, into cacheDir: URL) async {
+    ///
+    /// Skipped outright when `thumbs/<id>/complete.json` holds `stamp` — the
+    /// file's `CacheStamp` as `generateCaches` measured it: no decode, no
+    /// post. Otherwise whatever is on disk is cleared first and the marker
+    /// is written after the loop, so the marker means "a pass over this file
+    /// finished, and what it wrote is here" and nothing weaker.
+    static func thumbnails(
+        for media: MediaSnapshot, url: URL, stamp: CacheStamp?, into cacheDir: URL
+    ) async {
         guard media.hasVideo else { return }
         let directory = thumbsDirectory(for: media.id, in: cacheDir)
+        let marker = thumbsMarkerURL(for: media.id, in: cacheDir)
+        // The head check. A nil stamp (the file cannot be stat'ed) never
+        // skips, and never writes a marker below either.
+        if let stamp, readStamp(at: marker) == stamp { return }
         guard ensureDirectory(directory) else { return }
+        // What is on disk is the old film or a partial pass. The marker goes
+        // first, then the frames (`clearThumbnails` says why in that order).
+        // `replaced` rides the FIRST post of this pass and no other. The
+        // timeline memoises decoded tiles, so the old film's are in its memo
+        // and the first post must drop them; the first also suffices,
+        // because nothing of the old film is on disk once `clearThumbnails`
+        // returns — every tile memoised after that post is this pass's, and
+        // a miss is cleared by every post anyway. On every post it would
+        // empty the whole media's memo every sixteen frames for nothing.
+        var replaced = clearThumbnails(in: directory)
+        // The indices `writeJPEG` succeeded on: what the marker vouches for.
+        var written: Set<Int> = []
 
         if media.kind == .image {
-            if let image = decodeImage(url, maxPixelSize: Int(thumbnailHeight * 4)) {
-                writeJPEG(image, to: directory.appendingPathComponent("0.jpg"))
-                postCacheChange(media: media.id, kind: thumbsKind)
+            if let image = decodeImage(url, maxPixelSize: Int(thumbnailHeight * 4)),
+                writeJPEG(image, to: directory.appendingPathComponent("0.jpg")) {
+                written.insert(0)
             }
+            if let stamp, stripHolds(written, in: directory) { writeStamp(stamp, to: marker) }
+            // Posted whether or not the picture decoded: the old tile is
+            // gone either way, and a memo still holding it would draw a
+            // picture the package no longer has.
+            postCacheChange(media: media.id, kind: thumbsKind, replaced: replaced)
             return
         }
 
+        // `media.duration` is the RECORD's, and `relink_media` never
+        // re-probes (`core/src/edit_track.rs` replaces path and bookmark
+        // only), so a relink to a file of another length sizes this strip —
+        // and `peaks`' bucket count — from the old duration. Pre-existing,
+        // recorded here rather than fixed: the marker rebuilds the strip on
+        // a relink, at the old length.
         let seconds = max(
             1,
             min(maxThumbnails, Int((Double(media.duration) / Double(ReelTime.perSecond)).rounded(.up))))
@@ -401,7 +491,9 @@ enum MediaImporter {
                 let index = Int(
                     (Double(CompositionBuilder.ticks(requested)) / Double(ReelTime.perSecond))
                         .rounded())
-                writeJPEG(image, to: directory.appendingPathComponent("\(index).jpg"))
+                if writeJPEG(image, to: directory.appendingPathComponent("\(index).jpg")) {
+                    written.insert(index)
+                }
             case .failure:
                 // A frame that will not decode leaves a hole in the strip;
                 // the timeline draws the clip's tint there and carries on.
@@ -412,24 +504,55 @@ enum MediaImporter {
             sinceLastPost += 1
             if sinceLastPost >= 16 {
                 sinceLastPost = 0
-                postCacheChange(media: media.id, kind: thumbsKind)
+                postCacheChange(media: media.id, kind: thumbsKind, replaced: replaced)
+                replaced = false
             }
         }
-        postCacheChange(media: media.id, kind: thumbsKind)
+        // AFTER the loop and never inside it: a hole left by a frame that
+        // would not decode is still a finished pass — complete is not a
+        // count. But only when the pass wrote at least one frame and every
+        // frame it wrote is still there (`stripHolds` argues both halves: a
+        // pass that wrote nothing is a failed reader to retry, and a frame
+        // that is gone is a titled document's save having swapped the
+        // package under the pass); otherwise NO marker, and the next open
+        // rebuilds, exactly as before the marker existed. And only for a
+        // stamp that exists; nothing certifies a strip made from a file that
+        // could not be measured.
+        if let stamp, stripHolds(written, in: directory) { writeStamp(stamp, to: marker) }
+        postCacheChange(media: media.id, kind: thumbsKind, replaced: replaced)
     }
 
     // MARK: - Peaks
 
-    /// Writes the waveform for `media`: one Float32 per bucket, 100 buckets a
-    /// second, each the MAX MAGNITUDE over the bucket across every channel —
-    /// a mono envelope, which is what a waveform lane draws. Written to
-    /// `cache/peaks/<id>.bin` as raw little-endian floats, so reading it back
-    /// is one `Data` read and a rebind.
+    /// Writes the waveform for `media` to `cache/peaks/<id>.bin`: the
+    /// reader's every sample buffer through `PeakBuckets`
+    /// (`MediaCacheFiles.swift`, which holds the arithmetic and the argument
+    /// for max over RMS), then one atomic write of its floats.
     ///
-    /// Max, not RMS: a waveform's job is to show where the transients are,
-    /// and an RMS envelope hides a clipped peak.
-    static func peaks(for media: MediaSnapshot, url: URL, into cacheDir: URL) async {
+    /// Skipped when `peaks/<id>.complete.json` holds `stamp` AND the `.bin`
+    /// is there — the marker is a sibling, not a child, so either can be
+    /// deleted without the other. Otherwise BOTH go, before anything below
+    /// can fail, and a removed `.bin` is posted at once (`clearPeaks` says
+    /// why: nothing that reads a `.bin` asks for its marker first, so an old
+    /// file's waveform left through the rebuild would be drawn and measured,
+    /// and kept for ever by an early return). The three silent returns
+    /// below (no audio track, a reader that will not be built or started)
+    /// write NO marker and no `.bin`, so the next pass retries them, and
+    /// they cost what they cost the first time: an asset load, no samples
+    /// read.
+    static func peaks(
+        for media: MediaSnapshot, url: URL, stamp: CacheStamp?, into cacheDir: URL
+    ) async {
         guard media.hasAudio, media.duration > 0 else { return }
+        let file = peaksURL(for: media.id, in: cacheDir)
+        let marker = peaksMarkerURL(for: media.id, in: cacheDir)
+        if let stamp, readStamp(at: marker) == stamp,
+            FileManager.default.fileExists(atPath: file.path) {
+            return
+        }
+        if clearPeaks(for: media.id, in: cacheDir) {
+            postCacheChange(media: media.id, kind: peaksKind)
+        }
         let asset = AVURLAsset(url: url)
         guard let track = (try? await asset.loadTracks(withMediaType: .audio))?.first,
             let reader = try? AVAssetReader(asset: asset)
@@ -449,67 +572,15 @@ enum MediaImporter {
         reader.add(output)
         guard reader.startReading() else { return }
 
-        let bucketCount = max(
-            1,
-            Int(
-                (Double(media.duration) / Double(ReelTime.perSecond)
-                    * Double(peakBucketsPerSecond)).rounded(.up)))
-        var buckets = [Float](repeating: 0, count: bucketCount)
-        // Frames consumed so far, so a bucket that spans two sample buffers
-        // still lands in one place.
-        var frameCursor = 0.0
-        var sampleRate = 48000.0
-        var channels = 1
-
-        while let sample = output.copyNextSampleBuffer() {
-            if let description = CMSampleBufferGetFormatDescription(sample),
-                let asbd = CMAudioFormatDescriptionGetStreamBasicDescription(description) {
-                sampleRate = asbd.pointee.mSampleRate > 0 ? asbd.pointee.mSampleRate : sampleRate
-                channels = max(1, Int(asbd.pointee.mChannelsPerFrame))
-            }
-            guard let block = CMSampleBufferGetDataBuffer(sample) else { continue }
-            let byteCount = CMBlockBufferGetDataLength(block)
-            guard byteCount >= 4 else { continue }
-            var samples = [Float](repeating: 0, count: byteCount / 4)
-            let copied = samples.withUnsafeMutableBytes { raw -> OSStatus in
-                guard let base = raw.baseAddress else { return -1 }
-                // Copy rather than point into the block: a block buffer may be
-                // several non-contiguous chunks, and pointing at the first one
-                // silently truncates the buffer.
-                return CMBlockBufferCopyDataBytes(
-                    block, atOffset: 0, dataLength: byteCount, destination: base)
-            }
-            guard copied == noErr else { continue }
-
-            let framesPerBucket = max(1.0, sampleRate / Double(peakBucketsPerSecond))
-            let frames = samples.count / channels
-            var frame = 0
-            while frame < frames {
-                let bucket = Int(frameCursor / framesPerBucket)
-                guard bucket >= 0 else { break }
-                if bucket >= bucketCount {
-                    frame = frames
-                    break
-                }
-                let bucketEnd = Double(bucket + 1) * framesPerBucket
-                let take = max(1, min(frames - frame, Int(bucketEnd - frameCursor)))
-                var magnitude: Float = 0
-                samples.withUnsafeBufferPointer { buffer in
-                    guard let base = buffer.baseAddress else { return }
-                    vDSP_maxmgv(
-                        base + frame * channels, 1, &magnitude, vDSP_Length(take * channels))
-                }
-                buckets[bucket] = max(buckets[bucket], magnitude)
-                frame += take
-                frameCursor += Double(take)
-            }
-        }
+        var peaks = PeakBuckets(duration: media.duration)
+        while let sample = output.copyNextSampleBuffer() { peaks.add(sample) }
         reader.cancelReading()
 
-        let file = peaksURL(for: media.id, in: cacheDir)
         guard ensureDirectory(file.deletingLastPathComponent()) else { return }
-        let data = buckets.withUnsafeBufferPointer { Data(buffer: $0) }
-        guard (try? data.write(to: file, options: .atomic)) != nil else { return }
+        guard (try? peaks.data.write(to: file, options: .atomic)) != nil else { return }
+        // After the `.bin`'s atomic write, so a marker never vouches for a
+        // file that is not there yet.
+        if let stamp { writeStamp(stamp, to: marker) }
         postCacheChange(media: media.id, kind: peaksKind)
     }
 }

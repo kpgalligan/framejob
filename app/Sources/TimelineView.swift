@@ -352,7 +352,8 @@ final class TimelineView: NSView, NSTextFieldDelegate {
     @objc private func mediaCacheChanged(_ note: Notification) {
         guard let media = note.userInfo?[MediaImporter.mediaIDKey] as? UInt32 else { return }
         let kind = note.userInfo?[MediaImporter.cacheKindKey] as? String
-        caches.invalidate(media: media, kind: kind)
+        let replaced = note.userInfo?[MediaImporter.replacedKey] as? Bool ?? false
+        caches.invalidate(media: media, kind: kind, replaced: replaced)
         content.needsDisplay = true
     }
 
@@ -1005,8 +1006,11 @@ final class TimelineCaches {
 
     /// Called for every `.mediaCacheDidChange`. Thumbnails post repeatedly as
     /// they land, so only the misses need clearing there — a tile already
-    /// read is still the same tile.
-    func invalidate(media: UInt32, kind: String?) {
+    /// read is still the same tile. That is true while a strip is being
+    /// filled in and false once it has been REPLACED (a relink, a changed
+    /// file), which is what `replaced` says: then the hits go too, or the old
+    /// film's tiles stay on screen until the 800-entry drop.
+    func invalidate(media: UInt32, kind: String?, replaced: Bool = false) {
         if kind == MediaImporter.peaksKind || kind == nil {
             peakCache.removeValue(forKey: media)
             peakMisses.remove(media)
@@ -1014,6 +1018,7 @@ final class TimelineCaches {
         if kind == MediaImporter.thumbsKind || kind == nil {
             let prefix = "\(media)/"
             thumbnailMisses = thumbnailMisses.filter { !$0.hasPrefix(prefix) }
+            if replaced { thumbnailCache = thumbnailCache.filter { !$0.key.hasPrefix(prefix) } }
         }
     }
 

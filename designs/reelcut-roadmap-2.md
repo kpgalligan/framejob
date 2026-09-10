@@ -2971,10 +2971,13 @@ type doc's claim that "a panel keeps ⌘Z alive" was a measured falsehood; and t
 Media tab's Relink… was the only one of three relink paths that never
 regenerated caches, so a relinked file got no filmstrip, thumbnail or peaks
 (pre-existing, fixed here).
-Two limits recorded rather than fixed: `ProjectDocument.selectedMedia` can point
-at a row the filter has hidden, and `generateCaches`'s "a cache already on disk
-is not rebuilt" is FALSE — measured, it re-decodes — which is a wrong comment
-and wasted work, not a wrong picture.
+Two limits recorded rather than fixed here: `ProjectDocument.selectedMedia` can
+point at a row the filter has hidden, and `generateCaches`'s "a cache already
+on disk is not rebuilt" was FALSE — measured, it re-decoded — which was a wrong
+comment and wasted work, not a wrong picture. The second was closed after the
+road map, by a completion marker that makes the sentence true
+(`designs/reelcut-remaining.md` records it; `MediaCacheFiles.swift`'s
+`CacheStamp` is the code).
 
 ---
 
@@ -3126,7 +3129,12 @@ clean, `make typecheck` 0 errors and the same 4 AVFoundation warnings,
 of `app/Sources` (the op envelope, `isDocumentLevel` and `NestScope`'s
 arithmetic have no caller a running binary can reach). Phases 1–8 all re-run
 unchanged: 66, 85, 121, 8, 84, 88, 167, 92, 79 over MCP and 26, 33, 59, 81, 70,
-78, 150 offscreen.
+78, 150 offscreen. Those are the gate's numbers, kept as history; two of the
+review wave's fixes shipped with only an untracked instrument each and have a
+tracked proof now — the marker-scope refusal and `scopeLanding` as
+`phase9_proof.py`'s section 9 (**214/214**, its two mutants 209/214 each), and
+the corner photographed SCROLLED by `phase9_chrome.py` (**62/62**, three
+mutants at 52, 57 and 55 of 62).
 **Twenty-four mutants across the two halves** — 15 in the core wave, 9 in the
 proof — with two survivors, both reported. The core's survivor is equivalent (a
 view carrying the parent's markers changes nothing the core can see) and the

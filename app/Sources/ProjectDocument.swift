@@ -422,8 +422,9 @@ final class ProjectDocument: NSDocument {
         publishReverseResolution()
         addWindowController(EditorWindowController(document: self))
         // Filmstrips and waveforms for whatever the open brought in. Cheap
-        // to ask for repeatedly: `MediaImporter` skips a cache that is
-        // already on disk.
+        // to ask for repeatedly: `MediaImporter` skips a cache whose marker
+        // matches the file it was made from, and rebuilds one that has no
+        // marker — a strip cut short by a save or a crash.
         generateCaches()
         // A package can arrive without its `cache/` — copied out of a zip that
         // dropped it, or opened after someone cleaned it out — so an open is
@@ -769,8 +770,11 @@ final class ProjectDocument: NSDocument {
     }
 
     /// Kicks off thumbnails and peaks for every media that has a file. Safe
-    /// to call repeatedly — a cache already on disk is not rebuilt — so the
-    /// open path and the import path both just call it.
+    /// to call repeatedly — a cache whose marker matches its file is not
+    /// rebuilt; a relinked, changed, partial or unmarked one is
+    /// (`MediaImporter.CacheStamp`) — so the open path, the import path, the
+    /// three relink paths and Consolidate all just call it; a media with
+    /// nothing to do costs a stat, a marker read per half and a `fileExists`.
     func generateCaches() {
         guard let cache = cacheDirectory else { return }
         let urls = mediaURLs()

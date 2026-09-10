@@ -159,14 +159,15 @@ extension MediaPane {
     /// is the app's one spelling of "make what is missing", the relink SHEET
     /// relinks several files in a single step and so could use nothing
     /// narrower, and a per-media entry point invented for this one call site
-    /// would be a second answer to that question. What it costs
-    /// is worth saying, because the function's own doc understates it and this
-    /// phase measured otherwise: the pass re-decodes every media that has a
-    /// file rather than skipping the ones already cached (a filmstrip frame's
-    /// modification date moves on a second pass), all of it in a detached
-    /// utility-priority task. A relink is a rare, deliberate act — one panel,
-    /// one file — so a few background decodes on it buy the guarantee that
-    /// every one of the three paths leaves the same caches behind.
+    /// would be a second answer to that question. What the whole pass costs
+    /// is what the function's doc now says: a stat, a marker read per half
+    /// and a `fileExists` per media whose completion marker still matches its
+    /// file, and a rebuild for the one whose file just changed, all in a
+    /// detached utility-priority task. It used to re-decode every media on every call — phase 8
+    /// measured a filmstrip frame's modification date moving on a second pass
+    /// — which `MediaImporter.CacheStamp` ended. A relink is a rare,
+    /// deliberate act — one panel, one file — and every one of the three
+    /// paths leaves the same caches behind.
     func relink(_ media: UInt32) {
         guard let entry = binding.snapshot.media(media), let window = window else {
             NSSound.beep()

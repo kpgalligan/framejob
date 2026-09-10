@@ -3,9 +3,10 @@
 `CLAUDE.md`'s "Verifying a build" is the standard: the app is verified by
 driving the built binary and comparing what it renders, not by reading
 code. These are the scripts that do it — an MCP script per road-map-2 phase,
-and from phase 2 an offscreen-chrome script beside it — so a proof can be
-re-run after a later change rather than believed on the strength of a
-paragraph.
+from phase 2 an offscreen-chrome script beside it, and for the fixes
+`designs/reelcut-remaining.md` records, `remaining_proof.py` over MCP and
+`remaining_probe.py` offscreen — so a proof can be re-run after a later
+change rather than believed on the strength of a paragraph.
 
 `mcp.py` is a ~80-line MCP client (streamable HTTP, tools only) — enough to
 `initialize`, list the tools and call one: `call(tool, **args)`, or
@@ -177,18 +178,22 @@ are already there.
 
 The offscreen scripts take no port and are run on their own —
 `python3 tools/proof/phase2_chrome.py` and its successors through
-`phase8_chrome.py`; each paragraph below says what its own one renders into.
-Phase 9 has no chrome script — `phase9_probe.py` is its second half and is a
-PROBE rather than a photograph, for the reason its own section gives. **What
-that leaves unphotographed is the breadcrumb**, and `designs/reelcut-remaining.md`
-§1b is the open item: the corner is only wrong at a NON-ZERO vertical scroll
-(the header column and the floating ruler do not overlap at rest), and every
-render here is at scroll 0, so a `scope` argument alone would not reach it. The
-instrument that DID measure it — a probe that builds a bare `TimelineView` and
-scrolls it — is in `work/phase9-corner-probe/`, untracked, which is the debt.
-`phase8_chrome.py` is the one that puts WINDOWS on screen — its `dispatch`
-mode activates a probe for about a second, because a key window is the thing
-it measures.
+`phase9_chrome.py`; each paragraph below says what its own one renders into.
+Phase 9 has two offscreen scripts: `phase9_probe.py` is a PROBE rather than a
+photograph, for the reason its own section gives, and `phase9_chrome.py` is
+the photograph of the one thing the harness cannot take — the breadcrumb's
+corner, which is only wrong at a NON-ZERO vertical scroll (the header column
+and the floating ruler do not overlap at rest) while every harness render is
+at scroll 0. It is a probe too, one that builds a bare `TimelineView`, scrolls
+it and captures through the harness's own `cacheDisplay` path; the untracked
+`work/phase9-corner-probe/` that measured the fix at the time is superseded by
+it and deleted. `remaining_probe.py` is a third probe: the app arithmetic
+behind `designs/reelcut-remaining.md`'s fixes, one section per item, and its
+last section photographs a bare `TimelineView`'s filmstrip tile the same way
+`phase9_chrome.py` photographs the corner. `phase8_chrome.py` is the one
+that puts WINDOWS on screen — its
+`dispatch` mode activates a probe for about a second, because a key window is
+the thing it measures.
 
 The last line is `<n>/<n> checks passed`, and the exit status is non-zero if
 any failed. The log's second line names the port the app actually bound (a
@@ -1106,18 +1111,53 @@ person's eyes: two builds agreeing byte for byte is an isolation claim, not a
 picture.
 
 `phase9_proof.py` is phase 9's MCP half (`python3 tools/proof/phase9_proof.py
-[port] [log path]`, **184/184**, about seven seconds). **It is 29 checks short
-of what phase 9 measured**, and that is an open debt rather than a boundary:
-the review's fix wave proved two MCP-coherence fixes — the marker refusal on an
-INHERITED scope, and `editResult` reporting the scope the ops were actually
-stamped with — in `work/lane9_marker_scope_mcp.py`, which is untracked. They
-belong here, at or before section 9. `designs/reelcut-remaining.md` §1a carries
-the fold and the two mutants that gate it. Otherwise it is deliberately
+[port] [log path]`, **214/214**, about seven seconds). It was 184 for the
+phase's own gate and twenty-eight checks short of what phase 9 measured: the
+review's fix wave proved two MCP-coherence fixes in
+`work/lane9_marker_scope_mcp.py`, untracked (28 checks — the "29" this tree's
+documents quoted for a while counted its `def check` line), and a fix with no
+permanent proof is the shape this tree does not accept. **Section 9 is that
+script folded in**, sentence for sentence, with the fixture rebuilt on
+`fresh()` and every id read back through `get_project`, plus two checks the
+fold added, so it is thirty. The
+two fixes are both about a scope the caller INHERITED from `set_scope` rather
+than asked for, which the core cannot tell from an explicit one, so both are
+the app's (`AgentServer+Scope.swift`): (a) `add_marker`, and `set_marker`
+carrying a `time`, are refused BEFORE the edit — a marker's time is the
+timeline's and every tick in the call is the nest's, `add_marker`'s default
+`at` most of all, since the playhead inside a nest is nest-local (the section
+reads it as 0 where the timeline's is 1,200,000) — while `set_marker`'s name,
+chapter and color apply and are reported as having gone to the document; an
+EXPLICIT scope still hears `core/src/scope.rs`'s own sentence, unchanged, with
+the nest open as well as named. (b) A result reports where its ops LANDED:
+`scope` is the nest they were stamped with and `document_ops` names any op the
+document-level list sent to the document instead, so `set_canvas` inside a
+nest answers `document_ops: [set_canvas]` where it used to answer the open
+view's `scope`, and a result with no scope anywhere carries neither key. Three
+checks are the fold's own, not the lane's: the "explicit `at` is refused
+identically" comparison is `is not None and ==` rather than `==`, because under
+a build whose refusal is gone both calls succeed and `None == None` scored it
+green; the `at must be a time in ticks (600000 per second).` refusal is matched
+verbatim, so the "argument reader speaks first" claim beside it is pinned to
+one voice; and the `undo` of an inherited-scope `remove_marker` is checked to
+put the marker back on the DOCUMENT, renamed and chaptered, because three
+explicit-scope refusals below it resolve the marker's id against the timeline
+and a marker the undo had not restored would make them answer "No marker has
+id" and read as scope refusals gone wrong. **Its two mutants, each in a copy of
+the tree under `/tmp` with one edit, `make app` run and the copy's own binary
+relaunched on its own port**: `checkDocumentLevelTicks` made a no-op scores
+**209/214** — the no-`at` refusal, its way-out sentence, the identical
+explicit-`at` refusal, `set_marker`'s `time` refusal and "nothing was placed"
+(three markers where there was one) — and `scopeLanding` put back to the
+unconditional `if let scope = effectiveScope(document)` echo scores
+**209/214** — the five `document_ops` claims, `set_marker` name and chapter,
+`remove_marker`, `set_canvas` and `remove_media`, every one answering the
+view's `scope` instead. Otherwise it is deliberately
 the SMALLER half of the phase: `phase9_probe.py` below already owns everything
 the app decides before a tool call leaves it, so nothing here repeats it and
 the two touch the same ideas from opposite sides — the probe reads the JSON an
 op leaves with, this reads what a document that got one looks like afterwards.
-Ten sections. **The oracle is the phase's own, and the sameness in it is not
+Eleven sections. **The oracle is the phase's own, and the sameness in it is not
 this script's to define**: `content` and `contents` are
 `core/tests/common/mod.rs`'s pair transcribed key for key — strip `id`, `track`
 and each action's `id`, key each clip by its start and by the INDEX of the
@@ -1216,32 +1256,37 @@ TIMELINE clip also shows, and nothing here stages two clips sharing one nest.
 merge is core-side, so an MCP mirror would be redundancy rather than reach.
 
 What no script can claim about phase 9, gathered so it is not spread through
-the sections. The gestures and the chrome are untouched: ⌘↓ / ⌘↑, the
-double-click that enters, and the breadcrumb in the timeline bar's
-131 × 21 pt corner are a PICTURE, and there is no `phase9_chrome.py` — the
-probe reads `NestScope.names`, which is what the breadcrumb prints, but nobody
-has photographed the corner. Nothing here says a nest PLAYS: a scoped
+the sections. The gestures and the chrome are not this script's: ⌘↓ / ⌘↑, the
+double-click that enters, and the breadcrumb in the ruler's 132 × 22 pt
+corner are a PICTURE and a click count, and `phase9_chrome.py` (its own
+section below) is what photographs the corner SCROLLED and delivers the clicks
+— the probe reads `NestScope.names`, which is what the breadcrumb prints, and
+the chrome script reads what the corner draws. Nothing here says a nest PLAYS:
+a scoped
 composition's audio and its 60 fps are the two things spec §10 has always left
 to a person at the machine. The identity between the handle `rc_project_scoped`
 returns and the view an edit is applied to is `core/tests/scope.rs`'s claim,
 made in-process against one `scoped_view`; what this file adds is that the app,
 the renderer and the tools all agree with that handle once it is open. And
 three sections EXIT EARLY under a mutant that breaks scoping outright, which is
-why `double-ids` scores out of 120 rather than 184 — `scoped_edit` turns the
-first refused op of a section into a scored failure and stops, because a crash
-is a worse detection than a failure and a section that raised would leave every
-claim below it unrun.
+why `double-ids` scores out of 120 rather than 184 — 184 being the baseline at
+the time; the script is 214 since section 9 landed, and the nine have not been
+re-run against it — `scoped_edit` turns the first refused op of a section into
+a scored failure and stops, because a crash is a worse detection than a failure
+and a section that raised would leave every claim below it unrun.
 
 `media/A.mov`, `AV.mov` and `B.mov` are all it reads and it writes nothing to
 `media/`: `AV.mov` is the oracle's media clip (eight of the thirty-two rows
-mean nothing on a shape), `A.mov` is section 6's media in nobody's use, and
-`B.mov` is only ever a PATH inside a paste payload. Its version packages are
+mean nothing on a shape), `A.mov` is sections 6 and 9's media in nobody's use,
+and `B.mov` is only ever a PATH inside a paste payload. Its version packages are
 `work/phase9-v<n>.reelcut` at FIXED names, which is safe for phase 2's reason
 inverted — they are never saved through the document machinery, only read — and
-it opens FIFTEEN documents in the instance (nine `new_project`, one per
-section that needs a clean fixture, and six `open_project`), so the relaunch
-rule below is not optional for it: two runs on one process is thirty, and the
-deadlock is somewhere past forty. No `ffmpeg`, no `swiftc`, no window server grant.
+it opens SIXTEEN documents in the instance (ten `new_project` — one per
+section that needs a clean fixture, and section 7 needs two — and six
+`open_project`), so the relaunch
+rule below is not optional for it: two runs on one process is thirty-two, and
+the deadlock is somewhere past forty. No `ffmpeg`, no `swiftc`, no window server
+grant.
 
 `media/` and `work/` are ignored: the movies are regenerable from the lines
 above and the projects are rebuilt on every run. Phase 2's packages are
@@ -1653,5 +1698,321 @@ undo step". Sending every op scoped — `isDocumentLevel` ignored — plus
 dropping `setNestPath`'s `inOutRange = nil` scores **46/48** and takes exactly
 the two checks those two lines exist for. The PICTURE half of this phase is
 not here and cannot be: the breadcrumb is drawn inside the frozen ruler's
-`draw`, and a scope is view state the harness has no argument for, so a
-photograph of the corner needs a harness argument this phase did not add.
+`draw`, and a scope is view state the harness has no argument for — it is
+`phase9_chrome.py`'s, next, which photographs the corner with no harness
+argument at all.
+
+## Phase 9 — the corner, photographed (`phase9_chrome.py`)
+
+`python3 tools/proof/phase9_chrome.py`, **62/62**. No port, no window server
+grant, no media: route 1 of `designs/reelcut-remaining.md` §1b, a probe over
+the WHOLE of `app/Sources` in `phase9_probe.py`'s shape — `harness/build.sh`'s
+own swiftc line, cached on modification times under `work/cornerprobe/<tag>/`,
+a build failure scored as a FAILURE rather than an exit — except that this one
+RENDERS. Route 2 was two harness arguments, and three things ruled it out. The
+defect is a z-order, the header column painted ABOVE the floating ruler; the
+two bands overlap in exactly one square — the 132 × 22 pt corner the
+breadcrumb is drawn in — and only once the pane has scrolled VERTICALLY, while
+every harness render is at scroll 0, so a `scope` argument alone would have
+shown a correct corner against a build that painted it out on the first
+scrolled point. A vertical-scroll argument would have had to be appended after
+`mediaFilter` and then proved harmless by re-running seven chrome scripts. And
+half of what the fix wave changed is not a picture: how many levels one
+double-click walks out (`beginGesture`'s `clicks < 2`) and what Clip ▸ Open
+Nest / Close Nest validate as while a rename field is being typed into — a
+click count and a validator's answer, which no photograph can read. So the
+probe builds a bare `TimelineView`, feeds it a snapshot, scrolls it and
+captures through the same `cacheDisplay` path the harness uses, then drives a
+real `EditorViewController` over the nested package `phase9_probe.py` uses.
+The untracked `work/phase9-corner-probe/` measured the fix this way at the
+time; this is that instrument as a tracked script with what the scout found
+wrong with it put right, and the untracked directory is deleted.
+
+**The fixture is honestly scrollable, and the untracked probe's was not.** Ten
+text tracks make 490 pt of content against a 324 pt viewport — 166 pt of room
+for the 62 pt scrolled (`rowTop(1) − 10`, a row's top 10 pt under the ruler's
+bottom, where a track rename's field sits) — and every scrolled scene reports
+`clipMinY == pinnedY == 62`, a scroll the app can reach. The untracked probe's
+six tracks were 306 pt against the same 324: `NSClipView.scroll(to:)` does not
+clamp, so it reported a 62 pt scroll of a pane with no room to scroll and
+photographed a state no user reaches. Its z-order pictures held anyway, which
+is why the fix was right; the fixture is what a proof cannot carry.
+
+Six scenes, each a full PNG under `work/cornerprobe/<tag>/shots/` with the
+corner cropped beside it by the SCRIPT from the decoded PNG, so the crop
+compared is a crop of the photographed picture and not a second capture:
+`topPlain` (scroll 0, no trail — the corner every project before phase 9
+drew), `top` (scroll 0, a two-level trail), `scrolledPlain`, `scrolled`,
+`rename` (the same scroll with a track rename field open on the top, partly
+scrolled row — the one thing that must stay above the ruler) and
+`renameEnded` (then `endRename()`, the scene the untracked probe never had and
+the only one that can see the restore line). Section 1 is the instrument's
+honesty: all six SETTLED (two consecutive captures byte-identical), one
+backing scale, the corner 132 × 22 pt at the pane's visible top-left in every
+scene, and the scroll arithmetic above. Section 2 is the picture, every claim
+a byte comparison of the decoded corner crop that names WHERE any difference
+lies: `scrolled` == `top` (the trail survives the scroll); `scrolled` !=
+`scrolledPlain` (941 px differ, every one inside the corner — the trail is
+VISIBLE); `scrolledPlain` == `topPlain`, and that blank square holds at most 3
+distinct pixel values where the trailed corner holds 144; `scrolled` vs
+`scrolledPlain` and `top` vs `topPlain` differ ONLY inside the corner;
+`rename` != `scrolled` with `content.subviews.last === headers` and the
+difference confined to the corner ∪ the field's rectangle (at a 2 px slop,
+because a bezeled `NSTextField` paints its halo one point outside its frame —
+258 px fell outside at slop 1, measured); `renameEnded`'s corner ==
+`scrolled`'s and the WHOLE frame identical, with `subviews.last === ruler`; and
+`init`'s order `[headers, ruler]` read in all six. Section 3 is the gestures
+on the real editor: the corner's hit compared as the `TimelineHit` enum
+(`.corner` at depth 0, `.breadcrumb(level: 0)` at 1, `.breadcrumb(level: 1)`
+at 2), a double-click delivered as AppKit delivers one (`clicks: 1`, its
+mouse-up, `clicks: 2`) entering the nest clip where a single click only
+selects, the CONTROLLER's push of the trail read after each step, the
+breadcrumb double-click at depth 2 coming out ONE level, a lone click at depth
+1 reaching the timeline and re-selecting clip 3, a click on the inert
+top-level corner swallowed, and a breadcrumb click under an open rename ending
+the field first. Section 4 is `validateNestScopeAction` at depth 0, idle,
+typing and after ending, for `openNest`, `closeNest`, the three marker
+selectors (nil at depth 0, false at depth 1) and `splitAtPlayhead` (nil — not
+its business). The activation policy is `.prohibited`, the harness's; the one
+thing that could have needed `.accessory` was the rename field taking first
+responder in a never-shown window, and it does, scored in both halves.
+
+Made to fail, three ways, each a one-line mutant that `--mutant` applies to a
+COPY of `app/Sources` under `work/` and builds in its own cache — never the
+tree, and not a reference build the way phase 5's is, because no git commit
+has the old z-order AND a breadcrumb; the phase's one app commit ships the
+fix. `init-order` (`init`'s two `addSubview` lines swapped back) scores
+**52/62** and takes ten by name: the init order, the ruler front-most in the
+plain scenes and at idle, `scrolled` == `top`, `scrolled` != `scrolledPlain`,
+`scrolledPlain` == `topPlain`, the ≤ 3-colour corner, only-inside-the-corner,
+and BOTH `renameEnded` identities — the restore puts the ruler above the
+headers, which is the fixed order, so the ended scene shows the trail the
+un-ended one lost. `end-rename` (`endRename`'s restore line deleted) scores
+**57/62** and takes five: `renameEnded`'s `subviews.last`, its two identities,
+and the two "ruler front-most again" reads in sections 3 and 4 — the untracked
+probe's four scenes would have let this one through. `double-click`
+(`clicks < 2` made `true`) scores **55/62** and takes seven, the second-press
+check and six downstream of it, since every later step of the gesture half is
+then at the wrong depth. `--sources DIR` (or `RC_APP_SOURCES`) and `--tag`
+build against any other copy. The probe builds in 40–45 s and runs in about
+2.5 s; a cold run of the script is about 52 s and a warm one about 8 s, and two
+direct probe runs into separate directories come out byte-identical across
+processes.
+
+What is not claimed: the renders are in the light appearance only; the picture
+half is a bare `TimelineView`, so the trail it draws was assigned by the probe
+and the controller's push is read structurally in the gesture half rather than
+photographed; and no mouse event is synthesised — `beginGesture` is called
+with the hit, point, flags and click count `mouseDown` would have computed,
+which is the frozen file's one line and not under test. The gesture half is
+sequential, so a wrong depth propagates into the checks below it — recorded,
+not changed.
+
+## The remaining-work probe (`remaining_probe.py`)
+
+`python3 tools/proof/remaining_probe.py`, **141/141**. No port, no window
+server grant, and no media beyond `media/A.mov` (sections 2, 3 and 5),
+`AV.mov` and `B.mov` (section 5): a standalone probe over the WHOLE of
+`app/Sources` in `phase9_probe.py`'s shape — `harness/build.sh`'s own swiftc
+line, cached on modification times under
+`work/remainingprobe/<tree|mutant-hash>/`, a build failure scored as a
+FAILURE rather than an exit — for the items in
+`designs/reelcut-remaining.md` that are APP arithmetic or an app PICTURE no
+tool reaches. One section per item, and one binary answering all of them by
+a request `mode`, so the next item adds a `case` and a `section_…` without
+touching the others: section 1 is §2b's naming (70 checks with the build
+check), sections 2–5 are §2a's cache marker on the app side (71).
+`--sources DIR` (or `RC_APP_SOURCES`, the spelling `phase9_chrome.py` uses
+too) compiles it against any other copy, which is the gate.
+
+Section 1 is §2b, the three stem helpers, and why it is a probe is the point.
+Both sites the item named are PANEL-only —
+`CaptionExportOptions.formatChanged` rewrites the save panel's name field
+when the Format popup moves, and
+`exportCaptionsCommand` seeds that field from the document's title — and the
+MCP path never comes near either: `export_captions` goes through
+`AgentServer.destinationURL`, which strips only a member of
+`replaceableExtensions` and appends otherwise, so `{path: "Board v1.2"}` wrote
+`Board v1.2.srt` before the fix and after it, and an MCP check for that name
+passes against the unfixed build. What can see it is the shape
+`FrameWriter.renamed` chose in phase 7 for the same defect, a pure function of
+a string run over a table of names. **1a**: `CaptionExporter.renamed` — its
+known set is exactly `{srt, vtt}`, read off `Format.allCases` rather than a
+second list, and fourteen rows, of which `Board v1.2` + SubRip →
+`Board v1.2.srt` is the one a bare `deletingPathExtension` fails; a foreign
+extension is KEPT (`talk.txt` → `talk.txt.srt`, the file the tool writes for
+that path), the suffix is compared lower-cased, and `chart.png` + SubRip →
+`chart.png.srt` pins the recorded divergence from MCP's `chart.srt`. **1b**:
+`FrameWriter.renamed`, nine rows over the same shape — its docstring has said
+since phase 7 that a probe compiled from `app/Sources` calls it with a table
+of names, and none did until this one. **1c**:
+`ProjectDocument.displayStem(of:)`, the title-bar stem the three panels
+(Export…, Save Frame…, Export Captions…) put an extension after, whose set
+is `{reelcut}` and NOT the caption set: nine rows, `Board v1.2.reelcut` →
+`Board v1.2` and `talk.srt` → `talk.srt`. **1d**: the instance accessor over
+live documents — a fresh `ProjectDocument()` and one told it lives at
+`Board v1.2.reelcut` — because a static function nobody calls is not a fix.
+**1e** is a STRUCTURAL read, and it is there because a behavioural probe
+cannot see whether a panel's private method calls the helper: it reads the
+four function bodies out of the sources it compiled and asserts each names its
+helper and carries no `deletingPathExtension` of its own, and that each file
+holds exactly the bare count it is allowed. `phase7_chrome.py`'s
+`destinationProperties != nil` is the precedent, and it is weaker than a
+behaviour and said to be. **1f** pins the one rule three documents state and
+nothing had checked — `knownExtensions` ⊆ `AgentServer.replaceableExtensions`,
+without which the panel and the tool would name one file two ways: rows built
+FROM `knownExtensions` (not a second list) call `destinationURL` with each
+member asked for as the other format, upper-case too, and assert the strip
+(`x.srt` + WebVTT → `x.vtt`, `x.vtt` + SubRip → `x.srt`) against a non-member's
+append (`x.txt` + SubRip → `x.txt.srt`), plus a coverage check that every
+member read off the type has a row.
+
+Made to fail, four ways, each a copy of `app/Sources` under
+`work/remainingprobe/mutants/` and the script pointed at it with `--sources`;
+the first three were scored when section 1 was 63 checks, the fourth at 108.
+`caption-bare` (`CaptionExporter.renamed` back on the bare strip) scores
+**59/63** and takes the `Board v1.2`, `talk.txt`, `shot.final` and `chart.png`
+caption rows. `stem-bare` (`displayStem(of:)` back on the bare strip with an
+empty fallback) scores **60/63** and takes the `Board v1.2`, `talk.srt` and
+`talk.mov` stem rows — and 1d's live document PASSED against it, because this
+Mac shows extensions and a bare strip of `Board v1.2.reelcut` is right by
+accident there; the static table is the killer and the live read is a wiring
+check. `site-unwired` (`exportCaptionsCommand` alone back on the bare strip,
+both helpers intact) scores **60/63** and takes only 1e's three — the call,
+the absence of a bare strip at that site, and the file's bare count — while
+every behavioural row passed, which is what 1e is for: an unwired site with
+correct helpers beside it is the unfixed defect with a proof next to it.
+`no-vtt` (`vtt` removed from `replaceableExtensions`) scores **106/108** and
+takes exactly the two `x.vtt` + SubRip rows — the pair the tree had never
+pinned, since `phase4_proof.py` asks a `.srt` path for WebVTT and nothing had
+asked a `.vtt` path for SubRip. The probe builds in about 45 s and the tree's
+cached binary is reused across runs.
+
+Sections 2–5 are the half of §2a's completion marker that a running instance
+cannot be asked about; `remaining_proof.py` below is the other half.
+**2**: `CacheStamp.stamp(for:url:)` as pure calls over four files the script
+prepares — an original, a byte copy at another path with its times preserved
+(EQUAL, which is the claim that the path is not in the stamp), the same bytes
+with a later mtime (differs in `modified` alone, by the seconds the script
+moved it), and a missing path (nil) — plus the key set read off the encoding
+a marker carries and the shape of the two marker paths. **3**: the ledger,
+visible only as a COUNT: `generateCaches` once into a fresh directory, the
+`thumbs` posts counted until 1.5 s of quiet, then three calls in a row into a
+second directory — one pass's worth under the ledger, because the second and
+third queue behind the first and find its marker — and a fourth call after
+the quiet posts nothing and leaves `0.jpg`'s inode alone. **4**: the timeline's
+stale-tile wiring as PIXELS — a bare `TimelineView` (phase 9's chrome scene)
+over one media whose `0.jpg` the probe wrote solid red, the file turned blue,
+and `.mediaCacheDidChange` posted twice: WITHOUT `replaced` the tile stays
+red (the memo rule, pinned), WITH it the tile is blue, four PNGs compared
+inside the clip's rectangle with the differing box printed. **5** is the
+pass's own rules, the ones the review of the first landing forced — a pass
+certifies only a strip it can vouch for, and a peaks rebuild withdraws the
+old floats first: **5a** deletes `0.jpg` the instant it appears (a 1 ms poll
+on a thread of its own) and asserts NO marker, nine frames and a post, then
+runs the SAME pass untouched and asserts all ten frames, the marker, and
+`replaced` on its first post — the retry a hole earns; **5b** hands a
+`hasVideo` record a text file: no frame, no marker, a post; **5c** runs an
+IMAGE record over a text file with a seeded `0.jpg`: the tile is cleared, no
+marker, exactly one post carrying `replaced` (the decode-failure path posts
+too); **5d** makes ONE replacing pass post twice by running `A.mov` under a
+20 s RECORD — `relink_media` never re-probes, so a record longer than its
+file is a state the app can be in; a request past the end fails as a hole
+rather than clamping, measured — and asserts `replaced` on the first post and
+on no later one; **5e** builds `AV.mov`'s peaks, runs the same record over a
+video-only file and asserts the `.bin` and its marker are GONE with exactly
+one `peaks` post (the withdrawal — the "timeline was told" claim no tool can
+see), then `AV.mov` again brings the `.bin` back at its first size with one
+post. A limit: 5a's poll must see `0.jpg` before a ten-frame pass finishes,
+and on a machine that decodes all ten inside one step the PRECONDITION row
+fails by name rather than the rule row.
+
+Made to fail on copies of the tree with `--sources` — the first two scored
+at 108 checks, the rest at 141: the ledger removed (`generateCaches` back to
+a bare `Task.detached`) **107/108**, three rapid calls posting 3 where one
+pass posts 1; the one `if replaced` line removed from
+`TimelineCaches.invalidate` **105/108**, the tile still red after the flagged
+post; `stripHolds`' presence check removed **138/141** (5a's no-marker row
+and the two retry rows, since the wrongly written marker makes the retry
+skip); its empty-set guard removed **139/141** (5b and 5c's no-marker rows);
+`clearPeaks` back to marker-only **139/141** (5e's `.bin`-gone and
+one-withdrawal-post rows); the image branch's post moved back inside the
+decode's success arm **140/141** (5c's post row); `replaced` left on every
+post **140/141** (5d's "no later post" row).
+
+## The cache marker over MCP (`remaining_proof.py`)
+
+`python3 tools/proof/remaining_proof.py [port]`, **79/79**, against a
+running instance on its own port (4834 by default). It is §2a's sentence —
+"a cache already on disk is not rebuilt" — claim by claim, on a SAVED
+package, because an untitled document's temporary cache directory is
+reachable from no tool. Fixtures are COPIED into `work/` under new names
+before anything touches them (`AV.mov`, `A.mov`, `B.mov`, `C.mov`), since
+`os.utime` is one of the claims and a shared fixture's mtime is not this
+script's to move; earlier pids' `remaining-cache-*` packages and copies are
+swept at start, the rule every other MCP proof's `Session` follows. The
+instrument is `os.stat`'s inode and `st_mtime_ns`, not the marker's say-so:
+ImageIO stages every thumbnail and renames it into place and the peaks file
+is written `.atomic`, so a rebuilt file is a NEW inode, and "nothing moved"
+is a claim about four inodes and four nanosecond mtimes across every sample
+of a 3 s window against a baseline read BEFORE the trigger. The trigger is an
+import of a fresh 8 KB copy of `C.mov` under a new name — a path already in
+the list is an identity edit and never reaches the cache line — and the
+window is BOUNDED by a positive control in the same section that MEASURES:
+the same trigger with the marker deleted rebuilds at a latency dated from the
+trigger that must be at most the 3 s the window samples (0.06 s and 0.09 s
+here; 10 s is only the poll's cap), so a build whose rebuild lands at 4 s
+fails the control rather than slipping past the window. Every sub-section
+runs isolated, so a raise scores one failure and the next one runs; a
+missing parity log is scored, not printed; and the package copy in 1g is
+taken on a settle of the six cache files, not a pause.
+
+Section 0 is the parity log and the catalog. Section 1, in the order the
+remaining document argues it: both markers land after `AV.mov` (video AND
+audio) is imported, are JSON carrying `size`, `modified` and `duration` and
+NO key or value naming a path, agree with the copy's own stat, and are
+byte-identical to each other; a second whole-media pass (importing `A.mov`)
+moves none of the four; the thumbs marker deleted, the same trigger rebuilds
+`0.jpg` at a measured latency inside the window, and the peaks half — SAMPLED
+over 3 s once the rewritten thumbs marker says the pass finished, since a
+single read taken before that half could have run was a race — is left
+alone; the `.bin` deleted with its marker kept is rebuilt, because the peaks
+head check asks for both; `os.utime` of `A`'s copy by +2 s rebuilds `A`'s
+strip and moves the marker's `modified` by exactly 2; `relink_media` to a
+byte copy of `A` with a LATER mtime rebuilds on the mtime alone and relinking
+back rebuilds again, then `A` → `B` rebuilds with DIFFERENT `0.jpg` bytes and
+`B` → `A` brings them back; a byte copy of the whole package opened under a
+new path is not rebuilt in 3 s while a second copy with one marker deleted is
+rebuilt at a measured latency inside it; `consolidate_media` leaves the
+marker MATCHING the consolidated file — measured on this machine, `copyItem`
+preserves `st_mtime_ns` to the nanosecond, so nothing is rebuilt and the
+markers are untouched, which the script asserts and prints (a rebuild would
+also have been correct; only a stale marker is wrong); and **1i**, the
+withdrawal over MCP: a clip on `AV`, `detect_silence` answering, then
+`relink_media` to a copy of `A` (the record keeps `has_audio`; the pass finds
+no track and returns early) — the `.bin` is GONE inside the cap and stays
+absent with its marker across the window, `detect_silence` names `AV` in
+`pending_peaks` and proposes nothing rather than measuring the old file, and
+relinking back brings a byte-identical `.bin` and the detector's answer with
+it. The first run of 1g scored a copy with NO media green — `project.json` is
+written only by a save — so 1g saves first and asserts both copies list the
+media; the check is kept.
+
+Made to fail, each mutant a copy of the tree with the app built in the copy
+and its binary relaunched on its own port; the first four were scored when
+the file had 69 checks, the last two at 79. The thumbs head check deleted
+**65/69** — every negative claim (1b's "none of AV's four files moved", 1c's
+"the thumbs half was NOT rebuilt", 1g's "none of the copy's 6 cache files
+moved", 1h's "nothing was rebuilt") and nothing else. `CacheStamp.modified`
+forced to 0 **59/69** — both markers' `modified`, the utime row's
+precondition and its two rebuild claims, the four claims of the `A` → touched
+copy → `A` relink (each differing by mtime alone), and the consolidated file's
+match. A 4 s `Task.sleep` after the thumbs head check **67/69** — exactly the
+two latency bounds, with every 10 s cap passing, which is what the bounds are
+for. The peaks head check deleted **75/79** — 1b through the `.bin`'s inode,
+1c's sampled peaks claim, 1g and 1h; the review of the first landing had
+noted no mutant covered that check. `clearPeaks` back to marker-only
+**76/79** — 1i's three: the `.bin` gone, absent across the window, and the
+detector reporting `AV` pending. It opens THREE documents; relaunch between
+full runs. Phases 2, 3, 3-silence and 5, whose fixtures read the peaks path,
+were re-run against the same binary and still score 85, 121, 8 and 88.

@@ -599,14 +599,14 @@ final class ExportSheetController: NSViewController {
         RecipeOptions(burnInTimecode: burnInCheckbox.state == .on)
     }
 
-    /// The document's name with the container's extension. `displayName` is
-    /// what the title bar says, including "Untitled Project".
+    /// The document's name with the container's extension: `displayStem`, the
+    /// title with the package's own extension off and NOTHING else off, so
+    /// "Board v1.2" is `Board v1.2.mp4` (`ProjectDocument+DisplayStem.swift`).
     private func suggestedName(for settings: ExportSettings, in editor: EditorViewController)
         -> String
     {
-        let base = editor.document?.displayName ?? "Untitled Project"
-        let stem = (base as NSString).deletingPathExtension
-        return (stem.isEmpty ? base : stem) + "." + Exporter.fileExtension(for: settings)
+        let stem = editor.document?.displayStem ?? ProjectDocument.untitledDisplayName
+        return stem + "." + Exporter.fileExtension(for: settings)
     }
 
     /// The save panel's one line about what is being written. "As a movie"

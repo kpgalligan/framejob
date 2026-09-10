@@ -150,8 +150,10 @@ final class RelinkSheetController: NSViewController {
     }
 
     /// Every chosen file as ONE undo step, then a cache pass: a relinked
-    /// movie has no filmstrip or waveform on disk yet, and `generateCaches`
-    /// skips the ones that do.
+    /// entry's marker is compared against the file it now points at — a
+    /// different file rebuilds, the same file moved elsewhere is skipped
+    /// (the stamp has no path), and every other media whose marker still
+    /// matches is skipped too.
     @objc private func applyClicked(_ sender: Any?) {
         let replacements = self.replacements
         let document = self.document

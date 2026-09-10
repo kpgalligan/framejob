@@ -8,13 +8,15 @@ of M2 landed with it.
 
 Five things in `designs/`, and you want all of them:
 
-- **`designs/reelcut-remaining.md` — what is LEFT, and the only thing here
-  with open work in it. START HERE if you are picking up new work.** Road map
-  2 is complete, so what remains is the debt two large phases left behind: two
-  fixes whose proof instruments are still untracked (§1, the only place the
-  project's own standard was not met), two live defects recorded but not fixed
-  (§2), the size ledger a feature phase consults before it pays its toll (§3),
-  and the checks only a person at the machine can make (§4).
+- **`designs/reelcut-remaining.md` — what is LEFT, and the record of the
+  debt that was paid. START HERE if you are picking up new work.** Road map
+  2 is complete, and the debt two large phases left behind is now CLOSED and
+  written up there: §1 (two fixes whose proof instruments were untracked —
+  the only place the project's own standard was not met) and §2 (two live
+  defects, one of which became the cache completion marker). What is still
+  open is §3, the size ledger a feature phase consults before it pays its
+  toll, §4, the checks only a person at the machine can make, and §5, where
+  a third road map would start.
 - `designs/reelcut-design.md` — the normative spec. The schemas (§5), the op
   table (§6) and the architecture (§7) govern any change to either side; §11
   holds decisions already made, which are not to be re-litigated.
@@ -236,7 +238,15 @@ times the way the harness does, and a probe that will not build is a scored
 FAILURE rather than an exit, so a rotted instrument cannot take the rest of
 the score down with it. **When the thing to check is app ARITHMETIC or app
 STRUCTURE with no caller a script can reach, the answer is a probe against
-`app/Sources` and not a photograph.**
+`app/Sources` and not a photograph.** Two more took the route after the road
+map closed, and one of them PHOTOGRAPHS: `phase9_chrome.py` builds a bare
+`TimelineView`, scrolls it and captures through the same `cacheDisplay`
+path, because the breadcrumb's corner is only wrong at a non-zero vertical
+scroll and every harness render is at scroll 0; `remaining_probe.py` runs
+the naming helpers over tables, counts a notification to see the cache
+ledger, and renders a filmstrip tile red-then-blue to see the timeline drop
+a replaced strip's decoded tiles. A probe can render; what it cannot do is
+put up a sheet or a save panel, which is where the structural reads come in.
 
 ## Milestone status
 
@@ -1328,10 +1338,12 @@ STRUCTURE with no caller a script can reach, the answer is a probe against
   Preview Quality deleted outright** — section 5, a probe reading the render
   size off a real `AVPlayerItem`, is what closes it, and both numbers are in
   its docstring. Nineteen of 33 review findings survived their sceptics.
-  Two limits recorded rather than fixed: `selectedMedia` can point at a row
-  the filter has hidden, and `ProjectDocument.generateCaches`'s "a cache
-  already on disk is not rebuilt" is FALSE — measured, it re-decodes — which
-  is a wrong comment and wasted work, not a wrong picture.
+  Two limits recorded rather than fixed here: `selectedMedia` can point at a
+  row the filter has hidden, and `ProjectDocument.generateCaches`'s "a cache
+  already on disk is not rebuilt" was FALSE — measured, it re-decoded — a
+  wrong comment and wasted work, not a wrong picture. The second was fixed
+  after the road map closed, by making the sentence true (the completion
+  marker, in "After road map 2" below).
 
 - **Road map 2, phase 9 — Inside the nest: done.** The largest item, and the
   one the spec designed and left (§4.4). No schema change (v6 stands), NO new
@@ -1401,17 +1413,127 @@ STRUCTURE with no caller a script can reach, the answer is a probe against
   building, the catalog at 74 and the parity log EMPTY (the check has FOUR
   parts now — the fourth asserts every op tool declares `scope`, and is the
   only mechanism that would catch the 56th op added without one).
-  `tools/proof/phase9_proof.py` **184/184** over MCP — its spine is the oracle,
-  "apply inside with `scope`, then `unnest`" equals "`unnest`, then apply at
-  top level" over fourteen ops, ids aside, with every row ALSO asserted to
-  differ from the untouched round trip — and `phase9_probe.py` **48/48** over a
-  probe compiled from the whole of `app/Sources`. Phases 1–8 re-run unchanged:
-  66, 85, 121, 8, 84, 88, 167, 92, 79 over MCP and 26, 33, 59, 81, 70, 78, 150
-  offscreen. **Twenty-four mutants, two survivors, both reported.** The core's
+  `tools/proof/phase9_proof.py` **184/184** over MCP at the landing — its spine
+  is the oracle, "apply inside with `scope`, then `unnest`" equals "`unnest`,
+  then apply at top level" over fourteen ops, ids aside, with every row ALSO
+  asserted to differ from the untouched round trip — and `phase9_probe.py`
+  **48/48** over a probe compiled from the whole of `app/Sources`. Phases 1–8
+  re-run unchanged: 66, 85, 121, 8, 84, 88, 167, 92, 79 over MCP and 26, 33,
+  59, 81, 70, 78, 150 offscreen. The phase shipped two review-wave fixes with
+  only UNTRACKED instruments behind them, and the debt was paid after the road
+  map closed: `phase9_proof.py` is **214/214** since its section 9 (the
+  inherited-scope marker refusals and the landing a result reports; two
+  mutants, 209/214 each), and **`phase9_chrome.py` — 62/62 — photographs the
+  ruler corner SCROLLED** through a probe compiled from `app/Sources`, which is
+  the only way the z-order defect above can be seen (three mutants: 52, 57, 55
+  of 62). **Twenty-four mutants, two survivors, both reported.** The core's
   survivor was EQUIVALENT there and the MCP script KILLED it, because
   `get_project` inside a scope reports the view — a view somebody can look at
   is a contract. And the mutant giving the view the PARENT's canvas would have
   SURVIVED the frame-region comparison alone, since inner and outer then have
   the same size and the comparison degenerates into a whole-frame identity.
+
+- **After road map 2 — the remainder: done.** `designs/reelcut-remaining.md`
+  §1 and §2 are closed and carry the record; §3–§5 are what is still open.
+  Four items, no schema change, no new op, no new tool (the catalog is still
+  **74**), one size toll paid alone first (`3e5b598`).
+  **§1a** — the 28 marker-scope checks phase 9's fix wave measured with an
+  untracked script are `phase9_proof.py`'s section 9 (30 with a tightened
+  check and two the fold added; **214/214**; the two mutants — the refusal
+  made a no-op, the landing echoed unconditionally — score 209/214 each,
+  five named failures apiece). The doc said 29; the 29th was `def check`.
+  **§1b** — **`phase9_chrome.py`, 62/62**, route 1 over a probe: six scenes
+  of a bare `TimelineView` over an honestly scrollable ten-track fixture (the
+  untracked six-track one had OVER-SCROLLED through `NSClipView.scroll(to:)`
+  — its content was shorter than the pane, and a tracked script should not
+  claim a state the app cannot reach), the corner byte-compared as a decoded
+  crop, and the gesture half read as the `Equatable` `TimelineHit`. Its gate
+  is a MUTANT on a copy of `app/Sources` because no git commit has the old
+  z-order WITH a breadcrumb: init order swapped 52/62, `endRename`'s restore
+  deleted 57/62 (a fifth scene ends a rename, which the untracked probe never
+  did), the double-click guard flipped 55/62.
+  **§2a — the cache completion marker.** The decision the doc asked for: not
+  a doc-only fix (every open of a saved project would keep re-decoding every
+  filmstrip and re-reading every audio track) and not a plain existence
+  check (`relink_media` keeps the media id, so `thumbs/<id>/` already exists
+  with the OLD film's frames and a relinked media would never get new ones —
+  a wrong picture, and Remove Silences and Normalize would measure the old
+  file). `CacheStamp` (`MediaCacheFiles.swift`, spec §5.6) is the source's
+  size and modification second plus the record fields and constants that
+  size a cache, written LAST as `thumbs/<id>/complete.json` and
+  `peaks/<id>.complete.json`, and it carries NO path — unlike the reversed
+  cache's digest, which names a file in a shared directory — so a moved
+  package, a consolidated copy and a copy on another disk keep every
+  filmstrip. `generateCaches`'s task stats the file ONCE and hands the stamp
+  to both halves; `thumbnails` and `peaks` compare it with their marker at
+  the head and return without decoding when it matches; a relinked,
+  changed, partial or unmarked cache is deleted — the old frames, or the old
+  `.bin`, whose withdrawal is POSTED at once so nothing measures the
+  previous file's sound meanwhile — and rebuilt, and the marker is written
+  LAST and only for a strip the pass can vouch for (at least one frame
+  landed and every frame it wrote is still there: a save of a titled
+  document mid-pass swaps the package under it and loses the frames written
+  between the listing and the swap, and a reader that fails on every frame
+  would otherwise certify an empty strip — both leave no marker and the next
+  open rebuilds, as before). The FIRST post of a replacing pass says
+  `replaced`, and `TimelineView.swift` took five wiring lines so the
+  timeline drops that media's decoded tiles only then (`TimelineCaches`
+  kept hits on purpose, for the fill-in case, and a relink used to leave the
+  old film on screen until the 800-entry drop — pre-existing). Passes for one
+  media run one at a time IN CALL ORDER through `CacheLedger`, an `NSLock`
+  rather than an actor, because a pass carries the URL the media resolved to
+  when asked and two `Task` hops from one thread are not ordered; its price,
+  recorded, is that a pass stuck inside one AVFoundation call holds a relink
+  away from the stalled file. Seven comments that stated the false sentence
+  now state the true one, and `MediaImporter.generateCaches`'s "a cancelled
+  import (the document closing)" — a case that does not exist; nothing
+  cancels the task — names the real partial cases. The size toll came due a
+  second time mid-fix (644 against the cap), paid by moving the peak-bucket
+  arithmetic next door as `PeakBuckets`, byte-identical output against the
+  pre-move binary; 586 and 490 after.
+  Measured: `remaining_proof.py` **79/79** over MCP (inodes and nanosecond
+  mtimes across a 3 s window, bounded by a positive control whose measured
+  rebuild latency — 0.06 s here — is asserted inside that window;
+  `copyItem` preserves `st_mtime_ns`, so Consolidate rebuilds nothing; a
+  relink to a file with no audio track withdraws the `.bin` and
+  `detect_silence` reports the media pending instead of answering from the
+  old file) and `remaining_probe.py` sections 2–5 (the stamp as pure calls,
+  the ledger as a post count, the stale tile as pixels, and the pass's own
+  rules — a frame deleted mid-pass, an unreadable file, a failed image
+  decode, one `replaced` post, the withdrawal). Twelve mutants across the
+  two, no survivor: the thumbs head check deleted 65/69, `modified` forced
+  to 0 59/69, a 4 s sleep after the head check 67/69 (only the latency
+  bounds), the peaks head check deleted 75/79, `clearPeaks` back to
+  marker-only 76/79; the ledger removed 107/108, the hit-clearing removed
+  105/108, the presence check removed 138/141, its empty-set guard removed
+  139/141, the withdrawal's probe half 139/141, the image post moved back
+  140/141, `replaced` on every post 140/141. The review of the first landing
+  is what forced the vouching rule and the withdrawal — a lane that had
+  passed its own gate still had two defects a reader with a different
+  question found. Recorded, not fixed: `relink_media` never re-probes, so a
+  relink to a file of another length sizes the new strip from the old
+  `duration`; and an open Remove Silences sheet re-reads on a peaks post only
+  while something is pending, so spans it measured from a file an MCP relink
+  then swapped away (the sheet is modal, so nothing else can) stay until it
+  is reopened.
+  **§2b** — the item's premise was half wrong. `CaptionExporter`'s format
+  popup wanted a `{srt, vtt}` set (`CaptionExporter.renamed`,
+  `FrameWriter.renamed`'s six lines), but its other site strips the
+  DOCUMENT's extension off a title-bar name, and so did two siblings the
+  scout found (Save Frame's stem, the export sheet's `suggestedName`): all
+  three now read `ProjectDocument.displayStem`
+  (`ProjectDocument+DisplayStem.swift`, set `{reelcut}`, an extension because
+  the base file is over the cap). Both sites are PANEL-only and the MCP path
+  was right all along, so an MCP check passes against the unfixed build; the
+  proof is `remaining_probe.py`'s section 1 over tables — which is also the
+  first instrument to call `FrameWriter.renamed`, whatever its docstring
+  claimed since phase 7 — plus a structural read that the four sites CALL
+  their helpers (an unwired site scored 60/60 on the behavioural rows; three
+  mutants 59, 60, 60 of 63). Recorded limit: `chart.png` under SubRip is
+  `chart.png.srt` in the panel and `chart.srt` over MCP.
+  Measured for the lot: `make test` 494, `make lint` and `cargo fmt --check`
+  clean, `make typecheck` 0 errors and the same 4 warnings, the parity log
+  EMPTY, every phase proof unchanged against the final binary, and the
+  offscreen list is now 26, 33, 59, 81, 70, 78, 150, 48, 62, 101.
 
 Keep this file current as code lands.

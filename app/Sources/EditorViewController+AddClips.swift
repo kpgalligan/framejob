@@ -234,8 +234,9 @@ extension EditorViewController {
         document.performGroupedEdit("Add Background", [add, .addBackground(media: media)])
         // The thumbnail the Media tab draws, and the filmstrip the timeline
         // draws: the import path generates them after every commit and this is
-        // a commit like any other. Safe to call repeatedly — a cache already
-        // on disk is not rebuilt.
+        // a commit like any other. Safe to call repeatedly — a cache whose
+        // marker matches its file is not rebuilt, so a picture already in the
+        // list costs the pass a stat and a marker read.
         document.generateCaches()
         selectClips(addedSince: before, in: document)
     }

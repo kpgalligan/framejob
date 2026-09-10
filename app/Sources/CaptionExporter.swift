@@ -262,6 +262,67 @@ enum CaptionExporter {
         return Format(rawValue: url.pathExtension.lowercased()) ?? .srt
     }
 
+    // MARK: - Naming
+
+    /// Every extension a caption file is written under — the two formats'
+    /// `rawValue`s, which ARE their extensions (`Format`'s doc). It is the
+    /// caption formats' own set and not `FrameWriter.knownExtensions`, because
+    /// the question a set here answers is "did THIS popup write the suffix on
+    /// this name", and the only suffixes a caption panel ever puts on a name
+    /// are these two; a still's `.png` is `FrameWriter`'s to replace and a
+    /// caption panel handed `chart.png` keeps it, as it keeps `.txt`. Its two
+    /// spellings are the `srt` and `vtt` rows of
+    /// `AgentServer.replaceableExtensions`, and they have to be a SUBSET of
+    /// that set — see `renamed`; `tools/proof/remaining_probe.py`'s 1f
+    /// builds a row from each member here and asks `destinationURL`, so
+    /// the rule is pinned rather than stated.
+    static let knownExtensions = Set(Format.allCases.map { $0.rawValue })
+
+    /// A save panel's name field rewritten for a newly chosen format: the
+    /// stem it already holds, then that format's extension. `fallback` is
+    /// what an empty field falls back to. It is `FrameWriter.renamed` line
+    /// for line, with `rawValue` where that one has `fileExtension`, and for
+    /// its reason: **only a suffix this app WRITES is an extension**, and the
+    /// rest of the name is the person's. A bare `deletingPathExtension` takes
+    /// whatever follows the last dot, so the format popup used to turn
+    /// `Board v1.2` into `Board v1.vtt` — eating a character somebody typed
+    /// on purpose while doing exactly what it was told. Measured:
+    /// `("Board v1.2" as NSString).deletingPathExtension` is "Board v1", and
+    /// `("shot.final" as NSString)`'s is "shot".
+    ///
+    /// A foreign extension is KEPT: `talk.txt` under SubRip is `talk.txt.srt`,
+    /// because `txt` is part of the name by `AgentServer.destinationURL`'s
+    /// rule — it strips only a member of `replaceableExtensions` and appends
+    /// otherwise — and `talk.txt.srt` is the file `export_captions` writes for
+    /// that same path, so the panel and the tool agree about what the name
+    /// means. The suffix is compared lower-cased, as `destinationURL`
+    /// compares, so `talk.SRT` under WebVTT is `talk.vtt` and not
+    /// `talk.SRT.vtt`; a dot-leading name has no extension to Foundation
+    /// (`.srt` under WebVTT is `.srt.vtt`), which is pinned rather than
+    /// special-cased. The one place the two rules part company is a name
+    /// carrying another of the app's OWN containers — `chart.png` under
+    /// SubRip is `chart.png.srt` here and `chart.srt` over MCP, since `png`
+    /// is replaceable there and not a caption spelling — and that is a
+    /// recorded limit, not a case to widen the set for: a wider set is
+    /// exactly the bare strip with a longer list.
+    ///
+    /// It is a pure function of a string and lives HERE rather than in
+    /// `CaptionExportOptions` for `FrameWriter.renamed`'s reason: an
+    /// accessory view's private method is reachable by no proof this project
+    /// can write, because a save panel cannot be driven over MCP or
+    /// offscreen, and the MCP path never comes near it — `export_captions`
+    /// goes through `destinationURL`, which was right all along, so an MCP
+    /// check for `Board v1.2` passes against a build with the bare strip in
+    /// it. `tools/proof/remaining_probe.py` compiles `app/Sources` and calls
+    /// this with a table of names instead.
+    static func renamed(_ name: String, as format: Format, fallback: String) -> String {
+        let suffix = (name as NSString).pathExtension.lowercased()
+        let stem =
+            knownExtensions.contains(suffix)
+            ? (name as NSString).deletingPathExtension : name
+        return "\(stem.isEmpty ? fallback : stem).\(format.rawValue)"
+    }
+
     /// Writes the file, UTF-8, no BOM. A missing folder is refused rather
     /// than created: a caller who named one that is not there meant a
     /// different path.
@@ -391,11 +452,17 @@ private final class CaptionExportOptions: NSObject {
     /// revert to the document's name, and save to a path they had already
     /// replaced. `stem` survives as the fallback for a field emptied to
     /// nothing.
+    ///
+    /// The rewrite itself is `CaptionExporter.renamed`, which strips a
+    /// trailing suffix only when it is one of the two formats' own — so
+    /// `Board v1.2` no longer becomes `Board v1.vtt` — and is a free function
+    /// for the reason its doc gives: a rule inside a save panel's private
+    /// method is a rule no proof can reach.
     @objc private func formatChanged(_ sender: Any?) {
         guard let panel = panel else { return }
         panel.allowedContentTypes = [format.contentType]
-        let typed = (panel.nameFieldStringValue as NSString).deletingPathExtension
-        panel.nameFieldStringValue = "\(typed.isEmpty ? stem : typed).\(format.rawValue)"
+        panel.nameFieldStringValue = CaptionExporter.renamed(
+            panel.nameFieldStringValue, as: format, fallback: stem)
     }
 }
 
@@ -431,11 +498,12 @@ extension EditorViewController {
             NSSound.beep()
             return
         }
-        // `displayName` is what the title bar says, including "Untitled
-        // Project" — `ExportSheetController.suggestedName`'s fallback, for
-        // its reason: NSDocument declares it implicitly unwrapped.
-        let base = document.displayName ?? "Untitled Project"
-        let stem = (base as NSString).deletingPathExtension
+        // The title with the package's own extension off and NOTHING else
+        // off — `ProjectDocument+DisplayStem.swift` says why the bare strip
+        // that stood here lost the `.2` of "Board v1.2", and why its known
+        // set is `{reelcut}` where the popup's below is `{srt, vtt}`. It is
+        // also the popup's fallback for a field emptied to nothing.
+        let stem = document.displayStem
         let panel = NSSavePanel()
         panel.nameFieldStringValue = "\(stem).srt"
         panel.canCreateDirectories = true

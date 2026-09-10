@@ -284,9 +284,10 @@ enum FrameWriter {
     /// the last dot whatever it is, so the format popup used to turn
     /// `Board v1.2` into `Board v1.jpg` — eating a character somebody typed
     /// on purpose while doing exactly what it was told. That is the same
-    /// hazard `AgentServer.destinationURL` refuses in those same words for
-    /// that same name, and `replaceableExtensions` is what it keeps to refuse
-    /// it with; `knownExtensions` is this side's half of the one rule.
+    /// hazard `AgentServer.destinationURL` avoids for that same name — it
+    /// strips only a member of `replaceableExtensions` and APPENDS otherwise,
+    /// so `Board v1.2` over MCP is written as `Board v1.2.png` and always
+    /// was; `knownExtensions` is this side's half of the one rule.
     /// Measured: `("Board v1.2" as NSString).deletingPathExtension` is
     /// "Board v1", and `("shot.final" as NSString)`'s is "shot".
     ///
@@ -296,7 +297,8 @@ enum FrameWriter {
     /// cannot be driven over MCP or offscreen — so a rule kept there is a
     /// rule nothing can check. As a pure function a probe compiled from
     /// `app/Sources` calls it with a table of names (`AudioNormalize.swift`'s
-    /// argument, and `CaptionCues`').
+    /// argument, and `CaptionCues`') — `tools/proof/remaining_probe.py`,
+    /// section 1, the first instrument to have actually done so.
     static func renamed(_ name: String, as format: Format, fallback: String) -> String {
         let suffix = (name as NSString).pathExtension.lowercased()
         let stem =

@@ -90,10 +90,6 @@ extension EditorViewController {
             NSSound.beep()
             return
         }
-        // `displayName` is what the title bar says, including "Untitled
-        // Project" — `ExportSheetController.suggestedName`'s fallback, for its
-        // reason: NSDocument declares it implicitly unwrapped.
-        let base = document.displayName ?? "Untitled Project"
         // The TIME is fixed here and nowhere else. It is the person's own
         // choice, it is spelled into the name they are about to edit, and a
         // frame grab whose file disagrees with its own filename is worse than
@@ -110,8 +106,14 @@ extension EditorViewController {
         // the two canvases spell a tick identically and this line changes no
         // name; it is written this way to say which container the tick came
         // from, so the next person to touch it does not have to work it out.
+        //
+        // The base is `displayStem`: the title with the package's own
+        // extension off and NOTHING else off. A bare `deletingPathExtension`
+        // stood here and offered "Board v1.2" as `Board v1 ….png` — the same
+        // character the format popup below used to eat, fixed on the same
+        // terms (`ProjectDocument+DisplayStem.swift`).
         let stem = frameStem(
-            base: (base as NSString).deletingPathExtension, at: time,
+            base: document.displayStem, at: time,
             canvas: document.editedProject.snapshot.canvas)
         let panel = NSSavePanel()
         panel.nameFieldStringValue = "\(stem).\(FrameWriter.Format.png.fileExtension)"
