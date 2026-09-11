@@ -128,9 +128,10 @@ Section 5 is the PASS: the rules the review put into `thumbnails` and
 `peaks` after the marker landed — when a pass may write its marker, and
 what it tells — each driven straight at a directory, because no tool can
 delete a frame under a running pass, hand the app a text file with a
-movie's record, or count a notification. Five passes, over copies of
-`A.mov` and `AV.mov` (the one fixture with a peaks half) and two text files
-the script writes under a movie's name and an image's:
+movie's record, or count a notification. Thirteen passes, over copies of
+`A.mov`, `AV.mov` (the one tracked fixture with a peaks half) and
+`toneA.m4a`, three fixtures 5f makes with `ffmpeg` at proof time, and two
+text files the script writes under a movie's name and an image's:
 
   * 5a: `A.mov` with `0.jpg` deleted the instant it appears — a 1 ms poll on
     a thread of its own, the frame a titled document's save loses between
@@ -146,11 +147,13 @@ the script writes under a movie's name and an image's:
     the decode-failure path.
   * 5d: `A.mov` under a 20 s record with a `0.jpg` seeded — a relink never
     re-probes, so a record longer than its file is a state the app can be
-    in, and a request past the end fails as a hole (measured: eleven
-    frames, the one at 10 s landing inside the tolerance) while every
-    result counts toward the every-16 post, so ONE replacing pass makes TWO
-    posts, which no fixture is long enough to give: `replaced` on the first
-    and on no later one.
+    in. The ten seconds past the picture are HELD (5f's cure: one decode of
+    the track's last frame, written under each — twenty tiles, where they
+    used to fail as holes with only the one at 10 s landing inside the
+    tolerance), and the every-16 post counts TILES, so ONE replacing pass
+    makes TWO posts — at the eleventh result, which lands ten tiles, and
+    after the loop — which no fixture is long enough to give otherwise:
+    `replaced` on the first and on no later one.
   * 5e: `AV.mov`'s peaks built (one `peaks` post, the landing); the same
     record over a video-only file — `hasAudio` still true — WITHDRAWS the
     `.bin` and its marker at the head and posts `peaks` exactly once, the
@@ -158,6 +161,52 @@ the script writes under a movie's name and an image's:
     the `.bin` back at its first size with one post. That the timeline is
     TOLD is the claim `remaining_proof.py`'s 1i cannot make over MCP, and
     this row is where it lives.
+  * 5f: a picture that ends before its sound — road map 3's R0 surprise,
+    the shape of a screen recording of a static screen with narration,
+    whose video track ends at the last change while the sound runs on. The
+    fixture is made by `ffmpeg` at proof time under the script's own work
+    dir (1 s of `testsrc2` over 5 s of a 440 Hz tone, no `-shortest`), and
+    `ffprobe` pins the shape before anything is claimed of it. Under the
+    5 s record `import_media` gives such a file (the asset's duration, the
+    sound's), every second used to be asked for at its own time with a
+    half-second tolerance, and the four more than that past the picture
+    FAILED (`AVFoundationErrorDomain -11832`) as tinted holes under a
+    marker that certified them. Now the seconds at or past the video
+    track's end ask for its last frame ONCE: five tiles, `2.jpg`–`4.jpg`
+    byte-identical to `1.jpg`, `0.jpg` a different picture (so the identity
+    is the held tail's and not a strip of one frame), the marker written,
+    the `.bin` beside it. And a media with no video track runs as it always
+    did: the sound file (`toneA.m4a`) under its own record makes no thumbs
+    directory and no thumbs post while its `.bin` lands with one peaks
+    post, and the picture's record over the sound file — a relink to a file
+    with no video track — lands no tile and no marker and still posts,
+    5b's answer, because there is no end to read.
+    5f's second shape is the SPARSE recording — three frames at 0, 25 and
+    50 s under 60 s of sound, `-fps_mode vfr`, made twice: with
+    `h264_videotoolbox` (the recorder's own encoder; the first frame is the
+    only sync sample) and with `libx264 -g 1` (every frame a sync sample).
+    Each runs under the record `probeBlocking` gives it, read in the probe
+    and answered, because the record's RATE is the point: three frames over
+    50 s is 0.06 fps to `rationalFrameRate`, a 16.7 s "frame", and the
+    first landing measured its tail from that — `duration − frameDuration`
+    min'd with the track's end — so every second from 34 s asked for
+    33.4 s, inside the 25 s slide, while `CompositionBuilder.heldTail` (the
+    track's `minFrameDuration`, 1/30 s) held the 50 s slide. The rows: tiles
+    50–59 all there and byte-identical (the last frame asked for ONCE, at
+    its own time) and different from tiles 25 and 0; tiles 0–24 there and
+    identical to each other, 25 there and different (the generator answers
+    a second inside a SYNC frame's range with that frame, 24 s after it);
+    tiles 26–49 HOLES (a second inside a non-sync frame's range that is not
+    the frame's own time fails, `-11821` — the recorded limit the doc in
+    `thumbnails` states, measured here rather than assumed); 36 tiles, the
+    marker, a post; and the all-sync twin lands all sixty, 25–49 identical
+    and 50–59 identical and different. The held request is the frame's
+    EXACT time (an `AVSampleCursor` on the sample table, mapped through the
+    edit list) and not the track's end less a frame, because `timeRange` is
+    stored in the movie timescale and rounds UP — 50.0333 s is 50.034 at
+    1000 — and the VideoToolbox file answers 50.0007 s with `-11821` where
+    the x264 one happens to answer it: the `rounded-end` mutant below is
+    that arithmetic.
 
 Section 5's gate, each a copy of the tree pointed at with `--sources`,
 against this file's **141** checks. `stripHolds` without its presence
@@ -175,7 +224,18 @@ does", which is the row the 20 s record exists to make fallible. And
 posted (`remaining_proof.py`'s 1i mutant, run here as well) scores
 **139/141**: 5e's "the `.bin` is GONE" and "exactly ONE peaks post". No
 survivors; every section-5 row but the preconditions and the settle rows
-is taken by at least one of the five.
+is taken by at least one of the five. 5f grew the total to **156** and its
+own mutant is the pass as it stood before road map 3 — `thumbnails` with
+the video track's end unread, every second asked for at its own time
+(`git show be14253:app/Sources/MediaImporter.swift` over a copy of the
+tree) — which scores **153/156**: 5f's "five tiles" (two land, `0.jpg` and
+`1.jpg`, the one at 1 s inside the tolerance), 5f's identity row (there is
+no `2.jpg`), and 5d's "all TWENTY tiles" (eleven frames, the ten past the
+file's end back as holes under a marker). 5f's `0.jpg`-differs row and its
+no-video rows pass against it, as they should: the first is a precondition
+on the fixture and the others pin behaviour the cure leaves alone. The
+five mutants above take the rows they took; their scores are quoted
+against the 141 they were measured at.
 
 Run it from anywhere; it needs no port and no window server grant. The
 environment override is `RC_APP_SOURCES`, the name `phase9_chrome.py`
@@ -626,7 +686,7 @@ func staletile(_ request: [String: Any]) -> [String: Any] {
 
 // ---- mode "cachepass": when a pass may certify a strip, and what it tells --
 //
-// Five passes of `generateCaches`, each into a fresh directory the script
+// Thirteen passes of `generateCaches`, each into a fresh directory the script
 // prepared, each answered as what is on disk afterwards and every
 // `.mediaCacheDidChange` post it made in order:
 //
@@ -640,15 +700,32 @@ func staletile(_ request: [String: Any]) -> [String: Any] {
 //              relink whose decode fails, with the old tile on disk.
 //   twice      A.mov under a 20 s record, with a `0.jpg` seeded. A relink
 //              never re-probes, so a record longer than its file is a state
-//              the app can be in. A request past the file's end FAILS (a
-//              hole; measured — only the one at 10 s lands, inside the
-//              half-second tolerance, so eleven frames), but every result
-//              counts toward the every-16 post, so the pass posts at 16
-//              results and at the end — two posts from one replacing pass,
-//              which no fixture of the right length can give.
+//              the app can be in. The ten seconds past the picture are HELD
+//              (one decode of the track's last frame, written under each —
+//              twenty tiles; before road map 3 they failed as holes, only
+//              the one at 10 s landing inside the tolerance), and the
+//              every-16 post counts tiles, so the pass posts at the eleventh
+//              result and after the loop — two posts from one replacing
+//              pass, which no fixture of the right length can give.
 //   withdrawn  AV.mov's peaks built; then the same record over a video-only
 //              file (a relink to a file with no audio track, `hasAudio` still
 //              true on the record); then AV.mov again.
+//   short      a file whose picture ends at 1 s under 5 s of sound (the
+//              script makes it), under the 5 s record `import_media` gives
+//              it — the held tail; then the sound-only `toneA.m4a` under its
+//              own record (noVideo: the guard, no thumbs at all) and under
+//              the picture's record (noVideoTrack: a relink to a file with
+//              no video track, no end to read). Sent only when the script
+//              could make the fixture.
+//   sparse     three frames 25 s apart under 60 s of sound (the script makes
+//              it with the VideoToolbox encoder, the recorder's own), and
+//              `sparseKey`, the same with every frame a sync sample — each
+//              under the record `probeBlocking` gives it, read HERE and
+//              answered, because the record's rate is what the old tail was
+//              measured from (three frames over 50 s is 0.06 fps, a 16.7 s
+//              frame) and a rate typed into the script would be the answer
+//              the row exists to read. Sent only when the script could make
+//              the fixture.
 //
 // The observer is on `nil` queue, as `cacheledger`'s is: the post is a hop
 // to the main thread, which the spin drains.
@@ -705,6 +782,7 @@ func cachepass(_ request: [String: Any]) -> [String: Any] {
         return [
             "settled": settled,
             "posts": Array(posts[mark...]),
+            "thumbsDir": thumbs.path,
             "thumbsMarker": manager.fileExists(
                 atPath: MediaImporter.thumbsMarkerURL(for: 7, in: cacheDir).path),
             "jpgCount": MediaImporter.thumbnailCount(for: 7, in: cacheDir),
@@ -792,6 +870,49 @@ func cachepass(_ request: [String: Any]) -> [String: Any] {
     out["withdrawnBuilt"] = pass(av, url: avSource, into: withdrawnDir)
     out["withdrawn"] = pass(av, url: source, into: withdrawnDir)
     out["withdrawnBack"] = pass(av, url: avSource, into: withdrawnDir)
+
+    // short. The record is handed, as every record here is (5 s: the
+    // asset's duration, which is the sound's); the file's own shape is
+    // ffprobe's precondition on the script's side.
+    if let shortSource = request["shortVideo"] as? String,
+        let shortRecord = request["shortRecord"] as? [String: Any],
+        let audioSource = request["audioOnly"] as? String {
+        out["short"] = pass(snapshot(shortRecord, path: shortSource, kind: .video),
+                            url: shortSource, into: dir("short"))
+        var audioRecord = shortRecord
+        audioRecord["hasVideo"] = false
+        audioRecord["width"] = 0
+        audioRecord["height"] = 0
+        out["noVideo"] = pass(snapshot(audioRecord, path: audioSource, kind: .audio),
+                              url: audioSource, into: dir("noVideo"))
+        out["noVideoTrack"] = pass(snapshot(shortRecord, path: audioSource, kind: .video),
+                                   url: audioSource, into: dir("noVideoTrack"))
+    }
+
+    // sparse, sparseKey. The record is the file's own, as `import_media`
+    // would report it: `probeBlocking` is the app's probe waited for, and
+    // its rate and duration are answered beside the pass so the script can
+    // pin what the pass was handed.
+    for name in ["sparse", "sparseKey"] {
+        guard let path = request[name] as? String else { continue }
+        do {
+            let descriptor = try MediaImporter.probeBlocking(url: URL(fileURLWithPath: path))
+            let media = MediaSnapshot(
+                id: 7, path: path, kind: descriptor.kind, duration: descriptor.duration,
+                width: descriptor.width, height: descriptor.height, fps: descriptor.fps,
+                hasVideo: descriptor.hasVideo, hasAudio: descriptor.hasAudio)
+            var record = pass(media, url: path, into: dir(name))
+            record["record"] = [
+                "duration": Int(descriptor.duration),
+                "fps": [descriptor.fps.num, descriptor.fps.den],
+                "width": descriptor.width, "height": descriptor.height,
+                "hasVideo": descriptor.hasVideo, "hasAudio": descriptor.hasAudio,
+            ] as [String: Any]
+            out[name] = record
+        } catch {
+            out[name] = ["error": "\(error)"]
+        }
+    }
     return out
 }
 
@@ -1467,6 +1588,107 @@ AV_RECORD = {"duration": 3_000_000, "width": 640, "height": 360,
              "hasVideo": True, "hasAudio": True}
 
 
+# 5f's record: what `import_media` reports for a file whose picture ends at
+# 1 s under 5 s of sound — the asset's duration, which is the sound's — so
+# the pass asks for five seconds of a one-second picture.
+SHORT_RECORD = {"duration": 3_000_000, "width": 640, "height": 360,
+                "hasVideo": True, "hasAudio": True}
+
+
+def make_short_video(path):
+    """1 s of `testsrc2` over 5 s of a 440 Hz tone, no `-shortest` — the
+    shape of a screen recording of a static screen with narration. Made at
+    proof time (`ffmpeg` is a proof-time tool here, as it is for
+    `phase2_proof.py`'s PCM decode), never a tracked fixture; nil, scored
+    by the caller, when it cannot be made."""
+    if shutil.which("ffmpeg") is None or shutil.which("ffprobe") is None:
+        return None, "ffmpeg/ffprobe are not on PATH"
+    made = subprocess.run(
+        ["ffmpeg", "-y", "-v", "error", "-f", "lavfi", "-t", "1",
+         "-i", "testsrc2=size=640x360:rate=30", "-f", "lavfi", "-t", "5",
+         "-i", "sine=frequency=440:sample_rate=48000", "-map", "0:v", "-map", "1:a",
+         "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "128k", path],
+        capture_output=True, text=True)
+    if made.returncode != 0 or not os.path.exists(path):
+        return None, (made.stderr.strip().splitlines() or ["ffmpeg failed"])[-1]
+    return path, None
+
+
+def encoder_available(name):
+    """Whether this ffmpeg build carries `name` — read off `-encoders`, so a
+    missing platform encoder is a scored reason and not a cryptic exit."""
+    listing = subprocess.run(["ffmpeg", "-hide_banner", "-encoders"], capture_output=True,
+                             text=True).stdout
+    return any(line.split()[1:2] == [name] for line in listing.splitlines() if line.strip())
+
+
+def make_sparse_video(path, video_codec):
+    """Three frames of `testsrc2` at 0, 25 and 50 s under 60 s of a 440 Hz
+    tone, `-fps_mode vfr` so the container keeps the three times — the shape
+    of a screen recording of a screen that changed twice: the video track
+    ends a frame after its last sample (50.03 s), the container at 60 s, and
+    the record's rate is the frame count over the length. `video_codec` is
+    `["h264_videotoolbox"]` (the recorder's own encoder, whose first frame is
+    the only sync sample) or `["libx264", "-g", "1"]` (every frame a sync
+    sample). Nil, scored by the caller, when it cannot be made."""
+    if shutil.which("ffmpeg") is None or shutil.which("ffprobe") is None:
+        return None, "ffmpeg/ffprobe are not on PATH"
+    made = subprocess.run(
+        ["ffmpeg", "-y", "-v", "error", "-f", "lavfi", "-t", "60",
+         "-i", "testsrc2=size=640x360:rate=30", "-f", "lavfi", "-t", "60",
+         "-i", "sine=frequency=440:sample_rate=48000",
+         "-filter:v", "select='eq(t,0)+eq(t,25)+eq(t,50)'", "-fps_mode", "vfr",
+         "-map", "0:v", "-map", "1:a", "-c:v"] + video_codec
+        + ["-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "128k", path],
+        capture_output=True, text=True)
+    if made.returncode != 0 or not os.path.exists(path):
+        return None, (made.stderr.strip().splitlines() or ["ffmpeg failed"])[-1]
+    return path, None
+
+
+def video_frames(path):
+    """The video stream's sample count, read with ffprobe (`nb_frames`, which
+    a QuickTime file states outright); -1 when it cannot be read."""
+    probe = subprocess.run(
+        ["ffprobe", "-v", "error", "-select_streams", "v", "-show_entries", "stream=nb_frames",
+         "-of", "json", path], capture_output=True, text=True)
+    try:
+        streams = json.loads(probe.stdout).get("streams", [])
+        return int(streams[0].get("nb_frames", -1)) if streams else -1
+    except (ValueError, IndexError):
+        return -1
+
+
+def stream_durations(path):
+    """`{codec_type: duration}` for the file's streams and `format` for
+    the container, in seconds, read with ffprobe — the precondition that the
+    picture really ends before the sound."""
+    probe = subprocess.run(
+        ["ffprobe", "-v", "error", "-show_entries", "stream=codec_type,duration:format=duration",
+         "-of", "json", path], capture_output=True, text=True)
+    try:
+        info = json.loads(probe.stdout)
+    except ValueError:
+        return {}
+    out = {s.get("codec_type"): float(s.get("duration", "nan")) for s in info.get("streams", [])}
+    out["format"] = float(info.get("format", {}).get("duration", "nan"))
+    return out
+
+
+def tile_digests(thumbs_dir):
+    """`{index: sha256}` of every `<n>.jpg` in a strip's directory —
+    read by the script rather than reported by the probe, so a byte identity
+    is a fact about the files and not about an answer."""
+    if not thumbs_dir or not os.path.isdir(thumbs_dir):
+        return {}
+    digests = {}
+    for name in os.listdir(thumbs_dir):
+        if name.endswith(".jpg") and name[:-4].isdigit():
+            with open(os.path.join(thumbs_dir, name), "rb") as handle:
+                digests[int(name[:-4])] = hashlib.sha256(handle.read()).hexdigest()
+    return digests
+
+
 def thumbs_posts(record):
     return [p for p in (record or {}).get("posts", []) if p.get("kind") == "thumbs"]
 
@@ -1493,13 +1715,44 @@ def section_pass(binary, sources):
     for path in (unreadable, garbage_image):
         with open(path, "w") as handle:
             handle.write("not a movie, not a picture — a few KB of text\n" * 90)
+    # 5f's fixture, made here; and the sound-only file beside it.
+    short_video, short_error = make_short_video(os.path.join(here, "short-video.mov"))
+    check("`ffmpeg` made 5f's fixture, 1 s of picture over 5 s of sound, under the script's "
+          "own work dir", short_video is not None, short_error or "")
+    tone = fixture("toneA.m4a")
+    audio_only = None
+    if tone is not None:
+        audio_only = os.path.join(here, "toneA.m4a")
+        shutil.copy2(tone, audio_only)
     request = {
         "mode": "cachepass", "record": A_RECORD, "avRecord": AV_RECORD,
         "source": a_copy, "avSource": av_copy,
         "unreadable": unreadable, "garbageImage": garbage_image,
         "dirs": {name: fresh_dir("pass", name)
-                 for name in ("hole", "unreadable", "image", "twice", "withdrawn")},
+                 for name in ("hole", "unreadable", "image", "twice", "withdrawn",
+                              "short", "noVideo", "noVideoTrack")},
     }
+    if short_video is not None and audio_only is not None:
+        request.update({"shortVideo": short_video, "shortRecord": SHORT_RECORD,
+                        "audioOnly": audio_only})
+    # 5f's second shape: three frames 25 s apart, twice — the recorder's
+    # encoder, and every frame a sync sample.
+    have_vt = encoder_available("h264_videotoolbox")
+    check("this ffmpeg carries `h264_videotoolbox` — the recorder's own encoder, whose "
+          "sparse file is the one the held request has to be exact for", have_vt)
+    sparse, sparse_error = (make_sparse_video(os.path.join(here, "sparse.mov"),
+                                              ["h264_videotoolbox"]) if have_vt else (None, "no encoder"))
+    check("`ffmpeg` made the sparse fixture — three frames at 0, 25 and 50 s under 60 s of "
+          "sound, VideoToolbox", sparse is not None, sparse_error or "")
+    sparse_key, key_error = make_sparse_video(os.path.join(here, "sparse-key.mov"),
+                                              ["libx264", "-g", "1"])
+    check("  and the same with every frame a sync sample (`libx264 -g 1`)",
+          sparse_key is not None, key_error or "")
+    request["dirs"].update({name: fresh_dir("pass", name) for name in ("sparse", "sparseKey")})
+    if sparse is not None:
+        request["sparse"] = sparse
+    if sparse_key is not None:
+        request["sparseKey"] = sparse_key
     answer, error = run_probe(binary, "cachepass", request)
     check("the probe answers mode `cachepass`", answer is not None and "error" not in answer,
           error or (answer or {}).get("error", ""))
@@ -1578,10 +1831,10 @@ def section_pass(binary, sources):
           "every post would empty the media's memo every sixteen frames for nothing",
           len(twice_posts) >= 2 and all(p.get("replaced") is not True for p in twice_posts[1:]),
           f"{twice_posts}")
-    check("  the marker is written over a strip with holes — a request past the file's end "
-          "fails, and complete is not a count (the ten real seconds are on disk, plus the "
-          "one at 10 s that the half-second tolerance lets land)",
-          twice.get("thumbsMarker") is True and (twice.get("jpgCount") or 0) >= 10,
+    check("  the marker is written and the strip holds all TWENTY tiles — the ten seconds "
+          "past the picture are HELD at the track's last frame (5f), where they used to fail "
+          "as holes with only the one at 10 s landing inside the tolerance",
+          twice.get("thumbsMarker") is True and twice.get("jpgCount") == 20,
           f"marker={twice.get('thumbsMarker')} jpgs={twice.get('jpgCount')}")
 
     print("\n  5e. a peaks rebuild withdraws the old `.bin` at its head and says so — the "
@@ -1613,6 +1866,150 @@ def section_pass(binary, sources):
           and back.get("peaksMarker") is True and len(peaks_posts(back)) == 1,
           f"bin={back.get('binExists')} bytes={back.get('binBytes')} vs "
           f"{built.get('binBytes')} marker={back.get('peaksMarker')} posts={back.get('posts')}")
+
+    print("\n  5f. a picture that ends before its sound — the seconds past it hold its last "
+          "frame, and a media with no video track runs as it always did")
+    if short_video is None or audio_only is None:
+        print("       (skipped: the fixture could not be made — scored above)")
+        return
+    for name in ("short", "noVideo", "noVideoTrack"):
+        check(f"the `{name}` pass settled (no post for 1.5 s inside the 60 s cap)",
+              (answer.get(name) or {}).get("settled") is True, f"{answer.get(name)}")
+    shape = stream_durations(short_video)
+    print(f"       (ffprobe: video {shape.get('video')} s, audio {shape.get('audio')} s, "
+          f"container {shape.get('format')} s)")
+    check("the fixture's video stream ends at 1 s while its sound and its container run 5 s "
+          "(ffprobe) — a recording of a static screen with narration has this shape, and "
+          "`import_media` reports the container's duration (the precondition)",
+          0.9 <= shape.get("video", 0) <= 1.1 and 4.9 <= shape.get("audio", 0) <= 5.2
+          and 4.9 <= shape.get("format", 0) <= 5.2, f"{shape}")
+    short = answer.get("short") or {}
+    tiles = tile_digests(short.get("thumbsDir"))
+    print(f"       (tiles: { {i: tiles[i][:10] for i in sorted(tiles)} })")
+    check("the pass writes a tile for EVERY whole second of the 5 s record — `0.jpg` to "
+          "`4.jpg`, five — where the four more than the tolerance past the picture used to "
+          "fail (`AVFoundationErrorDomain -11832`) and leave tinted holes",
+          sorted(tiles) == [0, 1, 2, 3, 4] and short.get("jpgCount") == 5,
+          f"tiles={sorted(tiles)} jpgs={short.get('jpgCount')}")
+    check("the tiles at 2, 3 and 4 s are byte-identical to the tile at 1 s — one decode of "
+          "the track's last frame, written under each held second, which is the frame "
+          "`CompositionBuilder.fill` holds over the same tail",
+          all(i in tiles for i in (1, 2, 3, 4)) and len({tiles.get(i) for i in (1, 2, 3, 4)}) == 1,
+          f"{ {i: (tiles.get(i) or '')[:10] for i in (1, 2, 3, 4)} }")
+    check("  and the tile at 0 s is a DIFFERENT picture (`testsrc2` changes every frame), so "
+          "the identity above is the held tail's and not a strip of one frame",
+          0 in tiles and 1 in tiles and tiles[0] != tiles[1],
+          f"0: {(tiles.get(0) or '')[:10]} 1: {(tiles.get(1) or '')[:10]}")
+    check("the marker is written — a held tail is a strip the pass can vouch for, and every "
+          "tile it wrote is there",
+          short.get("thumbsMarker") is True, f"marker present={short.get('thumbsMarker')}")
+    check("  and the sound's half landed beside it — the `.bin` and its marker, one peaks post",
+          short.get("binExists") is True and short.get("peaksMarker") is True
+          and len(peaks_posts(short)) == 1,
+          f"bin={short.get('binExists')} marker={short.get('peaksMarker')} "
+          f"posts={short.get('posts')}")
+    check("  and the strip was posted, so the timeline draws it",
+          len(thumbs_posts(short)) >= 1, f"{short.get('posts')}")
+    no_video = answer.get("noVideo") or {}
+    check("the sound file under its own record (`hasVideo` false): NO thumbs directory, no "
+          "tile, no marker and no thumbs post — the pass returns at its guard before any track "
+          "is read, as it always did",
+          not os.path.isdir(no_video.get("thumbsDir") or "") and no_video.get("jpgCount") == 0
+          and no_video.get("thumbsMarker") is False and len(thumbs_posts(no_video)) == 0,
+          f"dir={os.path.isdir(no_video.get('thumbsDir') or '')} jpgs={no_video.get('jpgCount')} "
+          f"marker={no_video.get('thumbsMarker')} posts={no_video.get('posts')}")
+    check("  while its `.bin` and marker land with one peaks post — whatever it wrote before",
+          no_video.get("binExists") is True and no_video.get("peaksMarker") is True
+          and len(peaks_posts(no_video)) == 1,
+          f"bin={no_video.get('binExists')} marker={no_video.get('peaksMarker')} "
+          f"posts={no_video.get('posts')}")
+    no_track = answer.get("noVideoTrack") or {}
+    check("the picture's record over the sound file (a relink to a file with no video track): "
+          "no tile, no marker, and still a post — 5b's answer, since there is no end to read "
+          "and every request fails as before",
+          no_track.get("jpgCount") == 0 and no_track.get("thumbsMarker") is False
+          and len(thumbs_posts(no_track)) >= 1,
+          f"jpgs={no_track.get('jpgCount')} marker={no_track.get('thumbsMarker')} "
+          f"posts={no_track.get('posts')}")
+    section_sparse(answer, sparse, sparse_key)
+
+
+def section_sparse(answer, sparse, sparse_key):
+    """5f's second shape: the held request is the TRACK's last frame at its
+    own time, never a frame measured from the record's rate."""
+    print("\n  5f. the sparse shape — three frames 25 s apart under 60 s of sound: the held "
+          "tail is the LAST slide, at the frame's own time")
+    if sparse is None or sparse_key is None:
+        print("       (skipped: a fixture could not be made — scored above)")
+        return
+    for name in ("sparse", "sparseKey"):
+        record = answer.get(name) or {}
+        check(f"the `{name}` pass ran and settled (no post for 1.5 s inside the 60 s cap)",
+              record.get("settled") is True, f"{record}")
+    shape = stream_durations(sparse)
+    frames = video_frames(sparse)
+    print(f"       (ffprobe: {frames} video frames, video {shape.get('video')} s, audio "
+          f"{shape.get('audio')} s, container {shape.get('format')} s)")
+    check("the fixture's video stream is three frames ending a frame after 50 s while its "
+          "sound and its container run 60 s (ffprobe) — the precondition",
+          frames == 3 and 50.0 <= shape.get("video", 0) <= 50.1
+          and 59.9 <= shape.get("audio", 0) <= 60.1 and 59.9 <= shape.get("format", 0) <= 60.1,
+          f"frames={frames} {shape}")
+    record = (answer.get("sparse") or {}).get("record") or {}
+    fps = record.get("fps") or [0, 0]
+    rate = fps[0] / fps[1] if fps[1] else 0
+    print(f"       (the record `probeBlocking` handed the pass: fps {fps[0]}/{fps[1]} = "
+          f"{rate:.4f}, duration {record.get('duration', 0) / 600000:.3f} s)")
+    check("the record's rate is the frame count over the length — under 0.1 fps, a frame of "
+          "over ten seconds — and its duration is the sound's 60 s: what `import_media` "
+          "reports for such a file, and what the old tail was measured from",
+          0 < rate < 0.1 and abs(record.get("duration", 0) / 600000 - 60) < 0.2
+          and record.get("hasVideo") is True and record.get("hasAudio") is True,
+          f"{record}")
+    tiles = tile_digests((answer.get("sparse") or {}).get("thumbsDir"))
+    print(f"       (sparse tiles on disk: {sorted(tiles)})")
+    tail = [tiles.get(i) for i in range(50, 60)]
+    check("tiles 50–59 are ALL there and byte-identical — the seconds at or past the last "
+          "frame ask for it once, at its own time (50.0 s), and the one decode is written under "
+          "each; the old arithmetic held from 34 s at a time the generator refuses",
+          all(tail) and len(set(tail)) == 1, f"{ {i: (tiles.get(i) or '')[:10] for i in range(50, 60)} }")
+    check("  and that tile is the LAST slide — it differs from the tile at 25 s and from the "
+          "tile at 0 s, so the tail is not the slide before the last one",
+          50 in tiles and 25 in tiles and 0 in tiles and tiles[50] != tiles[25]
+          and tiles[50] != tiles[0],
+          f"50: {(tiles.get(50) or '')[:10]} 25: {(tiles.get(25) or '')[:10]} "
+          f"0: {(tiles.get(0) or '')[:10]}")
+    head = [tiles.get(i) for i in range(0, 25)]
+    check("tiles 0–24 are all there and byte-identical, and 25 is there and differs — the "
+          "generator answers a second inside a SYNC frame's range with that frame however far "
+          "after it (24 s), and the frame at its own time; measured, and the doc's sentence",
+          all(head) and len(set(head)) == 1 and 25 in tiles and tiles[25] != tiles[0],
+          f"present={sorted(i for i in range(0, 26) if i in tiles)}")
+    check("tiles 26–49 are HOLES — a second inside a NON-sync frame's range that is not the "
+          "frame's own time fails (`-11821`), the recorded limit the doc states; a failure "
+          "still leaves a hole rather than a copied neighbour",
+          not any(i in tiles for i in range(26, 50)),
+          f"present={sorted(i for i in range(26, 50) if i in tiles)}")
+    short = answer.get("sparse") or {}
+    check("the strip holds exactly those 36 tiles, the marker is written (complete is not a "
+          "count) and it was posted",
+          short.get("jpgCount") == 36 and short.get("thumbsMarker") is True
+          and len(thumbs_posts(short)) >= 1,
+          f"jpgs={short.get('jpgCount')} marker={short.get('thumbsMarker')} "
+          f"posts={short.get('posts')}")
+    key_tiles = tile_digests((answer.get("sparseKey") or {}).get("thumbsDir"))
+    print(f"       (sparseKey tiles on disk: {len(key_tiles)})")
+    check("with every frame a sync sample, all SIXTY tiles land — the same request list, "
+          "and the generator answers every second with its displayed frame",
+          sorted(key_tiles) == list(range(60)), f"present={len(key_tiles)}")
+    middle = [key_tiles.get(i) for i in range(25, 50)]
+    key_tail = [key_tiles.get(i) for i in range(50, 60)]
+    check("  tiles 25–49 are byte-identical (the 25 s slide, up to 24 s after its sample) and "
+          "tiles 50–59 are byte-identical to each other and differ from them (the last slide, "
+          "held) — the strip of a static screen that changed twice",
+          all(middle) and len(set(middle)) == 1 and all(key_tail) and len(set(key_tail)) == 1
+          and key_tail[0] != middle[0],
+          f"25–49 distinct={len(set(middle))} 50–59 distinct={len(set(key_tail))}")
 
 
 SECTIONS = [section_naming, section_cachestamp, section_ledger, section_staletile, section_pass]

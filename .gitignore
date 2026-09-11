@@ -2,6 +2,7 @@
 /build/
 /Reelcut.xcodeproj/
 /app/Info.plist
+/app/Reelcut.entitlements
 xcuserdata/
 .DS_Store
 .idea/

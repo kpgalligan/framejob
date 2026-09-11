@@ -17,12 +17,14 @@ Six things in `designs/`, and you want all of them:
   open is §3, the size ledger a feature phase consults before it pays its
   toll, §4, the checks only a person at the machine can make, and §5, where
   a third road map would start.
-- **`designs/reelcut-roadmap-3.md` — road map 3, PLANNED and not started:
-  screen recording**, the first item taken off road map 2 §4. It records
-  the decision that reverses spec §1's non-goal, a half-session spike (R0)
-  whose five answers are pasted into it before any code, and one phase (R1)
-  — no op, no schema change, one tool, one size toll paid first. START
-  THERE if you are picking up the recorder.
+- **`designs/reelcut-roadmap-3.md` — road map 3, BUILT: screen recording**,
+  the first item taken off road map 2 §4. It records the decision that
+  reverses spec §1's non-goal, the spike (R0) whose six answers were pasted
+  into it before any code — two of which overturned the plan — the one
+  phase (R1: no op, no schema change, one tool, three size tolls), the
+  adversarial review and the two-stage fix wave, and what only a person at
+  the machine can still check. START THERE if you are touching the
+  recorder.
 - `designs/reelcut-design.md` — the normative spec. The schemas (§5), the op
   table (§6) and the architecture (§7) govern any change to either side; §11
   holds decisions already made, which are not to be re-litigated.
@@ -129,13 +131,13 @@ make app
 
 The log line names the port it actually bound (a taken port falls back to an
 ephemeral one). Then drive it with any MCP client over streamable HTTP at
-`http://127.0.0.1:<port>/mcp` — 74 tools: one per §6 op (55, each of which
+`http://127.0.0.1:<port>/mcp` — 75 tools: one per §6 op (55, each of which
 also takes the `scope` envelope key since road map 2's phase 9) plus the
-nineteen app-state tools: `open_project`, `new_project`, `save_project`,
+twenty app-state tools: `open_project`, `new_project`, `save_project`,
 `get_project`, `import_media`, `import_captions`, `export_captions`,
 `transcribe`, `consolidate_media`, `detect_silence`, `normalize_clip`,
 `set_playhead`, `set_range`, `set_selection`, `set_scope`, `undo`, `redo`,
-`render_frame` and `export`.
+`render_frame`, `export` and — road map 3 — `record_screen`.
 `render_frame` writes a PNG and returns its path, so a script can diff it
 against `ffmpeg`-extracted source frames; `export` waits for the file.
 
@@ -1540,6 +1542,76 @@ put up a sheet or a save panel, which is where the structural reads come in.
   Measured for the lot: `make test` 494, `make lint` and `cargo fmt --check`
   clean, `make typecheck` 0 errors and the same 4 warnings, the parity log
   EMPTY, every phase proof unchanged against the final binary, and the
-  offscreen list is now 26, 33, 59, 81, 70, 78, 150, 48, 62, 101.
+  offscreen list is now 26, 33, 59, 81, 70, 78, 150, 48, 62, 170 (the last
+  was 101 when this paragraph was written and 141 by the time it was read;
+  road map 3's held tail took it to 170).
+
+- **Road map 3, phase R1 — screen recording: done** (2026-09-11). The
+  feature spec §1 named a non-goal on day one, reversed by a recorded
+  decision (§11): the app records a display or a window through
+  ScreenCaptureKit into `~/Movies/Reelcut Recordings/` and imports the file
+  exactly as File ▸ Open would. No schema change (v6 stands), NO new op
+  (`OP_NAMES` is still 55), ONE new tool (`record_screen`; the catalog is
+  **75**), no FFI change, three size tolls (`AgentCatalog+Files.swift` first
+  and alone; `MediaImporter+Probe.swift` and `AgentServer+RecordingArguments/Result.swift`
+  mid-wave) and nineteen new Swift files under a 400-line cap each.
+  **The spike ran before the code and overturned the plan twice** (R0, in
+  `designs/reelcut-roadmap-3.md`, dated): `SCRecordingOutput` folds a
+  microphone INTO the system-audio track — one stereo track, inseparable,
+  clipping when both are loud — so the microphone is a SECOND FILE through
+  an `AVCaptureSession` + `AVCaptureAudioFileOutput`, landing as its own
+  clip on a "Microphone" track at the offset the two did-start callbacks
+  measure; and `captureResolution .best` scales nothing, so pixels are asked
+  for by hand. It also found what nobody asked: **a recording's VIDEO track
+  ends at the last screen change**, and AVFoundation inserts the uncovered
+  range without clamping and renders it BLACK — `CompositionBuilder.fill`
+  now holds a video track's last frame over any part of a segment's source
+  range the track does not cover (spec §7.2), and `MediaImporter.thumbnails`
+  holds it in the strip from the track's last sample's own time. A shell-
+  launched instance is attributed by TCC to its TERMINAL (R0 q1), which is
+  why every proof's instance runs under ghostty's grants and the refusal
+  sentences name the launching process's pid. **The recorder never prompts
+  and the panel asks for both grants on a press** (decision 4); the canvas
+  of a new project takes the panel's 30 or 60 while the media keeps the
+  file's honest variable rate (24981/1000, 42381/1000, 21410/1000 measured);
+  undo of Add Recording leaves the file. `ScreenRecorder` is a machine
+  `idle → arming → recording → finishing → idle` whose every framework
+  callback is stamped where it lands and hopped to main; its `onFinish` is
+  the one hook, on the session, called exactly once; a `stop()` past idle
+  JOINS the finishing under way; a microphone problem is `micProblem` on a
+  `.success` and never the recording's failure; the capture session is
+  prepared during the countdown (a smoke run had lost the first 421 ms of
+  voice). **Reviewed by nine readers, 68 findings; eleven confirmed by every
+  refuter, two refuted, fifty-five never judged (the usage limit killed the
+  refuters) and triaged by hand; a two-stage fix wave closed them by root
+  file with a mutant each** — road map 3's record lists them.
+  Measured: `make test` 494, `make lint` and `cargo fmt --check` clean,
+  `make typecheck` 0 errors and the same 4 AVFoundation warnings (now at
+  `CompositionBuilder.swift` :368/:401/:446 and `Exporter.swift` :595 — the
+  file reads `minFrameDuration` and `nominalFrameRate` by KEY, because the
+  baseline counts a deprecation diagnostic per USE SITE), `make app`
+  building with the audio-input entitlement in the signed binary, the parity
+  log EMPTY, and every earlier proof unchanged against the final binary: 66,
+  85, 121, 8, 84, 88, 167, 92, 79, 214, 79 over MCP and 26, 33, 59, 81, 70,
+  78, 150, 48, 62, 170 offscreen. The phase's own: `recording_spike.py` (six
+  answers), **`recording_proof.py` 152/152** on this host with the two tone
+  rows skipped BY NAME — a Bluetooth or muted output hands the system-audio
+  tap nothing, and a locked console shares no display; **host state is a
+  proof input, read and named, never assumed** — and **`recording_probe.py`
+  662/662** over a probe compiled from the whole of `app/Sources`, whose
+  section 3 drives a FAKED session (an `SCContentFilter()`, an `SCStream`
+  and an `SCRecordingOutput` all construct without a grant) and whose
+  twenty-odd named mutants score 613–661 of 662. Two things the phase found
+  in older ground: the harness pinned keys by SYMBOL and `phase5_chrome.py`
+  had been comparing two builds of its instrument since phase 8 without
+  saying so (`MediaSearchField` outside the `HARNESS_REFERENCE_BUILD`
+  guard) — both literalised or guarded, and phase 5 compares one program
+  again; and `AVAssetImageGenerator` fails INSIDE a non-sync frame's range
+  on an ffmpeg-made sparse file (−11821) while a real recording lands every
+  second, which `remaining_probe.py` 5f pins. What only a person can check
+  is in `reelcut-remaining.md` §4: the picker from a non-activating panel,
+  whether a picked recording contains the panel (it orders out meanwhile),
+  the countdown's look, the menu bar's own indicator, and the microphone
+  prompt from the signed bundle.
 
 Keep this file current as code lands.

@@ -196,7 +196,7 @@ enum CompositionBuilder {
         guard let source = firstTrack(of: asset, mediaType: .video) else { return }
         let id = (plan.audioTracks.map(\.id).max() ?? 0) + 1
         let track = try makeTrack(in: composition, mediaType: .video, id: id)
-        let frame = CMTimeRange(start: .zero, duration: source.timeRange.duration)
+        let frame = CMTimeRange(start: .zero, duration: timeRange(of: source).duration)
         try track.insertTimeRange(frame, of: source, at: .zero)
         track.scaleTimeRange(
             CMTimeRange(start: .zero, duration: frame.duration),
@@ -248,6 +248,18 @@ enum CompositionBuilder {
     /// forward asset: that would play the clip in the wrong direction with
     /// nothing on screen to say so, which is precisely the bug the pre-render
     /// exists to fix. `missingClips` then makes it draw §5.6's slate.
+    ///
+    /// **A video insert past the end of its source track holds the track's
+    /// last frame** (road map 3's R0 surprise). ScreenCaptureKit ends the
+    /// video track at the last screen change — 2.16 s of a 5.2 s recording —
+    /// the media record takes the asset's duration, the audio's, and
+    /// `insertTimeRange` takes a range the track does not cover WITHOUT
+    /// clamping (5 s of a 1 s track reads back as one 5 s segment): picture
+    /// at 0.99 s and BLACK from 3 s, measured in the built app. `heldTail`
+    /// splits such a request into what the track covers and its last frame
+    /// stretched over the rest — §7.2's freeze idiom inside one segment,
+    /// BEFORE the speed step below, which scales the `sourceDuration` it
+    /// always did. Video only; a covered range takes the one insert it always took.
     private static func fill(
         _ track: AVMutableCompositionTrack, from planTrack: PlanTrack, mediaType: AVMediaType,
         urls: [UInt32: URL], reverse: ReverseResolution, assets: inout [UInt32: AVURLAsset],
@@ -284,11 +296,23 @@ enum CompositionBuilder {
                 continue
             }
 
+            let requested = CMTimeRange(
+                start: time(segment.sourceIn), duration: time(segment.sourceDuration))
             do {
-                try track.insertTimeRange(
-                    CMTimeRange(
-                        start: time(segment.sourceIn), duration: time(segment.sourceDuration)),
-                    of: source, at: time(cursor))
+                if mediaType == .video, let tail = heldTail(segment, of: source) {
+                    if tail.covered > 0 {
+                        try track.insertTimeRange(
+                            CMTimeRange(start: requested.start, duration: time(tail.covered)),
+                            of: source, at: time(cursor))
+                    }
+                    let at = cursor + tail.covered
+                    try track.insertTimeRange(tail.hold, of: source, at: time(at))
+                    track.scaleTimeRange(
+                        CMTimeRange(start: time(at), duration: tail.hold.duration),
+                        toDuration: time(segment.sourceDuration - tail.covered))
+                } else {
+                    try track.insertTimeRange(requested, of: source, at: time(cursor))
+                }
             } catch {
                 throw BuildError.insertFailed(clip: segment.clip, underlying: error)
             }
@@ -342,6 +366,62 @@ enum CompositionBuilder {
     /// deprecation warning rather than one per call site.
     static func firstTrack(of asset: AVAsset, mediaType: AVMediaType) -> AVAssetTrack? {
         asset.tracks(withMediaType: mediaType).first
+    }
+
+    // MARK: - The held last frame
+
+    /// A video segment whose source range runs past the end of `source`, as
+    /// the TICKS of it the track covers (zero once the in point is past the
+    /// end) and the track's last frame, `[end − oneFrame, end)` in the track's
+    /// own timescale with `oneFrame` rounded DOWN into it, so the window never
+    /// starts before that frame does. The covered end is floored onto the tick grid, so
+    /// `fill` stays in ticks and the remainder is at least one tick; a duration that rounds
+    /// UP onto the tick grid makes a one-tick hold, measured byte-identical to the plain
+    /// insert, and the floor must stay a floor because a round would put `covered` past the
+    /// track. Nil (the ordinary insert) when the track covers the range or is too coarse.
+    private static func heldTail(
+        _ segment: PlanSegment, of source: AVAssetTrack
+    ) -> (covered: Ticks, hold: CMTimeRange)? {
+        let extent = timeRange(of: source)
+        let asked = segment.sourceIn + segment.sourceDuration
+        guard extent.end.isNumeric, time(asked) > extent.end else { return nil }
+        let frame = CMTimeConvertScale(
+            oneFrame(of: source), timescale: extent.end.timescale, method: .roundTowardZero)
+        let hold = CMTimeRange(start: max(extent.start, extent.end - frame), end: extent.end)
+        guard hold.duration > .zero else { return nil }
+        let floored = CMTimeConvertScale(
+            extent.end, timescale: CMTimeScale(ReelTime.perSecond), method: .roundTowardZero)
+        return (min(segment.sourceDuration, max(0, floored.value - segment.sourceIn)), hold)
+    }
+
+    /// **The one synchronous `timeRange` read in the app**, on `firstTrack`'s
+    /// terms: the deprecated getter stays, funnelled here so the placeholder
+    /// and `heldTail` cost one warning between them and not one each.
+    private static func timeRange(of track: AVAssetTrack) -> CMTimeRange {
+        track.timeRange
+    }
+
+    /// One frame of `track`: `minFrameDuration` when the file states one, else
+    /// `1 / nominalFrameRate`, else 1/30 — its SMALLEST claim, since a window
+    /// longer than the last frame shows the frame before it first. Read by
+    /// KEY, deliberately: the Objective-C getters are not deprecated
+    /// (`AVAssetTrack.h`, `AVF_DEPRECATED_FOR_SWIFT_ONLY`), only Swift's
+    /// spelling is, for an `async` `load` confined to `MediaImporter.swift`,
+    /// and the baseline counts deprecations per USE SITE — two named reads
+    /// would be two new warnings. Measured, the keyed value is the named one.
+    private static func oneFrame(of track: AVAssetTrack) -> CMTime {
+        let minimum = (keyed(track, "minFrameDuration") as? NSValue)?.timeValue ?? .invalid
+        if minimum.isNumeric, minimum > .zero { return minimum }
+        let nominal = (keyed(track, "nominalFrameRate") as? NSNumber)?.floatValue ?? 0
+        if nominal > 0, nominal < 100_000 {
+            return CMTime(value: 1000, timescale: CMTimeScale((nominal * 1000).rounded()))
+        }
+        return CMTime(value: 1, timescale: 30)
+    }
+
+    /// A property by key; nil, not an exception, for one the SDK dropped.
+    private static func keyed(_ track: AVAssetTrack, _ key: String) -> Any? {
+        track.responds(to: NSSelectorFromString(key)) ? track.value(forKey: key) : nil
     }
 
     // MARK: - Source orientation

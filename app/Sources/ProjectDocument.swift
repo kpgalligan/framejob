@@ -564,20 +564,28 @@ final class ProjectDocument: NSDocument {
     /// `open_project` arrives on main regardless — so a completion delivered
     /// through `MainActor.run` would deadlock against its own waiter.
     private func readMediaFile(at url: URL) throws {
+        let descriptor = try MediaImporter.probeBlocking(url: url)
+        try adoptImported(descriptor, source: url)
+    }
+
+    /// `readMediaFile`'s body once its probe has answered, and the door
+    /// `untitled(around:)` (`ProjectDocument+Recording.swift`, which argues
+    /// it) comes in by — ONE spelling of how a probed file becomes this
+    /// document's project. `fps` non-nil replaces the canvas rate alone.
+    func adoptImported(_ descriptor: MediaDescriptor, source: URL, fps: Fps? = nil) throws {
         // Set BEFORE the project is built: it is what makes the `fileURL` and
         // `fileType` overrides above refuse the assignments NSDocument makes
-        // as soon as this method returns. Written on the read queue and read
+        // as soon as the read returns. Written on the read queue and read
         // on the main thread afterwards, which NSDocument's own hand-off
         // between the two orders for us.
-        importSourceURL = url
+        importSourceURL = source
         // …and undo the assignment NSDocument may already have made, on the
         // open path that sets the two BEFORE the read (see `fileURL` above).
         // A document left pointing at the movie is not untitled, and saving
         // it writes a package over the source file.
         fileURL = nil
         fileType = Self.projectTypeIdentifier
-        let descriptor = try MediaImporter.probeBlocking(url: url)
-        project = try Self.makeProject(around: descriptor)
+        project = try Self.makeProject(around: descriptor, fps: fps)
         // The same four, and the same note: `nestPath` is cleared by
         // `read(from:ofType:)`'s clamp. A file-import read is always a fresh
         // document, so the path is empty already — the line is not here
@@ -590,11 +598,15 @@ final class ProjectDocument: NSDocument {
 
     /// Builds the project one imported file becomes. The canvas takes the
     /// source's display size and rate when it has video; an audio-only file
-    /// has neither, so it lands on the 1080p/30 default.
-    private static func makeProject(around descriptor: MediaDescriptor) throws -> ReelProject {
+    /// has neither, so it lands on the 1080p/30 default. A non-nil `fps`
+    /// replaces that rate and nothing else: the media record keeps the file's.
+    private static func makeProject(
+        around descriptor: MediaDescriptor, fps: Fps? = nil
+    ) throws -> ReelProject {
         let width = descriptor.hasVideo && descriptor.width > 0 ? descriptor.width : 1920
         let height = descriptor.hasVideo && descriptor.height > 0 ? descriptor.height : 1080
-        let fps = descriptor.hasVideo && descriptor.fps.double > 0 ? descriptor.fps : .thirty
+        let fps =
+            fps ?? (descriptor.hasVideo && descriptor.fps.double > 0 ? descriptor.fps : .thirty)
         guard let base = ReelProject.new(width: width, height: height, fps: fps) else {
             throw ReelCoreError(
                 message: "\(descriptor.path) reports a size or frame rate a project cannot use.")

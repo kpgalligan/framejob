@@ -88,6 +88,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     /// order and every delegate that can cancel a termination inherits it;
     /// nothing is lost, and asking first is not on offer.
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        // ⌘Q with a recording running (road map 3, R1c): cancel, stop nothing,
+        // and bring the panel forward — a person who meant to stop presses
+        // Stop. A quit that silently finished the recording would land a file
+        // into a document that is about to ask whether to save, the wrong
+        // moment for both. This is a BACKSTOP asked after the document review
+        // above; `RecorderPanelController`'s doc records what that order
+        // means for the recording's target. For a picked-window recording,
+        // which keeps the panel hidden, `show()` BEEPS instead (R1 review):
+        // un-hiding it would put the panel into the recording, and Stop is
+        // on the status item meanwhile.
+        if ScreenRecorder.shared.isRecording {
+            RecorderPanelController.shared.show()
+            return .terminateCancel
+        }
         let queue = ExportQueueController.shared
         guard !queue.isIdle else { return .terminateNow }
 
@@ -199,6 +213,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     }
 
     func validateMenuItem(_ item: NSMenuItem) -> Bool {
+        if item.action == #selector(newRecording(_:)) {
+            // File ▸ New Recording… reads Stop Recording while one runs — the
+            // same item, retitled from live state exactly as the agent-server
+            // item below is (road map 3, R1c). The state read is the
+            // RECORDER's, so the title also covers a recording the
+            // `record_screen` tool started; `AppDelegate+Recording.swift`
+            // routes the stop to whichever door owns it.
+            item.title = ScreenRecorder.shared.isRecording ? "Stop Recording" : "New Recording…"
+        }
         if item.action == #selector(toggleAgentServer(_:)) {
             // The item carries the endpoint while it is up, so the address to
             // point a client at never has to be guessed.

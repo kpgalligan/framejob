@@ -47,7 +47,7 @@ extension AgentServer {
     ///
     /// Internal rather than private for one reason and no other:
     /// `AgentCatalog+Clips.swift` builds forty-five tools with it and
-    /// `AgentCatalog+Files.swift` ten, and `private` on an extension member
+    /// `AgentCatalog+Files.swift` eleven, and `private` on an extension member
     /// reaches only its own file.
     func tool(
         _ name: String, _ description: String,
@@ -93,7 +93,7 @@ extension AgentServer {
     /// tools, and the startup parity check asks that each of them has a tool
     /// AND that the tool declares the property. One list, so the three
     /// cannot disagree — and a `static let`, so the FFI call and the JSON
-    /// decode behind it happen once per process instead of seventy-four
+    /// decode behind it happen once per process instead of seventy-five
     /// times per catalog build.
     ///
     /// **An empty answer is a silent catastrophe, so it is not allowed to be

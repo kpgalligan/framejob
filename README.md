@@ -18,6 +18,18 @@ normative: §5.2 is the project schema, §6 the op table, §7 the architecture.
 
 - **One kind of track.** Every track holds any clip — video, audio, image,
   text, shape. Tracks stack back to front; `tracks[0]` is the back.
+- **Screen recording.** File ▸ New Recording… (⌥⌘N, or the welcome window's
+  third button) opens a small floating panel: a display or a window (the
+  system picker), a microphone with a live meter, system audio, click rings,
+  30 or 60 fps, point or pixel size, and where it lands — a new project, or
+  an open document at its playhead. A 3-2-1 countdown, then a red dot with
+  the elapsed time in the menu bar carries Stop. The file is written to
+  `~/Movies/Reelcut Recordings/` and imported as ordinary media (undo
+  removes the clip, never the file); a microphone is a second file on its
+  own Microphone track, aligned to the picture. A new project takes the
+  rate you chose; a screen recording's own rate is whatever the screen did.
+  The app asks for the Screen Recording and Microphone grants the first
+  time you press Record, and never from an agent.
 - **Timeline** with a frame-accurate ruler, filmstrips and waveforms from a
   per-media cache, three row heights, magnify/⌥-wheel zoom about the cursor,
   and gesture sessions for drag, trim, rate-stretch (⌥ on the end edge),
@@ -234,7 +246,8 @@ Makefile              Build orchestration
 | `InspectorPane.swift` · `InspectorViewController.swift` · `ClipPane` `MediaPane` `DocumentPane` (with `VideoPane` `AudioPane` `TextPane` `ShapePane` as section factories) | the binding that knows about actions, one file per tab, and the sections the Clip tab composes |
 | `MediaRowView.swift` · `MediaListFilter.swift` · `MediaPaneCommands.swift` · `MediaUsage.swift` · `MediaReveal.swift` | the Media tab around its pane: the row and the drag it sources, the find band as a value, the row's commands, the one answer to "is this file used" (which walks the nests), and Reveal in Timeline |
 | `EditorViewController.swift` + `EditorViewController+{Timeline,Canvas,Inspector,Export}.swift` | wiring in the base file, features in extensions |
-| `AgentServer.swift` + `AgentServer+{Arguments,Project,Clips,Tracks,Media,Render,History,Silence,Captions,Audio,Background}.swift` · `AgentCatalog.swift` | the MCP endpoint, its handlers, and the tool catalog |
+| `AgentServer.swift` + `AgentServer+{Arguments,Project,Clips,Tracks,Media,Render,History,Silence,Captions,Audio,Background,Scope,Recording}.swift` · `AgentCatalog.swift` · `AgentCatalog+Clips.swift` · `AgentCatalog+Files.swift` | the MCP endpoint, its handlers, and the tool catalog |
+| `RecordingSetup.swift` · `ScreenRecorder.swift` (with `+Finishing` and `+Content`) · `RecordingLanding.swift` · `ProjectDocument+Recording.swift` · `RecorderPanelController.swift` (with `+Rows` and `+Recording`) · `RecorderStatusItem.swift` · `AppDelegate+Recording.swift` · `AgentServer+Recording.swift` | screen recording (road map 3): the values, the session over ScreenCaptureKit and a second `AVCaptureSession` for the microphone, the landing as ordinary media, the floating non-activating panel with its countdown and meter, the menu-bar status item, and the `record_screen` tool |
 | `AppDelegate.swift` · `EditorWindowController.swift` · `WelcomeWindowController.swift` · `main.swift` | menus (nil-target selectors), window, welcome |
 | `SpeedSheetController.swift` · `RelinkSheetController.swift` · `SilenceSheetController.swift` (with `SilenceDetector.swift` behind it) · `TranscribeSheetController.swift` | the remaining dialogs |
 | `Theme.swift` · `Controls.swift` · `OptionControls.swift` · `Sheets.swift` · `EditorChrome.swift` · `FileDropView.swift` | shared chrome, copied from Rasterize |
@@ -320,6 +333,7 @@ here.
 | `import_media {path}` | probes a file and returns the **new media id**; `add_clip` then places it |
 | `import_captions {path, track?}` | an SRT file as text clips (File ▸ Import Captions…) |
 | `consolidate_media {}` | copies every referenced file into the package (File ▸ Consolidate Media…) |
+| `record_screen {seconds, display?, window?, microphone?, system_audio?, show_clicks?, rate?, size?, place?, path?}` | records a display (index, 0 = main) or a window (a `CGWindowID`) for `seconds` and lands it as a clip at the target document's playhead — or as an untitled document rated at `rate` when nothing is open (File ▸ New Recording…). `microphone` records the default microphone to a second file on a Microphone track; `path` is a FOLDER override. It reads the two grants and never asks: the refusal names the System Settings pane, and a shell-launched instance runs under its TERMINAL's grants |
 | `transcribe {clips?, language?, place?}` | on-device speech recognition into caption clips (File ▸ Generate Captions…). Returns the cues in ticks whether or not it places them, and `place: false` changes nothing at all. macOS gates speech recognition and this tool never asks: without the grant it refuses with the status named, since the system prompt needs a frontmost app and an agent-driven one never is |
 | `export_captions {track?, path, format?}` | one text track out as `.srt` or `.vtt` (File ▸ Export Captions…). The track is never guessed — with no all-text track, or more than one, it refuses and lists the candidates |
 | `detect_silence {clips?, threshold_db?, min_length?, padding?}` | the quiet spans of the timeline, which `ripple_delete_ranges` then cuts — the same detector Clip ▸ Remove Silences… uses, so an agent and the sheet propose the same cuts. It changes nothing; loudness is the waveform peak times the mix envelope, so mute and solo are already in the answer |

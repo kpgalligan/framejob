@@ -14,17 +14,21 @@ already made so they are not re-litigated.
 
 ## 1. What this is
 
-a screencast editor's editor without a screencast editor's recorder. Open one or more video
-files from disk, arrange them on layered tracks over a fixed canvas, trim,
+a screencast editor's editor without a screencast editor's recorder — and, since road map 3,
+a recorder of the SCREEN alone, whose output is ordinary media. Open one or
+more video files from disk, arrange them on layered tracks over a fixed canvas, trim,
 split, annotate, animate, and export. Mac only, Apple Silicon, macOS 15+.
 
 The bar is a screencast editor's balance: enough to make a real cut with text,
 shapes, transitions and simple animation, without Final Cut's magnetic
 timeline, roles, multicam, scopes, or a plugin ecosystem.
 
-Deliberate non-goals: screen or camera recording, multicam, color grading
-beyond per-clip controls, audio beyond volume/fade/duck, a plugin system,
-any platform but macOS.
+Deliberate non-goals: camera recording, multicam, color grading beyond
+per-clip controls, audio beyond volume/fade/duck, a plugin system, any
+platform but macOS. **Screen recording was on this list until road map 3
+reversed it** (§11): the app records a display or a window through
+ScreenCaptureKit into a file it then imports exactly as File ▸ Open would;
+camera capture and callouts reconstructed after the fact stay out.
 
 **The opening flow is the point.** File > Open on a `.mov` or `.mp4` (or a
 drop on the Dock icon, or the welcome window's Open Video…) creates an
@@ -116,8 +120,8 @@ Inspector and timeline are `NSSplitView` panes; sizes persist in
 `UserDefaults`. There is no left panel: the media library is an inspector
 tab, as in a screencast editor, so the canvas gets the width. Below about 1080 pt wide,
 narrow the inspector before anything else. The window has a welcome sibling
-(`WelcomeWindowController`, as in Rasterize) offering Open Video…, New Project
-and Recent, under the stacked wordmark.
+(`WelcomeWindowController`, as in Rasterize) offering Open Video…, New
+Project, New Recording… (road map 3) and Recent, under the stacked wordmark.
 
 ## 4. The regions in detail
 
@@ -1704,11 +1708,11 @@ pass nothing, because each wants the picture rather than a deliverable.
 | `ProjectDocument.swift` | NSDocument, `.reelcut` package read/write, the single mutation point (`applyEdit`, live-edit trio), undo as a handle stack, dirty counting, and the FIVE pieces of view state (playhead, selection, in/out range, `selectedMedia`, `nestPath`). `nestPath` is §4.4's nest scope as the PATH it was entered by — one step per level, each naming the nest and the nest CLIP that showed it, because a nest can be shown by two clips at two different starts. `scope` is its last step's nest and is what every op is stamped with (`ReelOp.scoped(_:)`), except the seven the core refuses inside a nest, which are sent unscoped; `editedProject` is the memoised `rc_project_scoped` handle every view of the TIMELINE draws from, where `project` stays the document for save, export, captions, consolidate and the Document and Media tabs |
 | `EditorViewController+NestScope.swift` · `TimelineView+NestScope.swift` | going inside a nest and coming back out (§4.4): Open / Close Nest, the double-click, the playhead mapping, and the breadcrumb the ruler draws in the corner over the track headers — one stored property, one closure, one draw call, one hit token and one gesture case in the frozen `TimelineView.swift`, `TimelineView+Candidates.swift`'s split exactly |
 | `Playback.swift` · `EditorViewController+PreviewQuality.swift` · `PreviewWindowController.swift` | `AVPlayer` + `AVPlayerItem` over the plan; the rebuild-vs-refresh decision (§7.6); coalesced exact seeks; JKL rates; loop range; `preferredMaximumResolution` = canvas size. **Preview Quality** (View ▸ Preview Quality ▸ Full / Half / Quarter) scales the PLAYER's render size on a `mutableCopy()` of the built video composition, so `CompositionBuilder.build` is untouched and the export and `render_frame` paths are UNREACHABLE from the setting rather than merely unchanged by it; the size always carries the canvas's EXACT aspect (`m · (w/g, h/g)`, `g = gcd(w,h)`, `m = ceil(g/divisor)`), falling back to the next coarser exact size and finally to Full for a coprime canvas, because the overlay maps every drag handle through `AVPlayerLayer.videoRect`. **Preview Window** (⇧⌘P) is a second `AVPlayerLayer` on the SAME player in an `NSPanel` — a panel because a titled window becomes MAIN and every ⌘-item whose action is on `EditorViewController` then resolves to nothing |
-| `CompositionBuilder.swift` | plan JSON → `AVMutableComposition` + `AVMutableAudioMix` + `AVMutableVideoComposition` (+ `CompositionInstruction`) |
+| `CompositionBuilder.swift` | plan JSON → `AVMutableComposition` + `AVMutableAudioMix` + `AVMutableVideoComposition` (+ `CompositionInstruction`). Since road map 3, `fill` HOLDS a video track's last frame over any part of a segment's source range the track does not cover (§7.2): a screen recording's video track ends at the last screen change while its sound runs on, and AVFoundation inserts the uncovered range without clamping and renders it black |
 | `Compositor.swift` | the `AVVideoCompositing` class and its Metal pipeline (§7.5) |
 | `LayerRenderers.swift` · `LayerRenderersText.swift` | text (Core Text) and shape (Core Graphics) descriptions → premultiplied BGRA `MTLTexture`s, LRU-cached by hash; reports measured text sizes to the overlay; draws a shape's `gradient` (format version 6) by CLIPPING to the path and running `CGGradient`, sorting the stops the core deliberately does not police (§5.2). The TEXT half — the layout caches, the attributed string and the three §5.2 reveals drawn over the recipe's `reveal`, so a reveal can never reflow the box — went out to `LayerRenderersText.swift` under the size rule when phase 6 came to add the gradient |
 | `CaptionImporter.swift` · `CaptionLayout.swift` · `Transcriber.swift` · `CaptionExporter.swift` | captions in both directions: the SubRip grammar; the placement every producer shares (the frame grid, the overlap trim, the Caption preset, the new front-most track); on-device speech recognition and the cue builder over it; and the `.srt` / `.vtt` writer |
-| `MediaImporter.swift` | `AVURLAsset` probing (the **one** place `async`/`await` is allowed — AVFoundation's loading API is async-only going forward), thumbnails via `AVAssetImageGenerator`, peaks via `AVAssetReader` + vDSP, cache files in the package |
+| `MediaImporter.swift` | `AVURLAsset` probing (the **one** place `async`/`await` is allowed — AVFoundation's loading API is async-only going forward), thumbnails via `AVAssetImageGenerator` — the seconds at or past the video track's end ask for its last frame once and hold it, the strip's half of the rule `CompositionBuilder` applies to the picture — peaks via `AVAssetReader` + vDSP, cache files in the package |
 | `Exporter.swift` | picks the pipeline for the core's settings — `ExportWriter` (`AVAssetReader`/`AVAssetWriter`: chapters, explicit bitrates, the loudness gain) or the ImageIO frame sequence for GIF/APNG — runs the loudness MEASUREMENT pass ahead of the write, reports progress, and renders one frame offline for `render_frame` |
 | `ExporterSettings.swift` | the resolved settings in AVFoundation's vocabulary — the time range, the fallback session preset, the file type, the UTI, the extension, `isAudioOnly` — cut out of `Exporter.swift` under the size rule when phase 7 gave `export` and `renderFrame` a `RecipeOptions` argument; `renderFrame` stayed behind because it is the app's only `copyCGImage` call and the build baseline names that warning by file |
 | `FrameWriter.swift` | a CGImage and a format in, a written file out (PNG / JPEG / HEIC) — the ONE writer File ▸ Save Frame… and `render_frame` both call, which is what makes their PNGs byte-identical by construction rather than by luck; PNG passes NIL destination properties, and JPEG flattens a transparent canvas onto black because the container has no alpha |
@@ -1722,6 +1726,9 @@ pass nothing, because each wants the picture rather than a deliverable.
 | `EditorViewController.swift` + `EditorViewController+<Feature>.swift` | wiring only in the base file; features in extensions (Rasterize's frozen-file rule) |
 | `ExportQueueController.swift` · `ExportQueueWindowController.swift` | the export queue (Window ▸ Export Queue): the job list and its state machine — one job at a time, on the main thread, a fresh `Exporter` each, every job holding the project handle and the media URLs as they were when it was confirmed — and a window that only reads it. The controller has no AppKit in it, so a probe compiled from `app/Sources` can run two jobs without a window; the queue edits no project, so it gets no MCP tool and `export` is already its mirror |
 | `AppDelegate.swift` · `EditorWindowController.swift` · `WelcomeWindowController.swift` · `main.swift` | menus (nil-target selectors), window, welcome |
+| `RecordingSetup.swift` · `ScreenRecorder.swift` · `ScreenRecorder+Microphone.swift` · `ScreenRecorder+Finishing.swift` · `ScreenRecorder+Content.swift` | screen recording's session (road map 3): the values a probe can call — `RecordingChoice`, `RecordingFiles` (the folder, the Screenshot app's date stem, ` (2)` on collision), `RecordingConfiguration.make` (pure, every field read back), `RecordingGrant` (the two synchronous grant reads and the refusal sentences; nothing here prompts) — and the machine `idle → arming → recording → finishing → idle` over one `SCStream` + `SCRecordingOutput` for the picture and system sound and, for a microphone, an `AVCaptureSession` + `AVCaptureAudioFileOutput` writing a SECOND file (§11). Every framework callback is stamped where it arrives and hopped to main; every state transition runs there |
+| `RecordingLanding.swift` · `ProjectDocument+Recording.swift` | where a finished recording goes: a value type answering an UNSCOPED op list and the ids the core will mint (the two-try track rule over a project that already holds the media; the microphone on a new back track named Microphone at the playhead minus the measured offset, a negative start trimmed rather than placed late) that the panel commits through `performGroupedEdit` and the tool through `AgentServer.performGroupedEdit`; and `untitled(around:)`, whose ORDER is a contract — open untitled, `adoptImported` (the one spelling File ▸ Open uses, now in the base file), the microphone's one edit, `makeWindowControllers`, `showWindows` |
+| `RecorderPanelController.swift` · `+Rows.swift` · `+Recording.swift` · `+Landing.swift` · `+Picker.swift` · `RecorderStatusItem.swift` · `AppDelegate+Recording.swift` · `AgentServer+Recording.swift` · `+RecordingArguments.swift` · `+RecordingResult.swift` | File ▸ New Recording… (⌥⌘N): the app's second `NSPanel` — `.floating` and `.nonactivatingPanel` so Stop can be clicked without bringing Reelcut over the thing being recorded, ONE instance because it outlives documents — its first `NSStatusItem` (a red dot and the elapsed time, with Stop), the grants asked BEFORE the countdown, and `record_screen`, the tool that never asks |
 | `AgentServer.swift` · `AgentServer+<Feature>.swift` · `AgentCatalog.swift` | MCP mirrors of every op, plus `open_project`, `import_media`, `render_frame`. One handler file per feature area, the frozen `AgentServer.swift` keeping only the registry rows |
 | `Theme.swift` · `Controls.swift` · `OptionControls.swift` · `Sheets.swift` | copied from Rasterize |
 
@@ -2102,6 +2109,14 @@ edit is one undo step" and "the in/out range scopes the export" properties
 cannot be checked by driving the built app),
 `import_captions {path, track?}` and `consolidate_media {}` (M3's two
 §5.6 file features),
+`record_screen {seconds, display? | window?, microphone?, system_audio?,
+show_clicks?, rate?, size?, place?, path?}` (road map 3 — File ▸ New
+Recording…'s mirror: the file lands as ordinary media at the playhead of
+the target document, or as an untitled document rated at `rate` when
+nothing is open; it reads the Screen Recording and Microphone grants
+synchronously and NEVER prompts, and its refusal order is the caller's own
+mistakes, then the grants, then the display or window lookup, which cannot
+be asked without them),
 `detect_silence {clips?, threshold_db?, min_length?, padding?}` → the
 quiet spans of the timeline and the scope they were taken over, which
 `ripple_delete_ranges` then cuts — the one tool that reads a CACHE rather
@@ -2315,6 +2330,7 @@ a clean `make lint` before finishing Rust work.
 | ⌥⌘V | Paste Attributes — the copied clip's look onto the selection |
 | ⌘E | Export… |
 | ⌥⌘E | Save Frame… — the frame under the playhead as a PNG, JPEG or HEIC still (road map 2's phase 7a). Export…'s still-image sibling, under the same letter |
+| ⌥⌘N | New Recording… — the recorder panel (road map 3). The same item reads Stop Recording while one runs, and stops it; a nil-target action on `AppDelegate`, so it resolves with no document open, as New Project does |
 | ⌥⌘I | Toggle inspector |
 | ⇧⌘P | Preview Window — a second window showing the same picture as the canvas, with no overlay (road map 2's phase 8b). A TOGGLE: the item carries a checkmark and the key both opens the window and puts it away |
 | `,` / `.` (⇧ ×10) | Nudge the selection one frame |
@@ -2338,7 +2354,9 @@ a key, nothing more.
 |---|---|---|
 | — | Nothing. Phase 9 took the ⌘↓ / ⌘↑ this table claimed for it, for Clip ▸ Open Nest and Clip ▸ Close Nest, and the row has been promoted into the bound table above. Carrying a modifier does NOT keep either off the first responder — every main-menu key equivalent is offered the key-down before the window dispatches it, and what a modifier changes is only WHICH field-editor binding it displaces (here `moveToBeginningOfDocument:` / `moveToEndOfDocument:`). So the pair is validated DEAD while text is being edited, the Delete pair's precedent — otherwise ⌘↑ in an inline rename would leave the nest and discard the open field | — |
 
-Menus: File (New Project, Open…, Open Recent, Close, Save, Save As…,
+Menus: File (New Project, New Recording… (road map 3 — directly under New
+Project with no separator, because both make a document out of nothing),
+Open…, Open Recent, Close, Save, Save As…,
 Add Media…, Import Captions… (M3), Generate Captions… and Export
 Captions… (road map 2's phase 4 — the three caption items sit
 together, in the order a caption track comes into being and leaves again,
@@ -2523,7 +2541,9 @@ assisted import.
   the rule stands. `SpeechAnalyzer`, the macOS 26 replacement, is
   `async`-only and would earn the argument again — but only when the
   deployment target moves, and then as one more named file, never as a
-  general licence.
+  general licence. Screen recording (road map 3) did not earn one either:
+  every ScreenCaptureKit and AVFoundation capture call it needs has a
+  completion-handler form, and `ScreenRecorder` uses those.
 - **Transcription reads EXTRACTED audio, not the media file.** Each clip's
   own source window is written to a temporary mono 16 kHz WAV and the
   recogniser is handed that. Whether `SFSpeechURLRecognitionRequest` can
@@ -2539,3 +2559,50 @@ assisted import.
   already finds is the recorded follow-up.
 - **Media is referenced, not copied**, by path + bookmark (not
   security-scoped; the app is not sandboxed). Consolidate is M3.
+- **Screen recording is IN; camera recording and callouts stay OUT** (road
+  map 3, reversing §1's day-one non-goal). A screen recording is the input
+  the whole product was shaped around; camera capture is a second capture
+  stack and callouts are a metadata format plus an Input Monitoring grant.
+  What ScreenCaptureKit draws into the pixels for free — the cursor, and
+  a ring around each click — is taken; nothing is reconstructed afterwards.
+- **A recording is ordinary media.** The recorder writes a file and the app
+  imports it through exactly the path File ▸ Open and Add Media… use
+  (`adoptImported`, the two-try placement). The model learns nothing: no
+  source kind, no flag, no schema bump. Every op, cache and export treats a
+  recording clip as the media clip it is.
+- **The file lives in `~/Movies/Reelcut Recordings/`**, named by date and
+  time, never in the package and never in the temporary directory: an
+  untitled document has no package (§5.6), and a recording is ORIGINAL
+  footage, so the one place it may not go is where a cache is regenerable.
+  Consolidate carries it in on the same terms as any other file.
+  `-RCRecordingFolder` overrides the folder for a proof.
+- **The canvas takes the recorder's RATE; the media record takes the
+  file's.** ScreenCaptureKit delivers a frame only when the screen changes,
+  so its files are variable-rate and the probe honestly reports something
+  like 24981/1000 (measured); the untitled document is built at the 30 or
+  60 the panel asked for, because that is the grid the person chose, and
+  `set_canvas` is NOT used for it afterwards — an untitled document's
+  first project is not an undo step, and the rate is part of what the
+  document IS.
+- **The panel asks for the grants; the tool never does.** `Transcriber`'s
+  rule for two grants: Screen Recording (`CGPreflightScreenCaptureAccess`
+  reads, `CGRequestScreenCaptureAccess` asks) and Microphone
+  (`AVCaptureDevice.authorizationStatus`, `requestAccess`). The microphone
+  status is read BEFORE any `AVCaptureDeviceInput` is constructed, because
+  that initializer prompts on its own. `record_screen` reads and refuses by
+  name with the fix in the sentence. The built app needs BOTH the plist
+  usage key and the hardened-runtime entitlement
+  `com.apple.security.device.audio-input` for the microphone; Screen
+  Recording needs neither.
+- **Microphone and system audio are two sources and stay two FILES.**
+  Measured (road map 3's R0): with both on, `SCRecordingOutput` writes ONE
+  stereo track that is their SUM, inseparable and clipping when both are
+  loud — the one thing a screencast cutter cannot repair afterwards. So the
+  microphone is never on the recording stream; it is an `AVCaptureSession`
+  writing its own `.m4a` beside the movie, started first in the same
+  run-loop turn, and it lands as its own clip on its own track at the
+  offset the two did-start callbacks measured (a per-recording number,
+  never a constant).
+- **Undo of Add Recording leaves the file on disk**, exactly as undoing Add
+  Media… does. A recorder that deleted footage on ⌘Z would be the only
+  destructive undo in the app.

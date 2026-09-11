@@ -1,6 +1,9 @@
 # Reelcut — road map 3: recording
 
-**Status: PLANNED, nothing built.** Road map 2 is complete
+**Status: BUILT, reviewed and fixed (2026-09-11).** The sections below
+are the plan as it was written, kept as written; "R0 — the answers" and
+"What R0 and the scouts change in R1" override them, and "R1 — the record"
+says what landed and what the review found. Road map 2 is complete
 (`reelcut-roadmap-2.md` §1) and `reelcut-remaining.md` §5 says a third road
 map starts at road map 2's §4, "Considered and left out". This is the plan
 for the first thing taken off that list: **screen recording**, the feature
@@ -92,7 +95,7 @@ only destructive undo in the app.
 | Phase | Theme | Sessions | Schema | Status |
 |---|---|---|---|---|
 | R0 | The spike — five questions measured before design leans on them (and a sixth from the scouts) | ½ | — | **done** 2026-09-10; the answers are in §3 |
-| R1 | Screen recording | 2–3 | — | planned |
+| R1 | Screen recording | 2–3 | — | **done** 2026-09-11; the commit is recorded in the row below once made |
 
 R0 comes first and its answers are written into R1's section before R1's
 waves are briefed. Two of R1's branches (the audio landing, the panel's
@@ -563,6 +566,149 @@ finding or the R0 answer it comes from.
   the initial commit; a third button moves the other two, so the score is
   `extent(diff)` equal to the new row's rectangle with nothing outside it,
   clusters printed and never counted as one.
+
+#### R1 — the record (written as the phase landed; the plan above is unchanged)
+
+- **The granted tier first RAN unattended on 2026-09-11 at 00:24 EDT**, under
+  a poller that waited for the console to unlock (the whole of lane D's
+  session had run against a locked console with the display asleep, where
+  ScreenCaptureKit lists no display under a TRUE preflight, so the tier's
+  33 + 6 rows had been written blind against the seam). Under the
+  terminal's grants (R0 q1: the direct launch is ghostty's, which the tier's
+  summary line prints) it scored **101/102** on its first run: a new
+  project's `canvas.fps` was `[60, 1]` while the media's was `[42381, 1000]`
+  (decision 3 measured on a real recording); `size: best` wrote 3456×2234
+  for a 1728×1117 display; the two-try rule's second branch minted a new
+  front track; inside a nest the answer said `scope 13, document_ops
+  [add_media]` and the view showed the clip while the timeline did not;
+  one undo removed media and clip while the file stayed; and the
+  microphone rows — the entitlement in the signed binary, the terminal's
+  grant authorized — landed the second file on a track named Microphone
+  with the two clips' starts differing by the measured `mic_offset` of
+  36 158 ticks (60 ms) to within half a frame. **The one failure was the
+  proof's, not the recorder's:** the "tone captured" row asked
+  `detect_silence` to find less than half of a recording made while
+  `afplay` played a 1 kHz tone, and on this host it found all of it. Two
+  measurements settled why. The host's output was MUTED, and a muted
+  output reaches the tap UNRELIABLY — R0's unity tone arrived at about
+  −10 dB against the floor in one 3 s run at 02:30 and not at all in the
+  next; and something else was playing (Plex, into the tap, at 0.025 RMS),
+  which a threshold detector cannot tell from a tone. The rows were
+  rewritten: the two recordings are decoded to PCM and read through a
+  Goertzel filter at 1 kHz (the tone recording's 1 kHz power ≥ 100× the
+  silent one's, and ≥ a quarter of its own total power), so a noisy host
+  cannot fail them and a quiet one cannot pass them vacuously, and when
+  `osascript` reads `output muted` they are SKIPPED with their count and
+  the numbers printed. The re-run at 02:26 scored **100/100 with the two
+  tone rows skipped by name**; unmuting the host is what scores them.
+- **The review, and the fix wave's first stage.** Nine readers over the
+  uncommitted tree (session, landing, chrome, tool, composition, rules,
+  proof, grants, plan) returned 68 findings; three refuters per finding were
+  briefed and the usage limit killed most of them mid-run, so 11 findings are
+  CONFIRMED by every vote, 2 refuted, and 55 were never judged and were
+  triaged by hand — an unjudged finding is not a refuted one. The recorder's
+  lane closed the eleven and the recorder-side unjudged ones (`ScreenRecorder.swift`,
+  `+Microphone.swift` — new, the capture session prepared during the
+  countdown after lane A's smoke run lost the first 421 ms of voice —
+  `+Finishing.swift`, `+Content.swift`, `RecordingSetup.swift`): a microphone
+  problem is `micProblem` on a `.success` and never the recording's failure
+  (the movie is probed FIRST, the mic file left on disk and named);
+  `stop()` in any state past idle JOINS the finishing under way instead of
+  answering `.busy`, which had dropped a landing when a person's Stop
+  followed the menu bar's by a second; `settle` is one-shot
+  (`Session.settling` — measured, a did-finish landing during the probe had
+  concluded TWICE and wiped the next session); a microphone that dies
+  mid-recording sets `microphoneProblem` live and silences the meter while
+  the picture records on; the hook is `onFinish`, a parameter of `start`
+  stored on the session and called exactly once, because a Record refused
+  `.busy` from the other door had erased the running recording's hook; the
+  arm ceiling has its own sentence; every failure past `beginFinishing`
+  names its files (`RecorderError.filesKept`); a late `didStopWithError` is
+  adopted as the reason when no `stop()` ended the recording; the grant
+  sentences carry the launching process's pid when `getppid()` is not 1,
+  since a shell-launched instance runs under the terminal's grants and the
+  pane sentence alone sent a person to grant the wrong application;
+  `shareableContent` issues its call from a global queue for both doors
+  (a panel that made it on main would have frozen the app for the ~37 s the
+  framework held a locked console's caller); two dead helpers went.
+  `recording_probe.py` section 3 grew 49 rows over a FAKED session — an
+  `SCContentFilter()`, an `SCStream` and an `SCRecordingOutput` all
+  construct in a bare Mach-O, only `startCapture` needs the grant — with
+  four mutants: `busy-finishing` 617/620, `no-oneshot` 617/620,
+  `mic-fails-all` 618/620, `no-path` 618/620.
+- **The landing's fixes.** A new-project recording with a microphone read
+  CLEAN after one ⌘Z and ⌘W closed it without a prompt (the mic edit was the
+  document's only change count; `makeWindowControllers`' import count is
+  guarded by `!isDocumentEdited` and was skipped): `untitled(around:)` makes
+  the import count itself BEFORE the microphone's edit (mutant
+  `no-import-count` 619/620). That edit is named "Add Microphone", since it
+  removes the voice and keeps the picture. The landing's comment that the
+  trial "cannot see `check_caps`" was false — the trial applies each scoped
+  op to the parent handle, which is the scoped apply — and row 8 measures
+  `too many tracks: 65 (max 64)` thrown in the trial, in a nest and out; the
+  one-list limit (a refused microphone track takes the picture down with
+  it) is recorded in `placement`'s doc rather than fixed.
+- **The filmstrip's fix, and the cap.** The held tail was measured from the
+  RECORD's nominal rate, so a sparse recording's last tiles showed the slide
+  before the last (three frames in 50 s read as 0.06 fps, a 16.7 s frame,
+  the tail held from 34 s); it is the track's last sample's own time now
+  (an `AVSampleCursor` mapped through the edit list; `remaining_probe.py` 5f
+  gained the sparse shape, 170/170, mutants `record-rate-tail` 166/170 and
+  `rounded-end` 168/170). Lane F's recorded limit was half true and is
+  replaced by the measured facts. `MediaImporter.swift` was 619 against the
+  ~600 cap with the tail in it and paid its toll mid-wave: the await-free
+  half went to `MediaImporter+Probe.swift` as a pure move (619 → 518 → 571).
+- **The doors' fixes (stage B of the wave).** The panel asks for BOTH grants
+  unconditionally on a press — a `canAsk` gate told a person under
+  `-AgentServerEnabled` to press the button they had just pressed and left a
+  `notDetermined` microphone unrecoverable; decision 4 is that the TOOL never
+  asks, and the panel is the tool's opposite — a `.starting` attempt is
+  numbered and bounded by the arm ceiling, `land()` reads the commit's
+  outcome off the project handle (a beep-and-return refusal was reported as
+  added), Record Into freezes at the captured choice through a recording,
+  the grown card is constrained to its screen, the countdown and tick run in
+  `.common` run-loop modes, `show()` beeps while a picked recording hid the
+  panel, Record over the Window… row with no filter refuses first, the tick
+  shows a live microphone problem and a landed one, the capture session is
+  prepared when the countdown begins, and File ▸ Stop Recording routes a
+  tool's recording to the recorder instead of beeping at it — with the panel
+  now five files (`+Landing`, `+Picker`) and `recording_probe.py` section 5
+  at 116 rows with eight mutants at 660–661/662. The tool names the file in
+  every failure after the recording was written ("The recording was saved at
+  … but could not be added: …", measured on a document at `MAX_TRACKS`),
+  waits out a live drag on the server thread at the panel's own bound,
+  bounds its stop wait at 75 s independent of `seconds` (the recorder's
+  finish ceiling plus two 30 s probe ceilings), refuses zero shareable
+  displays by name, treats a blank `path` as absent (a mutant landed a
+  recording in `tools/proof/  /`), carries `mic_problem`, puts up the same
+  menu-bar status item the panel does, mentions macOS 15's periodic
+  screen-recording consent alert in both timeout sentences, and is three
+  files (`+RecordingArguments`, `+RecordingResult`). Its proof scores a 1 kHz
+  SHARE on Parseval's scale with a self-test (the first Goertzel rows had
+  compared two scales and could not fail), skips the `canvas.fps` row by
+  count when the file's own rate is exactly 60/1, reports a raise inside the
+  granted tier as one failure plus a counted skip, reads the microphone
+  status off the launched instance, and gained the mic rows that see a lost
+  head: **with a prepared session the microphone LEADS the picture by 65–75
+  ms** (three runs), its file LONGER than the movie by that lead plus the
+  writers' tail difference, and the landing at playhead 0 takes the
+  head-trim branch — R0's +11 ms mean was for a session started inside
+  `start`, and lane A's −421 ms is what the one-sided head-loss row fails.
+- **Host state is a proof INPUT, read and named, never assumed.** Four of
+  it in one night: a locked console (0 shareable displays under a true
+  preflight — the tool answers `display must be 0…0 (got 0); 0 displays are
+  shareable.` in 0.1 s, and the tier skips with a count), a muted output
+  (above), another application's sound in the tap, and — measured at 12:10
+  the next day with AirPods Max as the default output — **a Bluetooth output
+  hands the system-audio tap DIGITAL SILENCE**: `afplay` and `say` both
+  alive through a 3 s `record_screen`, the file decoding to RMS 0.0 and peak
+  0.0, where the built-in speakers had given R0's unity tone. The proof's
+  host probe now reads the default output device and its transport through
+  CoreAudio and skips the tone rows by name (`the default output 'Kevin's
+  AirPods Max' is a Bluetooth device, which delivers nothing to the
+  system-audio tap on this host`); a wired or built-in output scores them.
+  Each of the four is a named skip or a measurement that survives it, and
+  none is a pass.
 
 ### Phase R1 — Screen recording
 

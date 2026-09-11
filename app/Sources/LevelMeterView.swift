@@ -1,7 +1,12 @@
 import AppKit
 
 /// The output level meter in the timeline bar (road map 2, phase 5b): the one
-/// view of `LevelMeter.shared`.
+/// view of `LevelMeter.shared` — and, since road map 3's recorder panel, of
+/// any other `LevelMeter` handed to `init(meter:)`. The default is `.shared`,
+/// so `TimelineBar`'s `LevelMeterView()` and every chrome render are byte for
+/// byte what they were; the panel binds one to `ScreenRecorder.shared.meter`,
+/// because a microphone published to `.shared` would light the timeline bar's
+/// meter with the microphone (`ScreenRecorder`'s doc).
 ///
 /// **The measurement is the model's, the ballistics are the view's.** What
 /// arrives is a `LevelMeterReading` — per channel peak and RMS as linear
@@ -119,10 +124,13 @@ final class LevelMeterView: NSView {
     private var lastTick = Date.distantPast
     private var tick: Timer?
     private var observation: LevelMeterObservation?
+    /// The model this view draws — `.shared` unless the caller says otherwise.
+    private let meter: LevelMeter
 
     // MARK: - Life cycle
 
-    init() {
+    init(meter: LevelMeter = .shared) {
+        self.meter = meter
         super.init(frame: .zero)
         translatesAutoresizingMaskIntoConstraints = false
         setContentHuggingPriority(NSLayoutConstraint.Priority(1), for: .horizontal)
@@ -133,7 +141,7 @@ final class LevelMeterView: NSView {
         setAccessibilityLabel("Output levels")
         // Dropping the token unsubscribes, so the meter's whole teardown is
         // this view's own lifetime and nothing has to remember to detach it.
-        observation = LevelMeter.shared.addObserver { [weak self] reading in
+        observation = meter.addObserver { [weak self] reading in
             self?.wake(reading)
         }
     }
@@ -188,7 +196,7 @@ final class LevelMeterView: NSView {
         let now = Date()
         let elapsed = Float(min(max(now.timeIntervalSince(lastTick), 0), 0.5))
         lastTick = now
-        let reading = LevelMeter.shared.reading
+        let reading = meter.reading
         let releasing = reading.isSilent
         bars[0] = step(
             bars[0], peak: reading.peakLeft, rms: reading.rmsLeft,

@@ -91,9 +91,11 @@ final class AgentServer {
     /// not acceptable. `transcribe` waits on a recognition task — whose
     /// callbacks the Speech framework delivers on an `OperationQueue` that
     /// defaults to the app's MAIN one — after extracting the clip's audio, so
-    /// it is `import_media`'s case twice over. Each hops back through `onMain`
-    /// for every document touch, so the single-mutation-point rule is
-    /// untouched.
+    /// it is `import_media`'s case twice over. `record_screen` waits on the
+    /// recorder, whose every callback is hopped to main, for up to ten
+    /// minutes — `import_media`'s case again, and longer. Each hops back
+    /// through `onMain` for every document touch, so the
+    /// single-mutation-point rule is untouched.
     ///
     /// The criterion is NOT "touches the disk", which is why
     /// `detect_silence`, `consolidate_media`, `import_captions` and
@@ -101,6 +103,7 @@ final class AgentServer {
     /// main thread and each says so in its own handler.
     static let offMainTools: Set<String> = [
         "import_media", "render_frame", "export", "save_project", "new_project", "transcribe",
+        "record_screen",
     ]
 
     // MARK: - Lifecycle
@@ -179,7 +182,7 @@ final class AgentServer {
         }
         // The envelope's `scope` is read ONCE, here, because this is the only
         // place that holds both the tool's name and its arguments for all
-        // seventy-four of them — a read inside each handler would be
+        // seventy-five of them — a read inside each handler would be
         // fifty-eight edit sites across two files, every one of them able to
         // forget. It is read for exactly the tools whose schema declares it
         // (`AgentCatalog.opNames`, the core's own op list), so a stray
@@ -200,12 +203,12 @@ final class AgentServer {
     /// and `start()` checks the two sets match on every launch.
     ///
     /// One entry per row of the op table (spec §6, and the module doc of
-    /// `core/src/edit.rs`) plus the nineteen tools that are not ops: the
+    /// `core/src/edit.rs`) plus the twenty tools that are not ops: the
     /// project-level ones spec §7.9 names, the five view-state and history
     /// mirrors beside them (`set_range`, `set_selection`, `set_scope`,
-    /// `undo`, `redo`), and
-    /// the composites later phases added — `detect_silence`, `transcribe`,
-    /// `import_captions`, `export_captions`, `normalize_clip`. The count is
+    /// `undo`, `redo`), the composites later phases added —
+    /// `detect_silence`, `transcribe`, `import_captions`, `export_captions`,
+    /// `normalize_clip` — and road map 3's `record_screen`. The count is
     /// not decoration: `start()`'s parity check reads the core's own
     /// `rc_op_names` and holds an explicit allow-list for the ops that
     /// deliberately have no tool, so a new tool that is not an op belongs in
@@ -277,6 +280,8 @@ final class AgentServer {
         // Captions (AgentServer+Captions.swift)
         "transcribe": { $0.transcribe },
         "export_captions": { $0.exportCaptions },
+        // Recording (AgentServer+Recording.swift)
+        "record_screen": { $0.recordScreen },
         // Tracks, markers and the canvas (AgentServer+Tracks.swift)
         "add_track": { $0.addTrack },
         "remove_track": { $0.removeTrack },
@@ -738,7 +743,7 @@ final class AgentBox<Value> {
 /// C callback for `RcAgentToolHandler`: hops to the main thread, executes, and
 /// hands the result back as a core-owned string.
 ///
-/// The three `offMainTools` deliberately do NOT hop — they wait on work the
+/// The seven `offMainTools` deliberately do NOT hop — they wait on work the
 /// main thread has to perform, so taking it first would deadlock — and reach
 /// the main thread through `AgentServer.onMain` instead.
 private func agentToolTrampoline(

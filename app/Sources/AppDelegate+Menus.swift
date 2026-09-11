@@ -103,6 +103,15 @@ extension AppDelegate {
     private func fileMenu() -> NSMenu {
         let menu = NSMenu(title: "File")
         menu.addItem(item("New Project", #selector(newProject(_:)), "n"))
+        // Directly under New Project with no separator, because both make a
+        // document out of nothing (road map 3 §4). ⌥⌘N: ⌘N and ⇧⌘N are
+        // taken, and the modifier keeps the key off the first responder. It
+        // reads "Stop Recording" while one runs — `AppDelegate.validateMenuItem`
+        // retitles it, the agent-server item's precedent.
+        menu.addItem(
+            item(
+                "New Recording…", #selector(AppDelegate.newRecording(_:)), "n",
+                [.command, .option]))
         menu.addItem(item("Open…", #selector(NSDocumentController.openDocument(_:)), "o"))
 
         // AppKit auto-populates a submenu whose sole item's action is

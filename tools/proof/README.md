@@ -149,7 +149,28 @@ that needs a decoder, because ProRes 4444's alpha is a pixel format only
 `ffprobe` can name.
 
 Then launch YOUR OWN instance on YOUR OWN port and only ever kill that one
-(`pgrep -f "MacOS/Reelcut"` lists them; another session may have one running):
+(`pgrep -f "MacOS/Reelcut"` lists them; another session may have one running).
+**A direct launch of the binary runs under the TERMINAL's grants** — road map
+3's R0 question 1, measured: TCC attributes a shell-launched
+`Reelcut.app/Contents/MacOS/Reelcut` to the terminal that launched it
+(`responsibility_get_pid_responsible_for_pid` names the terminal, not
+Reelcut), so a Screen Recording or Microphone grant given to Reelcut.app in
+System Settings never reaches a proof's instance, and the terminal's own
+grants are what `record_screen` runs under. That is why `recording_proof.py`'s
+granted tier prints whose grant it ran under. To get an instance that is
+responsible for ITSELF — the shipped app's own grants, the way a person
+launches it — use `open` instead, which carries the port through `--env` and
+the log through `--stdout`/`--stderr`:
+
+```sh
+open -a ./build/Build/Products/Release/Reelcut.app --env RC_AGENT_PORT=4823 \
+   --stdout /tmp/reelcut-4823.log --stderr /tmp/reelcut-4823.log \
+   --args -ApplePersistenceIgnoreState YES -AgentServerEnabled YES
+```
+
+(One trap: `open -a` of a bundle that already has an instance running
+ACTIVATES that instance rather than launching another.) The direct line
+below is still the one every script here is run against:
 
 ```sh
 make app
@@ -202,10 +223,16 @@ startup parity check would complain — `grep "Reelcut: " /tmp/reelcut-4823.log`
 must print nothing before a proof run means anything.
 
 **The EXACT tool count belongs to the newest phase's script**, because it is
-what tells a stale binary on the port from the build under test: phase 9
-asserts **74**, and phases 1 to 8 keep floors (63, 65, 68, 70, 71, 73, 73 and
-73) so a later phase's tools never fail an older proof. That handover has now
-happened four times, each time exactly as it was written down — phase 5 added
+what tells a stale binary on the port from the build under test: road map 3's
+`recording_proof.py` asserts **75** (`record_screen`), and phases 1 to 9 keep
+floors (63, 65, 68, 70, 71, 73, 73, 73 and 74) so a later phase's tools never
+fail an older proof. Road map 3's was the fifth handover and cost two rows in
+one script, both in the same commit as the tool: `phase9_proof.py`'s `TOOLS`
+became a `>=`, and its `APP_STATE_TOOLS` — asserted as an EXACT set, because
+an op tool that lost its scope would leave the count right and the set
+wrong — gained `record_screen`, the first scopeless tool to arrive after
+that set was written. Before it, the handover had happened four times, each
+time exactly as it was written down — phase 5 added
 `normalize_clip`, took the exact count, and phase 4's `check` became a `>=`;
 phase 6 added `add_background` and `add_blurred_background`, took the count
 at 73, and phase 5's became a `>=` in the same commit; and phase 7 was the
@@ -1810,9 +1837,17 @@ not changed.
 
 ## The remaining-work probe (`remaining_probe.py`)
 
-`python3 tools/proof/remaining_probe.py`, **141/141**. No port, no window
+`python3 tools/proof/remaining_probe.py`, **170/170** (141 when it landed; 156
+with road map 3's 5f, the held tail over a 1 s-picture / 5 s-sound fixture;
+170 with the fix wave's sparse shape, three frames 25 s apart under 60 s of
+sound, and its all-sync twin). No port, no window
 server grant, and no media beyond `media/A.mov` (sections 2, 3 and 5),
-`AV.mov` and `B.mov` (section 5): a standalone probe over the WHOLE of
+`AV.mov`, `B.mov` and `toneA.m4a` (section 5) plus the fixtures 5f MAKES with
+`ffmpeg` at proof time under `work/remaining-probe-files/pass/` — 1 s of
+`testsrc2` picture over 5 s of a 440 Hz tone, the shape of a screen recording
+of a static screen with narration, and a sparse three-frame twin with
+VideoToolbox and all-sync encodings — so `ffmpeg` and `ffprobe` on `PATH`
+are a proof-time requirement here as for `phase2_proof.py`'s PCM decode: a standalone probe over the WHOLE of
 `app/Sources` in `phase9_probe.py`'s shape — `harness/build.sh`'s own swiftc
 line, cached on modification times under
 `work/remainingprobe/<tree|mutant-hash>/`, a build failure scored as a
@@ -1821,7 +1856,8 @@ FAILURE rather than an exit — for the items in
 tool reaches. One section per item, and one binary answering all of them by
 a request `mode`, so the next item adds a `case` and a `section_…` without
 touching the others: section 1 is §2b's naming (70 checks with the build
-check), sections 2–5 are §2a's cache marker on the app side (71).
+check), sections 2–5 are §2a's cache marker on the app side and road map
+3's held tail seen from the strip (100).
 `--sources DIR` (or `RC_APP_SOURCES`, the spelling `phase9_chrome.py` uses
 too) compiles it against any other copy, which is the gate.
 
@@ -1917,9 +1953,10 @@ IMAGE record over a text file with a seeded `0.jpg`: the tile is cleared, no
 marker, exactly one post carrying `replaced` (the decode-failure path posts
 too); **5d** makes ONE replacing pass post twice by running `A.mov` under a
 20 s RECORD — `relink_media` never re-probes, so a record longer than its
-file is a state the app can be in; a request past the end fails as a hole
-rather than clamping, measured — and asserts `replaced` on the first post and
-on no later one; **5e** builds `AV.mov`'s peaks, runs the same record over a
+file is a state the app can be in; the ten seconds past the picture are HELD
+at the track's last frame since road map 3 (5f) — twenty tiles where there
+were eleven and nine holes, the row its unclamped mutant fails — and asserts
+`replaced` on the first post and on no later one; **5e** builds `AV.mov`'s peaks, runs the same record over a
 video-only file and asserts the `.bin` and its marker are GONE with exactly
 one `peaks` post (the withdrawal — the "timeline was told" claim no tool can
 see), then `AV.mov` again brings the `.bin` back at its first size with one
@@ -2016,3 +2053,77 @@ noted no mutant covered that check. `clearPeaks` back to marker-only
 detector reporting `AV` pending. It opens THREE documents; relaunch between
 full runs. Phases 2, 3, 3-silence and 5, whose fixtures read the peaks path,
 were re-run against the same binary and still score 85, 121, 8 and 88.
+
+## Road map 3 — screen recording (`recording_spike.py`, `recording_proof.py`, `recording_probe.py`)
+
+Three instruments, in the order they came.
+
+`python3 tools/proof/recording_spike.py` is R0, the spike that ran BEFORE the
+code and stays as the record of its six answers (`--only 2,5` for a subset; a
+subset run carries the other questions' answers forward under
+`carriedForward`). It compiles a Swift probe against nothing from
+`app/Sources`, launches the built app both ways for question 1 (the README's
+direct line, and `open -a … --env … --stdout … --stderr … --args …`) on ports
+4890 and 4891, records a few seconds of the main display for the others, and
+writes `work/spike/answers.json`. Its answers are pasted into
+`designs/reelcut-roadmap-3.md` dated; two of them overturned the plan.
+
+`python3 tools/proof/recording_proof.py [port]`, over MCP, in two tiers. The
+HEADLESS tier always runs: the catalog at exactly 75 with `record_screen`
+declaring no `scope`, the refusals in the contract's ORDER (the caller's
+mistakes, the microphone grant by status word, a `project` naming nothing,
+THEN the Screen Recording grant, then the display or window lookup), lane E's
+held-tail rows over an `ffmpeg`-made fixture (1 s of picture under 5 s of
+sound — three byte comparisons of `render_frame` PNGs and a YAVG black test),
+structural reads of the tool file, and a self-test of the tone rows' Goertzel
+arithmetic over a wave-written sine/noise/silence trio. The GRANTED tier
+launches a SECOND instance of its own with `-RCRecordingFolder` under
+`work/recordings/<pid>-files/`, prints whose grants both instances run under
+(a shell-launched instance runs under its TERMINAL's — R0 q1), and records the
+main display: a new project rated at 60 while the media keeps the file's own
+variable rate, a landing at the playhead on the front track, a new front track
+when that one is occupied, one-step undo with the file kept, `size: best` at
+the pixel size, `place: false`, inside a nest, a document at `MAX_TRACKS`
+(the refusal names the file), the microphone rows (a second file on a
+Microphone track at the measured offset; the head-loss row), and the tone
+rows. **Host state is read and named, never assumed**: a locked console (zero
+shareable displays under a TRUE preflight), a muted output and a BLUETOOTH or
+AirPlay output (the system-audio tap hands it digital silence — measured with
+AirPods Max) each SKIP their rows with a count; a raise inside the tier
+scores one failure plus a counted skip; the summary line says what did not
+run. On this host it is **152/152** with the two tone rows skipped by name
+(the headless tier 105, the granted 47); expect 105 plus a counted skip on an
+ungranted or locked machine. It needs `ffmpeg`, `ffprobe`, `osascript` and
+`afplay` on `PATH`. The mutants it names — the grant check hoisted, the
+`.newProject` fallback deleted, the `fps:` override dropped, the undo group
+split, the held-tail branch deleted, a `scope` on the tool — and the four the
+fix wave built (a placement throw unwrapped, the `path` trim removed, a
+named project falling through to a new document, the Goertzel share on the
+wrong scale) are in its docstring with the rows that kill them.
+
+`python3 tools/proof/recording_probe.py`, **662/662**, over a probe compiled
+from the whole of `app/Sources` (`remaining_probe.py`'s shape): section 1 the
+file naming, 2 `RecordingConfiguration.make` read back field by field over
+sixteen configurations (`excludesCurrentProcessAudio` TRUE in every row — the
+one mutant no MCP proof can see), 3 the recorder's state machine over a FAKED
+session (an `SCContentFilter()`, an `SCStream` and an `SCRecordingOutput` all
+construct in a bare Mach-O; only `startCapture` needs the grant — the join,
+the one-shot settle, a microphone that dies, the sentences), 4 the landing
+(every placement committed through `performGroupedEdit` and the minted ids
+compared with the prediction; the untitled ORDER on the real
+`ProjectDocument` through a subclassed `NSDocumentController`; the caps
+thrown in the trial), 5 the chrome's structure (the File-menu row, the
+welcome button, the panel's construction, the retitle and the quit guard
+under a `ScreenRecorder.shared.state` the probe writes and resets, and the
+fix wave's rows), 6 the welcome window's cross-build against the tree one
+commit before the button (phase 5's pattern; the reference is a pickaxe on
+the button's title, `HEAD` while uncommitted), 7 the catalog move, 8 host
+facts printed and never asserted. `--mutant <name>` prepares a copy of
+`app/Sources` and runs the whole thing over it; twenty-odd are named in the
+docstring, each measured at 613–661 of 662.
+
+Worth knowing: the built app is ad-hoc signed, so its designated requirement
+is its cdhash and a Screen Recording or Microphone grant given to Reelcut.app
+(the `open -a` line) is for THAT build — after a rebuild remove and re-add it,
+or answer the microphone prompt again. The proofs' direct launch never meets
+this, because it runs under the terminal's stable identity.

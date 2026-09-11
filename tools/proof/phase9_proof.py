@@ -79,10 +79,13 @@ the same comparison with the nest clip at `scale: 0.5`, which must differ in
 most of the region; without it a build whose two renders were the same
 picture for the wrong reason would pass.
 
-**What the live server alone can say** is sections 0 and 4 to 9: the exact
-catalog (74 tools, exactly 55 declaring `scope` — that 55 is `rc_op_names`
-read through `AgentCatalog.opNames`, so it is the live core's op count and
-not a number typed here), one undo step per edit with entering and leaving
+**What the live server alone can say** is sections 0 and 4 to 9: the
+catalog (at least 74 tools — the exact count was this script's until road
+map 3's `record_screen` made it 75 and `recording_proof.py`'s, the handover
+`tools/proof/README.md` describes — and exactly 55 declaring `scope`; that 55
+is `rc_op_names` read through `AgentCatalog.opNames`, so it is the live
+core's op count and not a number typed here, and the twenty tools WITHOUT
+one are still named exactly), one undo step per edit with entering and leaving
 contributing none, `set_scope` in all its shapes, the seven refusals reached
 BY MESSAGE, the wide `Err` arm — the two invariants a view cannot see,
 which are the phase's most surprising contract and which nothing but a
@@ -162,8 +165,10 @@ SEC = 600_000
 # The whole catalog after phase 9: phase 7's 73 plus `set_scope`, which is
 # not an op — view state like `set_playhead`, `set_range` and
 # `set_selection`. The EXACT count belongs to the newest phase's script
-# (tools/proof/README.md), and this is that script, so phases 6, 7 and 8's
-# `== 73` assertions became floors and this one is exact.
+# (tools/proof/README.md), and this WAS that script until road map 3's
+# `record_screen` took the count to 75 — `recording_proof.py` asserts the
+# exact 75 now, and this number is a FLOOR, the handover phases 6, 7 and 8's
+# `== 73` went through when this script took theirs.
 TOOLS = 74
 
 # `rc_op_names`' own length. It is asserted here as the number of tools that
@@ -173,14 +178,18 @@ TOOLS = 74
 # not an op, so phase 9 must NOT have moved it.
 OPS = 55
 
-# The nineteen tools that are not §6 rows and therefore carry no `scope`.
+# The twenty tools that are not §6 rows and therefore carry no `scope`.
 # Spelled out rather than counted: an op tool that silently lost its scope
 # would leave the count right and this set wrong, and vice versa.
+# `record_screen` is road map 3's (R1d): an app-state tool like `transcribe`,
+# added here in the same commit as the tool because this set is asserted
+# EXACTLY below and a new scopeless tool would otherwise fail phase 9's own
+# catalog row for the right reason at the wrong address.
 APP_STATE_TOOLS = {
     "open_project", "new_project", "save_project", "get_project", "import_media",
     "import_captions", "export_captions", "transcribe", "consolidate_media",
     "detect_silence", "normalize_clip", "set_playhead", "set_range", "set_selection",
-    "set_scope", "undo", "redo", "render_frame", "export",
+    "set_scope", "undo", "redo", "render_frame", "export", "record_screen",
 }
 
 # The seven ops `core/src/scope.rs` refuses inside a nest, and the sentence
@@ -555,11 +564,12 @@ def one_nest(mcp):
 def catalog_part(mcp):
     listed = mcp._request("tools/list", {})["tools"]
     names = {tool["name"] for tool in listed}
-    check(len(names) == TOOLS,
-          f"the catalog holds exactly phase 9's {TOOLS} tools (got {len(names)}) — phase 7's "
+    check(len(names) >= TOOLS,
+          f"the catalog holds at least phase 9's {TOOLS} tools (got {len(names)}) — phase 7's "
           "73 plus set_scope, which is view state and not an op; the exact count belongs to "
-          "the newest phase's script, and phases 6, 7 and 8's assertions became floors so "
-          "this one could be it")
+          "the newest phase's script, which since road map 3's record_screen is "
+          "recording_proof.py at 75, so this one is a floor as phases 6, 7 and 8's became "
+          "when it took theirs")
     check("set_scope" in names, "set_scope is among them")
 
     scoped = sorted(
@@ -571,7 +581,7 @@ def catalog_part(mcp):
           "added an op would move it, and phase 9 must NOT have: a scope is an envelope "
           "key, not an op")
     check(names - set(scoped) == APP_STATE_TOOLS,
-          "and the tools WITHOUT one are exactly the nineteen app-state tools, named rather "
+          "and the tools WITHOUT one are exactly the twenty app-state tools, named rather "
           f"than counted: {sorted(names - set(scoped) - APP_STATE_TOOLS)} unexpected, "
           f"{sorted(APP_STATE_TOOLS - (names - set(scoped)))} missing")
     check("set_scope" not in scoped,

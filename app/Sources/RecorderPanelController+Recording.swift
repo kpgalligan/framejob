@@ -1,0 +1,359 @@
+import AVFoundation
+import AppKit
+import ScreenCaptureKit
+
+/// Everything the recorder panel does from Record pressed to the recording
+/// RUNNING (road map 3, R1c) — the grants, the countdown, the start, the
+/// stop — `RecorderPanelController.swift`'s third file. The recording's END
+/// and its landing are `+Landing.swift`, and the window picker is
+/// `+Picker.swift`, both cut out along the lines `recordingEnded` and
+/// `presentPicker` draw when the R1 review's fixes put this file past the
+/// 400-line cap.
+///
+/// **The grants are asked for HERE and nowhere else, and UNCONDITIONALLY**
+/// (decision 4: the TOOL never asks — it reads the status and refuses by
+/// name — because a system prompt needs a person in front of it; the panel
+/// asks, because a press of Record IS that person, exactly as the transcribe
+/// sheet's Start is). Screen Recording is asked with
+/// `CGRequestScreenCaptureAccess()` on every press that finds it absent; it
+/// may prompt and it returns false at once on a first ask, so the refusal
+/// sentence is shown either way and the person presses Record again once
+/// the grant is on. The microphone is asked only when one is chosen, from
+/// `.notDetermined`, and the countdown starts from the answer; `.denied` and
+/// `.restricted` name the pane and stop there. Both readings happen BEFORE
+/// the countdown, so a countdown never ends in a prompt. An earlier draft
+/// gated both asks on `Transcriber.canAsk` — false under `-AgentServerEnabled
+/// YES` — and the R1 review measured what that cost: under that flag the
+/// refusal note told the person to press the button they had just pressed,
+/// and a `notDetermined` microphone could never be granted from anywhere.
+/// `canAsk` is the tool's rule about a prompt nobody would see; it does not
+/// apply to a button somebody clicked.
+///
+/// **Before the grants, the source** (R1 review): Record with the Source row
+/// reading "Window…" and no picked filter refuses FIRST, by name, and starts
+/// no countdown — `currentChoice()` would otherwise quietly fall back to the
+/// main display and record the wrong thing. The picker is NOT presented from
+/// the guard: a refusal that puts up a system UI is not a refusal.
+///
+/// **The start is bounded and numbered** (R1 review). `.starting` used to
+/// have no ceiling and no exit: `ScreenRecorder.shareableContent` can hold
+/// its answer for tens of seconds on a locked console (measured ~37 s), and
+/// a panel waiting on it showed "Starting…" with the button disabled and no
+/// way back. Now each press of Record is one ATTEMPT with a number
+/// (`startGeneration`), the lookup's completion carries the number and is
+/// ignored once it is stale, and a one-shot timer at
+/// `ScreenRecorder.armCeiling` fails the attempt with `.startTimedOut` while
+/// the lookup is still pending. Once `launch` has handed the attempt to the
+/// recorder its own arm ceiling is the bound (the same sentence, from the
+/// start completion) and the panel's timer is cancelled, so the two cannot
+/// both fire on one attempt.
+///
+/// **Stop while starting** (lane C's flag, closed by reading the seam):
+/// after `launch` the recorder is arming and `stop()` is HELD — finishing
+/// begins the moment the start lands, and the end arrives through the
+/// session's `onFinish` like any other; a start that FAILS instead answers
+/// the start completion alone, `onFinish` is never called for it, and
+/// `startFailed` is the only thing that runs. Before `launch` there is
+/// nothing to stop: `abandonStart` bumps the generation so the pending
+/// answer is dropped, and the panel goes idle. Without that arm a Stop while
+/// the lookup was pending left the panel at "Stopping…" for good, because
+/// the answer then found the phase moved on and did nothing.
+///
+/// **The microphone is prepared at the countdown's start** (R1 review;
+/// `ScreenRecorder+Microphone.swift` says why — `startRunning()`'s first-use
+/// cost, up to 0.4 s of voice missing from the file) and discarded on cancel,
+/// on close and on a refused start, so an input never stays open past the
+/// recording it was for. **The tick shows a microphone problem the moment
+/// the recorder reports one**: the picture keeps recording, the meter goes
+/// silent, and the note says so rather than leaving a dead bar.
+///
+/// **Two timers run in `.common` modes** — the countdown and the 30 Hz tick
+/// — because a status item's menu runs the run loop in event-tracking mode
+/// while it is open, and a default-mode timer stalls there: the elapsed
+/// label in the menu bar froze at the one moment a person was looking at
+/// it. `RecorderStatusItem`'s doc carries the same sentence from its side.
+extension RecorderPanelController {
+    /// The note for Record pressed over "Window…" with nothing picked.
+    static let chooseWindowSentence = "Choose a window with Window… first, or pick a display."
+    /// The note for a Stop that arrived before the recording had begun.
+    static let abandonedSentence = "Stopped before the recording began; nothing was recorded."
+
+    // MARK: - Record and Stop
+
+    /// The Record button in every phase: start, cancel the countdown, or
+    /// stop; a beep while the recorder is finishing or the panel is adding.
+    @objc func record(_ sender: Any?) {
+        switch phase {
+        case .idle:
+            beginIfGranted()
+        case .countdown:
+            cancelCountdown()
+        case .recording, .starting:
+            stopRecording()
+        case .stopping, .landing:
+            NSSound.beep()
+        }
+    }
+
+    /// Stop, from the panel's button, the status item's menu or File ▸ Stop
+    /// Recording. A recording the panel did not start (the `record_screen`
+    /// tool's) is not this panel's to stop — `AppDelegate.newRecording`
+    /// routes that one to the recorder directly — so anything but a panel
+    /// recording beeps. While `.starting`: launched, the stop is held by the
+    /// recorder and lands through `onFinish`; not yet, the attempt is
+    /// abandoned (the type doc).
+    func stopRecording() {
+        switch phase {
+        case .recording:
+            phase = .stopping
+            recorder.stop()
+        case .starting where launched:
+            phase = .stopping
+            recorder.stop()
+        case .starting:
+            abandonStart()
+        default:
+            NSSound.beep()
+        }
+    }
+
+    // MARK: - The grants
+
+    private func beginIfGranted() {
+        if sourcePopup.selectedItem?.tag == Self.windowTag, pickedFilter == nil {
+            setNote(Self.chooseWindowSentence)
+            return
+        }
+        guard RecordingGrant.screenRecordingGranted else {
+            _ = CGRequestScreenCaptureAccess()
+            setNote(RecordingGrant.screenRecordingRefusal)
+            return
+        }
+        if currentChoice().microphone != nil {
+            let status = RecordingGrant.microphoneStatus
+            switch status {
+            case .authorized:
+                break
+            case .notDetermined:
+                recordButton.isEnabled = false
+                // The framework does not say which queue it answers on; the
+                // hop is `Transcriber.requestAuthorization`'s.
+                AVCaptureDevice.requestAccess(for: .audio) { [weak self] _ in
+                    DispatchQueue.main.async { self?.microphoneAnswered() }
+                }
+                return
+            default:
+                setNote(RecordingGrant.microphoneRefusal(status))
+                return
+            }
+        }
+        setNote("")
+        beginCountdown()
+    }
+
+    /// The prompt's answer. The button comes back either way; the countdown
+    /// begins only in an idle panel that is still ON SCREEN (R1 review) — a
+    /// panel closed during the prompt must not count down where nobody can
+    /// cancel it, and `panelWillClose` cannot cancel a countdown that has not
+    /// begun.
+    private func microphoneAnswered() {
+        recordButton.isEnabled = true
+        guard phase == .idle, window?.isVisible == true else { return }
+        let status = RecordingGrant.microphoneStatus
+        guard status == .authorized else {
+            setNote(RecordingGrant.microphoneRefusal(status))
+            return
+        }
+        setNote("")
+        beginCountdown()
+    }
+
+    // MARK: - The countdown
+
+    /// 3, 2, 1 in the panel, one second each — `TimelineView.flashRefusal`'s
+    /// shape: `[weak self]`, self-invalidating — added to the main run loop
+    /// in `.common` modes (the type doc). The Record button reads Cancel
+    /// meanwhile, and a click on it or closing the panel ends the countdown
+    /// with nothing started. The microphone the choice names is prepared
+    /// here, after the grants and before the first second has passed, so its
+    /// start cost is paid while the numeral is still on screen.
+    private func beginCountdown() {
+        countdownTimer?.invalidate()
+        phase = .countdown(Self.countdownSeconds)
+        recorder.prepareMicrophone(currentChoice().microphone)
+        let timer = Timer(timeInterval: 1, repeats: true) { [weak self] timer in
+            guard let self, case .countdown(let remaining) = self.phase else {
+                timer.invalidate()
+                return
+            }
+            if remaining > 1 {
+                self.phase = .countdown(remaining - 1)
+            } else {
+                timer.invalidate()
+                self.countdownTimer = nil
+                self.startRecording()
+            }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        countdownTimer = timer
+    }
+
+    func cancelCountdown() {
+        countdownTimer?.invalidate()
+        countdownTimer = nil
+        recorder.discardPreparedMicrophone()
+        if case .countdown = phase { phase = .idle }
+    }
+
+    // MARK: - Start
+
+    /// The choice as the controls stand, then the filter: a picked window's
+    /// is the picker's own; a display's is built from the shareable content
+    /// and excludes Reelcut's own application (`ScreenRecorder.filter(for:in:)`),
+    /// which is what lets the panel stay on screen for a display recording.
+    /// One attempt, numbered and bounded (the type doc).
+    private func startRecording() {
+        let choice = currentChoice()
+        startGeneration += 1
+        let generation = startGeneration
+        launched = false
+        phase = .starting
+        startTimer?.invalidate()
+        startTimer = Timer.scheduledTimer(
+            withTimeInterval: ScreenRecorder.armCeiling, repeats: false
+        ) { [weak self] _ in self?.armTimedOut(generation: generation) }
+        if choice.source == .picked, let filter = pickedFilter {
+            launch(filter: filter, choice: choice)
+            return
+        }
+        ScreenRecorder.shareableContent { [weak self] outcome in
+            guard let self, self.phase == .starting, generation == self.startGeneration else {
+                return
+            }
+            switch outcome {
+            case .failure(let error):
+                self.startFailed(error)
+            case .success(let content):
+                do {
+                    let filter = try ScreenRecorder.filter(for: choice.source, in: content)
+                    self.launch(filter: filter, choice: choice)
+                } catch {
+                    self.startFailed(error)
+                }
+            }
+        }
+    }
+
+    /// The arm ceiling, for the lookup half of an attempt: a stale number, a
+    /// phase that moved on, or an attempt the recorder already holds (its
+    /// own ceiling reports that one) does nothing. Internal so a probe can
+    /// fire it without a lookup.
+    func armTimedOut(generation: Int) {
+        guard phase == .starting, generation == startGeneration, !launched else { return }
+        startFailed(RecorderError.startTimedOut)
+    }
+
+    /// A Stop before the recorder was handed the attempt: the pending
+    /// lookup's answer is orphaned by the generation bump, the prepared
+    /// microphone let go, and the panel idle with a note saying nothing was
+    /// recorded.
+    private func abandonStart() {
+        startGeneration += 1
+        startTimer?.invalidate()
+        startTimer = nil
+        recorder.discardPreparedMicrophone()
+        phase = .idle
+        setNote(Self.abandonedSentence)
+    }
+
+    private func launch(filter: SCContentFilter, choice: RecordingChoice) {
+        // From here the recorder's arm ceiling is the bound.
+        startTimer?.invalidate()
+        startTimer = nil
+        launched = true
+        recorder.start(
+            filter: filter, choice: choice,
+            onFinish: { [weak self] outcome in self?.recordingEnded(outcome) }
+        ) { [weak self] error in
+            guard let self else { return }
+            if let error {
+                self.startFailed(error)
+                return
+            }
+            self.recordingDidStart(choice)
+        }
+    }
+
+    /// A refused, failed or timed-out start: idle, the note, and the
+    /// microphone the countdown prepared let go.
+    func startFailed(_ error: any Error) {
+        startTimer?.invalidate()
+        startTimer = nil
+        launched = false
+        recorder.discardPreparedMicrophone()
+        phase = .idle
+        setNote(error.localizedDescription)
+    }
+
+    /// The recording chrome: Stop on the button, the status item in the menu
+    /// bar, the 30 Hz tick, and — for a picked window only (R0 q3) — the
+    /// panel ordered out until the recording lands, whether or not it was
+    /// on screen (`show()` beeps meanwhile; `showWhenLanded` says whether to
+    /// bring it back).
+    private func recordingDidStart(_ choice: RecordingChoice) {
+        // A stop asked for while arming has moved the phase on; the end
+        // comes through `recordingEnded`.
+        guard phase == .starting else { return }
+        phase = .recording
+        setNote("")
+        let item = RecorderStatusItem(onStop: { [weak self] in self?.stopRecording() })
+        item.show()
+        statusItem = item
+        armTick()
+        if choice.source == .picked {
+            showWhenLanded = window?.isVisible == true
+            hiddenForRecording = true
+            window?.orderOut(nil)
+        }
+    }
+
+    // MARK: - The tick
+
+    /// 30 Hz while recording, in `.common` modes (the type doc): the
+    /// microphone's level into the panel's own meter
+    /// (`ScreenRecorder.publishMicrophoneLevel`, a no-op without a
+    /// microphone), the elapsed time in the footnote and in the status item,
+    /// and a microphone problem into the note.
+    private func armTick() {
+        tickTimer?.invalidate()
+        let timer = Timer(timeInterval: 1.0 / 30, repeats: true) { [weak self] timer in
+            guard let self, self.phase == .recording || self.phase == .stopping else {
+                timer.invalidate()
+                return
+            }
+            self.recorder.publishMicrophoneLevel()
+            self.refreshStatusLabel()
+            self.statusItem?.update(elapsed: self.recorder.elapsed)
+            self.syncMicrophoneNote()
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        tickTimer = timer
+    }
+
+    /// `ScreenRecorder.microphoneProblem` into the note the moment it is
+    /// non-nil — a device unplugged, a writer that gave up — with the fact
+    /// that the picture is still recording, since a silent meter alone
+    /// reads as a broken recording. Written once: the note is compared
+    /// before it is set, because `setNote` refits the window and this runs
+    /// at 30 Hz.
+    func syncMicrophoneNote() {
+        guard let problem = recorder.microphoneProblem else { return }
+        let text = "The microphone stopped: \(problem) The picture is still recording."
+        if noteLabel.stringValue != text { setNote(text) }
+    }
+
+    func disarmTick() {
+        tickTimer?.invalidate()
+        tickTimer = nil
+    }
+}

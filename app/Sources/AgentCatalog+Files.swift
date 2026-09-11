@@ -2,14 +2,17 @@ import Foundation
 
 // MARK: - Catalog: files
 
-/// The catalog's FILE half: the ten tools whose every row is about a path on
-/// disk — the six of Media (a file probed into the list, a caption file read
-/// onto a track, the package consolidated, and the three raw media ops), the
-/// two of Captions (a transcript made, a caption file written) and the two of
-/// Rendering and export (a frame, and the movie). Three of the ten are ops
-/// (`add_media`, `relink_media`, `remove_media`), so `tool` gives them a
-/// `scope` as it gives every op; the other seven are app-state tools of
-/// spec §7.9.
+/// The catalog's FILE half: the eleven tools whose every row is about a path
+/// on disk — the six of Media (a file probed into the list, a caption file
+/// read onto a track, the package consolidated, and the three raw media ops),
+/// the two of Captions (a transcript made, a caption file written), the two
+/// of Rendering and export (a frame, and the movie) and, since road map 3,
+/// the one of Recording (a movie the app wrote itself). Three of the eleven
+/// are ops (`add_media`, `relink_media`, `remove_media`), so `tool` gives
+/// them a `scope` as it gives every op; the other eight are app-state tools
+/// of spec §7.9 — `record_screen` among them, declaring NO `scope` by
+/// construction, since `tool` injects one for the core's op names only and
+/// the parity check's fourth part reads those.
 ///
 /// A pure move out of `AgentCatalog.swift`, which stood at 807 lines against
 /// app/CLAUDE.md's ~600 cap — road map 2's phase 9 had put it back over the
@@ -39,7 +42,8 @@ import Foundation
 extension AgentServer {
 
     /// The file rows of `catalogJSON()`'s array, in its order: Media,
-    /// Captions, then Rendering and export.
+    /// Captions, Rendering and export, then Recording — appended LAST, so
+    /// the seventy-four rows before it list in the order they always did.
     func fileTools(ticks: String) -> [[String: Any]] {
         // `export_captions`' container list, read off the exporter's own enum
         // rather than restated, and hoisted for the type-checker budget reason
@@ -404,6 +408,154 @@ extension AgentServer {
                     ],
                     "burn_in_timecode": burnInProperty,
                 ], required: ["preset", "path"]),
+
+            // MARK: Recording
+            //
+            // File ▸ New Recording… (road map 3, R1d; `AgentServer+Recording.swift`).
+            // An app-state tool like `transcribe`: no op runs of its own — the
+            // landing is `add_media` + `add_clip` through `RecordingLanding`,
+            // as the panel's is — so it takes no `scope` (`tool` injects one
+            // for the core's op names only) and follows the OPEN container
+            // the way the panel does.
+
+            tool(
+                "record_screen",
+                "Records the screen for seconds and lands the movie as ORDINARY MEDIA — File "
+                    + "▸ New Recording…, without the panel. The file goes to ~/Movies/Reelcut "
+                    + "Recordings (or the folder path names), named Screen Recording "
+                    + "<date> at <time>.mov, and is then imported exactly as import_media "
+                    + "imports a file: a media entry, and with place (the default) one clip "
+                    + "at the playhead on the front track of whatever container is open — "
+                    + "inside a nest when set_scope has one open. With no project open, or "
+                    + "when the target document closed while the recording ran, it opens as a "
+                    + "NEW untitled project instead and landed says new_project; that document "
+                    + "is then addressable by project: <the recording's path>, which is the "
+                    + "path get_project reports for it. The canvas of that new project takes "
+                    + "rate, while the media record keeps the file's OWN frame rate — for a "
+                    + "screen recording that is whatever the screen did, since ScreenCaptureKit "
+                    + "delivers a frame only when something changes, so a mostly-still screen "
+                    + "reports a low, fractional fps; that is the file, not a defect, and the "
+                    + "picture holds its last frame to the end of the sound. A microphone is a "
+                    + "SECOND file (<stem> (Microphone).m4a) landing as a second clip on a new "
+                    + "back track named Microphone, at the picture's start minus mic_offset — "
+                    + "the measured lead of one file over the other, in ticks, positive meaning "
+                    + "the picture began after the microphone; a negative start is the head "
+                    + "trimmed, not a clip placed late. A microphone that never started, whose "
+                    + "writer failed or whose file will not read does NOT fail the recording: "
+                    + "the picture lands, mic_path and the mic ids are absent, and mic_problem "
+                    + "carries the sentence (the note repeats it). THE GRANTS: this tool never "
+                    + "asks for one and never opens the picker. The Screen Recording grant "
+                    + "(and the Microphone grant when microphone is true) must already be held "
+                    + "by this process — the panel is where somebody grants them — and a "
+                    + "missing one is refused by name with the System Settings pane in the "
+                    + "sentence. A Reelcut launched from a shell runs under the TERMINAL's "
+                    + "grants, not the app icon's, and both refusals then also name the "
+                    + "launching process (its pid) and the way out — relaunch with open -a "
+                    + "Reelcut.app, or grant the terminal. THE REFUSAL ORDER is fixed: your own "
+                    + "mistakes first (seconds missing or outside 1…600, display and window "
+                    + "both given, a rate or size outside the vocabulary, microphone: true "
+                    + "without the Microphone grant, a project naming nothing open), then the "
+                    + "Screen Recording grant, then the display or window lookup — where a "
+                    + "console that is locked or asleep lists NO display and is refused as "
+                    + "that, by name — then the recording itself. While it records, a status "
+                    + "item in the menu bar shows the elapsed time with a Stop Recording menu, "
+                    + "and File ▸ Stop Recording works too: a person at the machine can end an "
+                    + "agent's recording early, and it still lands, with stopped_by saying so. "
+                    + "The call blocks for seconds plus about a second of start and finish, "
+                    + "and up to 75 s more if the writers are slow to close the files; a "
+                    + "timeout names the movie, which may still finish on its own. THE RESULT "
+                    + "carries: path (the movie); mic_path, mic_duration and mic_offset when a "
+                    + "microphone file landed, mic_problem when one was asked for and did not; "
+                    + "media and clip (the picture's ids; clip absent with place: false), "
+                    + "mic_media and mic_clip (the microphone's); duration (ticks), width, "
+                    + "height, fps [num, den], has_audio and audio_tracks (what the MOVIE "
+                    + "holds: 1 with system_audio, else 0 — the microphone is never a track of "
+                    + "it); stopped_by — stopped, or user_stopped / system_stopped when the "
+                    + "menu bar's indicator or the system ended it early; landed (document or "
+                    + "new_project); note, when there is something to say; project, the usual "
+                    + "summary; and for a document landing the created ids as every edit "
+                    + "reports them — new_media, new_clips, and new_tracks when a track was "
+                    + "minted — plus scope and document_ops when it landed inside a nest. A "
+                    + "failure AFTER the file was written names it: \"The recording was saved "
+                    + "at <path> but could not be added: …\". UNDO: for a document landing, "
+                    + "undo removes the media and the clip(s) in ONE step and leaves the file "
+                    + "on disk, as undoing Add Media… does; a recording that opened as a new "
+                    + "project has no undo step — the picture IS the document — and with a "
+                    + "microphone, undo removes the microphone pair (the step is named Add "
+                    + "Microphone) and leaves the picture.",
+                [
+                    "seconds": [
+                        "type": "number", "minimum": 1, "maximum": 600,
+                        "description": "How long to record, 1…600 s. The call returns after "
+                            + "the recording has finished, been probed and landed.",
+                    ],
+                    "display": [
+                        "type": "integer", "minimum": 0,
+                        "description": "Which display, as an index into the shareable "
+                            + "displays with 0 the MAIN display (default 0). Reelcut's own "
+                            + "windows are always left out of a display recording, so the "
+                            + "app's panel and editor are never in the picture. Exclusive "
+                            + "with window.",
+                    ],
+                    "window": [
+                        "type": "integer", "minimum": 0,
+                        "description": "A CGWindowID to record on its own — that window's "
+                            + "frame, at its own size — instead of a display. Exclusive with "
+                            + "display; an id that names no shareable window is refused by "
+                            + "name.",
+                    ],
+                    "microphone": [
+                        "type": "boolean",
+                        "description": "Record the DEFAULT microphone to a second file beside "
+                            + "the movie (default false). Needs the Microphone grant, which "
+                            + "only the panel can ask for; without it the call is refused "
+                            + "with the grant's status word (notDetermined, denied or "
+                            + "restricted) in the sentence.",
+                    ],
+                    "system_audio": [
+                        "type": "boolean",
+                        "description": "Capture what the system plays — every application but "
+                            + "Reelcut, so the timeline can play meanwhile and not be in "
+                            + "it — as the movie's one stereo 48 kHz track (default true). "
+                            + "false writes a movie with no audio track, and has_audio "
+                            + "reports false.",
+                    ],
+                    "show_clicks": [
+                        "type": "boolean",
+                        "description": "Draw a circle around each mouse click (default "
+                            + "false). The cursor itself is always in the picture.",
+                    ],
+                    "rate": [
+                        "type": "integer", "enum": [30, 60],
+                        "description": "The capture's frame rate, 30 or 60 (default 60) — the "
+                            + "most frames a second the file may hold — and the canvas rate "
+                            + "of a new project the recording opens as. The file's own fps "
+                            + "is whatever the screen did.",
+                    ],
+                    "size": [
+                        "type": "string", "enum": RecordingResolution.allCases.map { $0.rawValue },
+                        "description": "nominal (default) records the display's POINT size; "
+                            + "best its PIXEL size, twice the points on a Retina display. An "
+                            + "odd dimension is rounded up to even by the encoder.",
+                    ],
+                    "place": [
+                        "type": "boolean",
+                        "description": "Put the clip (and the microphone's) on the timeline at "
+                            + "the playhead (default true), in ONE undo step with the media. "
+                            + "false adds the media to the list and no clip — import_media's "
+                            + "shape — and the answer carries no clip id. For a NEW project "
+                            + "the picture is the document, so its clip is at 0 whatever "
+                            + "place says, and the answer notes it.",
+                    ],
+                    "path": [
+                        "type": "string",
+                        "description": "A FOLDER to record into instead of ~/Movies/Reelcut "
+                            + "Recordings, created if it does not exist. The file's name is "
+                            + "always the dated one — this names the folder, never the file — "
+                            + "and the answer's path is the file that was written. Trimmed; "
+                            + "an empty or blank string means the default folder.",
+                    ],
+                ], required: ["seconds"]),
         ]
     }
 }

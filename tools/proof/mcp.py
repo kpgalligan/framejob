@@ -5,10 +5,16 @@ import urllib.request
 
 
 class MCP:
-    def __init__(self, port, path="/mcp"):
+    def __init__(self, port, path="/mcp", timeout=600):
+        """`timeout` is the per-request ceiling in seconds. 600 is what every
+        script before road map 3 waited (and still waits: the default is
+        unchanged); `recording_proof.py` passes its own, because a
+        `record_screen` blocks for the whole recording plus its finish and a
+        hang has to be told apart from a long take."""
         self.url = f"http://127.0.0.1:{port}{path}"
         self.session = None
         self.next_id = 0
+        self.timeout = timeout
         self._request(
             "initialize",
             {
@@ -28,7 +34,7 @@ class MCP:
         if self.session:
             headers["Mcp-Session-Id"] = self.session
         req = urllib.request.Request(self.url, data=data, headers=headers, method="POST")
-        with urllib.request.urlopen(req, timeout=600) as response:
+        with urllib.request.urlopen(req, timeout=self.timeout) as response:
             sid = response.headers.get("Mcp-Session-Id")
             if sid:
                 self.session = sid

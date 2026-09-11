@@ -1,9 +1,9 @@
 import AppKit
 
 /// The no-document window: shown when the app is frontmost with nothing open,
-/// replacing the bare open panel (spec §3). Offers Open Video…, New Project
-/// and Recent, accepts dropped files through `FileDropView`, and closes as
-/// soon as a document window becomes main.
+/// replacing the bare open panel (spec §3). Offers Open Video…, New Project,
+/// New Recording… and Recent, accepts dropped files through `FileDropView`,
+/// and closes as soon as a document window becomes main.
 final class WelcomeWindowController: NSWindowController {
     static let shared = WelcomeWindowController()
 
@@ -61,7 +61,13 @@ final class WelcomeWindowController: NSWindowController {
         let newButton = StickerButton(
             title: "New Project", style: .secondary, target: nil,
             action: #selector(AppDelegate.newProject(_:)))
-        let buttons = NSStackView(views: [openButton, newButton])
+        // Road map 3, R1c: the recorder panel, reachable with no document
+        // open — a nil-target action, `newProject`'s shape, resolved by the
+        // application delegate at the end of the responder chain.
+        let recordButton = StickerButton(
+            title: "New Recording…", style: .secondary, target: nil,
+            action: #selector(AppDelegate.newRecording(_:)))
+        let buttons = NSStackView(views: [openButton, newButton, recordButton])
         buttons.translatesAutoresizingMaskIntoConstraints = false
         buttons.orientation = .horizontal
         buttons.spacing = 12

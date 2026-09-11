@@ -15,7 +15,7 @@ import AppKit
 ///
 ///  - **The scope is read ONCE, at the dispatch.** `AgentServer.dispatch` is
 ///    the only place holding both a tool's name and its arguments for all
-///    seventy-four of them, so it reads `scope` there and leaves it on
+///    seventy-five of them, so it reads `scope` there and leaves it on
 ///    `callScope` for the length of the call; `performGroupedEdit` stamps it
 ///    onto every op through `addressed` below. Fifty-eight handlers were not
 ///    touched and cannot forget.

@@ -287,6 +287,28 @@ enum Harness {
             // preview window at all, but ordinary use of the app writes this
             // key on every move and resize of one.
             "NSWindow Frame ReelcutPreviewWindow": "",
+            // The recorder panel's six remembered choices (road map 3, R1c:
+            // `RecorderPanelController.<key>` — spelled as LITERALS here, because this
+            // file must also compile against a tree from before the recorder existed
+            // under `-D HARNESS_REFERENCE_BUILD`, the phase-5 cross-build), pinned to their first-run
+            // values — the display 0 (the main one), no microphone, system
+            // audio ON (the one of the six whose absent-key reading is not
+            // the default, which the panel tests by name), clicks off, 60,
+            // nominal. NOTHING the harness photographs reads them: the panel
+            // is a floating `NSPanel` and never in the editor's content
+            // view. Pinned on `ReelcutExportChoice`'s terms — written by
+            // ORDINARY USE of the app on the machine that runs the proofs,
+            // every time a person changes a row — so that the day a chrome
+            // grows a readout of the recorder's state the renders cannot
+            // start moving with whatever the developer last recorded. The
+            // panel keeps NO frame autosave name, so there is no
+            // "NSWindow Frame …" key to pin for it.
+            "ReelcutRecordingDisplay": 0,
+            "ReelcutRecordingMicrophone": "",
+            "ReelcutRecordingSystemAudio": true,
+            "ReelcutRecordingShowClicks": false,
+            "ReelcutRecordingRate": 60,
+            "ReelcutRecordingSize": "nominal",
             "AgentServerEnabled": false,
             // AppKit picks legacy (16 pt, always visible) or overlay scrollers
             // by whether a MOUSE is attached, and the inspector pane is 16 pt
@@ -336,6 +358,12 @@ enum Harness {
     /// the argument would come back as the resting band, which is exactly the
     /// picture the caller is comparing against.
     static func applyMediaFilter(_ spec: String, in controller: EditorViewController) {
+        // `MediaSearchField`, `OptionPopupControl` and `OptionCheckboxControl` are
+        // phase 8's, so this mode compiles out under -D HARNESS_REFERENCE_BUILD
+        // (the cross-build convention above): a reference tree from before
+        // the find band existed must still compile THIS instrument, or the
+        // phase-5 comparison silently falls back to two builds of it.
+        #if !HARNESS_REFERENCE_BUILD
         let parts = spec.split(separator: "|", omittingEmptySubsequences: false).map(String.init)
         let search = parts.count > 0 ? parts[0] : ""
         let order = parts.count > 1 ? Int(parts[1]) : nil
@@ -386,6 +414,9 @@ enum Harness {
             }
             boxes[0].mouseDown(with: event)
         }
+        #else
+        warn("mediaFilter: this harness was built -D HARNESS_REFERENCE_BUILD, which compiles the mode out")
+        #endif
     }
 
     static func warn(_ message: String) {

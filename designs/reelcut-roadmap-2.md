@@ -3245,11 +3245,12 @@ struck.
 
 Named so the next reader does not re-derive them.
 
-- **Voice-over recording.** Spec §1 excludes screen and camera recording;
-  microphone capture is on the boundary and is the user's call. If wanted
-  it is one session: an audio-only `AVCaptureSession` to a WAV inside
-  `media/`, `add_media`, `add_clip` at the playhead, a record button with
-  a meter (Phase 5's).
+- **Voice-over recording.** Spec §1 excluded screen and camera recording
+  when this was written; road map 3 reversed the screen half and took the
+  microphone with it — `ScreenRecorder` records a microphone to a second
+  file beside the movie, with a meter, and lands it on its own track. What
+  remains of this bullet is a PICTURE-LESS recording as its own command,
+  which is a Source popup entry away and is left for whoever wants it.
 - **LUTs (`.cube`).** Colour grading beyond per-clip controls is a non-goal.
 - **Speed ramps.** `speed` is not an action target; a ramp is several plan
   segments at different rates, which `scaleTimeRange` can do but the model,

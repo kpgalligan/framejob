@@ -130,9 +130,17 @@ final class StickerButton: NSButton {
 /// border and offset shadow was retired in the Rasterize redesign, and the
 /// window chrome follows — square-ish, flat, quiet. `StickerButton` stays for
 /// the sheets and the welcome screen, which are not chrome.
+///
+/// `fill` is the rectangle's ink and defaults to `DS.accent`, so the toolbar's
+/// Export button — the one caller before road map 3 — draws byte for byte what
+/// it drew; the recorder panel's Record button passes `DS.meterClip`, the one
+/// place the chrome spends the warning red on a button (road map 3, R1c). It
+/// is a stored `let` rather than a parameter of `draw` so a probe can read
+/// what a button was built with.
 final class AccentButton: NSButton {
     private let symbolName: String?
     private let fallbackGlyph: String
+    let fill: NSColor
     private var hovered = false
 
     private static let height: CGFloat = 26
@@ -140,9 +148,13 @@ final class AccentButton: NSButton {
     private static let symbolGap: CGFloat = 6
     private static let symbolPointSize: CGFloat = 15
 
-    init(title: String, symbol: String?, fallback: String, tooltip: String, action: Selector?) {
+    init(
+        title: String, symbol: String?, fallback: String, tooltip: String, action: Selector?,
+        fill: NSColor = DS.accent
+    ) {
         self.symbolName = symbol
         self.fallbackGlyph = fallback
+        self.fill = fill
         super.init(frame: .zero)
         self.title = title
         target = nil
@@ -208,7 +220,7 @@ final class AccentButton: NSButton {
     }
 
     override func draw(_ dirtyRect: NSRect) {
-        var fill = DS.accent
+        var fill = self.fill
         if isEnabled, isHighlighted {
             fill = fill.blended(withFraction: 0.16, of: .black) ?? fill
         } else if isEnabled, hovered {

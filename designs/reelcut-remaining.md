@@ -4,7 +4,7 @@
 phases are done and `designs/reelcut-roadmap-2.md` §1 carries the commit of
 each. `make test` is at 494, `make lint` and `cargo fmt --check` are clean,
 `make typecheck` is at 0 errors and its four deliberate AVFoundation
-warnings, the catalog is 74 tools and the parity log is empty, and every
+warnings, the catalog is 75 tools and the parity log is empty, and every
 proof script passes: 66, 85, 121, 8, 84, 88, 167, 92, 79, 214 and 79 over
 MCP and 26, 33, 59, 81, 70, 78, 150, 48, 62 and 141 offscreen.
 
@@ -200,18 +200,20 @@ would be the bare strip with a longer list.
 
 ## 3. The size debt
 
-24 files in `app/Sources` are over the ~600-line cap. Most are long-standing;
-these are the ones the last two phases and the closing above moved, and the
-first two are AT a cut that the next feature must pay (the third has just paid
-its, as road map 3's R1·toll):
+25 files in `app/Sources` are over the ~600-line cap. Most are long-standing;
+these are the ones the last three phases and the closing above moved. Road map
+3 paid three tolls — `AgentCatalog.swift` first and alone (R1·toll), then
+`MediaImporter.swift` and `AgentServer+Recording.swift` mid-fix-wave when a
+fix took each over its line — and left two files AT the cap:
 
 | File | Now | Note |
 |---|---|---|
 | `AgentServer+Scope.swift` | 592 | ON the cap. Seam: the envelope rule (`checkCallScope`, `effectiveScope`, `idScope`, `addressed`, `checkDocumentLevelTicks`, `scopeLanding`, `scopeFailure`) against `set_scope` THE TOOL and its path arithmetic (`setScope`, `nestScopePath`, `pathToClip`, `applyNestScope`, `commonPrefix`, `scopeReport`) |
-| `MediaImporter.swift` | 586 | Just under the cap, after giving up the await-free cache plumbing to `MediaCacheFiles.swift` (490) twice — the pure move, then the peak-bucket arithmetic when the fixes reached 644. What is left is the probing half and the three async writers; the next cut is the probing half, and it is the half that does NOT await |
-| `AgentCatalog.swift` | 454 | Was cut to 665 in `b410125`, phase 9 put it back over at 807, and road map 3's R1·toll paid the cut the file's own header had named, first and alone: the FILE groups — Media, Captions, Rendering and export — are `AgentCatalog+Files.swift` (**409**, nowhere near the cap, and where `record_screen`'s entry lands), spliced after the Canvas group exactly as the clip rows are. The header's "sharing no hoisted local with what stays" was false by ONE: `render_frame`'s `t` row reads `ticks`, which Projects and Markers read too, so `fileTools(ticks:)` takes it as an argument, as the clip rows take three. The move was ~400 lines, not the ~300 the header guessed — phase 6's warning again — and `tools/list` is byte-identical before and after, the three groups being the catalog's last three |
+| `MediaImporter.swift` | 571 | Went to 619 when road map 3's held tail landed in it, and paid mid-wave: the await-free half — `ImportError`, `isImage`/`probeImage`, the rate table — to `MediaImporter+Probe.swift` (121), a pure move (619 → 518, 571 with the tail). The next cut is the peaks reader, which awaits and stays |
+| `AgentCatalog.swift` | 454 | Was cut to 665 in `b410125`, phase 9 put it back over at 807, and road map 3's R1·toll paid the cut the file's own header had named, first and alone: the FILE groups — Media, Captions, Rendering and export — are `AgentCatalog+Files.swift` (**561** with `record_screen`'s entry, whose description is the longest in the catalog; the cut it will owe is that entry's sentences), spliced after the Canvas group as the clip rows are. The header's "sharing no hoisted local" was false by ONE, `ticks`, which `fileTools(ticks:)` takes as an argument |
+| `CompositionBuilder.swift` | 601 | AT the cap since road map 3's held tail (+83); the next addition pays first — the audio-parameter half (`audioParameters` and the `AudioTap.make` call) is the natural cut |
 | `ReelOps.swift` | 925 | Created by `b410125` at 853. It is a TABLE — one factory per row of `edit.rs`'s op table — so it has the same standing exemption `edit.rs` has on the Rust side |
-| `ProjectDocument.swift` | 1336 | Stored properties cannot move to an extension; the natural cut is the media/reverse machinery, NOT the scope. `ProjectDocument+DisplayStem.swift` is the shape a pure addition takes meanwhile |
+| `ProjectDocument.swift` | 1348 | Stored properties cannot move to an extension; the natural cut is the media/reverse machinery, NOT the scope. `ProjectDocument+DisplayStem.swift` is the shape a pure addition takes meanwhile; road map 3 added ONE internal method (`adoptImported`, +12 lines) so `ProjectDocument+Recording.swift` could build the untitled document by File ▸ Open's own spelling |
 | `TimelineView.swift` | 1630 | Frozen. Of the five lines the cache marker added, one is behaviour (the hit-clearing under `replaced`) |
 | `ExporterWriter.swift` | 1114 | Over since phase 7; its seam — the settings/encoder half — is still unpaid |
 | `AgentServer+Clips.swift` | 1196 | Over since phase 6 |
@@ -230,6 +232,21 @@ and the closing above added the rest.
 
 - **A clip plays with audio** (spec §10 step 4) and **the preview holds 60 fps**
   (step 5). No still frame can answer either.
+- **The recorder, road map 3** — what no headless proof can see: the
+  picker's window mode presenting from the non-activating panel and the
+  choice arriving (`didUpdateWith`, a nil stream); the countdown's look;
+  that a recording of a display does NOT contain the panel (the programmatic
+  filter excludes Reelcut — measured at 99 % of an excluded app's pixels)
+  and whether a PICKER-made recording does (R0 q3 is unmeasured, so the
+  panel orders out for those; if a person finds it excluded, promote the
+  panel to staying); that the timeline's own playback is absent from the
+  file (`excludesCurrentProcessAudio`); the menu bar's own screen-recording
+  indicator naming Reelcut, and its Stop landing the file; the popups and
+  switches working on a `.nonactivatingPanel` while another app is
+  frontmost; the microphone grant prompt from the signed bundle (the
+  entitlement and the usage key together); and the first shareable-content
+  call of a fresh instance, which held the main thread ~37 s on a locked
+  console when made through `onMain` and now runs off it.
 - **The two preview windows show the same frame.** Phase 8 measured that two
   `AVPlayerLayer`s on one `AVPlayer` both display, and that they hand back
   byte-identical `displayedPixelBuffer`s — but nothing has ever opened the
@@ -268,9 +285,11 @@ should be read in that light: **"a left-hand media browser with bins — phase
 8's search and sort come first"** — they have landed, so spec §11's trigger (a
 library that has outgrown the pane) is the only thing still gating it.
 
-**Screen recording is now decided and planned**: `designs/reelcut-roadmap-3.md`
+**Screen recording is BUILT** (road map 3's R1; its record is in that file) — the
+sentence below is kept as the pointer it was: `designs/reelcut-roadmap-3.md`
 reverses spec §1's non-goal by a recorded decision and lays out the spike
-and the one phase that builds it. Nothing of it is built.
+and the one phase that builds it — built, reviewed and fixed since; its
+record is in that file.
 
 The others, unchanged: voice-over recording (one session, and the user's call
 since spec §1 excludes capture); speed ramps (feasible, unasked — `speed` is

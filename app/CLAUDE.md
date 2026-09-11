@@ -319,7 +319,7 @@ lockstep are in the root `CLAUDE.md`; the full design is
   hid; and a slot's share of a cover is weighted by its own strength, so a
   region at `amount` 0 — "there but hides nothing" — cannot pull a
   neighbour's effect to full strength inside its own box.
-- `MediaImporter.swift` · `MediaCacheFiles.swift` · `FFmpegRewrap.swift` — the
+- `MediaImporter.swift` · `MediaImporter+Probe.swift` · `MediaCacheFiles.swift` · `FFmpegRewrap.swift` — the
   import funnel, the await-free half of its cache, and the opt-in ffmpeg step
   behind it (spec §7.7, §11). `async`/`await` is confined to
   `MediaImporter.swift`, and that rule is what decided the cut:
@@ -398,6 +398,35 @@ lockstep are in the root `CLAUDE.md`; the full design is
   caller creates the leaf, at the moment it has something to put in it, so
   building a path never litters a Library with folders for features nobody
   used.
+  **`thumbnails` holds the last frame past the video track's end** (road
+  map 3's R0 surprise): a screen recording's picture ends at the last screen
+  change while its sound runs on and the record's `duration` is the sound's,
+  so the seconds past the picture used to fail as tinted holes under a marker
+  that certified them. The pass now finds the track's LAST SAMPLE's own time
+  — an `AVSampleCursor` at the end of the sample table mapped through the
+  edit list, `range.end − minFrameDuration` only when the file offers no
+  cursor — and treats the seconds at or past it as a HELD suffix that asks
+  for that frame once and is written under each index: `CompositionBuilder.fill`'s
+  held tail, seen from the strip. It is the TRACK's time and never the
+  record's rate, because a sparse recording's `nominalFrameRate` is its frame
+  count over its length (three frames in 50 s read as 0.06 fps, a 16.7 s
+  'frame'), and a tail measured from the record held the slide BEFORE the
+  last one from 34 s on while the composition showed the last — the review's
+  finding, `remaining_probe.py` 5f's sparse shape and its `record-rate-tail`
+  mutant. What the generator answers between frames, measured: a second
+  whose displayed frame is a SYNC sample lands however far after it (24 s
+  after a keyframe); a real ScreenCaptureKit recording lands every second up
+  to its track's end; an ffmpeg file of three frames 25 s apart FAILS
+  (−11821) inside a non-sync frame's range and 0.7 ms after its last frame's
+  time under VideoToolbox — so the held request is the frame's exact time,
+  not the track's end less a frame. The failure arm still leaves a hole,
+  deliberately; a file with no video track runs as it did; the every-16 post
+  counts TILES; the marker's rules are untouched. `MediaImporter+Probe.swift`
+  is the await-free half — `ImportError`, `imageTypes`/`isImage`,
+  `probeImage` and the rate table `rationalFrameRate` rounds onto — cut when
+  the held tail took the base file over the ~600 cap (619 → 518, 571 with
+  the tail in it); every call site keeps its `MediaImporter.` spelling and
+  the cut cost one token, `probeImage`'s `private`.
 - `MediaConsolidator.swift`
   with `EditorViewController+Consolidate.swift` (File ▸ Consolidate Media…) —
   the §5.6 file feature. Consolidate writes inside the package behind
@@ -796,10 +825,23 @@ lockstep are in the root `CLAUDE.md`; the full design is
   and no `pinDefaults` entry is affected by it. Phase 8b's preview window went
   the other way and says why in its own doc: a queue is a list you glance at,
   and a preview window is furniture you put on a particular display.
-- `AgentCatalog.swift` — the MCP tool catalog; a startup check enforces that
-  catalog names match the dispatch registry (it traps in debug and logs in
-  Release, because `make app` builds Release). The handlers live in
-  `AgentServer+Project/Clips/Tracks/Media/Render/History/Silence/Captions/Audio/Background/Scope.swift`
+- `AgentCatalog.swift` · `AgentCatalog+Clips.swift` · `AgentCatalog+Files.swift`
+  — the MCP tool catalog, in three files: the helper, the project group,
+  tracks, markers and the canvas in the base file; the forty-five clip and
+  action rows spliced in from `+Clips`; the eleven FILE rows (Media,
+  Captions, Rendering and export, and `record_screen`) spliced in from
+  `+Files` (road map 3's R1·toll), each splice taking the hoisted locals it
+  reads as arguments; a startup check enforces that catalog names match the
+  dispatch registry (it traps in debug and logs in Release, because
+  `make app` builds Release). The handlers live in
+  `AgentServer+Project/Clips/Tracks/Media/Render/History/Silence/Captions/Audio/Background/Scope/Recording.swift`
+  — `record_screen` being three files since the R1 fix wave:
+  `+Recording.swift` (the tool, its three semaphore waits and the menu-bar
+  chrome a tool recording gets), `+RecordingArguments.swift` (the argument
+  vocabulary and the shareable-content lookup) and `+RecordingResult.swift`
+  (the result fields and every sentence a refusal after the file exists
+  names it with; `stopCeiling` = the recorder's finish ceiling plus two
+  30 s probe ceilings plus a margin, 75 s, independent of `seconds`)
   — `+Scope.swift` being the newest and largest of them (the call's scope,
   `idScope`, `effectiveScope`, the `set_scope` handler and the parity
   check's fourth part)
@@ -1117,6 +1159,159 @@ lockstep are in the root `CLAUDE.md`; the full design is
   track. Save Frame passes NO burn-in — it omits `renderFrame`'s `options`
   argument and takes the default — while the export sheet, `export` and
   `render_frame` all offer one; a grab is of the picture, not of a deliverable.
+- `RecordingSetup.swift` · `ScreenRecorder.swift` · `ScreenRecorder+Microphone.swift`
+  · `ScreenRecorder+Finishing.swift` · `ScreenRecorder+Content.swift` — screen
+  recording's session (road map 3, R1a). `RecordingSetup.swift` is the half a probe can call: `RecordingChoice`,
+  `RecordingFiles` (decision 2's folder, the Screenshot app's date stem, ` (2)`
+  on collision, ` (Microphone).m4a` beside the movie), `RecordingConfiguration.make`
+  (PURE — every field read back by `tools/proof/recording_probe.py`, BGRA when
+  Show Clicks is on because `showMouseClicks` draws under no other pixel
+  format, pixels asked for by hand under Best because `captureResolution`
+  scales nothing — R0 q4/q6), `RecordingGrant` (the two synchronous grant
+  reads and the refusal sentences; nothing here ever prompts) and the three
+  result types. `ScreenRecorder` is the machine `idle → arming → recording →
+  finishing → idle`, cut at the 400-line cap along its own line: arming and
+  the meter in the base file, everything that ENDS a session plus the three
+  delegates in `+Finishing`, the static content/filter/geometry/error helpers
+  in `+Content`, and the capture session's preparation (`prepareMicrophone`,
+  paid during the countdown so the first 0.4 s of voice is in the file — lane
+  A's one smoke run measured −421 ms without it), its adoption by `start` and
+  the meter poll in `+Microphone`; every crossing member is internal for it,
+  `state` included.
+  **The microphone is a SECOND FILE** (R0 q2: `SCRecordingOutput` folds a
+  microphone INTO the system track, inseparable and clipping): an
+  `AVCaptureSession` + `AVCaptureAudioFileOutput` started FIRST in the same
+  run-loop turn (`startRunning()` blocks main 100–180 ms, measured and
+  accepted), then the stream; the recording output's did-start arrives 86–107 ms
+  BEFORE `startCapture`'s completion in every measured run, `fileOutput(_:didStartRecordingTo:)`
+  on a private queue and its did-finish on main, so the machine stamps each
+  callback where it lands and hops it, and `micOffset` (screen did-start minus
+  microphone did-start; positive = the picture began after the microphone) is
+  measured per recording and never a constant — one smoke run gave −421 ms
+  where R0's mean was +11 ms. Refusals complete SYNCHRONOUSLY before `start`
+  returns; success completes later from the framework. `.userStopped` (the
+  menu bar's indicator) and `.systemStoppedStream` (a display that slept) take
+  the same finishing path and land through the session's `onFinish`, the ONE
+  hook `start` takes — there is no settable hook on the recorder, because a
+  panel Record refused `.busy` once erased the tool's and an external stop
+  then reached nobody (the review's finding) — and a `stop()` in any state
+  past idle JOINS the finishing under way rather than answering `.busy`,
+  which used to drop a landing when a person's Stop followed the menu bar's
+  by a second. The rest of the review's recorder findings live here too: a
+  microphone problem is `micProblem` on a `.success` and never the
+  recording's failure (the movie is probed FIRST; the mic file is left on
+  disk and named), `settle` runs once (`Session.settling`), a microphone
+  that dies mid-recording sets `microphoneProblem` live and silences the
+  meter while the picture records on, the arm ceiling has its own sentence
+  (`.startTimedOut`), and a failure past `beginFinishing` names its files
+  through `RecorderError.filesKept`. The meter is the file output connection's `AVCaptureAudioChannel`
+  levels, polled from the panel's timer (R0 q6c) — no queue, no sample buffer.
+  Pitfalls: `NSObject` already has `finalize()`, so the recorder's is `settle()`;
+  reading `outputURL` off a fresh `SCRecordingOutputConfiguration` TRAPS
+  (non-optional in Swift, nil underneath) — `make` assigns it first;
+  `SCShareableContent`'s completion form is `getExcludingDesktopWindows(_:onScreenWindowsOnly:completionHandler:)`
+  / `getWithCompletionHandler(_:)`, the docs' `current` is `async`-only, and
+  the error type is `SCStreamError.Code`, not `SCError`.
+- `RecordingLanding.swift` · `ProjectDocument+Recording.swift` — where a
+  finished recording goes (road map 3, R1b). `RecordingLanding` is a value
+  type, `AudioNormalize`'s shape: a `RecordingResult` and a document in, an
+  UNSCOPED op list and the ids the core will mint out — `next_id` read off a
+  purely-applied PARENT handle before each op that mints, the two-try track
+  rule run over a project that already HOLDS the media (`add_media` applied
+  purely first; a path already in the list is the documented identity and the
+  id is the entry's by trimmed path — `backgroundMedia(for:in:)`'s rule, not
+  `addGeneratedClip`, whose probe cannot see a media the project lacks).
+  Nothing in it commits: the panel commits through `document.performGroupedEdit`,
+  the tool through `AgentServer.performGroupedEdit`, so each door keeps its
+  own refusal posture. The microphone lands on a NEW BACK track named
+  "Microphone" at `playhead − micOffset`; a negative start is the head
+  TRIMMED, not a clip placed late (`add_clip` at 0, `trim_start`, `move_clip`,
+  one grouped edit, the head snapped to the canvas frame so a sub-frame offset
+  sends no trim — `slip` cannot do it, a clip covering its whole media has
+  nothing to slip into). `placement` throws by name while `isLiveEditing`
+  ("A drag is in progress; the recording can be added when it ends.").
+  `untitled(around:)`'s ORDER is a contract: `openUntitledDocumentAndDisplay(false)`
+  (adds the document; no `addDocument`) → `adoptImported` (before anything
+  reads `displayName`, which AppKit pins on FIRST read) → the import count
+  `makeWindowControllers` would have made (`fileModificationDate = nil`,
+  `countEditChange(.changeDone)`), run HERE and BEFORE the microphone's edit,
+  with or without one, so that edit stacks a SECOND count and its undo leaves
+  the first standing — counted the other way round, the review measured one
+  ⌘Z reading CLEAN and ⌘W closing the recording's document without a prompt
+  → the microphone's one grouped edit through `microphonePlacement`, named
+  `microphoneActionName` "Add Microphone" and NOT "Add Recording", because
+  the step removes the voice and keeps the picture (the picture is already at
+  0 on track 1 from `makeProject`, so `placement`'s `add_clip` would refuse
+  against its own clip) → `makeWindowControllers()` (its own import count
+  now skipped by its guard; it still runs `generateCaches()`) →
+  `showWindows()`; a throw closes the document it opened. `ProjectDocument.swift` took ONE internal method for it,
+  `adoptImported(_:source:fps:)` — `readMediaFile`'s whole post-probe body,
+  moved so a recording becomes a document by the one spelling File ▸ Open
+  uses — and `makeProject` gained `fps: Fps? = nil`, replacing the canvas rate
+  alone (decision 3). Limits: the trial applies each scoped op to the PARENT
+  handle — the scoped apply itself — so `check_caps`/`check_nesting` on the
+  merged parent refuse in the TRIAL exactly as at the commit (a document at
+  `MAX_TRACKS` throws the core's "too many tracks" before any list is
+  answered, inside a nest or out — `recording_probe.py` section 4, row 8), and
+  because the picture and the microphone are ONE list, a microphone track the
+  caps refuse takes the picture down with it — neither lands, and both doors
+  name the file; `place: false` with a microphone lands two media and the
+  offset is not stored (a recording is ordinary media). With a microphone, ⌘Z
+  (Undo Add Microphone) removes the voice, keeps the picture and leaves the
+  document dirty; without one there is no undo step at all.
+- `RecorderPanelController.swift` · `+Rows.swift` · `+Recording.swift` ·
+  `+Landing.swift` · `+Picker.swift` · `RecorderStatusItem.swift` ·
+  `AppDelegate+Recording.swift` — File ▸ New Recording… (⌥⌘N, road map 3's
+  R1c): the app's second `NSPanel` and its first `NSStatusItem`, five files
+  since the fix wave cut the recording's end and its landing (`+Landing`)
+  and the window picker (`+Picker`) out of `+Recording` at the 400-line cap. The panel is `.floating` and `.nonactivatingPanel`
+  (Stop without bringing Reelcut over the thing being recorded),
+  `hidesOnDeactivate` false (`NSPanel` defaults it TRUE), `isExcludedFromWindowsMenu`,
+  `isReleasedWhenClosed` false, ONE instance (`shared`, `ExportQueueWindowController`'s
+  mould, because it outlives documents and must exist with none, and because
+  probes instantiate `AppDelegate()`, which therefore stores nothing), NO
+  window delegate (there is no document to answer `windowWillReturnUndoManager`
+  with), and it persists its six choices under `ReelcutRecording…` keys
+  (pinned in the harness) and not its frame. Rows: Source (the `NSScreen`s,
+  then Window… → `SCContentSharingPicker`), Microphone (+ a `LevelMeterView(meter:)`
+  bound to the recorder's OWN meter — a microphone published to `.shared`
+  would light the timeline bar), System Audio, Show Clicks, Rate, Size, Record
+  Into (`NSMenuItem`s carrying `recipeKey`, never `addItem(withTitle:)`).
+  **The panel is the ONLY place `CGRequestScreenCaptureAccess()` and
+  `AVCaptureDevice.requestAccess` are called** (decision 4, `Transcriber.canAsk`'s
+  rule for two grants), both BEFORE the 3-2-1 countdown, so a countdown never
+  ends in a prompt. A display source keeps the panel on screen (the
+  programmatic filter excludes Reelcut, measured); a picker-made source orders
+  it out until the recording lands (R0 q3 unmeasured). The landing goes
+  through `RecordingLanding` and the document's own door, a document mid-drag
+  retried from a half-second timer bounded at 40 tries, and on any failure the
+  note names the FILE, which is on disk whatever went wrong after it. Quit
+  while recording is cancelled by `applicationShouldTerminate`'s first line
+  and brings the panel forward — a BACKSTOP asked after NSDocumentController's
+  review, so the save sheet comes first and a target closed by the review
+  lands as a new project through the `recipeKey` lookup. The retitle
+  (Stop Recording) is in `AppDelegate.validateMenuItem` beside the agent-server
+  branch; the delegate's items never reach `validateUserInterfaceItem`.
+  `LevelMeterView.init(meter: LevelMeter = .shared)` and `AccentButton.init(…,
+  \1 The review's chrome
+  findings, closed: the panel asks for BOTH grants unconditionally on a press
+  (decision 4 is that the TOOL never asks — a `canAsk` gate here told a person
+  under `-AgentServerEnabled` to press the button they had just pressed and
+  left a `notDetermined` microphone unrecoverable); a `.starting` attempt is
+  numbered and bounded by `ScreenRecorder.armCeiling`; `land()` reads the
+  commit's outcome off the project HANDLE (`performGroupedEdit` answers
+  nothing, and a beep-and-return refusal used to be reported as added);
+  Record Into freezes at the captured choice through a recording;
+  `fitWindowToContent` constrains the grown card to its screen; the countdown
+  and the 30 Hz tick run in `.common` run-loop modes so the status item's
+  label moves under its own menu; `show()` beeps while a picked recording hid
+  the panel; Record over the Window… row with no filter refuses first; the
+  tick shows `ScreenRecorder.microphoneProblem` live and a landed
+  `micProblem` after; `prepareMicrophone` is paid when the countdown begins;
+  and File ▸ Stop Recording routes a TOOL's recording to `ScreenRecorder.shared.stop()`
+  instead of beeping at it. Pitfalls: `NSPopUpButton`
+  has no `item(withTag:)` — it is `menu?.item(withTag:)`; `selectItem(withTag:)`
+  answers a Bool to discard by name.
 - `EditorViewController+PreviewQuality.swift` · `PreviewWindowController.swift`
   — road map 2's phase 8a and 8b, two ways of LOOKING at the picture. They are
   one lane because they share `Playback` and the View menu, and neither is an
@@ -1166,7 +1361,9 @@ lockstep are in the root `CLAUDE.md`; the full design is
   window's chain — measured, with a plain window every ⌘-item whose action lives
   on `EditorViewController` (⌘E, ⌘T, ⌘0) resolves to NOTHING and validates
   disabled, while with a panel the editor stays main and every one of them
-  keeps working with no forwarding code.
+  keeps working with no forwarding code. The recorder's panel (road map 3)
+  is the second `NSPanel`, non-activating on top of that, and takes NO
+  delegate — see its row.
   **What a panel keeps alive is the items whose action is on the EDITOR's own
   responder chain, and ⌘Z / ⇧⌘Z are NOT those** — the sentence that used to
   name ⌘Z in that list was a measured falsehood, and the honest version is the
@@ -1354,7 +1551,9 @@ allowed **only inside `MediaImporter.swift`** (AVFoundation's loading API is
 async-only going forward) — and nothing else earns the exception by asking:
 speech recognition landed in phase 4 and did not, because
 `SFSpeechRecognizer`'s callback and delegate API is complete for a
-transcription, which is what `Transcriber.swift` uses (spec §11);
+transcription, which is what `Transcriber.swift` uses (spec §11), and
+screen recording did not either — every ScreenCaptureKit and capture call
+`ScreenRecorder` needs has a completion-handler form;
 `DispatchQueue` only at the documented seams
 (the compositor's render queue, the composition rebuild, import, the export
 progress timer, `Transcriber`'s serial work queue (phase 4) with
@@ -1369,7 +1568,20 @@ belongs on the compositor's build queue, where a grab would sit behind a
 preview rebuild and a rebuild behind a grab. They are two objects because
 each is `private` to its own file, and putting two unrelated commands in one
 line would buy nothing — the seam is the SHAPE, and a third one-frame render
-joins this entry rather than growing the list).
+joins this entry rather than growing the list). The RECORDER (road map 3)
+adds NO queue: ScreenCaptureKit and AVFoundation deliver their delegate
+callbacks on private queues, `ScreenRecorder` stamps each with `Date()`
+where it arrives and hops it to main through `DispatchQueue.main.async` —
+`Transcriber.requestAuthorization`'s and `MediaImporter.probe`'s shape — so
+every state transition runs on the main thread and needs no lock; the
+microphone meter is polled from the panel's timer, and `record_screen`'s
+waits are semaphores on the server thread, `import_media`'s shape. Its ONE
+seam is `ScreenRecorder.shareableContent` (`ScreenRecorder+Content.swift`),
+which issues `SCShareableContent.getExcludingDesktopWindows` from
+`DispatchQueue.global(qos: .userInitiated)` and hops the answer to main — one
+spelling for both doors, because on a locked console the framework held the
+calling thread ~37 s before answering nothing, and a panel that made the call
+on main froze the whole app for it.
 **`import Synchronization` is allowed only inside `LevelMeter.swift`** — the
 same shape of exception, and phase 5's. Its `publish` runs on AVPlayer's
 audio render thread inside the tap's process callback, where a lock invites
