@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Road map 3, phase R0 — the recording spike: five questions MEASURED before
+"""Road map 3, phase R0 — the recording spike: six questions MEASURED before
 R1's design leans on them.
 
 `designs/reelcut-roadmap-3.md` §3 ("Phase R0 — The spike") names five things
@@ -15,7 +15,9 @@ numbers assembled into ONE JSON object printed to stdout and saved to
 host OS**, before R1's first wave is briefed; it stays in the tree afterwards
 as the record, re-runnable.
 
-The five questions and what each outcome means for R1:
+The six questions and what each outcome means for R1 (the sixth was added
+after the first five were answered and the scouts had read the SDK; the
+five are re-runnable exactly as they were):
 
 1. **TCC attribution of a shell-launched binary.** Every proof launches
    `Reelcut.app/Contents/MacOS/Reelcut` from a shell; TCC attributes a
@@ -62,13 +64,40 @@ The five questions and what each outcome means for R1:
    output** on one stream, whether buffers arrive, at what rate and format,
    and on which queue (the label read inside the handler). Outcome A: the
    meter reads it. Outcome B: it cannot.
+6. **Three things the answers to 2 and 5 and the SDK scout left open**, each
+   in its own subprocess. (a) **Show Clicks under BGRA**: the SDK says
+   `showMouseClicks` "currently applies when pixelFormat is set to BGRA"
+   and a fresh configuration's format is `420v`, so 4 s of the display is
+   recorded exactly as question 4 does (points, 1/60, no audio) with
+   `showMouseClicks` on under `kCVPixelFormatType_32BGRA`, again under the
+   DEFAULT format, and once more under BGRA with clicks off as the
+   same-run size reference, the pointer warped two pixels and back
+   meanwhile (never clicked). Outcome A: the BGRA recording starts and
+   writes — Show Clicks is buildable. Outcome B: it refuses or writes
+   nothing — Show Clicks goes to the road map's §5. (b) **The second-file
+   microphone path**: an `AVCaptureSession` + `AVCaptureAudioFileOutput`
+   writing `.m4a` and an `SCStream` + `SCRecordingOutput` with system
+   audio and NO microphone, started in ONE run-loop turn in both orders
+   (session first, stream first; two runs each), the wall clock of every
+   call and callback against one `Date()` taken before the first call —
+   the offset between the two did-start callbacks is the number R1's
+   landing places the microphone clip with — and both files decoded.
+   Outcome A: both files land with a measurable offset. Outcome B: the
+   file output refuses under this process (the built app also needs the
+   `com.apple.security.device.audio-input` entitlement, which a bare probe
+   does not). (c) **The meter**: `audioChannels` read off the file
+   output's audio connection from the MAIN run loop at 30 Hz while (b)
+   records, and in a subprocess of its own recording 3 s. Outcome A:
+   readable at 30 Hz on main, so the meter needs no queue. Outcome B: not
+   — then `canAddOutput(AVCaptureAudioDataOutput())` beside the file
+   output says whether the queue-fed fallback is accepted.
 
 Run it from the repository (it needs the built app at
 `build/Build/Products/Release/Reelcut.app` for question 1 and never runs
 `make app`); recordings go under `tools/proof/work/spike/` and are four to
 six seconds each:
 
-    python3 tools/proof/recording_spike.py            # all five
+    python3 tools/proof/recording_spike.py            # all six
     python3 tools/proof/recording_spike.py --only 2,5 # a subset, same JSON shape
 
 It launches Reelcut on ports 4890 and 4891, ONE AT A TIME (an `open -a` of a
@@ -347,6 +376,12 @@ func record(_ spec: [String: Any]) -> [String: Any] {
     let resolution = spec["resolution"] as? String ?? "nominal"
     let sizeMode = spec["sizeMode"] as? String ?? "points"
     let micOutput = spec["micOutput"] as? String ?? "none"
+    // Question 6a's three keys. Absent, every earlier row's configuration
+    // is byte for byte what it was: BGRA asked, showMouseClicks untouched,
+    // the pointer left alone.
+    let pixelFormat = spec["pixelFormat"] as? String ?? "bgra"
+    let showClicks = spec["showMouseClicks"] as? Bool
+    let wiggle = spec["wiggleMouse"] as? Bool ?? false
     try? FileManager.default.removeItem(atPath: outPath)
 
     let (content, contentError) = shareableContent(timeout: 15)
@@ -363,7 +398,9 @@ func record(_ spec: [String: Any]) -> [String: Any] {
     config.height = height
     config.minimumFrameInterval = CMTime(value: 1, timescale: CMTimeScale(fps))
     config.showsCursor = true
-    config.pixelFormat = kCVPixelFormatType_32BGRA
+    let freshPixelFormat = fourcc(config.pixelFormat)
+    if pixelFormat != "default" { config.pixelFormat = kCVPixelFormatType_32BGRA }
+    if let showClicks { config.showMouseClicks = showClicks }
     config.capturesAudio = systemAudio
     config.sampleRate = 48000
     config.channelCount = 2
@@ -377,7 +414,9 @@ func record(_ spec: [String: Any]) -> [String: Any] {
     out["configuration"] = ["width": width, "height": height, "minimumFrameInterval": [1, fps],
                             "capturesAudio": systemAudio, "captureMicrophone": mic,
                             "captureResolution": resolution, "excludesCurrentProcessAudio": true,
-                            "sampleRate": 48000, "channelCount": 2, "showsCursor": true]
+                            "sampleRate": 48000, "channelCount": 2, "showsCursor": true,
+                            "pixelFormat": fourcc(config.pixelFormat), "freshPixelFormat": freshPixelFormat,
+                            "showMouseClicks": config.showMouseClicks]
     if mic || micOutput != "none" { out["defaultMicrophone"] = defaultMicrophone() }
 
     let filter = SCContentFilter(display: display, excludingWindows: [])
@@ -415,7 +454,7 @@ func record(_ spec: [String: Any]) -> [String: Any] {
         out["events"] = session.events; return out
     }
     out["didStartArrived"] = spin(20) { session.read { session.didStart || session.didFail } }
-    _ = spin(seconds) { false }
+    if wiggle { out["mouse"] = wiggleMouse(seconds: seconds) } else { _ = spin(seconds) { false } }
     out["recordedDurationBeforeStop"] = fin(recording.recordedDuration.seconds)
     out["recordedDurationBeforeStopCMTime"] = ["value", Int(recording.recordedDuration.value),
                                                "timescale", Int(recording.recordedDuration.timescale)]
@@ -815,6 +854,305 @@ func exclusion(outDir: String) -> [String: Any] {
     return out
 }
 
+// ---- question 6: the pointer, the second-file microphone, the meter --------
+
+/// A two-pixel excursion and back four times a second for `seconds`, through
+/// `CGWarpMouseCursorPosition` (which needs no grant) with a `mouseMoved`
+/// event posted beside each warp; the pointer is put back where it was and
+/// NOTHING is clicked. Whether a posted event took effect is not observable
+/// here; the warp's result code is.
+func wiggleMouse(seconds: Double) -> [String: Any] {
+    guard let origin = CGEvent(source: nil)?.location else {
+        _ = spin(seconds) { false }
+        return ["error": "CGEvent(source: nil) gave no pointer location"]
+    }
+    var warps = 0, posted = 0, step = 0
+    var warpFailures: [Int] = []
+    let deadline = Date().addingTimeInterval(seconds)
+    while Date() < deadline {
+        let d = CGFloat(step % 2 == 0 ? 2 : -2)
+        let target = CGPoint(x: origin.x + d, y: origin.y + d)
+        let result = CGWarpMouseCursorPosition(target)
+        warps += 1
+        if result != .success { warpFailures.append(Int(result.rawValue)) }
+        if let event = CGEvent(mouseEventSource: nil, mouseType: .mouseMoved, mouseCursorPosition: target, mouseButton: .left) {
+            event.post(tap: .cghidEventTap)
+            posted += 1
+        }
+        step += 1
+        RunLoop.main.run(until: Date().addingTimeInterval(0.25))
+    }
+    let restore = CGWarpMouseCursorPosition(origin)
+    RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+    let after = CGEvent(source: nil)?.location
+    // Whether the excursion was in the recorded picture at all: the rows
+    // record the MAIN display, and the pointer is wherever it was left.
+    let mainBounds = CGDisplayBounds(CGMainDisplayID())
+    return ["origin": [Double(origin.x), Double(origin.y)], "warps": warps, "warpFailures": warpFailures,
+            "postedMoves": posted, "restoreResult": Int(restore.rawValue),
+            "mainDisplayBounds": rect(mainBounds), "onRecordedDisplay": mainBounds.contains(origin),
+            "after": after.map { [Double($0.x), Double($0.y)] } as Any,
+            "restored": after.map { abs($0.x - origin.x) < 1 && abs($0.y - origin.y) < 1 } as Any]
+}
+
+final class MicFileDelegate: NSObject, AVCaptureFileOutputRecordingDelegate {
+    let lock = NSLock()
+    var startedAt: Double? = nil, finishedAt: Double? = nil
+    var startQueue: String? = nil, finishQueue: String? = nil
+    var startOnMain: Bool? = nil, finishOnMain: Bool? = nil
+    var finishError: String? = nil
+
+    func read<T>(_ body: () -> T) -> T { lock.lock(); defer { lock.unlock() }; return body() }
+
+    func fileOutput(_ output: AVCaptureFileOutput, didStartRecordingTo fileURL: URL, from connections: [AVCaptureConnection]) {
+        let t = now(), label = String(cString: __dispatch_queue_get_label(nil)), main = Thread.isMainThread
+        lock.lock(); startedAt = t; startQueue = label; startOnMain = main; lock.unlock()
+    }
+    func fileOutput(_ output: AVCaptureFileOutput, didFinishRecordingTo outputFileURL: URL, from connections: [AVCaptureConnection], error: (any Error)?) {
+        let t = now(), label = String(cString: __dispatch_queue_get_label(nil)), main = Thread.isMainThread
+        lock.lock(); finishedAt = t; finishQueue = label; finishOnMain = main; finishError = error.map { "\($0)" }; lock.unlock()
+    }
+}
+
+/// The meter (question 6c): `audioChannels` read off the file output's audio
+/// connection from the MAIN run loop at 30 Hz, each read stamped with the
+/// interval it actually came at, so the answer is a measured rate on a named
+/// thread and not a claim.
+final class Meter {
+    var polls = 0, nilConnection = 0, emptyChannels = 0
+    var channelCounts = Set<Int>()
+    var average: [Double] = [], peak: [Double] = [], intervals: [Double] = []
+
+    func sample(_ output: AVCaptureOutput, interval: Double) {
+        polls += 1
+        intervals.append(interval)
+        guard let connection = output.connection(with: .audio) else { nilConnection += 1; return }
+        let channels = connection.audioChannels
+        channelCounts.insert(channels.count)
+        guard let first = channels.first else { emptyChannels += 1; return }
+        average.append(Double(first.averagePowerLevel))
+        peak.append(Double(first.peakHoldLevel))
+    }
+
+    func report() -> [String: Any] {
+        func stats(_ values: [Double]) -> Any {
+            guard !values.isEmpty else { return NSNull() }
+            let s = values.sorted()
+            return ["count": values.count, "min": fin(s.first!), "median": fin(s[s.count / 2]), "max": fin(s.last!)]
+        }
+        func moves(_ values: [Double]) -> Any {
+            guard let lo = values.min(), let hi = values.max() else { return NSNull() }
+            return hi - lo > 1
+        }
+        return ["polls": polls, "nilConnection": nilConnection, "emptyChannels": emptyChannels,
+                "channelCounts": Array(channelCounts).sorted(),
+                "averagePowerLevelDB": stats(average), "peakHoldLevelDB": stats(peak),
+                "distinctAverageValues": Set(average).count, "distinctPeakValues": Set(peak).count,
+                "averageMovesMoreThan1dB": moves(average), "peakMovesMoreThan1dB": moves(peak),
+                "pollIntervalSeconds": stats(intervals),
+                "firstFiveAverage": average.prefix(5).map { fin($0) }, "lastFiveAverage": average.suffix(5).map { fin($0) },
+                "firstFivePeak": peak.prefix(5).map { fin($0) }, "lastFivePeak": peak.suffix(5).map { fin($0) }]
+    }
+}
+
+/// Question 6b and 6c in one subprocess: the capture session's file output
+/// and, unless `order` is `session-only`, an SCStream with system audio and
+/// no microphone beside it, started in the order asked within ONE run-loop
+/// turn, every call and callback stamped against one `Date()` taken before
+/// the first call, the meter polled from main at 30 Hz meanwhile.
+func micCapture(_ spec: [String: Any]) -> [String: Any] {
+    var out: [String: Any] = ["spec": spec]
+    let order = spec["order"] as? String ?? "session-first"
+    let micPath = spec["micOut"] as! String
+    let screenPath = spec["screenOut"] as? String
+    let seconds = spec["seconds"] as? Double ?? 5
+    let withStream = order != "session-only" && screenPath != nil
+    try? FileManager.default.removeItem(atPath: micPath)
+    if let screenPath { try? FileManager.default.removeItem(atPath: screenPath) }
+
+    out["authorization"] = micStatus()
+    guard AVCaptureDevice.authorizationStatus(for: .audio) == .authorized else {
+        out["outcome"] = "unmeasured"
+        out["reason"] = "the Microphone grant is not authorized for this process; nothing was started"
+        return out
+    }
+    guard let device = AVCaptureDevice.default(for: .audio) else { out["error"] = "no default audio capture device"; return out }
+    out["device"] = ["name": device.localizedName, "uniqueID": device.uniqueID, "modelID": device.modelID]
+
+    let session = AVCaptureSession()
+    let input: AVCaptureDeviceInput
+    do { input = try AVCaptureDeviceInput(device: device) }
+    catch { out["error"] = "AVCaptureDeviceInput threw: \(error)"; return out }
+    guard session.canAddInput(input) else { out["error"] = "canAddInput false"; return out }
+    session.addInput(input)
+    let output = AVCaptureAudioFileOutput()
+    out["availableOutputFileTypes"] = AVCaptureAudioFileOutput.availableOutputFileTypes().map { $0.rawValue }
+    guard session.canAddOutput(output) else { out["error"] = "canAddOutput(AVCaptureAudioFileOutput) false"; return out }
+    session.addOutput(output)
+    // Outcome B's fallback, asked and never added: would a data output sit
+    // beside the file output on this session?
+    out["canAddAudioDataOutputBeside"] = session.canAddOutput(AVCaptureAudioDataOutput())
+    if let connection = output.connection(with: .audio) {
+        out["audioConnectionBeforeStart"] = ["channels": connection.audioChannels.count,
+                                             "isActive": connection.isActive, "isEnabled": connection.isEnabled]
+    } else {
+        out["audioConnectionBeforeStart"] = NSNull()
+    }
+
+    let noteLock = NSLock()
+    let notes = Box<[[String: Any]]>([])
+    func note(_ name: String, _ extra: [String: Any] = [:]) {
+        var entry = extra
+        entry["name"] = name
+        entry["t"] = now()
+        noteLock.lock(); notes.value.append(entry); noteLock.unlock()
+    }
+    let center = NotificationCenter.default
+    let tokens: [NSObjectProtocol] = [
+        center.addObserver(forName: AVCaptureSession.runtimeErrorNotification, object: session, queue: nil) { n in
+            note("runtimeError", ["error": (n.userInfo?[AVCaptureSessionErrorKey] as? NSError).map { "\($0)" } ?? "?"])
+        },
+        center.addObserver(forName: AVCaptureSession.didStartRunningNotification, object: session, queue: nil) { _ in note("didStartRunning") },
+        center.addObserver(forName: AVCaptureSession.didStopRunningNotification, object: session, queue: nil) { _ in note("didStopRunning") },
+        center.addObserver(forName: AVCaptureSession.wasInterruptedNotification, object: session, queue: nil) { _ in note("wasInterrupted") },
+    ]
+    defer { tokens.forEach { center.removeObserver($0) } }
+    let fileDelegate = MicFileDelegate()
+
+    let sck = Session()
+    var stream: SCStream? = nil
+    if withStream {
+        let (content, contentError) = shareableContent(timeout: 15)
+        guard let content, let display = mainDisplay(content) else {
+            out["error"] = "shareable content: \(contentError ?? "no display")"; return out
+        }
+        let config = SCStreamConfiguration()
+        config.width = display.width
+        config.height = display.height
+        config.minimumFrameInterval = CMTime(value: 1, timescale: 60)
+        config.showsCursor = true
+        config.pixelFormat = kCVPixelFormatType_32BGRA
+        config.capturesAudio = true
+        config.sampleRate = 48000
+        config.channelCount = 2
+        config.excludesCurrentProcessAudio = true
+        config.captureMicrophone = false
+        config.captureResolution = .nominal
+        let filter = SCContentFilter(display: display, excludingWindows: [])
+        let s = SCStream(filter: filter, configuration: config, delegate: sck)
+        let recordingConfig = SCRecordingOutputConfiguration()
+        recordingConfig.outputURL = URL(fileURLWithPath: screenPath!)
+        recordingConfig.outputFileType = .mov
+        let recording = SCRecordingOutput(configuration: recordingConfig, delegate: sck)
+        do { try s.addRecordingOutput(recording); out["addRecordingOutput"] = "ok" }
+        catch { out["addRecordingOutput"] = "threw: \(error)"; out["error"] = "addRecordingOutput threw"; return out }
+        stream = s
+    }
+
+    // The starts, in the order asked, in ONE run-loop turn: nothing spins
+    // between the first call and the last.
+    var marks: [String: Double] = [:]
+    let t0 = now()
+    func startSession() {
+        marks["startRunningCalled"] = now()
+        session.startRunning()
+        marks["startRunningReturned"] = now()
+        marks["startRecordingCalled"] = now()
+        output.startRecording(to: URL(fileURLWithPath: micPath), outputFileType: .m4a, recordingDelegate: fileDelegate)
+        marks["startRecordingReturned"] = now()
+    }
+    func startStream() {
+        guard let stream else { return }
+        marks["startCaptureCalled"] = now()
+        stream.startCapture { error in
+            sck.flag { sck.startDone = true; sck.startError = error.map { "\($0)" } }
+            sck.mark("startCaptureCompleted")
+        }
+        marks["startCaptureReturned"] = now()
+    }
+    switch order {
+    case "stream-first": startStream(); startSession()
+    case "session-only": startSession()
+    default: startSession(); startStream()
+    }
+    out["isRunningAfterStart"] = session.isRunning
+    out["isRecordingAfterStart"] = output.isRecording
+
+    out["fileOutputDidStartArrived"] = spin(20) { fileDelegate.read { fileDelegate.startedAt != nil || fileDelegate.finishedAt != nil } }
+    if withStream {
+        out["startCaptureCompleted"] = spin(20) { sck.read { sck.startDone } }
+        if let e = sck.read({ sck.startError }) { out["startError"] = e }
+        out["recordingOutputDidStartArrived"] = spin(20) { sck.read { sck.didStart || sck.didFail } }
+    }
+
+    // Record, reading the meter from the main run loop at 30 Hz meanwhile.
+    let meter = Meter()
+    let deadline = Date().addingTimeInterval(seconds)
+    var last = now()
+    while Date() < deadline {
+        RunLoop.main.run(until: Date().addingTimeInterval(1.0 / 30))
+        let t = now()
+        meter.sample(output, interval: t - last)
+        last = t
+    }
+    out["meter"] = meter.report()
+    out["isRecordingBeforeStop"] = output.isRecording
+    out["recordedDurationBeforeStop"] = fin(output.recordedDuration.seconds)
+    out["recordedFileSizeBeforeStop"] = Int(output.recordedFileSize)
+
+    marks["stopRecordingCalled"] = now()
+    output.stopRecording()
+    marks["stopRecordingReturned"] = now()
+    if let stream {
+        marks["stopCaptureCalled"] = now()
+        stream.stopCapture { error in
+            sck.flag { sck.stopDone = true; sck.stopError = error.map { "\($0)" } }
+            sck.mark("stopCaptureCompleted")
+        }
+    }
+    out["fileOutputDidFinishArrived"] = spin(30) { fileDelegate.read { fileDelegate.finishedAt != nil } }
+    if withStream {
+        out["stopCompleted"] = spin(20) { sck.read { sck.stopDone } }
+        out["recordingOutputDidFinishArrived"] = spin(30) { sck.read { sck.didFinish || sck.didFail } }
+        out["didFinish"] = sck.read { sck.didFinish }
+        out["didFail"] = sck.read { sck.didFail }
+        if let e = sck.read({ sck.recordingError }) { out["recordingError"] = e }
+        if let e = sck.read({ sck.streamStopError }) { out["streamStopError"] = e }
+        if let e = sck.read({ sck.stopError }) { out["stopError"] = e }
+    }
+    marks["stopRunningCalled"] = now()
+    session.stopRunning()
+    marks["stopRunningReturned"] = now()
+    _ = spin(0.5) { false }
+    if let e = fileDelegate.read({ fileDelegate.finishError }) { out["fileOutputFinishError"] = e }
+    out["queues"] = ["fileOutputDidStart": fileDelegate.read { fileDelegate.startQueue } as Any,
+                     "fileOutputDidStartOnMainThread": fileDelegate.read { fileDelegate.startOnMain } as Any,
+                     "fileOutputDidFinish": fileDelegate.read { fileDelegate.finishQueue } as Any,
+                     "fileOutputDidFinishOnMainThread": fileDelegate.read { fileDelegate.finishOnMain } as Any]
+
+    var timeline: [String: Any] = [:]
+    for (name, t) in marks { timeline[name] = t - t0 }
+    if let t = fileDelegate.read({ fileDelegate.startedAt }) { timeline["fileOutputDidStart"] = t - t0 }
+    if let t = fileDelegate.read({ fileDelegate.finishedAt }) { timeline["fileOutputDidFinish"] = t - t0 }
+    for event in sck.read({ sck.events }) { timeline[event["event"] as! String] = (event["t"] as! Double) - t0 }
+    noteLock.lock()
+    for entry in notes.value { timeline["session:" + (entry["name"] as! String)] = (entry["t"] as! Double) - t0 }
+    let runtimeErrors = notes.value.filter { $0["name"] as? String == "runtimeError" }.compactMap { $0["error"] as? String }
+    noteLock.unlock()
+    out["timeline"] = timeline
+    out["runtimeErrors"] = runtimeErrors
+    if let a = timeline["fileOutputDidStart"] as? Double, let b = timeline["recordingOutputDidStartRecording"] as? Double {
+        out["offsetScreenDidStartMinusMicDidStart"] = b - a
+    }
+    out["micFileExists"] = FileManager.default.fileExists(atPath: micPath)
+    out["micFileSize"] = ((try? FileManager.default.attributesOfItem(atPath: micPath))?[.size] as? Int) ?? 0
+    if let screenPath {
+        out["screenFileExists"] = FileManager.default.fileExists(atPath: screenPath)
+        out["screenFileSize"] = ((try? FileManager.default.attributesOfItem(atPath: screenPath))?[.size] as? Int) ?? 0
+    }
+    return out
+}
+
 // ---- main ------------------------------------------------------------------
 
 let arguments = CommandLine.arguments
@@ -836,6 +1174,9 @@ case "analyze":
     emit(analyze(arguments[2]))
 case "exclude":
     emit(exclusion(outDir: arguments[2]))
+case "mic-capture":
+    let spec = try! JSONSerialization.jsonObject(with: Data(arguments[2].utf8)) as! [String: Any]
+    emit(micCapture(spec))
 default:
     emit(["error": "unknown mode \(mode)"])
     exit(2)
@@ -960,11 +1301,15 @@ class Tone:
 
 
 def record(binary, name, seconds=5, fps=60, system_audio=False, mic=False,
-           resolution="nominal", size_mode="points", mic_output="none", tone=None):
-    """One recording in its own subprocess, then its analysis in another."""
+           resolution="nominal", size_mode="points", mic_output="none", tone=None, extra=None):
+    """One recording in its own subprocess, then its analysis in another.
+    `extra` is question 6a's spec keys; the five earlier questions pass none,
+    so their specs are byte for byte what they were."""
     out = os.path.join(WORK, f"{name}.mov")
     spec = {"out": out, "seconds": seconds, "fps": fps, "systemAudio": system_audio, "mic": mic,
             "resolution": resolution, "sizeMode": size_mode, "micOutput": mic_output}
+    if extra:
+        spec.update(extra)
     player = Tone(tone) if tone else None
     try:
         recording = probe(binary, "record", json.dumps(spec), timeout=seconds + 120)
@@ -1329,11 +1674,180 @@ def question_5(binary, tone, granted):
 
 
 # ---------------------------------------------------------------------------
+# Question 6: Show Clicks under BGRA, the second-file microphone, the meter.
+
+
+def mic_capture(binary, order, name, seconds, tone):
+    """One second-file run in its own subprocess — the capture session's
+    file output and, unless `order` is session-only, an SCStream beside
+    it — then each written file's analysis in another. `order` is
+    `session-first`, `stream-first` or `session-only`."""
+    mic_out = os.path.join(WORK, f"{name}.m4a")
+    spec = {"order": order, "micOut": mic_out, "seconds": seconds}
+    screen_out = None
+    if order != "session-only":
+        screen_out = os.path.join(WORK, f"{name}.mov")
+        spec["screenOut"] = screen_out
+    player = Tone(tone) if tone else None
+    try:
+        capture = probe(binary, "mic-capture", json.dumps(spec), timeout=seconds + 120)
+    finally:
+        if player:
+            player.stop()
+    row = {"capture": capture}
+    row["micFile"] = (probe(binary, "analyze", mic_out, timeout=180) if os.path.exists(mic_out)
+                      else {"outcome": "no-file", "path": mic_out})
+    if screen_out:
+        row["screenFile"] = (probe(binary, "analyze", screen_out, timeout=180) if os.path.exists(screen_out)
+                             else {"outcome": "no-file", "path": screen_out})
+    return row
+
+
+def summarize_capture(row):
+    """The numbers a second-file run's summary line needs."""
+    capture = row["capture"]
+    timeline = capture.get("timeline") or {}
+    keys = ("startRunningCalled", "startRunningReturned", "startRecordingReturned", "startCaptureCalled",
+            "fileOutputDidStart", "startCaptureCompleted", "recordingOutputDidStartRecording",
+            "session:didStartRunning", "stopRecordingCalled", "stopCaptureCalled", "fileOutputDidFinish",
+            "stopCaptureCompleted", "recordingOutputDidFinishRecording")
+    return {"outcomeOfSubprocess": capture.get("outcome"), "error": capture.get("error"),
+            "startError": capture.get("startError"), "recordingError": capture.get("recordingError"),
+            "runtimeErrors": capture.get("runtimeErrors"), "fileOutputFinishError": capture.get("fileOutputFinishError"),
+            "fileOutputDidStartArrived": capture.get("fileOutputDidStartArrived"),
+            "fileOutputDidFinishArrived": capture.get("fileOutputDidFinishArrived"),
+            "recordingOutputDidStartArrived": capture.get("recordingOutputDidStartArrived"),
+            "recordingOutputDidFinishArrived": capture.get("recordingOutputDidFinishArrived"),
+            "offsetScreenDidStartMinusMicDidStart": capture.get("offsetScreenDidStartMinusMicDidStart"),
+            "timeline": {k: timeline.get(k) for k in keys if k in timeline},
+            "queues": capture.get("queues"),
+            "micFile": summarize_file(row.get("micFile", {})),
+            "screenFile": summarize_file(row["screenFile"]) if "screenFile" in row else None,
+            "meter": capture.get("meter")}
+
+
+def question_6(binary, tone, granted):
+    answer = {"question": 6}
+
+    # 6a — Show Clicks under BGRA and under the default pixel format, plus a
+    # same-run BGRA row with clicks off as the size reference; the record
+    # run's three point-size question-4 files, when still on disk, widen the
+    # reference to what a "static" screen's size wanders across runs.
+    sdk = subprocess.run(["xcrun", "--show-sdk-path"], capture_output=True, text=True).stdout.strip()
+    header = os.path.join(sdk, "System/Library/Frameworks/ScreenCaptureKit.framework/Headers/SCStream.h")
+    quotes = []
+    try:
+        for i, line in enumerate(open(header).read().splitlines(), 1):
+            if "showMouseClicks" in line:
+                quotes.append({"line": i, "text": line.strip()})
+    except OSError as error:
+        quotes.append({"error": repr(error)})
+    rows = {}
+    for name, pixel_format, show in (("bgra_clicks", "bgra", True), ("default_clicks", "default", True),
+                                     ("bgra_no_clicks", "bgra", False)):
+        rows[name] = record(binary, f"q6-clicks-{name}", seconds=4, fps=60,
+                            extra={"pixelFormat": pixel_format, "showMouseClicks": show, "wiggleMouse": True})
+
+    def clicks_row(row):
+        rec, f = row["recording"], row["file"]
+        video = (f.get("videoTracks") or [{}])[0]
+        cfg = rec.get("configuration") or {}
+        return {"outcomeOfSubprocess": rec.get("outcome"), "error": rec.get("error"),
+                "addRecordingOutput": rec.get("addRecordingOutput"), "startError": rec.get("startError"),
+                "recordingError": rec.get("recordingError"),
+                "didStartArrived": rec.get("didStartArrived"), "didFinishArrived": rec.get("didFinishArrived"),
+                "didFinish": rec.get("didFinish"), "didFail": rec.get("didFail"),
+                "pixelFormat": cfg.get("pixelFormat"), "freshPixelFormat": cfg.get("freshPixelFormat"),
+                "showMouseClicks": cfg.get("showMouseClicks"),
+                "naturalSize": video.get("naturalSize"), "codec": (video.get("formats") or [{}])[0].get("codec"),
+                "videoSamples": (video.get("samples") or {}).get("count"), "nominalFrameRate": video.get("nominalFrameRate"),
+                "duration": f.get("duration"), "fileSize": f.get("fileSize"), "mouse": rec.get("mouse")}
+
+    def writes(row):
+        rec, f = row["recording"], row["file"]
+        video = (f.get("videoTracks") or [{}])[0]
+        return (rec.get("addRecordingOutput") == "ok" and "startError" not in rec and rec.get("didFinish") is True
+                and ((video.get("samples") or {}).get("count") or 0) > 0)
+
+    sizes = {name: row["file"].get("fileSize") for name, row in rows.items()}
+    reference = {"q6-clicks-bgra_no_clicks": sizes.get("bgra_no_clicks")}
+    for q4 in ("q4-rate-60", "q4-size-best_points", "q4-size-automatic_points"):
+        path = os.path.join(WORK, q4 + ".mov")
+        if os.path.exists(path):
+            reference[q4] = os.path.getsize(path)
+    values = [v for v in reference.values() if v]
+    noise = (max(values) - min(values)) if len(values) >= 2 else None
+    diff = (abs(sizes["bgra_clicks"] - sizes["default_clicks"])
+            if sizes.get("bgra_clicks") and sizes.get("default_clicks") else None)
+    answer["clicks"] = {
+        "header": header, "headerQuotes": quotes, "rows": rows,
+        "summary": {name: clicks_row(row) for name, row in rows.items()},
+        "fileSizes": sizes, "referenceSizes": reference, "staticScreenNoise": noise,
+        "bgraVsDefaultDifference": diff,
+        "differsBeyondNoise": (diff > noise) if diff is not None and noise is not None else None,
+        "bgraWrites": writes(rows["bgra_clicks"]), "defaultWrites": writes(rows["default_clicks"]),
+        "outcome": "A" if writes(rows["bgra_clicks"]) else "B"}
+
+    # 6b — the second-file microphone path, both orders, two runs each, so
+    # "steadier" has a spread to be read off.
+    if not granted:
+        answer["secondFile"] = {"outcome": "unmeasured",
+                                "reason": "the Microphone grant is absent for this process; the capture session was not started"}
+        answer["meter"] = {"outcome": "unmeasured", "reason": "as 6b"}
+        return answer
+    orders = {}
+    for order in ("session-first", "stream-first"):
+        orders[order] = [mic_capture(binary, order, f"q6-{order.replace('-', '_')}-{i}", 5, tone) for i in (1, 2)]
+    second = {"orders": orders, "summary": {}}
+    all_landed = True
+    for order, runs in orders.items():
+        offsets = [r["capture"].get("offsetScreenDidStartMinusMicDidStart") for r in runs]
+        measured = [o for o in offsets if o is not None]
+        landed = all(r["capture"].get("micFileExists") and r["capture"].get("screenFileExists")
+                     and "audioTrackCount" in r.get("micFile", {}) and "audioTrackCount" in r.get("screenFile", {})
+                     for r in runs)
+        all_landed = all_landed and landed and len(measured) == len(runs)
+        second["summary"][order] = {
+            "runs": [summarize_capture(r) for r in runs], "offsets": offsets,
+            "offsetSpread": (max(measured) - min(measured)) if len(measured) >= 2 else None,
+            "offsetMean": (sum(measured) / len(measured)) if measured else None,
+            "bothFilesLandedEveryRun": landed}
+    refusals = [r["capture"].get("error") or r["capture"].get("outcome") for runs in orders.values() for r in runs
+                if r["capture"].get("error") or r["capture"].get("outcome")]
+    second["outcome"] = "A" if all_landed else "B"
+    second["refusals"] = refusals
+    second["entitlementNote"] = ("a bare swiftc probe carries no hardened runtime, so it needs no entitlement; "
+                                 "the built app needs com.apple.security.device.audio-input before this path "
+                                 "can be trusted there")
+    answer["secondFile"] = second
+
+    # 6c — the meter in a subprocess of its own (3 s, session only), with
+    # the 6b runs' polls beside it as corroboration.
+    run = mic_capture(binary, "session-only", "q6-meter", 3, tone)
+    meter = run["capture"].get("meter") or {}
+    counts = meter.get("channelCounts") or []
+    interval = (meter.get("pollIntervalSeconds") or {}) if isinstance(meter.get("pollIntervalSeconds"), dict) else {}
+    readable = ((meter.get("polls") or 0) > 0 and meter.get("nilConnection") == 0 and meter.get("emptyChannels") == 0
+                and counts and min(counts) >= 1 and (interval.get("median") or 1) < 0.05)
+    answer["meter"] = {"run": run, "summary": summarize_capture(run), "channelCounts": counts,
+                       "polls": meter.get("polls"), "nilConnection": meter.get("nilConnection"),
+                       "emptyChannels": meter.get("emptyChannels"),
+                       "averagePowerLevelDB": meter.get("averagePowerLevelDB"), "peakHoldLevelDB": meter.get("peakHoldLevelDB"),
+                       "averageMovesMoreThan1dB": meter.get("averageMovesMoreThan1dB"),
+                       "peakMovesMoreThan1dB": meter.get("peakMovesMoreThan1dB"),
+                       "pollIntervalSeconds": meter.get("pollIntervalSeconds"),
+                       "canAddAudioDataOutputBeside": run["capture"].get("canAddAudioDataOutputBeside"),
+                       "besideTheStream": {order: [r["capture"].get("meter") for r in runs] for order, runs in orders.items()},
+                       "outcome": "A" if readable else "B"}
+    return answer
+
+
+# ---------------------------------------------------------------------------
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    parser.add_argument("--only", default="1,2,3,4,5", help="which questions to run, e.g. 2,5")
+    parser.add_argument("--only", default="1,2,3,4,5,6", help="which questions to run, e.g. 2,5")
     args = parser.parse_args()
     wanted = {int(q) for q in args.only.split(",") if q.strip()}
     os.makedirs(WORK, exist_ok=True)
@@ -1400,8 +1914,63 @@ def main():
         say(f"  outcome {answers['q5'].get('outcome')}: {answers['q5'].get('buffers')} buffers, "
             f"{answers['q5'].get('buffersPerSecond')}/s, format {json.dumps(answers['q5'].get('format'))}, "
             f"queue {answers['q5'].get('queueLabel')}")
+    if 6 in wanted:
+        say("\nQ6 — Show Clicks under BGRA (three 4 s recordings), the second-file microphone path "
+            "(two orders, two 5 s runs each), and the meter (3 s)")
+        answers["q6"] = question_6(binary, tone, granted)
+        q6 = answers["q6"]
+        clicks = q6["clicks"]
+        say(f"  6a outcome {clicks.get('outcome')}: sizes {json.dumps(clicks.get('fileSizes'))}, "
+            f"BGRA vs default differ by {clicks.get('bgraVsDefaultDifference')} against a same-config spread of "
+            f"{clicks.get('staticScreenNoise')} ({json.dumps(clicks.get('referenceSizes'))}) → beyond noise: "
+            f"{clicks.get('differsBeyondNoise')}")
+        for name, row in clicks["summary"].items():
+            say(f"    {name}: {json.dumps({k: v for k, v in row.items() if k != 'mouse'})}")
+            say(f"      mouse {json.dumps(row.get('mouse'))}")
+        second = q6["secondFile"]
+        say(f"  6b outcome {second.get('outcome')}"
+            + (f": {second.get('reason')}" if second.get("reason") else ""))
+        for order, s in (second.get("summary") or {}).items():
+            say(f"    {order}: offsets {json.dumps(s.get('offsets'))} spread {s.get('offsetSpread')} "
+                f"mean {s.get('offsetMean')} landed {s.get('bothFilesLandedEveryRun')}")
+            for i, r in enumerate(s.get("runs") or [], 1):
+                say(f"      run {i} timeline {json.dumps(r.get('timeline'))}")
+                say(f"      run {i} mic {json.dumps(r.get('micFile'))}")
+                say(f"      run {i} screen {json.dumps(r.get('screenFile'))}")
+                say(f"      run {i} errors {json.dumps({k: r.get(k) for k in ('error', 'startError', 'recordingError', 'runtimeErrors', 'fileOutputFinishError')})}"
+                    f" queues {json.dumps(r.get('queues'))}")
+                say(f"      run {i} meter {json.dumps(r.get('meter'))}")
+        meter = q6["meter"]
+        say(f"  6c outcome {meter.get('outcome')}: polls {meter.get('polls')} nil {meter.get('nilConnection')} "
+            f"empty {meter.get('emptyChannels')} channels {json.dumps(meter.get('channelCounts'))} "
+            f"average {json.dumps(meter.get('averagePowerLevelDB'))} peak {json.dumps(meter.get('peakHoldLevelDB'))} "
+            f"moves {meter.get('averageMovesMoreThan1dB')}/{meter.get('peakMovesMoreThan1dB')} "
+            f"interval {json.dumps(meter.get('pollIntervalSeconds'))} "
+            f"canAddAudioDataOutputBeside {meter.get('canAddAudioDataOutputBeside')}")
+        if meter.get("summary"):
+            say(f"    meter-only run: {json.dumps({k: meter['summary'].get(k) for k in ('timeline', 'micFile', 'error', 'runtimeErrors', 'fileOutputFinishError')})}")
 
     path = os.path.join(WORK, "answers.json")
+    # A subset run carries forward the previous file's keys for the questions
+    # it did not run, and says so — the record run's answers are pasted into
+    # the road map by date, and a later `--only 6` must not erase them.
+    try:
+        with open(path) as f:
+            previous = json.load(f)
+    except (OSError, ValueError):
+        previous = None
+    if previous:
+        carried = [q for q in range(1, 7) if q not in wanted and f"q{q}" in previous]
+        # Each carried answer keeps the date of the run that MEASURED it — a
+        # previous file that had itself carried keys forward names it under
+        # `carriedForward.dates`, else its own `date`.
+        origin = (previous.get("carriedForward") or {}).get("dates") or {}
+        dates = {}
+        for q in carried:
+            answers[f"q{q}"] = previous[f"q{q}"]
+            dates[str(q)] = origin.get(str(q), previous.get("date"))
+        if carried:
+            answers["carriedForward"] = {"questions": carried, "dates": dates}
     with open(path, "w") as f:
         json.dump(answers, f, indent=2, sort_keys=True)
     say(f"\nanswers saved to {path}")

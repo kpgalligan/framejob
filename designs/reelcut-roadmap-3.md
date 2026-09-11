@@ -319,6 +319,87 @@ subprocess so a crash is a reported outcome.
    output's connection exposes `AVCaptureAudioChannel.averagePowerLevel` /
    `peakHoldLevel` in decibels, polled at 30 Hz from main, which is the
    meter with no queue and no sample buffer in it.
+6. **Outcome A three times, and one order to pick.** Measured by a
+   `--only 6` run of the same script at 22:29:58 EDT the same day (the
+   probe gained a `mic-capture` mode and `record` three defaulted spec
+   keys; a subset run now carries the other questions' answers forward
+   byte-identical under `carriedForward.dates`, so the five above are
+   still the 22:01 record run's); two earlier runs at 22:25 and 22:27 are
+   quoted where they widen a number. **(a) Show Clicks under BGRA is
+   buildable.** `SCStream.h:257` says `showMouseClicks` "currently applies
+   when pixelFormat is set to BGRA" and a fresh configuration reads `420v`;
+   4 s of the main display recorded as question 4 does with
+   `showMouseClicks` on under `kCVPixelFormatType_32BGRA` added its output,
+   started, fired did-start and did-finish and wrote 1728×1118 `avc1`, 56
+   video samples, 4.153 s, 142,001 bytes; the same under the default `420v`
+   wrote 73 samples, 4.163 s, 260,037 bytes, and BGRA with clicks off 78
+   samples, 4.162 s, 265,844 bytes. The two clicks files differ by 118,036
+   bytes (66,111 and 11,325 in the earlier runs) against a
+   same-configuration spread of 772,677 across this run's clicks-off file
+   and the record run's three point-size question-4 files
+   (265,844–1,038,521), so the format changes nothing a size can see, and
+   `RecordingConfiguration.make` sets BGRA when clicks are on as R1 already
+   says. Limit: the pointer was warped two pixels and back sixteen times
+   per row and restored (`CGWarpMouseCursorPosition`, no grant, nothing
+   clicked), but it sat on the SECOND display (x 3134) throughout, so no
+   cursor excursion is in any file and the "static" screen was a live
+   terminal in every row; the probe reports `onRecordedDisplay` now so the
+   next run cannot mistake that. **(b) The second file lands in both
+   orders with a measurable offset.** `AVCaptureSession` +
+   `AVCaptureDeviceInput` (RØDE PodMic USB) + `AVCaptureAudioFileOutput`
+   writing `.m4a`, and an `SCStream` + `SCRecordingOutput` with
+   `capturesAudio` on and `captureMicrophone` off, started in ONE run-loop
+   turn. `session.startRunning()` BLOCKS the main thread 102–183 ms
+   (fifteen runs) and returns with `isRunning` true; `startRecording`
+   returns in under a millisecond with `isRecording` still FALSE — the
+   panel waits for the did-start, not the property;
+   `fileOutput(_:didStartRecordingTo:from:)` fires 63–87 ms after it when
+   the session goes first (20–31 ms when the stream is already running or
+   there is none) on a private queue labelled "File ou",
+   `Thread.isMainThread` false, so the state machine hops — while
+   `fileOutput(_:didFinishRecordingTo:from:error:)` fired ON MAIN, 2–28 ms
+   after `stopRecording`, in every run; `recordingOutputDidStartRecording`
+   fires 65–90 ms after `startCapture` and, in EVERY run of both orders,
+   86–107 ms BEFORE `startCapture`'s completion (question 2's finding
+   holds); `stopCapture` to its did-finish is 4–34 ms with no microphone on
+   the stream. The offset, the screen's did-start minus the microphone's:
+   session first +8.4 and +27.5 ms this run, −7.5, +26.8, +5.2 and +3.1 ms
+   in the two before — mean about +11 ms, scatter 35 ms, every sample
+   within a frame of zero; stream first −85.5 and −83.9 ms, and −76.8,
+   −77.9, −74.4, −83.1 before — steadier at 11 ms of scatter but some 80 ms
+   (two and a half frames at 30) of picture with no microphone under it.
+   **R1 starts the session first**: its offset is the smaller and is
+   centred on zero, so a landing that mis-reads it by its whole scatter is
+   still within a frame, and the landing applies the MEASURED offset per
+   recording, never a constant. Sign: positive means the picture began
+   AFTER the microphone, so the microphone clip starts that much earlier
+   than the picture's clip (or has its in point trimmed by it). The
+   microphone `.m4a` holds ONE mono 48 kHz AAC track (the device's
+   connection reports one channel, `isActive` before the session runs),
+   5.012–5.097 s, all but 40–74 ms of the span from its did-start to the
+   stop call, RMS 0.00054–0.00154 (the speakers barely reach a dynamic
+   microphone); the screen `.mov` holds the tone in its one stereo track at
+   RMS 0.3504–0.3517 (unity, as in question 2), all but 15–63 ms of its
+   own span, and again a video track ending at the last screen change
+   (2.475 s in a 5.104 s file). The file output's `recordedDuration` is
+   fractional (5.12 and 5.0347 s before the stop), unlike the recording
+   output's whole seconds; `availableOutputFileTypes` is aiff, m4a, caf,
+   mp4, aifc, 3gpp and wav; no runtime-error notification arrived in any
+   run. The entitlement caveat above is unchanged: a bare `swiftc` probe
+   carries no hardened runtime, so this measures the framework and not the
+   app, which needs `com.apple.security.device.audio-input` first. **(c)
+   The meter needs no queue.** Polling
+   `output.connection(with: .audio)?.audioChannels` from the main run loop
+   in 1/30 s slices — alone for 3 s, and beside the stream in each of the
+   four (b) runs — read one channel on every poll, never a nil connection
+   and never an empty array: 82 polls at a median 37.3 ms (33.8–38.5)
+   alone, 147 at 34.3 ms (33.3–36.5) beside the stream, so the slice comes
+   back at 27–29 Hz rather than 30 and the panel's timer should not assume
+   better; `averagePowerLevel` −62.68…−39.59 dB (median −55.46) and
+   `peakHoldLevel` −55.66…−34.74 dB (median −42.15), all 147 average
+   readings distinct beside the stream (82 of 82 alone), both moving by
+   more than 1 dB. `canAddOutput(AVCaptureAudioDataOutput())` beside the
+   file output is true and is not needed.
 
 **Two things the plan did not anticipate.** First, and the one with teeth:
 **a recording's VIDEO track ends at the last screen change.** ScreenCaptureKit
