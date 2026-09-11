@@ -95,7 +95,7 @@ only destructive undo in the app.
 | Phase | Theme | Sessions | Schema | Status |
 |---|---|---|---|---|
 | R0 | The spike — five questions measured before design leans on them (and a sixth from the scouts) | ½ | — | **done** 2026-09-10; the answers are in §3 |
-| R1 | Screen recording | 2–3 | — | **done** 2026-09-11; the commit is recorded in the row below once made |
+| R1 | Screen recording | 2–3 | — | **done** 2026-09-11, `a4c476f` (the fix wave's record and the proof scores are in "R1 — the record") |
 
 R0 comes first and its answers are written into R1's section before R1's
 waves are briefed. Two of R1's branches (the audio landing, the panel's
