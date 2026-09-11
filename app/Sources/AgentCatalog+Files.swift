@@ -1,0 +1,409 @@
+import Foundation
+
+// MARK: - Catalog: files
+
+/// The catalog's FILE half: the ten tools whose every row is about a path on
+/// disk — the six of Media (a file probed into the list, a caption file read
+/// onto a track, the package consolidated, and the three raw media ops), the
+/// two of Captions (a transcript made, a caption file written) and the two of
+/// Rendering and export (a frame, and the movie). Three of the ten are ops
+/// (`add_media`, `relink_media`, `remove_media`), so `tool` gives them a
+/// `scope` as it gives every op; the other seven are app-state tools of
+/// spec §7.9.
+///
+/// A pure move out of `AgentCatalog.swift`, which stood at 807 lines against
+/// app/CLAUDE.md's ~600 cap — road map 2's phase 9 had put it back over the
+/// cut `AgentCatalog+Clips.swift` bought — and whose own header named this
+/// cut in advance. It is road map 3's R1·toll, paid first and alone. The
+/// seam is the one the file had drawn: `// MARK: Media`, `// MARK: Captions`
+/// and `// MARK: Rendering and export` came here whole, in their existing
+/// order, with their bodies untouched, and so did the six hoisted locals
+/// nothing outside them reads — `captionFormatNames` and its property,
+/// `frameFormatNames` and its property, `burnInProperty`,
+/// `exportPresetProperty` and `exportSizeProperty`.
+///
+/// **One hoisted local IS shared, and it arrives as an argument**, exactly as
+/// the clip rows take three: `render_frame`'s `t` row reads `ticks`, which
+/// the Projects and Markers groups read as well, so `ticks` stayed on the
+/// other side and is handed in here. The old header's "none of them shares a
+/// hoisted local with the groups that stay" was false by exactly that one,
+/// and it is corrected there.
+///
+/// These three groups are the LAST three of the catalog, so the splice is an
+/// append after the Canvas group and the catalog's order — the order an agent
+/// reads the tools in — is what it always was; `tools/list` byte-identical
+/// before and after the cut is the gate that says so. The move is about 400
+/// lines rather than the 300 the old header guessed, which is the warning
+/// this project keeps re-learning about budgeting a cut against the
+/// pessimistic number.
+extension AgentServer {
+
+    /// The file rows of `catalogJSON()`'s array, in its order: Media,
+    /// Captions, then Rendering and export.
+    func fileTools(ticks: String) -> [[String: Any]] {
+        // `export_captions`' container list, read off the exporter's own enum
+        // rather than restated, and hoisted for the type-checker budget reason
+        // `AgentCatalog+Clips.swift`'s own hoisted clauses record.
+        let captionFormatNames = CaptionExporter.Format.allCases.map { $0.rawValue }
+        let captionFormatProperty: [String: Any] = [
+            "type": "string", "enum": captionFormatNames,
+            "description": "srt (SubRip) or vtt (WebVTT). Default: the path's own extension "
+                + "when it is one of those, else srt. An explicit format WINS, and the path's "
+                + "extension is replaced rather than appended to — the result reports the file "
+                + "that was really written.",
+        ]
+        // `render_frame`'s three image containers, read off `FrameWriter`'s
+        // own enum rather than restated, and hoisted for the same budget
+        // reason.
+        let frameFormatNames = FrameWriter.Format.allCases.map { $0.rawValue }
+        let frameFormatProperty: [String: Any] = [
+            "type": "string", "enum": frameFormatNames,
+            "description": "The container to write. Default: the path's own extension when it "
+                + "is one of those (.jpg counts as jpeg), else png — so a call with no path "
+                + "and no format writes a PNG, as it always has. An explicit format WINS and "
+                + "the path's extension is REPLACED rather than appended to, so {path: "
+                + "\"shot.jpg\", format: \"png\"} writes shot.png. png and heic keep the "
+                + "canvas's alpha; \(FrameWriter.flattenNote)",
+        ]
+        // The burn-in argument, written ONCE and shared by `render_frame` and
+        // `export`: the two are the same question about the same layer, and
+        // two spellings of it would drift the first time either was edited.
+        let burnInProperty: [String: Any] = [
+            "type": "boolean",
+            "description": "Draw the project timecode over the picture, topmost — the export "
+                + "sheet's Burn in timecode checkbox. Default: false. It is a review copy's "
+                + "reference, so it reads the DOCUMENT'S timecode in the document's own "
+                + "spelling (the toolbar's, non-drop, HH:MM:SS:FF or HH:MM:SS.mmm), and it "
+                + "shows PROJECT time even in a file written from the in/out range: a range "
+                + "export starting at 00:00:10:00 begins at 00:00 carrying a burn-in that "
+                + "reads 00:00:10:00, which is the number a note about that frame needs.",
+        ]
+        // `export`'s two alpha-bearing arguments, hoisted for the budget
+        // reason above and because both had to grow the same sentence.
+        //
+        // **A capability an agent cannot read is a capability it does not
+        // have.** Phase 7b gave the table two rows that keep a transparent
+        // canvas and gave `ExportWriter` a refusal for one of them, and
+        // neither reached the schema — so the tool promised a letterbox where
+        // the build throws, and the row to ask for was named nowhere a caller
+        // could see it. The refusal is `prores_4444`'s alone: `apng` takes
+        // the ImageIO path, which FITS instead of padding.
+        let exportPresetProperty: [String: Any] = [
+            "type": "string",
+            "description": "Export preset id — one per encoding, a container and a codec with "
+                + "no size of its own (that is size's). h264 is what the export sheet opens "
+                + "on. Two rows keep a transparent canvas transparent: prores_4444 (the movie "
+                + "row — see size, which it constrains) and apng. gif is not one of them: it "
+                + "can show a transparent pixel but has no alpha channel, so nothing partial "
+                + "survives it. Pass a wrong one once and the error lists them all.",
+        ]
+        let exportSizeProperty: [String: Any] = [
+            "type": ["string", "array"],
+            "items": ["type": "integer"], "minItems": 2, "maxItems": 2,
+            "description": "Output size — the sheet's Size popup. A row id: document (the "
+                + "default, the document's own size), 1080p, 720p, 1440p or 2160p (the number "
+                + "is the SHORT edge and the long edge follows the document's aspect, rounded "
+                + "to even, so a vertical project's 1080p is 1080 × 1920), or preset for an "
+                + "image format's cap (gif and apng, where it is the default) — or an explicit "
+                + "[width, height] in px, the sheet's Custom…. Every row exists on every "
+                + "document — a 1920 × 1080 project's 1080p is its own size and is listed "
+                + "anyway — so an id means the same thing wherever it is sent; only preset is "
+                + "confined to gif and apng. Omit for the document size or the image format's "
+                + "cap; a wrong id's error lists the ids. A movie is written at exactly the "
+                + "size asked for, letterboxed if the aspect differs — except on prores_4444, "
+                + "where a size of a DIFFERENT ASPECT from the canvas is refused rather than "
+                + "written, because the padding destroys the alpha channel that row is chosen "
+                + "for; every row id is already the document's own aspect, so this only bites "
+                + "on a [width, height] of another shape. On gif and apng a size — the cap, a "
+                + "row, or [width, height] — is a box the picture is fitted inside, aspect "
+                + "kept and never upscaled, and the width and height reported back are the "
+                + "file's: a vertical 1080 × 1920 project's GIF default is 152 × 270.",
+        ]
+        return [
+            // MARK: Media
+
+            tool(
+                "import_media",
+                "Probes a movie, sound file or picture and adds it to the project's media list, "
+                    + "returning its new media id — File ▸ Add Media…. It is NOT on the timeline "
+                    + "yet: place it with add_clip {track, media, at}. The result also reports "
+                    + "what the probe found (kind, duration, display size, frame rate, whether "
+                    + "it has video, audio or an alpha channel), which is what you need to place "
+                    + "and size it.",
+                ["path": ["type": "string", "description": "Absolute or ~ path to the file."]],
+                required: ["path"]),
+            tool(
+                "import_captions",
+                "Reads a SubRip (.srt) caption file and lays it out as TEXT CLIPS, one per cue, "
+                    + "on a new track of its own — File ▸ Import Captions…. They are ordinary "
+                    + "text clips in the Caption preset, so they render in the preview, in "
+                    + "render_frame and in an export (burn-in) with no further step, and any of "
+                    + "them can be retimed with move_clip or restyled with set_text. Times snap "
+                    + "to the frame grid; a cue that overlapped the next one is shortened to "
+                    + "meet it. The result reports how many cues landed and, under skipped, "
+                    + "every entry the file was too malformed to read, with its line number.",
+                [
+                    "path": [
+                        "type": "string",
+                        "description": "Absolute or ~ path to the .srt file.",
+                    ],
+                    "track": [
+                        "type": "integer",
+                        "description": "Put the captions on this existing track instead of a "
+                            + "new one. Cues the overlap rule refuses there are dropped, so "
+                            + "prefer omitting it.",
+                    ],
+                ], required: ["path"]),
+            tool(
+                "consolidate_media",
+                "Copies every file the project references into media/ inside the .reelcut "
+                    + "package and relinks the project at the copies — File ▸ Consolidate "
+                    + "Media…. Afterwards the package is the whole edit: it can be moved or "
+                    + "archived and still open with its original footage deleted. The project "
+                    + "must have been saved (call save_project with a path first); files that "
+                    + "are already inside are left alone, missing files are reported rather "
+                    + "than guessed at, and a file that cannot be copied leaves its media entry "
+                    + "pointing at the original, so the project always still opens. This can "
+                    + "take a while and copies as many bytes as the footage weighs.",
+                [:]),
+            tool(
+                "add_media",
+                "The raw op behind import_media: adds a media entry from a descriptor you "
+                    + "supply — the media[] element of the project JSON minus its id (path, "
+                    + "bookmark, kind, duration, width, height, fps [num, den], has_video, "
+                    + "has_audio, has_alpha). Probing files is the host's job, so unless you are "
+                    + "replaying a project's own JSON, call import_media and let it probe.",
+                [
+                    "descriptor": [
+                        "type": "object",
+                        "description": "The media entry to add; only path is required.",
+                    ]
+                ], required: ["descriptor"]),
+            tool(
+                "relink_media",
+                "Points a media entry at a file that moved — the Relink… sheet. Every clip using "
+                    + "it comes back; a bookmark for the new location is stored so the next move "
+                    + "is followed automatically. get_project's missing_media names the entries "
+                    + "that need this.",
+                [
+                    "media": ["type": "integer", "description": "Media id."],
+                    "path": ["type": "string", "description": "Where the file is now."],
+                    "bookmark": [
+                        "type": "string",
+                        "description": "Base64 security bookmark; omit and one is made for you.",
+                    ],
+                ], required: ["media", "path"]),
+            tool(
+                "remove_media",
+                "Removes a media entry from the project. Media still used by clips is refused "
+                    + "unless with_clips is true, which removes those clips with it.",
+                [
+                    "media": ["type": "integer", "description": "Media id."],
+                    "with_clips": [
+                        "type": "boolean",
+                        "description": "Remove the clips using it too (default false).",
+                    ],
+                ], required: ["media"]),
+
+            // MARK: Captions
+            //
+            // `import_captions` is up in Media with the other file readers;
+            // these two are the app-state tools of spec §7.9 that make and
+            // write captions rather than reading a file into the project.
+
+            tool(
+                "transcribe",
+                "Transcribes clips with ON-DEVICE speech recognition and lays the result out as "
+                    + "TEXT CLIPS, one per cue, on a new track of its own — File ▸ Generate "
+                    + "Captions…. They are ordinary text clips in the Caption preset, exactly "
+                    + "what import_captions makes, so they render in the preview, in "
+                    + "render_frame and in an export (burn-in) and can be retimed with "
+                    + "move_clip or restyled with set_text. Cues are at most two lines of 42 "
+                    + "characters and at most 6 s, with a frame between them. THE GRANT: macOS "
+                    + "gates speech recognition, and this tool never asks for it — the system "
+                    + "prompt needs the app to be frontmost and an agent-driven app never is, "
+                    + "so without the grant the call is refused with the authorization status "
+                    + "named and nothing is changed; somebody has to run File ▸ Generate "
+                    + "Captions… once from the app. Recognition also stops after about a "
+                    + "minute per clip: when it does, the result says so under truncated with "
+                    + "the time it stopped at, rather than ending quietly. The result carries "
+                    + "the cues themselves in TICKS whether or not they were placed, and "
+                    + "reports under skipped every clip you named that cannot be transcribed.",
+                [
+                    "clips": [
+                        "type": "array", "items": ["type": "integer"], "minItems": 1,
+                        "description": "Transcribe only these clips — the sheet's scope. Omit "
+                            + "for every clip in the project that has recorded sound. Only a "
+                            + "clip playing a movie or sound file can be transcribed, and not "
+                            + "one played in REVERSE, whose words would come out backwards; a "
+                            + "clip you name that cannot be is reported under skipped.",
+                    ],
+                    "language": [
+                        "type": "string",
+                        "description": "A language tag, e.g. en-US. Default: this Mac's own "
+                            + "language. The two ways a tag can be wrong are two different "
+                            + "problems with two different fixes, so they are refused "
+                            + "SEPARATELY and the message says which you have. A tag speech "
+                            + "recognition has never heard of is a misspelling: it is refused "
+                            + "with the tags it does know, and answered before the grant is "
+                            + "even read, so you get that answer on a machine nobody has "
+                            + "granted yet. A tag it knows that this Mac has no on-device "
+                            + "MODEL for is a download instead: that refusal names System "
+                            + "Settings ▸ Keyboard ▸ Dictation and lists the languages ready "
+                            + "here, and it comes after the grant, because an ungranted Mac "
+                            + "cannot be asked which models it has.",
+                    ],
+                    "place": [
+                        "type": "boolean",
+                        "description": "Place the cues as text clips (default true), as ONE "
+                            + "undo step. false returns the cues and changes nothing at all — "
+                            + "no edit, no undo step — which is the way to check a transcript "
+                            + "before committing to it.",
+                    ],
+                ]),
+            tool(
+                "export_captions",
+                "Writes one text track out as a subtitle file — File ▸ Export Captions…. Every "
+                    + "text clip on the track becomes one cue at the time it sits at, in the "
+                    + "order they play. THE TRACK IS NEVER GUESSED: the default is the single "
+                    + "track whose clips are ALL text clips, and with none or with more than "
+                    + "one the call is refused and the candidates listed by id and name — "
+                    + "writing the wrong track and reporting success is the failure this rule "
+                    + "prevents. WebVTT escapes &, < and > where SubRip does not, so on text "
+                    + "containing none of the three the two files differ only by the WEBVTT "
+                    + "header, the missing index lines and a . where SubRip writes a , in the "
+                    + "timestamps. A round trip back through import_captions returns every cue "
+                    + "to the TICK it was written from, at every ordinary frame rate: a "
+                    + "timestamp is rounded to the nearest millisecond, at most 300 ticks, and "
+                    + "half a frame is 10,000 ticks even at 30 fps, so the snap on the way "
+                    + "back in lands on the frame the cue left. What is not exact is the "
+                    + "FILE: import_captions snaps every cue to the frame grid, so a source "
+                    + "whose times are off that grid comes back written onto it — at 30 fps "
+                    + "00:00:04,120 returns as 00:00:04,133 — and byte identity with the file "
+                    + "you imported needs cue times already on the grid AND a frame that is a "
+                    + "whole number of milliseconds, which is 25 or 50 fps. Nothing is edited "
+                    + "and no undo step is registered.",
+                [
+                    "track": [
+                        "type": "integer",
+                        "description": "The track to write. Omit when the project has exactly "
+                            + "one all-text track; a track that is not one of the candidates "
+                            + "is refused by name, since a clip with no words would export as "
+                            + "a blank cue.",
+                    ],
+                    "path": [
+                        "type": "string",
+                        "description": "Where to write, e.g. ~/Movies/talk.srt. The folder "
+                            + "must exist.",
+                    ],
+                    "format": captionFormatProperty,
+                ], required: ["path"]),
+
+            // MARK: Rendering and export
+
+            tool(
+                "render_frame",
+                "Renders one frame of the finished timeline as a picture so you can SEE the "
+                    + "result — the verification hook. It goes through the same composition and "
+                    + "the same Metal compositor an export does, so this is what the file will "
+                    + "contain at that moment, not a preview of it. The image comes back both "
+                    + "as an image block and as a file on disk whose path the text names. Use it "
+                    + "before and after every edit. It writes a PNG to a temporary file unless "
+                    + "path or format says otherwise, so a call that names neither is exactly "
+                    + "the call it always was.",
+                [
+                    "t": [
+                        "type": "integer",
+                        "description": "The moment to render, \(ticks) Default: the playhead.",
+                    ],
+                    "max_width": [
+                        "type": "integer", "minimum": 16, "maximum": 8192,
+                        "description": "Cap the image's width in px, aspect kept and never "
+                            + "upscaled. Default: the canvas's own size.",
+                    ],
+                    "path": [
+                        "type": "string",
+                        "description": "Where to write the file, e.g. ~/Desktop/shot.png. The "
+                            + "folder must exist. Omit for a temporary file; either way the "
+                            + "text block's last sentence names the file that was written. "
+                            + "This is the same writer File ▸ Save Frame… uses, so a PNG "
+                            + "written here and one saved from the menu are byte-identical.",
+                    ],
+                    "format": frameFormatProperty,
+                    "burn_in_timecode": burnInProperty,
+                ]),
+            tool(
+                "export",
+                "Writes the timeline to a file and waits for it to finish — ⌘E, the export "
+                    + "sheet's six controls (format, size, frame rate, quality, loudness, "
+                    + "range) in the sheet's own vocabulary, all but the frame rate — this "
+                    + "exports at the "
+                    + "document's rate, or on gif and apng at the format's own rate (12.5 and "
+                    + "25 fps). The preset is the ENCODING only and the size a separate "
+                    + "choice defaulting to the document's own, or on gif and apng to the "
+                    + "format's cap; the core resolves both into concrete settings "
+                    + "(container, codec, size, rate, range) and hands them to the same "
+                    + "exporter the sheet uses, so an agent export and a menu export cannot "
+                    + "disagree. An existing file at the path is replaced, and the "
+                    + "container's extension is added when the path has none. The result "
+                    + "reports the settings that were used, the file's size, and — for every "
+                    + "format that carries sound, normalised or not — what that sound "
+                    + "MEASURED on the way through, under loudness: integrated_lufs, "
+                    + "true_peak_dbtp and the gain_db that was applied. Those are read off "
+                    + "the mix that was written, so they are what the file holds rather than "
+                    + "what was asked for.",
+                [
+                    "preset": exportPresetProperty,
+                    "path": [
+                        "type": "string",
+                        "description": "Where to write, e.g. ~/Movies/cut.mp4. The folder must "
+                            + "exist.",
+                    ],
+                    "size": exportSizeProperty,
+                    "range": [
+                        "type": "string",
+                        "enum": ["project", "in_out"],
+                        "description": "What to write: the whole timeline (default), or just "
+                            + "the in/out range set_range set — the sheet's Range popup.",
+                    ],
+                    "video_bitrate": [
+                        "type": "integer", "minimum": 1,
+                        "description": "Target video rate in BITS per second (8000000 is "
+                            + "8 Mbps) — the sheet's Quality popup. Omit to let the preset's "
+                            + "own encoder settings decide. Ignored by presets that carry no "
+                            + "rate of their own: ProRes is fixed by its profile, and GIF and "
+                            + "APNG have no bitrate at all.",
+                    ],
+                    "audio_bitrate": [
+                        "type": "integer", "minimum": 1,
+                        "description": "Target AAC rate in BITS per second (192000 is "
+                            + "192 kbps) — the sheet's Quality popup. Omit for the preset's "
+                            + "own. Ignored where the sound is not AAC: ProRes, WAV and AIFF "
+                            + "all write LPCM, whose rate is its sample format.",
+                    ],
+                    "loudness_lufs": [
+                        "type": "number", "minimum": -70, "maximum": 0,
+                        "description": "Normalise the whole mix to this integrated loudness, "
+                            + "in LUFS — the sheet's Loudness popup, whose rows are -14 "
+                            + "(streaming), -16 (podcast) and -23 (EBU R 128 broadcast). The "
+                            + "export measures itself first and then applies ONE gain to "
+                            + "everything, so relative levels inside the timeline are "
+                            + "untouched and no limiter is involved. Omit not to normalise: "
+                            + "the export still measures and still reports. Ignored where "
+                            + "there is no sound to measure (gif, apng).",
+                    ],
+                    "peak_dbtp": [
+                        "type": "number", "minimum": -20, "maximum": 0,
+                        "description": "The true-peak ceiling that gain is capped against, in "
+                            + "dBTP. The sheet fixes it at -1 and this is the knob for "
+                            + "anything else. Because normalisation is gain-only, a ceiling "
+                            + "with no loudness_lufs beside it would have nothing to cap and "
+                            + "is REFUSED rather than accepted and left inert. When the "
+                            + "ceiling bites, the file lands quieter than the target asked "
+                            + "for and the result's capped_by_peak says so.",
+                    ],
+                    "burn_in_timecode": burnInProperty,
+                ], required: ["preset", "path"]),
+        ]
+    }
+}

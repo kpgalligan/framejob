@@ -200,15 +200,16 @@ would be the bare strip with a longer list.
 
 ## 3. The size debt
 
-25 files in `app/Sources` are over the ~600-line cap. Most are long-standing;
+24 files in `app/Sources` are over the ~600-line cap. Most are long-standing;
 these are the ones the last two phases and the closing above moved, and the
-first three are AT or just past a cut that the next feature must pay:
+first two are AT a cut that the next feature must pay (the third has just paid
+its, as road map 3's R1·toll):
 
 | File | Now | Note |
 |---|---|---|
 | `AgentServer+Scope.swift` | 592 | ON the cap. Seam: the envelope rule (`checkCallScope`, `effectiveScope`, `idScope`, `addressed`, `checkDocumentLevelTicks`, `scopeLanding`, `scopeFailure`) against `set_scope` THE TOOL and its path arithmetic (`setScope`, `nestScopePath`, `pathToClip`, `applyNestScope`, `commonPrefix`, `scopeReport`) |
 | `MediaImporter.swift` | 586 | Just under the cap, after giving up the await-free cache plumbing to `MediaCacheFiles.swift` (490) twice — the pure move, then the peak-bucket arithmetic when the fixes reached 644. What is left is the probing half and the three async writers; the next cut is the probing half, and it is the half that does NOT await |
-| `AgentCatalog.swift` | 807 | Was cut to 665 in `b410125` and phase 9 put it back over. **The next cut is named in the file's own header**: the FILE groups — Media, Captions, Rendering, export — to an `AgentCatalog+Files.swift`, ~300 lines, sharing no hoisted local with what stays |
+| `AgentCatalog.swift` | 454 | Was cut to 665 in `b410125`, phase 9 put it back over at 807, and road map 3's R1·toll paid the cut the file's own header had named, first and alone: the FILE groups — Media, Captions, Rendering and export — are `AgentCatalog+Files.swift` (**409**, nowhere near the cap, and where `record_screen`'s entry lands), spliced after the Canvas group exactly as the clip rows are. The header's "sharing no hoisted local with what stays" was false by ONE: `render_frame`'s `t` row reads `ticks`, which Projects and Markers read too, so `fileTools(ticks:)` takes it as an argument, as the clip rows take three. The move was ~400 lines, not the ~300 the header guessed — phase 6's warning again — and `tools/list` is byte-identical before and after, the three groups being the catalog's last three |
 | `ReelOps.swift` | 925 | Created by `b410125` at 853. It is a TABLE — one factory per row of `edit.rs`'s op table — so it has the same standing exemption `edit.rs` has on the Rust side |
 | `ProjectDocument.swift` | 1336 | Stored properties cannot move to an extension; the natural cut is the media/reverse machinery, NOT the scope. `ProjectDocument+DisplayStem.swift` is the shape a pure addition takes meanwhile |
 | `TimelineView.swift` | 1630 | Frozen. Of the five lines the cache marker added, one is behaviour (the hit-clearing under `replaced`) |
