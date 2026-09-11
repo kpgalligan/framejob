@@ -6,7 +6,7 @@ Rust staticlib core, the same shape as `~/devel/rasterize`.
 **It builds and runs.** M1 (Cut) is done and verified against spec §10; most
 of M2 landed with it.
 
-Five things in `designs/`, and you want all of them:
+Six things in `designs/`, and you want all of them:
 
 - **`designs/reelcut-remaining.md` — what is LEFT, and the record of the
   debt that was paid. START HERE if you are picking up new work.** Road map
@@ -17,6 +17,12 @@ Five things in `designs/`, and you want all of them:
   open is §3, the size ledger a feature phase consults before it pays its
   toll, §4, the checks only a person at the machine can make, and §5, where
   a third road map would start.
+- **`designs/reelcut-roadmap-3.md` — road map 3, PLANNED and not started:
+  screen recording**, the first item taken off road map 2 §4. It records
+  the decision that reverses spec §1's non-goal, a half-session spike (R0)
+  whose five answers are pasted into it before any code, and one phase (R1)
+  — no op, no schema change, one tool, one size toll paid first. START
+  THERE if you are picking up the recorder.
 - `designs/reelcut-design.md` — the normative spec. The schemas (§5), the op
   table (§6) and the architecture (§7) govern any change to either side; §11
   holds decisions already made, which are not to be re-litigated.

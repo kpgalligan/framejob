@@ -267,6 +267,10 @@ should be read in that light: **"a left-hand media browser with bins — phase
 8's search and sort come first"** — they have landed, so spec §11's trigger (a
 library that has outgrown the pane) is the only thing still gating it.
 
+**Screen recording is now decided and planned**: `designs/reelcut-roadmap-3.md`
+reverses spec §1's non-goal by a recorded decision and lays out the spike
+and the one phase that builds it. Nothing of it is built.
+
 The others, unchanged: voice-over recording (one session, and the user's call
 since spec §1 excludes capture); speed ramps (feasible, unasked — `speed` is
 not an action target and the model, the plan and the audio envelopes would all
