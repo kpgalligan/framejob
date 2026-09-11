@@ -91,7 +91,7 @@ only destructive undo in the app.
 
 | Phase | Theme | Sessions | Schema | Status |
 |---|---|---|---|---|
-| R0 | The spike — five questions measured before design leans on them | ½ | — | planned |
+| R0 | The spike — five questions measured before design leans on them (and a sixth from the scouts) | ½ | — | **done** 2026-09-10; the answers are in §3 |
 | R1 | Screen recording | 2–3 | — | planned |
 
 R0 comes first and its answers are written into R1's section before R1's
@@ -235,6 +235,253 @@ The five questions, each with the two designs it chooses between:
 
 What the spike does NOT do: present the picker (a system UI needs a person),
 or decide anything about the panel's layout.
+
+#### R0 — the answers, measured 2026-09-10
+
+Host: macOS 26.5.1 (25F80), Xcode 26.2, main display 1728×1117 points at
+scale 2 (3456×2234 pixels), a second 2560×1440 display at scale 1. The
+script is `tools/proof/recording_spike.py` (`python3 tools/proof/recording_spike.py`,
+`--only 2,5` for a subset); its record run's JSON is
+`tools/proof/work/spike/answers.json`, ignored. Every number below is from
+that run unless it says otherwise, and each question runs in its own
+subprocess so a crash is a reported outcome.
+
+1. **Outcome B.** The README's direct launch of
+   `Reelcut.app/Contents/MacOS/Reelcut` is attributed by TCC to the
+   TERMINAL — `responsibility_get_pid_responsible_for_pid` names ghostty
+   (pid 29081), `responsibleForItself: false` — so a Screen Recording or
+   Microphone grant given to Reelcut.app never reaches a proof's instance,
+   and the terminal's grants are what it runs under (which is why
+   `CGPreflightScreenCaptureAccess()` already reads true from this shell).
+   `open -a … --env RC_AGENT_PORT=4891 --stdout LOG --stderr LOG --args
+   -ApplePersistenceIgnoreState YES -AgentServerEnabled YES` launches an
+   instance that is responsible for ITSELF (ppid 1, `responsibleName:
+   Reelcut`), binds the port the `--env` gave it and answers 74 tools, so
+   both flags reach the app that way. Consequence: the launch line does not
+   change; the granted tier runs under the terminal's grants and SAYS whose
+   grant it ran under in its summary line; a person checking the shipped
+   app's own grant uses the `open` line. Trap: `open -a` of a bundle with an
+   instance already running ACTIVATES it instead of launching one.
+2. **Outcome A, decision 5's bad case.** With `capturesAudio` and
+   `captureMicrophone` both on, `SCRecordingOutput` writes exactly ONE
+   stereo 48 kHz AAC track that is the SUM of system and microphone: a
+   both-on recording of nothing carries the microphone's floor (RMS
+   0.00148) where a system-only recording of nothing decodes to exactly 0,
+   and a smoke run with a person audible clipped at peak 1.218. So the
+   microphone never goes on the recording stream: the `SCStream` carries
+   `capturesAudio` alone (its system track is at unity — RMS 0.3514 for a
+   0.354-RMS tone, independent of the output volume) and the microphone is
+   a SECOND file through `AVCaptureSession` + `AVCaptureAudioFileOutput`,
+   landing as a second clip. Timing: `recordingOutputDidStartRecording`
+   fires 0.09–0.20 s BEFORE `startCapture`'s completion in every row (a
+   state machine must tolerate the callback arriving first); the file holds
+   all but 13–43 ms of the span between did-start and the stop call, so the
+   "`addRecordingOutput` after `startCapture`" mutant is caught by a lower
+   bound near the full span and not by a large gap; stop → did-finish is
+   0.03 s without a microphone and 0.84–1.11 s with one, so `stop` bounds
+   its wait; `recordedDuration` is WHOLE seconds (`CMTime` timescale 1) —
+   fine for the panel's timer, useless as an offset.
+   `availableVideoCodecTypes` is `[avc1, hvc1]`, `availableOutputFileTypes`
+   `[mp4, mov]`, the default codec `avc1`.
+3. **Unmeasured for the picker; measured for the programmatic filter.**
+   `SCContentSharingPicker.h` documents `excludedBundleIDs` (:47–49) and
+   `excludedWindowIDs` (:42–44) as "for picking" and says nothing about
+   capture. `SCContentFilter(display:excludingApplications:exceptingWindows:)`
+   removes 99.19 % of the excluded application's window pixels against a
+   same-filter noise floor of 0 %, so the tool's path and the panel's
+   display-popup path (both programmatic, both excluding Reelcut) may keep
+   the panel on screen; a PICKER-made filter takes outcome B — the panel
+   orders out for the recording's duration and Stop lives on the status
+   item and the File menu — until a person checks A (§4 of
+   `reelcut-remaining.md`). Instrument note: `SCShareableContent.windows`
+   is NOT front to back; z-order comes from
+   `CGWindowListCopyWindowInfo(.optionOnScreenOnly)`, and the spike's first
+   version read a false "does nothing" off an occluded window.
+4. **Decision 3 stands on evidence, and `.best` does not scale.** A 4 s
+   recording of a mostly static screen reported `nominalFrameRate` 25.58 at
+   `minimumFrameInterval` 1/60 and 16.78 at 1/30 (earlier runs 18.69 /
+   21.53 and 1.60 / 17.64 — the number is whatever the screen did), so
+   `rationalFrameRate` passes it through and — measured in the built app
+   afterwards — `open_project` of such a file makes the canvas 24981/1000.
+   `captureResolution` `.best` and `.automatic` at the display's POINT size
+   give a point-sized file; pixels come only when `width`/`height` are asked
+   in pixels, which `RecordingConfiguration.make` must do itself under
+   `.best`, reading the pixel size off `CGDisplayCopyDisplayMode`
+   (`CGDisplayPixelsWide` reports POINTS on this Retina display). The H.264
+   writer rounds the odd point height 1117 UP to 1118, so a proof row
+   comparing the file's size to the display's allows even rounding.
+5. **Outcome A, and moot.** A `.microphone` stream output beside the
+   recording output is accepted and delivers ~94 buffers/s of 512 frames on
+   the named serial queue, in the DEVICE's native format (Int24 mono 48 kHz
+   for one device, Float32 mono 24 kHz for another — a meter must read each
+   buffer's format). But under question 2 the microphone is not on the
+   stream at all, so the meter's source is the `AVCaptureSession`: its file
+   output's connection exposes `AVCaptureAudioChannel.averagePowerLevel` /
+   `peakHoldLevel` in decibels, polled at 30 Hz from main, which is the
+   meter with no queue and no sample buffer in it.
+
+**Two things the plan did not anticipate.** First, and the one with teeth:
+**a recording's VIDEO track ends at the last screen change.** ScreenCaptureKit
+delivers a frame only when something changes and the writer ends the video
+track at the last one, so a 5.2 s recording of a static screen with sound
+has a 2.16 s video track (and a silent one, a 1.03 s track in a 5.10 s
+file). `MediaImporter` reads the asset's duration — the audio's — so the
+media record is right, but measured in the built app the frame is picture
+at 0.5 s and 1.5 s and BLACK from 3 s to the end: `CompositionBuilder.fill`
+inserts a source range the track does not cover and AVFoundation leaves the
+tail empty. A screencast with narration over a still screen — the commonest
+kind — would go black after its last change. R1 cures it in the composition
+(below), not in the recorder. Second, the built app's microphone needs the
+hardened-runtime entitlement `com.apple.security.device.audio-input`
+(`project.yml` has `ENABLE_HARDENED_RUNTIME` and no entitlements), which a
+bare `swiftc` probe never needs — so the spike's microphone rows measure
+what the framework does and NOT what the app will do until the entitlement
+lands, and the proof's granted tier asserts the entitlement is in the signed
+binary before trusting a microphone row.
+
+#### What R0 and the scouts change in R1
+
+Recorded here before R1 is briefed; the phase sections above are the plan
+as written and this list is what overrides them. Each item names the scout
+finding or the R0 answer it comes from.
+
+- **The microphone is a second file** (R0 q2): `ScreenRecorder` owns an
+  `AVCaptureSession` with an `AVCaptureDeviceInput` for the chosen device
+  and an `AVCaptureAudioFileOutput` writing `.m4a` beside the movie, started
+  before the stream so its start latency is not in the picture's head;
+  `RecordingResult` carries `micDescriptor` and the measured offset between
+  the two files' did-start callbacks, and the landing places the microphone
+  clip at the playhead plus that offset on a new track. The `.microphone`
+  stream output is not used. The meter reads the file output connection's
+  `AVCaptureAudioChannel` levels from the panel's own 30 Hz timer, so
+  `app/CLAUDE.md`'s `DispatchQueue` seam list gains NOTHING.
+- **The composition holds a media's last frame when its video track ends
+  before the requested source range** (the R0 surprise): in
+  `CompositionBuilder.fill`, a video insert past the source track's
+  `timeRange` inserts what the track covers and then the track's last frame
+  stretched over the remainder — the freeze-frame idiom (§7.2) applied
+  inside one segment — BEFORE the segment's own speed scaling, so the
+  composition range's length is unchanged. Audio is untouched; a media
+  whose video covers the range is byte-identical by construction, which
+  every earlier proof re-checks. The headless proof row is an
+  `ffmpeg`-made fixture with 1 s of picture and 5 s of sound: `render_frame`
+  at 3 s equals `render_frame` at 0.99 s byte for byte and neither is black.
+- **`ProjectDocument.swift` takes one internal method, not two tokens**
+  (document scout): `project` and `importSourceURL` are `private(set)` and
+  `clampViewState()` is private, so an extension file cannot build the
+  untitled document. `adoptImported(_ descriptor:, source:, fps:)` (~10
+  lines) does what `readMediaFile` does after its probe — source, `fileURL`
+  nil, package type, `makeProject(around:fps:)`, the view state reset, the
+  clamp — and `readMediaFile` calls it, so there is one spelling;
+  `makeProject` stays `private static` and gains `fps: Fps? = nil`. The
+  `.newProject` ORDER is a contract: `openUntitledDocumentAndDisplay(false)`
+  → `adoptImported` → `makeWindowControllers()` → `showWindows()`; no
+  `addDocument` (the untitled call already adds it), and nothing reads
+  `displayName` before the adopt, because AppKit pins the name on first
+  read. `makeWindowControllers` already dirties the document and runs
+  `generateCaches()`.
+- **`RecordingLanding` answers ops and predicted ids, and each caller
+  commits through its own door** (document scout): the panel through
+  `document.performGroupedEdit("Add Recording", ops)` then
+  `generateCaches()` and the selection, the tool through
+  `AgentServer.performGroupedEdit` / `editResult`, which reports `created`
+  ids and the scope landing — a document-side commit would turn a tool's
+  refusal into a sheet. The two-try track choice runs over a project that
+  already HOLDS the media (`add_media` applied purely first, the id read off
+  the result or, for a path already in the list, off the list —
+  `placeImageBackground` and `backgroundMedia(for:in:)` are the precedent,
+  not `addGeneratedClip`, whose probe cannot see a media the project lacks),
+  scoped through `.scoped(scope)` when a nest is open, and the new track's
+  id is the probed result's `nextId`. With a microphone file the second pair
+  is derived from the first pair's purely-applied result, never from one
+  `nextId` read. A landing while `document.isLiveEditing` is deferred to
+  the gesture's end.
+- **The destination is `.document(recipeKey:)`**, not an
+  `ObjectIdentifier` (document scout): an identifier of a closed document is
+  reused by the next one at the same address (`RelinkSheetController.swift:29`
+  says so), while `recipeKey` is never minted twice, so the miss →
+  `.newProject` fallback is exact.
+- **`record_screen`'s target rule** (server scout): a named `project` goes
+  through `target(a)` and its by-name refusal STANDS (no tool silently
+  records into a fresh document when the caller misspelt a path); an
+  unnamed one with no document open lands as `.newProject`; otherwise the
+  frontmost. The wait is `import_media`'s `DispatchSemaphore` + `AgentBox`
+  around `onMain { recorder.start … }` / `onMain { recorder.stop … }` with
+  `semaphore.wait(timeout: .now() + seconds + 30)` and a timeout that asks
+  main to stop the recorder — never `transcribe`'s synchronous-body shape.
+  The handler is an extension method and its two registrations (a name in
+  `offMainTools`, a line in `handlers`) go into the frozen file, with the
+  four count sentences the commit makes stale. `tools/proof/mcp.py`'s
+  client timeout is 600 s, so `MCP.__init__` gains a `timeout` parameter
+  the proof passes.
+- **The toll shares one hoisted local** (server scout): `render_frame`'s
+  `t` row reads `ticks`, so `AgentCatalog+Files.swift` is
+  `func fileTools(ticks: String) -> [[String: Any]]` spliced after the
+  Canvas group, taking the six file-only locals with it, about 400 lines;
+  the header's "none of them shares a hoisted local" sentence is corrected.
+  Because the three groups are the LAST three, `tools/list` is byte-identical
+  before and after, which is the cheapest gate beside phase 9's 214/214.
+- **The count handover is two rows in `phase9_proof.py`**, not one (server
+  and proof scouts): `TOOLS` becomes a floor AND `APP_STATE_TOOLS` gains
+  `record_screen` (or becomes a subset check), in the same commit as the
+  tool; `recording_proof.py` owns the exact 75, the exact 55 scoped, the
+  twenty scopeless names, and "`scope` absent on `record_screen`".
+- **Show Clicks needs BGRA** (SDK scout): `showMouseClicks` "currently
+  applies when pixelFormat is set to BGRA" and a fresh configuration's
+  `pixelFormat` is `420v`, so `RecordingConfiguration.make` sets
+  `kCVPixelFormatType_32BGRA` when clicks are on; the spike's question 6
+  measures that a recording output over a BGRA stream starts and writes.
+- **Spellings that differ from the plan's** (SDK scout, compiled):
+  `SCShareableContent.getExcludingDesktopWindows(_:onScreenWindowsOnly:completionHandler:)`
+  and `getWithCompletionHandler(_:)` — there is no `getShareableContent`
+  in Swift and the docs' `current` is `async`-only; `SCStreamError.Code`,
+  not `SCError`; `SCContentFilter(display:including:)` for windows and
+  `(display:including:exceptingWindows:)` for applications;
+  `.systemStoppedStream` (−3821) is a second external stop beside
+  `.userStopped` and takes the same finishing path;
+  `.failedToStartMicrophoneCapture` (−3820) names the microphone;
+  `SCRecordingOutputConfiguration.outputURL` imports non-optional and is
+  nil underneath until assigned, so reading it first TRAPS (exit 133) —
+  `make` assigns it before anything reads the configuration and the probe
+  reads fields only off a returned one; `AVCaptureDevice.DeviceType.microphone`
+  and `.external`, since `.builtInMicrophone` is a deprecation warning at
+  15.0; `AVCaptureDeviceInput(device:)` auto-prompts on `.notDetermined`,
+  so the tool reads the status first.
+- **The chrome** (chrome scout): `ScreenRecorder.shared` and
+  `RecorderPanelController.shared` (`ExportQueueWindowController`'s mould),
+  so `AppDelegate.swift` changes by the quit guard's line alone and
+  `AppDelegate+Recording.swift` stores nothing — probes instantiate
+  `AppDelegate()`; the retitle is in `AppDelegate.validateMenuItem` beside
+  the agent-server branch (the delegate's items never reach
+  `validateUserInterfaceItem`); the panel is
+  `[.titled, .closable, .nonactivatingPanel]`, `level = .floating`,
+  `hidesOnDeactivate = false`, `isExcludedFromWindowsMenu = true`,
+  `isReleasedWhenClosed = false`, no window delegate; `LevelMeterView`
+  gains `init(meter: LevelMeter = .shared)` (it is bound to `.shared` by
+  name today, and publishing the microphone there would make the timeline
+  bar meter the microphone) and `AccentButton` gains `fill: NSColor =
+  DS.accent` (both defaults keep every chrome render byte-identical, which
+  the earlier chrome proofs check); `DS.meterClip` is the warning red, not
+  "the one coral". Quit while recording: `applicationShouldTerminate` is
+  asked AFTER the document review, so the guard is a backstop and the order
+  is recorded — the save sheet comes first, and a target document closed by
+  the review lands as `.newProject`, which the `recipeKey` lookup makes
+  exact. `project.yml` gains `entitlements` with
+  `com.apple.security.device.audio-input` beside the plist key, and the
+  generated `app/Reelcut.entitlements` joins `.gitignore`.
+- **The proof** (proof scout): the granted tier's detection is
+  `record_screen {seconds: 1, place: false, path: …}` against a document
+  the script opened, a TRUE preflight followed by a `userDeclined` start
+  scores as a failure quoting the sentence; the tier launches its own
+  instance with `-RCRecordingFolder` through `phase8_proof.py`'s `Instance`
+  and names the responsible application in its summary; the microphone
+  refusal names the framework's status word rather than assuming absence.
+  The welcome cross-build's reference is a pickaxe on the button's title
+  (`git log -S"New Recording" -- app/Sources/WelcomeWindowController.swift`,
+  last + `^`; `HEAD` while uncommitted), since the file's adding commit is
+  the initial commit; a third button moves the other two, so the score is
+  `extent(diff)` equal to the new row's rectangle with nothing outside it,
+  clusters printed and never counted as one.
 
 ### Phase R1 — Screen recording
 
