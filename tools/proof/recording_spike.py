@@ -92,12 +92,35 @@ five are re-runnable exactly as they were):
    — then `canAddOutput(AVCaptureAudioDataOutput())` beside the file
    output says whether the queue-fed fallback is accepted.
 
+7. **Pause and resume — segments over ONE stream** (added 2026-09-12, for
+   the recorder's Pause menu). ScreenCaptureKit has no pause: `SCStream`
+   and `SCRecordingOutput` carry none, and the header's only lever is
+   `removeRecordingOutput` ("Stops Recording if the stream is currently
+   recording", `SCStream.h`) beside `addRecordingOutput` ("Starts Recording
+   if stream is already capturing"). So a paused recording can only be a
+   SEQUENCE of files, and the question is whether one running stream can
+   write them: three segments of 2 s with 1.5 s pauses between, the
+   recording output REMOVED at each pause and a fresh one ADDED at each
+   resume while the stream keeps capturing, a `.screen` stream output
+   counting frames meanwhile so "still capturing while paused" is a
+   measured rate and not a guess. Three rows: `wait` resumes only after the
+   removed output's did-finish; `immediate` adds the next output the
+   moment the previous is removed (the header says one output at a time,
+   and this row says what that costs); `mic` is the `wait` row with the
+   second-file microphone stopped and restarted per segment on one running
+   `AVCaptureSession`, each segment's screen-minus-microphone did-start
+   offset measured. Outcome A: every add starts, every remove finishes its
+   file, every file's duration is its segment's span and the stream never
+   stops — pause is buildable over one stream. Outcome B: an add on a
+   running stream refuses or never starts — pause is built as one
+   `stopCapture`/`startCapture` per segment instead (R1's arm path, twice).
+
 Run it from the repository (it needs the built app at
 `build/Build/Products/Release/Reelcut.app` for question 1 and never runs
 `make app`); recordings go under `tools/proof/work/spike/` and are four to
 six seconds each:
 
-    python3 tools/proof/recording_spike.py            # all six
+    python3 tools/proof/recording_spike.py            # all seven
     python3 tools/proof/recording_spike.py --only 2,5 # a subset, same JSON shape
 
 It launches Reelcut on ports 4890 and 4891, ONE AT A TIME (an `open -a` of a
@@ -1153,6 +1176,271 @@ func micCapture(_ spec: [String: Any]) -> [String: Any] {
     return out
 }
 
+// ---- pause and resume over one stream (question 7) ---------------------------
+
+/// The delegate for SEVERAL recording outputs on one stream: each output is
+/// numbered when it is made, every callback is stamped with its number, so
+/// three outputs' did-start and did-finish can be told apart. It is also
+/// the stream delegate and, when asked, a `.screen` stream output that
+/// counts frames — the only way to see whether a stream with no recording
+/// output attached is still capturing.
+final class Segments: NSObject, SCStreamDelegate, SCRecordingOutputDelegate, SCStreamOutput {
+    let lock = NSLock()
+    var indices: [ObjectIdentifier: Int] = [:]
+    var events: [[String: Any]] = []
+    var streamStopError: String? = nil
+    var screenFrames = 0
+    var frameTimes: [Double] = []
+    var startDone = false, startError: String? = nil
+    var stopDone = false, stopError: String? = nil
+
+    func register(_ output: SCRecordingOutput) -> Int {
+        lock.lock(); defer { lock.unlock() }
+        let index = indices.count
+        indices[ObjectIdentifier(output)] = index
+        return index
+    }
+    func index(of output: SCRecordingOutput) -> Int {
+        lock.lock(); defer { lock.unlock() }
+        return indices[ObjectIdentifier(output)] ?? -1
+    }
+    func mark(_ name: String, _ segment: Int? = nil, _ extra: [String: Any] = [:]) {
+        var entry = extra
+        entry["event"] = name
+        entry["t"] = now()
+        if let segment { entry["segment"] = segment }
+        lock.lock(); events.append(entry); lock.unlock()
+    }
+    func read<T>(_ body: () -> T) -> T { lock.lock(); defer { lock.unlock() }; return body() }
+    func has(_ name: String, segment: Int) -> Bool {
+        read { events.contains { $0["event"] as? String == name && $0["segment"] as? Int == segment } }
+    }
+    func stream(_ stream: SCStream, didStopWithError error: any Error) {
+        lock.lock(); streamStopError = "\(error)"; lock.unlock()
+        mark("stream:didStopWithError", nil, ["error": "\(error)"])
+    }
+    func recordingOutputDidStartRecording(_ o: SCRecordingOutput) { mark("didStart", index(of: o)) }
+    func recordingOutput(_ o: SCRecordingOutput, didFailWithError error: any Error) {
+        mark("didFail", index(of: o), ["error": "\(error)"])
+    }
+    func recordingOutputDidFinishRecording(_ o: SCRecordingOutput) { mark("didFinish", index(of: o)) }
+    func stream(_ stream: SCStream, didOutputSampleBuffer sampleBuffer: CMSampleBuffer, of type: SCStreamOutputType) {
+        guard type == .screen else { return }
+        lock.lock(); screenFrames += 1; frameTimes.append(now()); lock.unlock()
+    }
+}
+
+/// The microphone file output's delegate for several files in a row, each
+/// callback stamped with the file it names.
+final class MicSegments: NSObject, AVCaptureFileOutputRecordingDelegate {
+    let lock = NSLock()
+    var events: [[String: Any]] = []
+    func mark(_ name: String, _ url: URL, _ error: String? = nil) {
+        var entry: [String: Any] = ["event": name, "t": now(), "file": url.lastPathComponent]
+        if let error { entry["error"] = error }
+        lock.lock(); events.append(entry); lock.unlock()
+    }
+    func has(_ name: String, file: String) -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        return events.contains { $0["event"] as? String == name && $0["file"] as? String == file }
+    }
+    func read<T>(_ body: () -> T) -> T { lock.lock(); defer { lock.unlock() }; return body() }
+    func fileOutput(_ output: AVCaptureFileOutput, didStartRecordingTo fileURL: URL, from connections: [AVCaptureConnection]) {
+        mark("micDidStart", fileURL)
+    }
+    func fileOutput(_ output: AVCaptureFileOutput, didFinishRecordingTo outputFileURL: URL, from connections: [AVCaptureConnection], error: (any Error)?) {
+        mark("micDidFinish", outputFileURL, error.map { "\($0)" })
+    }
+}
+
+/// Question 7: `segments` files over ONE stream, the recording output
+/// removed at each pause and a fresh one added at each resume; the
+/// microphone, when asked, stopped and restarted per segment on one
+/// running capture session. Every call and callback is stamped against
+/// the first `startCapture`, and every file is analysed at the end.
+func pauseResume(_ spec: [String: Any]) -> [String: Any] {
+    var out: [String: Any] = ["spec": spec]
+    let stem = spec["stem"] as! String
+    let count = max(2, spec["segments"] as? Int ?? 3)
+    let segmentSeconds = spec["segmentSeconds"] as? Double ?? 2
+    let pauseSeconds = spec["pauseSeconds"] as? Double ?? 1.5
+    let waitForFinish = spec["waitForFinish"] as? Bool ?? true
+    let mic = spec["mic"] as? Bool ?? false
+    let countFrames = spec["countFrames"] as? Bool ?? true
+    var movieURLs: [URL] = [], micURLs: [URL] = []
+    for i in 0..<count {
+        movieURLs.append(URL(fileURLWithPath: "\(stem)-\(i + 1).mov"))
+        micURLs.append(URL(fileURLWithPath: "\(stem)-\(i + 1)-mic.m4a"))
+    }
+    for url in movieURLs + micURLs { try? FileManager.default.removeItem(at: url) }
+
+    let (content, contentError) = shareableContent(timeout: 15)
+    guard let content, let display = mainDisplay(content) else {
+        out["error"] = "shareable content: \(contentError ?? "no display")"; return out
+    }
+    let config = SCStreamConfiguration()
+    config.width = display.width
+    config.height = display.height
+    config.minimumFrameInterval = CMTime(value: 1, timescale: 60)
+    config.showsCursor = true
+    config.capturesAudio = true
+    config.sampleRate = 48000
+    config.channelCount = 2
+    config.excludesCurrentProcessAudio = true
+    config.captureResolution = .nominal
+    let filter = SCContentFilter(display: display, excludingWindows: [])
+    let segments = Segments()
+    let stream = SCStream(filter: filter, configuration: config, delegate: segments)
+    if countFrames {
+        do {
+            try stream.addStreamOutput(segments, type: .screen, sampleHandlerQueue: DispatchQueue(label: "reelcut.spike.frames"))
+            out["addStreamOutput"] = "ok"
+        } catch { out["addStreamOutput"] = "threw: \(error)" }
+    }
+    func makeOutput(_ i: Int) -> SCRecordingOutput {
+        let c = SCRecordingOutputConfiguration()
+        c.outputURL = movieURLs[i]
+        c.outputFileType = .mov
+        let o = SCRecordingOutput(configuration: c, delegate: segments)
+        _ = segments.register(o)
+        return o
+    }
+    var outputs: [SCRecordingOutput] = [makeOutput(0)]
+    var steps: [[String: Any]] = []
+    func step(_ name: String, _ i: Int, _ body: () throws -> Void) -> Bool {
+        let t = now()
+        do {
+            try body()
+            steps.append(["step": name, "segment": i, "result": "ok", "took": now() - t])
+            return true
+        } catch {
+            steps.append(["step": name, "segment": i, "result": "threw: \(error)", "took": now() - t])
+            return false
+        }
+    }
+    guard step("addRecordingOutput", 0, { try stream.addRecordingOutput(outputs[0]) }) else {
+        out["steps"] = steps; out["error"] = "the first addRecordingOutput threw"; return out
+    }
+
+    // The microphone: one session, started before the stream (R1's order),
+    // its file output restarted per segment.
+    var micSession: AVCaptureSession? = nil
+    let micOutput = AVCaptureAudioFileOutput()
+    let micDelegate = MicSegments()
+    if mic {
+        out["authorization"] = micStatus()
+        // `micDeviceContains` names a device by a substring of its name
+        // (the built-in microphone, when the default input is a Bluetooth
+        // headset that hands the session nothing — host state, read and
+        // recorded); absent, the default input, R1's own choice.
+        let wanted = spec["micDeviceContains"] as? String
+        let candidates = AVCaptureDevice.DiscoverySession(
+            deviceTypes: [.microphone, .external], mediaType: .audio, position: .unspecified).devices
+        out["inputDevices"] = candidates.map { ["name": $0.localizedName, "uniqueID": $0.uniqueID] }
+        let chosen = wanted.flatMap { w in candidates.first { $0.localizedName.localizedCaseInsensitiveContains(w) } }
+            ?? AVCaptureDevice.default(for: .audio)
+        guard AVCaptureDevice.authorizationStatus(for: .audio) == .authorized,
+              let device = chosen,
+              let input = try? AVCaptureDeviceInput(device: device) else {
+            out["outcome"] = "unmeasured"; out["reason"] = "no authorized microphone for this process (asked: \(wanted ?? "the default"))"; return out
+        }
+        out["device"] = ["name": device.localizedName, "uniqueID": device.uniqueID, "modelID": device.modelID,
+                         "isDefault": device.uniqueID == AVCaptureDevice.default(for: .audio)?.uniqueID]
+        let s = AVCaptureSession()
+        guard s.canAddInput(input), s.canAddOutput(micOutput) else {
+            out["error"] = "the capture session refused the input or the file output"; return out
+        }
+        s.addInput(input)
+        s.addOutput(micOutput)
+        s.startRunning()
+        micSession = s
+        segments.mark("micStartRecordingCalled", 0)
+        micOutput.startRecording(to: micURLs[0], outputFileType: .m4a, recordingDelegate: micDelegate)
+    }
+    segments.mark("startCaptureCalled", 0)
+    stream.startCapture { error in
+        segments.lock.lock(); segments.startDone = true; segments.startError = error.map { "\($0)" }; segments.lock.unlock()
+        segments.mark("startCaptureCompleted", 0)
+    }
+    guard spin(20, until: { segments.read { segments.startDone } }) else {
+        out["error"] = "startCapture never completed (20 s)"; out["events"] = segments.events; return out
+    }
+    if let e = segments.read({ segments.startError }) {
+        out["error"] = "startCapture failed: \(e)"; out["events"] = segments.events; return out
+    }
+    var arrivals: [[String: Any]] = []
+    var first: [String: Any] = ["segment": 0, "added": true,
+                                "didStart": spin(20) { segments.has("didStart", segment: 0) || segments.has("didFail", segment: 0) }]
+    if mic { first["micDidStart"] = spin(20) { micDelegate.has("micDidStart", file: micURLs[0].lastPathComponent) } }
+    arrivals.append(first)
+    _ = spin(segmentSeconds) { false }
+
+    for i in 1..<count {
+        // PAUSE: the output comes off the running stream; the microphone's
+        // writer closes its file.
+        let framesBeforePause = segments.read { segments.screenFrames }
+        segments.mark("removeRecordingOutputCalled", i - 1)
+        let removed = step("removeRecordingOutput", i - 1) { try stream.removeRecordingOutput(outputs[i - 1]) }
+        if mic { segments.mark("micStopRecordingCalled", i - 1); micOutput.stopRecording() }
+        var paused: [String: Any] = ["segment": i - 1, "removed": removed, "waitedForFinish": waitForFinish]
+        if waitForFinish {
+            paused["didFinish"] = spin(30) { segments.has("didFinish", segment: i - 1) || segments.has("didFail", segment: i - 1) }
+            if mic { paused["micDidFinish"] = spin(30) { micDelegate.has("micDidFinish", file: micURLs[i - 1].lastPathComponent) } }
+        }
+        let pauseStarted = now()
+        _ = spin(pauseSeconds) { false }
+        paused["pausedSeconds"] = now() - pauseStarted
+        paused["framesWhilePaused"] = segments.read { segments.screenFrames } - framesBeforePause
+        paused["streamStopError"] = segments.read { segments.streamStopError } as Any
+        arrivals.append(paused)
+        // RESUME: a fresh output onto the SAME running stream; the
+        // microphone's writer opens a new file.
+        let next = makeOutput(i)
+        outputs.append(next)
+        if mic {
+            segments.mark("micStartRecordingCalled", i)
+            micOutput.startRecording(to: micURLs[i], outputFileType: .m4a, recordingDelegate: micDelegate)
+        }
+        segments.mark("addRecordingOutputCalled", i)
+        let added = step("addRecordingOutput", i) { try stream.addRecordingOutput(next) }
+        var resumed: [String: Any] = ["segment": i, "added": added]
+        if added {
+            resumed["didStart"] = spin(20) { segments.has("didStart", segment: i) || segments.has("didFail", segment: i) }
+        }
+        if mic { resumed["micDidStart"] = spin(20) { micDelegate.has("micDidStart", file: micURLs[i].lastPathComponent) } }
+        arrivals.append(resumed)
+        _ = spin(segmentSeconds) { false }
+    }
+    // STOP, with the last output still attached — the header says the
+    // recording then finishes writing on its own.
+    segments.mark("stopCaptureCalled", count - 1)
+    if mic { segments.mark("micStopRecordingCalled", count - 1); micOutput.stopRecording() }
+    stream.stopCapture { error in
+        segments.lock.lock(); segments.stopDone = true; segments.stopError = error.map { "\($0)" }; segments.lock.unlock()
+        segments.mark("stopCaptureCompleted", count - 1)
+    }
+    out["stopCompleted"] = spin(20) { segments.read { segments.stopDone } }
+    out["lastDidFinish"] = spin(30) { segments.has("didFinish", segment: count - 1) || segments.has("didFail", segment: count - 1) }
+    if mic { out["lastMicDidFinish"] = spin(30) { micDelegate.has("micDidFinish", file: micURLs[count - 1].lastPathComponent) } }
+    micSession?.stopRunning()
+    _ = spin(0.5) { false }
+    out["everyDidFinish"] = (0..<count).map { segments.has("didFinish", segment: $0) }
+    out["anyDidFail"] = (0..<count).map { segments.has("didFail", segment: $0) }
+    out["arrivals"] = arrivals
+    out["steps"] = steps
+    let events = segments.read { segments.events }
+    let t0 = (events.first { $0["event"] as? String == "startCaptureCalled" }?["t"] as? Double) ?? now()
+    out["events"] = events.map { e in var c = e; c["t"] = (e["t"] as! Double) - t0; return c }
+    out["micEvents"] = micDelegate.read { micDelegate.events }.map { e in var c = e; c["t"] = (e["t"] as! Double) - t0; return c }
+    out["streamStopError"] = segments.read { segments.streamStopError } as Any
+    out["stopError"] = segments.read { segments.stopError } as Any
+    out["screenFrames"] = segments.read { segments.screenFrames }
+    out["frameTimes"] = segments.read { segments.frameTimes }.map { $0 - t0 }
+    out["files"] = movieURLs.map { analyze($0.path) }
+    if mic { out["micFiles"] = micURLs.map { analyze($0.path) } }
+    return out
+}
+
 // ---- main ------------------------------------------------------------------
 
 let arguments = CommandLine.arguments
@@ -1177,6 +1465,9 @@ case "exclude":
 case "mic-capture":
     let spec = try! JSONSerialization.jsonObject(with: Data(arguments[2].utf8)) as! [String: Any]
     emit(micCapture(spec))
+case "pause":
+    let spec = try! JSONSerialization.jsonObject(with: Data(arguments[2].utf8)) as! [String: Any]
+    emit(pauseResume(spec))
 default:
     emit(["error": "unknown mode \(mode)"])
     exit(2)
@@ -1843,11 +2134,154 @@ def question_6(binary, tone, granted):
 
 
 # ---------------------------------------------------------------------------
+# Question 7: pause and resume as segments over one running stream.
+
+
+def pause_resume(binary, name, **spec):
+    spec["stem"] = os.path.join(WORK, name)
+    return probe(binary, "pause", json.dumps(spec), timeout=180)
+
+
+def summarize_pause(row):
+    """The numbers a design leans on, read off one row's events: per
+    segment, the add/remove results, the resume latency (add call → the
+    output's did-start), the pause latency (remove call → did-finish), the
+    span the segment was recording for (did-start → remove or stop call)
+    against the file's own duration, the frame rate while recording against
+    the frame rate while paused, and — with a microphone — each segment's
+    screen-minus-microphone did-start offset."""
+    if row.get("error") or row.get("outcome"):
+        return {"error": row.get("error"), "outcome": row.get("outcome"), "reason": row.get("reason"),
+                "steps": row.get("steps"), "stderr_tail": row.get("stderr_tail")}
+    events = row.get("events") or []
+    mic_events = row.get("micEvents") or []
+    files = row.get("files") or []
+    count = len(files)
+
+    def at(name, segment):
+        for e in events:
+            if e.get("event") == name and e.get("segment") == segment:
+                return e["t"]
+        return None
+
+    def mic_at(name, segment):
+        stem = os.path.basename(row["spec"]["stem"])
+        for e in mic_events:
+            if e.get("event") == name and e.get("file") == f"{stem}-{segment + 1}-mic.m4a":
+                return e["t"]
+        return None
+
+    steps = {(s["step"], s["segment"]): s for s in row.get("steps") or []}
+    per = []
+    for i in range(count):
+        start = at("didStart", i)
+        end = at("removeRecordingOutputCalled", i)
+        if end is None:
+            end = at("stopCaptureCalled", i)
+        video = (files[i].get("videoTracks") or [{}])[0]
+        add = steps.get(("addRecordingOutput", i), {})
+        remove = steps.get(("removeRecordingOutput", i), {})
+        entry = {
+            "segment": i + 1,
+            "addRecordingOutput": add.get("result", "ok" if i == 0 else None),
+            "addCall_to_didStart": (start - at("addRecordingOutputCalled", i)) if start is not None
+            and at("addRecordingOutputCalled", i) is not None else None,
+            "startCall_to_didStart": (start - at("startCaptureCalled", 0)) if i == 0 and start is not None else None,
+            "removeRecordingOutput": remove.get("result"),
+            "removeCall_to_didFinish": (at("didFinish", i) - end) if at("didFinish", i) is not None and end is not None
+            and i < count - 1 else None,
+            "stopCall_to_didFinish": (at("didFinish", i) - end) if at("didFinish", i) is not None and end is not None
+            and i == count - 1 else None,
+            "didFail": at("didFail", i) is not None,
+            "recordingSpan": (end - start) if start is not None and end is not None else None,
+            "fileDuration": files[i].get("duration"), "fileSize": files[i].get("fileSize"),
+            "videoTracks": files[i].get("videoTrackCount"), "audioTracks": files[i].get("audioTrackCount"),
+            "videoSamples": (video.get("samples") or {}).get("count"),
+            "videoTimeRange": video.get("timeRange"),
+        }
+        if row.get("micFiles"):
+            mic_start = mic_at("micDidStart", i)
+            entry["micDidStart_arrived"] = mic_start is not None
+            entry["micDidFinish_arrived"] = mic_at("micDidFinish", i) is not None
+            entry["offsetScreenDidStartMinusMicDidStart"] = (start - mic_start) if start is not None and mic_start is not None else None
+            entry["micFileDuration"] = row["micFiles"][i].get("duration")
+            entry["micStartCall_to_micDidStart"] = (mic_start - at("micStartRecordingCalled", i)) if mic_start is not None \
+                and at("micStartRecordingCalled", i) is not None else None
+            entry["micStopCall_to_micDidFinish"] = (mic_at("micDidFinish", i) - at("micStopRecordingCalled", i)) \
+                if mic_at("micDidFinish", i) is not None and at("micStopRecordingCalled", i) is not None else None
+        per.append(entry)
+
+    # Frames per second while a segment was recording and while paused,
+    # from the frame stamps.
+    frames = row.get("frameTimes") or []
+
+    def rate(a, b):
+        if a is None or b is None or b <= a:
+            return None
+        return sum(1 for t in frames if a <= t < b) / (b - a)
+
+    recording_rates = [rate(at("didStart", i), at("removeRecordingOutputCalled", i) if i < count - 1 else at("stopCaptureCalled", i))
+                       for i in range(count)]
+    paused_rates = [rate(at("didFinish", i) or at("removeRecordingOutputCalled", i), at("addRecordingOutputCalled", i + 1))
+                    for i in range(count - 1)]
+    spans = [p["recordingSpan"] for p in per]
+    durations = [p["fileDuration"] for p in per]
+    every_file_matches = all(s is not None and d is not None and abs(s - d) <= 0.35 for s, d in zip(spans, durations))
+    return {
+        "segments": per,
+        "everyAddOk": all(p["addRecordingOutput"] == "ok" for p in per),
+        "everyRemoveOk": all(p["removeRecordingOutput"] == "ok" for p in per[:-1]),
+        "everyDidStart": all(at("didStart", i) is not None for i in range(count)),
+        "everyDidFinish": row.get("everyDidFinish"), "anyDidFail": row.get("anyDidFail"),
+        "everyFileMatchesItsSpan": every_file_matches,
+        "sumOfFileDurations": sum(d for d in durations if d) if all(durations) else None,
+        "firstDidStart_to_stopCall": (at("stopCaptureCalled", count - 1) - at("didStart", 0))
+        if at("didStart", 0) is not None and at("stopCaptureCalled", count - 1) is not None else None,
+        "framesPerSecondRecording": recording_rates, "framesPerSecondPaused": paused_rates,
+        "streamStopError": row.get("streamStopError"), "stopError": row.get("stopError"),
+        "stopCompleted": row.get("stopCompleted"), "addStreamOutput": row.get("addStreamOutput"),
+        "arrivals": row.get("arrivals"),
+    }
+
+
+def question_7(binary, granted):
+    answer = {"question": 7}
+    sdk = subprocess.run(["xcrun", "--show-sdk-path"], capture_output=True, text=True).stdout.strip()
+    header = os.path.join(sdk, "System/Library/Frameworks/ScreenCaptureKit.framework/Headers/SCStream.h")
+    quotes = []
+    try:
+        for i, line in enumerate(open(header).read().splitlines(), 1):
+            if "RecordingOutput" in line and ("@abstract" in line or "@discussion" in line):
+                quotes.append({"line": i, "text": line.strip()})
+    except OSError as error:
+        quotes.append({"error": repr(error)})
+    answer["header"] = header
+    answer["headerQuotes"] = quotes
+    rows = {
+        "wait": pause_resume(binary, "q7-wait", segments=3, segmentSeconds=2, pauseSeconds=1.5, waitForFinish=True, mic=False),
+        "immediate": pause_resume(binary, "q7-immediate", segments=3, segmentSeconds=2, pauseSeconds=1.5,
+                                  waitForFinish=False, mic=False),
+    }
+    if granted:
+        rows["mic"] = pause_resume(binary, "q7-mic", segments=3, segmentSeconds=2, pauseSeconds=1.5, waitForFinish=True, mic=True)
+    else:
+        rows["mic"] = {"outcome": "unmeasured", "reason": "the Microphone grant is absent for this process"}
+    answer["rows"] = rows
+    answer["summary"] = {name: summarize_pause(row) for name, row in rows.items()}
+    wait = answer["summary"]["wait"]
+    buildable = (wait.get("everyAddOk") and wait.get("everyRemoveOk") and wait.get("everyDidStart")
+                 and all(wait.get("everyDidFinish") or []) and not any(wait.get("anyDidFail") or [])
+                 and wait.get("everyFileMatchesItsSpan") and wait.get("streamStopError") is None)
+    answer["outcome"] = "A" if buildable else "B"
+    return answer
+
+
+# ---------------------------------------------------------------------------
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    parser.add_argument("--only", default="1,2,3,4,5,6", help="which questions to run, e.g. 2,5")
+    parser.add_argument("--only", default="1,2,3,4,5,6,7", help="which questions to run, e.g. 2,5")
     args = parser.parse_args()
     wanted = {int(q) for q in args.only.split(",") if q.strip()}
     os.makedirs(WORK, exist_ok=True)
@@ -1950,6 +2384,23 @@ def main():
         if meter.get("summary"):
             say(f"    meter-only run: {json.dumps({k: meter['summary'].get(k) for k in ('timeline', 'micFile', 'error', 'runtimeErrors', 'fileOutputFinishError')})}")
 
+    if 7 in wanted:
+        say("\nQ7 — pause and resume as segments over one stream (three rows of three 2 s segments)")
+        answers["q7"] = question_7(binary, granted)
+        q7 = answers["q7"]
+        say(f"  outcome {q7.get('outcome')}")
+        for name, s in q7["summary"].items():
+            if s.get("error") or s.get("outcome"):
+                say(f"  {name}: {json.dumps({k: s.get(k) for k in ('error', 'outcome', 'reason', 'steps')})}")
+                continue
+            say(f"  {name}: adds ok {s.get('everyAddOk')} removes ok {s.get('everyRemoveOk')} didStart {s.get('everyDidStart')} "
+                f"didFinish {json.dumps(s.get('everyDidFinish'))} didFail {json.dumps(s.get('anyDidFail'))} "
+                f"files match spans {s.get('everyFileMatchesItsSpan')} sum {s.get('sumOfFileDurations')} over "
+                f"{s.get('firstDidStart_to_stopCall')} s wall; stream stop error {s.get('streamStopError')}")
+            say(f"    fps recording {json.dumps(s.get('framesPerSecondRecording'))} paused {json.dumps(s.get('framesPerSecondPaused'))}")
+            for p in s.get("segments") or []:
+                say(f"    segment {p['segment']}: {json.dumps(p)}")
+
     path = os.path.join(WORK, "answers.json")
     # A subset run carries forward the previous file's keys for the questions
     # it did not run, and says so — the record run's answers are pasted into
@@ -1960,7 +2411,7 @@ def main():
     except (OSError, ValueError):
         previous = None
     if previous:
-        carried = [q for q in range(1, 7) if q not in wanted and f"q{q}" in previous]
+        carried = [q for q in range(1, 8) if q not in wanted and f"q{q}" in previous]
         # Each carried answer keeps the date of the run that MEASURED it — a
         # previous file that had itself carried keys forward names it under
         # `carriedForward.dates`, else its own `date`.

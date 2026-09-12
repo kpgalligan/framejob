@@ -90,12 +90,44 @@ removes the media and the clip and leaves the file on disk**, exactly as
 undoing Add Media… does. A recorder that deleted footage on ⌘Z would be the
 only destructive undo in the app.
 
+Two more, recorded for R2 (2026-09-12) before its first line of code — the
+first forced by the framework, the second asked for by the user:
+
+6. **A paused recording is a SEQUENCE of files over ONE stream.**
+   ScreenCaptureKit has no pause: `SCStream` and `SCRecordingOutput` carry
+   none, and the header's only lever is `removeRecordingOutput` ("Stops
+   Recording if the stream is currently recording") beside
+   `addRecordingOutput` ("Starts Recording if stream is already capturing").
+   R0's question 7 measured that pair on a running stream (below), so a
+   pause REMOVES the recording output — its file closes — and a resume ADDS
+   a fresh one to a new file while the stream keeps capturing; the
+   microphone's writer is stopped and restarted per segment on its one
+   running session. Each segment is named by ITS OWN start time
+   (`RecordingFiles.stem(at:)` at the resume), is a `(movie, mic)` pair with
+   its own measured offset, and lands as a clip placed at the previous
+   segment's end — so a paused recording is `n` ordinary media files and
+   `n` touching clips, and the model still learns nothing (decision 1). No
+   post-processing joins them (§5's rule: the cutter trims and joins).
+7. **The panel goes away when the recording starts, for EVERY source, and
+   comes back only with something to say.** R1 kept the panel on screen for
+   a display recording (the programmatic filter excludes Reelcut) and hid
+   it for a picked window; the user asked for the dialog to go away when a
+   recording starts and for the menu bar's item to be the recording's
+   controls — Pause Recording and Stop Recording, then Resume Recording and
+   Stop Recording while paused. So the status item is the recording's whole
+   chrome, the panel orders out at `recordingDidStart` whatever the source,
+   and after the landing it returns ONLY when the landing's note is
+   non-empty (a stop from the menu bar's own indicator, a closed target, a
+   microphone problem, a failure) — a clean recording lands in its document
+   or opens its new project and the panel stays away. ⌥⌘N shows it again.
+
 ## 1. Status
 
 | Phase | Theme | Sessions | Schema | Status |
 |---|---|---|---|---|
 | R0 | The spike — five questions measured before design leans on them (and a sixth from the scouts) | ½ | — | **done** 2026-09-10; the answers are in §3 |
 | R1 | Screen recording | 2–3 | — | **done** 2026-09-11, `a4c476f` (the fix wave's record and the proof scores are in "R1 — the record") |
+| R2 | Pause and resume; the panel that goes away | 1 | — | **spiked** 2026-09-12 (R0 q7, outcome A); building — the plan is "Phase R2" below |
 
 R0 comes first and its answers are written into R1's section before R1's
 waves are briefed. Two of R1's branches (the audio landing, the panel's
@@ -422,6 +454,54 @@ bare `swiftc` probe never needs — so the spike's microphone rows measure
 what the framework does and NOT what the app will do until the entitlement
 lands, and the proof's granted tier asserts the entitlement is in the signed
 binary before trusting a microphone row.
+
+#### R0 — the seventh answer, measured 2026-09-12 (for R2)
+
+Host as above (macOS 26.5.1, Xcode 26.2, the same two displays), the
+terminal's Screen Recording grant, the Microphone grant authorized;
+`python3 tools/proof/recording_spike.py --only 7`, answers carried into
+`tools/proof/work/spike/answers.json`.
+
+7. **Outcome A — pause is buildable over one stream, and the numbers are
+   small.** Three 2 s segments with 1.5 s pauses, the recording output
+   REMOVED at each pause and a fresh one ADDED at each resume on the one
+   running `SCStream`, a `.screen` stream output counting frames alongside:
+   `removeRecordingOutput` returns in under 0.1 ms and the removed output's
+   `recordingOutputDidFinishRecording` lands **5–25 ms** later;
+   `addRecordingOutput` on the running stream returns in 0.2 ms and the new
+   output's did-start lands **8–10 ms** later (against 67–78 ms for the
+   first output after `startCapture`); the stream never stops
+   (`didStopWithError` never fires) and keeps delivering **56–58 fps while
+   paused**, the same rate as while recording — so a paused recording costs
+   what a recording costs and the system's own menu-bar indicator stays up
+   (a person checks that, §4). Every file's duration is its segment's span
+   to within 40 ms (2.14 / 2.01 / 2.00 s against 2.15 / 2.04 / 2.02 s asked;
+   the sum 6.15 s over a 9.33 s wall clock, the two pauses excluded), with
+   one video and one audio track each. The `immediate` row — the next output
+   added the moment the previous is removed, BEFORE its did-finish — is as
+   clean (every add ok, every did-finish arrives, files 2.13 / 2.01 / 2.03
+   s), so the machine need not wait for a closing file before resuming.
+   **The microphone as a second file per segment** — one `AVCaptureSession`
+   running throughout, its `AVCaptureAudioFileOutput` `stopRecording()` at
+   each pause and `startRecording(to:)` to a new file at each resume — lands
+   too: the restart's did-start in 25–95 ms, the stop's did-finish in 1–30
+   ms, each segment's mic file within 0.13 s of its movie, and the
+   screen-minus-microphone did-start offset per segment −22 / −72 / −67 ms
+   on the AirPods and +33 / −23 / −16 ms on the built-in microphone — a
+   per-SEGMENT number, which is why each segment carries its own offset
+   and the landing never reuses the first one. **And one host fact found
+   on the way**: the FIRST mic row of the day, on AirPods Max whose input
+   had not been used since they connected, wrote a 2 ms first file (48
+   Float32 packets at 24 kHz, the did-start 0.60 s after the call — the
+   headset switching profiles mid-recording) and then failed every
+   restarted file on the same output with `kAudioFileInvalidPacketOffsetError`
+   (`'pck?'`, −11800): "a format or device change will result in the
+   recording being stopped", the header says, and this one poisoned the
+   writer for the rest of the session. Two later runs on the same headset
+   and one on the built-in microphone were clean. So a segment's
+   microphone can fail where the picture does not — R1's `micProblem`
+   posture, now per segment — and `prepareMicrophone` (the countdown's
+   session start) is exactly the cost that pays this before the recording.
 
 #### What R0 and the scouts change in R1
 
@@ -1037,6 +1117,242 @@ the choice arriving; the countdown's look; that the recording does not
 contain the panel (question 3's outcome) or the status item's own menu; that
 the timeline's playback is absent from the file; the menu bar's own
 screen-recording indicator naming Reelcut.
+
+### Phase R2 — Pause and resume, and the panel that goes away
+
+*One session. No schema change (v6 stands). No new op (`OP_NAMES` is 55).
+No new tool (the catalog is 75; `record_screen`'s RESULT grows two keys).
+No FFI change. Decisions 6 and 7 (§0) are its contract; R0's seventh
+answer is its evidence. Three size tolls, two of them PURE MOVES landed
+alone first: `RecordingResult.swift` (the foot of `RecordingSetup.swift`,
+387 → 298) and `RecordingLanding+Microphone.swift` (the microphone half of
+`RecordingLanding.swift`, 350 → 238), so every later diff to those files is
+attributable; the third, `ScreenRecorder+Pause.swift`, is where the new
+code lives rather than a move. Every file under the 400-line cap.*
+
+#### R2a. The session — `ScreenRecorder` learns to pause
+
+`State` gains `paused`: `idle → arming → recording ⇄ paused → finishing →
+idle`. `isRecording` (`state != .idle`) is unchanged, so File ▸ Stop
+Recording, the quit guard and `.busy` all read a paused recording as one
+in progress. Two new entries, MAIN THREAD, synchronous, `throws`:
+
+```
+func pause() throws     // .recording → .paused; anything else throws .notRecording
+func resume() throws    // .paused → .recording; anything else throws .notPaused;
+                        // an addRecordingOutput that throws → .startFailed(sentence),
+                        // the state STAYS .paused (the stream still captures; Stop lands
+                        // what was recorded)
+var isPaused: Bool
+```
+
+`pause()` removes the current segment's `SCRecordingOutput` from the stream
+(`removeRecordingOutput`; its did-finish arrives on that segment), stops
+the microphone's file output when there is one (its did-finish likewise),
+stamps the segment's `stoppedAt`, publishes `.silent` to the meter, and
+that is all — the stream keeps capturing (R0 q7: 57 fps while paused).
+`resume()` mints a NEW segment: `RecordingFiles.stem(at: Date())` through
+`uniqueURL` for the movie, `microphoneURL(beside:)` for the mic, a fresh
+`SCRecordingOutput` added to the running stream (`addRecordingOutput`;
+did-start in ~10 ms), `startRecording(to:)` on the same microphone output,
+both stamped where the calls are made and the did-starts stamped where
+they land (R1's rule). The `immediate` row of q7 says a resume need not
+wait for the paused segment's did-finish, so `resume()` never does.
+
+`Session` becomes the stream, the microphone session and output, the
+choice, the hook, the reason, the failure and `segments: [Segment]` —
+never empty; a `Segment` is what one file pair owns: `movieURL`, `micURL`,
+`output`, `addedAt`, `micRecordingCalledAt`, `screenStartedAt`,
+`micStartedAt`, `stoppedAt`, `screenFinished`, `micFinished`, `micFailure`.
+The delegates find their segment by IDENTITY of the output for the screen
+and by the FILE URL the microphone delegate reports for the mic (one
+output writes every segment's file), and a callback for an output that
+belongs to no segment of the current session changes nothing, as before.
+`elapsed` is the SUM over segments of `(stoppedAt ?? now) − (screenStartedAt
+?? addedAt)`, so it freezes while paused and never counts the gap.
+
+`stop()` while `.paused` begins finishing as `.recording` does, except that
+no output is attached and the microphone is already stopped:
+`beginFinishing` sends `stopRecording` to the mic output only while
+recording, calls `stopCapture` either way, and `checkFinished` waits for
+EVERY segment's `screenFinished` and (with a microphone) `micFinished` —
+the paused segment's may already be true. An external stop
+(`didStopWithError`) while paused takes the same path with its reason.
+`settle` probes every segment's movie in order, then each one's
+microphone file, and answers ONE `RecordingResult` carrying one
+`RecordingSegment` per segment; a movie that will not probe is the
+recording's failure exactly as in R1 — `filesKept` naming EVERY file,
+comma-joined, the single-segment sentence byte for byte what it was — and
+a microphone file that will not is that SEGMENT's `micProblem`, the
+picture landing without it. (Landing the readable segments of a recording
+whose last one failed is the kinder rule and is NOT built here: the R1
+posture — a picture failure fails the recording, naming its files — stays,
+and this sentence records the alternative.) A microphone that failed on
+one segment is still asked to record the next: `resume()` calls
+`startRecording` regardless, each segment is judged on its own file, and
+`microphoneProblem` (the live sentence) is set on the first failure and
+kept, since the panel writes its note once.
+
+`RecordingResult.swift` — already moved — gains the segment:
+
+```
+struct RecordingSegment {
+    let descriptor: MediaDescriptor      // the movie, probed
+    let micDescriptor: MediaDescriptor?  // the mic file, probed; nil with micProblem
+    let micOffset: Ticks                 // screen did-start − mic did-start, THIS segment's
+    let startedAt: Date                  // the screen's did-start (fallbacks as R1)
+    let micProblem: String?
+}
+struct RecordingResult {
+    let segments: [RecordingSegment]     // never empty
+    let choice: RecordingChoice
+    let stoppedBy: StopReason
+    var descriptor: MediaDescriptor      // segments[0].descriptor — "the recording's file":
+                                         // the untitled document's source, its name, the
+                                         // path a tool addresses it by
+    var startedAt: Date                  // segments[0].startedAt
+    var micProblem: String?              // the segments' problems joined by a space; nil when none
+    var pauses: Int                      // segments.count − 1
+    init(segments:choice:stoppedBy:)
+    init(descriptor:micDescriptor:micOffset:choice:startedAt:stoppedBy:micProblem:)
+                                         // ONE segment — R1's shape, kept so the probe's rows
+                                         // and a single-segment construction read as they did
+}
+```
+
+There is deliberately NO `result.micDescriptor` and NO `result.micOffset`:
+a reader that compiled against a first-segment convenience would be
+silently wrong for a paused recording, and the compiler is the cheapest
+reviewer. `RecorderError` gains `notPaused` ("The recording is not
+paused."); `filesKept` keeps its shape and its `movie` / `microphone`
+strings may hold a comma-joined list.
+
+#### R2b. The landing — segments back to back
+
+`RecordingLanding.placement(_:in:place:)` lands `n` segments as ONE
+grouped edit: each segment's `add_media` in order; with `place`, each
+picture clip on ONE track, the first at the playhead and each later one at
+the previous clip's END as read off the trial after its apply (the core
+snaps a clip's length to the frame grid, so the end is read, never
+computed), touching and never overlapping — `add_clip` refuses an overlap
+and touching is not one. The two-try track rule is applied to the
+SEQUENCE: every picture on the front track of the open container, and if
+any one of them refuses there, ALL on a new front track (a recording split
+across two tracks would read as two recordings). With microphone files,
+one new BACK track "Microphone" (added once), and segment `k`'s mic clip
+at `pictureStart_k − micOffset_k` FLOORED at the previous mic clip's end
+(and at 0): the R1 head-trim dance — `add_clip` at the floor, `trim_start`
+to floor + head, `move_clip` by −head — with the floor in place of 0, so
+two segments' voices can neither overlap (a refusal) nor be placed late.
+`Placement` gains `clipIds: [UInt32]` and `micClipIds: [UInt32]` (the
+existing `clipId` / `micClipId` are the first of each, so every reader
+still compiles; the panel selects them all). `place: false` lands every
+media and no clip.
+
+`microphonePlacement` becomes **`remainderPlacement(_:in:)`**: for the
+untitled document that already holds segment 1's picture at 0 on track 1
+(`makeProject`), the ops for everything ELSE — segments 2…n's pictures on
+that track from clip 1's end, then every mic clip by the rule above — and
+nil when there is nothing to add. Its undo step is named by
+`remainderActionName(for:)`: "Add Microphone" for one segment with a
+microphone (R1's name, R1's reason), "Add Recording Segments" otherwise.
+`ProjectDocument.untitled(around:)`'s ORDER is unchanged: the import count
+before the remainder's edit, the remainder before the window, and the
+first segment is what the document IS.
+
+#### R2c. The chrome — the status item is the recording's controls
+
+`RecorderStatusItem` takes three closures — `onPause`, `onResume`,
+`onStop` — and `update(elapsed:paused:)`; when `paused` flips it rebuilds
+its menu from `menuTitles(paused:)`, PURE: `["Pause Recording", "Stop
+Recording"]` recording, `["Resume Recording", "Stop Recording"]` paused.
+`title(elapsed:paused:)` draws the coral dot and the time while recording
+and a pause glyph (`❚❚`) in the menu bar's own colour with the FROZEN time
+while paused; the tooltip says which. The label's arithmetic is untouched.
+
+`RecorderPanelController.Phase` gains `.paused` (the button reads Stop; the
+footnote the pause glyph and the frozen time). `+Pause.swift` (new) holds
+`pauseRecording()` (`.recording` → `recorder.pause()` → `.paused`; a throw
+beeps) and `resumeRecording()` (`.paused` → `recorder.resume()` →
+`.recording`; a throw sets the note and stays paused). `record(_:)` and
+`stopRecording()` treat `.paused` as `.recording`; the tick runs through
+`.paused` (the meter poll is a no-op there — the recorder guards it — and
+the recorder silenced the bar at the pause). **`recordingDidStart` hides
+the panel for EVERY source** (decision 7): `showWhenLanded = window is
+visible`, `hiddenForRecording = true`, `orderOut`. `recordingEnded` clears
+`hiddenForRecording` and shows NOTHING; `landed`, `failedToLand` and the
+failure arm end in `revealIfNoted()` — the panel comes back only when
+`showWhenLanded` and the note is non-empty, and `showWhenLanded` is
+cleared either way. `show()` still beeps while hidden (the quit guard and
+the welcome button reach it); File ▸ New Recording… still reads Stop
+Recording and stops. `AppDelegate+Recording.newRecording`'s `.paused` arm
+stops through the panel as `.recording` does.
+
+#### R2d. The mirror — `record_screen`'s result, and its menu-bar item
+
+`RecordingToolChrome` builds the same item with `onPause` / `onResume`
+calling `ScreenRecorder.shared.pause()` / `resume()` (`try?` — a refusal
+there is a race with the recording's own end and beeps nothing) and its
+1 Hz tick passes `paused: recorder.isPaused`. The span is WALL CLOCK,
+unchanged: a person who pauses an agent's recording from the menu bar
+shortens what was recorded, and the result says so. The result gains
+`pauses` (an integer, `segments.count − 1`) and `segments` (an array, one
+entry per segment, ALWAYS present: `path`, `duration`, `started_at`, and
+`mic_path`, `mic_duration`, `mic_offset`, `mic_problem` on R1's terms, plus
+`media` / `clip` / `mic_media` / `mic_clip` when they are known — from the
+placement for a document landing, by path for a new project). The
+top-level keys keep their R1 meaning for the FIRST segment (`path`,
+`width`, `height`, `fps`, `has_audio`, `audio_tracks`, `mic_path`,
+`mic_duration`, `mic_offset`, `media`, `clip`, `mic_media`, `mic_clip`);
+`duration` becomes the TOTAL recorded (the sum), which for an unpaused
+recording is what it was; `mic_problem` is the joined text. Every failure
+sentence that named "the recording" names every segment's file.
+The description gains the Pause sentence and the two keys; the catalog
+count stays 75 and the parity check has nothing new to see.
+
+#### R2e. Proof, review, lockstep
+
+`tools/proof/recording_spike.py` question 7 is the measurement of the
+framework pair and stays as the record. `recording_probe.py` grows: section
+3's faked session becomes a segment (`Session(segments:)`), with rows for
+`pause()` / `resume()` / a stop while paused / the delegates finding a
+segment by output identity and mic file URL / `elapsed` frozen /
+`notPaused` and `notRecording` by name / `filesKept` over two files; section
+4 rows for a two- and a three-segment result (touching clips on ONE track
+with the ends read off the handle, the sequence falling to a new track
+together, the mic floor with an offset that would overlap, `place: false`,
+`remainderPlacement` through the real untitled order and its two names);
+section 5 rows for `menuTitles`, `title(paused:)`, the `.paused` phase's
+button and footnote, the panel HIDDEN after `recordingDidStart` for a
+DISPLAY source (driven, `isVisible` read), and `revealIfNoted` both ways;
+section 7's description phrases; and a NEW section 9, the probe's own
+GRANTED tier under the terminal's grant (R0 q1; the spike proves a bare
+Mach-O can): a real `ScreenRecorder()` on the main display — start, 1 s,
+`pause()`, `elapsed` read twice 0.5 s apart and equal, `resume()`, 1 s,
+`stop()` — answering a result with TWO segments whose files probe at about
+a second each and are named by their own start times; skipped BY NAME
+with a count under a false preflight or zero shareable displays.
+`recording_proof.py` reads the two new keys and the Pause phrase off the
+description, and `pauses == 0` with one segment on its existing detection
+call. Mutants, one per rule, in the probe's table: the segment placed at
+the playhead instead of the previous end; the mic floor dropped; the menu
+not rebuilt on pause; the panel's hide narrowed back to `.picked`; the
+reveal made unconditional; `elapsed` counting through a pause; `resume`
+reusing the first segment's mic offset.
+
+Review: five readers over the uncommitted tree — the machine's races (a
+did-finish landing after the resume; a Stop inside the ~10 ms between a
+remove and its did-finish; an external stop while paused; two pauses in a
+row), the landing's arithmetic, the chrome (the hidden panel's notes; the
+item's menu under the tracking run loop; quit while paused), the tool
+(span versus pause; the keys; the files a failure names), and the
+documents against the code. Fixes routed by root file with a mutant each;
+then the lockstep pass: `record_screen`'s description, spec §7.4's file
+map and §7.9's tool list, §11's two decisions, `CLAUDE.md`'s paragraph,
+`app/CLAUDE.md`'s recorder entries, `tools/proof/README.md`, and
+`reelcut-remaining.md` §4 (what a person checks: the item's two menus, the
+pause glyph, the system indicator staying up through a pause, the panel
+returning only with a note).
 
 ## 4. Proposed keys and menu items
 
