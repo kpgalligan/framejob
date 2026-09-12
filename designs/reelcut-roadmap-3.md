@@ -127,7 +127,7 @@ first forced by the framework, the second asked for by the user:
 |---|---|---|---|---|
 | R0 | The spike — five questions measured before design leans on them (and a sixth from the scouts) | ½ | — | **done** 2026-09-10; the answers are in §3 |
 | R1 | Screen recording | 2–3 | — | **done** 2026-09-11, `a4c476f` (the fix wave's record and the proof scores are in "R1 — the record") |
-| R2 | Pause and resume; the panel that goes away | 1 | — | **done** 2026-09-12 (the review's record, the deviations and the proof scores are in "R2 — the record") |
+| R2 | Pause and resume; the panel that goes away | 1 | — | **done** 2026-09-12, `d5b3c3e` (the review's record, the deviations and the proof scores are in "R2 — the record") |
 
 R0 comes first and its answers are written into R1's section before R1's
 waves are briefed. Two of R1's branches (the audio landing, the panel's
