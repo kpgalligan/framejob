@@ -837,11 +837,16 @@ lockstep are in the root `CLAUDE.md`; the full design is
   `AgentServer+Project/Clips/Tracks/Media/Render/History/Silence/Captions/Audio/Background/Scope/Recording.swift`
   — `record_screen` being three files since the R1 fix wave:
   `+Recording.swift` (the tool, its three semaphore waits and the menu-bar
-  chrome a tool recording gets), `+RecordingArguments.swift` (the argument
-  vocabulary and the shareable-content lookup) and `+RecordingResult.swift`
-  (the result fields and every sentence a refusal after the file exists
-  names it with; `stopCeiling` = the recorder's finish ceiling plus two
-  30 s probe ceilings plus a margin, 75 s, independent of `seconds`)
+  chrome a tool recording gets — since R2 the same Pause / Resume / Stop
+  item the panel puts up, its closures calling the recorder directly),
+  `+RecordingArguments.swift` (the argument vocabulary and the
+  shareable-content lookup) and `+RecordingResult.swift` (the result
+  fields — `pauses` and `segments` since R2, one entry per file with its
+  ids as `RecordingSegmentIds`, ONE shape for both doors, `duration` the
+  TOTAL — and every sentence a refusal after the files exist names them
+  with, over `RecordingResult.filesClause`; the stop ceiling is the
+  recorder's finish ceiling plus two 30 s probe ceilings PER SEGMENT plus
+  a margin, independent of `seconds`)
   — `+Scope.swift` being the newest and largest of them (the call's scope,
   `idScope`, `effectiveScope`, the `set_scope` handler and the parity
   check's fourth part)
@@ -1159,20 +1164,40 @@ lockstep are in the root `CLAUDE.md`; the full design is
   track. Save Frame passes NO burn-in — it omits `renderFrame`'s `options`
   argument and takes the default — while the export sheet, `export` and
   `render_frame` all offer one; a grab is of the picture, not of a deliverable.
-- `RecordingSetup.swift` · `ScreenRecorder.swift` · `ScreenRecorder+Microphone.swift`
-  · `ScreenRecorder+Finishing.swift` · `ScreenRecorder+Content.swift` — screen
-  recording's session (road map 3, R1a). `RecordingSetup.swift` is the half a probe can call: `RecordingChoice`,
+- `RecordingSetup.swift` · `RecordingResult.swift` · `ScreenRecorder.swift` ·
+  `ScreenRecorder+Pause.swift` · `ScreenRecorder+Delegates.swift` ·
+  `ScreenRecorder+Microphone.swift` · `ScreenRecorder+Finishing.swift` ·
+  `ScreenRecorder+Content.swift` — screen recording's session (road map 3,
+  R1a; pause and resume R2a). `RecordingSetup.swift` is the half a probe can call: `RecordingChoice`,
   `RecordingFiles` (decision 2's folder, the Screenshot app's date stem, ` (2)`
   on collision, ` (Microphone).m4a` beside the movie), `RecordingConfiguration.make`
   (PURE — every field read back by `tools/proof/recording_probe.py`, BGRA when
   Show Clicks is on because `showMouseClicks` draws under no other pixel
   format, pixels asked for by hand under Best because `captureResolution`
   scales nothing — R0 q4/q6), `RecordingGrant` (the two synchronous grant
-  reads and the refusal sentences; nothing here ever prompts) and the three
-  result types. `ScreenRecorder` is the machine `idle → arming → recording →
-  finishing → idle`, cut at the 400-line cap along its own line: arming and
-  the meter in the base file, everything that ENDS a session plus the three
-  delegates in `+Finishing`, the static content/filter/geometry/error helpers
+  reads and the refusal sentences; nothing here ever prompts); the three
+  result types — `StopReason`, `RecordingResult` over `RecordingSegment`s
+  and `RecorderError` — are `RecordingResult.swift` since R2's toll, still
+  values a probe can make, with `filesClause` the ONE spelling of "the
+  files on disk" both doors' failure sentences use. `ScreenRecorder` is the
+  machine `idle → arming → recording ⇄ paused → finishing → idle`, six
+  files at the 400-line cap: arming and `stop()` in the base file; the
+  `Segment` and `pause()` / `resume()` in `+Pause` — ScreenCaptureKit has
+  no pause, so a pause REMOVES the segment's `SCRecordingOutput` (its file
+  closes 5–25 ms later) and a resume ADDS a fresh one to a file named by
+  its own start time while the stream keeps capturing (R0 q7: 57 fps
+  through the pause, the did-start ~10 ms after the add), the microphone
+  writer stopped and restarted per segment on its one running session;
+  everything that ENDS a session in `+Finishing`, from `.recording` or
+  `.paused`, `settle` probing segment by segment (a movie that will not
+  probe fails the recording naming EVERY file, a microphone file that will
+  not is that SEGMENT's `micProblem`); the three delegates in `+Delegates`,
+  each finding ITS segment by the output's identity or the microphone
+  file's URL, because a closed segment's did-finish can land after the
+  resume — a did-finish on a closed segment is inert, a did-FAIL on any
+  segment ends the recording, and a stream that stops while PAUSED lands
+  what was recorded (every file is closed) rather than failing it; the
+  static content/filter/geometry/error helpers
   in `+Content`, and the capture session's preparation (`prepareMicrophone`,
   paid during the countdown so the first 0.4 s of voice is in the file — lane
   A's one smoke run measured −421 ms without it), its adoption by `start` and
@@ -1187,8 +1212,8 @@ lockstep are in the root `CLAUDE.md`; the full design is
   on a private queue and its did-finish on main, so the machine stamps each
   callback where it lands and hops it, and `micOffset` (screen did-start minus
   microphone did-start; positive = the picture began after the microphone) is
-  measured per recording and never a constant — one smoke run gave −421 ms
-  where R0's mean was +11 ms. Refusals complete SYNCHRONOUSLY before `start`
+  measured per SEGMENT and never a constant — one smoke run gave −421 ms
+  where R0's mean was +11 ms, and q7 gave −22 to +33 ms across resumes. Refusals complete SYNCHRONOUSLY before `start`
   returns; success completes later from the framework. `.userStopped` (the
   menu bar's indicator) and `.systemStoppedStream` (a display that slept) take
   the same finishing path and land through the session's `onFinish`, the ONE
@@ -1197,14 +1222,20 @@ lockstep are in the root `CLAUDE.md`; the full design is
   then reached nobody (the review's finding) — and a `stop()` in any state
   past idle JOINS the finishing under way rather than answering `.busy`,
   which used to drop a landing when a person's Stop followed the menu bar's
-  by a second. The rest of the review's recorder findings live here too: a
-  microphone problem is `micProblem` on a `.success` and never the
+  by a second. `elapsed` is the SUM of the segments' spans, frozen while
+  paused and 0 while arming; `pauses` is a COUNT of Pause presses carried
+  on the session (a pause with no resume before the stop still counts);
+  `pause()` while paused is `.alreadyPaused`, `resume()` while not is
+  `.notPaused`, and a resume whose add refuses leaves the machine PAUSED
+  with the stream still capturing. The rest of the review's recorder findings live here too: a
+  microphone problem is `micProblem` on that SEGMENT of a `.success` and never the
   recording's failure (the movie is probed FIRST; the mic file is left on
   disk and named), `settle` runs once (`Session.settling`), a microphone
   that dies mid-recording sets `microphoneProblem` live and silences the
   meter while the picture records on, the arm ceiling has its own sentence
   (`.startTimedOut`), and a failure past `beginFinishing` names its files
-  through `RecorderError.filesKept`. The meter is the file output connection's `AVCaptureAudioChannel`
+  through `RecorderError.filesKept` (comma-joined lists with segments; the
+  one-file sentence byte for byte R1's). The meter is the file output connection's `AVCaptureAudioChannel`
   levels, polled from the panel's timer (R0 q6c) — no queue, no sample buffer.
   Pitfalls: `NSObject` already has `finalize()`, so the recorder's is `settle()`;
   reading `outputURL` off a fresh `SCRecordingOutputConfiguration` TRAPS
@@ -1212,8 +1243,15 @@ lockstep are in the root `CLAUDE.md`; the full design is
   `SCShareableContent`'s completion form is `getExcludingDesktopWindows(_:onScreenWindowsOnly:completionHandler:)`
   / `getWithCompletionHandler(_:)`, the docs' `current` is `async`-only, and
   the error type is `SCStreamError.Code`, not `SCError`.
-- `RecordingLanding.swift` · `ProjectDocument+Recording.swift` — where a
-  finished recording goes (road map 3, R1b). `RecordingLanding` is a value
+- `RecordingLanding.swift` · `RecordingLanding+Placing.swift` ·
+  `RecordingLanding+Microphone.swift` · `ProjectDocument+Recording.swift` —
+  where a finished recording goes (road map 3, R1b; segments R2b).
+  `+Placing.swift` is the R2 fix wave's seam — `placeBackToBack`,
+  `placeClip` (every `add_clip` READ BACK; a landing under its floor is
+  discarded and re-added a frame up), `tooShortNote` (the core's own "no
+  duration" test asked over the FFI, `ReelTime.snapToFrame`, never a Swift
+  replica) — cut out when the read-backs took the base file to 466.
+  `RecordingLanding` is a value
   type, `AudioNormalize`'s shape: a `RecordingResult` and a document in, an
   UNSCOPED op list and the ids the core will mint out — `next_id` read off a
   purely-applied PARENT handle before each op that mints, the two-try track
@@ -1223,12 +1261,29 @@ lockstep are in the root `CLAUDE.md`; the full design is
   `addGeneratedClip`, whose probe cannot see a media the project lacks).
   Nothing in it commits: the panel commits through `document.performGroupedEdit`,
   the tool through `AgentServer.performGroupedEdit`, so each door keeps its
-  own refusal posture. The microphone lands on a NEW BACK track named
-  "Microphone" at `playhead − micOffset`; a negative start is the head
-  TRIMMED, not a clip placed late (`add_clip` at 0, `trim_start`, `move_clip`,
-  one grouped edit, the head snapped to the canvas frame so a sub-frame offset
+  own refusal posture. **The pictures land as a SEQUENCE on ONE track**
+  (`addSequence`: all on the front track or all on a new one, each at the
+  previous clip's END as the core reports it, read back after every apply —
+  touching, or a sub-frame GAP at an inexact canvas rate such as decision
+  3's 24981/1000, where the end is not a grid point and an `add_clip` at it
+  would snap DOWN into a 1-tick overlap and a minted cross dissolve; never
+  an overlap). Each segment's microphone lands on ONE new BACK track named
+  "Microphone" at its picture's start minus ITS offset, FLOORED at the
+  previous voice's end (read off the trial, never summed) and at 0; a start
+  below the floor is the head TRIMMED, not a clip placed late (`add_clip`
+  at the floor, `trim_start`, `move_clip`, one grouped edit, the head
+  snapped to the canvas frame BEFORE the floor test so a sub-frame offset
   sends no trim — `slip` cannot do it, a clip covering its whole media has
-  nothing to slip into). `placement` throws by name while `isLiveEditing`
+  nothing to slip into), and the placed clip is read back so a refused op
+  can never ride a committed list. Two things are left as MEDIA with a
+  sentence in `Placement.notes` naming the file, which both doors append to
+  their note: a voice wholly under the previous one (its snapped length no
+  longer than its head — `trim_start` clamps at a frame from the end and
+  the move would land inside the previous voice), and any file under a
+  frame (R0 q7 measured a real 2 ms microphone file; `add_clip` refuses it
+  as "no duration", which used to take every picture down). `Placement`'s
+  four id lists have ONE entry per segment, nil where nothing was minted.
+  `placement` throws by name while `isLiveEditing`
   ("A drag is in progress; the recording can be added when it ends.").
   `untitled(around:)`'s ORDER is a contract: `openUntitledDocumentAndDisplay(false)`
   (adds the document; no `addDocument`) → `adoptImported` (before anything
@@ -1238,11 +1293,15 @@ lockstep are in the root `CLAUDE.md`; the full design is
   with or without one, so that edit stacks a SECOND count and its undo leaves
   the first standing — counted the other way round, the review measured one
   ⌘Z reading CLEAN and ⌘W closing the recording's document without a prompt
-  → the microphone's one grouped edit through `microphonePlacement`, named
-  `microphoneActionName` "Add Microphone" and NOT "Add Recording", because
-  the step removes the voice and keeps the picture (the picture is already at
-  0 on track 1 from `makeProject`, so `placement`'s `add_clip` would refuse
-  against its own clip) → `makeWindowControllers()` (its own import count
+  → the REMAINDER's one grouped edit through `remainderPlacement` —
+  segments 2…n's pictures after clip 1's end on its track, no two-try rule,
+  then every voice by the floor rule; with no clip 1 (a first picture the
+  core refused) the voices land as media only — named by
+  `remainderActionName(for:)`: `microphoneActionName` "Add Microphone" for
+  one segment with a voice, NOT "Add Recording", because the step removes
+  the voice and keeps the picture (the picture is already at 0 on track 1
+  from `makeProject`, so `placement`'s `add_clip` would refuse against its
+  own clip), and "Add Recording Segments" otherwise → `makeWindowControllers()` (its own import count
   now skipped by its guard; it still runs `generateCaches()`) →
   `showWindows()`; a throw closes the document it opened. `ProjectDocument.swift` took ONE internal method for it,
   `adoptImported(_:source:fps:)` — `readMediaFile`'s whole post-probe body,
@@ -1255,17 +1314,23 @@ lockstep are in the root `CLAUDE.md`; the full design is
   answered, inside a nest or out — `recording_probe.py` section 4, row 8), and
   because the picture and the microphone are ONE list, a microphone track the
   caps refuse takes the picture down with it — neither lands, and both doors
-  name the file; `place: false` with a microphone lands two media and the
-  offset is not stored (a recording is ordinary media). With a microphone, ⌘Z
-  (Undo Add Microphone) removes the voice, keeps the picture and leaves the
-  document dirty; without one there is no undo step at all.
+  name the files; `place: false` lands every media — n pictures and every
+  microphone file — and no clip, and the offsets are not stored (a
+  recording is ordinary media). With a microphone, ⌘Z (Undo Add Microphone)
+  removes the voice, keeps the picture and leaves the document dirty; for a
+  paused recording ⌘Z (Undo Add Recording Segments) removes segments 2…n and
+  every voice and keeps the first picture; without either there is no undo
+  step at all.
 - `RecorderPanelController.swift` · `+Rows.swift` · `+Recording.swift` ·
-  `+Landing.swift` · `+Picker.swift` · `RecorderStatusItem.swift` ·
+  `+Pause.swift` · `+Landing.swift` · `+Picker.swift` · `RecorderStatusItem.swift` ·
   `AppDelegate+Recording.swift` — File ▸ New Recording… (⌥⌘N, road map 3's
-  R1c): the app's second `NSPanel` and its first `NSStatusItem`, five files
+  R1c; R2c's pause), the app's second `NSPanel` and its first `NSStatusItem`, six files
   since the fix wave cut the recording's end and its landing (`+Landing`)
-  and the window picker (`+Picker`) out of `+Recording` at the 400-line cap. The panel is `.floating` and `.nonactivatingPanel`
-  (Stop without bringing Reelcut over the thing being recorded),
+  and the window picker (`+Picker`) out of `+Recording` at the 400-line cap
+  and R2 added `+Pause` (`pauseRecording` / `resumeRecording`, reachable
+  only from the status item). The panel is `.floating` and `.nonactivatingPanel`
+  (Record and the countdown's Cancel without bringing Reelcut over the thing
+  ABOUT to be recorded — during the recording the panel is off screen),
   `hidesOnDeactivate` false (`NSPanel` defaults it TRUE), `isExcludedFromWindowsMenu`,
   `isReleasedWhenClosed` false, ONE instance (`shared`, `ExportQueueWindowController`'s
   mould, because it outlives documents and must exist with none, and because
@@ -1280,16 +1345,35 @@ lockstep are in the root `CLAUDE.md`; the full design is
   **The panel is the ONLY place `CGRequestScreenCaptureAccess()` and
   `AVCaptureDevice.requestAccess` are called** (decision 4, `Transcriber.canAsk`'s
   rule for two grants), both BEFORE the 3-2-1 countdown, so a countdown never
-  ends in a prompt. A display source keeps the panel on screen (the
-  programmatic filter excludes Reelcut, measured); a picker-made source orders
-  it out until the recording lands (R0 q3 unmeasured). The landing goes
+  ends in a prompt. **The panel orders OUT at `recordingDidStart` for EVERY
+  source** (decision 7; `showWhenLanded` remembers whether it was visible)
+  and the status item is the recording's whole chrome: three closures,
+  `update(elapsed:paused:)`, the menu rebuilt in place ONLY when `paused`
+  flips (Pause Recording · Stop Recording, then Resume Recording · Stop
+  Recording), `menuTitles` / `title(elapsed:paused:)` / `tooltip` pure so a
+  probe pins them, `freeze()` at the Stop so the mark does not flip back to
+  the coral dot through the finish; `Phase.paused` reads Stop on the button
+  and the pause glyph with the FROZEN time in the footnote. The panel comes
+  back after the landing only through `revealIfNoted` — visible when the
+  recording began, and a non-empty note: the landing's own sentences, a
+  refused resume's (`resumeProblem`, kept as STATE, never composed from the
+  label — the 30 Hz tick used to wipe it), the files the landing could not
+  place. A clean recording leaves it away; ⌥⌘N shows it again. The landing goes
   through `RecordingLanding` and the document's own door, a document mid-drag
   retried from a half-second timer bounded at 40 tries, and on any failure the
-  note names the FILE, which is on disk whatever went wrong after it. Quit
-  while recording is cancelled by `applicationShouldTerminate`'s first line
-  and brings the panel forward — a BACKSTOP asked after NSDocumentController's
+  note names EVERY file, which is on disk whatever went wrong after it. Quit
+  while recording is cancelled by `applicationShouldTerminate`'s first line,
+  which opens the status item's MENU when the panel is hidden for a
+  recording (a bare beep left a person who paused and forgot with nothing on
+  screen) — a BACKSTOP asked after NSDocumentController's
   review, so the save sheet comes first and a target closed by the review
-  lands as a new project through the `recipeKey` lookup. The retitle
+  lands as a new project through the `recipeKey` lookup. The welcome
+  window's New Recording… button has its own selector to `show()` (it used
+  to route through `newRecording`, whose first arm STOPS a running
+  recording). Two limits, recorded: macOS hides status items that do not
+  fit the menu bar, and Pause / Resume live nowhere else (Stop survives in
+  the File menu); and "●" and "❚❚" differ in width, so the bar shifts at a
+  pause. The retitle
   (Stop Recording) is in `AppDelegate.validateMenuItem` beside the agent-server
   branch; the delegate's items never reach `validateUserInterfaceItem`.
   `LevelMeterView.init(meter: LevelMeter = .shared)` and `AccentButton.init(…,
@@ -1304,8 +1388,10 @@ lockstep are in the root `CLAUDE.md`; the full design is
   Record Into freezes at the captured choice through a recording;
   `fitWindowToContent` constrains the grown card to its screen; the countdown
   and the 30 Hz tick run in `.common` run-loop modes so the status item's
-  label moves under its own menu; `show()` beeps while a picked recording hid
-  the panel; Record over the Window… row with no filter refuses first; the
+  label moves under its own menu; `show()` beeps while any recording has
+  the panel hidden; closing the panel during `.starting` abandons or stops
+  the attempt as the countdown's Cancel does, so a note never lands in a
+  panel nobody can see; Record over the Window… row with no filter refuses first; the
   tick shows `ScreenRecorder.microphoneProblem` live and a landed
   `micProblem` after; `prepareMicrophone` is paid when the countdown begins;
   and File ▸ Stop Recording routes a TOOL's recording to `ScreenRecorder.shared.stop()`

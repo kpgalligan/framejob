@@ -27,8 +27,9 @@ Deliberate non-goals: camera recording, multicam, color grading beyond
 per-clip controls, audio beyond volume/fade/duck, a plugin system, any
 platform but macOS. **Screen recording was on this list until road map 3
 reversed it** (§11): the app records a display or a window through
-ScreenCaptureKit into a file it then imports exactly as File ▸ Open would;
-camera capture and callouts reconstructed after the fact stay out.
+ScreenCaptureKit into a file it then imports exactly as File ▸ Open would —
+paused and resumed from the menu bar, each stretch its own file and its own
+clip; camera capture and callouts reconstructed after the fact stay out.
 
 **The opening flow is the point.** File > Open on a `.mov` or `.mp4` (or a
 drop on the Dock icon, or the welcome window's Open Video…) creates an
@@ -1726,9 +1727,9 @@ pass nothing, because each wants the picture rather than a deliverable.
 | `EditorViewController.swift` + `EditorViewController+<Feature>.swift` | wiring only in the base file; features in extensions (Rasterize's frozen-file rule) |
 | `ExportQueueController.swift` · `ExportQueueWindowController.swift` | the export queue (Window ▸ Export Queue): the job list and its state machine — one job at a time, on the main thread, a fresh `Exporter` each, every job holding the project handle and the media URLs as they were when it was confirmed — and a window that only reads it. The controller has no AppKit in it, so a probe compiled from `app/Sources` can run two jobs without a window; the queue edits no project, so it gets no MCP tool and `export` is already its mirror |
 | `AppDelegate.swift` · `EditorWindowController.swift` · `WelcomeWindowController.swift` · `main.swift` | menus (nil-target selectors), window, welcome |
-| `RecordingSetup.swift` · `ScreenRecorder.swift` · `ScreenRecorder+Microphone.swift` · `ScreenRecorder+Finishing.swift` · `ScreenRecorder+Content.swift` | screen recording's session (road map 3): the values a probe can call — `RecordingChoice`, `RecordingFiles` (the folder, the Screenshot app's date stem, ` (2)` on collision), `RecordingConfiguration.make` (pure, every field read back), `RecordingGrant` (the two synchronous grant reads and the refusal sentences; nothing here prompts) — and the machine `idle → arming → recording → finishing → idle` over one `SCStream` + `SCRecordingOutput` for the picture and system sound and, for a microphone, an `AVCaptureSession` + `AVCaptureAudioFileOutput` writing a SECOND file (§11). Every framework callback is stamped where it arrives and hopped to main; every state transition runs there |
-| `RecordingLanding.swift` · `ProjectDocument+Recording.swift` | where a finished recording goes: a value type answering an UNSCOPED op list and the ids the core will mint (the two-try track rule over a project that already holds the media; the microphone on a new back track named Microphone at the playhead minus the measured offset, a negative start trimmed rather than placed late) that the panel commits through `performGroupedEdit` and the tool through `AgentServer.performGroupedEdit`; and `untitled(around:)`, whose ORDER is a contract — open untitled, `adoptImported` (the one spelling File ▸ Open uses, now in the base file), the microphone's one edit, `makeWindowControllers`, `showWindows` |
-| `RecorderPanelController.swift` · `+Rows.swift` · `+Recording.swift` · `+Landing.swift` · `+Picker.swift` · `RecorderStatusItem.swift` · `AppDelegate+Recording.swift` · `AgentServer+Recording.swift` · `+RecordingArguments.swift` · `+RecordingResult.swift` | File ▸ New Recording… (⌥⌘N): the app's second `NSPanel` — `.floating` and `.nonactivatingPanel` so Stop can be clicked without bringing Reelcut over the thing being recorded, ONE instance because it outlives documents — its first `NSStatusItem` (a red dot and the elapsed time, with Stop), the grants asked BEFORE the countdown, and `record_screen`, the tool that never asks |
+| `RecordingSetup.swift` · `RecordingResult.swift` · `ScreenRecorder.swift` · `+Pause.swift` · `+Delegates.swift` · `+Microphone.swift` · `+Finishing.swift` · `+Content.swift` | screen recording's session (road map 3): the values a probe can call — `RecordingChoice`, `RecordingFiles` (the folder, the Screenshot app's date stem, ` (2)` on collision), `RecordingConfiguration.make` (pure, every field read back), `RecordingGrant` (the two synchronous grant reads and the refusal sentences; nothing here prompts), and in `RecordingResult.swift` what a recording ENDS as — `RecordingResult` over `RecordingSegment`s, `StopReason`, `RecorderError` — and the machine `idle → arming → recording ⇄ paused → finishing → idle` over one `SCStream` and one `SCRecordingOutput` PER SEGMENT (a pause removes it and its file closes; a resume adds a fresh one to a file named by its own start time while the stream keeps capturing — R0 q7) for the picture and system sound and, for a microphone, an `AVCaptureSession` + `AVCaptureAudioFileOutput` writing a SECOND file per segment (§11). Every framework callback is stamped where it arrives and hopped to main, and finds ITS segment by the output's identity or the microphone file's URL; every state transition runs there |
+| `RecordingLanding.swift` · `RecordingLanding+Placing.swift` · `RecordingLanding+Microphone.swift` · `ProjectDocument+Recording.swift` | where a finished recording goes: a value type answering an UNSCOPED op list and the ids the core will mint — every segment's picture back to back on ONE track by the two-try rule over the SEQUENCE (all on the front track or all on a new one), each at the previous clip's END as the core reports it, touching or a sub-frame gap at an inexact rate and never an overlap; each segment's microphone on one new back track named Microphone at ITS picture's start minus ITS offset, floored at the previous voice's end and at 0, a start below the floor head-trimmed rather than placed late, a voice wholly under the previous one or a file under a frame left as media with a note naming it — that the panel commits through `performGroupedEdit` and the tool through `AgentServer.performGroupedEdit`; and `untitled(around:)`, whose ORDER is a contract — open untitled, `adoptImported` (the one spelling File ▸ Open uses, now in the base file) with the FIRST segment, the import count, the REMAINDER's one edit (`remainderPlacement`: segments 2…n after clip 1, then every voice; named Add Microphone for one segment with a voice, else Add Recording Segments), `makeWindowControllers`, `showWindows` |
+| `RecorderPanelController.swift` · `+Rows.swift` · `+Recording.swift` · `+Pause.swift` · `+Landing.swift` · `+Picker.swift` · `RecorderStatusItem.swift` · `AppDelegate+Recording.swift` · `AgentServer+Recording.swift` · `+RecordingArguments.swift` · `+RecordingResult.swift` | File ▸ New Recording… (⌥⌘N): the app's second `NSPanel` — `.floating` and `.nonactivatingPanel` so Record and the countdown's Cancel can be clicked without bringing Reelcut forward over the thing ABOUT to be recorded; the panel is off screen for the recording itself (§11) and ONE instance because it outlives documents — its first `NSStatusItem`, the recording's whole chrome: a coral dot and the elapsed time with Pause Recording · Stop Recording, the pause glyph and the FROZEN time with Resume Recording · Stop Recording; the grants asked BEFORE the countdown; and `record_screen`, the tool that never asks and whose result carries `pauses` and `segments` |
 | `AgentServer.swift` · `AgentServer+<Feature>.swift` · `AgentCatalog.swift` | MCP mirrors of every op, plus `open_project`, `import_media`, `render_frame`. One handler file per feature area, the frozen `AgentServer.swift` keeping only the registry rows |
 | `Theme.swift` · `Controls.swift` · `OptionControls.swift` · `Sheets.swift` | copied from Rasterize |
 
@@ -2116,7 +2117,10 @@ the target document, or as an untitled document rated at `rate` when
 nothing is open; it reads the Screen Recording and Microphone grants
 synchronously and NEVER prompts, and its refusal order is the caller's own
 mistakes, then the grants, then the display or window lookup, which cannot
-be asked without them),
+be asked without them; pausable from the menu bar's item while it runs,
+the result then carrying `pauses` and `segments` — one entry per file,
+ALWAYS present — with `duration` the TOTAL recorded and the top-level keys
+the first segment's),
 `detect_silence {clips?, threshold_db?, min_length?, padding?}` → the
 quiet spans of the timeline and the scope they were taken over, which
 `ripple_delete_ranges` then cuts — the one tool that reads a CACHE rather
@@ -2330,7 +2334,7 @@ a clean `make lint` before finishing Rust work.
 | ⌥⌘V | Paste Attributes — the copied clip's look onto the selection |
 | ⌘E | Export… |
 | ⌥⌘E | Save Frame… — the frame under the playhead as a PNG, JPEG or HEIC still (road map 2's phase 7a). Export…'s still-image sibling, under the same letter |
-| ⌥⌘N | New Recording… — the recorder panel (road map 3). The same item reads Stop Recording while one runs, and stops it; a nil-target action on `AppDelegate`, so it resolves with no document open, as New Project does |
+| ⌥⌘N | New Recording… — the recorder panel (road map 3). The same item reads Stop Recording while one runs, paused included, and stops it; a nil-target action on `AppDelegate`, so it resolves with no document open, as New Project does. Pause Recording and Resume Recording have no menu item and no key — they are the status item's rows (R2) |
 | ⌥⌘I | Toggle inspector |
 | ⇧⌘P | Preview Window — a second window showing the same picture as the canvas, with no overlay (road map 2's phase 8b). A TOGGLE: the item carries a checkmark and the key both opens the window and puts it away |
 | `,` / `.` (⇧ ×10) | Nudge the selection one frame |
@@ -2601,8 +2605,29 @@ assisted import.
   microphone is never on the recording stream; it is an `AVCaptureSession`
   writing its own `.m4a` beside the movie, started first in the same
   run-loop turn, and it lands as its own clip on its own track at the
-  offset the two did-start callbacks measured (a per-recording number,
-  never a constant).
-- **Undo of Add Recording leaves the file on disk**, exactly as undoing Add
+  offset the two did-start callbacks measured (a per-SEGMENT number since
+  R2 — R0 q7 measured a different one at every resume — never a constant).
+- **Undo of Add Recording leaves the files on disk**, exactly as undoing Add
   Media… does. A recorder that deleted footage on ⌘Z would be the only
-  destructive undo in the app.
+  destructive undo in the app. For a recording that opened as a new project
+  the first segment IS the document and has no step; the rest is one step,
+  Add Microphone (one segment with a voice) or Add Recording Segments.
+- **A paused recording is a SEQUENCE of files over ONE stream** (road map
+  3's R2, 2026-09-12). ScreenCaptureKit has no pause: the only lever is
+  removing the recording output — its file closes — and adding a fresh one
+  to a new file while the stream keeps capturing, measured (R0 q7) at
+  5–25 ms to close, 8–10 ms to start and 57 fps through the pause; the
+  microphone's writer is stopped and restarted per segment on its one
+  session. Each segment is named by its OWN start time, carries its own
+  measured offset, and lands as a clip touching the previous one; the model
+  still learns nothing, and nothing joins the files afterwards.
+- **The recorder panel goes away when a recording starts, for every
+  source, and comes back only with something to say** (R2). The menu bar's
+  status item is the recording's whole chrome — Pause Recording and Stop
+  Recording, then Resume Recording and Stop Recording while paused — and the
+  panel returns after the landing only when it was on screen as the
+  recording began and the landing's note is non-empty (a stop from the
+  SYSTEM's own indicator — Reelcut's item's Stop writes no note — a closed
+  target, a microphone problem, a refused resume, a file the landing could
+  not place, a failure). ⌥⌘N shows it again; while it is hidden, the quit
+  guard opens the item's menu rather than beeping.

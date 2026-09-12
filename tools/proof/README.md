@@ -2059,14 +2059,22 @@ were re-run against the same binary and still score 85, 121, 8 and 88.
 Three instruments, in the order they came.
 
 `python3 tools/proof/recording_spike.py` is R0, the spike that ran BEFORE the
-code and stays as the record of its six answers (`--only 2,5` for a subset; a
+code and stays as the record of its seven answers (`--only 2,5` for a subset; a
 subset run carries the other questions' answers forward under
 `carriedForward`). It compiles a Swift probe against nothing from
 `app/Sources`, launches the built app both ways for question 1 (the README's
 direct line, and `open -a … --env … --stdout … --stderr … --args …`) on ports
 4890 and 4891, records a few seconds of the main display for the others, and
 writes `work/spike/answers.json`. Its answers are pasted into
-`designs/reelcut-roadmap-3.md` dated; two of them overturned the plan.
+`designs/reelcut-roadmap-3.md` dated; two of them overturned the plan. The
+seventh (2026-09-12, `--only 7`, three rows of three 2 s segments) is R2's:
+pause and resume as segments over ONE running stream — the recording output
+removed at each pause and a fresh one added at each resume, with a `.screen`
+output counting frames through the pause, and the second-file microphone
+stopped and restarted per segment; `pause_resume(..., micDeviceContains:
+"MacBook")` picks the microphone by a substring of its name, because the day's
+first row on a Bluetooth headset switched profiles mid-recording and poisoned
+the file output for every later file — a host fact, recorded in the road map.
 
 `python3 tools/proof/recording_proof.py [port]`, over MCP, in two tiers. The
 HEADLESS tier always runs: the catalog at exactly 75 with `record_screen`
@@ -2091,17 +2099,28 @@ shareable displays under a TRUE preflight), a muted output and a BLUETOOTH or
 AirPlay output (the system-audio tap hands it digital silence — measured with
 AirPods Max) each SKIP their rows with a count; a raise inside the tier
 scores one failure plus a counted skip; the summary line says what did not
-run. On this host it is **152/152** with the two tone rows skipped by name
-(the headless tier 105, the granted 47); expect 105 plus a counted skip on an
-ungranted or locked machine. It needs `ffmpeg`, `ffprobe`, `osascript` and
-`afplay` on `PATH`. The mutants it names — the grant check hoisted, the
+run. Since R2 (pause and resume) the headless tier also reads `pauses`,
+`segments` and `started_at` and the three Pause phrases off the description,
+section 3 reads the segment-sized `stopCeiling(segments:)` and the
+`filesClause` sentence off the tool's source, and the granted tier's
+detection call asserts the result's SHAPE — `pauses == 0`, one `segments`
+entry equal to the top level with its own `width`/`height`/`fps`, a
+`started_at` that parses as ISO-8601 UTC within a minute of the call. On this
+host it is **187/187** with the two tone rows skipped by name (the headless
+tier 121, the granted 66 — 9 detection, 44 landing, 13 microphone); expect
+121 plus a counted skip on an ungranted or locked machine. Its honest limit:
+with ONE segment the "segment equals top level" rows cannot tell a build that
+copied the top level into the segment from one that did not — the two-segment
+shape is `recording_probe.py`'s, whose granted tier records for real. It
+needs `ffmpeg`, `ffprobe`, `osascript` and `afplay` on `PATH`. The mutants it names — the grant check hoisted, the
 `.newProject` fallback deleted, the `fps:` override dropped, the undo group
 split, the held-tail branch deleted, a `scope` on the tool — and the four the
 fix wave built (a placement throw unwrapped, the `path` trim removed, a
 named project falling through to a new document, the Goertzel share on the
 wrong scale) are in its docstring with the rows that kill them.
 
-`python3 tools/proof/recording_probe.py`, **662/662**, over a probe compiled
+`python3 tools/proof/recording_probe.py`, **876/876** (662 before R2; `--only
+<sections>` for iteration), over a probe compiled
 from the whole of `app/Sources` (`remaining_probe.py`'s shape): section 1 the
 file naming, 2 `RecordingConfiguration.make` read back field by field over
 sixteen configurations (`excludesCurrentProcessAudio` TRUE in every row — the
@@ -2118,9 +2137,27 @@ under a `ScreenRecorder.shared.state` the probe writes and resets, and the
 fix wave's rows), 6 the welcome window's cross-build against the tree one
 commit before the button (phase 5's pattern; the reference is a pickaxe on
 the button's title, `HEAD` while uncommitted), 7 the catalog move, 8 host
-facts printed and never asserted. `--mutant <name>` prepares a copy of
-`app/Sources` and runs the whole thing over it; twenty-odd are named in the
-docstring, each measured at 613–661 of 662.
+facts printed and never asserted, and — R2 — 9 the probe's own GRANTED
+tier: under the terminal's grant with a display to share (R0 q1; a bare
+Mach-O can start a stream), two real `ScreenRecorder()` runs on the main
+display into `work/` — start, pause with `elapsed` read twice and equal,
+resume, stop → two segments named by their own start times, `pauses` 1;
+then a stop while paused → one segment — and then the PANEL end to end over
+a faked session on `.shared`, hidden at `recordingDidStart` for a DISPLAY
+source and still hidden after a clean landing. Skipped BY NAME with its
+count (41) on a locked console or under a false preflight. R2 also rebuilt
+section 3's `Fake` on `Session(segments:)` — measured on the way: a
+never-started `SCStream` accepts add / remove / re-add of a recording
+output grant-less and writes nothing — for pause, resume, the refusals,
+a stop while paused, the delegates finding a segment by identity and by
+mic URL, and the three-segment walker; folded lane L's two- and
+three-segment landings into 4b (the short-voice and sub-frame notes, the
+24981/1000 canvas with no overlap); and added 5p–5u for the item's pure
+vocabulary, `resumeProblem`, `revealIfNoted` and a real pause/resume/stop
+through the panel. `--mutant <name>` prepares a copy of
+`app/Sources` and runs the whole thing over it; twenty-nine are named in the
+docstring, every one killed — the nine R2 ones at 811–875 of 876, R1's
+re-scored at 857–875.
 
 Worth knowing: the built app is ad-hoc signed, so its designated requirement
 is its cdhash and a Screen Recording or Microphone grant given to Reelcut.app

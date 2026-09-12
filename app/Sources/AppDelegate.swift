@@ -89,17 +89,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     /// nothing is lost, and asking first is not on offer.
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         // ⌘Q with a recording running (road map 3, R1c): cancel, stop nothing,
-        // and bring the panel forward — a person who meant to stop presses
-        // Stop. A quit that silently finished the recording would land a file
-        // into a document that is about to ask whether to save, the wrong
-        // moment for both. This is a BACKSTOP asked after the document review
-        // above; `RecorderPanelController`'s doc records what that order
-        // means for the recording's target. For a picked-window recording,
-        // which keeps the panel hidden, `show()` BEEPS instead (R1 review):
-        // un-hiding it would put the panel into the recording, and Stop is
-        // on the status item meanwhile.
+        // and put the recording's controls in front of the person — who, if
+        // they meant to stop, presses Stop. A quit that silently finished the
+        // recording would land a file into a document that is about to ask
+        // whether to save, the wrong moment for both. This is a BACKSTOP
+        // asked after the document review above; `RecorderPanelController`'s
+        // doc records what that order means for the recording's target. The
+        // panel is HIDDEN for every recording it runs (decision 7), so
+        // `revealControls()` opens the status item's menu — Pause or Resume,
+        // and Stop — where `show()` could only beep (R2 review: a person who
+        // paused and forgot was beeped at); for a recording the panel does
+        // not own (the tool's) it shows the panel as before.
         if ScreenRecorder.shared.isRecording {
-            RecorderPanelController.shared.show()
+            RecorderPanelController.shared.revealControls()
             return .terminateCancel
         }
         let queue = ExportQueueController.shared

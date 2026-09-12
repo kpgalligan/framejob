@@ -11,8 +11,9 @@ import AppKit
 /// exactly once whoever ended the recording: the panel's Stop, the status
 /// item's, the system indicator's, a display that slept, a failure — arrives
 /// at `recordingEnded`, which tears the recording chrome down (the tick, the
-/// status item, the panel shown again if a picked source hid it) and then
-/// lands. A DOCUMENT target commits the placement through the document's
+/// status item, and the `hiddenForRecording` flag that made `show()` beep —
+/// clearing it, and showing NOTHING) and then lands. A DOCUMENT target
+/// commits the placement through the document's
 /// own door (`performGroupedEdit`, then `generateCaches`, the selection, and
 /// the editor told through `viewStateDidChange`); a NEW PROJECT is
 /// `ProjectDocument.untitled(around:)`, which does everything. A document
@@ -39,15 +40,38 @@ import AppKit
 /// an edit landing between the two on the same run-loop turn — and it is
 /// there because the alternative is a note that lies.
 ///
-/// **The note says three things, in order**, through `landingNote`, a pure
+/// **The note says five things, in order**, through `landingNote`, a pure
 /// function so a probe can pin every combination without a landing: how the
-/// recording ended when it was not this panel's own Stop; that the document
-/// the person CHOSE had closed, when the choice was a document and the
-/// landing opened a new project (R1 review — the fallback is exact, and a
-/// person who chose "Untitled 2" should not have to work out why a new
-/// window appeared instead); and the microphone's problem, when the
-/// recording is a `.success` whose `micProblem` is set — a success, not an
-/// error, so the picture lands first and the sentence follows it.
+/// recording ended when it was not this panel's own Stop (`.stopped` is the
+/// status item's Stop too; `.userStopped` is the SYSTEM's indicator, and the
+/// sentence names it so, now that Reelcut's own item is a menu-bar item as
+/// well); that the document the person CHOSE had closed, when the choice
+/// was a document and the landing opened a new project (R1 review — the
+/// fallback is exact, and a person who chose "Untitled 2" should not have
+/// to work out why a new window appeared instead); the microphone's
+/// problem, when the recording is a `.success` whose `micProblem` is set —
+/// a success, not an error, so the picture lands first and the sentence
+/// follows it; a resume the recorder refused (`resumeProblem`, STATE on the
+/// panel and never text read back off the label — the R2 review's defect:
+/// each end replaced the label whole, so after a refused resume and a clean
+/// Stop the note was empty and the reveal showed nothing, the opposite of
+/// what `+Pause.swift` promised); and the placement's own notes, one per
+/// file the landing could not place. `failedToLand` names every file
+/// through `filesClause` and carries the microphone's and the resume's
+/// sentences too.
+///
+/// **The panel comes back ONLY with something to say** (decision 7, R2c).
+/// It ordered out at `recordingDidStart` whatever the source, and each of
+/// the three ends — `landed`, `failedToLand`, the failure arm of
+/// `recordingEnded` — finishes with `revealIfNoted()`, AFTER its note is
+/// set: the panel is ordered front when it was on screen as the recording
+/// began (`showWhenLanded`) and the note is non-empty, and `showWhenLanded`
+/// is cleared either way. A clean recording lands in its document or opens
+/// its project and the panel stays away; ⌥⌘N shows it again. The reveal
+/// belongs to the END and not to `recordingEnded`, because the deferred
+/// landing's retries can put twenty seconds between the two, and a panel
+/// shown with "Adding…" and no note yet is the dialog the user asked to be
+/// rid of.
 extension RecorderPanelController {
     static let landingRetryInterval: TimeInterval = 0.5
     static let landingRetryLimit = 40
@@ -61,15 +85,14 @@ extension RecorderPanelController {
         statusItem?.remove()
         statusItem = nil
         launched = false
-        if hiddenForRecording {
-            hiddenForRecording = false
-            if showWhenLanded { window?.orderFront(nil) }
-            showWhenLanded = false
-        }
+        hiddenForRecording = false
         switch outcome {
         case .failure(let error):
             phase = .idle
-            setNote(error.localizedDescription)
+            setNote(
+                [error.localizedDescription, resumeProblem].compactMap { $0 }
+                    .joined(separator: " "))
+            revealIfNoted()
         case .success(let result):
             phase = .landing
             landingAttempts = 0
@@ -97,16 +120,20 @@ extension RecorderPanelController {
                     return
                 }
                 document.generateCaches()
-                document.selection = Set([placement.clipId, placement.micClipId].compactMap { $0 })
+                // Every segment's clip, microphone clips included (R2b); a
+                // segment that minted none is a nil entry, and its sentence
+                // is in `placement.notes`.
+                document.selection = Set(
+                    (placement.clipIds + placement.micClipIds).compactMap { $0 })
                 Self.editor(of: document)?.viewStateDidChange()
-                landed(result, asNewProject: false)
+                landed(result, asNewProject: false, notes: placement.notes)
             } catch {
                 failedToLand(result, error)
             }
         case .newProject:
             do {
-                _ = try ProjectDocument.untitled(around: result)
-                landed(result, asNewProject: true)
+                let (_, notes) = try ProjectDocument.untitled(around: result)
+                landed(result, asNewProject: true, notes: notes)
             } catch {
                 failedToLand(result, error)
             }
@@ -134,43 +161,66 @@ extension RecorderPanelController {
         }
     }
 
-    /// Back to idle; the note is `landingNote`'s.
-    private func landed(_ result: RecordingResult, asNewProject: Bool) {
+    /// Back to idle; the note is `landingNote`'s, over the placement's own
+    /// notes, and the reveal last.
+    private func landed(_ result: RecordingResult, asNewProject: Bool, notes: [String]) {
         phase = .idle
         rebuildDestinations()
         setNote(
             Self.landingNote(
                 stoppedBy: result.stoppedBy, chosen: result.choice.destination,
-                landedAsNewProject: asNewProject, micProblem: result.micProblem))
+                landedAsNewProject: asNewProject, micProblem: result.micProblem,
+                resumeProblem: resumeProblem, notes: notes))
+        revealIfNoted()
     }
 
-    /// The file is on disk whatever went wrong after it, so the note says
-    /// where — and what became of the microphone, when that is a second
-    /// sentence the result carries.
+    /// The files are on disk whatever went wrong after them, so the note
+    /// names every one (`filesClause`: each segment's movie, and the
+    /// microphone files that landed) — then what became of the microphone
+    /// and of a refused resume, when the result or the panel carries those
+    /// sentences — and the reveal last.
     private func failedToLand(_ result: RecordingResult, _ error: any Error) {
         phase = .idle
         var note =
-            "The recording was saved at \(result.descriptor.path) but could not be added: "
+            "The recording was saved at \(result.filesClause) but could not be added: "
             + error.localizedDescription
-        if let problem = result.micProblem { note += " " + problem }
+        for sentence in [result.micProblem, resumeProblem].compactMap({ $0 }) {
+            note += " " + sentence
+        }
         setNote(note)
+        revealIfNoted()
+    }
+
+    /// The panel back on screen after a landing, ONLY when it was on screen
+    /// as the recording began and the note has something in it (the type
+    /// doc). Called LAST by each of the three ends, after the note is set —
+    /// which is the whole point — and reached after the deferred landing's
+    /// retries as well, since nothing before it clears `showWhenLanded`.
+    /// Cleared either way, so a later `show()` of the person's own is not
+    /// mistaken for this one. Internal so a probe can drive both ways.
+    func revealIfNoted() {
+        if showWhenLanded, !noteLabel.stringValue.isEmpty { window?.orderFront(nil) }
+        showWhenLanded = false
     }
 
     /// The landing's note (the type doc): the stop's sentence unless the
     /// stop was this panel's own; the closed-document sentence when a chosen
     /// document was gone by the time the recording ended; the microphone's
-    /// problem last. Empty for the ordinary case, so `setNote` hides the
-    /// label.
+    /// problem; a refused resume's sentence; then the placement's notes.
+    /// Empty for the ordinary case, so `setNote` hides the label. The two
+    /// R2 arguments are LAST and default, so the probe's R1 rows read as
+    /// they did.
     static func landingNote(
         stoppedBy: StopReason, chosen: RecordingDestination, landedAsNewProject: Bool,
-        micProblem: String?
+        micProblem: String?, resumeProblem: String? = nil, notes: [String] = []
     ) -> String {
         var sentences: [String] = []
         switch stoppedBy {
         case .stopped:
             break
         case .userStopped:
-            sentences.append("Stopped from the menu bar; the recording was added.")
+            sentences.append(
+                "Stopped from the system's screen-recording indicator; the recording was added.")
         case .systemStopped:
             sentences.append(
                 "The system stopped the recording (the display slept or went away); "
@@ -180,6 +230,8 @@ extension RecorderPanelController {
             sentences.append(destinationClosedSentence)
         }
         if let micProblem { sentences.append(micProblem) }
+        if let resumeProblem { sentences.append(resumeProblem) }
+        sentences.append(contentsOf: notes)
         return sentences.joined(separator: " ")
     }
 

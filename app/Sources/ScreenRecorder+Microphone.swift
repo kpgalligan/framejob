@@ -100,16 +100,18 @@ extension ScreenRecorder {
 
     /// MAIN THREAD, from the panel's 30 Hz timer. Reads the microphone file
     /// output's connection channels and publishes one reading; a no-op —
-    /// nothing published — while no microphone is recording, and once the
-    /// microphone has finished or failed (finding 3 published the silence
-    /// then, and a dead connection must not light the bar again). One
+    /// nothing published — while no microphone is recording (idle, arming,
+    /// PAUSED, finishing: the pause published the silence), and once the
+    /// LATEST segment's microphone has finished or failed (finding 3
+    /// published the silence then, and a dead connection must not light the
+    /// bar again; a closed segment's state is not this segment's). One
     /// channel is reported on both sides, `LevelMeterSink`'s rule for a
     /// mono track (R0 q6c: the connection exposes `averagePowerLevel` and
     /// `peakHoldLevel` in dB on every poll, so there is no sample buffer and
     /// no queue in it).
     func publishMicrophoneLevel() {
-        guard state == .recording, let current = session, !current.micFinished,
-            current.micFailure == nil, let output = current.micOutput,
+        guard state == .recording, let current = session, !current.latest.micFinished,
+            current.latest.micFailure == nil, let output = current.micOutput,
             let connection = output.connection(with: .audio),
             let first = connection.audioChannels.first
         else { return }

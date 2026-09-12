@@ -19,12 +19,13 @@ Six things in `designs/`, and you want all of them:
   a third road map would start.
 - **`designs/reelcut-roadmap-3.md` — road map 3, BUILT: screen recording**,
   the first item taken off road map 2 §4. It records the decision that
-  reverses spec §1's non-goal, the spike (R0) whose six answers were pasted
-  into it before any code — two of which overturned the plan — the one
-  phase (R1: no op, no schema change, one tool, three size tolls), the
-  adversarial review and the two-stage fix wave, and what only a person at
-  the machine can still check. START THERE if you are touching the
-  recorder.
+  reverses spec §1's non-goal, the spike (R0) whose seven answers were
+  pasted into it before any code — two of which overturned the plan — the
+  two phases (R1: no op, no schema change, one tool, three size tolls; R2:
+  pause and resume from the menu bar, and the panel that goes away — no
+  op, no tool, no FFI change, a seventh spike answer, five files), each
+  phase's adversarial review and fix wave, and what only a person at the
+  machine can still check. START THERE if you are touching the recorder.
 - `designs/reelcut-design.md` — the normative spec. The schemas (§5), the op
   table (§6) and the architecture (§7) govern any change to either side; §11
   holds decisions already made, which are not to be re-litigated.
@@ -1610,8 +1611,80 @@ put up a sheet or a save panel, which is where the structural reads come in.
   on an ffmpeg-made sparse file (−11821) while a real recording lands every
   second, which `remaining_probe.py` 5f pins. What only a person can check
   is in `reelcut-remaining.md` §4: the picker from a non-activating panel,
-  whether a picked recording contains the panel (it orders out meanwhile),
-  the countdown's look, the menu bar's own indicator, and the microphone
-  prompt from the signed bundle.
+  whether a picked recording contains the panel (moot since R2 — it orders
+  out for every source), the countdown's look, the menu bar's own
+  indicator, and the microphone prompt from the signed bundle.
+
+- **Road map 3, phase R2 — pause and resume, and the panel that goes away:
+  done** (2026-09-12). Two decisions recorded before the code (spec §11):
+  **a paused recording is a SEQUENCE of files over ONE stream**, because
+  ScreenCaptureKit has no pause and the only lever is removing the
+  recording output (its file closes) and adding a fresh one while the
+  stream keeps capturing — spiked as R0's seventh question before the
+  plan leaned on it (remove → did-finish 5–25 ms, add → did-start 8–10 ms,
+  57 fps through the pause; a Bluetooth headset's first use poisoning the
+  microphone writer was the one host fact) — and **the panel orders out at
+  the start of EVERY recording and comes back only with something to
+  say**; the menu bar's status item is the recording's whole chrome, Pause
+  Recording · Stop Recording, then Resume Recording · Stop Recording while
+  paused, the coral dot swapped for a pause glyph with the time FROZEN. No
+  schema change (v6 stands), NO new op (`OP_NAMES` is 55), NO new tool
+  (the catalog is still **75**; `record_screen`'s result grows `pauses`
+  and `segments`, `duration` becoming the total), no FFI change. Two pure
+  moves paid the toll first and alone (`91fb287`: `RecordingResult.swift`,
+  `RecordingLanding+Microphone.swift`); three more files are new
+  (`ScreenRecorder+Pause.swift`, `RecorderPanelController+Pause.swift`,
+  `RecordingLanding+Placing.swift`) and one is a mid-phase pure move
+  (`ScreenRecorder+Delegates.swift`); `ScreenRecorder.swift` (399) and
+  `AgentServer+Recording.swift` (400) are AT the 400-line cap.
+  **The machine** (`ScreenRecorder+Pause.swift`): `idle → arming →
+  recording ⇄ paused → finishing → idle`; a `Session` holds `segments`,
+  never empty, and every framework callback finds ITS segment by the
+  output's identity or the microphone file's URL, because a closed
+  segment's did-finish can land after the resume and a resume never waits
+  for it; `elapsed` is the segments' spans summed, frozen while paused;
+  each segment carries its OWN measured microphone offset (q7: −22 to
+  +33 ms across resumes); a stream that stops while PAUSED lands what was
+  recorded rather than failing it, since every file is closed; `pauses`
+  is a stored count of Pause presses. **The landing** places the pictures
+  back to back on ONE track, every `add_clip` READ BACK — at an inexact
+  canvas rate (decision 3's 24981/1000) the previous end is not a grid
+  point and a raw add snaps DOWN into a one-tick overlap the core dresses
+  as a cross dissolve, so the rule is touching or a sub-frame gap, never
+  an overlap; each voice on one Microphone track at its picture's start
+  minus its offset, floored at the previous voice's end with the head
+  snapped BEFORE the floor test; a voice shorter than its head (the
+  `trim_start` clamp would leave a one-frame sliver and a REFUSED
+  `move_clip` riding the committed list) and any file under a frame (R0
+  measured a real 2 ms microphone file) land as media with a note naming
+  the file, and `Placement`'s four id lists have one entry per segment,
+  nil where nothing was minted. A new project's remainder is one undo
+  step, "Add Microphone" for one segment with a voice, else "Add Recording
+  Segments". **The chrome**: a refused resume's sentence is STATE
+  (`resumeProblem`) so the panel can come back and say it; the welcome
+  button has its own selector (it used to STOP a running recording through
+  `newRecording`'s first arm — inherited from R1 and invisible until the
+  panel hid); ⌘Q while paused opens the item's menu; the item freezes at
+  Stop. **Reviewed by four readers, twenty-nine findings, fixed by root
+  file with a mutant each** — road map 3's R2 record lists them.
+  Measured: `make test` 494 and `make lint` clean stand (no Rust change),
+  `make typecheck` 0 errors and the same 4 AVFoundation warnings,
+  `make app` building, the parity log EMPTY; `recording_proof.py`
+  **187/187** with the two tone rows skipped by name; `recording_probe.py`
+  **876/876** over a probe from the whole of `app/Sources` (662 before the
+  phase; twenty-nine mutants, every one killed, the R2 nine at 811–875),
+  its section 9 a real two-segment recording under the terminal's grant —
+  skipped by name, 41 rows counted, on the locked console it landed on,
+  and measured ONCE when the display woke mid-sweep: the panel hidden at
+  the start and still hidden after a clean landing, two segments, the
+  did-finish 0 ms after the remove and the did-start 23 ms after the add;
+  every earlier proof unchanged against the final binary — 66, 85, 121,
+  8, 84, 88, 167, 92, 79, 214, 79 over MCP and 26, 33, 59, 81, 70, 78, 150
+  (144 on this locked console — section 4's six dispatch checks fail on
+  their own precondition, the known state), 48, 62, 170 offscreen.
+  What only a person can check is in `reelcut-remaining.md` §4: the
+  item's two menus and the glyph, the system indicator through a pause,
+  the panel gone for a display source and back only with a note, ⌘Q while
+  paused, and a paused recording played across its segment boundary.
 
 Keep this file current as code lands.

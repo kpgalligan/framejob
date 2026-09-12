@@ -127,7 +127,7 @@ first forced by the framework, the second asked for by the user:
 |---|---|---|---|---|
 | R0 | The spike — five questions measured before design leans on them (and a sixth from the scouts) | ½ | — | **done** 2026-09-10; the answers are in §3 |
 | R1 | Screen recording | 2–3 | — | **done** 2026-09-11, `a4c476f` (the fix wave's record and the proof scores are in "R1 — the record") |
-| R2 | Pause and resume; the panel that goes away | 1 | — | **spiked** 2026-09-12 (R0 q7, outcome A); building — the plan is "Phase R2" below |
+| R2 | Pause and resume; the panel that goes away | 1 | — | **done** 2026-09-12 (the review's record, the deviations and the proof scores are in "R2 — the record") |
 
 R0 comes first and its answers are written into R1's section before R1's
 waves are briefed. Two of R1's branches (the audio landing, the panel's
@@ -1354,6 +1354,155 @@ map and §7.9's tool list, §11's two decisions, `CLAUDE.md`'s paragraph,
 pause glyph, the system indicator staying up through a pause, the panel
 returning only with a note).
 
+#### R2 — the record (written as the phase landed; the plan above is unchanged)
+
+- **The spike came first and answered in ten minutes** (2026-09-12, R0 q7):
+  three rows of three 2 s segments over ONE running stream, the recording
+  output removed at each pause and added at each resume. Outcome A, with
+  numbers small enough that the machine waits for nothing: a remove closes
+  its file in 5–25 ms, an add on the running stream starts writing in 8–10
+  ms, and the stream delivers 57 fps through the pause. The day's first
+  microphone row found a host fact rather than a defect — AirPods Max on
+  first use switched profiles mid-recording and poisoned the file output
+  for every later file (`'pck?'`) — so the spike grew a way to name the
+  microphone, and the built-in one measured clean.
+- **Two pure moves paid the toll first and alone** (`91fb287`):
+  `RecordingResult.swift` off the foot of `RecordingSetup.swift` and
+  `RecordingLanding+Microphone.swift` out of `RecordingLanding.swift`;
+  `recording_probe.py` 662/662 against the moved tree. A THIRD pure move
+  was made inside the phase and not landed alone — `ScreenRecorder+Delegates.swift`,
+  the three delegates off the foot of `+Finishing.swift` when the segments
+  took it over the cap — so its diff is attributable only by reading. Three
+  NEW files: `ScreenRecorder+Pause.swift`, `RecorderPanelController+Pause.swift`
+  (taking `syncPhase` and `refreshStatusLabel` whole when the panel's base
+  file reached 399) and, from the fix wave, `RecordingLanding+Placing.swift`
+  (the read-back placement, when the base file reached 466). After the fix wave: `ScreenRecorder.swift`
+  399 and `AgentServer+Recording.swift` 400, both AT the cap; `AgentCatalog+Files.swift`
+  609 against the ~600 cap for an existing file, the entry's two paragraphs
+  hoisted into locals for the type checker's budget — the next addition to
+  either pays first.
+- **The seam was written before the lanes**: `RecordingSegment`, the
+  `RecordingResult` over segments (`descriptor` and `startedAt` the FIRST
+  segment's by design; no `micDescriptor` or `micOffset` on the result, so
+  a reader that compiled against a first-segment convenience would have
+  been silently wrong for a paused recording and the compiler was the
+  cheapest reviewer), and `RecorderError.notPaused` — so three lanes
+  compiled against one shape and the typecheck told each which files were
+  its own.
+- **Where the code overruled the plan**, each argued where it lives:
+  `Session` carries the filter's `displayPointSize` and `scale`, because
+  `resume()` needs an output configuration and `RecordingConfiguration.make`
+  is the tree's one builder of it; `elapsed`'s first segment keeps R1's
+  arming rule (0 until the did-start or `startCapture`'s completion — an
+  arm is not footage), later segments fall back to the resume's `addedAt`;
+  a did-FAIL on ANY segment's output, a closed one's included, ends the
+  recording as an external stop does, since a segment that will not probe
+  fails the recording anyway; the meter is silenced only when a microphone
+  failure is the LATEST segment's; `Placement` grew `mediaIds` and
+  `micMediaIds` beside the two the plan named — and then, after the review,
+  every list became ONE entry per segment, `nil` where nothing was minted,
+  plus `notes`; the mic floor test uses the SNAPPED head (a raw start
+  within half a frame below the floor snaps to one frame BELOW it, which
+  the core accepts as a one-frame overlap and dresses as a transition);
+  `remainderPlacement` applies no two-try rule to segments 2…n (a refusal
+  on a fresh document's one track is a bad file, thrown by name) and with
+  no clip 1 lands the voices as media only; a refused resume's sentence is
+  STATE (`resumeProblem`), because the 30 Hz tick used to compose the note
+  from the label and wiped it; the tool's `onPause` / `onResume` tick the
+  item at the click; `newProjectIds` answers a per-segment list and the
+  top-level ids derive from entry 0; `pause()` while paused is
+  `.alreadyPaused`, since `.notRecording`'s sentence is false while
+  `isRecording` is true; and `pauses` is a STORED count of Pause presses,
+  because `segments.count − 1` read 0 for a recording paused once and then
+  stopped.
+- **The review: four readers, twenty-nine findings, fixed by root file
+  with a mutant each.** The ones with teeth — the machine: a stream that
+  FAILED while paused threw the recording away although every file was
+  closed (now it lands as `.systemStopped`); a stop from `.paused` landed
+  only if `stopCapture`'s completion arrived, which for a stream the system
+  already stopped is unmeasured (now `beginFinishing` calls `checkFinished`
+  synchronously); a did-start landing after its own segment's pause made a
+  negative span; two resumes inside one second could mint one movie URL.
+  The landing: a voice SHORTER than its head became a one-frame sliver
+  placed late with a REFUSED `move_clip` riding the committed list —
+  `trim_start` clamps a frame from the end, the move then lands inside the
+  previous voice and is refused, and `applying(_ ops:)` still answered
+  non-nil because the add and the trim had changed something (now such a
+  voice mints no clip and a note names its file, and every placed clip is
+  READ BACK so a refused op can never ride a committed list); a sub-frame
+  file — R0 q7 measured a real 2 ms microphone file — took the WHOLE
+  recording down with a sentence naming a trial media id (now a note, the
+  pictures land); and at an inexact canvas rate (decision 3's 24981/1000)
+  "touching" was unreachable, an `add_clip` at the previous end snapping
+  DOWN into a one-tick overlap and a minted cross dissolve (now the next
+  grid point at or after the end — touching, or a sub-frame GAP, never an
+  overlap). The chrome: a refused resume's sentence never reached the
+  reveal, so the panel stayed away with nothing to say; the welcome
+  window's New Recording… button STOPPED a running recording (it routed
+  through `newRecording`'s first arm — inherited from R1, invisible until
+  the panel hid); closing the panel during `.starting` put every later
+  note in a hidden panel; the coral dot came back after a Stop from paused
+  (`freeze()`); a quit while paused was a bare beep (the guard opens the
+  item's menu now). The tool: "stopped_by says so" was false for a
+  person's Stop — the item's and the File menu's both yield `.stopped`,
+  the same as the span's end, and `duration` is what says so; `stopCeiling`
+  assumed two probes where a paused recording runs 2n (a function of the
+  segment count now, read in the same main hop that stops).
+- **Measured**: `make typecheck` 0 errors and the same 4 AVFoundation
+  warnings; no Rust change (`make test` 494, `make lint` clean stand);
+  every recorder file ≤ 400 lines; the catalog still 75 and the parity log
+  EMPTY. `recording_proof.py` over MCP against the final binary: **187/187**
+  with the two tone rows skipped by name (a muted output) — 152 before the
+  phase; its headless tier reads the two new keys, the three Pause phrases,
+  the segment-sized stop ceiling and the `filesClause` sentence, and its
+  granted tier asserts the result's shape on a one-segment recording (the
+  mic rows measured +76 / +79 ms offsets). `phase9_proof.py` **214/214**
+  against the same binary, and every earlier phase re-run unchanged against
+  it, one fresh instance each with the parity log empty: 66, 85, 121, 8, 84,
+  88, 167, 92, 79, 79 over MCP; 26, 33, 59, 81, 70, 78, 144/150 (the
+  console was LOCKED for the whole re-run — `phase8_chrome.py`'s six
+  dispatch checks fail on their own precondition, the state the tree
+  records, and the probe's granted tier skipped by name for the same
+  reason), 48, 62, 170 offscreen. `recording_probe.py` **876/876** (662
+  before the phase) over a probe compiled from the whole of `app/Sources`,
+  with section 9's 41 rows — the probe's own GRANTED tier: two real
+  `ScreenRecorder()` runs on the main display and then the PANEL end to
+  end over the item's entries — skipped BY NAME on the locked console and
+  measured once when the display woke mid-sweep (the panel hidden at
+  `recordingDidStart` for a display source and still hidden after a clean
+  landing, two segments and `pauses` 1, the did-finish 0 ms after the
+  remove, the did-start 23 ms after the add, stop → conclude 58 ms). Its
+  section 3 drives a faked session ON segments — measured on the way: a
+  never-started `SCStream` accepts add / remove / re-add of a recording
+  output without a grant, refuses a second output beside an attached one
+  and any add after `stopCapture` (−3812), and writes nothing — so pause,
+  resume, the refusals by name, a stop while paused, the closed segment's
+  inert did-finish, a did-fail on a closed one ending the recording, an
+  external stop while paused, the late did-start ignored, two resumes
+  within a second minting two names, and the three-segment walker are all
+  rows; 4b lands two and three segments touching, the sequence falling to
+  a new track whole, the mic floor, the short-voice and sub-frame notes,
+  the 24981/1000 canvas with no overlap and no transition, and the
+  remainder's two names; 5p–5u the pure vocabulary, `resumeProblem` as
+  state, `revealIfNoted` both ways and a real pause/resume/stop through
+  the panel. **Twenty-nine mutants, every one killed**: the nine R2 ones
+  at `segment-stacked` 811, `mic-floor-dropped` 863, `menu-static` 875,
+  `hide-picked-only` 875, `reveal-always` 874, `elapsed-through-pause`
+  909/917 (the tier ran), `resume-first-offset` 875, `resume-no-segment`
+  859, `pause-no-mic-stop` 873; four of R1's re-aimed at lines the wave
+  moved (`mic-trim` 857, `quit-guard` 872, `welcome-action` 873,
+  `mic-fails-all` 867) and sixteen re-scored unchanged at 860–875. Four
+  rules could not be driven and are read structurally: the `try?` that
+  swallows only a nil (a real `Err` needs 4,096 clips), `freeze()` and
+  the quit guard's `openMenu()` (the probe never puts an item in the
+  menu bar), and the `.starting` arm of the panel's close.
+- **What only a person can check** is in `reelcut-remaining.md` §4: the
+  item's two menus and the pause glyph; the system's own indicator staying
+  up through a pause; the panel gone from the moment the recording starts
+  for a display source and back only with a note; ⌘Q while paused opening
+  the item's menu; and a paused recording played across its segment
+  boundary.
+
 ## 4. Proposed keys and menu items
 
 Checked against spec §9 by the scout; a phase that binds one promotes its
@@ -1361,7 +1510,8 @@ row into §9.
 
 | Keys | Action | Phase |
 |---|---|---|
-| ⌥⌘N | File ▸ New Recording… (reads Stop Recording while one runs) | R1 |
+| ⌥⌘N | File ▸ New Recording… (reads Stop Recording while one runs, paused included) | R1 |
+| — | Pause Recording / Resume Recording: NO key and NO main-menu item — they are the status item's rows (decision 7), and a menu bar too crowded to show the item leaves Stop in the File menu and Pause nowhere (recorded limit) | R2 |
 
 Menus: File ▸ New Recording… directly under New Project, with no separator,
 because both make a document out of nothing; nothing in the Clip menu, since

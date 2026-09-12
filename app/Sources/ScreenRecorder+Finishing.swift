@@ -2,30 +2,39 @@ import AVFoundation
 import AppKit
 import ScreenCaptureKit
 
-/// Everything that ENDS a recording, and the three delegates that tell the
-/// recorder about it — `ScreenRecorder.swift`'s second half, cut at the
-/// 400-line cap along the line the state machine already had: arming there,
-/// finishing here. Every crossing member of the base class is internal for
-/// it, the tree's rule for a class split across files.
+/// Everything that ENDS a recording — `ScreenRecorder.swift`'s second half,
+/// cut at the 400-line cap along the line the state machine already had:
+/// arming there, finishing here. The three delegates that tell the recorder
+/// about it were the foot of this file until R2's segments took it over the
+/// cap, and are `ScreenRecorder+Delegates.swift` now. Every crossing member
+/// of the base class is internal for it, the tree's rule for a class split
+/// across files.
 ///
 /// **One finishing path.** `stop()`, the stream delegate's external stops
-/// (`.userStopped`, `.systemStoppedStream`), a stream failure and a
-/// recording-output failure all enter `beginFinishing`, which tells the
-/// microphone output to stop, calls `stopCapture`, and waits — bounded at
-/// `finishCeiling` — for every writer's did-finish before `settle` stops
-/// the microphone session and probes the files. What differs between the
-/// entrances is only `Session.stoppedBy` and `Session.screenFailure`: a
-/// screen failure set by the time `settle` runs is what the caller
-/// receives, and the files are left where they are for a person to find —
-/// NAMED, in the sentence (finding 6).
+/// (`.userStopped`, `.systemStopped`), a stream failure and a
+/// recording-output failure all enter `beginFinishing` — from `.recording`
+/// OR `.paused` — which stamps and stops what is still open (nothing, when
+/// paused: the pause closed the segment's output and stopped the
+/// microphone's writer), calls `stopCapture` either way, asks the wait's
+/// question once itself, and waits — bounded at `finishCeiling` — for
+/// EVERY segment's did-finish before `settle` stops the microphone session
+/// and probes the files. What differs
+/// between the entrances is only `Session.stoppedBy` and
+/// `Session.screenFailure`: a screen failure set by the time `settle` runs
+/// is what the caller receives, and the files are left where they are for
+/// a person to find — NAMED, every one that exists, in the sentence
+/// (finding 6).
 ///
-/// **The microphone cannot fail the recording** (finding 0). `settle`
-/// probes the MOVIE first whenever the screen side did not fail; a
-/// microphone that never started, whose writer reported an error, or whose
-/// file will not probe is a `.success` with `micDescriptor` nil and
-/// `micProblem` set, its file left on disk and named. A microphone that
-/// dies MID-recording (finding 3) sets `microphoneProblem` at once,
-/// silences the meter and lets the picture record on; `stop` lands it.
+/// **The microphone cannot fail the recording** (finding 0), per segment.
+/// `settle` probes segment by segment, in order, the MOVIE first whenever
+/// the screen side did not fail; a microphone that never started, whose
+/// writer reported an error, or whose file will not probe is that SEGMENT's
+/// `micProblem` on a `.success`, its file left on disk and named, the
+/// picture landing without it. A microphone that dies MID-recording
+/// (finding 3) sets `microphoneProblem` at once, silences the meter and
+/// lets the picture record on; `stop` lands it. A movie that will not probe
+/// is the recording's failure whichever segment's it is — landing the
+/// readable ones is NOT built (road map 3, R2a).
 ///
 /// **`settle` runs once** (finding 2): `Session.settling` is set on entry,
 /// `checkFinished` and the ceiling timer bail on it, and a callback that
@@ -34,56 +43,73 @@ import ScreenCaptureKit
 /// did-finish 0.03 s without a microphone, up to 1.1 s with one): past the
 /// ceiling the files are probed anyway, since the writer may have closed
 /// the file without saying so, and a movie that will not probe is answered
-/// `.timedOut`.
-///
-/// **Every delegate method hops to main first** and then checks that the
-/// object calling belongs to the CURRENT session, so a late callback from
-/// a session that already failed or settled changes nothing.
+/// `.timedOut` when ITS writer never said it finished — a closed segment's
+/// is a read failure whichever segment the ceiling fired for.
 
 extension ScreenRecorder {
     /// `settle` has begun for the current session — the one-shot's
     /// question, asked in one place (finding 2).
     var isSettling: Bool { session?.settling ?? false }
 
-    /// The one finishing path, from `.recording` only. `reason` is what
-    /// `RecordingResult.stoppedBy` will say; a failure, if any, is already
-    /// on the session. The meter goes silent HERE (finding 8), not at
-    /// settle, so a bar does not hold its last level through the wait.
-    /// `stopRecording` is ALWAYS sent to a microphone output and its
-    /// did-finish always waited for: the SDK delivers one per request even
-    /// when nothing was written, and a `micFinished` set by hand is what
-    /// let a file the writer was still closing be probed too early.
+    /// The one finishing path, from `.recording` or `.paused`. `reason` is
+    /// what `RecordingResult.stoppedBy` will say; a failure, if any, is
+    /// already on the session. The meter goes silent HERE (finding 8), not
+    /// at settle, so a bar does not hold its last level through the wait.
+    /// While RECORDING the last segment is still open: its `stoppedAt` is
+    /// stamped and `stopRecording` is sent to the microphone output —
+    /// ALWAYS, and its did-finish waited for: the SDK answers a request
+    /// with one even when nothing was written (a writer that already failed
+    /// and said so gets no second one, harmlessly: its did-finish with the
+    /// error set `micFinished`, and the wait reads the flag), and a
+    /// `micFinished` set by hand is what let a file the writer was still
+    /// closing be probed too early. While PAUSED both were done at the
+    /// pause, only `stopCapture` remains, and NO did-finish is coming to
+    /// ask the wait's question — every flag may have been true for minutes
+    /// — so `checkFinished` is asked once here, synchronously, LAST (the R2
+    /// review): the alternative was to trust `stopCapture`'s completion on
+    /// a stream the system may already have stopped, which is unmeasured.
+    /// Safe from `.recording` too: there `allFinished` is false unless the
+    /// last output finished before the path began, and that file is closed.
     func beginFinishing(_ reason: StopReason) {
-        guard state == .recording, let current = session else { return }
+        guard state == .recording || state == .paused, let current = session else { return }
         timer?.invalidate()
+        let wasRecording = state == .recording
         state = .finishing
         session?.stoppedBy = reason
-        session?.stoppedAt = Date()
         meter.publish(.silent, from: ObjectIdentifier(self))
-        current.micOutput?.stopRecording()
+        if wasRecording {
+            session?.segments[current.lastIndex].stoppedAt = Date()
+            current.micOutput?.stopRecording()
+        }
         current.stream.stopCapture { [weak self] _ in
-            // The output's did-finish is what says the file is closed; an
-            // error here (a stream the system already stopped) changes
+            // The outputs' did-finishes are what say the files are closed;
+            // an error here (a stream the system already stopped) changes
             // nothing about the wait.
             DispatchQueue.main.async { self?.checkFinished() }
         }
-        timer = Timer.scheduledTimer(withTimeInterval: Self.finishCeiling, repeats: false) {
-            [weak self] _ in
+        // In `.common`, the panel's rule: a status-item menu held open runs
+        // the loop in tracking mode, where a default-mode timer waits for
+        // the menu to close — and `record_screen`'s `stopCeiling`, two
+        // seconds past this one, does not.
+        let ceiling = Timer(timeInterval: Self.finishCeiling, repeats: false) { [weak self] _ in
             guard let self, self.state == .finishing, !self.isSettling else { return }
             self.session?.timedOut = true
             self.settle()
         }
+        RunLoop.main.add(ceiling, forMode: .common)
+        timer = ceiling
+        // Last, so a synchronous settle finds the timer to invalidate.
+        checkFinished()
     }
 
     func checkFinished() {
-        guard state == .finishing, !isSettling, let current = session, current.screenFinished,
-            current.micOutput == nil || current.micFinished
+        guard state == .finishing, !isSettling, let current = session, current.allFinished
         else { return }
         settle()
     }
 
-    /// Stops the microphone session, probes the movie and then — when the
-    /// microphone's writer did not fail — its file, and answers. Once, per
+    /// Stops the microphone session and probes segment by segment — each
+    /// movie, then its microphone file — and answers ONE result. Once, per
     /// session. The recorder stays `.finishing` until the answer is
     /// delivered, so a second start cannot overwrite the first's hook.
     func settle() {
@@ -94,45 +120,66 @@ extension ScreenRecorder {
         done.micSession?.stopRunning()
         meter.publish(.silent, from: ObjectIdentifier(self))
         if let failure = done.screenFailure { return conclude(done, .failure(failure)) }
-        MediaImporter.probe(url: done.movieURL) { [weak self] movie in
+        probeSegment(done, at: 0, landed: [])
+    }
+
+    /// The walker: probes segment `index`'s movie — a failure is the
+    /// recording's, `unreadable` — then its microphone, appends the
+    /// `RecordingSegment` and moves to the next; past the last, concludes.
+    /// Sequential and recursive rather than concurrent, because each
+    /// probe's completion is on main and the order of `landed` IS the order
+    /// the landing places the clips in.
+    private func probeSegment(_ done: Session, at index: Int, landed: [RecordingSegment]) {
+        guard index < done.segments.count else {
+            // The reason is read LIVE: an external stop whose did-finish
+            // landed first writes it during the probe (`+Delegates.swift`'s
+            // `.finishing` arm), after `settle` copied `done`.
+            let result = RecordingResult(
+                segments: landed, choice: done.choice,
+                stoppedBy: session?.stoppedBy ?? done.stoppedBy, pauses: done.pauses)
+            return conclude(done, .success(result))
+        }
+        MediaImporter.probe(url: done.segments[index].movieURL) { [weak self] movie in
             guard let self else { return }
             switch movie {
             case .failure(let error):
-                self.conclude(done, .failure(Self.unreadable(done, error)))
+                self.conclude(done, .failure(Self.unreadable(done, at: index, error)))
             case .success(let descriptor):
-                self.settleMicrophone(done, movie: descriptor)
+                self.probeMicrophone(done, at: index, movie: descriptor) { [weak self] segment in
+                    self?.probeSegment(done, at: index + 1, landed: landed + [segment])
+                }
             }
         }
     }
 
-    /// The microphone's half of `settle`: no microphone → done; a writer
+    /// The microphone's half of one segment: no microphone → done; a writer
     /// that reported an error → its sentence; otherwise the file is probed,
     /// and a probe that fails says whether the microphone ever started.
-    private func settleMicrophone(_ done: Session, movie: MediaDescriptor) {
-        guard let micURL = done.micURL else {
-            return conclude(done, .success(Self.result(done, movie: movie, mic: nil, problem: nil)))
+    /// `then` receives the landed segment, on main.
+    private func probeMicrophone(
+        _ done: Session, at index: Int, movie: MediaDescriptor,
+        then: @escaping (RecordingSegment) -> Void
+    ) {
+        let segment = done.segments[index]
+        guard let micURL = segment.micURL else {
+            return then(Self.result(done, at: index, movie: movie, mic: nil, problem: nil))
         }
-        if let failure = done.micFailure {
+        if let failure = segment.micFailure {
             let problem = failure + Self.fileClause(micURL, "What it wrote is at")
-            return conclude(
-                done, .success(Self.result(done, movie: movie, mic: nil, problem: problem)))
+            return then(Self.result(done, at: index, movie: movie, mic: nil, problem: problem))
         }
-        MediaImporter.probe(url: micURL) { [weak self] mic in
-            guard let self else { return }
+        MediaImporter.probe(url: micURL) { mic in
             switch mic {
             case .failure(let error):
                 let problem =
-                    done.micStartedAt == nil
+                    segment.micStartedAt == nil
                     ? "The microphone never started recording, so the picture was recorded "
                         + "without it." + Self.fileClause(micURL, "Its file is at")
                     : "The microphone recording could not be read: " + error.localizedDescription
                         + Self.fileClause(micURL, "The file is at")
-                self.conclude(
-                    done, .success(Self.result(done, movie: movie, mic: nil, problem: problem)))
+                then(Self.result(done, at: index, movie: movie, mic: nil, problem: problem))
             case .success(let micDescriptor):
-                self.conclude(
-                    done,
-                    .success(Self.result(done, movie: movie, mic: micDescriptor, problem: nil)))
+                then(Self.result(done, at: index, movie: movie, mic: micDescriptor, problem: nil))
             }
         }
     }
@@ -160,12 +207,19 @@ extension ScreenRecorder {
 
     /// The failure with " The recording is at <movie>; the microphone at
     /// <mic>." appended — each file only when it is actually on disk, so a
-    /// sentence never sends a person to a path that holds nothing.
+    /// sentence never sends a person to a path that holds nothing. With
+    /// segments, every movie that exists comma-joined in order, and every
+    /// microphone file likewise, so one segment's sentence is byte for byte
+    /// R1's; no movie on disk at all leaves the error as it was.
     static func namingFiles(_ error: RecorderError, _ done: Session) -> RecorderError {
         let manager = FileManager.default
-        guard manager.fileExists(atPath: done.movieURL.path) else { return error }
-        let mic = done.micURL.flatMap { manager.fileExists(atPath: $0.path) ? $0.path : nil }
-        return .filesKept(error, movie: done.movieURL.path, microphone: mic)
+        let movies = done.segments.map(\.movieURL.path).filter { manager.fileExists(atPath: $0) }
+        guard !movies.isEmpty else { return error }
+        let mics = done.segments.compactMap { $0.micURL?.path }
+            .filter { manager.fileExists(atPath: $0) }
+        return .filesKept(
+            error, movie: movies.joined(separator: ", "),
+            microphone: mics.isEmpty ? nil : mics.joined(separator: ", "))
     }
 
     /// " <lead> <path>." when the file exists, else nothing.
@@ -173,158 +227,36 @@ extension ScreenRecorder {
         FileManager.default.fileExists(atPath: url.path) ? " \(lead) \(url.path)." : ""
     }
 
-    private static func unreadable(_ done: Session, _ error: any Error) -> RecorderError {
-        done.timedOut
+    /// `.timedOut` only when the FAILING segment's writer never said it
+    /// finished — the ceiling's own case; a closed segment's movie that will
+    /// not probe is a read failure whichever segment the ceiling fired for.
+    private static func unreadable(_ done: Session, at index: Int, _ error: any Error)
+        -> RecorderError
+    {
+        done.timedOut && !done.segments[index].screenFinished
             ? .timedOut
             : .finishFailed("The recording could not be read: " + error.localizedDescription)
     }
 
-    /// The offset is the screen's did-start minus the microphone's, each
-    /// falling back to the call that asked for it when the callback never
-    /// came; `startedAt` is the screen's did-start on the same terms.
+    /// One segment, landed. The offset is the screen's did-start minus the
+    /// microphone's, each falling back to the call that asked for it when
+    /// the callback never came; `startedAt` is the screen's did-start on
+    /// the same terms (`Session.screenStart(of:)`, then the call that added
+    /// the output — which, for the first segment, is `start`'s own call,
+    /// R1's third fallback).
     private static func result(
-        _ done: Session, movie: MediaDescriptor, mic: MediaDescriptor?, problem: String?
-    ) -> RecordingResult {
-        let screenStart = done.screenStartedAt ?? done.captureStartedAt ?? done.calledAt
+        _ done: Session, at index: Int, movie: MediaDescriptor, mic: MediaDescriptor?,
+        problem: String?
+    ) -> RecordingSegment {
+        let segment = done.segments[index]
+        let screenStart = done.screenStart(of: index) ?? segment.addedAt
         var offset: Ticks = 0
-        if mic != nil, let micStart = done.micStartedAt ?? done.micRecordingCalledAt {
+        if mic != nil, let micStart = segment.micStartedAt ?? segment.micRecordingCalledAt {
             let seconds = screenStart.timeIntervalSince(micStart)
             offset = Ticks((seconds * Double(ReelTime.perSecond)).rounded())
         }
-        return RecordingResult(
-            descriptor: movie, micDescriptor: mic, micOffset: offset, choice: done.choice,
-            startedAt: screenStart, stoppedBy: done.stoppedBy, micProblem: problem)
-    }
-}
-
-// MARK: - The stream's delegate
-
-extension ScreenRecorder: SCStreamDelegate {
-    /// The system indicator's Stop, a display that slept, or a failure. The
-    /// 15.2 `streamDidBecomeActive`/`Inactive` pair is optional and not
-    /// implemented, so nothing here needs an `@available`.
-    func stream(_ stream: SCStream, didStopWithError error: any Error) {
-        DispatchQueue.main.async { [weak self] in self?.streamStopped(stream, error: error) }
-    }
-
-    private func streamStopped(_ stream: SCStream, error: any Error) {
-        guard let current = session, current.stream === stream else { return }
-        switch state {
-        case .idle:
-            return
-        case .finishing:
-            // An external stop whose did-finish landed FIRST (finding 7):
-            // the output's finish began the path as `.stopped`, and the
-            // reason arrives now. Adopted only when no `stop()` ended the
-            // recording, so a person's own Stop keeps its name.
-            if !current.stopAsked, current.stoppedBy == .stopped,
-                let reason = Self.externalStop(error)
-            {
-                session?.stoppedBy = reason
-            }
-        case .arming:
-            // The start's completion reports it (`captureStarted` reads it).
-            session?.screenFailure = RecorderError.startFailed(Self.sentence(for: error))
-        case .recording:
-            if let reason = Self.externalStop(error) {
-                beginFinishing(reason)
-            } else {
-                session?.screenFailure = RecorderError.finishFailed(Self.sentence(for: error))
-                beginFinishing(.stopped)
-            }
-        }
-    }
-}
-
-// MARK: - The recording output's delegate
-
-extension ScreenRecorder: SCRecordingOutputDelegate {
-    /// Stamped where it arrives (R0 q2: 86–107 ms BEFORE `startCapture`'s
-    /// completion), so the offset never includes the hop.
-    func recordingOutputDidStartRecording(_ recordingOutput: SCRecordingOutput) {
-        let at = Date()
-        DispatchQueue.main.async { [weak self] in
-            guard let self, let current = self.session, current.output === recordingOutput,
-                current.screenStartedAt == nil
-            else { return }
-            self.session?.screenStartedAt = at
-        }
-    }
-
-    func recordingOutput(_ recordingOutput: SCRecordingOutput, didFailWithError error: any Error) {
-        DispatchQueue.main.async { [weak self] in
-            guard let self, let current = self.session, current.output === recordingOutput
-            else { return }
-            self.session?.screenFinished = true
-            if self.session?.screenFailure == nil {
-                let sentence = "The recording failed: " + error.localizedDescription
-                self.session?.screenFailure =
-                    self.state == .arming ? .startFailed(sentence) : .finishFailed(sentence)
-            }
-            self.outputEnded()
-        }
-    }
-
-    func recordingOutputDidFinishRecording(_ recordingOutput: SCRecordingOutput) {
-        DispatchQueue.main.async { [weak self] in
-            guard let self, let current = self.session, current.output === recordingOutput
-            else { return }
-            self.session?.screenFinished = true
-            self.outputEnded()
-        }
-    }
-
-    /// A finish or a failure nobody asked for (the writer gave up) ends the
-    /// recording the way an external stop does; one that was asked for is
-    /// the wait's answer. While arming, the start's completion reports it.
-    private func outputEnded() {
-        if state == .recording { beginFinishing(.stopped) } else { checkFinished() }
-    }
-}
-
-// MARK: - The microphone file output's delegate
-
-extension ScreenRecorder: AVCaptureFileOutputRecordingDelegate {
-    /// Arrives on a private queue (R0 q6b), stamped here before the hop.
-    func fileOutput(
-        _ output: AVCaptureFileOutput, didStartRecordingTo fileURL: URL,
-        from connections: [AVCaptureConnection]
-    ) {
-        let at = Date()
-        DispatchQueue.main.async { [weak self] in
-            guard let self, let current = self.session, current.micOutput === output,
-                current.micStartedAt == nil
-            else { return }
-            self.session?.micStartedAt = at
-        }
-    }
-
-    /// The writer is done, well or badly. Badly while the picture still
-    /// records (finding 3) — the device unplugged, the writer giving up —
-    /// is a microphone PROBLEM and never the recording's end: the sentence
-    /// is published at once for the panel's tick, the meter goes silent,
-    /// and `settle` will carry it on the result. Badly while arming is the
-    /// same problem, seen earlier.
-    func fileOutput(
-        _ output: AVCaptureFileOutput, didFinishRecordingTo outputFileURL: URL,
-        from connections: [AVCaptureConnection], error: (any Error)?
-    ) {
-        // A non-nil error can still mean a usable file: the key says so.
-        let finishedWell =
-            error == nil
-            || ((error as NSError?)?.userInfo[AVErrorRecordingSuccessfullyFinishedKey] as? Bool)
-                == true
-        DispatchQueue.main.async { [weak self] in
-            guard let self, let current = self.session, current.micOutput === output
-            else { return }
-            self.session?.micFinished = true
-            if !finishedWell, self.session?.micFailure == nil, let error {
-                let sentence = "The microphone recording failed: " + error.localizedDescription
-                self.session?.micFailure = sentence
-                self.microphoneProblem = sentence
-                self.meter.publish(.silent, from: ObjectIdentifier(self))
-            }
-            self.checkFinished()
-        }
+        return RecordingSegment(
+            descriptor: movie, micDescriptor: mic, micOffset: offset, startedAt: screenStart,
+            micProblem: problem)
     }
 }

@@ -17,9 +17,11 @@ extension RecorderPanelController {
 
     /// `SCContentSharingPicker` in single-window mode, Reelcut's own windows
     /// excluded from the LIST — `excludedBundleIDs` is documented "for
-    /// picking" and says nothing about capture (R0 q3), which is why a picked
-    /// recording hides the panel. The observer is added once; the picker is
-    /// activated for the presentation and deactivated when it answers.
+    /// picking" and says nothing about capture (R0 q3), which is why R1 hid
+    /// the panel for a picked window alone; since R2 every recording hides
+    /// it (decision 7), and the exclusion is about the list only. The
+    /// observer is added once; the picker is activated for the presentation
+    /// and deactivated when it answers.
     func presentPicker() {
         let picker = SCContentSharingPicker.shared
         if !pickerObserved {

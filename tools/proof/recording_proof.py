@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Road map 3, R1 — `record_screen`, driven against the built binary over MCP.
+"""Road map 3, R1 and R2 — `record_screen`, driven against the built binary
+over MCP.
 
 `record_screen` is File ▸ New Recording… without the panel: `ScreenRecorder`
 run for a fixed number of seconds from the agent and landed through the
@@ -25,7 +26,11 @@ count rather than passing vacuously.
   `AgentCatalog.opNames`, the live core's op count) and the twenty without
   one are named, not counted. The description is read for the phrases the
   R1 review made it owe — `mic_problem`, the `Add Microphone` undo step, the
-  launching process — and the parity log is read too.
+  launching process — and for R2's: `Pause Recording` and `Resume Recording`
+  (the status item's two menus), the `Add Recording Segments` undo step, and
+  the result keys `pauses`, `segments` and `started_at` beside R1's
+  twenty-four. The catalog count stays 75 — R2 adds no tool, and there is
+  deliberately no tool that pauses — and the parity log is read too.
 * Section 1, the refusals, each asserted as the EXACT sentence, each leaving
   `get_project`'s whole answer byte-identical and pushing no undo step. And
   the ORDER: the caller's own mistakes (`seconds` absent, 0, 601, `"x"`;
@@ -64,12 +69,27 @@ count rather than passing vacuously.
   and a render at 0.4 s (source 0.8 s, frame 24) a DIFFERENT non-black
   frame. Every claim is an equality between renders, never a literal hash.
 * Section 3, the tool's SOURCE, read where no call can reach: the stop
-  ceiling's derivation (`ScreenRecorder.finishCeiling + 2 * 30 + 5`,
-  independent of `seconds`), the old "`.busy` mid-finish" claim gone from
+  ceiling's derivation (`stopCeiling(segments:)` — `finishCeiling + 2 × 30 ×
+  max(n, 1) + 5` over the segments the recorder holds, 75 s unpaused and
+  60 s more per further segment, independent of `seconds`; the R2 review
+  found a fixed 75 s shorter than two segments' probes), the old "`.busy`
+  mid-finish" claim gone from
   the file, the status item the tool now puts up, the alert clause on both
   timeout sentences, the gesture wait bound to the panel's own constants by
   name, `mic_problem` in the result, the zero-display sentence ahead of the
-  range sentence, and `path`'s trim. These are structural reads of Swift —
+  range sentence, `path`'s trim, and R2's: the status item's THREE closures
+  (Pause and Resume as the recorder's `pause()` / `resume()` under `try?`,
+  Stop freezing the item's mark before the recorder's `stop()`, the tick
+  passing `elapsed` and `isPaused`), the finish timeout reading the
+  session's SEGMENTS — their count sizing the ceiling — and its sentence
+  pluralised by count, `savedButNotAdded` built over
+  `RecordingResult.filesClause`, which names every segment's movie and
+  every microphone file comma-joined,
+  `pauses` and `segments` written unconditionally with `started_at` from an
+  ISO 8601 UTC formatter with fractional seconds, `duration` as the SUM over
+  segments, and NO `result.micDescriptor` or `result.micOffset` in either
+  file's CODE (the doc comment that names them is skipped, or the read would
+  be satisfied by the sentence saying they are gone). These are structural reads of Swift —
   `phase7_chrome.py`'s `destinationProperties != nil` is the precedent —
   and they claim exactly that: the text is there. A 75 s stop ceiling and
   a menu-bar item are not things a script can wait out or photograph.
@@ -103,6 +123,22 @@ outcomes:
   it (a `userDeclined` start after a true preflight is the case the road
   map names), and the tier runs.
 
+When it runs, the detection call's own ANSWER is the first thing read
+(R2d — the result's shape with one segment, on the headless instance's
+document): `pauses` 0 and an integer; `segments` a list of exactly one
+entry whose `path` and `duration` are the top level's (one segment: the
+TOTAL is the segment's), whose `media` is the top level's AND the
+document's media entry for that path, which carries no `clip` (`place:
+false`), whose `width`, `height` and `fps` are the top level's (each entry
+carries its own descriptor's — the fix wave's addition), whose
+`mic_offset` is the top level's and which has no `mic_path` or
+`mic_problem` (no microphone was asked for), whose keys are a subset of
+the fourteen the description names, and whose `started_at` is spelled
+`YYYY-MM-DDTHH:MM:SS.mmmZ` and parses (`datetime.fromisoformat`) to an
+instant between the call and a minute after it — a formatter left in local
+time fails that row by the host's UTC offset wherever the host is not at
+UTC.
+
 With the grant, the tier launches a SECOND instance of the same binary on
 `GRANTED_PORT` with `-RCRecordingFolder` pointing into `work/recordings/`
 (`phase8_proof.py`'s `Instance`, copied whole), reads the Microphone grant
@@ -121,24 +157,33 @@ this order because the first row needs NO document open:
   media's `fps` is NOT `[60, 1]` — ONE row, decision 3, the row the "fps
   override deleted" mutant fails — SKIPPED with a count on a run where the
   file's own rate happens to be exactly 60/1, since then the override
-  cannot be told from the file; and no undo step (a mic-less new project's
-  first project is what the document is);
+  cannot be told from the file; no undo step (a mic-less new project's
+  first project is what the document is); and the R2 shape — `pauses` 0
+  with one segment whose `path` and `duration` are the top level's, whose
+  `width`, `height` and `fps` are its own descriptor's and equal the top
+  level's, whose `started_at` is within a minute after the call, and whose `media` and
+  `clip` — looked up by PATH on the document `untitled(around:)` built —
+  are the top level's;
 * into a saved document with an EMPTY front track: the clip at the
   playhead ON that track with the new media id (the two-try rule's first
   branch, no track minted); `undo` removes media and clip in ONE step, the
   whole project fingerprint back to what it was, the file still on disk;
   a `render_frame` at the clip's midpoint that is neither black nor the
-  frame the project rendered there before the recording;
+  frame the project rendered there before the recording; and the one
+  segment carrying the placement's PREDICTED `media` and `clip`, equal to
+  the top level's;
 * the same playhead with the front track now OCCUPIED → a new front track
   (the second branch), which the `new_tracks` key reports;
 * `size: "best"` → the display's PIXEL size, even rounding allowed;
-* `place: false` → media alone: `new_media`, no `new_clips`, no `clip`;
+* `place: false` → media alone: `new_media`, no `new_clips`, no `clip`,
+  and the segment with the media and no `clip` either;
 * `path: "  "` (blank) → the file lands in the instance's own
   `-RCRecordingFolder`, never in the process's working directory (the R1
   review: `URL(fileURLWithPath: "")` IS the cwd);
 * inside an OPEN nest (`nest`, then `set_scope`) → the answer carries
   `scope` and `document_ops: ["add_media"]`, the view shows the clip with
-  the new media, and after `set_scope {}` the timeline does not;
+  the new media — the segment's `clip` and `media` are those — and after
+  `set_scope {}` the timeline does not;
 * `system_audio: true` with NOTHING of this script's playing → `has_audio`
   true, `audio_tracks` 1; and then, while `afplay` plays a 30 s 1 kHz tone
   this script writes with the `wave` module, a second recording → the two
@@ -179,8 +224,11 @@ this order because the first row needs NO document open:
   A's −421 ms head loss, which `prepareMicrophone` now pays before the
   start; a LONGER file is the microphone leading by `mic_offset`, measured
   +66 and +70 ms with a prepared session, and is not a loss), NO
-  `mic_problem` on a microphone that landed, both files' ids created and
-  one undo removing both; then a recording at PLAYHEAD 0, where the
+  `mic_problem` on a microphone that landed, the one segment's `mic_path`,
+  `mic_duration`, `mic_offset`, `mic_media` and `mic_clip` equal to the top
+  level's with no `mic_problem` in it, both files' ids created and
+  one undo removing both; then a recording at PLAYHEAD 0 — one segment,
+  `pauses` 0, its `mic_offset` the one the branch reads — where the
   measured offset decides the landing's branch: an offset of at least half
   a frame trims the voice clip's HEAD (start 0, `in` the snapped offset);
   one of at most minus half a frame places it LATE by the snapped amount
@@ -215,11 +263,26 @@ and 4.9 s frames go black); a `scope` declared on the tool → section 0's
 full-document row (the sentence is then the core's alone, no path in it);
 `path`'s trim removed → the blank-path row (the file lands in the cwd);
 `mic_problem` dropped from the result → section 3's read, and the
-microphone note row.
+microphone note row; `pauses` or `segments` dropped from the result →
+section 0's key reads and every shape row; `started_at` spelled in local
+time → the within-a-minute rows, by the host's UTC offset (at UTC they
+survive, and section 3's formatter read is what catches it there); the
+timeout sentence's plural arm deleted → section 3. **What one segment
+cannot tell**, said so the number is not mistaken for coverage: a build
+writing the top level's values INTO the segment rather than the segment's
+own, or leaving `duration` as the first segment's rather than the sum, is
+byte-identical on every row here, because with one segment the two are
+equal. No tool pauses — deliberately: a pause is a person's, from the menu
+bar or the panel — so the two-segment result and the machine behind it are
+`recording_probe.py`'s (its section 9 records, pauses and resumes under the
+terminal's grant), and this script claims the one-segment shape and the
+text.
 
 **What this script does not claim.** The panel, the status item, the
 welcome button and the menu item are a picture and a click, and they are
-`recording_probe.py`'s and the chrome proofs'. The two configurations a
+`recording_probe.py`'s and the chrome proofs' — so is a PAUSE, which only
+the item's menu or the panel can send (R2: no tool pauses), and with it
+every claim about a second segment. The two configurations a
 choice becomes are pure and `recording_probe.py` reads every field back —
 including `excludesCurrentProcessAudio`, which no recording can show. A
 picker-made source (`.picked`) needs a person: the tool never presents one.
@@ -243,6 +306,7 @@ import subprocess
 import sys
 import time
 import wave
+from datetime import datetime
 
 from mcp import MCP, ToolError
 
@@ -323,13 +387,26 @@ NO_OPEN_PROJECT = re.compile(
 # with no display in it — a locked console, every display asleep.
 NO_DISPLAY_SENTENCE = ("No display is shareable right now — the console is locked or every "
                        "display is asleep; nothing can be recorded until one is.")
-# `AgentServer+RecordingResult.savedButNotAdded`'s shape.
+# `AgentServer+RecordingResult.savedButNotAdded`'s shape — the ONE-segment
+# sentence, byte for byte R1's; a paused recording's names every movie
+# comma-joined in group 1, which no row here can produce (no tool pauses).
 SAVED_BUT_NOT_ADDED = re.compile(
     r"^The recording was saved at (.+?\.mov)( and its microphone at (.+?\.m4a))? but could "
     r"not be added: (.+)$", re.DOTALL)
 # The recorder's file name (`RecordingFiles.stem`), made unique with ` (n)`.
 DATED_NAME = re.compile(
     r"^Screen Recording \d{4}-\d{2}-\d{2} at \d{2}\.\d{2}\.\d{2}( \(\d+\))?\.mov$")
+# `segments[…].started_at`'s spelling (`AgentServer.startedAtFormatter`):
+# ISO 8601 in UTC to the millisecond, with the Z.
+STARTED_AT = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$")
+# The fourteen keys one entry of `segments` may carry (R2d, and the fix
+# wave's per-segment size): seven always — `path`, `duration`, `width`,
+# `height`, `fps`, `started_at`, `mic_offset` — three on the microphone's
+# terms, four ids when known.
+SEGMENT_KEYS = {
+    "path", "duration", "width", "height", "fps", "started_at", "mic_offset", "mic_path",
+    "mic_duration", "mic_problem", "media", "clip", "mic_media", "mic_clip",
+}
 # What `undo` answers with nothing on the stack (`AgentServer+History.swift`).
 NOTHING_TO_UNDO = "There is nothing to undo."
 # `AgentServer+Render.swift`'s sentence, read the way every earlier script
@@ -353,9 +430,13 @@ MAX_TRACKS = 64
 # skipped separately. Rows a run may skip INSIDE a group (the fps row, the
 # two tone rows, the head-trim row) are counted here and subtracted when
 # they are skipped, so the self-check row still holds.
-GRANTED_CHECKS = 36
-MIC_CHECKS = 10
+GRANTED_CHECKS = 44
+MIC_CHECKS = 13
 TONE_CHECKS = 2
+# The detection call's own answer, read for R2d's one-segment shape before
+# the second instance is launched; in the tier's promise, and in every
+# skip of the tier.
+DETECTION_CHECKS = 9
 
 failures = []
 checks = 0
@@ -430,16 +511,38 @@ def call(mcp, tool, args):
     return mcp.call_with(tool, args)
 
 
-def refusal(mcp, tool, args):
-    """The refusal MESSAGE with the tool's own prefix stripped, or None when
-    the call succeeded."""
+def attempt(mcp, tool, args):
+    """Both halves of a call: `(answer, None)` when it succeeded, `(None,
+    message)` — the refusal with the tool's own prefix stripped — when it
+    did not. For the one call whose ANSWER a later row reads when it lands
+    (the detection call, R2d's shape rows)."""
     try:
-        mcp.call_with(tool, args)
-        return None
+        return mcp.call_with(tool, args), None
     except ToolError as error:
         text = str(error)
         prefix = f"{tool}: "
-        return text[len(prefix):] if text.startswith(prefix) else text
+        return None, (text[len(prefix):] if text.startswith(prefix) else text)
+
+
+def refusal(mcp, tool, args):
+    """The refusal MESSAGE with the tool's own prefix stripped, or None when
+    the call succeeded."""
+    return attempt(mcp, tool, args)[1]
+
+
+def parse_started_at(text):
+    """`started_at` as a POSIX timestamp, or None when it is not a string
+    that parses to an AWARE instant. `datetime.fromisoformat` reads the `Z`
+    since Python 3.11; the replacement keeps the row honest on an older
+    interpreter, where it would otherwise raise and the row would score
+    the interpreter rather than the tool."""
+    if not isinstance(text, str):
+        return None
+    try:
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed.timestamp() if parsed.tzinfo is not None else None
 
 
 def state(mcp, document=None):
@@ -501,6 +604,13 @@ def read(path):
 def source(name):
     """One file of `app/Sources`, as text, for the structural reads."""
     return read(os.path.join(SOURCES, name)).decode("utf-8")
+
+
+def code(text):
+    """`text` without its comment lines — for a read that the CODE must
+    fail to contain, which a doc comment naming the absent thing would
+    otherwise satisfy."""
+    return "\n".join(line for line in text.splitlines() if not line.strip().startswith("//"))
 
 
 def parity_lines(path):
@@ -631,12 +741,18 @@ def catalog_part(mcp):
     description = [tool for tool in listed if tool["name"] == "record_screen"][0]["description"]
     for phrase in ("File ▸ New Recording…", "Reelcut Recordings", "new_project", "Microphone",
                    "REFUSAL ORDER", "mic_problem", "Add Microphone", "launching process",
-                   "Stop Recording", "The recording was saved at"):
+                   "Stop Recording", "The recording was saved at",
+                   # R2d: the status item's two menus and the undo step a
+                   # paused recording's remainder is named by.
+                   "Pause Recording", "Resume Recording", "Add Recording Segments"):
         check(phrase in description, f"the description says \"{phrase}\"")
     for key in ("path", "mic_path", "mic_duration", "mic_offset", "mic_problem", "media",
                 "mic_media", "clip", "mic_clip", "duration", "width", "height", "fps",
                 "has_audio", "audio_tracks", "stopped_by", "landed", "note", "project",
-                "new_media", "new_clips", "new_tracks", "scope", "document_ops"):
+                "new_media", "new_clips", "new_tracks", "scope", "document_ops",
+                # R2d's three: the two keys always present, and the one only a
+                # segment carries.
+                "pauses", "segments", "started_at"):
         check(re.search(rf"(?<![a-z_]){re.escape(key)}(?![a-z_])", description) is not None,
               f"…and names the result key {key}")
 
@@ -872,20 +988,39 @@ def source_part():
     arguments = source("AgentServer+RecordingArguments.swift")
     result = source("AgentServer+RecordingResult.swift")
 
-    check("static let stopCeiling: TimeInterval = ScreenRecorder.finishCeiling + 2 * 30 + 5"
+    check("static func stopCeiling(segments: Int) -> TimeInterval" in tool
+          and "ScreenRecorder.finishCeiling + 2 * 30 * TimeInterval(max(segments, 1)) + 5"
           in tool,
-          "the stop wait is `stopCeiling` = finishCeiling + 2 × 30 + 5 (75 s), derived from "
-          "the recorder's finish ceiling and two sequential probe ceilings, independent of "
-          "seconds")
-    check("Self.stopCeiling" in tool and ".now() + seconds + 30" not in tool,
-          "…and the wait after stop() reads it — the old `.now() + seconds + 30` is gone")
+          "the stop wait is `stopCeiling(segments:)` = finishCeiling + 2 × 30 × max(n, 1) + 5 "
+          "(75 s unpaused, 60 s more per further segment), derived from the recorder's finish "
+          "ceiling and two sequential probe ceilings PER SEGMENT, independent of seconds — "
+          "R2's review found a fixed 75 s shorter than two segments' probes")
+    check("Self.stopCeiling(segments: segments)" in tool and ".now() + seconds + 30" not in tool
+          and "static let stopCeiling" not in tool,
+          "…and the wait after stop() reads it over the segment count — the old "
+          "`.now() + seconds + 30` and the fixed constant are both gone")
     check("mid-finish is `.busy`" not in tool and "`.busy` by contract" not in tool
           and "JOINS the finishing" in tool,
           "the header no longer claims a second stop() mid-finish is .busy — it says it joins")
-    check("RecorderStatusItem(onStop: { ScreenRecorder.shared.stop() })" in tool
-          and "forMode: .common" in tool,
-          "a recording the tool starts gets a RecorderStatusItem whose Stop is the "
-          "recorder's own stop(), ticked by a timer in .common modes")
+    # R2d: the item takes THREE closures now; R1's one-closure literal is the
+    # text that moved.
+    chrome = tool.split("private final class RecordingToolChrome")[1]
+    check("RecorderStatusItem(" in chrome and "onPause:" in chrome and "onResume:" in chrome
+          and ("onStop: { [weak self] in\n                self?.freeze()\n"
+               "                ScreenRecorder.shared.stop()\n            })") in chrome
+          and "func freeze() { item?.freeze() }" in chrome
+          and "forMode: .common" in chrome,
+          "a recording the tool starts gets a RecorderStatusItem with three closures — "
+          "onPause, onResume and a Stop that FREEZES the item's mark and time and then is "
+          "the recorder's own stop() — ticked by a timer in .common modes")
+    check("_ = try? ScreenRecorder.shared.pause()" in chrome
+          and "_ = try? ScreenRecorder.shared.resume()" in chrome,
+          "…whose Pause and Resume are the recorder's pause() / resume() under try? — the "
+          "one refusal possible is a race with the recording's own end, with no panel to "
+          "say it in")
+    check("item.update(elapsed: recorder.elapsed, paused: recorder.isPaused)" in chrome,
+          "…and the tick passes the recorder's elapsed (frozen while paused) and isPaused "
+          "into the item, so the menu flips with the state")
     check("chrome.remove()" in tool.split("let deliver")[1].split("finished.signal()")[0],
           "…and the item comes down inside onFinish, before the landing")
     check(tool.count("Self.recordingAlertClause") >= 1
@@ -900,6 +1035,56 @@ def source_part():
     check(tool.count("Self.savedButNotAdded(result, error)") == 3,
           "all three post-record throw sites — the placement, the commit, the untitled "
           "document — go through savedButNotAdded")
+    # R2d: the finish timeout names EVERY segment's movie, and the sentence
+    # is pluralised by count — with one movie it is R1's, byte for byte.
+    check("static func finishTimeoutSentence(movies: [String])" in result
+          and "Self.finishTimeoutSentence(movies: movies)" in tool
+          and "recorder.session?.segments.map(\\.movieURL.path)" in tool
+          and "let count = recorder.session?.segments.count ?? 1" in tool
+          and "session?.movieURL" not in tool,
+          "the finish timeout reads the session's SEGMENTS — their count for the ceiling, "
+          "their movies for the sentence — and the single movieURL R1 read is gone from the "
+          "tool")
+    timeout = result.split("static func finishTimeoutSentence")[1].split("\n    }\n")[0]
+    check("case 1:" in timeout and "its movie is at \\(movies[0])." in timeout
+          and "its movies are at " in timeout and 'movies.joined(separator: ", ")' in timeout
+          and "stopCeiling(segments: movies.count)" in timeout,
+          "…and its sentence is pluralised by count and states the ceiling it waited, sized "
+          "by the same count: one movie spelled as R1 spelled it, several comma-joined")
+    saved = result.split("static func savedButNotAdded")[1].split("\n    }\n")[0]
+    clause = source("RecordingResult.swift").split("var filesClause")[1].split("\n    }\n")[0]
+    check("The recording was saved at \\(result.filesClause) but could " in saved
+          and 'segments.map { $0.descriptor.path }.joined(separator: ", ")' in clause
+          and "segments.compactMap { $0.micDescriptor?.path }" in clause
+          and '" and its microphone at " + mics[0]' in clause
+          and '" and its microphone files at " + mics.joined(separator: ", ")' in clause,
+          "savedButNotAdded builds over RecordingResult.filesClause — EVERY segment's movie, "
+          "comma-joined, then every microphone file that landed, singular for one — so the "
+          "one-segment sentence is byte for byte R1's, the shape section 5's full-document "
+          "row matches live")
+    # R2d: the two keys are written unconditionally, each segment through
+    # `segmentFields`, and `duration` is the sum.
+    fields = result.split("static func recordingFields")[1].split("\n    }\n")[0]
+    check('"pauses": result.pauses, "segments": segments' in fields
+          and "segmentFields(segment, ids:" in fields
+          and "static func segmentFields" in result
+          and '"started_at": startedAtFormatter.string(from: segment.startedAt)' in result,
+          "the result writes pauses and segments in its literal — always present — with each "
+          "entry built by segmentFields, which writes started_at")
+    formatter = result.split("static let startedAtFormatter")[1].split("}()")[0]
+    check(".withInternetDateTime" in formatter and ".withFractionalSeconds" in formatter
+          and "TimeZone(secondsFromGMT: 0)" in formatter,
+          "started_at's formatter is ISO 8601 with fractional seconds, pinned to UTC")
+    check("let total = result.segments.reduce(Ticks(0)) { $0 + $1.descriptor.duration }"
+          in fields and '"duration": total' in fields,
+          "duration is the SUM over the segments — the read is here because one segment "
+          "cannot tell the total from the first's over MCP")
+    check("result.micDescriptor" not in code(result) and "result.micOffset" not in code(result)
+          and "result.micDescriptor" not in code(tool) and "result.micOffset" not in code(tool)
+          and "first.micOffset" in fields and "first.micDescriptor" in fields,
+          "neither file's CODE reads a result-level micDescriptor or micOffset — the top "
+          "level's are the FIRST segment's (R2a: the convenience deliberately does not exist, "
+          "so a reader compiled against it would be wrong for a paused recording)")
     check('fields["mic_problem"] = problem' in result and "microphoneNote" in result,
           "the result carries mic_problem and the note mentions it")
     check("The recording was saved at" in result and "but could not "
@@ -1179,40 +1364,50 @@ def granted_tier(mcp):
           f"{host['width']}×{host['height']} at scale {host['scale']}")
 
     document = new_document(mcp, "detect")
-    message = refusal(mcp, "record_screen",
-                      {"seconds": 1, "place": False, "path": PROBE_FOLDER, "project": document})
+    asked = time.time()
+    detection, message = attempt(
+        mcp, "record_screen",
+        {"seconds": 1, "place": False, "path": PROBE_FOLDER, "project": document})
+    # Everything the tier promises, for a skip of the whole of it.
+    tier = GRANTED_CHECKS + DETECTION_CHECKS + MIC_CHECKS
     if not host["preflight"]:
         check(message is not None and message.startswith(SCREEN_SENTENCE),
               f"with the preflight FALSE the tool refuses with the Screen Recording sentence, "
               f"naming the pane (the launch clause may follow it): {message!r}")
-        skip("the granted tier: the Screen Recording grant is absent for this shell",
-             GRANTED_CHECKS + MIC_CHECKS)
+        skip("the granted tier: the Screen Recording grant is absent for this shell", tier)
         return
     if host["displays"] <= 0:
         check(message == NO_DISPLAY_SENTENCE,
               f"with the preflight TRUE and no display to share, the tool NAMES the "
               f"condition rather than hanging or spelling it as an index: {message!r}")
         skip(f"the granted tier: ScreenCaptureKit lists no display (console locked: "
-             f"{host['locked']}, display asleep: {host['asleep']})",
-             GRANTED_CHECKS + MIC_CHECKS)
+             f"{host['locked']}, display asleep: {host['asleep']})", tier)
         return
     check(message is None,
           f"detection: 1 s, place: false, into the headless instance's document — a TRUE "
           f"preflight with {host['displays']} display(s) followed by a refusal is a failure: "
           f"{message!r}")
     if message is not None:
-        skip("the granted tier: the detection recording was refused", GRANTED_CHECKS + MIC_CHECKS)
+        skip("the granted tier: the detection recording was refused", tier)
         return
+
+    # The tier's promise starts HERE — the detection answer's shape rows come
+    # before the second instance, so `counted` is read before them and the
+    # self-check at the end covers them too.
+    counted = checks
+    promised = GRANTED_CHECKS + DETECTION_CHECKS
+    not_made = 0
+    raised = 0
+    skipped_inside, failed = run_rows("detection shape rows", DETECTION_CHECKS, detection_rows,
+                                      mcp, detection, document, asked)
+    not_made += skipped_inside
+    raised += failed
 
     # The microphone's first precondition, read off the signed binary.
     entitled = "com.apple.security.device.audio-input" in subprocess.run(
         ["codesign", "-d", "--entitlements", "-", APP], capture_output=True, text=True).stdout
 
     instance = Instance("granted", GRANTED_PORT, extra=("-RCRecordingFolder", RUN))
-    counted = checks
-    promised = GRANTED_CHECKS
-    not_made = 0
-    raised = 0
     try:
         # The second precondition, read off the LAUNCHED instance — the one
         # the microphone rows run on — with the same never-records call.
@@ -1252,8 +1447,59 @@ def granted_tier(mcp):
           f"{promised} promised, {not_made} skipped by name, {raised} added by a raise)")
 
 
+def segment_of(answer):
+    """The first entry of `segments`, or an empty dict when the key is not a
+    non-empty list — so a row reads `{}` and fails rather than raising."""
+    segments = answer.get("segments")
+    return segments[0] if isinstance(segments, list) and segments else {}
+
+
+def detection_rows(mcp, answer, document, asked):
+    """The detection call's own answer — 1 s, `place: false`, no microphone,
+    never paused — read for R2d's result shape with ONE segment, on the
+    headless instance's document. `asked` is when the call was made."""
+    pauses = answer.get("pauses")
+    check(pauses == 0 and isinstance(pauses, int) and not isinstance(pauses, bool),
+          f"a recording nobody paused answers pauses 0, an integer: {pauses!r}")
+    segments = answer.get("segments")
+    check(isinstance(segments, list) and len(segments) == 1,
+          f"segments is ALWAYS present and holds exactly one entry for it: "
+          f"{type(segments).__name__} of {len(segments) if isinstance(segments, list) else '?'}")
+    segment = segment_of(answer)
+    check(segment.get("path") == answer["path"],
+          "the segment's path is the top level's — the recording's file")
+    check(segment.get("duration") == answer["duration"],
+          f"…and its duration is the top level's: with one segment the TOTAL is the "
+          f"segment's ({answer['duration']} ticks)")
+    started = segment.get("started_at")
+    check(isinstance(started, str) and STARTED_AT.match(started) is not None,
+          f"started_at is spelled as ISO 8601 UTC to the millisecond with a Z: {started!r}")
+    instant = parse_started_at(started)
+    check(instant is not None and -1.0 <= instant - asked <= 60.0,
+          f"…and parses (datetime.fromisoformat) to an instant between the call and a minute "
+          f"after it: {'?' if instant is None else format(instant - asked, '+.3f')} s after "
+          f"the call was made — a formatter in local time is off by the host's UTC offset "
+          f"here")
+    listed = {m["id"]: m for m in project(mcp, document)["media"]}
+    check(segment.get("media") == answer["media"] and "clip" not in segment
+          and listed.get(answer["media"], {}).get("path") == segment.get("path")
+          and segment.get("mic_offset") == answer["mic_offset"]
+          and "mic_path" not in segment and "mic_problem" not in segment,
+          "the segment's media is the top level's and is the document's entry for that path; "
+          "it carries no clip (place: false), its mic_offset is the top level's, and with no "
+          "microphone asked for it has no mic_path and no mic_problem")
+    check(segment.get("width") == answer["width"] and segment.get("height") == answer["height"]
+          and segment.get("fps") == answer["fps"],
+          f"the segment carries its own width, height and fps, the top level's for one "
+          f"segment: {segment.get('width')}×{segment.get('height')} at {segment.get('fps')}")
+    check(set(segment) <= SEGMENT_KEYS,
+          f"its keys are among the fourteen the description names: "
+          f"{sorted(set(segment) - SEGMENT_KEYS)} unexpected")
+
+
 def granted_rows(mcp, host):
     # (a) NO document open: the recording opens as a new project.
+    asked = time.time()
     answer = mcp.call_with("record_screen", {"seconds": 2})
     path = answer["path"]
     check(answer["landed"] == "new_project" and answer["ok"],
@@ -1271,6 +1517,22 @@ def granted_rows(mcp, host):
     check(answer["project"]["path"] == path,
           "and is addressable by project: <the recording's path>")
     check(answer["stopped_by"] == "stopped", f"stopped_by is stopped: {answer['stopped_by']}")
+    # R2d's shape on the new-project door: one segment, its ids looked up by
+    # PATH on the document `untitled(around:)` built.
+    segments = answer.get("segments")
+    segment = segment_of(answer)
+    check(answer.get("pauses") == 0 and isinstance(segments, list) and len(segments) == 1,
+          f"never paused: pauses 0 and one segment (pauses {answer.get('pauses')!r}, "
+          f"{len(segments) if isinstance(segments, list) else '?'} segment(s))")
+    check(segment.get("path") == path and segment.get("duration") == answer["duration"],
+          "the segment's path and duration are the top level's")
+    check(segment.get("width") == answer["width"] and segment.get("height") == answer["height"]
+          and segment.get("fps") == answer["fps"],
+          "…and so are its own width, height and fps")
+    instant = parse_started_at(segment.get("started_at"))
+    check(instant is not None and -1.0 <= instant - asked <= 60.0,
+          f"its started_at is within a minute after the call: {segment.get('started_at')!r}, "
+          f"{'?' if instant is None else format(instant - asked, '+.3f')} s")
     reported = project(mcp, path)
     media = reported["media"][0]
     if media["fps"] == [60, 1]:
@@ -1292,6 +1554,9 @@ def granted_rows(mcp, host):
           "the one clip shows the recording from 0")
     check(answer["has_audio"] and answer["audio_tracks"] == 1,
           "the movie holds one audio track (system audio is on by default)")
+    check(segment.get("media") == answer["media"] and segment.get("clip") == answer["clip"],
+          "the segment's media and clip — looked up by PATH on the new document — are the "
+          "top level's")
     undone = refusal(mcp, "undo", {"project": path})
     check(undone is not None and undone.startswith(NOTHING_TO_UNDO),
           f"a mic-less new project has NO undo step — its first project is what it is: "
@@ -1321,6 +1586,11 @@ def granted_rows(mcp, host):
           "media id")
     check(answer["new_media"] == [answer["media"]] and answer["new_clips"] == [answer["clip"]],
           "the created ids are reported: one media, one clip")
+    segment = segment_of(answer)
+    check(answer.get("pauses") == 0 and segment.get("media") == answer["media"]
+          and segment.get("clip") == answer["clip"],
+          "the document landing's one segment carries the placement's PREDICTED ids, equal "
+          "to the top level's")
     midpoint = 2 * SEC + answer["duration"] // 2
     after = render(mcp, document, midpoint)
     yavg = luma_average(after)
@@ -1355,6 +1625,9 @@ def granted_rows(mcp, host):
     check("new_media" in answer and "new_clips" not in answer and "clip" not in answer
           and "add_clip" in answer.get("note", ""),
           "place: false lands the media alone, with import_media's note and no clip id")
+    segment = segment_of(answer)
+    check(segment.get("media") == answer["media"] and "clip" not in segment,
+          "…and its one segment has the media and no clip either")
 
     # (e2) A blank path is the default folder, never the process's cwd
     # (`URL(fileURLWithPath: "")` is the cwd — the R1 review's finding).
@@ -1381,6 +1654,9 @@ def granted_rows(mcp, host):
     check(any(c["id"] == answer["clip"] and c["source"]["media"] == answer["media"]
               for c in view["clips"]),
           "and the nest's view shows the clip with the new media")
+    segment = segment_of(answer)
+    check(segment.get("clip") == answer["clip"] and segment.get("media") == answer["media"],
+          "…and the segment's ids are the ones the view shows — predicted inside the scope")
     mcp.call_with("set_scope", {"project": document})
     outside = project(mcp, document)
     check(not any(c["id"] == answer["clip"] for c in outside["clips"])
@@ -1498,6 +1774,15 @@ def microphone_rows(mcp):
           f"microphone: true writes a second file beside the movie: {mic_path}")
     check("mic_media" in answer and "mic_clip" in answer and "mic_duration" in answer,
           "the answer carries mic_media, mic_clip and mic_duration")
+    segment = segment_of(answer)
+    check(segment.get("mic_path") == mic_path
+          and segment.get("mic_duration") == answer.get("mic_duration")
+          and segment.get("mic_offset") == answer["mic_offset"],
+          "the one segment's mic_path, mic_duration and mic_offset are the top level's")
+    check(segment.get("mic_media") == answer.get("mic_media")
+          and segment.get("mic_clip") == answer.get("mic_clip")
+          and "mic_problem" not in segment,
+          "…and its mic_media and mic_clip too, with no mic_problem in it")
     tracks, picture, voice = landed(answer)
     check(voice is not None and tracks[voice["track"]]["name"] == "Microphone"
           and voice["source"]["media"] == answer["mic_media"],
@@ -1544,6 +1829,10 @@ def microphone_rows(mcp):
     tracks, picture, voice = landed(answer)
     offset = answer["mic_offset"]
     gap = answer.get("mic_duration", 0) - answer["duration"]
+    check(answer.get("pauses") == 0 and len(answer.get("segments") or []) == 1
+          and segment_of(answer).get("mic_offset") == offset,
+          f"the playhead-0 recording is one segment, never paused, whose mic_offset is the "
+          f"one the branch below reads ({offset} ticks)")
     check(picture is not None and voice is not None and picture["start"] == 0
           and tracks[voice["track"]]["name"] == "Microphone",
           f"at playhead 0 the picture is at 0 and the voice is on its Microphone track: "
@@ -1581,7 +1870,7 @@ def cleanup():
 def main():
     os.makedirs(WORK, exist_ok=True)
     mcp = MCP(PORT, timeout=180)
-    print(f"road map 3, R1 — record_screen, against 127.0.0.1:{PORT}")
+    print(f"road map 3, R1 and R2 — record_screen, against 127.0.0.1:{PORT}")
     try:
         section("0 — the catalog: 75 exactly, record_screen's arguments, no scope on it",
                 catalog_part, mcp)

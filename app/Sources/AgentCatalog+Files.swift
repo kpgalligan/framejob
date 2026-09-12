@@ -123,6 +123,77 @@ extension AgentServer {
                 + "kept and never upscaled, and the width and height reported back are the "
                 + "file's: a vertical 1080 × 1920 project's GIF default is 152 × 270.",
         ]
+        // `record_screen`'s pause paragraph and its result paragraph (road
+        // map 3, R2d), hoisted for the budget reason above: the entry's
+        // description is one `+` chain of some seventy literals, and the two
+        // paragraphs a paused recording added would have taken it past the
+        // type checker's budget in the one place `fileTools` cannot be split.
+        // `tools/proof/recording_proof.py` section 0 reads the phrases and
+        // every result key off the finished string, so the keys are named
+        // here exactly as `AgentServer+RecordingResult.swift` writes them.
+        let recordingPauseClause: String =
+            "While it records, a status item in the menu bar shows the elapsed time with a "
+            + "menu offering Pause Recording and Stop Recording — Resume Recording and Stop "
+            + "Recording while it is paused — and File ▸ Stop Recording works too. A "
+            + "person's Stop from the menu bar or the File menu ends an agent's recording "
+            + "EARLY and it still lands, with stopped_by: stopped — the same value the "
+            + "tool's own stop at the span's end yields — and a duration shorter than the "
+            + "span, which is what says so; user_stopped is only the SYSTEM's own "
+            + "screen-recording indicator, and system_stopped a display that slept. PAUSE: "
+            + "the span is wall clock, so a person's pause SHORTENS what the call records — "
+            + "the paused stretch is in no file — and the result's pauses says how many "
+            + "times Pause was pressed (0 when never; a pause with no resume before the stop "
+            + "still counts). A paused "
+            + "recording is a SEQUENCE of files, one per stretch between a start or resume "
+            + "and a pause or the stop, each named by its own start time and, with a "
+            + "microphone, carrying its own microphone file with its own measured "
+            + "mic_offset; every segment lands as its own clip placed at the previous one's "
+            + "end on ONE track, touching and never overlapping, and each microphone file as "
+            + "its own clip on the Microphone track at its own offset. segments carries one "
+            + "entry per file (exactly one for an unpaused recording) and duration is the "
+            + "TOTAL recorded across them. "
+        let recordingResultClause: String =
+            "The call blocks for seconds plus about a second of start and finish, and up to "
+            + "75 s more if the writers are slow to close the files — 60 s more for each "
+            + "further segment of a paused recording, whose files are probed in turn; a "
+            + "timeout names the movies, which may still finish on their own. THE RESULT "
+            + "carries: path (the FIRST segment's movie — the recording's file, the one a "
+            + "new project is addressed by); mic_offset (ALWAYS present — the first "
+            + "segment's, 0 without a microphone); mic_path and mic_duration (the first "
+            + "segment's) when its microphone file landed, and mic_problem — every "
+            + "segment's sentence, joined — when a microphone was asked for and any "
+            + "segment's did not land, which can stand beside a mic_path when it was a "
+            + "later segment's; media and clip (the first segment's ids; clip and mic_clip "
+            + "absent with place: false), mic_media and mic_clip (its microphone's); "
+            + "duration (ticks — the TOTAL recorded, every segment's summed, which for an "
+            + "unpaused recording is the movie's own); width, height, fps [num, den], "
+            + "has_audio and audio_tracks — the FIRST segment's movie's (what it holds: "
+            + "audio_tracks is 1 with system_audio, else 0 — the microphone is never a "
+            + "track of it); pauses (an integer, the count of Pause presses); segments (an "
+            + "array, ALWAYS present, one entry per file in order, each with path, "
+            + "duration, started_at — the screen's own start as an ISO-8601 UTC timestamp "
+            + "to the millisecond — its OWN width, height and fps, because a screen "
+            + "recording's rate is whatever the screen did and differs per segment, and "
+            + "mic_path, mic_duration, mic_offset and mic_problem on the same terms as the "
+            + "top level for THAT segment's files, plus media, clip, mic_media and mic_clip "
+            + "when they are known); stopped_by — stopped for the tool's own stop and for a "
+            + "person's Stop from Reelcut's menu-bar item or the File menu, user_stopped "
+            + "for the system's own screen-recording indicator, system_stopped for a "
+            + "display that slept; landed (document or new_project); note, when "
+            + "there is something to say; project, the usual summary; and for a document "
+            + "landing the created ids as every edit reports them — new_media, new_clips, "
+            + "and new_tracks when a track was minted — plus scope and document_ops when it "
+            + "landed inside a nest. A failure AFTER the files were written names every one "
+            + "of them: \"The recording was saved at <path> but could not be added: …\", the "
+            + "movies comma-separated and the microphone files after them. UNDO: for a "
+            + "document landing, undo removes every segment's media and clip(s) in ONE step "
+            + "and leaves the files on disk, as undoing Add Media… does; a recording that "
+            + "opened as a new project has no undo step for its first segment — that "
+            + "picture IS the document — and with a microphone on an unpaused recording, "
+            + "undo removes the microphone pair (the step is named Add Microphone) and "
+            + "leaves the picture, while a PAUSED recording's later segments and every "
+            + "microphone clip are one step named Add Recording Segments, so undo leaves "
+            + "the first picture alone in the document."
         return [
             // MARK: Media
 
@@ -442,8 +513,8 @@ extension AgentServer {
                     + "the picture began after the microphone; a negative start is the head "
                     + "trimmed, not a clip placed late. A microphone that never started, whose "
                     + "writer failed or whose file will not read does NOT fail the recording: "
-                    + "the picture lands, mic_path and the mic ids are absent, and mic_problem "
-                    + "carries the sentence (the note repeats it). THE GRANTS: this tool never "
+                    + "the picture lands, that segment's mic_path and mic ids are absent, and "
+                    + "mic_problem carries the sentence (the note repeats it). THE GRANTS: this tool never "
                     + "asks for one and never opens the picker. The Screen Recording grant "
                     + "(and the Microphone grant when microphone is true) must already be held "
                     + "by this process — the panel is where somebody grants them — and a "
@@ -457,32 +528,8 @@ extension AgentServer {
                     + "without the Microphone grant, a project naming nothing open), then the "
                     + "Screen Recording grant, then the display or window lookup — where a "
                     + "console that is locked or asleep lists NO display and is refused as "
-                    + "that, by name — then the recording itself. While it records, a status "
-                    + "item in the menu bar shows the elapsed time with a Stop Recording menu, "
-                    + "and File ▸ Stop Recording works too: a person at the machine can end an "
-                    + "agent's recording early, and it still lands, with stopped_by saying so. "
-                    + "The call blocks for seconds plus about a second of start and finish, "
-                    + "and up to 75 s more if the writers are slow to close the files; a "
-                    + "timeout names the movie, which may still finish on its own. THE RESULT "
-                    + "carries: path (the movie); mic_path, mic_duration and mic_offset when a "
-                    + "microphone file landed, mic_problem when one was asked for and did not; "
-                    + "media and clip (the picture's ids; clip absent with place: false), "
-                    + "mic_media and mic_clip (the microphone's); duration (ticks), width, "
-                    + "height, fps [num, den], has_audio and audio_tracks (what the MOVIE "
-                    + "holds: 1 with system_audio, else 0 — the microphone is never a track of "
-                    + "it); stopped_by — stopped, or user_stopped / system_stopped when the "
-                    + "menu bar's indicator or the system ended it early; landed (document or "
-                    + "new_project); note, when there is something to say; project, the usual "
-                    + "summary; and for a document landing the created ids as every edit "
-                    + "reports them — new_media, new_clips, and new_tracks when a track was "
-                    + "minted — plus scope and document_ops when it landed inside a nest. A "
-                    + "failure AFTER the file was written names it: \"The recording was saved "
-                    + "at <path> but could not be added: …\". UNDO: for a document landing, "
-                    + "undo removes the media and the clip(s) in ONE step and leaves the file "
-                    + "on disk, as undoing Add Media… does; a recording that opened as a new "
-                    + "project has no undo step — the picture IS the document — and with a "
-                    + "microphone, undo removes the microphone pair (the step is named Add "
-                    + "Microphone) and leaves the picture.",
+                    + "that, by name — then the recording itself. " + recordingPauseClause
+                    + recordingResultClause,
                 [
                     "seconds": [
                         "type": "number", "minimum": 1, "maximum": 600,
@@ -543,8 +590,9 @@ extension AgentServer {
                         "description": "Put the clip (and the microphone's) on the timeline at "
                             + "the playhead (default true), in ONE undo step with the media. "
                             + "false adds the media to the list and no clip — import_media's "
-                            + "shape — and the answer carries no clip id. For a NEW project "
-                            + "the picture is the document, so its clip is at 0 whatever "
+                            + "shape — and the answer carries no clip or mic_clip id. For a "
+                            + "NEW project the picture is the document, so its clips — one "
+                            + "per segment, the first at 0 — are on the timeline whatever "
                             + "place says, and the answer notes it.",
                     ],
                     "path": [

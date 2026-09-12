@@ -9,13 +9,15 @@ import ScreenCaptureKit
 /// grants it stands on — so that `tools/proof/recording_probe.py` can read
 /// every field back from a bare Mach-O that never starts a stream.
 ///
-/// `ScreenRecorder.swift` (with `+Microphone.swift`, `+Finishing.swift` and
-/// `+Content.swift`) is the other half: the class that owns the `SCStream`,
-/// the `SCRecordingOutput` and, when a microphone is chosen, the
-/// `AVCaptureSession` for the second file. The result types a recording
-/// ends as — `StopReason`, `RecordingResult`, `RecorderError` — are
-/// `RecordingResult.swift`, moved off the foot of this file at the 400-line
-/// cap; they are still values a probe can make.
+/// `ScreenRecorder.swift` (with `+Pause.swift`, `+Microphone.swift`,
+/// `+Finishing.swift`, `+Delegates.swift` and `+Content.swift`) is the other
+/// half: the class that owns the `SCStream`, one `SCRecordingOutput` per
+/// SEGMENT (R2: a pause removes one and a resume adds the next) and, when a
+/// microphone is chosen, the `AVCaptureSession` for the second file. The
+/// result types a recording ends as — `StopReason`, `RecordingSegment`,
+/// `RecordingResult`, `RecorderError` — are `RecordingResult.swift`, moved
+/// off the foot of this file at the 400-line cap; they are still values a
+/// probe can make.
 ///
 /// Three R0 facts shape the configuration and are restated on the fields
 /// they decide (`designs/reelcut-roadmap-3.md`, "R0 — the answers"):

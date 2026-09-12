@@ -63,10 +63,13 @@ final class WelcomeWindowController: NSWindowController {
             action: #selector(AppDelegate.newProject(_:)))
         // Road map 3, R1c: the recorder panel, reachable with no document
         // open — a nil-target action, `newProject`'s shape, resolved by the
-        // application delegate at the end of the responder chain.
+        // application delegate at the end of the responder chain. Its OWN
+        // action since the R2 review, not the File menu's `newRecording`:
+        // that item reads Stop Recording and stops while a recording runs,
+        // and a button whose title never changes must not.
         let recordButton = StickerButton(
             title: "New Recording…", style: .secondary, target: nil,
-            action: #selector(AppDelegate.newRecording(_:)))
+            action: #selector(AppDelegate.showRecorderPanel(_:)))
         let buttons = NSStackView(views: [openButton, newButton, recordButton])
         buttons.translatesAutoresizingMaskIntoConstraints = false
         buttons.orientation = .horizontal

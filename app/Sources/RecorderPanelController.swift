@@ -13,14 +13,19 @@ import ScreenCaptureKit
 /// the popups and turns them into a `RecordingChoice` and back;
 /// `+Recording.swift` is everything from Record pressed to the recording
 /// running, `+Landing.swift` everything from the recording's end to the
-/// note that says where it went, and `+Picker.swift` the window picker.
-/// Five files at the 400-line cap, and the crossing members are internal
-/// for it, the tree's rule for a class split across files.
+/// note that says where it went, `+Picker.swift` the window picker, and
+/// `+Pause.swift` the pause and the resume, the hidden recording's one door
+/// and the phases drawn (R2c). Six files at the 400-line cap, and the
+/// crossing members are internal for it, the tree's rule for a class split
+/// across files.
 ///
 /// **It is an `NSPanel`, floating and NON-ACTIVATING**, and each of the four
-/// window settings below is load-bearing. `.nonactivatingPanel` so Stop can
-/// be clicked without bringing Reelcut forward over the thing being recorded;
-/// `.floating` so it stays above that thing; `hidesOnDeactivate = false`
+/// window settings below is load-bearing. `.nonactivatingPanel` so Record,
+/// and the countdown's Cancel, can be clicked with the application about to
+/// be recorded still FRONTMOST — the panel is off screen once the recording
+/// runs (below), so this is for the seconds before it, when activating
+/// Reelcut would put its document windows over the target; `.floating` so
+/// it stays above that thing; `hidesOnDeactivate = false`
 /// because `NSPanel` defaults it TRUE (`PreviewWindowController` measured it)
 /// and a recorder panel that vanished the moment the person switched to the
 /// application they are about to record would be useless; and NO window
@@ -36,26 +41,42 @@ import ScreenCaptureKit
 /// natural place for a recorder, used to put its Cancel button under the
 /// Dock.
 ///
-/// **Visibility during a recording** (R0 q3): a DISPLAY source is recorded
-/// through a programmatic filter that excludes Reelcut's own application —
-/// measured at 99 % of its window pixels removed — so the panel STAYS, with
-/// its Stop button and the microphone meter. A PICKED window's filter is the
-/// picker's own and whether it honours `excludedBundleIDs` for capture is
-/// unmeasured, so the panel orders OUT for the recording's duration and comes
-/// back when it lands; Stop lives on the status item and the File menu
-/// meanwhile — and `show()` BEEPS while `hiddenForRecording` (R1 review),
-/// because the quit guard below calls it, and a panel un-hidden into the
-/// recording would be in the file the hiding exists to keep it out of.
+/// **Visibility during a recording** (decision 7, R2c): the panel orders
+/// OUT at `recordingDidStart` for EVERY source, and the status item is the
+/// recording's whole chrome — Pause, Resume and Stop are its menu; File ▸
+/// Stop Recording still stops. R1 kept a DISPLAY recording's panel up, its
+/// filter excluding Reelcut (R0 q3), and hid only a PICKED window's; the
+/// user asked for the dialog to go away whatever is recorded, and a panel
+/// whose one live control was a Stop the menu bar also has earned nothing
+/// on screen. It comes back after the landing ONLY when it was on screen
+/// as the recording began (`showWhenLanded`, read at `recordingDidStart`)
+/// AND the landing left a note (`revealIfNoted`, `+Landing.swift`): a stop
+/// from the system's own indicator, a closed target, a microphone problem,
+/// a refused resume, a failure. A clean recording lands and the panel
+/// stays away, and a panel closed before the recording began stays closed
+/// whatever the note; ⌥⌘N shows it again. `show()` BEEPS while
+/// `hiddenForRecording` (R1 review) — the welcome window's button reaches
+/// it — because a panel un-hidden into the recording would be in the file;
+/// the quit guard goes through `revealControls()` instead (`+Pause.swift`).
+///
+/// Two limits of that chrome, accepted (R2 review). With the panel hidden
+/// the status item is the ONLY Pause and Resume, and macOS drops a status
+/// item that does not fit the menu bar — behind a notch, in a crowded bar
+/// — so there Stop survives in the File menu and Pause and Resume do not.
+/// And "●" and "❚❚" differ in width under `variableLength`, so the items to
+/// the left of it shift by a few points at each pause and resume.
 ///
 /// **Quit while recording, and the order AppKit asks in.**
 /// `AppDelegate.applicationShouldTerminate` cancels a quit while
-/// `ScreenRecorder.shared.isRecording` and shows this panel (a beep, for a
-/// picked-window recording: Stop is on the status item), and it is a
-/// BACKSTOP: `NSDocumentController` reviews modified documents FIRST, so the
-/// save sheet comes before the guard, and a target document the review
-/// CLOSED lands as `.newProject` — `RecordingLanding.resolve` looks the
-/// destination up by `recipeKey`, never minted twice, so the miss is exact,
-/// and the landing's note says the document was closed.
+/// `ScreenRecorder.shared.isRecording` and calls `revealControls()` — the
+/// status item's menu, opened, while this panel is hidden for its
+/// recording; `show()` for any other (a tool's, which File ▸ Stop Recording
+/// ends) — and it is a BACKSTOP: `NSDocumentController` reviews modified
+/// documents FIRST, so the save sheet comes before the guard, and a target
+/// document the review CLOSED lands as `.newProject` —
+/// `RecordingLanding.resolve` looks the destination up by `recipeKey`,
+/// never minted twice, so the miss is exact, and the landing's note says
+/// the document was closed.
 ///
 /// **Two Record Into rules.** The popup is built from `NSMenuItem`s carrying
 /// each document's `recipeKey` in `representedObject` and is read from
@@ -108,6 +129,7 @@ final class RecorderPanelController: NSWindowController {
         case countdown(Int)
         case starting
         case recording
+        case paused
         case stopping
         case landing
     }
@@ -148,12 +170,17 @@ final class RecorderPanelController: NSWindowController {
     var sourceBeforePick = 0
     /// nil follows the front document; set by the popup's own action.
     var chosenDestination: RecordingDestination?
-    /// A picked-window recording is running and the panel must stay off
-    /// screen for it (`show()` beeps). Set for EVERY picked recording, not
-    /// only one that found the panel visible; `showWhenLanded` remembers
-    /// whether to bring it back.
+    /// A recording is running and the panel is off screen for it (`show()`
+    /// beeps). Set at EVERY `recordingDidStart`, visible panel or not;
+    /// `showWhenLanded` remembers whether it WAS visible, which is what
+    /// `revealIfNoted` reads after the landing.
     var hiddenForRecording = false
     var showWhenLanded = false
+    /// The recorder's sentence for a resume it refused (`+Pause.swift`):
+    /// REPLACED by each retry, cleared when a resume lands or the next
+    /// recording starts, one of the two parts the live note is rebuilt
+    /// from, and a sentence the landing's note carries (`+Landing.swift`).
+    var resumeProblem: String?
     /// Each press of Record is one attempt, numbered, and the completions
     /// the attempt hands out carry its number (`+Recording.swift`): a
     /// shareable-content answer from an attempt that was abandoned or timed
@@ -258,11 +285,19 @@ final class RecorderPanelController: NSWindowController {
     /// again here rather than left to `cancelCountdown`, because a panel
     /// closed during the microphone PROMPT (before any countdown) may also
     /// hold one, and an input left open past the panel is the leak the
-    /// discard exists to close (R1 review). A RECORDING carries on — the
-    /// status item and File ▸ Stop Recording can end it — and the sync timer
-    /// stops until the next `show()`.
+    /// discard exists to close (R1 review). A close while `.starting` is a
+    /// Stop (R2 review) — the attempt abandoned before `launch`, the
+    /// recording stopped after it, `stopRecording`'s own two arms — because
+    /// a start that ran on behind a closed panel would read `showWhenLanded`
+    /// false and land every later note where nobody sees it. A RECORDING
+    /// carries on — the status item and File ▸ Stop Recording can end it —
+    /// and the sync timer stops until the next `show()`.
     @objc private func panelWillClose(_ note: Notification) {
-        if case .countdown = phase { cancelCountdown() }
+        switch phase {
+        case .countdown: cancelCountdown()
+        case .starting: stopRecording()
+        default: break
+        }
         recorder.discardPreparedMicrophone()
         syncTimer?.invalidate()
         syncTimer = nil
@@ -270,9 +305,9 @@ final class RecorderPanelController: NSWindowController {
 
     // MARK: - Showing
 
-    /// Beeps and shows nothing while a picked-window recording has the
-    /// panel hidden (the type doc): the quit guard is the caller that
-    /// would otherwise un-hide it into the recording.
+    /// Beeps and shows nothing while a recording has the panel hidden (the
+    /// type doc): the welcome window's button is the caller that would
+    /// otherwise un-hide it into the recording.
     func show() {
         guard !hiddenForRecording else {
             NSSound.beep()
@@ -306,57 +341,8 @@ final class RecorderPanelController: NSWindowController {
         }
     }
 
-    /// Draws the phase: the button's title and enabled state, the controls
-    /// locked while anything is in flight, the countdown numeral, the
-    /// footnote, and the window refitted to whatever appeared or went.
-    func syncPhase() {
-        let idle = phase == .idle
-        let controls: [NSControl] = [
-            sourcePopup, microphonePopup, ratePopup, sizePopup, destinationPopup,
-            systemAudioSwitch, showClicksSwitch,
-        ]
-        for control in controls { control.isEnabled = idle }
-        var countdown: String?
-        switch phase {
-        case .idle:
-            recordButton.title = "Record"
-            recordButton.isEnabled = true
-        case .countdown(let remaining):
-            recordButton.title = "Cancel"
-            recordButton.isEnabled = true
-            countdown = "\(remaining)"
-        case .starting:
-            recordButton.title = "Starting…"
-            recordButton.isEnabled = false
-        case .recording:
-            recordButton.title = "Stop"
-            recordButton.isEnabled = true
-        case .stopping:
-            recordButton.title = "Stopping…"
-            recordButton.isEnabled = false
-        case .landing:
-            recordButton.title = "Adding…"
-            recordButton.isEnabled = false
-        }
-        recordButton.invalidateIntrinsicContentSize()
-        countdownLabel.stringValue = countdown ?? ""
-        countdownLabel.isHidden = countdown == nil
-        refreshStatusLabel()
-        fitWindowToContent()
-    }
-
-    /// The footnote: the folder while idle, the elapsed time while recording.
-    func refreshStatusLabel() {
-        switch phase {
-        case .recording, .stopping:
-            statusLabel.stringValue = "● " + RecorderStatusItem.label(for: recorder.elapsed)
-            statusLabel.textColor = DS.meterClip
-        default:
-            statusLabel.stringValue =
-                "saved in " + (RecordingFiles.folder().path as NSString).abbreviatingWithTildeInPath
-            statusLabel.textColor = DS.textFaint
-        }
-    }
+    // `syncPhase()` and `refreshStatusLabel()` — the phases drawn — are
+    // `+Pause.swift`'s since the R2 review, the base file's toll.
 
     func setNote(_ text: String) {
         noteLabel.stringValue = text

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Road map 3, R1 — the recorder's APP half, measured (sections 1–8).
+"""Road map 3 — the recorder's APP half, measured: R1 (sections 1–8) and R2's
+pause and resume (rows 3o–3t, section 4b, rows 5p–5u, 7d, and section 9).
 
 Why a probe and not an MCP script. Three of the things R1a added have no
 caller a running binary can be asked to reach, and one of them is the row
@@ -85,8 +86,10 @@ request: the review measured that `SCContentFilter()` and
 `SCStream(filter:configuration:delegate:)` CONSTRUCT without a grant and
 only `startCapture` needs one, so the probe builds a `Session` from those,
 a PNG at the movie URL (a "movie" `MediaImporter.probe` answers with a
-descriptor) and a bare `AVCaptureAudioFileOutput` whose `stopRecording`
-delivers nothing — which HOLDS the finishing wait until the probe drives
+descriptor) and — since R2 — a `SpyAudioOutput`, an `AVCaptureAudioFileOutput`
+subclass with no session that COUNTS `stopRecording` and keeps the URLs
+`startRecording(to:)` is asked for (a bare output delivers nothing either
+way) — which HOLDS the finishing wait until the probe drives
 the microphone's did-finish itself, so every row is deterministic — and
 calls the three delegate methods as the frameworks would. Rows: a second
 `stop()` while `.finishing` is registered and never `.busy`, and one
@@ -109,8 +112,60 @@ an unknown id are no-ops that leave it idle; and two `stop()`s while
 timer (20 s) and `failStart`, which is why finding 5's row is the two
 sentences and not the timer.
 
+**Then R2a — pause and resume over the SAME faked session** (rows 3o–3t),
+which stands on one more measurement: `addRecordingOutput` accepts an
+output on a never-started, grant-less `SCStream`, `removeRecordingOutput`
+of an added output returns, and a fresh output can be added after the
+remove — while a second output beside an attached one, an output never
+added, and any add after `stopCapture` all throw −3812, and no file is
+ever written — so the `Fake` now ADDS its last segment's output (R1's
+pre-`startCapture` order) and `pause()` / `resume()` run their real
+bodies. 3o: `pause()` → `.paused`, `isPaused`, still `isRecording`, the
+segment stamped, the meter silenced, the writer asked to stop ONCE,
+`elapsed` read twice 0.3 s apart EQUAL (and about the second recorded), a
+poll publishing nothing, a second `pause()` `.alreadyPaused` by name;
+`resume()` → `.recording` with a SECOND segment minted in the choice's
+folder as `Screen Recording <date> at <time>.mov` (its own start time,
+never the first's name), its mic file beside it, `micRecordingCalledAt`
+stamped, the ONE writer restarted to exactly that file; the closed
+segment's did-finish and mic did-finish landing AFTER the resume INERT
+(the state stays `.recording`, only its flags move); the new pair's
+did-starts stamping segment 1 alone (found by output identity and by file
+URL); a stray output and a stray file changing nothing; `resume()` while
+recording `.notPaused`; a second pause; `stop()` while PAUSED beginning
+finishing as `.stopped` with the pause's stamp KEPT and no second
+`stopRecording`; and the walker, meeting segment 1's movie written EMPTY,
+failing the RECORDING (landing the readable one is deliberately not
+built) with `filesKept(finishFailed)` naming all four files comma-joined
+in segment order. 3p: a refused pause (the output never added, so the
+remove throws) rethrown as `.finishFailed` with the recorder STAYING
+`.recording` and nothing changed. 3q: a refused resume (the state paused
+BY THE PROBE with the output still attached, so the add throws) rethrown
+as `.startFailed` with the recorder STAYING `.paused`, no segment minted,
+no `startRecording`. 3r: a did-FAIL on a CLOSED segment (paused, its
+did-finish still in flight) ending the recording, the open segment
+stamped and its writer stopped, the walker naming every file. 3s: the
+pause's own did-finish inert, then an external `.userStopped` while paused
+landing ONE segment with `pauses` 1 — the count is STORED per press, never
+`segments − 1` (the R2 review: a pause with no resume before the stop read
+0) — and, the review's other three: a NON-external stream stop while
+paused LANDING as `systemStopped` rather than failing with every file
+whole on disk; a did-start landing after its own segment's pause IGNORED
+(the span never runs backwards); and a second resume within one second
+minting a name the session does not already HOLD (three different names,
+no file of any of them yet). 3t: the walker over THREE closed segments
+with chosen stamps — `elapsed` 2 + 3 + 1.5 = 6.5 s with the two gaps
+never counted, frozen; ONE result of three `RecordingSegment`s in order,
+`pauses` 2, the result's `descriptor` and `startedAt` the first's;
+segment 0's microphone never started (no file — the sentence, offset 0),
+segment 1's landed with ITS OWN offset −12 000, segment 2's writer failed
+(the writer's sentence naming the file it left); `micProblem` the two
+sentences joined by a space in order. Beside them 3g pins
+`RecorderError.notPaused`'s sentence and `filesKept` over two movies and
+two microphone files, each list comma-joined.
+
 Section 4 (`landing`) is the LANDING — `RecordingLanding.placement`,
-`microphonePlacement` through `ProjectDocument.untitled(around:)`, and
+`remainderPlacement` (R1's `microphonePlacement`, over every segment since R2) through `ProjectDocument.untitled(around:)`, and
 `resolve` — lane B's fifteen scratch rows made tracked, one check per fact.
 Every placement row COMMITS the op list through the document's own door
 (`performGroupedEdit`, the panel's) and compares what the core minted with
@@ -169,6 +224,58 @@ at the commit (the landing's first comment said the trial could not see
 it, and this row is what shows it can); one track under the cap the same
 nested landing trials clean and commits the 64th track inside the nest.
 
+Section 4b (`segments`) is the landing over a SEQUENCE (R2b) — lane L's
+scratch instrument folded in, every row committed through the document's
+own door and compared with the prediction, over the R2 review's
+`Placement` (four lists with ONE entry per segment, nil where nothing was
+minted, and `notes`). A: two segments on a fresh document → `[add_media,
+add_media, add_clip, add_clip]`, `mediaIds [2, 3]`, `clipIds [4, 5]`, the
+mic lists `[nil, nil]`, clip 2 starting at clip 1's END on the same
+track, no transition (touching is a cut), one undo step "Add Recording",
+the second add_clip SENT at 3 000 000 — the end read off the trial. B:
+off-grid durations (3 000 007, 1 504 999) — each clip's length as the
+core SNAPS it, each start the previous end, never a sum. C and D: a
+blocker refusing the second (7–15 s) or the first (1–9 s) segment on the
+front track → ALL on a new front track with the predicted id, touching
+from 0, the blocker's track untouched. E: the microphone floor — voice 2
+wants 3 000 000 − 11 000 and the floor is voice 1's end 3 020 000, so it
+lands AT the floor with a 40 000-tick head trimmed (in 40 000, length
+2 980 000), the ops `add_clip` at the floor, `trim_start` to floor + head,
+`move_clip` by −head — never at 2 989 000, which the core would snap a
+frame UNDER the floor and accept as a transition. E2: a lagging voice
+(−30 000) above the floor, no trim. E3: offsets 4 000 / 9 999 / 10 000 /
+15 000 / 31 000 AT the floor — the head is the core's snap of the
+shortfall, half away from zero, so 9 999 sends no trim and 10 000 one
+frame. E4: the hazard on the core directly — an `add_clip` three quarters
+of a frame under a clip's end is snapped a frame early and ACCEPTED with
+a transition. F: a mic-less middle segment — the mic lists THREE entries
+with the middle nil (the review: an iterator over "the segments that have
+a file" misaligned the two lists). G: `place: false` — three `add_media`,
+clip lists all nil, no clip. H: inside a nest — unscoped ops, two clips
+inside touching, the parent's one clip untouched. J: an INEXACT canvas
+rate (24981/1000, decision 3's shape) — each later segment at or after
+the previous end by at most a frame, and measured, clip 3 a whole frame
+after clip 2's end because that end's nearest grid point is a tick UNDER
+it, never an overlap, no transition. K: a voice SHORTER than its head
+(the review's numbers — mic 1 ending 3 040 000, picture 2 at 3 000 000,
+mic 2 an 80 ms file at +18 000) mints NO clip and ONE note naming the
+file, its media still landing, no `trim_start` in the list — never the
+old 20 000-tick sliver placed late. L: a microphone file under one frame
+(R0 q7's 2 ms file) — no clip, a note, the pictures and voice 1 land. M:
+a PICTURE under a frame in the middle — `clipIds [id, nil, id]`, a note,
+segment 3 following segment 1's END. N: `remainderPlacement` with NO clip
+1 (the document holds the picture's media alone) — the microphone's MEDIA
+only, `[add_media]`, every clip entry nil, a note. I: `untitled(around:)`
+through the real order for three segments with voices on 1 and 3 —
+displayName the first's stem, canvas [60, 1], ONE undo step "Add
+Recording Segments", five media, tracks [Microphone, Track 1], three
+pictures touching from 0, voice 1 at 0 (3 010 000 long on the 60 fps
+grid) and voice 3 at the 60 fps snap of picture 3's start − 11 000, one
+undo leaving segment 1 alone with the document STILL dirty; one segment
+with a voice → "Add Microphone" (R1's name) with a 10 000 head; one alone
+→ no undo step; `remainderActionName` and `remainderPlacement(...) == nil`
+pinned as pure calls.
+
 Section 5 (`chrome`) is the CHROME's structure, lane C's 64 scratch rows
 made tracked: a probe compiled over `app/Sources` that instantiates
 `AppDelegate()` and runs `applicationWillFinishLaunching` (`phase6_chrome.py`'s
@@ -222,6 +329,59 @@ the chosen destination and the microphone problem (fix 10); and
 `newRecording` with the recorder recording and the panel idle stops the
 recorder rather than showing the panel (fix 12, `route-to-show`).
 
+**Then R2c** (rows 5p–5u, the `chrome-pause` mode — its own process, so
+the panel and the delegate are fresh). 5p: `RecorderStatusItem`'s pure
+vocabulary — `menuTitles(paused:)` `[Pause Recording, Stop Recording]` /
+`[Resume Recording, Stop Recording]`, the two tooltips, `pauseGlyph` ❚❚,
+and `title(elapsed:paused:)`: "● 1:01" with the dot in `DS.meterClip` and
+the time uncoloured in monospaced digits, "❚❚ 1:01" with NO colour
+attribute on the glyph (the menu bar's own) and the frozen time. 5q: the
+panel's `.paused` phase drawn — Stop enabled, the controls locked, the
+footnote the glyph and the time in `DS.textFaint`; `.recording`'s coral
+dot; `.idle`'s folder. 5r: `pauseRecording()` / `resumeRecording()`
+against a recorder that refuses (idle) — a pause beeps and STAYS
+`.recording` with no note; a refused resume stays `.paused` and keeps the
+sentence as `resumeProblem` STATE drawn into the note at once, a second
+refusal REPLACING it (one copy, never two), a live `microphoneProblem`
+composed in FRONT of it by the tick and left there by a second tick (the
+R2 review: the tick used to wipe it), `liveNote` pinned pure over the
+four combinations; then a REAL pause and resume through the panel over a
+faked session built on `ScreenRecorder.shared` (a probe-only
+manipulation, torn down to idle in the same run): the phase follows the
+recorder's own transitions, the footnote goes from "● 0:02" to "❚❚ 0:02"
+and HOLDS through a later refresh, a stale `resumeProblem` is cleared by
+the resume that lands, and `stopRecording()` while paused goes to
+`recorder.stop()` (`.stopping`, the recorder `.finishing`, `stopAsked`).
+5s: `revealIfNoted` both ways — `showWhenLanded` with an EMPTY note stays
+hidden and clears the flag, with a note comes back, with the panel not on
+screen before stays hidden; `revealControls()` (the quit guard's call)
+shows the panel when nothing has it hidden and beeps with no item to
+open; `landingNote`'s `.userStopped` sentence naming the SYSTEM's
+screen-recording indicator, and its two R2 arguments — a refused resume's
+sentence, then the placement's notes LAST. 5t: New Recording… with the
+panel `.paused` stopping THROUGH THE PANEL; the recorder `.paused` (probe-
+written, reset) retitling the item Stop Recording and cancelling ⌘Q. 5u,
+structural over the comment-stripped source, the reads no headless
+process can drive: `recordingDidStart` hides the panel for EVERY source —
+`hiddenForRecording = true` and `orderOut` with no `.picked` in the body
+— remembers `showWhenLanded` and hands the item the three closures;
+`recordingEnded` clears the flag and shows NOTHING; the three ends call
+`revealIfNoted()`, whose body conjoins `showWhenLanded` with a non-empty
+note; `update` rebuilds the item's menu only when `paused` FLIPS and
+ignores the argument once `freeze()`d, which the tool's chrome calls too;
+the tick runs through `.paused` and passes `paused:`; `newRecording`
+names `.paused`; the tool passes the three closures and
+`paused: recorder.isPaused`; `show()`'s guard is unchanged; `+Pause.swift`
+keeps `resumeProblem` and clears it on a landed resume; `landed` passes
+`resumeProblem` and the notes, `failedToLand` names the files through
+`filesClause`; closing the panel during `.starting` stops or abandons the
+attempt; the quit guard calls `revealControls()`, which opens the item's
+menu; and the welcome button's action is `showRecorderPanel`, which only
+shows (5c and 6a read the live button). What no headless probe can do is
+put the status item UP — `show()` would put a real item in this
+machine's menu bar — so the menu's rebuild is a structural read and the
+`menu-static` mutant is caught there.
+
 Section 6 (`welcome`) is the welcome window's CROSS-BUILD — `phase5_chrome.py`'s
 pattern: the tree one commit before the button existed, `git archive`d into
 `work/recordingprobe/before/` and compiled with the same swiftc line, the
@@ -261,13 +421,65 @@ had them (`import_media`, `import_captions`, `consolidate_media`,
 `export_captions`, `render_frame`, `export` — `df6b916^`'s order — then
 `record_screen`); `scope` on every op tool's schema and on none of the
 twenty, `record_screen`'s among them; and `record_screen`'s declared
-argument names.
+argument names. 7d (R2d): the tool's description names the two menus'
+rows, `pauses`, `segments`, `started_at`, `mic_offset`, `mic_problem`, the
+two undo names, the wall-clock span, the TOTAL, `user_stopped` and the
+system's screen-recording indicator.
 
 Section 8 (`host`): CGPreflightScreenCaptureAccess(), the microphone's
 status word, the console lock (`CGSessionCopyCurrentDictionary()`'s
 `CGSSessionScreenIsLocked`) and the active display count — PRINTED, never
 asserted, so a reader of a probe log knows which tiers of
 `recording_proof.py` could have run on that machine.
+
+Section 9 (`granted`) is the probe's own GRANTED tier (R2e), the one
+section that starts a stream: under this process's grant (R0 q1: a
+shell-launched Mach-O runs under its TERMINAL's; the spike showed a bare
+probe can start a stream) and with a shareable display, a real
+`ScreenRecorder()` — never `.shared` — on the main display, the folder
+pinned under `work/` by `-RCRecordingFolder` and deleted after. 9a:
+start, 1 s, `pause()`, `elapsed` read twice 0.5 s apart and EQUAL, the
+removed output's did-finish landing while paused (R0 q7's 5–25 ms),
+`resume()`, the new output's did-start (8–10 ms), 1 s, `stop()` → ONE
+result of TWO segments with `pauses` 1, each movie probing with pictures
+at about a second, the two names DIFFERENT and each the local-time
+spelling of ITS OWN start, segment 2's start ≥ 1.9 s after segment 1's,
+elapsed before the stop about 2 s against a wall clock at least 0.8 s
+longer, both files on disk with bytes. 9b: start, 1 s, pause, stop while
+paused → one segment with `pauses` 1 (the press is counted, not the
+files). 9c: the PANEL end to end over `ScreenRecorder.shared` — Record
+over the main display, the countdown, then at `recordingDidStart` the
+panel HIDDEN with `showWhenLanded` remembered true, the item up, `show()`
+showing nothing; `pauseRecording()` → "❚❚ 0:01" faint and HELD through the
+30 Hz tick, `resumeRecording()` → two segments, `stopRecording()` → the
+landing as a new project, after which the panel STAYS HIDDEN because the
+note is empty (decision 7 driven, not read), the item down, the recorder
+idle, and the document holding two media and two touching clips under
+"Add Recording Segments" at [60, 1]. Without the grant or with zero
+shareable displays the tier is SKIPPED BY NAME with its row count printed
+— the count is taken by running the same row code over an empty answer
+with `check` swapped for a counter, so it cannot drift from the tier —
+and the summary line says so; never a vacuous pass. The microphone is
+not used here: the probe has no usage string, and a prompt would abort
+it. **On the host this was written on the console was LOCKED for every
+run** (0 shareable displays under a TRUE preflight, the state phase 8
+recorded), so the tier compiled and skipped, and its rows are unmeasured
+until somebody runs the script with the console unlocked.
+
+**Measured 2026-09-12 against the tree after R2's fix wave: 876/876**, with
+section 9's 41 rows SKIPPED by name (the console was locked — 0 shareable
+displays under a TRUE preflight) and counted in the summary line rather
+than passed. By section: the build row 1; section 1, 21; section 2, 242;
+section 3, 133 (R1's 76, then 3g's two R2 sentences and 3o–3t's 55);
+section 4, 164; section 4b, 83; section 5, 116; 5p–5u, 59; section 6,
+28; section 7, 27 (7d's 14 among them); section 8, 1; section 9, 1 plus
+the 41 skipped. The four rows the first run against the landed wave
+failed were all the script's own expectations and no defect: 3o's
+second-pause span is measured from the DRIVEN did-start stamp (about
+1.4 s, not 2), 3s read an intermediate state the wave's synchronous
+`checkFinished` now passes through inside the spin (the landed result was
+right), and 4b·J's gap at the inexact rate is exactly `frameDuration`,
+the band the code documents as `≤ frame` where the row had `< frame`.
 
 The gate, on COPIES of `app/Sources` under `work/` (`--mutant <name>`,
 `phase9_chrome.py`'s `prepare_mutant` shape, which points `--sources` at
@@ -354,18 +566,73 @@ Lane P2's, the R1 review's chrome fixes (section 5's rows), measured
                    tool's recording (AppDelegate+Recording.swift) —
                    660/662: 5h's routing read and 5o (fix 12).
 
-**The tree's one failing row is 6b's "one program" row, and it is the
-harness's to fix, not this script's**: `tools/proof/harness/main.swift`
-pins the six recorder keys as `RecorderPanelController.<key>` in
-`pinDefaults`, OUTSIDE the `HARNESS_REFERENCE_BUILD` guard, so a reference
-tree from before that type existed cannot compile the current instrument
-and `build_reference` falls back to the reference commit's own
-`main.swift` (the same fallback `phase5_chrome.py`'s reference build now
-takes, silently, against its pre-meter tree). Six string literals in the
-pin map — every other key there is one — would make both cross-builds one
-program again and turn this row green.
+**Road map 3, R2's mutants**, one per rule, measured 2026-09-12 against
+the tree at 876/876 with section 9 skipped (the locked console) — except
+`elapsed-through-pause`, during whose run the display happened to wake,
+so section 9 RAN and its denominator is 917; that run is also the one
+measurement of the granted tier on this host, 37 of its 41 rows passing
+under a mutant that touches none of them and the other four being that
+mutant's own kills:
+
+  segment-stacked      `at = landed.end` deleted in placeBackToBack
+                       (RecordingLanding+Placing.swift) — 811/871: every
+                       4b sequence row (A–D, F, H, J–M, I), the second clip
+                       refused against the first on both tracks, so a
+                       throw where a list was expected; the denominator is
+                       871 because a row that throws skips its reads.
+  mic-floor-dropped    `floor = placed.end` deleted in addMicrophones
+                       (RecordingLanding+Microphone.swift) — 863/876: 4b·E's
+                       voice 2 landed a frame under the floor with a
+                       transition, E3's three trimmed offsets, K's three.
+  menu-static          `rebuildMenu(paused: paused)` deleted from update
+                       (RecorderStatusItem.swift) — 875/876: 5u's read of
+                       update's body. Structural, and honestly so: the
+                       probe never puts the item UP.
+  hide-picked-only     recordingDidStart's hide guarded on `.picked` again
+                       (RecorderPanelController+Recording.swift) — 875/876:
+                       5u's read; 9c's driven kill sits in the skipped tier.
+  reveal-always        revealIfNoted's note test dropped
+                       (RecorderPanelController+Landing.swift) — 874/876:
+                       5s's empty-note row (the panel came back) and 5u's
+                       read of the conjunction.
+  elapsed-through-pause  every segment counted to now (ScreenRecorder.swift)
+                       — 909/917: 3o's frozen pair and second-pause span,
+                       3s's late did-start span, 3t's 6.5 s, and — the
+                       tier having run — 9a's frozen pair and 2 s against
+                       the wall clock, 9b's pair, 9c's held footnote.
+  resume-first-offset  `result` reads the FIRST segment's stamps
+                       (ScreenRecorder+Finishing.swift) — 875/876: 3t's
+                       segment-1 offset (0 for −12 000).
+  resume-no-segment    `session?.segments.append(segment)` deleted
+                       (ScreenRecorder+Pause.swift) — 859/876: 3o's seventeen
+                       rows after the resume, 3s's two, 5r's real resume.
+  pause-no-mic-stop    the writer's stopRecording dropped from pause()
+                       (ScreenRecorder+Pause.swift) — 873/876: 3o's three
+                       stop counts.
+
+Four R1 mutants were RE-AIMED at the wave's rewritten lines and
+re-measured (the old text no longer occurred once, which `prepare_mutant`
+refuses): `mic-trim` is now `head` forced to 0 in addMicrophoneClip —
+857/876 (4·4a, 4·5b, 4·7, 4b·E, E3's three, I2, K); `quit-guard` deletes
+the guard whose call is `revealControls()` — 872/876 (5g's two, 5t, 5u);
+`welcome-action` turns `showRecorderPanel(_:)` — 873/876 (5c, 6a, 5u);
+`mic-fails-all` returns the FIRST segment's micFailure before the probes
+(the field moved from the session to the segment; the R1 text no longer
+COMPILED, which scored 0/1 and is exactly what the build row is for) —
+867/876 (3k's two, 3t's seven). The other sixteen R1 mutants re-scored
+against 876 on the same day: excludes 860, fps-override 868, resolve-first
+872, retitle 873, no-import-count 874 (4·5c's dirty row and 4b·I's),
+busy-finishing 873, no-oneshot 872, no-path 872, canask-restored 875,
+no-handle-check 875, sync-while-recording 874, no-constrain 875,
+show-while-hidden 874, window-row-unguarded 874, arm-no-generation 875,
+route-to-show 874 — every one below the count.
+
+6b's "one program" row, the tree's one failure when this file was first
+written, turned green when the harness literalised the six recorder keys
+in its pin map (R1's landing): both cross-builds are one program again.
 
     python3 tools/proof/recording_probe.py                 # the tree
+    python3 tools/proof/recording_probe.py --only state,segments   # a subset
     python3 tools/proof/recording_probe.py --mutant excludes
     python3 tools/proof/recording_probe.py --sources <dir> # any copy
     RC_APP_SOURCES=<dir> python3 tools/proof/recording_probe.py
@@ -404,6 +671,11 @@ WELCOME_FILE = "app/Sources/WelcomeWindowController.swift"
 
 passed = 0
 failed = 0
+# Section 9's rows when its tier cannot run — counted and NAMED in the
+# summary, never a vacuous pass (recording_proof.py's rule for host state).
+skipped = 0
+skip_reason = ""
+STEM_RE = r"Screen Recording \d{4}-\d{2}-\d{2} at \d{2}\.\d{2}\.\d{2}"
 
 
 def check(name, ok, detail=""):
@@ -589,6 +861,8 @@ func caseName(_ error: RecorderError) -> String {
     switch error {
     case .busy: return "busy"
     case .notRecording: return "notRecording"
+    case .notPaused: return "notPaused"
+    case .alreadyPaused: return "alreadyPaused"
     case .startFailed: return "startFailed"
     case .finishFailed: return "finishFailed"
     case .startTimedOut: return "startTimedOut"
@@ -599,19 +873,43 @@ func caseName(_ error: RecorderError) -> String {
 }
 
 /// One outcome — what `onFinish` or a stop completion received — as JSON.
+/// `micDescriptor` is the FIRST segment's (R1's rows read it as the
+/// recording's); `segments` carries every one in the walker's order, each
+/// with its own offset and problem (R2).
 func spell(_ outcome: Result<RecordingResult, Error>) -> [String: Any] {
     switch outcome {
     case .success(let result):
         return [
             "kind": "success", "path": result.descriptor.path,
-            "micDescriptor": result.micDescriptor != nil,
+            "micDescriptor": result.segments[0].micDescriptor != nil,
             "micProblem": result.micProblem as Any, "stoppedBy": "\(result.stoppedBy)",
+            "pauses": result.pauses, "startedAt": result.startedAt.timeIntervalSince1970,
+            "segments": result.segments.map { segment -> [String: Any] in
+                [
+                    "path": segment.descriptor.path, "duration": segment.descriptor.duration,
+                    "hasVideo": segment.descriptor.hasVideo,
+                    "hasAudio": segment.descriptor.hasAudio,
+                    "width": segment.descriptor.width, "height": segment.descriptor.height,
+                    "micDescriptor": segment.micDescriptor != nil,
+                    "micPath": segment.micDescriptor?.path as Any,
+                    "micOffset": segment.micOffset, "micProblem": segment.micProblem as Any,
+                    "startedAt": segment.startedAt.timeIntervalSince1970,
+                ]
+            },
         ]
     case .failure(let error):
         var spelled: [String: Any] = ["kind": "failure", "description": error.localizedDescription]
         if let recorder = error as? RecorderError { spelled["case"] = caseName(recorder) }
         return spelled
     }
+}
+
+/// A thrown error by case name and sentence, for the two synchronous entries.
+func spellError(_ error: any Error) -> String {
+    if let recorder = error as? RecorderError {
+        return "\(caseName(recorder)): \(recorder.localizedDescription)"
+    }
+    return "other: \(error.localizedDescription)"
 }
 
 /// A 16×16 PNG at `url`: a "movie" `MediaImporter.probe` answers with a
@@ -632,44 +930,147 @@ func emptyFile(_ url: URL) -> Bool {
     FileManager.default.createFile(atPath: url.path, contents: Data())
 }
 
+/// The microphone output the faked session carries: an
+/// `AVCaptureAudioFileOutput` with no session, so the two calls the recorder
+/// makes on it — `stopRecording()` at a pause and at the stop,
+/// `startRecording(to:…)` at a resume — are COUNTED and their URLs kept
+/// rather than forwarded (a session-less output writes nothing either way;
+/// R1's bare output measured `stopRecording` delivering nothing). The
+/// finishing wait therefore HOLDS until the probe drives the did-finish
+/// itself, which is what makes every row deterministic rather than a race
+/// against a writer.
+final class SpyAudioOutput: AVCaptureAudioFileOutput {
+    var stops = 0
+    var starts: [String] = []
+    override func stopRecording() { stops += 1 }
+    override func startRecording(
+        to outputFileURL: URL, outputFileType fileType: AVFileType,
+        recordingDelegate delegate: any AVCaptureFileOutputRecordingDelegate
+    ) {
+        starts.append(outputFileURL.path)
+    }
+}
+
+/// One (movie, microphone) pair of a hand-built session. `closed` is a
+/// segment a pause has already shut — `stoppedAt` stamped, both did-finishes
+/// landed — unless the stamps say otherwise; the stamps are what `elapsed`
+/// and the per-segment offset are computed from.
+struct FakeSegment {
+    var movie: URL
+    var mic: URL?
+    var closed = false
+    var screenStart: Date? = nil
+    var micStart: Date? = nil
+    var stoppedAt: Date? = nil
+    var screenFinished: Bool? = nil
+    var micFailure: String? = nil
+}
+
 /// A session the machine can be driven through with no stream started —
 /// the R1 review measured that `SCContentFilter()` and
 /// `SCStream(filter:configuration:delegate:)` CONSTRUCT without a grant and
 /// only `startCapture` needs one; `SCRecordingOutput(configuration:delegate:)`
-/// constructs beside them. The microphone output, when asked for, is a bare
-/// `AVCaptureAudioFileOutput` with no session: `stopRecording` on it
-/// delivers nothing, so the finishing wait HOLDS until this probe drives
-/// the did-finish itself, which is what makes every row below deterministic
-/// rather than a race against the writer. The delegate methods are called
-/// directly, as the frameworks would call them (each hops to main itself).
+/// constructs beside them. **And the R2 probe measured the pause's pair on
+/// that never-started, grant-less stream**: `addRecordingOutput` accepts an
+/// output, `removeRecordingOutput` of an added output returns, and a fresh
+/// output can be added after the remove (a second output while one is
+/// attached, an output never added, or any add after `stopCapture` throws
+/// −3812; no file is ever written) — so the LAST segment's output is added
+/// here, R1's pre-`startCapture` order, and `pause()` / `resume()` run their
+/// real bodies. Earlier segments are the closed ones a pause left behind.
+/// The delegate methods are called directly, as the frameworks would call
+/// them (each hops to main itself).
 final class Fake {
     let recorder = ScreenRecorder()
     let stream: SCStream
-    let output: SCRecordingOutput
-    let micOutput: AVCaptureAudioFileOutput?
+    let outputs: [SCRecordingOutput]
+    let micOutput: SpyAudioOutput?
     let movie: URL
     let mic: URL?
     var finishes: [[String: Any]] = []
+    /// The add that puts the last segment's output on the stream, or why not.
+    var attachFailure: String?
 
-    init(movie: URL, mic: URL?, state: ScreenRecorder.State) {
-        self.movie = movie
-        self.mic = mic
+    /// R1's shape: one open segment, its output attached.
+    convenience init(movie: URL, mic: URL?, state: ScreenRecorder.State) {
+        self.init(
+            segments: [FakeSegment(movie: movie, mic: mic)], mic: mic != nil, state: state,
+            folder: movie.deletingLastPathComponent())
+    }
+
+    /// `segments` in order; `mic` says whether the session carries a
+    /// microphone output at all (a segment's `mic` URL is then its file);
+    /// `attach` puts the LAST segment's output on the stream — false for a
+    /// recording whose output was never added, the one way `pause()`'s
+    /// remove can throw. `folder` is where a `resume()` mints its files.
+    init(
+        segments: [FakeSegment], mic: Bool, state: ScreenRecorder.State, folder: URL,
+        attach: Bool = true
+    ) {
+        movie = segments[0].movie
+        self.mic = segments[0].mic
+        var choice = RecordingChoice()
+        choice.folder = folder
+        let size = CGSize(width: 16, height: 16)
         let configs = RecordingConfiguration.make(
-            RecordingChoice(), displayPointSize: CGSize(width: 16, height: 16), scale: 1,
-            outputURL: movie)
+            choice, displayPointSize: size, scale: 1, outputURL: segments[0].movie)
         stream = SCStream(
             filter: SCContentFilter(), configuration: configs.stream, delegate: recorder)
-        output = SCRecordingOutput(configuration: configs.output, delegate: recorder)
-        micOutput = mic == nil ? nil : AVCaptureAudioFileOutput()
+        var outs: [SCRecordingOutput] = []
+        for segment in segments {
+            let made = RecordingConfiguration.make(
+                choice, displayPointSize: size, scale: 1, outputURL: segment.movie)
+            outs.append(SCRecordingOutput(configuration: made.output, delegate: recorder))
+        }
+        outputs = outs
+        micOutput = mic ? SpyAudioOutput() : nil
+        if attach, let last = outs.last {
+            do { try stream.addRecordingOutput(last) } catch { attachFailure = "\(error)" }
+        }
+        let now = Date()
+        var built: [ScreenRecorder.Segment] = []
+        for (index, segment) in segments.enumerated() {
+            var made = ScreenRecorder.Segment(
+                movieURL: segment.movie, micURL: segment.mic, output: outs[index],
+                addedAt: segment.screenStart ?? now)
+            made.screenStartedAt = segment.screenStart
+            made.micStartedAt = segment.micStart
+            if segment.mic != nil { made.micRecordingCalledAt = segment.micStart ?? now }
+            made.micFailure = segment.micFailure
+            if segment.closed {
+                made.stoppedAt = segment.stoppedAt ?? now
+                made.screenFinished = segment.screenFinished ?? true
+                made.micFinished = segment.mic != nil
+            }
+            built.append(made)
+        }
         recorder.session = ScreenRecorder.Session(
-            choice: RecordingChoice(), movieURL: movie, micURL: mic, stream: stream,
-            output: output, micSession: nil, micOutput: micOutput, calledAt: Date(),
-            onFinish: { [weak self] outcome in self?.finishes.append(spell(outcome)) })
+            choice: choice, displayPointSize: size, scale: 1, stream: stream, micSession: nil,
+            micOutput: micOutput, calledAt: now,
+            onFinish: { [weak self] outcome in self?.finishes.append(spell(outcome)) },
+            segments: built)
+        // A hand-built session of n closed segments came from n − 1 pauses;
+        // a real `pause()` on it counts on from there.
+        recorder.session?.pauses = max(0, built.count - 1)
         recorder.state = state
     }
 
     var state: String { "\(recorder.state)" }
     var stoppedBy: String { recorder.session.map { "\($0.stoppedBy)" } ?? "nil" }
+    var segmentCount: Int { recorder.session?.segments.count ?? -1 }
+    var pauses: Int { recorder.session?.pauses ?? -1 }
+    func segment(_ index: Int) -> ScreenRecorder.Segment? {
+        guard let segments = recorder.session?.segments, segments.indices.contains(index) else {
+            return nil
+        }
+        return segments[index]
+    }
+    /// Segment `index`'s output — the recorder's own for one a `resume()`
+    /// minted, this fake's for the hand-built ones (still known once the
+    /// session is gone, for a callback driven after the conclude).
+    private func output(_ index: Int) -> SCRecordingOutput? {
+        segment(index)?.output ?? (outputs.indices.contains(index) ? outputs[index] : nil)
+    }
 
     /// Lights the recorder's own meter, as a poll would.
     func light() {
@@ -677,10 +1078,40 @@ final class Fake {
             LevelMeterReading(peakLeft: 0.5, peakRight: 0.5, rmsLeft: 0.3, rmsRight: 0.3),
             from: ObjectIdentifier(recorder))
     }
-    func screenFinished() { recorder.recordingOutputDidFinishRecording(output) }
+    func screenStarted(_ index: Int = 0) {
+        guard let output = output(index) else { return }
+        recorder.recordingOutputDidStartRecording(output)
+    }
+    func screenFinished(_ index: Int = 0) {
+        guard let output = output(index) else { return }
+        recorder.recordingOutputDidFinishRecording(output)
+    }
+    func screenFailed(_ index: Int, _ message: String) {
+        guard let output = output(index) else { return }
+        recorder.recordingOutput(
+            output,
+            didFailWithError: NSError(
+                domain: SCStreamError.errorDomain, code: SCStreamError.Code.internalError.rawValue,
+                userInfo: [NSLocalizedDescriptionKey: message]))
+    }
+    /// A did-finish for an output that belongs to no segment of this session.
+    func strayScreenFinished() {
+        let configuration = SCRecordingOutputConfiguration()
+        configuration.outputURL = movie.deletingLastPathComponent().appendingPathComponent("stray.mov")
+        let stray = SCRecordingOutput(configuration: configuration, delegate: recorder)
+        recorder.recordingOutputDidFinishRecording(stray)
+    }
+    func micStarted(url: URL) {
+        guard let micOutput else { return }
+        recorder.fileOutput(micOutput, didStartRecordingTo: url, from: [])
+    }
     func micFinished(error: Error?) {
-        guard let micOutput, let mic else { return }
-        recorder.fileOutput(micOutput, didFinishRecordingTo: mic, from: [], error: error)
+        guard let mic else { return }
+        micFinished(url: mic, error: error)
+    }
+    func micFinished(url: URL, error: Error?) {
+        guard let micOutput else { return }
+        recorder.fileOutput(micOutput, didFinishRecordingTo: url, from: [], error: error)
     }
     func streamStopped(_ code: SCStreamError.Code) {
         recorder.stream(
@@ -689,6 +1120,21 @@ final class Fake {
     }
     /// True once the recorder is idle again — the conclude landed.
     func settled() -> Bool { spin(5) { recorder.state == .idle } }
+}
+
+/// One segment's stamps and flags, as JSON.
+func describeSegment(_ segment: ScreenRecorder.Segment?) -> [String: Any] {
+    guard let segment else { return ["missing": true] }
+    return [
+        "movie": segment.movieURL.path, "mic": segment.micURL?.path as Any,
+        "addedAt": segment.addedAt.timeIntervalSince1970,
+        "micCalled": segment.micRecordingCalledAt != nil,
+        "screenStartedAt": segment.screenStartedAt?.timeIntervalSince1970 as Any,
+        "micStartedAt": segment.micStartedAt?.timeIntervalSince1970 as Any,
+        "stoppedAt": segment.stoppedAt?.timeIntervalSince1970 as Any,
+        "screenFinished": segment.screenFinished, "micFinished": segment.micFinished,
+        "micFailure": segment.micFailure as Any,
+    ]
 }
 
 /// Finding 1 (JOIN), 8 (the meter at `beginFinishing`) and 0's "never
@@ -742,7 +1188,7 @@ func scenarioOneShot(_ work: URL) -> [String: Any] {
     let fake = Fake(movie: movie, mic: nil, state: .recording)
     var first: [[String: Any]] = []
     fake.recorder.stop { first.append(spell($0)) }
-    fake.recorder.session?.screenFinished = true
+    fake.recorder.session?.segments[0].screenFinished = true
     fake.recorder.settle()
     out["settlingAfterSettle"] = fake.recorder.isSettling
     out["stateAfterSettle"] = fake.state
@@ -884,11 +1330,382 @@ func scenarioIdleFaces(_ work: URL) -> [String: Any] {
     return out
 }
 
+// ---- R2: pause and resume over the faked session ----------------------
+
+/// The pause and the resume, driven through their real bodies (the `Fake`
+/// doc: the pair works on a never-started stream). One open segment with a
+/// microphone whose picture began 1 s ago and 12 ms after its voice;
+/// `pause()` closes it, `elapsed` freezes, `resume()` mints the next pair
+/// in the work folder, the closed segment's late callbacks are inert, the
+/// new pair's did-starts stamp only their own segment, a stray output and a
+/// stray file change nothing, a second `pause()` then `stop()` while paused
+/// takes the finishing path with the segment's stamp KEPT and no second
+/// `stopRecording` — and the walker, meeting an EMPTY second movie, fails
+/// naming all four files, comma-joined.
+func scenarioPause(_ work: URL) -> [String: Any] {
+    var out: [String: Any] = [:]
+    let movie = work.appendingPathComponent("pause.png")
+    let mic = work.appendingPathComponent("pause-mic.png")
+    out["written"] = writePNG(movie) && writePNG(mic)
+    var first = FakeSegment(movie: movie, mic: mic)
+    first.screenStart = Date(timeIntervalSinceNow: -1.0)
+    first.micStart = first.screenStart!.addingTimeInterval(-0.012)
+    let fake = Fake(segments: [first], mic: true, state: .recording, folder: work)
+    out["attached"] = fake.attachFailure ?? "ok"
+    fake.light()
+    out["elapsedBefore"] = fake.recorder.elapsed
+    do {
+        try fake.recorder.pause()
+        out["pause"] = "ok"
+    } catch { out["pause"] = spellError(error) }
+    out["stateAfterPause"] = fake.state
+    out["isPaused"] = fake.recorder.isPaused
+    out["isRecordingWhilePaused"] = fake.recorder.isRecording
+    out["segment0AfterPause"] = describeSegment(fake.segment(0))
+    out["meterSilentAfterPause"] = fake.recorder.meter.reading.isSilent
+    out["micStopsAfterPause"] = fake.micOutput?.stops ?? -1
+    let a = fake.recorder.elapsed
+    _ = spin(0.3) { false }
+    let b = fake.recorder.elapsed
+    out["elapsedA"] = a
+    out["elapsedB"] = b
+    fake.light()
+    fake.recorder.publishMicrophoneLevel()
+    out["meterLitAfterPollWhilePaused"] = !fake.recorder.meter.reading.isSilent
+    do {
+        try fake.recorder.pause()
+        out["pauseAgain"] = "ok"
+    } catch { out["pauseAgain"] = spellError(error) }
+    do {
+        try fake.recorder.resume()
+        out["resume"] = "ok"
+    } catch { out["resume"] = spellError(error) }
+    out["stateAfterResume"] = fake.state
+    out["segmentsAfterResume"] = fake.segmentCount
+    out["segment1AfterResume"] = describeSegment(fake.segment(1))
+    out["segment0AfterResume"] = describeSegment(fake.segment(0))
+    out["micStartsAfterResume"] = fake.micOutput?.starts ?? []
+    out["folder"] = work.path
+    let c = fake.recorder.elapsed
+    _ = spin(0.3) { false }
+    out["elapsedC"] = c
+    out["elapsedD"] = fake.recorder.elapsed
+    // The closed segment's did-finishes land AFTER the resume: inert.
+    fake.screenFinished(0)
+    fake.micFinished(url: mic, error: nil)
+    _ = spin(0.2) { false }
+    out["stateAfterLateFinish"] = fake.state
+    out["segment0AfterLateFinish"] = describeSegment(fake.segment(0))
+    out["segment1AfterLateFinish"] = describeSegment(fake.segment(1))
+    // The new pair's did-starts stamp segment 1 alone.
+    fake.screenStarted(1)
+    if let micURL = fake.segment(1)?.micURL { fake.micStarted(url: micURL) }
+    _ = spin(0.2) { false }
+    out["segment1Stamped"] = describeSegment(fake.segment(1))
+    out["segment0Stamped"] = describeSegment(fake.segment(0))
+    // A did-finish for no segment's output, and one for a file no segment
+    // asked for: nothing.
+    fake.strayScreenFinished()
+    fake.micFinished(url: work.appendingPathComponent("stray.m4a"), error: nil)
+    _ = spin(0.2) { false }
+    out["stateAfterStray"] = fake.state
+    out["segmentsAfterStray"] = fake.segmentCount
+    out["segment1AfterStray"] = describeSegment(fake.segment(1))
+    do {
+        try fake.recorder.resume()
+        out["resumeWhileRecording"] = "ok"
+    } catch { out["resumeWhileRecording"] = spellError(error) }
+    // A second pause, then a stop while paused.
+    do {
+        try fake.recorder.pause()
+        out["secondPause"] = "ok"
+    } catch { out["secondPause"] = spellError(error) }
+    out["stateAfterSecondPause"] = fake.state
+    let stampAtPause = fake.segment(1)?.stoppedAt
+    out["micStopsAfterSecondPause"] = fake.micOutput?.stops ?? -1
+    out["elapsedAtSecondPause"] = fake.recorder.elapsed
+    var stops: [[String: Any]] = []
+    fake.recorder.stop { stops.append(spell($0)) }
+    out["stateAfterStop"] = fake.state
+    out["stoppedBy"] = fake.stoppedBy
+    out["stoppedAtKept"] = fake.segment(1)?.stoppedAt == stampAtPause && stampAtPause != nil
+    out["micStopsAfterStop"] = fake.micOutput?.stops ?? -1
+    out["segment1AtStop"] = describeSegment(fake.segment(1))
+    // Segment 1's files: EMPTY, so the movie will not probe and the
+    // sentence names every file that exists.
+    let movie1 = fake.segment(1)?.movieURL
+    let mic1 = fake.segment(1)?.micURL
+    out["emptyWritten"] = movie1.map(emptyFile) == true && mic1.map(emptyFile) == true
+    out["paths"] = [movie.path, mic.path, movie1?.path ?? "", mic1?.path ?? ""]
+    fake.screenFinished(1)
+    if let mic1 { fake.micFinished(url: mic1, error: nil) }
+    out["settled"] = fake.settled()
+    out["onFinishCount"] = fake.finishes.count
+    out["onFinish"] = fake.finishes.first ?? [:]
+    out["stopCount"] = stops.count
+    out["stop"] = stops.first ?? [:]
+    out["elapsedAfter"] = fake.recorder.elapsed
+    return out
+}
+
+/// `pause()` refused: the output was never added, so the remove throws and
+/// the recorder STAYS recording with nothing changed — no stamp, no
+/// `stopRecording`, the meter still lit; a `stop()` then closes it as ever.
+func scenarioPauseRefused(_ work: URL) -> [String: Any] {
+    var out: [String: Any] = [:]
+    let movie = work.appendingPathComponent("pauserefused.png")
+    let mic = work.appendingPathComponent("pauserefused-mic.png")
+    out["written"] = writePNG(movie) && writePNG(mic)
+    let fake = Fake(
+        segments: [FakeSegment(movie: movie, mic: mic)], mic: true, state: .recording,
+        folder: work, attach: false)
+    fake.light()
+    do {
+        try fake.recorder.pause()
+        out["pause"] = "ok"
+    } catch { out["pause"] = spellError(error) }
+    out["stateAfter"] = fake.state
+    out["segment0"] = describeSegment(fake.segment(0))
+    out["micStops"] = fake.micOutput?.stops ?? -1
+    out["meterLit"] = !fake.recorder.meter.reading.isSilent
+    fake.recorder.stop()
+    out["stateAfterStop"] = fake.state
+    out["micStopsAfterStop"] = fake.micOutput?.stops ?? -1
+    fake.screenFinished(0)
+    fake.micFinished(error: nil)
+    out["settled"] = fake.settled()
+    out["onFinish"] = fake.finishes.first ?? [:]
+    return out
+}
+
+/// `resume()` refused: the state is `.paused` BY THE PROBE with the
+/// segment's output still attached (a probe-only manipulation), so the add
+/// throws −3812 and the recorder STAYS paused with no segment minted and no
+/// `startRecording`; a `stop()` then lands the one segment.
+func scenarioResumeRefused(_ work: URL) -> [String: Any] {
+    var out: [String: Any] = [:]
+    let movie = work.appendingPathComponent("resumerefused.png")
+    let mic = work.appendingPathComponent("resumerefused-mic.png")
+    out["written"] = writePNG(movie) && writePNG(mic)
+    let fake = Fake(
+        segments: [FakeSegment(movie: movie, mic: mic)], mic: true, state: .paused, folder: work)
+    out["attached"] = fake.attachFailure ?? "ok"
+    do {
+        try fake.recorder.resume()
+        out["resume"] = "ok"
+    } catch { out["resume"] = spellError(error) }
+    out["stateAfter"] = fake.state
+    out["segments"] = fake.segmentCount
+    out["micStarts"] = fake.micOutput?.starts ?? []
+    out["filesInFolder"] = (try? FileManager.default.contentsOfDirectory(atPath: work.path))?
+        .filter { $0.hasPrefix("Screen Recording") }.count ?? -1
+    var stops: [[String: Any]] = []
+    fake.recorder.stop { stops.append(spell($0)) }
+    out["stateAfterStop"] = fake.state
+    fake.screenFinished(0)
+    fake.micFinished(error: nil)
+    out["settled"] = fake.settled()
+    out["onFinish"] = fake.finishes.first ?? [:]
+    out["stopCount"] = stops.count
+    return out
+}
+
+/// A did-fail on a CLOSED segment ends the recording: segment 0 was paused
+/// (stamped) but its did-finish is still in flight when its writer reports
+/// a failure instead; segment 1 is open. The failure begins finishing as
+/// `.stopped`, the open segment is stamped and its writer asked to stop,
+/// and the walker answers the recording's failure naming every file.
+func scenarioClosedFail(_ work: URL) -> [String: Any] {
+    var out: [String: Any] = [:]
+    let m0 = work.appendingPathComponent("closedfail0.png")
+    let x0 = work.appendingPathComponent("closedfail0-mic.png")
+    let m1 = work.appendingPathComponent("closedfail1.png")
+    let x1 = work.appendingPathComponent("closedfail1-mic.png")
+    out["written"] = writePNG(m0) && writePNG(x0) && writePNG(m1) && writePNG(x1)
+    out["paths"] = [m0.path, m1.path, x0.path, x1.path]
+    var closed = FakeSegment(movie: m0, mic: x0, closed: true)
+    closed.screenFinished = false
+    closed.screenStart = Date(timeIntervalSinceNow: -5)
+    closed.stoppedAt = Date(timeIntervalSinceNow: -3)
+    var open = FakeSegment(movie: m1, mic: x1)
+    open.screenStart = Date(timeIntervalSinceNow: -2)
+    let fake = Fake(segments: [closed, open], mic: true, state: .recording, folder: work)
+    out["attached"] = fake.attachFailure ?? "ok"
+    fake.screenFailed(0, "the writer gave up")
+    _ = spin(0.3) { false }
+    out["stateAfterFail"] = fake.state
+    out["stoppedBy"] = fake.stoppedBy
+    out["segment0"] = describeSegment(fake.segment(0))
+    out["segment1"] = describeSegment(fake.segment(1))
+    out["micStops"] = fake.micOutput?.stops ?? -1
+    fake.screenFinished(1)
+    fake.micFinished(url: x1, error: nil)
+    out["settled"] = fake.settled()
+    out["onFinishCount"] = fake.finishes.count
+    out["onFinish"] = fake.finishes.first ?? [:]
+    return out
+}
+
+/// An external stop while PAUSED: the pause's did-finish has landed (inert),
+/// then the indicator's `.userStopped` arrives and takes the finishing path
+/// with its reason — one segment, `stoppedBy` userStopped.
+func scenarioExternalPaused(_ work: URL) -> [String: Any] {
+    var out: [String: Any] = [:]
+    let movie = work.appendingPathComponent("externalpaused.png")
+    out["written"] = writePNG(movie)
+    var first = FakeSegment(movie: movie, mic: nil)
+    first.screenStart = Date(timeIntervalSinceNow: -2)
+    let fake = Fake(segments: [first], mic: false, state: .recording, folder: work)
+    do {
+        try fake.recorder.pause()
+        out["pause"] = "ok"
+    } catch { out["pause"] = spellError(error) }
+    fake.screenFinished(0)
+    _ = spin(0.2) { false }
+    out["stateAfterPauseFinish"] = fake.state
+    out["segment0"] = describeSegment(fake.segment(0))
+    let frozen = fake.recorder.elapsed
+    out["pauses"] = fake.pauses
+    fake.streamStopped(.userStopped)
+    // The hop to main lands on the next turn; `beginFinishing` then runs
+    // `checkFinished` synchronously and the one closed segment settles at
+    // once, so the state is read the moment the hop has run.
+    _ = spin(1) { fake.recorder.state != .paused }
+    out["stateAfterExternal"] = fake.state
+    out["stoppedBy"] = fake.stoppedBy
+    out["settled"] = fake.settled()
+    out["onFinish"] = fake.finishes.first ?? [:]
+    out["elapsedFrozen"] = frozen
+    return out
+}
+
+/// A stream stop while PAUSED with a code that is NOT an external stop (the
+/// R2 review): nothing was writing, every file is closed, so the recording
+/// LANDS as `.systemStopped` rather than failing with every file whole on
+/// disk.
+func scenarioSystemStopPaused(_ work: URL) -> [String: Any] {
+    var out: [String: Any] = [:]
+    let movie = work.appendingPathComponent("systempaused.png")
+    out["written"] = writePNG(movie)
+    var first = FakeSegment(movie: movie, mic: nil)
+    first.screenStart = Date(timeIntervalSinceNow: -2)
+    let fake = Fake(segments: [first], mic: false, state: .recording, folder: work)
+    do {
+        try fake.recorder.pause()
+        out["pause"] = "ok"
+    } catch { out["pause"] = spellError(error) }
+    fake.screenFinished(0)
+    _ = spin(0.2) { false }
+    fake.streamStopped(.internalError)
+    _ = spin(0.2) { false }
+    out["stateAfter"] = fake.state
+    out["stoppedBy"] = fake.stoppedBy
+    out["settled"] = fake.settled()
+    out["onFinish"] = fake.finishes.first ?? [:]
+    return out
+}
+
+/// Two races the R2 review named, on the resume's ~10 ms window: a
+/// did-start landing AFTER its own segment's pause is ignored (the span
+/// would otherwise run backwards; it is clamped at 0 anyway), and a second
+/// resume within the same second mints a DIFFERENT name from the one the
+/// session already holds, although no file of either exists yet.
+func scenarioLateDidStart(_ work: URL) -> [String: Any] {
+    var out: [String: Any] = [:]
+    let movie = work.appendingPathComponent("latedidstart.png")
+    out["written"] = writePNG(movie)
+    var first = FakeSegment(movie: movie, mic: nil)
+    first.screenStart = Date(timeIntervalSinceNow: -1.0)
+    let fake = Fake(segments: [first], mic: false, state: .recording, folder: work)
+    do {
+        try fake.recorder.pause()
+        try fake.recorder.resume()
+        try fake.recorder.pause()
+        out["transitions"] = "ok"
+    } catch { out["transitions"] = spellError(error) }
+    out["segmentsAfter"] = fake.segmentCount
+    // The did-start for segment 1 arrives after its own pause.
+    fake.screenStarted(1)
+    _ = spin(0.2) { false }
+    out["segment1"] = describeSegment(fake.segment(1))
+    out["elapsed"] = fake.recorder.elapsed
+    do {
+        try fake.recorder.resume()
+        try fake.recorder.pause()
+        out["secondResume"] = "ok"
+    } catch { out["secondResume"] = spellError(error) }
+    out["movies"] = (fake.recorder.session?.segments ?? []).map { $0.movieURL.path }
+    out["pauses"] = fake.pauses
+    out["stateAfter"] = fake.state
+    out["filesExist"] = (fake.recorder.session?.segments ?? []).dropFirst().map {
+        FileManager.default.fileExists(atPath: $0.movieURL.path)
+    }
+    return out
+}
+
+/// The walker over three closed segments, paused: the stamps are chosen so
+/// `elapsed` is 2 + 3 + 1.5 s with two gaps of a second that it must not
+/// count, segment 0's microphone never started (no file), segment 1's
+/// began 20 ms AFTER its picture (offset −12 000), segment 2's writer
+/// failed with its file left behind. A `stop()` while paused probes every
+/// pair in order and answers ONE result with three `RecordingSegment`s.
+func scenarioWalker(_ work: URL) -> [String: Any] {
+    var out: [String: Any] = [:]
+    let t0 = Date(timeIntervalSinceNow: -20)
+    var segments: [FakeSegment] = []
+    var paths: [[String: Any]] = []
+    for index in 0..<3 {
+        let movie = work.appendingPathComponent("walker\(index).png")
+        let mic = work.appendingPathComponent("walker\(index)-mic.png")
+        var segment = FakeSegment(movie: movie, mic: mic, closed: true)
+        var written = writePNG(movie)
+        switch index {
+        case 0:
+            segment.screenStart = t0
+            segment.stoppedAt = t0.addingTimeInterval(2.0)
+        case 1:
+            segment.screenStart = t0.addingTimeInterval(3.0)
+            segment.micStart = t0.addingTimeInterval(3.020)
+            segment.stoppedAt = t0.addingTimeInterval(6.0)
+            written = written && writePNG(mic)
+        default:
+            segment.screenStart = t0.addingTimeInterval(7.0)
+            segment.micStart = t0.addingTimeInterval(7.0)
+            segment.stoppedAt = t0.addingTimeInterval(8.5)
+            segment.micFailure = "The microphone recording failed: boom."
+            written = written && writePNG(mic)
+        }
+        segments.append(segment)
+        paths.append(["movie": movie.path, "mic": mic.path, "written": written,
+                      "screenStart": segment.screenStart!.timeIntervalSince1970])
+    }
+    out["paths"] = paths
+    let fake = Fake(segments: segments, mic: true, state: .paused, folder: work)
+    out["elapsedPaused"] = fake.recorder.elapsed
+    _ = spin(0.2) { false }
+    out["elapsedPausedAgain"] = fake.recorder.elapsed
+    var stops: [[String: Any]] = []
+    fake.recorder.stop { stops.append(spell($0)) }
+    out["stateAfterStop"] = fake.state
+    out["settled"] = fake.settled()
+    out["onFinishCount"] = fake.finishes.count
+    out["onFinish"] = fake.finishes.first ?? [:]
+    out["stop"] = stops.first ?? [:]
+    return out
+}
+
 func state(_ request: [String: Any]) -> [String: Any] {
     var out: [String: Any] = [:]
     // The driven half, in its own request so a fake that will not build
     // fails its rows and not the idle machine's.
     if request["drive"] as? Bool == true, let path = request["work"] as? String {
+        // A `.mov` the walker cannot read must never reach `FFmpegRewrap`'s
+        // consent alert (`MediaImporter.probeAllowingRewrap` offers a
+        // refused non-image to it): the policy is pinned to never for the
+        // life of this probe, exactly as a person who said never would have it.
+        UserDefaults.standard.setVolatileDomain(
+            [FFmpegRewrap.policyDefaultsKey: FFmpegRewrap.Policy.never.rawValue],
+            forName: UserDefaults.argumentDomain)
         let work = URL(fileURLWithPath: path, isDirectory: true)
         out["join"] = scenarioJoin(work)
         out["oneShot"] = scenarioOneShot(work)
@@ -896,6 +1713,14 @@ func state(_ request: [String: Any]) -> [String: Any] {
         out["path"] = scenarioPath(work)
         out["external"] = scenarioExternal(work)
         out["idleFaces"] = scenarioIdleFaces(work)
+        out["pause"] = scenarioPause(work)
+        out["pauseRefused"] = scenarioPauseRefused(work)
+        out["resumeRefused"] = scenarioResumeRefused(work)
+        out["closedFail"] = scenarioClosedFail(work)
+        out["externalPaused"] = scenarioExternalPaused(work)
+        out["systemStopPaused"] = scenarioSystemStopPaused(work)
+        out["lateDidStart"] = scenarioLateDidStart(work)
+        out["walker"] = scenarioWalker(work)
         return out
     }
     let recorder = ScreenRecorder()
@@ -955,6 +1780,10 @@ func state(_ request: [String: Any]) -> [String: Any] {
         ).localizedDescription,
         "filesKeptAlone": RecorderError.filesKept(.finishFailed("why."), movie: "/m/a.mov",
             microphone: nil).localizedDescription,
+        "notPaused": RecorderError.notPaused.localizedDescription,
+        "filesKeptTwo": RecorderError.filesKept(
+            .timedOut, movie: "/m/a.mov, /m/b.mov", microphone: "/m/x.m4a, /m/y.m4a"
+        ).localizedDescription,
     ]
     out["linear"] = (request["decibels"] as? [Double] ?? []).map { dB -> [String: Any] in
         ["dB": dB, "linear": Double(RecordingMeter.linear(fromDecibels: Float(dB)))]
@@ -1019,6 +1848,12 @@ final class ProbeDocumentController: NSDocumentController {
 
 func fpsPair(_ f: Fps) -> [Int] { [f.num, f.den] }
 
+/// A `Placement` list as plain ints — one overload per shape the tree has
+/// had (`[UInt32]`, and `[UInt32?]` with −1 where nothing was minted), so
+/// the probe compiles against either.
+func ids(_ list: [UInt32]) -> [Int] { list.map { Int($0) } }
+func ids(_ list: [UInt32?]) -> [Int] { list.map { $0.map { Int($0) } ?? -1 } }
+
 /// One minted clip as plain numbers.
 func describeClip(_ clip: ClipSnapshot) -> [String: Any] {
     var inPoint: Ticks = -1
@@ -1029,7 +1864,8 @@ func describeClip(_ clip: ClipSnapshot) -> [String: Any] {
     }
     return [
         "id": Int(clip.id), "track": Int(clip.track), "start": clip.start,
-        "duration": clip.duration, "in": inPoint, "media": mediaId,
+        "duration": clip.duration, "in": inPoint, "media": mediaId, "end": clip.end,
+        "transition": clip.transitionIn != nil,
     ]
 }
 
@@ -1051,18 +1887,24 @@ func commit(_ document: ProjectDocument, _ placement: RecordingLanding.Placement
         .map { ["id": Int($0.id), "name": $0.name] }
     let viewTracks: [[String: Any]] = afterView.tracks.map { ["id": Int($0.id), "name": $0.name] }
     let scopes: [Int] = placement.ops.map { op -> Int in op.scope.map { Int($0) } ?? -1 }
+    let predicted: [String: Any] = [
+        "media": Int(placement.mediaId), "clip": placement.clipId.map { Int($0) } ?? -1,
+        "micMedia": placement.micMediaId.map { Int($0) } ?? -1,
+        "micClip": placement.micClipId.map { Int($0) } ?? -1,
+    ]
+    // The four lists, in segment order; an entry nothing was minted for
+    // (the fix wave's `[UInt32?]`) reads −1.
+    let predictedLists: [String: Any] = [
+        "media": ids(placement.mediaIds), "clips": ids(placement.clipIds),
+        "micMedia": ids(placement.micMediaIds), "micClips": ids(placement.micClipIds),
+    ]
     return [
         "ops": placement.ops.map { $0.name }, "opJSON": placement.ops.map { $0.json },
-        "scopes": scopes,
-        "predicted": [
-            "media": Int(placement.mediaId), "clip": placement.clipId.map { Int($0) } ?? -1,
-            "micMedia": placement.micMediaId.map { Int($0) } ?? -1,
-            "micClip": placement.micClipId.map { Int($0) } ?? -1,
-        ] as [String: Any],
+        "scopes": scopes, "predicted": predicted, "predictedLists": predictedLists,
         "nextIdBefore": Int(beforeDoc.nextId),
         "frontTrackBefore": Int(beforeView.tracks.last?.id ?? 0),
         "mintedMedia": media, "mintedClips": clips, "mintedTracks": tracks,
-        "viewTracks": viewTracks,
+        "viewTracks": viewTracks, "notes": placement.notes,
         "documentClips": afterDoc.clips.count, "viewClips": afterView.clips.count,
         "documentMedia": afterDoc.media.count, "documentTracks": afterDoc.tracks.count,
         "canUndo": document.undoManager?.canUndo ?? false,
@@ -1185,7 +2027,7 @@ func landing(_ request: [String: Any]) -> [String: Any] {
         var desc = picture
         desc.path = movie.path
         let docsBefore = NSDocumentController.shared.documents.count
-        let d = try ProjectDocument.untitled(around: result(mic: false, rate: 60, descriptor: desc))
+        let (d, _) = try ProjectDocument.untitled(around: result(mic: false, rate: 60, descriptor: desc))
         let s = d.project.snapshot
         // Keyed one at a time: one literal of this size is past what swiftc
         // will type-check in reasonable time.
@@ -1221,7 +2063,7 @@ func landing(_ request: [String: Any]) -> [String: Any] {
         desc2.path = movie2.path
         var micDesc = microphone
         micDesc.path = mic2.path
-        let d2 = try ProjectDocument.untitled(
+        let (d2, _) = try ProjectDocument.untitled(
             around: result(mic: true, offset: 12_000, rate: 60, descriptor: desc2,
                            micDescriptor: micDesc))
         let s2 = d2.project.snapshot
@@ -1410,6 +2252,329 @@ func landing(_ request: [String: Any]) -> [String: Any] {
         } catch { row8["under"] = ["error": error.localizedDescription] }
         out["row8"] = row8
     } catch { out["row8"] = ["error": "\(error)"] }
+    return out
+}
+
+// ---- mode "segments": the landing over a SEQUENCE (road map 3, R2b) ----
+
+/// Lane L's scratch rows made tracked: two- and three-segment results
+/// placed back to back on ONE track with the ends READ off the handle, the
+/// sequence falling to a new track whole, the microphone floor, a
+/// mic-less middle, `place: false`, inside a nest, and `remainderPlacement`
+/// through the real untitled order. Every row commits through the
+/// document's own door and reports what the core minted beside the
+/// prediction; the checks are the script's.
+func segments(_ request: [String: Any]) -> [String: Any] {
+    let controller = ProbeDocumentController()
+    let app = NSApplication.shared
+    app.setActivationPolicy(.prohibited)
+    UserDefaults.standard.setVolatileDomain(
+        ["ApplePersistenceIgnoreState": true, "AgentServerEnabled": false,
+         "AppleShowScrollBars": "Always"],
+        forName: UserDefaults.argumentDomain)
+    var out: [String: Any] = [:]
+    out["controllerIsProbe"] = NSDocumentController.shared === controller
+    let tmp = URL(
+        fileURLWithPath: request["tempFolder"] as? String ?? NSTemporaryDirectory(),
+        isDirectory: true)
+    try? FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
+    let second: Ticks = 600_000
+
+    func picture(_ n: Int, ticks: Ticks = 5 * 600_000) -> MediaDescriptor {
+        MediaDescriptor(
+            path: tmp.appendingPathComponent("seg\(n).mov").path, kind: .video, duration: ticks,
+            width: 1728, height: 1118, fps: Fps(num: 24981, den: 1000), hasVideo: true,
+            hasAudio: true)
+    }
+    func mic(_ n: Int, ticks: Ticks) -> MediaDescriptor {
+        MediaDescriptor(
+            path: tmp.appendingPathComponent("seg\(n) (Microphone).m4a").path, kind: .audio,
+            duration: ticks, hasAudio: true)
+    }
+    func segment(
+        _ n: Int, ticks: Ticks = 5 * 600_000, micTicks: Ticks? = nil, offset: Ticks = 0
+    ) -> RecordingSegment {
+        RecordingSegment(
+            descriptor: picture(n, ticks: ticks), micDescriptor: micTicks.map { mic(n, ticks: $0) },
+            micOffset: offset, startedAt: Date())
+    }
+    func result(_ list: [RecordingSegment], rate: Int = 60) -> RecordingResult {
+        var choice = RecordingChoice()
+        choice.rate = rate
+        return RecordingResult(
+            segments: list, choice: choice, stoppedBy: .stopped, pauses: list.count - 1)
+    }
+    func blocked(from: Ticks, seconds: Ticks) -> ProjectDocument {
+        let d = ProjectDocument()
+        let blocker = MediaDescriptor(
+            path: "/nowhere/blocker.mov", kind: .video, duration: seconds * second, width: 640,
+            height: 360, fps: .thirty, hasVideo: true)
+        let t = d.project.snapshot.tracks[0].id
+        d.performGroupedEdit("seed", [.addMedia(descriptor: blocker)])
+        let bid = d.project.snapshot.media.last?.id ?? 0
+        d.performGroupedEdit("seed clip", [.addClip(track: t, media: bid, at: from)])
+        return d
+    }
+    /// `commit` plus the facts a sequence row reads: the front track before,
+    /// `next_id` before, and every clip in the edited container after.
+    func placed(_ d: ProjectDocument, _ p: RecordingLanding.Placement) -> [String: Any] {
+        var facts = commit(d, p)
+        facts["allClips"] = d.editedProject.snapshot.clips.map(describeClip)
+        return facts
+    }
+    func row(_ body: () throws -> [String: Any]) -> [String: Any] {
+        do { return try body() } catch { return ["error": "\(error)"] }
+    }
+
+    // A: two segments on a fresh document.
+    out["A"] = row {
+        let d = ProjectDocument()
+        let p = try RecordingLanding.placement(result([segment(1), segment(2)]), in: d, place: true)
+        return placed(d, p)
+    }
+    // B: off-grid durations — the end is READ off the core, never summed.
+    out["B"] = row {
+        let d = ProjectDocument()
+        let p = try RecordingLanding.placement(
+            result([segment(1, ticks: 5 * second + 7), segment(2, ticks: 1_504_999), segment(3)]),
+            in: d, place: true)
+        return placed(d, p)
+    }
+    // C: the second segment refuses on the front track (a blocker at 7–15 s).
+    out["C"] = row {
+        let d = blocked(from: 7 * second, seconds: 8)
+        let p = try RecordingLanding.placement(result([segment(1), segment(2)]), in: d, place: true)
+        var facts = placed(d, p)
+        facts["frontTrackAfter"] = Int(d.project.snapshot.tracks.last?.id ?? 0)
+        return facts
+    }
+    // D: the FIRST refuses (a blocker at 1–9 s).
+    out["D"] = row {
+        let d = blocked(from: 1 * second, seconds: 8)
+        let p = try RecordingLanding.placement(result([segment(1), segment(2)]), in: d, place: true)
+        var facts = placed(d, p)
+        facts["frontTrackAfter"] = Int(d.project.snapshot.tracks.last?.id ?? 0)
+        return facts
+    }
+    // E: the microphone floor — segment 2's voice wants 3 000 000 − 11 000,
+    // the floor is voice 1's end.
+    out["E"] = row {
+        let d = ProjectDocument()
+        let p = try RecordingLanding.placement(
+            result([
+                segment(1, micTicks: 3_012_000, offset: 0),
+                segment(2, micTicks: 3_012_000, offset: 11_000),
+            ]), in: d, place: true)
+        return placed(d, p)
+    }
+    // E2: a lagging microphone (negative offset) is above the floor: no trim.
+    out["E2"] = row {
+        let d = ProjectDocument()
+        let p = try RecordingLanding.placement(
+            result([
+                segment(1, micTicks: 3_012_000, offset: 0),
+                segment(2, micTicks: 3_012_000, offset: -30_000),
+            ]), in: d, place: true)
+        return placed(d, p)
+    }
+    // E3: rounding AT the floor — voice 1 ends exactly where picture 2 starts.
+    var boundary: [[String: Any]] = []
+    for offset in request["boundaryOffsets"] as? [Int] ?? [] {
+        var facts = row {
+            let d = ProjectDocument()
+            let p = try RecordingLanding.placement(
+                result([
+                    segment(1, micTicks: 3_000_000, offset: 0),
+                    segment(2, micTicks: 3_000_000, offset: Ticks(offset)),
+                ]), in: d, place: true)
+            return placed(d, p)
+        }
+        facts["offset"] = offset
+        boundary.append(facts)
+    }
+    out["E3"] = boundary
+    // E4: the hazard the floor exists for, on the core directly: an add_clip
+    // three quarters of a frame under a clip's end is snapped a frame EARLY
+    // and accepted — as a transition.
+    out["E4"] = row {
+        let d = ProjectDocument()
+        d.performGroupedEdit(
+            "seed", [.addMedia(descriptor: mic(1, ticks: 3_000_000)),
+                     .addMedia(descriptor: mic(2, ticks: 3_000_000))])
+        let ids = d.project.snapshot.media.map { $0.id }
+        let t = d.project.snapshot.tracks[0].id
+        d.performGroupedEdit("seed clip", [.addClip(track: t, media: ids[0], at: 0)])
+        let frame = d.project.snapshot.canvas.fps.frameDuration
+        let raw = try d.project.applying(
+            .addClip(track: t, media: ids[1], at: 3_000_000 - (frame - frame / 4)))
+        return [
+            "frame": frame, "accepted": raw != nil,
+            "clip": raw?.snapshot.clips.last.map(describeClip) ?? [:],
+        ]
+    }
+    // F: a middle segment with no microphone.
+    out["F"] = row {
+        let d = ProjectDocument()
+        let p = try RecordingLanding.placement(
+            result([
+                segment(1, micTicks: 3_000_000, offset: 0), segment(2),
+                segment(3, micTicks: 3_000_000, offset: 12_000),
+            ]), in: d, place: true)
+        return placed(d, p)
+    }
+    // G: place false.
+    out["G"] = row {
+        let d = ProjectDocument()
+        let p = try RecordingLanding.placement(
+            result([segment(1, micTicks: 3_000_000), segment(2)]), in: d, place: false)
+        return placed(d, p)
+    }
+    // H: inside a nest whose one clip blocks the playhead.
+    out["H"] = row {
+        let n = blocked(from: 0, seconds: 8)
+        let cid = n.project.snapshot.clips.last?.id ?? 0
+        n.performGroupedEdit("nest", [.nest(clips: [cid], name: "N")])
+        let snap = n.project.snapshot
+        guard let nestClip = snap.clips.first, let nest = snap.nests.first else {
+            throw ReelCoreError(message: "no nest")
+        }
+        n.setNestPath([NestScopeStep(nest: nest.id, clip: nestClip.id)], playhead: 0, selection: [])
+        let p = try RecordingLanding.placement(result([segment(1), segment(2)]), in: n, place: true)
+        var facts = placed(n, p)
+        facts["scopeOpen"] = n.scope == nest.id
+        facts["outerClips"] = n.project.snapshot.clips.count
+        facts["outerMedia"] = n.project.snapshot.media.count
+        facts["outerTracks"] = n.project.snapshot.tracks.count
+        return facts
+    }
+    // J: an INEXACT canvas rate (24981/1000, decision 3's shape): the
+    // previous end is not a grid point, so each later segment lands at the
+    // first grid point at or after it — touching or a sub-frame gap, never
+    // a tick of overlap and never a minted cross dissolve (the R2 review).
+    out["J"] = row {
+        let d = ProjectDocument()
+        d.performGroupedEdit("rate", [.setCanvas(fps: Fps(num: 24981, den: 1000))])
+        let p = try RecordingLanding.placement(
+            result([segment(1), segment(2), segment(3)]), in: d, place: true)
+        var facts = placed(d, p)
+        facts["canvasFps"] = fpsPair(d.project.snapshot.canvas.fps)
+        return facts
+    }
+    // K: a voice SHORTER than its head — mic 1 ends 3 040 000, picture 2 is
+    // at 3 000 000, mic 2 is an 80 ms file with offset +18 000 — mints NO
+    // clip and a note, never a sliver placed late (the R2 review's numbers).
+    out["K"] = row {
+        let d = ProjectDocument()
+        let p = try RecordingLanding.placement(
+            result([
+                segment(1, micTicks: 3_040_000, offset: 0),
+                segment(2, micTicks: 48_000, offset: 18_000),
+            ]), in: d, place: true)
+        return placed(d, p)
+    }
+    // L: a microphone file under one frame (R0 q7's real 2 ms file).
+    out["L"] = row {
+        let d = ProjectDocument()
+        let p = try RecordingLanding.placement(
+            result([
+                segment(1, micTicks: 3_000_000, offset: 0), segment(2, micTicks: 1_200, offset: 0),
+            ]), in: d, place: true)
+        return placed(d, p)
+    }
+    // M: a PICTURE under one frame in the middle.
+    out["M"] = row {
+        let d = ProjectDocument()
+        let p = try RecordingLanding.placement(
+            result([segment(1), segment(2, ticks: 5_000), segment(3)]), in: d, place: true)
+        return placed(d, p)
+    }
+    // N: remainderPlacement with NO clip 1 — the document holds the first
+    // picture's media and no clip (makeProject tolerates a first picture the
+    // core refuses): the fallback lands the microphone MEDIA only.
+    out["N"] = row {
+        let d = ProjectDocument()
+        d.performGroupedEdit("seed", [.addMedia(descriptor: picture(1))])
+        guard let p = try RecordingLanding.remainderPlacement(
+            result([segment(1, micTicks: 3_000_000, offset: 12_000)]), in: d)
+        else { return ["nil": true] }
+        return placed(d, p)
+    }
+
+    // I: untitled(around:) — the remainder, through the real order.
+    for n in 1...3 {
+        try? Data("not a movie".utf8).write(to: tmp.appendingPathComponent("seg\(n).mov"))
+        try? Data("not audio".utf8).write(
+            to: tmp.appendingPathComponent("seg\(n) (Microphone).m4a"))
+    }
+    out["names"] = [
+        "three": RecordingLanding.remainderActionName(
+            for: result([segment(1, micTicks: 3_012_000), segment(2), segment(3)])),
+        "oneMic": RecordingLanding.remainderActionName(for: result([segment(1, micTicks: 1000)])),
+        "oneAlone": RecordingLanding.remainderActionName(for: result([segment(1)])),
+        "twoNoMic": RecordingLanding.remainderActionName(for: result([segment(1), segment(2)])),
+        "microphoneActionName": RecordingLanding.microphoneActionName,
+        "segmentsActionName": RecordingLanding.segmentsActionName,
+        "actionName": RecordingLanding.actionName,
+    ]
+    out["remainderNil"] = row {
+        let d = ProjectDocument()
+        return ["nil": try RecordingLanding.remainderPlacement(result([segment(1)]), in: d) == nil]
+    }
+    out["I"] = row {
+        let r = result([
+            segment(1, micTicks: 3_012_000, offset: 0), segment(2),
+            segment(3, micTicks: 3_012_000, offset: 11_000),
+        ])
+        let docsBefore = NSDocumentController.shared.documents.count
+        let (d, landingNotes) = try ProjectDocument.untitled(around: r)
+        let s = d.project.snapshot
+        var facts: [String: Any] = [:]
+        facts["notes"] = landingNotes
+        facts["displayName"] = d.displayName ?? "<nil>"
+        facts["canvasFps"] = fpsPair(s.canvas.fps)
+        facts["frame"] = s.canvas.fps.frameDuration
+        facts["edited"] = d.isDocumentEdited
+        facts["undoName"] = d.undoManager?.undoActionName ?? ""
+        facts["media"] = s.media.count
+        facts["tracks"] = s.tracks.map { $0.name }
+        facts["backTrack"] = Int(s.tracks.first?.id ?? 0)
+        facts["frontTrack"] = Int(s.tracks.last?.id ?? 0)
+        facts["clips"] = s.clips.map(describeClip)
+        facts["windows"] = d.windowControllers.count
+        facts["documents"] = NSDocumentController.shared.documents.count - docsBefore
+        d.undoManager?.undo()
+        let u = d.project.snapshot
+        facts["afterUndo"] = [
+            "clips": u.clips.count, "media": u.media.count, "tracks": u.tracks.count,
+            "edited": d.isDocumentEdited, "redoName": d.undoManager?.redoActionName ?? "",
+        ]
+        d.close()
+        return facts
+    }
+    out["I2"] = row {
+        let (d, _) = try ProjectDocument.untitled(
+            around: result([segment(1, micTicks: 3_012_000, offset: 12_000)]))
+        let s = d.project.snapshot
+        var facts: [String: Any] = [:]
+        facts["undoName"] = d.undoManager?.undoActionName ?? ""
+        facts["backTrack"] = Int(s.tracks.first?.id ?? 0)
+        facts["tracks"] = s.tracks.map { $0.name }
+        facts["clips"] = s.clips.map(describeClip)
+        facts["media"] = s.media.count
+        d.close()
+        return facts
+    }
+    out["I3"] = row {
+        let (d, landingNotes) = try ProjectDocument.untitled(around: result([segment(1)]))
+        let facts: [String: Any] = [
+            "canUndo": d.undoManager?.canUndo ?? true, "edited": d.isDocumentEdited,
+            "media": d.project.snapshot.media.count, "clips": d.project.snapshot.clips.count,
+            "notes": landingNotes,
+        ]
+        d.close()
+        return facts
+    }
+    out["documentsAfterClose"] = NSDocumentController.shared.documents.count
     return out
 }
 
@@ -1698,7 +2863,8 @@ func chrome(_ request: [String: Any]) -> [String: Any] {
         "plain": RecorderPanelController.landingNote(
             stoppedBy: .stopped, chosen: .newProject, landedAsNewProject: false, micProblem: nil),
         "closedSentence": RecorderPanelController.destinationClosedSentence,
-        "menuBarSentence": "Stopped from the menu bar; the recording was added.",
+        "menuBarSentence":
+            "Stopped from the system's screen-recording indicator; the recording was added.",
     ]
 
     // fix 12 — New Recording… routes a TOOL's recording to the recorder, not the panel.
@@ -1712,6 +2878,238 @@ func chrome(_ request: [String: Any]) -> [String: Any] {
     ScreenRecorder.shared.state = .idle
     window?.orderOut(nil)
 
+    return out
+}
+
+// ---- mode "chrome-pause": the status item's vocabulary, the .paused phase,
+// the panel's two entries, the reveal, and the route (road map 3, R2c) ----
+func chromePause(_ request: [String: Any]) -> [String: Any] {
+    var out: [String: Any] = [:]
+    let app = NSApplication.shared
+    app.setActivationPolicy(.prohibited)
+    UserDefaults.standard.setVolatileDomain([
+        RecorderPanelController.displayKey: 0, RecorderPanelController.microphoneKey: "",
+        RecorderPanelController.systemAudioKey: true, RecorderPanelController.showClicksKey: false,
+        RecorderPanelController.rateKey: 60, RecorderPanelController.sizeKey: "nominal",
+        "AgentServerEnabled": false,
+    ], forName: UserDefaults.argumentDomain)
+    let delegate = AppDelegate()
+    delegate.applicationWillFinishLaunching(
+        Notification(name: NSApplication.willFinishLaunchingNotification, object: app))
+    let work = URL(fileURLWithPath: request["work"] as? String ?? NSTemporaryDirectory(),
+                   isDirectory: true)
+
+    // The status item's vocabulary, pure.
+    out["menuTitles"] = [
+        "recording": RecorderStatusItem.menuTitles(paused: false),
+        "paused": RecorderStatusItem.menuTitles(paused: true),
+    ]
+    out["tooltip"] = [
+        "recording": RecorderStatusItem.tooltip(paused: false),
+        "paused": RecorderStatusItem.tooltip(paused: true),
+    ]
+    out["pauseGlyph"] = RecorderStatusItem.pauseGlyph
+    func describeTitle(_ title: NSAttributedString) -> [String: Any] {
+        let markColor = title.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor
+        let markFont = title.attribute(.font, at: 0, effectiveRange: nil) as? NSFont
+        let last = title.length - 1
+        let timeColor = title.attribute(.foregroundColor, at: last, effectiveRange: nil)
+        let timeFont = title.attribute(.font, at: last, effectiveRange: nil) as? NSFont
+        let size = NSFont.systemFontSize
+        return [
+            "string": title.string, "markHasColor": markColor != nil,
+            "markIsClip": markColor == DS.meterClip,
+            "markFontIsSystem": markFont == NSFont.systemFont(ofSize: size),
+            "timeHasColor": timeColor != nil,
+            "timeFontIsMonoDigits":
+                timeFont == NSFont.monospacedDigitSystemFont(ofSize: size, weight: .regular),
+        ]
+    }
+    out["titleRecording"] = describeTitle(RecorderStatusItem.title(elapsed: 61.9, paused: false))
+    out["titlePaused"] = describeTitle(RecorderStatusItem.title(elapsed: 61.9, paused: true))
+    out["titlePausedHour"] = describeTitle(RecorderStatusItem.title(elapsed: 3661, paused: true))
+
+    // The panel's .paused phase, drawn.
+    let panel = RecorderPanelController.shared
+    let window = panel.window as? NSPanel
+    window?.orderOut(nil)
+    panel.setNote("")
+    panel.phase = .paused
+    out["pausedPhase"] = [
+        "buttonTitle": panel.recordButton.title, "enabled": panel.recordButton.isEnabled,
+        "status": panel.statusLabel.stringValue,
+        "statusFaint": panel.statusLabel.textColor == DS.textFaint,
+        "controlsDisabled": !panel.sourcePopup.isEnabled && !panel.destinationPopup.isEnabled
+            && !panel.microphonePopup.isEnabled,
+        "countdownHidden": panel.countdownLabel.isHidden,
+    ]
+    panel.phase = .recording
+    out["recordingPhase"] = [
+        "buttonTitle": panel.recordButton.title, "status": panel.statusLabel.stringValue,
+        "statusClip": panel.statusLabel.textColor == DS.meterClip,
+    ]
+    panel.phase = .idle
+    out["idlePhase"] = ["status": panel.statusLabel.stringValue,
+                        "statusFaint": panel.statusLabel.textColor == DS.textFaint]
+
+    // The two entries against a recorder that refuses (idle): each answered
+    // as +Pause.swift says — a pause beeps and stays, a resume writes the
+    // note after what is there and stays paused.
+    panel.pauseRecording()
+    out["pauseFromIdle"] = "\(panel.phase)"
+    panel.phase = .recording
+    panel.pauseRecording()
+    out["pauseRefused"] = ["phase": "\(panel.phase)", "recorder": "\(ScreenRecorder.shared.state)",
+                           "note": panel.noteLabel.stringValue]
+    panel.phase = .paused
+    panel.setNote("")
+    panel.resumeProblem = nil
+    panel.resumeRecording()
+    out["resumeRefused"] = ["phase": "\(panel.phase)", "note": panel.noteLabel.stringValue,
+                            "noteShown": !panel.noteLabel.isHidden,
+                            "resumeProblem": panel.resumeProblem as Any]
+    // A second refused resume REPLACES the sentence (state, not text).
+    panel.resumeRecording()
+    out["resumeRefusedTwice"] = panel.noteLabel.stringValue
+    // With a live microphone problem the note is composed from the two
+    // pieces of STATE, the microphone's first, and a tick's
+    // syncMicrophoneNote leaves it alone rather than wiping the resume's.
+    ScreenRecorder.shared.microphoneProblem = "The microphone recording failed: boom."
+    panel.syncMicrophoneNote()
+    out["resumeRefusedWithMic"] = panel.noteLabel.stringValue
+    panel.syncMicrophoneNote()
+    out["resumeRefusedWithMicAgain"] = panel.noteLabel.stringValue
+    ScreenRecorder.shared.microphoneProblem = nil
+    panel.resumeProblem = nil
+    panel.setNote("")
+    panel.phase = .recording
+    panel.resumeRecording()
+    out["resumeFromRecording"] = "\(panel.phase)"
+    panel.phase = .idle
+    out["liveNote"] = [
+        "none": RecorderPanelController.liveNote(microphoneProblem: nil, resumeProblem: nil),
+        "mic": RecorderPanelController.liveNote(microphoneProblem: "boom.", resumeProblem: nil),
+        "resume": RecorderPanelController.liveNote(
+            microphoneProblem: nil, resumeProblem: "The recording is not paused."),
+        "both": RecorderPanelController.liveNote(
+            microphoneProblem: "boom.", resumeProblem: "The recording is not paused."),
+    ]
+    out["landingNoteR2"] = [
+        "userStopped": RecorderPanelController.landingNote(
+            stoppedBy: .userStopped, chosen: .newProject, landedAsNewProject: true, micProblem: nil),
+        "resume": RecorderPanelController.landingNote(
+            stoppedBy: .stopped, chosen: .newProject, landedAsNewProject: true, micProblem: nil,
+            resumeProblem: "The recording could not be resumed: x."),
+        "all": RecorderPanelController.landingNote(
+            stoppedBy: .userStopped, chosen: .document(recipeKey: 1), landedAsNewProject: true,
+            micProblem: "Mic.", resumeProblem: "Resume.", notes: ["Note one.", "Note two."]),
+        "notesOnly": RecorderPanelController.landingNote(
+            stoppedBy: .stopped, chosen: .newProject, landedAsNewProject: true, micProblem: nil,
+            notes: ["Note."]),
+    ]
+
+    // A REAL pause and resume through the panel, over a faked session on
+    // ScreenRecorder.shared (a probe-only manipulation, torn down below):
+    // the phase follows the recorder's own transitions.
+    let shared = ScreenRecorder.shared
+    let movie = work.appendingPathComponent("panel.png")
+    _ = writePNG(movie)
+    var choice = RecordingChoice()
+    choice.folder = work
+    let size = CGSize(width: 16, height: 16)
+    let configs = RecordingConfiguration.make(
+        choice, displayPointSize: size, scale: 1, outputURL: movie)
+    let stream = SCStream(filter: SCContentFilter(), configuration: configs.stream, delegate: shared)
+    let output = SCRecordingOutput(configuration: configs.output, delegate: shared)
+    var attached = "ok"
+    do { try stream.addRecordingOutput(output) } catch { attached = "\(error)" }
+    var first = ScreenRecorder.Segment(movieURL: movie, micURL: nil, output: output, addedAt: Date())
+    first.screenStartedAt = Date(timeIntervalSinceNow: -2)
+    shared.session = ScreenRecorder.Session(
+        choice: choice, displayPointSize: size, scale: 1, stream: stream, micSession: nil,
+        micOutput: nil, calledAt: Date(), onFinish: { _ in }, segments: [first])
+    shared.state = .recording
+    panel.phase = .recording
+    let statusRecording = panel.statusLabel.stringValue
+    panel.pauseRecording()
+    let statusPaused = panel.statusLabel.stringValue
+    _ = spin(0.3) { false }
+    panel.refreshStatusLabel()
+    out["panelPause"] = [
+        "attached": attached, "phase": "\(panel.phase)", "recorder": "\(shared.state)",
+        "statusRecording": statusRecording, "statusPaused": statusPaused,
+        "statusHeld": panel.statusLabel.stringValue,
+        "statusFaint": panel.statusLabel.textColor == DS.textFaint,
+        "buttonTitle": panel.recordButton.title,
+    ]
+    panel.resumeProblem = "a stale refusal"
+    panel.resumeRecording()
+    out["panelResume"] = ["phase": "\(panel.phase)", "recorder": "\(shared.state)",
+                          "segments": shared.session?.segments.count ?? -1,
+                          "resumeProblemCleared": panel.resumeProblem == nil]
+    panel.pauseRecording()
+    panel.stopRecording()
+    out["panelStopWhilePaused"] = ["phase": "\(panel.phase)", "recorder": "\(shared.state)",
+                                  "stopAsked": shared.session?.stopAsked ?? false]
+    shared.timer?.invalidate()
+    shared.timer = nil
+    shared.session = nil
+    shared.state = .idle
+    shared.stopCompletions = []
+    shared.pendingStop = false
+    panel.phase = .idle
+    out["tornDown"] = "\(shared.state)"
+
+    // revealIfNoted, both ways, and once more with the panel never on screen.
+    window?.orderOut(nil)
+    panel.showWhenLanded = true
+    panel.setNote("")
+    panel.revealIfNoted()
+    out["revealEmpty"] = ["visible": window?.isVisible ?? true, "cleared": !panel.showWhenLanded]
+    panel.showWhenLanded = true
+    panel.setNote("Stopped from the menu bar; the recording was added.")
+    panel.revealIfNoted()
+    out["revealNoted"] = ["visible": window?.isVisible ?? false, "cleared": !panel.showWhenLanded]
+    window?.orderOut(nil)
+    panel.showWhenLanded = false
+    panel.revealIfNoted()
+    out["revealNotOnScreenBefore"] = ["visible": window?.isVisible ?? true]
+    panel.setNote("")
+
+    // revealControls — the quit guard's call: the panel when it is not
+    // hidden for a recording; the status item's menu when it is, and a beep
+    // with no item to open.
+    window?.orderOut(nil)
+    panel.hiddenForRecording = false
+    panel.revealControls()
+    out["revealControlsShown"] = window?.isVisible ?? false
+    window?.orderOut(nil)
+    panel.hiddenForRecording = true
+    panel.revealControls()
+    out["revealControlsHidden"] = ["visible": window?.isVisible ?? true,
+                                  "itemUp": panel.statusItem != nil]
+    panel.hiddenForRecording = false
+
+    // New Recording… while the panel is paused stops through the panel.
+    window?.orderOut(nil)
+    panel.phase = .paused
+    delegate.newRecording(nil)
+    out["routePaused"] = ["phase": "\(panel.phase)", "panelShown": window?.isVisible ?? true]
+    panel.phase = .idle
+
+    // The retitle and the quit guard while PAUSED (probe-written, reset).
+    ScreenRecorder.shared.state = .paused
+    let item = NSMenuItem(
+        title: "New Recording…", action: #selector(AppDelegate.newRecording(_:)), keyEquivalent: "")
+    out["pausedValidate"] = [
+        "enabled": delegate.validateMenuItem(item), "title": item.title,
+        "isRecording": ScreenRecorder.shared.isRecording,
+        "isPaused": ScreenRecorder.shared.isPaused,
+        "reply": spellReply(delegate.applicationShouldTerminate(app)),
+    ]
+    ScreenRecorder.shared.state = .idle
+    window?.orderOut(nil)
+    out["stateAfter"] = "\(ScreenRecorder.shared.state)"
     return out
 }
 
@@ -1779,6 +3177,7 @@ func catalog(_ request: [String: Any]) -> [String: Any] {
                 "name": tool["name"] as? String ?? "", "hasScope": properties["scope"] != nil,
                 "properties": properties.keys.sorted(),
                 "required": (schema["required"] as? [String] ?? []).sorted(),
+                "description": tool["description"] as? String ?? "",
             ]
         }
         out["bytes"] = json.utf8.count
@@ -1804,6 +3203,220 @@ func host(_ request: [String: Any]) -> [String: Any] {
     return out
 }
 
+// ---- mode "granted": the probe's own granted tier (road map 3, R2e) ------
+
+/// One real recording of the main display on a FRESH `ScreenRecorder()`:
+/// start, a second, `pause()`, `elapsed` twice half a second apart, then —
+/// with `resume` — `resume()`, a second more, and `stop()`. Every wait is
+/// bounded. `spell` carries each segment's probed descriptor.
+func grantedRun(_ filter: SCContentFilter, _ choice: RecordingChoice, resume: Bool)
+    -> [String: Any]
+{
+    var out: [String: Any] = [:]
+    let recorder = ScreenRecorder()
+    var finishes: [[String: Any]] = []
+    var startError: String?
+    var started = false
+    let t0 = Date()
+    recorder.start(filter: filter, choice: choice, onFinish: { finishes.append(spell($0)) }) {
+        error in
+        startError = error.map { $0.localizedDescription }
+        started = true
+    }
+    out["started"] = spin(ScreenRecorder.armCeiling + 5) { started }
+    out["startError"] = startError as Any
+    out["startLatency"] = Date().timeIntervalSince(t0)
+    guard started, startError == nil else { return out }
+    out["stateAfterStart"] = "\(recorder.state)"
+    out["segment0"] = describeSegment(recorder.segment0)
+    _ = spin(1.0) { false }
+    out["elapsedBeforePause"] = recorder.elapsed
+    do {
+        try recorder.pause()
+        out["pause"] = "ok"
+    } catch { out["pause"] = spellError(error) }
+    out["stateAfterPause"] = "\(recorder.state)"
+    out["isPaused"] = recorder.isPaused
+    let a = recorder.elapsed
+    _ = spin(0.5) { false }
+    let b = recorder.elapsed
+    out["elapsedA"] = a
+    out["elapsedB"] = b
+    let removed = Date()
+    out["segment0FinishedWhilePaused"] =
+        spin(3) { recorder.session?.segments.first?.screenFinished == true }
+    out["didFinishLatency"] = Date().timeIntervalSince(removed)
+    _ = spin(0.5) { false }
+    if resume {
+        do {
+            try recorder.resume()
+            out["resume"] = "ok"
+        } catch { out["resume"] = spellError(error) }
+        out["stateAfterResume"] = "\(recorder.state)"
+        out["segmentsAfterResume"] = recorder.session?.segments.count ?? -1
+        let added = Date()
+        out["segment1DidStart"] =
+            spin(3) { recorder.session?.segments.count == 2
+                && recorder.session?.segments[1].screenStartedAt != nil }
+        out["didStartLatency"] = Date().timeIntervalSince(added)
+        out["segment1"] = describeSegment(
+            recorder.session.flatMap { $0.segments.count > 1 ? $0.segments[1] : nil })
+        _ = spin(1.0) { false }
+        out["elapsedBeforeStop"] = recorder.elapsed
+        out["elapsedWall"] = Date().timeIntervalSince(t0)
+    }
+    var stops: [[String: Any]] = []
+    recorder.stop { stops.append(spell($0)) }
+    out["stateAfterStop"] = "\(recorder.state)"
+    let stopped = Date()
+    out["concluded"] = spin(30) { recorder.state == .idle }
+    out["stopLatency"] = Date().timeIntervalSince(stopped)
+    out["onFinishCount"] = finishes.count
+    out["onFinish"] = finishes.first ?? [:]
+    out["stopCount"] = stops.count
+    out["stop"] = stops.first ?? [:]
+    out["elapsedAfter"] = recorder.elapsed
+    var sizes: [String: Int] = [:]
+    for segment in (finishes.first?["segments"] as? [[String: Any]]) ?? [] {
+        if let path = segment["path"] as? String {
+            let attributes = try? FileManager.default.attributesOfItem(atPath: path)
+            sizes[path] = (attributes?[.size] as? NSNumber)?.intValue ?? -1
+        }
+    }
+    out["sizes"] = sizes
+    return out
+}
+
+extension ScreenRecorder {
+    var segment0: Segment? { session?.segments.first }
+}
+
+func granted(_ request: [String: Any]) -> [String: Any] {
+    // FIRST: the untitled landing in run 3 needs the probe's controller.
+    let controller = ProbeDocumentController()
+    let app = NSApplication.shared
+    app.setActivationPolicy(.prohibited)
+    let folder = URL(fileURLWithPath: request["folder"] as? String ?? NSTemporaryDirectory(),
+                     isDirectory: true)
+    UserDefaults.standard.setVolatileDomain([
+        RecorderPanelController.displayKey: 0, RecorderPanelController.microphoneKey: "",
+        RecorderPanelController.systemAudioKey: true, RecorderPanelController.showClicksKey: false,
+        RecorderPanelController.rateKey: 60, RecorderPanelController.sizeKey: "nominal",
+        RecordingFiles.folderDefaultsKey: folder.path,
+        FFmpegRewrap.policyDefaultsKey: FFmpegRewrap.Policy.never.rawValue,
+        "ApplePersistenceIgnoreState": true, "AgentServerEnabled": false,
+        "AppleShowScrollBars": "Always",
+    ], forName: UserDefaults.argumentDomain)
+    var out: [String: Any] = [:]
+    out["controllerIsProbe"] = NSDocumentController.shared === controller
+    out["preflight"] = CGPreflightScreenCaptureAccess()
+    let session = CGSessionCopyCurrentDictionary() as? [String: Any]
+    out["locked"] = (session?["CGSSessionScreenIsLocked"] as? Bool) ?? false
+    out["folderPinned"] = RecordingFiles.folder().path
+    var content: SCShareableContent?
+    var listFailure = ""
+    var answered = false
+    ScreenRecorder.shareableContent { outcome in
+        switch outcome {
+        case .success(let listed): content = listed
+        case .failure(let error): listFailure = error.localizedDescription
+        }
+        answered = true
+    }
+    out["answered"] = spin(20) { answered }
+    out["displays"] = content?.displays.count ?? -1
+    out["listFailure"] = listFailure
+    guard CGPreflightScreenCaptureAccess() else {
+        out["skipped"] = "CGPreflightScreenCaptureAccess() is false under this process's grant"
+        return out
+    }
+    guard let content, !content.displays.isEmpty else {
+        out["skipped"] = "no shareable display (\(content?.displays.count ?? -1); "
+            + (listFailure.isEmpty ? "the console is locked or every display is asleep" : listFailure)
+            + ")"
+        return out
+    }
+    do { try RecordingFiles.create(folder) } catch { return ["error": "\(error)"] }
+    let filter: SCContentFilter
+    do {
+        filter = try ScreenRecorder.filter(for: .display(CGMainDisplayID()), in: content)
+    } catch { return ["error": "\(error)"] }
+    out["filter"] = ["width": Double(filter.contentRect.width),
+                     "height": Double(filter.contentRect.height),
+                     "scale": Double(filter.pointPixelScale)]
+    var choice = RecordingChoice()
+    choice.folder = folder
+    choice.microphone = nil
+    out["run1"] = grantedRun(filter, choice, resume: true)
+    out["run2"] = grantedRun(filter, choice, resume: false)
+
+    // Run 3: the PANEL, end to end — Record over the main display, the
+    // panel hidden at recordingDidStart, Pause and Resume through the two
+    // entries the status item calls, Stop, the landing as a new project,
+    // and the panel STAYING hidden because the note is empty (decision 7).
+    // `ScreenRecorder.shared` and the pinned folder, the panel's own path.
+    var r3: [String: Any] = [:]
+    let panel = RecorderPanelController.shared
+    let window = panel.window
+    panel.selectDisplay(CGMainDisplayID())
+    panel.show()
+    r3["visibleBefore"] = window?.isVisible ?? false
+    r3["destinationNewProject"] = panel.currentChoice().destination == .newProject
+    r3["microphoneOff"] = panel.currentChoice().microphone == nil
+    r3["sourceMain"] = panel.currentChoice().source == .display(CGMainDisplayID())
+    let docsBefore = NSDocumentController.shared.documents.count
+    panel.record(nil)
+    if case .countdown = panel.phase { r3["countdownBegan"] = true } else { r3["countdownBegan"] = false }
+    r3["recording"] = spin(Double(RecorderPanelController.countdownSeconds) + ScreenRecorder.armCeiling + 5) {
+        panel.phase == .recording
+    }
+    r3["atStart"] = [
+        "visible": window?.isVisible ?? true, "hiddenForRecording": panel.hiddenForRecording,
+        "showWhenLanded": panel.showWhenLanded, "itemShowing": panel.statusItem?.isShowing ?? false,
+        "note": panel.noteLabel.stringValue, "recorder": "\(ScreenRecorder.shared.state)",
+    ]
+    panel.show()
+    r3["showWhileHidden"] = window?.isVisible ?? true
+    _ = spin(1.0) { false }
+    panel.pauseRecording()
+    let statusAtPause = panel.statusLabel.stringValue
+    r3["paused"] = [
+        "phase": "\(panel.phase)", "recorder": "\(ScreenRecorder.shared.state)",
+        "status": statusAtPause, "faint": panel.statusLabel.textColor == DS.textFaint,
+        "elapsed": ScreenRecorder.shared.elapsed,
+    ]
+    _ = spin(0.7) { false }
+    r3["statusHeld"] = panel.statusLabel.stringValue
+    r3["elapsedHeld"] = ScreenRecorder.shared.elapsed
+    panel.resumeRecording()
+    r3["resumed"] = ["phase": "\(panel.phase)", "recorder": "\(ScreenRecorder.shared.state)",
+                     "segments": ScreenRecorder.shared.session?.segments.count ?? -1]
+    _ = spin(1.0) { false }
+    panel.stopRecording()
+    r3["stopping"] = "\(panel.phase)"
+    r3["landed"] = spin(40) { panel.phase == .idle }
+    r3["afterLanding"] = [
+        "visible": window?.isVisible ?? true, "note": panel.noteLabel.stringValue,
+        "hiddenForRecording": panel.hiddenForRecording, "showWhenLanded": panel.showWhenLanded,
+        "itemDown": panel.statusItem == nil, "recorder": "\(ScreenRecorder.shared.state)",
+    ]
+    r3["documentsOpened"] = NSDocumentController.shared.documents.count - docsBefore
+    if let d = NSDocumentController.shared.documents.last as? ProjectDocument {
+        let s = d.project.snapshot
+        r3["document"] = [
+            "media": s.media.count, "tracks": s.tracks.map { $0.name },
+            "clips": s.clips.sorted { $0.start < $1.start }.map(describeClip),
+            "undoName": d.undoManager?.undoActionName ?? "",
+            "displayName": d.displayName ?? "<nil>", "canvasFps": fpsPair(s.canvas.fps),
+            "edited": d.isDocumentEdited,
+            "mediaPaths": s.media.map { $0.path },
+        ]
+        d.close()
+    }
+    out["run3"] = r3
+    return out
+}
+
 // ---- dispatch -------------------------------------------------------------
 let args = CommandLine.arguments
 guard args.count >= 3 else {
@@ -1824,8 +3437,14 @@ do {
         answer = state(request)
     case "landing":
         answer = landing(request)
+    case "segments":
+        answer = segments(request)
     case "chrome":
         answer = chrome(request)
+    case "chrome-pause":
+        answer = chromePause(request)
+    case "granted":
+        answer = granted(request)
     case "welcome":
         answer = welcome(request)
     case "catalog":
@@ -1896,7 +3515,7 @@ def build_probe(sources):
     return binary, None
 
 
-def run_probe(binary, tag, request):
+def run_probe(binary, tag, request, timeout=120):
     """One request in, one answer out, both kept beside the binary under
     the section's tag so a failed row can be read back after the run."""
     here = os.path.dirname(binary)
@@ -1907,9 +3526,9 @@ def run_probe(binary, tag, request):
     if os.path.exists(out):
         os.remove(out)
     try:
-        result = subprocess.run([binary, req, out], capture_output=True, text=True, timeout=120)
+        result = subprocess.run([binary, req, out], capture_output=True, text=True, timeout=timeout)
     except subprocess.TimeoutExpired:
-        return None, "the probe did not answer within 120 s"
+        return None, f"the probe did not answer within {timeout} s"
     if result.returncode != 0 or not os.path.exists(out):
         return None, (result.stderr.strip().splitlines() or ["(no output)"])[-1]
     with open(out) as f:
@@ -2164,6 +3783,13 @@ def section_state(binary, sources):
     check("3g: … and names the movie alone when no microphone file exists",
           errors.get("filesKeptAlone") == "why. The recording is at /m/a.mov.",
           f"got {errors.get('filesKeptAlone')!r}")
+    check("3g: RecorderError.notPaused reads 'The recording is not paused.' (R2)",
+          errors.get("notPaused") == "The recording is not paused.", f"got {errors.get('notPaused')!r}")
+    check("3g: filesKept over two movies and two microphone files keeps its shape with each list "
+          "comma-joined — ' The recording is at /m/a.mov, /m/b.mov; the microphone at /m/x.m4a, "
+          "/m/y.m4a.' (R2)",
+          errors.get("filesKeptTwo") == timed_out + " The recording is at /m/a.mov, /m/b.mov; the "
+          "microphone at /m/x.m4a, /m/y.m4a.", f"got {errors.get('filesKeptTwo')!r}")
 
     ppid = answer.get("ppid")
     pane = answer.get("screenPane") or ""
@@ -2316,6 +3942,271 @@ def section_state_driven(binary, sources):
           arming.get("state") == "arming" and arming.get("pendingStop") is True
           and arming.get("registered") == 2 and arming.get("answered") == 0
           and arming.get("stopAsked") is True, f"got {arming!r}")
+
+    section_state_r2(answer)
+
+
+def section_state_r2(answer):
+    """Road map 3, R2a over the faked session: the pause, the resume, the
+    two refusals, a closed segment's failure, an external stop while paused,
+    and the walker over three segments."""
+    print("  3o — pause() and resume() over the faked session (R2a)")
+    p = answer.get("pause") or {}
+    paths = p.get("paths") or ["", "", "", ""]
+    s0p = p.get("segment0AfterPause") or {}
+    check("3o: the fixtures were written and the segment's output was ADDED to the never-started, "
+          "grant-less stream (R1's pre-startCapture order; the R2 probe measured the pair works there)",
+          p.get("written") is True and p.get("attached") == "ok", f"{p.get('attached')!r}")
+    check("3o: elapsed before the pause is about a second (the did-start stamp is 1 s back)",
+          0.9 <= p.get("elapsedBefore", 0) <= 1.6, f"got {p.get('elapsedBefore')}")
+    check("3o: pause() while .recording returns without throwing", p.get("pause") == "ok",
+          f"got {p.get('pause')!r}")
+    check("3o: … → .paused, isPaused, and STILL isRecording (File ▸ Stop Recording, the quit guard "
+          "and .busy read a paused recording as one in progress)",
+          p.get("stateAfterPause") == "paused" and p.get("isPaused") is True
+          and p.get("isRecordingWhilePaused") is True,
+          f"{p.get('stateAfterPause')!r}, isPaused {p.get('isPaused')}, isRecording "
+          f"{p.get('isRecordingWhilePaused')}")
+    check("3o: … the segment's stoppedAt is stamped and its did-finish is not yet in",
+          s0p.get("stoppedAt") is not None and s0p.get("screenFinished") is False, f"{s0p}")
+    check("3o: … the meter goes silent AT the pause", p.get("meterSilentAfterPause") is True)
+    check("3o: … and the microphone's writer was asked to stop exactly once (pause-no-mic-stop)",
+          p.get("micStopsAfterPause") == 1, f"got {p.get('micStopsAfterPause')}")
+    check("3o: elapsed read twice 0.3 s apart while paused is EQUAL — frozen, and about the second "
+          "recorded (elapsed-through-pause)",
+          p.get("elapsedA") == p.get("elapsedB") and 0.9 <= (p.get("elapsedA") or 0) <= 1.6,
+          f"{p.get('elapsedA')} then {p.get('elapsedB')}")
+    check("3o: publishMicrophoneLevel() while paused publishes NOTHING — a meter lit by hand stays "
+          "as it was", p.get("meterLitAfterPollWhilePaused") is True)
+    check("3o: a second pause() throws .alreadyPaused by name — its own sentence, since 'no recording "
+          "is in progress' would be false while isRecording is true (the R2 review)",
+          (p.get("pauseAgain") or "").startswith("alreadyPaused: The recording is already paused."),
+          f"got {p.get('pauseAgain')!r}")
+    check("3o: resume() while .paused returns without throwing → .recording with TWO segments "
+          "(resume-no-segment)",
+          p.get("resume") == "ok" and p.get("stateAfterResume") == "recording"
+          and p.get("segmentsAfterResume") == 2,
+          f"{p.get('resume')!r}, {p.get('stateAfterResume')!r}, {p.get('segmentsAfterResume')}")
+    s1 = p.get("segment1AfterResume") or {}
+    movie1 = s1.get("movie") or ""
+    check("3o: the new segment's movie is minted in the choice's folder as `Screen Recording <date> "
+          "at <time>.mov` — ITS OWN start time through uniqueURL (decision 6), not the first's name",
+          os.path.dirname(movie1) == p.get("folder")
+          and re.fullmatch(STEM_RE + r"( \(\d+\))?\.mov", os.path.basename(movie1)) is not None
+          and movie1 != paths[0], f"got {movie1!r}")
+    check("3o: … its microphone file beside it, ` (Microphone).m4a`",
+          s1.get("mic") == os.path.splitext(movie1)[0] + " (Microphone).m4a", f"got {s1.get('mic')!r}")
+    check("3o: … micRecordingCalledAt stamped where the call is made; no did-start yet, nothing "
+          "finished, no stoppedAt",
+          s1.get("micCalled") is True and s1.get("screenStartedAt") is None
+          and s1.get("micStartedAt") is None and s1.get("stoppedAt") is None
+          and s1.get("screenFinished") is False and s1.get("micFinished") is False, f"{s1}")
+    check("3o: … and the ONE writer was restarted to exactly that file (startRecording once, the new "
+          "mic path)", p.get("micStartsAfterResume") == [s1.get("mic")],
+          f"got {p.get('micStartsAfterResume')}")
+    s0r = p.get("segment0AfterResume") or {}
+    check("3o: the closed segment is untouched by the resume — still stamped, still unfinished",
+          s0r.get("stoppedAt") == s0p.get("stoppedAt") and s0r.get("screenFinished") is False, f"{s0r}")
+    check("3o: elapsed grows again after the resume",
+          p.get("elapsedD", 0) > p.get("elapsedC", 0) >= p.get("elapsedB", 0),
+          f"B {p.get('elapsedB')}, C {p.get('elapsedC')}, D {p.get('elapsedD')}")
+    late0 = p.get("segment0AfterLateFinish") or {}
+    late1 = p.get("segment1AfterLateFinish") or {}
+    check("3o: the closed segment's did-finish and its mic's did-finish landing AFTER the resume are "
+          "INERT — the state stays .recording and only ITS flags move (R0 q7: 5–25 ms after the "
+          "remove; the resume never waits)",
+          p.get("stateAfterLateFinish") == "recording" and late0.get("screenFinished") is True
+          and late0.get("micFinished") is True and late1.get("screenFinished") is False
+          and late1.get("micFinished") is False,
+          f"state {p.get('stateAfterLateFinish')!r}, 0 {late0}, 1 {late1}")
+    s1s = p.get("segment1Stamped") or {}
+    s0s = p.get("segment0Stamped") or {}
+    check("3o: the new output's did-start (found by identity) and the mic's did-start for the NEW "
+          "file (found by URL) stamp segment 1",
+          s1s.get("screenStartedAt") is not None and s1s.get("micStartedAt") is not None, f"{s1s}")
+    check("3o: … and leave segment 0's stamps where they were",
+          s0s.get("screenStartedAt") == s0p.get("screenStartedAt")
+          and s0s.get("micStartedAt") == s0p.get("micStartedAt"), f"{s0s} vs {s0p}")
+    stray = p.get("segment1AfterStray") or {}
+    check("3o: a did-finish for an output of NO segment and a mic did-finish for a file no segment "
+          "asked for change nothing",
+          p.get("stateAfterStray") == "recording" and p.get("segmentsAfterStray") == 2
+          and stray.get("screenFinished") is False and stray.get("micFinished") is False,
+          f"state {p.get('stateAfterStray')!r}, {stray}")
+    check("3o: resume() while .recording throws .notPaused by name",
+          (p.get("resumeWhileRecording") or "").startswith("notPaused: "),
+          f"got {p.get('resumeWhileRecording')!r}")
+    check("3o: a second pause() closes segment 1 — .paused, the writer asked to stop a second time",
+          p.get("secondPause") == "ok" and p.get("stateAfterSecondPause") == "paused"
+          and p.get("micStopsAfterSecondPause") == 2,
+          f"{p.get('secondPause')!r}, {p.get('stateAfterSecondPause')!r}, stops "
+          f"{p.get('micStopsAfterSecondPause')}")
+    check("3o: elapsed at the second pause is the two recorded spans — the first's second plus the "
+          "second's, measured from its DRIVEN did-start stamp (about 0.4 s before the pause), never "
+          "from the add and never the gap",
+          1.25 <= p.get("elapsedAtSecondPause", 0) <= 1.95, f"got {p.get('elapsedAtSecondPause')}")
+    check("3o: stop() while PAUSED begins finishing as .stopped",
+          p.get("stateAfterStop") == "finishing" and p.get("stoppedBy") == "stopped",
+          f"{p.get('stateAfterStop')!r}, {p.get('stoppedBy')!r}")
+    check("3o: … with the segment's stoppedAt KEPT from the pause and NO second stopRecording — "
+          "the pause did both, only stopCapture remains",
+          p.get("stoppedAtKept") is True and p.get("micStopsAfterStop") == 2,
+          f"kept {p.get('stoppedAtKept')}, stops {p.get('micStopsAfterStop')}")
+    fin = p.get("onFinish") or {}
+    check("3o: segment 1's files written EMPTY, its two did-finishes driven, the recorder settled",
+          p.get("emptyWritten") is True and p.get("settled") is True,
+          f"written {p.get('emptyWritten')}, settled {p.get('settled')}, state {p.get('stateAfterStop')!r}")
+    check("3o: the walker meets an unreadable second movie and fails the RECORDING (landing the "
+          "readable one is deliberately not built): filesKept(finishFailed) naming EVERY file — both "
+          "movies, then both microphone files, comma-joined in segment order",
+          fin.get("kind") == "failure" and fin.get("case") == "filesKept(finishFailed)"
+          and (fin.get("description") or "").startswith("The recording could not be read: ")
+          and (fin.get("description") or "").endswith(
+              f" The recording is at {paths[0]}, {paths[2]}; the microphone at {paths[1]}, {paths[3]}."),
+          f"got {fin!r}")
+    check("3o: onFinish once, the stop's completion once, both the same outcome",
+          p.get("onFinishCount") == 1 and p.get("stopCount") == 1 and p.get("stop") == fin,
+          f"onFinish {p.get('onFinishCount')}, stop {p.get('stopCount')}")
+    check("3o: elapsed is 0 again once idle", p.get("elapsedAfter") == 0, f"got {p.get('elapsedAfter')}")
+
+    print("  3p — pause() refused")
+    pr = answer.get("pauseRefused") or {}
+    check("3p: a remove that throws (an output never added; −3812) is rethrown as .finishFailed 'The "
+          "recording could not be paused: …' — a file that could not be closed",
+          (pr.get("pause") or "").startswith("finishFailed: The recording could not be paused: "),
+          f"got {pr.get('pause')!r}")
+    check("3p: … and the recorder STAYS .recording with nothing changed — no stamp, no stopRecording, "
+          "the meter still lit",
+          pr.get("stateAfter") == "recording" and (pr.get("segment0") or {}).get("stoppedAt") is None
+          and pr.get("micStops") == 0 and pr.get("meterLit") is True,
+          f"{pr.get('stateAfter')!r}, {pr.get('segment0')}, stops {pr.get('micStops')}, lit {pr.get('meterLit')}")
+    check("3p: a stop() then closes it as ever — finishing, the writer asked to stop once, a .success",
+          pr.get("stateAfterStop") == "finishing" and pr.get("micStopsAfterStop") == 1
+          and pr.get("settled") is True and (pr.get("onFinish") or {}).get("kind") == "success",
+          f"{pr.get('stateAfterStop')!r}, stops {pr.get('micStopsAfterStop')}, {pr.get('onFinish')}")
+
+    print("  3q — resume() refused")
+    rr = answer.get("resumeRefused") or {}
+    check("3q: an add that throws (the segment's output still attached — a second output on one "
+          "stream is −3812; the state paused BY THE PROBE) is rethrown as .startFailed 'The recording "
+          "could not be resumed: …'",
+          rr.get("attached") == "ok"
+          and (rr.get("resume") or "").startswith("startFailed: The recording could not be resumed: "),
+          f"attached {rr.get('attached')!r}, got {rr.get('resume')!r}")
+    check("3q: … and the recorder STAYS .paused with no segment minted and no startRecording",
+          rr.get("stateAfter") == "paused" and rr.get("segments") == 1 and rr.get("micStarts") == [],
+          f"{rr.get('stateAfter')!r}, {rr.get('segments')}, {rr.get('micStarts')}")
+    check("3q: a stop() then lands the one segment",
+          rr.get("stateAfterStop") == "finishing" and rr.get("settled") is True
+          and (rr.get("onFinish") or {}).get("kind") == "success" and rr.get("stopCount") == 1
+          and len((rr.get("onFinish") or {}).get("segments") or []) == 1, f"{rr.get('onFinish')}")
+
+    print("  3r — a did-fail on a CLOSED segment")
+    cf = answer.get("closedFail") or {}
+    cpaths = cf.get("paths") or ["", "", "", ""]
+    check("3r: a did-fail on a CLOSED segment (paused; its did-finish still in flight) ends the "
+          "recording — finishing as .stopped, the failure on the session",
+          cf.get("attached") == "ok" and cf.get("stateAfterFail") == "finishing"
+          and cf.get("stoppedBy") == "stopped",
+          f"attached {cf.get('attached')!r}, {cf.get('stateAfterFail')!r}, {cf.get('stoppedBy')!r}")
+    check("3r: … the closed segment flagged finished; the OPEN segment stamped and its writer asked "
+          "to stop", (cf.get("segment0") or {}).get("screenFinished") is True
+          and (cf.get("segment1") or {}).get("stoppedAt") is not None and cf.get("micStops") == 1,
+          f"0 {cf.get('segment0')}, 1 {cf.get('segment1')}, stops {cf.get('micStops')}")
+    fin = cf.get("onFinish") or {}
+    check("3r: the walker answers the recording's failure naming every file",
+          cf.get("settled") is True and cf.get("onFinishCount") == 1
+          and fin.get("case") == "filesKept(finishFailed)"
+          and fin.get("description") == f"The recording failed: the writer gave up The recording is "
+          f"at {cpaths[0]}, {cpaths[1]}; the microphone at {cpaths[2]}, {cpaths[3]}.", f"got {fin!r}")
+
+    print("  3s — an external stop while paused")
+    ep = answer.get("externalPaused") or {}
+    check("3s: the pause's own did-finish while .paused is inert (stoppedAt says it was asked for)",
+          ep.get("pause") == "ok" and ep.get("stateAfterPauseFinish") == "paused"
+          and (ep.get("segment0") or {}).get("screenFinished") is True,
+          f"{ep.get('pause')!r}, {ep.get('stateAfterPauseFinish')!r}, {ep.get('segment0')}")
+    check("3s: didStopWithError(.userStopped) while PAUSED takes the finishing path with its reason — "
+          "and with the one segment already closed, beginFinishing's own checkFinished settles it on "
+          "the same turn (the R2 review: a stop from paused no longer waits for stopCapture's completion)",
+          ep.get("stateAfterExternal") in ("finishing", "idle")
+          and ep.get("stoppedBy") in ("userStopped", "nil"),
+          f"{ep.get('stateAfterExternal')!r}, {ep.get('stoppedBy')!r}")
+    efin = ep.get("onFinish") or {}
+    check("3s: … and lands ONE segment as userStopped with pauses 1 — the count is STORED per press, "
+          "never segments − 1 (a pause with no resume before the stop was still a pause; the R2 review)",
+          ep.get("settled") is True and efin.get("stoppedBy") == "userStopped"
+          and efin.get("pauses") == 1 and ep.get("pauses") == 1 and len(efin.get("segments") or []) == 1,
+          f"{efin}, session pauses {ep.get('pauses')}")
+    check("3s: elapsed while paused was about the 2 s recorded",
+          1.9 <= ep.get("elapsedFrozen", 0) <= 2.4, f"got {ep.get('elapsedFrozen')}")
+    sp = answer.get("systemStopPaused") or {}
+    sfin = sp.get("onFinish") or {}
+    check("3s: a stream stop while PAUSED with a NON-external code (nothing is writing; every file is "
+          "closed) LANDS the recording as systemStopped rather than failing it (the R2 review)",
+          sp.get("pause") == "ok" and sp.get("stateAfter") in ("finishing", "idle")
+          and sp.get("stoppedBy") in ("systemStopped", "nil") and sp.get("settled") is True
+          and sfin.get("kind") == "success" and sfin.get("stoppedBy") == "systemStopped"
+          and len(sfin.get("segments") or []) == 1, f"{sp.get('stateAfter')!r}, {sfin}")
+    ld = answer.get("lateDidStart") or {}
+    s1 = ld.get("segment1") or {}
+    check("3s: a did-start landing AFTER its own segment's pause (inside the resume's ~10 ms window) is "
+          "IGNORED — screenStartedAt stays nil, the add's own call is the span's start — and elapsed "
+          "is the first segment's second plus nothing negative",
+          ld.get("transitions") == "ok" and ld.get("segmentsAfter") == 2 and s1.get("screenStartedAt") is None
+          and s1.get("stoppedAt") is not None and 0.95 <= (ld.get("elapsed") or 0) <= 1.3,
+          f"{ld.get('transitions')!r}, {s1}, elapsed {ld.get('elapsed')}")
+    movies = ld.get("movies") or []
+    check("3s: a second resume within the same second mints a name the session does not already HOLD "
+          "(no file of either exists yet) — three different movie names, the held one skipped",
+          ld.get("secondResume") == "ok" and len(movies) == 3 and len(set(movies)) == 3
+          and ld.get("filesExist") == [False, False] and ld.get("pauses") == 3 and ld.get("stateAfter") == "paused",
+          f"{movies}, exist {ld.get('filesExist')}, pauses {ld.get('pauses')}")
+
+    print("  3t — the walker over three closed segments")
+    w = answer.get("walker") or {}
+    wp = w.get("paths") or []
+    check("3t: three closed segments' fixtures — movies 0–2, microphone files 1 and 2 (0's never "
+          "started)", len(wp) == 3 and all(x.get("written") for x in wp), f"{wp}")
+    check("3t: elapsed over three closed segments is 2 + 3 + 1.5 = 6.5 s — the SUM of the spans, "
+          "the two 1 s gaps never counted, and frozen (elapsed-through-pause)",
+          abs(w.get("elapsedPaused", 0) - 6.5) < 0.01
+          and w.get("elapsedPaused") == w.get("elapsedPausedAgain"),
+          f"{w.get('elapsedPaused')} then {w.get('elapsedPausedAgain')}")
+    fin = w.get("onFinish") or {}
+    segs = fin.get("segments") or []
+    check("3t: stop() while paused settles ONE result of THREE RecordingSegments in order, pauses 2",
+          w.get("stateAfterStop") == "finishing" and w.get("settled") is True
+          and w.get("onFinishCount") == 1 and fin.get("kind") == "success" and fin.get("pauses") == 2
+          and [s.get("path") for s in segs] == [x.get("movie") for x in wp],
+          f"{w.get('stateAfterStop')!r}, settled {w.get('settled')}, {fin}")
+    if len(segs) != 3 or len(wp) != 3:
+        for _ in range(6):
+            check("3t: (a segment row could not be read — see above)", False)
+        return
+    check("3t: the result's descriptor and startedAt are the FIRST segment's",
+          fin.get("path") == wp[0].get("movie")
+          and abs(fin.get("startedAt", 0) - wp[0].get("screenStart", 1)) < 0.001, f"{fin.get('path')}")
+    check("3t: segment 0's microphone never started — no file, micDescriptor nil, the sentence, "
+          "offset 0", segs[0].get("micDescriptor") is False
+          and segs[0].get("micProblem") == "The microphone never started recording, so the picture "
+          "was recorded without it." and segs[0].get("micOffset") == 0, f"{segs[0]}")
+    check("3t: segment 1's microphone landed with ITS OWN offset −12 000 (its picture began 20 ms "
+          "before its voice) — never the first segment's (resume-first-offset)",
+          segs[1].get("micDescriptor") is True and segs[1].get("micOffset") == -12_000
+          and segs[1].get("micProblem") is None and segs[1].get("micPath") == wp[1].get("mic"),
+          f"{segs[1]}")
+    check("3t: segment 2's writer failed — micDescriptor nil, the writer's sentence naming the file "
+          "it left", segs[2].get("micDescriptor") is False
+          and segs[2].get("micProblem") == "The microphone recording failed: boom. What it wrote is "
+          f"at {wp[2].get('mic')}.", f"{segs[2]}")
+    check("3t: the result's micProblem is the segments' sentences JOINED by a space, in order",
+          fin.get("micProblem") == f"{segs[0].get('micProblem')} {segs[2].get('micProblem')}",
+          f"got {fin.get('micProblem')!r}")
+    check("3t: each segment's startedAt is its OWN screen did-start; the stop's completion received "
+          "the same result",
+          all(abs(s.get("startedAt", 0) - x.get("screenStart", 1)) < 0.001 for s, x in zip(segs, wp))
+          and w.get("stop") == fin, f"{[s.get('startedAt') for s in segs]}")
 
 
 # --------------------------------------------------------------------------
@@ -2703,6 +4594,367 @@ def section_landing(binary, sources):
 
 
 # --------------------------------------------------------------------------
+# Section 4b — the landing over a SEQUENCE (road map 3, R2b): lane L's rows.
+
+SEG_LEN = 5 * SEC                      # each picture fixture's 5 s
+SEGMENTS_ACTION_NAME = "Add Recording Segments"
+# Offsets AT the floor (voice 1 ends exactly where picture 2 starts): the
+# head is the offset snapped to the 30 fps grid, half away from zero, so
+# 9 999 is no trim and 10 000 is one frame.
+BOUNDARY_OFFSETS = [4_000, 9_999, 10_000, 15_000, 31_000]
+SEQUENCE_OPS = ["add_media", "add_media", "add_clip", "add_clip"]
+SEQUENCE_OPS_NEW_TRACK = ["add_media", "add_media", "add_track", "add_clip", "add_clip"]
+
+
+def snap(ticks, frame):
+    """The core's own rounding of a time argument to the frame grid."""
+    return (ticks + frame // 2) // frame * frame
+
+
+def section_segments(binary, sources):
+    print("\nSection 4b — the landing over a SEQUENCE (road map 3, R2b): touching clips on ONE track "
+          "with the ends read off the handle, the two-try rule over the whole sequence, the "
+          "microphone floor, and the untitled remainder")
+    tmp = fresh_dir("segments")
+    answer, error = run_probe(binary, "segments", {
+        "mode": "segments", "tempFolder": tmp, "boundaryOffsets": BOUNDARY_OFFSETS})
+    check("4b: the probe answers", answer is not None and not answer.get("error"),
+          error or (answer or {}).get("error", ""))
+    if not answer or answer.get("error"):
+        return
+    check("4b: the probe's NSDocumentController subclass is `.shared`", answer.get("controllerIsProbe") is True)
+
+    def lists(r):
+        return r.get("predictedLists") or {}
+
+    def clips_of(r, ids):
+        """The minted clips for a list of predicted ids, an entry nothing
+        was minted for (−1) skipped."""
+        by = {c.get("id"): c for c in r.get("mintedClips") or []}
+        return [by.get(i) or {} for i in ids if i != -1]
+
+    def one_track(cs):
+        return bool(cs) and all(c.get("track") == cs[0].get("track") for c in cs)
+
+    def touching(cs):
+        return bool(cs) and all(cs[i + 1].get("start") == cs[i].get("end") for i in range(len(cs) - 1))
+
+    def no_transition(cs):
+        return not any(c.get("transition") for c in cs)
+
+    # A.
+    r = answer.get("A") or {}
+    print("  A — two segments on a fresh document")
+    check(f"4b·A: ops {SEQUENCE_OPS}", r.get("ops") == SEQUENCE_OPS, r.get("error") or f"got {r.get('ops')}")
+    check("4b·A: mediaIds [2, 3], clipIds [4, 5], the two mic lists one nil entry per segment — every "
+          "list ONE entry per segment, each id off the purely-applied result before it",
+          lists(r) == {"media": [2, 3], "clips": [4, 5], "micMedia": [-1, -1], "micClips": [-1, -1]},
+          f"{lists(r)}")
+    check("4b·A: no note — everything landed", r.get("notes") == [], f"{r.get('notes')}")
+    check("4b·A: the singulars are the FIRST of each list (R1's fields kept)",
+          r.get("predicted") == {"media": 2, "clip": 4, "micMedia": -1, "micClip": -1}, f"{r.get('predicted')}")
+    check("4b·A: the core minted the media and the clips the landing predicted",
+          r.get("mintedMedia") == [2, 3] and sorted(c.get("id") for c in r.get("mintedClips") or []) == [4, 5],
+          f"media {r.get('mintedMedia')}, clips {r.get('mintedClips')}")
+    cs = clips_of(r, [4, 5])
+    check(f"4b·A: clip 1 at 0 for the 5 s ({SEG_LEN}), in 0",
+          cs[0].get("start") == 0 and cs[0].get("duration") == SEG_LEN and cs[0].get("in") == 0, f"{cs[0]}")
+    check("4b·A: clip 2 starts at clip 1's END on the SAME track — back to back (segment-stacked)",
+          cs[1].get("start") == cs[0].get("end") == SEG_LEN and cs[1].get("track") == cs[0].get("track") == 1,
+          f"{cs[1]} after {cs[0]}")
+    check("4b·A: neither carries a transition — two clips meeting at one tick are a cut, not an overlap",
+          no_transition(cs))
+    check(f"4b·A: no track was added; one undo step named {ACTION_NAME!r}",
+          r.get("mintedTracks") == [] and r.get("undoName") == ACTION_NAME and r.get("canUndo") is True,
+          f"tracks {r.get('mintedTracks')}, undo {r.get('undoName')!r}")
+    ops = op_json(r)
+    check(f"4b·A: the second add_clip is SENT at {SEG_LEN} — the end read off the trial",
+          len(ops) == 4 and ops[3] == {"op": "add_clip", "track": 1, "media": 3, "at": SEG_LEN}, f"{ops}")
+
+    # B.
+    r = answer.get("B") or {}
+    print("  B — off-grid durations: the end is READ off the core, never summed")
+    cs = clips_of(r, lists(r).get("clips") or [])
+    check("4b·B: three clips minted", len(cs) == 3 and all(cs), r.get("error") or f"{cs}")
+    if len(cs) == 3:
+        check("4b·B: clip 1's 3 000 007 ticks snapped to 3 000 000 (the 30 fps grid) — the length the "
+              "core reports", cs[0].get("duration") == 3_000_000, f"{cs[0]}")
+        check("4b·B: clip 2 at 3 000 000 — clip 1's END, not 3 000 007",
+              cs[1].get("start") == 3_000_000 == cs[0].get("end"), f"{cs[1]}")
+        check("4b·B: clip 2's 1 504 999 snapped to 1 500 000", cs[1].get("duration") == 1_500_000, f"{cs[1]}")
+        check("4b·B: clip 3 at 4 500 000, clip 2's end", cs[2].get("start") == 4_500_000 == cs[1].get("end"),
+              f"{cs[2]}")
+        check("4b·B: all on one track, touching, no transitions",
+              one_track(cs) and touching(cs) and no_transition(cs), f"{cs}")
+
+    # C, D.
+    for tag, title in (("C", "the SECOND segment refuses on the front track (a blocker at 7–15 s)"),
+                       ("D", "the FIRST segment refuses (a blocker at 1–9 s)")):
+        r = answer.get(tag) or {}
+        print(f"  {tag} — {title}: ALL on a new track")
+        check(f"4b·{tag}: ops {SEQUENCE_OPS_NEW_TRACK}", r.get("ops") == SEQUENCE_OPS_NEW_TRACK,
+              r.get("error") or f"got {r.get('ops')}")
+        cs = clips_of(r, lists(r).get("clips") or [])
+        new_track = r.get("frontTrackAfter")
+        tracks = r.get("mintedTracks") or [{}]
+        check(f"4b·{tag}: one new FRONT track with the predicted id — next_id after the two media "
+              f"({(r.get('nextIdBefore') or 0) + 2})",
+              len(tracks) == 1 and tracks[0].get("id") == new_track == (r.get("nextIdBefore") or 0) + 2
+              and (r.get("viewTracks") or [{}])[-1].get("id") == new_track,
+              f"tracks {tracks}, front after {new_track}, next_id before {r.get('nextIdBefore')}")
+        check(f"4b·{tag}: BOTH clips on the new track, touching from 0, no transition — the sequence "
+              "never splits",
+              len(cs) == 2 and all(c.get("track") == new_track for c in cs) and cs[0].get("start") == 0
+              and touching(cs) and no_transition(cs), f"{cs}")
+        check(f"4b·{tag}: the blocker's track still holds only the blocker",
+              sum(1 for c in r.get("allClips") or [] if c.get("track") == r.get("frontTrackBefore")) == 1,
+              f"{r.get('allClips')}")
+        ops = op_json(r)
+        check(f"4b·{tag}: add_track(index: 1), then both add_clips name the new track",
+              len(ops) == 5 and ops[2] == {"op": "add_track", "index": 1}
+              and ops[3].get("track") == new_track == ops[4].get("track"), f"{ops}")
+
+    # E.
+    r = answer.get("E") or {}
+    print("  E — the microphone floor: voice 2 wants 3 000 000 − 11 000, the floor is voice 1's end")
+    frame = r.get("frame") or FRAME_30
+    check(f"4b·E: the canvas frame is {FRAME_30}", frame == FRAME_30, r.get("error") or f"got {frame}")
+    check("4b·E: ops — the pictures, then each voice's media, ONE Microphone track, voice 1's add_clip, "
+          "voice 2's add_clip at the floor + trim_start + move_clip",
+          r.get("ops") == ["add_media", "add_media", "add_clip", "add_clip", "add_media", "add_media",
+                           "add_track", "add_clip", "add_clip", "trim_start", "move_clip"],
+          f"got {r.get('ops')}")
+    L = lists(r)
+    check("4b·E: two mic media ids and two mic clip ids, one per segment, none nil",
+          len(L.get("micMedia") or []) == 2 and len(L.get("micClips") or []) == 2
+          and -1 not in (L.get("micMedia") or [-1]) and -1 not in (L.get("micClips") or [-1]), f"{L}")
+    tracks = r.get("mintedTracks") or []
+    check("4b·E: one Microphone track, at the BACK, added once",
+          len(tracks) == 1 and tracks[0].get("name") == "Microphone"
+          and (r.get("viewTracks") or [{}])[0].get("id") == tracks[0].get("id")
+          and len(r.get("viewTracks") or []) == 2, f"{tracks}, view {r.get('viewTracks')}")
+    m = clips_of(r, L.get("micClips") or [])
+    d1 = snap(3_012_000, frame)
+    head = snap(d1 - (3_000_000 - 11_000), frame)
+    check(f"4b·E: voice 1 at 0, the snapped length {d1}, in 0",
+          len(m) == 2 and m[0].get("start") == 0 and m[0].get("duration") == d1 and m[0].get("in") == 0,
+          f"{m[:1]}")
+    check(f"4b·E: voice 2 at the floor {d1} — voice 1's end, read off the trial — with the head {head} "
+          f"trimmed (in {head}, length {d1 - head}), never at 2 989 000, which the core would snap a "
+          "frame UNDER the floor and accept as a transition (mic-floor-dropped)",
+          len(m) == 2 and m[1].get("start") == d1 == m[0].get("end") and m[1].get("in") == head
+          and m[1].get("duration") == d1 - head, f"{m[1:]}")
+    check("4b·E: the two voices touch on one track, and no minted clip carries a transition",
+          len(m) == 2 and m[1].get("track") == m[0].get("track") and no_transition(r.get("mintedClips") or []),
+          f"{r.get('mintedClips')}")
+    check("4b·E: every minted clip id was predicted",
+          sorted(c.get("id") for c in r.get("mintedClips") or [])
+          == sorted((L.get("clips") or []) + (L.get("micClips") or [])), f"{r.get('mintedClips')} vs {L}")
+    ops = op_json(r)
+    mic2 = (L.get("micClips") or [0, 0])[1]
+    check(f"4b·E: the ops send add_clip at the floor {d1}, trim_start to {d1 + head}, move_clip by −{head}",
+          len(ops) == 11 and ops[8].get("op") == "add_clip" and ops[8].get("at") == d1
+          and ops[9] == {"op": "trim_start", "clip": mic2, "to": d1 + head}
+          and ops[10] == {"op": "move_clip", "clips": [mic2], "delta": -head}, f"{ops[8:]}")
+
+    # E2.
+    r = answer.get("E2") or {}
+    print("  E2 — a lagging microphone (offset −30 000) is above the floor: no trim")
+    check("4b·E2: no trim_start in the ops", not r.get("error") and "trim_start" not in (r.get("ops") or []),
+          r.get("error") or f"{r.get('ops')}")
+    m = clips_of(r, lists(r).get("micClips") or [])
+    check(f"4b·E2: voice 2 at the core's snap of 3 030 000 ({snap(3_030_000, frame)}), in 0, above voice "
+          "1's end, no transition",
+          len(m) == 2 and m[1].get("start") == snap(3_030_000, frame) and m[1].get("in") == 0
+          and m[1].get("start") >= m[0].get("end") and not m[1].get("transition"), f"{m}")
+
+    # E3.
+    print("  E3 — rounding AT the floor: voice 1 ends exactly where picture 2 starts")
+    rows = {row.get("offset"): row for row in answer.get("E3") or []}
+    for offset in BOUNDARY_OFFSETS:
+        r = rows.get(offset) or {}
+        m = clips_of(r, lists(r).get("micClips") or [])
+        h = snap(offset, frame)
+        check(f"4b·E3: offset +{offset} → voice 2 AT the floor ({3_000_000}) with the head {h} trimmed "
+              f"({'no trim' if h == 0 else 'one frame' if h == frame else f'{h // frame} frames'}), no "
+              "transition on either",
+              len(m) == 2 and m[1].get("start") == m[0].get("end") == 3_000_000 and m[1].get("in") == h
+              and not m[0].get("transition") and not m[1].get("transition"), r.get("error") or f"{m}")
+        check(f"4b·E3: offset +{offset} → trim_start sent iff the head is non-zero",
+              ("trim_start" in (r.get("ops") or [])) == (h > 0), f"{r.get('ops')}")
+
+    # E4.
+    r = answer.get("E4") or {}
+    check("4b·E4: the hazard the floor exists for, on the core directly — an add_clip three quarters "
+          "of a frame under a clip's end is snapped a frame EARLY (2 980 000) and ACCEPTED, as a "
+          "one-frame overlap carrying a transition",
+          r.get("accepted") is True and (r.get("clip") or {}).get("start") == 3_000_000 - (r.get("frame") or 0)
+          and (r.get("clip") or {}).get("transition") is True, r.get("error") or f"{r}")
+
+    # F.
+    r = answer.get("F") or {}
+    print("  F — a middle segment with no microphone")
+    L = lists(r)
+    check("4b·F: the mic lists have THREE entries with the middle one nil — ONE entry per segment, "
+          "aligned by index with the clips (the R2 review: an iterator over the segments that have a "
+          "file misaligned the two lists)",
+          len(L.get("micMedia") or []) == 3 and (L.get("micMedia") or [0])[1] == -1
+          and (L.get("micMedia") or [-1])[0] != -1 and (L.get("micMedia") or [-1, -1, -1])[2] != -1
+          and len(L.get("micClips") or []) == 3 and (L.get("micClips") or [0])[1] == -1
+          and len(L.get("clips") or []) == 3, r.get("error") or f"{L}")
+    m = clips_of(r, L.get("micClips") or [])
+    check(f"4b·F: voice 3 at the snap of picture 3's start − 12 000 ({snap(2 * SEG_LEN - 12_000, frame)}), "
+          "above the floor, in 0",
+          len(m) == 2 and m[1].get("start") == snap(2 * SEG_LEN - 12_000, frame) and m[1].get("in") == 0,
+          f"{m}")
+    cs = clips_of(r, L.get("clips") or [])
+    check("4b·F: three pictures touching on one track, no transitions",
+          len(cs) == 3 and touching(cs) and one_track(cs) and no_transition(cs), f"{cs}")
+
+    # G.
+    r = answer.get("G") or {}
+    L = lists(r)
+    check("4b·G: place false → [add_media, add_media, add_media] — every picture's, then the "
+          "microphone's — clipIds and micClipIds one nil per segment, micMediaIds [id, nil], no clip "
+          "minted, three media in the document",
+          r.get("ops") == ["add_media"] * 3 and L.get("clips") == [-1, -1] and L.get("micClips") == [-1, -1]
+          and len(L.get("micMedia") or []) == 2 and (L.get("micMedia") or [-1])[0] != -1
+          and (L.get("micMedia") or [0, 0])[1] == -1 and len(L.get("media") or []) == 2
+          and r.get("mintedClips") == [] and r.get("documentMedia") == 3, r.get("error") or f"{r.get('ops')}, {L}")
+
+    # H.
+    r = answer.get("H") or {}
+    print("  H — inside a nest whose clip blocks the playhead: the ends are read off the VIEW")
+    check(f"4b·H: the scope is open and the ops are {SEQUENCE_OPS_NEW_TRACK}, every one UNSCOPED (the "
+          "door stamps)", r.get("scopeOpen") is True and r.get("ops") == SEQUENCE_OPS_NEW_TRACK
+          and bool(r.get("scopes")) and all(s == -1 for s in r.get("scopes")),
+          r.get("error") or f"{r.get('ops')}, scopes {r.get('scopes')}")
+    cs = clips_of(r, lists(r).get("clips") or [])
+    check("4b·H: two clips INSIDE the nest, touching, one track, no transition",
+          len(cs) == 2 and touching(cs) and one_track(cs) and no_transition(cs), f"{cs}")
+    check("4b·H: the parent still holds ONE clip (the nest) on one track, and three media",
+          r.get("outerClips") == 1 and r.get("outerMedia") == 3 and r.get("outerTracks") == 1, f"{r}")
+
+    # J.
+    r = answer.get("J") or {}
+    print("  J — an INEXACT canvas rate (24981/1000): the previous end is not a grid point")
+    cs = clips_of(r, lists(r).get("clips") or [])
+    jf = r.get("frame") or 0
+    check("4b·J: the canvas is 24981/1000 and three clips landed on one track",
+          r.get("canvasFps") == [24981, 1000] and len(cs) == 3 and one_track(cs), r.get("error") or f"{r.get('canvasFps')}, {cs}")
+    check("4b·J: each later segment starts AT or AFTER the previous end, by at most a frame — touching, "
+          "or the next grid point up when the core would have snapped the end a tick DOWN (measured: "
+          "clip 3 a whole 24 018-tick frame after clip 2's 6 004 564, whose nearest grid point is "
+          "6 004 563) — never a tick of overlap (the R2 review)",
+          len(cs) == 3 and all(0 <= cs[i + 1].get("start", -1) - cs[i].get("end", 0) <= max(jf, 1) for i in range(2)),
+          f"{[(c.get('start'), c.get('end')) for c in cs]}, frame {jf}")
+    check("4b·J: … and at least one of the two joins is NOT a touch — the inexact rate is doing something "
+          "the row can see", len(cs) == 3 and any(cs[i + 1].get("start") != cs[i].get("end") for i in range(2)),
+          f"{[(c.get('start'), c.get('end')) for c in cs]}")
+    check("4b·J: no cross dissolve minted between two halves of one recording — no transitionIn anywhere",
+          len(cs) == 3 and no_transition(r.get("mintedClips") or []), f"{r.get('mintedClips')}")
+
+    # K, L, M, N — what the landing could not place, named in `notes`.
+    r = answer.get("K") or {}
+    print("  K — a voice SHORTER than its head (mic 1 ends 3 040 000; picture 2 at 3 000 000; mic 2 an "
+          "80 ms file with offset +18 000)")
+    L = lists(r)
+    check("4b·K: the second voice mints NO clip — micClipIds [id, nil] — and no sliver is placed late "
+          "(the review's 20 000-tick clip at 3 060 000)",
+          len(L.get("micClips") or []) == 2 and (L.get("micClips") or [-1])[0] != -1
+          and (L.get("micClips") or [0, 0])[1] == -1 and "trim_start" not in (r.get("ops") or [])
+          and len(r.get("mintedClips") or []) == 3, r.get("error") or f"{L}, ops {r.get('ops')}, clips {r.get('mintedClips')}")
+    check("4b·K: … its MEDIA still lands (micMediaIds two ids), and ONE note names that file",
+          len(L.get("micMedia") or []) == 2 and -1 not in (L.get("micMedia") or [-1])
+          and len(r.get("notes") or []) == 1 and "seg2 (Microphone).m4a" in (r.get("notes") or [""])[0],
+          f"{L}, notes {r.get('notes')}")
+    check("4b·K: no refused op in the list — the trial's ops all committed, no transition anywhere",
+          r.get("canUndo") is True and no_transition(r.get("mintedClips") or []), f"{r.get('mintedClips')}")
+    r = answer.get("L") or {}
+    L = lists(r)
+    check("4b·L: a microphone file under one frame (R0 q7's 2 ms file) mints no clip and a note naming it; "
+          "the pictures and voice 1 land",
+          len(L.get("micClips") or []) == 2 and (L.get("micClips") or [-1])[0] != -1
+          and (L.get("micClips") or [0, 0])[1] == -1 and len(r.get("mintedClips") or []) == 3
+          and len(r.get("notes") or []) == 1 and "seg2 (Microphone).m4a" in (r.get("notes") or [""])[0],
+          r.get("error") or f"{L}, clips {r.get('mintedClips')}, notes {r.get('notes')}")
+    r = answer.get("M") or {}
+    L = lists(r)
+    cs = clips_of(r, L.get("clips") or [])
+    check("4b·M: a PICTURE under one frame in the middle mints no clip — clipIds [id, nil, id] — and a "
+          "note naming its movie; its media lands",
+          L.get("clips", [None, None, None])[1:2] == [-1] and (L.get("clips") or [-1])[0] != -1
+          and (L.get("clips") or [-1, -1, -1])[2] != -1 and len(r.get("notes") or []) == 1
+          and "seg2.mov" in (r.get("notes") or [""])[0] and r.get("documentMedia") == 3,
+          r.get("error") or f"{L}, notes {r.get('notes')}")
+    check("4b·M: … and segment 3's picture follows segment 1's END on the same track, no transition",
+          len(cs) == 2 and cs[1].get("start") == cs[0].get("end") and one_track(cs) and no_transition(cs), f"{cs}")
+    r = answer.get("N") or {}
+    L = lists(r)
+    check("4b·N: remainderPlacement with NO clip 1 (the document holds the picture's media alone) lands "
+          "the microphone's MEDIA only — [add_media], micMediaIds [id], micClipIds [nil], clipIds [nil]",
+          r.get("ops") == ["add_media"] and len(L.get("micMedia") or []) == 1 and (L.get("micMedia") or [-1])[0] != -1
+          and L.get("micClips") == [-1] and L.get("clips") == [-1] and r.get("mintedClips") == [],
+          r.get("error") or f"{r.get('ops')}, {L}, {r.get('mintedClips')}")
+    check("4b·N: … with a note saying so", len(r.get("notes") or []) >= 1, f"{r.get('notes')}")
+
+    # I.
+    names = answer.get("names") or {}
+    print("  I — untitled(around:): the remainder through the real order, and its two names")
+    check(f"4b·I: remainderActionName — three segments → {SEGMENTS_ACTION_NAME!r}; one with a microphone "
+          f"→ {MIC_ACTION_NAME!r}; two without → {SEGMENTS_ACTION_NAME!r}",
+          names.get("three") == SEGMENTS_ACTION_NAME == names.get("twoNoMic")
+          and names.get("oneMic") == MIC_ACTION_NAME, f"{names}")
+    check(f"4b·I: the constants are those two strings and {ACTION_NAME!r} stays the document landing's",
+          names.get("segmentsActionName") == SEGMENTS_ACTION_NAME
+          and names.get("microphoneActionName") == MIC_ACTION_NAME and names.get("actionName") == ACTION_NAME,
+          f"{names}")
+    check("4b·I: remainderPlacement of one segment with no microphone is nil — nothing to add",
+          (answer.get("remainderNil") or {}).get("nil") is True, f"{answer.get('remainderNil')}")
+    r = answer.get("I") or {}
+    check("4b·I: three segments, voices on 1 and 3 — displayName seg1 (the first segment IS the "
+          "document), canvas [60, 1], one window, one document opened",
+          r.get("displayName") == "seg1" and r.get("canvasFps") == [60, 1] and r.get("windows") == 1
+          and r.get("documents") == 1, r.get("error") or f"{r.get('displayName')!r}, {r.get('canvasFps')}, "
+          f"windows {r.get('windows')}, documents {r.get('documents')}")
+    check(f"4b·I: edited, ONE undo step named {SEGMENTS_ACTION_NAME!r}",
+          r.get("edited") is True and r.get("undoName") == SEGMENTS_ACTION_NAME, f"{r.get('undoName')!r}")
+    check("4b·I: five media (three pictures, two voices), tracks [Microphone, Track 1]",
+          r.get("media") == 5 and r.get("tracks") == ["Microphone", "Track 1"],
+          f"{r.get('media')}, {r.get('tracks')}")
+    clips = r.get("clips") or []
+    pics = sorted([c for c in clips if c.get("track") == r.get("frontTrack")], key=lambda c: c.get("start", 0))
+    mics = sorted([c for c in clips if c.get("track") == r.get("backTrack")], key=lambda c: c.get("start", 0))
+    check("4b·I: three pictures touching on Track 1 from 0, no transitions — segments 2 and 3 placed "
+          "from clip 1's END", len(pics) == 3 and pics[0].get("start") == 0 and touching(pics)
+          and no_transition(pics), f"{pics}")
+    check(f"4b·I: the untitled canvas frame is {FRAME_60} (60 fps)", r.get("frame") == FRAME_60, f"{r.get('frame')}")
+    want3 = snap((pics[2].get("start") if len(pics) == 3 else 0) - 11_000, FRAME_60)
+    check(f"4b·I: voice 1 at 0, 3 010 000 long (3 012 000 snapped to the 60 fps grid); voice 3 at the "
+          f"60 fps snap of picture 3's start − 11 000 ({want3}), untrimmed (above the floor)",
+          len(mics) == 2 and mics[0].get("start") == 0 and mics[0].get("duration") == 3_010_000
+          and mics[1].get("start") == want3 and mics[1].get("in") == 0, f"{mics}")
+    u = r.get("afterUndo") or {}
+    check("4b·I: one undo leaves segment 1 alone — one clip, one media, one track — the document STILL "
+          "edited (the import count is made first), the redo named the same",
+          u.get("clips") == 1 and u.get("media") == 1 and u.get("tracks") == 1 and u.get("edited") is True
+          and u.get("redoName") == SEGMENTS_ACTION_NAME, f"{u}")
+    r2 = answer.get("I2") or {}
+    check(f"4b·I2: one segment with a microphone at +12 000: the step is {MIC_ACTION_NAME!r} — R1's "
+          "landing, R1's name", r2.get("undoName") == MIC_ACTION_NAME and r2.get("media") == 2
+          and r2.get("tracks") == ["Microphone", "Track 1"], r2.get("error") or f"{r2}")
+    m2 = [c for c in r2.get("clips") or [] if c.get("track") == r2.get("backTrack")]
+    check(f"4b·I2: … the voice at 0 with a {FRAME_60} head trimmed",
+          len(m2) == 1 and m2[0].get("start") == 0 and m2[0].get("in") == FRAME_60, f"{m2}")
+    r3 = answer.get("I3") or {}
+    check("4b·I3: one segment, no microphone: NO undo step, still dirty, one media, one clip",
+          r3.get("canUndo") is False and r3.get("edited") is True and r3.get("media") == 1
+          and r3.get("clips") == 1, r3.get("error") or f"{r3}")
+    check("4b·I: every document closed", answer.get("documentsAfterClose") == 0,
+          f"{answer.get('documentsAfterClose')}")
+
+
+# --------------------------------------------------------------------------
 # Section 5 — the chrome's structure (road map 3, R1c): lane C's rows.
 
 PANEL_ROWS = [
@@ -2752,8 +5004,9 @@ def section_chrome(binary, sources):
     check("5c: in the order Open Video… / New Project / New Recording…",
           w.get("titles") == ["Open Video…", "New Project", "New Recording…"], f"{w.get('titles')}")
     actions = w.get("actions") or []
-    check("5c: the third's action is newRecording:", len(actions) == 3 and actions[2] == "newRecording:",
-          f"{actions}")
+    check("5c: the third's action is showRecorderPanel: — its OWN selector since the R2 review, which "
+          "only shows (newRecording's first arm STOPS a running recording under a label that never "
+          "retitles)", len(actions) == 3 and actions[2] == "showRecorderPanel:", f"{actions}")
     check("5c: … and its target nil", (w.get("targets") or [True] * 3)[-1] is False, f"{w.get('targets')}")
     check("5c: the other two are openDocument: and newProject:, unchanged",
           actions[:2] == ["openDocument:", "newProject:"], f"{actions}")
@@ -2959,6 +5212,246 @@ def section_chrome(binary, sources):
           rt.get("panelPhaseIdle") is True, f"{rt}")
     check("5o: newRecording did not show the panel — it stopped the recorder instead",
           rt.get("panelShown") is False, f"panelShown {rt.get('panelShown')}")
+
+
+# --------------------------------------------------------------------------
+# Section 5, continued — road map 3, R2c: the status item's vocabulary, the
+# .paused phase, the panel's two entries, the reveal, and the route.
+
+PAUSE_GLYPH = "❚❚"
+
+
+def section_chrome_pause(binary, sources):
+    print("\nSection 5 (continued) — R2c: the status item's vocabulary, the .paused phase, "
+          "pauseRecording()/resumeRecording(), revealIfNoted both ways, the route while paused, and the "
+          "structural reads")
+    work = fresh_dir("chrome-pause")
+    answer, error = run_probe(binary, "chrome-pause", {"mode": "chrome-pause", "work": work})
+    check("5p: the probe answers", answer is not None and not answer.get("error"),
+          error or (answer or {}).get("error", ""))
+    if not answer or answer.get("error"):
+        return
+    print("  5p — RecorderStatusItem, pure")
+    mt = answer.get("menuTitles") or {}
+    check("5p: menuTitles(paused: false) is [Pause Recording, Stop Recording]",
+          mt.get("recording") == ["Pause Recording", "Stop Recording"], f"{mt.get('recording')}")
+    check("5p: menuTitles(paused: true) is [Resume Recording, Stop Recording]",
+          mt.get("paused") == ["Resume Recording", "Stop Recording"], f"{mt.get('paused')}")
+    tt = answer.get("tooltip") or {}
+    check("5p: the tooltip says which — 'Reelcut is recording' / 'Reelcut's recording is paused'",
+          tt.get("recording") == "Reelcut is recording" and tt.get("paused") == "Reelcut's recording is paused",
+          f"{tt}")
+    check("5p: pauseGlyph is ❚❚ (two heavy vertical bars, U+275A)", answer.get("pauseGlyph") == PAUSE_GLYPH,
+          f"{answer.get('pauseGlyph')!r}")
+    tr = answer.get("titleRecording") or {}
+    check("5p: title(61.9, recording) is '● 1:01' — the dot in DS.meterClip (the coral), the time "
+          "uncoloured in monospaced digits, the mark in the system face",
+          tr.get("string") == "● 1:01" and tr.get("markIsClip") is True and tr.get("timeHasColor") is False
+          and tr.get("timeFontIsMonoDigits") is True and tr.get("markFontIsSystem") is True, f"{tr}")
+    tp = answer.get("titlePaused") or {}
+    check(f"5p: title(61.9, paused) is '{PAUSE_GLYPH} 1:01' — the glyph with NO colour attribute (the "
+          "menu bar's own), the FROZEN time in the same face",
+          tp.get("string") == f"{PAUSE_GLYPH} 1:01" and tp.get("markHasColor") is False
+          and tp.get("timeHasColor") is False and tp.get("timeFontIsMonoDigits") is True, f"{tp}")
+    check(f"5p: title(3661, paused) is '{PAUSE_GLYPH} 1:01:01'",
+          (answer.get("titlePausedHour") or {}).get("string") == f"{PAUSE_GLYPH} 1:01:01",
+          f"{(answer.get('titlePausedHour') or {}).get('string')!r}")
+
+    print("  5q — the panel's .paused phase, drawn")
+    pp = answer.get("pausedPhase") or {}
+    check("5q: .paused — the button reads Stop and is enabled, the controls locked, the countdown hidden",
+          pp.get("buttonTitle") == "Stop" and pp.get("enabled") is True and pp.get("controlsDisabled") is True
+          and pp.get("countdownHidden") is True, f"{pp}")
+    check("5q: … the footnote is the pause glyph and the frozen time, in DS.textFaint",
+          (pp.get("status") or "").startswith(PAUSE_GLYPH + " ") and pp.get("statusFaint") is True, f"{pp}")
+    rp = answer.get("recordingPhase") or {}
+    check("5q: .recording — Stop, the coral dot and the time in DS.meterClip",
+          rp.get("buttonTitle") == "Stop" and (rp.get("status") or "").startswith("● ")
+          and rp.get("statusClip") is True, f"{rp}")
+    ip = answer.get("idlePhase") or {}
+    check("5q: .idle — the footnote names the folder again, faint",
+          (ip.get("status") or "").startswith("saved in ") and ip.get("statusFaint") is True, f"{ip}")
+
+    print("  5r — pauseRecording() / resumeRecording() (+Pause.swift)")
+    check("5r: pauseRecording() while idle beeps and stays idle", answer.get("pauseFromIdle") == "idle",
+          f"{answer.get('pauseFromIdle')!r}")
+    pr = answer.get("pauseRefused") or {}
+    check("5r: pauseRecording() while .recording over a recorder that refuses (idle → .notRecording) "
+          "BEEPS and leaves the phase .recording with no note — the panel never claims a state the "
+          "recorder refused",
+          pr.get("phase") == "recording" and pr.get("recorder") == "idle" and pr.get("note") == "", f"{pr}")
+    rr = answer.get("resumeRefused") or {}
+    check("5r: resumeRecording() while .paused over a recorder that refuses (.notPaused) STAYS paused, "
+          "keeps the sentence as resumeProblem STATE and draws it into the note at once",
+          rr.get("phase") == "paused" and rr.get("note") == "The recording is not paused."
+          and rr.get("noteShown") is True and rr.get("resumeProblem") == "The recording is not paused.",
+          f"{rr}")
+    check("5r: a second refused resume REPLACES the sentence — one copy in the note, never two",
+          answer.get("resumeRefusedTwice") == "The recording is not paused.",
+          f"{answer.get('resumeRefusedTwice')!r}")
+    both = ("The microphone stopped: The microphone recording failed: boom. The picture is still "
+            "recording. The recording is not paused.")
+    check("5r: with a live microphone problem the tick composes the note from the two pieces of state, "
+          "the microphone's sentence FIRST and the resume's after it — and a second tick leaves it (the "
+          "R2 review: the tick used to wipe the resume's sentence)",
+          answer.get("resumeRefusedWithMic") == both and answer.get("resumeRefusedWithMicAgain") == both,
+          f"{answer.get('resumeRefusedWithMic')!r} then {answer.get('resumeRefusedWithMicAgain')!r}")
+    check("5r: resumeRecording() while .recording beeps and stays", answer.get("resumeFromRecording") == "recording",
+          f"{answer.get('resumeFromRecording')!r}")
+    ln2 = answer.get("liveNote") or {}
+    check("5r: liveNote is pure — empty with neither sentence, the microphone's wrapped, the resume's "
+          "bare, both joined in that order",
+          ln2.get("none") == "" and ln2.get("mic") == "The microphone stopped: boom. The picture is still recording."
+          and ln2.get("resume") == "The recording is not paused."
+          and ln2.get("both") == "The microphone stopped: boom. The picture is still recording. The "
+          "recording is not paused.", f"{ln2}")
+    pp2 = answer.get("panelPause") or {}
+    check("5r: a REAL pause through the panel over a faked session on ScreenRecorder.shared (its output "
+          "attached): .recording → .paused, the recorder .paused, the footnote from '● 0:02' to "
+          f"'{PAUSE_GLYPH} 0:02' in DS.textFaint, the button still Stop",
+          pp2.get("attached") == "ok" and pp2.get("phase") == "paused" and pp2.get("recorder") == "paused"
+          and pp2.get("statusRecording") == "● 0:02" and pp2.get("statusPaused") == f"{PAUSE_GLYPH} 0:02"
+          and pp2.get("statusFaint") is True and pp2.get("buttonTitle") == "Stop", f"{pp2}")
+    check("5r: … and the footnote HOLDS through a later refresh — elapsed is frozen",
+          pp2.get("statusHeld") == f"{PAUSE_GLYPH} 0:02", f"{pp2.get('statusHeld')!r}")
+    pr2 = answer.get("panelResume") or {}
+    check("5r: a REAL resume: .paused → .recording, the recorder .recording with TWO segments, and a "
+          "stale resumeProblem CLEARED (a sentence about a refusal the person got past must not bring "
+          "the panel back)",
+          pr2.get("phase") == "recording" and pr2.get("recorder") == "recording" and pr2.get("segments") == 2
+          and pr2.get("resumeProblemCleared") is True, f"{pr2}")
+    ps = answer.get("panelStopWhilePaused") or {}
+    check("5r: stopRecording() while paused goes to recorder.stop() — .stopping, the recorder .finishing, "
+          "stopAsked", ps.get("phase") == "stopping" and ps.get("recorder") == "finishing"
+          and ps.get("stopAsked") is True, f"{ps}")
+    check("5r: the probe tore the shared recorder down to idle",
+          answer.get("tornDown") == "idle" and answer.get("stateAfter") == "idle",
+          f"{answer.get('tornDown')!r}, {answer.get('stateAfter')!r}")
+
+    print("  5s — revealIfNoted, both ways (decision 7)")
+    re_ = answer.get("revealEmpty") or {}
+    check("5s: showWhenLanded with an EMPTY note → the panel stays hidden, and the flag is cleared "
+          "(reveal-always)", re_.get("visible") is False and re_.get("cleared") is True, f"{re_}")
+    rn = answer.get("revealNoted") or {}
+    check("5s: showWhenLanded with a note → the panel comes back, and the flag is cleared",
+          rn.get("visible") is True and rn.get("cleared") is True, f"{rn}")
+    check("5s: a note with the panel NOT on screen as the recording began → stays hidden",
+          (answer.get("revealNotOnScreenBefore") or {}).get("visible") is False,
+          f"{answer.get('revealNotOnScreenBefore')}")
+    check("5s: revealControls() (the quit guard's call) shows the panel when no recording has it hidden",
+          answer.get("revealControlsShown") is True, f"{answer.get('revealControlsShown')}")
+    rc = answer.get("revealControlsHidden") or {}
+    check("5s: … and while hiddenForRecording with no status item to open it beeps and shows nothing "
+          "(with an item it opens the item's menu — openMenu(), a structural read below)",
+          rc.get("visible") is False and rc.get("itemUp") is False, f"{rc}")
+    lr = answer.get("landingNoteR2") or {}
+    check("5s: landingNote's .userStopped sentence names the SYSTEM's screen-recording indicator (Reelcut's "
+          "own item is a menu-bar item too now)",
+          lr.get("userStopped") == "Stopped from the system's screen-recording indicator; the recording was "
+          "added.", f"{lr.get('userStopped')!r}")
+    check("5s: landingNote carries a refused resume's sentence, and the placement's notes LAST, in order "
+          "after the stop, the closed document and the microphone",
+          lr.get("resume") == "The recording could not be resumed: x."
+          and lr.get("all") == "Stopped from the system's screen-recording indicator; the recording was "
+          "added. The document you chose was closed, so the recording opened as a new project. Mic. "
+          "Resume. Note one. Note two." and lr.get("notesOnly") == "Note.", f"{lr}")
+
+    print("  5t — the route and the guard while paused")
+    rt = answer.get("routePaused") or {}
+    check("5t: New Recording… with the panel .paused stops THROUGH THE PANEL (.stopping) and shows nothing",
+          rt.get("phase") == "stopping" and rt.get("panelShown") is False, f"{rt}")
+    pv = answer.get("pausedValidate") or {}
+    check("5t: with the recorder .paused the item reads Stop Recording (isRecording true, isPaused true) "
+          "and ⌘Q is cancelled", pv.get("title") == "Stop Recording" and pv.get("enabled") is True
+          and pv.get("isRecording") is True and pv.get("isPaused") is True and pv.get("reply") == "terminateCancel",
+          f"{pv}")
+
+    print("  5u — structural: the hide for EVERY source, the reveal's condition, the menu rebuilt on the "
+          "flip, the tick through .paused, the route, the tool's closures")
+    rec = read_code(sources, "RecorderPanelController+Recording.swift")
+    land = read_code(sources, "RecorderPanelController+Landing.swift")
+    status = read_code(sources, "RecorderStatusItem.swift")
+    route = read_code(sources, "AppDelegate+Recording.swift")
+    tool = read_code(sources, "AgentServer+Recording.swift")
+    pause = read_code(sources, "RecorderPanelController+Pause.swift")
+    base = read_code(sources, "RecorderPanelController.swift")
+    for name, code in [("+Recording", rec), ("+Landing", land), ("status item", status),
+                       ("+Recording (route)", route), ("AgentServer+Recording", tool), ("+Pause", pause),
+                       ("base", base)]:
+        check(f"5u: {name} is in the sources", code is not None)
+    if None in (rec, land, status, route, tool, pause, base):
+        return
+    body = "\n".join(function_body(rec.splitlines(), "func recordingDidStart()") or [])
+    check("5u: recordingDidStart hides the panel for EVERY source — hiddenForRecording = true and "
+          "orderOut with no `.picked` in the body (hide-picked-only)",
+          "hiddenForRecording = true" in body and "orderOut" in body and ".picked" not in body, body)
+    check("5u: … remembers whether it WAS visible (showWhenLanded = window?.isVisible == true)",
+          "showWhenLanded = window?.isVisible == true" in body, body)
+    check("5u: … and hands the item the three closures (onPause, onResume, onStop)",
+          all(t in body for t in ("onPause:", "onResume:", "onStop:")), body)
+    ended = "\n".join(function_body(land.splitlines(), "func recordingEnded(") or [])
+    check("5u: recordingEnded clears hiddenForRecording and shows NOTHING (no orderFront, no show())",
+          "hiddenForRecording = false" in ended and "orderFront" not in ended and "show()" not in ended, ended)
+    check("5u: the three ends call revealIfNoted() — three call sites beside its definition",
+          land.count("revealIfNoted()") == 4, f"found {land.count('revealIfNoted()')}")
+    reveal = "\n".join(function_body(land.splitlines(), "func revealIfNoted()") or [])
+    check("5u: revealIfNoted orders front only under showWhenLanded AND a non-empty note, and clears "
+          "the flag either way",
+          "showWhenLanded, !noteLabel.stringValue.isEmpty" in reveal and "showWhenLanded = false" in reveal,
+          reveal)
+    upd = "\n".join(function_body(status.splitlines(), "func update(elapsed: TimeInterval, paused: Bool)") or [])
+    check("5u: RecorderStatusItem.update rebuilds the menu when `paused` FLIPS — compares it with "
+          "menuShowsPaused and calls rebuildMenu(paused: paused) (menu-static)",
+          "paused != menuShowsPaused" in upd and "rebuildMenu(paused: paused)" in upd, upd)
+    status_raw = open(os.path.join(sources, "RecorderStatusItem.swift")).read()
+    check("5u: the item's doc still names the .common run-loop mode and the panel still adds both timers "
+          "in it", ".common" in status_raw and rec.count("forMode: .common") == 2,
+          f"{rec.count('forMode: .common')} timers")
+    tick = "\n".join(function_body(rec.splitlines(), "func armTick()") or [])
+    check("5u: the tick runs through .paused and passes paused: to the item",
+          "self.phase == .paused" in tick and "paused: self.phase == .paused" in tick, tick)
+    nr = "\n".join(function_body(route.splitlines(), "func newRecording(_ sender: Any?)") or [])
+    check("5u: newRecording's panel arm names .paused beside .recording and .starting",
+          "case .recording, .paused, .starting:" in nr, nr)
+    check("5u: the tool's RecordingToolChrome passes the three closures and paused: recorder.isPaused",
+          all(t in tool for t in ("onPause:", "onResume:", "onStop:", "paused: recorder.isPaused")))
+    check("5u: show()'s guard is unchanged — beeps while hiddenForRecording",
+          "guard !hiddenForRecording else {" in base
+          and "NSSound.beep()" in "\n".join(function_body(base.splitlines(), "func show()") or []))
+    resume_body = "\n".join(function_body(pause.splitlines(), "func resumeRecording()") or [])
+    check("5u: +Pause.swift — a refused pause beeps; a refused resume keeps resumeProblem and redraws "
+          "the note through syncMicrophoneNote; a landed resume clears it",
+          "NSSound.beep()" in "\n".join(function_body(pause.splitlines(), "func pauseRecording()") or [])
+          and "resumeProblem = error.localizedDescription" in resume_body
+          and "syncMicrophoneNote()" in resume_body and "resumeProblem = nil" in resume_body, resume_body)
+    landed_body = "\n".join(function_body(land.splitlines(), "func landed(") or [])
+    failed_body = "\n".join(function_body(land.splitlines(), "func failedToLand(") or [])
+    check("5u: landed passes resumeProblem and the placement's notes to landingNote; failedToLand names "
+          "every file through filesClause",
+          "resumeProblem: resumeProblem" in landed_body and "notes: notes" in landed_body
+          and "filesClause" in failed_body, f"{landed_body}\n{failed_body}")
+    close_body = "\n".join(function_body(base.splitlines(), "func panelWillClose(") or [])
+    check("5u: closing the panel during .starting stops or abandons the attempt as the countdown's "
+          "cancel does (case .starting: stopRecording())",
+          "case .countdown: cancelCountdown()" in close_body and "case .starting: stopRecording()" in close_body,
+          close_body)
+    app_delegate = read_code(sources, "AppDelegate.swift") or ""
+    quit_body = "\n".join(function_body(app_delegate.splitlines(), "func applicationShouldTerminate(") or [])
+    check("5u: the quit guard calls revealControls() — the status item's menu when the panel is hidden "
+          "for a recording, the panel otherwise", "revealControls()" in quit_body, quit_body)
+    reveal_controls = "\n".join(function_body(pause.splitlines(), "func revealControls()") or [])
+    check("5u: revealControls opens the item's menu (openMenu) and beeps only with no item",
+          "openMenu()" in reveal_controls and "NSSound.beep()" in reveal_controls and "show()" in reveal_controls,
+          reveal_controls)
+    check("5u: RecorderStatusItem freezes at the Stop — update ignores `paused` once frozen — and the "
+          "tool's chrome freezes it too",
+          "let paused = frozen ? menuShowsPaused : paused" in upd and "func freeze()" in status
+          and "chrome.freeze()" in tool, upd)
+    welcome_code = read_code(sources, "WelcomeWindowController.swift") or ""
+    check("5u: the welcome button's action is showRecorderPanel, which only shows",
+          "AppDelegate.showRecorderPanel(_:)" in welcome_code
+          and "RecorderPanelController.shared.show()" in "\n".join(
+              function_body(route.splitlines(), "func showRecorderPanel(") or []))
 
 
 # --------------------------------------------------------------------------
@@ -3331,9 +5824,9 @@ def section_welcome(binary, sources):
           (answer or {}).get("fontsRegistered", 0) >= 4
           and buttons and all((b.get("font") or "").startswith("SourceSans3") for b in buttons),
           f"registered {(answer or {}).get('fontsRegistered')}, fonts {[b.get('font') for b in buttons]}")
-    check("6a: three buttons, the third New Recording… with action newRecording:",
+    check("6a: three buttons, the third New Recording… with action showRecorderPanel:",
           len(buttons) == 3 and buttons[2].get("title") == "New Recording…"
-          and buttons[2].get("action") == "newRecording:", f"{[(b.get('title'), b.get('action')) for b in buttons]}")
+          and buttons[2].get("action") == "showRecorderPanel:", f"{[(b.get('title'), b.get('action')) for b in buttons]}")
     check("6a: the stack's spacing is 12 (WelcomeWindowController)", spacing == 12, f"{spacing}")
     check(f"6a: the content view is {WELCOME_W}×{WELCOME_H} pt",
           (answer or {}).get("contentSize") == [WELCOME_W, WELCOME_H], f"{(answer or {}).get('contentSize')}")
@@ -3518,6 +6011,12 @@ def section_catalog(binary, sources):
     check("7c: … requiring seconds alone", rs.get("required") == ["seconds"], f"{rs.get('required')}")
     check("7c: every tool carries `project`", all("project" in (t.get("properties") or []) for t in tools),
           f"{[t.get('name') for t in tools if 'project' not in (t.get('properties') or [])]}")
+    description = rs.get("description") or ""
+    for phrase in ["Pause Recording", "Resume Recording", "Stop Recording", "pauses", "segments",
+                   "started_at", "mic_offset", "mic_problem", "Add Recording Segments", "Add Microphone",
+                   "wall clock", "TOTAL", "user_stopped", "screen-recording indicator"]:
+        check(f"7d: record_screen's description names {phrase!r} (R2d)", phrase in description,
+              f"{len(description)} chars of description")
 
 
 # --------------------------------------------------------------------------
@@ -3545,6 +6044,210 @@ def section_host(binary, sources):
 
 
 # --------------------------------------------------------------------------
+# Section 9 — the probe's own GRANTED tier (road map 3, R2e).
+
+def granted_run_rows(tag, r, title, resume):
+    """One `grantedRun`'s rows: the start, the pause, the frozen elapsed,
+    the resume when asked, the stop, the result and its files."""
+    print(f"  {title}")
+    check(f"{tag}: the start landed — no error, within the arm ceiling",
+          r.get("started") is True and r.get("startError") is None,
+          f"{r.get('startError')!r} after {r.get('startLatency')} s")
+    print(f"      start → completion {r.get('startLatency', 0):.3f} s")
+    check(f"{tag}: recording after the start", r.get("stateAfterStart") == "recording",
+          f"{r.get('stateAfterStart')!r}")
+    check(f"{tag}: elapsed before the pause is about a second (the did-start counts, the arm does not)",
+          0.85 <= (r.get("elapsedBeforePause") or 0) <= 1.6, f"got {r.get('elapsedBeforePause')}")
+    check(f"{tag}: pause() → .paused, isPaused",
+          r.get("pause") == "ok" and r.get("stateAfterPause") == "paused" and r.get("isPaused") is True,
+          f"{r.get('pause')!r}, {r.get('stateAfterPause')!r}")
+    check(f"{tag}: elapsed read twice 0.5 s apart while paused is EQUAL (elapsed-through-pause)",
+          r.get("elapsedA") is not None and r.get("elapsedA") == r.get("elapsedB"),
+          f"{r.get('elapsedA')} then {r.get('elapsedB')}")
+    check(f"{tag}: the removed output's did-finish landed while paused (R0 q7: 5–25 ms after the remove)",
+          r.get("segment0FinishedWhilePaused") is True, f"{r.get('didFinishLatency')} s")
+    print(f"      did-finish after the remove: {r.get('didFinishLatency', 0):.3f} s")
+    if resume:
+        check(f"{tag}: resume() → .recording with two segments",
+              r.get("resume") == "ok" and r.get("stateAfterResume") == "recording"
+              and r.get("segmentsAfterResume") == 2,
+              f"{r.get('resume')!r}, {r.get('stateAfterResume')!r}, {r.get('segmentsAfterResume')}")
+        check(f"{tag}: the new output's did-start landed (R0 q7: 8–10 ms after the add)",
+              r.get("segment1DidStart") is True, f"{r.get('didStartLatency')} s")
+        print(f"      did-start after the add: {r.get('didStartLatency', 0):.3f} s")
+        check(f"{tag}: elapsed before the stop is about 2 s — two recorded seconds with the paused second "
+              "excluded — against a wall clock at least 0.8 s longer",
+              1.7 <= (r.get("elapsedBeforeStop") or 0) <= 2.7
+              and (r.get("elapsedWall") or 0) >= (r.get("elapsedBeforeStop") or 0) + 0.8,
+              f"elapsed {r.get('elapsedBeforeStop')}, wall {r.get('elapsedWall')}")
+    check(f"{tag}: stop() → finishing → idle within the bound; onFinish once, the completion once",
+          r.get("stateAfterStop") == "finishing" and r.get("concluded") is True
+          and r.get("onFinishCount") == 1 and r.get("stopCount") == 1,
+          f"{r.get('stateAfterStop')!r}, concluded {r.get('concluded')} in {r.get('stopLatency')} s, "
+          f"onFinish {r.get('onFinishCount')}, stop {r.get('stopCount')}")
+    print(f"      stop → conclude {r.get('stopLatency', 0):.3f} s")
+    fin = r.get("onFinish") or {}
+    segs = fin.get("segments") or []
+    return fin, segs
+
+
+def granted_rows_count(folder):
+    """How many rows the granted tier would score — counted by running the
+    same row code over an EMPTY answer with `check` swapped for a counter,
+    so the number a skip prints is the tier's by construction and cannot
+    drift from it."""
+    global check
+    real = check
+    counted = [0]
+
+    def counter(name, ok, detail=""):
+        counted[0] += 1
+
+    check = counter
+    try:
+        import io
+        import contextlib
+        with contextlib.redirect_stdout(io.StringIO()):
+            granted_rows({}, folder)
+    finally:
+        check = real
+    return counted[0]
+
+
+def section_granted(binary, sources):
+    global skipped, skip_reason
+    print("\nSection 9 — the probe's own GRANTED tier: a real ScreenRecorder() on the main display "
+          "under this process's grant (R0 q1: the terminal's), and the panel end to end")
+    folder = fresh_dir("granted")
+    answer, error = run_probe(binary, "granted", {"mode": "granted", "folder": folder}, timeout=300)
+    check("9: the probe answers", answer is not None and not answer.get("error"),
+          error or (answer or {}).get("error", ""))
+    if not answer or answer.get("error"):
+        return
+    print(f"  host: CGPreflightScreenCaptureAccess() = {answer.get('preflight')}, console locked = "
+          f"{answer.get('locked')}, shareable displays = {answer.get('displays')} (listed: "
+          f"{answer.get('answered')}{', ' + answer['listFailure'] if answer.get('listFailure') else ''})")
+    if answer.get("skipped"):
+        skip_reason = answer["skipped"]
+        count = granted_rows_count(folder)
+        skipped += count
+        print(f"  SKIPPED by name: {skip_reason} — {count} rows did not run")
+        return
+    granted_rows(answer, folder)
+    shutil.rmtree(folder, ignore_errors=True)
+    print(f"      the recordings under {os.path.relpath(folder, ROOT)} were deleted")
+
+
+def granted_rows(answer, folder):
+    """Every row below the skip point, over the probe's answer."""
+    check("9: the probe's NSDocumentController subclass is .shared and the recordings folder is pinned "
+          "under work/ by -RCRecordingFolder",
+          answer.get("controllerIsProbe") is True and answer.get("folderPinned") == folder,
+          f"{answer.get('folderPinned')!r} vs {folder!r}")
+    f = answer.get("filter") or {}
+    print(f"      the main display's filter: {f.get('width')}×{f.get('height')} pt at scale {f.get('scale')}")
+
+    fin, segs = granted_run_rows("9a", answer.get("run1") or {},
+                                 "9a — a fresh ScreenRecorder(): start, 1 s, pause, resume, 1 s, stop", True)
+    r = answer.get("run1") or {}
+    check("9a: a .success of TWO segments, pauses 1, stoppedBy stopped",
+          fin.get("kind") == "success" and len(segs) == 2 and fin.get("pauses") == 1
+          and fin.get("stoppedBy") == "stopped", f"{fin}")
+    check("9a: both movies probe with pictures, about a second each (600 000 ticks ± 250 000)",
+          len(segs) == 2 and all(s.get("hasVideo") and abs((s.get("duration") or 0) - SEC) <= 250_000 for s in segs),
+          f"{[s.get('duration') for s in segs]}")
+    print(f"      durations: {[s.get('duration') for s in segs]} ticks")
+    names = [os.path.basename(s.get("path") or "") for s in segs]
+    check("9a: the two movies are in the pinned folder with two DIFFERENT names, each `Screen Recording "
+          "<date> at <time>.mov` — its own start time (decision 6)",
+          len(segs) == 2 and all(os.path.dirname(s.get("path") or "") == folder for s in segs)
+          and all(re.fullmatch(STEM_RE + r"( \(\d+\))?\.mov", n) for n in names) and names[0] != names[1],
+          f"{names}")
+    check("9a: segment 2's start is at least 1.9 s after segment 1's (a recorded second and a paused one "
+          "between)", len(segs) == 2 and (segs[1].get("startedAt") or 0) - (segs[0].get("startedAt") or 0) >= 1.9,
+          f"{[s.get('startedAt') for s in segs]}")
+
+    def stem_matches(segment, name):
+        started = segment.get("startedAt") or 0
+        stem = re.sub(r"( \(\d+\))?\.mov$", "", name)
+        return stem in {expected_stem(math.floor(started)), expected_stem(math.floor(started) - 1)}
+
+    check("9a: each movie's stem is the local-time spelling of ITS OWN start (to the second; the did-start "
+          "may cross a second boundary after the call that named the file)",
+          len(segs) == 2 and all(stem_matches(s, n) for s, n in zip(segs, names)),
+          f"{names} vs {[s.get('startedAt') for s in segs]}")
+    check("9a: no microphone — micDescriptor nil and micOffset 0 on both segments, micProblem nil",
+          len(segs) == 2 and all(s.get("micDescriptor") is False and s.get("micOffset") == 0 for s in segs)
+          and fin.get("micProblem") is None, f"{segs}")
+    check("9a: the result's path is the FIRST segment's movie", len(segs) == 2 and fin.get("path") == segs[0].get("path"))
+    check("9a: idle after, elapsed 0", r.get("elapsedAfter") == 0, f"{r.get('elapsedAfter')}")
+    sizes = r.get("sizes") or {}
+    check("9a: both files are on disk with bytes in them", len(sizes) == 2 and all(v > 0 for v in sizes.values()),
+          f"{sizes}")
+
+    fin, segs = granted_run_rows("9b", answer.get("run2") or {}, "9b — start, 1 s, pause, stop while paused", False)
+    r = answer.get("run2") or {}
+    check("9b: a stop while paused answers ONE segment with pauses 1 (the press is counted, not the "
+          "files), stoppedBy stopped",
+          fin.get("kind") == "success" and len(segs) == 1 and fin.get("pauses") == 1
+          and fin.get("stoppedBy") == "stopped", f"{fin}")
+    check("9b: its movie is about a second with pictures, in the pinned folder",
+          len(segs) == 1 and segs[0].get("hasVideo") is True and abs((segs[0].get("duration") or 0) - SEC) <= 250_000
+          and os.path.dirname(segs[0].get("path") or "") == folder, f"{segs}")
+    check("9b: idle after, elapsed 0", r.get("elapsedAfter") == 0, f"{r.get('elapsedAfter')}")
+
+    r = answer.get("run3") or {}
+    print("  9c — the PANEL end to end: Record over the main display, hidden at the start, Pause and Resume "
+          "through the entries the status item calls, Stop, and a clean landing that keeps it hidden "
+          "(decision 7)")
+    check("9c: the panel was visible, over the main display, Record Into New Project, microphone Off",
+          r.get("visibleBefore") is True and r.get("destinationNewProject") is True
+          and r.get("microphoneOff") is True and r.get("sourceMain") is True, f"{r}")
+    check("9c: Record began the countdown, and the recording started within the bound",
+          r.get("countdownBegan") is True and r.get("recording") is True,
+          f"countdown {r.get('countdownBegan')}, recording {r.get('recording')}")
+    a = r.get("atStart") or {}
+    check("9c: at recordingDidStart for a DISPLAY source the panel is HIDDEN — isVisible false, "
+          "hiddenForRecording, showWhenLanded remembered TRUE — the item up, the note empty, the recorder "
+          "recording (hide-picked-only)",
+          a.get("visible") is False and a.get("hiddenForRecording") is True and a.get("showWhenLanded") is True
+          and a.get("itemShowing") is True and a.get("note") == "" and a.get("recorder") == "recording", f"{a}")
+    check("9c: show() while hidden shows nothing", r.get("showWhileHidden") is False, f"{r.get('showWhileHidden')}")
+    p = r.get("paused") or {}
+    check(f"9c: pauseRecording() (the item's Pause Recording) → .paused, the recorder .paused, the footnote "
+          f"'{PAUSE_GLYPH} 0:01' faint",
+          p.get("phase") == "paused" and p.get("recorder") == "paused" and p.get("status") == f"{PAUSE_GLYPH} 0:01"
+          and p.get("faint") is True, f"{p}")
+    check("9c: … and 0.7 s later the 30 Hz tick has left the footnote and elapsed exactly where they were",
+          r.get("statusHeld") == f"{PAUSE_GLYPH} 0:01" and r.get("elapsedHeld") == p.get("elapsed"),
+          f"{r.get('statusHeld')!r}, {r.get('elapsedHeld')} vs {p.get('elapsed')}")
+    rs = r.get("resumed") or {}
+    check("9c: resumeRecording() (the item's Resume Recording) → .recording, two segments",
+          rs.get("phase") == "recording" and rs.get("recorder") == "recording" and rs.get("segments") == 2, f"{rs}")
+    check("9c: stopRecording() → .stopping, then the landing → .idle within the bound",
+          r.get("stopping") == "stopping" and r.get("landed") is True, f"{r.get('stopping')!r}, {r.get('landed')}")
+    al = r.get("afterLanding") or {}
+    check("9c: after a CLEAN landing the panel STAYS HIDDEN — the note is empty, so revealIfNoted showed "
+          "nothing (reveal-always); hiddenForRecording and showWhenLanded cleared, the item down, the "
+          "recorder idle",
+          al.get("visible") is False and al.get("note") == "" and al.get("hiddenForRecording") is False
+          and al.get("showWhenLanded") is False and al.get("itemDown") is True and al.get("recorder") == "idle",
+          f"{al}")
+    d = r.get("document") or {}
+    clips = d.get("clips") or []
+    check(f"9c: one document opened — two media, ['Track 1'], two clips touching from 0 with no transition, "
+          f"the undo step {SEGMENTS_ACTION_NAME!r}, canvas [60, 1], edited",
+          r.get("documentsOpened") == 1 and d.get("media") == 2 and d.get("tracks") == ["Track 1"]
+          and len(clips) == 2 and clips[0].get("start") == 0 and clips[1].get("start") == clips[0].get("end")
+          and not any(c.get("transition") for c in clips) and d.get("undoName") == SEGMENTS_ACTION_NAME
+          and d.get("canvasFps") == [60, 1] and d.get("edited") is True, f"{d}")
+    paths = d.get("mediaPaths") or []
+    check("9c: its displayName is the FIRST segment's stem and both media are files in the pinned folder",
+          len(paths) == 2 and d.get("displayName") == os.path.splitext(os.path.basename(paths[0]))[0]
+          and all(os.path.dirname(p) == folder for p in paths), f"{d.get('displayName')!r}, {paths}")
+
+
+# --------------------------------------------------------------------------
 # The mutants. Each is one string replaced in a COPY of the tree's
 # `app/Sources` under `work/`, and the replacement must match exactly once,
 # or the copy is not the mutant it claims to be (`phase9_chrome.py`'s
@@ -3568,7 +6271,7 @@ MUTANTS = {
         "resolve answers the FIRST open document, whatever key was asked for"),
     "welcome-action": (
         "WelcomeWindowController.swift",
-        "            action: #selector(AppDelegate.newRecording(_:)))\n",
+        "            action: #selector(AppDelegate.showRecorderPanel(_:)))\n",
         "            action: #selector(AppDelegate.newProject(_:)))\n",
         "the welcome button's action pointed at newProject:"),
     "retitle": (
@@ -3579,7 +6282,7 @@ MUTANTS = {
     "quit-guard": (
         "AppDelegate.swift",
         "        if ScreenRecorder.shared.isRecording {\n"
-        "            RecorderPanelController.shared.show()\n"
+        "            RecorderPanelController.shared.revealControls()\n"
         "            return .terminateCancel\n"
         "        }\n",
         "",
@@ -3593,13 +6296,10 @@ MUTANTS = {
         "undo reads clean and ⌘W closes the recording's document without a prompt"),
     "mic-trim": (
         "RecordingLanding+Microphone.swift",
-        "            if head > 0 {\n"
-        "                clipOps += [\n"
-        "                    .trimStart(clip: clip, to: head), .moveClip(clips: [clip], delta: -head),\n"
-        "                ]\n"
-        "            }\n",
-        "",
-        "addMicrophoneClip's trim dropped — a negative start is placed at 0 untrimmed, the voice late"),
+        "        let head = start < floor ? ReelTime.snapToFrame(floor - start, fps: fps) : 0\n",
+        "        let head: Ticks = 0\n",
+        "addMicrophoneClip's head always 0 — a start below the floor is placed AT the floor "
+        "untrimmed, the voice late"),
     # Lane R's four, the R1 review's recorder fixes (section 3's driven rows).
     "busy-finishing": (
         "ScreenRecorder.swift",
@@ -3619,10 +6319,11 @@ MUTANTS = {
         "ScreenRecorder+Finishing.swift",
         "        if let failure = done.screenFailure { return conclude(done, .failure(failure)) }\n",
         "        if let failure = done.screenFailure { return conclude(done, .failure(failure)) }\n"
-        "        if let failure = done.micFailure {\n"
+        "        if let failure = done.segments.compactMap({ $0.micFailure }).first {\n"
         "            return conclude(done, .failure(RecorderError.finishFailed(failure)))\n"
         "        }\n",
-        "settle returns the microphone failure BEFORE the movie probe (finding 0 undone)"),
+        "settle returns any segment's microphone failure BEFORE the movie probes (finding 0 undone; "
+        "re-aimed at R2's segments, where micFailure moved from the session to the segment)"),
     "no-path": (
         "ScreenRecorder+Finishing.swift",
         "        if case .failure(let error) = outcome, let failure = error as? RecorderError {\n"
@@ -3690,6 +6391,61 @@ MUTANTS = {
         "                ScreenRecorder.shared.stop()\n",
         "                panel.show()\n",
         "New Recording… shows the panel instead of stopping a tool's recording (fix 12 undone)"),
+    # Road map 3, R2 — one per rule (sections 3o–3t, 4b, 5p–5u, 9).
+    "segment-stacked": (
+        "RecordingLanding+Placing.swift",
+        "            at = landed.end\n",
+        "",
+        "a later segment placed at the playhead, not the previous clip's end — the sequence stacks"),
+    "mic-floor-dropped": (
+        "RecordingLanding+Microphone.swift",
+        "            floor = placed.end\n",
+        "",
+        "the microphone floor dropped — a later voice is placed below the previous voice's end"),
+    "menu-static": (
+        "RecorderStatusItem.swift",
+        "        rebuildMenu(paused: paused)\n",
+        "",
+        "the status item's menu not rebuilt when paused flips — Pause Recording stays while paused"),
+    "hide-picked-only": (
+        "RecorderPanelController+Recording.swift",
+        "        showWhenLanded = window?.isVisible == true\n"
+        "        hiddenForRecording = true\n"
+        "        window?.orderOut(nil)\n",
+        "        if currentChoice().source == .picked {\n"
+        "            showWhenLanded = window?.isVisible == true\n"
+        "            hiddenForRecording = true\n"
+        "            window?.orderOut(nil)\n"
+        "        }\n",
+        "the panel's hide narrowed back to a picked window (R1's rule; decision 7 undone)"),
+    "reveal-always": (
+        "RecorderPanelController+Landing.swift",
+        "        if showWhenLanded, !noteLabel.stringValue.isEmpty { window?.orderFront(nil) }\n",
+        "        if showWhenLanded { window?.orderFront(nil) }\n",
+        "the reveal made unconditional — the panel comes back after every clean landing"),
+    "elapsed-through-pause": (
+        "ScreenRecorder.swift",
+        "            total += max(0, (segment.stoppedAt ?? now).timeIntervalSince(start))\n",
+        "            total += max(0, now.timeIntervalSince(start))\n",
+        "elapsed counts every segment to now — a paused recording's clock keeps running"),
+    "resume-first-offset": (
+        "ScreenRecorder+Finishing.swift",
+        "    ) -> RecordingSegment {\n"
+        "        let segment = done.segments[index]\n",
+        "    ) -> RecordingSegment {\n"
+        "        let segment = done.segments[0]\n",
+        "every segment's offset and stamps read off the FIRST segment"),
+    "resume-no-segment": (
+        "ScreenRecorder+Pause.swift",
+        "        session?.segments.append(segment)\n",
+        "",
+        "resume() mints no segment — the new output has nothing to report on"),
+    "pause-no-mic-stop": (
+        "ScreenRecorder+Pause.swift",
+        "        current.micOutput?.stopRecording()\n"
+        "        state = .paused\n",
+        "        state = .paused\n",
+        "pause() leaves the microphone's writer running through the pause"),
 }
 
 
@@ -3715,8 +6471,9 @@ def prepare_mutant(name):
     return target
 
 
-SECTIONS = [section_files, section_configuration, section_state, section_landing, section_chrome,
-            section_welcome, section_catalog, section_host]
+SECTIONS = [section_files, section_configuration, section_state, section_landing, section_segments,
+            section_chrome, section_chrome_pause, section_welcome, section_catalog, section_host,
+            section_granted]
 
 
 def main():
@@ -3728,11 +6485,24 @@ def main():
     parser.add_argument("--mutant", choices=sorted(MUTANTS),
                         help="prepare a named mutant copy of the tree's app/Sources and "
                              "compile against it (overrides --sources)")
+    parser.add_argument("--only",
+                        help="a comma-separated subset of sections to run, by the name after "
+                             "`section_` (files, configuration, state, landing, segments, chrome, "
+                             "chrome_pause, welcome, catalog, host, granted) — for iterating on "
+                             "one; the full run is what the counts in the docstring are")
     args = parser.parse_args()
     sources = os.path.abspath(args.sources)
+    sections = SECTIONS
+    if args.only:
+        wanted = {name.strip() for name in args.only.split(",")}
+        sections = [s for s in SECTIONS if s.__name__.removeprefix("section_") in wanted]
+        unknown = wanted - {s.__name__.removeprefix("section_") for s in SECTIONS}
+        if unknown:
+            sys.exit(f"--only names no section: {sorted(unknown)}")
 
-    print("recording — road map 3 R1's app half: files, configurations, the idle machine, the "
-          "landing, the chrome, the welcome cross-build, the catalog\n")
+    print("recording — road map 3's app half (R1, and R2's pause and resume): files, configurations, "
+          "the machine over a faked session, the landing of a sequence, the chrome, the welcome "
+          "cross-build, the catalog, and the granted tier\n")
     if args.mutant:
         sources = prepare_mutant(args.mutant)
     if sources != os.path.realpath(TREE_SOURCES):
@@ -3741,10 +6511,11 @@ def main():
     check("the probe builds — an instrument that will not compile is a FAILURE here, "
           "not an exit", binary is not None, error or "")
     if binary is not None:
-        for section in SECTIONS:
+        for section in sections:
             section(binary, sources)
 
-    print(f"\n{passed}/{passed + failed} checks passed")
+    tail = f" ({skipped} skipped by name — section 9: {skip_reason})" if skipped else ""
+    print(f"\n{passed}/{passed + failed} checks passed{tail}")
     return 0 if failed == 0 else 1
 
 

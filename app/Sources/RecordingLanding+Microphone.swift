@@ -1,132 +1,380 @@
 // app/Sources/RecordingLanding+Microphone.swift — the microphone half of
-// the landing (road map 3, R1b), a PURE MOVE out of `RecordingLanding.swift`
-// landed alone at the 400-line cap (R2's toll): the names the microphone's
-// track and undo step carry, `microphonePlacement` (the microphone ALONE,
-// for a document that already holds the picture) and `addMicrophoneClip`
-// with the `snapped` helper only it calls. Every body is byte for byte what
-// it was; `addMicrophoneClip` is internal now because `placement` in the
-// base file calls it, and `addMedia`, `view` and `trimmed` were widened
-// there for the same reason.
+// the landing (road map 3, R1b; per segment since R2b), a PURE MOVE out of
+// `RecordingLanding.swift` landed alone at the 400-line cap (R2's toll) and
+// then grown here: the names the microphone's track and the two undo steps
+// carry, `remainderPlacement` (everything a fresh untitled document does not
+// already hold), `addMicrophones` (every segment's voice on ONE back track,
+// by the floor rule) and `addMicrophoneClip`, the head-trim dance with every
+// step of it READ BACK. `addMedia`, `view`, `clip(_:in:scope:)` and
+// `trimmed` are internal in the base file for this one, and
+// `placeBackToBack`, `placeClip`, `mediaEntry`, `tooShortNote` and
+// `milliseconds` in `+Placing`, because `private` does not cross a file.
 
 import AppKit
 
 extension RecordingLanding {
     /// The undo step's name for `ProjectDocument.untitled(around:)`'s
-    /// microphone edit ALONE. There the picture is the document — undoing
-    /// the step removes the voice and keeps the picture — so a step called
-    /// "Add Recording" would promise to take back what it cannot, and the
-    /// Edit menu would read "Undo Add Recording" over a project the undo
-    /// leaves with the recording in it. The `.document` landing keeps
-    /// `actionName`: its one step really does add and remove both.
+    /// remainder edit when the remainder is a microphone ALONE — one segment
+    /// with a voice. There the picture is the document — undoing the step
+    /// removes the voice and keeps the picture — so a step called "Add
+    /// Recording" would promise to take back what it cannot, and the Edit
+    /// menu would read "Undo Add Recording" over a project the undo leaves
+    /// with the recording in it. The `.document` landing keeps `actionName`:
+    /// its one step really does add and remove both.
     static let microphoneActionName = "Add Microphone"
 
-    /// The new back track a microphone clip lands on.
+    /// The same step's name when the remainder holds more than a voice — a
+    /// paused recording's later segments, with or without microphones.
+    /// "Segments" and not "Recording" for the reason above: the FIRST
+    /// segment is the document and stays under the undo; what the step takes
+    /// back is the rest.
+    static let segmentsActionName = "Add Recording Segments"
+
+    /// The new back track every microphone clip lands on — ONE track for the
+    /// whole recording, added once, before the first voice that takes a
+    /// frame, so a paused recording's voices sit in a row under its pictures
+    /// as its pictures do, and a recording none of whose voices can be
+    /// placed adds no empty track.
     static let microphoneTrackName = "Microphone"
 
-    /// The microphone half ALONE, for a document that already holds the
-    /// picture: `ProjectDocument.untitled(around:)`, whose `makeProject`
-    /// placed the picture at 0 on track 1 before anything else could run.
-    /// `placement(_:in:place:)` cannot serve it — the picture's `add_media`
-    /// would be the documented identity and its `add_clip` at 0 would meet
-    /// its own clip on the front track, refuse, and put a SECOND copy on a
-    /// new track. nil when the result carries no microphone. `mediaId` and
-    /// `clipId` name the picture the document holds, so the answer reads as
-    /// a whole landing.
+    /// Which of the two names `untitled(around:)`'s remainder edit takes:
+    /// "Add Microphone" for one segment with a microphone — R1's landing,
+    /// R1's name — and "Add Recording Segments" otherwise. A one-segment
+    /// recording with no microphone has no remainder and no step, and the
+    /// answer for it is never read.
+    static func remainderActionName(for result: RecordingResult) -> String {
+        if result.segments.count == 1, result.segments[0].micDescriptor != nil {
+            return microphoneActionName
+        }
+        return segmentsActionName
+    }
+
+    /// Everything a fresh untitled document does NOT already hold, for
+    /// `ProjectDocument.untitled(around:)`, whose `makeProject` placed the
+    /// FIRST segment's picture at 0 on track 1 before anything else could
+    /// run: segments 2…n's media and their pictures on that same track from
+    /// clip 1's end, then every segment's microphone by the floor rule. nil
+    /// when there is nothing to add — one segment, no microphone.
+    /// `placement(_:in:place:)` cannot serve it — the first picture's
+    /// `add_media` would be the documented identity and its `add_clip` at 0
+    /// would meet its own clip on the front track, refuse, and put the whole
+    /// sequence a SECOND time on a new track. The answer reads as a whole
+    /// landing: `mediaIds[0]` and `clipIds[0]` name the picture the document
+    /// holds.
     ///
-    /// `clipId` is the FIRST clip whose source is the picture's media, and
-    /// `pictureAt` is that clip's start. That is exact for the one caller:
-    /// `makeProject` places exactly one clip, at 0. A document holding the
+    /// Clip 1 is the FIRST clip whose source is the first segment's media,
+    /// and the later pictures go on ITS track from ITS end — read off the
+    /// document, not assumed to be track 1 at 0. That is exact for the one
+    /// caller: `makeProject` places exactly one clip. A document holding the
     /// same media in several clips has no single answer here, and this
     /// method does not pretend to one — it is `untitled(around:)`'s, not a
-    /// general "add a microphone to a document" op.
-    static func microphonePlacement(
+    /// general "add the rest of a recording to a document" op. The later
+    /// pictures take no two-try rule: a refusal on a fresh document's one
+    /// track is not a track choice to fall back from but something wrong
+    /// with a file, and is thrown by name.
+    ///
+    /// **Without clip 1** — `makeProject` tolerates a first picture the core
+    /// refuses (a media with no duration) and opens the file in the Media
+    /// tab — nothing on the timeline says where the recording is, so the
+    /// remainder lands as MEDIA ONLY, `place: false`'s shape, with a
+    /// sentence per file in `notes`. The first shape here placed every
+    /// voice against a picture at 0, R1's one-segment fallback, which with
+    /// several voices stacked each one under the last (the floor rule
+    /// trimming a whole voice off) — a wrong sound where a Media-tab list
+    /// is at least an honest one.
+    static func remainderPlacement(
         _ result: RecordingResult, in document: ProjectDocument
     ) throws -> Placement? {
         assert(Thread.isMainThread)
-        guard let mic = result.micDescriptor else { return nil }
+        let hasMicrophone = result.segments.contains { $0.micDescriptor != nil }
+        guard result.segments.count > 1 || hasMicrophone else { return nil }
         let path = trimmed(result.descriptor.path)
         let snapshot = document.editedProject.snapshot
         guard let mediaId = snapshot.media.first(where: { $0.path == path })?.id else {
             throw ReelCoreError(message: "\(path) is not in the document's media list.")
         }
-        let clipId = snapshot.clips.first { clip in
+        let first = snapshot.clips.first { clip in
             if case .media(let id, _, _) = clip.source { return id == mediaId }
             return false
-        }?.id
+        }
+        let scope = document.scope
         var trial = document.project
         var ops: [ReelOp] = []
-        let micMediaId = try addMedia(mic, to: &trial, ops: &ops)
-        let micClipId = try addMicrophoneClip(
-            micMediaId, pictureAt: clipId.flatMap { id in snapshot.clips.first { $0.id == id } }?
-                .start ?? 0,
-            offset: result.micOffset, scope: document.scope, to: &trial, ops: &ops)
+        var notes: [String] = []
+        var mediaIds = [mediaId]
+        for segment in result.segments.dropFirst() {
+            mediaIds.append(try addMedia(segment.descriptor, to: &trial, ops: &ops))
+        }
+        var pictures: [Landed] = []
+        if let first = first {
+            pictures = [Landed(clip: first, at: first.start)]
+            let rest = Array(mediaIds.dropFirst())
+            if !rest.isEmpty {
+                guard
+                    let placed = try placeBackToBack(
+                        rest, on: first.track, from: first.end, scope: scope, to: &trial,
+                        ops: &ops, notes: &notes)
+                else {
+                    throw ReelCoreError(
+                        message: "The recording's later segments could not be placed after its first.")
+                }
+                pictures += placed
+            }
+        } else {
+            for segment in result.segments.dropFirst() {
+                notes.append(unplacedNote(segment.descriptor.path, behind: path))
+            }
+            for segment in result.segments {
+                if let mic = segment.micDescriptor { notes.append(unplacedNote(mic.path, behind: path)) }
+            }
+        }
+        let microphones = try addMicrophones(
+            result.segments, pictureStarts: first == nil ? nil : pictures.map { $0.at },
+            scope: scope, to: &trial, ops: &ops, notes: &notes)
+        let clipIds: [UInt32?] = first == nil ? mediaIds.map { _ in nil } : pictures.map { $0.clip?.id }
         return Placement(
-            ops: ops, mediaId: mediaId, clipId: clipId, micMediaId: micMediaId,
-            micClipId: micClipId)
+            ops: ops, mediaIds: mediaIds, clipIds: clipIds, micMediaIds: microphones.media,
+            micClipIds: microphones.clips, notes: notes)
     }
 
-    /// The microphone's clip: a new BACK track (index 0, named
-    /// "Microphone"), so the voice sits under the picture as a detached
-    /// audio twin does, and the clip at `pictureAt − offset`.
+    /// Every segment's microphone: each file's `add_media` in segment order,
+    /// then — when `pictureStarts` is given, one per segment — ONE new back
+    /// track and each voice's clip by the floor rule, in the same order. A
+    /// nil `pictureStarts` is `place: false`: the media land and no clip
+    /// does, R1's rule. Answers one media id and one clip id PER SEGMENT,
+    /// nil where the segment has no file, or where its voice minted no clip
+    /// — too short for a frame, or wholly under the previous voice, each
+    /// with its sentence in `notes`.
+    ///
+    /// **The floor.** Segment `k`'s voice belongs at `pictureStart_k −
+    /// micOffset_k`, and with one voice that is R1's rule exactly, floored at
+    /// 0. With several, two voices on one track can neither overlap — a
+    /// refusal, or worse a sub-frame overlap the rule ACCEPTS as a
+    /// transition, minting a cross dissolve between two halves of one
+    /// recording — nor be placed late (the same wrong sound as R1's negative
+    /// start put at 0), so the floor for voice `k` is the previous voice's
+    /// END, and a start below it is head-trimmed to it by the same dance.
+    /// The floor is READ off the trial, never computed: the previous clip's
+    /// end is on the frame grid because the core snapped its start and its
+    /// length, and a sum over descriptor durations would not be. (At an
+    /// inexact rate even that end is not a grid point, and `placeClip` steps
+    /// the add up a frame when the core snaps under it.)
+    ///
+    /// The track is added on the attempt of the FIRST voice that takes a
+    /// frame, and kept only when that voice lands: a voice that mints no
+    /// clip discards its attempt whole, so a recording with no placeable
+    /// voice adds no empty track. Its id is `next_id` off the trial at that
+    /// moment, unchanged by a discarded attempt.
+    static func addMicrophones(
+        _ segments: [RecordingSegment], pictureStarts: [Ticks]?, scope: UInt32?,
+        to trial: inout ReelProject, ops: inout [ReelOp], notes: inout [String]
+    ) throws -> (media: [UInt32?], clips: [UInt32?]) {
+        precondition(
+            pictureStarts.map { $0.count == segments.count } ?? true,
+            "one picture start per segment")
+        var media: [UInt32?] = []
+        for segment in segments {
+            if let mic = segment.micDescriptor {
+                media.append(try addMedia(mic, to: &trial, ops: &ops))
+            } else {
+                media.append(nil)
+            }
+        }
+        let none: [UInt32?] = segments.map { _ in nil }
+        guard let starts = pictureStarts else { return (media, none) }
+        var track: UInt32?
+        var clips: [UInt32?] = []
+        var floor: Ticks = 0
+        for (k, segment) in segments.enumerated() {
+            guard let id = media[k] else {
+                clips.append(nil)
+                continue
+            }
+            var attempt = trial
+            var attemptOps: [ReelOp] = []
+            let on: UInt32
+            if let added = track {
+                on = added
+            } else {
+                on = attempt.snapshot.nextId
+                let addTrack = ReelOp.addTrack(index: 0, name: microphoneTrackName)
+                guard let withTrack = try attempt.applying(addTrack.scoped(scope)) else {
+                    throw ReelCoreError(message: "A track for the microphone could not be added.")
+                }
+                attempt = withTrack
+                attemptOps.append(addTrack)
+            }
+            guard
+                let placed = try addMicrophoneClip(
+                    id, on: on, pictureAt: starts[k], offset: segment.micOffset, floor: floor,
+                    scope: scope, to: &attempt, ops: &attemptOps, notes: &notes)
+            else {
+                clips.append(nil)
+                continue
+            }
+            trial = attempt
+            ops += attemptOps
+            track = on
+            clips.append(placed.id)
+            floor = placed.end
+        }
+        return (media, clips)
+    }
+
+    /// One voice's clip on `track`, at `pictureAt − offset` and never below
+    /// `floor` — 0 for the first voice, the previous voice's end after it.
+    /// nil, with a sentence in `notes`, for a voice that gets no clip; the
+    /// trial and the ops are advanced only for a clip returned.
     ///
     /// **The sign.** `offset` is the screen's did-start minus the
     /// microphone's, in ticks; positive means the picture began AFTER the
     /// microphone, so the microphone's content LEADS and its clip starts
     /// that much earlier than the picture's. R0 measured it centred near
-    /// zero with a 35 ms scatter (road map 3, R0 q6b), and the landing
-    /// applies the measured number per recording, never a constant.
+    /// zero with a 35 ms scatter (road map 3, R0 q6b) and a different number
+    /// at every resume (q7), and the landing applies each segment's measured
+    /// number — never a constant, never the first segment's.
     ///
-    /// **When that start is negative** — the picture at 0, the microphone
-    /// ahead of it — the clip cannot start before the timeline, and placing
-    /// it at 0 would leave the voice LATE by the offset. So the head is
-    /// trimmed off instead, and it stays one grouped edit: `add_clip` at 0,
-    /// `trim_start` to the head (start and `in` both advance), `move_clip`
-    /// back by the same amount (start returns to 0, `in` keeps the trim). A
+    /// **When that start is below the floor** — the picture at 0 with the
+    /// microphone ahead of it, or a later voice whose picture began less
+    /// than its offset after the previous voice ended — the clip cannot
+    /// start there: below 0 there is no timeline, below the previous voice's
+    /// end there is a clip, and placing it AT the floor would leave the
+    /// voice LATE by the difference. So the head is trimmed off instead, and
+    /// it stays one grouped edit: `add_clip` at the floor, `trim_start` to
+    /// the landed start + head (the core sets the start there and advances
+    /// `in` by the same amount — `core/src/edit_clip.rs`), `move_clip` back
+    /// by what the trim advanced, read off the trimmed clip (the head, at
+    /// an exact rate; at an inexact one the grid point nearest it). A
     /// `slip` would be the one-op spelling and cannot be used: the clip
     /// covers its whole media, so the slip's clamp reduces it to nothing.
-    /// The head is snapped to the canvas frame grid HERE, the same rounding
-    /// the core applies to every time argument, so a sub-frame offset makes
-    /// no trim and the two ops are not sent; a head the core still snaps to
-    /// zero would be an identity the list carries on past, not a failure.
-    /// Limit: the grid is the picture's frame — at 60 fps 16.7 ms — so the
-    /// alignment is exact to half a frame and no finer.
+    /// The head is the core's own snap of the shortfall
+    /// (`ReelTime.snapToFrame`, the rounding every time argument gets), so a
+    /// start within half a frame of the floor makes no trim and the two ops
+    /// are not sent — the core's snap of that start lands it on the floor —
+    /// while a start further below is trimmed rather than left to the snap,
+    /// because the core would snap it to the frame BELOW the floor: at 0
+    /// clamped up and late by a frame, above 0 a one-frame overlap the rule
+    /// accepts as a transition. Limit: the grid is the picture's frame — at
+    /// 60 fps 16.7 ms — so the alignment is exact to half a frame and no
+    /// finer.
+    ///
+    /// **Every step is read back, and two things are decided by what comes
+    /// back** (the R2 review). `trim_start` clamps its `to` at a frame
+    /// before the clip's end, so a voice no longer than its head — an 80 ms
+    /// file whose picture began 100 ms after it — used to be trimmed to a
+    /// one-frame sliver and then moved back INTO the previous voice, which
+    /// `move_clips` refused: `applying(_ ops:)` still answered non-nil (the
+    /// add and the trim had changed something), the trial "succeeded", and
+    /// the commit ran a refused op inside its undo step with the sliver
+    /// sitting late. Now the trimmed clip's start is compared with the
+    /// core's own snap of the requested `to`, and a start that is not it is
+    /// the clamp: the voice is wholly under its head, mints NO clip, and its
+    /// sentence names the file. And the moved clip must land exactly where
+    /// the core's snap of the delta says, at or above the floor, or the
+    /// throw names the file — a refused op can never ride a committed list.
+    /// At an INEXACT rate the move's landing can be a tick under a floor
+    /// that is a grid point (the delta and the trim round separately; grid
+    /// points are not closed under addition), which the rule would accept
+    /// and dress as a transition, so that one case is done once more a
+    /// frame up with a frame more head: the content stays aligned to the
+    /// tick, the voice starts a sub-frame gap after the previous one, and
+    /// its first frame past the head is the price — the documented limit of
+    /// such a rate, beside the pictures' own sub-frame gap.
     static func addMicrophoneClip(
-        _ media: UInt32, pictureAt: Ticks, offset: Ticks, scope: UInt32?,
-        to trial: inout ReelProject, ops: inout [ReelOp]
-    ) throws -> UInt32 {
-        let addTrack = ReelOp.addTrack(index: 0, name: microphoneTrackName)
-        let track = trial.snapshot.nextId
-        guard let withTrack = try trial.applying(addTrack.scoped(scope)) else {
-            throw ReelCoreError(message: "A track for the microphone could not be added.")
+        _ media: UInt32, on track: UInt32, pictureAt: Ticks, offset: Ticks, floor: Ticks,
+        scope: UInt32?, to trial: inout ReelProject, ops: inout [ReelOp], notes: inout [String]
+    ) throws -> ClipSnapshot? {
+        let file = try mediaEntry(media, in: trial, scope: scope)
+        let fps = try view(of: trial, scope: scope).snapshot.canvas.fps
+        if let note = tooShortNote(file, at: fps) {
+            notes.append(note)
+            return nil
         }
-        let clip = withTrack.snapshot.nextId
         let start = pictureAt - offset
-        var clipOps: [ReelOp]
-        if start >= 0 {
-            clipOps = [.addClip(track: track, media: media, at: start)]
-        } else {
-            let head = snapped(-start, to: trial.snapshot.canvas.fps.frameDuration)
-            clipOps = [.addClip(track: track, media: media, at: 0)]
-            if head > 0 {
-                clipOps += [
-                    .trimStart(clip: clip, to: head), .moveClip(clips: [clip], delta: -head),
-                ]
+        let head = start < floor ? ReelTime.snapToFrame(floor - start, fps: fps) : 0
+        guard head > 0 else {
+            guard
+                let placed = try placeClip(
+                    media, on: track, at: max(start, floor), notBelow: floor, scope: scope,
+                    to: &trial, ops: &ops)
+            else {
+                throw ReelCoreError(message: "\(file.path) could not be placed on its track.")
+            }
+            return placed
+        }
+        let frame = fps.frameDuration
+        for (at, head) in [(floor, head), (floor + frame, head + frame)] {
+            var attempt = trial
+            var attemptOps: [ReelOp] = []
+            guard
+                let placed = try headTrimmed(
+                    media, file: file, on: track, at: at, head: head, floor: floor, fps: fps,
+                    scope: scope, to: &attempt, ops: &attemptOps)
+            else {
+                notes.append(underNote(file, head: head, floor: floor))
+                return nil
+            }
+            if placed.start >= floor {
+                trial = attempt
+                ops += attemptOps
+                return placed
             }
         }
-        guard let placed = try withTrack.applying(clipOps.map { $0.scoped(scope) }) else {
-            throw ReelCoreError(message: "The microphone could not be placed on its track.")
-        }
-        trial = placed
-        ops += [addTrack] + clipOps
-        return clip
+        throw ReelCoreError(
+            message: "\(file.path) could not be placed clear of the previous microphone clip.")
     }
 
-    /// A non-negative length rounded to the nearest frame — the core's own
-    /// snap for a time argument, applied before the ops are built so a
-    /// sub-frame head sends no trim at all. A degenerate frame (0) snaps
-    /// nothing.
-    private static func snapped(_ length: Ticks, to frame: Ticks) -> Ticks {
-        guard frame > 0 else { return length }
-        return (length + frame / 2) / frame * frame
+    /// The dance once, on `trial`: the add at `at` (never under `floor`),
+    /// the trim to the landed start + `head`, the move back by what the trim
+    /// advanced. nil when the trim clamped — the voice is wholly under its
+    /// head — with the trial left as it was; every other surprise is a
+    /// throw naming the file. The clip returned may still sit a tick under
+    /// the floor at an inexact rate, which the caller reads.
+    private static func headTrimmed(
+        _ media: UInt32, file: MediaSnapshot, on track: UInt32, at: Ticks, head: Ticks,
+        floor: Ticks, fps: Fps, scope: UInt32?, to trial: inout ReelProject, ops: inout [ReelOp]
+    ) throws -> ClipSnapshot? {
+        guard
+            let added = try placeClip(
+                media, on: track, at: at, notBelow: floor, scope: scope, to: &trial, ops: &ops)
+        else {
+            throw ReelCoreError(message: "\(file.path) could not be placed on its track.")
+        }
+        let trim = ReelOp.trimStart(clip: added.id, to: added.start + head)
+        let promisedTrim = ReelTime.snapToFrame(added.start + head, fps: fps)
+        guard let trimmed = try trial.applying(trim.scoped(scope)),
+            try clip(added.id, in: trimmed, scope: scope).start == promisedTrim
+        else { return nil }
+        let advanced = promisedTrim - added.start
+        let move = ReelOp.moveClip(clips: [added.id], delta: -advanced)
+        let promisedStart = promisedTrim + ReelTime.snapToFrame(-advanced, fps: fps)
+        guard let moved = try trimmed.applying(move.scoped(scope)) else {
+            throw ReelCoreError(
+                message: "\(file.path) could not be moved back by its \(milliseconds(advanced)) ms head.")
+        }
+        let landed = try clip(added.id, in: moved, scope: scope)
+        guard landed.start == promisedStart, landed.source.sourceIn == advanced else {
+            throw ReelCoreError(
+                message: "\(file.path) landed at \(landed.start) with \(landed.source.sourceIn) "
+                    + "trimmed, not at \(promisedStart) with \(advanced).")
+        }
+        trial = moved
+        ops += [trim, move]
+        return landed
+    }
+
+    /// The sentence for a voice wholly under its head.
+    private static func underNote(_ file: MediaSnapshot, head: Ticks, floor: Ticks) -> String {
+        let clear = floor == 0 ? "the start of the timeline" : "the previous microphone clip"
+        return "\(file.path) was added to the media list without a clip: less than a frame of "
+            + "it would remain after the \(milliseconds(head)) ms head that keeps it clear of "
+            + "\(clear)."
+    }
+
+    /// The sentence for a file `remainderPlacement` lands as media because
+    /// the first segment's picture has no clip to follow.
+    private static func unplacedNote(_ path: String, behind first: String) -> String {
+        "\(path) was added to the media list without a clip: \(first) has no clip on the "
+            + "timeline for it to follow."
     }
 }

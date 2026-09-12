@@ -1,5 +1,5 @@
 // app/Sources/RecordingLanding.swift — where a finished recording goes
-// (road map 3, phase R1b).
+// (road map 3, phase R1b; a SEQUENCE of segments since R2b).
 //
 // A value type, `AudioNormalize`'s shape: a `RecordingResult` and a document
 // in, an op list and the ids it will mint out, so the recorder panel and the
@@ -9,18 +9,44 @@
 // posture on a refusal — a sheet, or an in-band error — which a document-side
 // commit would collapse into the wrong one for the tool.
 //
+// A recording is a sequence of segments (road map 3, decision 6: a pause
+// closes one file and a resume opens the next over the one stream), and the
+// landing places them back to back — one clip per segment, each at the
+// previous one's END as the core reports it — so a paused recording is `n`
+// ordinary media files and `n` clips on ONE track, touching, and the model
+// learns nothing. An unpaused recording is the one-segment case of the same
+// list, byte for byte R1's.
+//
+// **Every clip is READ BACK after its apply**, never assumed (the R2
+// review): the core snaps a start to the frame grid, and at an inexact
+// canvas rate — decision 3's 24981/1000, a document opened from a
+// recording — a clip's end is a sum of two grid points, which is NOT a grid
+// point, so an `add_clip` at it can snap DOWN by up to half a frame into a
+// one-tick overlap the rule accepts and a cross dissolve minted between two
+// halves of one recording. `placeClip` reads the landed start and, when it is
+// under the floor, places again a frame up; the rule is **touching, or a
+// sub-frame gap at an inexact rate — never an overlap, never a transition**,
+// and the gap is the documented limit of such a rate. A file the core would
+// refuse outright — one whose length snaps to no frame at all — lands as
+// MEDIA with a sentence in `Placement.notes`, rather than taking every other
+// segment down with it.
+//
 // The ops come back UNSCOPED. Inside an open nest the caller's door stamps the
-// scope (`ProjectDocument.addressed`, `AgentServer+Scope.addressed`): the two
-// `add_media` ops are document-level and travel unscoped, everything else
+// scope (`ProjectDocument.addressed`, `AgentServer+Scope.addressed`): every
+// `add_media` op is document-level and travels unscoped, everything else
 // carries the nest, and that is exactly what the trial below applies — so the
 // commit runs the list the trial ran.
 //
-// The microphone half — the second clip's placement, the names its track and
-// its undo step carry, and `untitled(around:)`'s microphone-only landing — is
+// The microphone half — each segment's voice on ONE new back track, the
+// floor rule that keeps two voices from overlapping, the names its track and
+// its undo steps carry, and `untitled(around:)`'s remainder landing — is
 // `RecordingLanding+Microphone.swift`, a pure move landed alone at the
-// 400-line cap (road map 3, R2's toll); `addMedia`, `view` and `trimmed`
-// widened from `private` to internal for it, because `private` does not
-// cross a file.
+// 400-line cap (road map 3, R2's toll) before it grew, and the placing of
+// one clip on the grid — `placeBackToBack`, `placeClip`, `tooShortNote`,
+// `mediaEntry`, `milliseconds` — is `RecordingLanding+Placing.swift`, the
+// same toll paid again when the read-backs arrived. `addMedia`, `view`,
+// `clip(_:in:scope:)` and `trimmed` are internal for them, because
+// `private` does not cross a file.
 
 import AppKit
 
@@ -28,15 +54,70 @@ struct RecordingLanding {
     /// The ops that land one recording, and the ids the core will mint for
     /// them — `next_id` read off a purely-applied result at each step, the
     /// documented contract (`core/src/edit.rs`: a new id is `next_id` from
-    /// before the call). `clipId` is nil when nothing was placed
-    /// (`place: false`); the two `mic…` ids are nil when the result carries
-    /// no microphone file.
+    /// before the call).
+    ///
+    /// **Every list has ONE entry per segment, in segment order** (the R2
+    /// review's rule: the first shape aligned the two `mic…` lists with "the
+    /// segments that have a microphone file", and a voice that mints no clip
+    /// — one shorter than its head, one under a frame — then misaligned the
+    /// media list with the clip list by an iterator nobody could see).
+    /// `mediaIds` is never empty. `clipIds[k]` is nil where segment `k`'s
+    /// picture minted no clip — every entry with `place: false`, or a
+    /// picture too short for a frame, which `notes` says. `micMediaIds[k]`
+    /// is nil for a segment with no microphone file; `micClipIds[k]` is nil
+    /// where no microphone clip was minted — no file, `place: false`, or a
+    /// voice wholly under the previous one, again in `notes`. The four
+    /// singulars are the FIRST segment's, R1's fields kept so a reader
+    /// written against one recording still compiles and still reads "the
+    /// recording's" ids. `notes` carries a sentence per thing the landing
+    /// could not place, each naming the file, for both doors to append to
+    /// their note; empty when everything landed.
+    ///
+    /// Three shapes, then: every media with every clip (`place: true`),
+    /// every media and no clip (`place: false`, and `remainderPlacement`
+    /// with no clip 1 to follow), and every media with SOME clips — the
+    /// third is what `notes` exists for, and each nil in the lists above has
+    /// its sentence there.
     struct Placement {
         let ops: [ReelOp]
-        let mediaId: UInt32
-        let clipId: UInt32?
-        let micMediaId: UInt32?
-        let micClipId: UInt32?
+        let mediaIds: [UInt32]
+        let clipIds: [UInt32?]
+        let micMediaIds: [UInt32?]
+        let micClipIds: [UInt32?]
+        let notes: [String]
+
+        var mediaId: UInt32 { mediaIds[0] }
+        var clipId: UInt32? { clipIds.first ?? nil }
+        var micMediaId: UInt32? { micMediaIds.first ?? nil }
+        var micClipId: UInt32? { micClipIds.first ?? nil }
+
+        init(
+            ops: [ReelOp], mediaIds: [UInt32], clipIds: [UInt32?], micMediaIds: [UInt32?],
+            micClipIds: [UInt32?], notes: [String] = []
+        ) {
+            precondition(!mediaIds.isEmpty, "a Placement lands at least one segment's media")
+            precondition(
+                clipIds.count == mediaIds.count && micMediaIds.count == mediaIds.count
+                    && micClipIds.count == mediaIds.count,
+                "a Placement's four lists have one entry per segment")
+            self.ops = ops
+            self.mediaIds = mediaIds
+            self.clipIds = clipIds
+            self.micMediaIds = micMediaIds
+            self.micClipIds = micClipIds
+            self.notes = notes
+        }
+    }
+
+    /// One segment's picture as the sequence placed it: its clip as the core
+    /// reports it, or nil for a picture too short for a frame — and `at`,
+    /// where the segment BEGINS on the timeline either way, which is the
+    /// clip's start or, with no clip, the point the sequence carried on
+    /// from. The microphone rule reads `at`, so a voice whose picture minted
+    /// no clip is still placed where its content began.
+    struct Landed {
+        let clip: ClipSnapshot?
+        let at: Ticks
     }
 
     enum Target {
@@ -44,8 +125,8 @@ struct RecordingLanding {
         case newProject
     }
 
-    /// The undo step's name, for both doors — the whole landing, picture
-    /// and microphone in one list.
+    /// The undo step's name, for both doors — the whole landing, every
+    /// picture and every microphone in one list.
     static let actionName = "Add Recording"
 
     // MARK: - Where
@@ -70,27 +151,30 @@ struct RecordingLanding {
     // MARK: - What
 
     /// PURE: the op list and the predicted ids for landing `result` in
-    /// `document` at its playhead, in the container it has open.
+    /// `document` at its playhead, in the container it has open — every
+    /// segment, as ONE grouped edit.
     ///
-    /// The picture's media goes in first, applied purely against the
-    /// DOCUMENT's handle (`add_media` is document-level, `ReelOp.documentLevelNames`)
-    /// and its id read off the result; then, with `place`, its clip by the
-    /// two-try track rule — the front track of the open container if the
-    /// core accepts the clip there, else a new track in front of everything.
-    /// The rule is `addGeneratedClip`'s (`EditorViewController+AddClips.swift`)
-    /// but it cannot be that method: its probe runs against a project that
-    /// does not hold the media yet, and `add_clip` naming an absent media is
-    /// an `Err` — every recording would fall to the new-track branch, and the
-    /// branch would then name the TRACK by the id `add_media` had consumed.
-    /// `placeImageBackground` / `backgroundMedia(for:in:)` are the precedent:
-    /// the probe runs over a project that already HOLDS the media.
+    /// Each segment's picture media goes in first, in order, applied purely
+    /// against the DOCUMENT's handle (`add_media` is document-level,
+    /// `ReelOp.documentLevelNames`) and its id read off the result; then,
+    /// with `place`, the pictures as a sequence on ONE track by the two-try
+    /// track rule — all of them on the front track of the open container if
+    /// the core accepts every one there, else all on a new track in front of
+    /// everything (`addSequence`). The rule is `addGeneratedClip`'s
+    /// (`EditorViewController+AddClips.swift`) but it cannot be that method:
+    /// its probe runs against a project that does not hold the media yet,
+    /// and `add_clip` naming an absent media is an `Err` — every recording
+    /// would fall to the new-track branch, and the branch would then name
+    /// the TRACK by the id `add_media` had consumed. `placeImageBackground`
+    /// / `backgroundMedia(for:in:)` are the precedent: the probe runs over a
+    /// project that already HOLDS the media.
     ///
-    /// With a microphone file the second pair — its media, a new BACK track
-    /// named "Microphone", its clip — is derived from the first pair's
-    /// purely-applied result, never from one `next_id` read, because the
-    /// first pair mints two or three ids and how many depends on which branch
-    /// the track rule took. `place == false` lands the media (and the
-    /// microphone's media) with no clip at all.
+    /// With microphone files the second half — each one's media, ONE new
+    /// BACK track named "Microphone", each one's clip — is derived from the
+    /// pictures' purely-applied result, never from one `next_id` read,
+    /// because the pictures mint `n` or `n + 1` ids and which depends on the
+    /// branch the track rule took. `place == false` lands every media (the
+    /// microphones' included) with no clip at all.
     ///
     /// The playhead is nest-local while a nest is open, the ops are unscoped,
     /// and the trial stamps the document's scope on the container ops exactly
@@ -107,18 +191,18 @@ struct RecordingLanding {
     /// here with the core's own sentence exactly as they would at the
     /// commit: a document at `MAX_TRACKS` throws "too many tracks" before
     /// any list is answered, inside a nest or out of one
-    /// (`tools/proof/recording_probe.py`, section 4, row 8). An earlier
-    /// draft of this comment said the opposite, and it was never true.
+    /// (`tools/proof/recording_probe.py`, section 4, row 8).
     ///
-    /// **One list, one limit.** The picture and the microphone are ONE
-    /// grouped edit, so a microphone pair the core refuses takes the picture
-    /// down with it. The case that reaches it: a document at `MAX_TRACKS`
-    /// with an empty front track takes the picture alone (no track is
-    /// added) and lands NEITHER once a microphone needs its own track. Kept
-    /// on purpose — half a recording landed, with the voice missing and no
-    /// undo step that says so, is worse than a refusal — and both doors
-    /// name the FILE in the refusal, which is on disk whatever happened
-    /// after it.
+    /// **One list, one limit.** The pictures and the microphones are ONE
+    /// grouped edit, so a microphone pair the core refuses takes every
+    /// picture down with it. The case that reaches it: a document at
+    /// `MAX_TRACKS` with an empty front track takes the pictures alone (no
+    /// track is added) and lands NOTHING once a microphone needs its own
+    /// track. Kept on purpose — half a recording landed, with the voice
+    /// missing and no undo step that says so, is worse than a refusal — and
+    /// both doors name the FILES in the refusal, which are on disk whatever
+    /// happened after them. What is NOT a refusal is a file the core cannot
+    /// make a clip of at all: it lands as media, with a sentence in `notes`.
     static func placement(
         _ result: RecordingResult, in document: ProjectDocument, place: Bool
     ) throws -> Placement {
@@ -128,29 +212,27 @@ struct RecordingLanding {
                 message: "A drag is in progress; the recording can be added when it ends.")
         }
         let scope = document.scope
-        let playhead = document.playhead
         var trial = document.project
         var ops: [ReelOp] = []
+        var notes: [String] = []
 
-        let mediaId = try addMedia(result.descriptor, to: &trial, ops: &ops)
-        var clipId: UInt32?
+        var mediaIds: [UInt32] = []
+        for segment in result.segments {
+            mediaIds.append(try addMedia(segment.descriptor, to: &trial, ops: &ops))
+        }
+        var pictures: [Landed] = []
         if place {
-            clipId = try addClip(mediaId, at: playhead, scope: scope, to: &trial, ops: &ops)
+            pictures = try addSequence(
+                mediaIds, from: document.playhead, scope: scope, to: &trial, ops: &ops,
+                notes: &notes)
         }
-        var micMediaId: UInt32?
-        var micClipId: UInt32?
-        if let mic = result.micDescriptor {
-            let id = try addMedia(mic, to: &trial, ops: &ops)
-            micMediaId = id
-            if place {
-                micClipId = try addMicrophoneClip(
-                    id, pictureAt: playhead, offset: result.micOffset, scope: scope,
-                    to: &trial, ops: &ops)
-            }
-        }
+        let microphones = try addMicrophones(
+            result.segments, pictureStarts: place ? pictures.map { $0.at } : nil,
+            scope: scope, to: &trial, ops: &ops, notes: &notes)
         return Placement(
-            ops: ops, mediaId: mediaId, clipId: clipId, micMediaId: micMediaId,
-            micClipId: micClipId)
+            ops: ops, mediaIds: mediaIds,
+            clipIds: place ? pictures.map { $0.clip?.id } : mediaIds.map { _ in nil },
+            micMediaIds: microphones.media, micClipIds: microphones.clips, notes: notes)
     }
 
     // MARK: - The steps, each applied purely and read back
@@ -181,25 +263,42 @@ struct RecordingLanding {
         return id
     }
 
-    /// The two-try track rule over a `trial` that holds `media`. The front
-    /// track of the open container first; a refusal there — the overlap rule
-    /// is the only reason the core has — takes a new track in front of
-    /// everything, whose id is `next_id` off the trial, and the clip's the
-    /// `next_id` after that track is applied. `try?` on the first attempt
-    /// collapses a throw and a nil into one answer on purpose: either way the
-    /// front track will not take this clip.
-    private static func addClip(
-        _ media: UInt32, at: Ticks, scope: UInt32?, to trial: inout ReelProject,
-        ops: inout [ReelOp]
-    ) throws -> UInt32 {
+    /// The two-try track rule over a SEQUENCE, for a `trial` that holds
+    /// every `media`: all of them back to back on the front track of the
+    /// open container, from `at`; if any one REFUSES there — the overlap
+    /// rule is the only reason the core has — ALL of them on a new track in
+    /// front of everything, from the same `at`. The sequence never splits: a
+    /// recording whose first segment sits on one track and whose second on
+    /// another would read as two recordings, so a refusal part-way discards
+    /// the front track's half-placed trial whole (it was a copy) and starts
+    /// the new track's from the trial that holds the media and no clip. The
+    /// new track's id is `next_id` off the trial, and each clip's is
+    /// `next_id` off the trial before its own `add_clip`.
+    ///
+    /// Only a REFUSAL (nil) falls through to the new track. An `Err` from
+    /// the first attempt propagates: the caps are the same on either track,
+    /// so a `try?` here — R1's shape — turned "too many clips" on a full
+    /// document into a second attempt that added a track and then reported
+    /// "too many tracks", the wrong cap, when the document was at both.
+    /// `notes` takes the winning attempt's sentences (the same either way —
+    /// a picture too short for a frame is too short on any track).
+    private static func addSequence(
+        _ media: [UInt32], from at: Ticks, scope: UInt32?, to trial: inout ReelProject,
+        ops: inout [ReelOp], notes: inout [String]
+    ) throws -> [Landed] {
         let container = try view(of: trial, scope: scope).snapshot
         if let front = container.tracks.last?.id {
-            let op = ReelOp.addClip(track: front, media: media, at: at)
-            if let placed = try? trial.applying(op.scoped(scope)) {
-                let clip = trial.snapshot.nextId
-                trial = placed
-                ops.append(op)
-                return clip
+            var attempt = trial
+            var attemptOps: [ReelOp] = []
+            var attemptNotes: [String] = []
+            if let placed = try placeBackToBack(
+                media, on: front, from: at, scope: scope, to: &attempt, ops: &attemptOps,
+                notes: &attemptNotes)
+            {
+                trial = attempt
+                ops += attemptOps
+                notes += attemptNotes
+                return placed
             }
         }
         // Index 0 is the BACK of the stack (§6), so the count is the front.
@@ -208,13 +307,32 @@ struct RecordingLanding {
         guard let withTrack = try trial.applying(addTrack.scoped(scope)) else {
             throw ReelCoreError(message: "A track for the recording could not be added.")
         }
-        let clip = withTrack.snapshot.nextId
-        let addClip = ReelOp.addClip(track: track, media: media, at: at)
-        guard let placed = try withTrack.applying(addClip.scoped(scope)) else {
+        var attempt = withTrack
+        var attemptOps: [ReelOp] = [addTrack]
+        var attemptNotes: [String] = []
+        guard
+            let placed = try placeBackToBack(
+                media, on: track, from: at, scope: scope, to: &attempt, ops: &attemptOps,
+                notes: &attemptNotes)
+        else {
             throw ReelCoreError(message: "The recording could not be placed on a new track.")
         }
-        trial = placed
-        ops += [addTrack, addClip]
+        trial = attempt
+        ops += attemptOps
+        notes += attemptNotes
+        return placed
+    }
+
+    /// The clip `id` as the core reports it, read off the CONTAINER the ops
+    /// are measured against — the nest's view while a scope is open, since
+    /// a nested clip is not in the parent's `clips`. An id the trial does
+    /// not list after its own `add_clip` accepted it is a throw, not a
+    /// guess.
+    static func clip(_ id: UInt32, in trial: ReelProject, scope: UInt32?) throws -> ClipSnapshot {
+        let container = try view(of: trial, scope: scope).snapshot
+        guard let clip = container.clips.first(where: { $0.id == id }) else {
+            throw ReelCoreError(message: "Clip \(id) was placed and is not listed.")
+        }
         return clip
     }
 

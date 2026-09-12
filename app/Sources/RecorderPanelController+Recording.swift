@@ -8,7 +8,8 @@ import ScreenCaptureKit
 /// and its landing are `+Landing.swift`, and the window picker is
 /// `+Picker.swift`, both cut out along the lines `recordingEnded` and
 /// `presentPicker` draw when the R1 review's fixes put this file past the
-/// 400-line cap.
+/// 400-line cap; the pause and the resume, and the phases drawn, are
+/// `+Pause.swift` (R2c).
 ///
 /// **The grants are asked for HERE and nowhere else, and UNCONDITIONALLY**
 /// (decision 4: the TOOL never asks — it reads the status and refuses by
@@ -88,7 +89,7 @@ extension RecorderPanelController {
             beginIfGranted()
         case .countdown:
             cancelCountdown()
-        case .recording, .starting:
+        case .recording, .paused, .starting:
             stopRecording()
         case .stopping, .landing:
             NSSound.beep()
@@ -99,12 +100,19 @@ extension RecorderPanelController {
     /// Recording. A recording the panel did not start (the `record_screen`
     /// tool's) is not this panel's to stop — `AppDelegate.newRecording`
     /// routes that one to the recorder directly — so anything but a panel
-    /// recording beeps. While `.starting`: launched, the stop is held by the
-    /// recorder and lands through `onFinish`; not yet, the attempt is
-    /// abandoned (the type doc).
+    /// recording beeps. Paused is stopped exactly as recording is: the
+    /// recorder's `.paused` arm takes the same finishing path with the
+    /// segment's output already closed — and the status item is FROZEN at
+    /// the mark it shows, because the tick goes on through `.stopping` with
+    /// `paused` false and would bring the coral dot back over a finish that
+    /// captures nothing (R2 review; the footnote holds its mark the same
+    /// way, `refreshStatusLabel`). While `.starting`: launched, the stop is
+    /// held by the recorder and lands through `onFinish`; not yet, the
+    /// attempt is abandoned (the type doc).
     func stopRecording() {
         switch phase {
-        case .recording:
+        case .recording, .paused:
+            statusItem?.freeze()
             phase = .stopping
             recorder.stop()
         case .starting where launched:
@@ -210,8 +218,8 @@ extension RecorderPanelController {
     /// The choice as the controls stand, then the filter: a picked window's
     /// is the picker's own; a display's is built from the shareable content
     /// and excludes Reelcut's own application (`ScreenRecorder.filter(for:in:)`),
-    /// which is what lets the panel stay on screen for a display recording.
-    /// One attempt, numbered and bounded (the type doc).
+    /// which keeps the document windows out of a display recording's
+    /// picture. One attempt, numbered and bounded (the type doc).
     private func startRecording() {
         let choice = currentChoice()
         startGeneration += 1
@@ -280,7 +288,7 @@ extension RecorderPanelController {
                 self.startFailed(error)
                 return
             }
-            self.recordingDidStart(choice)
+            self.recordingDidStart()
         }
     }
 
@@ -295,60 +303,75 @@ extension RecorderPanelController {
         setNote(error.localizedDescription)
     }
 
-    /// The recording chrome: Stop on the button, the status item in the menu
-    /// bar, the 30 Hz tick, and — for a picked window only (R0 q3) — the
-    /// panel ordered out until the recording lands, whether or not it was
-    /// on screen (`show()` beeps meanwhile; `showWhenLanded` says whether to
-    /// bring it back).
-    private func recordingDidStart(_ choice: RecordingChoice) {
+    /// The recording chrome (decision 7): the status item in the menu bar
+    /// with Pause, Resume and Stop (`+Pause.swift` for the first two), the
+    /// 30 Hz tick, and the panel ordered OUT for EVERY source until the
+    /// landing has something to say — whether or not it was on screen
+    /// (`show()` beeps meanwhile; `showWhenLanded` remembers, and
+    /// `revealIfNoted` reads it). R1 hid it for a picked window only,
+    /// because a display's filter excludes Reelcut (R0 q3); the user asked
+    /// for the dialog to go away whatever is recorded, and the menu bar's
+    /// item is the recording's controls now.
+    private func recordingDidStart() {
         // A stop asked for while arming has moved the phase on; the end
         // comes through `recordingEnded`.
         guard phase == .starting else { return }
         phase = .recording
+        resumeProblem = nil
         setNote("")
-        let item = RecorderStatusItem(onStop: { [weak self] in self?.stopRecording() })
+        let item = RecorderStatusItem(
+            onPause: { [weak self] in self?.pauseRecording() },
+            onResume: { [weak self] in self?.resumeRecording() },
+            onStop: { [weak self] in self?.stopRecording() })
         item.show()
         statusItem = item
         armTick()
-        if choice.source == .picked {
-            showWhenLanded = window?.isVisible == true
-            hiddenForRecording = true
-            window?.orderOut(nil)
-        }
+        showWhenLanded = window?.isVisible == true
+        hiddenForRecording = true
+        window?.orderOut(nil)
     }
 
     // MARK: - The tick
 
-    /// 30 Hz while recording, in `.common` modes (the type doc): the
-    /// microphone's level into the panel's own meter
+    /// 30 Hz while recording or paused, in `.common` modes (the type doc):
+    /// the microphone's level into the panel's own meter
     /// (`ScreenRecorder.publishMicrophoneLevel`, a no-op without a
-    /// microphone), the elapsed time in the footnote and in the status item,
-    /// and a microphone problem into the note.
+    /// microphone and while paused, the recorder having silenced the bar),
+    /// the elapsed time in the footnote and in the status item — with
+    /// `paused`, which is what flips the item's menu — and a microphone
+    /// problem into the note.
     private func armTick() {
         tickTimer?.invalidate()
         let timer = Timer(timeInterval: 1.0 / 30, repeats: true) { [weak self] timer in
-            guard let self, self.phase == .recording || self.phase == .stopping else {
+            guard let self,
+                self.phase == .recording || self.phase == .paused || self.phase == .stopping
+            else {
                 timer.invalidate()
                 return
             }
             self.recorder.publishMicrophoneLevel()
             self.refreshStatusLabel()
-            self.statusItem?.update(elapsed: self.recorder.elapsed)
+            self.statusItem?.update(elapsed: self.recorder.elapsed, paused: self.phase == .paused)
             self.syncMicrophoneNote()
         }
         RunLoop.main.add(timer, forMode: .common)
         tickTimer = timer
     }
 
-    /// `ScreenRecorder.microphoneProblem` into the note the moment it is
-    /// non-nil — a device unplugged, a writer that gave up — with the fact
-    /// that the picture is still recording, since a silent meter alone
-    /// reads as a broken recording. Written once: the note is compared
-    /// before it is set, because `setNote` refits the window and this runs
+    /// The live note — what the panel says while a recording runs or is
+    /// paused — rebuilt at every tick from its two PARTS and never from the
+    /// label's text: `ScreenRecorder.microphoneProblem` the moment it is
+    /// non-nil (a device unplugged, a writer that gave up), and
+    /// `resumeProblem`, a resume the recorder refused (`+Pause.swift`,
+    /// whose `liveNote` is the composition). Composing from the label was
+    /// the R2 review's defect: a microphone did-finish landing late
+    /// replaced a note that did not yet contain its sentence and wiped the
+    /// resume's, and each retried resume appended its sentence again. Set
+    /// only on a change, because `setNote` refits the window and this runs
     /// at 30 Hz.
     func syncMicrophoneNote() {
-        guard let problem = recorder.microphoneProblem else { return }
-        let text = "The microphone stopped: \(problem) The picture is still recording."
+        let text = Self.liveNote(
+            microphoneProblem: recorder.microphoneProblem, resumeProblem: resumeProblem)
         if noteLabel.stringValue != text { setNote(text) }
     }
 
