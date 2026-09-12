@@ -304,7 +304,7 @@ against 559/560, when 6b's "one program" row was the tree's one failure
                    4·5c's "still edited after the undo" row, the review's
                    ⌘W-without-a-prompt.
   mic-trim         `addMicrophoneClip`'s trim dropped, a negative start
-                   placed at 0 untrimmed (RecordingLanding.swift) —
+                   placed at 0 untrimmed (RecordingLanding+Microphone.swift) —
                    613/620: 4·4a's op list, start/in, length and the
                    trim/move pair, 4·5b's in point, 4·7's op list and head.
   busy-finishing   `stop()` while `.finishing` answers `.busy` again
@@ -3592,7 +3592,7 @@ MUTANTS = {
         "untitled(around:)'s import count deleted — the microphone's edit is the only count, so one "
         "undo reads clean and ⌘W closes the recording's document without a prompt"),
     "mic-trim": (
-        "RecordingLanding.swift",
+        "RecordingLanding+Microphone.swift",
         "            if head > 0 {\n"
         "                clipOps += [\n"
         "                    .trimStart(clip: clip, to: head), .moveClip(clips: [clip], delta: -head),\n"
