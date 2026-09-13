@@ -6,7 +6,7 @@ Rust staticlib core, the same shape as `~/devel/rasterize`.
 **It builds and runs.** M1 (Cut) is done and verified against spec §10; most
 of M2 landed with it.
 
-Six things in `designs/`, and you want all of them:
+Seven things in `designs/`, and you want all of them:
 
 - **`designs/reelcut-remaining.md` — what is LEFT, and the record of the
   debt that was paid. START HERE if you are picking up new work.** Road map
@@ -26,6 +26,18 @@ Six things in `designs/`, and you want all of them:
   op, no tool, no FFI change, a seventh spike answer, five files), each
   phase's adversarial review and fix wave, and what only a person at the
   machine can still check. START THERE if you are touching the recorder.
+- **`designs/reelcut-roadmap-4.md` — road map 4, DESIGNED and not built:
+  Remove Silences, second pass.** A spike (S0, run 2026-09-13, its three
+  instruments tracked in `tools/proof/silence_spike/`) measured the shipped
+  −40 dBFS level rule marking nine tenths of the recorder's own microphone
+  file silent and finding nothing under a hum, tried Apple's
+  `SpeechDetector` (reports nothing), the transcriber's word ranges (absorb
+  the pause before a word), SoundAnalysis (edges a quarter second outward)
+  and Silero VAD v6.2.1 through Core ML (edges within a frame, 350×
+  realtime, 640 KB, MIT, no new runtime, no `async`, no grant) — and the
+  plan (S1) is a per-media `cache/speech/` beside the peaks and a `mode`
+  on the detector, voice by default with level as the fallback. START THERE
+  if you are touching Remove Silences or `detect_silence`.
 - `designs/reelcut-design.md` — the normative spec. The schemas (§5), the op
   table (§6) and the architecture (§7) govern any change to either side; §11
   holds decisions already made, which are not to be re-litigated.
