@@ -598,6 +598,39 @@ fn a_degenerate_shape_is_refused_rather_than_scaled_from_nothing() {
 }
 
 #[test]
+fn a_crop_on_a_degenerate_shape_is_accepted_now_the_two_size_readers_are_one() {
+    // The ONE behaviour change road map 5's T0f made, pinned here rather
+    // than left to be discovered: `edit_props.rs` and `edit_background.rs`
+    // each held a private pixel-size reader, and only the background one
+    // guarded a shape's size for positivity. The two collapsed into
+    // `Project::source_size` (`model_query.rs`), and the STRICTER reading
+    // is the one kept — so clip 23, a hand-written rectangle of width and
+    // height 0, now has no size for `check_video`'s crop rule to measure
+    // against and a crop on it is accepted, where the old lenient reader
+    // answered `Some((0.0, 0.0))` and refused every crop as "l + r must be
+    // less than the source width 0". Reachable only through a file like
+    // this one, since no op will build a shape of width 0; the refusal that
+    // MATTERS about a degenerate shape is the test above's, and it still
+    // stands.
+    let project = backdrop_project();
+    let after = project
+        .apply(&json!({"op": "set_video", "clips": [23], "patch": {"crop": {"l": 10, "r": 10}}}));
+    let after = after.value();
+    let clip = by_id(&after, "/clips", 23);
+    assert_eq!(num(clip, "/video/crop/l"), 10.0);
+    assert_eq!(num(clip, "/video/crop/r"), 10.0);
+    // A sized shape is measured exactly as it always was: clip 24 is
+    // 640 × 360, and a crop that meets across it is still refused by name.
+    let message = project.errors(
+        &json!({"op": "set_video", "clips": [24], "patch": {"crop": {"l": 320, "r": 320}}}),
+    );
+    assert_eq!(
+        message,
+        "video.crop l + r must be less than the source width 640, not 640"
+    );
+}
+
+#[test]
 fn a_nest_clip_is_refused_because_the_blur_would_reach_no_layer() {
     // Not about the SIZE — a nest has a frozen canvas and the size reader
     // answers with it. It is about the BLUR. A nest clip never becomes a

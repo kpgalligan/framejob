@@ -5986,8 +5986,13 @@ def section_catalog(binary, sources):
     names = [t.get("name") for t in tools]
     ops = answer.get("coreOps") or []
     print(f"      {len(names)} tools, {len(ops)} core ops, {answer.get('bytes')} bytes of catalog")
-    check("7a: the core declares 55 ops (rc_op_names)", len(ops) == 55 and len(set(ops)) == 55, f"{len(ops)}")
-    check("7a: the catalog has exactly 75 tools, no name twice", len(names) == 75 and len(set(names)) == 75,
+    # Floors since road map 5's E1 added `add_transition` and
+    # `set_transition_style`: the exact counts belong to the newest phase's
+    # script (`tools/proof/README.md`), and what THIS one is about is the
+    # catalog's shape and its ORDER, neither of which a later op moves.
+    check("7a: the core declares at least 55 ops (rc_op_names), none twice",
+          len(ops) >= 55 and len(set(ops)) == len(ops), f"{len(ops)}")
+    check("7a: the catalog has at least 75 tools, no name twice", len(names) >= 75 and len(set(names)) == len(names),
           f"{len(names)} names, {len(set(names))} distinct")
     check("7a: they are the 55 ops plus the twenty app-state tools, record_screen among them",
           set(names) == set(ops) | set(APP_STATE_TOOLS), f"missing {sorted(set(ops) | set(APP_STATE_TOOLS) - set(names))}, "
@@ -5996,7 +6001,7 @@ def section_catalog(binary, sources):
           f"{sorted(set(APP_STATE_TOOLS) & set(ops))}")
     check("7b: the LAST eleven are the old file's ten file rows in its order, then record_screen",
           names[-11:] == FILE_GROUP_ORDER + ["record_screen"], f"{names[-11:]}")
-    check("7b: … so the first 64 are byte-for-byte the groups that stayed and the clip rows — none "
+    check("7b: … so everything before them is the groups that stayed and the clip rows — none "
           "of the ten appears earlier", not set(FILE_GROUP_ORDER) & set(names[:-11]),
           f"{sorted(set(FILE_GROUP_ORDER) & set(names[:-11]))}")
     by = {t.get("name"): t for t in tools}

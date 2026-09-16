@@ -393,12 +393,49 @@ pub enum Curve {
     EaseInOut,
 }
 
+/// The transition covering an overlap — which one, how its progress is
+/// eased, and whether the two clips' sound crosses over with the picture.
+///
+/// The DERIVED default is the FILE default: `cross_dissolve`, `linear`,
+/// `audio: false`. That is what a version-6 project's `{"kind": "wipe"}`
+/// reads as and what an overlap carrying no `transition_in` at all draws,
+/// so a project made before version 7 sounds and looks exactly as it did.
+/// It is deliberately NOT what a transition the CORE mints looks like —
+/// [`Transition::minted`] is that, and spec §11's R5-2 says why the two
+/// differ.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Transition {
     pub kind: TransitionKind,
+    pub curve: Curve,
+    pub audio: bool,
 }
 
+impl Transition {
+    /// A transition the core is MINTING now — from `add_transition`, from
+    /// `set_transition` on a clip that had none, from
+    /// `set_gained_transitions` when a clip gains an overlap (spec §11,
+    /// R5-2): eased at both ends, and crossfading its sound.
+    ///
+    /// The one place those two values are written, so "what a new
+    /// transition is" is a single fact rather than a habit spread over
+    /// a dozen call sites.
+    pub fn minted(kind: TransitionKind) -> Transition {
+        Transition {
+            kind,
+            curve: Curve::EaseInOut,
+            audio: true,
+        }
+    }
+}
+
+/// The transitions the compositor can draw. `wipe` keeps its name and its
+/// meaning — the edge travels rightward — and the three directions appended
+/// at version 7 are the other ways it can travel. Appended rather than
+/// interleaved, because the JSON spelling of a variant is the wire format
+/// and a reorder is a migration; the declaration ORDER itself is not a
+/// shader discriminant (`Compositor.swift` maps each name to a code and a
+/// direction vector by hand), unlike `BlendMode`'s and `ObscureKind`'s.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TransitionKind {
@@ -413,6 +450,9 @@ pub enum TransitionKind {
     Wipe,
     Slide,
     Zoom,
+    WipeLeft,
+    WipeUp,
+    WipeDown,
 }
 
 // ---- serde defaults ------------------------------------------------------

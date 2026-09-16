@@ -54,6 +54,55 @@ extension SilenceDetector {
         return (out, walled.sorted())
     }
 
+    /// The span around every OVERLAP on every unlocked track — the material
+    /// a candidate may not reach into, or the transition is destroyed
+    /// (road map 5, E1).
+    ///
+    /// **Every unlocked track, not the detector's scope**, because
+    /// `ripple_delete_ranges` cuts every unlocked track: a cut proposed from
+    /// the voice on track 3 shifts the pair on track 1 too, and the nest
+    /// walls are built the same way for the same reason.
+    ///
+    /// **A wall is the overlap WIDENED by its own length on each side** —
+    /// `[B.start − ov, A.end + ov]` with `ov = A.end − B.start` — snapped
+    /// OUTWARD to the frame grid, and that is where it differs from a nest
+    /// wall, which can be exact. A nest clip's edges are places a cut splits
+    /// nothing; an overlap's edges lie strictly INSIDE the other clip, so an
+    /// exact wall is not enough. A quiet run ending exactly at `B.start`
+    /// survives a wall of exactly `[B.start, A.end]`; `clear_range` then
+    /// splits A at `B.start` and the shift moves A's `ov`-long tail and B
+    /// together, leaving that tail wholly underneath B — an overlap longer
+    /// than half the shorter clip, which neither `ripple_delete_ranges` nor
+    /// `validate` checks. Widened, the nearest legal cut leaves each clip at
+    /// least `2·ov` across the overlap, which is exactly the half rule's own
+    /// bound.
+    ///
+    /// The transition's `audio` flag is deliberately NOT consulted. The
+    /// cases that matter are not about the crossfade making the overlap
+    /// quiet — `max(cos, sin) ≥ 0.707`, so a two-voice overlap is never
+    /// quiet from the fade alone — but about a pair where only one clip has
+    /// sound, and about handles pulled out of material Remove Silences had
+    /// already judged quiet, which is the common case since that is where a
+    /// person adds a transition after cutting. Neither depends on the flag.
+    static func overlapWalls(_ snapshot: ProjectSnapshot) -> [Span] {
+        var walls: [Span] = []
+        let fps = snapshot.canvas.fps
+        for track in snapshot.tracks where !track.locked {
+            let ordered = snapshot.clips(onTrack: track.id)
+            for (earlier, later) in zip(ordered, ordered.dropFirst()) {
+                let start = max(earlier.start, later.start)
+                let end = min(earlier.end, later.end)
+                let width = end - start
+                guard width > 0 else { continue }
+                walls.append(
+                    Span(
+                        start: snapDownToFrame(max(0, start - width), fps: fps),
+                        end: snapUpToFrame(end + width, fps: fps)))
+            }
+        }
+        return walls
+    }
+
     /// The length two spans share, or 0.
     static func overlap(_ a: Span, _ b: Span) -> Ticks {
         max(0, min(a.end, b.end) - max(a.start, b.start))

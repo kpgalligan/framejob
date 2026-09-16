@@ -82,7 +82,57 @@ use crate::model::{Canvas, Project};
 /// missing to notice. Nothing else phase 6 added persists a new key:
 /// `add_background` and `add_blurred_background` build ordinary clips out of
 /// schema that already existed.
-pub const RC_FORMAT_VERSION: u32 = 6;
+///
+/// Version 7 is transitions, second pass (road map 5, E1): two keys on ONE
+/// object. [`crate::model::Transition`] gains `curve`, how the progress the
+/// compositor is handed is eased, and `audio`, whether the two clips'
+/// SOUND crosses over with the picture at constant power. Both derive
+/// their defaults — `Linear` and `false` — so a version-6 file reads
+/// unchanged, renders the linear progress it always did, and is silent
+/// about sound; there is no migration step. Three transition KINDS are
+/// appended in the same version (`wipe_left`, `wipe_up`, `wipe_down`),
+/// which need no gate of their own: an unknown kind was never readable by
+/// an older build in the first place.
+///
+/// The argument for bumping is version 5's and version 6's, and it is
+/// written out again rather than pointed at, because the shape of the loss
+/// here is different from both. The two new fields do not merely go
+/// missing in a version-6 build — they are replaced by values that MEAN
+/// something else. A transition the core minted says `ease_in_out` and
+/// `audio: true`; drop those two keys and the same overlap reads as the
+/// FILE default, linear and silent, which is a different transition drawn
+/// with different sound and not an absence anybody would notice. That
+/// divergence is deliberate and is spec §11's R5-2: what a NEW transition
+/// is (`Transition::minted`) is not what an OLD file's transition is
+/// (`Transition::default`), so an ungated round trip through a version-6
+/// build would quietly rewrite every eased, crossfading transition in a
+/// project as a linear, silent one. Nothing else E1 added persists a new
+/// key: `add_transition` moves clips and writes a `transition_in` that
+/// already had a home.
+///
+/// Version 8 is motion (road map 5, E2): ONE key,
+/// [`crate::model::VideoProps::motion`], an optional
+/// [`crate::model::Motion`] holding up to three preset slots — an
+/// entrance, an exit and a continuous motion. It defaults to `None`, so a
+/// version-7 file reads unchanged and there is no migration step, and it
+/// is the only key the version adds: `motion.rs` computes placement out of
+/// it at render time and stores nothing, so the recipe publishes no
+/// `motion` key and no layer key moved.
+///
+/// The argument for bumping is versions 5, 6 and 7's, written out again
+/// rather than pointed at because the shape of THIS loss is different
+/// again. A version-7 build handed a version-8 file would open it, drop
+/// every entrance, every exit and every continuous motion on read, and
+/// write the loss back on the next save. What is lost is not a value that
+/// comes back meaning something else, as version 7's two did, and not a
+/// per-pixel property — the clip is still there, still on screen, still
+/// placed exactly where it was placed. It simply no longer MOVES, and
+/// there is nothing left in the file to say it ever did, which makes this
+/// the quietest loss of the four: version 6's dropped blend at least left
+/// a picture a careful reader could compare, where a preset that is gone
+/// looks in every still frame exactly like a preset that was never
+/// chosen.
+pub const RC_FORMAT_VERSION: u32 = 8;
 
 /// Reader caps, mirrored by the `RC_MAX_*` defines in the C header. They
 /// exist so a corrupt or generated file cannot make the app allocate
@@ -256,8 +306,8 @@ pub fn read(json: &str) -> Result<Project, String> {
 
     // MIGRATION HOOK. Each bump adds one step here, applied in order from
     // `version` up to RC_FORMAT_VERSION, rewriting `value` in place before
-    // it is deserialized. Versions 3, 4, 5 and 6 needed no rewrite — every
-    // field any of them added carries a serde default — so none has a
+    // it is deserialized. Versions 3, 4, 5, 6, 7 and 8 needed no rewrite —
+    // every field any of them added carries a serde default — so none has a
     // line; the next version that changes a field's SHAPE adds its own
     // below.
     if version < 2 {

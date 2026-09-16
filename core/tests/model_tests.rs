@@ -43,7 +43,7 @@ use reelcut_core::ffi_query::{
 /// Every `TransitionKind`, every `ShapeKind`, every `Curve` — the wire
 /// spellings from spec §5.2. A variant added to the model without a line
 /// here is a variant this file does not round-trip.
-const TRANSITION_KINDS: [&str; 10] = [
+const TRANSITION_KINDS: [&str; 13] = [
     "cross_dissolve",
     "fade_black",
     "fade_white",
@@ -54,6 +54,9 @@ const TRANSITION_KINDS: [&str; 10] = [
     "wipe",
     "slide",
     "zoom",
+    "wipe_left",
+    "wipe_up",
+    "wipe_down",
 ];
 const SHAPE_KINDS: [&str; 4] = ["rectangle", "ellipse", "line", "arrow"];
 const FILTER_KINDS: [&str; 7] = [
@@ -81,6 +84,23 @@ const BLEND_MODES: [&str; 8] = [
 /// written text, unlike the obscure kinds, so the sweep below can find
 /// them by search.
 const GRADIENT_KINDS: [&str; 2] = ["linear", "radial"];
+/// `EdgeMotion`, format version 8. `spin` is also a `DuringMotion`, which
+/// is why the sweep below reads the during kinds off the fixture rather
+/// than searching the written text for them — `OBSCURE_KINDS`' problem
+/// exactly, one version later.
+const EDGE_MOTIONS: [&str; 9] = [
+    "fade",
+    "zoom_in",
+    "zoom_out",
+    "slide_left",
+    "slide_right",
+    "slide_up",
+    "slide_down",
+    "spin",
+    "pop",
+];
+/// `DuringMotion`, format version 8.
+const DURING_MOTIONS: [&str; 5] = ["pulse", "shake", "spin", "bounce", "drift"];
 const CURVES: [&str; 4] = ["linear", "ease_in", "ease_out", "ease_in_out"];
 
 // ---- the schema round trip -----------------------------------------------
@@ -148,7 +168,12 @@ fn full_project() -> Value {
             { "shape": "rect", "x": 310.0, "y": -80.0, "width": 640.0,
               "height": 96.0, "feather": 0.0, "kind": "pixelate", "amount": 0.25 }
         ],
-        "blend": "screen"
+        "blend": "screen",
+        "motion": {
+            "in": { "kind": "slide_up", "duration": 300_000 },
+            "out": { "kind": "zoom_out", "duration": 450_000 },
+            "during": { "kind": "drift", "amount": 0.75, "period": 900_000 }
+        }
     });
     clip10["audio"] = json!({
         "volume": 1.25, "muted": false, "fade_in": 300_000, "fade_out": 600_000,
@@ -201,7 +226,8 @@ fn full_project() -> Value {
         "reflection": null,
         "spotlight": null,
         "obscure": [],
-        "blend": "normal"
+        "blend": "normal",
+        "motion": null
     });
 
     // Clip 21: an image, with the audio group absent (`null`) even though
@@ -299,13 +325,19 @@ fn full_project() -> Value {
         })
         .collect();
 
-    // Clips 30-39: one per TransitionKind.
+    // Clips 30-39 and 88-90: one per TransitionKind.
+    //
+    // The generated id is `30 + i` for the first ten and jumps to 88 for the
+    // three format version 7 appended, because `30 + i` would COLLIDE at
+    // 40, 41 and 42 with the nest clip and the two text clips below. 88-90
+    // are free; 91-104 are format version 8's motion sweep and `next_id` is
+    // 105, so the next block starts at 105.
     let transition_clips: Vec<Value> = TRANSITION_KINDS
         .iter()
         .enumerate()
         .map(|(i, kind)| {
             let mut clip = base_clip(
-                30 + i as u64,
+                if i < 10 { 30 + i as u64 } else { 78 + i as u64 },
                 4,
                 20_000_000 + 600_000 * i as i64,
                 600_000,
@@ -334,6 +366,34 @@ fn full_project() -> Value {
             clip
         })
         .collect();
+
+    // Clips 91-104: one per EdgeMotion as an `in`, then one per
+    // DuringMotion as a `during`. Fourteen kinds across two enums and no
+    // clip above carries a motion but clip 10, so the sweep needs a
+    // generated set of its own — `blend_clips`' answer, for `blend_clips`'
+    // reason. The `in` slot carries the edge kinds rather than `out`
+    // because the two read the same nine spellings and one of them is
+    // enough to cover the enum.
+    let motion_clips: Vec<Value> =
+        EDGE_MOTIONS
+            .iter()
+            .map(|kind| json!({ "in": { "kind": kind, "duration": 300_000 } }))
+            .chain(DURING_MOTIONS.iter().map(
+                |kind| json!({ "during": { "kind": kind, "amount": 0.5, "period": 600_000 } }),
+            ))
+            .enumerate()
+            .map(|(i, motion)| {
+                let mut clip = base_clip(
+                    91 + i as u64,
+                    4,
+                    40_000_000 + 600_000 * i as i64,
+                    600_000,
+                    json!({ "kind": "image", "media": 3 }),
+                );
+                clip["video"] = json!({ "motion": motion });
+                clip
+            })
+            .collect();
 
     // Clip 40: a nest, naming nest 60 by id — the format version 2 shape.
     let clip40 = base_clip(
@@ -376,10 +436,11 @@ fn full_project() -> Value {
     clips.extend(shape_clips);
     clips.extend(transition_clips);
     clips.extend(blend_clips);
+    clips.extend(motion_clips);
     clips.push(clip40);
 
     json!({
-        "version": 6,
+        "version": 8,
         "canvas": {
             "width": 1280, "height": 720, "fps": [30000, 1001],
             "background": [0.1, 0.2, 0.3, 1.0],
@@ -436,7 +497,7 @@ fn full_project() -> Value {
                 ]
             }
         ],
-        "next_id": 100
+        "next_id": 105
     })
 }
 
@@ -559,6 +620,33 @@ fn every_enum_variant_is_covered_by_the_round_trip() {
     for kind in GRADIENT_KINDS {
         assert_contains(&written, &format!("\"kind\": \"{kind}\""));
     }
+    // `EdgeMotion` and `DuringMotion`, format version 8. Searching the text
+    // would not do here for `OBSCURE_KINDS`' reason: `spin` is spelled in
+    // BOTH enums, so a hit proves nothing about which of them the fixture
+    // covers. The sweep reads the clips' own motion objects instead, which
+    // is a claim about the FIXTURE and not about a substring of it.
+    let project = handle.value();
+    let motions: Vec<&Value> = array(&project, "/clips")
+        .iter()
+        .filter_map(|clip| clip.get("video").and_then(|video| video.get("motion")))
+        .filter(|motion| !motion.is_null())
+        .collect();
+    for kind in EDGE_MOTIONS {
+        assert!(
+            motions
+                .iter()
+                .any(|motion| motion.pointer("/in/kind") == Some(&json!(kind))),
+            "no clip in the fixture enters with a {kind}"
+        );
+    }
+    for kind in DURING_MOTIONS {
+        assert!(
+            motions
+                .iter()
+                .any(|motion| motion.pointer("/during/kind") == Some(&json!(kind))),
+            "no clip in the fixture moves with a {kind}"
+        );
+    }
 
     for curve in CURVES {
         assert_contains(&written, &format!("\"curve\": \"{curve}\""));
@@ -578,7 +666,6 @@ fn every_enum_variant_is_covered_by_the_round_trip() {
     // spotlight's own `SpotShape`, so the sweeps above find both spellings
     // whether or not the fixture hides a single region. The guard for
     // format version 4's list has to read the list itself.
-    let project = handle.value();
     let regions = array(&project, "/clips/0/video/obscure");
     for kind in OBSCURE_KINDS {
         assert!(
@@ -605,7 +692,7 @@ fn a_new_project_is_the_documented_empty_project() {
     assert_eq!(
         project.value(),
         json!({
-            "version": 6,
+            "version": 8,
             "canvas": {
                 "width": 1280, "height": 720, "fps": [30000, 1001],
                 "background": [0.0, 0.0, 0.0, 1.0],
@@ -641,7 +728,7 @@ fn an_empty_object_is_an_empty_project() {
     assert_eq!(
         project,
         json!({
-            "version": 6,
+            "version": 8,
             "canvas": {
                 "width": 1920, "height": 1080, "fps": [30, 1],
                 "background": [0.0, 0.0, 0.0, 1.0],
@@ -676,7 +763,7 @@ fn omitted_optional_keys_take_the_documented_defaults() {
     }))
     .value();
 
-    assert_eq!(at(&project, "/version"), &json!(6));
+    assert_eq!(at(&project, "/version"), &json!(8));
     // A file that never heard of nests reads as one with none, which is
     // what "every new field carries a serde default" buys.
     assert_eq!(at(&project, "/nests"), &json!([]));
@@ -753,7 +840,7 @@ fn empty_property_objects_take_the_documented_defaults() {
             "color": { "brightness": 0.0, "contrast": 0.0, "saturation": 0.0, "hue": 0.0 },
             "chroma": null,
             "filters": [], "reflection": null, "spotlight": null, "obscure": [],
-            "blend": "normal"
+            "blend": "normal", "motion": null
         }),
         "VideoProps defaults"
     );
@@ -949,16 +1036,16 @@ fn an_unknown_source_kind_is_a_schema_error() {
 
 #[test]
 fn a_newer_format_version_is_refused_and_says_so() {
-    // 7 is ONE PAST the current version, and it moves with every bump: the
+    // 9 is ONE PAST the current version, and it moves with every bump: the
     // moment RC_FORMAT_VERSION reaches the number written here the test
     // stops exercising the gate and starts asserting that a current file
     // opens, which is a different claim entirely. The comment says "one
     // past the current version" rather than naming a number, so the next
     // bump does not have to rediscover that.
-    let msg = Handle::try_from_value(&json!({ "version": 7 }))
+    let msg = Handle::try_from_value(&json!({ "version": 9 }))
         .expect_err("a newer format version must be refused");
-    assert_contains(&msg, "version 7 is newer than this build understands");
-    assert_contains(&msg, "(version 6)");
+    assert_contains(&msg, "version 9 is newer than this build understands");
+    assert_contains(&msg, "(version 8)");
     assert_contains(&msg, "update Reelcut");
 
     // The gate reads the RAW json, so it has to cope with however the
@@ -967,9 +1054,9 @@ fn a_newer_format_version_is_refused_and_says_so() {
     // fall back to "current", and reach the user as a schema error about a
     // field this build has never heard of.
     // One past the current version again, written as a float.
-    let msg = Handle::try_from_value(&json!({ "version": 7.0 }))
+    let msg = Handle::try_from_value(&json!({ "version": 9.0 }))
         .expect_err("a newer format version written as a float must be refused");
-    assert_contains(&msg, "version 7 is newer than this build understands");
+    assert_contains(&msg, "version 9 is newer than this build understands");
 
     // A version that is not a number at all is named rather than ignored.
     let msg = Handle::try_from_value(&json!({ "version": "two" }))
@@ -981,15 +1068,15 @@ fn a_newer_format_version_is_refused_and_says_so() {
 fn every_prior_version_is_accepted_and_the_writer_stamps_the_current_one() {
     // The reader's promise (spec §5.6): a file from an older build opens,
     // and what comes back out is the current version.
-    for version in [1, 2, 3, 4, 5, 6] {
+    for version in [1, 2, 3, 4, 5, 6, 7, 8] {
         assert_eq!(
             Handle::from_value(&json!({ "version": version })).value()["version"],
-            json!(6),
+            json!(8),
             "version {version} did not read back as the current version"
         );
     }
     // Absent, the version defaults to current rather than to 0.
-    assert_eq!(Handle::from_json("{}").value()["version"], json!(6));
+    assert_eq!(Handle::from_json("{}").value()["version"], json!(8));
 }
 
 #[test]

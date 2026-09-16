@@ -10,8 +10,9 @@
 //! > A clip may overlap at most ONE neighbour on each side, and each
 //! > overlap must be at most HALF of the shorter of the two clips.
 //!
-//! The rule is written here once and called from `edit_clip` (move, trim,
-//! set_transition_duration) and `edit_time` (insert time, ripple): a second
+//! The rule is written here once and called from `edit_clip` (move, trim),
+//! `edit_transition` (set_transition_duration) and `edit_time` (insert time,
+//! ripple): a second
 //! copy would drift, and the difference between the copies would be the
 //! difference between a drop the UI animates back and a project the
 //! compositor cannot tile into instructions.
@@ -28,7 +29,9 @@
 //! method: nothing edits inside a nest except `nest` and `unnest`, and both
 //! check the TIMELINE they are moving clips on to.
 
-use crate::model::{Clip, Project, TransitionKind};
+use crate::actions;
+use crate::audio::Side;
+use crate::model::{Clip, Project, Transition, TransitionKind};
 use crate::model_query::clips_on;
 use crate::time::Ticks;
 
@@ -78,13 +81,18 @@ fn progress_in(overlap: &Overlap, t: Ticks) -> Option<f64> {
     Some((elapsed / overlap.duration as f64).clamp(0.0, 1.0))
 }
 
-/// The kind the LATER clip of a pair carries. An overlap is always a
-/// transition, so a clip that overlaps its predecessor with no
+/// The whole transition the LATER clip of a pair carries. An overlap is
+/// always a transition, so a clip that overlaps its predecessor with no
 /// `transition_in` — only possible in hand-written JSON; `move_clip` sets
 /// one when a clip gains an overlap — renders as the default cross
 /// dissolve rather than as a hard cut through two visible layers.
-fn kind_of(later: &Clip) -> TransitionKind {
-    later.transition_in.map(|t| t.kind).unwrap_or_default()
+///
+/// The fallback is `Transition::default()` and deliberately NOT
+/// `Transition::minted`: this is what a FILE means by an absent key, and a
+/// version-6 project's bare overlap must go on drawing linearly and
+/// silently (spec §11, R5-2). Minting is what an EDIT does.
+fn transition_of_later(later: &Clip) -> Transition {
+    later.transition_in.unwrap_or_default()
 }
 
 /// The overlap between `clip` and its predecessor among `clips` — one
@@ -111,6 +119,13 @@ pub(crate) fn overlap_after_of(clips: &[Clip], clip: u32) -> Option<Overlap> {
 /// The transition `clip` is playing at `t`, among the clips of its own
 /// container — [`Project::transition_at`]'s implementation, and the one a
 /// nested clip is evaluated with (at NEST time, not project time).
+///
+/// The progress is EASED by the transition's own `curve` (format version 7)
+/// before it is returned, so every consumer of it gets one number and none
+/// of them has to know the curve exists. `actions::ease` is the crate's one
+/// implementation of the four curves, and `Curve::Linear` is the identity —
+/// which is what makes a version-6 file's transitions byte-identical to
+/// what they were.
 pub(crate) fn transition_among(
     clips: &[Clip],
     clip: u32,
@@ -119,14 +134,70 @@ pub(crate) fn transition_among(
     let target = clips.iter().find(|c| c.id == clip)?;
     if let Some(overlap) = overlap_before_of(clips, clip) {
         if let Some(progress) = progress_in(&overlap, t) {
-            // This clip is the later one, so it carries the kind.
-            return Some((kind_of(target), progress, true, overlap.earlier));
+            // This clip is the later one, so it carries the transition.
+            let transition = transition_of_later(target);
+            let eased = actions::ease(transition.curve, progress);
+            return Some((transition.kind, eased, true, overlap.earlier));
         }
     }
     if let Some(overlap) = overlap_after_of(clips, clip) {
         if let Some(progress) = progress_in(&overlap, t) {
             let later = clips.iter().find(|c| c.id == overlap.later)?;
-            return Some((kind_of(later), progress, false, overlap.later));
+            let transition = transition_of_later(later);
+            let eased = actions::ease(transition.curve, progress);
+            return Some((transition.kind, eased, false, overlap.later));
+        }
+    }
+    None
+}
+
+/// The crossfade `clip` is in at `t`, among the clips of its own container:
+/// `(the later clip's transition, eased progress, is_incoming)`.
+///
+/// The audio twin of [`transition_among`], and it differs from it in one
+/// way that matters: on [`Side::Left`] the overlap is CLOSED at its end, so
+/// the outgoing clip's last sample reads p = 1 and its fade finishes at
+/// zero. `progress_in` is half-open — right for the picture, where the tick
+/// the earlier clip ends on is already past the transition and the
+/// instruction tiling must have no ambiguity — but an envelope evaluated
+/// from the LEFT at that tick is asking for the limit approaching it, and
+/// a `None` there would read as gain 1 and undo the whole fade on the last
+/// breakpoint.
+///
+/// The partner id is not returned because nothing in the envelope needs it:
+/// each stage multiplies its OWN term, and the two clips of a pair are
+/// different voices on different composition tracks.
+pub(crate) fn crossfade_among(
+    clips: &[Clip],
+    clip: u32,
+    t: Ticks,
+    side: Side,
+) -> Option<(Transition, f64, bool)> {
+    let closed = |overlap: &Overlap| -> Option<f64> {
+        if let Some(progress) = progress_in(overlap, t) {
+            return Some(progress);
+        }
+        if side == Side::Left && overlap.duration > 0 {
+            let end = overlap.start.saturating_add(overlap.duration);
+            if t == end {
+                return Some(1.0);
+            }
+        }
+        None
+    };
+
+    let target = clips.iter().find(|c| c.id == clip)?;
+    if let Some(overlap) = overlap_before_of(clips, clip) {
+        if let Some(progress) = closed(&overlap) {
+            let transition = transition_of_later(target);
+            return Some((transition, actions::ease(transition.curve, progress), true));
+        }
+    }
+    if let Some(overlap) = overlap_after_of(clips, clip) {
+        if let Some(progress) = closed(&overlap) {
+            let later = clips.iter().find(|c| c.id == overlap.later)?;
+            let transition = transition_of_later(later);
+            return Some((transition, actions::ease(transition.curve, progress), false));
         }
     }
     None

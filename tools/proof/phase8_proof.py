@@ -118,7 +118,8 @@ op and no tool, so a fourth phase in a row asserts it unchanged, and no tool
 name mentions the preview or the quality — the parity rule owes a mirror to
 every user-visible EDIT and this edits nothing. The startup parity log is
 empty for every instance this run touches, its own two included. The schema
-is still version 6, in `get_project` and in a saved `project.json`. And the
+is still version 8 — the number road map 5's E2 bumped it to — in
+`get_project` and in a saved `project.json`. And the
 three view-state calls an agent has (`set_playhead`, `set_selection`,
 `set_range`) leave the project JSON byte-identical and the frame at one
 instant byte-identical, which is the machine-checkable half of "phase 8 is
@@ -191,7 +192,7 @@ TOOLS = 73
 
 # What this build writes. Phase 8 declares "no schema; view state
 # throughout", so this is phase 6's number for the third phase running.
-VERSION = 6
+VERSION = 8
 
 # The app's own defaults key and bundle id. The first is read off the source
 # in section 0 as well as spelled here, so a rename shows up as a failure

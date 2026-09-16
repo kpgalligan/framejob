@@ -41,6 +41,14 @@ import Foundation
 /// the only way in. What has NOT changed is the rule above: whichever
 /// container is open, a candidate may not intersect a nest IN it.
 ///
+/// **A TRANSITION is a wall too** (road map 5's E1): an overlap on any
+/// unlocked track is subtracted from every run, widened by its own length
+/// each side, so no cut can leave one clip's tail sitting wholly under its
+/// neighbour. `SilenceDetector+Walls.overlapWalls` is that list and argues
+/// the widening; unlike a nest it is not REPORTED, because a transition is
+/// something the person made and expects to survive rather than something
+/// the sheet owes them an explanation for.
+///
 /// Nothing here is AppKit, a view or a document beyond one read: `Input.read`
 /// is the seam that takes a snapshot, a plan, a selection and the peak files
 /// off a `ProjectDocument` once, and everything after it is arithmetic over
@@ -266,6 +274,13 @@ enum SilenceDetector {
         fileprivate let voices: [Voice]
         /// The spans no candidate may reach into — see `NestExtent`.
         fileprivate let nests: [NestExtent]
+        /// The spans around every OVERLAP on every unlocked track, widened
+        /// by the overlap's own length each side
+        /// (`SilenceDetector+Walls.overlapWalls`). Subtracted exactly as the
+        /// nest walls are and never REPORTED: a nest a cut was kept out of
+        /// is something to explain, where a transition is a thing the person
+        /// made on purpose and expects to survive.
+        fileprivate let walls: [Span]
 
         /// False when the plan has no audio at all, which is the one case
         /// worth refusing the sheet outright for.
@@ -337,7 +352,8 @@ enum SilenceDetector {
         return Input(
             snapshot: snapshot, selection: selection ?? document.selection,
             pendingMedia: loader.pending.sorted(), voiceAvailable: SileroVAD.isAvailable,
-            pendingSpeech: speechLoader.pending.sorted(), voices: voices, nests: nests)
+            pendingSpeech: speechLoader.pending.sorted(), voices: voices, nests: nests,
+            walls: overlapWalls(snapshot))
     }
 
     // MARK: - Detection
@@ -460,8 +476,19 @@ enum SilenceDetector {
         // first would leave one long candidate spanning the nest.
         let (outside, walled) = excludingNests(
             runs, input.nests, minLength: settings.minLength)
+        // The transition walls, subtracted on the same terms and in the same
+        // place — before the minimum length, for the reason above — but
+        // never REPORTED: `excludingNests`' second answer is the sheet's
+        // list of protected NESTS, and an overlap is not one.
+        let clear =
+            input.walls.isEmpty
+            ? outside
+            : excludingNests(
+                outside, input.walls.map { NestExtent(clip: 0, span: $0) },
+                minLength: settings.minLength
+            ).0
         return Outcome(
-            spans: refine(outside, settings: settings, fps: input.snapshot.canvas.fps),
+            spans: refine(clear, settings: settings, fps: input.snapshot.canvas.fps),
             scope: settings.scope, clips: clips, pendingMedia: pending,
             protectedNests: walled, mode: settings.mode,
             judgedByLevel: judgedByLevelMedia.sorted(), voicePending: voicePendingMedia.sorted())

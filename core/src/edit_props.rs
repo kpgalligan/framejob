@@ -43,8 +43,8 @@ use serde_json::Value;
 use crate::actions::{self, MAX_PATCH_DEPTH};
 use crate::export::describe;
 use crate::model::{
-    AudioProps, BlendMode, Chroma, Clip, Compressor, Filter, ObscureRegion, Project, Reflection,
-    Shadow, ShapeProps, Source, Spotlight, TextProps, VideoProps,
+    AudioProps, BlendMode, Chroma, Clip, Compressor, Filter, Motion, ObscureRegion, Project,
+    Reflection, Shadow, ShapeProps, Source, Spotlight, TextProps, VideoProps,
 };
 use crate::props_check::{check_audio, check_shape, check_text, check_video};
 
@@ -98,6 +98,7 @@ impl Group {
                 reflection: Some(Reflection::default()),
                 spotlight: Some(Spotlight::default()),
                 obscure: vec![ObscureRegion::default()],
+                motion: Some(Motion::template()),
                 ..VideoProps::default()
             }),
             Group::Audio => actions::to_json(&AudioProps {
@@ -226,37 +227,6 @@ fn check_blend(clip: &Clip, props: &VideoProps) -> Result<(), String> {
 // ---- the ops -------------------------------------------------------------
 
 impl Project {
-    /// The source's pixel size, when the model knows it. `None` for text
-    /// (only the platform can measure a layout, spec §5.3) and for a media
-    /// whose descriptor carries no size.
-    ///
-    /// A NEST's size is its own canvas — the size it was frozen at, not the
-    /// project's current one — which is what a crop on a nest clip is
-    /// measured against and what the flattened layers are clipped to
-    /// (`nest.rs`).
-    fn source_size(&self, clip: &Clip) -> Option<(f64, f64)> {
-        match &clip.source {
-            Source::Media { media, .. } | Source::Still { media, .. } | Source::Image { media } => {
-                let found = self.media(*media)?;
-                if found.width == 0 || found.height == 0 {
-                    None
-                } else {
-                    Some((f64::from(found.width), f64::from(found.height)))
-                }
-            }
-            Source::Shape => clip.shape.as_ref().map(|s| (s.width, s.height)),
-            Source::Nest { project } => {
-                let found = self.nest(*project)?;
-                if found.width == 0 || found.height == 0 {
-                    None
-                } else {
-                    Some((f64::from(found.width), f64::from(found.height)))
-                }
-            }
-            Source::Text => None,
-        }
-    }
-
     /// Merges `patch` into every named clip's video props (spec §6).
     /// Refuses (`None`) when nothing changes; `Err` for an unknown clip, a
     /// clip with no video props, an unknown key, or a value out of range.
@@ -397,8 +367,20 @@ impl Project {
                         .clone()
                         .ok_or_else(|| format!("clip {id} has no video properties"))?;
                     let merged = merge_group(&actions::to_json(&base), patch, group)?;
-                    let props: VideoProps = serde_json::from_value(merged)
+                    let mut props: VideoProps = serde_json::from_value(merged)
                         .map_err(|e| format!("video patch does not match the schema: {e}"))?;
+                    // One spelling of "no motion" (format version 8): a
+                    // patch that clears the last filled slot leaves a
+                    // `Motion` with three `None`s behind, which round-trips
+                    // as `{"in": null, "out": null, "during": null}` and
+                    // would make two equal clips compare unequal. It is
+                    // normalised HERE rather than in serde, because the
+                    // deep merge is what produces the empty one — a caller
+                    // who writes `{"motion": {}}` means the same thing and
+                    // gets the same answer.
+                    if props.motion.is_some_and(|motion| motion.is_empty()) {
+                        props.motion = None;
+                    }
                     check_video(&props, self.source_size(&clip))?;
                     check_blend(&clip, &props)?;
                     if let Some(slot) = next.clip_mut(id) {

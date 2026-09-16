@@ -119,7 +119,7 @@ fn set_text(patch: Value) -> Value {
 // ---- reading older files -------------------------------------------------
 
 fn assert_no_animation(project: &Value) {
-    assert_eq!(at(project, "/version"), &json!(6));
+    assert_eq!(at(project, "/version"), &json!(8));
     assert_eq!(at(project, "/clips/0/text/animation"), &Value::Null);
     // The neighbours a version-5 reader adds nothing to, so a file that
     // gained an absent animation gained ONLY that.
@@ -151,7 +151,7 @@ fn every_older_version_reads_the_same_way() {
 #[test]
 fn the_animation_round_trips_exactly() {
     let written = Handle::from_value(&animated()).value();
-    assert_eq!(at(&written, "/version"), &json!(6));
+    assert_eq!(at(&written, "/version"), &json!(8));
 
     let animation = at(&written, "/clips/0/text/animation");
     assert_eq!(text(animation, "/kind"), "word_fade");

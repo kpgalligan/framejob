@@ -175,6 +175,9 @@ extension AgentServer {
                 "description": "\(role) as [r, g, b] or [r, g, b, a], each 0–1.",
             ]
         }
+        let clipProperty: [String: Any] = [
+            "type": "integer", "description": "Clip id (get_project lists them).",
+        ]
 
         var catalog: [[String: Any]] = [
 
@@ -311,10 +314,18 @@ extension AgentServer {
         ]
         // The clip and action rows are `AgentCatalog+Clips.swift`'s, spliced in HERE
         // rather than appended, because the catalog's order is the order an agent reads
-        // the tools in. The three locals it is handed are the ones a LATER group asks
-        // for too, which is why they stayed on this side of the cut.
+        // the tools in. The four locals it is handed are the ones a LATER group asks
+        // for too — `clipProperty` is hoisted here for exactly that reason, since the
+        // transition rows below take the same one — which is why they stayed on this
+        // side of the cut.
         catalog += clipAndActionTools(
-            ticks: ticks, trackProperty: trackProperty, colorProperty: colorProperty)
+            ticks: ticks, trackProperty: trackProperty, colorProperty: colorProperty,
+            clipProperty: clipProperty)
+        // The two transition rows go HERE, beside `set_transition` and
+        // `set_transition_duration` at the end of that group, and never at
+        // the end of the catalog — `recording_probe.py` reads the last
+        // eleven names, which are the FILE tools.
+        catalog += transitionTools(ticks: ticks, clipProperty: clipProperty)
         catalog += [
 
             // MARK: Tracks

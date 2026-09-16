@@ -48,12 +48,23 @@ extern "C" {
  * blur or a pixelation. Version 5 is `text.animation`, the reveal a text
  * layer arrives and leaves with. Version 6 is looks: `video.blend`, how a
  * layer combines with the canvas under it, and `shape.gradient`, a ramp
- * that takes precedence over a shape's flat fill. None of the last four
- * needed a migration step — every field they added carries a serde
- * default — but an older build must still refuse the newer file rather
- * than silently drop what it cannot read, which is what the version is
- * for. */
-#define RC_FORMAT_VERSION 6
+ * that takes precedence over a shape's flat fill. Version 7 is
+ * transitions, second pass: a transition's `curve`, how its progress is
+ * eased, and `audio`, whether the two clips' sound crosses over at
+ * constant power with the picture — plus three appended wipe directions.
+ * Version 8 is motion: `video.motion`, up to three preset slots — an
+ * entrance, an exit and a continuous motion — that the core turns into
+ * placement at render time and never stores the result of.
+ * None of the last six needed a migration step — every field they added
+ * carries a serde default — but an older build must still refuse the newer
+ * file rather than silently drop what it cannot read, which is what the
+ * version is for. Version 7's loss would be louder than a drop: a minted
+ * transition's eased, crossfading values would come back as the FILE
+ * defaults, which mean a different transition rather than none. Version
+ * 8's is the quietest of all: a clip whose motion was dropped is still on
+ * screen, still placed where it was placed, and simply no longer moves,
+ * with nothing left in the file to say it ever did. */
+#define RC_FORMAT_VERSION 8
 
 /* Reader caps enforced by the writer, so every file this build produces can
  * be read back (the `MAX_*` constants in core/src/format.rs). A nest's tracks and clips

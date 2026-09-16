@@ -267,6 +267,8 @@ final class AgentServer {
         "set_enabled": { $0.setEnabled },
         "set_transition": { $0.setTransition },
         "set_transition_duration": { $0.setTransitionDuration },
+        "add_transition": { $0.addTransition },
+        "set_transition_style": { $0.setTransitionStyle },
         // Actions (AgentServer+Clips.swift)
         "add_action": { $0.addAction },
         "add_zoom_action": { $0.addZoomAction },

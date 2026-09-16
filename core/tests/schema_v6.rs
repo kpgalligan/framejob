@@ -171,7 +171,7 @@ fn set_shape(patch: Value) -> Value {
 // ---- reading older files -------------------------------------------------
 
 fn assert_unstyled(project: &Value) {
-    assert_eq!(at(project, "/version"), &json!(6));
+    assert_eq!(at(project, "/version"), &json!(8));
     assert_eq!(at(project, "/clips/0/video/blend"), &json!("normal"));
     assert_eq!(at(project, "/clips/1/video/blend"), &json!("normal"));
     assert_eq!(at(project, "/clips/1/shape/gradient"), &Value::Null);
@@ -209,7 +209,7 @@ fn every_older_version_reads_the_same_way() {
 #[test]
 fn the_blend_and_the_gradient_round_trip_exactly() {
     let written = Handle::from_value(&styled()).value();
-    assert_eq!(at(&written, "/version"), &json!(6));
+    assert_eq!(at(&written, "/version"), &json!(8));
     assert_eq!(text(&written, "/clips/0/video/blend"), "multiply");
 
     let gradient = at(&written, "/clips/1/shape/gradient");
@@ -267,11 +267,18 @@ fn blend_is_the_last_key_of_the_video_object() {
     };
     assert!(position("\"spotlight\"") < position("\"obscure\""));
     assert!(position("\"obscure\"") < position("\"blend\""));
-    // ...and it CLOSES the object: the mode, then the video object's own
-    // closing brace, with nothing between them.
+    // ...and `blend` is still followed by `motion` and nothing else. The
+    // CLOSING claim moved onto version 8's key when it was appended, which
+    // is the point of writing it this way: what is pinned is that a new key
+    // lands at the END of the object, not that any one key is forever last.
+    assert!(position("\"blend\"") < position("\"motion\""));
     assert!(
-        first.contains("\"blend\": \"multiply\"\n      }"),
-        "blend does not close the video object:\n{first}"
+        first.contains("\"blend\": \"multiply\""),
+        "blend is not written as the styled fixture asks:\n{first}"
+    );
+    assert!(
+        first.contains("\"motion\": null\n      }"),
+        "motion does not close the video object:\n{first}"
     );
 
     // A second trip through the text is byte-identical to the first, which

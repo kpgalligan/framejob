@@ -339,11 +339,15 @@ SEC = 600_000
 # The EXACT count belongs to the newest phase's script (tools/proof/README.md)
 # and this is that script; `phase9_proof.py`'s 74 became a floor in the same
 # commit that added the tool.
+# Road map 5's E1 added `add_transition` and `set_transition_style`, so this
+# is a FLOOR now and the exact count belongs to `e1_proof.py` — the rule
+# `tools/proof/README.md` states, applied to this script the way phase 9's
+# was applied to it.
 TOOLS = 75
 
 # `rc_op_names`' own length, asserted as the number of tools declaring
 # `scope`. R1 adds NO op, so this is phase 9's number unmoved.
-OPS = 55
+OPS = 55  # a floor too, for the same reason
 
 # The twenty tools that are not §6 rows and therefore carry no `scope`,
 # spelled out: an op tool that silently lost its scope would leave the count
@@ -709,10 +713,10 @@ def stop_launched():
 def catalog_part(mcp):
     listed = mcp._request("tools/list", {})["tools"]
     names = {tool["name"] for tool in listed}
-    check(len(names) == TOOLS,
-          f"the catalog holds exactly road map 3's {TOOLS} tools (got {len(names)}) — phase "
+    check(len(names) >= TOOLS,
+          f"the catalog holds at least road map 3's {TOOLS} tools (got {len(names)}) — phase "
           "9's 74 plus record_screen; the exact count belongs to the newest phase's script, "
-          "and phase 9's assertion became a floor so this one could be it")
+          "and this one became a floor when road map 5's E1 added two")
     check("record_screen" in names, "record_screen is among them")
 
     schemas = {tool["name"]: tool["inputSchema"] for tool in listed}
@@ -759,9 +763,9 @@ def catalog_part(mcp):
     scoped = sorted(
         tool["name"] for tool in listed
         if "scope" in (tool["inputSchema"].get("properties") or {}))
-    check(len(scoped) == OPS,
-          f"exactly {OPS} tools declare the envelope's scope (got {len(scoped)}) — R1 adds "
-          "no op, so rc_op_names is phase 9's number unmoved")
+    check(len(scoped) >= OPS,
+          f"at least {OPS} tools declare the envelope's scope (got {len(scoped)}) — R1 adds "
+          "no op, and the exact number is the newest phase's to assert")
     check(names - set(scoped) == APP_STATE_TOOLS,
           "and the tools WITHOUT one are exactly the twenty app-state tools, named: "
           f"{sorted(names - set(scoped) - APP_STATE_TOOLS)} unexpected, "

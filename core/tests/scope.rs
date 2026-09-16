@@ -626,7 +626,7 @@ fn every_refused_name_is_an_op_the_table_knows() {
     // table would be a lie the compiler cannot catch. `rc_op_names` is the
     // table as the host reads it.
     use reelcut_core::OP_NAMES;
-    assert_eq!(OP_NAMES.len(), 55, "a scope is an envelope key, not an op");
+    assert_eq!(OP_NAMES.len(), 57, "a scope is an envelope key, not an op");
     for (name, _) in refused() {
         assert!(
             OP_NAMES.contains(&name),
@@ -639,8 +639,10 @@ fn every_refused_name_is_an_op_the_table_knows() {
 
 /// A nest with something of every kind in it: two tracks, a media clip
 /// carrying an action, a text clip, a shape clip and a nest clip showing an
-/// inner nest a TIMELINE clip also shows. Rich enough that a plausible
-/// envelope exists for all fifty-five ops.
+/// inner nest a TIMELINE clip also shows, and — for `add_transition` — a
+/// HARD CUT with handles on both sides of it (clip 13 abuts clip 7 and both
+/// show media 1 with source left over). Rich enough that a plausible
+/// envelope exists for all fifty-seven ops.
 fn every_kind() -> Handle {
     Handle::from_value(&json!({
       "version": 6,
@@ -667,7 +669,9 @@ fn every_kind() -> Handle {
            {"id":11,"track":6,"start":3*SEC,"duration":SEC,"source":{"kind":"shape"},
             "video":{},"shape":{}},
            {"id":12,"track":5,"start":4*SEC,"duration":SEC,
-            "source":{"kind":"nest","project":30},"video":{}}
+            "source":{"kind":"nest","project":30},"video":{}},
+           {"id":13,"track":5,"start":2*SEC,"duration":2*SEC,
+            "source":{"kind":"media","media":1,"in":10*SEC},"video":{},"audio":{}}
          ]},
         {"id":30,"name":"Inner","width":1920,"height":1080,
          "tracks":[{"id":31,"name":"C"}],
@@ -797,6 +801,14 @@ fn every_op() -> Vec<(&'static str, Value)> {
             "set_transition_duration",
             json!({"op":"set_transition_duration","clip":11,"duration":SEC/2}),
         ),
+        (
+            "add_transition",
+            json!({"op":"add_transition","clip":13,"duration":SEC}),
+        ),
+        (
+            "set_transition_style",
+            json!({"op":"set_transition_style","clip":13,"curve":"ease_in"}),
+        ),
         ("add_action", json!({"op":"add_action","clip":10,"at":0})),
         (
             "add_zoom_action",
@@ -850,7 +862,7 @@ fn every_op() -> Vec<(&'static str, Value)> {
 fn every_op_in_the_table_works_inside_a_nest_except_the_seven() {
     // The empirical half of `scope.rs`'s exhaustive `refused_inside` match.
     // The match makes the compiler classify every op; this makes the
-    // CLASSIFICATION true — that the forty-eight actually apply against a
+    // CLASSIFICATION true — that the fifty actually apply against a
     // real nest and come back through `validate` on the merged parent, and
     // that exactly seven do not.
     use reelcut_core::OP_NAMES;

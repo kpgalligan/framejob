@@ -26,7 +26,7 @@
 //! makes.
 
 use crate::edit_clip::{clip_end, set_gained_transitions};
-use crate::model::{Clip, Enabled, Project, Source};
+use crate::model::{Clip, Enabled, Project, Source, VideoProps};
 use crate::time::{Ticks, TIMESCALE};
 
 /// Default freeze length (spec §6). Two seconds is long enough for a hold
@@ -505,7 +505,18 @@ impl Project {
                 audio: false,
             },
             speed: 1.0,
-            video: Some(video),
+            // A still is a NEW clip with new ends, so it does not inherit
+            // the preset anchored to the ones it was taken from (format
+            // version 8): a freeze taken mid-arrival would otherwise arrive
+            // again, and one taken anywhere at all would carry a departure
+            // onto a frame that is meant to hold. The evaluated placement
+            // it keeps is the un-moved one — `evaluate_clip` never applies
+            // motion — so the still sits exactly where the inspector said
+            // the clip was, which is the documented jump (road map 5 §5h).
+            video: Some(VideoProps {
+                motion: None,
+                ..video
+            }),
             audio: None,
             text: None,
             shape: None,

@@ -4,8 +4,13 @@
 //! splits, copies or re-describes a clip. The five property patches are the
 //! OTHER half of the clip surface, `edit_props.rs`'s, policed by the range
 //! checks of `props_check.rs`: this file decides where a clip sits, that one
-//! what it looks like. The action ops, which were here, are `edit_action.rs`.
-//! `edit.rs` dispatches to all three by name; nothing here knows about JSON
+//! what it looks like. The action ops, which were here, are `edit_action.rs`;
+//! the transition ops, which were here too, are `edit_transition.rs`; and
+//! `split_clip` with its two helpers, which every splitter in the crate
+//! routes through, is `edit_split.rs` — a split is not a placement but a
+//! question about what the SECOND clip inherits, and road map 5's E2 added
+//! a rule to it.
+//! `edit.rs` dispatches to all of them by name; nothing here knows about JSON
 //! op envelopes, and nothing here mutates `self` — an edit clones, changes
 //! the clone, and hands it back (spec §5.5).
 //!
@@ -23,10 +28,11 @@
 //!    phantom undo step) and turns a broken invariant into `Err`.
 //!
 //! The pieces those three rules are made of — `snapped`, `frame`, the
-//! `require_*` lookups, `finish`, `selected_clips`, `clip_end` and
-//! `set_gained_transitions` — are `pub(crate)` so `edit_track.rs` and
-//! `edit_time.rs` obey the same rules by calling them rather than by
-//! restating them.
+//! `require_*` lookups, `finish`, `selected_clips` and `clip_end` — are
+//! `pub(crate)` so `edit_track.rs` and `edit_time.rs` obey the same rules by
+//! calling them rather than by restating them. `set_gained_transitions` is
+//! the sixth and now lives in `edit_transition.rs`, re-exported from here so
+//! every caller's path is unchanged.
 //!
 //! The two ops here that DO take a patch — `add_text_clip` and
 //! `add_shape_clip` — build their preset and then hand it to `edit_props`'s
@@ -35,14 +41,20 @@
 
 use serde_json::Value;
 
-use crate::actions::{self, Evaluated, MAX_PATCH_DEPTH};
+use crate::actions;
 use crate::edit_props::{merge_group, Group};
+use crate::edit_split::split_clip;
 use crate::model::{
     Action, AudioProps, Clip, Enabled, Media, MediaKind, Project, ShapeKind, ShapeProps, Source,
-    TextProps, Track, Transition, TransitionKind, VideoProps,
+    TextProps, Track, VideoProps,
 };
 use crate::props_check::{check_shape, check_text, SCALE_MAX, SCALE_MIN};
 use crate::time::{self, Ticks, TIMESCALE};
+
+/// Re-exported from its new home so the nine call sites here and the three
+/// in `edit_time.rs`, `edit_nest.rs` and `edit_paste.rs` keep naming it at
+/// the path they always did.
+pub(crate) use crate::edit_transition::set_gained_transitions;
 
 /// Default duration for a source with no source bound — text, shape, and an
 /// image whose descriptor carries no duration. Five seconds is a screencast editor's
@@ -78,159 +90,6 @@ struct Described {
 
 pub(crate) fn clip_end(clip: &Clip) -> Ticks {
     clip.start.saturating_add(clip.duration)
-}
-
-/// Gives every clip that now overlaps its predecessor and has no
-/// `transition_in` a cross dissolve. An overlap IS a transition (spec
-/// §5.2), so a clip that gains one and would otherwise render as two
-/// stacked layers gets the default rather than nothing.
-pub(crate) fn set_gained_transitions(project: &mut Project, tracks: &[u32]) {
-    let mut gained: Vec<u32> = Vec::new();
-    for track in tracks {
-        for clip in project.clips_on_track(*track) {
-            if clip.transition_in.is_none() && project.overlap_before(clip.id).is_some() {
-                gained.push(clip.id);
-            }
-        }
-    }
-    for id in gained {
-        if let Some(clip) = project.clip_mut(id) {
-            clip.transition_in = Some(Transition::default());
-        }
-    }
-}
-
-/// The evaluated state as an action-style patch object, so `split` can hand
-/// the first half of a straddled action the state it must reach.
-fn state_patch(evaluated: &Evaluated) -> Value {
-    let mut out = serde_json::Map::new();
-    out.insert("video".to_string(), actions::to_json(&evaluated.video));
-    out.insert("audio".to_string(), actions::to_json(&evaluated.audio));
-    if let Some(text) = &evaluated.text {
-        out.insert("text".to_string(), actions::to_json(text));
-    }
-    Value::Object(out)
-}
-
-/// `state` narrowed to the keys `shape` mentions — the minimal patch with
-/// the same reach as the original. Keeping the shape means a split action's
-/// first half animates exactly the fields the whole action animated, rather
-/// than pinning every property of the clip.
-fn narrow_to(state: &Value, shape: &Value, depth: u32) -> Value {
-    let (Value::Object(from), Value::Object(keys)) = (state, shape) else {
-        return shape.clone();
-    };
-    if depth >= MAX_PATCH_DEPTH {
-        return shape.clone();
-    }
-    let mut out = serde_json::Map::new();
-    for (key, sub) in keys {
-        match from.get(key) {
-            Some(value) if value.is_object() && sub.is_object() => {
-                out.insert(key.clone(), narrow_to(value, sub, depth + 1));
-            }
-            Some(value) => {
-                out.insert(key.clone(), value.clone());
-            }
-            // A key the state does not have (an unknown patch key): carry
-            // the original through untouched, exactly as evaluation would.
-            None => {
-                out.insert(key.clone(), sub.clone());
-            }
-        }
-    }
-    Value::Object(out)
-}
-
-/// Cuts `clip_id` in two at project time `at`, in place. Returns false —
-/// and changes nothing — when `at` is not strictly inside the clip, which
-/// is the spec's refusal.
-///
-/// The second clip's BASE props are the evaluated state at the cut, so the
-/// join is invisible; its actions are the ones that had not finished,
-/// rebased to its own clip time.
-fn split_clip(project: &mut Project, clip_id: u32, at: Ticks) -> bool {
-    let Some(original) = project.clip(clip_id).cloned() else {
-        return false;
-    };
-    let clip_t = at.saturating_sub(original.start);
-    if clip_t <= 0 || clip_t >= original.duration {
-        return false;
-    }
-    let state = project.evaluate_clip(&original, clip_t);
-    let patch_source = state_patch(&state);
-
-    let mut second = original.clone();
-    second.id = project.allocate_id();
-    second.start = at;
-    second.duration = clip_end(&original).saturating_sub(at);
-    // The cut consumes `clip_t` of timeline, which is `clip_t * speed` of
-    // source; a still's frozen frame and the sourceless kinds do not move.
-    if let Source::Media {
-        media,
-        r#in,
-        reversed,
-    } = original.source
-    {
-        let advance = (clip_t as f64 * original.speed).round();
-        let advance = if advance.is_finite() {
-            advance as Ticks
-        } else {
-            0
-        };
-        second.source = Source::Media {
-            media,
-            r#in: r#in.saturating_add(advance).max(0),
-            reversed,
-        };
-    }
-    // Presence of a group is a fact about the clip, so an audio-only clip
-    // stays audio-only; only the values come from the evaluation.
-    second.video = original.video.as_ref().map(|_| state.video.clone());
-    second.audio = original.audio.map(|_| state.audio);
-    second.text = state.text.clone();
-    second.shape = original.shape.clone();
-    // The transition covers the join with the PREVIOUS clip, which is still
-    // the first half's business (spec §6).
-    second.transition_in = None;
-
-    let mut first_actions: Vec<Action> = Vec::new();
-    let mut second_actions: Vec<Action> = Vec::new();
-    for action in &original.actions {
-        let end = action.start.saturating_add(action.duration);
-        if end <= clip_t {
-            first_actions.push(action.clone());
-        } else if action.start >= clip_t {
-            let mut moved = action.clone();
-            moved.start = action.start.saturating_sub(clip_t);
-            second_actions.push(moved);
-        } else {
-            // Straddles the cut. The first half ends at the state the
-            // evaluation reached there, narrowed to the keys the action
-            // animated; the second half keeps the original target. The
-            // curve is kept on both halves: re-deriving an exact sub-curve
-            // is impossible for the eased forms, and the endpoints — which
-            // is what a viewer sees at the join — are exact either way.
-            let mut head = action.clone();
-            head.duration = clip_t.saturating_sub(action.start);
-            head.end = narrow_to(&patch_source, &action.end, 0);
-            first_actions.push(head);
-
-            let mut tail = action.clone();
-            tail.id = project.allocate_id();
-            tail.start = 0;
-            tail.duration = end.saturating_sub(clip_t);
-            second_actions.push(tail);
-        }
-    }
-    second.actions = second_actions;
-
-    if let Some(first) = project.clip_mut(clip_id) {
-        first.duration = clip_t;
-        first.actions = first_actions;
-    }
-    project.clips.push(second);
-    true
 }
 
 // ---- the ops -------------------------------------------------------------
@@ -1158,7 +1017,7 @@ impl Project {
         self.finish(next)
     }
 
-    // ---- enablement and transitions --------------------------------------
+    // ---- enablement ------------------------------------------------------
 
     /// Per-clip visibility and mute (spec §6). An argument left `None` is
     /// left alone, so the two halves of Detach Audio can be set
@@ -1179,74 +1038,6 @@ impl Project {
                 slot.enabled.audio = value;
             }
         }
-        self.finish(next)
-    }
-
-    /// Sets — or clears, with `None` — the transition covering the clip's
-    /// overlap with its predecessor (spec §6). A clip with no overlap may
-    /// still carry a kind; it is simply ignored until one exists, which is
-    /// what lets the inspector set the kind before dragging the overlap.
-    pub fn set_transition(
-        &self,
-        clip: u32,
-        kind: Option<TransitionKind>,
-    ) -> Result<Option<Project>, String> {
-        self.require_clip(clip)?;
-        let mut next = self.clone();
-        if let Some(slot) = next.clip_mut(clip) {
-            slot.transition_in = kind.map(|kind| Transition { kind });
-        }
-        self.finish(next)
-    }
-
-    /// Moves the clip so its overlap with its predecessor is exactly
-    /// `duration` (spec §6) — the transition's length IS that overlap, so
-    /// there is nothing else to set.
-    ///
-    /// Refuses (`None`) when the clip has no predecessor on its track, when
-    /// the new start would be negative, or when the result breaks the
-    /// overlap rule. `Err` on a negative duration.
-    pub fn set_transition_duration(
-        &self,
-        clip: u32,
-        duration: Ticks,
-    ) -> Result<Option<Project>, String> {
-        let target = self.require_clip(clip)?.clone();
-        let duration = self.snapped(duration);
-        if duration < 0 {
-            return Err(format!(
-                "transition duration must not be negative, not {duration}"
-            ));
-        }
-        let ordered = self.clips_on_track(target.track);
-        let index = match ordered.iter().position(|c| c.id == clip) {
-            Some(index) => index,
-            None => return Ok(None),
-        };
-        let Some(previous) = index.checked_sub(1).and_then(|i| ordered.get(i)) else {
-            return Ok(None);
-        };
-        // The overlap is the tail of the previous clip the later one covers,
-        // so the later one starts exactly `duration` before that tail ends.
-        let start = clip_end(previous).saturating_sub(duration);
-        if start < 0 {
-            return Ok(None);
-        }
-
-        let mut moved = target.clone();
-        moved.start = start;
-        if self
-            .check_overlap_rule(&[moved.clone()], moved.track, &[])
-            .is_err()
-        {
-            return Ok(None);
-        }
-
-        let mut next = self.clone();
-        if let Some(slot) = next.clip_mut(clip) {
-            slot.start = start;
-        }
-        set_gained_transitions(&mut next, &[target.track]);
         self.finish(next)
     }
 }

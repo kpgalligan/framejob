@@ -138,6 +138,19 @@ extension EditorViewController {
 
     /// Clip ▸ Transition ▸ — the sender's tag indexes `TransitionKind.allCases`
     /// and −1 is None, the same table the Video tab's popup offers.
+    ///
+    /// A kind is sent one of two ways per clip, and the choice is the
+    /// clip's own placement: a clip that already OVERLAPS its predecessor
+    /// gets `set_transition`, which names the kind and keeps the style; a
+    /// clip at a HARD CUT gets `add_transition`, which makes the overlap out
+    /// of the two clips' handles first. Anything else — a gap, or the first
+    /// clip on a track — is SKIPPED rather than sent, because
+    /// `ReelProject.applying` throws on the first `Err` and one clip at a
+    /// gap would abort the whole selection.
+    ///
+    /// **None (tag −1) never reaches `add_transition`.** It is a clear, it
+    /// goes to every selected clip whatever its placement, and an absent
+    /// kind on `add_transition` would ADD a dissolve rather than remove one.
     func setTransitionKindCommand(_ sender: Any?) {
         guard let document = document, let tag = (sender as? NSMenuItem)?.tag,
               !selectedClips.isEmpty
@@ -150,9 +163,78 @@ extension EditorViewController {
             NSSound.beep()
             return
         }
-        let kind: TransitionKind? = tag < 0 ? nil : kinds[tag]
-        document.applyEdit(
-            "Set Transition", selectedClips.map { .setTransition(clip: $0.id, kind: kind) })
+        guard tag >= 0 else {
+            document.applyEdit(
+                "Set Transition", selectedClips.map { .setTransition(clip: $0.id, kind: nil) })
+            return
+        }
+        let kind = kinds[tag]
+        let snapshot = document.editedProject.snapshot
+        let half = ReelTime.snapToFrame(
+            ReelTime.ticks(seconds: 0.5), fps: snapshot.canvas.fps)
+        var ops: [ReelOp] = []
+        var requested: [UInt32] = []
+        for clip in selectedClips {
+            switch transitionPlacement(of: clip, in: snapshot) {
+            case .overlap:
+                ops.append(.setTransition(clip: clip.id, kind: kind))
+            case .hardCut:
+                ops.append(
+                    .addTransition(clip: clip.id, kind: kind, duration: half, align: .center))
+                requested.append(clip.id)
+            case .neither:
+                continue
+            }
+        }
+        guard !ops.isEmpty else {
+            NSSound.beep()
+            return
+        }
+        document.applyEdit("Set Transition", ops)
+        // Every `add_transition` in the batch can come back `Ok(None)` —
+        // neither side of the cut had a frame to spare. When the batch was
+        // ALL adds, `applyEdit` beeps for it already (every op an identity
+        // is its nil case); a MIXED batch is the one it cannot see, because
+        // the `set_transition`s that landed make the document differ. So ask
+        // the clips themselves — a landed `add_transition` leaves its clip
+        // overlapping its predecessor — and say so rather than leaving the
+        // menu looking as though it worked.
+        guard !requested.isEmpty, ops.count > requested.count else { return }
+        let after = document.editedProject.snapshot
+        let landed = requested.contains { id in
+            guard let clip = after.clips.first(where: { $0.id == id }) else { return false }
+            return transitionPlacement(of: clip, in: after) == .overlap
+        }
+        if !landed { NSSound.beep() }
+    }
+
+    /// Where a clip sits relative to the clip before it on its track, which
+    /// is what decides how Clip ▸ Transition ▸ writes a kind onto it.
+    enum TransitionPlacement {
+        case overlap
+        case hardCut
+        case neither
+    }
+
+    /// `roll`'s test, in Swift: the predecessor is whatever ends EXACTLY
+    /// where this clip begins (`EditorViewController+Edge.swift`), and an
+    /// overlap is a predecessor that ends after it.
+    func transitionPlacement(of clip: ClipSnapshot) -> TransitionPlacement {
+        guard let document = document else { return .neither }
+        return transitionPlacement(of: clip, in: document.editedProject.snapshot)
+    }
+
+    func transitionPlacement(
+        of clip: ClipSnapshot, in snapshot: ProjectSnapshot
+    ) -> TransitionPlacement {
+        let neighbours = snapshot.clips.filter { $0.track == clip.track && $0.id != clip.id }
+        if neighbours.contains(where: { $0.start < clip.start && $0.end > clip.start }) {
+            return .overlap
+        }
+        if neighbours.contains(where: { $0.end == clip.start }) {
+            return .hardCut
+        }
+        return .neither
     }
 
     // MARK: - Validation
@@ -172,6 +254,15 @@ extension EditorViewController {
                 let current = selectedClips.first?.transitionIn?.kind
                 let tagged = kinds.indices.contains(menuItem.tag) ? kinds[menuItem.tag] : nil
                 menuItem.state = tagged == current ? .on : .off
+                // None stays enabled for ANY selection, as it always has:
+                // a clip can carry a stored transition the timeline does not
+                // draw — set at a hard cut, or left behind when the overlap
+                // was dragged away — and clearing it must stay reachable.
+                // A KIND is only enabled where there is somewhere to put
+                // one, since the command skips every other clip.
+                if menuItem.tag >= 0 {
+                    return selectedClips.contains { transitionPlacement(of: $0) != .neither }
+                }
             }
             return !document.selection.isEmpty
         default:

@@ -47,11 +47,17 @@ use serde_json::{Map, Value};
 
 use crate::actions::Evaluated;
 use crate::evaluate::{json, number, Assignment};
-use crate::model::{BlendMode, Clip, Project, Source, TransitionKind, VideoProps};
-use crate::nest::{Frame, Instance};
+use crate::model::{BlendMode, Clip, Nest, Project, Source, TransitionKind, VideoProps};
+use crate::motion;
+use crate::nest::{Enclosing, Frame, Instance};
 use crate::recipe_text::burn_in_layer;
 use crate::time::Ticks;
 use crate::transition;
+
+/// A nest's frozen canvas as the pair `motion::apply` wants.
+fn nest_size(nest: &Nest) -> (f64, f64) {
+    (f64::from(nest.width), f64::from(nest.height))
+}
 
 /// The text layer's own arithmetic — [`Reveal`], the `text_hash` that
 /// folds it into the cache key, and the [`text_source`] that assembles a
@@ -301,6 +307,16 @@ impl Project {
         Value::Object(out)
     }
 
+    /// The canvas a clip enclosed by `inside` is placed IN — the innermost
+    /// nest's frozen canvas, or the project's at the top level. What a
+    /// slide measures itself against (`motion.rs`).
+    fn container(&self, inside: &[Enclosing]) -> (f64, f64) {
+        match inside.last() {
+            Some(enclosing) => nest_size(enclosing.nest),
+            None => (f64::from(self.canvas.width), f64::from(self.canvas.height)),
+        }
+    }
+
     /// One layer of the recipe.
     fn layer(&self, instance: &Instance, t: Ticks, assignment: &Assignment) -> Value {
         // Clip time: 0 is the clip's first frame, which is what actions are
@@ -311,7 +327,22 @@ impl Project {
         // the props it reveals run off one clock.
         let clip_t = instance.clip_time(t);
         let evaluated = self.evaluate_clip(instance.clip, clip_t);
-        let video = &evaluated.video;
+        // `video.motion` (format version 8) turned into placement — one of
+        // `motion::apply`'s two call sites, whose module doc is the whole
+        // argument. Here and not in `evaluate_clip` on purpose (spec §11,
+        // R5-4). `moved` equals `evaluated.video` in every field but the
+        // five placed ones, so `RecipeLayer.video` reads its per-pixel
+        // properties off it and the recipe publishes no `motion` key.
+        let size = self.source_size(instance.clip);
+        let container = self.container(&instance.inside);
+        let moved = motion::apply(
+            &evaluated.video,
+            clip_t,
+            instance.clip.duration,
+            size,
+            container,
+        );
+        let video = &moved;
         let (source, source_size) = self.layer_source(instance, &evaluated, clip_t, assignment);
         let frame = self.frame_of(instance, t);
         let placed = frame.place(video);
@@ -388,9 +419,23 @@ impl Project {
     /// worth adding the day a deep nest shows up in a profile.
     fn frame_of(&self, instance: &Instance, t: Ticks) -> Frame {
         let mut frame = Frame::TOP;
-        for enclosing in &instance.inside {
-            let evaluated = self.evaluate_clip(enclosing.clip, t.saturating_sub(enclosing.origin));
-            frame = frame.enter(&evaluated.video, enclosing.nest, &self.canvas);
+        for (i, enclosing) in instance.inside.iter().enumerate() {
+            let clip_t = t.saturating_sub(enclosing.origin);
+            let evaluated = self.evaluate_clip(enclosing.clip, clip_t);
+            // A nest clip's own motion, folded into every layer inside it —
+            // `motion::apply`'s second call site. Its SIZE is the nest's
+            // frozen canvas and its CONTAINER is whatever encloses IT,
+            // which is what the loop gained its index for.
+            let size = Some(nest_size(enclosing.nest));
+            let container = self.container(&instance.inside[..i]);
+            let moved = motion::apply(
+                &evaluated.video,
+                clip_t,
+                enclosing.clip.duration,
+                size,
+                container,
+            );
+            frame = frame.enter(&moved, enclosing.nest, &self.canvas);
         }
         frame
     }

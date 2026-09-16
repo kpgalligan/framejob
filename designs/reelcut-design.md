@@ -320,8 +320,14 @@ Chroma key — or to a media source, which is Speed.
   match, so a longer or shorter list in an end patch would be invisible
   for the whole span and then be overwritten by the next write of that
   list; dialling a value INSIDE an entry still animates.
-- *Transition* appears when the clip overlaps its predecessor: kind and
-  duration.
+- *Transition* appears when the clip overlaps its predecessor: kind,
+  curve, whether the two clips' sound crosses over, and duration. The
+  Curve popup and the Crossfade Audio checkbox both read the FILE's
+  defaults (`linear`, off) rather than what the core would mint — the
+  section says what is there — and when the clip has no stored transition
+  at all each of the two sends BOTH keys, so the transition that gets
+  minted is exactly what the section was showing and only the touched
+  value moves.
 - M3: *Chroma key* (key color with a canvas eyedropper, tolerance,
   softness, spill suppression), *Reflection*, *Filters* (blur, sharpen,
   pixelate, sepia, noir, vignette, invert — Core Image behind them).
@@ -640,10 +646,17 @@ begins, which was the whole complaint.
 - ⌫ deletes and leaves a gap. ⌘⌫ ripple-deletes.
 - ⇧⌘F freeze frame at the playhead.
 - Detach Audio (⌥⌘D).
-- Transitions: double-click the overlap (or the Transition section) for
-  kind — Cross Dissolve, Fade through black / white, Push (4 directions),
-  Wipe, Slide, Zoom — and duration. Changing the duration moves the later
-  clip to match.
+- Transitions: the Transition section for kind — Cross Dissolve, Fade
+  through black / white, Push (4 directions), Wipe (4 directions), Slide,
+  Zoom — its curve, its audio crossfade and its duration. Changing the
+  duration moves the later clip to match. Clip ▸ Transition ▸ does the
+  same for a selection, and at a HARD CUT it MAKES the overlap first
+  (`add_transition`, half a second centred) out of the two clips' unused
+  handles, so nothing else on the timeline moves; a clip at a gap is
+  skipped rather than refused, and None stays available for any selection
+  because a clip can carry a stored transition the timeline does not draw.
+  Double-clicking a clip renames it, or opens a nest — it has never set a
+  kind.
 - Nest (⌘G): the selected clips collapse into one grey clip standing for
   the group, which then moves, trims, fades and transforms as one thing;
   the new clip is selected. Un-nest (⇧⌘G) opens every nest clip in the
@@ -696,7 +709,7 @@ grid (`rc_time_snap_to_frame`, round-to-nearest); sources keep their own
 rate and AVFoundation picks the source frame. Frame rates are rationals
 `[num, den]` everywhere.
 
-### 5.2 Project — the JSON schema (format version 6)
+### 5.2 Project — the JSON schema (format version 8)
 
 The Rust value, serialized by serde. Small, no pixels. All times are
 ticks, all positions canvas pixels, colors `[r, g, b, a]` floats 0–1,
@@ -704,7 +717,7 @@ angles degrees, opacity/volume 0–1 (volume may exceed 1, up to 4).
 
 ```json
 {
-  "version": 6,
+  "version": 8,
   "canvas": { "width": 1920, "height": 1080, "fps": [30, 1],
               "background": [0, 0, 0, 1], "fit_new_clips": true,
               "timecode_frames": true },
@@ -730,7 +743,7 @@ angles degrees, opacity/volume 0–1 (volume may exceed 1, up to 4).
                  "color": { "brightness": 0, "contrast": 0, "saturation": 0, "hue": 0 },
                  "chroma": null,
                  "filters": [], "reflection": null, "spotlight": null,
-                 "obscure": [], "blend": "normal" },
+                 "obscure": [], "blend": "normal", "motion": null },
       "audio": { "volume": 1.0, "muted": false, "fade_in": 0, "fade_out": 0,
                  "duck": null, "mono": false, "keep_pitch": true,
                  "pan": 0, "compressor": null, "noise_reduction": 0 },
@@ -830,6 +843,32 @@ angles degrees, opacity/volume 0–1 (volume may exceed 1, up to 4).
   (`edit_props.rs`'s `check_blend`) rather than a vocabulary one, since
   the value is legal and it is the clip that refuses it. A blend on a clip
   INSIDE a nest is allowed, and §5.3 records what it blends against.
+- `video.motion` (format version 8): `null`, or up to three preset SLOTS —
+  `{"in": {"kind", "duration"}, "out": {…}, "during": {"kind", "amount",
+  "period"}}`. `in` and `out` are one of nine edge kinds (`fade`, `zoom_in`,
+  `zoom_out`, `slide_left`, `slide_right`, `slide_up`, `slide_down`, `spin`,
+  `pop`) over a DURATION measured from the clip's first and last frame,
+  `text.animation`'s convention; `during` is one of five (`pulse`, `shake`,
+  `spin`, `bounce`, `drift`) over the whole clip, `amount` 0–1 and `period`
+  one cycle in ticks, which `drift` ignores. Both enums are closed and
+  refused by serde on the way in; neither declaration ORDER is load-bearing,
+  unlike `BlendMode`'s, because nothing crosses to a shader. Every field
+  defaults, `null` being a clip that sits where it is placed, so an absent
+  key means what every project meant before it existed.
+  **It is not a value the compositor reads.** A preset says what a clip
+  DOES, and the core turns it into PLACEMENT at render time (§5.3, §7.3) —
+  the recipe publishes no `motion` key at all, and everything that EDITS
+  rather than draws reads the clip un-moved (§5.4). Three rules are not in
+  the schema and are stated where they hold: a `Motion` whose three slots
+  are all null is NORMALISED to `null`, by the patch path and by the split
+  rule, so one clip has one spelling of "no motion"; `in + out` longer than
+  the clip scales both down to meet rather than refusing, because "too long
+  for THIS clip" is a fact about a clip and a later trim would invalidate a
+  refusal anyway; and a copy op decides which slots it may carry, since a
+  preset is anchored to a clip's two ends and a copy has new ones (§6, and
+  road map 5 §5e's table). The range checks are `props_check.rs`'s — both
+  durations ≥ 0, `amount` 0–1, `period` at least one tick — and the ticks
+  are NOT snapped by the core, `text.animation`'s precedent exactly.
 - `audio.duck`: `{ "level": 0.2, "attack": 300000, "release": 600000 }`.
 - `audio.pan` (M3) is -1 (hard left) to +1 (hard right);
   `audio.noise_reduction` (M3) is 0 (off) to 1.
@@ -918,8 +957,17 @@ angles degrees, opacity/volume 0–1 (volume may exceed 1, up to 4).
   `curve` ∈ `linear`, `ease_in`, `ease_out`, `ease_in_out`.
 - `transition_in`: `null` or `{ "kind": "cross_dissolve" | "fade_black" |
   "fade_white" | "push_left" | "push_right" | "push_up" | "push_down" |
-  "wipe" | "slide" | "zoom" }`. Its duration *is* the overlap with the
-  previous clip on the track; a clip with no overlap ignores it.
+  "wipe" | "slide" | "zoom" | "wipe_left" | "wipe_up" | "wipe_down",
+  "curve": curve, "audio": bool }`. Its duration *is* the overlap with the
+  previous clip on the track; a clip with no overlap ignores it. `wipe` is
+  the original rightward one and the three directions beside it are
+  **version 7**'s, appended; `curve` (version 7, default `linear`) eases the
+  progress the compositor is handed, and `audio` (version 7, default
+  `false`) crossfades the two clips' sound across the overlap at constant
+  power. Both defaults are the FILE's and deliberately differ from what the
+  core MINTS — every transition an edit makes from version 7 on says
+  `ease_in_out` and `audio: true` (§11, R5-2), so a project written before
+  the keys existed looks and sounds exactly as it did.
 - `name` (format version 3): the clip's own name, or `null` — the common
   case — meaning "call it what it shows": the app falls back to the nest's
   name for a nest clip, the media file's name where there is one, else the
@@ -998,6 +1046,21 @@ angles degrees, opacity/volume 0–1 (volume may exceed 1, up to 4).
   layer's cropped height tall, fading out with `falloff`. It is drawn
   BEFORE the layer, so the layer always wins where they meet, and it is
   part of the layer — it rotates with it.
+- **`video.motion` is the second recipe-only term** (format version 8, spec
+  §11's R5-4; a transition's progress is the first). It is a PRESET and not
+  a placement: `motion.rs` turns it into a scale, a rotation, an opacity and
+  an offset at render time, and `recipe.rs` folds those into the five placed
+  fields of the layer it publishes — so the recipe carries no `motion` key
+  and the compositor never hears of one. The container a slide measures
+  itself against is the canvas the clip is placed in, the enclosing nest's
+  frozen one inside a nest; the pivot is the layer's VISIBLE centre, so a
+  zoom on a cropped layer does not drift; the total rotation is reduced
+  `rem_euclid(360)`, so a whole turn is exactly no turn; and for TEXT, whose
+  size the model cannot know, a slide starts half a canvas beyond the edge,
+  which clears any text narrower than it. A clip with no active slot is
+  returned UNTOUCHED rather than moved by an identity, because `x + b − b`
+  is not `x` in floats and the frame at the end of an arrival has to be
+  byte-identical to the same clip with no preset at all.
 - **A nest's layers are flattened at evaluation time** (M3): each drawing
   clip inside a nest becomes one recipe layer with the nest clip's
   transform folded in (scales multiply, rotations add, offsets rotate),
@@ -1058,6 +1121,24 @@ interpolates their `in` and `out`. That second one is legal and rarely what
 anybody wants — the two numbers are the animation's own timebase, so
 sliding them mid-reveal moves the ground under it — which is a caution, not
 a rule the ops enforce.
+
+**`video.motion` is NOT an animation target** (format version 8). A preset is
+anchored to the clip's two ends and an action is a ramp between two states,
+so there is nothing to interpolate — half a slide into half a spin is not a
+picture anybody asked for — and the evaluator would put the base value back
+anyway, leaving a control that reported success and did nothing. So
+`set_action_end` refuses a patch whose `video` object names `motion`, by
+name, which is that op's ONE refusal past "the patch must be an object"; and
+because a hand-written file, a pasted action or a project from another tool
+reaches evaluation without passing the op, `evaluate_clip` overwrites the
+state's `motion` with the BASE value's JSON before the video group is
+decoded. That restore is at the `Value` level for two reasons — `clamp_video`
+is never handed the base props, and a malformed `motion` would otherwise fail
+the whole group's decode and discard every other animated property — and it
+is GUARDED on the group still being an object, since an end patch may have
+replaced `video` with a number, a string, an array, a bool or a null and each
+of those must keep falling through to the base props exactly as it always
+did.
 
 An action's end patch is deliberately **lenient** — `set_action_end` merges
 whatever it is given, so a half-written animation stays editable — while
@@ -1247,7 +1328,7 @@ many clips`, `too many tracks`, `nests are more than 8 deep at nest N`.
 | `add_clip {track, media, at}` | Whole media as one clip at `at`; source in 0; Fit scale if `fit_new_clips` and the source exceeds the canvas. Refuses if the overlap rule fails. |
 | `add_text_clip {track, at, duration=5 s, text?}` / `add_shape_clip {…, shape?}` | Same placement rules; default text is the Title preset centered, default shape the rectangle — except that `shape.kind = "arrow"` is created with `arrow_end` on, since an arrow with no head is a diagonal line. `text` and `shape` are **patch objects** in the `set_text` / `set_shape` shape, merged over that default — not a bare string or kind — so an explicit `arrow_end: false` still wins. (The MCP tools additionally accept a bare string as shorthand: the words for `text`, a kind name for `shape`.) |
 | `add_background {media?, color?=white, duration?=the timeline's length}` | A backdrop on a NEW back-most track, starting at 0 and named "Background". With `media`, that file placed as `add_clip` would place it but for its SCALE — the right source kind, audio props when it has sound, and a FILL scale where `add_clip` takes a Fit one, because a plate that leaves the canvas showing down one side has failed at the one thing a background is for; with `color`, or with neither, a canvas-sized filled rectangle with no stroke at scale 1. The plate default is WHITE, not black: the canvas is already black, so a black plate is a command that appears to do nothing. `Err` for `media` and `color` together, an unknown media, a media with no pictures, a colour outside 0–1, or a duration under a frame. A full-canvas GRADIENT is this clip and a `set_shape {gradient}` after it — the canvas background stays one colour (§5.2). |
-| `add_blurred_background {clip}` | The screencast backdrop: `clip` copied onto a NEW back-most track at the same start, duration, speed and source window — so the two play the same frames — scaled to FILL the canvas, centred, uncropped, blended `normal` and blurred at full strength. The copy is muted (`enabled` becomes `{video: true, audio: false}`, `detach_audio`'s pair read the other way) and drops its `audio.duck` — the one field of that group that lowers OTHER material, so a copy keeping it would duck the mix including the clip it came from — along with its transition, its actions and its label; it is named "Blurred Background". `Err` for an unknown clip, a NEST (flattening drops a nest clip's own filters, so the copy would come out sharp), a source with no pixel size (text, audio-only), or a clip with no video properties. Both of these mint TWO objects — a track and the clip on it — and the TRACK takes the `next_id` the call was made with, the clip the one after. |
+| `add_blurred_background {clip}` | The screencast backdrop: `clip` copied onto a NEW back-most track at the same start, duration, speed and source window — so the two play the same frames — scaled to FILL the canvas, centred, uncropped, blended `normal` and blurred at full strength. The copy is muted (`enabled` becomes `{video: true, audio: false}`, `detach_audio`'s pair read the other way) and drops its `audio.duck` — the one field of that group that lowers OTHER material, so a copy keeping it would duck the mix including the clip it came from — along with its transition, its actions, its label and its `video.motion` (format version 8 — a backdrop that slid in or pulsed behind the clip it copies would be two pictures of one recording disagreeing about where they are, and a slide would leave the canvas showing down one side, which is the one thing a background exists to prevent); it is named "Blurred Background". `Err` for an unknown clip, a NEST (flattening drops a nest clip's own filters, so the copy would come out sharp), a source with no pixel size (text, audio-only), or a clip with no video properties. Both of these mint TWO objects — a track and the clip on it — and the TRACK takes the `next_id` the call was made with, the clip the one after. |
 | `insert_clip {track, media, at}` | The INSERT edit: the clip `at` is strictly inside on `track` is split, every unlocked track opens by the media's whole length (`insert_time`), then the media lands at `at`. Only the destination track is cut — a straddler on another track rides the shift whole, which is what keeps a bed unbroken. One op, so one undo step and one tool. Refuses when the clip could not be placed after the room was made, which is what a locked destination track gives. |
 | `overwrite_clip {track, media, at}` | The OVERWRITE edit: `[at, at + media length)` is cleared on `track` ALONE — cut at both bounds, whatever is left inside removed — and the media lands there. Nothing shifts and no other track is touched; the named track is cleared whether or not it is locked, exactly as `ripple_delete` removes the clips it was given. |
 | `move_clip {clips, delta, track}` | Shifts by `delta` ticks (may be negative; clamps at 0) and optionally to another track (all selected clips keep their relative track offsets). **Overlap rule** on the destination track: a clip may overlap at most one neighbour on each side, and each overlap must be ≤ half of the shorter of the two clips; anything else refuses. An overlap is a transition; a clip that gains a predecessor overlap gets `transition_in = cross_dissolve` if it had none. |
@@ -1256,7 +1337,7 @@ many clips`, `too many tracks`, `nests are more than 8 deep at nest N`.
 | `rate_stretch {clip, to_end}` | `speed = source_len / (to_end − start)`; duration follows. Media sources only — a non-media clip is an **error**, not a refusal, so an MCP caller gets a message it can correct from (the UI never offers it). |
 | `slip {clip, delta}` | Slides the source under a fixed clip: `in += delta × speed`, start and duration unchanged, so nothing downstream moves. `delta` is TIMELINE ticks; positive shows later material. Clamped so the window stays inside the media (`in ≥ 0`, `in + duration × speed ≤ media.duration`), and a slip the clamps reduce to nothing refuses. A `still` moves its `at` instead — it has a source time if not a window. Any other source is an **error**, as `rate_stretch` is. Actions are clip-relative and do not move. |
 | `roll {clip, to}` | Moves a hard cut: this clip's start and its predecessor's end both become `to`, and nothing else moves — the pair's outer edges and its total length are invariants. The predecessor is the clip on the same track ending EXACTLY at this one's start; with a gap or an overlap there instead it refuses (an overlap is a transition, and its length is `set_transition_duration`'s). Clamped four ways: one frame kept on each side, this clip's own source head, and the predecessor's remaining source. Front-trim semantics here (`in` follows), a plain end trim there. |
-| `split {clips?, at}` | Two clips. Second: `start = at`, `in += (at − start) × speed`, base props = the evaluated state at `at`. Actions before `at` stay with the first; after go to the second (start rebased); a straddling action becomes two — the first half's end patch is the evaluated state at `at`. `transition_in` stays with the first. Refuses when `at` is not strictly inside. **Omitting** `clips` — not passing a flag — means every unlocked clip `at` is strictly inside, the ⌘T-with-no-selection case. |
+| `split {clips?, at}` | Two clips. Second: `start = at`, `in += (at − start) × speed`, base props = the evaluated state at `at`. Actions before `at` stay with the first; after go to the second (start rebased); a straddling action becomes two — the first half's end patch is the evaluated state at `at`. `transition_in` stays with the first. A PRESET anchored to the clip's two ends is divided rather than copied (format version 8): the first half keeps `video.motion.in` and loses `out`, the second keeps `out` and loses `in`, each normalised to `null` when nothing is left, and `text.animation` is split the same way — `out` zeroed on the first half, `in` on the second, the pair becoming `null` when both are 0. Carrying both to both halves, which is what a clone does and what version 5 did, makes the first half leave at the cut and the second arrive again there. A `during` slot survives on both, since it is anchored to neither end, and restarts at each cut. Every splitter in the crate routes through this — `split`, `delete` and the two range cuts, `lift_range`, `insert_clip`, `overwrite_clip` and `freeze_frame` — so the rule is stated once (`edit_split.rs`, §7.10). Refuses when `at` is not strictly inside. **Omitting** `clips` — not passing a flag — means every unlocked clip `at` is strictly inside, the ⌘T-with-no-selection case. |
 | `delete {clips}` | Removes; gaps stay. |
 | `ripple_delete {clips}` / `ripple_delete_range {from, to}` | Removes; then for each removed span (union of the removed clips' spans, processed right-to-left) shifts every clip on **unlocked** tracks whose start ≥ span end left by the span length. Clips on other tracks that straddle a span are left in place. Range form: every unlocked clip is split at both bounds first, the middle pieces removed, then the shift. |
 | `ripple_delete_ranges {ranges: [[from, to], …]}` | Several ranges as ONE edit — the silence cut. Each pair is snapped, clamped and ordered exactly as `ripple_delete_range`'s one is (a reversed pair is the same range), the pairs are then MERGED — touching as well as overlapping — and the survivors cut and closed right to left. So the op is **merge-then-cut and not N `ripple_delete_range`s**, and the difference is visible in the document: a cut at a boundary that no longer exists would mint a fragment and burn an id. `set_gained_transitions` runs once at the end, over the unlocked tracks. Markers do not move, as they do not for the singular. An empty list, and a list that merges to nothing, change nothing. Written by Clip ▸ Remove Silences… as one undo step, whatever the number of cuts. |
@@ -1265,17 +1346,19 @@ many clips`, `too many tracks`, `nests are more than 8 deep at nest N`.
 | `close_gap {track, at}` | Closes the empty span on `track` that contains `at`, bounded by the nearest clip edges there (0 in front when nothing precedes it): everything from the gap's far side shifts left by its length, across every unlocked track, straddlers staying put. Refuses on a locked `track`, on an `at` that is on a clip, when there is no clip after the gap, and when the shift would break the overlap rule — a gap closes fully or not at all, because a partial close leaves the user unable to tell whether the op ran. Markers do not move. |
 | `set_speed {clip, rate, keep_pitch}` | `duration = source_len / rate`; actions keep their clip-relative *fraction* of the clip. Media sources only, an **error** on any other kind (as `rate_stretch`). Rate is clamped to ×0.1–×10. |
 | `set_reversed {clip, reversed}` | Plays the media back to front, or forward again. The core does no pixel work, so this changes neither the plan nor the recipe: Swift substitutes a pre-rendered reversed asset for that media's segments (§11). `in` is measured in the direction the clip PLAYS, so reversing keeps the in point and therefore shows different frames; the alternative would put two conventions into every trim and split. Media sources only, an **error** on any other kind. |
-| `freeze_frame {clip, at, duration=2 s}` | `split` at `at`, `insert_time(at, duration)`, then a `still {media, at: source time}` clip filling the gap on the same track with the original's video props. Media sources only, an **error** on any other kind (as `rate_stretch`). |
+| `freeze_frame {clip, at, duration=2 s}` | `split` at `at`, `insert_time(at, duration)`, then a `still {media, at: source time}` clip filling the gap on the same track with the original's video props, LESS its `video.motion` (format version 8): a still is a new clip with new ends, so one taken mid-arrival would otherwise arrive again and one taken anywhere would carry a departure onto a frame that is meant to hold. The placement it keeps is the un-moved one, since evaluation never applies a preset, so a freeze taken mid-motion jumps to where the inspector said the clip was. Media sources only, an **error** on any other kind (as `rate_stretch`). |
 | `detach_audio {clip}` | `enabled.audio = false` on the clip; a new clip with `enabled = {video: false, audio: true}`, same source/in/duration/speed and the audio props, on the track below (a track is inserted at index 0 if needed). Refuses if the media has no audio or audio is already detached. |
 | `duplicate {clips}` | Copies placed after the originals' span on the same tracks (⌥-drag then moves them). |
 | `paste {at, track?, payload}` | Inserts the clips of a clipboard payload — `{"clips": [...], "media": [...]}`, what ⌘C wrote to `com.kgalligan.reelcut.clips` — with fresh ids for the clips, their actions and any media row added. The EARLIEST clip lands exactly at `at` and the rest keep their offsets from it. A payload clip's `track` is a **depth from the front** (0 = front-most), not an id, since the ids belong to the document copied from: `track` names where depth 0 lands (default: the front-most track), the rest follow by the same index delta, and tracks missing behind it are added. Media is matched to `media[]` **by path** — reused when it is there, appended when it is not — so a paste between documents brings the entry with it. A clip the overlap rule refuses on its target track goes on a new track in front (as Add Text does, §4.1), so the only refusal is an empty clip list; a malformed payload is an **error**. |
 | `paste_attributes {clips, payload, groups?}` | Copies the payload's EARLIEST clip's property groups onto each clip (at one start the front-most, then the lower id — never the array's first, which is Copy's creation order) — `payload` is the same Copy payload `paste` takes, and only that clip's `video`, `audio`, `text` and `shape` are read; its ids, times, media rows and nests do not matter and nothing is minted. A group is REPLACED whole, never merged: video and audio whole, transform included (`audio.muted` and `keep_pitch` travel — they are properties like opacity); text but its `content`; a shape but its `kind`, `width`, `height`, `from` and `to`. `groups` ∈ `video`, `audio`, `text`, `shape`: absent, it means every group BOTH sides have, silently skipping the rest; a NAMED group the payload clip lacks, or a target lacks, is an **error**, all-or-nothing, and so is a copied value the inspector would refuse — each copied group passes the patches' range checks. Speed, enabled, actions, the transition, the source and the clip's own name and label stay. Refuses when nothing changes, and on an empty `groups` list. |
 | `nest {clips, name?}` | Collapses the selection into ONE clip showing a nest (§5.2), on the front-most track the selection occupied, running from the earliest start to the latest end. The clips move whole — ids, props, actions, transitions — keeping their relative times (the earliest starts at 0 inside) and their track order, onto fresh tracks of the nest's own that copy the source tracks' names and their hidden/muted/locked/solo state (a copied solo is then judged among the nest's own tracks, §5.2). The nest's canvas is frozen at the project's current size, so a later `set_canvas` cannot re-lay-out what is inside it. Media is untouched: a nest references the project's `media[]` in the same one id space. Refuses on an empty selection, on a selection of one nest clip, and when the nest clip would break the overlap rule against what was left behind. |
 | `unnest {clip}` | The inverse: the nest's clips return at `clip.start + their own start` with fresh ids (as `split` then a re-join mints fresh ones), on tracks counted back from the nest clip's own — the nest's front-most track lands where the nest clip was — with tracks missing behind added, and the nest clip goes. A clip the overlap rule refuses lands on a new track in front, as `paste` does, so a group can always be opened. A nest clip trimmed shorter than its contents gives **all** of them back: there is no in point on a nest, so this is the inverse of `nest`, not of the trim. The nest is dropped from `nests[]` when no clip anywhere still shows it. An **error** when `clip` is not a nest clip. |
-| `set_video {clips, patch}` / `set_audio` / `set_text` / `set_shape` | Merge the patch into the base props. Refuses if nothing changes. One value is refused by the CLIP rather than by the vocabulary: `video.blend` on a nest clip is an **error** naming it (format version 6), because a nest is flattened rather than composited offscreen and there is no group picture for a blend to combine with. It fires on the MERGED value only, so `{"blend": "normal"}` on a nest clip is the identity and refuses instead — otherwise an all-or-nothing `paste_attributes` of an ordinary look onto a nest clip would fail over a value that changes nothing. `set_action_end` validates nothing, so the same rule is enforced again in the evaluator (§5.4's `clamp_video`), which closes the recipe, `clip_state` and both export writers at once. |
+| `set_video {clips, patch}` / `set_audio` / `set_text` / `set_shape` | Merge the patch into the base props. Refuses if nothing changes. One value is refused by the CLIP rather than by the vocabulary: `video.blend` on a nest clip is an **error** naming it (format version 6), because a nest is flattened rather than composited offscreen and there is no group picture for a blend to combine with. It fires on the MERGED value only, so `{"blend": "normal"}` on a nest clip is the identity and refuses instead — otherwise an all-or-nothing `paste_attributes` of an ordinary look onto a nest clip would fail over a value that changes nothing. `set_action_end` validates nothing, so the same rule is enforced again in the evaluator (§5.4's `clamp_video`), which closes the recipe, `clip_state` and both export writers at once. One KEY behaves unlike every other in a patch: `video.motion` (format version 8) deep-merges here like the rest — `{"motion": {"in": …}}` keeps a stored `out` — but the two Swift writers and the MCP argument all send the WHOLE object with nil slots as `null`, so from the app and from an agent it REPLACES; `{"motion": null}` clears the field, and a motion whose three slots are all null is normalised to `null` before the range checks run, so one clip has one spelling of "no motion". |
 | `set_clip {clips, patch: {name?: string \| null, label?: string \| null}}` | The fifth patch op: sets or clears the clip's own name and label (§5.2). Inside the patch an absent key keeps, `null` clears, and so does an empty string — after the trim a name gets on its way in — because an unnamed clip is `null`, not `""`. Any other key is an **error**, checked before the clip ids. A patch and not two top-level arguments, because the op envelope reads an absent optional and an explicit `null` as the same thing, and "keep" and "clear" have to differ here. A `split`, `duplicate`, `detach_audio` or `paste` carries both along (they clone the clip); `paste_attributes` never does. Refuses if nothing changes. |
 | `set_enabled {clip, video?, audio?}` | Visibility/mute per clip. |
-| `set_transition {clip, kind|null}` | Sets `transition_in`. `set_transition_duration {clip, duration}` moves the clip so the overlap equals `duration` (subject to the overlap rule). |
+| `set_transition {clip, kind\|null}` | Sets `transition_in`. With a kind on a clip that already HAS a transition only the `kind` moves — its `curve` and `audio` stay where the person put them (format version 7), because a kind chosen from the popup, the menu or MCP must not reset a curve; a clip that had none gets a minted one (§11, R5-2). `set_transition_duration {clip, duration}` moves the clip so the overlap equals `duration` (subject to the overlap rule). |
+| `add_transition {clip, kind?, duration, align="center"}` | Makes an overlap at the HARD CUT before `clip` out of the two clips' unused handles and puts a transition on it — **nothing else on the timeline moves** and the pair's outer edges stay (§11, R5-3). `align` `center` takes half from each side (the odd frame to the incoming clip, and a side that cannot supply its share passes it to the other before the total shrinks), `before` takes it all from the incoming clip's head, `after` all from the outgoing clip's tail. The duration is snapped DOWN to whole frames before the split — snapping two halves separately would lose the odd frame — and then clamped: to each side's handle (a media clip's source window; UNBOUNDED for a still, an image, text or a shape; **0 for a nest's head**, since trimming a nest clip's head moves its contents, and the nest's own remaining length for its tail), to the neighbours on the track, and to the overlap rule, which is stepped down from the larger side until it passes. A request that clamps below one frame is `None`. The incoming clip's `in` moves back by the extension times its speed, and its ACTIONS move with it — where `trim_start` deliberately leaves actions alone, because a transition reveals material in front of a first frame nobody asked to move. `kind` absent uses the clip's own stored kind if it has one, else `cross_dissolve`; a stored transition keeps its style and a new one is minted. **Error** for a non-positive duration, an unknown clip, and for not being at a hard cut — naming which of: no predecessor, a gap, an overlap that already exists. |
+| `set_transition_style {clip, curve?, audio?}` | Sets the transition's easing and whether it crossfades the sound; an absent key KEEPS. A separate op rather than two more arguments on `set_transition`, because that one reads an absent `kind` and an explicit `null` as the same thing and so cannot spell "keep". It stores on the same terms — any clip, with or without an overlap — and a clip with no stored transition and at least one key given gets a minted `cross_dissolve` with the style applied. NEITHER key given is `None` whatever the clip holds, and never mints. **Error** for an unknown clip. |
 
 **Actions**
 
@@ -1284,7 +1367,7 @@ many clips`, `too many tracks`, `nests are more than 8 deep at nest N`.
 | `add_action {clip, at, duration=1 s}` | Refuses if it would overlap another action or run past the clip end. End patch starts empty (= no change until edited). |
 | `add_zoom_action {clip, at, duration=1 s, region: {x, y, width, height} \| null, fit="fit", curve="ease_in_out"}` | An `add_action` whose end patch is the `scale`, `x` and `y` that bring `region` to the canvas — the screencast zoom. **`region`'s `x` and `y` are its CENTRE** and `width`/`height` its size, both source pixels from the centre of the cropped rect (§5.3's one region frame); the field names say neither, so the tool description and the core's doc say it too. `fit` shows the whole region, `fill` covers the whole canvas, both measured THROUGH the clip's rotation — a rectangle contains a rotated rectangle exactly when it contains its four corners, and the test collapses to the naive form at 0°. Rotation and crop — and nothing else — are read from the clip evaluated at `at`, the frame the rectangle was drawn on: the `scale`, `x` and `y` it writes are absolute, so the placement never reads a transform, base or evaluated. A rotation animated between `at` and `at + duration` is not tracked. The scale clamps to the layer maximum and the offsets are derived from the CLAMPED value, so a region too small to reach it still lands centred and only the magnification degrades. `region` absent or `null` is a zoom BACK: the end patch is the clip's STORED base `scale`, `x`, `y` — the one thing here that is NOT read evaluated, because "back" means where the clip sits when nothing is animating it, which is also what a later zoom on the same clip measures from. It composes `add_action` + `set_action` + `set_action_end`, so it is one undo step and inherits every `add_action` refusal rather than restating it; a clip with no video properties is an **error**. |
 | `set_action {clip, action, start?, duration?, curve?}` | Same overlap checks. |
-| `set_action_end {clip, action, patch}` | Merges into the end patch; a key set to `null` removes it. |
+| `set_action_end {clip, action, patch}` | Merges into the end patch; a key set to `null` removes it. Deliberately lenient about everything except ONE key: a `video` object naming `motion` is an **error** (format version 8, §5.4), because a preset is anchored to the clip's two ends rather than being a value to ramp between two states, and the evaluator would restore the base value anyway. That is the op's only refusal past "the patch must be an object". |
 | `remove_action {clip, action}` | |
 
 **Tracks, markers, canvas, media**
@@ -1466,9 +1549,10 @@ every edit and compares).
   freeze-frame idiom; no image extraction needed.
 - **Audio envelopes** are per composition audio track, piecewise-linear,
   covering the track's whole extent, with fades, volume, volume actions
-  (sampled at 1/30 s across their span) and ducking (every other clip's
+  (sampled at 1/30 s across their span), ducking (every other clip's
   envelope multiplied by `level` over the ducking clip's extent with
-  linear attack/release ramps) already folded in, **multiplied by the same
+  linear attack/release ramps) and — format version 7 — the **transition
+  crossfade** already folded in, **multiplied by the same
   quantities for every nest clip the segment is inside** — turning a nest
   down turns everything in it down, and muting one silences it. Muted
   clips and muted tracks produce a 0 envelope, and so does a track
@@ -1484,7 +1568,25 @@ every edit and compares).
   solo inside a nest
   is judged among that nest's tracks alone, and a timeline solo on some
   other track silences a whole nest through the nest clip's own stage, by
-  the same multiply. **`mono` is not in the plan at all** and never was:
+  the same multiply.
+  **The crossfade** (format version 7) is one more factor in that product:
+  an overlap whose `transition_in.audio` is true multiplies the outgoing
+  clip by `cos(p·π/2)` and the incoming one by `sin(p·π/2)`, over the same
+  EASED progress §7.3 hands the compositor. Constant power rather than
+  equal gain because the two clips of a transition are uncorrelated
+  material, where `cos² + sin² = 1` holds the level and a linear pair dips
+  3 dB (§11, R5-2). It is sampled across the overlap on the action loop's
+  own grid — 1/30 s, widened so one span can never contribute more than
+  4096 breakpoints — because neither the sine law nor an eased progress is
+  a straight line. Mute, solo, ducking, volume and the fades all keep their
+  precedence, since the term multiplies rather than replacing anything, and
+  a pair where only one clip has sound still fades that one. **Every STAGE
+  multiplies its own term**, which is where the sound parts company with
+  the picture: a clip inside an overlap inside a nest that is itself in a
+  transition gets BOTH fades, where §7.3's recipe picks the clip's own
+  transition and stops. That is right for sound — both fades are audible —
+  and it is deliberate rather than an oversight in one of the two.
+  **`mono` is not in the plan at all** and never was:
   `AVMutableAudioMixInputParameters` applies gain over time and cannot
   combine channels, so the flag this paragraph used to promise ("a
   per-segment flag Swift applies with `AVMutableAudioMixInputParameters`
@@ -1535,7 +1637,12 @@ Asked once per frame by the compositor, and by the overlay for hit-testing.
 ```
 
 - Layers are back-to-front. Every property is already evaluated through
-  actions. `source.kind` ∈ `track` (a composition video track id),
+  actions — **and, for the five PLACED ones, moved by `video.motion`**
+  (format version 8): a layer's `x`, `y`, `scale`, `rotation` and `opacity`
+  carry whatever the clip's preset asks for at this instant, and there is no
+  `motion` key here at all, because a preset is a statement about placement
+  and this is the placement. §5.3 says what the arithmetic is and §5.4 says
+  why nothing that EDITS sees it. `source.kind` ∈ `track` (a composition video track id),
   `image` (`media` id — Swift decodes with ImageIO and caches the
   texture), `text` / `shape` (the resolved description plus a stable
   content hash Swift caches textures by), `missing` (draw a slate).
@@ -1640,7 +1747,12 @@ Asked once per frame by the compositor, and by the overlay for hit-testing.
   rectangle and the intersection of two rotated rectangles is not one.
 - During a transition both layers are present, adjacent, each carrying the
   same `kind` and `progress` with `role` `out` / `in`. The compositor
-  draws them as one pair.
+  draws them as one pair. **`progress` is EASED by the transition's own
+  `curve`** (format version 7) before it leaves the core, so every consumer
+  of it — the shader, the dissolve's weight correction, the zoom's partner
+  box — gets one number and none of them knows the curve exists. `linear`
+  is the identity, which is what makes a project written before version 7
+  render exactly what it rendered.
 - The recipe is a few KB; parsing it per frame costs tens of microseconds.
   A binary form is a later optimization, not a design change.
 
@@ -1708,6 +1820,8 @@ pass nothing, because each wants the picture rather than a deliverable.
 | File | Owns |
 |---|---|
 | `ReelCore.swift` | the **only** `rc_*` caller; `ReelProject` (handle + lazy `ProjectSnapshot`), typed op builders, `RecipeSource` |
+| `MotionProps.swift` | `video.motion`'s Swift vocabulary (format version 8): `EdgeMotion` and `DuringMotion` with their display names, `MotionEdge`, `MotionDuring` and `MotionProps`, all decoded leniently and all with the core's own defaults mirrored rather than derived. Its `dictionary`s live here rather than beside every other property type's in `ReelCore.swift`, which is far over the ~600-line cap — and `MotionProps.dictionary` ALWAYS writes three keys, `NSNull` for a nil slot, because a raw core patch deep-merges a motion (§6) and a slot left out would leave the old one in place |
+| `AgentServer+Motion.swift` | reading `motion` out of a `set_video` patch by HAND, `gradientArg`'s posture: a misspelt key at every level, a kind outside either vocabulary and a wrong type all refused by NAME, where `patchArg`'s round trip cannot see inside a nested object and a motion has two levels of them. `setVideo` strips the key before `patchArg` runs, so the two readers never meet; the durations go through `optionalTimeArg`, the one spelling of the frame snap |
 | `ProjectDocument.swift` | NSDocument, `.reelcut` package read/write, the single mutation point (`applyEdit`, live-edit trio), undo as a handle stack, dirty counting, and the FIVE pieces of view state (playhead, selection, in/out range, `selectedMedia`, `nestPath`). `nestPath` is §4.4's nest scope as the PATH it was entered by — one step per level, each naming the nest and the nest CLIP that showed it, because a nest can be shown by two clips at two different starts. `scope` is its last step's nest and is what every op is stamped with (`ReelOp.scoped(_:)`), except the seven the core refuses inside a nest, which are sent unscoped; `editedProject` is the memoised `rc_project_scoped` handle every view of the TIMELINE draws from, where `project` stays the document for save, export, captions, consolidate and the Document and Media tabs |
 | `EditorViewController+NestScope.swift` · `TimelineView+NestScope.swift` | going inside a nest and coming back out (§4.4): Open / Close Nest, the double-click, the playhead mapping, and the breadcrumb the ruler draws in the corner over the track headers — one stored property, one closure, one draw call, one hit token and one gesture case in the frozen `TimelineView.swift`, `TimelineView+Candidates.swift`'s split exactly |
 | `Playback.swift` · `EditorViewController+PreviewQuality.swift` · `PreviewWindowController.swift` | `AVPlayer` + `AVPlayerItem` over the plan; the rebuild-vs-refresh decision (§7.6); coalesced exact seeks; JKL rates; loop range; `preferredMaximumResolution` = canvas size. **Preview Quality** (View ▸ Preview Quality ▸ Full / Half / Quarter) scales the PLAYER's render size on a `mutableCopy()` of the built video composition, so `CompositionBuilder.build` is untouched and the export and `render_frame` paths are UNREACHABLE from the setting rather than merely unchanged by it; the size always carries the canvas's EXACT aspect (`m · (w/g, h/g)`, `g = gcd(w,h)`, `m = ceil(g/divisor)`), falling back to the next coarser exact size and finally to Full for a coprime canvas, because the overlay maps every drag handle through `AVPlayerLayer.videoRect`. **Preview Window** (⇧⌘P) is a second `AVPlayerLayer` on the SAME player in an `NSPanel` — a panel because a titled window becomes MAIN and every ⌘-item whose action is on `EditorViewController` then resolves to nothing |
@@ -1721,19 +1835,19 @@ pass nothing, because each wants the picture rather than a deliverable.
 | `FrameWriter.swift` | a CGImage and a format in, a written file out (PNG / JPEG / HEIC) — the ONE writer File ▸ Save Frame… and `render_frame` both call, which is what makes their PNGs byte-identical by construction rather than by luck; PNG passes NIL destination properties, and JPEG flattens a transparent canvas onto black because the container has no alpha |
 | `AudioTap.swift` · `AudioDSP.swift` · `LevelMeter.swift` · `LevelMeterView.swift` | the sample-level audio the plan cannot carry: one `MTAudioProcessingTap` per composition audio track running noise reduction, the compressor and the Mix stage (the mono fold, then the pan), and the level meter's model and its one view — the model publishing a raw per-channel peak and RMS lock-free off the render thread, the view owning the ballistics |
 | `MediaPane.swift` · `MediaRowView.swift` · `MediaListFilter.swift` · `MediaPaneCommands.swift` · `MediaUsage.swift` · `MediaReveal.swift` | the Media tab (§4.3): the pane and its find band, the row and the drag it sources, the filter as a VALUE (search, order, unused-only), the seven commands a row calls back into, the ONE answer to "is this file used" — which walks the nests the way the core's `every_clip()` does, and which Remove and `remove_media` ask too — and the reveal, which selects and then scrolls |
-| `MediaPeaks.swift` · `AudioNormalize.swift` · `SilenceDetector.swift` · `SilenceDetector+Walls.swift` | the waveform cache and the two questions asked of it: `MediaPeaks` is the one mapping from a plan segment's source window to peak buckets (the reversed mirror included, and `window`/`bucketIndex(_:bucket:)` generalised over the bucket size for `MediaSpeech` since road map 4), `AudioNormalize` turns a clip's peak into a `set_audio` op (Normalize, `normalize_clip`) and `SilenceDetector` turns peak × envelope, or since road map 4 the cached Silero VAD probability, into the quiet spans — `Mode` (`voice` / `level`), the gain floor and the per-media level fallback. `SilenceDetector+Walls.swift` is the nest walls and the frame-grid snap, a pure move out at road map 4's toll 1 |
+| `MediaPeaks.swift` · `AudioNormalize.swift` · `SilenceDetector.swift` · `SilenceDetector+Walls.swift` | the waveform cache and the two questions asked of it: `MediaPeaks` is the one mapping from a plan segment's source window to peak buckets (the reversed mirror included, and `window`/`bucketIndex(_:bucket:)` generalised over the bucket size for `MediaSpeech` since road map 4), `AudioNormalize` turns a clip's peak into a `set_audio` op (Normalize, `normalize_clip`) and `SilenceDetector` turns peak × envelope, or since road map 4 the cached Silero VAD probability, into the quiet spans — `Mode` (`voice` / `level`), the gain floor and the per-media level fallback. `SilenceDetector+Walls.swift` is the nest walls, the OVERLAP walls (road map 5's E1 — one per transition on every unlocked track, widened by the overlap's own length each side and subtracted like a nest wall but never reported) and the frame-grid snap, a pure move out at road map 4's toll 1 |
 | `SileroVAD.swift` · `MediaSpeech.swift` · `MediaImporter+Speech.swift` | road map 4's voice model: `SileroVAD` is the streaming Core ML wrapper over `app/Resources/Models/silero_vad.mlmodelc` — the process-wide `isAvailable`/`markUnavailable` pair, `NSLock`-guarded — `MediaSpeech` is the chunk grid (`chunkTicks`, `chunkCount`) and the cache `Loader`/`speechMax` over `MediaPeaks.window`, and `MediaImporter+Speech.swift` is the await-free head check and the reader/inference pass `MediaImporter.swift`'s `speech(for:url:stamp:into:)` calls — run AFTER `peaks` in `generateCaches`'s order, so the peaks `.bin`'s withdrawal is never held behind a full-file decode and an inference |
 | `Loudness.swift` | BS.1770-4 integrated loudness and true peak over plain float buffers — no AVFoundation, no player, no tap — plus the export gain that follows from a measurement and the 16-bit scaler that applies it |
 | `TimelineView.swift` | custom `NSView` in an `NSScrollView`; drawing from the snapshot; gesture sessions (`ClipDragSession`, `TrimSession`, `RangeSession`, `MarkerDragSession`) as structs; `on*` closures to the VC |
 | `PreviewCanvasView.swift` | `AVPlayerLayer` under a transparent overlay `NSView`; `CanvasSession` structs for move/scale/rotate/crop; handle drawing |
-| `InspectorViewController.swift` + `VideoPane` / `AudioPane` / `TextPane` / `ShapePane` / `MediaPane` / `DocumentPane` | one file per tab, descriptor-driven controls from `OptionControls.swift` |
+| `InspectorViewController.swift` + `VideoPane` / `AudioPane` / `TextPane` / `ShapePane` / `MediaPane` / `DocumentPane` | one file per tab, descriptor-driven controls from `OptionControls.swift`. `VideoPane+Transition.swift` is the Transition section, an extension file since road map 5's E1 toll — the one group that is not about the layer's own pixels but about how it MEETS the clip before it, and the two rows E1 added (Curve, Crossfade Audio) send BOTH keys whenever the clip has no stored transition, so the minted one is exactly what the section showed |
 | `EditorViewController.swift` + `EditorViewController+<Feature>.swift` | wiring only in the base file; features in extensions (Rasterize's frozen-file rule) |
 | `ExportQueueController.swift` · `ExportQueueWindowController.swift` | the export queue (Window ▸ Export Queue): the job list and its state machine — one job at a time, on the main thread, a fresh `Exporter` each, every job holding the project handle and the media URLs as they were when it was confirmed — and a window that only reads it. The controller has no AppKit in it, so a probe compiled from `app/Sources` can run two jobs without a window; the queue edits no project, so it gets no MCP tool and `export` is already its mirror |
 | `AppDelegate.swift` · `EditorWindowController.swift` · `WelcomeWindowController.swift` · `main.swift` | menus (nil-target selectors), window, welcome |
 | `RecordingSetup.swift` · `RecordingResult.swift` · `ScreenRecorder.swift` · `+Pause.swift` · `+Delegates.swift` · `+Microphone.swift` · `+Finishing.swift` · `+Content.swift` | screen recording's session (road map 3): the values a probe can call — `RecordingChoice`, `RecordingFiles` (the folder, the Screenshot app's date stem, ` (2)` on collision), `RecordingConfiguration.make` (pure, every field read back), `RecordingGrant` (the two synchronous grant reads and the refusal sentences; nothing here prompts), and in `RecordingResult.swift` what a recording ENDS as — `RecordingResult` over `RecordingSegment`s, `StopReason`, `RecorderError` — and the machine `idle → arming → recording ⇄ paused → finishing → idle` over one `SCStream` and one `SCRecordingOutput` PER SEGMENT (a pause removes it and its file closes; a resume adds a fresh one to a file named by its own start time while the stream keeps capturing — R0 q7) for the picture and system sound and, for a microphone, an `AVCaptureSession` + `AVCaptureAudioFileOutput` writing a SECOND file per segment (§11). Every framework callback is stamped where it arrives and hopped to main, and finds ITS segment by the output's identity or the microphone file's URL; every state transition runs there |
 | `RecordingLanding.swift` · `RecordingLanding+Placing.swift` · `RecordingLanding+Microphone.swift` · `ProjectDocument+Recording.swift` | where a finished recording goes: a value type answering an UNSCOPED op list and the ids the core will mint — every segment's picture back to back on ONE track by the two-try rule over the SEQUENCE (all on the front track or all on a new one), each at the previous clip's END as the core reports it, touching or a sub-frame gap at an inexact rate and never an overlap; each segment's microphone on one new back track named Microphone at ITS picture's start minus ITS offset, floored at the previous voice's end and at 0, a start below the floor head-trimmed rather than placed late, a voice wholly under the previous one or a file under a frame left as media with a note naming it — that the panel commits through `performGroupedEdit` and the tool through `AgentServer.performGroupedEdit`; and `untitled(around:)`, whose ORDER is a contract — open untitled, `adoptImported` (the one spelling File ▸ Open uses, now in the base file) with the FIRST segment, the import count, the REMAINDER's one edit (`remainderPlacement`: segments 2…n after clip 1, then every voice; named Add Microphone for one segment with a voice, else Add Recording Segments), `makeWindowControllers`, `showWindows` |
 | `RecorderPanelController.swift` · `+Rows.swift` · `+Recording.swift` · `+Pause.swift` · `+Landing.swift` · `+Picker.swift` · `RecorderStatusItem.swift` · `AppDelegate+Recording.swift` · `AgentServer+Recording.swift` · `+RecordingArguments.swift` · `+RecordingResult.swift` | File ▸ New Recording… (⌥⌘N): the app's second `NSPanel` — `.floating` and `.nonactivatingPanel` so Record and the countdown's Cancel can be clicked without bringing Reelcut forward over the thing ABOUT to be recorded; the panel is off screen for the recording itself (§11) and ONE instance because it outlives documents — its first `NSStatusItem`, the recording's whole chrome: a coral dot and the elapsed time with Pause Recording · Stop Recording, the pause glyph and the FROZEN time with Resume Recording · Stop Recording; the grants asked BEFORE the countdown; and `record_screen`, the tool that never asks and whose result carries `pauses` and `segments` |
-| `AgentServer.swift` · `AgentServer+<Feature>.swift` · `AgentCatalog.swift` | MCP mirrors of every op, plus `open_project`, `import_media`, `render_frame`. One handler file per feature area, the frozen `AgentServer.swift` keeping only the registry rows |
+| `AgentServer.swift` · `AgentServer+<Feature>.swift` · `AgentCatalog.swift` | MCP mirrors of every op, plus `open_project`, `import_media`, `render_frame`. One handler file per feature area, the frozen `AgentServer.swift` keeping only the registry rows. `AgentServer+Transitions.swift` and `AgentCatalog+Transitions.swift` are road map 5 E1's pair (`add_transition`, `set_transition_style`); the catalog rows are spliced in beside the clip group and never appended at the end, where `recording_probe.py` reads the last eleven names |
 | `Theme.swift` · `Controls.swift` · `OptionControls.swift` · `Sheets.swift` | copied from Rasterize |
 
 ### 7.5 Compositor
@@ -1812,7 +1926,14 @@ pass nothing, because each wants the picture rather than a deliverable.
 - **Transitions** are one pass over the pair: dissolve = both with
   progress-weighted opacity; fade black/white = out fades to the color
   then in fades from it; push/slide = offset by progress; wipe = a UV
-  threshold; zoom = scale ramp. A layer mid-transition always draws
+  threshold; zoom = scale ramp. The FOUR wipe directions (format version 7)
+  are one shader branch and four vectors, as the four pushes are: the
+  branch takes `local.y` when `|dirY| > |dirX|` and flips on a negative
+  component, and the edge is measured in each layer's OWN box — so a
+  different-size pair does not meet at one edge, which is the price of
+  every nested wipe working and the common same-size pair being exact. The
+  `progress` the pass reads is already eased (§7.3); nothing here knows
+  about `curve`. A layer mid-transition always draws
   `normal`, and the core is what says so (§7.3), so this shader has no
   special case for it and none may be added. Shadows (M3) render the
   layer's alpha to a small offscreen texture, blur with
@@ -2203,10 +2324,12 @@ concern is a new module with its own `impl Project` block.
 |---|---|
 | `lib.rs` | declarations and re-exports only |
 | `model.rs` | the §5.2 types and serde derives, and the serde defaults that say what an absent key means — the schema's SHAPE, and nothing else |
-| `model_props.rs` | the §5.2 per-clip property types — `VideoProps`, `Crop`, `Shadow`, `ColorAdjust`, `Chroma`, `Filter`, `Reflection`, `BlendMode`, `AudioProps`, `Compressor`, `Duck`, `ShapeProps`, `Stroke`, `Gradient`, `GradientKind`, `GradientStop` and their enums, with their defaults: the schema's VOCABULARY where `model.rs` is its shape. Cut out under the size rule (road map 2, phase 2) and re-exported whole by `model.rs`, so every `crate::model::X` path still resolves. It has since paid the same rule TWICE itself, both times BEFORE the phase that owed it took anything on: the region types went to `model_regions.rs` in phase 3c and the text vocabulary to `model_text.rs` in phase 6, and it re-exports both, so no path anywhere changed either time |
+| `model_props.rs` | the §5.2 per-clip property types — `VideoProps`, `Crop`, `Shadow`, `ColorAdjust`, `Chroma`, `Filter`, `Reflection`, `BlendMode`, `AudioProps`, `Compressor`, `Duck`, and their enums, with their defaults: the schema's VOCABULARY where `model.rs` is its shape. Cut out under the size rule (road map 2, phase 2) and re-exported whole by `model.rs`, so every `crate::model::X` path still resolves. It has since paid the same rule THREE times itself, every time BEFORE the phase that owed it took anything on: the region types went to `model_regions.rs` in phase 3c, the text vocabulary to `model_text.rs` in phase 6 and the shape vocabulary to `model_shape.rs` in road map 5's E2, and it re-exports all three, so no path anywhere changed any time |
 | `model_regions.rs` | the boxes drawn ON the picture — `Spotlight`, `ObscureRegion`, the `SpotShape` both are drawn with and the `MAX_OBSCURE` budget on the second. One concern, not three adjacent ones: they share one coordinate frame (`x`/`y` the region's CENTRE, an offset in SOURCE pixels from the centre of the layer's CROPPED rect; `width`/`height` its size in the same pixels — which is what carries a region with its layer through scale, move and rotation) and one shape enum. Cut out of `model_props.rs` under the size rule (road map 2, phase 3c) and re-exported whole by it, so every `crate::model::X` path still resolves; the FIELDS holding them (`VideoProps.spotlight`, `VideoProps.obscure`) stay with the video group |
 | `model_text.rs` | the text vocabulary — `TextProps`, the `TextAlign` and `TextVAlign` it is placed by, the `Outline` and `Backdrop` drawn with it, and the `TextAnimation` and `TextAnimationKind` that reveal it. Cut out of `model_props.rs` under the size rule (road map 2, phase 6) and re-exported whole by it, and cut HERE because text is the one property group the model cannot MEASURE: every other group is quantities the core bounds, interpolates and solves against, while only the platform can lay a string out and the size comes back the other way through a cache (§5.3, §11). `TextAnimationKind`'s declaration order is NOT load-bearing — the recipe carries a reveal's kind by NAME — where `ObscureKind`'s and `BlendMode`'s are shader discriminants; the JSON spelling of every variant is, so a rename needs a migration step |
-| `model_query.rs` | reading a project: `Project::new`, id allocation, the `clip` / `track` / `media` / `marker` / `nest` lookups, `clips_on`, `duration`, `validate` with its nesting walk, and the three source-window measurements (`content_length`, `source_head`, `source_length`) every placement op clamps against |
+| `model_shape.rs` | the shape vocabulary — `ShapeProps`, the `ShapeKind` it draws, the `Stroke` around it, and the `Gradient`, `GradientKind`, `GradientStop` and `MAX_GRADIENT_STOPS` that fill it. Cut out of `model_props.rs` under the size rule (road map 5, E2) and re-exported whole by it, and cut HERE because it is `model_text.rs`'s seam read a second time: shape and text are the two sources the model only DESCRIBES, drawn on the CPU and keyed by the recipe's content hash, where everything left in `model_props.rs` is read straight into the compositor's uniform block. Nothing here is ever a shader discriminant — `GradientKind` may gain a kind at the END and nothing derives a number from the order, where `BlendMode`'s order IS the discriminant |
+| `model_motion.rs` | the motion vocabulary (format version 8, road map 5's E2) — `Motion` and the `MotionEdge`, `MotionDuring`, `EdgeMotion` and `DuringMotion` it is made of. Its own module for a seam rather than for room: every other member of the video group is a quantity the compositor reads more or less straight, while these five say only what a clip should DO and the placement that comes out of them is computed at render time by `motion.rs`. Re-exported whole by `model_props.rs`; neither enum's declaration order is load-bearing, and both are closed |
+| `model_query.rs` | reading a project: `Project::new`, id allocation, the `clip` / `track` / `media` / `marker` / `nest` lookups, `clips_on`, `duration`, `validate` with its nesting walk, the three source-window measurements (`content_length`, `source_head`, `source_length`) every placement op clamps against, and `source_size` — the source's pixel size when the model knows it, `None` for text and for a media, nest or shape with no positive size. That last one was TWO private readers, `edit_props.rs`'s and `edit_background.rs`'s stricter one, collapsed here by road map 5's T0f, so a source kind added to `model.rs` is answered once |
 | `time.rs` | `Ticks`, `TIMESCALE`, `Fps`, frame snapping, timecode format/parse (non-drop `HH:MM:SS:FF` and `HH:MM:SS.mmm`) |
 | `edit.rs` | the op enum + serde, `apply(&self, op) -> Result<Option<Project>, String>`; **its module doc is the op schema table**. `parse` answers an `Envelope` — the op AND the envelope's `scope` — which it takes out of the object in the pass that already reads `"op"`, because `Op` is internally tagged with `deny_unknown_fields` on every variant (an envelope key would be a typo to all fifty-five) and serde does not support that attribute with `flatten`. `apply_op(&Op)` is unchanged and knows nothing about nests |
 | `scope.rs` | editing INSIDE a nest — the envelope's `scope` key (road map 2, phase 9). Builds a VIEW project out of the nest, applies the op to it unchanged, and merges `tracks`, `clips`, `next_id`, `media` and `nests` back. Its own module because a scope is a change of CONTAINER rather than an op or a property of one, and because the whole of it is two pure functions and a refusal list, which belong nowhere near the semantics of any single edit. Three readings in it are measured rather than reasoned: the scoped nest's row stays in the view with its tracks and clips **emptied** (whole, it doubles every id in `validate`'s one uniqueness sweep; removed, it dangles every other nest's clip that shows it — the nest-inside-a-nest case the phase exists for); the nests write-back is **union first, orphans after**, because `unnest`'s `nest_is_shown` cannot see the parent's timeline clips from inside a view and would drop a nest a timeline clip still shows; and the caps and the depth are checked ONCE on the merged parent, which is why a scoped op has a wider `Err` arm than any other |
@@ -2214,15 +2337,20 @@ concern is a new module with its own `impl Project` block.
 | `props_check.rs` | the range checks every value written into a property group passes first — `check_video` / `check_audio` / `check_text` / `check_shape`, the `finite` / `in_range` family under them, and the bounds they check against (§4.3's numbers, which `actions.rs`'s `clamp_video` reads too) — cut out of `edit_props.rs` in phase 2 because a range check is a fact about the vocabulary, not about an edit; a patch and a `paste_attributes` copy run the same checks (`Project::check_group`) |
 | `edit_edge.rs` / `edit_insert.rs` | the cutting moves that keep something fixed on purpose: `slip` and `roll` (the clip's place, and the pair's outer edges); `insert_clip` and `overwrite_clip` (the other tracks, and the timeline's total length) |
 | `edit_action.rs` / `edit_nest.rs` / `edit_paste.rs` | the ops with a concern of their own: actions (the no-overlap rule); `nest` / `unnest`; `paste` (making another document's clips fit) and `paste_attributes` (the same payload's earliest clip's property groups copied onto clips already placed — replaced whole, never merged) |
+| `edit_split.rs` | cutting one clip in two — `split_clip` and the two helpers only it has ever needed, `state_patch` and `narrow_to`. Cut out of `edit_clip.rs` under the size rule (road map 5, E2) and cut HERE because a split is not a placement: every other op there decides where a clip sits, while this one decides what the SECOND clip INHERITS — its base props from the evaluation at the cut, the actions that had not finished rebased to its own clip time with a straddled one narrowed to the keys it animated, and the halves of a preset anchored to the clip's two ends (`video.motion`'s rule, and `text.animation`'s). Every splitter in the crate routes here — `split_clips`, `split_under_playhead`, `clear_range` (so `ripple_delete_range(s)` and `lift_range`), `insert_clip`, `overwrite_clip` and `freeze_frame` — so a rule stated once is a rule they all obey |
+| `edit_transition.rs` | the WRITE half of a transition: `set_transition`, `set_transition_duration`, `set_gained_transitions` (the rule that a clip which gains an overlap gains a transition), and road map 5 E1's `add_transition` and `set_transition_style` with the `TransitionAlign` their op argument is spelled in. Cut out of `edit_clip.rs` under the size rule and cut HERE because placement and transitions are different questions — `edit_clip.rs` decides where a clip SITS, this decides what happens where two of them meet. `transition.rs` is the READ half and nothing here restates it; `set_gained_transitions` is re-exported from `edit_clip.rs`, so every caller's path is unchanged |
 | `edit_zoom.rs` | `add_zoom_action`, the screencast zoom (road map 2, phase 3b) — the one op whose substance is geometry rather than bookkeeping, which is why it is not a fifth function in `edit_action.rs`. **Its module doc is the placement equation**: the two frames (Q, `model_regions.rs`'s source pixels from the cropped rect's centre; C, canvas pixels) and the solve that turns a rectangle drawn on the picture into the `scale` / `x` / `y` an action's end patch carries, rotation and crop included. Composes `add_action` + `set_action` + `set_action_end`, so a drag is one undo step and every `add_action` refusal is inherited rather than copied |
 | `edit_background.rs` | `add_background` and `add_blurred_background`, what goes BEHIND the picture (road map 2, phase 6c) — a plate (a colour, or an image) or a blurred copy of a clip, each ONE clip on a NEW track at index 0, so there is no overlap to check and one undo step takes it all away. They are core OPS rather than app-side composites, which the road map had planned, because the composite carries a constraint no half of it states: the blurred copy must show the same frames as its original, which means its source WINDOW, where `add_clip` gives the whole media and `duplicate` lands the copy somewhere else on the same track. In the core it is `clip.clone()` with six VIDEO fields overwritten — `scale`, `x`, `y`, `crop`, `filters`, `blend` — over vocabulary the app lacks: the source's pixel size, `edit_clip.rs`'s `fill_scale` and the `SCALE_MAX` clamp on it. `insert_clip`, `overwrite_clip` and `add_zoom_action` are the standing precedent for that rule |
 | `actions.rs` | evaluation and interpolation, `clip_state(clip, t)`, and `clamp_video`, the last line of defence §5.4 describes. §5.4's LIST rule is stated here once and applies to every array of objects in the schema (`video.filters`, `video.obscure`), neither of which carries a line of its own code; the widened discriminant set is confined to list ENTRIES, so `video.spotlight`'s animation is what it has always been. `clamp_video` also carries the one bound that is not a range — a NEST clip's evaluated `blend` is forced to `normal` (format version 6) — because `set_action_end` validates nothing beyond "is it an object", and closing it in the evaluator closes the recipe, `clip_state` and both export writers at once, which no per-op check can |
 | `transition.rs` | overlap detection, the overlap rule, progress at *t* |
 | `evaluate.rs` | `composition_plan()` (A/B assignment, instruction tiling) and the `assign()` the recipe shares with it |
-| `recipe.rs` | `frame_recipe(t)`: the layer list at one instant — like every walk over what plays, it consumes `nest.rs`'s instances — and the keys of each layer in it, `blend` included. `content_hash` and the FNV under it stay here and are `pub(crate)`: a SHAPE layer hashes its description through the same function, so the hash is the recipe's texture-cache primitive rather than a text concern. Phase 7 added `RecipeOptions` (what a caller wanted besides `t`; `frame_recipe(t)` is `frame_recipe_opts(t, defaults)`, one implementation so the two cannot drift) and `RecipeLayer`, the twenty layer keys written in ONE place — the burn-in is a second producer of layers, and a copied skeleton would drift silently, since `RecipeLayer.init(from:)` defaults a missing key with no diagnostic |
+| `recipe.rs` | `frame_recipe(t)`: the layer list at one instant — like every walk over what plays, it consumes `nest.rs`'s instances — and the keys of each layer in it, `blend` included. It is also where a clip's `video.motion` becomes placement, through the two `motion::apply` calls in `layer` and `frame_of` (§5.3); no layer key was added for it. `content_hash` and the FNV under it stay here and are `pub(crate)`: a SHAPE layer hashes its description through the same function, so the hash is the recipe's texture-cache primitive rather than a text concern. Phase 7 added `RecipeOptions` (what a caller wanted besides `t`; `frame_recipe(t)` is `frame_recipe_opts(t, defaults)`, one implementation so the two cannot drift) and `RecipeLayer`, the twenty layer keys written in ONE place — the burn-in is a second producer of layers, and a copied skeleton would drift silently, since `RecipeLayer.init(from:)` defaults a missing key with no diagnostic |
 | `recipe_text.rs` | what a text layer SHOWS at one instant: the `reveal`, its phase and its kind (§7.3), computed in the core so everything that draws reads one description, folded into the layer's content hash so a per-frame picture cannot be served a stale texture, and assembled into the layer's `source` object by `text_source`. Cut out of `recipe.rs` under the size rule (road map 2, phase 7) and re-exported by it, so `crate::recipe::text_source` still resolves, and cut HERE because placement is the same question for every layer while text is the one kind that is not finished when its placement is — the model can only state an intent (§5.3, §11), and an ANIMATED intent is not even fixed. `text_source` takes a description, a clip time and a duration and nothing else — no clip, no instance — so a text layer the core synthesizes is a text layer like any other. The cut paid for itself at once: `burn_in_layer`, the timecode layer `burn_in_timecode` appends, is here, with no animation (so `Reveal::WHOLE`), a fraction-of-the-height placement rather than a bottom anchor, and the non-drop and project-time readings §7.3 records |
+| `motion.rs` | `video.motion` turned into PLACEMENT (§5.3): the two edge tables and the during table of road map 5 §5b, the tent rule, the `rem_euclid(360)` reduction, the visible-centre pivot and the slide geometry. `apply` takes the EVALUATED props, the clip time, the clip's own duration, the source's pixel size and the container's canvas and answers the same props with five fields moved; `recipe.rs`'s `layer` and `frame_of` are its only two callers, which is what keeps everything that EDITS reading the clip un-moved (§5.4). It never trusts the file — a degenerate duration, period or amount is inactive or clamped, and no NaN reaches the recipe — and it SHORT-CIRCUITS to `video.clone()` when no slot is running, so a frame past an arrival is byte-identical to the same clip with no preset |
 | `nest.rs` | flattening a nest: the walk that turns a nest clip into the clips it stands for, and the transform they inherit |
 | `audio.rs` | envelopes: fades, volume actions, ducking, mute and solo — solo judged per container (the timeline, or a nest's own tracks) in `Voice::of` against that container's track set, never in the plan |
+| `audio_duck.rs` | ducking — the one term of the envelope that comes from ELSEWHERE: `Ducker`, `duck_gain` (the attack / hold / release multiplier at a tick) and `Project::duckers`, the walk over the flattened timeline that collects them. Cut out of `audio.rs` under the size rule and cut HERE because every other factor `audio.rs` folds is a property of the voice being measured, while a duck is imposed by a clip on some other track and is computed from a different input — the instances, not one composition track's segments. `Ducker` is re-exported by `audio.rs`, so `crate::audio::Ducker` still resolves |
+| `audio_crossfade.rs` | the transition crossfade (format version 7, road map 5's E1) — `crossfade_gain`, the constant-power multiplier at a tick, and `crossfade_breaks`, the ticks the curve has to be sampled at for it to survive coalescing. `audio_duck.rs`'s seam one step along: a duck comes from a clip on another TRACK, a crossfade from the neighbour this clip OVERLAPS, and neither is a property of the voice being measured. Both halves in one module because they have to agree — a gain with no breakpoints under it is flattened into one ramp and the constant-power law degenerates into the equal-gain one it exists to avoid |
 | `snap.rs` | candidates and `resolve` |
 | `format.rs` | `RC_FORMAT_VERSION`, the `MAX_*` reader caps (`RC_MAX_*` in the header), read-any-version / write-current |
 | `export.rs` | settings resolution: `Project::export_settings`, the one thing that reads a canvas, a duration, a rate and an override and meets a preset row against them. Still the file whose module doc explains the whole export design, and it re-exports `preset` / `presets` (beside `describe`) at their old paths |
@@ -2658,3 +2786,36 @@ assisted import.
   detects exactly what it did.
 - **No network model in the silence path.** A transcript-level edit is
   where such a model would go, and that is a separate item on a later list.
+- **R5-1 — Effects are closed vocabularies, never a runtime.** Every
+  transition kind and motion preset is an enum variant or a struct the core
+  range-checks, the recipe carries, the MCP catalog mirrors and the one
+  compositor draws. There is no package format, no user shader, no
+  expression language — which is why neither road map 5 phase adds a Metal
+  pipeline.
+- **R5-2 — A transition's sound is a constant-power crossfade, on by
+  default for NEW transitions and absent from old files.** The overlap a
+  person adds a transition at is two different moments — a Remove Silences
+  cut, a jump between takes — which is uncorrelated material, where
+  constant power holds the level and equal gain dips 3 dB. A version-6 file
+  has no `audio` key and sounds exactly as it did; every transition the
+  core mints from version 7 on says `audio: true, curve: ease_in_out`. One
+  constructor, `Transition::minted`, is the only place those two values are
+  written.
+- **R5-3 — `add_transition` builds the overlap from handles, clamps the
+  duration, and never moves a third clip.** A shorter transition is the
+  same edit at a size the media allows; a gap closed part-way
+  (`close_gap`'s refusal) is a different edit. Not being at a hard cut is a
+  wrong ARGUMENT (`Err`), because the op is pointed at one cut by a caller
+  who meant that cut — unlike `roll`, which a drag can reach at any edge;
+  having no handle is a domain refusal (`Ok(None)`).
+- **R5-4 — Motion is a presentation term.** `video.motion` is stored in the
+  model and drawn by the recipe, but `evaluate_clip`, `get_project`, the
+  inspector's fields and every edit read the clip un-moved. It is the
+  second place the recipe draws what the model does not say — the first
+  being the forced `normal` blend under a transition (§7.3). It is not an
+  animation target: an action cannot animate it, and a file that tries is
+  drawn with the base motion.
+- **R5-5 — Motion is a pure function of clip time.** No seed, no wall
+  clock, no previous frame: `render_frame` at a tick is byte-identical run
+  after run, preview and export agree, and two clips with the same preset
+  at the same clip time are displaced identically.

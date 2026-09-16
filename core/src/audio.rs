@@ -32,6 +32,30 @@
 //! Nothing here edits, and nothing here touches a sample: this is a
 //! description of a gain curve, computed from the model alone.
 //!
+//! ### The crossfade
+//!
+//! An overlap whose transition says `audio: true` (format version 7) fades
+//! its two clips across each other at CONSTANT POWER — `cos(p·π/2)` out,
+//! `sin(p·π/2)` in, over the eased progress `transition.rs` reports. It is
+//! one more factor in the product, so mute, solo, ducking, volume and the
+//! fades all keep their precedence and a pair where only one clip has audio
+//! still fades that one.
+//!
+//! Every STAGE multiplies its own term, which is where the sound parts
+//! company with the picture: a clip inside an overlap inside a nest that is
+//! itself in a transition gets BOTH fades, where `recipe.rs` picks the
+//! clip's own transition and stops. That is right for sound — both fades
+//! are audible — and the difference is deliberate rather than an oversight
+//! in one of the two.
+//!
+//! TWO terms of the envelope are not properties of the voice being measured
+//! at all, and each has a module of its own. Ducking, which a clip somewhere
+//! ELSE in the project imposes, is `audio_duck.rs`; the crossfade above,
+//! which the NEIGHBOUR this clip overlaps imposes, is `audio_crossfade.rs`,
+//! both the gain at a tick and the breakpoints the curve has to be sampled
+//! at. This module reads each as one more factor in the product, as it reads
+//! any other.
+//!
 //! ### Nested sound
 //!
 //! What plays is not always a clip of `Project::clips`: a clip inside a nest
@@ -66,7 +90,11 @@
 
 use serde::Serialize;
 
-use crate::model::{AudioProps, Clip, Duck, Project, Track};
+use crate::audio_duck::duck_gain;
+/// Re-exported from its own module so `crate::audio::Ducker` — the path
+/// `evaluate.rs` names — resolves where it always did.
+pub use crate::audio_duck::Ducker;
+use crate::model::{AudioProps, Clip, Nest, Project, Track};
 use crate::nest::Instance;
 use crate::time::{Ticks, TIMESCALE};
 
@@ -85,13 +113,13 @@ pub struct Ramp {
 /// what the ear hears as a step even on a fast fade, and it keeps a ten
 /// second action to three hundred breakpoints rather than the six million
 /// ticks it spans.
-const ACTION_SAMPLE: Ticks = TIMESCALE / 30;
+pub(crate) const ACTION_SAMPLE: Ticks = TIMESCALE / 30;
 
 /// A ceiling on the samples one action contributes, so an hour-long action
 /// widens its step instead of adding a hundred thousand breakpoints. 4096
 /// samples is over two minutes at the 1/30 s grid; past that the ramp is
 /// slow enough that a coarser grid is inaudible.
-const MAX_ACTION_SAMPLES: i64 = 4096;
+pub(crate) const MAX_ACTION_SAMPLES: i64 = 4096;
 
 /// Gain ceiling. `volume` is linear and may exceed 1, up to 4 (spec §5.2);
 /// clamping here keeps one bad patch from sending +80 dB to the mix.
@@ -113,33 +141,18 @@ const JOIN_EPS: f64 = 1e-9;
 /// an action) is evaluated at the boundary itself, where it already equals
 /// its own limit.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Side {
+pub(crate) enum Side {
     /// The value AT the breakpoint — the start of the ramp that follows.
     Right,
     /// The limit approaching the breakpoint — the end of the ramp before.
     Left,
 }
 
-fn covers(start: Ticks, end: Ticks, t: Ticks, side: Side) -> bool {
+pub(crate) fn covers(start: Ticks, end: Ticks, t: Ticks, side: Side) -> bool {
     match side {
         Side::Right => start <= t && t < end,
         Side::Left => start < t && t <= end,
     }
-}
-
-/// A clip elsewhere in the project that pushes this track down while it
-/// plays. Ducking is by clip EXTENT, not by voice activity (spec §11), so
-/// this is all the ducker's audio needed to compute the gain.
-///
-/// `clip` is carried so a track can drop the duckers that are its OWN
-/// segments; the span is project time, which for a nested ducker is the part
-/// of it the nest clip lets through.
-#[derive(Debug, Clone, Copy)]
-pub struct Ducker {
-    clip: u32,
-    start: Ticks,
-    end: Ticks,
-    duck: Duck,
 }
 
 /// One audible span on a composition audio track, and every clip whose gain
@@ -159,20 +172,27 @@ pub struct Voice<'a> {
 
 /// One clip's contribution to a voice's gain.
 #[derive(Debug, Clone, Copy)]
-struct Stage<'a> {
-    clip: &'a Clip,
+pub(crate) struct Stage<'a> {
+    pub(crate) clip: &'a Clip,
     /// Project time of this clip's FIRST FRAME — where its fades, its
     /// actions and its duration are measured from. Deliberately not the
     /// voice's `start`: a nest clip that cuts an inner clip's head off does
     /// not drag the inner clip's fade-in along with it.
-    origin: Ticks,
+    pub(crate) origin: Ticks,
     /// Whether the track this clip sits on — the nest's, inside one — is
     /// muted, or silenced by a solo elsewhere in its container. Decided
     /// here, in the walk, because a nested clip's track is not in
     /// `Project::tracks` and cannot be looked up by id, and because the
     /// solo rule needs the track's whole container set, which only the walk
     /// can name (see `silenced`).
-    track_muted: bool,
+    pub(crate) track_muted: bool,
+    /// The nest this clip sits IN, or `None` for a clip on the timeline.
+    ///
+    /// Carried for the crossfade term alone: an overlap is a fact about one
+    /// container's clips, and a nested clip's neighbours are the nest's, not
+    /// `Project::clips`. Decided in the walk for `track_muted`'s reason —
+    /// nothing downstream can look a nested clip's container up by id.
+    pub(crate) container: Option<&'a Nest>,
 }
 
 /// Whether `track` is silent for reasons of its own: muted, or not soloed
@@ -203,17 +223,27 @@ impl<'a> Voice<'a> {
                 .and_then(|i| instance.inside.get(i))
                 .map_or(top, |enclosing| enclosing.nest.tracks.as_slice())
         };
+        // The nest a stage at depth `d` sits IN — the same `inside[d - 1]`
+        // the track set comes from, which is why the two are read together.
+        let container_at = |depth: usize| -> Option<&'a Nest> {
+            depth
+                .checked_sub(1)
+                .and_then(|i| instance.inside.get(i))
+                .map(|enclosing| enclosing.nest)
+        };
         let mut stages = Vec::with_capacity(instance.inside.len().saturating_add(1));
         stages.push(Stage {
             clip: instance.clip,
             origin: instance.origin,
             track_muted: silenced(set_at(instance.inside.len()), instance.track),
+            container: container_at(instance.inside.len()),
         });
         for (depth, enclosing) in instance.inside.iter().enumerate().rev() {
             stages.push(Stage {
                 clip: enclosing.clip,
                 origin: enclosing.origin,
                 track_muted: silenced(set_at(depth), enclosing.track),
+                container: container_at(depth),
             });
         }
         Voice {
@@ -227,69 +257,6 @@ impl<'a> Voice<'a> {
     /// has one; the 0 is unreachable and is there so nothing here can panic.
     fn clip_id(&self) -> u32 {
         self.stages.first().map(|s| s.clip.id).unwrap_or(0)
-    }
-}
-
-/// The ducker's multiplier at `t`.
-///
-/// The attack ramps 1 → `level` from the ducker's first tick, the level
-/// holds for the rest of its extent, and the release ramps back to 1 over
-/// the `release` ticks AFTER it ends. That is compressor ordering — a duck
-/// that released before its clip finished would lift the bed back under the
-/// last words of the voiceover — and it is why the ducked span reaches past
-/// the ducking clip.
-///
-/// An attack longer than the clip simply never arrives at `level`; the
-/// release then starts from wherever it got to, so no combination of
-/// lengths produces a discontinuity in the middle of the curve.
-fn duck_gain(ducker: &Ducker, t: Ticks, side: Side) -> f64 {
-    let level = ducker.duck.level;
-    if !level.is_finite() {
-        return 1.0;
-    }
-    let level = level.clamp(0.0, MAX_GAIN);
-    // Negative lengths are meaningless; treat them as instantaneous rather
-    // than dividing by them.
-    let attack = ducker.duck.attack.max(0);
-    let release = ducker.duck.release.max(0);
-    let ducked_end = ducker.end.saturating_add(release);
-    if !covers(ducker.start, ducked_end, t, side) {
-        return 1.0;
-    }
-
-    // How far down the attack has travelled after `elapsed` ticks. The
-    // endpoints are returned EXACTLY rather than through the interpolation:
-    // `1 + (0.2 - 1) * 1` is 0.19999999999999996, and the whole hold of
-    // every duck in every plan would print with that tail — noise in a
-    // string Swift compares and a person reads.
-    let reached = |elapsed: Ticks| -> f64 {
-        let u = if attack > 0 {
-            (elapsed.max(0) as f64 / attack as f64).clamp(0.0, 1.0)
-        } else {
-            // A zero attack is a step at the ducker's first tick.
-            1.0
-        };
-        match u {
-            u if u <= 0.0 => 1.0,
-            u if u >= 1.0 => level,
-            u => 1.0 + (level - 1.0) * u,
-        }
-    };
-
-    if covers(ducker.start, ducker.end, t, side) {
-        reached(t.saturating_sub(ducker.start))
-    } else {
-        let held = reached(ducker.end.saturating_sub(ducker.start));
-        let u = if release > 0 {
-            (t.saturating_sub(ducker.end) as f64 / release as f64).clamp(0.0, 1.0)
-        } else {
-            1.0
-        };
-        match u {
-            u if u <= 0.0 => held,
-            u if u >= 1.0 => 1.0,
-            u => held + (1.0 - held) * u,
-        }
     }
 }
 
@@ -394,38 +361,6 @@ impl Project {
         coalesce(ramps)
     }
 
-    /// Every ducking clip in the project, with the span it ducks over.
-    ///
-    /// Computed once per plan from the flattened timeline, so a duck set
-    /// INSIDE a nest ducks over the part of it that plays, and a duck on the
-    /// nest clip itself ducks over the whole nest. A clip appears at most
-    /// once even when several instances name it — a nest shown twice ducks
-    /// over the first span it was found at, which is a corner no UI can
-    /// reach and not worth a second entry that would duck twice.
-    ///
-    /// The duck is read from the base props, not through actions: the ramp
-    /// lengths describe an envelope, and an envelope whose own attack time
-    /// animates is not a version-1 feature.
-    pub(crate) fn duckers(&self, instances: &[Instance<'_>]) -> Vec<Ducker> {
-        let mut out: Vec<Ducker> = Vec::new();
-        for instance in instances {
-            for (clip, start, end) in instance.chain() {
-                if out.iter().any(|d| d.clip == clip.id) {
-                    continue;
-                }
-                if let Some(duck) = clip.audio.and_then(|a| a.duck) {
-                    out.push(Ducker {
-                        clip: clip.id,
-                        start,
-                        end,
-                        duck,
-                    });
-                }
-            }
-        }
-        out
-    }
-
     /// The ticks the envelope is sampled at: the ends of the extent, every
     /// voice edge, every fade edge of every stage, every duck edge, and a
     /// 1/30 s grid inside each action that touches the audio group. Sorted,
@@ -460,6 +395,15 @@ impl Project {
                 }
                 if props.fade_out > 0 {
                     breaks.push(end.saturating_sub(props.fade_out));
+                }
+
+                // The crossfade is a curve too, and an eased one is not even
+                // a straight line, so an audio-true overlap gets its two
+                // edges plus samples across it. The step is the ACTION
+                // loop's own formula below, which is what keeps a
+                // twenty-minute overlap to ~4096 points rather than 36,000.
+                if let Some(overlap_breaks) = self.crossfade_breaks(stage) {
+                    breaks.extend(overlap_breaks);
                 }
 
                 for action in &clip.actions {
@@ -507,7 +451,7 @@ impl Project {
         let mut gain = voices
             .iter()
             .find(|v| covers(v.start, v.end, t, side))
-            .map(|v| self.voice_gain(v, t))
+            .map(|v| self.voice_gain(v, t, side))
             .unwrap_or(0.0);
         for ducker in duckers {
             gain *= duck_gain(ducker, t, side);
@@ -519,20 +463,20 @@ impl Project {
     /// inside. Turning a nest down turns everything in it down, and muting
     /// one silences everything in it — which falls out of the product rather
     /// than needing a rule of its own.
-    fn voice_gain(&self, voice: &Voice<'_>, t: Ticks) -> f64 {
+    fn voice_gain(&self, voice: &Voice<'_>, t: Ticks, side: Side) -> f64 {
         let mut gain = 1.0;
         for stage in &voice.stages {
             if gain == 0.0 {
                 break;
             }
-            gain *= self.stage_gain(stage, t);
+            gain *= self.stage_gain(stage, t, side);
         }
         gain
     }
 
     /// One clip's own gain at project time `t`: its evaluated volume shaped
     /// by its fades, or 0 if it is silenced.
-    fn stage_gain(&self, stage: &Stage<'_>, t: Ticks) -> f64 {
+    fn stage_gain(&self, stage: &Stage<'_>, t: Ticks, side: Side) -> f64 {
         let clip = stage.clip;
         if !clip.enabled.audio {
             return 0.0;
@@ -569,7 +513,8 @@ impl Project {
             let remaining = clip.duration.saturating_sub(clip_t).max(0) as f64;
             gain *= (remaining / props.fade_out as f64).clamp(0.0, 1.0);
         }
-        gain
+
+        gain * self.crossfade_gain(stage, t, side)
     }
 
     /// The clip's audio props at a clip time, through its actions.

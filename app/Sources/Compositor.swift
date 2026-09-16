@@ -482,8 +482,12 @@ struct ShadowUniforms {
 }
 
 /// `TransitionKind` (§5.2) as the shader's code plus its direction vector.
-/// Four push directions collapse to one code and four vectors, which is why
-/// the shader has eight branches and not eleven.
+/// Four push directions collapse to one code and four vectors, and — since
+/// format version 7 — four WIPE directions collapse to one code and four
+/// more, which is why the shader has eight branches and not fourteen.
+/// `Compositor.metal`'s wipe branch takes `local.y` when `|dirY| > |dirX|`
+/// and flips on a negative component, and `local.y = 0` is the layer box's
+/// top, so these four vectors are the whole of the three new kinds.
 enum TransitionCode {
     static func code(_ kind: TransitionKind) -> Float {
         switch kind {
@@ -492,7 +496,7 @@ enum TransitionCode {
         case .fadeWhite: return 3
         case .pushLeft, .pushRight, .pushUp, .pushDown: return 4
         case .slide: return 5
-        case .wipe: return 6
+        case .wipe, .wipeLeft, .wipeUp, .wipeDown: return 6
         case .zoom: return 7
         }
     }
@@ -509,6 +513,9 @@ enum TransitionCode {
         // Slide: the incoming clip travels leftward in from the right edge.
         case .slide: return (-1, 0)
         case .wipe: return (1, 0)
+        case .wipeLeft: return (-1, 0)
+        case .wipeUp: return (0, -1)
+        case .wipeDown: return (0, 1)
         case .crossDissolve, .fadeBlack, .fadeWhite, .zoom: return (0, 0)
         }
     }

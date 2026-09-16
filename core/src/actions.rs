@@ -504,6 +504,23 @@ impl Project {
             state = lerp(&state, &target, ease(action.curve, progress));
         }
 
+        // Motion is NOT an animation target (format version 8, spec §5.4).
+        // `set_action_end` refuses a patch naming it, but a hand-written
+        // file, a pasted action or another tool's project reaches here
+        // without passing that op, so the BASE value goes back over what
+        // the loop reached — at the `Value` level, since `clamp_video` is
+        // never handed the base props and a malformed `motion` would fail the
+        // WHOLE video group's decode below, losing every other animated one. The guard is "no input may panic" applied to a value
+        // nothing validates: `merge_at` REPLACES on a type mismatch, and
+        // `set_action_end` checks only the patch's top level, so
+        // `state["video"]` may be a number, string, array, bool or null
+        // here — and `IndexMut<&str>` panics on all but null, where it would
+        // MINT `{"motion": …}` and decode as DEFAULT props rather than base.
+        // With the `if let` each keeps falling through to
+        // `.ok().unwrap_or(base_video)`, as it always did.
+        if let Some(Value::Object(video)) = state.get_mut("video") {
+            video.insert("motion".to_string(), to_json(&base_video.motion));
+        }
         // A patch that writes a bad type into a field (12.5 into a tick
         // count, say) loses that whole group rather than failing: the
         // evaluator has no way to report, and a base-props frame is far

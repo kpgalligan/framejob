@@ -19,6 +19,15 @@
 //! half-written animation must stay editable and a project from a newer
 //! build must survive a round trip through this one. The evaluator is the
 //! line of defence instead — it clamps every value it produces (spec §5.4).
+//!
+//! It has exactly ONE refusal beyond "the patch must be an object", and it
+//! is about a key that is not a value at all: `video.motion` (format
+//! version 8) names a PRESET anchored to the clip's two ends, not a
+//! quantity to ramp between two states, so an action cannot target it and
+//! `set_action_end` says so by name. The refusal is a courtesy rather than
+//! the enforcement — `evaluate_clip` restores the base motion over whatever
+//! any end patch carries, which is what closes a hand-written file, a
+//! pasted action and a project from another tool at once.
 
 use serde_json::Value;
 
@@ -186,6 +195,14 @@ impl Project {
     /// Unknown keys are kept, not rejected: an end patch is evaluated
     /// leniently (`actions.rs`), and a project written by a newer build
     /// must survive a round trip through this one.
+    ///
+    /// The ONE exception, and the op's only refusal past the top-level
+    /// object check: a `video` object naming `motion` is an `Err`. A preset
+    /// is anchored to the clip's two ends and an action is a ramp between
+    /// two states, so there is nothing to interpolate — half a slide into
+    /// half a spin is not a picture anybody asked for — and the evaluator
+    /// would put the base value back anyway, leaving a control that
+    /// reported success and did nothing.
     pub fn set_action_end(
         &self,
         clip: u32,
@@ -203,6 +220,15 @@ impl Project {
                 "action end patch must be a json object, not {}",
                 describe(patch)
             ));
+        }
+        // Present at all — a `null` included, since writing `motion: null`
+        // into an end patch is still asking an action to decide a preset.
+        if patch
+            .get("video")
+            .and_then(|video| video.get("motion"))
+            .is_some()
+        {
+            return Err("video.motion is not an animation target".to_string());
         }
         let mut merged = actions::merge(&existing.end, patch);
         prune_removed(&mut merged, patch, 0);

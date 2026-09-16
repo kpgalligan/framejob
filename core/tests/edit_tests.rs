@@ -40,9 +40,17 @@ const SECOND: i64 = 600_000;
 // ---- fixtures ------------------------------------------------------------
 
 /// The everything fixture: three media (video with audio, audio only, an
-/// image), four tracks, a media clip with one action, an audio clip, a text
-/// clip, a shape clip, a nest clip with a text clip inside it, and a marker.
-/// Sized so that every op in the table has somewhere legal to land on it.
+/// image), five tracks, a media clip with one action, an audio clip, a text
+/// clip, a shape clip, a nest clip with a text clip inside it, a marker, and
+/// an ABUTTING PAIR (clips 46 and 47 on track 8, each showing media 1 with
+/// handles on both sides of the cut). Sized so that every op in the table
+/// has somewhere legal to land on it.
+///
+/// The abutting pair is road map 5 E1's, and it is on a track of its own
+/// deliberately: `op_table`'s `close_gap` row is aimed at track 6's gap and
+/// a pair placed there would fill it. It is what gives `roll`,
+/// `add_transition` and `set_transition_style` a hard cut to work at — the
+/// first of which therefore LEFT `UNCHANGING`.
 fn general() -> Handle {
     Handle::from_json(
         r#"{
@@ -61,7 +69,8 @@ fn general() -> Handle {
     {"id": 4, "name": "Track 1"},
     {"id": 5, "name": "Track 2"},
     {"id": 6, "name": "Track 3"},
-    {"id": 7, "name": "Track 4"}
+    {"id": 7, "name": "Track 4"},
+    {"id": 8, "name": "Track 5"}
   ],
   "clips": [
     {"id": 10, "track": 4, "start": 0, "duration": 6000000,
@@ -76,7 +85,13 @@ fn general() -> Handle {
     {"id": 40, "track": 6, "start": 4200000, "duration": 3000000,
      "source": {"kind": "shape"}, "video": {}, "shape": {"width": 320, "height": 120}},
     {"id": 41, "track": 7, "start": 0, "duration": 3000000,
-     "source": {"kind": "nest", "project": 42}, "video": {}}
+     "source": {"kind": "nest", "project": 42}, "video": {}},
+    {"id": 46, "track": 8, "start": 0, "duration": 3000000,
+     "source": {"kind": "media", "media": 1, "in": 3000000},
+     "video": {}, "audio": {}},
+    {"id": 47, "track": 8, "start": 3000000, "duration": 3000000,
+     "source": {"kind": "media", "media": 1, "in": 12000000},
+     "video": {}, "audio": {}}
   ],
   "markers": [{"id": 50, "time": 6000000, "name": "Intro"}],
   "next_id": 60,
@@ -598,7 +613,7 @@ fn op_table() -> Vec<Value> {
         json!({"op": "trim_end", "clip": 10, "to": 4800000}),
         json!({"op": "rate_stretch", "clip": 10, "to_end": 4800000}),
         json!({"op": "slip", "clip": 10, "delta": 600000}),
-        json!({"op": "roll", "clip": 40, "to": 3600000}),
+        json!({"op": "roll", "clip": 47, "to": 3600000}),
         json!({"op": "split", "clips": [10], "at": 3000000}),
         json!({"op": "delete", "clips": [40]}),
         json!({"op": "ripple_delete", "clips": [10]}),
@@ -643,6 +658,8 @@ fn op_table() -> Vec<Value> {
         json!({"op": "set_enabled", "clip": 10, "video": false}),
         json!({"op": "set_transition", "clip": 10, "kind": "wipe"}),
         json!({"op": "set_transition_duration", "clip": 40, "duration": 600000}),
+        json!({"op": "add_transition", "clip": 47, "duration": 600000}),
+        json!({"op": "set_transition_style", "clip": 47, "curve": "ease_in"}),
         json!({"op": "add_action", "clip": 20, "at": 0, "duration": 600000}),
         // Clip 10's own action runs 1 200 000 – 1 800 000, so this one sits
         // clear of it; the region is a quarter of the 1920×1080 source,
@@ -675,12 +692,12 @@ fn op_table() -> Vec<Value> {
 /// "valid, changes nothing" rather than an edit.
 ///
 /// Every track in that fixture holds a clip, so there is nothing for
-/// `remove_empty_tracks` to drop; and no two clips in it abut, so `roll`
-/// finds no hard cut to move and refuses, which is its documented answer to
-/// a gap. Both rows are still worth having here — they prove the envelope
-/// parses and the dispatch reaches the op — and `roll`'s actual edits are
-/// proved against a fixture built for them in `core/tests/edge.rs`.
-const UNCHANGING: [&str; 2] = ["remove_empty_tracks", "roll"];
+/// `remove_empty_tracks` to drop. It is the only row left: `roll` was the
+/// other until road map 5's E1 gave `general()` an abutting pair for
+/// `add_transition` to work at, which is a hard cut `roll` can move too —
+/// so it now changes something here as well, and its own edits stay proved
+/// against the fixture built for them in `core/tests/edge.rs`.
+const UNCHANGING: [&str; 1] = ["remove_empty_tracks"];
 
 // ---- the op table --------------------------------------------------------
 
@@ -2375,7 +2392,7 @@ fn duplicate_places_the_copies_one_span_later_with_fresh_ids() {
     let after = project
         .apply(&json!({"op": "duplicate", "clips": [30, 40]}))
         .value();
-    assert_eq!(array(&after, "/clips").len(), 7);
+    assert_eq!(array(&after, "/clips").len(), 9);
     assert_eq!(placement(&after, first_new), (7_200_000, 3_000_000));
     assert_eq!(
         placement(&after, first_new + 1),

@@ -13,9 +13,8 @@ lockstep are in the root `CLAUDE.md`; the full design is
   its tracks, clips, sources, actions, markers and nests.
 - `model_props.rs` — the schema's VOCABULARY: the §5.2 per-clip property
   types (`VideoProps`, `Crop`, `Shadow`, `ColorAdjust`, `Chroma`,
-  `Filter`, `Reflection`, `BlendMode`, `AudioProps`, `Compressor`, `Duck`,
-  `ShapeProps`, `Stroke`, `Gradient`, `GradientKind`, `GradientStop` and
-  their enums) with their
+  `Filter`, `Reflection`, `BlendMode`, `AudioProps`, `Compressor`, `Duck`
+  and their enums) with their
   defaults. Re-exported whole by `model.rs`, so every `crate::model::X`
   path and the `lib.rs` re-exports are unchanged; it is a separate file
   because of the size rule, not a separate concern.
@@ -49,6 +48,39 @@ lockstep are in the root `CLAUDE.md`; the full design is
   `ObscureKind`'s and `BlendMode`'s are shader discriminants: the recipe
   carries a reveal's kind by NAME. The JSON spelling of a variant still
   is, so a rename needs a migration step.
+- `model_shape.rs` — the shape vocabulary: `ShapeProps`, the `ShapeKind` it
+  draws, the `Stroke` around it, and the `Gradient`, `GradientKind`,
+  `GradientStop` and `MAX_GRADIENT_STOPS` that fill it. Cut out of
+  `model_props.rs` in road map 5's E2, when that file stood AT the 600-line
+  cap owing `video.motion` — the alternative phase 6 had weighed and refused
+  for lack of room — and cut HERE because `model_text.rs`'s seam reads a
+  second time: shape and text are the two sources the model only DESCRIBES,
+  drawn on the CPU by `LayerRenderers` and keyed by the recipe's content
+  hash, where everything left in `model_props.rs` is read straight into the
+  compositor's uniform block. Nothing in this file is ever a shader
+  discriminant, and that is a standing rule rather than an omission:
+  `GradientKind` may gain a kind at the END and nothing derives a number
+  from the order, where `BlendMode`'s order IS one. Re-exported whole by
+  `model_props.rs`, which `model.rs` re-exports whole in turn, so
+  `crate::model::ShapeProps` and every other path is unchanged; the FIELD
+  that holds these values (`Clip.shape`) stays in `model.rs`.
+- `model_motion.rs` — the motion vocabulary (format version 8, road map
+  5's E2): `Motion` and the three slots it holds — `MotionEdge` with an
+  `EdgeMotion` kind for an entrance and for an exit, `MotionDuring` with a
+  `DuringMotion` kind for the whole clip. Its own module for a SEAM rather
+  than for room: every other member of the video group is a quantity the
+  compositor reads more or less straight, while these five say only what a
+  clip should DO, and the placement that comes out of them is computed by
+  `motion.rs` at render time from the clip's own duration, the container's
+  canvas and the source's size — `recipe.rs` publishes no `motion` key at
+  all. Re-exported whole by `model_props.rs`, so `crate::model::Motion`
+  resolves like every other property type. Neither enum's declaration ORDER
+  is load-bearing, where `BlendMode`'s and `ObscureKind`'s are shader
+  discriminants, so a kind may be appended; the JSON spelling of each IS
+  persisted, so a rename needs a migration step. Both are closed, for
+  `TextAnimationKind`'s reason — there is no neutral motion to fall back
+  to — and `spin` is spelled in BOTH, which is why `model_tests.rs`'s enum
+  sweep reads the during kinds off the fixture rather than off the text.
 - `model_regions.rs` — the boxes drawn ON the picture: `Spotlight`,
   `ObscureRegion`, the `SpotShape` both are drawn with and the
   `MAX_OBSCURE` budget on the second. Cut out of `model_props.rs` in road
@@ -70,7 +102,15 @@ lockstep are in the root `CLAUDE.md`; the full design is
   `is_missing_media`, `duration`, `validate` with its nesting walk, and the
   three source-window measurements every placement op clamps against —
   `source_head` (what lies before the window), `content_length` (the window)
-  and `source_length` (what a window starting at `in` could grow to).
+  and `source_length` (what a window starting at `in` could grow to) — plus
+  `source_size`, the source's pixel size when the model knows it. That last
+  was TWO private readers — `edit_props.rs`'s and `edit_background.rs`'s
+  stricter one, whose doc asked for the collapse — merged here by road map
+  5's T0f, keeping the STRICTER reading (every arm positive, the shape arm
+  in floats so a `NaN` fails too). Its one behaviour change, pinned in
+  `core/tests/background.rs`: a crop on a hand-written 0-width shape clip is
+  now accepted, since its size reads `None` and there is nothing to measure
+  against.
 - `time.rs` — `Ticks`, `TIMESCALE`, `Fps`, frame snapping, timecode
   format/parse (non-drop `HH:MM:SS:FF` and `HH:MM:SS.mmm`).
 - `edit.rs` — the op enum + serde and `apply`. **Its module doc IS the op
@@ -128,6 +168,36 @@ lockstep are in the root `CLAUDE.md`; the full design is
   (one range or several — `ripple_delete_ranges` merges its pairs and cuts
   right to left as ONE edit, and the singular delegates to it), freeze
   frame.
+- `edit_split.rs` — cutting one clip in two: `split_clip` and the two
+  helpers only it has ever needed, `state_patch` and `narrow_to`. Cut out
+  of `edit_clip.rs` in road map 5's E2, which owed it a rule about
+  `video.motion` and found a 1171-line file, and cut HERE because a split
+  is not a placement — every other op in `edit_clip.rs` decides where a
+  clip sits or what it is made of, while this one decides what the SECOND
+  clip INHERITS: its base props from the evaluation at the cut, the actions
+  that had not finished rebased to its own clip time with a straddled one
+  narrowed to the keys it animated, and the halves of a preset anchored to
+  the clip's two ends. Every splitter in the crate routes here —
+  `split_clips`, `split_under_playhead`, `clear_range` (so
+  `ripple_delete_range(s)` and `lift_range`), `insert_clip`,
+  `overwrite_clip` and `freeze_frame` — so a rule stated once is a rule
+  they all obey. It stays a free function over `&mut Project` rather than a
+  method for the reason it always was: it is called mid-edit on a clone the
+  caller is still assembling.
+- `edit_transition.rs` — the WRITE half of a transition: `set_transition`,
+  `set_transition_duration`, and `set_gained_transitions`, the rule that a
+  clip which gains an overlap gains a transition. Road map 5's E1 adds
+  `add_transition` (an overlap built out of two clips' handles at a hard cut)
+  and `set_transition_style` (the curve and the audio crossfade), with
+  `TransitionAlign` beside them — `edit_zoom.rs`'s `ZoomFit` is the precedent
+  for an argument enum living with its op. Cut out of `edit_clip.rs` under
+  the size rule, and cut HERE because placement and transitions are different
+  questions: `edit_clip.rs` decides where a clip SITS, this decides what
+  happens where two of them meet. `transition.rs` is the READ half — finding
+  overlaps, the overlap rule, progress at a time — and nothing in this file
+  restates any of it. `set_gained_transitions` is re-exported from
+  `edit_clip.rs`, so the nine call sites there and the three in
+  `edit_time.rs`, `edit_nest.rs` and `edit_paste.rs` are unchanged.
 - `props_check.rs` — the range checks every value written into a property
   group passes first: `check_video` / `check_audio` / `check_text` /
   `check_shape`, the `finite` / `in_range` family they are built from, and
@@ -328,6 +398,26 @@ lockstep are in the root `CLAUDE.md`; the full design is
   wall clock at the hour, which is the definition and is what the toolbar
   shows; and it reads PROJECT time, so an in/out range export writes a file
   beginning at 00:00 whose burn-in reads the range's start.
+- `motion.rs` — `video.motion` turned into PLACEMENT: road map 5 §5b–§5c's
+  two edge tables and during table, the tent rule, the `rem_euclid(360)`
+  reduction, the visible-centre pivot and the slide geometry. `apply` takes
+  the EVALUATED props, the clip time, the clip's own duration, the source's
+  pixel size and the container's canvas and answers the same props with
+  five fields moved — `scale`, `rotation`, `opacity`, `x`, `y` — every
+  other field the input's, so `RecipeLayer.video` reads its per-pixel
+  properties off the moved props knowing nothing about motion. **Its only
+  two callers are `recipe.rs`'s `layer` and `frame_of`** (spec §11, R5-4):
+  everything that EDITS — `evaluate_clip`, `clip_state`, `get_project`,
+  `split_clip`'s state, `add_zoom_action`, `freeze_frame`, the audio plan —
+  reads the clip un-moved, so an edit works on the numbers a person typed
+  and only the picture moves. It never trusts the file, because `validate`
+  range-checks no property and `evaluate_clip`'s restore copies the base
+  motion past `clamp_video`: a duration ≤ 0 after the tent is inactive, a
+  `period` ≤ 0 is inactive, an `amount` is clamped, and a non-finite result
+  leaves that field as evaluated. And it SHORT-CIRCUITS to `video.clone()`
+  when no slot is running rather than computing an identity, because
+  `x + b − b` is not `x` in floats and the frame past an arrival has to be
+  byte-identical to the same clip with no preset.
 - `nest.rs` — flattening a nest into the clips it stands for, and the
   transform they inherit. Every walk over "what actually plays" goes
   through it: `evaluate.rs`, `recipe.rs` and `audio.rs` all consume its
@@ -338,6 +428,29 @@ lockstep are in the root `CLAUDE.md`; the full design is
   some track in the set soloed and this one not; mute wins), and it is an
   envelope exactly like mute: the plan's segments, `plays_audio` and
   `assign` never see it.
+- `audio_duck.rs` — ducking, the one term of the envelope that comes from
+  ELSEWHERE: `Ducker`, `duck_gain` (the attack / hold / release multiplier at
+  a tick) and `Project::duckers`, the walk over the flattened timeline that
+  collects them. Cut out of `audio.rs` under the size rule, and cut HERE
+  because every other factor `audio.rs` folds is a property of the voice
+  being measured, while a duck is imposed by a clip on some other track and
+  is computed from a different input — the instances, not one composition
+  track's segments. `Ducker` is re-exported by `audio.rs`, so
+  `crate::audio::Ducker` (which `evaluate.rs` names) still resolves; `Side`,
+  `covers` and `MAX_GAIN` stay in `audio.rs` and are `pub(crate)` for it.
+- `audio_crossfade.rs` — the transition crossfade, the OTHER term of the
+  envelope that a clip's own properties do not decide (format version 7,
+  road map 5's E1): `crossfade_gain`, the constant-power multiplier at a
+  tick, and `crossfade_breaks`, the ticks the curve has to be sampled at for
+  it to survive coalescing. `audio_duck.rs`'s seam exactly, one step along —
+  a duck comes from a clip on another TRACK and a crossfade from the
+  neighbour this clip OVERLAPS, and neither is a property of the voice being
+  measured. Both halves in one module because they have to agree: a gain
+  with no breakpoints under it is flattened into a single ramp and the
+  constant-power law degenerates into the equal-gain one it exists to
+  avoid. `Stage`, `Side`, `ACTION_SAMPLE` and `MAX_ACTION_SAMPLES` are
+  `pub(crate)` in `audio.rs` for it, and the sampling step is the ACTION
+  loop's own formula rather than a second one.
 - `snap.rs` — candidates and `resolve`.
 - `format.rs` — `RC_FORMAT_VERSION`, the `MAX_*` caps (four of them
   `RC_MAX_*` in the header), read-any-version / write-current.
@@ -416,12 +529,16 @@ banner section is the signal to split. Every module keeps a `//!` doc;
 numeric/algorithmic choices get prose "why" comments.
 
 Three modules are over the cap today and are known debt, not licence:
-`edit_clip.rs` (1252 — the placement ops are one concern and every further
-cut fragments it; the action ops were the M3 cut, into `edit_action.rs`),
-`edit.rs` (**840** — a module doc that IS the op table and grows a row per
+`edit_clip.rs` (**1043** — the placement ops are one concern and every
+further cut fragments it; the action ops were the M3 cut, into
+`edit_action.rs`, the transition ops road map 5 E1's, into
+`edit_transition.rs`, and `split_clip` with its two helpers E2's, into
+`edit_split.rs` (210)),
+`edit.rs` (**875** — a module doc that IS the op table and grows a row per
 op, which is what took it over in phase 3, what phase 6's two background
-rows added to again and what phase 9's `scope` section added to a third
-time) and `edit_track.rs` (674 — tracks, markers, canvas and
+rows added to again, what phase 9's `scope` section added to a third time
+and what road map 5 E1's two transition rows added to a fourth) and
+`edit_track.rs` (674 — tracks, markers, canvas and
 media, four small concerns in one block). Do not add to
 any of them without taking something out: a new placement op goes in a new
 module (`edit_edge.rs`, `edit_insert.rs`), a new op with a concern of its
@@ -440,9 +557,20 @@ forced, is the `Op` enum itself into an `edit_ops.rs`, leaving the doc, the
 parse and the dispatch — but it would make a phase's diff unattributable,
 so it is not a cut to make in the same phase as a feature.
 
-**Two modules now sit exactly AT the line and take nothing further
-without a cut of their own**: `edit_paste.rs` (600) and `model_props.rs`
-(600, which is the worked example below). `recipe.rs` was the third and
+**One module now sits exactly AT the line and takes nothing further
+without a cut of its own**: `edit_paste.rs` (600). `model_props.rs` was
+the other and is at **445**, having paid the rule a THIRD time in road map
+5's E2 — the shape vocabulary went out to `model_shape.rs` (232), which is
+the alternative phase 6 weighed and refused for lack of room, and
+`video.motion` landed in the space it left. `audio.rs` paid the rule TWICE in
+road map 5's E1 and is the shortest worked example in the file: it stood at
+587 owing a crossfade, gave up `audio_duck.rs` (134) as the phase's toll and
+came back to 487 — and the feature then landed at **635**, forty over, which
+is what "budget against the pessimistic number" means. So it paid again,
+mid-phase, with `audio_crossfade.rs` (134), and is at **532** with the whole
+of E1 in it. The two cuts are the same seam read twice: a term the voice's
+own properties do not decide. `edit_transition.rs` (475) is E1's other new
+module and has room. `recipe.rs` was the third and
 paid the rule in road map 2's phase 7 the way `export.rs` and
 `model_props.rs` had — 331 before phase 4c put the reveal there, 567
 after it, 600 once phase 6 added the layer's `blend`, and **381** once
@@ -455,12 +583,20 @@ landing; the review's answer to "does a burn-in clear a caption?" is
 fifty lines of arithmetic under `BURN_IN_Y_FRACTION`, and it says NO):
 both back under the line with room, which is the whole point of paying
 first. The others
-phase 6 touched are still under: `actions.rs` 573
-(the list rule, `clamp_video`'s region block and its nest-blend bound),
-`props_check.rs` 355 (the gradient's four checks and the ordering check
-it argues instead of making), `edit_props.rs` 450 (`check_blend`),
-`edit_time.rs` 526 and `edit_zoom.rs` 390. Those, and the two at the
-line, are the files to weigh a phase-7 addition against next.
+phase 6 touched are still under, with road map 5's E2 in them:
+`actions.rs` **590** — the list rule, `clamp_video`'s region block and its
+nest-blend bound, plus the twelve lines of `evaluate_clip`'s base-motion
+restore, which is its LAST headroom (the next addition cuts `clamp_video`
+and its helpers to an `actions_clamp.rs` first) — `props_check.rs` **383**
+(the gradient's four checks, the ordering check it argues instead of
+making, and motion's three), `edit_props.rs` **432** (`check_blend`, the
+template's `Motion::template()` and the all-`None` normalisation),
+`edit_time.rs` **537** and `edit_zoom.rs` 390. E2's own new modules are
+`model_motion.rs` (206), `model_shape.rs` (232), `edit_split.rs` (210) and
+`motion.rs` (456); `recipe.rs` is at **582** with the two `motion::apply`
+call sites in it, and `model_query.rs` at **503** with T0f's `source_size`.
+Those, and `edit_paste.rs` at the line, are the files to weigh the next
+addition against.
 
 **`export.rs` paid the rule in phase 5 and is the worked example.** It
 stood at 578 against the cap, and phase 5 owed it two container variants,
@@ -546,37 +682,49 @@ Export names mirror the Rust method exactly.
 **Format changes.** Any change to persisted project state bumps
 `RC_FORMAT_VERSION` in `format.rs` **and** the `#define` in
 `core/include/reelcut_core.h`; the reader must keep accepting every prior
-version; the writer enforces the reader's caps. The version is 6. A bump
+version; the writer enforces the reader's caps. The version is 8. A bump
 whose new fields all carry a serde default needs no migrate step —
 version 3 (a clip's `name` and `label`, a track's `solo`), version 4
 (`video.obscure`, the hidden regions of phase 3c), version 5
-(`text.animation`, phase 4c's reveal) and version 6 (`video.blend` and
-`shape.gradient`, phase 6's two looks) have none, and
+(`text.animation`, phase 4c's reveal), version 6 (`video.blend` and
+`shape.gradient`, phase 6's two looks), version 7 (a transition's `curve`
+and `audio`, road map 5 E1's) and version 8 (`video.motion`, E2's presets)
+have none, and
 `format.rs`'s MIGRATION HOOK comment says so — but they still bump, so an
 older build refuses a file whose fields it would otherwise silently drop;
 a bump that changes a field's SHAPE adds a step there (`migrate_1_to_2`).
 It is the fields needing NO migration whose loss is the quietest, which is
-why `format.rs`'s version-5 and version-6 paragraphs each restate the
-argument in their own words rather than pointing back at version 3's:
+why `format.rs`'s version-5, version-6 and version-7 paragraphs each
+restate the argument in their own words rather than pointing back at
+version 3's:
 unknown keys are ignored at every level by
 design, so without the gate an older build would open the file, drop every
 animation — or every blend and every gradient — on read, and write the loss
 back on the next save with the text still on screen. Version 6's is quieter
 still, and its paragraph says so: a dropped blend takes nothing OUT of the
-picture, since the layer is still drawn, just source-over.
+picture, since the layer is still drawn, just source-over. Version 7's is
+the loudest of the four and its paragraph says why: the two fields would
+not merely go missing in a version-6 build, they would come back as values
+that MEAN something else — a minted transition's `ease_in_out` and
+`audio: true` read as the file defaults, `linear` and silent, which is a
+different transition drawn with different sound rather than an absence.
 
 **And a trap the bump to 6 walked into, recorded so the next one does
 not.** `{"version": 6}` was the tree's "too new, refuse" fixture in
 `core/tests/schema_v3.rs` and `core/tests/model_tests.rs`; the moment
 `RC_FORMAT_VERSION` reached 6 those three tests stopped testing the gate
 and started testing that a CURRENT file opens — green either way. They are
-at 7 now, and the comment beside each says "one past the current version"
-rather than naming a number. Two more sites in that sweep are not
+at **9** now — the bumps to 7 and to 8 walked them forward exactly as this
+paragraph said they would have to — and the comment beside each says "one
+past the current version" rather than naming a number. Two more sites in that sweep are not
 substitutions: `schema_v3.rs`'s gate hard-codes both numbers inside a
 literal message string, and `schema_v4.rs` asserted BY LITERAL TEXT that
 `obscure` closes the video object, which appending `blend` falsifies by
 design — that assertion moved onto the pair rather than being deleted,
-because what it pins is that a new key lands at the END.
+because what it pins is that a new key lands at the END. It has now moved
+a SECOND time, in `schema_v6.rs`, where `blend`'s own closing claim gave
+way to `motion`'s in version 8: the assertion travelling is the point of
+writing it that way.
 Either way a `schema_vN.rs` test opens the previous versions' fixtures
 and reads the new keys' ORDER off the written text, since a parsed
 `serde_json::Value` sorts them.

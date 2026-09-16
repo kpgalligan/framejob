@@ -663,6 +663,52 @@ extension ReelOp {
         a.put("duration", duration)
         return ReelOp(name: "set_transition_duration", args: a.values)
     }
+
+    /// Makes an overlap at the hard cut BEFORE `clip` out of the two clips'
+    /// unused handles (format version 7, §6 `add_transition`).
+    ///
+    /// A nil `kind` and a nil `align` are OMITTED rather than sent as null:
+    /// the core's defaults are "the clip's own stored kind, else a cross
+    /// dissolve" and `center`, and an explicit null would be a parse error
+    /// in the first case and a wrong argument in the second. That is the
+    /// opposite of `setTransition`, where a nil kind is a CLEAR and has to
+    /// be spelled out.
+    static func addTransition(
+        clip: UInt32, kind: TransitionKind?, duration: Ticks, align: TransitionAlign? = nil
+    ) -> ReelOp {
+        var a = OpArgs()
+        a.put("clip", clip)
+        a.put("kind", kind?.rawValue)
+        a.put("duration", duration)
+        a.put("align", align?.rawValue)
+        return ReelOp(name: "add_transition", args: a.values)
+    }
+
+    /// The transition's easing and whether it crossfades the two clips'
+    /// sound (§6 `set_transition_style`). A nil argument is omitted, which
+    /// the core reads as "keep"; both nil changes nothing.
+    static func setTransitionStyle(clip: UInt32, curve: Curve?, audio: Bool?) -> ReelOp {
+        var a = OpArgs()
+        a.put("clip", clip)
+        a.put("curve", curve?.rawValue)
+        a.put("audio", audio)
+        return ReelOp(name: "set_transition_style", args: a.values)
+    }
+}
+
+/// Where the overlap `add_transition` makes is taken FROM —
+/// `core/src/edit_transition.rs`'s `TransitionAlign`, spelling for spelling.
+///
+/// It lives beside the op that takes it, as `ZoomFit` does, and is
+/// `CaseIterable` so the MCP handler can list the three legal values when
+/// it refuses a fourth by name.
+enum TransitionAlign: String, CaseIterable {
+    /// Half from each side, the odd frame to the incoming clip.
+    case center
+    /// All of it out of the incoming clip's head.
+    case before
+    /// All of it out of the outgoing clip's tail.
+    case after
 }
 
 // MARK: - Op factories: actions

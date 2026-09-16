@@ -44,6 +44,32 @@ lockstep are in the root `CLAUDE.md`; the full design is
   gets that refusal.
 - `ProjectSnapshot.swift` — the `Codable` mirror of the §5.2 project JSON:
   the read-only view every view draws from.
+- `MotionProps.swift` — `video.motion`'s vocabulary (format version 8, road
+  map 5's E2): `EdgeMotion` and `DuringMotion` with their display names,
+  `MotionEdge`, `MotionDuring` and `MotionProps`, decoded leniently like
+  every other snapshot type, with the core's own defaults MIRRORED rather
+  than derived so switching a slot on writes what the core would have
+  defaulted to. Its `dictionary`s live here and not beside every other
+  property type's in `ReelCore.swift`, which is over the cap and may not
+  take a group's worth of new code. **`MotionProps.dictionary` always
+  writes THREE keys, `NSNull` for a nil slot**, and that is load-bearing:
+  a raw core patch DEEP-MERGES a motion, so a `MotionProps` holding only an
+  `in` sent as `{"in": …}` would leave a stored `out` in place and choosing
+  None from a popup would appear to do nothing and beep. Nothing here draws
+  anything — the core turns a preset into placement inside the recipe, so
+  the inspector and the canvas see the clip UN-MOVED while the picture
+  moves, which is why a drag begun mid-motion starts from the base box.
+- `AgentServer+Motion.swift` — reading `motion` out of a `set_video` patch
+  BY HAND, `gradientArg`'s posture rather than the generic decoder's: a
+  misspelt key at every level, a kind outside either vocabulary and a wrong
+  type are all refused BY NAME. `patchArg`'s round trip cannot see inside a
+  nested object and a motion has two levels of them, so `setVideo` strips
+  `"motion"` out of the patch before `patchArg` runs and sets
+  `patch.motion` after it — the two readers never see each other's key. The
+  two durations go through `optionalTimeArg`, the one spelling of the frame
+  snap, which is why the reader takes the targeted document. Ranges are the
+  CORE's (`props_check.rs`): this decides the type and the grid, never
+  whether a number is legal.
 - `ProjectDocument.swift` — NSDocument, `.reelcut` package read/write, and
   the single mutation point (see Undo below). It also holds the FIVE pieces
   of VIEW state every view agrees on and nothing persists: the playhead, the
@@ -578,7 +604,12 @@ lockstep are in the root `CLAUDE.md`; the full design is
   clip's base stack. A third list-valued property joins this rather than
   reading `videoProps` directly) + `ClipPane.swift` for the Clip tab,
   `MediaPane.swift` and `DocumentPane.swift` for the other two, with
-  `VideoPane.swift`,
+  `VideoPane.swift`, `VideoPane+Transition.swift` (the Transition
+  section — the one group that is not about the layer's own pixels but
+  about how it MEETS the clip before it, shown only for a single clip
+  with an overlap; an extension file because the base pane stood at 1465
+  lines and the section grew road map 5 E1's Curve popup and Crossfade
+  Audio row, and the cut cost no visibility),
   `AudioPane.swift`, `TextPane.swift` and `ShapePane.swift` surviving as the
   section factories `ClipPane` composes. Descriptor-driven from
   `OptionControls.swift`. **Three tabs, not six**: `InspectorTab` is
@@ -826,12 +857,17 @@ lockstep are in the root `CLAUDE.md`; the full design is
   the other way and says why in its own doc: a queue is a list you glance at,
   and a preview window is furniture you put on a particular display.
 - `AgentCatalog.swift` · `AgentCatalog+Clips.swift` · `AgentCatalog+Files.swift`
-  — the MCP tool catalog, in three files: the helper, the project group,
+  · `AgentCatalog+Transitions.swift`
+  — the MCP tool catalog, in four files: the helper, the project group,
   tracks, markers and the canvas in the base file; the forty-five clip and
-  action rows spliced in from `+Clips`; the eleven FILE rows (Media,
-  Captions, Rendering and export, and `record_screen`) spliced in from
-  `+Files` (road map 3's R1·toll), each splice taking the hoisted locals it
-  reads as arguments; a startup check enforces that catalog names match the
+  action rows spliced in from `+Clips`; the TWO transition rows
+  (`add_transition`, `set_transition_style`, road map 5's E1) spliced in
+  from `+Transitions` immediately after them, beside `set_transition` and
+  `set_transition_duration` and never at the end of the catalog, which is
+  where `recording_probe.py` reads the last eleven names; the eleven FILE
+  rows (Media, Captions, Rendering and export, and `record_screen`) spliced
+  in from `+Files` (road map 3's R1·toll), each splice taking the hoisted
+  locals it reads as arguments; a startup check enforces that catalog names match the
   dispatch registry (it traps in debug and logs in Release, because
   `make app` builds Release). The handlers live in
   `AgentServer+Project/Clips/Tracks/Media/Render/History/Silence/Captions/Audio/Background/Scope/Recording.swift`
@@ -863,6 +899,19 @@ lockstep are in the root `CLAUDE.md`; the full design is
   refusing a
   value it cannot read BY NAME rather than dropping it; a new op means a
   handler, a catalog entry and a comment naming the UI path it mirrors.
+  `AgentServer+Transitions.swift` is road map 5 E1's pair of handlers, and
+  it is the reason `curveArg` widened from `private` to internal in
+  `AgentServer+Clips.swift` — `private` on an extension member reaches only
+  its own file, `ExporterLoudness.swift`'s toll. All four of its string
+  arguments are refused by NAME before a builder is called, which is not
+  automatic: `ProjectSnapshot`'s enums decode leniently, so a misspelt
+  `kind` or `align` that reached a typed value would become the first case
+  and the caller be told its wipe had landed. It also refuses a keyless
+  `set_transition_style` (the core's own answer is `None`, which reads as
+  "made no change" to a caller who simply forgot an argument) and rewords
+  `add_transition`'s `None`, whose cause is that neither side of the cut
+  had a frame of unused material rather than the overlap rule
+  `performGroupedEdit`'s fixed text names.
   One gap in that guard worth knowing: `patchArg`'s round-trip check
   cannot see a wrong-typed value for a `T??` field — the `nullable()`
   decoder in `ProjectSnapshot.swift` swallows every decode error and
@@ -874,7 +923,11 @@ lockstep are in the root `CLAUDE.md`; the full design is
   `width` / `animation` — and on the object-valued ones a wrong type
   CLEARS the effect. (`ShapePatch` is not in that count: it is the one
   patch built by hand rather than decoded, so `stroke` and `fill` refuse a
-  wrong type by name.)
+  wrong type by name. **`VideoPatch.motion` is the eleventh `T??` field
+  and has NO gap either**, for the same reason one step further: it is
+  hand-read by `motionPatchArg` and stripped out of the dictionary before
+  `patchArg` ever sees it, so a wrong type, a misspelt key at any of its
+  three levels and a kind outside either enum are each refused by name.)
   A second thing that round trip cannot do, older than phase 3 and
   measured again by its proof: a nested OBJECT in a patch is decoded into
   its typed struct and re-serialised, so an unknown key inside one is

@@ -40,14 +40,11 @@ extension AgentServer {
     /// The clip and action rows of `catalogJSON()`'s array, in its order.
     func clipAndActionTools(
         ticks: String, trackProperty: [String: Any],
-        colorProperty: (String) -> [String: Any]
+        colorProperty: (String) -> [String: Any], clipProperty: [String: Any]
     ) -> [[String: Any]] {
         let clipsProperty: [String: Any] = [
             "type": "array", "items": ["type": "integer"], "minItems": 1,
             "description": "Clip ids (get_project lists them).",
-        ]
-        let clipProperty: [String: Any] = [
-            "type": "integer", "description": "Clip id (get_project lists them).",
         ]
         let shapeNames = ShapeKind.allCases.map { $0.rawValue }
         let filterNames = FilterKind.allCases.map { $0.rawValue }
@@ -88,6 +85,30 @@ extension AgentServer {
             + "call before this one. It is forced to normal for the length of a cross "
             + "dissolve, whose own weighting requires it, so what the frame shows there can "
             + "legitimately differ from the value get_project reports)"
+        // `video.motion`'s clause, its own explicitly-typed local for
+        // `blendClause`'s reason: two non-literal operands (the two kind
+        // lists) and a video chain that is long enough already.
+        //
+        // Three things are in the text because a caller meets each of them
+        // immediately: that the handler REPLACES the whole object (so a slot
+        // left out is cleared, unlike every other key in this patch, which
+        // merges); that it is not an animation target; and that get_project
+        // reports the clip UN-MOVED, which is what makes an edit work on the
+        // numbers a person typed and would otherwise read as the tool
+        // ignoring the preset.
+        let edgeNames = EdgeMotion.allCases.map { $0.rawValue }
+        let duringNames = DuringMotion.allCases.map { $0.rawValue }
+        let motionClause: String =
+            ", motion (what the clip DOES: null, or {in, out, during} — in and out are "
+            + "{kind: \(edgeNames.joined(separator: "|")), duration: ticks} measured from the "
+            + "clip's first and last frame, during is {kind: "
+            + "\(duringNames.joined(separator: "|")), amount: 0–1, period: ticks} over the "
+            + "whole clip and drift ignores its period. Unlike every other key here this one "
+            + "REPLACES: a slot left out or set to null is cleared, and a motion with no slot "
+            + "left reads back as null. in + out longer than the clip scales both down to "
+            + "meet rather than refusing. It is NOT an animation target — set_action_end "
+            + "refuses it — and get_project reports the clip UN-MOVED, since the preset "
+            + "becomes placement only when a frame is rendered)"
         // The three patch vocabularies, written once: every property group of
         // spec §5.2, with the ranges the ops enforce. A patch MERGES, so a key
         // left out keeps its current value and a key set to null clears an
@@ -115,6 +136,7 @@ extension AgentServer {
             + "is OUTSIDE and zoom 1–2 magnifies what is inside)"
             + obscureClause
             + blendClause
+            + motionClause
             + ". A colour is [r, g, b] or "
             + "[r, g, b, a], each 0–1; chroma's key is the one that takes no alpha."
         let audioPatchDescription =
@@ -692,10 +714,12 @@ extension AgentServer {
             tool(
                 "set_video",
                 "Changes the clips' BASE video properties — position, scale, rotation, opacity, "
-                    + "crop, corner radius, shadow, colour, chroma key, filters, reflection and "
-                    + "spotlight. The patch MERGES: keys you leave out keep their values, and "
-                    + "shadow, chroma, reflection or spotlight set to null clears it. Filters "
-                    + "are the exception — the array replaces, so send the whole stack. "
+                    + "crop, corner radius, shadow, colour, chroma key, filters, reflection, "
+                    + "spotlight and motion (what the clip does on its way in, on its way out "
+                    + "and all the way through). The patch MERGES: keys you leave out keep "
+                    + "their values, and shadow, chroma, reflection or spotlight set to null "
+                    + "clears it. Filters and motion are the exceptions — the filter array "
+                    + "replaces, so send the whole stack, and a motion replaces slot by slot. "
                     + "Placement is spec §5.3: the source rectangle is centred at the "
                     + "canvas centre plus (x, y), scaled, then rotated about that centre, and "
                     + "crop removes edges in place without shifting the content. To animate a "
@@ -870,7 +894,9 @@ extension AgentServer {
                     + "shrink into the corner over the action's span. A key set to null is "
                     + "REMOVED from the end state, so that property stops being animated. Groups "
                     + "are video, audio and text, with the same keys as set_video / set_audio / "
-                    + "set_text.",
+                    + "set_text — with ONE exception: video.motion is refused here, because a "
+                    + "preset is anchored to the clip's two ends rather than being a value to "
+                    + "ramp between two states. Set it with set_video.",
                 [
                     "clip": clipProperty,
                     "action": ["type": "integer", "description": "Action id."],

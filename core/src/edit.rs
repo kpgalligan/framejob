@@ -118,10 +118,12 @@
 //! | `set_enabled` | `clip: u32, video?: bool, audio?: bool` | The per-clip hide and mute switches; omitted fields keep their value. |
 //! | `set_transition` | `clip: u32, kind?: transition` | Sets `transition_in`; absent or `null` clears it. The overlap with the predecessor IS the duration. |
 //! | `set_transition_duration` | `clip: u32, duration: ticks` | Moves the clip so its overlap with its predecessor is exactly `duration`. |
+//! | `add_transition` | `clip: u32, kind?: transition, duration: ticks, align?: center \| before \| after = center` | Makes an overlap at the HARD CUT before `clip` out of the two clips' unused handles and puts a transition on it — nothing else on the timeline moves. `center` takes half from each side (the odd frame to the incoming clip) and passes a side's shortfall to the other; `before` takes it all from the incoming clip's head, `after` all from the outgoing clip's tail. The duration is snapped down to whole frames and CLAMPED — to each handle, to the neighbours on the track, and to the overlap rule — so a request too long for the material lands shorter rather than refusing; below one frame is None. A nest gives no head, and a nest tail ends at the nest's own length. The incoming clip's actions move with its new first frame. `kind` absent uses the clip's stored kind if it has one, else cross_dissolve; a stored transition keeps its curve and crossfade, a new one is minted (eased, crossfading). Err for a non-positive duration, an unknown clip, and for not being at a hard cut — naming which of no predecessor, a gap, an existing overlap. |
+//! | `set_transition_style` | `clip: u32, curve?: curve, audio?: bool` | Sets the transition's easing and whether it crossfades the two clips' sound; an absent key keeps. A clip with no stored transition and at least one key given gets a minted `cross_dissolve` with the style applied; NEITHER key given is None and never mints. A separate op from `set_transition` because that one reads an absent `kind` as a clear and so cannot spell "keep". |
 //!
 //! `transition` is one of `cross_dissolve`, `fade_black`, `fade_white`,
 //! `push_left`, `push_right`, `push_up`, `push_down`, `wipe`, `slide`,
-//! `zoom`.
+//! `zoom`, `wipe_left`, `wipe_up`, `wipe_down`.
 //!
 //! ### Actions
 //!
@@ -191,6 +193,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::edit_props::Group;
+use crate::edit_transition::TransitionAlign;
 use crate::edit_zoom::{ZoomFit, ZoomRegion};
 use crate::export::describe;
 use crate::model::{Color, Curve, Project, TransitionKind};
@@ -202,7 +205,7 @@ use crate::time::{Fps, Ticks};
 /// Kept next to [`Op`] so a mistyped op can be answered with the list
 /// instead of a bare parse error — models and users both mistype op names,
 /// and the alternative is a serde message written in variant-speak.
-pub const OP_NAMES: [&str; 55] = [
+pub const OP_NAMES: [&str; 57] = [
     "add_clip",
     "add_text_clip",
     "add_shape_clip",
@@ -241,6 +244,8 @@ pub const OP_NAMES: [&str; 55] = [
     "set_enabled",
     "set_transition",
     "set_transition_duration",
+    "add_transition",
+    "set_transition_style",
     "add_action",
     "add_zoom_action",
     "set_action",
@@ -463,6 +468,27 @@ pub enum Op {
     SetTransitionDuration {
         clip: u32,
         duration: Ticks,
+    },
+    /// An absent `kind` means the clip's own stored kind if it has one, and
+    /// `cross_dissolve` otherwise — never a clear, unlike `set_transition`,
+    /// which is why this variant's `kind` is not nullable in the schema
+    /// even though serde would accept a null into the `Option`.
+    AddTransition {
+        clip: u32,
+        #[serde(default)]
+        kind: Option<TransitionKind>,
+        duration: Ticks,
+        #[serde(default)]
+        align: Option<TransitionAlign>,
+    },
+    /// Both arguments are "absent means keep", so neither is nullable and
+    /// an op carrying neither changes nothing.
+    SetTransitionStyle {
+        clip: u32,
+        #[serde(default)]
+        curve: Option<Curve>,
+        #[serde(default)]
+        audio: Option<bool>,
     },
 
     // ---- actions --------------------------------------------------------
@@ -758,6 +784,15 @@ impl Project {
             Op::SetTransition { clip, kind } => self.set_transition(*clip, *kind),
             Op::SetTransitionDuration { clip, duration } => {
                 self.set_transition_duration(*clip, *duration)
+            }
+            Op::AddTransition {
+                clip,
+                kind,
+                duration,
+                align,
+            } => self.add_transition(*clip, *kind, *duration, *align),
+            Op::SetTransitionStyle { clip, curve, audio } => {
+                self.set_transition_style(*clip, *curve, *audio)
             }
 
             // ---- actions -------------------------------------------------

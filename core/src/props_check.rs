@@ -142,6 +142,34 @@ pub(crate) fn check_video(props: &VideoProps, size: Option<(f64, f64)>) -> Resul
             ));
         }
     }
+    // Motion (format version 8). The two edge values are DURATIONS, so 0 is
+    // legal — it means that end of the clip does not move — and a negative
+    // one is a sign mistake, not a request to run the preset backwards;
+    // `text.animation`'s arm below is the precedent, and ticks are NOT
+    // snapped here for its reason either (the inspector snaps). `amount` is
+    // a fraction of the preset's own range, so 0 is the identity and 1 the
+    // full strength. `period` is the one value with no meaningful zero: it
+    // is a divisor in every `during` formula, so one tick is the floor and
+    // the message says so rather than naming a range. The two KINDS need no
+    // check — serde refuses an unknown variant on the way in, which is what
+    // closing both enums bought (`model_motion.rs`).
+    if let Some(motion) = &props.motion {
+        if let Some(edge) = &motion.r#in {
+            ticks_positive_or_zero("video.motion.in.duration", edge.duration)?;
+        }
+        if let Some(edge) = &motion.out {
+            ticks_positive_or_zero("video.motion.out.duration", edge.duration)?;
+        }
+        if let Some(during) = &motion.during {
+            in_range("video.motion.during.amount", during.amount, 0.0, 1.0)?;
+            if during.period < 1 {
+                return Err(format!(
+                    "video.motion.during.period must be at least one tick, not {}",
+                    during.period
+                ));
+            }
+        }
+    }
     if let Some(shadow) = &props.shadow {
         color_ok("video.shadow.color", &shadow.color)?;
         in_range("video.shadow.opacity", shadow.opacity, 0.0, 1.0)?;

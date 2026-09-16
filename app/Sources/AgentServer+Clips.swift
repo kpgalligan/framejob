@@ -19,7 +19,7 @@ extension AgentServer {
     /// edit it did not.
     static let videoPatchKeys: Set<String> = [
         "x", "y", "scale", "rotation", "opacity", "crop", "corner_radius", "shadow", "color",
-        "chroma", "filters", "reflection", "spotlight", "obscure", "blend",
+        "chroma", "filters", "reflection", "spotlight", "obscure", "blend", "motion",
     ]
     static let audioPatchKeys: Set<String> = [
         "volume", "muted", "fade_in", "fade_out", "duck", "mono", "keep_pitch", "pan",
@@ -517,8 +517,20 @@ extension AgentServer {
     func setVideo(_ a: [String: Any]) throws -> String {
         let document = try target(a)
         let clips = try clipsArg(a, "clips", document)
-        let patch = try patchArg(a, "patch", VideoPatch.self, allowed: Self.videoPatchKeys)
-        try Self.checkVideoEnums(a["patch"] as? [String: Any] ?? [:], "patch")
+        // `motion` (format version 8) is read BY HAND and stripped before
+        // `patchArg` sees it: that helper cannot look inside a nested
+        // object and a motion has two levels of them, so the generic
+        // decoder would drop a misspelt key in silence
+        // (`AgentServer+Motion.swift` argues it). The copy is what keeps
+        // the two readers off each other's key.
+        var rest = a
+        var object = a["patch"] as? [String: Any] ?? [:]
+        let motion = try motionPatchArg(object, "motion", document)
+        object.removeValue(forKey: "motion")
+        rest["patch"] = object
+        var patch = try patchArg(rest, "patch", VideoPatch.self, allowed: Self.videoPatchKeys)
+        try Self.checkVideoEnums(object, "patch")
+        patch.motion = motion
         guard !patch.isEmpty else {
             throw ToolError(message: "patch names nothing to change.")
         }
@@ -925,7 +937,11 @@ extension AgentServer {
     /// An action's easing curve, by the name the model spells it with. One
     /// reader for the two tools that take one, so their refusals say the
     /// same thing.
-    private func curveArg(_ a: [String: Any], _ key: String) throws -> Curve? {
+    /// Internal rather than private for ONE reason:
+    /// `AgentServer+Transitions.swift` reads `set_transition_style`'s curve
+    /// with it, and `private` on an extension member reaches only its own
+    /// file (`ExporterLoudness.swift`'s toll). Nothing else about it moved.
+    func curveArg(_ a: [String: Any], _ key: String) throws -> Curve? {
         guard let name = try stringArg(a, key) else { return nil }
         guard let curve = Curve(rawValue: name) else {
             throw ToolError(
@@ -1004,6 +1020,16 @@ extension AgentServer {
             guard let raw = object[name], !(raw is NSNull) else { continue }
             guard let nested = raw as? [String: Any] else {
                 throw ToolError(message: "\(key).\(name) must be a JSON object.")
+            }
+            // Motion is not an animation target (format version 8, spec
+            // §5.4), refused BY NAME before the unknown-key filter below,
+            // which would let it through — `motion` IS a legal video patch
+            // key. The core refuses it too (`edit_action.rs`); this names
+            // the op that does take it.
+            if name == "video", nested["motion"] != nil {
+                throw ToolError(
+                    message: "\(key).video.motion is not an animation target — set it with "
+                        + "set_video.")
             }
             let unknown = nested.keys.filter { !allowed.contains($0) }.sorted()
             if let first = unknown.first {

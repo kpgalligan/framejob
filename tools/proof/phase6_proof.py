@@ -213,7 +213,7 @@ TOOLS = 73
 # What this build writes. An older file must still OPEN — that is
 # `core/tests/schema_v6.rs`'s claim — but what THIS build saves is version 6,
 # and that number moves with every bump.
-VERSION = 6
+VERSION = 8
 
 # The one lossless card section 8 decodes, written per run. **It is not the
 # `qtrle` line `README.md` gives**, and the substitution is measured rather
@@ -1690,8 +1690,8 @@ def catalog_part(mcp):
     # the claim is about ORDER: an appended key lands at the END and never in
     # the middle, which is the whole of what the append-only rule rests on.
     video = re.search(r'"video": \{.*?\n      \}', text, re.S)
-    check(video is not None and re.findall(r'"(\w+)":', video.group(0))[-1] == "blend",
-          "`blend` is the LAST key of the video object")
+    check(video is not None and re.findall(r'"(\w+)":', video.group(0))[-1] == "motion",
+          "`motion` is the LAST key of the video object, after `blend`")
     shape = re.search(r'"shape": \{.*?\n        "gradient"', text, re.S)
     check(shape is not None,
           "`gradient` is the LAST key of the shape object, after `to`")

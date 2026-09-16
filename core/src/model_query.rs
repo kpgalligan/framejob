@@ -184,6 +184,55 @@ impl Project {
         Some((remaining as f64 / clip.speed).floor() as Ticks)
     }
 
+    /// The source's pixel size, when the model knows it. `None` for text
+    /// (only the platform can measure a layout, spec §5.3) and for a media
+    /// whose descriptor carries no size, which is every audio-only file.
+    ///
+    /// A NEST's size is its own canvas — the size it was frozen at, not the
+    /// project's current one — which is what a crop on a nest clip is
+    /// measured against and what the flattened layers are clipped to
+    /// (`nest.rs`).
+    ///
+    /// Every arm tests for a POSITIVE size, the shape arm in floats where
+    /// the others are in integers: a hand-written project can hold a shape
+    /// clip of width 0 (`validate` checks ids, caps and the canvas, never
+    /// the property vocabulary), and `fill_scale` of a degenerate source
+    /// answers 1 rather than refusing, so an unguarded arm would let
+    /// `add_blurred_background` place a full-size sharp copy and call it a
+    /// background. A `NaN` fails `> 0.0` too, which is the answer wanted
+    /// there as well.
+    ///
+    /// This is ONE reader where there were two — `edit_props.rs`'s private
+    /// `source_size` and `edit_background.rs`'s stricter
+    /// `source_pixel_size`, whose doc asked for exactly this collapse.
+    /// Reading a project is this module's stated concern, and a source kind
+    /// added to `model.rs` is now answered in one place rather than two.
+    /// The stricter reading is the one kept, so `check_video`'s crop check
+    /// on a degenerate 0-width shape clip — reachable only through a
+    /// hand-written file — no longer has a size to measure against and
+    /// accepts the crop; `core/tests/background.rs` pins it.
+    pub(crate) fn source_size(&self, clip: &Clip) -> Option<(f64, f64)> {
+        let sized = |width: u32, height: u32| {
+            (width > 0 && height > 0).then(|| (f64::from(width), f64::from(height)))
+        };
+        match &clip.source {
+            Source::Media { media, .. } | Source::Still { media, .. } | Source::Image { media } => {
+                let found = self.media(*media)?;
+                sized(found.width, found.height)
+            }
+            Source::Shape => clip
+                .shape
+                .as_ref()
+                .filter(|shape| shape.width > 0.0 && shape.height > 0.0)
+                .map(|shape| (shape.width, shape.height)),
+            Source::Nest { project } => {
+                let found = self.nest(*project)?;
+                sized(found.width, found.height)
+            }
+            Source::Text => None,
+        }
+    }
+
     /// True when no `media[]` entry carries this id.
     ///
     /// This is NOT spec §5.6's "the media is missing" — that is about the

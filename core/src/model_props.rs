@@ -1,8 +1,8 @@
 //! The per-clip property types of spec §5.2 — the `video`, `audio`, `text`
 //! and `shape` groups a [`crate::model::Clip`] carries, and every struct
-//! and enum inside them but two families, both re-exported below: the
-//! region types, which are `model_regions.rs`'s, and the text types, which
-//! are `model_text.rs`'s.
+//! and enum inside them but three families, all re-exported below: the
+//! region types, which are `model_regions.rs`'s, the text types, which are
+//! `model_text.rs`'s, and the shape types, which are `model_shape.rs`'s.
 //!
 //! Split out of `model.rs` under the size rule (core/CLAUDE.md: a module
 //! over ~600 lines gives something up before it takes anything on), and
@@ -13,7 +13,7 @@
 //! what the compositor's uniforms are read from. Reading one is reading the
 //! schema's SHAPE; reading the other is reading its VOCABULARY.
 //!
-//! It has since paid the same rule TWICE itself, and both payments were
+//! It has since paid the same rule THREE times itself, and every payment was
 //! made before the phase that owed them took anything on. Road map 2's
 //! phase 3c added `video.obscure` and its two types, which took the file to
 //! 633 lines, so the boxes drawn ON the picture — [`Spotlight`],
@@ -25,14 +25,23 @@
 //! [`Backdrop`], [`TextAnimation`] and [`TextAnimationKind`] — went out to
 //! `model_text.rs` in the same way. Its seam is the one property group the
 //! model cannot MEASURE, because only the platform can lay text out; that
-//! module's doc states it.
+//! module's doc states it. Road map 5's E2 arrived AT 600 owing
+//! `video.motion`, so the shape vocabulary — [`ShapeProps`], [`ShapeKind`],
+//! [`Stroke`], [`Gradient`], [`GradientKind`], [`GradientStop`] and
+//! [`MAX_GRADIENT_STOPS`] — went out to `model_shape.rs`, which is the
+//! alternative phase 6 weighed and refused for lack of room. Its seam is
+//! the text one read a second time: shape and text are the two sources the
+//! model only DESCRIBES, drawn on the CPU and keyed by the recipe's content
+//! hash, where everything left here is read straight into the compositor's
+//! uniform block.
 //!
-//! Every path stays as it was, through all three cuts: `model.rs`
+//! Every path stays as it was, through all four cuts: `model.rs`
 //! re-exports this whole module with `pub use crate::model_props::*` and
-//! this module re-exports the other two the same way, so
+//! this module re-exports the other three the same way, so
 //! `crate::model::VideoProps`, `crate::model::Spotlight`,
-//! `crate::model::TextProps` and the crate-root re-exports in `lib.rs` are
-//! all untouched. The rules are `model.rs`'s too — the field names ARE the
+//! `crate::model::TextProps`, `crate::model::ShapeProps` and the crate-root
+//! re-exports in `lib.rs` are all untouched. The rules are `model.rs`'s
+//! too — the field names ARE the
 //! JSON keys, declaration order IS key order, every type is
 //! `#[serde(default)]` over a hand-written [`Default`] that says what an
 //! absent key means, and nothing here carries `deny_unknown_fields`.
@@ -60,6 +69,26 @@ pub use crate::model_regions::*;
 /// module's doc for the seam they share — text is the one group the model
 /// cannot measure — which is why they are a file of their own.
 pub use crate::model_text::*;
+
+/// The shape types — [`ShapeProps`], the [`ShapeKind`] it draws, the
+/// [`Stroke`] around it, and the [`Gradient`], [`GradientKind`],
+/// [`GradientStop`] and [`MAX_GRADIENT_STOPS`] that fill it — live in
+/// `model_shape.rs` and are re-exported whole, so every
+/// `crate::model_props::ShapeProps` path (and, through `model.rs`'s own
+/// glob, every `crate::model::ShapeProps` one) still resolves. See that
+/// module's doc for the seam they share with the text types — shape and
+/// text are the two CPU-rendered, hash-keyed sources — which is why they
+/// are a file of their own.
+pub use crate::model_shape::*;
+
+/// The motion types — [`Motion`] and the [`MotionEdge`], [`MotionDuring`],
+/// [`EdgeMotion`] and [`DuringMotion`] it is made of — live in
+/// `model_motion.rs` and are re-exported whole, so every
+/// `crate::model_props::Motion` path (and, through `model.rs`'s own glob,
+/// every `crate::model::Motion` one) still resolves. See that module's doc
+/// for the seam: motion is a PRESET and not a value, the one member of the
+/// video group whose meaning is computed at render time rather than read.
+pub use crate::model_motion::*;
 
 // ---- video properties ----------------------------------------------------
 
@@ -94,6 +123,20 @@ pub struct VideoProps {
     /// one fragment stage — with the nest clip an op's refusal rather than
     /// a schema one (`edit_props.rs`'s `check_blend`).
     pub blend: BlendMode,
+    /// What this layer DOES — an entrance, an exit, a continuous motion, or
+    /// any two of the three (format version 8). `None` is a clip that sits
+    /// where it is placed, which is what every project did before the key
+    /// existed.
+    ///
+    /// Unlike every other field here it is not a quantity the compositor
+    /// reads: `motion.rs` turns it into `scale`, `rotation`, `opacity`, `x`
+    /// and `y` where `recipe.rs` produces PLACEMENT, and the recipe
+    /// publishes no `motion` key at all. Everything that evaluates a clip
+    /// rather than placing it — `clip_state`, `get_project`, the inspector,
+    /// `split_clip`'s state, `add_zoom_action`, `freeze_frame`, the audio
+    /// plan — therefore reads the clip UN-MOVED, which is what keeps an
+    /// edit working on the numbers a person typed (spec §5.4, §7.3).
+    pub motion: Option<Motion>,
 }
 
 impl Default for VideoProps {
@@ -114,6 +157,7 @@ impl Default for VideoProps {
             spotlight: None,
             obscure: Vec::new(),
             blend: BlendMode::Normal,
+            motion: None,
         }
     }
 }
@@ -396,205 +440,6 @@ impl Default for Duck {
             level: 0.2,
             attack: 300_000,
             release: 600_000,
-        }
-    }
-}
-
-// ---- shapes --------------------------------------------------------------
-
-/// A shape layer. A rounded rectangle is [`ShapeKind::Rectangle`] with a
-/// non-zero `radius`; `from`/`to` are unit coordinates inside the box and
-/// apply to lines and arrows only (spec §5.2).
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(default)]
-pub struct ShapeProps {
-    pub kind: ShapeKind,
-    pub width: f64,
-    pub height: f64,
-    pub stroke: Option<Stroke>,
-    pub fill: Option<Color>,
-    pub arrow_start: bool,
-    pub arrow_end: bool,
-    pub radius: f64,
-    pub from: [f64; 2],
-    pub to: [f64; 2],
-    /// A gradient fill, taking precedence over `fill` when set
-    /// (format version 6). Ignored on `Line` and `Arrow`, which have no
-    /// area.
-    pub gradient: Option<Gradient>,
-}
-
-impl Default for ShapeProps {
-    /// The spec §5.2 example's box, stroked and unfilled so a newly added
-    /// shape is visible over any footage.
-    fn default() -> Self {
-        ShapeProps {
-            kind: ShapeKind::Rectangle,
-            width: 320.0,
-            height: 120.0,
-            stroke: Some(Stroke::default()),
-            fill: None,
-            arrow_start: false,
-            arrow_end: false,
-            radius: 0.0,
-            from: [0.0, 1.0],
-            to: [1.0, 0.0],
-            gradient: None,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum ShapeKind {
-    #[default]
-    Rectangle,
-    Ellipse,
-    Line,
-    Arrow,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
-#[serde(default)]
-pub struct Stroke {
-    pub width: f64,
-    pub color: Color,
-}
-
-impl Default for Stroke {
-    fn default() -> Self {
-        Stroke {
-            width: 6.0,
-            color: [1.0, 1.0, 1.0, 1.0],
-        }
-    }
-}
-
-/// The most stops one gradient may carry. NOT a shader budget, which is why
-/// it is 8 where [`MAX_FILTERS`] and [`MAX_OBSCURE`] are both 4: those two
-/// are SLOTS — the uniform block carries exactly four `(kind, amount)` pairs
-/// and exactly four regions, and a fifth of either has nowhere to go — while
-/// a gradient never reaches the fragment stage at all, since
-/// `LayerRenderers.renderShape` hands the stops to `CGGradient` on the CPU,
-/// which takes as many as it is given. Four here would be a real limitation
-/// (a sunset, a spectrum, a brand ramp) bought for no technical reason, and
-/// a cap that turns out too high costs nothing where one that turns out too
-/// low is reported as a bug. It is NAMED rather than trimmed all the same,
-/// the posture the other two take: a stop silently dropped from the next
-/// write is a colour the user placed and can no longer see.
-pub const MAX_GRADIENT_STOPS: usize = 8;
-
-/// A gradient fill for a shape (format version 6, road map 2's phase 6) —
-/// what `shape.fill`'s single colour becomes when a flat plate is not
-/// enough: a sky behind a title, a brand ramp, the wash on the full-canvas
-/// background clip `edit_background.rs` puts on the back track.
-///
-/// **Setting a gradient does not clear `fill`.** Both persist and the
-/// RENDERER prefers the gradient while it is non-null, which makes
-/// `{"gradient": null}` an exact inverse — the inspector's Reset restores
-/// the colour underneath rather than leaving an invisible shape — and keeps
-/// the precedence rule in one statable place instead of spreading it as a
-/// side effect of whichever op wrote last. The stops are NOT required to be
-/// sorted, and that too is a decision rather than an omission:
-/// `props_check.rs` argues the missing check where it would have gone, and
-/// the renderer sorts.
-///
-/// [`ShapeKind::Line`] and [`ShapeKind::Arrow`] have no area, so they ignore
-/// a gradient entirely: stored, range-checked, not drawn, with the
-/// inspector's rows disabled for them. That is `radius`'s precedent exactly —
-/// every kind carries it, only the rectangle reads it — and worth restating,
-/// because refusing the field per kind looks tidier: it would mean the kind
-/// popup had to CLEAR the field on its way past, and a value a popup deleted
-/// is work nobody can get back.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(default)]
-pub struct Gradient {
-    pub kind: GradientKind,
-    pub stops: Vec<GradientStop>,
-    /// Degrees from the RIGHT, counter-clockwise — [`Shadow`]'s `angle`
-    /// convention, which is the crate's only one. Meaningless for
-    /// [`GradientKind::Radial`]; stored and range-checked there all the
-    /// same, so flipping a gradient's kind and back does not lose it.
-    pub angle: f64,
-}
-
-impl Default for Gradient {
-    /// Black to white, left to right.
-    ///
-    /// The feature's whole first impression, not a formality: the
-    /// container-level `#[serde(default)]` over a `null` base means
-    /// `{"gradient": {}}` — the inspector's Add, and the most natural thing
-    /// an agent will write — produces exactly this. So it follows
-    /// [`Filter::default`]'s rule and
-    /// [`ObscureRegion::default`]'s, that a default must be visibly
-    /// SOMETHING the moment it is switched on or the control reads as
-    /// broken, taken as far as it goes: black and white are the two colours
-    /// that cannot be mistaken for footage, for the canvas or for each
-    /// other in either appearance, and every gradient anybody actually
-    /// wants is two swatch clicks away. Angle 0 is to the RIGHT (see the
-    /// field), so the ramp runs the way a left-to-right reader expects, and
-    /// the kind is `Linear`, the one the angle means anything to.
-    fn default() -> Self {
-        Gradient {
-            kind: GradientKind::Linear,
-            stops: vec![
-                GradientStop {
-                    at: 0.0,
-                    color: [0.0, 0.0, 0.0, 1.0],
-                },
-                GradientStop {
-                    at: 1.0,
-                    color: [1.0, 1.0, 1.0, 1.0],
-                },
-            ],
-            angle: 0.0,
-        }
-    }
-}
-
-/// The two gradient geometries, closed for [`crate::model::ObscureKind`]'s
-/// reason: each is a different `CGGradient` call taking different
-/// arguments, not a parameter of a shared one, so an unknown kind is a
-/// value nothing downstream could repair and there is no neutral geometry
-/// to fall back to. Refusing it at the serde boundary makes the illegal
-/// state unrepresentable.
-///
-/// A kind may be added at the END. Nothing derives a number from the order
-/// — this enum never reaches a shader, unlike [`BlendMode`] — but each
-/// variant's JSON spelling is persisted, so a rename needs a migration
-/// step.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum GradientKind {
-    #[default]
-    Linear,
-    Radial,
-}
-
-/// One colour, and where along the ramp it sits.
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
-#[serde(default)]
-pub struct GradientStop {
-    /// 0–1 along the gradient.
-    pub at: f64,
-    pub color: Color,
-}
-
-impl Default for GradientStop {
-    /// Opaque black at the start of the ramp. This one does a different job
-    /// from [`Gradient::default`]: it is what the container-level
-    /// `#[serde(default)]` fills in, so `{"at": 0.75}` gets a colour and
-    /// `{"color": [1, 0, 0, 1]}` gets a position rather than a schema
-    /// error. A stop the inspector ADDS is never this one — a new row lands
-    /// between its neighbours, which the model cannot do, having no idea
-    /// which row was clicked. Black is what the crate reaches for whenever
-    /// a colour must exist before anybody has chosen one
-    /// ([`Outline::default`], [`Shadow::default`]); 0 is the ramp's own
-    /// origin, the one position that needs no argument.
-    fn default() -> Self {
-        GradientStop {
-            at: 0.0,
-            color: [0.0, 0.0, 0.0, 1.0],
         }
     }
 }

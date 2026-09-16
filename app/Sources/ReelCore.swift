@@ -914,6 +914,14 @@ struct VideoPatch: Codable, Equatable {
     var spotlight: SpotlightProps??
     var obscure: [ObscureProps]?
     var blend: BlendMode?
+    /// **`motion` is a `T??` like the four object-valued fields above, but
+    /// it is NOT read by `patchArg`** (format version 8): a motion has two
+    /// levels of nested objects, so `AgentServer+Motion.swift` reads it by
+    /// hand and `setVideo` strips the key first — which is why this one has
+    /// NO gap in the `T??` family app/CLAUDE.md records. `.some(nil)` AND
+    /// `.some(an empty MotionProps)` both write `NSNull`, since the core
+    /// normalises an all-`None` motion to `None` anyway.
+    var motion: MotionProps??
 
     init(
         x: Double? = nil, y: Double? = nil, scale: Double? = nil, rotation: Double? = nil,
@@ -921,7 +929,7 @@ struct VideoPatch: Codable, Equatable {
         shadow: ShadowProps?? = nil, color: ColorAdjust? = nil, chroma: ChromaProps?? = nil,
         filters: [FilterProps]? = nil, reflection: ReflectionProps?? = nil,
         spotlight: SpotlightProps?? = nil, obscure: [ObscureProps]? = nil,
-        blend: BlendMode? = nil
+        blend: BlendMode? = nil, motion: MotionProps?? = nil
     ) {
         self.x = x
         self.y = y
@@ -938,6 +946,7 @@ struct VideoPatch: Codable, Equatable {
         self.spotlight = spotlight
         self.obscure = obscure
         self.blend = blend
+        self.motion = motion
     }
 
     init(from decoder: Decoder) throws {
@@ -958,6 +967,9 @@ struct VideoPatch: Codable, Equatable {
         obscure = c.lenient(.obscure)
         // `lenient`, never `nullable` — the struct doc says what that buys.
         blend = c.lenient(.blend)
+        // `nullable`, because a motion HAS a null form; the gap that costs
+        // the other `T??` fields is closed by `motionPatchArg`, not here.
+        motion = c.nullable(.motion)
     }
 
     var dictionary: [String: Any] {
@@ -1001,6 +1013,13 @@ struct VideoPatch: Codable, Equatable {
         }
         if let obscure = obscure { d["obscure"] = obscure.map { $0.dictionary } }
         if let blend = blend { d["blend"] = blend.rawValue }
+        if let motion = motion {
+            if let motion = motion, !motion.isEmpty {
+                d["motion"] = motion.dictionary
+            } else {
+                d["motion"] = NSNull()
+            }
+        }
         return d
     }
 

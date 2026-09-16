@@ -244,6 +244,8 @@ fn refused_inside(op: &Op) -> Option<&'static str> {
         | Op::SetEnabled { .. }
         | Op::SetTransition { .. }
         | Op::SetTransitionDuration { .. }
+        | Op::AddTransition { .. }
+        | Op::SetTransitionStyle { .. }
         | Op::AddAction { .. }
         | Op::AddZoomAction { .. }
         | Op::SetAction { .. }

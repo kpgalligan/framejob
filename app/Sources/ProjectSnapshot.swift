@@ -364,9 +364,10 @@ enum Curve: String, Codable, CaseIterable {
     }
 }
 
-/// The ten transitions of spec §5.2. A transition's DURATION is the overlap
-/// with the previous clip on the track, so it lives in the timeline, not
-/// here; this is only which one it is.
+/// The thirteen transitions of spec §5.2. A transition's DURATION is the
+/// overlap with the previous clip on the track, so it lives in the timeline,
+/// not here; this is only which one it is. The three wipe DIRECTIONS were
+/// appended at format version 7 beside the original rightward `wipe`.
 enum TransitionKind: String, Codable, CaseIterable {
     case crossDissolve = "cross_dissolve"
     case fadeBlack = "fade_black"
@@ -378,6 +379,9 @@ enum TransitionKind: String, Codable, CaseIterable {
     case wipe
     case slide
     case zoom
+    case wipeLeft = "wipe_left"
+    case wipeUp = "wipe_up"
+    case wipeDown = "wipe_down"
 
     var displayName: String {
         switch self {
@@ -391,6 +395,9 @@ enum TransitionKind: String, Codable, CaseIterable {
         case .wipe: return "Wipe"
         case .slide: return "Slide"
         case .zoom: return "Zoom"
+        case .wipeLeft: return "Wipe Left"
+        case .wipeUp: return "Wipe Up"
+        case .wipeDown: return "Wipe Down"
         }
     }
 }
@@ -896,6 +903,14 @@ struct VideoProps: Codable, Equatable {
     /// shader discriminants rest on. `.normal` is source-over, so it is both
     /// the default and how a blend is cleared; there is no null form.
     let blend: BlendMode
+    /// What the clip DOES — an entrance, an exit, a continuous motion
+    /// (format version 8). The LAST key of the struct now, as in
+    /// `model_props.rs`; `blend` held that place until road map 5's E2.
+    /// Nothing on this side reads it to DRAW: the core turns a preset into
+    /// placement inside the recipe, so the inspector and the canvas see the
+    /// clip UN-MOVED while the picture moves (spec §5.4), which is why a
+    /// drag begun mid-motion starts from the base box.
+    let motion: MotionProps?
 
     init(
         x: Double = 0, y: Double = 0, scale: Double = 1, rotation: Double = 0,
@@ -903,7 +918,8 @@ struct VideoProps: Codable, Equatable {
         shadow: ShadowProps? = nil, color: ColorAdjust = .identity,
         chroma: ChromaProps? = nil, filters: [FilterProps] = [],
         reflection: ReflectionProps? = nil, spotlight: SpotlightProps? = nil,
-        obscure: [ObscureProps] = [], blend: BlendMode = .normal
+        obscure: [ObscureProps] = [], blend: BlendMode = .normal,
+        motion: MotionProps? = nil
     ) {
         self.x = x
         self.y = y
@@ -920,6 +936,7 @@ struct VideoProps: Codable, Equatable {
         self.spotlight = spotlight
         self.obscure = obscure
         self.blend = blend
+        self.motion = motion
     }
 
     init(from decoder: Decoder) throws {
@@ -945,6 +962,10 @@ struct VideoProps: Codable, Equatable {
         // — source-over, what the app drew before the key existed. Same
         // shape of argument, same reason version 6 needs no migrate step.
         blend = c.lenient(.blend, BlendMode.normal)
+        // And a version-7 file has no `motion` key, which reads as nil —
+        // what every clip did before it existed. Same argument again, same
+        // reason version 8 needs no migrate step.
+        motion = c.lenient(.motion)
     }
 
     static let identity = VideoProps()
@@ -1707,16 +1728,27 @@ struct ClipSnapshot: Codable, Equatable, Identifiable {
 }
 
 /// The transition into a clip (§5.2 `transition_in`).
+///
+/// `curve` and `audio` are format version 7's. Their defaults here are the
+/// FILE defaults — linear and silent — and not what the core MINTS (spec
+/// §11, R5-2), because this type decodes files: a version-6 project carries
+/// neither key and must read as what it always rendered.
 struct TransitionSnapshot: Codable, Equatable {
     let kind: TransitionKind
+    let curve: Curve
+    let audio: Bool
 
-    init(kind: TransitionKind = .crossDissolve) {
+    init(kind: TransitionKind = .crossDissolve, curve: Curve = .linear, audio: Bool = false) {
         self.kind = kind
+        self.curve = curve
+        self.audio = audio
     }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         kind = c.lenient(.kind, TransitionKind.crossDissolve)
+        curve = c.lenient(.curve, Curve.linear)
+        audio = c.lenient(.audio, false)
     }
 }
 

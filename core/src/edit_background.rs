@@ -176,56 +176,6 @@ const BLURRED_BACKGROUND_NAME: &str = "Blurred Background";
 /// rather than black — the module doc argues it.
 const DEFAULT_PLATE: Color = [1.0, 1.0, 1.0, 1.0];
 
-/// The source's pixel size, or `None` when the model cannot know it: a text
-/// layout, which only the platform can measure (spec §5.3), and a media
-/// whose descriptor carries no size, which is every audio-only file.
-///
-/// A NEST answers with its own frozen canvas, which is the size its
-/// flattened layers are clipped to. That is the honest answer to the
-/// question this function asks, and it is kept even though
-/// [`Project::add_blurred_background`] refuses a nest clip before it ever
-/// gets here — that refusal is about the BLUR, not about the size, and an
-/// arm that lied about the size to save the caller a check would be a trap
-/// for whichever reader inherits it when this and its twin collapse into
-/// one.
-///
-/// Every arm tests for a POSITIVE size, the shape arm in floats where the
-/// others are in integers: a hand-written project can hold a shape clip of
-/// width 0 (`validate` checks ids, caps and the canvas, never the property
-/// vocabulary), and `fill_scale` of a degenerate source answers 1 rather
-/// than refusing, so an unguarded arm would place a full-size sharp copy
-/// and call it a background. A `NaN` fails `> 0.0` too, which is the
-/// answer wanted there as well.
-///
-/// **This is a second reading of `edit_props.rs`'s private
-/// `Project::source_size`, and the two should be one** — the natural home
-/// is `model_query.rs`, whose stated concern is reading a project, with a
-/// single `pub(crate)` reader both files call. The collapse is left to a
-/// follow-up rather than taken here, because promoting the twin is a change
-/// to a file this phase does not otherwise touch; until then, a source kind
-/// added to `model.rs` must be answered in both places.
-fn source_pixel_size(project: &Project, clip: &Clip) -> Option<(f64, f64)> {
-    let sized = |width: u32, height: u32| {
-        (width > 0 && height > 0).then(|| (f64::from(width), f64::from(height)))
-    };
-    match &clip.source {
-        Source::Media { media, .. } | Source::Still { media, .. } | Source::Image { media } => {
-            let found = project.media(*media)?;
-            sized(found.width, found.height)
-        }
-        Source::Shape => clip
-            .shape
-            .as_ref()
-            .filter(|shape| shape.width > 0.0 && shape.height > 0.0)
-            .map(|shape| (shape.width, shape.height)),
-        Source::Nest { project: nest } => {
-            let found = project.nest(*nest)?;
-            sized(found.width, found.height)
-        }
-        Source::Text => None,
-    }
-}
-
 impl Project {
     /// A clone of this project with a new EMPTY track at index 0, and that
     /// track's id.
@@ -419,7 +369,8 @@ impl Project {
     ///
     /// **A NEST clip is refused**, and it is the one refusal here that is
     /// not about a missing size — a nest has a frozen canvas and
-    /// `source_pixel_size` answers with it. It is about the BLUR. Flattening
+    /// `Project::source_size` answers with it. It is about the BLUR.
+    /// Flattening
     /// (`nest.rs`) folds a nest clip's PLACEMENT down onto the layers inside
     /// it and drops every per-pixel property it carries: a nest clip never
     /// becomes a layer of its own, so `recipe.rs::layer` reads `filters`,
@@ -453,7 +404,7 @@ impl Project {
                  so a blurred copy of it would come out sharp"
             ));
         }
-        let Some((source_width, source_height)) = source_pixel_size(self, &target) else {
+        let Some((source_width, source_height)) = self.source_size(&target) else {
             return Err(format!(
                 "clip {clip}'s source has no pixel size, so nothing can be scaled to fill the canvas"
             ));
@@ -500,6 +451,14 @@ impl Project {
             // for the picture in front of it — over the default black that
             // mode is either destructive or inert. The module doc argues it.
             blend: BlendMode::Normal,
+            // And it does not MOVE (format version 8). A backdrop that slid
+            // in, spun or pulsed behind the clip it was copied from would
+            // be two pictures of one recording disagreeing about where they
+            // are, which is the visible half of the same mistake as keeping
+            // the audio switch — and a slide would leave the canvas showing
+            // down one side, which is the one thing a background exists to
+            // prevent.
+            motion: None,
             ..video
         });
         next.clips.push(copy);

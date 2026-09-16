@@ -575,11 +575,12 @@ def catalog_part(mcp):
     scoped = sorted(
         tool["name"] for tool in listed
         if "scope" in (tool["inputSchema"].get("properties") or {}))
-    check(len(scoped) == OPS,
-          f"exactly {OPS} tools declare the envelope's scope (got {len(scoped)}) — that "
+    check(len(scoped) >= OPS,
+          f"at least {OPS} tools declare the envelope's scope (got {len(scoped)}) — that "
           "number is rc_op_names read through AgentCatalog.opNames, so a phase that had "
           "added an op would move it, and phase 9 must NOT have: a scope is an envelope "
-          "key, not an op")
+          "key, not an op. A FLOOR since road map 5's E1 added two ops; the exact "
+          "count is the newest phase's")
     check(names - set(scoped) == APP_STATE_TOOLS,
           "and the tools WITHOUT one are exactly the twenty app-state tools, named rather "
           f"than counted: {sorted(names - set(scoped) - APP_STATE_TOOLS)} unexpected, "
@@ -1456,7 +1457,7 @@ def versions_part(mcp):
     old_nest = {"id": 4, "track": 2, "start": 2 * SEC, "duration": 2 * SEC,
                 "source": {"kind": "nest", "project": "/gone/Old Group.reelcut"},
                 "video": {}}
-    for version in (1, 2, 3, 4, 5, 6):
+    for version in (1, 2, 3, 4, 5, 6, 7, 8):
         extra = (old_nest,) if version == 1 else ()
         try:
             mcp.call_with("open_project", {"path": package(version, extra)})
@@ -1464,9 +1465,9 @@ def versions_part(mcp):
             check(False, f"a version-{version} file opens in the built app ({error})")
             continue
         reported = project(mcp)
-        check(reported["version"] == 6 and reported["clips"][0]["text"]["content"]
+        check(reported["version"] == 8 and reported["clips"][0]["text"]["content"]
               == f"v{version}",
-              f"a version-{version} file opens in the built app and is stamped {6} in "
+              f"a version-{version} file opens in the built app and is stamped 8 in "
               f"memory, its content intact")
 
     # The migrated nest is the interesting one: version 1's path string is
@@ -1488,8 +1489,12 @@ def versions_part(mcp):
           "…and edit in it, which is the one thing a project rescued from version 1 could "
           "never have had done to it before")
 
-    future = refusal(mcp, "open_project", {"path": package(7)})
-    check(future is not None and "version 7 is newer than this build understands" in future,
+    # ONE PAST the current version, and it moves with every bump — the trap
+    # `core/CLAUDE.md` records: the moment RC_FORMAT_VERSION reaches the
+    # number written here this stops testing the gate and starts testing
+    # that a current file opens, green either way.
+    future = refusal(mcp, "open_project", {"path": package(9)})
+    check(future is not None and "version 9 is newer than this build understands" in future,
           f"and a file one version PAST the current one is still refused at the door: "
           f"{future!r}")
 
