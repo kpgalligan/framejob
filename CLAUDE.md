@@ -6,7 +6,7 @@ Rust staticlib core, the same shape as `~/devel/rasterize`.
 **It builds and runs.** M1 (Cut) is done and verified against spec §10; most
 of M2 landed with it.
 
-Seven things in `designs/`, and you want all of them:
+Nine things in `designs/`, and you want all of them:
 
 - **`designs/reelcut-remaining.md` — what is LEFT, and the record of the
   debt that was paid. START HERE if you are picking up new work.** Road map
@@ -38,6 +38,26 @@ Seven things in `designs/`, and you want all of them:
   plan (S1) is a per-media `cache/speech/` beside the peaks and a `mode`
   on the detector, voice by default with level as the fallback. START THERE
   if you are touching Remove Silences or `detect_silence`.
+- **`designs/reelcut-roadmap-5.md` — road map 5, PLANNED and not built:
+  transitions and motion.** Two phases in build detail. E1: three wipe
+  directions, eased transitions, a constant-power audio crossfade minted on
+  new transitions, `add_transition` at a hard cut from handles and
+  `set_transition_style` (schema v7, `OP_NAMES` 57, catalog 77). E2:
+  `video.motion` In / Out / During presets the core turns into placement at
+  render time, relative and composing (schema v8, no op). Five spec §11
+  entries to record first (R5-1…R5-5), tolls, lanes with their files, seams,
+  proofs and mutants. Road map 4's S1 must be committed before it starts.
+  START THERE if you are touching transitions or adding motion.
+- `designs/reelcut-effects-survey.md` — the survey road map 5 came from:
+  `~/devel/Concat`'s transitions, effects and filters compared with
+  Reelcut's (Concat is AGPL-3.0 — its behaviour was studied, and none of its
+  code, shaders, chains or colour tables may be carried over), nine phases
+  designed, two spikes measured (`tools/proof/effects_spike/`: offline voice
+  rendering through Apple's audio units, Vision person segmentation) and a
+  two-reader review. **E3–E9 — tone, filters, looks, adjustment clips, LUT
+  import, voice effects, background removal — are DEFERRED** by the user
+  (2026-09-15: colour grading and LUT import "eventually, but not now").
+  Read it before planning any of them.
 - `designs/reelcut-design.md` — the normative spec. The schemas (§5), the op
   table (§6) and the architecture (§7) govern any change to either side; §11
   holds decisions already made, which are not to be re-litigated.
