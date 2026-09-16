@@ -962,7 +962,12 @@ final class ProjectDocument: NSDocument {
         completion: (([UInt32]) -> Void)?
     ) {
         guard index < urls.count else {
-            completion?(commitImport(descriptors))
+            // Two statements, never `completion?(commitImport(descriptors))`:
+            // optional chaining skips the ARGUMENT too, so with no completion
+            // — File ▸ Add Media… and a Media-tab drop pass none — the files
+            // were probed and never added, with no beep and no error.
+            let added = commitImport(descriptors)
+            completion?(added)
             return
         }
         MediaImporter.probe(url: urls[index]) { [weak self] result in
