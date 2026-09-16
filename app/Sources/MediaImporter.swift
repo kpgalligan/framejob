@@ -300,6 +300,7 @@ enum MediaImporter {
                 let stamp = CacheStamp.stamp(for: media, url: url)
                 await thumbnails(for: media, url: url, stamp: stamp, into: cacheDir)
                 await peaks(for: media, url: url, stamp: stamp, into: cacheDir)
+                await speech(for: media, url: url, stamp: stamp, into: cacheDir)
                 done()
             }
         }
@@ -567,5 +568,37 @@ enum MediaImporter {
         // file that is not there yet.
         if let stamp { writeStamp(stamp, to: marker) }
         postCacheChange(media: media.id, kind: peaksKind)
+    }
+
+    // MARK: - Speech
+
+    /// Writes `cache/speech/<id>.bin` — road map 4's voice cache, run AFTER
+    /// `peaks` in `generateCaches`'s order (never before it), so the `.bin`
+    /// withdrawal at `peaks`' own head is never held behind a full-file
+    /// decode and an inference pass.
+    ///
+    /// Skipped when `speechIsCurrent` (`MediaImporter+Speech.swift`'s head
+    /// check) says the marker, the model and the chunk size all still agree,
+    /// or when there is no audio to analyse at all. A stale cache is cleared
+    /// and posted at once — `clearSpeech`'s doc argues the order, `peaks`'
+    /// posture repeated for the voice cache — and then `SileroVAD.isAvailable`
+    /// is asked exactly once: a model that has already been marked
+    /// unavailable this process (a nil bundle, or an earlier thrown
+    /// prediction) is not retried, so a project full of media does not pay
+    /// for the same failure once per file.
+    static func speech(
+        for media: MediaSnapshot, url: URL, stamp: CacheStamp?, into cacheDir: URL
+    ) async {
+        guard media.hasAudio, media.duration > 0 else { return }
+        guard !speechIsCurrent(for: media, stamp: stamp, in: cacheDir) else { return }
+        if clearSpeech(for: media.id, in: cacheDir) {
+            postCacheChange(media: media.id, kind: speechKind)
+        }
+        guard SileroVAD.isAvailable else { return }
+        let asset = AVURLAsset(url: url)
+        guard let track = (try? await asset.loadTracks(withMediaType: .audio))?.first else {
+            return
+        }
+        writeSpeech(for: media, asset: asset, track: track, stamp: stamp, into: cacheDir)
     }
 }

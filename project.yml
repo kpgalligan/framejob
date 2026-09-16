@@ -15,6 +15,9 @@ targets:
       - path: app/Resources/Fonts
         type: folder
         buildPhase: resources
+      - path: app/Resources/Models
+        type: folder
+        buildPhase: resources
       # A one-frame 16x16 black movie. A timeline of nothing but text, shapes
       # and images owns no composition track, and AVFoundation gives a
       # composition of empty edits a duration of ZERO — so nothing renders

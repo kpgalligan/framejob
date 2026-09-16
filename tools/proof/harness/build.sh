@@ -55,6 +55,8 @@ swiftc \
     -o "$bin"
 rm -rf "$out/Fonts"
 cp -R "$root/app/Resources/Fonts" "$out/Fonts"
+rm -rf "$out/Models"
+cp -R "$root/app/Resources/Models" "$out/Models"
 end=$(date +%s)
 echo "built $bin in $((end - start)) s" >&2
 echo "$bin"

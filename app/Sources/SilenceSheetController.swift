@@ -44,13 +44,18 @@ final class SilenceSheetController: NSViewController, NSTextFieldDelegate {
     /// these spans, so the readout and the edit cannot disagree.
     private var outcome: SilenceDetector.Outcome
 
+    private let modePopup = NSPopUpButton(frame: .zero, pullsDown: false)
     private let thresholdSlider = NSSlider()
     private let thresholdReadout = NSTextField(labelWithString: "")
+    private let thresholdLabel = NSTextField(labelWithString: "")
     private let minimumField = NSTextField(string: "")
     private let paddingField = NSTextField(string: "")
     private let scopePopup = NSPopUpButton(frame: .zero, pullsDown: false)
     private let summaryLabel = NSTextField(labelWithString: "")
     private let noteLabel = NSTextField(wrappingLabelWithString: "")
+
+    /// The popup's rows, in order.
+    private static let modes: [SilenceDetector.Mode] = [.voice, .level]
     /// Set in `loadView`; the only implicitly-unwrapped optional here, which
     /// is what app/CLAUDE.md allows them for.
     private var applyButton: NSButton!
@@ -63,7 +68,8 @@ final class SilenceSheetController: NSViewController, NSTextFieldDelegate {
         self.document = document
         self.editor = editor
         self.input = input
-        let settings = SilenceDetector.Settings(scope: input.defaultScope)
+        let settings = SilenceDetector.Settings(
+            scope: input.defaultScope, mode: input.voiceAvailable ? .voice : .level)
         self.initialSettings = settings
         self.outcome = SilenceDetector.detect(input, settings: settings)
         super.init(nibName: nil, bundle: nil)
@@ -83,6 +89,19 @@ final class SilenceSheetController: NSViewController, NSTextFieldDelegate {
     // MARK: - View
 
     override func loadView() {
+        for mode in Self.modes { modePopup.addItem(withTitle: mode.displayName) }
+        // `autoenablesItems` off FIRST: a popup's menu validates its own
+        // rows and would put a disabled one straight back on otherwise.
+        modePopup.menu?.autoenablesItems = false
+        if !input.voiceAvailable, let item = modePopup.item(at: 0) {
+            item.isEnabled = false
+        }
+        modePopup.selectItem(at: Self.modes.firstIndex(of: initialSettings.mode) ?? 1)
+        modePopup.font = DS.sans(13)
+        modePopup.target = self
+        modePopup.action = #selector(controlChanged(_:))
+        modePopup.widthAnchor.constraint(equalToConstant: 168).isActive = true
+
         thresholdSlider.minValue = SilenceDetector.Settings.thresholdRange.lowerBound
         thresholdSlider.maxValue = SilenceDetector.Settings.thresholdRange.upperBound
         thresholdSlider.doubleValue = initialSettings.thresholdDB
@@ -91,6 +110,9 @@ final class SilenceSheetController: NSViewController, NSTextFieldDelegate {
         thresholdSlider.target = self
         thresholdSlider.action = #selector(controlChanged(_:))
         thresholdSlider.widthAnchor.constraint(equalToConstant: 168).isActive = true
+
+        thresholdLabel.font = DS.sans(13)
+        thresholdLabel.textColor = DS.textStrong
 
         thresholdReadout.font = DS.mono(11)
         thresholdReadout.textColor = DS.textMuted
@@ -130,7 +152,8 @@ final class SilenceSheetController: NSViewController, NSTextFieldDelegate {
         let paddingRow = row([paddingField, unitLabel("seconds")])
 
         let grid = NSGridView(views: [
-            [fieldLabel("Quieter than:"), thresholdRow],
+            [fieldLabel("Judge by:"), modePopup],
+            [thresholdLabel, thresholdRow],
             [fieldLabel("Longer than:"), minimumRow],
             [fieldLabel("Keep at ends:"), paddingRow],
             [fieldLabel("In:"), scopePopup],
@@ -228,12 +251,22 @@ final class SilenceSheetController: NSViewController, NSTextFieldDelegate {
         return Self.scopes[index]
     }
 
+    private var mode: SilenceDetector.Mode {
+        let index = modePopup.indexOfSelectedItem
+        guard Self.modes.indices.contains(index) else { return initialSettings.mode }
+        let picked = Self.modes[index]
+        // The Voice row is disabled rather than removed when the model
+        // cannot be used, but a stale selection (a popup rebuilt under one)
+        // must still fall back honestly.
+        return picked == .voice && !input.voiceAvailable ? .level : picked
+    }
+
     private var settings: SilenceDetector.Settings {
         SilenceDetector.Settings(
             thresholdDB: thresholdDB,
             minLength: ReelTime.ticks(seconds: minimumSeconds),
             padding: ReelTime.ticks(seconds: paddingSeconds),
-            scope: scope)
+            scope: scope, mode: mode)
     }
 
     // MARK: - Detection
@@ -245,6 +278,11 @@ final class SilenceSheetController: NSViewController, NSTextFieldDelegate {
     private func refresh() {
         outcome = SilenceDetector.detect(input, settings: settings)
         thresholdReadout.stringValue = String(format: "%.0f dBFS", thresholdDB)
+        // The floor keeps the hint (:153–158) true in either mode: a level
+        // is still what a clip with no voice, or every clip when the model
+        // cannot be used, is judged by.
+        thresholdLabel.stringValue =
+            outcome.mode == .voice ? "Level if no voice:" : "Quieter than:"
         summaryLabel.stringValue = summaryText()
         let note = noteText()
         noteLabel.stringValue = note
@@ -291,6 +329,28 @@ final class SilenceSheetController: NSViewController, NSTextFieldDelegate {
                 "The waveform is still being analysed for \(listed). Nothing inside is "
                     + "proposed for removal yet.")
         }
+        if !input.voiceAvailable {
+            notes.append(
+                "The voice model could not be used, so quiet is judged by level.")
+        }
+        if !outcome.voicePending.isEmpty {
+            let names = outcome.voicePending.compactMap { input.snapshot.media($0)?.name }
+            let listed = names.isEmpty
+                ? (outcome.voicePending.count == 1
+                    ? "one file" : "\(outcome.voicePending.count) files")
+                : names.joined(separator: ", ")
+            notes.append(
+                "Speech is still being analysed for \(listed). Nothing inside is proposed "
+                    + "for removal yet.")
+        }
+        if !outcome.judgedByLevel.isEmpty {
+            let names = outcome.judgedByLevel.compactMap { input.snapshot.media($0)?.name }
+            let listed = names.isEmpty
+                ? "\(outcome.judgedByLevel.count) file(s)" : names.joined(separator: ", ")
+            notes.append(
+                "\(outcome.judgedByLevel.count) file(s) hold no voice and are judged by "
+                    + "level: \(listed).")
+        }
         if !outcome.protectedNests.isEmpty {
             // The detector will not propose a span that reaches into a nest
             // (`SilenceDetector`'s doc says why), so a nested screencast
@@ -327,8 +387,9 @@ final class SilenceSheetController: NSViewController, NSTextFieldDelegate {
     /// does not use posts nothing, and a re-read costs one pass over caches
     /// that are already in the page cache.
     @objc private func cacheChanged(_ note: Notification) {
-        guard note.userInfo?[MediaImporter.cacheKindKey] as? String == MediaImporter.peaksKind,
-              !input.pendingMedia.isEmpty,
+        let kind = note.userInfo?[MediaImporter.cacheKindKey] as? String
+        guard kind == MediaImporter.peaksKind || kind == MediaImporter.speechKind,
+              !input.pendingMedia.isEmpty || !input.pendingSpeech.isEmpty,
               let document = document,
               let reread = SilenceDetector.read(from: document)
         else { return }

@@ -98,6 +98,24 @@ enum SilenceDetector {
         }
     }
 
+    /// How a moment is judged quiet — road map 4's S1. `voice` asks the
+    /// cached Silero VAD probability (`cache/speech/<id>.bin`) and falls
+    /// back to `level` per media that holds no voice anywhere, or for every
+    /// media at once when the model cannot be used this process; `level` is
+    /// today's rule, byte for byte, and what a media with no voice cache yet
+    /// is judged by too.
+    enum Mode: String, CaseIterable {
+        case voice
+        case level
+
+        var displayName: String {
+            switch self {
+            case .voice: return "Voice"
+            case .level: return "Level"
+            }
+        }
+    }
+
     /// The four numbers the sheet and the `detect_silence` tool both spell.
     struct Settings: Equatable {
         /// The level, in dBFS, at or under which a moment counts as quiet —
@@ -115,10 +133,18 @@ enum SilenceDetector {
         /// room rather than as an edit.
         var padding: Ticks
         var scope: Scope
+        /// `voice` by default; the sheet opens in `level` when the model
+        /// cannot be used this process.
+        var mode: Mode
+        /// The Silero probability at or above which a moment counts as
+        /// speech, in `voice` mode. Read only in that mode — the tool
+        /// refuses it in `level`, named rather than silently ignored.
+        var voiceConfidence: Double
 
         static let defaultThresholdDB = -40.0
         static let defaultMinLength: Ticks = ReelTime.ticks(seconds: 0.5)
         static let defaultPadding: Ticks = ReelTime.ticks(seconds: 0.1)
+        static let defaultVoiceConfidence = 0.5
 
         /// The ranges the sheet's controls and the tool's arguments clamp to.
         /// −80 dBFS is under any real recording's noise floor and −10 dBFS is
@@ -127,17 +153,22 @@ enum SilenceDetector {
         static let thresholdRange = -80.0...(-10.0)
         static let minLengthRange = 0.05...10.0
         static let paddingRange = 0.0...2.0
+        static let voiceConfidenceRange = 0.1...0.9
 
         init(
             thresholdDB: Double = Settings.defaultThresholdDB,
             minLength: Ticks = Settings.defaultMinLength,
             padding: Ticks = Settings.defaultPadding,
-            scope: Scope = .audible
+            scope: Scope = .audible,
+            mode: Mode = .voice,
+            voiceConfidence: Double = Settings.defaultVoiceConfidence
         ) {
             self.thresholdDB = thresholdDB
             self.minLength = minLength
             self.padding = padding
             self.scope = scope
+            self.mode = mode
+            self.voiceConfidence = voiceConfidence
         }
     }
 
@@ -159,6 +190,17 @@ enum SilenceDetector {
         /// the sheet can say why it found fewer cuts than the timeline
         /// looks like it holds. Empty is the ordinary answer.
         let protectedNests: [UInt32]
+        /// The mode the run actually used — `settings.mode`, echoed back for
+        /// the same reason `scope` is.
+        let mode: Mode
+        /// Distinct media, in scope, that hold no voice anywhere and were
+        /// therefore judged by level even in `voice` mode. Always `[]` in
+        /// `level` mode.
+        let judgedByLevel: [UInt32]
+        /// Distinct media, in scope, whose `cache/speech/<id>.bin` has not
+        /// landed yet — never quiet by the model, judged by level until it
+        /// does. Always `[]` in `level` mode.
+        let voicePending: [UInt32]
 
         var removed: Ticks { spans.reduce(0) { $0 + $1.length } }
         var isEmpty: Bool { spans.isEmpty }
@@ -183,6 +225,9 @@ enum SilenceDetector {
         /// segment. It is BOTH scopes' membership test, not just its
         /// namesake's — `detect` says why a silenced voice cannot be scoped.
         let audible: Bool
+        /// The forward file's cached Silero VAD probabilities, or nil when
+        /// the cache is not on disk — road map 4's voice mode.
+        let speech: [Float]?
 
         var end: Ticks { segment.start + max(0, segment.duration) }
     }
@@ -194,7 +239,7 @@ enum SilenceDetector {
     /// splits nor removes there and `shift_clips` does not move it either,
     /// so nothing of it can be lost. Built once per `Input`, like `Voice`
     /// and for the same reason — it is a function of the snapshot alone.
-    fileprivate struct NestExtent {
+    struct NestExtent {
         let clip: UInt32
         let span: Span
     }
@@ -211,6 +256,13 @@ enum SilenceDetector {
         /// Every media in the timeline whose peaks are still missing, whether
         /// or not it is in scope — what the sheet names as "still analysing".
         let pendingMedia: [UInt32]
+        /// `SileroVAD.isAvailable`, read once here so `detect` (pure and
+        /// synchronous) never asks the model directly.
+        let voiceAvailable: Bool
+        /// Every media in the timeline whose `cache/speech/<id>.bin` is not
+        /// on disk yet, whether or not it is in scope — `pendingMedia`'s
+        /// shape for the voice cache. `MediaSpeech.Loader.pending`, sorted.
+        let pendingSpeech: [UInt32]
         fileprivate let voices: [Voice]
         /// The spans no candidate may reach into — see `NestExtent`.
         fileprivate let nests: [NestExtent]
@@ -253,6 +305,8 @@ enum SilenceDetector {
         // is that memo, and its `pending` set is what this reports as "still
         // analysing".
         let loader = MediaPeaks.Loader(cacheDirectory: cacheDirectory)
+        // One read per media, exactly `loader`'s shape, for the voice cache.
+        let speechLoader = MediaSpeech.Loader(cacheDirectory: cacheDirectory)
 
         var voices: [Voice] = []
         for track in plan.audioTracks {
@@ -263,7 +317,8 @@ enum SilenceDetector {
                         segment: segment, ramps: track.ramps,
                         peaks: loader.peaks(for: segment.media),
                         reversedPivot: MediaPeaks.reversedPivot(for: segment, in: snapshot),
-                        audible: isAudible(track.ramps, over: span)))
+                        audible: isAudible(track.ramps, over: span),
+                        speech: speechLoader.probabilities(for: segment.media)))
             }
         }
         // The walls. Top-level clips only, which is exactly right: a nest
@@ -281,7 +336,8 @@ enum SilenceDetector {
         }
         return Input(
             snapshot: snapshot, selection: selection ?? document.selection,
-            pendingMedia: loader.pending.sorted(), voices: voices, nests: nests)
+            pendingMedia: loader.pending.sorted(), voiceAvailable: SileroVAD.isAvailable,
+            pendingSpeech: speechLoader.pending.sorted(), voices: voices, nests: nests)
     }
 
     // MARK: - Detection
@@ -323,7 +379,29 @@ enum SilenceDetector {
         guard !scoped.isEmpty else {
             return Outcome(
                 spans: [], scope: settings.scope, clips: [], pendingMedia: [],
-                protectedNests: [])
+                protectedNests: [], mode: settings.mode, judgedByLevel: [], voicePending: [])
+        }
+
+        // Road map 4's voice mode: per scoped voice, whether its media holds
+        // no voice anywhere in the segment (judged by level for its whole
+        // span) or its speech cache has not landed (never quiet by the
+        // model). Both are empty in `.level` mode.
+        var judgedByLevelMedia: Set<UInt32> = []
+        var voicePendingMedia: Set<UInt32> = []
+        if settings.mode == .voice {
+            for voice in scoped {
+                guard let speech = voice.speech else {
+                    voicePendingMedia.insert(voice.segment.media)
+                    continue
+                }
+                let whole = Double(
+                    MediaSpeech.speechMax(
+                        speech, over: voice.segment, from: voice.segment.start, to: voice.end,
+                        reversedPivot: voice.reversedPivot))
+                if whole < settings.voiceConfidence {
+                    judgedByLevelMedia.insert(voice.segment.media)
+                }
+            }
         }
 
         let step = MediaPeaks.bucketTicks
@@ -355,7 +433,10 @@ enum SilenceDetector {
                 let to = min(slotEnd, voice.end)
                 guard to > from else { continue }
                 covered = true
-                if level(of: voice, from: from, to: to, step: step) > limit {
+                if !isQuiet(
+                    voice, from: from, to: to, limit: limit, mode: settings.mode,
+                    voiceConfidence: settings.voiceConfidence,
+                    byLevel: judgedByLevelMedia.contains(voice.segment.media)) {
                     quiet = false
                     break
                 }
@@ -382,7 +463,8 @@ enum SilenceDetector {
         return Outcome(
             spans: refine(outside, settings: settings, fps: input.snapshot.canvas.fps),
             scope: settings.scope, clips: clips, pendingMedia: pending,
-            protectedNests: walled)
+            protectedNests: walled, mode: settings.mode,
+            judgedByLevel: judgedByLevelMedia.sorted(), voicePending: voicePendingMedia.sorted())
     }
 
     /// Length filter, then padding, then the frame grid — in that order,
@@ -412,91 +494,61 @@ enum SilenceDetector {
         return out
     }
 
-    // MARK: - The walls
-
-    /// Every run cut into the pieces that lie OUTSIDE every nest clip, with
-    /// the nests that took a cut's worth of quiet away named alongside.
-    ///
-    /// A piece may end exactly where a nest begins, and that is safe:
-    /// `clear_range` cuts its bounds with `split_under_playhead`, which
-    /// splits only what a tick falls STRICTLY inside, so a bound on a nest
-    /// clip's own edge splits nothing and the ripple then moves the whole
-    /// nest clip left — a move, not a cut into it. Nor can the op weld two
-    /// pieces back together across a nest: it merges spans that overlap or
-    /// TOUCH, and these are a nest clip's whole length apart.
-    ///
-    /// The second answer is the sheet's, and it names a nest only when the
-    /// quiet inside it was long enough to have BEEN a cut — a stray bucket
-    /// of room tone behind a wall is not something to explain.
-    private static func excludingNests(
-        _ runs: [Span], _ nests: [NestExtent], minLength: Ticks
-    ) -> ([Span], [UInt32]) {
-        guard !nests.isEmpty else { return (runs, []) }
-        var walled: Set<UInt32> = []
-        for nest in nests {
-            for run in runs where overlap(run, nest.span) >= max(1, minLength) {
-                walled.insert(nest.clip)
-            }
-        }
-        // Merged first, so two nest clips that abut do not leave a
-        // zero-length piece between them.
-        let walls = merged(nests.map { $0.span })
-        var out: [Span] = []
-        for run in runs {
-            var start = run.start
-            for wall in walls {
-                if wall.end <= start { continue }
-                if wall.start >= run.end { break }
-                if wall.start > start { out.append(Span(start: start, end: wall.start)) }
-                start = wall.end
-                if start >= run.end { break }
-            }
-            if start < run.end { out.append(Span(start: start, end: run.end)) }
-        }
-        return (out, walled.sorted())
-    }
-
-    /// The length two spans share, or 0.
-    private static func overlap(_ a: Span, _ b: Span) -> Ticks {
-        max(0, min(a.end, b.end) - max(a.start, b.start))
-    }
-
-    /// Overlapping and touching spans folded together, in start order — the
-    /// same rule `edit_time.rs`'s `union` applies to the ranges the op is
-    /// finally handed.
-    private static func merged(_ spans: [Span]) -> [Span] {
-        var out: [Span] = []
-        for span in spans.sorted(by: { $0.start < $1.start }) where span.end > span.start {
-            guard let last = out.last, span.start <= last.end else {
-                out.append(span)
-                continue
-            }
-            out[out.count - 1] = Span(start: last.start, end: max(last.end, span.end))
-        }
-        return out
-    }
-
     // MARK: - The quiet test
 
-    /// `peak × envelope` for one segment over one step of project time.
-    ///
-    /// The envelope is sampled at both ends of the step and the LOUDER taken,
-    /// so a step that straddles a fade's edge is judged by the loud side.
-    /// A zero envelope short-circuits: a muted, solo-silenced or fully faded
+    /// The mix envelope at a step, the LOUDER of its two ends — a step that
+    /// straddles a fade's edge is judged by the loud side. Factored out of
+    /// `level` for road map 4's floor: a step whose envelope alone lands the
+    /// quiet threshold at or under full scale is quiet whatever the file
+    /// holds, in either mode, before either test below is asked.
+    private static func gain(of voice: Voice, from: Ticks, to: Ticks) -> Double {
+        max(
+            MediaPeaks.envelope(voice.ramps, at: from),
+            MediaPeaks.envelope(voice.ramps, at: max(from, to - 1)))
+    }
+
+    /// `peak × envelope` for one segment over one step of project time — the
+    /// LEVEL test, byte-identical to what it always answered. A zero
+    /// envelope short-circuits: a muted, solo-silenced or fully faded
     /// segment is silent in the mix whatever its file holds, which is the
     /// whole reason the test is written against the plan.
     private static func level(of voice: Voice, from: Ticks, to: Ticks, step: Ticks) -> Double {
-        let gain = max(
-            MediaPeaks.envelope(voice.ramps, at: from),
-            MediaPeaks.envelope(voice.ramps, at: max(from, to - 1)))
-        guard gain > 0 else { return 0 }
+        let g = gain(of: voice, from: from, to: to)
+        guard g > 0 else { return 0 }
         // No peaks on disk yet: never quiet. Treating a missing cache as
         // silence would propose deleting the whole clip, which is the one
         // failure this feature must not have.
         guard let peaks = voice.peaks else { return .infinity }
         let magnitude = MediaPeaks.peak(
             peaks, over: voice.segment, from: from, to: to, reversedPivot: voice.reversedPivot)
-        return Double(magnitude) * gain
+        return Double(magnitude) * g
+    }
+
+    /// Whether one voice reads quiet over `[from, to)` — the per-step test
+    /// the walk asks, in the order road map 4's S1 settled on. `gain <=
+    /// limit` is the FLOOR: a full-scale sample at that gain lands at or
+    /// under `thresholdDB`, so a turned-down, faded or ducked voice never
+    /// holds a cut up, in EITHER mode, before the model is ever consulted —
+    /// the mix promise the sheet's hint and the tool's catalog entry both
+    /// make. `byLevel` (a media that holds no voice anywhere, computed once
+    /// per voice over its whole segment) and `.level` mode both fall through
+    /// to the level test unchanged; otherwise a pending speech cache is
+    /// never quiet, and the model's answer is the MAX Silero probability
+    /// over the step, never the mean.
+    private static func isQuiet(
+        _ voice: Voice, from: Ticks, to: Ticks, limit: Double, mode: Mode, voiceConfidence: Double,
+        byLevel: Bool
+    ) -> Bool {
+        let g = gain(of: voice, from: from, to: to)
+        guard g > limit else { return true }
+        if mode == .level || byLevel {
+            return level(of: voice, from: from, to: to, step: 0) <= limit
+        }
+        guard let speech = voice.speech else { return false }
+        return Double(
+            MediaSpeech.speechMax(
+                speech, over: voice.segment, from: from, to: to,
+                reversedPivot: voice.reversedPivot)) < voiceConfidence
     }
 
     /// Whether a track's envelope is anything but zero across a span. The
@@ -515,24 +567,4 @@ enum SilenceDetector {
         return !covered
     }
 
-    // MARK: - Frame snapping, directionally
-
-    /// The core has `snap_up_to_frame` / `snap_down_to_frame` (the directional
-    /// pair phase 1 added for exactly this), but neither crosses the FFI —
-    /// `rc_time_snap_to_frame` is the whole C surface for time. So the two are
-    /// composed here from the two pieces Swift DOES have, `ReelTime.snapToFrame`
-    /// and `Fps.frameDuration`, rather than re-deriving a grid: the nearest
-    /// boundary is asked for, and when it fell the wrong way the neighbouring
-    /// one is asked for instead.
-    private static func snapUpToFrame(_ t: Ticks, fps: Fps) -> Ticks {
-        let nearest = ReelTime.snapToFrame(t, fps: fps)
-        guard nearest < t else { return nearest }
-        return ReelTime.snapToFrame(nearest + max(fps.frameDuration, 1), fps: fps)
-    }
-
-    private static func snapDownToFrame(_ t: Ticks, fps: Fps) -> Ticks {
-        let nearest = ReelTime.snapToFrame(t, fps: fps)
-        guard nearest > t else { return nearest }
-        return ReelTime.snapToFrame(nearest - max(fps.frameDuration, 1), fps: fps)
-    }
 }

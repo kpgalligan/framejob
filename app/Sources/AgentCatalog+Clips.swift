@@ -215,7 +215,7 @@ extension AgentServer {
             "description": "Which property groups travel. Default: every group both clips "
                 + "have; an empty list is refused.",
         ]
-        return [
+        var rows: [[String: Any]] = [
 
             // MARK: Clips
 
@@ -496,78 +496,13 @@ extension AgentServer {
                     + "not move, as under every ripple. An empty list, and a list that merges "
                     + "to nothing, change nothing. detect_silence returns ranges in this shape.",
                 ["ranges": rangesProperty], required: ["ranges"]),
-            tool(
-                "detect_silence",
-                "Finds the quiet stretches of the timeline and REPORTS them, changing nothing "
-                    + "— the read half of Clip ▸ Remove Silences…, whose Remove button sends "
-                    + "the answer to ripple_delete_ranges. Quiet is measured IN THE MIX: each "
-                    + "10 ms of a clip's cached waveform times the audio envelope at that "
-                    + "moment, so volume, fades, ducking, mute and another track's solo all "
-                    + "count. A run quieter than threshold_db and at least min_length long is "
-                    + "a candidate; it then loses padding at each end, and its bounds snap "
-                    + "INWARD to the frame grid — which can leave a frame of room tone, where "
-                    + "outward would clip the attack of the next word. A moment no clip in "
-                    + "scope covers is not a candidate at all: a hole in the timeline is not "
-                    + "dead air. The result reports the scope it used, and names any media "
-                    + "whose waveform is still being analysed rather than counting it silent.",
-                [
-                    "clips": [
-                        "type": "array", "items": ["type": "integer"], "minItems": 1,
-                        "description": "Analyse only these clips — the sheet's Selected "
-                            + "clips scope. Omit to take the sheet's own opening rule: the "
-                            + "project's current selection when it holds anything with sound, "
-                            + "every audible clip otherwise. The result says which ran.",
-                    ],
-                    "threshold_db": [
-                        "type": "number", "maximum": 0,
-                        "description": "Quieter than this counts as silence, in dBFS in the "
-                            + "mix. Default -40.",
-                    ],
-                    "min_length": [
-                        "type": "integer",
-                        "description": "The shortest quiet run worth cutting, \(ticks) "
-                            + "Default 0.5 s (300000).",
-                    ],
-                    "padding": [
-                        "type": "integer",
-                        "description": "Left at each end of every candidate, \(ticks) "
-                            + "Default 0.1 s (60000).",
-                    ],
-                ]),
-            tool(
-                "normalize_clip",
-                "Sets each clip's audio volume so its own loudest moment lands at peak_db — "
-                    + "the Normalize button in the Clip tab's Volume section, and Clip ▸ "
-                    + "Normalize. The level is measured from the clip's cached waveform over "
-                    + "the part of it that actually plays, which is PRE-FADER: it knows "
-                    + "nothing about the volume, fades, ducking, mute or solo already on the "
-                    + "clip, because normalise is a statement about the material and not "
-                    + "about the mix. Three things follow, and each is a decision rather than "
-                    + "an accident. It REPLACES volume rather than multiplying it, so a "
-                    + "second call changes nothing (and comes back as \"made no change\", "
-                    + "which is that working). It writes the clip's BASE volume even when the "
-                    + "playhead is inside an action, since it is about the whole clip — a "
-                    + "clip whose volume is animated is normalised underneath and then "
-                    + "overridden for the action's span. And it leaves muted alone: a mute is "
-                    + "a switch, not a level. Each clip gets its OWN gain, so this does not "
-                    + "match levels across a selection. One undo step however many clips. "
-                    + "The model's volume ceiling is 4×, so a clip quieter than about "
-                    + "-13 dBFS cannot reach -1: it is still normalised, as loud as it goes, "
-                    + "and result_db says where it landed. A clip that plays no sound, one "
-                    + "that is silent over the part that plays, and one whose waveform has "
-                    + "not been analysed yet are each reported by name under skipped and the "
-                    + "rest are still normalised.",
-                [
-                    "clips": clipsProperty,
-                    "peak_db": [
-                        "type": "number", "minimum": -60, "maximum": 0,
-                        "description": "Where the loudest moment should land, in dBFS. "
-                            + "Default -1, which is what the button uses: hot enough to use "
-                            + "the format, with a decibel of room for the inter-sample peaks "
-                            + "a lossy encoder can add. Above 0 is a request to clip and is "
-                            + "refused rather than clamped.",
-                    ],
-                ], required: ["clips"]),
+        ]
+        // detect_silence and normalize_clip are `AgentCatalog+Audio.swift`'s,
+        // spliced in HERE rather than appended, so the catalog's order is
+        // unchanged — road map 4's toll 2. `ticks` and `clipsProperty` are
+        // the two hoisted locals they read.
+        rows += audioTools(ticks: ticks, clipsProperty: clipsProperty)
+        rows += [
             tool(
                 "lift_range",
                 "Cuts a time range out and LEAVES the hole — ⌫ with an in/out range and nothing "
@@ -953,5 +888,6 @@ extension AgentServer {
                     "action": ["type": "integer", "description": "Action id."],
                 ], required: ["clip", "action"]),
         ]
+        return rows
     }
 }

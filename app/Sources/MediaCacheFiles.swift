@@ -69,6 +69,7 @@ extension MediaImporter {
     static let cacheKindKey = "cache"
     static let thumbsKind = "thumbs"
     static let peaksKind = "peaks"
+    static let speechKind = "speech"
     /// Present (and `true`) only on the first post from a pass that replaced
     /// a strip that was on disk; absent otherwise, never `false`.
     static let replacedKey = "replaced"
@@ -92,6 +93,21 @@ extension MediaImporter {
     static func peaksURL(for media: UInt32, in cacheDir: URL) -> URL {
         cacheDir.appendingPathComponent("peaks", isDirectory: true)
             .appendingPathComponent("\(media).bin")
+    }
+
+    /// `cache/speech/<media id>.bin` inside the document package — one Float32
+    /// per Silero VAD chunk (`MediaSpeech.chunkTicks`), `peaksURL`'s shape.
+    static func speechURL(for media: UInt32, in cacheDir: URL) -> URL {
+        cacheDir.appendingPathComponent("speech", isDirectory: true)
+            .appendingPathComponent("\(media).bin")
+    }
+
+    /// `cache/speech/<media id>.complete.json`, `peaksMarkerURL`'s shape: a
+    /// sidecar beside the `.bin`, not a child, so either can be deleted
+    /// without the other.
+    static func speechMarkerURL(for media: UInt32, in cacheDir: URL) -> URL {
+        cacheDir.appendingPathComponent("speech", isDirectory: true)
+            .appendingPathComponent("\(media).complete.json")
     }
 
     // MARK: - Completion markers
@@ -204,13 +220,38 @@ extension MediaImporter {
 
     /// Sorted keys, so two markers of one stamp are byte-identical and a
     /// proof can compare them as text; `.atomic`, so a marker is whole or
-    /// absent and never a truncated file that decodes to nothing.
+    /// absent and never a truncated file that decodes to nothing. Generic
+    /// since `SpeechStamp` wraps a `CacheStamp` rather than sharing its
+    /// type — `CacheStamp` itself is UNCHANGED, so thumbs and peaks markers
+    /// stay valid, and only a model or chunk-size change invalidates speech.
     @discardableResult
-    static func writeStamp(_ stamp: CacheStamp, to url: URL) -> Bool {
+    static func writeStamp<S: Encodable>(_ stamp: S, to url: URL) -> Bool {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
         guard let data = try? encoder.encode(stamp) else { return false }
         return (try? data.write(to: url, options: .atomic)) != nil
+    }
+
+    /// The stamp `cache/speech/<id>.complete.json` carries — a `CacheStamp`
+    /// plus the model and chunk size that made the file, so a build that
+    /// changes either rebuilds every speech cache without touching the
+    /// thumbs or peaks markers, which share `source`'s underlying stamp.
+    struct SpeechStamp: Codable, Equatable {
+        let source: CacheStamp
+        let speechModel: String
+        let speechChunkSamples: Int
+
+        init(_ source: CacheStamp) {
+            self.source = source
+            self.speechModel = SileroVAD.modelName
+            self.speechChunkSamples = SileroVAD.chunkSamples
+        }
+    }
+
+    /// `readStamp`'s sibling for the speech marker.
+    static func readSpeechStamp(at url: URL) -> SpeechStamp? {
+        guard let data = try? Data(contentsOf: url) else { return nil }
+        return try? JSONDecoder().decode(SpeechStamp.self, from: data)
     }
 
     /// Clears a strip a pass is about to rebuild. The marker goes FIRST, so
@@ -317,6 +358,25 @@ extension MediaImporter {
         let url = peaksURL(for: media, in: cacheDir)
         guard let data = try? Data(contentsOf: url), data.count >= 4 else { return nil }
         return data.withUnsafeBytes { raw in Array(raw.bindMemory(to: Float.self)) }
+    }
+
+    /// The cached Silero VAD probabilities, or nil when they have not been
+    /// generated — `loadPeaks`' shape for `cache/speech/<id>.bin`.
+    static func loadSpeech(for media: UInt32, in cacheDir: URL) -> [Float]? {
+        let url = speechURL(for: media, in: cacheDir)
+        guard let data = try? Data(contentsOf: url), data.count >= 4 else { return nil }
+        return data.withUnsafeBytes { raw in Array(raw.bindMemory(to: Float.self)) }
+    }
+
+    /// `clearPeaks`' shape: the marker first, then the `.bin`. Returns
+    /// whether a `.bin` was removed.
+    @discardableResult
+    static func clearSpeech(for media: UInt32, in cacheDir: URL) -> Bool {
+        let manager = FileManager.default
+        try? manager.removeItem(at: speechMarkerURL(for: media, in: cacheDir))
+        let file = speechURL(for: media, in: cacheDir)
+        guard manager.fileExists(atPath: file.path) else { return false }
+        return (try? manager.removeItem(at: file)) != nil
     }
 
     /// The `.bin`'s content as `peaks` accumulates it: one Float32 per

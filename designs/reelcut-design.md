@@ -1092,6 +1092,8 @@ Talk.reelcut/
     thumbs/<media id>/complete.json    # completion marker, written LAST (below)
     peaks/<media id>.bin        # f32 max-magnitude per bucket, 100 buckets/s
     peaks/<media id>.complete.json     # its marker, a sidecar; the .bin keeps its name
+    speech/<media id>.bin       # f32 Silero VAD probability per 32 ms chunk (road map 4)
+    speech/<media id>.complete.json    # its marker, a sidecar carrying the model and chunk size
     reversed/<media id>-<digest>.mov   # pre-rendered reverse (M3)
   media/                # only after Consolidate (M3)
 ```
@@ -1719,7 +1721,8 @@ pass nothing, because each wants the picture rather than a deliverable.
 | `FrameWriter.swift` | a CGImage and a format in, a written file out (PNG / JPEG / HEIC) — the ONE writer File ▸ Save Frame… and `render_frame` both call, which is what makes their PNGs byte-identical by construction rather than by luck; PNG passes NIL destination properties, and JPEG flattens a transparent canvas onto black because the container has no alpha |
 | `AudioTap.swift` · `AudioDSP.swift` · `LevelMeter.swift` · `LevelMeterView.swift` | the sample-level audio the plan cannot carry: one `MTAudioProcessingTap` per composition audio track running noise reduction, the compressor and the Mix stage (the mono fold, then the pan), and the level meter's model and its one view — the model publishing a raw per-channel peak and RMS lock-free off the render thread, the view owning the ballistics |
 | `MediaPane.swift` · `MediaRowView.swift` · `MediaListFilter.swift` · `MediaPaneCommands.swift` · `MediaUsage.swift` · `MediaReveal.swift` | the Media tab (§4.3): the pane and its find band, the row and the drag it sources, the filter as a VALUE (search, order, unused-only), the seven commands a row calls back into, the ONE answer to "is this file used" — which walks the nests the way the core's `every_clip()` does, and which Remove and `remove_media` ask too — and the reveal, which selects and then scrolls |
-| `MediaPeaks.swift` · `AudioNormalize.swift` · `SilenceDetector.swift` | the waveform cache and the two questions asked of it: `MediaPeaks` is the one mapping from a plan segment's source window to peak buckets (the reversed mirror included), `AudioNormalize` turns a clip's peak into a `set_audio` op (Normalize, `normalize_clip`) and `SilenceDetector` turns peak × envelope into the quiet spans |
+| `MediaPeaks.swift` · `AudioNormalize.swift` · `SilenceDetector.swift` · `SilenceDetector+Walls.swift` | the waveform cache and the two questions asked of it: `MediaPeaks` is the one mapping from a plan segment's source window to peak buckets (the reversed mirror included, and `window`/`bucketIndex(_:bucket:)` generalised over the bucket size for `MediaSpeech` since road map 4), `AudioNormalize` turns a clip's peak into a `set_audio` op (Normalize, `normalize_clip`) and `SilenceDetector` turns peak × envelope, or since road map 4 the cached Silero VAD probability, into the quiet spans — `Mode` (`voice` / `level`), the gain floor and the per-media level fallback. `SilenceDetector+Walls.swift` is the nest walls and the frame-grid snap, a pure move out at road map 4's toll 1 |
+| `SileroVAD.swift` · `MediaSpeech.swift` · `MediaImporter+Speech.swift` | road map 4's voice model: `SileroVAD` is the streaming Core ML wrapper over `app/Resources/Models/silero_vad.mlmodelc` — the process-wide `isAvailable`/`markUnavailable` pair, `NSLock`-guarded — `MediaSpeech` is the chunk grid (`chunkTicks`, `chunkCount`) and the cache `Loader`/`speechMax` over `MediaPeaks.window`, and `MediaImporter+Speech.swift` is the await-free head check and the reader/inference pass `MediaImporter.swift`'s `speech(for:url:stamp:into:)` calls — run AFTER `peaks` in `generateCaches`'s order, so the peaks `.bin`'s withdrawal is never held behind a full-file decode and an inference |
 | `Loudness.swift` | BS.1770-4 integrated loudness and true peak over plain float buffers — no AVFoundation, no player, no tap — plus the export gain that follows from a measurement and the 16-bit scaler that applies it |
 | `TimelineView.swift` | custom `NSView` in an `NSScrollView`; drawing from the snapshot; gesture sessions (`ClipDragSession`, `TrimSession`, `RangeSession`, `MarkerDragSession`) as structs; `on*` closures to the VC |
 | `PreviewCanvasView.swift` | `AVPlayerLayer` under a transparent overlay `NSView`; `CanvasSession` structs for move/scale/rotate/crop; handle drawing |
@@ -2631,3 +2634,27 @@ assisted import.
   target, a microphone problem, a refused resume, a file the landing could
   not place, a failure). ⌥⌘N shows it again; while it is hidden, the quit
   guard opens the item's menu rather than beeping.
+- **The silence detector's second signal is a voice-activity model, and
+  the model is Silero VAD v6.2.1 as a Core ML program** (road map 4's S0/S1).
+  It is the app's first ML asset. It is vendored COMPILED
+  (`silero_vad.mlmodelc`, 640 KB, FP16) with its MIT notice and a
+  provenance file naming the upstream tag, the conversion's repository and
+  the download's revision, so a re-conversion from the MIT upstream with
+  coremltools is a documented option and not the only route. Core ML is the
+  runtime; nothing else is added.
+- **Edges come from the model's own 32 ms grid, inward; the level rule is
+  the judge only for media that hold no voice.** No adaptive threshold, no
+  level-based edge refinement: the measured edge error is inside the
+  padding the feature already keeps.
+- **The probabilities are a per-media CACHE, never computed at feature
+  time.** `cache/speech/<media id>.bin` beside `peaks/`, stamped and marked
+  on the same terms (§5.6), written by `MediaImporter`'s pass — so the
+  model runs where `await` is already allowed and `MLModel.prediction` is
+  synchronous anyway. **No new `async` exception, no `@available`, no
+  deployment-target change.**
+- **Voice is the default mode** for the sheet and for `detect_silence`;
+  level stays as a mode and as the fallback, unchanged in its arithmetic,
+  so a project whose sound is tones (road map 2's phase-3 fixtures are)
+  detects exactly what it did.
+- **No network model in the silence path.** A transcript-level edit is
+  where such a model would go, and that is a separate item on a later list.

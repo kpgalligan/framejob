@@ -112,7 +112,27 @@ enum MediaPeaks {
         _ peaks: [Float], over segment: PlanSegment, from: Ticks, to: Ticks,
         reversedPivot: Ticks?
     ) -> Float {
-        guard segment.duration > 0, segment.sourceDuration > 0, !peaks.isEmpty else { return 0 }
+        guard
+            let range = window(
+                of: segment, from: from, to: to, reversedPivot: reversedPivot,
+                bucketTicks: bucketTicks, count: peaks.count)
+        else { return 0 }
+        var loudest: Float = 0
+        for index in range { loudest = max(loudest, peaks[index]) }
+        return loudest
+    }
+
+    /// The bucket-index range a project span `[from, to)` of `segment` covers
+    /// in a cache built at `bucketTicks` per bucket over `count` buckets, or
+    /// nil when it falls outside the file the cache was built from —
+    /// `peak`'s lines 115–128 generalised over the bucket size, so
+    /// `MediaSpeech.speechMax` can ask the same question of the 32 ms Silero
+    /// grid without a second copy of the reversed-mirror arithmetic.
+    static func window(
+        of segment: PlanSegment, from: Ticks, to: Ticks, reversedPivot: Ticks?,
+        bucketTicks: Ticks, count: Int
+    ) -> ClosedRange<Int>? {
+        guard segment.duration > 0, segment.sourceDuration > 0, count > 0 else { return nil }
         let first = sourceTick(segment, at: from)
         let last = max(first, sourceTick(segment, at: to) - 1)
 
@@ -123,12 +143,10 @@ enum MediaPeaks {
             hi = pivot - first
         }
 
-        let lower = max(0, bucketIndex(lo))
-        let upper = min(peaks.count - 1, bucketIndex(hi))
-        guard lower <= upper else { return 0 }
-        var loudest: Float = 0
-        for index in lower...upper { loudest = max(loudest, peaks[index]) }
-        return loudest
+        let lower = max(0, bucketIndex(lo, bucket: bucketTicks))
+        let upper = min(count - 1, bucketIndex(hi, bucket: bucketTicks))
+        guard lower <= upper else { return nil }
+        return lower...upper
     }
 
     /// The pivot a reversed clip's window is mirrored about, or nil when the
@@ -164,8 +182,7 @@ enum MediaPeaks {
     /// reversed window produces when the clip runs past the media's start.
     /// Swift's integer division truncates toward zero, so the negative half
     /// has to be spelled out.
-    static func bucketIndex(_ tick: Ticks) -> Int {
-        let bucket = bucketTicks
+    static func bucketIndex(_ tick: Ticks, bucket: Ticks = MediaPeaks.bucketTicks) -> Int {
         guard bucket > 0 else { return 0 }
         let quotient = tick >= 0 ? tick / bucket : -((-tick + bucket - 1) / bucket)
         return Int(max(min(quotient, Ticks(Int.max)), Ticks(Int.min)))

@@ -1030,9 +1030,69 @@ lockstep are in the root `CLAUDE.md`; the full design is
   drags are begun from there — the same split `TimelineClipDrawing.swift`
   and `MediaRowView.swift`'s drop targets use, and the reason `dragSnapper`
   and `makeSnapper` are internal.
-- `SilenceDetector.swift` · `SilenceSheetController.swift` ·
+- `SileroVAD.swift` · `MediaSpeech.swift` · `MediaImporter+Speech.swift` —
+  road map 4's voice model, and the three files are its three concerns.
+  `SileroVAD` is the streaming Core ML wrapper over
+  `app/Resources/Models/silero_vad.mlmodelc` (vendored COMPILED, MIT, with
+  `PROVENANCE.md` naming the upstream tag and the conversion's revision —
+  spec §11): 512 new samples and 64 of carried context per prediction, the
+  LSTM state fed back, the remainder HELD across `feed` calls so a reader
+  handing it one `CMSampleBuffer` at a time never loses the tail of a chunk
+  that straddled two buffers. It is **NOT `async`** and must not become so —
+  `MLModel.prediction` is synchronous, which is what lets the same class
+  serve the cache pass and (through the cache) a detector that runs on
+  main. Its availability is ONE `NSLock`-guarded process-wide reason:
+  `markUnavailable(_:)` keeps and logs the FIRST reason only, `isAvailable`
+  reads it, and `bundled()` calls it for a nil bundle URL or a throwing
+  init. **A marked-unavailable process never retries until relaunch** —
+  recorded, not worked around: the sheet then opens in level and the tool
+  refuses `mode: "voice"` by name. `bundledURL` looks in `Bundle.main`'s
+  `Models` subdirectory FIRST and then beside `bundleURL`, which is the
+  offscreen harness's layout (`build.sh` copies `Models` next to the binary,
+  the Fonts copy's shape).
+  `MediaSpeech` is the chunk grid and the reader: `chunkTicks` (19,200,
+  written as the division for `MediaPeaks.bucketTicks`' reason),
+  `chunkCount(duration:)`, a `Loader` that is `MediaPeaks.Loader`'s shape
+  over `loadSpeech`, and `speechMax`, which asks `MediaPeaks.window` — the
+  project→source conversion, the negative floor and the reversed MIRROR,
+  generalised over the bucket size at road map 4's step 2 so `peak` and
+  `speechMax` share ONE spelling rather than making a third.
+  `MediaImporter+Speech.swift` is the await-free half of the pass
+  (`MediaCacheFiles.swift`'s rule, same reason): `speechIsCurrent` and
+  `writeSpeech`, whose reader settings are 16 kHz mono **float** — the
+  spike's, NOT `Transcriber.extractSettings`, which is 16-bit int and would
+  feed the model integers. A `canAdd`/`startReading` failure returns
+  silently, `peaks`' posture; a thrown `feed`/`flush` calls
+  `markUnavailable` and leaves no `.bin` and no marker, which turns the
+  whole process's `voiceAvailable` false rather than leaving one media
+  pending for ever. The async shell is `MediaImporter.speech(...)` and
+  `generateCaches`'s order is **`thumbnails` → `peaks` → `speech`**: the
+  `.bin` withdrawal at `peaks`' head is §2a's measured window and may never
+  be held behind a full-file decode and an inference. `CacheStamp` is
+  UNCHANGED — `SpeechStamp` WRAPS it with the model name and the chunk
+  size, so a model change rebuilds speech caches and no filmstrip.
+- `SilenceDetector.swift` · `SilenceDetector+Walls.swift` ·
+  `SilenceSheetController.swift` ·
   `TimelineView+Candidates.swift` — Remove Silences (Clip ▸ Remove
-  Silences…, and the `detect_silence` tool). The detector is pure
+  Silences…, and the `detect_silence` tool). **Since road map 4 the
+  detector has a `Mode`** — `voice` (the default) and `level` (the shipped
+  rule, byte for byte) — and three things about it are load-bearing. The
+  per-step test's ORDER is the gain FLOOR first (`gain(of:from:to:)`,
+  factored out of `level`, which still answers exactly what it did): a step
+  whose envelope alone lands full scale at or under `thresholdDB` is quiet
+  in EITHER mode before the model is consulted, which is what keeps the
+  sheet's hint and the tool's catalog sentence about a turned-down, faded or
+  ducked clip TRUE in voice mode. Then a media that holds **no voice
+  anywhere** — `speechMax` over its whole segment under `voiceConfidence`,
+  computed once per scoped voice — falls back to the level test for its
+  whole span (`Outcome.judgedByLevel`). Then a media whose speech cache has
+  not landed is NEVER quiet (`Outcome.voicePending`), the missing-peaks rule
+  repeated. `detect` stays PURE and SYNCHRONOUS — the sheet re-detects per
+  slider tick — so the model is never loaded on that path: `Input.read`
+  reads only `SileroVAD.isAvailable`. `SilenceDetector+Walls.swift` is the
+  nest walls and the directional frame snap, a pure move out at road map
+  4's toll 1 (`NestExtent` and the five functions widened to internal for
+  it). The detector is pure
   arithmetic over values: `Input.read` is the one seam that takes a
   snapshot, a plan, a selection and the peak files off a `ProjectDocument`,
   and everything after it is a function of those — which is what lets the

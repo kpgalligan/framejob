@@ -51,8 +51,9 @@ extension AgentServer {
                 message: "The project's audio plan could not be read, so there is nothing to "
                     + "measure silence against.")
         }
-        let settings = try silenceSettings(
-            a, document, scope: clips == nil ? input.defaultScope : .selected)
+        let (settings, modeNote) = try silenceSettings(
+            a, document, scope: clips == nil ? input.defaultScope : .selected,
+            voiceAvailable: input.voiceAvailable)
         let outcome = SilenceDetector.detect(input, settings: settings)
 
         var result: [String: Any] = [
@@ -65,27 +66,41 @@ extension AgentServer {
             "threshold_db": settings.thresholdDB,
             "min_length": settings.minLength,
             "padding": settings.padding,
+            "mode": outcome.mode.rawValue,
+            "voice_confidence": settings.voiceConfidence,
+            "judged_by_level": outcome.judgedByLevel.map { Int($0) },
         ]
+        var notes: [String] = []
+        if let modeNote { notes.append(modeNote) }
         // Two things worth a sentence rather than a silent zero, because both
         // read as "there is no dead air here" and neither is that.
         if outcome.clips.isEmpty {
-            result["note"] =
+            notes.append(
                 settings.scope == .selected
                 ? "None of those clips plays any sound, so nothing was analysed."
-                : "Nothing in this timeline is audible, so nothing was analysed."
-        } else if !outcome.pendingMedia.isEmpty {
-            // The peaks cache is written by a fire-and-forget task at open
-            // (`ProjectDocument.generateCaches`), so a project opened seconds
-            // ago or a just-relinked movie has none yet. The detector treats
-            // a media with no peaks as NEVER quiet — proposing to delete a
-            // whole clip because its waveform has not landed is the one
-            // failure this feature must not have — so the honest report is
-            // "ask again in a moment", not a short list.
-            result["pending_peaks"] = outcome.pendingMedia.map { Int($0) }
-            result["note"] =
-                "The waveform is still being analysed for \(outcome.pendingMedia.count) media "
-                + "file(s). Nothing inside them is proposed for removal; call again in a moment."
+                : "Nothing in this timeline is audible, so nothing was analysed.")
         }
+        // Both waiters fold into ONE key, `pending_peaks` — the union of what
+        // the level test and the voice test are each still waiting on — so a
+        // caller that only ever read that key still knows to call again.
+        let pendingPeaks = Set(outcome.pendingMedia)
+        let pendingUnion = outcome.mode == .voice
+            ? pendingPeaks.union(outcome.voicePending) : pendingPeaks
+        if !pendingUnion.isEmpty {
+            result["pending_peaks"] = pendingUnion.sorted().map { Int($0) }
+            notes.append(
+                "Analysis is still running for \(pendingUnion.count) media file(s). Nothing "
+                    + "inside them is proposed for removal; call again in a moment.")
+        }
+        if !outcome.voicePending.isEmpty {
+            result["voice_pending"] = outcome.voicePending.map { Int($0) }
+        }
+        if !outcome.judgedByLevel.isEmpty {
+            notes.append(
+                "\(outcome.judgedByLevel.count) media file(s) hold no voice and were judged "
+                    + "by level instead.")
+        }
+        if !notes.isEmpty { result["note"] = notes.joined(separator: " ") }
         result["project"] = summary(document)
         return try jsonResult(result)
     }
@@ -99,9 +114,40 @@ extension AgentServer {
     /// all — everything else is passed through and named back in the result,
     /// so a caller reading `threshold_db` sees what actually ran.
     private func silenceSettings(
-        _ a: [String: Any], _ document: ProjectDocument, scope: SilenceDetector.Scope
-    ) throws -> SilenceDetector.Settings {
+        _ a: [String: Any], _ document: ProjectDocument, scope: SilenceDetector.Scope,
+        voiceAvailable: Bool
+    ) throws -> (SilenceDetector.Settings, String?) {
         var settings = SilenceDetector.Settings(scope: scope)
+        var note: String?
+        if let modeString = try stringArg(a, "mode") {
+            guard let mode = SilenceDetector.Mode(rawValue: modeString) else {
+                throw ToolError(
+                    message: "mode must be \"voice\" or \"level\".")
+            }
+            if mode == .voice, !voiceAvailable {
+                throw ToolError(
+                    message: "The voice model could not be used; call with mode: \"level\".")
+            }
+            settings.mode = mode
+        } else if !voiceAvailable {
+            settings.mode = .level
+            note = "The voice model could not be used, so quiet is judged by level."
+        }
+        if let voiceConfidence = try doubleArg(a, "voice_confidence") {
+            guard settings.mode == .voice else {
+                throw ToolError(
+                    message: "voice_confidence only applies in mode: \"voice\".")
+            }
+            guard voiceConfidence.isFinite,
+                SilenceDetector.Settings.voiceConfidenceRange.contains(voiceConfidence)
+            else {
+                throw ToolError(
+                    message: "voice_confidence must be a number in "
+                        + "\(SilenceDetector.Settings.voiceConfidenceRange.lowerBound)…"
+                        + "\(SilenceDetector.Settings.voiceConfidenceRange.upperBound).")
+            }
+            settings.voiceConfidence = voiceConfidence
+        }
         if let thresholdDB = try doubleArg(a, "threshold_db") {
             // Above full scale every bucket of every recording counts as
             // quiet and the whole timeline comes back as one candidate.
@@ -133,6 +179,6 @@ extension AgentServer {
             }
             settings.padding = padding
         }
-        return settings
+        return (settings, note)
     }
 }
