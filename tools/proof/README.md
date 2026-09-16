@@ -2164,3 +2164,38 @@ is its cdhash and a Screen Recording or Microphone grant given to Reelcut.app
 (the `open -a` line) is for THAT build — after a rebuild remove and re-add it,
 or answer the microphone prompt again. The proofs' direct launch never meets
 this, because it runs under the terminal's stable identity.
+
+## The preview that played black (`preview_validity_probe.py`)
+
+A project of two screen recordings on a 28.172 fps canvas previewed BLACK at
+every playhead position — reopened or not — while `render_frame` and an
+export of the same project were right. The plan ended at 7858867/600000 s and
+the composition `CompositionBuilder.build` made from it at
+13098111667/1000000000 s: both clips run past their recording's video track,
+`fill` holds the last frame from the source's timescale into ticks, and
+AVFoundation reports the composition's duration in nanoseconds, rounded. The
+instructions stopped a third of a nanosecond short, `AVVideoComposition.isValid`
+reports an empty range there, and `AVPlayer` draws no video for an invalid
+composition — no error, no failed item. `CompositionBuilder+InstructionRanges.swift`
+ends the last instruction on the composition when the two differ by under a
+tick.
+
+**No MCP script can see this one, which is the reason for a probe.**
+`render_frame` and `export` go through `AVAssetImageGenerator` and the export
+writer, both of which tolerate the invalid composition, so every MCP
+comparison passes against the broken build. The probe compiles the whole of
+`app/Sources` with the harness's swiftc line and the app's `Compositor.metal`
+beside it (`phase7_chrome.py`'s reason), builds its fixture with `ffmpeg` into
+`work/preview-validity/` — video at timescale 600 and shorter than the audio,
+the recordings' own shape, under a `project.json` with the recorded project's
+exact ticks — and checks that the overrun REPRODUCES before it claims anything
+about the repair. Section 4 opens the package in a real editor window and
+reads `AVPlayerLayer.displayedPixelBuffer()` on the editor's own player (phase
+8's measured instrument); a locked console displays nothing in any layer, so
+it reads `IOConsoleLocked` and skips those five rows BY NAME.
+
+**24/24** at the landing, console unlocked. Mutants, on the working tree with
+the probe rebuilt: `instructionRanges` returning the plan's ranges
+unconditionally **14/24** (the built composition invalid, the absorbing rows,
+and all five player rows — the reported defect exactly); the bound widened
+from one tick to eleven **21/24** (the three whole-tick rows).

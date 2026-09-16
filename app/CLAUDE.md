@@ -190,6 +190,19 @@ lockstep are in the root `CLAUDE.md`; the full design is
   `Source::Shape` arm hashes the whole shape description, so the gradient
   is already inside `cacheHash` — the phase-4 text lesson arriving already
   answered, and still proved by measurement.
+- `CompositionBuilder+InstructionRanges.swift` — the video composition's
+  instruction ranges, and the one correction to them: the LAST instruction
+  ends exactly where the COMPOSITION ends when the two differ by under a
+  tick. `fill`'s held last frame is scaled from the source's timescale to
+  ticks and AVFoundation reports the composition's duration in nanoseconds,
+  rounded, so two recordings on a 28.172 fps canvas built a composition a
+  third of a nanosecond longer than its instructions — and
+  `AVPlayer` refuses an invalid video composition SILENTLY: the preview was
+  black at every playhead position while `render_frame` and an export (the
+  generator tolerates it) looked right. `AVVideoComposition.isValid` with a
+  validation delegate is the instrument that names it, and an offline render
+  never sees it — `tools/proof/preview_validity_probe.py` measures both
+  that and the player's own layer.
 - `Playback.swift` · `CompositionBuilder.swift` · `Compositor.swift` ·
   `CompositorEffects.swift` · `MediaImporter.swift` ·
   `Exporter.swift` · `ExporterLoudness.swift` · `ExporterSettings.swift` ·

@@ -135,10 +135,10 @@ enum CompositionBuilder {
             size.width >= 1 && size.height >= 1 ? size : CGSize(width: 1920, height: 1080)
         videoComposition.renderScale = 1
         videoComposition.customVideoCompositorClass = Compositor.self
-        videoComposition.instructions = plan.instructions.map { instruction in
+        let ranges = instructionRanges(plan, ending: composition.duration)
+        videoComposition.instructions = zip(plan.instructions, ranges).map { instruction, range in
             RecipeInstruction(
-                timeRange: CMTimeRange(
-                    start: time(instruction.start), duration: time(max(1, instruction.duration))),
+                timeRange: range,
                 // PITFALL, and not a bug: AVFoundation reads an EMPTY
                 // `requiredSourceTrackIDs` as "every source track is
                 // required" rather than "none". Harmless here — the
