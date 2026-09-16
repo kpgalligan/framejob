@@ -672,15 +672,18 @@ extension ReelOp {
     /// dissolve" and `center`, and an explicit null would be a parse error
     /// in the first case and a wrong argument in the second. That is the
     /// opposite of `setTransition`, where a nil kind is a CLEAR and has to
-    /// be spelled out.
+    /// be spelled out. `ripple` makes the overlap by sliding the incoming
+    /// clip and everything after it left instead, and is sent only when true.
     static func addTransition(
-        clip: UInt32, kind: TransitionKind?, duration: Ticks, align: TransitionAlign? = nil
+        clip: UInt32, kind: TransitionKind?, duration: Ticks, align: TransitionAlign? = nil,
+        ripple: Bool = false
     ) -> ReelOp {
         var a = OpArgs()
         a.put("clip", clip)
         a.put("kind", kind?.rawValue)
         a.put("duration", duration)
         a.put("align", align?.rawValue)
+        a.put("ripple", ripple ? true : nil)
         return ReelOp(name: "add_transition", args: a.values)
     }
 

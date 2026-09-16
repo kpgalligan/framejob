@@ -45,7 +45,16 @@ extension AgentServer {
                     + "stays on the source frame it was drawn over. Errors when duration is "
                     + "not positive and when the clip is NOT at a hard cut, naming which of: "
                     + "no clip before it, a gap, an overlap that already exists (use "
-                    + "set_transition or set_transition_duration for that one).",
+                    + "set_transition or set_transition_duration for that one). With "
+                    + "ripple true the overlap is made by MOVING instead — the sheet's Shift "
+                    + "Clips Left button when neither clip has footage beyond the cut: no "
+                    + "material is read and align is ignored, and the incoming clip plus "
+                    + "every clip at or after the cut on every unlocked track slides left by "
+                    + "duration, so the timeline gets that much shorter and no clip's source "
+                    + "window changes. It is capped at half the shorter of the two clips and "
+                    + "stepped down until every moved track passes the overlap rule; a clip "
+                    + "on another track pushed into its neighbour gets a cross_dissolve; "
+                    + "markers do not move.",
                 [
                     "clip": clipProperty,
                     "kind": [
@@ -62,8 +71,16 @@ extension AgentServer {
                     "align": [
                         "type": "string", "enum": alignNames,
                         "description":
-                            "Which side the overlap comes out of. Default center.",
+                            "Which side the overlap comes out of. Default center. Ignored "
+                            + "with ripple.",
                     ] as [String: Any],
+                    "ripple": [
+                        "type": "boolean",
+                        "description":
+                            "Make the overlap by sliding the incoming clip and everything "
+                            + "after it left, for two clips with no footage beyond the cut. "
+                            + "Default false.",
+                    ],
                 ], required: ["clip", "duration"]),
             tool(
                 "set_transition_style",

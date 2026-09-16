@@ -118,7 +118,7 @@
 //! | `set_enabled` | `clip: u32, video?: bool, audio?: bool` | The per-clip hide and mute switches; omitted fields keep their value. |
 //! | `set_transition` | `clip: u32, kind?: transition` | Sets `transition_in`; absent or `null` clears it. The overlap with the predecessor IS the duration. |
 //! | `set_transition_duration` | `clip: u32, duration: ticks` | Moves the clip so its overlap with its predecessor is exactly `duration`. |
-//! | `add_transition` | `clip: u32, kind?: transition, duration: ticks, align?: center \| before \| after = center` | Makes an overlap at the HARD CUT before `clip` out of the two clips' unused handles and puts a transition on it — nothing else on the timeline moves. `center` takes half from each side (the odd frame to the incoming clip) and passes a side's shortfall to the other; `before` takes it all from the incoming clip's head, `after` all from the outgoing clip's tail. The duration is snapped down to whole frames and CLAMPED — to each handle, to the neighbours on the track, and to the overlap rule — so a request too long for the material lands shorter rather than refusing; below one frame is None. A nest gives no head, and a nest tail ends at the nest's own length. The incoming clip's actions move with its new first frame. `kind` absent uses the clip's stored kind if it has one, else cross_dissolve; a stored transition keeps its curve and crossfade, a new one is minted (eased, crossfading). Err for a non-positive duration, an unknown clip, and for not being at a hard cut — naming which of no predecessor, a gap, an existing overlap. |
+//! | `add_transition` | `clip: u32, kind?: transition, duration: ticks, align?: center \| before \| after = center, ripple?: bool = false` | Makes an overlap at the HARD CUT before `clip` out of the two clips' unused handles and puts a transition on it — nothing else on the timeline moves. `center` takes half from each side (the odd frame to the incoming clip) and passes a side's shortfall to the other; `before` takes it all from the incoming clip's head, `after` all from the outgoing clip's tail. The duration is snapped down to whole frames and CLAMPED — to each handle, to the neighbours on the track, and to the overlap rule — so a request too long for the material lands shorter rather than refusing; below one frame is None. A nest gives no head, and a nest tail ends at the nest's own length. The incoming clip's actions move with its new first frame. `kind` absent uses the clip's stored kind if it has one, else cross_dissolve; a stored transition keeps its curve and crossfade, a new one is minted (eased, crossfading). Err for a non-positive duration, an unknown clip, and for not being at a hard cut — naming which of no predecessor, a gap, an existing overlap. `ripple?: bool = false`: when true no handle is read and `align` is ignored — the overlap is made by SHIFTING the incoming clip and every clip at or after it on every unlocked track left by the snapped duration, so the timeline gets shorter and no source window changes; the duration is capped at half the shorter of the two clips and stepped down a frame at a time until every track something moved on passes the overlap rule, another track's clip that gains an overlap gets a minted cross_dissolve (`close_gap`'s rule), markers do not move, and an incoming clip on a locked track is None. |
 //! | `set_transition_style` | `clip: u32, curve?: curve, audio?: bool` | Sets the transition's easing and whether it crossfades the two clips' sound; an absent key keeps. A clip with no stored transition and at least one key given gets a minted `cross_dissolve` with the style applied; NEITHER key given is None and never mints. A separate op from `set_transition` because that one reads an absent `kind` as a clear and so cannot spell "keep". |
 //!
 //! `transition` is one of `cross_dissolve`, `fade_black`, `fade_white`,
@@ -480,6 +480,8 @@ pub enum Op {
         duration: Ticks,
         #[serde(default)]
         align: Option<TransitionAlign>,
+        #[serde(default)]
+        ripple: bool,
     },
     /// Both arguments are "absent means keep", so neither is nullable and
     /// an op carrying neither changes nothing.
@@ -790,7 +792,8 @@ impl Project {
                 kind,
                 duration,
                 align,
-            } => self.add_transition(*clip, *kind, *duration, *align),
+                ripple,
+            } => self.add_transition(*clip, *kind, *duration, *align, *ripple),
             Op::SetTransitionStyle { clip, curve, audio } => {
                 self.set_transition_style(*clip, *curve, *audio)
             }

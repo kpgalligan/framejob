@@ -26,7 +26,7 @@ extension AgentServer {
     /// the one before it (`EditorViewController.setTransitionKind:`, whose
     /// body is `setTransitionKindCommand` in
     /// `EditorViewController+Inspector.swift`; the menu sends 0.5 s
-    /// centred).
+    /// centred), and with `ripple` that sheet's Shift Clips Left button.
     ///
     /// `kind` is optional and NOT nullable: absent means the clip's own
     /// stored kind if it has one and `cross_dissolve` otherwise, where
@@ -46,8 +46,10 @@ extension AgentServer {
         let kind = try transitionKindArg(a, "kind")
         let duration = try timeArg(a, "duration", document)
         let align = try alignArg(a, "align")
+        let ripple = try boolArg(a, "ripple") ?? false
         let ops: [ReelOp] = [
-            .addTransition(clip: clip.id, kind: kind, duration: duration, align: align)
+            .addTransition(
+                clip: clip.id, kind: kind, duration: duration, align: align, ripple: ripple)
         ]
         // The trial `performGroupedEdit` runs would report this op's domain
         // refusal in the overlap rule's words, which is the wrong diagnosis:
@@ -55,12 +57,20 @@ extension AgentServer {
         // nothing. Addressed the same way the commit will be, so a scoped
         // call is tried in the container it will land in.
         if try document.project.applying(addressed(ops, document)) == nil {
+            if ripple {
+                throw ToolError(
+                    message: "add_transition made no change: with ripple the shift clamped "
+                        + "below one frame — the incoming clip's track is locked, a clip is "
+                        + "too short for the overlap rule, or sliding a clip on another track "
+                        + "into its neighbour would break that track's overlap rule.")
+            }
             throw ToolError(
                 message: "add_transition made no change: neither side of the cut has media "
                     + "beyond it. An overlap is built out of the source before the incoming "
                     + "clip's in point and after the outgoing clip's out point, and a request "
-                    + "that clamps below one frame is refused. Trim one of the two clips, or "
-                    + "use move_clip to make the overlap by hand.")
+                    + "that clamps below one frame is refused. Pass ripple: true to make the "
+                    + "overlap by sliding the incoming clip and everything after it left, or "
+                    + "trim one of the two clips.")
         }
         return try editResult(document, "Set Transition", ops)
     }

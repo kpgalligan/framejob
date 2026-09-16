@@ -63,7 +63,7 @@ fn union(mut spans: Vec<Span>) -> Vec<Span> {
 }
 
 /// The ids of every track a timeline-wide shift may touch.
-fn unlocked_tracks(project: &Project) -> Vec<u32> {
+pub(crate) fn unlocked_tracks(project: &Project) -> Vec<u32> {
     project
         .tracks
         .iter()
@@ -78,7 +78,7 @@ fn unlocked_tracks(project: &Project) -> Vec<u32> {
 ///
 /// The comparison is on `start` alone, which is rule 3: a clip that
 /// straddles `from` began before it and stays.
-fn shift_clips(project: &mut Project, from: Ticks, delta: Ticks) {
+pub(crate) fn shift_clips(project: &mut Project, from: Ticks, delta: Ticks) {
     if delta == 0 {
         return;
     }

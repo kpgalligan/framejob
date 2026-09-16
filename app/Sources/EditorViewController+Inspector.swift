@@ -190,22 +190,87 @@ extension EditorViewController {
             NSSound.beep()
             return
         }
-        document.applyEdit("Set Transition", ops)
         // Every `add_transition` in the batch can come back `Ok(None)` —
-        // neither side of the cut had a frame to spare. When the batch was
-        // ALL adds, `applyEdit` beeps for it already (every op an identity
-        // is its nil case); a MIXED batch is the one it cannot see, because
-        // the `set_transition`s that landed make the document differ. So ask
+        // neither side of the cut had a frame to spare, which is EVERY cut
+        // between two clips that each use their whole file. That refusal
+        // has to be SAID (road map 5 §3g): a bare beep is all `applyEdit`
+        // gives a batch of identities, and a person placing whole
+        // recordings back to back has no way to guess that a transition is
+        // built from footage beyond the cut. So TRY the batch first, on the
+        // container the edit lands in (`inspectorProbe`'s trial), and ask
         // the clips themselves — a landed `add_transition` leaves its clip
-        // overlapping its predecessor — and say so rather than leaving the
-        // menu looking as though it worked.
-        guard !requested.isEmpty, ops.count > requested.count else { return }
-        let after = document.editedProject.snapshot
-        let landed = requested.contains { id in
-            guard let clip = after.clips.first(where: { $0.id == id }) else { return false }
+        // overlapping its predecessor. A throw is left to `applyEdit`, which
+        // presents the core's own sentence.
+        let trial: ProjectSnapshot?
+        do {
+            trial = try document.editedProject.applying(ops)?.snapshot
+        } catch {
+            document.applyEdit("Set Transition", ops)
+            return
+        }
+        let added = requested.contains { id in
+            guard let after = trial, let clip = after.clips.first(where: { $0.id == id })
+            else { return false }
             return transitionPlacement(of: clip, in: after) == .overlap
         }
-        if !landed { NSSound.beep() }
+        // Applied whenever something changes — a MIXED batch keeps the
+        // `set_transition`s that landed — and whenever there was no add to
+        // explain, so an all-`set_transition` identity still beeps.
+        if trial != nil || requested.isEmpty {
+            document.applyEdit("Set Transition", ops)
+        }
+        if !requested.isEmpty && !added {
+            presentNoFootageForTransition(clips: requested, kind: kind, duration: half)
+        }
+    }
+
+    /// Why Clip ▸ Transition ▸ <kind> did nothing at a hard cut, as a sheet
+    /// rather than a beep — and the way to get the transition anyway.
+    ///
+    /// **Shift Clips Left** re-sends the same cuts as `add_transition` with
+    /// `ripple` (spec §11, R5-3's amendment): each incoming clip, and every
+    /// clip at or after its cut on an unlocked track, slides left by the
+    /// same half second, so the overlap is made of footage the clips already
+    /// show and the project gets shorter. It is offered only here, where the
+    /// handle form found nothing at all, because a cut with ANY footage to
+    /// spare got a shorter transition and never reaches this sheet. The
+    /// MCP tool's refusal says the same thing in the op's words
+    /// (`AgentServer+Transitions.swift`).
+    ///
+    /// The sheet's completion is not an AppKit event, so the edit goes
+    /// through `performGroupedEdit` (app/CLAUDE.md's undo pitfall), and it is
+    /// one undo step whatever the number of cuts.
+    private func presentNoFootageForTransition(
+        clips: [UInt32], kind: TransitionKind, duration: Ticks
+    ) {
+        guard let window = view.window else {
+            NSSound.beep()
+            return
+        }
+        let one = clips.count == 1
+        let alert = NSAlert()
+        alert.messageText =
+            one
+            ? "There’s no extra footage at this cut for a transition."
+            : "There’s no extra footage at these cuts for a transition."
+        alert.informativeText =
+            "A transition overlaps two clips, so it needs footage past the end of the "
+            + "first clip or before the start of the second. A clip that uses its whole "
+            + "file has none.\n\nShift Clips Left makes the overlap by sliding "
+            + (one ? "the second clip" : "the second clip at each cut")
+            + " — and everything after it on unlocked tracks — left by half a second. "
+            + "The project gets shorter by the same amount."
+        alert.addButton(withTitle: "Shift Clips Left")
+        alert.addButton(withTitle: "Cancel")
+        alert.beginSheetModal(for: window) { [weak document] response in
+            guard response == .alertFirstButtonReturn, let document = document else { return }
+            document.performGroupedEdit(
+                "Add Transition",
+                clips.map {
+                    .addTransition(
+                        clip: $0, kind: kind, duration: duration, align: .center, ripple: true)
+                })
+        }
     }
 
     /// Where a clip sits relative to the clip before it on its track, which

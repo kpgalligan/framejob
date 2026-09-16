@@ -2199,3 +2199,31 @@ the probe rebuilt: `instructionRanges` returning the plan's ranges
 unconditionally **14/24** (the built composition invalid, the absorbing rows,
 and all five player rows — the reported defect exactly); the bound widened
 from one tick to eleven **21/24** (the three whole-tick rows).
+
+## The transition sheet (`transition_sheet_probe.py`)
+
+Clip ▸ Transition ▸ at a hard cut between two WHOLE files used to beep and
+nothing else: `add_transition` builds the overlap from handles (spec §11,
+R5-3) and a whole file has none. `setTransitionKindCommand` now tries the
+batch first and, when no `add_transition` in it would land, puts up a sheet
+saying why, whose **Shift Clips Left** re-sends those cuts with `ripple`
+(R5-3's 2026-09-16 amendment) as one undo step. The core's rules for
+`ripple` are `core/tests/ripple_transition.rs`'s; this is the COMMAND — when
+the sheet appears and when it must not, what it says, what each button does,
+and that a shift undoes byte for byte. A sheet, a menu validator and an undo
+step have no MCP tool, so it is a probe over the whole of `app/Sources` with
+an editor in a real window; `window.endSheet(_:returnCode:)` presses a button,
+running the sheet's own completion. Its fixture is one six-second `ffmpeg`
+movie in `work/transition-sheet/`, opened as a new project so every clip of it
+is whole.
+
+**32/32** at the landing. Mutants: the sheet never presented **14/32**; the
+button sending `ripple: false` **24/32**; the trial's apply guard reduced to
+"only an all-`set_transition` batch" **28/32** (the split pair and the mixed
+selection). **One survivor**: the button calling `applyEdit` instead of
+`performGroupedEdit` scores 32/32. The grouped entry point is mandatory
+because an undo registration outside an AppKit event lands in an implicit
+group AppKit never closes, merging it with the next such edit — and the probe
+spins the run loop between every edit, which closes that group, so the merge
+cannot be staged here. The rule stays, argued in the sheet's doc comment and
+app/CLAUDE.md's undo pitfall.

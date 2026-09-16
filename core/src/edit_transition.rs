@@ -24,6 +24,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::edit_clip::clip_end;
+use crate::edit_time::{shift_clips, unlocked_tracks};
 use crate::model::{Clip, Curve, Project, Source, Transition, TransitionKind};
 use crate::time::Ticks;
 
@@ -163,6 +164,11 @@ impl Project {
     /// refused, and only a request that clamps below one whole frame gives
     /// up.
     ///
+    /// **`ripple` makes the overlap by MOVING instead** (spec §11, R5-3's
+    /// amendment of 2026-09-16), and is [`Project::add_transition_by_shift`];
+    /// steps 0 and 1 and the kind (step 10) are shared, and nothing between
+    /// them runs.
+    ///
     /// The steps, in order:
     ///
     /// 0. A `duration` that is not positive is an `Err` before anything
@@ -217,6 +223,7 @@ impl Project {
         kind: Option<TransitionKind>,
         duration: Ticks,
         align: Option<TransitionAlign>,
+        ripple: bool,
     ) -> Result<Option<Project>, String> {
         // 0. The one wrong ARGUMENT that is not about the timeline.
         if duration <= 0 {
@@ -258,6 +265,9 @@ impl Project {
             }
             Some(p) => p.clone(),
         };
+        if ripple {
+            return self.add_transition_by_shift(&earlier, &later, kind, duration);
+        }
 
         let frame = self.frame();
         // 2 and 3. The handles, floored to whole frames. `None` is
@@ -341,6 +351,74 @@ impl Project {
             *slot = moved;
         }
         self.finish(next)
+    }
+
+    /// `add_transition` with `ripple` — the overlap made by SHIFTING the
+    /// incoming clip left over the end of the outgoing one, for the cut
+    /// where neither clip has a frame of unused material (two whole files
+    /// placed back to back, which the handle form can never join).
+    ///
+    /// No handle is read and `align` means nothing: the outgoing clip keeps
+    /// every frame and its place, the incoming clip keeps its source window
+    /// and its actions (they are clip time, and the clip moves whole), and
+    /// its first frames blend over the outgoing clip's last ones. What moves
+    /// is `close_gap`'s set — every clip at or after the cut on every
+    /// UNLOCKED track, through the same [`shift_clips`] — so the tracks stay
+    /// in sync and the timeline gets shorter by the overlap. Markers do not
+    /// move, as they do not for `ripple_delete` or `close_gap`.
+    ///
+    /// The duration is snapped down to whole frames, capped at half the
+    /// shorter of the two clips (the pair's own overlap rule, closed form),
+    /// and then stepped down a frame at a time until every track something
+    /// moved on passes the overlap rule — clamped rather than refused, the
+    /// handle form's posture. A clip on another track that the shift pushes
+    /// into its predecessor gains a minted `cross_dissolve`, which is
+    /// `close_gap`'s rule for the same shift. An incoming clip on a LOCKED
+    /// track cannot move, and nothing below one frame is left: both `None`.
+    pub(crate) fn add_transition_by_shift(
+        &self,
+        earlier: &Clip,
+        later: &Clip,
+        kind: Option<TransitionKind>,
+        duration: Ticks,
+    ) -> Result<Option<Project>, String> {
+        let unlocked = unlocked_tracks(self);
+        if !unlocked.contains(&later.track) {
+            return Ok(None);
+        }
+        let frame = self.frame();
+        let cut = later.start;
+        let mut touched: Vec<u32> = Vec::new();
+        for clip in &self.clips {
+            if clip.start >= cut && unlocked.contains(&clip.track) && !touched.contains(&clip.track)
+            {
+                touched.push(clip.track);
+            }
+        }
+
+        let shorter = earlier.duration.min(later.duration);
+        let mut frames = (duration / frame).min(shorter / 2 / frame);
+        while frames > 0 {
+            let mut next = self.clone();
+            shift_clips(&mut next, cut, -(frames * frame));
+            if touched
+                .iter()
+                .all(|track| next.check_overlap_rule(&[], *track, &[]).is_ok())
+            {
+                if let Some(slot) = next.clip_mut(later.id) {
+                    slot.transition_in = Some(match (kind, later.transition_in) {
+                        (Some(kind), Some(stored)) => Transition { kind, ..stored },
+                        (Some(kind), None) => Transition::minted(kind),
+                        (None, Some(stored)) => stored,
+                        (None, None) => Transition::minted(TransitionKind::default()),
+                    });
+                }
+                set_gained_transitions(&mut next, &touched);
+                return self.finish(next);
+            }
+            frames -= 1;
+        }
+        Ok(None)
     }
 
     /// How many whole frames the INCOMING clip could be extended backward

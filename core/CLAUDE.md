@@ -188,7 +188,11 @@ lockstep are in the root `CLAUDE.md`; the full design is
   `set_transition_duration`, and `set_gained_transitions`, the rule that a
   clip which gains an overlap gains a transition. Road map 5's E1 adds
   `add_transition` (an overlap built out of two clips' handles at a hard cut)
-  and `set_transition_style` (the curve and the audio crossfade), with
+  and `set_transition_style` (the curve and the audio crossfade), and
+  `add_transition`'s `ripple` form (2026-09-16, spec §11 R5-3's amendment:
+  the overlap made by sliding the incoming clip and everything after it left
+  through `edit_time.rs`'s `shift_clips`, widened to `pub(crate)` for it with
+  `unlocked_tracks`, for two whole files that have no handle), with
   `TransitionAlign` beside them — `edit_zoom.rs`'s `ZoomFit` is the precedent
   for an argument enum living with its op. Cut out of `edit_clip.rs` under
   the size rule, and cut HERE because placement and transitions are different
@@ -569,8 +573,8 @@ came back to 487 — and the feature then landed at **635**, forty over, which
 is what "budget against the pessimistic number" means. So it paid again,
 mid-phase, with `audio_crossfade.rs` (134), and is at **532** with the whole
 of E1 in it. The two cuts are the same seam read twice: a term the voice's
-own properties do not decide. `edit_transition.rs` (475) is E1's other new
-module and has room. `recipe.rs` was the third and
+own properties do not decide. `edit_transition.rs` (**553** since `add_transition`'s `ripple` form, 475 at E1) is E1's other new
+module and has about 47 lines of room. `recipe.rs` was the third and
 paid the rule in road map 2's phase 7 the way `export.rs` and
 `model_props.rs` had — 331 before phase 4c put the reveal there, 567
 after it, 600 once phase 6 added the layer's `blend`, and **381** once
