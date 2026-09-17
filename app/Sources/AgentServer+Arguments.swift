@@ -422,6 +422,33 @@ extension AgentServer {
         return value
     }
 
+    /// A caller-authored patch, forwarded to the core UNCHANGED — the door
+    /// deepening D1 moves every property op to (`designs/reelcut-roadmap-7.md`
+    /// §1, kpgalligan/reelcut#1).
+    ///
+    /// It reads NOTHING about the value. The core is the one validator of
+    /// what a patch may carry and names the dotted path and the value in
+    /// every refusal, where a lenient Swift decode of the same object
+    /// corrected a misspelt variant to the vocabulary's first case and
+    /// dropped an unknown key inside a nested object. Even "that is not an
+    /// object" belongs there: `video patch must be a json object, not 5`
+    /// names the group the caller was writing, which this side would have to
+    /// be told.
+    ///
+    /// The one thing left here is what the core cannot see: the argument is
+    /// ABSENT, a mistake about the CALL rather than about the patch, which
+    /// would otherwise come back as serde's complaint about the op envelope.
+    /// `null` is not absent — it is forwarded, and refused in the sentence
+    /// above.
+    func rawPatchArg(_ a: [String: Any], _ key: String) throws -> Any {
+        guard let raw = a[key] else {
+            throw ToolError(
+                message: "Missing required argument: \(key) (a JSON object of the properties "
+                    + "to change, e.g. {\"scale\": 0.5})")
+        }
+        return raw
+    }
+
     /// A patch object (`set_video` and its siblings) decoded into its typed
     /// Swift form. Deliberately STRICTER than the core's serde on both counts
     /// a silent drop can happen: an unknown key is refused by NAME, and a key

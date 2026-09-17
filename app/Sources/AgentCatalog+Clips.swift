@@ -90,12 +90,13 @@ extension AgentServer {
         // lists) and a video chain that is long enough already.
         //
         // Three things are in the text because a caller meets each of them
-        // immediately: that the handler REPLACES the whole object (so a slot
-        // left out is cleared, unlike every other key in this patch, which
-        // merges); that it is not an animation target; and that get_project
-        // reports the clip UN-MOVED, which is what makes an edit work on the
-        // numbers a person typed and would otherwise read as the tool
-        // ignoring the preset.
+        // immediately: that it MERGES slot by slot like every other nested
+        // object (deepening D1·3 — the agent door used to replace the whole
+        // object, and the two Swift writers still send all three slots, which
+        // is the same thing said a different way); that it is not an
+        // animation target; and that get_project reports the clip UN-MOVED,
+        // which is what makes an edit work on the numbers a person typed and
+        // would otherwise read as the tool ignoring the preset.
         let edgeNames = EdgeMotion.allCases.map { $0.rawValue }
         let duringNames = DuringMotion.allCases.map { $0.rawValue }
         let motionClause: String =
@@ -103,9 +104,12 @@ extension AgentServer {
             + "{kind: \(edgeNames.joined(separator: "|")), duration: ticks} measured from the "
             + "clip's first and last frame, during is {kind: "
             + "\(duringNames.joined(separator: "|")), amount: 0–1, period: ticks} over the "
-            + "whole clip and drift ignores its period. Unlike every other key here this one "
-            + "REPLACES: a slot left out or set to null is cleared, and a motion with no slot "
-            + "left reads back as null. in + out longer than the clip scales both down to "
+            + "whole clip and drift ignores its period. Like every other object here it "
+            + "MERGES: a slot you leave out keeps what is stored, a slot set to null clears "
+            + "that slot, {motion: null} clears the whole preset, and a motion with no slot "
+            + "left reads back as null. The two durations and the period are snapped to the "
+            + "document's frame grid, so what you send back is what get_project gives. "
+            + "in + out longer than the clip scales both down to "
             + "meet rather than refusing. It is NOT an animation target — set_action_end "
             + "refuses it — and get_project reports the clip UN-MOVED, since the preset "
             + "becomes placement only when a frame is rendered)"
@@ -137,8 +141,10 @@ extension AgentServer {
             + obscureClause
             + blendClause
             + motionClause
-            + ". A colour is [r, g, b] or "
-            + "[r, g, b, a], each 0–1; chroma's key is the one that takes no alpha."
+            + ". A colour is FOUR numbers, [r, g, b, a], each 0–1: three is refused by "
+            + "length and a component outside the range is refused by name, neither "
+            + "filled in nor clamped. chroma's key is the one exception, three numbers "
+            + "with no alpha."
         let audioPatchDescription =
             "Audio properties to merge. Keys: volume (0–4, 1 = unity), muted, fade_in, "
             + "fade_out (ticks), duck (null or {level, attack, release}), mono, keep_pitch, "
@@ -716,10 +722,15 @@ extension AgentServer {
                 "Changes the clips' BASE video properties — position, scale, rotation, opacity, "
                     + "crop, corner radius, shadow, colour, chroma key, filters, reflection, "
                     + "spotlight and motion (what the clip does on its way in, on its way out "
-                    + "and all the way through). The patch MERGES: keys you leave out keep "
-                    + "their values, and shadow, chroma, reflection or spotlight set to null "
-                    + "clears it. Filters and motion are the exceptions — the filter array "
-                    + "replaces, so send the whole stack, and a motion replaces slot by slot. "
+                    + "and all the way through). The patch MERGES AT EVERY DEPTH: keys you "
+                    + "leave out keep their values, inside a nested object too — a patch of "
+                    + "just {shadow: {blur: 20}} keeps the shadow's colour, angle and "
+                    + "distance — and shadow, chroma, reflection, spotlight or motion set to "
+                    + "null clears it. A LIST is the exception: filters and obscure each "
+                    + "replace whole, so send the whole stack and [] to clear it. A key or a "
+                    + "value the vocabulary does not have is an error naming its dotted path "
+                    + "(array indices included) and the value you sent; nothing is dropped, "
+                    + "corrected or clamped. "
                     + "Placement is spec §5.3: the source rectangle is centred at the "
                     + "canvas centre plus (x, y), scaled, then rotated about that centre, and "
                     + "crop removes edges in place without shifting the content. To animate a "

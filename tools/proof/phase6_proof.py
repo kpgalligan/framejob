@@ -945,8 +945,12 @@ def nest_part(mcp):
           "…while `{blend: \"normal\"}` on one is the identity and answers \"made no "
           f"change\", so `paste_attributes` of an ordinary look still works — got {identity!r}")
     misspelt = s.error("set_video", clips=[nest], patch={"blend": "muliply"})
-    check(misspelt is not None and "blend" in misspelt,
-          f"a misspelt mode is refused naming the key — got {misspelt!r}")
+    check(misspelt is not None
+          and 'bad value at "blend" in a video patch' in misspelt
+          and "muliply" in misspelt,
+          f"a misspelt mode is refused naming the key AND the value — the core's "
+          f"own sentence since D1·3, where this door used to answer — got "
+          f"{misspelt!r}")
 
     # The `set_action_end` back door. That door walks keys and types (D1·2)
     # but never sees the CLIP, and `multiply` is a perfectly legal mode, so
@@ -1639,13 +1643,24 @@ def actions_part(mcp):
 
     # The refusal that makes the natural agent spelling loud rather than
     # wrong. `{"filters": [{"amount": 1}]}` is the core's documented idiom for
-    # "the same filter, more of it"; over MCP the decoder COMPLETES the
-    # missing `kind` from the defaults, so a sepia base would animate and
-    # then switch to a blur with the caller told it worked.
+    # "the same filter, more of it"; over MCP the decoder used to COMPLETE
+    # the missing `kind` from the defaults, so a sepia base would animate
+    # and then switch to a blur with the caller told it worked.
+    #
+    # **The two `set_video` refusals here now speak the CORE's words** (D1·3,
+    # kpgalligan/reelcut#4): that door forwards the caller's patch raw, so
+    # the sentence an agent reads is `patch.rs`'s, and it carries the value
+    # sent as well as the index. Both were written against the SWIFT door's
+    # `patch.filters[0]` and went on passing after that door came out, only
+    # because a keyword check cannot tell the two apart — which is why each
+    # is now the whole sentence. `tools/proof/patch_door_proof.py` is where
+    # the seam itself is proved; these two stay because the partial entry is
+    # phase 6's own feature. The two `set_action_end` refusals below are
+    # still the Swift door's, until kpgalligan/reelcut#6 moves them.
     partial = animated.error("set_video", clips=[clip],
                              patch={"filters": [{"amount": 1.0}]})
-    check(partial is not None and "patch.filters[0]" in partial
-          and "kind and amount" in partial,
+    check(partial is not None
+          and 'missing key "filters[0].kind" in a video patch' in partial,
           f"a filter entry missing `kind` is refused BY INDEX — got {partial!r}")
     partial_end = animated.error(
         "set_action_end", clip=clip, action=action["id"],
@@ -1655,9 +1670,11 @@ def actions_part(mcp):
           f"tempting — got {partial_end!r}")
     unknown = animated.error("set_video", clips=[clip],
                              patch={"filters": [{"kind": "glow", "amount": 1.0}]})
-    check(unknown is not None and "patch.filters[0].kind" in unknown,
-          f"a filter kind outside the closed set is refused by index too — got "
-          f"{unknown!r}")
+    check(unknown is not None
+          and 'bad value at "filters[0].kind" in a video patch' in unknown
+          and "glow" in unknown,
+          f"a filter kind outside the closed set is refused by index too, naming the "
+          f"value sent — got {unknown!r}")
     end_blend = animated.error(
         "set_action_end", clip=clip, action=action["id"],
         patch={"video": {"blend": "muliply"}})

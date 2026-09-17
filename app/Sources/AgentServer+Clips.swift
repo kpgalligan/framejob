@@ -514,57 +514,47 @@ extension AgentServer {
     /// because that is what dragging a handle inside an animated span means.
     /// The agent says which it wants — `set_video` changes the clip's BASE
     /// props, `set_action_end` an action's end state.
+    ///
+    /// **The patch goes to the core UNREAD** (deepening D1·3,
+    /// `designs/reelcut-roadmap-7.md` §2.3). Decoding the object into a
+    /// `VideoPatch`, checking an allowed-key set, reading `motion` by hand
+    /// and checking four closed enums are all `core/src/patch.rs`'s now, and
+    /// its refusals name the dotted path (array indices included) and the
+    /// value sent. Two things an agent sees change with it: a nested object
+    /// MERGES where the decode-and-re-encode replaced it (a one-key `shadow`
+    /// patch keeps the colour and the offset, a `motion` naming only `in`
+    /// keeps the stored `out`), and a colour must be four numbers, since
+    /// nothing fills in an alpha on the way past any more.
+    ///
+    /// What is left is what the core cannot know: which document, which
+    /// clips, and that `patch` was passed at all.
     func setVideo(_ a: [String: Any]) throws -> String {
         let document = try target(a)
         let clips = try clipsArg(a, "clips", document)
-        // `motion` (format version 8) is read BY HAND and stripped before
-        // `patchArg` sees it: that helper cannot look inside a nested
-        // object and a motion has two levels of them, so the generic
-        // decoder would drop a misspelt key in silence
-        // (`AgentServer+Motion.swift` argues it). The copy is what keeps
-        // the two readers off each other's key.
-        var rest = a
-        var object = a["patch"] as? [String: Any] ?? [:]
-        let motion = try motionPatchArg(object, "motion", document)
-        object.removeValue(forKey: "motion")
-        rest["patch"] = object
-        var patch = try patchArg(rest, "patch", VideoPatch.self, allowed: Self.videoPatchKeys)
-        try Self.checkVideoEnums(object, "patch")
-        patch.motion = motion
-        guard !patch.isEmpty else {
-            throw ToolError(message: "patch names nothing to change.")
-        }
-        return try editResult(document, "Video Properties", [.setVideo(clips: clips, patch: patch)])
+        let patch = try rawPatchArg(a, "patch")
+        return try editResult(
+            document, "Video Properties", [.setVideoRaw(clips: clips, patch: patch)])
     }
 
     /// The five string ENUMS a video patch can carry, checked by hand, plus
     /// the one PARTIAL entry the decoder cannot report.
     ///
-    /// `patchArg`'s round-trip test catches a value the patch could not read,
-    /// but only at the top level, and its own doc says why it cannot recurse:
-    /// one level down every field has a real default, so a value that decoded
-    /// TO that default is indistinguishable from a value that was absent.
-    /// `filters[].kind`, `spotlight.shape` and an obscure region's `shape`
-    /// and `kind` are exactly that case and the worst version of it —
-    /// `ProjectSnapshot` decodes all four leniently, on purpose, so that a
-    /// file naming a filter this build has never heard of still opens rather
-    /// than blanking the whole project. The cost is that
-    /// `{"kind": "glow"}` reaches the core as `blur`: not a nuance dropped but
-    /// a DIFFERENT filter applied, and the caller told it worked (measured).
-    ///
-    /// So the closed sets are checked here, against the enums themselves —
-    /// no new list to fall out of step with, and the refusal names the value.
-    ///
-    /// **A filter entry is checked for COMPLETENESS as well**, and it is the
-    /// same defect one step further on. `{"filters": [{"amount": 1.0}]}` is the
-    /// core's own documented idiom for "the same filter, more of it" — an end
-    /// patch's entries are merged over the base ones — and it is the most
-    /// natural thing an agent will write. Over MCP it cannot work: `FilterProps`
-    /// has no optionals, so the decoder fills the missing `kind` with `blur`,
-    /// a `sepia` base animates and then switches to a blur, and the caller is
-    /// told it worked (measured). Two lines refusing the partial entry by index
-    /// are worth more than a wrong picture reported as success, and there is no
-    /// second reading of it: the key is either there or it is not.
+    /// **Its one remaining caller is `checkActionPatch`.** `set_video` used
+    /// to be the other, and D1·3 took that door raw; D1·5
+    /// (kpgalligan/reelcut#6) takes this one the same way, which is what
+    /// deletes this function. The whole of the argument it was written with
+    /// is in `designs/reelcut-app-notes.md`; what has to be known while it
+    /// still runs is that `patchArg`'s round trip cannot see INSIDE a nested
+    /// object — one level down every field has a real default, so a value
+    /// that decoded TO that default is indistinguishable from an absent one
+    /// — and that `ProjectSnapshot` decodes `filters[].kind`,
+    /// `spotlight.shape` and an obscure region's `shape` and `kind`
+    /// LENIENTLY, on purpose, so that a file naming a filter this build has
+    /// never heard of still opens. Together those mean `{"kind": "glow"}`
+    /// reaches the core as `blur`: a DIFFERENT filter applied, reported as
+    /// success (measured). The same defect completes a filter entry that
+    /// names only its amount into a half-strength blur, which is why the
+    /// completeness check is here beside the four vocabularies.
     private static func checkVideoEnums(_ object: [String: Any], _ path: String) throws {
         if let filters = object["filters"] as? [[String: Any]] {
             let known = FilterKind.allCases.map { $0.rawValue }

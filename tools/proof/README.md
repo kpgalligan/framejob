@@ -186,6 +186,7 @@ python3 tools/proof/phase6_proof.py 4823
 python3 tools/proof/phase7_proof.py 4823
 python3 tools/proof/phase8_proof.py 4823
 python3 tools/proof/phase9_proof.py 4823
+python3 tools/proof/patch_door_proof.py 4823
 ```
 
 **Phase 9 takes a SECOND argument**, the log path, defaulting to
@@ -2275,3 +2276,42 @@ group AppKit never closes, merging it with the next such edit — and the probe
 spins the run loop between every edit, which closes that group, so the merge
 cannot be staged here. The rule stays, argued in the sheet's doc comment and
 app/CLAUDE.md's undo pitfall.
+
+## The patch door (`patch_door_proof.py`)
+
+`python3 tools/proof/patch_door_proof.py [port]`. **Named for the SEAM, not
+for a phase**, which is the one thing about it that is not the house shape:
+what it proves is the single door every caller-authored object comes through
+(`core/src/patch.rs`, `CONTEXT.md`'s **Patch**), and the doors arrive one
+deepening ticket at a time (`designs/reelcut-roadmap-7.md` §1). D1·3
+(kpgalligan/reelcut#4) built it with `set_video`'s section, at **39/39**;
+D1·4 and D1·5 add theirs beside it, and the file says in a marked comment
+where the next one goes and what has to change in the copy.
+
+What it asserts, per door: the four refusal sentences VERBATIM rather than
+by keyword (`unknown key`, `missing key`, `bad value at`, `<group> patch
+must be a json object`), the project BYTE-identical either side of every
+refusal, that one `undo` after a whole batch of refusals puts back the one
+real edit that preceded them — so not one refusal registered a step — and
+then the merge rules read back through `get_project` (one key changed,
+siblings kept, `null` clearing, a list replacing, a motion slot kept) and
+the frame-grid snap the core applies to the ticks a patch carries.
+
+**Why it exists beside `core/tests/patch_door.rs`, which proves the same
+rules through the FFI.** Those tests cannot see the Swift agent door, which
+until D1·3 decoded the caller's object through the app's LENIENT project
+types and sent the RESULT to the core: a misspelt enum landed as the
+vocabulary's first case, an unknown key inside a nested object was dropped,
+a three-element colour had an alpha filled in and an out-of-range component
+was clamped — each of them reported as a success. Only a call made over MCP
+against the built binary tells the two apart. It needs no ffmpeg and nothing
+in `media/` but `A.mov`.
+
+Two assertions elsewhere moved here in spirit rather than in place, and both
+are noted in their own files: `phase6_proof.py`'s `set_video` refusals (the
+partial filter entry, the misspelt filter kind, the misspelt blend) now
+assert the core's whole sentence instead of the Swift door's `patch.`-prefixed
+key, and `phase3_proof.py`'s printed NOTE that a misspelt key inside a
+nested object was dropped is two CHECKS now, because it no longer is. The
+`set_action_end` refusals in both files are still the Swift door's until
+kpgalligan/reelcut#6.

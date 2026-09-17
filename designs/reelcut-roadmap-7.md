@@ -1,7 +1,7 @@
 # Reelcut — road map 7: deepening
 
-**Status: D1 IN PROGRESS — D1·1 and D1·2 built (§2.1, §2.2); D1·3 to D1·6
-not started.**
+**Status: D1 IN PROGRESS — D1·1, D1·2 and D1·3 built (§2.1 to §2.3);
+D1·4 to D1·6 not started.**
 
 Road maps 2 to 6 each added something a person using the app can see. This
 one does not. A **deepening** takes knowledge that is spread across callers
@@ -588,3 +588,166 @@ and the two in `props_check.rs` that said "the inspector snaps".
 **Owed.** Nothing for this ticket. The MCP proof of all of it is D1·3 to
 D1·5's, by design: none of this is reachable through the agent door until
 the Swift launder comes out.
+
+### 2.3 D1·3 — `set_video` forwards the caller's patch (kpgalligan/reelcut#4)
+
+**Commits.** This one (the ticket); the review's follow-up is named here
+once it lands, as §2.1's and §2.2's are.
+
+**What landed.** The first door. `set_video` hands the core the object the
+caller wrote, and an agent sees D1·1's and D1·2's work for the first time.
+
+- **The handler is four lines.** `target` → `clipsArg` → `rawPatchArg` →
+  `editResult`. What went: the decode into `VideoPatch`, the allowed-key set,
+  `checkVideoEnums`' four closed vocabularies and its filter-completeness
+  check, the `patch.isEmpty` refusal, and the whole of
+  `AgentServer+Motion.swift` — 157 lines that read `motion` by hand because
+  `patchArg` could not see two levels down.
+- **`rawPatchArg`** (`AgentServer+Arguments.swift`) reads NOTHING about the
+  value. Its one refusal is the ABSENT argument, which is a mistake about the
+  CALL; a `null`, a number and a list are all forwarded, because
+  `video patch must be a json object, not 5` names the group and this side
+  would have to be told which one. It returns `Any`, not `[String: Any]`, so
+  that stays true.
+- **`ReelOp.setVideoRaw(clips:patch:)`** is the raw factory, beside the typed
+  `setVideo(clips:patch:)` the inspector, the canvas sessions and Clip ▸
+  Motion ▸ keep using. The paste payload factories (`paste`,
+  `pasteAttributes`) are the precedent, and the rule they keep is why it is
+  here: the op table stays the only place in the app where an op is spelled.
+  **#5 and #6 copy this shape** — `patch: Any`, one `OpArgs.put`, the same
+  op name.
+- **The empty patch is the core's answer now.** `{}` used to be
+  `patch names nothing to change.`; it is the identity refusal
+  (`Video Properties made no change…`) since nothing on this side reads the
+  object. No proof asserted the old sentence.
+
+**What an agent sees change**, both named in the catalog:
+
+- **A nested object MERGES.** `{"shadow": {"blur": 20}}` keeps the colour,
+  the angle and the distance where the decode-and-re-encode replaced the
+  whole object from defaults. `motion` is the loudest case: the MCP argument
+  used to replace all three slots, so a patch naming `in` cleared a stored
+  `out`. `MotionProps.dictionary` still writes three keys and is now the ONLY
+  edge that does — the app's writers know all three slots, which is the same
+  rule spelled out rather than a second one.
+- **A colour is four numbers.** Nothing fills in an alpha
+  (`bad value at "shadow.color" in a video patch: invalid length 3…`) and
+  nothing clamps a component (`video.shadow.color must be between 0 and 1,
+  not 2`). `colorArg`'s three-element form and its clamp are untouched: it
+  has no video caller, and its callers — `set_canvas`'s background,
+  `add_background_clip`'s colour and `set_shape`'s stroke, fill and stops —
+  are #5's by that ticket's own criteria. So is `withOpaqueColors`, which
+  `patchArg` still applies at the doors that have not moved.
+
+**The proof is born.** `tools/proof/patch_door_proof.py`, **39/39**, 409
+lines, named for the SEAM and not for a phase. One section per door; this
+one is the template, and a marked comment says where the next goes and what
+has to change in the copy. Four helpers: `refused` (the sentence VERBATIM,
+plus `get_project` identical either side), `landed` (a merge read back), and
+`undo_marker` / `undo_claim`, whose pair is the stronger form of "a refusal
+is not an undo step" — one real edit, then eleven refusals, then ONE undo
+that has to put the project back. The fixture stores a shadow, a filter
+stack and a motion BEFORE anything is refused, so every refusal names a key
+the clip already has a value for and a door that dropped, cleared or
+completed it would be making a real edit.
+
+**Two other scripts said something that is no longer true.**
+`phase6_proof.py`'s three `set_video` refusals asserted the Swift door's
+`patch.`-prefixed key and went on passing after that door came out, because
+a keyword check cannot tell the two apart; each is now the core's whole
+sentence. `phase3_proof.py`'s printed NOTE that a misspelt key inside a
+nested object is dropped is two CHECKS now, because it no longer is
+(`obscure[0].amont` and `shadow.blurr`). The `set_action_end` refusals in
+both files are still the Swift door's, until #6.
+
+**Measured.**
+
+- `make test`: 632 passed, 0 failed (no Rust changed). `make lint` and
+  `cargo fmt --check` clean. `make typecheck` 0 errors and the 4 known
+  warnings. `make app` succeeded; the startup parity log stayed empty across
+  the whole proof run.
+- Twelve proof scripts green against the rebuilt app: patch_door 39/39,
+  phase1 66/66, phase2 85/85, phase3 123/123 (121 before, plus the two the
+  note became), phase3_silence_scope 8/8, phase4 84/84, phase5 88/88,
+  phase6 167/167, phase7 92/92, phase8 79/79, phase9 216/216,
+  remaining 79/79. `recording_proof.py` is 186/187 with two counted
+  host-state skips, and its one failure is the microphone file's length
+  against the movie's on a host whose default output is a Bluetooth headset
+  — that script never calls `set_video`.
+- Line counts: `AgentServer+Clips.swift` 1222 → 1212 (the toll: the handler
+  lost fifteen lines of body and `checkVideoEnums`' doc, which argues a
+  function #6 deletes, was cut to what governs it while it runs),
+  `AgentServer+Motion.swift` 157 → 0, `ReelOps.swift` 974 → 999,
+  `AgentCatalog+Clips.swift` 919 → 930, `AgentServer+Arguments.swift`
+  554 → 581. That last one is the file to watch: it is the one #7 guts, and
+  #5 and #6 add no reader to it, since they call `rawPatchArg`.
+
+**Mutants.** Ten, each a rebuild of the app and a fresh instance on its own
+port. Nine caught, one survivor with a reason.
+
+| Mutant | Score |
+|---|---|
+| the Swift launder restored at `set_video` (decode through `VideoPatch`, typed factory) | patch_door **9/32, ABORTED**; phase3 120/123; phase6 164/167 |
+| the core's key walk (`check_keys`) disabled | patch_door **29/39**; phase3 121/123; phase6 166/167 |
+| `snap_motion` a no-op | patch_door **37/39** |
+| the filter completeness rule disabled (`COMPLETE_ENTRIES` emptied) | patch_door **35/39**; phase6 166/167 |
+| the path dropped from the typed read (`serde_path_to_error`'s path blanked) | patch_door **35/39**; phase3 122/123; phase6 165/167 |
+| the colour range check (`color_ok`) disabled | patch_door **35/39** |
+| a three-element colour laundered at the door again (`withOpaqueColors` back in `rawPatchArg`) | patch_door **35/39** |
+| the deep merge made shallow (a nested object replaces) | patch_door **29/32, ABORTED** |
+| `patch_clips`' "patch must be a json object" removed | patch_door **39/39 — SURVIVOR** |
+| …and `merge_group`'s copy of it removed too | patch_door **38/39** |
+
+The survivor is the one D1·1's review already argued: the sentence is
+spelled twice, and both copies are needed — `patch_clips` checks before
+resolving ids so an empty selection still refuses a non-object, and
+`merge_group`'s copy guards the two new-clip ops. With a non-empty selection
+the second answers in the identical words, so removing the first is
+invisible from outside. Removing BOTH is caught: the walk answers instead,
+with `bad value at "" in a video patch`, and the path is empty.
+
+The two mutants D1·6 owes (the launder restored at one door, the key walk
+disabled) are the first two rows above, run here against one door. #7 runs
+them against all of them.
+
+**The review** (standards and spec, in parallel, against the ticket and
+spec #1) is written here when it has run.
+
+**What the next tickets inherit.**
+
+- **The raw factory's shape**, to copy verbatim: `static func
+  set<Group>Raw(clips: [UInt32], patch: Any) -> ReelOp`, `patch` typed `Any`
+  so a non-object reaches the core, one `a.put("patch", patch)`, the same op
+  name as the typed factory beside it. `add_zoom_action`'s region is the one
+  that will not fit the mould exactly — the region is an ARGUMENT, not a
+  patch — and takes `region: Any` beside its other arguments.
+- **The proof's section shape**, also verbatim: a `<door>_door(mcp)`
+  function, a fixture that STORES a value for every key the refusals name,
+  then `undo_marker` → the refusals → `undo_claim` → the merges → the snap.
+  One line in `main`. The marker comment in the file names the doors owed.
+- **A refusal is asserted as the whole sentence, never by keyword.** A
+  keyword check passes against both doors, which is exactly how three
+  phase-6 assertions survived D1·3 meaning nothing.
+- **`checkVideoEnums` still runs**, from `checkActionPatch` alone. So do
+  `patchArg`, `withOpaqueColors`, `colorArg`'s conveniences and the four
+  allowed-key sets. #7's deletion list is unchanged by this ticket.
+- **Three sentences outside this ticket's diff were false and were
+  corrected** (listed under Documents): the biggest is spec §5.4's "the
+  ticks are NOT snapped by the core", which D1·2 falsified and did not
+  catch, and which §6's own preamble already contradicted.
+
+**Documents.** Spec §5.4's motion paragraph (the snap, the period's frame
+floor, and that a FILE is not snapped), §6's `set_video` row (the motion
+sentence: it merges, and only the app's writers send the whole object),
+§7.4's `MotionProps.swift` row, and §7.4's `AgentServer+Motion.swift` row,
+deleted with the file. `app/CLAUDE.md`'s `AgentServer` family list (no
+`Motion`), its `MotionProps.dictionary` note and its
+`AgentServer+Arguments.swift` entry, which now leads with `rawPatchArg` and
+says which doors still launder. The catalog's `set_video` description and
+`videoPatchDescription` (merge at every depth, a list replaces, four-number
+colours) and `motionClause` (merge, and the frame-grid snap).
+`ReelCore.swift`'s `VideoPatch.motion` doc, `MotionProps.swift`'s
+replace-whole paragraph, and `tools/proof/README.md`, which gains the new
+script in the run list and a section of its own.
+
+**Owed.** Nothing for this ticket. The other doors are #5 and #6 by design.

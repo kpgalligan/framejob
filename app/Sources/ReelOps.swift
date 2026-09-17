@@ -599,6 +599,31 @@ extension ReelOp {
         return ReelOp(name: "set_video", args: a.values)
     }
 
+    /// The same op with the patch object the CALLER wrote, forwarded to the
+    /// core byte for byte — the agent door's factory (deepening D1,
+    /// `designs/reelcut-roadmap-7.md` §1), beside the typed one the
+    /// inspector, the canvas sessions and the menus keep using.
+    ///
+    /// **`patch` is `Any` rather than `[String: Any]`** so that a caller who
+    /// sent a number, a list or `null` where the object belongs is refused by
+    /// the CORE, in the words that name the group — `video patch must be a
+    /// json object, not 5` — instead of by a cast on this side that knows
+    /// less. `ReelOp.json` serialises whatever it is; a value JSON cannot
+    /// carry is impossible here, since the argument came out of a parsed
+    /// JSON-RPC call.
+    ///
+    /// The paste payload factories are the precedent for a factory that takes
+    /// a foreign object whole (`paste`, `pasteAttributes`), and the rule they
+    /// keep is the point of putting this here: the op table stays the ONLY
+    /// place in the app where an op is spelled, raw patch or not. #5's and
+    /// #6's doors copy this shape.
+    static func setVideoRaw(clips: [UInt32], patch: Any) -> ReelOp {
+        var a = OpArgs()
+        a.put("clips", clips)
+        a.put("patch", patch)
+        return ReelOp(name: "set_video", args: a.values)
+    }
+
     static func setAudio(clips: [UInt32], patch: AudioPatch) -> ReelOp {
         var a = OpArgs()
         a.put("clips", clips)

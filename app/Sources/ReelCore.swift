@@ -914,11 +914,14 @@ struct VideoPatch: Codable, Equatable {
     var spotlight: SpotlightProps??
     var obscure: [ObscureProps]?
     var blend: BlendMode?
-    /// **`motion` is a `T??` like the four object-valued fields above, but
-    /// it is NOT read by `patchArg`** (format version 8): a motion has two
-    /// levels of nested objects, so `AgentServer+Motion.swift` reads it by
-    /// hand and `setVideo` strips the key first — which is why this one has
-    /// NO gap in the `T??` family app/CLAUDE.md records. `.some(nil)` AND
+    /// **`motion` is a `T??` like the four object-valued fields above, and
+    /// since D1·3 no agent's patch reaches it** (format version 8): the MCP
+    /// door forwards the caller's object to the core unread, where
+    /// `patch.rs` walks a motion's two levels of nested objects and refuses a
+    /// misspelt key or kind by its dotted path. This type is the APP's
+    /// writer now — the inspector's Motion section and Clip ▸ Motion ▸ — so
+    /// it has no gap in the `T??` family app/CLAUDE.md records because
+    /// nothing a caller wrote is decoded through it. `.some(nil)` AND
     /// `.some(an empty MotionProps)` both write `NSNull`, since the core
     /// normalises an all-`None` motion to `None` anyway.
     var motion: MotionProps??
@@ -967,8 +970,10 @@ struct VideoPatch: Codable, Equatable {
         obscure = c.lenient(.obscure)
         // `lenient`, never `nullable` — the struct doc says what that buys.
         blend = c.lenient(.blend)
-        // `nullable`, because a motion HAS a null form; the gap that costs
-        // the other `T??` fields is closed by `motionPatchArg`, not here.
+        // `nullable`, because a motion HAS a null form. Since D1·3 nothing
+        // decodes an agent's `motion` through this initialiser at all — the
+        // caller's object goes to the core unread — so the gap the other
+        // `T??` fields carry does not arise here either.
         motion = c.nullable(.motion)
     }
 
