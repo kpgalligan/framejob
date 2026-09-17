@@ -75,8 +75,9 @@ file is what governs a module now.
 - `edit_props.rs` — the five patches (`set_video`, `set_audio`, `set_text`,
   `set_shape`, `set_clip`), `Group`, `merge_group` (the one read of a
   caller-authored group patch, the new text and shape clips' included: the
-  key walk, the deep merge and the path-tracking deserialise, so every
-  refusal names the path, indices included, and the value),
+  walk of keys and JSON kinds against the group's template, the deep merge
+  and the path-tracking deserialise, so every refusal names the path,
+  indices included, and the value),
   `Project::check_group` (how a patch and a `paste_attributes` copy run the
   same check), and `check_blend`, the one check about a CLIP rather than a
   value: a nest clip cannot blend. A patch merges key by key at every depth,
@@ -218,8 +219,9 @@ phase as a feature). The current list is `wc -l` and
 
 **Dependencies.** `serde` and `serde_json` (the JSON the FFI speaks),
 `tiny_http` (the agent's socket), and `serde_path_to_error`, which is there
-so a patch refusal names the path to a misspelt variant or a wrong-typed
-value, where serde alone names only the value.
+so a patch refusal names the path to what only the type can refuse (a
+misspelt variant, a `null` a required field cannot take), where serde alone
+names only the value.
 
 **One implementation per algorithm.** Before writing time math, find the
 existing implementation and route through it. Shared constants have exactly

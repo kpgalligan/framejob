@@ -132,33 +132,44 @@ One entry per ticket, written when it lands.
 
 ### 2.1 D1·1 — the core names the path and the value (kpgalligan/reelcut#2)
 
+**Commits.** `ebab0db` (the ticket) and `52bb75d` (what its review found,
+below).
+
 **What landed.** Core and documents only. No Swift changed, so an agent does
 not see any of this yet: the agent door still decodes before the core does,
 until D1·3.
 
-- **The key walk carries indices.** `edit_props.rs`'s `check_keys` builds the
-  path per element, so a misspelt kind on the second filter is
-  `unknown key "filters[1].kindd" in a video patch`, where it used to say
-  `filters.kindd`.
+- **The walk checks keys and kinds, with indices.** `edit_props.rs`'s
+  `check_keys` builds the path per element, so a misspelt key on the second
+  filter is `unknown key "filters[1].kindd" in a video patch`, where it used
+  to say `filters.kindd`. At every step it also compares the value's JSON
+  kind against the group's template. It refuses
+  `bad value at "<path>" in a <group> patch: expected <kind>, not <value>`,
+  where the kind is an object, a list, a string, a number, a whole number or
+  true or false.
+- **Why the kind check matters.** The review found that serde READS two
+  wrong kinds. A struct deserializes from a JSON array of its fields in
+  declaration order, so `{"duck": [0.9, 300000, 600000]}` stored a duck.
+  A unit variant deserializes from a one-key object, so
+  `{"blend": {"multiply": null}}` stored a blend. Both are refused now. The
+  check also means a type refusal speaks the schema's words, not
+  serde's `expected struct Duck`. A `null` always passes the walk, because
+  in a patch it clears.
 - **The read names its path.** `merge_group` is now typed
-  (`merge_group<T>(base: &T, patch, group) -> Result<T, String>`). It does
-  the object check, the key walk, the deep merge and then a
-  `serde_path_to_error` read. A misspelt variant or a wrong-typed value is
-  refused as
-  ``bad value at "<path>" in a <group> patch: <serde's sentence>``, and
-  serde's sentence already names the value and, for a variant, what the
-  vocabulary allows. Examples:
-  ``bad value at "filters[1].kind" in a video patch: unknown variant `glw`, expected one of `blur`, …``
-  and
-  ``bad value at "duck" in an audio patch: invalid type: integer `5`, expected struct Duck``.
+  (`merge_group<T>(base: &T, patch, group) -> Result<T, String>`): the
+  object check, the walk, the deep merge, then a `serde_path_to_error` read.
+  The read catches what only the type knows: a misspelt variant, a `null` a
+  required field cannot take, a colour of the wrong length. It refuses them
+  as ``bad value at "<path>" in a <group> patch: <serde's sentence>``, whose
+  sentence names the value and, for a variant, what the vocabulary allows:
+  ``bad value at "filters[1].kind" in a video patch: unknown variant `glw`, expected one of `blur`, …``.
   The path runs into the MERGED group, which gives the same path as the
-  patch's, because the merge keeps keys where the patch put them and an
-  array replaces its list whole. Its six callers (the four `set_*` arms,
-  `add_text_clip` and `add_shape_clip`) each dropped their own `from_value`
-  and their "… patch does not match the schema" message. A new clip's patch
-  is therefore refused in exactly the words `set_text` / `set_shape` use.
+  patch's. Its six callers (the four `set_*` arms, `add_text_clip` and
+  `add_shape_clip`) each dropped their own `from_value` and their "… patch
+  does not match the schema" message. A new clip's patch is therefore
+  refused in exactly the words `set_text` / `set_shape` use.
 - **The article is right:** "an audio patch", no longer "a audio patch".
-- **Unchanged:** `set_clip` already named the key and the value
+  `set_clip` is unchanged, because it already named the key and the value
   (`"name" in a clip patch must be a string or null, not 5`).
 - **The dependency.** `serde_path_to_error` 0.1.20 (MIT OR Apache-2.0). Its
   own dependencies, `serde_core` and `itoa`, were already in the lock file.
@@ -166,23 +177,29 @@ until D1·3.
   said: `tiny_http` was already there. `core/CLAUDE.md`'s new
   **Dependencies** rule says why each of the four is there.
 
-**Tests.** A new file, `core/tests/patch_door.rs`, holds seven tests through
-the FFI. Each refusal is checked for three things: the invalid-input tier (a
-message, so no undo step), a byte-identical `rc_project_to_json`, and a
-message that does not open with a capital and contains the path and the
-value. The cases covered:
+**Tests.** A new file, `core/tests/patch_door.rs`, holds six table tests
+through the FFI. Every refusal goes through `Handle::errors`, which is the
+"project unchanged" claim at this seam: NULL with a message means no new
+project and no undo step, and a correction or a clear would come back as a
+new handle and fail the test. (The first commit also compared the handle's
+JSON before and after. A handle is immutable, so that could never fail, and
+the review had it removed.) Each message is compared exactly, or by its path
+prefix plus serde's value. The cases covered:
 
 - an unknown key with an index (`filters[1]`, `obscure[1]`,
   `gradient.stops[1]`) or at depth (`motion.during`, `compressor`,
   `animation`), at every group;
-- a misspelt variant at every group that has one (`blend`, `motion.in.kind`,
-  `obscure[0].kind`, `align`, `animation.kind`, shape `kind`,
-  `gradient.kind`);
-- a wrong type where a nested object belongs (shadow, duck, outline and
-  stroke, each STORED on the fixture, so a clear would show up as a changed
-  project), plus a clip name that is not a string;
-- a wrong type inside an object or a list (`filters[0].amount`, `crop: null`,
-  `duck.attack`, `outline.color[1]`, `gradient.stops[1].at`);
+- a misspelt variant at every group that has one (`filters[1].kind`,
+  `blend`, `motion.in.kind`, `obscure[0].kind`, `align`, `animation.kind`,
+  shape `kind`, `gradient.kind`);
+- a wrong kind where a nested object belongs: shadow, duck, outline and
+  stroke. Each is STORED on the fixture, so a clear would have been a real
+  edit. A clip name that is not a string is covered too;
+- a wrong kind inside an object or a list (`filters[0].amount`,
+  `duck.attack` as a fraction, `outline.color[1]`, `gradient.stops[1].at`),
+  and a `null` for the required `crop`;
+- a list or an object where the schema has another kind (duck, a filter
+  entry, crop, blend, animation, stroke);
 - the `text` and `shape` of a new clip.
 
 `audio` has no list and no enum, and `set_clip`'s patch is two flat strings.
@@ -197,38 +214,78 @@ and its gradient stop key, and `schema_v8.rs`'s motion kinds.
 
 **Measured.**
 
-- `make test`: 628 passed, 0 failed (621 before, plus the 7 new tests).
+- `make test`: 627 passed, 0 failed (621 before, plus the 6 new tests).
 - `make lint` and `cargo fmt --check`: clean.
-- Line counts: `edit_props.rs` went from 432 to 471, and `edit_clip.rs` from
-  1043 to 1038.
-- Three mutants, all caught:
-  - The key walk without the index failed 3 `patch_door` tests plus the
-    `schema_v4` and `schema_v6` key tests.
+- Line counts: `edit_props.rs` went from 432 to 522, `edit_clip.rs` from
+  1043 to 1038, and the new `patch_door.rs` is 390.
+- Mutants, all caught:
+  - The walk without the index failed `patch_door` tests (4 of the final 6)
+    plus the `schema_v4` and `schema_v6` key tests.
   - `serde_json::from_value` back in place of the path-tracking read failed
-    5 `patch_door` tests plus the `schema_v5`, `schema_v6` and `schema_v8`
+    3 `patch_door` tests plus the `schema_v5`, `schema_v6` and `schema_v8`
     kind tests.
-  - "a audio" failed 2 `patch_door` tests.
+  - "a audio" failed 4 `patch_door` tests.
+  - The kind check disabled failed 3 `patch_door` tests; the positional
+    reads came back.
+  - The whole-number refinement disabled failed 1.
+
+**The review** (standards and spec, in parallel, against the ticket and
+spec #1).
+
+Fixed:
+
+- An array where an object belongs, and an object where an enum belongs,
+  were read, not refused. This is the kind check above; the spec review
+  found the array case.
+- The tautological "project unchanged" comparison is gone.
+- `Group::article` no longer repeats the four names.
+- The test helper is `patch_op`, not `patch`: it returns an op.
+- Spec §7.10's `edit_props.rs` row now names `merge_group`, mirroring
+  `core/CLAUDE.md`.
+- Rust type names in type refusals are gone, except in the read's
+  `null`-on-a-required-field sentence (`expected struct Crop`).
+
+Judged not real:
+
+- *The range check after `merge_group` is repeated at six sites.* Each
+  group's check has a different signature: video needs the clip's source
+  size and the nest-blend check. Folding them into the read would need a
+  per-group trait for no caller that needs it.
+- *"patch must be a json object" appears twice.* This predates the ticket,
+  and both copies are needed. `patch_clips` checks before resolving ids, so
+  an empty selection still refuses a non-object. `merge_group`'s copy guards
+  the two new-clip ops.
+- *"Third dependency" and "every group" do not hold literally.* Both
+  readings are recorded above.
 
 **What the next tickets inherit.**
 
-- The two sentence forms above are what D1·3's proof asserts over MCP.
+- The three sentence forms above are what D1·3's proof asserts over MCP.
 - `merge_group` is the one read of a group patch. D1·2's end-state op and
-  incomplete-filter refusal have the key walk's path spelling to match.
+  incomplete-filter refusal have the walk's path spelling to match, and the
+  end-state op can reuse the kind check only against a template, since an
+  end patch spans groups.
 - **Range refusals are not indexed.** `props_check.rs` still spells a list
   entry as `video.filters[].amount` / `shape.gradient.stops[].at`, which
   names the field and the value but not which entry. Those refusals were not
   in this ticket's criteria, and `tools/proof/phase6_proof.py` asserts the
   `[]` spelling through the app. A ticket that wants indices there has to
   move that proof too.
+- **A fraction where a tick count belongs** is refused by the walk, as serde
+  already refused it. Any door that forwards raw JSON with tick values
+  written as `600000.0` gets the refusal, not a rounding. D1·2's snap only
+  moves whole-number ticks onto the frame grid.
 
 **Documents.**
 
 - Spec §6's row for the property patches now says a refusal names the path
-  and the value, and that a new clip's patch answers in the same words.
-- Spec §7.10's dependency list and file tree now include the new crate.
-- `edit.rs`'s op-table bullet on unknown keys says the same as spec §6.
+  and the value, gives the three forms, and says a new clip's patch answers
+  in the same words.
+- Spec §7.10's dependency list, file tree and `edit_props.rs` row are
+  updated.
+- `edit.rs`'s op-table bullet says the same as spec §6.
 - `core/CLAUDE.md`'s `edit_props.rs` entry names `merge_group`. Its "a patch
   of a nested object is a REPLACEMENT" was false about the core, which
   merges key by key, and now says so.
 
-**Owed.** Nothing for this ticket beyond the review that follows its commit.
+**Owed.** Nothing for this ticket.

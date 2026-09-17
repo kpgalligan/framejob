@@ -21,10 +21,10 @@
 //!    silently dropped here is a bug the user would never see. The check
 //!    runs against a fully-populated template of the group, so
 //!    `{"shadow": {"blurr": 8}}` is caught even when the clip's shadow is
-//!    currently `null`. A misspelt variant and a wrong-typed value are
-//!    `Err`s too, and every one of the three names the dotted path to the
-//!    mistake, array indices included (`filters[1].kind`), and the value
-//!    sent — `merge_group` is where.
+//!    currently `null`. A value of the wrong JSON kind and a misspelt
+//!    variant are `Err`s too, and every one of the three names the dotted
+//!    path to the mistake, array indices included (`filters[1].kind`), and
+//!    the value sent — `merge_group` is where.
 //! 3. **Values are named, never clamped.** A channel outside 0–1 is a units
 //!    mistake (0–255) and a scale of 50 is a typo; silently clamping them
 //!    would leave the user looking at a number the inspector did not
@@ -77,14 +77,12 @@ impl Group {
         }
     }
 
-    /// The name with its article, for the sentences that say which patch
-    /// a mistake was in: `an audio patch`, never `a audio patch`.
+    /// The article before [`Group::name`] in the sentences that say which
+    /// patch a mistake was in: `an audio patch`, never `a audio patch`.
     fn article(self) -> &'static str {
         match self {
-            Group::Video => "a video",
-            Group::Audio => "an audio",
-            Group::Text => "a text",
-            Group::Shape => "a shape",
+            Group::Audio => "an",
+            Group::Video | Group::Text | Group::Shape => "a",
         }
     }
 
@@ -138,7 +136,8 @@ impl Group {
     }
 }
 
-/// Rejects any key in `patch` the group's schema does not have, naming the
+/// Rejects any key in `patch` the group's schema does not have, and any
+/// value whose JSON kind is not the one the schema has there, naming the
 /// dotted path to it — array indices included, so `filters[1].kindd` says
 /// WHICH entry to fix, where a bare `filters.kindd` would leave the caller
 /// comparing every entry it sent. `path` is the path to `patch` itself,
@@ -152,6 +151,21 @@ fn check_keys(
     path: &str,
     depth: u32,
 ) -> Result<(), String> {
+    // The kind comes first, and it is not only a nicer sentence than
+    // serde's `expected struct Duck`: serde READS two wrong kinds. A struct
+    // deserializes from a JSON array of its fields in declaration order, so
+    // `{"duck": [0.9, 300000, 600000]}` would store a duck, and a unit
+    // variant from a one-key object, so `{"blend": {"multiply": null}}`
+    // would store a blend — spellings the caller never learnt from
+    // `get_project` and a typo could land on by accident.
+    if let Some(expected) = wrong_kind(patch, template) {
+        return Err(format!(
+            "bad value at \"{path}\" in {} {} patch: expected {expected}, not {}",
+            group.article(),
+            group.name(),
+            describe(patch)
+        ));
+    }
     // An array of objects — `video.filters`, and from format version 4
     // `video.obscure` — is where the schema puts keys inside an array, and
     // every element has the SAME shape, so the template's first entry
@@ -187,8 +201,9 @@ fn check_keys(
         };
         let Some(reference) = known.get(key) else {
             return Err(format!(
-                "unknown key \"{here}\" in {} patch",
-                group.article()
+                "unknown key \"{here}\" in {} {} patch",
+                group.article(),
+                group.name()
             ));
         };
         check_keys(value, reference, group, &here, depth + 1)?;
@@ -196,19 +211,54 @@ fn check_keys(
     Ok(())
 }
 
-/// Checks the patch's keys, merges it into `base` and reads the merged group
-/// back as its type — the one door every caller-authored patch of a group
-/// comes through, `set_*` and the `text` / `shape` of a new clip alike. The
-/// merge itself is `actions::merge`, the one deep merge in the crate.
+/// The JSON kind the schema has where the template holds `reference`, as a
+/// refusal says it, when `given` is NOT that kind; `None` when it is.
 ///
-/// The read is where a misspelt variant or a wrong-typed value is caught,
-/// and it goes through `serde_path_to_error` so the refusal can say WHERE,
-/// in the key walk's own spelling: serde's sentence alone names the value
-/// and what the vocabulary allows, but not which of four filters it was
-/// in. The path is into the MERGED group, which is the
-/// patch's path too: the merge keeps every key where the patch put it and
-/// an array replaces whole, and the base was written by this crate and
-/// reads back cleanly, so the only values that can fail are the patch's.
+/// A `null` on either side passes: in a patch it clears, and whether the
+/// field may be cleared is the read's to say (an optional takes it, a
+/// required one refuses it). A number is one kind with one refinement —
+/// the template writes every `f64` with a fraction and every tick count
+/// without one, so a fraction where a tick count belongs is named here
+/// rather than as serde's `expected i64`.
+fn wrong_kind(given: &Value, reference: &Value) -> Option<&'static str> {
+    let fits = match (given, reference) {
+        (Value::Null, _) | (_, Value::Null) => true,
+        (Value::Number(given), Value::Number(reference)) => reference.is_f64() || !given.is_f64(),
+        (Value::Bool(_), Value::Bool(_))
+        | (Value::String(_), Value::String(_))
+        | (Value::Array(_), Value::Array(_))
+        | (Value::Object(_), Value::Object(_)) => true,
+        _ => false,
+    };
+    if fits {
+        return None;
+    }
+    Some(match reference {
+        Value::Number(number) if !number.is_f64() => "a whole number",
+        Value::Number(_) => "a number",
+        Value::Bool(_) => "true or false",
+        Value::String(_) => "a string",
+        Value::Array(_) => "a list",
+        Value::Object(_) | Value::Null => "an object",
+    })
+}
+
+/// Checks the patch's keys and kinds, merges it into `base` and reads the
+/// merged group back as its type — the one door every caller-authored patch
+/// of a group comes through, `set_*` and the `text` / `shape` of a new clip
+/// alike. The merge itself is `actions::merge`, the one deep merge in the
+/// crate.
+///
+/// The walk has already refused an unknown key and a value of the wrong
+/// kind; the read is where what only the TYPE knows is caught — a misspelt
+/// variant, a `null` a required field cannot take, a colour of the wrong
+/// length. It goes through `serde_path_to_error` so that refusal says WHERE
+/// in the walk's own spelling: serde's sentence alone names the value and
+/// what the vocabulary allows, but not which of four filters it was in. The
+/// path is into the MERGED group, which is the patch's path too: the merge
+/// keeps every key where the patch put it and an array replaces whole, and
+/// the base was written by this crate and reads back cleanly, so the only
+/// values that can fail are the patch's.
 pub(crate) fn merge_group<T: Serialize + DeserializeOwned>(
     base: &T,
     patch: &Value,
@@ -225,9 +275,10 @@ pub(crate) fn merge_group<T: Serialize + DeserializeOwned>(
     let merged = actions::merge(&actions::to_json(base), patch);
     serde_path_to_error::deserialize(merged).map_err(|e| {
         format!(
-            "bad value at \"{}\" in {} patch: {}",
+            "bad value at \"{}\" in {} {} patch: {}",
             e.path(),
             group.article(),
+            group.name(),
             e.inner()
         )
     })

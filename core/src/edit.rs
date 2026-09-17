@@ -38,11 +38,13 @@
 //!   it swallows, then the nest clip.
 //! - Unknown keys are an error, in the envelope and in every property
 //!   patch: a typo in a hand-written op or an agent call is a mistake to
-//!   report, not a silent no-op. In a property patch a misspelt variant and
-//!   a wrong-typed value are errors too, and the refusal names the dotted
-//!   path to the mistake, array indices included, and the value sent:
-//!   `unknown key "filters[1].kindd" in a video patch`, ``bad value at
-//!   "shadow" in a video patch: invalid type: integer `5`, …``. The one
+//!   report, not a silent no-op. In a property patch a value of the wrong
+//!   kind and a misspelt variant are errors too — never read as a clear,
+//!   and a list or an object is never read field by field as something
+//!   else — and the refusal names the dotted path to the mistake, array
+//!   indices included, and the value sent: `unknown key "filters[1].kindd"
+//!   in a video patch`, `bad value at "shadow" in a video patch: expected
+//!   an object, not 5`. The one
 //!   exception is an action's `end` patch, which is evaluated leniently and
 //!   keeps what it does not know.
 //!   `set_clip` is the fifth patch op. In every patch an absent key keeps

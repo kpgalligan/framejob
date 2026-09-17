@@ -9,8 +9,8 @@
 //!    so `filters[1].kindd` says which entry to fix.
 //! 2. **What** — the offending value as the caller sent it, and for a
 //!    misspelt variant what the vocabulary allows.
-//! 3. **Nothing happened** — the invalid-input tier (NULL with a message,
-//!    so no undo step) and a project byte-identical to the one before.
+//! 3. **Nothing happened** — the invalid-input tier: NULL with a message,
+//!    so there is no new project and no undo step.
 //!
 //! The groups do not all have the same shapes to get wrong. `video` and
 //! `shape` hold lists of objects (`filters`, `obscure`, `gradient.stops`);
@@ -73,8 +73,9 @@ fn project() -> Handle {
     }))
 }
 
-/// The op for `group`'s patch, aimed at the clip that has that group.
-fn patch(group: &str, patch: Value) -> Value {
+/// The `set_<group>` op carrying `patch`, aimed at the clip that has that
+/// group.
+fn patch_op(group: &str, patch: Value) -> Value {
     let clip = match group {
         "video" | "audio" | "clip" => 11,
         "text" => 12,
@@ -84,19 +85,18 @@ fn patch(group: &str, patch: Value) -> Value {
     json!({ "op": format!("set_{group}"), "clips": [clip], "patch": patch })
 }
 
-/// Applies `op`, asserting it is REFUSED as invalid input — an error with a
-/// message, which the app registers no undo step for — that the project is
-/// byte-identical afterwards, and that the message follows the core's error
-/// rule (it does not open with a capital) and contains every `needle`: the
-/// path, and the value. Returns the message for an exact comparison.
+/// Applies `op`, asserting it is REFUSED as invalid input, that the message
+/// follows the core's error rule (it does not open with a capital) and that
+/// it contains every `needle`. Returns the message for an exact comparison.
+///
+/// "The project is unchanged" is the invalid-input answer itself, and
+/// `Handle::errors` is what asserts it: NULL with `err_out` set, so there is
+/// no new project and no undo step. A handle is immutable, so comparing the
+/// one passed in before and after would prove nothing. What CAN go wrong —
+/// a wrong-typed shadow read as a clear, a misspelt kind read as the first
+/// case — comes back as a new handle, and `errors` panics on that.
 fn refused(project: &Handle, op: Value, needles: &[&str]) -> String {
-    let before = project.to_json();
     let msg = project.errors(&op);
-    assert_eq!(
-        project.to_json(),
-        before,
-        "a refusal left the project changed: {op}"
-    );
     assert!(
         !msg.starts_with(char::is_uppercase),
         "the core's messages are lowercase, got {msg:?}"
@@ -110,26 +110,18 @@ fn refused(project: &Handle, op: Value, needles: &[&str]) -> String {
 // ---- an unknown key, at depth, with indices --------------------------------
 
 #[test]
-fn an_unknown_key_inside_a_list_entry_names_its_index() {
-    // The acceptance example: a misspelt kind on the SECOND filter. Without
-    // the index the caller learns only that some filter is wrong.
-    let msg = refused(
-        &project(),
-        patch(
-            "video",
-            json!({ "filters": [{ "kind": "blur", "amount": 0.5 }, { "kindd": "sepia", "amount": 1.0 }] }),
-        ),
-        &[],
-    );
-    assert_eq!(msg, "unknown key \"filters[1].kindd\" in a video patch");
-}
-
-#[test]
 fn an_unknown_key_at_depth_is_named_by_its_path_at_every_group() {
-    // One row per group at the deepest place that group has. `audio` has
-    // no list, so its path is a dotted one; `set_clip`'s patch is flat.
+    // One row per group at the deepest place that group has, led by the
+    // acceptance example: a misspelt key on the SECOND filter, where a path
+    // with no index would leave the caller comparing every entry. `audio`
+    // has no list, so its path is a dotted one; `set_clip`'s is flat.
     let project = project();
     for (group, body, expected) in [
+        (
+            "video",
+            json!({ "filters": [{ "kind": "blur", "amount": 0.5 }, { "kindd": "sepia", "amount": 1.0 }] }),
+            "unknown key \"filters[1].kindd\" in a video patch",
+        ),
         (
             "video",
             json!({ "obscure": [{ "kind": "blur" }, { "shape": "rect", "kynd": "blur" }] }),
@@ -161,7 +153,7 @@ fn an_unknown_key_at_depth_is_named_by_its_path_at_every_group() {
             "unknown key \"nmae\" in a clip patch",
         ),
     ] {
-        assert_eq!(refused(&project, patch(group, body), &[]), expected);
+        assert_eq!(refused(&project, patch_op(group, body), &[]), expected);
     }
 }
 
@@ -196,31 +188,20 @@ fn a_new_clips_patch_is_refused_as_the_set_op_would_refuse_it() {
 // ---- a misspelt variant, with its path and the vocabulary ------------------
 
 #[test]
-fn a_misspelt_variant_inside_a_list_entry_names_its_path_value_and_vocabulary() {
-    // The failure the Swift door used to have: `glw` decoded as the
-    // vocabulary's FIRST case. The core names the entry, the value sent and
-    // what it could have been.
-    let msg = refused(
-        &project(),
-        patch(
-            "video",
-            json!({ "filters": [{ "kind": "blur", "amount": 0.5 }, { "kind": "glw", "amount": 1.0 }] }),
-        ),
-        &["unknown variant `glw`", "expected one of `blur`, `sharpen`"],
-    );
-    assert!(
-        msg.starts_with("bad value at \"filters[1].kind\" in a video patch: "),
-        "the path, in the key walk's form, got {msg:?}"
-    );
-}
-
-#[test]
 fn a_misspelt_variant_is_named_by_its_path_at_every_group_that_has_one() {
-    // `audio` holds no enum and `set_clip`'s patch holds two strings, so
-    // neither has a variant to misspell. Each row: the path, the value as
-    // sent, and one spelling the vocabulary does allow.
+    // The failure the Swift door used to have: `glw` decoded as the
+    // vocabulary's FIRST case. Each row: the path, the value as sent, and
+    // one spelling the vocabulary does allow. `audio` holds no enum and
+    // `set_clip`'s patch holds two strings, so neither has a row.
     let project = project();
     for (group, body, path, value, allowed) in [
+        (
+            "video",
+            json!({ "filters": [{ "kind": "blur", "amount": 0.5 }, { "kind": "glw", "amount": 1.0 }] }),
+            "filters[1].kind",
+            "`glw`",
+            "`sharpen`",
+        ),
         (
             "video",
             json!({ "blend": "muliply" }),
@@ -273,7 +254,7 @@ fn a_misspelt_variant_is_named_by_its_path_at_every_group_that_has_one() {
     ] {
         let msg = refused(
             &project,
-            patch(group, body),
+            patch_op(group, body),
             &[&format!("unknown variant {value}, expected "), allowed],
         );
         let prefix = format!("bad value at \"{path}\" in a {group} patch: ");
@@ -285,35 +266,38 @@ fn a_misspelt_variant_is_named_by_its_path_at_every_group_that_has_one() {
 
 #[test]
 fn a_wrong_type_where_a_nested_object_belongs_is_refused_not_cleared() {
-    // Every clip in the fixture HOLDS the sub-object named here, and
-    // `refused` asserts the project is byte-identical afterwards: a number
-    // where a shadow belongs is a mistake, never "no shadow".
+    // Every clip in the fixture HOLDS the sub-object named here, so a
+    // number read as "no shadow" would be a real edit and `refused` would
+    // see a new project. The refusal names the kind the schema has there.
     let project = project();
-    for (group, body, path, value) in [
-        ("video", json!({ "shadow": 5 }), "shadow", "integer `5`"),
-        ("audio", json!({ "duck": 5 }), "duck", "integer `5`"),
+    for (group, body, expected) in [
+        (
+            "video",
+            json!({ "shadow": 5 }),
+            "bad value at \"shadow\" in a video patch: expected an object, not 5",
+        ),
+        (
+            "audio",
+            json!({ "duck": 5 }),
+            "bad value at \"duck\" in an audio patch: expected an object, not 5",
+        ),
         (
             "text",
             json!({ "outline": "thick" }),
-            "outline",
-            "string \"thick\"",
+            "bad value at \"outline\" in a text patch: expected an object, not \"thick\"",
         ),
         (
             "shape",
             json!({ "stroke": true }),
-            "stroke",
-            "boolean `true`",
+            "bad value at \"stroke\" in a shape patch: expected an object, not true",
         ),
     ] {
-        let msg = refused(&project, patch(group, body), &[value]);
-        let article = if group == "audio" { "an" } else { "a" };
-        let prefix = format!("bad value at \"{path}\" in {article} {group} patch: invalid type: ");
-        assert!(msg.starts_with(&prefix), "expected {prefix:?}, got {msg:?}");
+        assert_eq!(refused(&project, patch_op(group, body), &[]), expected);
     }
     // A clip patch's two keys are strings, and the op's own reader names
     // the key and the value the same way.
     assert_eq!(
-        refused(&project, patch("clip", json!({ "name": 5 })), &[]),
+        refused(&project, patch_op("clip", json!({ "name": 5 })), &[]),
         "\"name\" in a clip patch must be a string or null, not 5"
     );
 }
@@ -324,25 +308,21 @@ fn a_wrong_type_inside_a_nested_object_or_a_list_names_the_index() {
     // component, a gradient stop. The colour row is how `text` gets an
     // index of its own — a colour is a list of four numbers.
     let project = project();
-    for (group, body, path, value) in [
+    for (group, body, expected) in [
         (
             "video",
             json!({ "filters": [{ "kind": "blur", "amount": "lots" }] }),
-            "filters[0].amount",
-            "string \"lots\"",
+            "bad value at \"filters[0].amount\" in a video patch: expected a number, not \"lots\"",
         ),
-        ("video", json!({ "crop": null }), "crop", "null"),
         (
             "audio",
             json!({ "duck": { "attack": 0.5 } }),
-            "duck.attack",
-            "floating point `0.5`",
+            "bad value at \"duck.attack\" in an audio patch: expected a whole number, not 0.5",
         ),
         (
             "text",
             json!({ "outline": { "color": [0.0, "black", 0.0, 1.0] } }),
-            "outline.color[1]",
-            "string \"black\"",
+            "bad value at \"outline.color[1]\" in a text patch: expected a number, not \"black\"",
         ),
         (
             "shape",
@@ -350,11 +330,61 @@ fn a_wrong_type_inside_a_nested_object_or_a_list_names_the_index() {
                 { "at": 0.0, "color": [1.0, 0.0, 0.0, 1.0] },
                 { "at": "end", "color": [0.0, 0.0, 1.0, 1.0] }
             ] } }),
-            "gradient.stops[1].at",
-            "string \"end\"",
+            "bad value at \"gradient.stops[1].at\" in a shape patch: expected a number, not \"end\"",
         ),
     ] {
-        let msg = refused(&project, patch(group, body), &[value]);
-        assert_contains(&msg, &format!("bad value at \"{path}\" in "));
+        assert_eq!(refused(&project, patch_op(group, body), &[]), expected);
+    }
+    // A `null` passes the walk, because in a patch it clears; a REQUIRED
+    // field refuses it at the read, still by path and value.
+    refused(
+        &project,
+        patch_op("video", json!({ "crop": null })),
+        &["bad value at \"crop\" in a video patch: invalid type: null"],
+    );
+}
+
+#[test]
+fn a_list_or_an_object_where_the_schema_has_another_kind_is_refused_not_read_positionally() {
+    // serde reads a struct from a JSON ARRAY of its fields in declaration
+    // order, and a unit variant from a one-key object. Neither is how the
+    // schema is written, so `{"duck": [0.9, 300000, 600000]}` would store a
+    // duck nobody spelt and `{"blend": {"multiply": null}}` a blend by a
+    // spelling `get_project` never gives back. Each is refused, naming the
+    // kind the schema has there and the value sent.
+    let project = project();
+    for (group, body, expected) in [
+        (
+            "audio",
+            json!({ "duck": [0.9, 300000, 600000] }),
+            "bad value at \"duck\" in an audio patch: expected an object, not [0.9,300000,600000]",
+        ),
+        (
+            "video",
+            json!({ "filters": [["blur", 0.5]] }),
+            "bad value at \"filters[0]\" in a video patch: expected an object, not [\"blur\",0.5]",
+        ),
+        (
+            "video",
+            json!({ "crop": [1.0, 2.0, 3.0, 4.0] }),
+            "bad value at \"crop\" in a video patch: expected an object, not [1.0,2.0,3.0,4.0]",
+        ),
+        (
+            "video",
+            json!({ "blend": { "multiply": null } }),
+            "bad value at \"blend\" in a video patch: expected a string, not {\"multiply\":null}",
+        ),
+        (
+            "text",
+            json!({ "animation": ["word_fade", 0, 0] }),
+            "bad value at \"animation\" in a text patch: expected an object, not [\"word_fade\",0,0]",
+        ),
+        (
+            "shape",
+            json!({ "stroke": [4.0, [1.0, 0.0, 0.0, 1.0]] }),
+            "bad value at \"stroke\" in a shape patch: expected an object, not [4.0,[1.0,0.0,0.0,1.0]]",
+        ),
+    ] {
+        assert_eq!(refused(&project, patch_op(group, body), &[]), expected);
     }
 }
