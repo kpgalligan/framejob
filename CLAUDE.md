@@ -78,6 +78,7 @@ app/
   Resources/Models/    silero_vad.mlmodelc, vendored compiled (PROVENANCE.md)
   Bridging/            the bridging header importing core/include/reelcut_core.h
 designs/             the spec, the road maps, the handoff — the table above
+docs/agents/         what the engineering skills read: tracker, labels, domain docs
 tools/proof/         mcp.py, the per-phase proof scripts, harness/ (offscreen chrome)
 project.yml          xcodegen definition; Makefile; README.md (user-facing)
 ```
@@ -221,3 +222,17 @@ the answer is a probe compiled from `app/Sources` over `harness/build.sh`'s
 own `swiftc` line, not a photograph. A probe that will not build is a scored
 FAILURE, never an exit, so a rotted instrument cannot take a score down with
 it.
+
+## Agent skills
+
+### Issue tracker
+
+GitHub Issues on `kpgalligan/reelcut`, through the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+The five default role strings (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: one root `CONTEXT.md`, with spec §11 as the decision record in place of `docs/adr/`. See `docs/agents/domain.md`.
