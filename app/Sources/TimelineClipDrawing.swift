@@ -179,6 +179,13 @@ extension TimelineContentView {
             height: min(DS.clipHeaderHeight, body.height))
         NSColor.black.withAlphaComponent(0.26).setFill()
         strip.fill()
+        // `hasPixels` is the test the Motion section and Clip ▸ Motion gate
+        // on: a detached audio twin clones the video props, and its strip
+        // must not claim a motion it never shows.
+        let motion = InspectorTab.hasPixels(clip, in: owner.snapshot) ? clip.videoProps.motion : nil
+        if let motion = motion {
+            drawMotionWedges(motion, clip: clip, strip: strip, body: body)
+        }
 
         let padding: CGFloat = 6
         var x = strip.minX + padding
@@ -205,11 +212,59 @@ extension TimelineContentView {
                 nameEnd = dot.minX - 5
             }
         }
+        // The during glyph: an 11 pt box (the kind icon's) at the right end,
+        // 4 pt left of the label dot when there is one (the dot moved
+        // `nameEnd` 5 pt left of itself), guarded like the dot.
+        if motion?.during != nil {
+            let right = nameEnd < strip.maxX - padding ? nameEnd + 1 : nameEnd
+            let glyph = CGRect(x: right - 11, y: strip.minY, width: 11, height: strip.height)
+            if glyph.minX >= x {
+                TimelineDraw.symbol(
+                    "waveform.path", fallback: "~", in: glyph,
+                    tint: NSColor.white.withAlphaComponent(0.62))
+                nameEnd = glyph.minX - 5
+            }
+        }
         TimelineDraw.truncated(
             owner.snapshot.name(of: clip),
             in: CGRect(x: x, y: strip.minY, width: max(nameEnd - x, 0), height: strip.height),
             font: DS.sans(10, weight: .semibold),
             color: NSColor.white.withAlphaComponent(0.92))
+    }
+
+    /// The in and out wedges along the strip's bottom edge: a triangle as
+    /// long as the preset's duration at this zoom, rising to 4 pt at its
+    /// inner end, so the ramp reads as "how far in the motion runs". Base
+    /// props, because motion ignores actions. A tent simply overlaps — the
+    /// core resolves it, and no tent arithmetic belongs here.
+    private func drawMotionWedges(
+        _ motion: MotionProps, clip: ClipSnapshot, strip: CGRect, body: CGRect
+    ) {
+        let perTick = body.width / CGFloat(max(clip.duration, 1))
+        // 2 pt minimum so a short preset still shows; never wider than the clip.
+        func width(_ edge: MotionEdge) -> CGFloat {
+            min(max(CGFloat(edge.duration) * perTick, 2), body.width)
+        }
+        // 0.55 white: a strip literal, a shade under the icon's 0.62.
+        NSColor.white.withAlphaComponent(0.55).setFill()
+        if let edge = motion.inEdge {
+            let w = width(edge)
+            let path = NSBezierPath()
+            path.move(to: CGPoint(x: strip.minX, y: strip.maxY))
+            path.line(to: CGPoint(x: strip.minX + w, y: strip.maxY))
+            path.line(to: CGPoint(x: strip.minX + w, y: strip.maxY - 4))
+            path.close()
+            path.fill()
+        }
+        if let edge = motion.out {
+            let w = width(edge)
+            let path = NSBezierPath()
+            path.move(to: CGPoint(x: strip.maxX, y: strip.maxY))
+            path.line(to: CGPoint(x: strip.maxX - w, y: strip.maxY))
+            path.line(to: CGPoint(x: strip.maxX - w, y: strip.maxY - 4))
+            path.close()
+            path.fill()
+        }
     }
 
     // There is deliberately NO second line under the name strip for a text or

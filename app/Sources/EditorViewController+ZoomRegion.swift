@@ -85,7 +85,11 @@ extension EditorViewController {
             NSSound.beep()
             return
         }
-        let region = CanvasRegionView(purpose: purpose, clip: target.id)
+        // A During motion moves the clip under a zoom solved without it, so
+        // the band says so in a second pill.
+        let during = document?.editedProject.snapshot.clip(target.id)?.videoProps.motion?.during
+        let note = purpose == .zoom && during != nil ? CanvasRegionView.duringNote : nil
+        let region = CanvasRegionView(purpose: purpose, clip: target.id, note: note)
         // One-line forwards only (app/CLAUDE.md).
         region.canvasPoint = { [weak self] point in self?.regionCanvasPoint(point) }
         region.viewPoint = { [weak self] point in self?.regionViewPoint(point) ?? point }
@@ -289,6 +293,8 @@ final class CanvasRegionView: NSView, CanvasModalMode {
     let purpose: CanvasRegionPurpose
     /// The clip the mode was armed for.
     let clip: UInt32
+    /// A second hint pill under the first; nil draws none.
+    let note: String?
     /// Live between mouse-down and mouse-up, and nil either side of it.
     private(set) var session: ZoomRegionSession?
 
@@ -303,15 +309,17 @@ final class CanvasRegionView: NSView, CanvasModalMode {
 
     private static let zoomHint = "Drag a rectangle to zoom to it · ⇧ fills · Esc to cancel"
     private static let obscureHint = "Drag a rectangle to obscure · Esc to cancel"
+    static let duringNote = "This clip has During motion — the zoom is solved without it"
     private static let hintPadding: CGFloat = 9
     private static let hintTop: CGFloat = 10
     /// The band's own stroke, and the resolved frame's at a lower alpha —
     /// the same ink, because they are two readings of one rectangle.
     private static let frameAlpha: CGFloat = 0.45
 
-    init(purpose: CanvasRegionPurpose, clip: UInt32) {
+    init(purpose: CanvasRegionPurpose, clip: UInt32, note: String? = nil) {
         self.purpose = purpose
         self.clip = clip
+        self.note = note
         super.init(frame: .zero)
         wantsLayer = true
     }
@@ -444,22 +452,31 @@ final class CanvasRegionView: NSView, CanvasModalMode {
     /// how to leave it. Copied from `CanvasEyedropperView` so the two modes
     /// announce themselves identically.
     private func drawHint() {
-        let text = purpose == .zoom ? Self.zoomHint : Self.obscureHint
+        let hint = purpose == .zoom ? Self.zoomHint : Self.obscureHint
+        let height = drawPill(hint, top: Self.hintTop)
+        // 6 pt between the two pills: a gap that reads as two lines of one hint.
+        if let note = note { _ = drawPill(note, top: Self.hintTop + height + 6) }
+    }
+
+    /// One pill centred at `top`, skipped when it would not fit; answers its
+    /// height either way, so a second pill's place does not depend on the first.
+    private func drawPill(_ text: String, top: CGFloat) -> CGFloat {
         let label = NSAttributedString(
             string: text,
             attributes: [.font: DS.sans(11), .foregroundColor: DS.textStrong])
         let size = label.size()
         let pill = CGRect(
             x: ((bounds.width - size.width) / 2 - Self.hintPadding).rounded(),
-            y: Self.hintTop,
+            y: top,
             width: (size.width + Self.hintPadding * 2).rounded(),
             height: (size.height + 6).rounded())
-        guard pill.width < bounds.width else { return }
+        guard pill.width < bounds.width else { return pill.height }
         let path = NSBezierPath(roundedRect: pill, xRadius: 4, yRadius: 4)
         DS.chromeBackground.withAlphaComponent(0.92).setFill()
         path.fill()
         DS.accent.setStroke()
         path.stroke()
         label.draw(at: NSPoint(x: pill.minX + Self.hintPadding, y: pill.minY + 3))
+        return pill.height
     }
 }

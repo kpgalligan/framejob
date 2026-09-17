@@ -191,3 +191,22 @@ struct MotionProps: Codable, Equatable {
         ]
     }
 }
+
+// MARK: - One slot replaced
+
+/// A copy with ONE slot replaced and the other two kept — the step both the
+/// Motion section and Clip ▸ Motion take per clip, because a `motion` patch
+/// replaces the whole object and a clip keeps its own other slots.
+extension MotionProps {
+    func with(inEdge next: MotionEdge?) -> MotionProps {
+        MotionProps(inEdge: next, out: out, during: during)
+    }
+
+    func with(out next: MotionEdge?) -> MotionProps {
+        MotionProps(inEdge: inEdge, out: next, during: during)
+    }
+
+    func with(during next: MotionDuring?) -> MotionProps {
+        MotionProps(inEdge: inEdge, out: out, during: next)
+    }
+}

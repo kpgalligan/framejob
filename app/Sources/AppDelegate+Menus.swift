@@ -266,6 +266,10 @@ extension AppDelegate {
         menu.addItem(
             item("Remove Silences…", #selector(EditorViewController.removeSilences(_:))))
         menu.addItem(submenuItem(transitionMenu()))
+        // Road map 5's E2, beside Transition ▸: the two "how the clip arrives"
+        // submenus together (a recorded deviation from §5f's "after Label").
+        // No key equivalent, for Remove Silences…' reason above.
+        menu.addItem(submenuItem(motionMenu()))
         menu.addItem(.separator())
         // Road map 2's phase 6c — what goes BEHIND the picture, in a group of
         // its own because neither item edits the selection: both put a clip on
@@ -352,6 +356,38 @@ extension AppDelegate {
         menu.addItem(.separator())
         menu.addItem(
             tagged("None", #selector(EditorViewController.setTransitionKind(_:)), -1))
+        return menu
+    }
+
+    /// Clip ▸ Motion: one submenu per slot, then Preview.
+    private func motionMenu() -> NSMenu {
+        let menu = NSMenu(title: "Motion")
+        let edges = EdgeMotion.allCases.map(\.displayName)
+        menu.addItem(
+            submenuItem(
+                motionSlotMenu("In", edges, #selector(EditorViewController.setMotionIn(_:)))))
+        menu.addItem(
+            submenuItem(
+                motionSlotMenu("Out", edges, #selector(EditorViewController.setMotionOut(_:)))))
+        menu.addItem(
+            submenuItem(
+                motionSlotMenu(
+                    "During", DuringMotion.allCases.map(\.displayName),
+                    #selector(EditorViewController.setMotionDuring(_:)))))
+        menu.addItem(.separator())
+        menu.addItem(item("Preview", #selector(EditorViewController.previewClipMotion(_:))))
+        return menu
+    }
+
+    /// One slot's kinds, the `transitionMenu()` idiom: the index as the tag,
+    /// a separator, None as −1.
+    private func motionSlotMenu(_ title: String, _ names: [String], _ action: Selector) -> NSMenu {
+        let menu = NSMenu(title: title)
+        for (index, name) in names.enumerated() {
+            menu.addItem(tagged(name, action, index))
+        }
+        menu.addItem(.separator())
+        menu.addItem(tagged("None", action, -1))
         return menu
     }
 

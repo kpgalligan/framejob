@@ -59,6 +59,15 @@ lockstep are in the root `CLAUDE.md`; the full design is
   anything — the core turns a preset into placement inside the recipe, so
   the inspector and the canvas see the clip UN-MOVED while the picture
   moves, which is why a drag begun mid-motion starts from the base box.
+- `VideoPane+Motion.swift` · `EditorViewController+Motion.swift` — the app
+  half of `video.motion` (road map 5's E2): the Clip tab's Motion section
+  (seven rows and Preview, shut by default, registered LAST in
+  `ClipPane.makeSections()`'s effects group) and Clip ▸ Motion ▸ In / Out /
+  During with Preview. Both write ONE `set_video` PER CLIP, because a
+  motion patch replaces the whole object and each clip keeps its own other
+  slots; `structural(video:for:)` puts `motion` on the BASE props even
+  inside an action (the core refuses it in `set_action_end`). Preview sets
+  the in/out range to the clip and turns Loop on, and both stay.
 - `AgentServer+Motion.swift` — reading `motion` out of a `set_video` patch
   BY HAND, `gradientArg`'s posture rather than the generic decoder's: a
   misspelt key at every level, a kind outside either vocabulary and a wrong
@@ -1214,7 +1223,9 @@ lockstep are in the root `CLAUDE.md`; the full design is
   `CanvasLayerBox.sourcePoint` — the region frame — reads the EVALUATED
   props, the opposite of every other session in `CanvasSessions.swift`,
   because a region is drawn on what is on SCREEN and has to agree with
-  `edit_zoom.rs`'s `evaluate_clip(clip, at)`.
+  `edit_zoom.rs`'s `evaluate_clip(clip, at)`. A zoom armed over a clip with a
+  During motion draws a second hint pill (`CanvasRegionView.note`), because
+  the zoom is solved without the motion that will move the clip under it.
 - `FrameWriter.swift` · `EditorViewController+SaveFrame.swift` — File ▸ Save
   Frame… (⌥⌘E), road map 2's phase 7a, and the split between the two files is
   the feature. `FrameWriter` is a VALUE TYPE in `AudioNormalize.swift`'s
@@ -1688,7 +1699,9 @@ lockstep are in the root `CLAUDE.md`; the full design is
   phase 5b — the level meter in the flexible gap left of the zoom cluster,
   where the arithmetic for "no divider before it" is written down),
   `TimelineClipDrawing.swift` (a clip is one object — body, name strip,
-  filmstrip under a tint wash, waveform, grips, transition zone),
+  filmstrip under a tint wash, waveform, grips, transition zone; since road
+  map 5's E2 the strip also carries `video.motion`'s in/out wedges and a
+  During glyph, drawn only for a clip `InspectorTab.hasPixels` accepts),
   `ClipPane.swift` (the Clip tab: the selection header, and
   `makeSections()`, the function from a selection's kind to the sections it
   gets — the four old clip panes are held there as section FACTORIES, never

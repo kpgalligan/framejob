@@ -183,8 +183,10 @@ HEIGHT = 862
 #         rather than trusting it.
 #
 # 1600 measures identically to 1400, which is what says the number is a
-# threshold and not a resonance.
-TALL = 1400
+# threshold and not a resonance. It is 1600 since road map 5's E2 put a shut
+# Motion header after Obscure: at 1400 the four-stop fixture's OPEN stack no
+# longer fitted the pane and relaid out the panel (grad-4 495/495, 68/70).
+TALL = 1600
 # The band under the section starts this far below its header. It must clear
 # the tallest body any fixture here has (235 pt, four stops) or the
 # measurement would be reading the section against itself — section 4 scores

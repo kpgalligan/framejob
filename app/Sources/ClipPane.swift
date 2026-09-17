@@ -132,7 +132,7 @@ final class ClipPane: InspectorPaneView {
             sections.append(contentsOf: [
                 inspectorShadowSection(binding), videoPane.filtersSection(),
                 videoPane.reflectionSection(), videoPane.spotlightSection(),
-                videoPane.obscureSection(),
+                videoPane.obscureSection(), videoPane.motionSection(),
             ])
         }
         if videoPane.allMedia {

@@ -1360,6 +1360,12 @@ final class InspectorBinding {
             base.obscure = obscure
             animatable.obscure = nil
         }
+        // Motion is not an animation target (the core refuses it in
+        // `set_action_end`), so it ALWAYS lands on the base props.
+        if patch.motion != nil {
+            base.motion = patch.motion
+            animatable.motion = nil
+        }
         return (base.isEmpty ? nil : base, animatable.isEmpty ? nil : animatable)
     }
 

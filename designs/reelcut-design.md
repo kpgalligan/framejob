@@ -349,6 +349,16 @@ Chroma key — or to a media source, which is Speed.
   blurred region is self-evident on the picture, unlike a spotlight's
   geometry, and drag handles for one are a hit-test family the frozen
   canvas file has no room for yet.
+- Format version 8: *Motion* — In and Out (a kind from the nine
+  entrances/exits, or None, each with a duration in seconds), During (a
+  kind from the five continuous motions, or None, with Amount % and
+  Period — Period disabled for Drift, which ignores it) and a Preview
+  button that sets the in/out range to the clip, turns Loop on and plays.
+  Shut by default, after Obscure. Every write is one `set_video` per clip,
+  so each clip keeps its own other slots, and it lands on the base props
+  even inside an action, since motion is not an animation target. Also
+  Clip ▸ Motion ▸; the timeline's name strip draws the in/out wedges and a
+  During glyph.
 
 **Audio sections** — clips whose media has an audio track and whose audio
 is enabled.
@@ -2513,7 +2523,8 @@ Detach Audio because those two are the menu's only sound commands; no key
 equivalent, and it duplicates the Audio section's button deliberately —
 a command reachable from a pane alone can be lost), Add Action, Speed…,
 Close Gap, Remove
-Silences…, Transition ▸, Add Background ▸ (Solid Color · Image… — road map
+Silences…, Transition ▸, Motion ▸ (In ▸ / Out ▸ / During ▸, each the kinds
+and None; no key equivalent), Add Background ▸ (Solid Color · Image… — road map
 2's phase 6c, a submenu rather than one dialog because the two are
 different commands: the colour takes no dialog at all and is re-coloured
 afterwards in the Shape section's Fill row, which is also how a
