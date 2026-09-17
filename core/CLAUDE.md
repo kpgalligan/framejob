@@ -73,10 +73,15 @@ file is what governs a module now.
   rule they all obey. A free function over `&mut Project` because it is
   called mid-edit on a clone the caller is still assembling.
 - `edit_props.rs` — the five patches (`set_video`, `set_audio`, `set_text`,
-  `set_shape`, `set_clip`), `Group`, `Project::check_group` (how a patch and
-  a `paste_attributes` copy run the same check), and `check_blend`, the one
-  check about a CLIP rather than a value: a nest clip cannot blend. A patch
-  of a nested object is a REPLACEMENT.
+  `set_shape`, `set_clip`), `Group`, `merge_group` (the one read of a
+  caller-authored group patch, the new text and shape clips' included: the
+  key walk, the deep merge and the path-tracking deserialise, so every
+  refusal names the path, indices included, and the value),
+  `Project::check_group` (how a patch and a `paste_attributes` copy run the
+  same check), and `check_blend`, the one check about a CLIP rather than a
+  value: a nest clip cannot blend. A patch merges key by key at every depth,
+  an array replaces its list, and `null` clears an optional key (a required
+  one refuses it).
 - `props_check.rs` — the range checks every value written into a property
   group passes first (`check_video` / `check_audio` / `check_text` /
   `check_shape`, the `finite` / `in_range` family, the bounds `actions.rs`'s
@@ -210,6 +215,11 @@ standing exemption is that its module doc IS the op table (the cut there, if
 ever forced, is the `Op` enum into an `edit_ops.rs`, and never in the same
 phase as a feature). The current list is `wc -l` and
 `designs/reelcut-remaining.md` §3.
+
+**Dependencies.** `serde` and `serde_json` (the JSON the FFI speaks),
+`tiny_http` (the agent's socket), and `serde_path_to_error`, which is there
+so a patch refusal names the path to a misspelt variant or a wrong-typed
+value, where serde alone names only the value.
 
 **One implementation per algorithm.** Before writing time math, find the
 existing implementation and route through it. Shared constants have exactly

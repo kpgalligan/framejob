@@ -41,7 +41,6 @@
 
 use serde_json::Value;
 
-use crate::actions;
 use crate::edit_props::{merge_group, Group};
 use crate::edit_split::split_clip;
 use crate::model::{
@@ -357,9 +356,7 @@ impl Project {
         let props = match text {
             None => title,
             Some(patch) => {
-                let merged = merge_group(&actions::to_json(&title), patch, Group::Text)?;
-                let props: TextProps = serde_json::from_value(merged)
-                    .map_err(|e| format!("text patch does not match the schema: {e}"))?;
+                let props = merge_group(&title, patch, Group::Text)?;
                 check_text(&props)?;
                 props
             }
@@ -410,9 +407,7 @@ impl Project {
                     arrow_end: matches!(kind, Some(ShapeKind::Arrow)),
                     ..ShapeProps::default()
                 };
-                let merged = merge_group(&actions::to_json(&base), patch, Group::Shape)?;
-                let props: ShapeProps = serde_json::from_value(merged)
-                    .map_err(|e| format!("shape patch does not match the schema: {e}"))?;
+                let props = merge_group(&base, patch, Group::Shape)?;
                 check_shape(&props)?;
                 props
             }

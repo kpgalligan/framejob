@@ -21,7 +21,10 @@
 //!    silently dropped here is a bug the user would never see. The check
 //!    runs against a fully-populated template of the group, so
 //!    `{"shadow": {"blurr": 8}}` is caught even when the clip's shadow is
-//!    currently `null`.
+//!    currently `null`. A misspelt variant and a wrong-typed value are
+//!    `Err`s too, and every one of the three names the dotted path to the
+//!    mistake, array indices included (`filters[1].kind`), and the value
+//!    sent — `merge_group` is where.
 //! 3. **Values are named, never clamped.** A channel outside 0–1 is a units
 //!    mistake (0–255) and a scale of 50 is a typo; silently clamping them
 //!    would leave the user looking at a number the inspector did not
@@ -37,6 +40,7 @@
 //! is a fact about the CLIP and not about the vocabulary, and nothing in
 //! `props_check.rs` is handed a clip to ask.
 
+use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -70,6 +74,17 @@ impl Group {
             Group::Audio => "audio",
             Group::Text => "text",
             Group::Shape => "shape",
+        }
+    }
+
+    /// The name with its article, for the sentences that say which patch
+    /// a mistake was in: `an audio patch`, never `a audio patch`.
+    fn article(self) -> &'static str {
+        match self {
+            Group::Video => "a video",
+            Group::Audio => "an audio",
+            Group::Text => "a text",
+            Group::Shape => "a shape",
         }
     }
 
@@ -124,9 +139,12 @@ impl Group {
 }
 
 /// Rejects any key in `patch` the group's schema does not have, naming the
-/// dotted path. Recursion is bounded by the same depth action patches use;
-/// past it the check stops rather than descending an arbitrary tree, and
-/// serde drops whatever it finds there.
+/// dotted path to it — array indices included, so `filters[1].kindd` says
+/// WHICH entry to fix, where a bare `filters.kindd` would leave the caller
+/// comparing every entry it sent. `path` is the path to `patch` itself,
+/// empty at the group's root. Recursion is bounded by the same depth action
+/// patches use; past it the check stops rather than descending an arbitrary
+/// tree, and serde drops whatever it finds there.
 fn check_keys(
     patch: &Value,
     template: &Value,
@@ -145,8 +163,9 @@ fn check_keys(
     if let (Value::Array(given), Value::Array(known)) = (patch, template) {
         if depth < MAX_PATCH_DEPTH {
             if let Some(reference) = known.first() {
-                for value in given {
-                    check_keys(value, reference, group, path, depth + 1)?;
+                for (index, value) in given.iter().enumerate() {
+                    let here = format!("{path}[{index}]");
+                    check_keys(value, reference, group, &here, depth + 1)?;
                 }
             }
         }
@@ -161,20 +180,40 @@ fn check_keys(
         return Ok(());
     }
     for (key, value) in given {
+        let here = if path.is_empty() {
+            key.clone()
+        } else {
+            format!("{path}.{key}")
+        };
         let Some(reference) = known.get(key) else {
             return Err(format!(
-                "unknown key \"{path}{key}\" in a {} patch",
-                group.name()
+                "unknown key \"{here}\" in {} patch",
+                group.article()
             ));
         };
-        check_keys(value, reference, group, &format!("{path}{key}."), depth + 1)?;
+        check_keys(value, reference, group, &here, depth + 1)?;
     }
     Ok(())
 }
 
-/// Checks the patch's shape and merges it into `base` (already serialized).
-/// The merge itself is `actions::merge` — the one deep merge in the crate.
-pub(crate) fn merge_group(base: &Value, patch: &Value, group: Group) -> Result<Value, String> {
+/// Checks the patch's keys, merges it into `base` and reads the merged group
+/// back as its type — the one door every caller-authored patch of a group
+/// comes through, `set_*` and the `text` / `shape` of a new clip alike. The
+/// merge itself is `actions::merge`, the one deep merge in the crate.
+///
+/// The read is where a misspelt variant or a wrong-typed value is caught,
+/// and it goes through `serde_path_to_error` so the refusal can say WHERE,
+/// in the key walk's own spelling: serde's sentence alone names the value
+/// and what the vocabulary allows, but not which of four filters it was
+/// in. The path is into the MERGED group, which is the
+/// patch's path too: the merge keeps every key where the patch put it and
+/// an array replaces whole, and the base was written by this crate and
+/// reads back cleanly, so the only values that can fail are the patch's.
+pub(crate) fn merge_group<T: Serialize + DeserializeOwned>(
+    base: &T,
+    patch: &Value,
+    group: Group,
+) -> Result<T, String> {
     if !patch.is_object() {
         return Err(format!(
             "{} patch must be a json object, not {}",
@@ -183,7 +222,15 @@ pub(crate) fn merge_group(base: &Value, patch: &Value, group: Group) -> Result<V
         ));
     }
     check_keys(patch, &group.template(), group, "", 0)?;
-    Ok(actions::merge(base, patch))
+    let merged = actions::merge(&actions::to_json(base), patch);
+    serde_path_to_error::deserialize(merged).map_err(|e| {
+        format!(
+            "bad value at \"{}\" in {} patch: {}",
+            e.path(),
+            group.article(),
+            e.inner()
+        )
+    })
 }
 
 /// The one check a video group cannot make on its own: a NEST clip may not
@@ -366,9 +413,7 @@ impl Project {
                         .video
                         .clone()
                         .ok_or_else(|| format!("clip {id} has no video properties"))?;
-                    let merged = merge_group(&actions::to_json(&base), patch, group)?;
-                    let mut props: VideoProps = serde_json::from_value(merged)
-                        .map_err(|e| format!("video patch does not match the schema: {e}"))?;
+                    let mut props = merge_group(&base, patch, group)?;
                     // One spelling of "no motion" (format version 8): a
                     // patch that clears the last filled slot leaves a
                     // `Motion` with three `None`s behind, which round-trips
@@ -391,9 +436,7 @@ impl Project {
                     let base = clip
                         .audio
                         .ok_or_else(|| format!("clip {id} has no audio properties"))?;
-                    let merged = merge_group(&actions::to_json(&base), patch, group)?;
-                    let props: AudioProps = serde_json::from_value(merged)
-                        .map_err(|e| format!("audio patch does not match the schema: {e}"))?;
+                    let props = merge_group(&base, patch, group)?;
                     check_audio(&props)?;
                     if let Some(slot) = next.clip_mut(id) {
                         slot.audio = Some(props);
@@ -404,9 +447,7 @@ impl Project {
                         .text
                         .clone()
                         .ok_or_else(|| format!("clip {id} has no text properties"))?;
-                    let merged = merge_group(&actions::to_json(&base), patch, group)?;
-                    let props: TextProps = serde_json::from_value(merged)
-                        .map_err(|e| format!("text patch does not match the schema: {e}"))?;
+                    let props = merge_group(&base, patch, group)?;
                     check_text(&props)?;
                     if let Some(slot) = next.clip_mut(id) {
                         slot.text = Some(props);
@@ -417,9 +458,7 @@ impl Project {
                         .shape
                         .clone()
                         .ok_or_else(|| format!("clip {id} has no shape properties"))?;
-                    let merged = merge_group(&actions::to_json(&base), patch, group)?;
-                    let props: ShapeProps = serde_json::from_value(merged)
-                        .map_err(|e| format!("shape patch does not match the schema: {e}"))?;
+                    let props = merge_group(&base, patch, group)?;
                     check_shape(&props)?;
                     if let Some(slot) = next.clip_mut(id) {
                         slot.shape = Some(props);

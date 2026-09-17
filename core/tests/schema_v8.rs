@@ -411,20 +411,23 @@ fn a_misspelt_key_is_refused_by_name_at_every_level() {
 fn an_unknown_kind_is_refused_at_the_serde_boundary() {
     // Both enums are closed, so a misspelt kind is a schema error on the
     // way in rather than a value clamped later — there is no neutral motion
-    // to fall back to.
+    // to fall back to. The refusal names the slot's path and the value sent
+    // (D1·1, kpgalligan/reelcut#2; it used to read "video patch does not
+    // match the schema" and say nothing of which slot).
     let handle = plain();
+    let msg = handle.errors(&set_video(
+        json!({ "motion": { "in": { "kind": "slide_lft" } } }),
+    ));
+    common::assert_contains(&msg, "bad value at \"motion.in.kind\" in a video patch: ");
+    common::assert_contains(&msg, "`slide_lft`");
+    let msg = handle.errors(&set_video(
+        json!({ "motion": { "during": { "kind": "wobble" } } }),
+    ));
     common::assert_contains(
-        &handle.errors(&set_video(
-            json!({ "motion": { "in": { "kind": "slide_lft" } } }),
-        )),
-        "video patch does not match the schema",
+        &msg,
+        "bad value at \"motion.during.kind\" in a video patch: ",
     );
-    common::assert_contains(
-        &handle.errors(&set_video(
-            json!({ "motion": { "during": { "kind": "wobble" } } }),
-        )),
-        "video patch does not match the schema",
-    );
+    common::assert_contains(&msg, "`wobble`");
 }
 
 // ---- not an animation target ---------------------------------------------

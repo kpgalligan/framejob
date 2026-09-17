@@ -512,12 +512,14 @@ fn an_unknown_blend_mode_and_an_unknown_gradient_kind_are_refused_by_the_enums()
     // neutral value to fall back to — a mode the shader has no constant for
     // and a geometry `CGGradient` has no call for are alike unrepairable —
     // so an unknown one is refused at the serde boundary rather than range
-    // checked a long way from the type.
+    // checked a long way from the type. Both refusals name the path in the
+    // key walk's spelling (D1·1, kpgalligan/reelcut#2; they used to open
+    // "… patch does not match the schema:" and say nothing of where).
     let project = plain();
     let msg = project.errors(&set_video(json!({ "blend": "muliply" })));
     assert!(
-        msg.starts_with("video patch does not match the schema:"),
-        "the schema refusal, got {msg:?}"
+        msg.starts_with("bad value at \"blend\" in a video patch: "),
+        "the schema refusal, with its path, got {msg:?}"
     );
     assert!(
         msg.contains("unknown variant `muliply`"),
@@ -525,6 +527,10 @@ fn an_unknown_blend_mode_and_an_unknown_gradient_kind_are_refused_by_the_enums()
     );
 
     let msg = project.errors(&set_shape(json!({ "gradient": { "kind": "conic" } })));
+    assert!(
+        msg.starts_with("bad value at \"gradient.kind\" in a shape patch: "),
+        "the schema refusal, with its path, got {msg:?}"
+    );
     assert!(
         msg.contains("unknown variant `conic`"),
         "the message names the variant, got {msg:?}"
@@ -566,12 +572,15 @@ fn an_unknown_key_inside_the_gradient_is_named_like_any_other() {
     // has to carry a stop for the same reason its `obscure` carries a
     // region: the array arm reads the FIRST element as the reference for
     // every element it is given, and an empty list is no reference at all.
+    // The path names the stop's INDEX (D1·1, kpgalligan/reelcut#2; it used
+    // to read `gradient.stops.colour`), so a caller sending eight stops is
+    // told which one to fix.
     let msg = refusal(json!({
         "gradient": { "stops": [{ "at": 0.0 }, { "at": 1.0, "colour": [1.0, 0.0, 0.0, 1.0] }] }
     }));
     assert_eq!(
         msg,
-        "unknown key \"gradient.stops.colour\" in a shape patch"
+        "unknown key \"gradient.stops[1].colour\" in a shape patch"
     );
 }
 

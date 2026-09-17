@@ -290,11 +290,14 @@ fn an_unknown_kind_is_refused_by_the_enum_itself() {
     // The enum is closed, and this is what that bought: there is no neutral
     // animation to fall back to the way a filter's `amount` can fall back
     // to 0, so a kind nothing downstream could draw is refused at the serde
-    // boundary rather than range-checked a long way from the type.
+    // boundary rather than range-checked a long way from the type. The
+    // refusal names the path in the key walk's spelling (D1·1,
+    // kpgalligan/reelcut#2; it used to open "text patch does not match the
+    // schema:" and say nothing of where).
     let msg = plain().errors(&set_text(json!({ "animation": { "kind": "fade" } })));
     assert!(
-        msg.starts_with("text patch does not match the schema:"),
-        "the schema refusal, got {msg:?}"
+        msg.starts_with("bad value at \"animation.kind\" in a text patch: "),
+        "the schema refusal, with its path, got {msg:?}"
     );
     assert!(
         msg.contains("unknown variant `fade`"),

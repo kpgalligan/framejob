@@ -32,6 +32,7 @@ changes a file's role or adds a rule. Never append a status paragraph here.
 | `designs/reelcut-roadmap-4.md` | Remove Silences judged by voice — Silero VAD through Core ML (S1), built; its own proof scripts are still owed. Start here for `detect_silence`. |
 | `designs/reelcut-roadmap-5.md` | Transitions second pass (E1) and motion presets (E2), built; their proof scripts are still owed. Start here for transitions or `video.motion`. |
 | `designs/reelcut-roadmap-6.md` | Captions from the cloud (AssemblyAI), DESIGNED and not built; its spike C0 has not run. Start here for transcription. |
+| `designs/reelcut-roadmap-7.md` | The deepening series: §0 the rules it inherits (deep module, seam, the deletion test, the interface is the test surface), §1 D1's plan — the core as the one validator of a caller's patch, tickets #2–#7 — and §2 each ticket's record. Start here for how a patch is checked or refused. |
 | `designs/reelcut-effects-survey.md` | The survey road map 5 came from. E3–E9 (tone, filters, looks, adjustment clips, LUT import, voice effects, background removal) are DEFERRED by the user. Concat is AGPL-3.0: its behaviour was studied, and none of its code, shaders, chains or colour tables may be carried over. |
 | `designs/reelcut-milestones.md` | The per-phase record this file carried until 2026-09-17, moved out verbatim. Not maintained. |
 | `designs/design_handoff_reelcut/` | The shipped chrome cleanup and identity; its README is normative for the redesign's metrics. |

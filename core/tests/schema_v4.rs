@@ -332,17 +332,19 @@ fn an_unknown_key_inside_a_region_is_named_like_any_other() {
         "op": "set_video", "clips": [11],
         "patch": { "obscure": [{ "kind": "blur", "amont": 0.5 }] }
     }));
-    assert_eq!(msg, "unknown key \"obscure.amont\" in a video patch");
+    assert_eq!(msg, "unknown key \"obscure[0].amont\" in a video patch");
 
     // Every element is checked against that one reference, not just the
-    // first, so a typo hiding behind a good region is caught too. The
-    // dotted path carries no index for the same reason `props_check.rs`'s
-    // messages do not: the caller is being told which FIELD it got wrong.
+    // first, so a typo hiding behind a good region is caught too. The path
+    // names the INDEX (D1·1, kpgalligan/reelcut#2; it used to read
+    // `obscure.kynd`): the caller is told which field AND which of up to
+    // eight regions it got wrong, which is the spelling a patch refusal
+    // uses everywhere now — `core/tests/patch_door.rs`.
     let msg = project.errors(&json!({
         "op": "set_video", "clips": [11],
         "patch": { "obscure": [{ "amount": 0.5 }, { "shape": "rect", "kynd": "blur" }] }
     }));
-    assert_eq!(msg, "unknown key \"obscure.kynd\" in a video patch");
+    assert_eq!(msg, "unknown key \"obscure[1].kynd\" in a video patch");
 }
 
 #[test]
