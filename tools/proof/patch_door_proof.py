@@ -357,10 +357,10 @@ def video_door(mcp):
 # that HAS the group it patches, holding a value the refusals name), the
 # tool, and the subject inside each sentence — `an audio patch`, `a text
 # patch`, `a shape patch`, `an action end patch` — plus the group prefix an
-# end patch's paths carry (`video.filters[1].kind`). The three helpers and
-# the three sub-sections (refusals, the undo claim, the merges) do not
-# change, and neither does the order: the fixture first, so that every
-# refusal is against a key the clip already has a value for.
+# end patch's paths carry (`video.filters[1].kind`). The four helpers and
+# the sub-sections (the undo marker, the refusals, the undo claim, the
+# merges, the snap) do not change, and neither does their order: the fixture
+# FIRST, so that a refusal names a key the clip already holds a value for.
 #
 # D1·4 (kpgalligan/reelcut#5): `set_audio`, `set_text`, `set_clip`,
 # `set_shape`, `add_text_clip`, `add_shape_clip`, and the two colour-only

@@ -591,8 +591,8 @@ the Swift launder comes out.
 
 ### 2.3 D1·3 — `set_video` forwards the caller's patch (kpgalligan/reelcut#4)
 
-**Commits.** This one (the ticket); the review's follow-up is named here
-once it lands, as §2.1's and §2.2's are.
+**Commits.** `eb17289` (the ticket) and `439d083` (what its review found,
+below).
 
 **What landed.** The first door. `set_video` hands the core the object the
 caller wrote, and an agent sees D1·1's and D1·2's work for the first time.
