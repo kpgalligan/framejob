@@ -449,11 +449,17 @@ extension AgentServer {
         return raw
     }
 
-    /// A patch object (`set_video` and its siblings) decoded into its typed
-    /// Swift form. Deliberately STRICTER than the core's serde on both counts
-    /// a silent drop can happen: an unknown key is refused by NAME, and a key
-    /// whose value the patch could not read is refused too, rather than either
-    /// one leaving the model believing an edit it never made.
+    /// A patch object decoded into its typed Swift form — the LAUNDER
+    /// `rawPatchArg` above is replacing, still read by the doors deepening D1
+    /// has not moved yet (`set_audio`, `set_text`, `set_clip`, `set_shape`,
+    /// the two new-clip ops and `set_action_end`; `set_video` left in D1·3).
+    ///
+    /// It was written to be stricter than the core's serde on both counts a
+    /// silent drop can happen: an unknown key is refused by NAME, and a key
+    /// whose value the patch could not read is refused too, rather than
+    /// either one leaving the model believing an edit it never made. The core
+    /// now refuses both, by their dotted path and with the value, which is
+    /// why the whole of this goes in kpgalligan/reelcut#7.
     ///
     /// **Why the second check is a round trip and not a type table.** Every
     /// `…Patch` decodes leniently, field by field, so the core can add a

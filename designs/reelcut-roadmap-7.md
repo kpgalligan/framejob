@@ -639,8 +639,8 @@ caller wrote, and an agent sees D1·1's and D1·2's work for the first time.
   are #5's by that ticket's own criteria. So is `withOpaqueColors`, which
   `patchArg` still applies at the doors that have not moved.
 
-**The proof is born.** `tools/proof/patch_door_proof.py`, **39/39**, 409
-lines, named for the SEAM and not for a phase. One section per door; this
+**The proof is born.** `tools/proof/patch_door_proof.py`, **39/39**, exactly
+400 lines (the cap a new file has, §0 — `patch.rs` landed on the same number), named for the SEAM and not for a phase. One section per door; this
 one is the template, and a marked comment says where the next goes and what
 has to change in the copy. Four helpers: `refused` (the sentence VERBATIM,
 plus `get_project` identical either side), `landed` (a merge read back), and
@@ -674,12 +674,13 @@ both files are still the Swift door's, until #6.
   host-state skips, and its one failure is the microphone file's length
   against the movie's on a host whose default output is a Bluetooth headset
   — that script never calls `set_video`.
-- Line counts: `AgentServer+Clips.swift` 1222 → 1212 (the toll: the handler
-  lost fifteen lines of body and `checkVideoEnums`' doc, which argues a
-  function #6 deletes, was cut to what governs it while it runs),
-  `AgentServer+Motion.swift` 157 → 0, `ReelOps.swift` 974 → 999,
+- Line counts, after the review fixes below: `AgentServer+Clips.swift`
+  1222 → 1205 (the toll: the handler lost fifteen lines of body, and
+  `checkVideoEnums`' doc and its `blend` comment, which argue a function #6
+  deletes, were cut to what governs them while they run),
+  `AgentServer+Motion.swift` 157 → 0, `ReelOps.swift` 974 → 1008,
   `AgentCatalog+Clips.swift` 919 → 930, `AgentServer+Arguments.swift`
-  554 → 581. That last one is the file to watch: it is the one #7 guts, and
+  554 → 587. That last one is the file to watch: it is the one #7 guts, and
   #5 and #6 add no reader to it, since they call `rawPatchArg`.
 
 **Mutants.** Ten, each a rebuild of the app and a fresh instance on its own
@@ -711,7 +712,62 @@ disabled) are the first two rows above, run here against one door. #7 runs
 them against all of them.
 
 **The review** (standards and spec, in parallel, against the ticket and
-spec #1) is written here when it has run.
+spec #1). The spec axis found all eight of #4's criteria met, checked
+against the code rather than the record, and the proof's 39 checks
+reconstructed from its own structure. Everything below is the standards
+axis's, plus two imprecisions the spec axis found in sentences this ticket
+wrote.
+
+Fixed:
+
+- **Three sentences inside the files this ticket edited were made false by
+  it.** `checkVideoEnums`' `blend` comment still said "`set_video` refuses
+  `patch.blend` by name before this function is ever called" and counted
+  "the two doors that round trip does not reach"; `patchArg`'s doc still
+  opened "A patch object (`set_video` and its siblings) decoded into its
+  typed Swift form"; and `videoPatchKeys`' doc still offered "let the core's
+  lenient serde drop it" as the alternative. Each now names the doors that
+  still launder and the ticket that takes them. This is the third ticket in
+  a row whose review found exactly this, which is worth saying plainly: the
+  sentence a deletion falsifies is usually in the file the deletion did not
+  quite reach.
+- **The op table's "one factory per row" is now "one typed factory per row,
+  plus a raw one at each door D1 has moved".** `ReelOps.swift`'s module doc,
+  `ReelOp.json`'s doc (a raw factory cannot carry a non-JSON value either:
+  its argument came out of a parsed JSON-RPC call), `app/CLAUDE.md`'s
+  `ReelOps.swift` entry and spec §7's "no untyped call site outside those
+  two files" paragraph. The root rule — the table is the only place an op
+  is spelled — is what the raw factory exists to keep, and it now says so.
+- **`designs/reelcut-app-notes.md` described a DELETED file in the present
+  tense.** Its body is a verbatim archive and is not edited, so the fix is
+  one sentence in its own header: a file it describes may since have been
+  deleted, and `app/CLAUDE.md`'s map is the list of files that exist.
+- **The catalog over-promised the motion snap.** It said the two durations
+  and the period are snapped "so what you send back is what get_project
+  gives"; `period` FLOORS at one frame, so a period of 5 comes back as a
+  whole frame. The sentence now says so, which §5.4 and the proof already
+  did.
+- **The proof's own docstring over-claimed its fixture.** "Every refusal
+  below names a key the clip already has a value for" is not true of
+  `spotlight.shape` or of the unknown `blurr`, which discriminate on the
+  sentence alone; it now says which is which.
+- The proof script was 408 lines against §0's 400-line cap for a new file,
+  and its docstring was the place to pay it. It is 400 now.
+
+Judged not real:
+
+- *The `set_action_end` catalog entry says its groups have "the same keys as
+  set_video", and that door still fills in a three-element colour.* True,
+  and it is #6's door with #7 owning the catalog's remaining
+  `[r, g, b]` sentences (spec #1's Documents decision). The promise is about
+  KEYS, and the leniency that remains is a colour ACCEPTED where four are
+  wanted, never a wrong picture.
+- *`rawPatchArg` is a five-line Middle Man.* It is the seam #5 and #6 copy,
+  and it holds the one refusal that is not the core's — the argument being
+  absent. Inlining it would put that sentence at eight doors.
+- *`patch_door_proof.py` at the 400-line cap.* §2.1's review already read
+  the cap as being about source modules; this one lands on the number
+  anyway, so the reading is not being leaned on.
 
 **What the next tickets inherit.**
 

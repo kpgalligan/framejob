@@ -1495,7 +1495,10 @@ build the op JSON, and they live in `ReelOps.swift` — cut out of
 `ReelCore.swift` under the size rule when road map 2's phase 9 came to add
 `scope` to the op envelope, so the struct and the ~55 writers that set its
 fields are one edit rather than two. There is no untyped call site outside
-those two files. The op schema table lives in the module doc of `edit.rs`
+those two files — an op whose door forwards a CALLER's object (the agent's
+property patches, since deepening D1) gets a RAW factory beside its typed one
+in the same table, taking that object whole, rather than op JSON written
+somewhere else. The op schema table lives in the module doc of `edit.rs`
 (the `adjust.rs` "module doc is the schema" pattern) and `ReelOps.swift`
 mirrors it.
 

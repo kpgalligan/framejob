@@ -8,11 +8,11 @@ built the file with `set_video`'s section; D1·4 and D1·5 add theirs beside
 it. There is no phase number to put on that.
 
 **What a patch means, which is the whole of what is checked here.** A patch
-merges key by key at EVERY depth, a key set to `null` clears that key, and an
-array replaces its whole list. A key or a value the vocabulary does not have
-is REFUSED — never dropped, never corrected, never clamped — naming the
-dotted path to it, array indices included, and the value that was sent. The
-project is left exactly as it was, so a failed call is safe to retry.
+merges key by key at EVERY depth, `null` clears a key and an array replaces
+its whole list. A key or a value the vocabulary does not have is REFUSED —
+never dropped, corrected or clamped — naming the dotted path to it, array
+indices included, and the value sent; the project is left exactly as it was,
+so a failed call is safe to retry.
 
 **The four sentence forms** the core gives, which every section below
 asserts verbatim rather than by keyword:
@@ -24,32 +24,26 @@ asserts verbatim rather than by keyword:
 
 `<subject>` is `a video patch`, `an audio patch`, `a text patch`, `a shape
 patch` or `an action end patch`; in the last the path carries the group
-(`video.filters[1].kind`). Beside them the RANGE refusals, which are
-`props_check.rs`'s and are spelled with the group's name and no index —
-`video.shadow.color must be between 0 and 1, not 2`.
+(`video.filters[1].kind`). Beside them the RANGE refusals, `props_check.rs`'s,
+spelled with the group's name and no index — `video.shadow.color must be
+between 0 and 1, not 2`.
 
-**Why it has to be driven through the app.** The core's own tests
-(`core/tests/patch_door.rs`) prove all of this through the FFI. What they
-cannot see is the Swift agent door, which until D1·3 decoded the caller's
-object through the app's LENIENT project types, re-encoded the result and
-sent THAT on: a misspelt enum arrived as the vocabulary's first case, an
-unknown key inside a nested object was dropped, a three-element colour had
-an alpha filled in and an out-of-range component was clamped — each of them
-an edit nobody asked for, reported as success. Only a call made over MCP
-against the built binary can tell the two apart, which is what every check
-here is.
+**Why it has to be driven through the app.** `core/tests/patch_door.rs`
+proves all of this through the FFI. What it cannot see is the Swift agent
+door, which until D1·3 decoded the caller's object through the app's LENIENT
+project types and sent the RESULT on: a misspelt enum arrived as the
+vocabulary's first case, an unknown key inside a nested object was dropped,
+a three-element colour had an alpha filled in and an out-of-range component
+was clamped — each of them an edit nobody asked for, reported as success.
+Only a call made over MCP against the built binary tells the two apart.
 
 **The template, and where the next door's section goes.** One section per
-door, each built out of the four helpers below — `refused`, which scores a
-refusal AND the unchanged project; `landed`, which reads a merge back; and
-`undo_marker` / `undo_claim`, the two halves of "a refusal registers no undo
-step". A new section is a
-function shaped like `video_door` plus one line in `main`; the marker
-`# ---- the next door's section goes here` says where. The doors still owed
-are `set_audio`, `set_text`, `set_clip`, `set_shape`, `add_text_clip`,
-`add_shape_clip` and the two colour-only arguments (D1·4,
-kpgalligan/reelcut#5), then `set_action_end` and `add_zoom_action` (D1·5,
-kpgalligan/reelcut#6).
+door, built out of the four helpers below — `refused` (the refusal AND the
+unchanged project), `landed` (a merge read back) and `undo_marker` /
+`undo_claim` (the two halves of "a refusal registers no undo step"). A new
+section is a function shaped like `video_door` plus one line in `main`; the
+marker `# ---- the next door's section goes here` says where, and which
+doors are still owed.
 
 Needs no ffmpeg and nothing in `media/` but `A.mov`, which
 `tools/proof/README.md` says how to make. Run it as every other script here
@@ -105,8 +99,8 @@ class Session:
     """One project, the shape every script here uses.
 
     `<name>-<pid>.reelcut`, never a fixed name: a `project` path is matched
-    against every open document and no tool closes one, so two earlier runs'
-    SAVED packages would have the app answering for an old one (measured in
+    against every open document and no tool closes one, so an earlier run's
+    SAVED package would have the app answering for an old one (measured in
     phase 2). Older runs' under this name go."""
 
     def __init__(self, mcp, name, canvas=CANVAS, fps=FPS):
@@ -160,15 +154,12 @@ def refused(s, tool, what, sentence, **call):
     """One bad call, scored twice: the refusal says `sentence` VERBATIM, and
     the project afterwards is the project before.
 
-    The sentence is compared as a substring rather than by keyword because
-    the wording IS the interface — an agent reads the path and the value out
-    of it to fix its call — and a check that only looked for `"kind"` would
-    pass against the Swift door this ticket deleted, which said `"kind"` too
-    and meant something else.
-
-    The second half is the one a keyword check cannot fake. It is where the
-    old door failed: a misspelt filter kind used to LAND as `blur`, so the
-    call came back a success and the project moved."""
+    The sentence is a substring and never a keyword, because the wording IS
+    the interface — an agent reads the path and the value out of it to fix
+    its call — and a check looking only for `"kind"` passes against the door
+    this ticket deleted, which said `"kind"` too and meant something else.
+    The second half is the one no keyword check can fake: a misspelt filter
+    kind used to LAND as `blur`, a success, with the project moved."""
     before = s.text()
     message = s.error(tool, **call)
     after = s.text()
@@ -213,11 +204,12 @@ def video_door(mcp):
     """`set_video` — the first door to forward the caller's patch raw.
 
     The fixture stores a shadow, a filter stack and a motion BEFORE anything
-    is refused, which is deliberate: every refusal below names a key the
-    clip already has a value for, so a door that dropped the key, cleared
-    the field or completed the entry would be making a real edit and the
-    "unchanged" half of `refused` would go red. A refusal against an empty
-    group proves much less."""
+    is refused, which is deliberate: wherever a refusal below names a key
+    the clip already holds a value for — the shadow, the filters, a motion
+    slot — a door that dropped the key, cleared the field or completed the
+    entry would be making a real edit, and the "unchanged" half of `refused`
+    would go red. (`spotlight.shape` and the unknown `blurr` have nothing
+    stored behind them; they discriminate on the sentence alone.)"""
     print("\n1 — set_video: the patch goes to the core as the caller wrote it")
     s = Session(mcp, "patch-door-video")
     clip = s.clip_of()
@@ -237,65 +229,64 @@ def video_door(mcp):
     start = undo_marker(s, lambda: s.op("set_video", clips=[clip], patch={"opacity": 0.25}))
 
     print("\n1b — a key or a value the vocabulary does not have, refused by path")
-    if True:  # one indented block, so a door with a longer list stays readable
-        # The ticket's three, first (kpgalligan/reelcut#4): each of them used
-        # to LAND. A misspelt kind arrived as the enum's first case, an
-        # unknown key inside a nested object was dropped on the way through
-        # the typed decoder, and a number where an object belongs read as
-        # "clear it".
-        refused(s, "set_video", "a misspelt filter kind, by INDEX",
-                'bad value at "filters[1].kind" in a video patch: unknown variant `glow`',
-                clips=[clip],
-                patch={"filters": [{"kind": "blur", "amount": 0.5},
-                                   {"kind": "glow", "amount": 1.0}]})
-        refused(s, "set_video", "an unknown key INSIDE a filter entry",
-                'unknown key "filters[0].amont" in a video patch',
-                clips=[clip],
-                patch={"filters": [{"kind": "blur", "amount": 0.5, "amont": 1.0}]})
-        refused(s, "set_video", "a number where the shadow OBJECT belongs",
-                'bad value at "shadow" in a video patch: expected an object, not 5',
-                clips=[clip], patch={"shadow": 5})
-        # The fourth sentence form (D1·2), and the most tempting patch an
-        # agent writes: "the same filter, more of it". A list replaces
-        # whole, so the entry is merged over nothing and a missing `kind`
-        # would be completed into a half-strength blur.
-        refused(s, "set_video", "a filter entry naming only its amount",
-                'missing key "filters[0].kind" in a video patch',
-                clips=[clip], patch={"filters": [{"amount": 1.0}]})
-        # A `null` is a spelling of a key, not a way past the walk.
-        refused(s, "set_video", "an unknown key spelled with a null",
-                'unknown key "blurr" in a video patch',
-                clips=[clip], patch={"blurr": None})
-        # Two levels down, inside `motion` — where the Swift door used to
-        # have a hand-written reader of its own (`AgentServer+Motion.swift`,
-        # deleted in D1·3) saying the same thing in different words.
-        refused(s, "set_video", "a misspelt key inside a motion slot",
-                'unknown key "motion.in.durration" in a video patch',
-                clips=[clip],
-                patch={"motion": {"in": {"kind": "fade", "durration": 3 * FRAME}}})
-        refused(s, "set_video", "a misspelt motion kind",
-                'bad value at "motion.in.kind" in a video patch: unknown variant `slide_upp`',
-                clips=[clip],
-                patch={"motion": {"in": {"kind": "slide_upp", "duration": 5 * FRAME}}})
-        refused(s, "set_video", "a misspelt spotlight shape",
-                'bad value at "spotlight.shape" in a video patch: unknown variant `circle`',
-                clips=[clip], patch={"spotlight": {"shape": "circle"}})
-        # A colour is FOUR numbers (spec #1). The three-element form used to
-        # have its alpha filled in on the way past and an out-of-range
-        # component used to be CLAMPED — a value changed without the caller
-        # knowing, which is the one thing a patch may never do.
-        refused(s, "set_video", "a three-element colour",
-                'bad value at "shadow.color" in a video patch: invalid length 3',
-                clips=[clip], patch={"shadow": {"color": [1.0, 0.0, 0.0]}})
-        refused(s, "set_video", "a colour component outside 0–1",
-                "video.shadow.color must be between 0 and 1, not 2",
-                clips=[clip], patch={"shadow": {"color": [2.0, 0.0, 0.0, 1.0]}})
-        # The patch itself. The core names the GROUP, which is what a check
-        # on this side could not: it is answering for `set_video` here and
-        # for `set_shape` in the same words.
-        refused(s, "set_video", "a patch that is not an object at all",
-                "video patch must be a json object, not 5",
-                clips=[clip], patch=5)
+    # The ticket's three, first (kpgalligan/reelcut#4): each of them used
+    # to LAND. A misspelt kind arrived as the enum's first case, an
+    # unknown key inside a nested object was dropped on the way through
+    # the typed decoder, and a number where an object belongs read as
+    # "clear it".
+    refused(s, "set_video", "a misspelt filter kind, by INDEX",
+            'bad value at "filters[1].kind" in a video patch: unknown variant `glow`',
+            clips=[clip],
+            patch={"filters": [{"kind": "blur", "amount": 0.5},
+                               {"kind": "glow", "amount": 1.0}]})
+    refused(s, "set_video", "an unknown key INSIDE a filter entry",
+            'unknown key "filters[0].amont" in a video patch',
+            clips=[clip],
+            patch={"filters": [{"kind": "blur", "amount": 0.5, "amont": 1.0}]})
+    refused(s, "set_video", "a number where the shadow OBJECT belongs",
+            'bad value at "shadow" in a video patch: expected an object, not 5',
+            clips=[clip], patch={"shadow": 5})
+    # The fourth sentence form (D1·2), and the most tempting patch an
+    # agent writes: "the same filter, more of it". A list replaces
+    # whole, so the entry is merged over nothing and a missing `kind`
+    # would be completed into a half-strength blur.
+    refused(s, "set_video", "a filter entry naming only its amount",
+            'missing key "filters[0].kind" in a video patch',
+            clips=[clip], patch={"filters": [{"amount": 1.0}]})
+    # A `null` is a spelling of a key, not a way past the walk.
+    refused(s, "set_video", "an unknown key spelled with a null",
+            'unknown key "blurr" in a video patch',
+            clips=[clip], patch={"blurr": None})
+    # Two levels down, inside `motion` — where the Swift door used to
+    # have a hand-written reader of its own (`AgentServer+Motion.swift`,
+    # deleted in D1·3) saying the same thing in different words.
+    refused(s, "set_video", "a misspelt key inside a motion slot",
+            'unknown key "motion.in.durration" in a video patch',
+            clips=[clip],
+            patch={"motion": {"in": {"kind": "fade", "durration": 3 * FRAME}}})
+    refused(s, "set_video", "a misspelt motion kind",
+            'bad value at "motion.in.kind" in a video patch: unknown variant `slide_upp`',
+            clips=[clip],
+            patch={"motion": {"in": {"kind": "slide_upp", "duration": 5 * FRAME}}})
+    refused(s, "set_video", "a misspelt spotlight shape",
+            'bad value at "spotlight.shape" in a video patch: unknown variant `circle`',
+            clips=[clip], patch={"spotlight": {"shape": "circle"}})
+    # A colour is FOUR numbers (spec #1). The three-element form used to
+    # have its alpha filled in on the way past and an out-of-range
+    # component used to be CLAMPED — a value changed without the caller
+    # knowing, which is the one thing a patch may never do.
+    refused(s, "set_video", "a three-element colour",
+            'bad value at "shadow.color" in a video patch: invalid length 3',
+            clips=[clip], patch={"shadow": {"color": [1.0, 0.0, 0.0]}})
+    refused(s, "set_video", "a colour component outside 0–1",
+            "video.shadow.color must be between 0 and 1, not 2",
+            clips=[clip], patch={"shadow": {"color": [2.0, 0.0, 0.0, 1.0]}})
+    # The patch itself. The core names the GROUP, which is what a check
+    # on this side could not: it is answering for `set_video` here and
+    # for `set_shape` in the same words.
+    refused(s, "set_video", "a patch that is not an object at all",
+            "video patch must be a json object, not 5",
+            clips=[clip], patch=5)
 
     print("\n1c — and not one of them was an undo step")
     undo_claim(s, start)

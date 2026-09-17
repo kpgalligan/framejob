@@ -14,9 +14,11 @@ extension AgentServer {
     // MARK: - Patch vocabularies
 
     /// The keys each patch accepts, from the §5.2 property groups. Used to
-    /// refuse an unknown key BY NAME rather than let the core's lenient serde
-    /// drop it — a silently ignored typo leaves a model believing it made an
-    /// edit it did not.
+    /// refuse an unknown key BY NAME at a door that still decodes the
+    /// caller's object. The core refuses one by its dotted path now
+    /// (`core/src/patch.rs`), so these sets are read only where the launder
+    /// has not yet come out: `set_audio`, `set_text`, `set_clip`,
+    /// `set_shape` and `checkActionPatch` (kpgalligan/reelcut#5 and #6).
     static let videoPatchKeys: Set<String> = [
         "x", "y", "scale", "rotation", "opacity", "crop", "corner_radius", "shadow", "color",
         "chroma", "filters", "reflection", "spotlight", "obscure", "blend", "motion",
@@ -575,25 +577,16 @@ extension AgentServer {
                 }
             }
         }
-        // `video.blend` (format version 6). A top-level key rather than a
-        // nested one, so — unlike the four above — `patchArg`'s round trip
-        // DOES catch a misspelling here: `VideoPatch.blend` is a single
-        // optional read through the fallback-less `lenient` (`ReelCore.swift`
-        // argues that pairing at length), so `"muliply"` decodes to nil,
-        // exactly as an absent key does, the without-the-key decode comes back
-        // equal, and `set_video` refuses `patch.blend` by name before this
-        // function is ever called.
-        //
-        // The arm is still load-bearing, at the two doors that round trip does
-        // not reach. `set_action_end` is the first: `checkActionPatch` runs
-        // ahead of `patchArg` there, and even afterwards the top-level round
-        // trip cannot see inside a group — `ActionPatch(video: VideoPatch())`
-        // is not equal to `ActionPatch(video: nil)`, so a video group holding
+        // `video.blend` (format version 6). Since D1·3 this function runs
+        // from `checkActionPatch` ALONE, and the end-state door is exactly
+        // where `patchArg`'s round trip could never reach a blend: it cannot
+        // see inside a group — `ActionPatch(video: VideoPatch())` is not
+        // equal to `ActionPatch(video: nil)` — so a video group holding
         // nothing but a misspelt key survives it and would go to the core as
-        // `{"video": {}}`. An explicit `{"blend": null}` is the second:
-        // `patchArg`'s loop exempts nulls by design, so this is what answers
-        // one — and refusing it is right, because `blend` has no null form at
-        // all (`normal` is how a blend is cleared) and a caller who wrote one
+        // `{"video": {}}`. An explicit `{"blend": null}` is the other case
+        // this arm answers: `patchArg`'s loop exempts nulls by design, and
+        // refusing one is right, because `blend` has no null form at all
+        // (`normal` is how a blend is cleared) and a caller who wrote one
         // meant something the key cannot mean.
         if let blend = object["blend"] {
             let known = BlendMode.allCases.map { $0.rawValue }

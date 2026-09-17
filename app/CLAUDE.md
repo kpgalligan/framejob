@@ -19,8 +19,10 @@ detail there.
   the `dictionary` extensions on the property types and the typed patches.
   `deinit` frees the Rust allocation.
 - `ReelOps.swift` — `OpArgs`, `ReelOp` and one typed factory per row of
-  `core/src/edit.rs`'s op table; there is no untyped op-JSON call site
-  anywhere else. `scope` is a member folded into `json`;
+  `core/src/edit.rs`'s op table, plus a RAW factory beside the typed one at
+  each door deepening D1 has moved (`setVideoRaw`), which takes the caller's
+  own patch object as `Any` and forwards it; there is no untyped op-JSON call
+  site anywhere else. `scope` is a member folded into `json`;
   `documentLevelNames` MIRRORS `scope.rs`'s `refused_inside` (seven names) so
   one edit can mix a document-level op with scoped ones. A table, with
   `edit.rs`'s size exemption.

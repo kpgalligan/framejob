@@ -6,7 +6,9 @@ each file's entry: the history of every size toll with its line counts, the
 measurements behind each decision, what each review found, and the arguments
 a comment in the file usually restates. Grep it when a file's PAST matters;
 read `app/CLAUDE.md` for what governs the file now. Its line counts and phase
-references are as of the phase that wrote them and are not maintained.
+references are as of the phase that wrote them and are not maintained, and a
+file it describes may since have been DELETED — `app/CLAUDE.md`'s map is the
+list of files that exist, and this one is not edited to follow it.
 
 ## Archived text — app/CLAUDE.md — Swift app rules
 

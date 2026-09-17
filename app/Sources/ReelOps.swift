@@ -6,6 +6,13 @@ import AppKit
 /// `edit.rs` is changed here in the same commit, and nowhere else in the app
 /// is op JSON written by hand.
 ///
+/// A row may have a SECOND factory beside its typed one: a RAW factory that
+/// takes the caller's own object and forwards it unread, which is what the
+/// agent door does at every op deepening D1 has moved (`setVideoRaw`; the
+/// paste payload factories are the precedent). It is a second SPELLING of
+/// one row, not a second row, and it is here for the rule above — the table
+/// stays the only place in the app where an op is named.
+///
 /// The seam is the FFI. `ReelCore.swift` is the only file in the app that
 /// names an `rc_*` symbol and nothing here names one: an op is a VALUE — a
 /// name, its arguments, and the JSON those two make — that no handle has to
@@ -87,7 +94,9 @@ struct ReelOp {
     /// The op as the JSON `rc_project_apply` takes. Keys are sorted so two
     /// equal ops compare equal as strings. `"{}"` — which the core rejects
     /// as an unknown op — if a value were not JSON-representable, which the
-    /// typed factories make impossible.
+    /// typed factories make impossible and a RAW one cannot reach either:
+    /// its argument came out of a parsed JSON-RPC call, so every value in it
+    /// is already one `JSONSerialization` wrote.
     ///
     /// An absent scope writes no key at all rather than an explicit null.
     /// The core reads the two the same way (`scope::read`), but a key that
