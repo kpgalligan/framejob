@@ -54,7 +54,7 @@ mod common;
 
 use serde_json::{json, Value};
 
-use common::{at, int, text, Handle};
+use common::{array, at, int, text, Handle};
 
 /// Ticks per second (spec §5.1), written out rather than imported so a
 /// change to `time::TIMESCALE` fails these tests instead of moving with
@@ -409,6 +409,21 @@ fn the_animations_timings_are_snapped_to_the_frame_grid_by_the_patch_door() {
     let handle = Handle::from_value(&snapped);
     handle.refuses(&set_text(json!({ "animation": on_the_grid })));
     handle.refuses(&set_text(json!({ "animation": { "in": 320_000 + 9_999 } })));
+
+    // A NEW text clip's animation lands on the same grid: it is the same
+    // merge and the same check one file over (`edit_clip.rs`), and a door
+    // that snapped only some of the time would be the exception this
+    // ticket removed.
+    let born = plain().apply(&json!({
+        "op": "add_text_clip", "track": 2, "at": 12 * SEC,
+        "text": { "content": "New", "animation": { "kind": "typewriter", "in": 310_000 } }
+    }));
+    let project = born.value();
+    let clips = array(&project, "/clips");
+    assert_eq!(
+        at(clips.last().expect("the new clip"), "/text/animation/in"),
+        &json!(320_000)
+    );
 
     // The FILE is not snapped, which is the same split the filter entry
     // has: `word_fade`'s `out` is 22.5 frames and opens exactly as written

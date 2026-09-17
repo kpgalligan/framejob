@@ -198,7 +198,11 @@ impl Project {
     /// argues the order and the rounding). Both are DURATIONS, so 0 is
     /// legal and a reveal shorter than half a frame lands there: it is a
     /// reveal no frame could show.
-    fn snap_animation(&self, props: &mut TextProps) {
+    ///
+    /// `pub(crate)` for the one text patch that is not `set_text`:
+    /// `add_text_clip`'s, which runs the same merge and the same check in
+    /// `edit_clip.rs` and must land on the same grid.
+    pub(crate) fn snap_animation(&self, props: &mut TextProps) {
         let Some(animation) = props.animation.as_mut() else {
             return;
         };

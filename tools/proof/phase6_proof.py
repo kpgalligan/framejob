@@ -123,13 +123,12 @@ Two colour rules the fixture obeys, both measured rather than assumed:
   is; `paste_attributes`, which is WHY the refusal is written that way —
   the group is replaced whole, so refusing every paste that mentioned
   `blend` would fail an all-or-nothing paste of an ordinary look; and
-  `set_action_end`, which stores the mode (an end patch names a legal value
-  and is not range-checked — and "a nest cannot blend" is a fact about the
-  CLIP, which that door never sees) and must still DRAW `normal`, since
-  `clamp_video` forces it. Beside them the documented limit on the other side — a blend set on a
-  clip BEFORE it is nested is carried inside and blends against the whole
-  canvas below the nest, because a nest is flattened rather than composited
-  offscreen.
+  `set_action_end`, which stores the mode (that door checks the vocabulary
+  and never the clip, and `multiply` is a legal mode) and must still DRAW
+  `normal`, since `clamp_video` forces it. Beside them the documented limit
+  on the other side — a blend set on a clip BEFORE it is nested is carried
+  inside and blends against the whole canvas below the nest, because a nest
+  is flattened rather than composited offscreen.
 * **8** the same arithmetic over a DECODED picture rather than a drawn one,
   which is what says `video.blend` belongs to the LAYER and not to a source
   kind. **Not the `qtrle` card `README.md` gives**: on macOS 26.5.1 an

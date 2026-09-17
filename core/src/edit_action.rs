@@ -15,10 +15,10 @@
 //!
 //! One asymmetry is deliberate and worth stating, and D1·2 moved where it
 //! falls. An end patch is walked for keys and types like every other patch
-//! (`patch.rs`'s `check_end_patch`), so a misspelt key here is refused by
-//! its path rather than stored and silently ignored; what stays LENIENT is
-//! the VALUE, because the state a clip interpolates toward may name
-//! something no stored group could hold, and because a half-written
+//! ([`check_end_patch`], over `patch.rs`'s walk), so a misspelt key here is
+//! refused by its path rather than stored and silently ignored; what stays
+//! LENIENT is the VALUE, because the state a clip interpolates toward may
+//! name something no stored group could hold, and because a half-written
 //! animation must stay editable. The evaluator is the line of defence for
 //! that — it clamps every value it produces (spec §5.4). The forward
 //! compatibility the old leniency was for lives in the FILE reader, which
@@ -85,8 +85,15 @@ fn prune_removed(value: &mut Value, patch: &Value, depth: u32) {
 /// cannot be a `Group`'s own subject.
 const END_PATCH: &str = "an action end patch";
 
-/// Walks an end patch's keys, kinds and values the way every other patch is
-/// walked (`patch.rs`), group by group, and refuses by the dotted path.
+/// The groups §5.4's end patch may name. `shape` is not among them, and its
+/// absence is a refusal rather than an omission: `evaluate_clip` passes a
+/// clip's shape through untouched, so the key would be stored, reported as
+/// success and animate nothing.
+const END_GROUPS: [Group; 3] = [Group::Video, Group::Audio, Group::Text];
+
+/// Walks an end patch's keys, kinds and values the way every other patch
+/// is walked (`patch.rs`'s `check_group_patch`), group by group, and
+/// refuses by the dotted path.
 ///
 /// What belongs to THIS door rather than to a property group, and is why
 /// the walk is composed here rather than called:
@@ -95,51 +102,32 @@ const END_PATCH: &str = "an action end patch";
 ///   `video`, `audio` and `text`. `shape` is refused rather than kept,
 ///   because `evaluate_clip` passes a clip's shape through untouched: the
 ///   key would be stored, reported as success, and animate nothing.
-/// - **A `null` is a REMOVAL at every depth**, not a clear, so it is
-///   stripped before the group is read. `{"video": {"crop": null}}` is
-///   "stop animating the crop", where the same spelling in a `set_video`
-///   patch is a required field being cleared and is refused. Only object
-///   keys are stripped, matching [`prune_removed`], which does the same to
-///   the STORED end state: a `null` inside a list is not a removal — a list
-///   replaces whole — and the read refuses it by index.
+/// - **A `null` is a REMOVAL at every depth**, not a clear. The walk sees
+///   it (so `{"video": {"blurr": null}}` is still an unknown key) and the
+///   typed read does not (so `{"video": {"crop": null}}` is "stop animating
+///   the crop" rather than a required field being cleared) —
+///   `check_group_patch` is where that split lives, and [`prune_removed`]
+///   below applies the same rule to the STORED end state.
 fn check_end_patch(patch: &Value) -> Result<(), String> {
     let Value::Object(groups) = patch else {
         return Ok(());
     };
     for (key, body) in groups {
-        let group = match key.as_str() {
-            "video" => Group::Video,
-            "audio" => Group::Audio,
-            "text" => Group::Text,
-            _ => return Err(unknown_key(key, END_PATCH)),
-        };
+        // The three groups, by their own names rather than by three string
+        // literals: a group renamed in `patch.rs` cannot drift from the
+        // door that lists it.
+        let group = END_GROUPS
+            .into_iter()
+            .find(|group| group.name() == key)
+            .ok_or_else(|| unknown_key(key, END_PATCH))?;
         // A group set to `null` removes the whole group from the end state,
         // which is the same removal one key deep.
         if body.is_null() {
             continue;
         }
-        check_group_patch(&without_nulls(body, 0), group, END_PATCH, key)?;
+        check_group_patch(body, group, END_PATCH, key)?;
     }
     Ok(())
-}
-
-/// A copy of `patch` with every `null`-valued key dropped, at every depth —
-/// [`check_end_patch`]'s second rule, and [`prune_removed`]'s shape applied
-/// to the incoming patch instead of to the stored state.
-fn without_nulls(patch: &Value, depth: u32) -> Value {
-    let Value::Object(fields) = patch else {
-        return patch.clone();
-    };
-    if depth >= MAX_PATCH_DEPTH {
-        return patch.clone();
-    }
-    Value::Object(
-        fields
-            .iter()
-            .filter(|(_, value)| !value.is_null())
-            .map(|(key, value)| (key.clone(), without_nulls(value, depth + 1)))
-            .collect(),
-    )
 }
 
 impl Project {

@@ -251,6 +251,13 @@ pub(crate) fn check_video(props: &VideoProps, size: Option<(f64, f64)>) -> Resul
     Ok(())
 }
 
+/// The audio group. Its six tick values — the two fades, the duck's and the
+/// compressor's attack and release — are the one family the Times rule
+/// deliberately leaves OFF the frame grid (core/CLAUDE.md): they are
+/// envelope lengths sampled at the audio rate rather than positions in the
+/// picture, and a 10 ms compressor attack quantised to a video frame would
+/// round to nothing. Only the sign is checked, as it is for a motion
+/// duration.
 pub(crate) fn check_audio(props: &AudioProps) -> Result<(), String> {
     in_range("audio.volume", props.volume, 0.0, MAX_GAIN)?;
     ticks_positive_or_zero("audio.fade_in", props.fade_in)?;

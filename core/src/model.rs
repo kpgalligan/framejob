@@ -34,8 +34,11 @@
 //! key: `add_media`'s descriptor and the `set_video` / `set_audio` /
 //! `set_text` / `set_shape` patches all reject an unknown key by name. The
 //! one place an unknown key SURVIVES a round trip is an [`Action`]'s `end`
-//! patch, which is opaque [`serde_json::Value`] here, is evaluated
-//! leniently by `actions.rs`, and is kept as written by `set_action_end`.
+//! patch, which is opaque [`serde_json::Value`] here and is evaluated
+//! leniently by `actions.rs`. That is the READER's doing and only the
+//! reader's: `set_action_end` refuses an unknown key by its path like every
+//! other patch op (`edit_action.rs`), so strictness at the op never costs a
+//! file a newer build wrote.
 
 use serde::{Deserialize, Serialize};
 

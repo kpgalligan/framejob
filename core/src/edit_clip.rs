@@ -356,8 +356,12 @@ impl Project {
         let props = match text {
             None => title,
             Some(patch) => {
-                let props = merge_group(&title, patch, Group::Text)?;
+                let mut props = merge_group(&title, patch, Group::Text)?;
                 check_text(&props)?;
+                // The same door `set_text` is, ticks included
+                // (`edit_props.rs`'s `snap_animation`, and the Times rule
+                // it keeps).
+                self.snap_animation(&mut props);
                 props
             }
         };

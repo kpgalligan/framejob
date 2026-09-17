@@ -10,16 +10,15 @@
 //! for: **a key or a value the vocabulary does not have is refused, never
 //! dropped and never corrected** — [`check_keys`] walks a patch's keys and
 //! JSON kinds against the group's own template, [`merge_group`] merges and
-//! reads the result back as its type, and [`check_end_patch`] does both for
-//! an action's end state. Every refusal names the dotted path (array
-//! indices included) and the value sent.
+//! reads the result back as its type, and [`check_group_patch`] does both
+//! for a group that is NOT merged into a stored one, which is what
+//! `edit_action.rs` builds an action's end-patch door out of. Every refusal
+//! names the dotted path (array indices included) and the value sent.
 //!
 //! Cut out of `edit_props.rs` under the size rule (core/CLAUDE.md), and cut
 //! HERE for the reason `props_check.rs` was cut out of the same file in
 //! phase 2: reading a patch is a fact about the VOCABULARY, not about an
-//! edit. Nothing in this file is handed a clip, a project or a frame rate;
-//! `edit_props.rs` owns the five ops that call it, and `edit_clip.rs`'s two
-//! new-clip ops call it the same way.
+//! edit. Nothing here is handed a clip, a project or a frame rate.
 
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
@@ -158,12 +157,15 @@ fn check_keys(
     if let (Value::Array(given), Value::Array(known)) = (patch, template) {
         if depth < MAX_PATCH_DEPTH {
             if let Some(reference) = known.first() {
-                let complete = COMPLETE_ENTRIES.contains(&last_segment(path));
+                let required = COMPLETE_ENTRIES
+                    .iter()
+                    .find(|(key, _)| *key == last_segment(path))
+                    .map(|(_, keys)| *keys);
                 for (index, value) in given.iter().enumerate() {
                     let here = format!("{path}[{index}]");
                     check_keys(value, reference, subject, &here, depth + 1)?;
-                    if complete {
-                        check_complete(value, reference, subject, &here)?;
+                    if let Some(required) = required {
+                        check_complete(value, required, subject, &here)?;
                     }
                 }
             }
@@ -207,11 +209,17 @@ fn check_keys(
 /// `video.obscure` is a box whose six geometry defaults are a real, centred
 /// region and `shape.gradient.stops` is a position and a colour, so in both
 /// an omitted key leaves the entry recognisably the thing the caller named.
-/// D1·2 moved only the filter rule into the door, where the Swift agent
-/// handler had been making it alone. The match is on the LAST segment of
-/// the path, so the rule holds at `filters` in a group patch and at
-/// `video.filters` in an end patch without being written twice.
-const COMPLETE_ENTRIES: [&str; 1] = ["filters"];
+/// The match is on the LAST segment of the path, so the rule holds at
+/// `filters` in a group patch and at `video.filters` in an end patch
+/// without being written twice.
+///
+/// The required keys are SPELLED rather than taken from the template's own
+/// entry, and the difference only shows up later: a field added to
+/// [`crate::model::Filter`] would otherwise join the requirement the day it
+/// landed and refuse every patch every agent had already learnt to write —
+/// where a new field's serde default is, by construction, the value every
+/// older project already has.
+const COMPLETE_ENTRIES: [(&str, &[&str]); 1] = [("filters", &["kind", "amount"])];
 
 /// The last dotted segment of `path` — the key an array is held under,
 /// which is what [`COMPLETE_ENTRIES`] is matched against.
@@ -220,20 +228,20 @@ fn last_segment(path: &str) -> &str {
 }
 
 /// Refuses an entry of a [`COMPLETE_ENTRIES`] list that does not name every
-/// key the template's reference entry has, by the path to the key it left
-/// out. A `null` is not a spelling of a key either: it clears an optional
-/// field, and nothing in such an entry is optional.
+/// `required` key, by the path to the key it left out. A `null` is not a
+/// spelling of a key either: it clears an optional field, and nothing named
+/// here is optional.
 fn check_complete(
     entry: &Value,
-    reference: &Value,
+    required: &[&str],
     subject: &str,
     path: &str,
 ) -> Result<(), String> {
-    let (Value::Object(given), Value::Object(known)) = (entry, reference) else {
+    let Value::Object(given) = entry else {
         return Ok(());
     };
-    for key in known.keys() {
-        if given.get(key).unwrap_or(&Value::Null).is_null() {
+    for key in required {
+        if given.get(*key).unwrap_or(&Value::Null).is_null() {
             return Err(format!("missing key \"{path}.{key}\" in {subject}"));
         }
     }
@@ -285,22 +293,47 @@ pub(crate) fn unknown_key(path: &str, subject: &str) -> String {
 /// could hold, and `actions.rs`'s `clamp_video` bounds the evaluated value
 /// instead.
 ///
-/// The caller strips whatever the patch's own `null` means before calling
-/// (`edit_action.rs`), because that is the door's rule and not the group's.
+/// **A `null` here can only be a REMOVAL**, there being no stored value to
+/// clear, so the read never sees one: `{"crop": null}` is "stop animating
+/// the crop", where the same spelling in a `set_video` patch is a required
+/// field being cleared and is refused. The WALK does see it, which is what
+/// keeps `{"blurr": null}` an unknown key rather than a key quietly
+/// dropped.
 pub(crate) fn check_group_patch(
     body: &Value,
     group: Group,
     subject: &str,
     prefix: &str,
 ) -> Result<(), String> {
-    check_keys(body, &group.template(), subject, prefix, 0)?;
-    let merged = actions::merge(&group.template(), body);
+    let template = group.template();
+    check_keys(body, &template, subject, prefix, 0)?;
+    let merged = actions::merge(&template, &without_nulls(body, 0));
     match group {
         Group::Video => read_merged::<VideoProps>(merged, subject, prefix).map(|_| ()),
         Group::Audio => read_merged::<AudioProps>(merged, subject, prefix).map(|_| ()),
         Group::Text => read_merged::<TextProps>(merged, subject, prefix).map(|_| ()),
         Group::Shape => read_merged::<ShapeProps>(merged, subject, prefix).map(|_| ()),
     }
+}
+
+/// A copy of `patch` with every `null`-valued key dropped, at every depth —
+/// [`check_group_patch`]'s removal rule, and the shape `edit_action.rs`'s
+/// `prune_removed` applies to the STORED end state. Only object keys go: a
+/// `null` inside a list is not a removal, and the read refuses it by index.
+fn without_nulls(patch: &Value, depth: u32) -> Value {
+    let Value::Object(fields) = patch else {
+        return patch.clone();
+    };
+    if depth >= MAX_PATCH_DEPTH {
+        return patch.clone();
+    }
+    Value::Object(
+        fields
+            .iter()
+            .filter(|(_, value)| !value.is_null())
+            .map(|(key, value)| (key.clone(), without_nulls(value, depth + 1)))
+            .collect(),
+    )
 }
 
 /// The JSON kind the schema has where the template holds `reference`, as a

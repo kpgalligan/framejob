@@ -154,8 +154,9 @@ file is what governs a module now.
   (each a wrong picture or a wrong sound if carried) and refuses a nest.
   Default plate colour is white: the canvas is already black.
 - `actions.rs` — action evaluation and interpolation, `clip_state`, and
-  `clamp_video`, the evaluator's last line of defence (`set_action_end` is
-  lenient by design; this bounds every value an end patch can carry and
+  `clamp_video`, the evaluator's last line of defence (`set_action_end`
+  checks an end patch's keys and kinds but deliberately not its VALUES, and
+  never sees the clip; this bounds every value an end patch can carry and
   forces `normal` on a nest clip). **The LIST rule is stated here once as the
   crate's**: an end patch interpolates a list per index when the lengths
   match and each pair of entries agrees on its discrete fields (`kind`,
@@ -265,8 +266,15 @@ messages naming the offending value. No input may panic. FFI mapping:
 caught panic → `"internal error: <what>"`.
 
 **Times.** Every tick value that reaches the model is snapped to the
-document's frame grid first (`time::snap_to_frame`). Never store a
-sub-frame time.
+document's frame grid before it is stored (`time::snap_to_frame`). Never
+store a sub-frame time. Where a range check names the value, the check runs
+on what the CALLER sent and the snap follows it, so a refusal never names a
+number the door rounded to (`props_check.rs`, `edit_props.rs`'s
+`snap_motion` / `snap_animation`). The one family that is deliberately NOT
+on the grid is the audio ramps — `audio.fade_in` / `fade_out`, the duck's
+and the compressor's attack and release — because they are envelope lengths
+sampled at the audio rate, not positions in the picture, and quantising
+them to a video frame would round a 10 ms attack to nothing.
 
 **FFI exports.** Every export: `#[no_mangle] pub unsafe extern "C"`, a `///`
 comment restating the header contract, a `/// # Safety` paragraph, NULL

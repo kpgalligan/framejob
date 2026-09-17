@@ -513,6 +513,14 @@ fn an_action_end_patch_is_walked_like_every_other_patch() {
             json!({ "video": 5 }),
             "bad value at \"video\" in an action end patch: expected an object, not 5",
         ),
+        (
+            // A `null` is a removal, so the typed read never sees one — but
+            // the WALK does, or an unknown key spelled with a null would be
+            // dropped rather than refused, which is the one thing a patch
+            // may never do (`CONTEXT.md`).
+            json!({ "video": { "blurr": null } }),
+            "unknown key \"video.blurr\" in an action end patch",
+        ),
     ] {
         assert_eq!(refused(&project, end_op(patch), &[]), expected);
     }

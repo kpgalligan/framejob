@@ -259,6 +259,68 @@ Judged not real:
 - *"Third dependency" and "every group" do not hold literally.* Both
   readings are recorded above.
 
+**The review** (standards and spec, in parallel, against the ticket and
+spec #1).
+
+Fixed:
+
+- **An unknown key spelled with a `null` escaped the new door.** The end
+  patch stripped its nulls BEFORE the walk, so `{"video": {"blurr": null}}`
+  was dropped and answered as an identity rather than refused — the one
+  thing a patch may never do (`CONTEXT.md`). The strip now lives inside
+  `check_group_patch`, after the walk and before the typed read, which is
+  where the two readings of a `null` actually part.
+- **`add_text_clip` did not snap.** Spec #1 puts the snap "at the patch
+  door", and a new clip's `text` is one of them. `snap_animation` is
+  `pub(crate)` and `edit_clip.rs` calls it, so the two text doors land on
+  the same grid.
+- **Three sentences outside the diff were made false by it** and are
+  corrected: `edit.rs`'s op table (an end patch "keeps what it does not
+  know"), `model.rs`'s reader note ("kept as written by `set_action_end`")
+  and `core/CLAUDE.md`'s `actions.rs` entry ("lenient by design"). The op
+  table's `set_action_end` and `add_zoom_action` rows now say what spec §6
+  says, which is the four-mirrors rule.
+- **The Times rule was half kept.** The six audio ramp ticks
+  (`audio.fade_in` / `fade_out`, the duck's and the compressor's attack and
+  release) are not snapped and never were. They are envelope lengths
+  sampled at the audio rate rather than positions in the picture — a 10 ms
+  compressor attack quantised to a video frame rounds to nothing — so the
+  rule in `core/CLAUDE.md` and `check_audio`'s doc now say so instead of
+  leaving it unstated.
+- **A field added to `Filter` would have joined the completeness rule** the
+  day it landed and refused every patch an agent had already learnt to
+  write. `COMPLETE_ENTRIES` spells `("filters", ["kind", "amount"])` rather
+  than taking the template entry's keys.
+- Three smaller ones: the `check_end_patch` doc link pointed at the module
+  it had just left; `check_end_patch` re-spelled the three group names as
+  string literals where `Group::name` owns them; and a `phase6_proof.py`
+  docstring line ran past the file's wrap.
+
+Judged not real:
+
+- *`ZoomRegion`'s hand-written `Deserialize` is scope creep.* The ticket
+  asks for the unknown and missing member, which serde already gave. The
+  positional LIST read is the same defect D1·1 found and closed inside a
+  patch, at the one op argument shaped like one, and spec #1's ninth user
+  story asks for every such door to behave identically. Recorded as a
+  deliberate addition rather than dropped.
+- *`period`'s frame floor is not a snap.* A period of five ticks lands on
+  one frame where the nearest grid point is zero. That is the point: the
+  value has no zero (`props_check.rs` refuses one), so the smallest period
+  on the grid is a frame.
+- *`core/tests/patch_door.rs` is 597 lines, past the 400-line new-file
+  cap.* The cap is about source modules: the ledger's own regeneration
+  command reads `app/Sources/*.swift` and `core/src/*.rs` only, and this
+  crate's test files run past 2 000 lines.
+- *`without_nulls` duplicates `prune_removed`.* Same shape, different jobs
+  — one copies a patch minus its nulls for a type read, the other removes
+  those keys from the STORED end state — and they now sit in different
+  modules for that reason.
+
+**Mutants for the review fixes.** Three more, all caught: the walk moved
+back behind the strip (1 test), `without_nulls` made the identity (2), and
+`add_text_clip`'s snap removed (1).
+
 **What the next tickets inherit.**
 
 - The three sentence forms above are what D1·3's proof asserts over MCP.
@@ -293,7 +355,8 @@ Judged not real:
 
 ### 2.2 D1·2 — what a patch may carry (kpgalligan/reelcut#3)
 
-**Commits.** `a36314b` (the toll) and `SHA2` (the ticket).
+**Commits.** `a36314b` (the toll), `a5424cf` (the ticket) and `SHA3` (what
+its review found, below).
 
 **What landed.** Core and documents only, again: the agent door still
 decodes before the core does, until D1·3. Four changes to what a patch may
@@ -355,8 +418,10 @@ groups an end patch may name, and what a `null` in one means, are facts
 about an action, so `edit_action.rs` composes the door out of that
 primitive. `unknown_key` is exported beside it so that refusal has one
 spelling rather than two. It also keeps `patch.rs` under the 400-line cap a
-new file has: 367 lines, with `edit_action.rs` at 333 and `edit_props.rs`
-down to 326 from 522.
+new file has — exactly 400, with `edit_action.rs` at 321 and `edit_props.rs`
+down to 331 from 522. The next cut there, if one is ever forced, is
+`Group` with its template: the vocabulary, where the rest of the file is the
+reading.
 
 **Tests.** Three new tests and five existing ones moved.
 
@@ -397,8 +462,14 @@ down to 326 from 522.
 
 - `make test`: 632 passed, 0 failed (627 before).
 - `make lint` and `cargo fmt --check`: clean.
-- Line counts: `patch.rs` 367 (new), `edit_props.rs` 522 → 326,
-  `edit_action.rs` 258 → 333, `edit_zoom.rs` 390 → 457.
+- Line counts: `patch.rs` 400 (new), `edit_props.rs` 522 → 331,
+  `edit_action.rs` 258 → 321, `edit_zoom.rs` 390 → 457, `edit_clip.rs`
+  1038 → 1042 (the one call that makes a new text clip's animation snap;
+  the file is back to the 1043 it stood at before D1·1 trimmed it).
+- Four proof scripts green against the rebuilt app, with the startup parity
+  log empty: phase2 85/85, phase3 121/121, phase4 84/84, phase6 167/167 —
+  the four that touch filters, regions, end patches and text animations.
+  They were run again after the review fixes.
 
 **Mutants.** Nine, each run as `cargo test --release --no-fail-fast` so the
 count is every failing test and not just the first failing binary. All
@@ -415,6 +486,68 @@ caught.
 | the region's "must be an object" removed | 1 (`zoom`) — the four-number list is read positionally again |
 | `without_nulls` made the identity | 2 (`patch_door`, `edit_tests`) — a `null` reaches the typed read and a removal becomes a refusal |
 | the completeness rule widened to EVERY list | 13, across `patch_door`, `schema_v4` and `schema_v6` — the measurement behind leaving `video.obscure` and `shape.gradient.stops` out of it: widening the rule is a behaviour change to two shipped vocabularies, not a tidy-up |
+
+**The review** (standards and spec, in parallel, against the ticket and
+spec #1).
+
+Fixed:
+
+- **An unknown key spelled with a `null` escaped the new door.** The end
+  patch stripped its nulls BEFORE the walk, so `{"video": {"blurr": null}}`
+  was dropped and answered as an identity rather than refused — the one
+  thing a patch may never do (`CONTEXT.md`). The strip now lives inside
+  `check_group_patch`, after the walk and before the typed read, which is
+  where the two readings of a `null` actually part.
+- **`add_text_clip` did not snap.** Spec #1 puts the snap "at the patch
+  door", and a new clip's `text` is one of them. `snap_animation` is
+  `pub(crate)` and `edit_clip.rs` calls it, so the two text doors land on
+  the same grid.
+- **Three sentences outside the diff were made false by it** and are
+  corrected: `edit.rs`'s op table (an end patch "keeps what it does not
+  know"), `model.rs`'s reader note ("kept as written by `set_action_end`")
+  and `core/CLAUDE.md`'s `actions.rs` entry ("lenient by design"). The op
+  table's `set_action_end` and `add_zoom_action` rows now say what spec §6
+  says, which is the four-mirrors rule.
+- **The Times rule was half kept.** The six audio ramp ticks
+  (`audio.fade_in` / `fade_out`, the duck's and the compressor's attack and
+  release) are not snapped and never were. They are envelope lengths
+  sampled at the audio rate rather than positions in the picture — a 10 ms
+  compressor attack quantised to a video frame rounds to nothing — so the
+  rule in `core/CLAUDE.md` and `check_audio`'s doc now say so instead of
+  leaving it unstated.
+- **A field added to `Filter` would have joined the completeness rule** the
+  day it landed and refused every patch an agent had already learnt to
+  write. `COMPLETE_ENTRIES` spells `("filters", ["kind", "amount"])` rather
+  than taking the template entry's keys.
+- Three smaller ones: the `check_end_patch` doc link pointed at the module
+  it had just left; `check_end_patch` re-spelled the three group names as
+  string literals where `Group::name` owns them; and a `phase6_proof.py`
+  docstring line ran past the file's wrap.
+
+Judged not real:
+
+- *`ZoomRegion`'s hand-written `Deserialize` is scope creep.* The ticket
+  asks for the unknown and missing member, which serde already gave. The
+  positional LIST read is the same defect D1·1 found and closed inside a
+  patch, at the one op argument shaped like one, and spec #1's ninth user
+  story asks for every such door to behave identically. Recorded as a
+  deliberate addition rather than dropped.
+- *`period`'s frame floor is not a snap.* A period of five ticks lands on
+  one frame where the nearest grid point is zero. That is the point: the
+  value has no zero (`props_check.rs` refuses one), so the smallest period
+  on the grid is a frame.
+- *`core/tests/patch_door.rs` is 597 lines, past the 400-line new-file
+  cap.* The cap is about source modules: the ledger's own regeneration
+  command reads `app/Sources/*.swift` and `core/src/*.rs` only, and this
+  crate's test files run past 2 000 lines.
+- *`without_nulls` duplicates `prune_removed`.* Same shape, different jobs
+  — one copies a patch minus its nulls for a type read, the other removes
+  those keys from the STORED end state — and they now sit in different
+  modules for that reason.
+
+**Mutants for the review fixes.** Three more, all caught: the walk moved
+back behind the strip (1 test), `without_nulls` made the identity (2), and
+`add_text_clip`'s snap removed (1).
 
 **What the next tickets inherit.**
 
@@ -437,7 +570,8 @@ caught.
 - **`paste_attributes` does not snap.** A payload written by hand can still
   carry a sub-frame motion duration or animation timing, because it is a
   copy of a stored group rather than a patch, and `check_group` only
-  range-checks. The FILE reader does not snap either, deliberately: a file
+  range-checks. The two doors that ARE patches — `set_video` / `set_text`
+  and `add_text_clip` — both snap. The FILE reader does not snap either, deliberately: a file
   opens as what it says (`schema_v8.rs` states that rule for the long-hand
   motion).
 
