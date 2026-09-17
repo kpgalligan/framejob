@@ -6,24 +6,20 @@
 //! array replaces its list, and `null` clears an optional key. It is the one
 //! thing in the schema a CALLER writes rather than this crate — a typed
 //! Swift builder, an MCP call, a project written by hand — so it is the one
-//! thing that has to be read suspiciously, and this module is where that
-//! happens: [`check_keys`] walks its keys and JSON kinds against the group's
-//! own template, and [`merge_group`] merges and reads the result back as its
-//! type, naming the dotted path (array indices included) and the offending
-//! value in every refusal.
+//! thing that has to be read suspiciously. The rule the whole file exists
+//! for: **a key or a value the vocabulary does not have is refused, never
+//! dropped and never corrected** — [`check_keys`] walks a patch's keys and
+//! JSON kinds against the group's own template, [`merge_group`] merges and
+//! reads the result back as its type, and [`check_end_patch`] does both for
+//! an action's end state. Every refusal names the dotted path (array
+//! indices included) and the value sent.
 //!
-//! Cut out of `edit_props.rs` under the size rule (core/CLAUDE.md: a module
-//! over ~600 lines gives something up BEFORE it takes anything on), and cut
+//! Cut out of `edit_props.rs` under the size rule (core/CLAUDE.md), and cut
 //! HERE for the reason `props_check.rs` was cut out of the same file in
 //! phase 2: reading a patch is a fact about the VOCABULARY, not about an
 //! edit. Nothing in this file is handed a clip, a project or a frame rate;
 //! `edit_props.rs` owns the five ops that call it, and `edit_clip.rs`'s two
 //! new-clip ops call it the same way.
-//!
-//! The rule the whole file exists for: **a key or a value the vocabulary
-//! does not have is refused, never dropped and never corrected.** A typed
-//! builder and an agent both reach these ops, and a key silently dropped
-//! here is a bug the user would never see.
 
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
@@ -61,31 +57,34 @@ impl Group {
         }
     }
 
-    /// The article before [`Group::name`] in the sentences that say which
-    /// patch a mistake was in: `an audio patch`, never `a audio patch`.
-    fn article(self) -> &'static str {
+    /// What a refusal calls this group's patch — the whole phrase, so the
+    /// sentences read `an audio patch` and never `a audio patch`.
+    /// [`check_keys`] takes one as a string because it walks an action's
+    /// END patch too, which spans three groups and is [`END_PATCH`].
+    fn subject(self) -> &'static str {
         match self {
-            Group::Audio => "an",
-            Group::Video | Group::Text | Group::Shape => "a",
+            Group::Video => "a video patch",
+            Group::Audio => "an audio patch",
+            Group::Text => "a text patch",
+            Group::Shape => "a shape patch",
         }
     }
 
     /// A fully-populated instance of the group, serialized: every optional
     /// sub-object present, so the key check can see inside `shadow`,
-    /// `chroma`, `reflection`, `spotlight`, `duck`, `compressor`,
-    /// `outline`, `backdrop`, `animation`, `stroke` and `gradient` even when
-    /// the clip
-    /// currently has `null` there — and one `filters` entry and one `obscure` region, so
-    /// it can see inside the elements of the two arrays of objects too.
+    /// `chroma`, `reflection`, `spotlight`, `duck`, `compressor`, `outline`,
+    /// `backdrop`, `animation`, `stroke` and `gradient` even when the clip
+    /// currently has `null` there — and one `filters` entry and one
+    /// `obscure` region, so it can see inside the two arrays of objects too.
     /// Both entries are load-bearing: `check_keys` reads the FIRST element
     /// of the template's array as the reference for every element it is
-    /// given, so a list left at its empty default would hand it no
-    /// reference at all and a misspelling inside a region would be dropped
-    /// in silence — the very failure the array arm was written for.
-    /// `Gradient::default()` earns its place twice over for that reason: it
-    /// is the only optional sub-object that CONTAINS an array of objects,
-    /// and its own default carries two stops, so `stops[].at` and
-    /// `stops[].color` get a reference without this arm naming them.
+    /// given, so a list left at its empty default would hand it no reference
+    /// and a misspelling inside a region would be dropped in silence — the
+    /// very failure the array arm was written for. `Gradient::default()`
+    /// earns its place twice over: it is the only optional sub-object that
+    /// CONTAINS an array of objects, and its own default carries two stops,
+    /// so `stops[].at` and `stops[].color` get a reference without this arm
+    /// naming them.
     fn template(self) -> Value {
         match self {
             Group::Video => actions::to_json(&VideoProps {
@@ -126,12 +125,12 @@ impl Group {
 /// WHICH entry to fix, where a bare `filters.kindd` would leave the caller
 /// comparing every entry it sent. `path` is the path to `patch` itself,
 /// empty at the group's root. Recursion is bounded by the same depth action
-/// patches use; past it the check stops rather than descending an arbitrary
+/// patches use; past it the check stops rather than walking an arbitrary
 /// tree, and serde drops whatever it finds there.
 fn check_keys(
     patch: &Value,
     template: &Value,
-    group: Group,
+    subject: &str,
     path: &str,
     depth: u32,
 ) -> Result<(), String> {
@@ -144,9 +143,7 @@ fn check_keys(
     // `get_project` and a typo could land on by accident.
     if let Some(expected) = wrong_kind(patch, template) {
         return Err(format!(
-            "bad value at \"{path}\" in {} {} patch: expected {expected}, not {}",
-            group.article(),
-            group.name(),
+            "bad value at \"{path}\" in {subject}: expected {expected}, not {}",
             describe(patch)
         ));
     }
@@ -155,15 +152,19 @@ fn check_keys(
     // every element has the SAME shape, so the template's first entry
     // describes all of them. Without this a misspelled
     // `{"filters": [{"amont": 1}]}` would be dropped in silence by serde,
-    // which is exactly the failure this check exists to prevent.
-    // Arrays of numbers (a colour, `from`/`to`) fall through it harmlessly:
-    // a number against a number has no keys to check.
+    // the failure this check exists to prevent. Arrays of numbers (a
+    // colour, `from`/`to`) fall through harmlessly: a number against a
+    // number has no keys to check.
     if let (Value::Array(given), Value::Array(known)) = (patch, template) {
         if depth < MAX_PATCH_DEPTH {
             if let Some(reference) = known.first() {
+                let complete = COMPLETE_ENTRIES.contains(&last_segment(path));
                 for (index, value) in given.iter().enumerate() {
                     let here = format!("{path}[{index}]");
-                    check_keys(value, reference, group, &here, depth + 1)?;
+                    check_keys(value, reference, subject, &here, depth + 1)?;
+                    if complete {
+                        check_complete(value, reference, subject, &here)?;
+                    }
                 }
             }
         }
@@ -184,15 +185,122 @@ fn check_keys(
             format!("{path}.{key}")
         };
         let Some(reference) = known.get(key) else {
-            return Err(format!(
-                "unknown key \"{here}\" in {} {} patch",
-                group.article(),
-                group.name()
-            ));
+            return Err(format!("unknown key \"{here}\" in {subject}"));
         };
-        check_keys(value, reference, group, &here, depth + 1)?;
+        check_keys(value, reference, subject, &here, depth + 1)?;
     }
     Ok(())
+}
+
+/// The lists whose entries a patch must spell out IN FULL, by the key that
+/// holds them.
+///
+/// An array replaces its list (`CONTEXT.md`), so an entry in a patch is
+/// merged over NOTHING and every key it leaves out comes from the type's
+/// serde defaults instead. For `video.filters` that completion is a picture
+/// nobody asked for: `{"filters": [{"amount": 1}]}` reads as "the same
+/// filter, more of it", which is what it means while an action interpolates
+/// it, and lands as a half-strength BLUR — the two keys ARE the filter, and
+/// neither has a defensible default when the other is named.
+///
+/// The schema's other two lists of objects are deliberately NOT here:
+/// `video.obscure` is a box whose six geometry defaults are a real, centred
+/// region and `shape.gradient.stops` is a position and a colour, so in both
+/// an omitted key leaves the entry recognisably the thing the caller named.
+/// D1·2 moved only the filter rule into the door, where the Swift agent
+/// handler had been making it alone. The match is on the LAST segment of
+/// the path, so the rule holds at `filters` in a group patch and at
+/// `video.filters` in an end patch without being written twice.
+const COMPLETE_ENTRIES: [&str; 1] = ["filters"];
+
+/// The last dotted segment of `path` — the key an array is held under,
+/// which is what [`COMPLETE_ENTRIES`] is matched against.
+fn last_segment(path: &str) -> &str {
+    path.rsplit('.').next().unwrap_or(path)
+}
+
+/// Refuses an entry of a [`COMPLETE_ENTRIES`] list that does not name every
+/// key the template's reference entry has, by the path to the key it left
+/// out. A `null` is not a spelling of a key either: it clears an optional
+/// field, and nothing in such an entry is optional.
+fn check_complete(
+    entry: &Value,
+    reference: &Value,
+    subject: &str,
+    path: &str,
+) -> Result<(), String> {
+    let (Value::Object(given), Value::Object(known)) = (entry, reference) else {
+        return Ok(());
+    };
+    for key in known.keys() {
+        if given.get(key).unwrap_or(&Value::Null).is_null() {
+            return Err(format!("missing key \"{path}.{key}\" in {subject}"));
+        }
+    }
+    Ok(())
+}
+
+/// Reads a merged group back as its type, naming the path and the value of
+/// whatever only the TYPE can refuse — a misspelt variant, a `null` a
+/// required field cannot take, a colour of the wrong length.
+///
+/// `serde_path_to_error` is what makes the path possible: serde's sentence
+/// names the value and what the vocabulary allows, but not which of four
+/// filters it was in. `prefix` is what the path hangs off when the group is
+/// not the root — its name inside an end patch — so one sentence serves
+/// both doors.
+fn read_merged<T: DeserializeOwned>(
+    merged: Value,
+    subject: &str,
+    prefix: &str,
+) -> Result<T, String> {
+    serde_path_to_error::deserialize(merged).map_err(|e| {
+        let inside = e.path().to_string();
+        let path = match (prefix, inside.as_str()) {
+            ("", inside) => inside.to_string(),
+            (prefix, "") => prefix.to_string(),
+            (prefix, inside) => format!("{prefix}.{inside}"),
+        };
+        format!("bad value at \"{path}\" in {subject}: {}", e.inner())
+    })
+}
+
+/// The refusal every walk gives for a key the vocabulary does not have,
+/// spelled once so a door that walks a patch group by group
+/// (`edit_action.rs`'s end patch) says it in the same words.
+pub(crate) fn unknown_key(path: &str, subject: &str) -> String {
+    format!("unknown key \"{path}\" in {subject}")
+}
+
+/// Walks and reads ONE group's body out of a patch that is not being merged
+/// into a stored group — an action's end state, where the patch is a patch
+/// of a patch and there is no clip to merge into.
+///
+/// `prefix` is where the body sits in the patch (`video`), so the paths the
+/// refusals name carry it: `bad value at "video.filters[1].kind"`. The read
+/// goes against the group's own TEMPLATE, which is what lets a sparse patch
+/// read at all; the merged value is thrown away, because only the refusal
+/// is wanted. It is a walk and a read and NOT a range check: the state a
+/// clip interpolates toward may legitimately name a value no stored group
+/// could hold, and `actions.rs`'s `clamp_video` bounds the evaluated value
+/// instead.
+///
+/// The caller strips whatever the patch's own `null` means before calling
+/// (`edit_action.rs`), because that is the door's rule and not the group's.
+pub(crate) fn check_group_patch(
+    body: &Value,
+    group: Group,
+    subject: &str,
+    prefix: &str,
+) -> Result<(), String> {
+    check_keys(body, &group.template(), subject, prefix, 0)?;
+    let merged = actions::merge(&group.template(), body);
+    match group {
+        Group::Video => read_merged::<VideoProps>(merged, subject, prefix).map(|_| ()),
+        Group::Audio => read_merged::<AudioProps>(merged, subject, prefix).map(|_| ()),
+        Group::Text => read_merged::<TextProps>(merged, subject, prefix).map(|_| ()),
+        Group::Shape => read_merged::<ShapeProps>(merged, subject, prefix).map(|_| ()),
+    }
 }
 
 /// The JSON kind the schema has where the template holds `reference`, as a
@@ -234,15 +342,13 @@ fn wrong_kind(given: &Value, reference: &Value) -> Option<&'static str> {
 /// crate.
 ///
 /// The walk has already refused an unknown key and a value of the wrong
-/// kind; the read is where what only the TYPE knows is caught — a misspelt
-/// variant, a `null` a required field cannot take, a colour of the wrong
-/// length. It goes through `serde_path_to_error` so that refusal says WHERE
-/// in the walk's own spelling: serde's sentence alone names the value and
-/// what the vocabulary allows, but not which of four filters it was in. The
-/// path is into the MERGED group, which is the patch's path too: the merge
-/// keeps every key where the patch put it and an array replaces whole, and
-/// the base was written by this crate and reads back cleanly, so the only
-/// values that can fail are the patch's.
+/// kind; the read ([`read_merged`]) is where what only the TYPE knows is
+/// caught — a misspelt variant, a `null` a required field cannot take, a
+/// colour of the wrong length. The path it names is into the MERGED group,
+/// which is the patch's path too: the merge keeps every key where the patch
+/// put it and an array replaces whole, and the base was written by this
+/// crate and reads back cleanly, so the only values that can fail are the
+/// patch's.
 pub(crate) fn merge_group<T: Serialize + DeserializeOwned>(
     base: &T,
     patch: &Value,
@@ -255,15 +361,7 @@ pub(crate) fn merge_group<T: Serialize + DeserializeOwned>(
             describe(patch)
         ));
     }
-    check_keys(patch, &group.template(), group, "", 0)?;
+    check_keys(patch, &group.template(), group.subject(), "", 0)?;
     let merged = actions::merge(&actions::to_json(base), patch);
-    serde_path_to_error::deserialize(merged).map_err(|e| {
-        format!(
-            "bad value at \"{}\" in {} {} patch: {}",
-            e.path(),
-            group.article(),
-            group.name(),
-            e.inner()
-        )
-    })
+    read_merged(merged, group.subject(), "")
 }

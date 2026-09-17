@@ -1,6 +1,7 @@
 # Reelcut — road map 7: deepening
 
-**Status: D1 IN PROGRESS — D1·1 built (§2.1); D1·2 to D1·6 not started.**
+**Status: D1 IN PROGRESS — D1·1 and D1·2 built (§2.1, §2.2); D1·3 to D1·6
+not started.**
 
 Road maps 2 to 6 each added something a person using the app can see. This
 one does not. A **deepening** takes knowledge that is spread across callers
@@ -289,3 +290,167 @@ Judged not real:
   merges key by key, and now says so.
 
 **Owed.** Nothing for this ticket.
+
+### 2.2 D1·2 — what a patch may carry (kpgalligan/reelcut#3)
+
+**Commits.** `a36314b` (the toll) and `SHA2` (the ticket).
+
+**What landed.** Core and documents only, again: the agent door still
+decodes before the core does, until D1·3. Four changes to what a patch may
+carry, and one toll paid first.
+
+- **The toll.** `edit_props.rs` stood at 522 lines and this ticket owed it
+  about another 150, so it gave something up first, as a pure move landed
+  and gated alone: `Group` with its template, `check_keys`, `wrong_kind` and
+  `merge_group` are now `core/src/patch.rs`. The seam is `props_check.rs`'s
+  one step earlier — what a patch may CARRY is a fact about the vocabulary,
+  not about an edit — and nothing in the new module is handed a clip or a
+  project. Not one moved line differs.
+- **A filter entry names both its keys.** `patch.rs`'s `COMPLETE_ENTRIES` is
+  the rule and its argument: an array replaces its list, so an entry is
+  merged over NOTHING and the keys it leaves out are completed from
+  `Filter::default()` — a half-strength blur where the caller wrote "the
+  same filter, more of it". `missing key "filters[0].kind" in a video patch`
+  is the third sentence form the door gives, beside `unknown key` and
+  `bad value at`. `video.obscure` and `shape.gradient.stops` are
+  deliberately not in the list: their omitted keys leave an entry
+  recognisably the thing the caller named, and the Swift handler this
+  replaces made the rule for filters alone.
+- **The end-state op walks like every other patch.** `set_action_end`
+  refuses an unknown key, a wrong JSON kind and a misspelt variant, by a
+  path carrying the group's name — `unknown key "video.filters[1].kindd" in
+  an action end patch`. A `shape` object is an unknown key, because a shape
+  is not animatable and the key would be stored, reported as success and
+  animate nothing. What stays lenient is the VALUE: no range check, so
+  `actions.rs`'s `clamp_video` is still the last line of defence and the
+  phase-6 nest-blend back door still behaves exactly as its proof says. A
+  `null` at any depth is still a REMOVAL, so it is stripped before the typed
+  read rather than type-checked.
+- **The ticks a patch carries are snapped.** `edit_props.rs`'s `snap_motion`
+  and `snap_animation` put a motion preset's two edge durations, its
+  `during` period and a text animation's `in` / `out` on the document's
+  frame grid, so the core's own Times rule now holds for them and the
+  comments in `props_check.rs` that said "the inspector snaps" are gone.
+  They run AFTER the range check, which is the one ordering decision here:
+  snapping first would turn a `duration` of −1 into a legal 0 and say
+  nothing, where the check names what the caller sent. `period` is the one
+  value with no zero — it divides in every `during` formula — so its snap
+  floors at one FRAME rather than at the nearest boundary. The app is
+  unaffected: `TextPane` already snaps both timings through
+  `ReelTime.snapToFrame`, and the motion slots are a menu of KINDS whose
+  durations come from the stored value or the type's default.
+- **The zoom region is read like a patch.** `ZoomRegion`'s `Deserialize` is
+  written out rather than derived. A missing and an unknown member were
+  already refused by name (serde's own sentences), so that half of the
+  ticket's criterion held before it was written and is now pinned. What was
+  NOT refused is a region written as a four-number LIST, which serde read
+  member by member in declaration order — the positional hole D1·1 closed
+  inside a patch, still open at the one op argument shaped like one. A
+  wrong-typed member names its path now too (`bad value at "region.width"`),
+  where serde alone said only `invalid type: string "wide", expected f64`.
+
+**Where the end-state door lives, and why not in `patch.rs`.** The walk and
+the typed read of ONE group are `patch.rs`'s `check_group_patch`; WHICH
+groups an end patch may name, and what a `null` in one means, are facts
+about an action, so `edit_action.rs` composes the door out of that
+primitive. `unknown_key` is exported beside it so that refusal has one
+spelling rather than two. It also keeps `patch.rs` under the 400-line cap a
+new file has: 367 lines, with `edit_action.rs` at 333 and `edit_props.rs`
+down to 326 from 522.
+
+**Tests.** Three new tests and five existing ones moved.
+
+- `core/tests/patch_door.rs` gains the fixture's sixth door (an action on
+  clip 11) and three tests: the incomplete filter entry at both doors and
+  the complete entry that still lands; the end patch walked like every other
+  patch (unknown key at depth with an index, `shape` as an unknown key, a
+  wrong kind, a group that is not an object, and a misspelt variant at
+  three depths); and what the end patch KEEPS (a sparse merge, `null`
+  removing a key at depth including a required one, an out-of-range value
+  still stored).
+- `core/tests/schema_v8.rs` and `core/tests/schema_v5.rs` each gain a frame
+  grid test beside the range checks they already own — an off-grid value
+  landing on the grid, the period's frame floor, the negative value still
+  named, and two identities (an on-grid rewrite and a sub-frame one that
+  snaps onto what is stored). Both also pin that the FILE is not snapped.
+- Five existing tests moved rather than being layered over.
+  `schema_v2.rs`'s `a_partial_filter_entry_interpolates_and_then_takes_the_types_own_defaults`
+  — the "known wart" — is now
+  `a_partial_filter_entry_is_refused_at_the_door_and_completed_in_a_file`:
+  it asserts the refusal at both doors and keeps the whole of the old
+  behaviour for a patch written into a FILE, which is where the leniency
+  now lives. Its neighbour, the filter budget test, spells its entries out
+  and hands the "an omitted amount is the default" claim to that test.
+  `edit_tests.rs`'s `set_action_end_merges_and_a_null_removes_a_key` asserts
+  the refusal of `video.from_a_newer_build` where it used to assert the key
+  was kept, and `model_tests.rs`'s `an_action_end_patch_keeps_the_keys_it_is_given`
+  now round-trips that very key through a file, so the two halves of the
+  promise name each other. `zoom.rs`'s
+  `the_region_takes_four_named_numbers_and_only_those` asserts the member
+  names instead of "the op is not valid".
+- One test was WRONG rather than out of date, which is the ticket paying for
+  itself: `scope.rs`'s op sweep sent
+  `set_action_end {"patch": {"opacity": 0.0}}` — no group — and the op
+  reported success and animated nothing for as long as it validated nothing.
+
+**Measured.**
+
+- `make test`: 632 passed, 0 failed (627 before).
+- `make lint` and `cargo fmt --check`: clean.
+- Line counts: `patch.rs` 367 (new), `edit_props.rs` 522 → 326,
+  `edit_action.rs` 258 → 333, `edit_zoom.rs` 390 → 457.
+
+**Mutants.** Nine, each run as `cargo test --release --no-fail-fast` so the
+count is every failing test and not just the first failing binary. All
+caught.
+
+| Mutant | Failing tests |
+|---|---|
+| the filter completeness check disabled | 2 (`patch_door`, `schema_v2`) |
+| `check_end_patch`'s result ignored | 4 (`patch_door` ×2, `schema_v2`, `edit_tests`) |
+| `snap_motion` a no-op | 1 (`schema_v8`) |
+| `snap_animation` a no-op | 1 (`schema_v5`) |
+| the snap moved BEFORE the range check | 2 — the grid test and `schema_v8`'s `every_range_check_refuses_by_name`, which is the test that says a `duration` of −1 is still named rather than rounded into a legal 0 |
+| `period`'s frame floor removed | 1 (`schema_v8`) |
+| the region's "must be an object" removed | 1 (`zoom`) — the four-number list is read positionally again |
+| `without_nulls` made the identity | 2 (`patch_door`, `edit_tests`) — a `null` reaches the typed read and a removal becomes a refusal |
+| the completeness rule widened to EVERY list | 13, across `patch_door`, `schema_v4` and `schema_v6` — the measurement behind leaving `video.obscure` and `shape.gradient.stops` out of it: widening the rule is a behaviour change to two shipped vocabularies, not a tidy-up |
+
+**What the next tickets inherit.**
+
+- **A fourth sentence form**, `missing key "<path>" in <subject>`, beside
+  D1·1's three. D1·3's proof asserts all four over MCP.
+- **The end patch's subject is `an action end patch`** and its paths carry
+  the group (`video.filters[1].kind`). D1·5's proof asserts exactly that,
+  and the ticket's "a misspelt variant refused with path and value" is what
+  `check_group_patch`'s typed read gives.
+- **Two proof scripts now say something false** and belong to the tickets
+  that own their sections: `phase6_proof.py`'s "an end patch validates
+  nothing but its shape" was corrected in place here (it is a comment, not
+  an assertion), and the same file's Swift-worded refusals for the partial
+  filter entry and the misspelt blend inside an end patch are still the
+  Swift door's, because that door still runs first. They move in D1·3 to
+  D1·5.
+- **Range refusals are still not indexed** (D1·1's note stands):
+  `props_check.rs` spells `video.filters[].amount`, and `phase6_proof.py`
+  asserts that spelling. Nothing here made the index available there.
+- **`paste_attributes` does not snap.** A payload written by hand can still
+  carry a sub-frame motion duration or animation timing, because it is a
+  copy of a stored group rather than a patch, and `check_group` only
+  range-checks. The FILE reader does not snap either, deliberately: a file
+  opens as what it says (`schema_v8.rs` states that rule for the long-hand
+  motion).
+
+**Documents.** Spec §5.4's leniency paragraph and the motion refusal
+sentence, §6's preamble (the ticks a patch carries), the `set_video` row
+(the filter entry, and "validates nothing" gone), the `set_action_end` row,
+the `add_zoom_action` row (the region's refusals), the `actions.rs` row and
+§7.10's `patch.rs`, `edit_props.rs` and `edit_action.rs` rows.
+`core/CLAUDE.md`'s map entries for `patch.rs`, `edit_props.rs`,
+`edit_action.rs`, `props_check.rs` and `edit_zoom.rs`. The two core comments
+that said an end patch "validates nothing" (`actions.rs`, `edit_props.rs`)
+and the two in `props_check.rs` that said "the inspector snaps".
+
+**Owed.** Nothing for this ticket. The MCP proof of all of it is D1·3 to
+D1·5's, by design: none of this is reachable through the agent door until
+the Swift launder comes out.

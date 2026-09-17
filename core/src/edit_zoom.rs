@@ -165,9 +165,11 @@
 //! second copy of `actions_overlap` and no visibility change to
 //! `edit_action.rs`'s private helpers.
 
+use serde::de::{self, Deserializer};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
+use crate::export::describe;
 use crate::model::{Clip, Curve, Project, VideoProps};
 use crate::nest::rotate;
 use crate::props_check::{SCALE_MAX, SCALE_MIN};
@@ -187,13 +189,78 @@ use crate::time::Ticks;
 /// An op argument, not stored state: it never reaches a project file, so it
 /// lives here beside the maths that consumes it rather than in
 /// `model_props.rs`.
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+///
+/// It is read the way a property patch is read (`patch.rs`), which is why
+/// the `Deserialize` below is written out rather than derived: it is the
+/// one op argument that is a caller-authored OBJECT, so a caller gets the
+/// same answers here as at every other door — an unknown member and a
+/// missing member named, a wrong-typed member named by its dotted path,
+/// and the object required to BE an object.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 pub struct ZoomRegion {
     pub x: f64,
     pub y: f64,
     pub width: f64,
     pub height: f64,
+}
+
+impl<'de> Deserialize<'de> for ZoomRegion {
+    /// The region's four members, refused by name.
+    ///
+    /// Three things the derive alone would not do, and each is a spelling
+    /// a caller never learnt and could only land on by accident:
+    ///
+    /// - **A list is not a region.** serde reads a struct from a JSON ARRAY
+    ///   of its fields in declaration order, so `[0, 0, 480, 270]` would
+    ///   zoom to a rectangle nobody spelled. It is the hole `patch.rs`'s
+    ///   kind check closed inside a patch, closed here for the one op
+    ///   argument shaped like one.
+    /// - **A wrong-typed member is named.** serde's own sentence is
+    ///   `invalid type: string "wide", expected f64` and says nothing of
+    ///   WHICH member, so the read goes through `serde_path_to_error` and
+    ///   the message opens `bad value at "region.width"`, the patch door's
+    ///   own form.
+    /// - **`deny_unknown_fields` and no defaults** do the other two: a
+    ///   `widht` is refused beside the four the region takes, and a missing
+    ///   member is refused by name, because there is no defensible default
+    ///   for any of them — a region with no width is not a region.
+    ///
+    /// `add_zoom_action`'s `region` is an `Option` with a serde default, so
+    /// an absent key and an explicit `null` never reach here: both mean a
+    /// zoom BACK (`edit.rs`).
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        #[derive(Deserialize)]
+        #[serde(deny_unknown_fields)]
+        struct Members {
+            x: f64,
+            y: f64,
+            width: f64,
+            height: f64,
+        }
+
+        let value = Value::deserialize(deserializer)?;
+        if !value.is_object() {
+            return Err(de::Error::custom(format!(
+                "expected an object, not {}",
+                describe(&value)
+            )));
+        }
+        let members: Members = serde_path_to_error::deserialize(value).map_err(|e| {
+            let path = e.path().to_string();
+            let at = if path.is_empty() {
+                "region".to_string()
+            } else {
+                format!("region.{path}")
+            };
+            de::Error::custom(format!("bad value at \"{at}\": {}", e.inner()))
+        })?;
+        Ok(ZoomRegion {
+            x: members.x,
+            y: members.y,
+            width: members.width,
+            height: members.height,
+        })
+    }
 }
 
 /// How the region is made to meet the canvas: `fit` shows all of it,

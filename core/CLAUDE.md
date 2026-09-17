@@ -74,17 +74,24 @@ file is what governs a module now.
   called mid-edit on a clone the caller is still assembling.
 - `edit_props.rs` — the five patches (`set_video`, `set_audio`, `set_text`,
   `set_shape`, `set_clip`), `Project::check_group` (how a patch and a
-  `paste_attributes` copy run the same range check), and `check_blend`, the
-  one check about a CLIP rather than a value: a nest clip cannot blend. What
-  a patch may CARRY is `patch.rs`'s and nothing here restates it.
+  `paste_attributes` copy run the same range check), `check_blend`, the one
+  check about a CLIP rather than a value (a nest clip cannot blend), and
+  `snap_motion` / `snap_animation`, which put the ticks a patch carries on
+  the frame grid AFTER the range check, so a refusal names what the caller
+  sent. What a patch may CARRY is `patch.rs`'s and nothing here restates it.
 - `patch.rs` — reading a caller-authored patch, cut out of `edit_props.rs`
   under the size rule: `Group` and its per-group template, `check_keys` (the
   walk of keys and JSON kinds, array indices in the path) and `merge_group`
   (the one read of a group patch — the walk, the deep merge and the
   path-tracking deserialise — the new text and shape clips' patches
   included), so every refusal names the path, indices included, and the
-  value. A patch merges key by key at every depth, an array replaces its
-  list, and `null` clears an optional key (a required one refuses it).
+  value. `check_group_patch` is the same walk and read for a group that is
+  NOT being merged into a stored one (an action's end state), and
+  `unknown_key` is that refusal's one spelling. A patch merges key by key at
+  every depth, an array replaces its list, and `null` clears an optional key
+  (a required one refuses it). `COMPLETE_ENTRIES` is the one exception to
+  "absent keeps": a `video.filters` entry must name both its keys, because a
+  list replaces whole and the type's defaults would invent a filter.
   Nothing here is handed a clip or a project: what a patch may carry is a
   fact about the vocabulary, which is `props_check.rs`'s reason for existing
   one step further on.
@@ -92,7 +99,9 @@ file is what governs a module now.
   group passes first (`check_video` / `check_audio` / `check_text` /
   `check_shape`, the `finite` / `in_range` family, the bounds `actions.rs`'s
   `clamp_video` reads too). A range check is a fact about the vocabulary, not
-  about an edit. Gradient stops are deliberately NOT order-checked: a refusal
+  about an edit — and it runs BEFORE `edit_props.rs` snaps a patch's ticks,
+  which is what lets a refusal name the number the caller sent rather than
+  the one a snap rounded it to. Gradient stops are deliberately NOT order-checked: a refusal
   would break dragging one stop past another mid-gesture, so the renderer
   sorts, and the comment says so where the check would have gone.
 - `edit_track.rs` — tracks, markers, the canvas and the media list. Over the
@@ -118,12 +127,23 @@ file is what governs a module now.
   `set_transition_style` (curve and audio crossfade). `transition.rs` is the
   READ half and nothing here restates it.
 - `edit_action.rs` · `edit_nest.rs` · `edit_paste.rs` — the action ops and
-  their no-overlap rule; `nest` and `unnest` (fresh ids, content byte-equal);
+  their no-overlap rule, plus `check_end_patch`, the END patch's door: the
+  three groups §5.4 allows (a `shape` is an unknown key), a `null` that
+  REMOVES at every depth rather than clearing, and `patch.rs`'s walk and
+  read per group. The door is composed here because which groups an end
+  patch names, and what a `null` in one means, are facts about an ACTION;
+  values are deliberately not range-checked, and `actions.rs`'s
+  `clamp_video` is the last line of defence for them. `nest` and `unnest`
+  (fresh ids, content byte-equal);
   `paste`, whose payload schema is its module doc, and `paste_attributes`,
   which copies the EARLIEST clip's property groups (then the front-most, then
   the lower id — never the array's first) onto each target, replaced whole
   and never merged.
-- `edit_zoom.rs` — `add_zoom_action`, the screencast zoom. **Its module doc
+- `edit_zoom.rs` — `add_zoom_action`, the screencast zoom, and `ZoomRegion`,
+  the one op ARGUMENT that is a caller-authored object: its `Deserialize` is
+  written out rather than derived so it answers as a patch does — an object
+  required (a list is not read member by member), an unknown or missing
+  member named, a wrong-typed one named by its path. **Its module doc
   IS the placement equation** between the region frame and canvas pixels,
   rotation and crop included; it composes `add_action` + `set_action` +
   `set_action_end` so a drag is one undo step and every refusal is inherited.

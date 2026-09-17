@@ -40,7 +40,7 @@
 use serde_json::Value;
 
 use crate::export::describe;
-use crate::model::{BlendMode, Clip, Project, Source, VideoProps};
+use crate::model::{BlendMode, Clip, Project, Source, TextProps, VideoProps};
 use crate::patch::{merge_group, Group};
 use crate::props_check::{check_audio, check_shape, check_text, check_video};
 
@@ -68,10 +68,11 @@ use crate::props_check::{check_audio, check_shape, check_text, check_video};
 /// clip. Both callers — the patch path and `paste_attributes`' `check_group`
 /// — run this one function, so the two give the identical message.
 ///
-/// It is not the whole story either: `set_action_end` validates nothing but
-/// "is it an object", so an end patch can still carry a blend onto a nest
-/// clip. `actions.rs`'s `clamp_video` is what closes that door, for the
-/// recipe, `clip_state` and both export writers at once.
+/// It is not the whole story either: `set_action_end` checks the VOCABULARY
+/// and never the clip, and a blend mode is a legal value, so an end patch
+/// can still carry one onto a nest clip. `actions.rs`'s `clamp_video` is
+/// what closes that door, for the recipe, `clip_state` and both export
+/// writers at once.
 fn check_blend(clip: &Clip, props: &VideoProps) -> Result<(), String> {
     if props.blend != BlendMode::Normal && matches!(clip.source, Source::Nest { .. }) {
         return Err(format!(
@@ -163,6 +164,48 @@ impl Project {
         self.finish(next)
     }
 
+    /// Puts a motion preset's two edge durations and its `during` period on
+    /// the document's frame grid — the core's Times rule (core/CLAUDE.md:
+    /// every tick value that reaches the model is snapped first) applied at
+    /// the patch door, where before D1·2 a comment in `props_check.rs` said
+    /// "the inspector snaps" and left an agent's value sub-frame.
+    ///
+    /// It runs AFTER the range check, so a refusal names the number the
+    /// caller actually sent: a `duration` of −1 is a sign mistake and is
+    /// refused, where snapping first would have turned it into a legal 0 and
+    /// said nothing. Snapping cannot undo that check — a non-negative
+    /// duration snaps to a non-negative one — with one exception, and
+    /// `period` carries its own floor for it: it divides in every `during`
+    /// formula, so a period under half a frame would snap to 0 and stop the
+    /// motion the caller asked for. On the grid the smallest period there
+    /// is is one frame, so that is where it lands.
+    fn snap_motion(&self, props: &mut VideoProps) {
+        let Some(motion) = props.motion.as_mut() else {
+            return;
+        };
+        for edge in [motion.r#in.as_mut(), motion.out.as_mut()]
+            .into_iter()
+            .flatten()
+        {
+            edge.duration = self.snapped(edge.duration);
+        }
+        if let Some(during) = motion.during.as_mut() {
+            during.period = self.snapped(during.period).max(self.frame());
+        }
+    }
+
+    /// The same for a text animation's two timings ([`Self::snap_motion`]
+    /// argues the order and the rounding). Both are DURATIONS, so 0 is
+    /// legal and a reveal shorter than half a frame lands there: it is a
+    /// reveal no frame could show.
+    fn snap_animation(&self, props: &mut TextProps) {
+        let Some(animation) = props.animation.as_mut() else {
+            return;
+        };
+        animation.r#in = self.snapped(animation.r#in);
+        animation.out = self.snapped(animation.out);
+    }
+
     /// The range check for ONE of a clip's groups — what `paste_attributes`
     /// runs on each group it has just replaced, and only on those, so a
     /// payload written by hand meets the bounds a patch does and a group the
@@ -239,6 +282,7 @@ impl Project {
                     }
                     check_video(&props, self.source_size(&clip))?;
                     check_blend(&clip, &props)?;
+                    self.snap_motion(&mut props);
                     if let Some(slot) = next.clip_mut(id) {
                         slot.video = Some(props);
                     }
@@ -258,8 +302,9 @@ impl Project {
                         .text
                         .clone()
                         .ok_or_else(|| format!("clip {id} has no text properties"))?;
-                    let props = merge_group(&base, patch, group)?;
+                    let mut props = merge_group(&base, patch, group)?;
                     check_text(&props)?;
+                    self.snap_animation(&mut props);
                     if let Some(slot) = next.clip_mut(id) {
                         slot.text = Some(props);
                     }

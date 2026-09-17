@@ -347,35 +347,28 @@ fn the_filter_budget_is_named_rather_than_silently_trimmed() {
     // MAX_FILTERS is the uniform block's four (kind, amount) pairs. A fifth
     // filter would be dropped from the next write and the user would be
     // looking at a control that did nothing, so the op refuses.
+    // Every entry names both its keys, because since D1·2
+    // (kpgalligan/reelcut#3) the door requires it — see
+    // `a_partial_filter_entry_is_refused_at_the_door_and_completed_in_a_file`
+    // below, which is where the omitted `amount` went.
     let project = plain();
+    let entry = |kind: &str| json!({ "kind": kind, "amount": 0.5 });
     let five = json!({
-        "filters": [
-            { "kind": "blur" }, { "kind": "sharpen" }, { "kind": "sepia" },
-            { "kind": "noir" }, { "kind": "invert" }
-        ]
+        "filters": [entry("blur"), entry("sharpen"), entry("sepia"),
+                    entry("noir"), entry("invert")]
     });
     let msg = project.errors(&json!({ "op": "set_video", "clips": [11], "patch": five }));
     assert_eq!(msg, "video.filters must hold at most 4 filters, not 5");
 
     // Four is the boundary and it is inclusive.
     let four = json!({
-        "filters": [
-            { "kind": "blur" }, { "kind": "sharpen" }, { "kind": "sepia" },
-            { "kind": "noir" }
-        ]
+        "filters": [entry("blur"), entry("sharpen"), entry("sepia"), entry("noir")]
     });
     let applied = project
         .apply(&json!({ "op": "set_video", "clips": [11], "patch": four }))
         .value();
     assert_eq!(array(&applied, "/clips/0/video/filters").len(), 4);
     assert_eq!(text(&applied, "/clips/0/video/filters/3/kind"), "noir");
-    // An omitted `amount` is the Filter default, not zero: a filter added
-    // from the inspector has to do something visible.
-    close(
-        num(&applied, "/clips/0/video/filters/0/amount"),
-        0.5,
-        "the default amount",
-    );
 }
 
 #[test]
@@ -988,22 +981,43 @@ fn an_end_patch_rewritten_from_the_evaluated_list_flattens_its_neighbours_ramp()
 }
 
 #[test]
-fn a_partial_filter_entry_interpolates_and_then_takes_the_types_own_defaults() {
-    // A KNOWN wart, pinned so nobody reads it as a regression later.
+fn a_partial_filter_entry_is_refused_at_the_door_and_completed_in_a_file() {
+    // This test used to pin the completion as a KNOWN WART, at both doors.
+    // D1·2 (kpgalligan/reelcut#3) closed the door half and left the file
+    // half exactly as it was, which is the split the whole deepening is
+    // about: `Filter`'s `#[serde(default)]` is for reading what somebody
+    // already saved, and nothing a caller writes is read through it.
     //
-    // `{"filters": [{"amount": 1.0}]}` is the core's documented idiom for
-    // "same filter, more of it", and while the action runs it does exactly
-    // that — the entry's other keys hold, because the patch side names none
-    // of them. At the switch the whole list becomes the PATCH's list, and
-    // the keys the patch left out come from `Filter::default()`, which is a
-    // half-strength BLUR. So a sepia animated this way ends as a blur.
-    //
-    // Filters have had this since M3 and `video.obscure` inherited it in
-    // phase 3; the cause is that `merge` replaces a list rather than merging
-    // it, and the fix would be a per-index merge whose correspondence is
-    // exactly the thing the list rule refuses to invent. The MCP path
-    // refuses the shape outright instead (phase 6's `checkVideoEnums`), so
-    // what survives here is the hand-written file.
+    // `{"filters": [{"amount": 1.0}]}` is the natural spelling of "the same
+    // filter, more of it", and while an action runs it does exactly that —
+    // the entry's other keys hold, because the patch side names none of
+    // them. At the switch the whole list becomes the PATCH's list and the
+    // keys it left out come from `Filter::default()`, a half-strength BLUR:
+    // a sepia animated this way ends as a blur. The cause is that `merge`
+    // replaces a list rather than merging it, and the fix would be a
+    // per-index merge whose correspondence is the thing the list rule
+    // refuses to invent. So the op REFUSES the shape instead.
+    let project = plain();
+    assert_eq!(
+        project.errors(&json!({ "op": "set_video", "clips": [11],
+                                "patch": { "filters": [{ "amount": 1.0 }] } })),
+        "missing key \"filters[0].kind\" in a video patch"
+    );
+    let with_action = animated(
+        json!({ "filters": [{ "kind": "sepia", "amount": 0.3 }] }),
+        json!({}),
+        json!({}),
+    );
+    assert_eq!(
+        with_action.errors(&json!({ "op": "set_action_end", "clip": 11, "action": 21,
+                                    "patch": { "video": { "filters": [{ "amount": 1.0 }] } } })),
+        "missing key \"video.filters[0].kind\" in an action end patch"
+    );
+
+    // What survives is the file: an end patch written straight into the
+    // project reaches the evaluator without passing an op, and behaves as
+    // it always has. Nothing here is refused, because refusing a FILE would
+    // cost a user a project to protect an agent from a typo.
     let handle = animated(
         json!({ "filters": [{ "kind": "sepia", "amount": 0.3 }] }),
         json!({}),
@@ -1032,6 +1046,20 @@ fn a_partial_filter_entry_interpolates_and_then_takes_the_types_own_defaults() {
         num(&ended, "/video/filters/0/amount"),
         1.0,
         "amount at the end",
+    );
+
+    // And the same for a clip's BASE filters: a file whose entry names only
+    // a kind opens with the amount it always had, rather than being refused
+    // at the door the op is now refused at.
+    let from_a_file = Handle::from_value(&one_clip(
+        json!({ "filters": [{ "kind": "sepia" }] }),
+        json!({}),
+    ))
+    .value();
+    assert_eq!(
+        at(&from_a_file, "/clips/0/video/filters/0"),
+        &json!({ "kind": "sepia", "amount": 0.5 }),
+        "an incomplete entry in a FILE still takes Filter::default()'s amount"
     );
 }
 

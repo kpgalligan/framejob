@@ -145,14 +145,18 @@ pub(crate) fn check_video(props: &VideoProps, size: Option<(f64, f64)>) -> Resul
     // Motion (format version 8). The two edge values are DURATIONS, so 0 is
     // legal — it means that end of the clip does not move — and a negative
     // one is a sign mistake, not a request to run the preset backwards;
-    // `text.animation`'s arm below is the precedent, and ticks are NOT
-    // snapped here for its reason either (the inspector snaps). `amount` is
-    // a fraction of the preset's own range, so 0 is the identity and 1 the
-    // full strength. `period` is the one value with no meaningful zero: it
-    // is a divisor in every `during` formula, so one tick is the floor and
-    // the message says so rather than naming a range. The two KINDS need no
-    // check — serde refuses an unknown variant on the way in, which is what
-    // closing both enums bought (`model_motion.rs`).
+    // `text.animation`'s arm below is the precedent. These ticks are not
+    // snapped HERE, and since D1·2 that is an order rather than an
+    // exemption: `edit_props.rs`'s `snap_motion` puts them on the frame
+    // grid AFTER this check, so a refusal names the number the caller sent
+    // rather than one the door rounded it to. `amount` is a fraction of the
+    // preset's own range, so 0 is the identity and 1 the full strength.
+    // `period` is the one value with no meaningful zero: it is a divisor in
+    // every `during` formula, so one tick is the floor and the message says
+    // so rather than naming a range (the snap's own floor is a FRAME, for
+    // the same reason one step further on). The two KINDS need no check —
+    // serde refuses an unknown variant on the way in, which is what closing
+    // both enums bought (`model_motion.rs`).
     if let Some(motion) = &props.motion {
         if let Some(edge) = &motion.r#in {
             ticks_positive_or_zero("video.motion.in.duration", edge.duration)?;
@@ -305,7 +309,9 @@ pub(crate) fn check_text(props: &TextProps) -> Result<(), String> {
         // animation does not happen — and a negative one is a sign
         // mistake, not a request to run the reveal backwards. `Ticks` is an
         // `i64`, so "finite" is the type's job and only the sign is left
-        // for a check to make. The KIND needs none: serde refuses an
+        // for a check to make. They are snapped to the frame grid by
+        // `edit_props.rs`'s `snap_animation`, after this check and for the
+        // motion arm's reason above. The KIND needs none: serde refuses an
         // unknown variant on the way in, which is what closing the enum
         // bought (`model_props.rs`).
         ticks_positive_or_zero("text.animation.in", animation.r#in)?;

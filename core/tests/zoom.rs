@@ -567,26 +567,47 @@ fn a_region_with_no_extent_is_an_error() {
     }
 }
 
-/// The region is a fixed shape: a missing key and a misspelt one are both
-/// refused, which is the envelope's "unknown keys are an error" rule
-/// reaching one level in.
+/// The region is a fixed shape: a missing member, a misspelt one and a
+/// member of the wrong type are each refused BY NAME, which is the
+/// envelope's "unknown keys are an error" rule reaching one level in, and
+/// what makes the region door answer the way a property patch does (D1·2,
+/// kpgalligan/reelcut#3).
 #[test]
 fn the_region_takes_four_named_numbers_and_only_those() {
     let project = zoom_project();
+    let zoom =
+        |region: Value| json!({"op": "add_zoom_action", "clip": 10, "at": 0, "region": region});
 
-    let msg = project.errors(&json!({"op": "add_zoom_action", "clip": 10, "at": 0,
-                                     "region": {"x": 0, "y": 0, "width": 480}}));
-    assert_contains(&msg, "height");
-
-    let msg = project.errors(&json!({"op": "add_zoom_action", "clip": 10, "at": 0,
-                                     "region": {"x": 0, "y": 0, "width": 480,
-                                                "height": 270, "w": 1}}));
+    // A missing member: there is no defensible default for any of the four
+    // — a region with no width is not a region — so the type carries none.
+    let msg = project.errors(&zoom(json!({"x": 0, "y": 0, "width": 480})));
     assert_contains(&msg, "op \"add_zoom_action\" is not valid");
+    assert_contains(&msg, "missing field `height`");
 
-    let msg = project.errors(&json!({"op": "add_zoom_action", "clip": 10, "at": 0,
-                                     "region": {"x": 0, "y": 0, "width": "wide",
-                                                "height": 270}}));
-    assert_contains(&msg, "op \"add_zoom_action\" is not valid");
+    // A misspelt one, named beside the four the region does take.
+    let msg = project.errors(&zoom(
+        json!({"x": 0, "y": 0, "width": 480, "height": 270, "widht": 1}),
+    ));
+    assert_contains(&msg, "unknown field `widht`");
+    assert_contains(&msg, "`x`, `y`, `width`, `height`");
+
+    // A member of the wrong type names the member, not just the op.
+    let msg = project.errors(&zoom(
+        json!({"x": 0, "y": 0, "width": "wide", "height": 270}),
+    ));
+    assert_contains(&msg, "width");
+
+    // And the region is an OBJECT. serde reads a struct from a JSON array
+    // of its fields in declaration order, so `[0, 0, 480, 270]` would zoom
+    // to a region nobody spelled — a spelling no tool description offers
+    // and `get_project` never gives back, which a caller could only land on
+    // by accident. It is the hole `patch.rs`'s kind check closed for a
+    // patch, closed here for the one argument that is a nested object.
+    let msg = project.errors(&zoom(json!([0, 0, 480, 270])));
+    assert_contains(&msg, "expected an object, not [0,0,480,270]");
+    // The two spellings that mean "zoom back" are untouched by that.
+    project.apply(&json!({"op": "add_zoom_action", "clip": 10, "at": 0, "region": null}));
+    project.apply(&json!({"op": "add_zoom_action", "clip": 10, "at": 0}));
 }
 
 /// `fit` is a closed vocabulary; anything else is refused by name rather

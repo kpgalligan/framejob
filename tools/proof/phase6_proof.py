@@ -123,9 +123,10 @@ Two colour rules the fixture obeys, both measured rather than assumed:
   is; `paste_attributes`, which is WHY the refusal is written that way —
   the group is replaced whole, so refusing every paste that mentioned
   `blend` would fail an all-or-nothing paste of an ordinary look; and
-  `set_action_end`, which stores the mode (an end patch validates nothing
-  but its shape) and must still DRAW `normal`, since `clamp_video` forces
-  it. Beside them the documented limit on the other side — a blend set on a
+  `set_action_end`, which stores the mode (an end patch names a legal value
+  and is not range-checked — and "a nest cannot blend" is a fact about the
+  CLIP, which that door never sees) and must still DRAW `normal`, since
+  `clamp_video` forces it. Beside them the documented limit on the other side — a blend set on a
   clip BEFORE it is nested is carried inside and blends against the whole
   canvas below the nest, because a nest is flattened rather than composited
   offscreen.
@@ -948,16 +949,17 @@ def nest_part(mcp):
     check(misspelt is not None and "blend" in misspelt,
           f"a misspelt mode is refused naming the key — got {misspelt!r}")
 
-    # The `set_action_end` back door. An end patch validates nothing but "is
-    # it an object", so the mode IS stored — and `clamp_video` forces
-    # `BlendMode::Normal` for a nest clip, which closes the recipe,
-    # `clip_state` and both export writers at once.
+    # The `set_action_end` back door. That door walks keys and types (D1·2)
+    # but never sees the CLIP, and `multiply` is a perfectly legal mode, so
+    # the mode IS stored — and `clamp_video` forces `BlendMode::Normal` for
+    # a nest clip, which closes the recipe, `clip_state` and both export
+    # writers at once.
     s.op("add_action", clip=nest, at=0, duration=SEC)
     action = s.clip(nest)["actions"][0]["id"]
     s.op("set_action_end", clip=nest, action=action, patch={"video": {"blend": "multiply"}})
     check(s.clip(nest)["actions"][0]["end"] == {"video": {"blend": "multiply"}},
-          "an action's end patch on a nest clip STORES the mode (an end patch validates "
-          "nothing but its shape)")
+          "an action's end patch on a nest clip STORES the mode (that door checks the "
+          "vocabulary, not the clip)")
     # And it never DRAWS — read that for exactly what it is, which is a
     # FLOOR and not the clamp's proof. A nest clip contributes no layer of
     # its own: `recipe.rs::frame_recipe` maps over the flattened INNER

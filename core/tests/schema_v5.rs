@@ -371,3 +371,52 @@ fn paste_attributes_carries_the_animation_and_re_checks_it() {
     }));
     assert_eq!(msg, "text.animation.in must not be negative, not -2");
 }
+
+// ---- the frame grid ------------------------------------------------------
+
+#[test]
+fn the_animations_timings_are_snapped_to_the_frame_grid_by_the_patch_door() {
+    // The core's Times rule — every tick value that reaches the model is
+    // snapped first (core/CLAUDE.md) — holds for these two as of D1·2
+    // (kpgalligan/reelcut#3). It did not before: the comment beside the
+    // check in `props_check.rs` said the inspector snapped, which left an
+    // agent's value sub-frame and made two callers of one op disagree.
+    // The canvas is 30 fps, so a frame is 20 000 ticks.
+    let project = plain();
+    let snapped = project
+        .apply(&set_text(json!({
+            "animation": { "kind": "line_rise", "in": 310_000, "out": 9_999 }
+        })))
+        .value();
+    assert_eq!(
+        at(&snapped, "/clips/0/text/animation"),
+        &json!({ "kind": "line_rise", "in": 320_000, "out": 0 }),
+        "15.5 frames rounds half away from zero; half a frame is no un-reveal at all"
+    );
+
+    // The sign check runs on what the CALLER sent, so a negative timing is
+    // still named rather than snapped into a legal 0.
+    assert_eq!(
+        project.errors(&set_text(
+            json!({ "animation": { "kind": "typewriter", "in": -1 } })
+        )),
+        "text.animation.in must not be negative, not -1"
+    );
+
+    // A value already on the grid that changes nothing is an identity —
+    // no undo step — and so is a sub-frame value that snaps onto it.
+    let on_the_grid = json!({ "kind": "line_rise", "in": 320_000, "out": 0 });
+    let handle = Handle::from_value(&snapped);
+    handle.refuses(&set_text(json!({ "animation": on_the_grid })));
+    handle.refuses(&set_text(json!({ "animation": { "in": 320_000 + 9_999 } })));
+
+    // The FILE is not snapped, which is the same split the filter entry
+    // has: `word_fade`'s `out` is 22.5 frames and opens exactly as written
+    // (`an_animation_round_trips_whole` reads it back key for key). A file
+    // opens as what it says; an op is what puts a value on the grid.
+    let from_a_file = Handle::from_value(&animated()).value();
+    assert_eq!(
+        at(&from_a_file, "/clips/0/text/animation/out"),
+        &json!(450_000)
+    );
+}

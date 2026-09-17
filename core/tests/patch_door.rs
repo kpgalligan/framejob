@@ -35,7 +35,9 @@ const SEC: i64 = 600_000;
 /// (13), each carrying the OPTIONAL sub-objects a wrong-typed value would
 /// otherwise be read as clearing: a shadow and a duck on the media clip, an
 /// outline on the text, a stroke on the shape. The media clip also holds a
-/// filter, so a list refusal has a stored list it must leave alone.
+/// filter, so a list refusal has a stored list it must leave alone, and one
+/// action (21), whose end state is the sixth door a caller-authored patch
+/// comes through.
 fn project() -> Handle {
     Handle::from_value(&json!({
         "version": 8,
@@ -54,7 +56,9 @@ fn project() -> Handle {
                     "shadow": { "x": 0.0, "y": 8.0, "blur": 12.0, "color": [0.0, 0.0, 0.0, 0.5] },
                     "filters": [{ "kind": "sepia", "amount": 0.8 }]
                 },
-                "audio": { "duck": { "level": 0.3, "attack": 300000, "release": 600000 } }
+                "audio": { "duck": { "level": 0.3, "attack": 300000, "release": 600000 } },
+                "actions": [{ "id": 21, "start": 0, "duration": 2 * SEC,
+                              "curve": "linear", "end": {} }]
             },
             {
                 "id": 12, "track": 2, "start": 10 * SEC, "duration": 5 * SEC,
@@ -69,7 +73,7 @@ fn project() -> Handle {
                 "shape": { "stroke": { "width": 4.0, "color": [1.0, 0.0, 0.0, 1.0] } }
             }
         ],
-        "next_id": 14
+        "next_id": 22
     }))
 }
 
@@ -387,4 +391,199 @@ fn a_list_or_an_object_where_the_schema_has_another_kind_is_refused_not_read_pos
     ] {
         assert_eq!(refused(&project, patch_op(group, body), &[]), expected);
     }
+}
+
+// ---- a filter entry names both its kind and its amount ---------------------
+
+/// `set_action_end` on the fixture's one action, carrying `patch` — the
+/// sixth door, and the one whose patch spans three groups.
+fn end_op(patch: Value) -> Value {
+    json!({ "op": "set_action_end", "clip": 11, "action": 21, "patch": patch })
+}
+
+#[test]
+fn an_incomplete_filter_entry_is_refused_by_the_key_it_leaves_out() {
+    // `{"filters": [{"amount": 1}]}` reads as "the same filter, more of it",
+    // and for a list that is exactly what it cannot be: an array REPLACES
+    // its list, so the entry is merged over nothing and `Filter`'s serde
+    // defaults finish it — a half-strength BLUR the caller never asked for.
+    // The type's defaults stay for the file reader; the door refuses.
+    let project = project();
+    for (op, expected) in [
+        (
+            patch_op("video", json!({ "filters": [{ "amount": 1.0 }] })),
+            "missing key \"filters[0].kind\" in a video patch",
+        ),
+        (
+            patch_op("video", json!({ "filters": [{ "kind": "blur" }] })),
+            "missing key \"filters[0].amount\" in a video patch",
+        ),
+        (
+            patch_op(
+                "video",
+                json!({ "filters": [{ "kind": "blur", "amount": 0.5 }, { "amount": 1.0 }] }),
+            ),
+            "missing key \"filters[1].kind\" in a video patch",
+        ),
+        (
+            // A `null` is not a spelling of the key either: it clears an
+            // optional, and neither of these two is optional.
+            patch_op(
+                "video",
+                json!({ "filters": [{ "kind": null, "amount": 1.0 }] }),
+            ),
+            "missing key \"filters[0].kind\" in a video patch",
+        ),
+        (
+            // Where the idiom is most tempting: inside an action's end
+            // state, where a list that interpolates per index invites
+            // naming only the amount.
+            end_op(json!({ "video": { "filters": [{ "amount": 1.0 }] } })),
+            "missing key \"video.filters[0].kind\" in an action end patch",
+        ),
+    ] {
+        assert_eq!(refused(&project, op, &[]), expected);
+    }
+
+    // A complete entry still lands, at both doors — the rule costs the
+    // caller two keys, not a feature.
+    let landed = project.apply(&patch_op(
+        "video",
+        json!({ "filters": [{ "kind": "noir", "amount": 0.25 }] }),
+    ));
+    assert_eq!(
+        landed.value()["clips"][0]["video"]["filters"],
+        json!([{ "kind": "noir", "amount": 0.25 }])
+    );
+    let animated = project.apply(&end_op(
+        json!({ "video": { "filters": [{ "kind": "noir", "amount": 1.0 }] } }),
+    ));
+    assert_eq!(
+        animated.value()["clips"][0]["actions"][0]["end"],
+        json!({ "video": { "filters": [{ "kind": "noir", "amount": 1.0 }] } })
+    );
+
+    // The OTHER two lists are untouched by this rule, and deliberately: an
+    // obscure region and a gradient stop are boxes and colours with
+    // defaults a caller can lean on, where a filter's two keys are the
+    // whole of it. `patch.rs`'s `COMPLETE_ENTRIES` is where that is said.
+    project.apply(&patch_op(
+        "video",
+        json!({ "obscure": [{ "kind": "blur" }] }),
+    ));
+}
+
+// ---- an action's end state, walked like every other patch ------------------
+
+#[test]
+fn an_action_end_patch_is_walked_like_every_other_patch() {
+    // The sixth door, and the one that used to keep whatever it was given.
+    // What it kept it for — a project a newer build wrote — is the FILE
+    // reader's job (`model_tests.rs`), and an op is not a file: a key the
+    // caller misspelt here animated nothing and was reported as success.
+    // The patch spans three groups, so every path carries the group's name
+    // and the subject is the end patch rather than one group's.
+    let project = project();
+    for (patch, expected) in [
+        (
+            json!({ "video": { "opacty": 0.5 } }),
+            "unknown key \"video.opacty\" in an action end patch",
+        ),
+        (
+            json!({ "video": { "filters": [{ "kind": "blur", "amount": 0.5 },
+                                           { "kindd": "sepia", "amount": 1.0 }] } }),
+            "unknown key \"video.filters[1].kindd\" in an action end patch",
+        ),
+        (
+            // §5.4's patch is video, audio and text: a shape is not
+            // animatable at all, so the key is not an inert one to keep —
+            // it is one the vocabulary does not have.
+            json!({ "shape": { "width": 640.0 } }),
+            "unknown key \"shape\" in an action end patch",
+        ),
+        (
+            json!({ "video": { "shadow": 5 } }),
+            "bad value at \"video.shadow\" in an action end patch: expected an object, not 5",
+        ),
+        (
+            json!({ "audio": { "fade_in": 0.5 } }),
+            "bad value at \"audio.fade_in\" in an action end patch: expected a whole number, not 0.5",
+        ),
+        (
+            json!({ "video": 5 }),
+            "bad value at \"video\" in an action end patch: expected an object, not 5",
+        ),
+    ] {
+        assert_eq!(refused(&project, end_op(patch), &[]), expected);
+    }
+
+    // A misspelt variant is the read's to catch, at both doors, and it
+    // names the vocabulary the same way.
+    for (patch, path, value, allowed) in [
+        (
+            json!({ "video": { "blend": "muliply" } }),
+            "video.blend",
+            "`muliply`",
+            "`multiply`",
+        ),
+        (
+            json!({ "text": { "animation": { "kind": "fade" } } }),
+            "text.animation.kind",
+            "`fade`",
+            "`word_fade`",
+        ),
+        (
+            json!({ "video": { "obscure": [{ "kind": "blurr" }] } }),
+            "video.obscure[0].kind",
+            "`blurr`",
+            "`pixelate`",
+        ),
+    ] {
+        let msg = refused(
+            &project,
+            end_op(patch),
+            &[&format!("unknown variant {value}, expected "), allowed],
+        );
+        let prefix = format!("bad value at \"{path}\" in an action end patch: ");
+        assert!(msg.starts_with(&prefix), "expected {prefix:?}, got {msg:?}");
+    }
+}
+
+#[test]
+fn an_action_end_patch_still_merges_and_a_null_still_removes_a_key() {
+    // The half that does NOT change: an end patch is sparse, it merges into
+    // what is there, and a `null` at any depth REMOVES that key rather than
+    // clearing the property — which is how the inspector stops animating
+    // one thing. The walk passes every null for that reason, and the typed
+    // read never sees one.
+    let project = project();
+    let animated = project.apply(&end_op(
+        json!({ "video": { "opacity": 0.25, "shadow": { "blur": 40.0 } } }),
+    ));
+    assert_eq!(
+        animated.value()["clips"][0]["actions"][0]["end"],
+        json!({ "video": { "opacity": 0.25, "shadow": { "blur": 40.0 } } })
+    );
+    let pruned = animated.apply(&end_op(json!({ "video": { "shadow": null } })));
+    assert_eq!(
+        pruned.value()["clips"][0]["actions"][0]["end"],
+        json!({ "video": { "opacity": 0.25 } })
+    );
+    // A `null` naming a REQUIRED field is a removal too, where the same
+    // spelling in a `set_video` patch is refused: an end patch is a patch
+    // of a patch, and `crop` is only required of a stored group.
+    let cropping = animated.apply(&end_op(json!({ "video": { "crop": { "l": 120.0 } } })));
+    let crop_gone = cropping.apply(&end_op(json!({ "video": { "crop": null } })));
+    assert_eq!(
+        crop_gone.value()["clips"][0]["actions"][0]["end"],
+        json!({ "video": { "opacity": 0.25, "shadow": { "blur": 40.0 } } })
+    );
+    // An out-of-range value is still stored: `actions.rs`'s `clamp_video`
+    // is the last line of defence for an evaluated value, and this door
+    // deliberately does not become a second one (spec §5.4).
+    let steep = project.apply(&end_op(json!({ "video": { "opacity": 5.0 } })));
+    assert_eq!(
+        steep.value()["clips"][0]["actions"][0]["end"],
+        json!({ "video": { "opacity": 5.0 } })
+    );
 }
