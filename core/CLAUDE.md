@@ -73,16 +73,21 @@ file is what governs a module now.
   rule they all obey. A free function over `&mut Project` because it is
   called mid-edit on a clone the caller is still assembling.
 - `edit_props.rs` — the five patches (`set_video`, `set_audio`, `set_text`,
-  `set_shape`, `set_clip`), `Group`, `merge_group` (the one read of a
-  caller-authored group patch, the new text and shape clips' included: the
-  walk of keys and JSON kinds against the group's template, the deep merge
-  and the path-tracking deserialise, so every refusal names the path,
-  indices included, and the value),
-  `Project::check_group` (how a patch and a `paste_attributes` copy run the
-  same check), and `check_blend`, the one check about a CLIP rather than a
-  value: a nest clip cannot blend. A patch merges key by key at every depth,
-  an array replaces its list, and `null` clears an optional key (a required
-  one refuses it).
+  `set_shape`, `set_clip`), `Project::check_group` (how a patch and a
+  `paste_attributes` copy run the same range check), and `check_blend`, the
+  one check about a CLIP rather than a value: a nest clip cannot blend. What
+  a patch may CARRY is `patch.rs`'s and nothing here restates it.
+- `patch.rs` — reading a caller-authored patch, cut out of `edit_props.rs`
+  under the size rule: `Group` and its per-group template, `check_keys` (the
+  walk of keys and JSON kinds, array indices in the path) and `merge_group`
+  (the one read of a group patch — the walk, the deep merge and the
+  path-tracking deserialise — the new text and shape clips' patches
+  included), so every refusal names the path, indices included, and the
+  value. A patch merges key by key at every depth, an array replaces its
+  list, and `null` clears an optional key (a required one refuses it).
+  Nothing here is handed a clip or a project: what a patch may carry is a
+  fact about the vocabulary, which is `props_check.rs`'s reason for existing
+  one step further on.
 - `props_check.rs` — the range checks every value written into a property
   group passes first (`check_video` / `check_audio` / `check_text` /
   `check_shape`, the `finite` / `in_range` family, the bounds `actions.rs`'s

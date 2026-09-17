@@ -199,11 +199,11 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::edit_props::Group;
 use crate::edit_transition::TransitionAlign;
 use crate::edit_zoom::{ZoomFit, ZoomRegion};
 use crate::export::describe;
 use crate::model::{Color, Curve, Project, TransitionKind};
+use crate::patch::Group;
 use crate::scope;
 use crate::time::{Fps, Ticks};
 

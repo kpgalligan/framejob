@@ -49,6 +49,7 @@ pub mod model_shape;
 pub mod model_text;
 pub mod motion;
 pub mod nest;
+pub mod patch;
 pub mod props_check;
 pub mod recipe;
 pub mod recipe_text;

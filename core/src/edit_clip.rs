@@ -41,12 +41,12 @@
 
 use serde_json::Value;
 
-use crate::edit_props::{merge_group, Group};
 use crate::edit_split::split_clip;
 use crate::model::{
     Action, AudioProps, Clip, Enabled, Media, MediaKind, Project, ShapeKind, ShapeProps, Source,
     TextProps, Track, VideoProps,
 };
+use crate::patch::{merge_group, Group};
 use crate::props_check::{check_shape, check_text, SCALE_MAX, SCALE_MIN};
 use crate::time::{self, Ticks, TIMESCALE};
 

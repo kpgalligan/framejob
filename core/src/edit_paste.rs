@@ -82,10 +82,10 @@ use serde::Deserialize;
 use serde_json::Value;
 
 use crate::edit_clip::set_gained_transitions;
-use crate::edit_props::Group;
 use crate::export::describe;
 use crate::format::MAX_TRACKS;
 use crate::model::{Clip, Media, Nest, Project, ShapeProps, Source, TextProps, Track};
+use crate::patch::Group;
 use crate::time::Ticks;
 
 /// One clipboard payload. `media` and `nests` default because most
