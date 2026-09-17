@@ -132,7 +132,7 @@ One entry per ticket, written when it lands.
 
 ### 2.1 D1·1 — the core names the path and the value (kpgalligan/reelcut#2)
 
-**Commits.** `ebab0db` (the ticket) and `52bb75d` (what its review found,
+**Commits.** `ebab0db` (the ticket) and `b02e4df` (what its review found,
 below).
 
 **What landed.** Core and documents only. No Swift changed, so an agent does
