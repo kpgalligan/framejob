@@ -6,7 +6,7 @@ Rust staticlib core, the same shape as `~/devel/rasterize`.
 **It builds and runs.** M1 (Cut) is done and verified against spec §10; most
 of M2 landed with it.
 
-Nine things in `designs/`, and you want all of them:
+Ten things in `designs/`, and you want all of them:
 
 - **`designs/reelcut-remaining.md` — what is LEFT, and the record of the
   debt that was paid. START HERE if you are picking up new work.** Road map
@@ -48,6 +48,18 @@ Nine things in `designs/`, and you want all of them:
   entries to record first (R5-1…R5-5), tolls, lanes with their files, seams,
   proofs and mutants. Road map 4's S1 must be committed before it starts.
   START THERE if you are touching transitions or adding motion.
+- **`designs/reelcut-roadmap-6.md` — road map 6, DESIGNED and not built:
+  captions from the cloud (AssemblyAI Universal-3.5 Pro).** Its §0 comments
+  on the ask's bucket-and-web-service shape — AssemblyAI's own upload
+  endpoint IS the bucket, with deletion built in, and what forces a server
+  is only WHO PAYS (the key) — and the plan is a second engine behind File ▸
+  Generate Captions… and `transcribe`: one upload per MEDIA, the words
+  cached verbatim under `cache/transcripts/`, the person's own key in the
+  Keychain (a new Reelcut ▸ Settings… window), a stand-in server for the
+  proof, no op, no schema change, no new tool, no `async` exception. C0 is
+  a spike NOT yet run (eight questions, two of which can overturn the
+  plan); C2 is the relay, specified but unbuildable until the identity
+  question is answered. START THERE if you are touching transcription.
 - `designs/reelcut-effects-survey.md` — the survey road map 5 came from:
   `~/devel/Concat`'s transitions, effects and filters compared with
   Reelcut's (Concat is AGPL-3.0 — its behaviour was studied, and none of its
