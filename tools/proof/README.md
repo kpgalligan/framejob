@@ -2200,6 +2200,54 @@ unconditionally **14/24** (the built composition invalid, the absorbing rows,
 and all five player rows — the reported defect exactly); the bound widened
 from one tick to eleven **21/24** (the three whole-tick rows).
 
+## The paused preview that did not follow an edit (`preview_refresh_probe.py`)
+
+With the transport paused, changing a clip's attributes — opacity, scale,
+anything the compositor reads from `RecipeSource` without a rebuild, spec
+§7.6's property-only branch — left the preview on the OLD picture until the
+playhead moved or the transport ran. `Playback.update` did what §7.6 said:
+publish the project, find the plan JSON equal, and "re-seek to the current
+time with zero tolerance to force one composed frame (the standard trick)".
+On macOS 26.5.1 that trick is a no-op, measured: the completion fires with
+`finished`, no composition request is issued, and `AVPlayerLayer` keeps its
+buffer; re-assigning the item's `videoComposition` and `AVPlayerItem.seek`
+to the same time are the same no-op, and a seek to a DIFFERENT time
+composes. `Playback.refreshPausedFrame` now seeks one tick off the playhead
+(inside the same frame) with the return queued behind it, landing back on
+the playhead's own tick with the new recipe drawn; parked AT the end it
+rests on the last frame's final tick instead, because the end tick composes
+the empty canvas (every seek to it, tolerant or not, displays black — a
+round trip there blanked the frame a transport had played to); and a
+refresh asked for while a seek is in flight is remembered and run when the
+seek lands, where the old guard dropped it. View ▸ Preview Quality relies on
+the same refresh and was invisible on a paused player for the same reason.
+
+**No MCP script can see this one either.** `render_frame` composes offline
+through `AVAssetImageGenerator`, which asks the compositor fresh every
+time, so every MCP frame comparison passed against the broken build. This is
+`preview_validity_probe.py`'s instrument: a `main.swift` over the whole of
+`app/Sources`, the app's `Compositor.metal` beside it, an `ffmpeg` test card
+under a one-clip `project.json` in `work/preview-refresh/`, a real editor
+window, and `AVPlayerLayer.displayedPixelBuffer()` read off the editor's own
+player after each edit — applied through `ProjectDocument.applyEdit`, the
+inspector's path. Two things the instrument had to learn. It captures on
+SETTLE (the harness's rule): a sample at one fixed instant read the buffer
+as nil about one run in three after a quality change, with the transport at
+rest on the right tick and every poll since answering at once — an instant
+with no buffer, not a layer left with none. And the dropped-refresh mutant
+survived the obvious rows, because a seek already in flight composes AFTER
+the recipe is published; the window `refreshWanted` exists for is a seek
+whose frame has composed but whose completion has not yet run on main, and
+the probe hits it on purpose by holding the main thread 300 ms between the
+move and the edit. It reads `IOConsoleLocked` and skips every row BY NAME on
+a locked console.
+
+**58/58** at the landing, console unlocked. Mutants, on the working tree with
+the probe rebuilt: the same-time seek restored **48/58** (every row where
+the picture has to change); the refresh-while-seeking dropped **57/58** (the
+held-thread row alone); the end branch removed **54/58** (the four end rows,
+the layer black on the end tick).
+
 ## The transition sheet (`transition_sheet_probe.py`)
 
 Clip ▸ Transition ▸ at a hard cut between two WHOLE files used to beep and

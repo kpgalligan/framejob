@@ -1975,9 +1975,17 @@ new `ReelProject` and `isLive`. `Playback` then:
 1. Sets `RecipeSource.current = newProject` (an atomic reference the
    compositor reads on every request).
 2. Computes the plan JSON; if it equals the current plan, the edit was
-   **property-only**: no rebuild — if paused, re-seek to the current time
-   with zero tolerance to force one composed frame (the standard trick for
-   redisplaying a paused `AVPlayer`).
+   **property-only**: no rebuild — if paused, force one composed frame.
+   The standard trick for that, a zero-tolerance seek to the time the
+   player is already at, is a NO-OP on macOS 26.5.1 (measured by
+   `tools/proof/preview_refresh_probe.py`: the completion fires and no
+   composition request is issued; re-assigning the item's
+   `videoComposition` is the same no-op), so `Playback.refreshPausedFrame`
+   seeks one tick off the playhead — inside the same frame — and queues the
+   return, landing back on the playhead's own tick with the new recipe
+   drawn. Parked at the end, where the end tick composes the empty canvas,
+   it rests on the last frame's final tick instead. A refresh asked for
+   while a seek is in flight is run when the seek lands, never dropped.
 3. Otherwise the edit was **structural**: rebuild the composition on a
    background queue, swap `AVPlayerItem` at the same time, keep the play
    state. Rebuilds are debounced at 80 ms during live gestures

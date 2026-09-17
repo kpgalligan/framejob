@@ -367,6 +367,31 @@ lockstep are in the root `CLAUDE.md`; the full design is
   hid; and a slot's share of a cover is weighted by its own strength, so a
   region at `amount` 0 — "there but hides nothing" — cannot pull a
   neighbour's effect to full strength inside its own box.
+  **The paused refresh is a one-tick round trip, not a same-time seek**
+  (`Playback.refreshPausedFrame`, 2026-09-17). Spec §7.6's property-only
+  branch publishes the project to `RecipeSource` and then has to make the
+  paused player compose one frame, and "the standard trick" — a
+  zero-tolerance seek to the time the player is already at — is a NO-OP on
+  macOS 26.5.1, measured by `tools/proof/preview_refresh_probe.py`: the
+  completion fires with `finished`, no composition request is issued, and
+  the layer keeps the frame it had, so every inspector edit showed only on
+  the next playhead move. Re-assigning the item's `videoComposition` and
+  `AVPlayerItem.seek` to the same time are the same no-op; only a seek to a
+  DIFFERENT time composes. So the refresh seeks one tick off the playhead
+  (inside the same frame, so the picture between the two seeks is the
+  picture) with the return queued as `pendingSeek`, and the transport lands
+  back on the playhead's own tick. Two edges, both measured: the END tick
+  composes the empty canvas (every seek to it, tolerant or not, displays
+  black, while a transport that PLAYED to the end holds whichever frame the
+  pipeline composed last), so parked at the end the refresh rests on the
+  last frame's final tick and does not return — a round trip there blanks
+  the frame — and the timecode then names that frame; and a refresh asked
+  for while a seek is in flight is remembered (`refreshWanted`) and run
+  when the seek lands, where the old guard dropped it and the last tick of
+  a live drag could be the one lost. View ▸ Preview Quality relies on the
+  same refresh and was invisible on a paused player for the same reason.
+  Do not put a same-time seek back, and do not "fix" the end case into a
+  return to the end tick.
 - `MediaImporter.swift` · `MediaImporter+Probe.swift` · `MediaCacheFiles.swift` · `FFmpegRewrap.swift` — the
   import funnel, the await-free half of its cache, and the opt-in ffmpeg step
   behind it (spec §7.7, §11). `async`/`await` is confined to
@@ -1644,9 +1669,10 @@ lockstep are in the root `CLAUDE.md`; the full design is
   guard in this window would be the same drift the single key map exists to
   prevent.
   Sizes, so the next reader picks a cut rather than discovering a debt:
-  `Playback.swift` is **570** with both of these in it (470 before), which is
-  under the ~600 cap and near enough that the next feature to land on it pays
-  one; the two files above are 408 and 191, and the frozen
+  `Playback.swift` is **600** with both of these in it (470 before phase 8,
+  570 after it, and the paused-refresh fix of 2026-09-17 took the last thirty
+  after trimming its own comments to fit), which is AT the ~600 cap, so the
+  next line to land on it pays a cut; the two files above are 408 and 191, and the frozen
   `EditorViewController.swift` took 41 lines — one stored property, two
   validator-chain lines, `handleEditorKey`'s `attachedSheet` guard, and the
   paragraphs that argue them, which is the whole of phase 8's footprint in a
