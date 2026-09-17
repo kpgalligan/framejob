@@ -150,6 +150,15 @@ def landed(what, got, wanted):
     check(got == wanted, f"{what} — {json.dumps(got)} (wanted {json.dumps(wanted)})")
 
 
+def marker_gone(got, wanted):
+    """The line after `undo_claim`, spelled once because every section says
+    it: the marker edit is itself gone, so the one `undo` above undid THAT
+    and not some step a refusal had left behind. It is `landed` with a fixed
+    sentence, and the value is whichever key the marker moved."""
+    landed("…the marker edit itself is gone, so the undo above undid THAT and nothing "
+           "else", got, wanted)
+
+
 def undo_marker(s, mark):
     """The first half of the "a refusal is not an undo step" claim: one REAL
     edit, whose undo step the refusals that follow have to leave alone.

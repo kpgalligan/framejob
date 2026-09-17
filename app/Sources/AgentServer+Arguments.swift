@@ -450,9 +450,9 @@ extension AgentServer {
     }
 
     /// A patch object decoded into its typed Swift form — the LAUNDER
-    /// `rawPatchArg` above is replacing, still read by the doors deepening D1
-    /// has not moved yet (`set_audio`, `set_text`, `set_clip`, `set_shape`,
-    /// the two new-clip ops and `set_action_end`; `set_video` left in D1·3).
+    /// `rawPatchArg` above replaced, and since D1·4 it has ONE caller left:
+    /// `set_action_end`, the last door deepening D1 has not moved
+    /// (kpgalligan/reelcut#6, which takes it; #7 then deletes this).
     ///
     /// It was written to be stricter than the core's serde on both counts a
     /// silent drop can happen: an unknown key is refused by NAME, and a key
@@ -528,17 +528,17 @@ extension AgentServer {
     }
 
     /// Fills in the alpha of every `[r, g, b]` written under a `color` key,
-    /// at any depth — the patch-shaped half of what `colorArg` does for a
-    /// flat argument.
+    /// at any depth — **the last launder standing, and it is now the ONLY
+    /// door at which a three-element colour is still accepted**.
     ///
-    /// The model spells a colour `[r, g, b, a]` (`core/src/model.rs`), but
-    /// `set_canvas`'s `background` and every `set_shape` colour go through
-    /// `colorArg` and take three components, so a caller learns that three is
-    /// allowed and then writes `{"color": [1, 0, 0]}` in a text or shadow
-    /// patch. Without this the array reaches serde intact and the core answers
-    /// `invalid length 3, expected an array of length 4` — true, but naming
-    /// neither the key nor the patch, which is exactly the message a model
-    /// cannot correct itself from. Keyed on the NAME `color` and applied only
+    /// It was written when `colorArg` took three components at every
+    /// colour-only argument, so a caller learnt that three was allowed and
+    /// then wrote `{"color": [1, 0, 0]}` in a text or shadow patch. D1·4
+    /// deleted `colorArg` and the leniency it taught: a colour is four
+    /// numbers each 0–1 at every other door, refused by length and never
+    /// clamped (spec kpgalligan/reelcut#1). This runs from `patchArg` alone,
+    /// so it reaches `set_action_end`'s patch and nothing else, and it goes
+    /// with that door in #6/#7. Keyed on the NAME `color` and applied only
     /// to a three-number array, so `video.color` (a `ColorAdjust` object) and
     /// `chroma.key` — the one colour the core really does spell `[r, g, b]` —
     /// are both left alone.

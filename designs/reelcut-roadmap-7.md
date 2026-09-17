@@ -810,8 +810,8 @@ script in the run list and a section of its own.
 
 ### 2.4 D1·4 — the remaining property doors forward raw (kpgalligan/reelcut#5)
 
-**Commits.** `<TOLL>` (the proof's harness, alone), `<MAIN>` (the ticket) and
-`<FIX>` (what its review found, below).
+**Commits.** `7144586` (the proof's harness, alone), `07a75eb` (the ticket)
+and the review-fix commit named at the foot of this section.
 
 **What landed.** Eight doors, all of them copying D1·3's shape. Every
 caller-authored object the agent can send is now the core's to read, bar
@@ -825,7 +825,7 @@ caller-authored object the agent can send is now the core's to read, bar
   (the gradient and every stop), `unitPoint`, `checkClipPatchTypes`,
   `textArg` and `shapeArg`, the `shapePatchKeys` and `clipPatchKeys` sets,
   three `patch.isEmpty` refusals and two `checkTextEnums` call sites —
-  **197 lines out of `AgentServer+Clips.swift`** (1205 → 1008).
+  **194 lines out of `AgentServer+Clips.swift`** (1205 → 1011).
 - **`colorArg` and `requiredColorArg` are deleted**, which is the payment
   `AgentServer+Arguments.swift` owed at 587 against the ~600 cap: it is 558,
   and #5 added no reader to it, exactly as §2.3 said it would not. Their
@@ -833,7 +833,7 @@ caller-authored object the agent can send is now the core's to read, bar
   `add_background`'s `color` are now `a["background"]` and `a["color"]`,
   forwarded whole — an explicit `null` included, which the core reads as
   absent under the envelope's own rule.
-- **Nine raw factories** in `ReelOps.swift` (974 → 1105, a table with
+- **Nine raw factories** in `ReelOps.swift` (974 → 1090, a table with
   `edit.rs`'s standing exemption). Five are `setVideoRaw`'s five lines with
   another op name. The other four differ from their typed twin in ONE
   argument — a colour, or a new clip's patch — so the TYPED factory delegates
@@ -868,17 +868,27 @@ caller-authored object the agent can send is now the core's to read, bar
   `{"label": 7}` was `.some(nil)` through the lenient decode and REMOVED the
   label; it is `"label" in a clip patch must be a string or null, not 7`.
 
-**The proof is 189/189** (39 before), and it is four files. D1·3 landed it at
-exactly the 400 lines §0 gives a new file; eight sections is about four
-hundred more, so the split went by kind and the harness went FIRST, alone, as
-a pure move:
+**The proof is 199/199** (39 before), and it is four files. D1·3 landed it at
+400 lines exactly and eight sections is four hundred more, so the sections
+split by kind and the harness went FIRST, alone, as a pure move:
 
 | File | Lines | What is in it |
 |---|---|---|
-| `patch_door.py` | 185 | the harness: `Session`, `refused`, `landed`, `undo_marker`, `undo_claim`, `summary` |
-| `patch_door_patches.py` | 523 | the five doors whose object is a PATCH |
-| `patch_door_args.py` | 224 | the four whose object is an ARGUMENT |
+| `patch_door.py` | 196 | the harness: `Session`, `refused`, `landed`, `undo_marker`, `undo_claim`, `marker_gone`, `summary` |
+| `patch_door_patches.py` | 519 | the five doors whose object is a PATCH |
+| `patch_door_args.py` | 250 | the four whose object is an ARGUMENT |
 | `patch_door_proof.py` | 104 | what a patch means, the sentence forms, and `main` |
+
+**The 400-line cap is about SOURCE modules, and `tools/proof/` is not held
+to it** — the reading §2.1's review settled and §2.3's repeated, and the
+directory proves it: twenty-five of its twenty-nine scripts are past 400 and
+`phase6_proof.py` is 1765. So `patch_door_patches.py` at 519 is not a debt,
+and the splits above were taken for NAVIGATION rather than to satisfy a
+number: a reader asking what `set_shape` answers opens one file, the doors
+arrive one ticket at a time so the file that grows is not the one holding
+the explanation, and the harness went first and alone because a pure move is
+how this repo takes any split. D1·3 landing the script on 400 exactly was a
+courtesy to a rule that does not bind it, not a precedent.
 
 The split by KIND is not cosmetic: an argument door's refusals are the op
 ENVELOPE's (`op "set_canvas" is not valid: invalid length 3, expected an
@@ -908,17 +918,18 @@ that is what re-sending is the identity of.
   `cargo fmt --check` clean. `make typecheck` 0 errors and the 4 known
   AVFoundation warnings. `make app` succeeded; the startup parity log stayed
   empty across every run.
-- Twelve proof scripts green on port 4824 — patch_door **189/189**, phase1
+- Twelve proof scripts green on port 4824 — patch_door **199/199**, phase1
   66/66, phase2 85/85, phase3 123/123, phase3_silence_scope 8/8, phase4
   84/84, phase5 88/88, phase6 **168/168**, phase7 92/92, phase8 79/79,
   phase9 216/216, remaining 79/79. `recording_proof.py` is 121/121 with 66
   checks SKIPPED, the console being locked on this host; it calls none of
   these doors.
-- Line counts: `AgentServer+Clips.swift` 1205 → 1008,
+- Line counts: `AgentServer+Clips.swift` 1205 → 1011,
   `AgentServer+Arguments.swift` 587 → 558, `AgentServer+Tracks.swift`
-  231 → 242, `AgentServer+Background.swift` 89 → 98, `ReelOps.swift`
-  974 → 1105, `AgentCatalog+Clips.swift` 930 → 937, `AgentCatalog.swift`
-  465 → 472. Net across the app: 742 lines deleted, 422 added.
+  231 → 242, `AgentServer+Background.swift` 89 → 99, `ReelOps.swift`
+  974 → 1090, `AgentCatalog+Clips.swift` 930 → 939, `AgentCatalog.swift`
+  465 → 472. `designs/reelcut-remaining.md` §3's table is regenerated, which
+  is the first time since road map 3.
 - **An instance deadlocks somewhere past forty open documents**, and this
   ticket hit it: phase5 aborted at 48/88 with a peaks marker never written
   and phase6 then timed out, on an instance that had already run six
@@ -981,6 +992,75 @@ describes may since have gone and now warns about a function too, naming the
 family D1 deleted. Nothing in `designs/reelcut-design.md` needed changing:
 §6's patch row and §7's raw-factory paragraph were both written generally by
 D1·3, and no spec sentence promised a three-element colour.
+
+**Where a criterion could not be met literally.** #5's first criterion asks
+for "a misspelt variant, an unknown nested key and a wrong-typed value" at
+each of the eight doors, and four of them have no such thing to get wrong:
+`set_audio`'s group holds no enum at all, `set_clip`'s patch is two flat
+strings with no nesting and no enum, and the two colour-only arguments have
+neither. Each section covers every shape that EXISTS at its door and says in
+its docstring which are missing and why, which is the honest reading of the
+criterion.
+
+**The review** (standards and spec, in parallel, against #5 and spec #1).
+The spec axis found all eight criteria substantively met and nothing wrong;
+everything below is what the two axes asked for and it landed in the
+follow-up commit.
+
+Fixed:
+
+- **`withOpaqueColors`' doc was the sentence this deletion left behind** —
+  the fourth ticket running to have one, which is worth saying again. Its
+  whole justification was "the patch-shaped half of what `colorArg` does for
+  a flat argument … `set_canvas`'s background and every `set_shape` colour go
+  through `colorArg` and take three components", and this ticket deleted
+  `colorArg` and both of those doors' leniency. It now says what it is: the
+  LAST launder standing, the one door where three components are still taken,
+  and #6/#7's to delete. Four more were found the same way before the review
+  ran — `patchArg`'s caller list, `ReelOp.setClip`'s "the agent reads it
+  through the same `patchArg`", `AgentServer+Background.swift`'s module doc
+  ("grows again this phase for the gradient reader"), and
+  `AgentServer+Clips.swift`'s ("the typed builders in `ReelCore.swift` are the
+  only place that spells one", wrong on two counts).
+- **Duplicated Code in the op table.** Four ops took the delegation rule and
+  five did not: `setVideo`, `setAudio`, `setText`, `setShape` and `setClip`
+  each kept a five-line body identical to their raw twin's but for
+  `patch.dictionary`. All five delegate now, so a row really does have one
+  body, and `setClipRaw` moved above `setClip` to match the other four.
+- **`audioPatchDescription` was the one patch vocabulary not corrected.** The
+  handler's own comment says the audio door's whole win is that a `duck` or a
+  `compressor` MERGES; the agent reading the tool was never told.
+- **Two readings of an explicit null in one ticket.** `newClipPatchArg`
+  stripped an `NSNull` while the two colour arguments forwarded theirs. Both
+  end in the same place — `Option<Value>` and `Option<Color>` each read a
+  `null` as absent — so the stripping went, and all three doors now forward
+  what the caller wrote.
+- **The proof's own duplication**, which the standards axis was right to call
+  out on a file whose whole subject is duplication: the sentence "…the marker
+  edit itself is gone" was written out at six sites and is `marker_gone` in
+  the harness now.
+- **Two more refusals per new-clip door**, the spec axis's one partial: an
+  unknown key inside a nested object and a number where that object belongs
+  were proved at `set_text` and `set_shape` but not at `add_text_clip` and
+  `add_shape_clip`. 189 → 197.
+- **One behaviour change was documented and not asserted**: a `set_canvas`
+  carrying nothing but `background: null` is the core's identity refusal
+  where it used to be the handler's "nothing to change". §8d pins it. 197 →
+  199.
+
+Judged not real:
+
+- *`patch_door_patches.py` is 519 lines against §0's 400-line cap for a new
+  file.* The cap is about source modules, as §2.1's review settled — the
+  argument is three paragraphs up, with the directory's own numbers.
+- *`checkVideoEnums` and `checkTextEnums` still exist.* #5's criterion is
+  "no enum, key or type checking FOR THESE GROUPS", and all five handlers
+  are `rawPatchArg` plus a raw factory. Both functions run from
+  `checkActionPatch` alone, which is #6's door.
+- *`AgentCatalog+Clips.swift` still says `[r, g, b]` once.* That is
+  `chroma.key`, which the core really does spell with three numbers
+  (`model_props.rs`: `pub key: [f64; 3]`), and the sentence beside it now
+  names it as the one exception.
 
 **Owed.** Nothing for this ticket. `set_action_end` and `add_zoom_action`
 are #6 by design, and the deletion sweep is #7's.

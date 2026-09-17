@@ -22,7 +22,10 @@ ARGUMENT of an op rather than a property patch:
 kpgalligan/reelcut#6's `add_zoom_action` region is the next section here.
 """
 
-from patch_door import SEC, Session, check, landed, refused, undo_claim, undo_marker
+from patch_door import (
+    SEC, Session, check, landed, marker_gone, refused, shown, undo_claim,
+    undo_marker,
+)
 
 
 # ---- add_text_clip's `text` (D1·4, kpgalligan/reelcut#5) ------------------
@@ -52,6 +55,12 @@ def new_text_clip_door(mcp):
     refused(s, "add_text_clip", "a misspelt animation kind",
             'bad value at "animation.kind" in a text patch: unknown variant `fade`',
             track=track, at=10 * SEC, text={"content": "Hi", "animation": {"kind": "fade"}})
+    refused(s, "add_text_clip", "a misspelt key INSIDE the outline",
+            'unknown key "outline.widht" in a text patch',
+            track=track, at=10 * SEC, text={"outline": {"widht": 4.0}})
+    refused(s, "add_text_clip", "a number where the outline OBJECT belongs",
+            'bad value at "outline" in a text patch: expected an object, not 5',
+            track=track, at=10 * SEC, text={"outline": 5})
     refused(s, "add_text_clip", "a three-element colour",
             'bad value at "color" in a text patch: invalid length 3',
             track=track, at=10 * SEC, text={"color": [1.0, 0.0, 0.0]})
@@ -100,6 +109,12 @@ def new_shape_clip_door(mcp):
     refused(s, "add_shape_clip", "a bare kind name outside the enum, by its PATH",
             'bad value at "kind" in a shape patch: unknown variant `square`',
             track=track, at=10 * SEC, shape="square")
+    refused(s, "add_shape_clip", "a misspelt key INSIDE the stroke",
+            'unknown key "stroke.widht" in a shape patch',
+            track=track, at=10 * SEC, shape={"stroke": {"widht": 2.0}})
+    refused(s, "add_shape_clip", "a number where the stroke OBJECT belongs",
+            'bad value at "stroke" in a shape patch: expected an object, not 5',
+            track=track, at=10 * SEC, shape={"stroke": 5})
     refused(s, "add_shape_clip", "a three-element stop colour",
             'bad value at "gradient.stops[0].color" in a shape patch: invalid length 3',
             track=track, at=10 * SEC,
@@ -169,13 +184,22 @@ def canvas_background_door(mcp):
 
     print("\n8c — and not one of them was an undo step")
     undo_claim(s, start)
-    landed("…the marker edit itself is gone, so the undo above undid THAT and nothing else",
-           s.project()["canvas"]["background"], [0.5, 0, 0, 1])
+    marker_gone(s.project()["canvas"]["background"], [0.5, 0, 0, 1])
 
     print("\n8d — and a four-number colour lands exactly as it was written")
     s.op("set_canvas", background=[0.1, 0.2, 0.3, 0.4])
     landed("every component kept, alpha included", s.project()["canvas"]["background"],
            [0.1, 0.2, 0.3, 0.4])
+    # A behaviour the forwarding changed, pinned so it is not a surprise: an
+    # explicit null is sent rather than stripped, so a call carrying nothing
+    # BUT that null is the core's identity refusal instead of the handler's
+    # own "set_canvas: nothing to change". Both refuse; the sentence moved.
+    message = s.error("set_canvas", background=None)
+    check(message is not None and "made no change" in message,
+          "…and a call carrying nothing but an explicit null is the core's identity "
+          f"refusal, the null reading as absent — got: {shown(message)}")
+    landed("…with the colour still the one that landed",
+           s.project()["canvas"]["background"], [0.1, 0.2, 0.3, 0.4])
 
 
 # ---- add_background's `color` (D1·4, kpgalligan/reelcut#5) ----------------

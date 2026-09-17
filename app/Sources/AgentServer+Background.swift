@@ -4,8 +4,9 @@ import AppKit
 /// `add_blurred_background`, spec §6's phase-6c rows (road map 2).
 ///
 /// A file of its own rather than two more handlers in `AgentServer+Clips.swift`,
-/// which is over the ~600-line cap by a wide margin and grows again this phase
-/// for the gradient reader and the filter-entry check. Both of these place
+/// which is over the ~600-line cap by a wide margin and grew again that phase
+/// for the gradient reader and the filter-entry check (both since deleted —
+/// deepening D1 moved their job into the core). Both of these place
 /// clips, so `+Clips.swift` is where they would naturally have gone; taking the
 /// split now is one of phase 6's three size payments, and it costs the reader
 /// nothing because a background is a nameable thing in its own right — the
@@ -40,6 +41,7 @@ extension AgentServer {
     /// to `add_media` the file first. Here it is one: an agent names a media
     /// that is already in the list, and `import_media` is the tool that puts
     /// it there.
+    ///
     /// **`color` goes to the core UNREAD** (deepening D1·4,
     /// `designs/reelcut-roadmap-7.md` §2.4): a colour is four numbers each
     /// 0–1 everywhere, so the three-element form `colorArg` used to fill an

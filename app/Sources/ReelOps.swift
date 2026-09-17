@@ -646,10 +646,7 @@ extension ReelOp {
     /// nothing changes, which is what keeps a live gesture from registering
     /// undo steps for frames that moved nowhere.
     static func setVideo(clips: [UInt32], patch: VideoPatch) -> ReelOp {
-        var a = OpArgs()
-        a.put("clips", clips)
-        a.put("patch", patch.dictionary)
-        return ReelOp(name: "set_video", args: a.values)
+        setVideoRaw(clips: clips, patch: patch.dictionary)
     }
 
     /// The same op with the patch object the CALLER wrote, forwarded to the
@@ -689,10 +686,7 @@ extension ReelOp {
     }
 
     static func setAudio(clips: [UInt32], patch: AudioPatch) -> ReelOp {
-        var a = OpArgs()
-        a.put("clips", clips)
-        a.put("patch", patch.dictionary)
-        return ReelOp(name: "set_audio", args: a.values)
+        setAudioRaw(clips: clips, patch: patch.dictionary)
     }
 
     static func setTextRaw(clips: [UInt32], patch: Any) -> ReelOp {
@@ -703,10 +697,7 @@ extension ReelOp {
     }
 
     static func setText(clips: [UInt32], patch: TextPatch) -> ReelOp {
-        var a = OpArgs()
-        a.put("clips", clips)
-        a.put("patch", patch.dictionary)
-        return ReelOp(name: "set_text", args: a.values)
+        setTextRaw(clips: clips, patch: patch.dictionary)
     }
 
     static func setShapeRaw(clips: [UInt32], patch: Any) -> ReelOp {
@@ -717,23 +708,7 @@ extension ReelOp {
     }
 
     static func setShape(clips: [UInt32], patch: ShapePatch) -> ReelOp {
-        var a = OpArgs()
-        a.put("clips", clips)
-        a.put("patch", patch.dictionary)
-        return ReelOp(name: "set_shape", args: a.values)
-    }
-
-    /// Sets or clears the clips' own name and label — the fifth patch op,
-    /// shaped like `set_video` so the agent reads it through the same
-    /// `patchArg`. Each key is three-state (`ClipPatch`): absent keeps, null
-    /// clears, a string sets. The core trims a name and treats an empty one
-    /// as a clear, so the app may send what the user typed. Refuses when
-    /// nothing changes.
-    static func setClip(clips: [UInt32], patch: ClipPatch) -> ReelOp {
-        var a = OpArgs()
-        a.put("clips", clips)
-        a.put("patch", patch.dictionary)
-        return ReelOp(name: "set_clip", args: a.values)
+        setShapeRaw(clips: clips, patch: patch.dictionary)
     }
 
     /// The fifth patch's raw factory (deepening D1·4). Its group has no
@@ -746,6 +721,16 @@ extension ReelOp {
         a.put("clips", clips)
         a.put("patch", patch)
         return ReelOp(name: "set_clip", args: a.values)
+    }
+
+    /// Sets or clears the clips' own name and label — the fifth patch op,
+    /// shaped like `set_video` so the agent reaches it the same way, through
+    /// the raw factory above. Each key is three-state (`ClipPatch`): absent
+    /// keeps, null clears, a string sets. The core trims a name and treats
+    /// an empty one as a clear, so the app may send what the user typed.
+    /// Refuses when nothing changes.
+    static func setClip(clips: [UInt32], patch: ClipPatch) -> ReelOp {
+        setClipRaw(clips: clips, patch: patch.dictionary)
     }
 
     /// Per-clip visibility and mute — the two halves Detach Audio flips.

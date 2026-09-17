@@ -5,10 +5,11 @@ import AppKit
 /// same name and the same argument names.
 ///
 /// Every handler is the canonical shape — `target(a)`, validate the ids
-/// against the snapshot, build the typed `ReelOp`, `performGroupedEdit`,
+/// against the snapshot, build the `ReelOp`, `performGroupedEdit`,
 /// `jsonResult` — and carries a comment naming the UI path it mirrors
-/// (app/CLAUDE.md's agent-parity rule). No op JSON is written here: the typed
-/// builders in `ReelCore.swift` are the only place that spells one.
+/// (app/CLAUDE.md's agent-parity rule). No op JSON is written here: the
+/// factories in `ReelOps.swift` are the only place that spells one, the RAW
+/// factories every patch handler below reaches for included.
 extension AgentServer {
 
     // MARK: - Patch vocabularies
@@ -106,13 +107,15 @@ extension AgentServer {
     /// Everything else goes on whole, `Any` and not `[String: Any]`, so that
     /// a number or a list where the patch belongs is refused by the CORE in
     /// the words that name the group (`text patch must be a json object, not
-    /// 5`). nil means ABSENT — an explicit null included, the op envelope's
-    /// own rule — which is what gives the core's Title preset and its default
-    /// rectangle.
+    /// 5`). An explicit `null` goes on whole too, rather than being stripped
+    /// here — `Option<Value>` reads one as ABSENT (`core/src/edit.rs`), which
+    /// is the op envelope's rule for every optional argument, so the clip
+    /// lands on the core's Title preset or its default rectangle. nil is the
+    /// key being missing, and that is the only thing this answers about.
     private func newClipPatchArg(
         _ a: [String: Any], _ key: String, shorthand: String
     ) -> Any? {
-        guard let raw = a[key], !(raw is NSNull) else { return nil }
+        guard let raw = a[key] else { return nil }
         if let words = raw as? String { return [shorthand: words] }
         return raw
     }

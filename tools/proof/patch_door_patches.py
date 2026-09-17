@@ -17,7 +17,8 @@ this one rather than the one holding the explanation.
 """
 
 from patch_door import (
-    FRAME, SEC, Session, check, landed, refused, undo_claim, undo_marker,
+    FRAME, SEC, Session, check, landed, marker_gone, refused, undo_claim,
+    undo_marker,
 )
 
 
@@ -114,8 +115,7 @@ def video_door(mcp):
 
     print("\n1c — and not one of them was an undo step")
     undo_claim(s, start)
-    check(s.video(clip)["opacity"] == 1.0,
-          "…the marker edit itself is gone, so the undo above undid THAT and nothing else")
+    marker_gone(s.video(clip)["opacity"], 1.0)
 
     print("\n1d — and a good patch merges, key by key, at every depth")
     s.op("set_video", clips=[clip], patch={"shadow": {"blur": 20.0}})
@@ -239,8 +239,7 @@ def audio_door(mcp):
 
     print("\n2c — and not one of them was an undo step")
     undo_claim(s, start)
-    check(s.clip(clip)["audio"]["volume"] == 0.8,
-          "…the marker edit itself is gone, so the undo above undid THAT and nothing else")
+    marker_gone(s.clip(clip)["audio"]["volume"], 0.8)
 
     print("\n2d — and a good patch merges, key by key, at every depth")
     s.op("set_audio", clips=[clip], patch={"duck": {"level": 0.7}})
@@ -327,8 +326,7 @@ def text_door(mcp):
 
     print("\n3c — and not one of them was an undo step")
     undo_claim(s, start)
-    check(s.clip(clip)["text"]["size"] == 72,
-          "…the marker edit itself is gone, so the undo above undid THAT and nothing else")
+    marker_gone(s.clip(clip)["text"]["size"], 72)
 
     print("\n3d — and a good patch merges, key by key, at every depth")
     s.op("set_text", clips=[clip], patch={"outline": {"width": 8.0}})
@@ -433,8 +431,7 @@ def shape_door(mcp):
 
     print("\n4c — and not one of them was an undo step")
     undo_claim(s, start)
-    check(s.clip(clip)["shape"]["radius"] == 0,
-          "…the marker edit itself is gone, so the undo above undid THAT and nothing else")
+    marker_gone(s.clip(clip)["shape"]["radius"], 0)
 
     print("\n4d — and a good patch merges, key by key, at every depth")
     s.op("set_shape", clips=[clip], patch={"stroke": {"width": 9.0}})
@@ -496,8 +493,7 @@ def clip_door(mcp):
 
     print("\n5c — and not one of them was an undo step")
     undo_claim(s, start)
-    check(s.clip(clip)["name"] == "Talk",
-          "…the marker edit itself is gone, so the undo above undid THAT and nothing else")
+    marker_gone(s.clip(clip)["name"], "Talk")
 
     print("\n5d — and a good patch changes the key it names and nothing else")
     s.op("set_clip", clips=[clip], patch={"label": None})

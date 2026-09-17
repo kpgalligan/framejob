@@ -2285,13 +2285,15 @@ what it proves is the single door every caller-authored object comes through
 (`core/src/patch.rs`, `CONTEXT.md`'s **Patch**), and the doors arrive one
 deepening ticket at a time (`designs/reelcut-roadmap-7.md` §1). D1·3
 (kpgalligan/reelcut#4) built it with `set_video`'s section, at **39/39**;
-D1·4 (#5) added eight more and it is **189/189**; D1·5 (#6) adds the last
+D1·4 (#5) added eight more and it is **199/199**; D1·5 (#6) adds the last
 two. Each door file says in a marked comment where the next one goes and
 what has to change in the copy.
 
 **It is four files and one script.** The sections outgrew a single file when
-D1·4's eight landed, so the split went by kind, under `CLAUDE.md`'s size
-rule:
+D1·4's eight landed, so the split went by kind — for navigation, since a
+proof script is not held to the 400-line cap a new SOURCE module gets
+(`designs/reelcut-roadmap-7.md` §2.4 argues it; most scripts here are well
+past it):
 
 | File | What is in it |
 |---|---|

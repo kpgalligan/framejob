@@ -151,7 +151,9 @@ extension AgentServer {
             "Audio properties to merge. Keys: volume (0–4, 1 = unity), muted, fade_in, "
             + "fade_out (ticks), duck (null or {level, attack, release}), mono, keep_pitch, "
             + "pan (-1 hard left … +1 hard right), compressor (null or {threshold_db, ratio, "
-            + "attack, release, makeup_db} — the two times in ticks), noise_reduction (0–1)."
+            + "attack, release, makeup_db} — the two times in ticks), noise_reduction (0–1). "
+            + "duck and compressor are OBJECTS and they MERGE: a key you leave out keeps what "
+            + "is stored, and {duck: null} clears the whole thing."
         // `text.animation`'s clause, its own explicitly-typed local for the
         // reason `obscureClause` is: the kind names are a non-literal operand
         // and the text chain is long enough already.
