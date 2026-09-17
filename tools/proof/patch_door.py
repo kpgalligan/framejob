@@ -8,16 +8,18 @@ say — so that a door's section is the door and nothing else.
 **Why it is a file of its own** (deepening D1·4,
 `designs/reelcut-roadmap-7.md` §2.4). The proof arrives one door at a time:
 D1·3 built it with `set_video` alone, at exactly the 400 lines §0 gives a
-new file, and D1·4 adds eight more sections to it. A file at its cap gives
+new file, and D1·4 added eight more sections. A file at its cap gives
 something up before it takes anything on (`CLAUDE.md`), and the thing to
-give up first is the half that does not grow. This split is landed ALONE, as
-a pure move, before a single door is added: the same functions, the same
-bodies, the same order.
+give up first is the half that does not grow. This split was landed ALONE,
+as a pure move, before a single door was added: the same functions, the same
+bodies, the same order. The sections themselves then split by kind
+(`patch_door_patches.py`, `patch_door_args.py`), leaving
+`patch_door_proof.py` the explanation and `main`.
 
-Nothing here is imported anywhere else, and that is the point rather than an
-oversight — `mcp.py` is the seam every script in this directory crosses, and
-this is one proof's own scaffolding, kept separate for size and not for
-reuse.
+Nothing here is imported outside those three, and that is the point rather
+than an oversight — `mcp.py` is the seam every script in this directory
+crosses, and this is one proof's own scaffolding, kept separate for size and
+not for reuse.
 """
 
 import json
@@ -102,8 +104,15 @@ class Session:
         track = self.project()["tracks"][0]["id"]
         return self.op("add_clip", track=track, media=media, at=0)["new_clips"][0]
 
+    def clip(self, clip):
+        """One clip as `get_project` reports it, whole — so a section can read
+        back whichever group its door patched, or the clip's own name and
+        label. `video` keeps a reader of its own below because `video_door`
+        was the only section this file was written for."""
+        return {c["id"]: c for c in self.project()["clips"]}[clip]
+
     def video(self, clip):
-        return {c["id"]: c for c in self.project()["clips"]}[clip]["video"]
+        return self.clip(clip)["video"]
 
     def error(self, tool, **kwargs):
         """The in-band error text of a call, or None when it succeeded."""

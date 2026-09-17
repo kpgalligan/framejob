@@ -20,19 +20,27 @@ detail there.
   `deinit` frees the Rust allocation.
 - `ReelOps.swift` — `OpArgs`, `ReelOp` and one typed factory per row of
   `core/src/edit.rs`'s op table, plus a RAW factory beside the typed one at
-  each door deepening D1 has moved (`setVideoRaw`), which takes the caller's
-  own patch object as `Any` and forwards it; there is no untyped op-JSON call
-  site anywhere else. `scope` is a member folded into `json`;
-  `documentLevelNames` MIRRORS `scope.rs`'s `refused_inside` (seven names) so
-  one edit can mix a document-level op with scoped ones. A table, with
+  each door deepening D1 has moved (`setVideoRaw`, `setAudioRaw`,
+  `setTextRaw`, `setShapeRaw`, `setClipRaw`, `addTextClipRaw`,
+  `addShapeClipRaw`, `setCanvasRaw`, `addBackgroundRaw`), which takes the
+  caller's own object as `Any` — never `[String: Any]`, so a non-object is
+  refused by the CORE in the words that name the group — and forwards it;
+  there is no untyped op-JSON call site anywhere else. Where only ONE
+  argument is the caller's (a colour, a new clip's patch) the typed factory
+  DELEGATES to the raw one, mapping its optional explicitly, because an
+  `Optional<T>.none` widened to `Any?` is a non-nil `Any` wrapping a nil.
+  `scope` is a member folded into `json`; `documentLevelNames` MIRRORS
+  `scope.rs`'s `refused_inside` (seven names) so one edit can mix a
+  document-level op with scoped ones. A table, with
   `edit.rs`'s size exemption.
 - `ProjectSnapshot.swift` · `MotionProps.swift` — the `Codable`, READ-ONLY
   mirror of spec §5.2 every view draws from. **Its enums decode LENIENTLY**
   — a misspelt kind becomes the first case, a `T??` field a clear — which is
   why a caller-authored object is never decoded through them (below), and
-  why the agent handlers that have not yet moved still check enums and types
-  by hand. `MotionProps.dictionary` always writes all three keys, `NSNull`
-  for a nil slot, because a core patch of `motion` deep-merges — it is the
+  why the ONE agent handler that has not yet moved (`set_action_end`,
+  kpgalligan/reelcut#6) still checks enums and types by hand.
+  `MotionProps.dictionary` always writes all three keys, `NSNull` for a nil
+  slot, because a core patch of `motion` deep-merges — it is the
   APP's writer saying all three slots, not a replace rule, and since D1·3 it
   is the only edge that writes a whole motion.
 
@@ -362,24 +370,27 @@ free.
   `transcribe`, `record_screen`, `export`, …); the criterion is "waits on
   main", not "touches the disk".
 - `AgentServer+Arguments.swift` — the shared argument vocabulary
-  (`intArg`, `timeArg`, `rangesArg`, `colorArg`, `rawPatchArg`, `patchArg`,
-  …), each refusing a value it cannot read BY NAME. **`rawPatchArg` is the
-  door deepening D1 is moving every property op to**: it reads nothing about
-  the value and hands the caller's object to the core, which is the one
+  (`intArg`, `timeArg`, `rangesArg`, `rawPatchArg`, `patchArg`, …), each
+  refusing a value it cannot read BY NAME. **`rawPatchArg` is the door
+  deepening D1 has moved every property op to**: it reads nothing about the
+  value and hands the caller's object to the core, which is the one
   validator of what a patch may carry and names the dotted path and the
-  value in every refusal (`core/src/patch.rs`). `set_video` went through it
-  in D1·3; `designs/reelcut-roadmap-7.md` §1 has the order the rest follow.
-  Until each door moves, `patchArg` still launders it, and its three gaps
-  are why the move is happening: its round trip cannot see a wrong-typed
-  `T??` field (`nullable()` decodes it as a CLEAR), so `set_clip` checks by
-  hand and the other object-valued `T??` fields still clear on a wrong type;
-  a nested OBJECT in a patch is decoded and re-serialised, so it is a
-  REPLACEMENT — an omitted key comes back as the default and a misspelt one
-  is dropped — except `gradient`, which is read by hand and refuses by name;
+  value in every refusal (`core/src/patch.rs`). Its one refusal is the
+  ABSENT argument, a mistake about the CALL. A colour-only ARGUMENT
+  (`set_canvas`'s background, `add_background`'s colour) is forwarded the
+  same way, straight off the call, which is why `colorArg` and
+  `requiredColorArg` are gone: a colour is four numbers each 0–1 and nothing
+  on this side fills in an alpha or clamps a component. `set_video` went
+  through in D1·3 and the other eight doors in D1·4;
+  `designs/reelcut-roadmap-7.md` §1 has the one that is left. `patchArg`
+  still launders `set_action_end`'s patch (kpgalligan/reelcut#6), and its
+  three gaps are why the move happened: its round trip cannot see a
+  wrong-typed `T??` field (`nullable()` decodes it as a CLEAR); a nested
+  OBJECT in a patch is decoded and re-serialised, so it is a REPLACEMENT —
+  an omitted key comes back as the default and a misspelt one is dropped;
   and `ProjectSnapshot`'s lenient enums mean `checkVideoEnums` /
-  `checkTextEnums` must run at every door still laundering a patch
-  (`set_text`, `add_*_clip`, `set_action_end`), not the one they were
-  written for.
+  `checkTextEnums` must run at the door that still launders, which is now
+  `checkActionPatch` alone.
 
 **Shared chrome.** `Theme.swift` (`DS` tokens, including the three track
 heights S/M/L per kind), `Controls.swift`, `OptionControls.swift`,

@@ -40,14 +40,23 @@ extension AgentServer {
     /// to `add_media` the file first. Here it is one: an agent names a media
     /// that is already in the list, and `import_media` is the tool that puts
     /// it there.
+    /// **`color` goes to the core UNREAD** (deepening D1·4,
+    /// `designs/reelcut-roadmap-7.md` §2.4): a colour is four numbers each
+    /// 0–1 everywhere, so the three-element form `colorArg` used to fill an
+    /// alpha into and the clamp it used to apply to a component outside the
+    /// range are both gone, and the core names what it refused — the wrong
+    /// length by its type, an out-of-range component as `shape.fill`, since
+    /// the plate IS a shape clip. An explicit `null` is forwarded rather than
+    /// stripped and reads as absent in the core, the op envelope's rule for
+    /// every optional argument, so the plate still comes out white.
     func addBackground(_ a: [String: Any]) throws -> String {
         let document = try target(a)
         let media = try optionalMedia(a, document)
-        let color = try colorArg(a, "color")
+        let color = a["color"]
         let duration = try optionalTimeArg(a, "duration", document)
         return try editResult(
             document, "Add Background",
-            [.addBackground(media: media?.id, color: color, duration: duration)])
+            [.addBackgroundRaw(media: media?.id, color: color, duration: duration)])
     }
 
     /// `media`, read only when the caller wrote one. `mediaArg` is required by

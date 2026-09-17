@@ -8,10 +8,14 @@ import AppKit
 ///
 /// A row may have a SECOND factory beside its typed one: a RAW factory that
 /// takes the caller's own object and forwards it unread, which is what the
-/// agent door does at every op deepening D1 has moved (`setVideoRaw`; the
-/// paste payload factories are the precedent). It is a second SPELLING of
-/// one row, not a second row, and it is here for the rule above — the table
-/// stays the only place in the app where an op is named.
+/// agent door does at every op deepening D1 has moved (`setVideoRaw` and the
+/// seven beside it; the paste payload factories are the precedent). It is a
+/// second SPELLING of one row, not a second row, and it is here for the rule
+/// above — the table stays the only place in the app where an op is named.
+/// Where the raw and the typed factory differ in ONE argument
+/// (`setCanvasRaw`, `addBackgroundRaw` and the two new-clip ops, whose
+/// caller-authored part is a colour or a patch beside ordinary arguments)
+/// the typed one delegates to the raw one, so a row still has one body.
 ///
 /// The seam is the FFI. `ReelCore.swift` is the only file in the app that
 /// names an `rc_*` symbol and nothing here names one: an op is a VALUE — a
@@ -193,11 +197,31 @@ extension ReelOp {
     static func addTextClip(
         track: UInt32, at: Ticks, duration: Ticks? = nil, text: TextPatch? = nil
     ) -> ReelOp {
+        addTextClipRaw(
+            track: track, at: at, duration: duration, text: text.map { $0.dictionary as Any })
+    }
+
+    /// The same op with the `text` object the CALLER wrote, forwarded to the
+    /// core unread — the agent door's factory (deepening D1·4), beside the
+    /// typed one Clip ▸ Add Text and the caption producers keep using.
+    ///
+    /// `text` is `Any?` for `setVideoRaw`'s reason: a caller who sent a
+    /// number or a list where the patch belongs is refused by the CORE, in
+    /// the words that name the group (`text patch must be a json object, not
+    /// 5`), rather than by a cast on this side that knows less. nil means the
+    /// key is ABSENT, which is what gives the core's own Title preset — and
+    /// it is why the typed factory above maps rather than passing its
+    /// optional straight in: an `Optional<[String: Any]>.none` widened to
+    /// `Any?` becomes a non-nil `Any` wrapping a nil, and the key would be
+    /// sent as a null.
+    static func addTextClipRaw(
+        track: UInt32, at: Ticks, duration: Ticks? = nil, text: Any? = nil
+    ) -> ReelOp {
         var a = OpArgs()
         a.put("track", track)
         a.put("at", at)
         a.put("duration", duration)
-        a.put("text", text.map { $0.dictionary })
+        a.put("text", text)
         return ReelOp(name: "add_text_clip", args: a.values)
     }
 
@@ -210,11 +234,20 @@ extension ReelOp {
     static func addShapeClip(
         track: UInt32, at: Ticks, duration: Ticks? = nil, shape: ShapePatch? = nil
     ) -> ReelOp {
+        addShapeClipRaw(
+            track: track, at: at, duration: duration, shape: shape.map { $0.dictionary as Any })
+    }
+
+    /// `addTextClipRaw`'s twin for the new shape clip's `shape`, same shape
+    /// and same reasons (deepening D1·4).
+    static func addShapeClipRaw(
+        track: UInt32, at: Ticks, duration: Ticks? = nil, shape: Any? = nil
+    ) -> ReelOp {
         var a = OpArgs()
         a.put("track", track)
         a.put("at", at)
         a.put("duration", duration)
-        a.put("shape", shape.map { $0.dictionary })
+        a.put("shape", shape)
         return ReelOp(name: "add_shape_clip", args: a.values)
     }
 
@@ -257,6 +290,17 @@ extension ReelOp {
     /// with no pictures, a colour outside 0–1, or a duration under a frame.
     static func addBackground(
         media: UInt32? = nil, color: RGBA? = nil, duration: Ticks? = nil
+    ) -> ReelOp {
+        addBackgroundRaw(media: media, color: color.map { $0 as Any }, duration: duration)
+    }
+
+    /// The same op with the `color` the CALLER wrote, forwarded unread — the
+    /// agent door's factory (deepening D1·4). A colour is four numbers each
+    /// 0–1 and the core is what says so: the wrong length is its type's
+    /// refusal and a component outside the range is `props_check.rs`'s,
+    /// naming `shape.fill`, since the plate IS a shape clip.
+    static func addBackgroundRaw(
+        media: UInt32? = nil, color: Any? = nil, duration: Ticks? = nil
     ) -> ReelOp {
         var a = OpArgs()
         a.put("media", media)
@@ -633,6 +677,17 @@ extension ReelOp {
         return ReelOp(name: "set_video", args: a.values)
     }
 
+    /// `setVideoRaw`'s twin for the audio group (deepening D1·4). The three
+    /// below and `setClipRaw` are the same five lines with another op name,
+    /// deliberately: the group a refusal names is the one the OP name picks,
+    /// so there is nothing here to get right per group.
+    static func setAudioRaw(clips: [UInt32], patch: Any) -> ReelOp {
+        var a = OpArgs()
+        a.put("clips", clips)
+        a.put("patch", patch)
+        return ReelOp(name: "set_audio", args: a.values)
+    }
+
     static func setAudio(clips: [UInt32], patch: AudioPatch) -> ReelOp {
         var a = OpArgs()
         a.put("clips", clips)
@@ -640,11 +695,25 @@ extension ReelOp {
         return ReelOp(name: "set_audio", args: a.values)
     }
 
+    static func setTextRaw(clips: [UInt32], patch: Any) -> ReelOp {
+        var a = OpArgs()
+        a.put("clips", clips)
+        a.put("patch", patch)
+        return ReelOp(name: "set_text", args: a.values)
+    }
+
     static func setText(clips: [UInt32], patch: TextPatch) -> ReelOp {
         var a = OpArgs()
         a.put("clips", clips)
         a.put("patch", patch.dictionary)
         return ReelOp(name: "set_text", args: a.values)
+    }
+
+    static func setShapeRaw(clips: [UInt32], patch: Any) -> ReelOp {
+        var a = OpArgs()
+        a.put("clips", clips)
+        a.put("patch", patch)
+        return ReelOp(name: "set_shape", args: a.values)
     }
 
     static func setShape(clips: [UInt32], patch: ShapePatch) -> ReelOp {
@@ -664,6 +733,18 @@ extension ReelOp {
         var a = OpArgs()
         a.put("clips", clips)
         a.put("patch", patch.dictionary)
+        return ReelOp(name: "set_clip", args: a.values)
+    }
+
+    /// The fifth patch's raw factory (deepening D1·4). Its group has no
+    /// nesting to merge, so what the forwarding buys here is the wrong TYPE:
+    /// `ClipPatch`'s two keys are `String??`, which a lenient decode reads as
+    /// a CLEAR, so `{"label": 7}` used to need a hand check on this side and
+    /// is now `"label" in a clip patch must be a string or null, not 7`.
+    static func setClipRaw(clips: [UInt32], patch: Any) -> ReelOp {
+        var a = OpArgs()
+        a.put("clips", clips)
+        a.put("patch", patch)
         return ReelOp(name: "set_clip", args: a.values)
     }
 
@@ -967,6 +1048,22 @@ extension ReelOp {
     /// size ratio; changing `fps` re-snaps every clip start and duration.
     static func setCanvas(
         width: Int? = nil, height: Int? = nil, fps: Fps? = nil, background: RGBA? = nil,
+        rescaleClips: Bool? = nil, fitNewClips: Bool? = nil, timecodeFrames: Bool? = nil
+    ) -> ReelOp {
+        setCanvasRaw(
+            width: width, height: height, fps: fps, background: background.map { $0 as Any },
+            rescaleClips: rescaleClips, fitNewClips: fitNewClips,
+            timecodeFrames: timecodeFrames)
+    }
+
+    /// The same op with the `background` the CALLER wrote, forwarded unread
+    /// — the agent door's factory (deepening D1·4). Only the colour differs
+    /// from the typed factory above, which is why that one delegates here
+    /// rather than keeping a second copy of the seven arguments; the `map` is
+    /// what keeps an absent background absent, since an `Optional<RGBA>.none`
+    /// widened straight to `Any?` is a non-nil `Any` wrapping a nil.
+    static func setCanvasRaw(
+        width: Int? = nil, height: Int? = nil, fps: Fps? = nil, background: Any? = nil,
         rescaleClips: Bool? = nil, fitNewClips: Bool? = nil, timecodeFrames: Bool? = nil
     ) -> ReelOp {
         var a = OpArgs()

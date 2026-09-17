@@ -169,10 +169,17 @@ extension AgentServer {
         let trackProperty: [String: Any] = [
             "type": "integer", "description": "Track id (get_project lists them).",
         ]
+        // The two colour-only ARGUMENTS — `set_canvas`'s background and
+        // `add_background`'s plate colour. FOUR numbers since deepening D1·4,
+        // not three or four: the alpha is never filled in and a component
+        // outside 0–1 is never clamped, because the core is the one validator
+        // of a colour now and it names what it refused.
         let colorProperty: (String) -> [String: Any] = { role in
             [
-                "type": "array", "items": ["type": "number"], "minItems": 3, "maxItems": 4,
-                "description": "\(role) as [r, g, b] or [r, g, b, a], each 0–1.",
+                "type": "array", "items": ["type": "number"], "minItems": 4, "maxItems": 4,
+                "description": "\(role) as [r, g, b, a], each 0–1. Four numbers exactly: "
+                    + "three is refused by length and a component outside the range is "
+                    + "refused by name, neither filled in nor clamped.",
             ]
         }
         let clipProperty: [String: Any] = [

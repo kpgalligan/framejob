@@ -555,33 +555,4 @@ extension AgentServer {
         }
         return out
     }
-
-    /// A colour argument as the model spells one: `[r, g, b, a]` floats 0–1,
-    /// alpha optional. nil when the key is absent.
-    func colorArg(_ a: [String: Any], _ key: String) throws -> RGBA? {
-        guard let raw = a[key], !(raw is NSNull) else { return nil }
-        guard let array = raw as? [Any], array.count == 3 || array.count == 4 else {
-            throw ToolError(
-                message: "\(key) must be [r, g, b] or [r, g, b, a], each 0–1.")
-        }
-        var components: [Double] = []
-        for value in array {
-            guard let number = (value as? NSNumber)?.doubleValue, number.isFinite else {
-                throw ToolError(message: "\(key) must contain numbers 0–1.")
-            }
-            components.append(min(max(number, 0), 1))
-        }
-        if components.count == 3 { components.append(1) }
-        return components
-    }
-
-    /// `colorArg` where the colour is not optional — the nested `color` of a
-    /// stroke, an outline or a backdrop, whose absence is a malformed object
-    /// rather than "leave it alone".
-    func requiredColorArg(_ a: [String: Any], _ key: String) throws -> RGBA {
-        guard let color = try colorArg(a, key) else {
-            throw ToolError(message: "\(key) must be [r, g, b] or [r, g, b, a], each 0–1.")
-        }
-        return color
-    }
 }

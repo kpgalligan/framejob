@@ -170,6 +170,17 @@ extension AgentServer {
     /// background, and the two document switches. `rescale_clips` multiplies
     /// every clip's `x`, `y` and `scale` by the size ratio (the pane's own
     /// checkbox); changing `fps` re-snaps every clip start and duration.
+    ///
+    /// **`background` goes to the core UNREAD** (deepening D1·4,
+    /// `designs/reelcut-roadmap-7.md` §2.4): a colour is four numbers each
+    /// 0–1 everywhere, so the three-element form `colorArg` used to fill an
+    /// alpha into and the clamp it used to apply are both gone, and the core
+    /// names what it refused — the wrong length by its type, an out-of-range
+    /// component as `canvas background`. It is forwarded even when it is an
+    /// explicit `null`, which the core reads as absent; so a call carrying
+    /// nothing but that null is the core's identity refusal rather than the
+    /// "nothing to change" below, which is what a call carrying no colour key
+    /// at all still gets.
     func setCanvas(_ a: [String: Any]) throws -> String {
         let document = try target(a)
         let width = try intArg(a, "width")
@@ -181,7 +192,7 @@ extension AgentServer {
             throw ToolError(message: "height must be 16…16384 px (got \(height)).")
         }
         let fps = try fpsArg(a, "fps")
-        let background = try colorArg(a, "background")
+        let background = a["background"]
         let rescale = try boolArg(a, "rescale_clips")
         let fitNew = try boolArg(a, "fit_new_clips")
         let timecodeFrames = try boolArg(a, "timecode_frames")
@@ -193,7 +204,7 @@ extension AgentServer {
         return try editResult(
             document, "Canvas",
             [
-                .setCanvas(
+                .setCanvasRaw(
                     width: width, height: height, fps: fps, background: background,
                     rescaleClips: rescale, fitNewClips: fitNew, timecodeFrames: timecodeFrames)
             ])

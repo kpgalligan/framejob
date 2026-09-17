@@ -1,7 +1,7 @@
 # Reelcut — road map 7: deepening
 
-**Status: D1 IN PROGRESS — D1·1, D1·2 and D1·3 built (§2.1 to §2.3);
-D1·4 to D1·6 not started.**
+**Status: D1 IN PROGRESS — D1·1 to D1·4 built (§2.1 to §2.4); D1·5 and
+D1·6 not started.**
 
 Road maps 2 to 6 each added something a person using the app can see. This
 one does not. A **deepening** takes knowledge that is spread across callers
@@ -807,3 +807,180 @@ replace-whole paragraph, and `tools/proof/README.md`, which gains the new
 script in the run list and a section of its own.
 
 **Owed.** Nothing for this ticket. The other doors are #5 and #6 by design.
+
+### 2.4 D1·4 — the remaining property doors forward raw (kpgalligan/reelcut#5)
+
+**Commits.** `<TOLL>` (the proof's harness, alone), `<MAIN>` (the ticket) and
+`<FIX>` (what its review found, below).
+
+**What landed.** Eight doors, all of them copying D1·3's shape. Every
+caller-authored object the agent can send is now the core's to read, bar
+`set_action_end`'s and `add_zoom_action`'s (#6).
+
+- **Five handlers are four lines.** `set_audio`, `set_text`, `set_clip` and
+  `set_shape` are `target` → `clipsArg` → `rawPatchArg` → `editResult`, and
+  `add_text_clip` / `add_shape_clip` are the same with `newClipPatchArg` in
+  place of the third step. What went with them: `shapePatchArg` (all eleven
+  keys by hand, three-state `stroke` and `fill` included), `gradientArg`
+  (the gradient and every stop), `unitPoint`, `checkClipPatchTypes`,
+  `textArg` and `shapeArg`, the `shapePatchKeys` and `clipPatchKeys` sets,
+  three `patch.isEmpty` refusals and two `checkTextEnums` call sites —
+  **197 lines out of `AgentServer+Clips.swift`** (1205 → 1008).
+- **`colorArg` and `requiredColorArg` are deleted**, which is the payment
+  `AgentServer+Arguments.swift` owed at 587 against the ~600 cap: it is 558,
+  and #5 added no reader to it, exactly as §2.3 said it would not. Their
+  three callers were all this ticket's. `set_canvas`'s `background` and
+  `add_background`'s `color` are now `a["background"]` and `a["color"]`,
+  forwarded whole — an explicit `null` included, which the core reads as
+  absent under the envelope's own rule.
+- **Nine raw factories** in `ReelOps.swift` (974 → 1105, a table with
+  `edit.rs`'s standing exemption). Five are `setVideoRaw`'s five lines with
+  another op name. The other four differ from their typed twin in ONE
+  argument — a colour, or a new clip's patch — so the TYPED factory delegates
+  to the raw one rather than keeping a second copy of seven `OpArgs.put`
+  lines, mapping its optional explicitly: an `Optional<T>.none` widened
+  straight to `Any?` is a non-nil `Any` wrapping a nil, and the key would go
+  out as a null.
+- **The bare-string shorthand stays** and is one reader for both new-clip
+  ops (`newClipPatchArg`, 7 lines against the 46 `textArg` and `shapeArg`
+  were). It PRODUCES `{"content": …}` or `{"kind": …}`, which is then
+  forwarded; it judges nothing, so a bare `"square"` is the core's
+  ``bad value at "kind" in a shape patch: unknown variant `square` ``.
+
+**What an agent sees change**, all three in the catalog now:
+
+- **A nested object MERGES at these doors too.** `{"duck": {"level": 0.7}}`
+  keeps the attack and the release; `{"outline": {"width": 8}}` keeps the
+  colour; `{"gradient": {"angle": 90}}` keeps the stops it was drawn with,
+  where `gradientArg` replaced the whole gradient from `Gradient::default()`.
+  The catalog's `animationClause` and `gradientClause` said "REPLACED whole
+  rather than merged" in so many words; both now say what happens.
+- **A colour is four numbers everywhere.** The three-element form is refused
+  by length and an out-of-range component by name, at a patch key
+  (`bad value at "outline.color" in a text patch: invalid length 3`), inside
+  an array of objects (`gradient.stops[0].color`, which `withOpaqueColors`
+  could never reach) and at the two colour-only ARGUMENTS
+  (`canvas background must be between 0 and 1, not 2`,
+  `shape.fill must be between 0 and 1, not 2` — the plate is a shape clip,
+  so its own group answers and there is no second range rule to keep in
+  step). `colorProperty`'s schema is `minItems: 4` rather than 3.
+- **A wrong-typed `set_clip` key is refused rather than read as a clear.**
+  `{"label": 7}` was `.some(nil)` through the lenient decode and REMOVED the
+  label; it is `"label" in a clip patch must be a string or null, not 7`.
+
+**The proof is 189/189** (39 before), and it is four files. D1·3 landed it at
+exactly the 400 lines §0 gives a new file; eight sections is about four
+hundred more, so the split went by kind and the harness went FIRST, alone, as
+a pure move:
+
+| File | Lines | What is in it |
+|---|---|---|
+| `patch_door.py` | 185 | the harness: `Session`, `refused`, `landed`, `undo_marker`, `undo_claim`, `summary` |
+| `patch_door_patches.py` | 523 | the five doors whose object is a PATCH |
+| `patch_door_args.py` | 224 | the four whose object is an ARGUMENT |
+| `patch_door_proof.py` | 104 | what a patch means, the sentence forms, and `main` |
+
+The split by KIND is not cosmetic: an argument door's refusals are the op
+ENVELOPE's (`op "set_canvas" is not valid: invalid length 3, expected an
+array of length 4`) rather than the patch walk's, because there is no group
+to name, so its section is a different copy from a patch door's and the two
+marker comments say which one #6 should take for each of its doors. Section
+order is D1·3's throughout: fixture first — the clip must HOLD a value for
+every key a refusal names, or "the project is unchanged" proves nothing —
+then the undo marker, the refusals, the undo claim, the merges, the snap.
+
+**Three older scripts said something that is no longer true**, and each was
+moved to the core's WHOLE sentence rather than to a keyword, which is the
+rule §2.3 left behind: `phase2_proof.py`'s three `set_clip` typos (two of
+them asserted `patch.label` / `patch.name`, which the core does not say, so
+those two were red rather than quietly passing); `phase4_proof.py`'s two
+text-animation kinds (both keyword checks, both green against either door);
+and `phase6_proof.py`'s three gradient refusals. Phase 6 also had a CLAIM
+this ticket reverses — "a THREE-component stop colour is accepted and means
+the four-component one, byte for byte" — which is a refusal now, and one
+check longer for it (167 → 168). Its identity check moved with it: what the
+clip still holds after the refusal is the UNSORTED pair sent before it, so
+that is what re-sending is the identity of.
+
+**Measured.**
+
+- `make test`: 632 passed, 0 failed (no Rust changed). `make lint` and
+  `cargo fmt --check` clean. `make typecheck` 0 errors and the 4 known
+  AVFoundation warnings. `make app` succeeded; the startup parity log stayed
+  empty across every run.
+- Twelve proof scripts green on port 4824 — patch_door **189/189**, phase1
+  66/66, phase2 85/85, phase3 123/123, phase3_silence_scope 8/8, phase4
+  84/84, phase5 88/88, phase6 **168/168**, phase7 92/92, phase8 79/79,
+  phase9 216/216, remaining 79/79. `recording_proof.py` is 121/121 with 66
+  checks SKIPPED, the console being locked on this host; it calls none of
+  these doors.
+- Line counts: `AgentServer+Clips.swift` 1205 → 1008,
+  `AgentServer+Arguments.swift` 587 → 558, `AgentServer+Tracks.swift`
+  231 → 242, `AgentServer+Background.swift` 89 → 98, `ReelOps.swift`
+  974 → 1105, `AgentCatalog+Clips.swift` 930 → 937, `AgentCatalog.swift`
+  465 → 472. Net across the app: 742 lines deleted, 422 added.
+- **An instance deadlocks somewhere past forty open documents**, and this
+  ticket hit it: phase5 aborted at 48/88 with a peaks marker never written
+  and phase6 then timed out, on an instance that had already run six
+  scripts. Both were green on a fresh one. Relaunch between scripts, not
+  only between sessions.
+
+**Mutants.** Ten, each a rebuild of the app and a fresh instance on port
+4824. All ten caught; no survivor.
+
+| Mutant | Score |
+|---|---|
+| `set_audio` laundered again (`patchArg` + the typed factory) | patch_door **177/189** |
+| `set_text` laundered again (`patchArg` + `checkTextEnums`) | patch_door **173/189**; phase4 83/84 |
+| `set_clip` laundered, with the deleted type check NOT restored | patch_door **130/139, ABORTED**; phase2 79/85 |
+| `colorArg` restored at the two colour-only arguments | patch_door **175/189** |
+| both bare-string shorthands dropped | patch_door **151/151, ABORTED** |
+| `snap_animation` made a no-op | patch_door **188/189** |
+| the core's key walk (`check_keys`) disabled | patch_door **118/151, ABORTED**; phase3 121/123 |
+| the deep merge made shallow (a nested object replaces) | patch_door **29/32, ABORTED** |
+| `Group::Shape`'s template loses its `Gradient::default()` | patch_door **184/189**; phase6 ABORTED on an unhandled refusal |
+| **D1·4's whole Swift half reverted** (the four files at `HEAD`) | patch_door **79/121, ABORTED**; phase2 82/85; phase4 82/84; phase6 163/168 |
+
+The last row is the one #7 owes against every door at once, run here against
+these eight; the first four are the same mutant aimed at one door each, which
+is what says a section is discriminating rather than the batch. The one that
+scores highest — `snap_animation`, at 188/189 — is a one-check claim by
+construction, and that is the right size for it: the snap is one value.
+
+**What the next ticket inherits.**
+
+- **The raw factory's shape, in its second spelling.** A door whose
+  caller-authored object is the WHOLE argument copies `setVideoRaw`; a door
+  where it sits beside ordinary arguments (`add_zoom_action`'s `region`)
+  copies `setCanvasRaw` — the raw factory holds the body and the typed one
+  delegates with an explicit `.map { $0 as Any }`.
+- **A colour is four numbers at every door**, and `colorArg` no longer
+  exists to be called. #6's `set_action_end` reaches colours through
+  `patchArg`'s `withOpaqueColors`, which is the last launder standing and
+  is #7's to delete.
+- **What is left uncalled after this ticket**, for #7's sweep: `patchArg`,
+  `decodePatch` and `withOpaqueColors` (one caller, `set_action_end`);
+  `checkVideoEnums`, `checkTextEnums` and `checkActionPatch` (the same one);
+  `videoPatchKeys`, `audioPatchKeys` and `textPatchKeys` (read by
+  `checkActionPatch` alone). Nothing this ticket left is dead today.
+- **The proof's four files**, and the two marker comments that say which
+  file each of #6's doors goes in.
+
+**Documents.** `app/CLAUDE.md`'s `ReelOps.swift` entry (the nine raw
+factories, and the delegation rule), its `ProjectSnapshot.swift` entry (ONE
+handler still checks by hand) and its `AgentServer+Arguments.swift` entry
+(no `colorArg`, and `patchArg`'s one remaining door). The catalog's
+`colorProperty`, `textPatchDescription`, `shapePatchDescription`,
+`animationClause` and `gradientClause`, plus the comment above the last of
+those, which claimed the gradient was the only nested object that named its
+own mistakes — true when phase 6 wrote it, false since D1·1.
+`tools/proof/README.md`'s patch-door section (the four files, the new
+sections, the older scripts' moved assertions).
+`designs/reelcut-app-notes.md`'s header, which warned that a FILE it
+describes may since have gone and now warns about a function too, naming the
+family D1 deleted. Nothing in `designs/reelcut-design.md` needed changing:
+§6's patch row and §7's raw-factory paragraph were both written generally by
+D1·3, and no spec sentence promised a three-element colour.
+
+**Owed.** Nothing for this ticket. `set_action_end` and `add_zoom_action`
+are #6 by design, and the deletion sweep is #7's.

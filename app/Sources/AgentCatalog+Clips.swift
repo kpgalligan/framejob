@@ -160,23 +160,25 @@ extension AgentServer {
             ", animation (null or {kind: \(animationNames.joined(separator: "|")), in, out} — "
             + "how the words arrive and leave. in and out are DURATIONS in ticks measured from "
             + "the clip's own first and last frame, not times; either may be 0 for no ramp at "
-            + "that end, and in + out longer than the clip simply shows a partial reveal. Like "
-            + "shadow and backdrop it is an OBJECT and is REPLACED whole rather than merged, so "
-            + "send every key you want: one you leave out arrives as its default, a 1 s "
-            + "typewriter with no un-reveal)"
+            + "that end, and in + out longer than the clip simply shows a partial reveal, and "
+            + "both are snapped to the document's frame grid. Like shadow and backdrop it "
+            + "MERGES: a key you leave out keeps what is stored, and {animation: null} clears "
+            + "the whole thing)"
         let textPatchDescription: String =
             "Text properties to merge. Keys: content, font (a PostScript name), size (px), "
             + "color, align (left|center|right), valign (top|middle|bottom), line_spacing, "
             + "tracking, outline (null or {width, color}), backdrop (null or {color, padding, "
             + "radius}), width (null for auto-sizing, or a wrap width in px)"
             + animationClause
-            + ". A colour is [r, g, b] or [r, g, b, a], each 0–1."
+            + ". A colour is FOUR numbers, [r, g, b, a], each 0–1: three is refused by "
+            + "length and a component outside the range is refused by name, neither "
+            + "filled in nor clamped."
         // `shape.gradient`'s clause, its own local for the budget reason the
-        // other hoisted clauses give — and worth a line of its own, because it
-        // is the one patch member that names its own mistakes: the shape patch
-        // is built by hand rather than decoded, so a key misspelt INSIDE
-        // gradient is refused by name, which shadow, chroma and an obscure
-        // region cannot manage.
+        // other hoisted clauses give. It used to be worth a line of its own as
+        // the only patch member that named its own mistakes, the shape patch
+        // being hand-read rather than decoded; since D1·1 the core names a
+        // misspelt key inside ANY nested object by its dotted path, stop
+        // indices included, so the gradient is no longer the exception.
         let gradientKindNames = GradientKind.allCases.map { $0.rawValue }
         let gradientClause: String =
             ", gradient (null, or {kind: \(gradientKindNames.joined(separator: "|")), "
@@ -186,8 +188,9 @@ extension AgentServer {
             + "ramp; the stops need NOT be sorted, and the renderer sorts them. angle is "
             + "degrees from the RIGHT turning counter-clockwise, the convention shadow's angle "
             + "uses, and means nothing for radial, which is an ellipse inscribed in the box. "
-            + "line and arrow have no area and ignore it. Like stroke it is an OBJECT and is "
-            + "REPLACED whole rather than merged, so send every key you want)"
+            + "line and arrow have no area and ignore it. Like stroke it MERGES: a key you "
+            + "leave out keeps what is stored, {gradient: null} clears it and brings the flat "
+            + "fill back out, and the stops are a LIST, so sending one replaces them all)"
         // Interpolated rather than concatenated: a `+` chain this long with
         // a non-literal operand in it is what tips the whole `catalog`
         // literal past the type checker's budget.
@@ -198,7 +201,9 @@ extension AgentServer {
             + "corners), arrow_start, arrow_end, and from / to — the endpoints of a line or "
             + "arrow as UNIT coordinates in its box, e.g. from [0, 1] to [1, 0]"
             + gradientClause
-            + ". A colour is [r, g, b] or [r, g, b, a], each 0–1."
+            + ". A colour is FOUR numbers, [r, g, b, a], each 0–1: three is refused by "
+            + "length and a component outside the range is refused by name, neither "
+            + "filled in nor clamped."
         // The fifth patch, `set_clip`'s. The label names are `ClipLabel`'s —
         // the one home of the marker-colour vocabulary — read rather than
         // restated, and typed for the same budget reason as the four above.

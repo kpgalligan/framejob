@@ -1312,22 +1312,28 @@ def gradient_rules_part(mcp):
           f"an `at` outside 0–1 is refused by its dotted key — got {outside!r}")
     conic = s.error("set_shape", clips=[clip], patch={
         "gradient": gradient("conic", stops=[stop(0, A_STOP), stop(1, B_STOP)])})
-    check(conic is not None and "gradient.kind" in conic and "conic" in conic,
+    check(conic is not None
+          and 'bad value at "gradient.kind" in a shape patch: unknown variant `conic`' in conic,
           f"a geometry outside the closed enum is refused rather than decoded "
           f"leniently into `linear` — got {conic!r}")
-    # The win worth pinning: because `shapePatchArg` is HAND-BUILT, a key
-    # misspelt INSIDE `gradient` is refused BY NAME. `shadow` (since M3),
-    # `chroma`, an `obscure` region and `animation` all go through the
-    # generic decoder, which drops the unknown key in silence and sends every
-    # key the caller omitted as its default.
+    # The three sentences below are the CORE's since deepening D1·4
+    # (kpgalligan/reelcut#5), which took `set_shape` raw and deleted the
+    # hand-built `shapePatchArg` and `gradientArg` this phase wrote. What
+    # was worth pinning then — that a key misspelt INSIDE `gradient` is
+    # refused by name, which no other nested object in a patch managed — is
+    # now true of every one of them, `shadow`, `chroma`, an `obscure` region
+    # and `animation` included, and it is the whole sentence that is
+    # asserted: a check for "stpos" alone passed against both doors.
+    # `tools/proof/patch_door_proof.py` §4 proves this door in full.
     typo = s.error("set_shape", clips=[clip],
                    patch={"gradient": {"kind": "linear", "stpos": []}})
-    check(typo is not None and "stpos" in typo,
+    check(typo is not None and 'unknown key "gradient.stpos" in a shape patch' in typo,
           f"a key misspelt inside `gradient` is refused BY NAME — got {typo!r}")
     stop_typo = s.error("set_shape", clips=[clip], patch={
         "gradient": {"stops": [{"at": 0, "colour": grey(A_STOP)},
                                {"at": 1, "color": grey(B_STOP)}]}})
-    check(stop_typo is not None and "stops[0]" in stop_typo and "colour" in stop_typo,
+    check(stop_typo is not None
+          and 'unknown key "gradient.stops[0].colour" in a shape patch' in stop_typo,
           f"…and one misspelt inside a STOP is refused by its index — got {stop_typo!r}")
     check(s.frame() == plain and s.clip(clip)["shape"]["gradient"] is None,
           "…and after six refusals the clip still has no gradient and renders the "
@@ -1362,21 +1368,30 @@ def gradient_rules_part(mcp):
           "an UNSORTED stop list is accepted and renders the SORTED ramp, byte for "
           "byte — the core leaves the order alone on purpose and the renderer sorts")
 
-    # A three-component stop colour, which `withOpaqueColors` could not have
-    # reached: it recurses into nested dictionaries but not into arrays of
-    # them, so this only works because the reader is hand-built.
-    s.op("set_shape", clips=[clip], patch={
+    # A three-component stop colour, which the hand-built reader accepted and
+    # completed with an opaque alpha. Deepening D1·4 (kpgalligan/reelcut#5)
+    # ended that: a colour is FOUR numbers at every door, the length is
+    # refused by the core's own type, and the frame is the one it was — the
+    # claim this check makes now, where it used to claim the opposite.
+    refusal = s.error("set_shape", clips=[clip], patch={
         "gradient": {"kind": "linear", "angle": 0,
                      "stops": [stop(0.25, A_STOP, components=3),
                                stop(0.75, B_STOP, components=3)]}})
+    check(refusal is not None
+          and 'bad value at "gradient.stops[0].color" in a shape patch: invalid length 3'
+          in refusal,
+          f"a THREE-component stop colour is REFUSED by its length — got {refusal!r}")
     check(s.frame() == ordered,
-          "a THREE-component stop colour is accepted and means the four-component "
-          "one, byte for byte")
+          "…and the frame is the one the four-component ramp drew, byte for byte")
+    # The same claim read off the MODEL rather than off the frame: what is
+    # stored is still the unsorted pair sent above, so re-sending exactly
+    # that is the identity. Were the refused patch to have landed instead,
+    # this would be a real edit and answer nothing.
     identity = s.error("set_shape", clips=[clip], patch={
-        "gradient": gradient("linear", 0.0, [stop(0.25, A_STOP), stop(0.75, B_STOP)])})
+        "gradient": gradient("linear", 0.0, [stop(0.75, B_STOP), stop(0.25, A_STOP)])})
     check(identity is not None and "made no change" in identity,
-          "…and re-sending it WITH the alpha is the identity, which is the same claim "
-          f"read off the model rather than off the frame — got {identity!r}")
+          "…and the stops the clip still holds are the ones sent BEFORE the refusal, "
+          f"since re-sending those is the identity — got {identity!r}")
 
     # `{gradient: null}` is an exact inverse, because setting one never
     # cleared `fill`.

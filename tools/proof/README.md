@@ -2285,8 +2285,20 @@ what it proves is the single door every caller-authored object comes through
 (`core/src/patch.rs`, `CONTEXT.md`'s **Patch**), and the doors arrive one
 deepening ticket at a time (`designs/reelcut-roadmap-7.md` §1). D1·3
 (kpgalligan/reelcut#4) built it with `set_video`'s section, at **39/39**;
-D1·4 and D1·5 add theirs beside it, and the file says in a marked comment
-where the next one goes and what has to change in the copy.
+D1·4 (#5) added eight more and it is **189/189**; D1·5 (#6) adds the last
+two. Each door file says in a marked comment where the next one goes and
+what has to change in the copy.
+
+**It is four files and one script.** The sections outgrew a single file when
+D1·4's eight landed, so the split went by kind, under `CLAUDE.md`'s size
+rule:
+
+| File | What is in it |
+|---|---|
+| `patch_door.py` | the harness — `Session`, and the four helpers every section is built out of. Split off ALONE, as a pure move, before a door was added |
+| `patch_door_patches.py` | the doors whose caller-authored object is a PATCH: `set_video`, `set_audio`, `set_text`, `set_shape`, `set_clip` |
+| `patch_door_args.py` | the doors whose object is an ARGUMENT: `add_text_clip`'s `text`, `add_shape_clip`'s `shape`, `set_canvas`'s `background`, `add_background`'s `color` |
+| `patch_door_proof.py` | what a patch means, which sentences the core gives, and `main`. The only one to run |
 
 What it asserts, per door: the four refusal sentences VERBATIM rather than
 by keyword (`unknown key`, `missing key`, `bad value at`, `<group> patch
@@ -2295,7 +2307,12 @@ refusal, that one `undo` after a whole batch of refusals puts back the one
 real edit that preceded them — so not one refusal registered a step — and
 then the merge rules read back through `get_project` (one key changed,
 siblings kept, `null` clearing, a list replacing, a motion slot kept) and
-the frame-grid snap the core applies to the ticks a patch carries.
+the frame-grid snap the core applies to the ticks a patch carries. An
+ARGUMENT door has no group to name, so its wrong TYPE is the op envelope's
+sentence one level out (`op "set_canvas" is not valid: invalid length 3,
+expected an array of length 4`) with `props_check.rs`'s range refusal under
+it; the two new-clip doors also assert that the bare-string shorthand still
+makes a clip with those words, and a shape clip of that kind.
 
 **Why it exists beside `core/tests/patch_door.rs`, which proves the same
 rules through the FFI.** Those tests cannot see the Swift agent door, which
@@ -2307,11 +2324,16 @@ was clamped — each of them reported as a success. Only a call made over MCP
 against the built binary tells the two apart. It needs no ffmpeg and nothing
 in `media/` but `A.mov`.
 
-Two assertions elsewhere moved here in spirit rather than in place, and both
-are noted in their own files: `phase6_proof.py`'s `set_video` refusals (the
-partial filter entry, the misspelt filter kind, the misspelt blend) now
-assert the core's whole sentence instead of the Swift door's `patch.`-prefixed
-key, and `phase3_proof.py`'s printed NOTE that a misspelt key inside a
-nested object was dropped is two CHECKS now, because it no longer is. The
+Assertions elsewhere moved here in spirit rather than in place, each noted in
+its own file. D1·3: `phase6_proof.py`'s `set_video` refusals (the partial
+filter entry, the misspelt filter kind, the misspelt blend) now assert the
+core's whole sentence instead of the Swift door's `patch.`-prefixed key, and
+`phase3_proof.py`'s printed NOTE that a misspelt key inside a nested object
+was dropped is two CHECKS now, because it no longer is. D1·4:
+`phase2_proof.py`'s three `set_clip` typos, `phase4_proof.py`'s two text
+animation kinds and `phase6_proof.py`'s three gradient refusals are the
+core's sentences, and phase 6's "a THREE-component stop colour is accepted
+and means the four-component one" is now a REFUSAL — a colour is four
+numbers at every door, so that script is one check longer (167 → 168). The
 `set_action_end` refusals in both files are still the Swift door's until
 kpgalligan/reelcut#6.
