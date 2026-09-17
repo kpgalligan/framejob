@@ -811,7 +811,7 @@ script in the run list and a section of its own.
 ### 2.4 D1·4 — the remaining property doors forward raw (kpgalligan/reelcut#5)
 
 **Commits.** `7144586` (the proof's harness, alone), `07a75eb` (the ticket)
-and the review-fix commit named at the foot of this section.
+and `f9b5276` (what its review found, below).
 
 **What landed.** Eight doors, all of them copying D1·3's shape. Every
 caller-authored object the agent can send is now the core's to read, bar
