@@ -355,7 +355,7 @@ back behind the strip (1 test), `without_nulls` made the identity (2), and
 
 ### 2.2 D1·2 — what a patch may carry (kpgalligan/reelcut#3)
 
-**Commits.** `a36314b` (the toll), `a5424cf` (the ticket) and `SHA3` (what
+**Commits.** `a36314b` (the toll), `a5424cf` (the ticket) and `5157501` (what
 its review found, below).
 
 **What landed.** Core and documents only, again: the agent door still
