@@ -17,8 +17,9 @@ no op, no field and no FFI export**, so §5, §6 and the header do not move.
 What it amends is §1 (the non-goal), §3 (the welcome window), §7.4 (the
 Swift file map), §7.9 (the tool list), §9 (one key) and §11 (five
 decisions, written below so they are made before the code and not by it).
-`CLAUDE.md` holds the milestone status; its paragraph for this phase is
-written when the proof exists. Every fact below that was read off the tree
+The phase's record is written into this document when the proof exists;
+the `CLAUDE.md` files carry rules and maps only, never a status paragraph.
+Every fact below that was read off the tree
 carries its file and line, and every fact that was read off a header is
 marked so; **the scouts verify both, they do not trust them** — the road map
 2 record shows the plan overturned by the code in every phase.
@@ -1549,7 +1550,7 @@ warnings), the parity log EMPTY, the catalog at 75, every earlier proof
 unchanged against the final binary (66, 85, 121, 8, 84, 88, 167, 92, 79,
 214 over MCP — phase 9's exact count now a floor — and 26, 33, 59, 81, 70,
 78, 150, 48, 62, 101 offscreen), the status table above saying "done" with
-the date and the commit, and `CLAUDE.md`'s milestone status, the spec's
+the date and the commit, and the record in this document, the spec's
 tables and the README saying what now exists. Plus road map 2's clause: the
 change has been read back adversarially and what that found is fixed and
 covered. And one of this road map's own: **R0's five answers are in this

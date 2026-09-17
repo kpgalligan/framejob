@@ -1,9 +1,10 @@
 # Reelcut — road map 4: Remove Silences, second pass
 
-**Status: DESIGNED, not built.** The spike (S0) was RUN on 2026-09-13 and
-its answers are pasted below before any plan leans on them; the phase (S1)
-is planned and waits on the user's call. Nothing in this document is in the
-tree except the spike's own instruments (`tools/proof/silence_spike/`).
+**Status: BUILT — S1 landed in `1c3e92e` (2026-09-15); its own proof
+instruments (§4g) are still owed.** The spike (S0) was RUN on 2026-09-13 and
+its answers are pasted below before any plan leans on them; §8 is the record
+of what landed, what was verified and what is owed. The sections between
+are the plan as it was written.
 
 Road map 2's phase 3a shipped Clip ▸ Remove Silences… and `detect_silence`
 over one rule: a moment is quiet when `peak × envelope` is under a fixed
@@ -514,3 +515,58 @@ binary and quoted "against the N it had at the time".
   10 ms decision at 50 % recall in noise), **any Rust route** (spec §7).
 - **Gemini** (q8, decision 5).
 - **Persisting the sheet's mode** — nothing in the sheet persists today.
+
+---
+
+## 8. S1 — the record (written 2026-09-17, after the fact)
+
+**`1c3e92e` (2026-09-15).** 23 files, +1343 / −211. From the commit's own
+account; the plan above is kept as written.
+
+- The second signal is Silero VAD v6.2.1 as a Core ML program, vendored
+  COMPILED at 640 KB under its MIT notice, with
+  `app/Resources/Models/PROVENANCE.md` naming the upstream tag, the
+  conversion repository, the download's revision and a sha256 per file.
+  Core ML is the runtime: no new dependency, no grant, no `async` exception,
+  no deployment-target change.
+- `SileroVAD.swift` is the streaming wrapper — 512 new samples and 64 of
+  carried context per prediction, the LSTM state fed back, the remainder held
+  across `feed` calls. `MLModel.prediction` is synchronous, which lets one
+  class serve the cache pass and, through the cache, a detector on main.
+  Availability is one process-wide `NSLock`-guarded reason; the first failure
+  is kept and logged, and a marked-unavailable process never retries until
+  relaunch.
+- The probabilities are a per-media CACHE, never computed at feature time:
+  `cache/speech/<id>.bin`, one float per 32 ms chunk, beside `peaks/` and
+  stamped on the same terms; `SpeechStamp` WRAPS `CacheStamp` with the model
+  name and the chunk size, so a model change rebuilds speech caches and no
+  filmstrip. The pass runs AFTER `peaks` in `generateCaches`, so the peaks
+  `.bin` withdrawal is never held behind a full-file decode and an inference.
+- `SilenceDetector` gains a `Mode`, and the ORDER of its per-step test is
+  the point: the gain FLOOR first (factored out of `level`), so a
+  turned-down, faded or ducked clip is quiet in either mode before the model
+  is consulted; then a media holding no voice anywhere falls back to level
+  for its whole span; then a media whose speech cache has not landed is never
+  quiet. `detect` stays pure and synchronous.
+- The sheet gains a Judge by popup (its Voice row disabled, not removed,
+  when the model cannot be used) and notes for pending speech and for files
+  judged by level; `detect_silence` gains `mode` and `voice_confidence`,
+  reports both back, and folds both waiters into `pending_peaks`.
+- Two pure moves paid the size toll first: `SilenceDetector+Walls.swift`
+  (the nest walls and the directional frame snap) and
+  `AgentCatalog+Audio.swift`, whose two rows are spliced back at the same
+  point in the catalog so `tools/list` keeps its order.
+
+**Verified at the landing:** `make typecheck` 0 errors and the same 4
+AVFoundation warnings, `make app` building, the catalog still 75 tools with
+`detect_silence` and `normalize_clip` in their old positions, the startup
+parity log EMPTY, the bundled model found and voice the default mode against
+the built binary, the three new argument refusals exact, and phase 3's
+`phase3_proof.py` 121/121 and `phase3_silence_scope.py` 8/8 unchanged — the
+fallback is what makes a tone fixture answer what it always did.
+
+**Owed, as of this record:** the phase's own proof instruments — §4g's
+`tools/proof/silence2_proof.py` (11 claims) and `silence2_probe.py` (6 more)
+with 8 named mutants — so the voice path's edges, the cache's stamp rules and
+the wrapper's trace are unproved by a tracked instrument; the reader review;
+and §4h's checks by a person at the machine.

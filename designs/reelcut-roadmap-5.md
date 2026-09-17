@@ -1,6 +1,10 @@
 # Reelcut — road map 5: transitions and motion (E1, E2)
 
-**Status: PLANNED, not built.** Two phases, taken on 2026-09-15 from the
+**Status: BUILT — E1 and E2's core in `e8028a2` (2026-09-16),
+`add_transition`'s `ripple` form in `5da056c` (2026-09-16), E2's chrome in
+`6dda2c7` (2026-09-17); both phases' own proof instruments and the reader
+review are still owed — §12 is the record.** Two phases, taken on
+2026-09-15 from the
 survey of another editor's transitions, effects and filters
 (`designs/reelcut-effects-survey.md`): **E1**, transitions learn direction,
 easing, an audio crossfade and a way to be added at a hard cut; **E2**, clips
@@ -1164,11 +1168,12 @@ enters a nest and never sets a kind), §5.2 (`transition_in` at :919-922;
 `add_blurred_background` dropping motion; `split_clip`'s rule), §7.2 (the
 crossfade term at :1467-1490), §7.3 (eased progress at :1641-1643), §7.4 (the
 Swift file map), §7.5 (transitions at :1812-1816), §7.10 (the new modules),
-`core/CLAUDE.md` (module map, sizes, the one-past fixture note),
+`core/CLAUDE.md` (module map, the one-past fixture note),
 `app/CLAUDE.md` (file map, the `structural` exception, the Motion section),
-root `CLAUDE.md` (a status paragraph per phase, the catalog count 77 in
-"Verifying a build"), `tools/proof/README.md` (the count handover, the two
-scripts). Line numbers above are S1's working tree; re-read before editing.
+this document's record (§12 — never a status paragraph in the root
+`CLAUDE.md`, which carries rules and maps only), `tools/proof/README.md`
+(the count handover, the two scripts). Line numbers above are S1's working
+tree; re-read before editing.
 
 ---
 
@@ -1261,3 +1266,108 @@ clips; LUT import; voice effects; background removal — the survey's E3–E9,
 with their designs, two measured spikes and review findings, in
 `designs/reelcut-effects-survey.md`. Nothing in road map 5 depends on them,
 and nothing in them is planned.
+
+---
+
+## 12. E1 and E2 — the record (written 2026-09-17, after the fact)
+
+The plan above is kept as written. What landed, from the three commits'
+own accounts; the sections above say what each was meant to be.
+
+**`e8028a2` (2026-09-16) — E1 and E2's core, both in one commit** because
+they share the files a schema bump touches (`format.rs`, the header,
+`model_tests.rs`, the `schema_v*` tests, the proof scripts' version
+literals, both side `CLAUDE.md` maps, spec §5/§6) and no E1-only tree was
+kept to verify a split against. 68 files, +7656 / −918.
+
+- E1, schema v7, `OP_NAMES` 57, catalog 77. Tolls first as pure moves gated
+  alone: `edit_transition.rs` (the three transition ops out of
+  `edit_clip.rs`), `audio_duck.rs` (ducking out of `audio.rs`),
+  `VideoPane+Transition.swift`; then `audio_crossfade.rs` mid-phase when
+  `audio.rs` measured 635 with the crossfade in it. `Transition` gains
+  `curve` and `audio`; `TransitionKind` gains `wipe_left` / `wipe_up` /
+  `wipe_down`; `Transition::minted` writes `ease_in_out` + `audio: true`
+  where a file's absent keys still read `linear` + `false`. Two ops:
+  `add_transition` builds the overlap from handles at a hard cut with nothing
+  else moving; `set_transition_style` sets curve and audio. The crossfade is
+  constant power per stage, honours `Side` so the outgoing clip's last
+  breakpoint is 0, and samples with the action loop's own step formula.
+  Remove Silences never proposes a cut inside an overlap. Clip ▸ Transition
+  at a hard cut calls `add_transition` (0.5 s, centred); the section gains
+  Curve and Crossfade Audio rows. Both MCP handlers refuse every string
+  argument by name (`curveArg` widened to internal). `phase9_proof.py`'s
+  one-past-the-version fixture moved 7 → 8.
+- E2 phase 1, schema v8, no op — core and MCP only. Tolls: `model_shape.rs`
+  (`model_props.rs` 600 → 401), `edit_split.rs` (`edit_clip.rs` 1171 →
+  1038), one `Project::source_size` in `model_query.rs` collapsing two
+  private twins. `video.motion` is `{in, out, during}` (`model_motion.rs`).
+  `motion.rs` is one pure function applied ONLY where placement is produced
+  — `recipe.rs`'s `layer` and `frame_of` — never in `evaluate_clip`, so
+  every edit path reads un-moved props; it short-circuits when no slot is
+  active. `evaluate_clip` restores the base motion behind an Object guard;
+  `set_action_end` refuses the key. A split clears `out` on the first half
+  and `in` on the second, every splitter inheriting it (and `text.animation`
+  got the same fix); join, freeze and the blurred background decide too.
+  Swift: `MotionProps.swift`, the snapshot and `VideoPatch` fields,
+  `AgentServer+Motion.swift` reading motion by hand so a misspelt key at any
+  level is refused by name.
+- Verified on that tree: `make test` 608 passed (494 at the previous HEAD),
+  `make lint` and `cargo fmt --check` clean, `make typecheck` 0 errors and
+  the same 4 AVFoundation warnings, `make app` building, the parity log
+  empty, 77 tools with 57 ops. Over MCP, each on a fresh instance: phase1 66,
+  phase2 85, phase3 121, phase4 84, phase5 88, phase6 167, phase7 92, phase8
+  79, phase3_silence_scope 8, remaining 79, phase9 216. Offscreen:
+  phase6_chrome 70, recording_probe 876 on a locked console (917 unlocked).
+  Two host-state numbers, neither a regression: phase8_chrome 144/150 on a
+  locked console, recording_proof 186/187 with a Bluetooth default input.
+
+**`5da056c` (2026-09-16) — `add_transition`'s `ripple` form and the sheet.**
+At a hard cut between two whole files there are no handles, so the menu
+beeped; `setTransitionKindCommand` now tries the batch and, when no
+`add_transition` in it would land, puts up a sheet saying why, whose Shift
+Clips Left sends the same cuts with the new `ripple` flag as one undo step.
+The user chose what moves: the incoming clip and every clip at or after the
+cut on every unlocked track slide left (spec §11 R5-3's amendment). In the
+core, `add_transition_by_shift` over `edit_time.rs`'s `shift_clips` (now
+`pub(crate)`): no handle read, `align` ignored, the overlap capped at half
+the shorter clip and stepped down a frame at a time until every moved track
+passes the overlap rule; a pushed clip gains a minted `cross_dissolve`,
+markers stay, a locked incoming track is `None`. No new op. Verified:
+`make test` 621 (13 new in `core/tests/ripple_transition.rs`, four mutants
+each killed); `tools/proof/transition_sheet_probe.py` 32/32 in a real window
+(mutants: sheet never presented 14/32, ripple false 24/32, apply guard broken
+28/32; one survivor — `applyEdit` for `performGroupedEdit` — recorded in
+`tools/proof/README.md`). 12 files, +968 / −28.
+
+**`6dda2c7` (2026-09-17) — E2's chrome.** The Clip tab's Motion section
+(`VideoPane+Motion.swift`), shut by default and registered after Obscure:
+In and Out (kind or None, duration), During (kind or None, Amount %, Period
+— disabled for Drift) and Preview, which sets the in/out range to the clip
+and turns Loop on. Clip ▸ Motion ▸ In / Out / During and Preview
+(`EditorViewController+Motion.swift`), placed after Transition ▸ rather than
+the plan's "after Label"; a row is checked only when every target agrees.
+Every write is one `set_video` PER CLIP through `MotionProps.with(...)`,
+because a motion patch replaces the whole object. `InspectorBinding.structural`
+puts motion on the BASE props even inside an action. The name strip draws
+in/out wedges and a During glyph for a clip `InspectorTab.hasPixels`
+accepts; a zoom armed over a clip with a During motion draws a second hint
+pill. `phase6_chrome.py`'s TALL went 1400 → 1600 (the new shut header pushed
+the gradient fixture's open stack past the pane). Verified: `make typecheck`
+at baseline, `make app`, the parity log empty; phase3_chrome 33/33,
+phase4_chrome 59/59, phase6_chrome 70/70, phase7_chrome 78/78,
+transition_sheet_probe 32/32; an UNTRACKED probe over `app/Sources` 17/17
+(menu selectors, per-clip writes, one undo restoring `project.json` byte for
+byte, checkmarks, Preview). 12 files, +503 / −11.
+
+**Owed, as of this record:**
+
+- E1's and E2's own proof instruments — `e1_proof.py`, `e1_chrome.py`,
+  `e2_proof.py`, `e2_chrome.py` / probe — with their named mutants (§4e,
+  §6e), and the reader review (§4f, §6f). Everything verified above is the
+  pre-existing proofs re-run, 114 new core tests, and one tracked probe for
+  the sheet.
+- Four review nits from `6dda2c7`: any negative menu tag reads as None; the
+  glyph infers the label dot from `nameEnd`; the zoom hint's note is fixed at
+  arm time; `phase6_chrome.py`'s comment still says 1600 measures
+  identically to 1400.
+- §4g's and §6g's checks by a person at the machine.

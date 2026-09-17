@@ -1,5 +1,9 @@
 # Reelcut — road map after M1
 
+> The per-milestone record the root `CLAUDE.md` carried — M1, M2, M3, the
+> chrome cleanup, and every road-map-2 and road-map-3 phase — is
+> `reelcut-milestones.md` since 2026-09-17, moved verbatim and unmaintained.
+
 **Status: M1, M2 and M3 are built. Every feature in `reelcut-design.md`'s
 milestone list (§10) is implemented and verified against a running binary.**
 What is left of the SPEC is not features: it is the half of the acceptance
@@ -8,8 +12,9 @@ What to build beyond the spec is `reelcut-roadmap-2.md`.
 
 This is the companion to `reelcut-design.md`, which stays normative for the
 schemas (§5), the op table (§6) and the architecture (§7); this document never
-overrides it. `CLAUDE.md` holds the milestone status and is the file to update
-as work lands.
+overrides it. `reelcut-milestones.md` holds the M1–M3 milestone record (moved out of
+`CLAUDE.md` on 2026-09-17, unmaintained); a road map's own document is the
+file to update as work lands.
 
 Published as a page (the pre-M3 version, kept for the phase plan it describes):
 <https://claude.ai/code/artifact/be6e91de-48f2-413e-a5f1-a4a91a01a0a1>
@@ -109,4 +114,4 @@ a screencast editor's editor rather than Final Cut's.
 Verification is driving the built binary over MCP and comparing `render_frame`
 output or measured audio, not reading code — the launch line and the tool list
 are in `CLAUDE.md`. Work is finished when that evidence exists, `make test`
-and `make lint` are clean, and `CLAUDE.md`'s milestone status matches.
+and `make lint` are clean, and the road map's own record matches.

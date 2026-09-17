@@ -200,11 +200,51 @@ would be the bare strip with a longer list.
 
 ## 3. The size debt
 
-25 files in `app/Sources` are over the ~600-line cap. Most are long-standing;
-these are the ones the last three phases and the closing above moved. Road map
-3 paid three tolls — `AgentCatalog.swift` first and alone (R1·toll), then
-`MediaImporter.swift` and `AgentServer+Recording.swift` mid-fix-wave when a
-fix took each over its line — and left two files AT the cap:
+Every file over the ~600-line cap as of 2026-09-17 — 30 of them.
+Regenerate the list with
+`wc -l app/Sources/*.swift core/src/*.rs | awk '$1>600 && $2!="total"' | sort -rn`
+rather than trusting the numbers here; the standing exemptions are
+`core/src/edit.rs` and `app/Sources/ReelOps.swift`, which are TABLES with one
+row per op.
+
+| File | Lines |
+|---|---|
+| `app/Sources/ProjectSnapshot.swift` | 2516 |
+| `app/Sources/InspectorPane.swift` | 1665 |
+| `app/Sources/TimelineView.swift` | 1630 |
+| `app/Sources/ReelCore.swift` | 1503 |
+| `app/Sources/VideoPane.swift` | 1411 |
+| `app/Sources/Compositor.swift` | 1391 |
+| `app/Sources/ProjectDocument.swift` | 1353 |
+| `app/Sources/ReverseRenderer.swift` | 1311 |
+| `app/Sources/AgentServer+Clips.swift` | 1222 |
+| `app/Sources/EditorViewController.swift` | 1123 |
+| `app/Sources/ExporterWriter.swift` | 1114 |
+| `app/Sources/PreviewCanvasView.swift` | 1104 |
+| `app/Sources/CanvasSessions.swift` | 1088 |
+| `app/Sources/OptionControls.swift` | 1081 |
+| `core/src/edit_clip.rs` | 1043 |
+| `app/Sources/ReelOps.swift` | 974 |
+| `app/Sources/Transcriber.swift` | 934 |
+| `app/Sources/AgentCatalog+Clips.swift` | 919 |
+| `app/Sources/AudioDSP.swift` | 890 |
+| `core/src/edit.rs` | 878 |
+| `app/Sources/AgentServer.swift` | 772 |
+| `app/Sources/FFmpegRewrap.swift` | 768 |
+| `app/Sources/Loudness.swift` | 742 |
+| `core/src/edit_track.rs` | 674 |
+| `app/Sources/ExportSheetController.swift` | 639 |
+| `app/Sources/Exporter.swift` | 609 |
+| `app/Sources/ClipPane.swift` | 609 |
+| `app/Sources/AgentCatalog+Files.swift` | 609 |
+| `app/Sources/MediaImporter.swift` | 604 |
+| `app/Sources/CompositionBuilder.swift` | 601 |
+
+The notes below are from road map 3's close and name each file's SEAM, which
+is what a phase needs before it pays; the counts in them are as of that day.
+Road map 3 paid three tolls — `AgentCatalog.swift` first and alone (R1·toll),
+then `MediaImporter.swift` and `AgentServer+Recording.swift` mid-fix-wave
+when a fix took each over its line — and left two files AT the cap:
 
 | File | Now | Note |
 |---|---|---|

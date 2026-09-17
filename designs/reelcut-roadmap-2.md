@@ -16,8 +16,9 @@ adds an op or a field updates §5.2 / §6 as it lands**, exactly as it updates
 `edit.rs`'s module doc, `ReelCore.swift`'s builders and `AgentCatalog.swift`.
 Phase 1 found one mirror this list forgot: **spec §7.10's Rust module map**,
 which `core/CLAUDE.md` calls "the same list" — so a phase that adds a MODULE
-updates it too, not only a phase that adds an op. `CLAUDE.md` holds the milestone status; its
-paragraph for a phase is written when the phase's proof exists.
+updates it too, not only a phase that adds an op. A phase's record is written
+into its section in §2 when its proof exists; the `CLAUDE.md` files carry
+rules and maps only, never a status paragraph (2026-09-17).
 `reelcut-roadmap.md` is the record of M1–M3 and its "known limits" list
 still stands.
 
@@ -131,7 +132,8 @@ full text.
 
 **Session protocol.** A session picks one phase (or half of one), reads its
 section here and the two side `CLAUDE.md`s, lands the work, runs the proof,
-then updates: the status table below, `CLAUDE.md`'s milestone status, the
+then updates: the status table below and the phase's record in §2 (never a
+status paragraph in a `CLAUDE.md`, which hold rules and maps only), the
 spec's §5.2 / §6 / §7.10 / §9 for anything they mirror, and the README's
 feature bullets. Unfinished halves are written down here under the phase,
 not left implicit.
@@ -3267,7 +3269,7 @@ Named so the next reader does not re-derive them.
 The same as before: the phase's proof exists as measured output from the
 built binary and from black-box core tests, `make test` and `make lint` are
 clean, `make typecheck` is at its baseline, the status table above says
-"done" with the date and the commit, and `CLAUDE.md`'s milestone status, the
+"done" with the date and the commit, and the phase's record in §2, the
 spec's tables and the README say what now exists.
 
 Phase 1 added one clause to that, having learnt it the hard way: **the
