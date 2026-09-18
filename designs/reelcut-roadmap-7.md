@@ -3787,9 +3787,9 @@ comparison is a tautology.
 
 ### 8.4 D3·4 — the remaining tools read the core (kpgalligan/reelcut#18)
 
-**Commits.** `PLACEHOLDER_ONE` (the migration and the proof),
-`PLACEHOLDER_TWO` (the mutants and the whole proof tree) and
-`PLACEHOLDER_THREE` (what the review found, below).
+**Commits.** `74e9b29` (the migration and the proof), `4a0b33f` (the
+mutants and the whole proof tree) and `PLACEHOLDER_THREE` (what the review
+found, below — including the one row the review added).
 
 **What landed.** The last fourteen op tools stopped restating the table:
 the nine of the Tracks, Markers and Canvas groups in `AgentCatalog.swift`,
@@ -3807,15 +3807,19 @@ this ticket touched came DOWN.
 | `AgentCatalog.swift` | 535 | **494** |
 | `AgentCatalog+Files.swift` | 609 | **601** |
 | `AgentCatalog+Transitions.swift` | 112 | **92** |
-| `AgentCatalog+Declarations.swift` | 279 | 286 (the one new row) |
+| `AgentCatalog+Declarations.swift` | 279 | 310 (two new rows, one of them the review's) |
 | `AgentCatalog+Clips.swift` · `+Audio.swift` | 791 · 117 | unchanged |
 
 `"type":` went 43 → 13 in `AgentCatalog.swift`, 40 → 34 in `+Files.swift`
 and 6 → 0 in `+Transitions.swift`; `"enum":` 3 → 0 in the transitions and
-`required: [` 9 → 4, 8 → 5 and 2 → 0. **Every one left is an app-state
-tool's** — read back line by line, not counted: the two in
-`AgentCatalog.swift` that are not `open_project` and `set_playhead` are
-`tool`'s own signature and `opTool`'s empty fallback.
+`required: [` 9 → 4, 8 → 5 and 2 → 0. **Not one of the survivors belongs to
+an op tool**, which was read back line by line rather than counted: in
+`AgentCatalog.swift` the thirteen `"type":` are the helper's own three
+(`tool`'s schema object, `projectProperty`, `scopeProperty`) and ten across
+seven app-state rows, and two of the four `required: [` are `tool`'s
+signature and `opTool`'s empty fallback while the others are `open_project`
+and `set_playhead`; in `+Files.swift` every one is one of the eight file
+tools with no op behind it.
 
 **The widening the migration needed is one row, and it is the fourth
 playhead.** `add_marker`'s `at` is `req` in the core's table — a marker IS a
@@ -3892,6 +3896,14 @@ SUCCEEDED; the built binary launched on port 4863 and `grep "Reelcut: "` on
 its log printed nothing — the startup parity check is unchanged, and its
 fifth part is #19's.
 
+**`clip_catalog_proof.py` stays, and what it is FOR has narrowed.** Its
+structural half is now a strict subset of the new script's — 43 of the 57 —
+and the two oracles are independent copies, so a bug in one must be fixed
+twice. What it still holds alone is its group section (a contiguous run of
+the catalog with the two composites inside it, found by asking the core) and
+its own behavioural rows, which drive the clip group's shorthands. Read it
+as the clip group's behaviour and this one as the catalog's shape.
+
 **Owed.** The fifth part of the parity check and the shared `tools/list`
 schemas accessor (#19); and the proof scripts that still re-type argument
 names in Python.
@@ -3942,3 +3954,56 @@ is byte-identical, which the capture above measured.
 and the app rebuilt, `tools/list` is byte-identical to the capture taken when
 the migration landed, `op_catalog_proof.py` is 22/22 and the parity log on
 port 4893 printed nothing.
+
+**What the review found.** Two axes, fixed point `17c91cf`, spec source the
+ticket plus spec kpgalligan/reelcut#14. The **Spec** axis re-derived the
+counts rather than trusting this record (58 `opTool(` occurrences less the
+one declaration = 57 call sites; every surviving `"type"`, `"enum"` and
+`required:` read back to an app-state tool by name; `record_screen`'s two
+by-name assertions unmoved in both scripts), went tool by tool over the
+fourteen handlers against the argument vocabulary to ask whether any other
+row was owed, and found no scope creep. The **Standards** axis re-derived
+every line and grep count here and found all of them exact.
+
+Five findings changed code or documents:
+
+- **`set_canvas.fps` published `minimum: 0` on its items while `fpsArg`
+  refuses a zero term BY NAME** — a schema one step WIDER than what is
+  accepted, which is the one direction the declarations list exists to
+  close, and the only row of the capture table with no running-app check
+  behind it. It is a row now, the second that NARROWS rather than widens
+  (`set_speed.rate` is the first), and the proof asks the running app:
+  `{"fps": [0, 1]}` refused by name while the items say `minimum: 1`. The
+  pre-migration schema promised even a negative term, so this was a gap
+  rather than a regression — and it is the fourth difference an agent sees:
+  `set_canvas.fps` items `minimum` 0 → **1**;
+- **`PLACEHOLDER_ONE` and `PLACEHOLDER_TWO` in this record's own Commits
+  line**, which is the omission `e7c1883` exists to fix and which D3·3's
+  review found in the same place;
+- **the size ledger was stale for the one file that went UP** —
+  `AgentServer.swift` 779 → 783, four lines of doc comment, which the §3
+  prose and its table now carry. D3·3's review found the same thing about
+  the same file;
+- **an arithmetic sentence in this record was wrong**: the thirteen `"type":`
+  left in `AgentCatalog.swift` are three helper occurrences and ten across
+  seven app-state rows, not "the two that are not `open_project` and
+  `set_playhead`". The conclusion held and the arithmetic did not;
+- **`AgentCatalog.swift`'s header still ended "at about 454"** — the number
+  the R1·toll left it at, two migrations ago.
+
+Three were judged not real. **`AgentCatalog+Declarations.swift` 279 → 286
+breaks "every catalog file touched comes down or stays level"**: it does, and
+it is the price of the criterion one line above it, which says a widening the
+migrated groups need is added to this list; the four files that hold TOOLS
+all came down. **The "at least one of" guard four tools carry** — a call
+naming none of a tool's optional keys is refused — is a rule about the CALL
+rather than about an argument, no shape in `Subject` addresses it, and every
+tool that has one says so in its own prose; it is named in the list's doc now
+rather than declared. And **`op_catalog_proof.py` duplicating the other
+script's probe and oracle** is the tree's one-script-one-file convention, and
+the two being independent copies is what makes a bug in one a failure rather
+than a shared opinion.
+
+The proof is **23/23** with the new row, `tools/list` differs from the
+migration capture by exactly the one fragment above, and port 4894's parity
+log printed nothing.

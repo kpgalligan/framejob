@@ -223,9 +223,12 @@ allowance. D3·4 migrated the four other groups, and every catalog file it
 touched came DOWN: `AgentCatalog.swift` 535 → **494**,
 `AgentCatalog+Files.swift` 609 → **601** (still over, by one line),
 `AgentCatalog+Transitions.swift` 112 → **92**, against
-`AgentCatalog+Declarations.swift` 279 → **286**, the one widening row the
-migration needed. Sixty-two lines of hand-written schema deleted and seven
-of reason written down.
+`AgentCatalog+Declarations.swift` 279 → **310**, the widening row the
+migration needed and the narrowing its review added. Sixty-two lines of hand-written schema deleted and seven
+of reason written down. The one file that went UP is `AgentServer.swift`
+(779 → **783**), four more lines of the frozen file's ~50-line doc
+allowance, correcting what the parity check's own comment says it cannot
+see.
 Regenerate the list with
 `wc -l app/Sources/*.swift core/src/*.rs | awk '$1>600 && $2!="total"' | sort -rn`
 rather than trusting the numbers here; the standing exemptions are
@@ -254,15 +257,15 @@ row per op.
 | `app/Sources/AgentServer+Clips.swift` | 847 |
 | `core/src/edit.rs` | 838 |
 | `app/Sources/AgentCatalog+Clips.swift` | 791 |
-| `app/Sources/AgentServer.swift` | 779 |
+| `app/Sources/AgentServer.swift` | 783 |
 | `app/Sources/FFmpegRewrap.swift` | 768 |
 | `app/Sources/Loudness.swift` | 742 |
 | `app/Sources/ExportSheetController.swift` | 639 |
 | `app/Sources/Exporter.swift` | 609 |
 | `app/Sources/ClipPane.swift` | 609 |
 | `app/Sources/MediaImporter.swift` | 604 |
-| `app/Sources/AgentCatalog+Files.swift` | 601 |
 | `app/Sources/CompositionBuilder.swift` | 601 |
+| `app/Sources/AgentCatalog+Files.swift` | 601 |
 
 The notes below are from road map 3's close and name each file's SEAM, which
 is what a phase needs before it pays; the counts in them are as of that day.

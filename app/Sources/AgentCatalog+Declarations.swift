@@ -119,12 +119,24 @@ struct AgentDeclaration {
 extension AgentServer {
 
     /// Every declaration, in one list (`AgentDeclaration`'s doc has the rule
-    /// an entry has to pass). Thirteen rows over five kinds of difference:
+    /// an entry has to pass). Fourteen rows over six kinds of difference:
     /// two bare-string shorthands, one reading of a whole JSON kind, two
     /// nulls that mean something, one range the core clamps to rather than
-    /// refusing, four times the tool takes from the app what the op would
+    /// refusing, one the APP refuses outside where the core's kind is
+    /// looser, four times the tool takes from the app what the op would
     /// have made the caller send, and three times a list the tool will not
     /// accept empty although the op reads one.
+    ///
+    /// **Two rows narrow rather than widen, and they are the same rule read
+    /// the other way.** `set_speed.rate` and `set_canvas.fps` each publish a
+    /// bound the APP enforces and the core's kind does not, because a schema
+    /// wider than what is accepted is the one direction that costs a caller
+    /// a call it cannot make. What is NOT here is the "at least one of"
+    /// guard four tools carry (`set_track`, `set_marker`, `set_canvas`,
+    /// `set_transition_style` each refuse a call that names none of their
+    /// optional keys): it is a rule about the CALL rather than about an
+    /// argument, no shape in `Subject` addresses it, and every tool that has
+    /// one says so in its own prose.
     ///
     /// **What is deliberately NOT here.** The argument vocabulary is lenient
     /// in ways no tool has ever declared — a lone id read as a one-element
@@ -191,6 +203,18 @@ extension AgentServer {
                 + "and it is guidance the tool gives instead. What the core does refuse is a "
                 + "non-positive or non-finite rate, which no JSON-Schema bound this table "
                 + "carries can say; the handler refuses it by name first."),
+
+        // ---- a bound the app refuses outside and the core does not ---------
+
+        AgentDeclaration(
+            .argument("fps", of: "set_canvas"),
+            alsoKeys: ["items": ["type": "integer", "minimum": 1]],
+            why: "A frame rate's two terms are u32, so the core publishes them as whole "
+                + "numbers at or above 0 — and fpsArg (AgentServer+Tracks.swift) refuses a "
+                + "numerator or denominator of 0 BY NAME, which is the one direction this "
+                + "list exists to close: a schema wider than what is accepted is a promise "
+                + "the app breaks. It narrows the items rather than widening them, which is "
+                + "set_speed.rate's shape."),
 
         // ---- a list the tool will not take empty ---------------------------
 

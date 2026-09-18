@@ -335,13 +335,24 @@ def main():
     check("every op tool carries its own description and, where it takes arguments at all, "
           "prose on at least one of them — the half the core cannot write",
           not hushed, json.dumps(hushed))
+    def describes(fragment):
+        """Whether a published fragment carries prose at any depth. The KEYS
+        are walked rather than the serialized text: a vocabulary member
+        spelling the word would make a substring test say yes."""
+        if isinstance(fragment, dict):
+            return "description" in fragment or any(map(describes, fragment.values()))
+        if isinstance(fragment, list):
+            return any(map(describes, fragment))
+        return False
+
     core_prose = sorted(
         f"{name}.{argument}" for name in group
         for argument, fragment in table[name]["properties"].items()
-        if "description" in json.dumps(fragment))
+        if describes(fragment))
     check(f"…and the core's table carries none of it: {total} of the {arguments} published "
           "arguments are described by the CATALOG and not one by the table",
-          not core_prose, json.dumps(core_prose))
+          not core_prose and 0 < total <= arguments,
+          json.dumps(core_prose) or f"{total} described of {arguments}")
 
     print("\n3 — the vocabularies a handler still parses by name are still the core's")
     for label, op, argument, key, is_list in [
@@ -449,6 +460,17 @@ def main():
           f"refusal {refused[:120]!r}, bound "
           f"{declared('set_canvas', 'width', 'minimum')}–"
           f"{declared('set_canvas', 'width', 'maximum')}")
+
+    # …and the one bound the APP refuses outside where the core's kind is
+    # looser. A schema wider than what is accepted is the direction that
+    # costs a caller a call it cannot make, so the row narrows the items and
+    # this asks the app whether the narrowing is true.
+    refused = refusal("set_canvas", {"fps": [0, 1]})
+    check("set_canvas refuses a frame rate with a zero term by name, and the tool narrows "
+          "the core's whole numbers to say so",
+          "fps must be" in refused
+          and (declared("set_canvas", "fps", "items") or {}).get("minimum") == 1,
+          f"refusal {refused[:120]!r}, items {declared('set_canvas', 'fps', 'items')}")
 
     # The opposite direction of `set_transition`'s null, and the reason the
     # two ops cannot share a row: an explicit null here is a mistake, the

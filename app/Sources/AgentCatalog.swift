@@ -38,8 +38,10 @@ import Foundation
 /// and Markers do, so `ticks` arrives there as an argument, as the clip
 /// rows' three do. (The sentence that stood here said none was shared; it
 /// was false by that one.) The move was about 400 lines, not the 300 this
-/// paragraph guessed, and it leaves this file the helper, the project
-/// group, tracks, markers and the canvas, at about 454.
+/// paragraph guessed, and it left this file the helper, the project group,
+/// tracks, markers and the canvas, at about 454 — which road map 7's D3
+/// took to 535 and then back to under 500, the helper having grown and the
+/// nine op rows having lost their hand-written schemas.
 extension AgentServer {
     /// One tool, declaring its whole schema. Every tool gets `project` for
     /// free: with several projects open a call would otherwise be ambiguous,

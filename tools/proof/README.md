@@ -2587,7 +2587,7 @@ measures the clip group: the same two independent sides (the CATALOG over
 MCP, the TABLE out of the staticlib through a probe built the way
 `op_schema_probe.py` builds its own and scored the same way when it will not
 compile), and the same oracle written in Python rather than imported.
-**22/22** at D3·4 (#18). The probe is built BEFORE the first MCP call.
+**23/23** at D3·4 (#18). The probe is built BEFORE the first MCP call.
 
 **Its structural half types no name at all**, not even the ends of a group:
 the group IS the core's op list (`rc_op_names`), so an op renamed on both
@@ -2611,8 +2611,9 @@ declarations**: all 13 rows still name something the core has. **The running
 app**: a marker with no `at` lands at the playhead although the core
 requires it, a track switch takes `"true"`, a negative id is refused by name
 where the schema says `minimum: 0`, `set_canvas` refuses a width one step
-under the bound it publishes and names both ends, `add_transition`'s `kind`
-is refused an explicit null and never offered one (the opposite of
+under the bound it publishes and names both ends and a frame rate with a
+zero term where its items say `minimum: 1`, `add_transition`'s `kind` is
+refused an explicit null and never offered one (the opposite of
 `set_transition`'s), and `add_media`'s descriptor is an object with no
 properties that refuses a string by name.
 
