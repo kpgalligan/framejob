@@ -20,7 +20,7 @@ detail there.
   `deinit` frees the Rust allocation.
 - `ReelOps.swift` — `OpArgs`, `ReelOp` and one typed factory per row of
   `core/src/edit.rs`'s op table, plus a RAW factory beside the typed one at
-  each door deepening D1 has moved — ELEVEN of them (`setVideoRaw`,
+  each door that takes a CALLER's own object — ELEVEN of them (`setVideoRaw`,
   `setAudioRaw`, `setTextRaw`, `setShapeRaw`, `setClipRaw`,
   `setActionEndRaw`, `addTextClipRaw`, `addShapeClipRaw`, `setCanvasRaw`,
   `addBackgroundRaw`, `addZoomActionRaw`), which takes the
@@ -40,17 +40,16 @@ detail there.
 - `ProjectSnapshot.swift` · `MotionProps.swift` — the `Codable`, READ-ONLY
   mirror of spec §5.2 every view draws from. **Its enums decode LENIENTLY**
   — a misspelt kind becomes the first case, a `T??` field a clear — which is
-  why a caller-authored object is never decoded through them (below). Since
-  D1·5 took `set_action_end`, the last agent handler that did, no handler
-  reads a caller-authored OBJECT at all. A scalar enum argument is a
-  different thing and several handlers still parse one by name
+  why a caller-authored object is never decoded through them (below): no
+  agent handler reads a caller-authored OBJECT at all. A scalar enum
+  argument is a different thing and several handlers still parse one by name
   (`add_zoom_action`'s `fit`, `curveArg`, `set_transition`'s `kind`): the
   core refuses those too, and what this rule forbids is decoding a caller's
   object through a lenient type.
   `MotionProps.dictionary` always writes all three keys, `NSNull` for a nil
   slot, because a core patch of `motion` deep-merges — it is the
-  APP's writer saying all three slots, not a replace rule, and since D1·3 it
-  is the only edge that writes a whole motion.
+  APP's writer saying all three slots, not a replace rule, and it is the only
+  edge that writes a whole motion.
 
 **The document.**
 - `ProjectDocument.swift` (+`DisplayStem`, +`Recording`) — NSDocument,
@@ -378,29 +377,21 @@ free.
   `transcribe`, `record_screen`, `export`, …); the criterion is "waits on
   main", not "touches the disk".
 - `AgentServer+Arguments.swift` — the shared argument vocabulary
-  (`intArg`, `timeArg`, `rangesArg`, `rawPatchArg`, …), each
-  refusing a value it cannot read BY NAME. **`rawPatchArg` is the door
-  deepening D1 moved every property op to**: it reads nothing about the
-  value and hands the caller's object to the core, which is the one
+  (`intArg`, `timeArg`, `rangesArg`, `rawPatchArg`, …), each refusing a
+  value it cannot read BY NAME, and ONLY what the core cannot know: target
+  and scope, an id checked against the container it names, a time on the
+  document's frame grid, and the in-band refusal. **`rawPatchArg` is the
+  door every op that takes a caller-authored object goes through**: it reads
+  nothing about the value and hands the object to the core, which is the one
   validator of what a patch may carry and names the dotted path and the
   value in every refusal (`core/src/patch.rs`). Its one refusal is the
   ABSENT argument, a mistake about the CALL. A colour-only ARGUMENT
-  (`set_canvas`'s background, `add_background`'s colour) is forwarded the
-  same way, straight off the call, which is why `colorArg` and
-  `requiredColorArg` are gone: a colour is four numbers each 0–1 and nothing
-  on this side fills in an alpha or clamps a component. `set_video` went
-  through in D1·3, eight more doors in D1·4, and `set_action_end` and
-  `add_zoom_action`'s region in D1·5 — **every door is through**, and D1·6
-  deleted the family that used to launder one: `patchArg` and its round-trip
-  check, `decodePatch`, `withOpaqueColors` and `nestedNumberArg`. Three
-  measured reasons they went, worth knowing before writing another one: a
-  round trip cannot see a wrong-typed `T??` field (`nullable()` decodes it
-  as a CLEAR), a nested OBJECT decoded and re-serialised is a REPLACEMENT,
-  and `ProjectSnapshot`'s lenient enums turn a misspelt kind into the
-  vocabulary's first case. What is left in the file is what the core cannot
-  know — target and scope, an id checked against the container it names, a
-  time on the document's frame grid, and the in-band refusal — and its
-  header says so.
+  (`set_canvas`'s background, `add_background`'s colour) goes the same way,
+  straight off the call: a colour is four numbers each 0–1 and nothing on
+  this side fills in an alpha or clamps a component. **There is no decoder
+  for a caller's object in this file and a new door does not add one** (the
+  rule under Rules; what was deleted and what it measured,
+  `designs/reelcut-roadmap-7.md` §2–§3).
 
 **Shared chrome.** `Theme.swift` (`DS` tokens, including the three track
 heights S/M/L per kind), `Controls.swift`, `OptionControls.swift`,
@@ -442,10 +433,14 @@ through `rawPatchArg` and the RAW factory beside its typed one, and the core
 names the dotted path and the value it refused. A scalar enum ARGUMENT
 parsed by name is not this (`add_zoom_action`'s `fit`, `curveArg`,
 `set_transition`'s `kind`): what the rule forbids is decoding a caller's
-object through a lenient type. This replaced "check enums and types by hand
-at every door" in deepening D1 (`designs/reelcut-roadmap-7.md` §2, spec
-§7.9): the hand checks were deleted, not moved, and a new door that wants
-one is a door that has not been read.
+object through a lenient type, and the ONE caller-authored object the app
+still reads by hand is `add_media`'s descriptor, which is a media row rather
+than a patch and has no op of its own to be refused by
+(`AgentServer+Media.swift`'s `mediaDescriptor`, named here so it is an
+exception on purpose). The hand checks this rule replaced were deleted
+rather than moved, so a new door that wants one is a door that has not been
+read; the spec says the same in §7.9, and what went and what it measured is
+`designs/reelcut-roadmap-7.md` §2–§3.
 
 **Agent parity.** Every user-visible EDIT gets an MCP mirror: a handler, a
 catalog entry declaring `scope`, and a comment naming the UI path. Handlers

@@ -330,7 +330,8 @@ key set to `null` clears it, an array replaces its whole list — and an
 unknown key or a misspelt value at any depth is an error naming the dotted
 path to it and the value you sent (`filters[1].kindd`), never a different
 edit made quietly. Nothing is corrected or clamped on the way: a colour is
-four numbers, `[r, g, b, a]`, each 0–1.
+four numbers, `[r, g, b, a]`, each 0–1 — `video.chroma.key`, which names a
+hue rather than paints with it, is the one `[r, g, b]` in the model.
 
 | Tool | |
 |---|---|

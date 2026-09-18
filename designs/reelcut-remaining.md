@@ -225,7 +225,7 @@ row per op.
 | `app/Sources/CanvasSessions.swift` | 1088 |
 | `app/Sources/OptionControls.swift` | 1081 |
 | `core/src/edit_clip.rs` | 1042 |
-| `app/Sources/AgentCatalog+Clips.swift` | 945 |
+| `app/Sources/AgentCatalog+Clips.swift` | 941 |
 | `app/Sources/Transcriber.swift` | 934 |
 | `app/Sources/AudioDSP.swift` | 890 |
 | `core/src/edit.rs` | 887 |

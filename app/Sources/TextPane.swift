@@ -310,10 +310,13 @@ final class TextPane: InspectorPaneView {
     /// fact about the frame under the playhead and not about the clip.
     ///
     /// `animation` is a whole OBJECT in the patch, so every row re-sends all
-    /// three keys: a patch of a nested object is a REPLACEMENT, and a key
-    /// left out would come back as that struct's default and silently reset
-    /// what the user did not touch (`app/CLAUDE.md`). Turning the popup to
-    /// None sends an explicit null, which is the model's "no animation".
+    /// three keys. The core MERGES a nested object key by key (§5.2), but a
+    /// stored `null` is not an object — turning the reveal ON replaces the
+    /// null with what this patch carries, and a key left out would then come
+    /// from the struct's default and silently reset what the user did not
+    /// touch. A section that knows all three keys is right in both cases.
+    /// Turning the popup to None sends an explicit null, which is the
+    /// model's "no animation".
     ///
     /// One thing worth knowing before animating this section from an action:
     /// `in` and `out` are numbers, so an action END patch would interpolate

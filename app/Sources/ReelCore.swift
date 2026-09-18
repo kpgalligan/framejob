@@ -1215,14 +1215,14 @@ struct TextPatch: Codable, Equatable {
 /// since a gradient never clears the `fill` underneath it — and
 /// `.some(value)` sets it.
 ///
-/// It is a nested object, so it inherits the replacement rule the MCP path
-/// records for `shadow` and `obscure`: a key left out of it comes back as
-/// its default rather than as what the shape had, so every writer sends the
-/// whole gradient. What it does NOT inherit is the SILENCE. The other
-/// nested objects are dropped into a typed struct by the generic decoder,
-/// which gets to a misspelt key before the core's `deny_unknown_fields`
-/// can name it; this patch is the one read by hand in `AgentServer`, so a
-/// key misspelt inside a gradient can be refused by name there.
+/// It is a nested object, so the core MERGES it key by key into a stored
+/// one (§5.2). The writers here still send the whole gradient, and the
+/// reason is the OTHER case: a stored `null` is not an object, so turning a
+/// gradient on replaces the null with what the patch carries and the keys
+/// left out come from `Gradient::default()`. A section that knows every key
+/// is right whichever of the two a clip is in. Since deepening D1·4 a key
+/// misspelt inside a gradient is refused by the CORE, by its dotted path
+/// with the stop's index in it, at this door and every other.
 struct ShapePatch: Equatable {
     var kind: ShapeKind?
     var width: Double?

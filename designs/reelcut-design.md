@@ -451,9 +451,11 @@ is enabled.
   brings the flat fill back. Every row is DISABLED for `line` and `arrow`,
   which have no area to fill and keep their stroke colour — the field is
   still stored and range-checked on them (§5.2), exactly as `radius` is on
-  every kind. Every key of `gradient` is re-sent on every write, because a
-  patch of a nested object is a REPLACEMENT (§5.2) and a key left out
-  comes back as its default.
+  every kind. Every key of `gradient` is re-sent on every write, which is the
+  SECTION knowing all of them rather than a rule about patches: a patch of a
+  nested object merges key by key (§5.2, §6), so an agent may send `gradient`
+  with one key in it and keep the rest — and a `stops` LIST it sends replaces
+  the whole list, which is why the row's Add and Remove re-send every stop.
 - M3: *Spotlight* — which darkens the canvas outside a rectangle or
   ellipse, with an optional 1.2–2× zoom of the region — is a
   `video.spotlight` prop and appears in the **Video** pane, not here.
