@@ -3202,8 +3202,8 @@ every group is migrated it would complain about the ones that are not.
 
 ### 8.1 D3·1 — the op table, and a test that asks the decoder (kpgalligan/reelcut#15)
 
-**Commits.** `589d5b1` (the ticket) and the review-fix commit named at the
-end of this section.
+**Commits.** `589d5b1` (the ticket) and `ade23da` (what its review found,
+below).
 
 **What landed.** Core only. No Swift file, no FFI export, no catalog entry,
 no proof script, no format bump; `OP_NAMES` is 57 and the catalog 77, as
@@ -3323,7 +3323,7 @@ two mutants of its own, and raised the four extra kinds and the unproven
 table having no production consumer YET is the spec's own expand-then-migrate
 sequence; `Kind::Object` having no wrong-kind probe IS the claim the kind
 makes; and `OP_COUNT` having no compile-time tie to the enum's arm count is
-the exposure the old `[&str; 57]` already had.
+the exposure the old `[&str; 57]` already had. The fixes are `ade23da`.
 
 **Owed.** The whole of D3 past this ticket: the JSON Schema function over the
 17 kinds, the query export, the catalog's migration, the fifth part of the
