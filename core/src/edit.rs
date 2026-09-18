@@ -81,7 +81,7 @@
 //! `add_media`, `relink_media`, `remove_media` (a nest references the
 //! parent's `media[]` in the parent's one id space, so a media edit inside
 //! a scope is an edit OUTSIDE it wearing a scope, which is the one thing a
-//! scope exists to prevent). Everything else — all forty-eight — works
+//! scope exists to prevent). Everything else — all fifty — works
 //! inside a nest as it works on the timeline, `nest` and `unnest`
 //! included.
 //!
@@ -644,8 +644,8 @@ pub enum Op {
 ///
 /// A struct rather than a bare [`Op`] because `scope` is the envelope's
 /// key and not any op's argument — it is spelled once, it means the same
-/// thing over all fifty-five, and folding it into the enum would mean
-/// fifty-five copies of one optional field. [`Project::apply_op`] still
+/// thing over all fifty-seven, and folding it into the enum would mean
+/// fifty-seven copies of one optional field. [`Project::apply_op`] still
 /// takes an `&Op` and knows nothing about nests.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Envelope {
@@ -671,7 +671,7 @@ pub struct Envelope {
 /// envelope key. A `#[serde(flatten)]` wrapper is not the way round it
 /// either: serde documents `deny_unknown_fields` as unsupported with
 /// `flatten`, and it would silently stop refusing typos. Removing the key
-/// before the typed decode keeps all three — the refusal, all fifty-five
+/// before the typed decode keeps all three — the refusal, all fifty-seven
 /// variants, and an envelope key that is not an argument.
 pub fn parse(op_json: &str) -> Result<Envelope, String> {
     let mut value: Value =

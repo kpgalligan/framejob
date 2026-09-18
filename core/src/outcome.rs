@@ -80,15 +80,15 @@ pub enum Outcome {
     /// The **empty-selection** answers are not on that list at all: an op
     /// handed an empty list of clips is a TRUE identity and stays one,
     /// deliberately (the same spec, decision 4). Counted at road map 7's
-    /// D2·5 there are EIGHT such guards serving twelve ops —
+    /// D2·5 the family is FOURTEEN ops, eight of them behind a guard —
     /// `edit_clip`'s `move_clips`, `delete_clips` and `duplicate_clips`,
     /// `edit_props`'s `patch_clips` (the one guard behind all five patch
     /// ops), `edit_nest`'s `nest_clips`, `edit_paste`'s `paste` (an empty
     /// payload), and `edit_time`'s `ripple_delete` and
     /// `ripple_delete_ranges` (ranges that merge to nothing). Nothing was
-    /// ASKED for at any of them, so there is no rule a sentence could name;
-    /// `split_clips` and `paste_attributes` reach the same answer without a
-    /// guard, through `finish`.
+    /// ASKED for at any of them, so there is no rule a sentence could name.
+    /// The other two, `split_clips` and `paste_attributes`, reach the same
+    /// answer with no guard at all, through `finish`.
     Identity,
 
     /// A rule declined the op, in the rule's own words. **No undo step**,

@@ -88,7 +88,7 @@ struct ReelOp {
 
     /// The nest this op resolves its ids INSIDE, or nil for the timeline —
     /// the envelope's `scope` key (`core/src/scope.rs`, spec §6), which is
-    /// not an argument of any op and is spelled once for all fifty-five.
+    /// not an argument of any op and is spelled once for all fifty-seven.
     ///
     /// It is a `var` with an initial value so the memberwise initialiser
     /// defaults it, which is what let every factory below stay untouched: an

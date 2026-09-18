@@ -227,7 +227,12 @@ no caller a script can reach** (a menu, a validator, a cue builder, a queue),
 the answer is a probe compiled from `app/Sources` over `harness/build.sh`'s
 own `swiftc` line, not a photograph. A probe that will not build is a scored
 FAILURE, never an exit, so a rotted instrument cannot take a score down with
-it.
+it. **That rule is about the INSTRUMENT, not about a reference tree it
+compares against.** Two scripts build an OLD `app/Sources` against the
+current core to photograph a "before"; a reference commit the current header
+has left behind cannot be made to compile by anything in this repo, so that
+one cause is a SKIP printed by name with its row count, and every other
+build failure is still the failure it was.
 
 ## Agent skills
 

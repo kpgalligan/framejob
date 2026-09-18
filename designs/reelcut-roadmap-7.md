@@ -2803,14 +2803,15 @@ than merely spelling it the old way, which is the reason for the sweep:
   kind of stale comment a reader cannot correct for themselves.
 
 **The empty-selection identities, counted rather than estimated.** The spec
-says "roughly nine sites"; there are **eight guards serving twelve ops** —
+says "roughly nine sites"; the family is **fourteen ops, eight of them
+behind a guard of their own** —
 `edit_clip`'s `move_clips`, `delete_clips` and `duplicate_clips`,
 `edit_props`'s `patch_clips` (the one guard behind all five patch ops),
 `edit_nest`'s `nest_clips`, `edit_paste`'s `paste` (an empty payload), and
 `edit_time`'s `ripple_delete` and `ripple_delete_ranges` (ranges that merge
-to nothing). They stay identities because **nothing was asked for**, so there
-is no rule a sentence could name; `split_clips` and `paste_attributes` reach
-the same answer with no guard at all, through `finish`. The list is in
+to nothing), with `split_clips` and `paste_attributes` reaching the same
+answer through `finish` and no guard at all. They stay identities because
+**nothing was asked for**, so there is no rule a sentence could name. The list is in
 `Outcome::Identity`'s doc, which is where the core keeps every such list, and
 the two families are named in spec §5.5 so a reader meets them without
 grepping. **The clamped-edge family** — a slip or a roll the clamps reduce to
@@ -2852,7 +2853,7 @@ own era, which is a different instrument.
 
 **The ledger, regenerated row by row against `wc -l`** (not by eye — that is
 D1·6's review's lesson, made the rule here). **Thirty rows became
-twenty-nine**: `core/src/edit_track.rs` came off it, 674 → **520**, because
+twenty-nine**: `core/src/edit_track.rs` came off it, 674 → **522**, because
 D2·3 cut `edit_canvas.rs` out of it and paid the toll first and alone. Six
 counts were stale: `ReelCore.swift` 1507 → **1500**, `ProjectDocument.swift`
 1353 → **1352**, `AgentServer.swift` 772 → **771**, `core/src/edit_clip.rs`
@@ -2926,6 +2927,74 @@ checks in `phase8_proof.py` — including the nested-media one that is the whole
 point of phase 8c — where a year's worth of scripts would once have passed it.
 **And the probe's one failing check is the one no MCP call can reach**: a
 refusal in front of `applyEdit`, which is where a person meets it.
+
+**What its review found.** The two-axis review ran against `bfbc2ac`. The
+spec axis found all seven acceptance criteria met; both axes found the same
+two numbers wrong, and the standards axis found two lines of my own making.
+Fixed in the follow-up commit:
+
+- **The one number the ticket's own claim rests on was not regenerated.**
+  `core/src/edit_track.rs` is **522**, and both this record and the ledger's
+  header said 520 — D2·3's record's figure, which was its TICKET commit's;
+  its review fix (`0b91795`) took the file to 522 and the number was never
+  chased. §6's measured table below had it right, so the document
+  contradicted itself. "Regenerated row by row against `wc -l`" has to
+  include the prose, not only the table.
+- **A stale op count on a line this ticket rewrote.** Spec §7.10's `edit.rs`
+  row still said an envelope key "would be a typo to all fifty-five";
+  `OP_NAMES` is **57** and the table has 57 rows. Corrected there, in §6's
+  preamble (`rc_op_names` is 57, not 55), and in the four mirrors that
+  repeat it — `edit.rs`'s own three, `ReelOps.swift`, `AgentCatalog.swift`,
+  `scope.rs` and `AgentServer+Scope.swift`, whose sentence is now "was
+  unchanged" so it cannot rot again. `edit.rs`'s "all forty-eight work
+  inside a nest" is **fifty** (57 less `refused_inside`'s seven). This is a
+  rot from whichever road map added ops 56 and 57 rather than D2's, and it
+  was taken because the op table's own text is a contract this ticket owns.
+- **Two doc lines over the ~100-column rule**, at 124 and 104, both made by
+  jamming a reflowed tail onto one line so `ClipPane.swift` would stay at
+  609. The rule was met in the letter and broken in the spirit; both
+  paragraphs are rewritten inside 100 columns and the file is still 609.
+- **`phase5_chrome.py` printed a skip with no COUNT**, where
+  `recording_probe.py` prints an integer that totals into the tail. It is
+  `CROSS_BUILD_ROWS = 45` now — what sections 3 to 7 scored the last time
+  the reference built (81/81 against today's 36) — hard-coded with the
+  reason, because those rows cannot be counted without running them and a
+  skip that prints no number is what `tools/proof/README.md` forbids.
+- **Dead state in `recording_probe.py`**: `skip_reason` was still written
+  and read nowhere once `skips` took over, and two `global` declarations
+  named a variable the new helper owns. Gone.
+- **Spec §5.5 understated the empty-selection family** at twelve ops, where
+  its own source says fourteen — `split_clips` and `paste_attributes` reach
+  the answer with no guard. Consistent at fourteen now in all three places.
+- **A rule-adjacent decision with nowhere to live.** The spec axis was right
+  that turning a failed reference build into a skip brushes against the root
+  rulebook's "a probe that will not build is a scored FAILURE, never an
+  exit". It is in the ROOT `CLAUDE.md` beside that sentence rather than in
+  spec §11: §11 is the product's decision record and this is a verification
+  rule, and the rulebook is where a verification rule is read. The clause
+  says the rule is about the INSTRUMENT and not about a reference tree it
+  compares against, and that every other build failure is still a failure.
+- **`designs/reelcut-core-notes.md`'s archived Purity and Errors rules**
+  still teach the two-outcome answer. The archive is not rewritten — that is
+  what an archive is — but its header now names those two paragraphs as
+  superseded, so a grep that lands there knows it is looking at 2026-09-17.
+  Same shape as D1·6's fix to `reelcut-app-notes.md`'s header.
+
+Judged not real:
+
+- *The `ffi_drift` rationale is duplicated between the two scripts
+  (Duplicated Code).* `build_reference` itself was already duplicated
+  between them before this diff, and a `tools/proof` script is deliberately
+  standalone — `mcp.py` is the only thing any of them imports. Extracting
+  six lines of comment into a new shared module would leave the real
+  duplication and add an import to two scripts that have none. The comment
+  in `recording_probe.py` is shortened to point at `phase5_chrome.py`, which
+  states it in full, which is the cheap half of the fix.
+- *The skip's guard is a substring match on compiler output, so a future FFI
+  break mentioning both strings is absorbed.* A future FFI break in the
+  reference tree's own `ReelCore.swift` IS this cause; a break anywhere else
+  does not name both, and the note it reads is the reference build's own
+  error text. Narrow enough, and the alternative — parsing swiftc — is worse.
 
 **Owed.** Nothing from this ticket. What D2 leaves is §6 below.
 
@@ -3052,8 +3121,9 @@ measured rather than asserted.
   list; and `edit_clip.rs` and `edit_edge.rs` would have to pay a toll to
   take them on. Named in `Outcome::Identity`'s doc, which is the one place
   that list lives.
-- **The empty-selection identities stay identities**, deliberately: eight
-  guards, twelve ops, named in that same doc and in spec §5.5.
+- **The empty-selection identities stay identities**, deliberately: fourteen
+  ops, eight of them behind a guard of their own, named in that same doc and
+  in spec §5.5.
 - **A refusal's sentence is still not shown to the person at the machine.**
   The beep stays, which is spec kpgalligan/reelcut#8's own out-of-scope, and
   where such a message would live is a design question of its own.

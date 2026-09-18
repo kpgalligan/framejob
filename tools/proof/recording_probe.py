@@ -675,7 +675,6 @@ failed = 0
 # vacuous pass (recording_proof.py's rule for host state). Section 9's are
 # host state; section 6b's are the tree's own history (see `skip_rows`).
 skipped = 0
-skip_reason = ""
 skips = []
 
 
@@ -687,6 +686,8 @@ def skip_rows(count, reason):
     skipped += count
     skips.append((count, reason))
     print(f"  SKIPPED by name: {reason} — {count} rows did not run")
+
+
 STEM_RE = r"Screen Recording \d{4}-\d{2}-\d{2} at \d{2}\.\d{2}\.\d{2}"
 
 
@@ -5875,14 +5876,12 @@ def section_welcome(binary, sources):
     reference, sha, note = build_reference(commit)
     print(f"      reference: {commit} = {sha[:12]}")
     print(f"      compiled with {note.splitlines()[0] if note else '?'}")
-    # **A reference the instrument cannot reach is a SKIP, not a failure.**
-    # The two builds are deliberately one core and two app trees, so a
-    # reference commit whose `ReelCore.swift` predates a change to the FFI
-    # cannot compile against the CURRENT header at all — nothing in this
-    # repo can make it, and no guard in `harness/main.swift` is the fix.
-    # Road map 7's D2·1 added `rc_project_apply`'s fourth parameter, which
-    # put this reference (pre-R1) permanently out of reach. Anything else
-    # that will not build is still the failure it was.
+    # **A reference the instrument cannot reach is a SKIP, not a failure**,
+    # for phase 5's reason and gated the same way (`phase5_chrome.py`, which
+    # states it in full): one core and two app trees means a reference whose
+    # own `ReelCore.swift` predates an FFI change cannot compile at all, and
+    # D2·1's fourth parameter put this reference (pre-R1) out of reach for
+    # good. Anything else that will not build is still the failure it was.
     ffi_drift = reference is None and "rc_project_apply" in (note or "") \
         and "app/Sources/ReelCore.swift" in (note or "")
     if ffi_drift:
@@ -6152,7 +6151,6 @@ def granted_rows_count(folder):
 
 
 def section_granted(binary, sources):
-    global skipped, skip_reason
     print("\nSection 9 — the probe's own GRANTED tier: a real ScreenRecorder() on the main display "
           "under this process's grant (R0 q1: the terminal's), and the panel end to end")
     folder = fresh_dir("granted")
@@ -6165,8 +6163,7 @@ def section_granted(binary, sources):
           f"{answer.get('locked')}, shareable displays = {answer.get('displays')} (listed: "
           f"{answer.get('answered')}{', ' + answer['listFailure'] if answer.get('listFailure') else ''})")
     if answer.get("skipped"):
-        skip_reason = answer["skipped"]
-        skip_rows(granted_rows_count(folder), skip_reason)
+        skip_rows(granted_rows_count(folder), answer["skipped"])
         return
     granted_rows(answer, folder)
     shutil.rmtree(folder, ignore_errors=True)

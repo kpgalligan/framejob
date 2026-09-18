@@ -189,14 +189,14 @@ final class ClipPane: InspectorPaneView {
     /// the op table in `edit.rs` says so in one line each): `trim_start` pulls
     /// the new start back to the source head and no later than one frame
     /// before the end, `trim_end` pushes the new end to at least one frame of
-    /// clip and no further than the source has left. The core declines only
-    /// when the clamped edge is where the edge already was or the two clamps
-    /// cross — an IDENTITY, since a clamp landing where the clip already is
-    /// names no rule — or when the move breaks the overlap rule, a REFUSAL in
-    /// that rule's own sentence; both beep from `applyEdit` and make no undo
-    /// step. So a typed value out of range does not beep: it lands clamped,
-    /// and the field re-reads what the core committed on the refresh after. Nothing here clamps on the user's behalf, which
-    /// is what keeps that one rule in one place.
+    /// clip and no further than the source has left. **The core declines** —
+    /// both arms beep from `applyEdit` and neither makes an undo step — when
+    /// the clamped edge is where the edge already was or the two clamps cross
+    /// (an IDENTITY: a clamp landing where the clip already is names no rule),
+    /// and when the move breaks the overlap rule (a REFUSAL, in that rule's
+    /// own sentence). So a typed value out of range does not beep: it lands
+    /// clamped, and the field re-reads what the core committed. Nothing here
+    /// clamps on the user's behalf, which keeps that one rule in one place.
     ///
     /// Duration is read-only because it has no op of its own: it is
     /// `end − start`, and §6 gives you the two edges instead.

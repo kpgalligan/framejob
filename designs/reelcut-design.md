@@ -1217,9 +1217,10 @@ be told. **Which of §6's "refuses" carry a sentence today is a list that
 grows**, and `Outcome::Identity`'s own doc comment is the one place it is
 kept, so a reader does not grep ten modules for it. Two families are
 identities on purpose and will not join it: an op handed an **empty
-selection** (twelve ops through eight guards — nothing was asked for, so
-there is no rule to name), and **a clamp that landed where the clip already
-was** (a slip or a roll the clamps reduce to nothing, a trim whose two
+selection** (fourteen ops — eight with a guard of their own, `split` and
+`paste_attributes` through the same answer with none — since nothing was
+asked for, so there is no rule to name), and **a clamp that landed where the
+clip already was** (a slip or a roll the clamps reduce to nothing, a trim whose two
 clamps crossed, a rate stretch outside ×0.1 – ×10), where "nothing needed to
 change" is the honest answer as well as the true one.
 
@@ -1385,7 +1386,7 @@ its frozen pair, the rate / background / switches and the `media[]` and
 twice), applies the op to it, and merges `tracks`, `clips`, `next_id`,
 `media` and `nests` back. So `Project::clip` keeps its one meaning, no op
 gained a nest-aware code path, undo is still one stack of parent handles,
-and `rc_op_names` is still 55 — a scope is an envelope key, not an op.
+and `rc_op_names` is still 57 — a scope is an envelope key, not an op.
 Times inside a scope are the nest's own, measured from its zero; a nest has
 no speed, so `t − nest_clip.start` is the whole mapping.
 
@@ -2447,7 +2448,7 @@ concern is a new module with its own `impl Project` block.
 | `model_query.rs` | reading a project: `Project::new`, id allocation, the `clip` / `track` / `media` / `marker` / `nest` lookups, `clips_on`, `duration`, `validate` with its nesting walk, the three source-window measurements (`content_length`, `source_head`, `source_length`) every placement op clamps against, and `source_size` — the source's pixel size when the model knows it, `None` for text and for a media, nest or shape with no positive size. That last one was TWO private readers, `edit_props.rs`'s and `edit_background.rs`'s stricter one, collapsed here by road map 5's T0f, so a source kind added to `model.rs` is answered once |
 | `time.rs` | `Ticks`, `TIMESCALE`, `Fps`, frame snapping, timecode format/parse (non-drop `HH:MM:SS:FF` and `HH:MM:SS.mmm`) |
 | `outcome.rs` | what an op ANSWERS (§5.5) — `Outcome`, with `Applied(Project)`, `Identity` and `Refused(String)`. An enum and not a side channel because a site that has not decided which of the three it gives does not compile, which is how the fourteen sites that used to throw a rule's sentence away were found (road map 7's D2). Its `Identity` doc is the ONE place that lists which refusals carry a sentence today, and the two families that stay identities on purpose |
-| `edit.rs` | the op enum + serde, `apply(&self, op) -> Result<Outcome, String>`; **its module doc is the op schema table**. `parse` answers an `Envelope` — the op AND the envelope's `scope` — which it takes out of the object in the pass that already reads `"op"`, because `Op` is internally tagged with `deny_unknown_fields` on every variant (an envelope key would be a typo to all fifty-five) and serde does not support that attribute with `flatten`. `apply_op(&Op)` is unchanged and knows nothing about nests |
+| `edit.rs` | the op enum + serde, `apply(&self, op) -> Result<Outcome, String>`; **its module doc is the op schema table**. `parse` answers an `Envelope` — the op AND the envelope's `scope` — which it takes out of the object in the pass that already reads `"op"`, because `Op` is internally tagged with `deny_unknown_fields` on every variant (an envelope key would be a typo to all fifty-seven) and serde does not support that attribute with `flatten`. `apply_op(&Op)` is unchanged and knows nothing about nests |
 | `scope.rs` | editing INSIDE a nest — the envelope's `scope` key (road map 2, phase 9). Builds a VIEW project out of the nest, applies the op to it unchanged, and merges `tracks`, `clips`, `next_id`, `media` and `nests` back. Its own module because a scope is a change of CONTAINER rather than an op or a property of one, and because the whole of it is two pure functions and a refusal list, which belong nowhere near the semantics of any single edit. Three readings in it are measured rather than reasoned: the scoped nest's row stays in the view with its tracks and clips **emptied** (whole, it doubles every id in `validate`'s one uniqueness sweep; removed, it dangles every other nest's clip that shows it — the nest-inside-a-nest case the phase exists for); the nests write-back is **union first, orphans after**, because `unnest`'s `nest_is_shown` cannot see the parent's timeline clips from inside a view and would drop a nest a timeline clip still shows; and the caps and the depth are checked ONCE on the merged parent, which is why a scoped op has a wider `Err` arm than any other |
 | `edit_clip.rs` / `edit_props.rs` / `edit_track.rs` / `edit_time.rs` | the §6 ops in `impl Project` blocks: clip placement; the five property patches (`set_video` / `set_audio` / `set_text` / `set_shape`, and `set_clip` for the clip's own name and label), each merged through `patch.rs` and then range-checked; tracks, markers, canvas, media; ripple, insert time, range delete, freeze |
 | `patch.rs` | reading a caller-authored patch: `Group` (the vocabulary the four patches and `paste_attributes` share, and its per-group template), `check_keys` (the walk of keys and JSON kinds, array indices in the path), `merge_group` (the one read of a group patch — walk, deep merge, typed read back) and `check_group_patch` (the same for a group that is not merged into a stored one, which is what `edit_action.rs` composes an end patch's door out of). Every refusal names the dotted path and the offending value, and `COMPLETE_ENTRIES` is where the `video.filters` entry rule is stated. Cut out of `edit_props.rs` under the size rule in D1·2 for `props_check.rs`'s reason: what a patch may CARRY is a fact about the vocabulary, not about an edit, and nothing here is handed a clip |

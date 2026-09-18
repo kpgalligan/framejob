@@ -6,7 +6,12 @@ each module's entry and the size ledger — which file paid which toll in which
 phase, at what line count, and why the cut fell where it did. Grep it when a
 module's PAST matters; read `core/CLAUDE.md` for what governs it now. Its line
 counts and phase references are as of the phase that wrote them and are not
-maintained.
+maintained, and neither are the RULES it archives: the Purity and Errors
+paragraphs below still say an op that changes nothing "returns `None`" and
+that there are two tiers, which deepening D2
+(`designs/reelcut-roadmap-7.md` §4–§6) replaced with three arms and one tier
+(`core/src/outcome.rs`, spec §5.5). A grep that lands here is looking at
+2026-09-17, not at what governs the crate.
 
 ## Archived text — core/CLAUDE.md — Rust core rules
 

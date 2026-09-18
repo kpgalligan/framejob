@@ -738,10 +738,13 @@ reference commit's own `ReelCore.swift` calls the three-argument export — so
 an app tree that old cannot compile against the CURRENT header, which is what
 the one-core-two-app-trees design requires. No guard in `harness/main.swift`
 fixes that, and nothing in this repo can. `phase5_chrome.py` is therefore
-**36/36 with sections 3 to 7 SKIPPED by name** (81/81 while the reference
-still built), and `recording_probe.py`'s §6b the same, which is why that
-script is **858/858 with 43 skipped** (2 here, 41 the locked console) where it
-was 917/917. A skip is not a pass: both print the reason and the count.
+**36/36 with 45 rows SKIPPED by name** — sections 3 to 7, which scored 81/81
+while the reference still built — and `recording_probe.py`'s §6b the same,
+which is why that script is **858/858 with 43 skipped** (2 here, 41 the
+locked console) where it was 917/917. A skip is not a pass: both print the
+reason AND the count, and both gate on the one cause — the error must name
+`rc_project_apply` and the reference tree's own `ReelCore.swift` — so every
+other build failure is still the scored failure it was (root `CLAUDE.md`).
 
 `phase5_chrome.py` is the other half, and phase 5 splits between the two more
 sharply than any phase so far: four of its five features are AUDIO, which a

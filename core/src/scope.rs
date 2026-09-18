@@ -7,7 +7,7 @@
 //! — `unnest`, edit, `nest` — which is the identity on clip content but
 //! throws the nest clip's own group-level properties away.
 //!
-//! **The fix is not to teach fifty-five ops about nests.** It is to give
+//! **The fix is not to teach fifty-seven ops about nests.** It is to give
 //! the ENVELOPE a scope, and to hand the op a project in which the nest's
 //! own tracks and clips are the top level. Then `Project::clip` keeps its
 //! one meaning, `apply_op` keeps its flat dispatch, every refusal and every
@@ -168,8 +168,8 @@ pub(crate) fn read(value: Option<&Value>) -> Result<Option<u32>, String> {
     }
 }
 
-/// The ops with no meaning inside a nest, by name, or `None` for the
-/// forty-eight that work in there unchanged.
+/// The ops with no meaning inside a nest, by name, or `None` for the fifty
+/// that work in there unchanged.
 ///
 /// Exhaustive rather than a short list with a `_` arm, and that is the
 /// point of writing it out: an op added by a later phase does not compile

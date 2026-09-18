@@ -772,8 +772,14 @@ def runs(values):
 
 RESULTS = []
 # Checks that could not run, and why. A skip is not a pass: `report` names
-# every reason, so a reader sees what was measured and what could not be.
+# every reason AND the count, so a reader sees what was measured and what
+# could not be.
 SKIPS = []
+# What sections 2 to 7 scored the last time the reference build worked:
+# 81/81 against the 36 sections 8 and 9 score alone. Hard-coded because the
+# rows cannot be counted without running them, and a skip that prints no
+# number is the thing `tools/proof/README.md` forbids.
+CROSS_BUILD_ROWS = 45
 
 
 def check(name, ok, detail=""):
@@ -785,7 +791,7 @@ def check(name, ok, detail=""):
 
 def skip(count, reason):
     SKIPS.append((count, reason))
-    print(f"  SKIPPED by name: {reason} — {count} did not run")
+    print(f"  SKIPPED by name: {reason} — {count} rows did not run")
 
 
 def same_file(a, b):
@@ -1225,7 +1231,8 @@ def report():
     passed = sum(RESULTS)
     tail = ""
     if SKIPS:
-        tail = " (skipped by name — " + "; ".join(f"{n}: {why}" for n, why in SKIPS) + ")"
+        total = sum(n for n, _ in SKIPS)
+        tail = f" ({total} skipped by name — " + "; ".join(why for _, why in SKIPS) + ")"
     print(f"\n{passed}/{len(RESULTS)} checks passed{tail}")
     sys.exit(0 if passed == len(RESULTS) else 1)
 
@@ -1499,9 +1506,10 @@ def main():
         print("\n2. the reference build — the tree one commit before the meter existed")
         ffi_drift = "rc_project_apply" in note and "app/Sources/ReelCore.swift" in note
         if ffi_drift:
-            skip("1 check, and sections 3 to 7 (every cross-build comparison)",
+            skip(CROSS_BUILD_ROWS,
                  "the reference tree's own ReelCore.swift predates an FFI change and cannot "
-                 "call the current header (road map 7's D2·1 fourth parameter)")
+                 "call the current header (road map 7's D2·1 fourth parameter); sections 3 "
+                 "to 7 (every cross-build comparison) did not run")
             print("      " + note.replace("\n", "\n      "))
         else:
             check("the reference tree built, so there is a 'before' to compare the chrome "

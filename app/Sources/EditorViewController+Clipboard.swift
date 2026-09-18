@@ -172,11 +172,11 @@ extension EditorViewController {
     /// clip THIS clip travels: not its place, speed, actions, transition, name
     /// or label, and not a text clip's words or a shape's geometry.
     ///
-    /// Whole selection, one op, one undo step. The core answers an IDENTITY
-    /// when the payload's clip and the targets share no group, or the look is
-    /// already theirs — `applyEdit`'s beep, no undo step — and an
-    /// out-of-range payload is its error, presented. There is no group picker here: the default rule is
-    /// what ⌥⌘V has always meant in a cutting room, and the agent's tool
+    /// Whole selection, one op, one undo step. An IDENTITY — the payload's
+    /// clip and the targets share no group, or the look is already theirs —
+    /// is `applyEdit`'s beep, and an out-of-range payload is its error,
+    /// presented. There is no group picker here: the default rule is what
+    /// ⌥⌘V has always meant in a cutting room, and the agent's tool
     /// (`paste_attributes`) takes `groups` for anyone who needs the choice.
     func pasteAttributes() {
         guard let document = document, !document.selection.isEmpty,
