@@ -220,7 +220,7 @@ hand-written structure rather than by moving anything. `AgentServer.swift`
 (771 → 779) took eight lines of doc comment correcting what the startup
 parity check says it cannot see, which is inside the frozen file's ~50-line
 allowance. D3·4 migrated the four other groups, and every catalog file it
-touched came DOWN: `AgentCatalog.swift` 535 → **494**,
+touched came DOWN: `AgentCatalog.swift` 535 → **496**,
 `AgentCatalog+Files.swift` 609 → **601** (still over, by one line),
 `AgentCatalog+Transitions.swift` 112 → **92**, against
 `AgentCatalog+Declarations.swift` 279 → **310**, the widening row the

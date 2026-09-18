@@ -3788,8 +3788,8 @@ comparison is a tautology.
 ### 8.4 D3·4 — the remaining tools read the core (kpgalligan/reelcut#18)
 
 **Commits.** `74e9b29` (the migration and the proof), `4a0b33f` (the
-mutants and the whole proof tree) and `PLACEHOLDER_THREE` (what the review
-found, below — including the one row the review added).
+mutants and the whole proof tree) and `dcd9466` (what the review found,
+below — including the one row the review added).
 
 **What landed.** The last fourteen op tools stopped restating the table:
 the nine of the Tracks, Markers and Canvas groups in `AgentCatalog.swift`,
@@ -3804,7 +3804,7 @@ this ticket touched came DOWN.
 
 | File | Before | After |
 |---|---|---|
-| `AgentCatalog.swift` | 535 | **494** |
+| `AgentCatalog.swift` | 535 | **494** (496 after the review fix) |
 | `AgentCatalog+Files.swift` | 609 | **601** |
 | `AgentCatalog+Transitions.swift` | 112 | **92** |
 | `AgentCatalog+Declarations.swift` | 279 | 310 (two new rows, one of them the review's) |
@@ -4006,4 +4006,7 @@ than a shared opinion.
 
 The proof is **23/23** with the new row, `tools/list` differs from the
 migration capture by exactly the one fragment above, and port 4894's parity
-log printed nothing.
+log printed nothing. The two neighbours that read the same list were re-run
+after the fix: `clip_catalog_proof.py` **24/24** — its oracle reads the
+declarations too — and `op_schema_probe.py` **28/28**, which asserts the
+CORE's frame rate and is untouched by a narrowing the app makes.
