@@ -10,9 +10,10 @@ import AppKit
 /// `core/include/reelcut_core.h` is the contract itself.
 ///
 /// `ReelOp` and its one static factory per row of the op table are next door
-/// in `ReelOps.swift`, the size payment this file owed at 2242 lines. Only
-/// `ReelOp.coreNames()` stayed behind, because it reads `rc_op_names()` and
-/// the rule above admits no second file.
+/// in `ReelOps.swift`, the size payment this file owed at 2242 lines, and
+/// what an op ANSWERS is in `ReelEdit.swift`, the payment it owed at 1507.
+/// Only `ReelOp.coreNames()` stayed behind, because it reads `rc_op_names()`
+/// and the rule above admits no second file.
 ///
 /// Three conventions carried from Rasterize's `RasterCore.swift`:
 ///
@@ -323,35 +324,27 @@ final class ReelProject {
         return out.sorted()
     }
 
-    /// Applies one op and returns the resulting project.
-    ///
-    /// Returns nil when the op left the project alone: an identity (nothing
-    /// needed to change) or a refusal (a rule said no, in its own words,
-    /// through `reason_out` — NULL here until D2·2 reads it). Either is NO
-    /// undo step; the UI beeps or animates the gesture back. Throws when the
-    /// op or its arguments are invalid, with the core's own message.
-    func applying(_ op: ReelOp) throws -> ReelProject? {
+    /// Applies one op and returns what the core answered — `ReelEdit`, next
+    /// door, says what each of its three arms means and which one is an undo
+    /// step. Throws when the op or its ARGUMENTS are invalid, with the core's
+    /// own message: that is the fourth answer, and the only one that is about
+    /// the request rather than about the project.
+    func applying(_ op: ReelOp) throws -> ReelEdit {
         var err: UnsafeMutablePointer<CChar>? = nil
-        guard let handle = rc_project_apply(ptr, op.json, &err, nil) else {
+        var reason: UnsafeMutablePointer<CChar>? = nil
+        guard let handle = rc_project_apply(ptr, op.json, &err, &reason) else {
+            // The header's three NULLs, read in its order. The two channels
+            // are never both written, and either is freed by being read.
+            if let why = takeString(reason) {
+                return .refused(ReelRefusal(op: op.name, reason: why))
+            }
             guard err == nil else {
                 throw ReelCoreError(
                     message: takeErrorMessage(err, fallback: "The edit could not be applied."))
             }
-            return nil
+            return .identity
         }
-        return ReelProject(owning: handle)
-    }
-
-    /// Applies ops in order, each to the result of the last. nil when EVERY
-    /// op was an identity edit; a later op still runs after an earlier
-    /// identity, so a compound gesture is not lost because its first step
-    /// happened to change nothing.
-    func applying(_ ops: [ReelOp]) throws -> ReelProject? {
-        var current: ReelProject?
-        for op in ops {
-            if let next = try (current ?? self).applying(op) { current = next }
-        }
-        return current
+        return .applied(ReelProject(owning: handle))
     }
 
     /// Reads `memoJSON` while the lock is already held. NSLock is NOT

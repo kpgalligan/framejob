@@ -75,7 +75,7 @@ extension RecordingLanding {
         for requested in [at, floor + frame] {
             let op = ReelOp.addClip(track: track, media: media, at: requested)
             let id = trial.snapshot.nextId
-            guard let next = try trial.applying(op.scoped(scope)) else { return nil }
+            guard let next = try trial.applying(op.scoped(scope)).project else { return nil }
             let landed = try clip(id, in: next, scope: scope)
             if landed.start < floor { continue }
             guard landed.start <= at + frame else {

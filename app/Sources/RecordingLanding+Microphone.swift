@@ -198,7 +198,8 @@ extension RecordingLanding {
             } else {
                 on = attempt.snapshot.nextId
                 let addTrack = ReelOp.addTrack(index: 0, name: microphoneTrackName)
-                guard let withTrack = try attempt.applying(addTrack.scoped(scope)) else {
+                guard let withTrack = try attempt.applying(addTrack.scoped(scope)).project
+                else {
                     throw ReelCoreError(message: "A track for the microphone could not be added.")
                 }
                 attempt = withTrack
@@ -342,13 +343,13 @@ extension RecordingLanding {
         }
         let trim = ReelOp.trimStart(clip: added.id, to: added.start + head)
         let promisedTrim = ReelTime.snapToFrame(added.start + head, fps: fps)
-        guard let trimmed = try trial.applying(trim.scoped(scope)),
+        guard let trimmed = try trial.applying(trim.scoped(scope)).project,
             try clip(added.id, in: trimmed, scope: scope).start == promisedTrim
         else { return nil }
         let advanced = promisedTrim - added.start
         let move = ReelOp.moveClip(clips: [added.id], delta: -advanced)
         let promisedStart = promisedTrim + ReelTime.snapToFrame(-advanced, fps: fps)
-        guard let moved = try trimmed.applying(move.scoped(scope)) else {
+        guard let moved = try trimmed.applying(move.scoped(scope)).project else {
             throw ReelCoreError(
                 message: "\(file.path) could not be moved back by its \(milliseconds(advanced)) ms head.")
         }

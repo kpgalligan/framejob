@@ -249,7 +249,7 @@ struct RecordingLanding {
     ) throws -> UInt32 {
         let op = ReelOp.addMedia(descriptor: descriptor)
         ops.append(op)
-        if let added = try trial.applying(op) {
+        if let added = try trial.applying(op).project {
             trial = added
             guard let id = added.snapshot.media.last?.id else {
                 throw ReelCoreError(message: "\(descriptor.path) was added and is not listed.")
@@ -304,7 +304,7 @@ struct RecordingLanding {
         // Index 0 is the BACK of the stack (§6), so the count is the front.
         let addTrack = ReelOp.addTrack(index: container.tracks.count)
         let track = trial.snapshot.nextId
-        guard let withTrack = try trial.applying(addTrack.scoped(scope)) else {
+        guard let withTrack = try trial.applying(addTrack.scoped(scope)).project else {
             throw ReelCoreError(message: "A track for the recording could not be added.")
         }
         var attempt = withTrack

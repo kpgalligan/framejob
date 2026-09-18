@@ -37,6 +37,17 @@ detail there.
   `scope.rs`'s `refused_inside` (seven names) so one edit can mix a
   document-level op with scoped ones. A table, with
   `edit.rs`'s size exemption.
+- `ReelEdit.swift` — what an op ANSWERS, mirroring `core/src/outcome.rs`:
+  `ReelEdit` (`.applied` / `.identity` / `.refused`), `ReelRefusal` (the op
+  the core declined and the rule's own sentence, carried verbatim), and the
+  fold that applies a LIST — which names no `rc_*` symbol, so it lives here
+  and not next door. **Only `.applied` is an undo step**; the other two are
+  both "the project did not change" and differ only in what a caller can
+  SAY. `.project` is the spelling for a caller that treats a refusal as
+  nothing happened (a probe, a live drag), and there is one on
+  `ReelEdit?` too for the `try?` probes. In the fold **a refusal does not
+  stop the list** — a later op still runs after one, exactly as after an
+  identity — and the FIRST refusal is answered only when nothing applied.
 - `ProjectSnapshot.swift` · `MotionProps.swift` — the `Codable`, READ-ONLY
   mirror of spec §5.2 every view draws from. **Its enums decode LENIENTLY**
   — a misspelt kind becomes the first case, a `T??` field a clear — which is

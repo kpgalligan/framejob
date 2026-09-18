@@ -96,7 +96,7 @@ extension EditorViewController {
         guard let document = document else { return nil }
         let probed: ReelProject?
         do {
-            probed = try document.editedProject.applying(ops)
+            probed = try document.editedProject.applying(ops).project
         } catch {
             return nil
         }
@@ -203,7 +203,7 @@ extension EditorViewController {
         // presents the core's own sentence.
         let trial: ProjectSnapshot?
         do {
-            trial = try document.editedProject.applying(ops)?.snapshot
+            trial = try document.editedProject.applying(ops).project?.snapshot
         } catch {
             document.applyEdit("Set Transition", ops)
             return

@@ -187,6 +187,7 @@ python3 tools/proof/phase7_proof.py 4823
 python3 tools/proof/phase8_proof.py 4823
 python3 tools/proof/phase9_proof.py 4823
 python3 tools/proof/patch_door_proof.py 4823
+python3 tools/proof/refusal_proof.py 4823
 ```
 
 **Phase 9 takes a SECOND argument**, the log path, defaulting to
@@ -212,7 +213,9 @@ it and captures through the harness's own `cacheDisplay` path; the untracked
 it and deleted. `remaining_probe.py` is a third probe: the app arithmetic
 behind `designs/reelcut-remaining.md`'s fixes, one section per item, and its
 last section photographs a bare `TimelineView`'s filmstrip tile the same way
-`phase9_chrome.py` photographs the corner. `phase8_chrome.py` is the one
+`phase9_chrome.py` photographs the corner. `refusal_probe.py` is a fourth:
+the three app paths a refusal reaches that no MCP call can, driven through a
+live `ProjectDocument`. `phase8_chrome.py` is the one
 that puts WINDOWS on screen — its
 `dispatch` mode activates a probe for about a second, because a key window is
 the thing it measures.
@@ -2357,3 +2360,91 @@ and the misspelt blend inside an end patch) are the core's whole sentences
 with the GROUP in the path, and `phase3_proof.py`'s region check asserts the
 whole of the one refusal its handler kept rather than the word `region`,
 which every refusal at that door said.
+
+## What an op answers (`refusal_proof.py`)
+
+`python3 tools/proof/refusal_proof.py [port]`. **Named for the SEAM, not for
+a phase**, as the patch door is: what it proves is the answer every edit
+comes back with (`core/src/outcome.rs`, `app/Sources/ReelEdit.swift`,
+`CONTEXT.md`'s **Op**), and the rules that can say WHY arrive one deepening
+ticket at a time (`designs/reelcut-roadmap-7.md` §4, kpgalligan/reelcut#8).
+Deepening D2·2 (#10) built it with the overlap rule's section, at
+**39/39**; D2·3 (#11) adds one section per rule that finds its voice, each a
+copy of `overlap_rule`.
+
+An op answers one of three ways: it applied, it was an IDENTITY (valid, and
+nothing needed to change), or it was REFUSED (a rule declined it, in the
+rule's own words). The last two are both "the project did not change" —
+neither registers an undo step, neither is an error tier, and a person at
+the machine gets the same beep for both — and until D2 nothing outside the
+core could tell them apart. The two sentences an agent now reads are
+asserted WHOLE and never by keyword:
+
+    <Action> made no change: the project is already in that state.
+    <Action> was refused at <op>: <the rule's own sentence>
+
+| Section | What it measures |
+|---|---|
+| 1 — the overlap rule | the rule's whole sentence, ids and tick counts included, out of `move_clip`, out of `duplicate` (which names the copy it never made) and out of a SCOPED call; an overlap one frame under the limit still applying, so the number in the sentence is the rule's own boundary; the project unchanged either side of every refusal; and ONE undo putting back the marker edit, so not one of them registered a step |
+| 2 — an identity | four doors (`set_video`, `set_clip`, `set_canvas`, `split`) asked for the value the project already holds, each answering that whole sentence and NOTHING else — an equality, which is the only way to measure "says only that" — and naming no rule |
+| 3 — several ops | `normalize_clip` sends one `set_audio` per clip, so it is where the fold over a list is observable: a list of identities answers the identity, one undo puts both clips back, and a later op still runs after an earlier identity |
+
+Every refusal and every identity also asserts the ABSENCE of two fragments
+of the paragraph D2·2 deleted ("Either the project is already in that
+state", "the usual reason for a placement op is the overlap rule"). That
+paragraph also began "<Action> made no change", so a check looking only for
+the new words would pass against a build that still sent it.
+
+**What section 3 cannot reach, said so it is not rediscovered as a gap.**
+Only three tools send a list of ops — `normalize_clip`, `import_captions`
+and `consolidate_media` — and none can send one where NOTHING applied and
+something was refused: a `set_audio` of a measured gain has no rule to
+decline it, `CaptionLayout` probes its own batch and refuses app-side before
+the shared reply is reached, and `consolidate_media` short-circuits an empty
+plan. The op-naming half of that answer is proved in §1, which goes through
+the same one format string. When a tool gains such a list, its fixture goes
+in §3.
+
+**Why it exists beside `core/tests/refusal.rs`**, which proves the three
+arms through the FFI: those tests cannot see the Swift side of the seam —
+whether the app reads `reason_out` at all, whether the agent's shared reply
+still guesses, and whether a refusal is still no undo step once it has been
+through `ProjectDocument`. It needs no ffmpeg, and nothing in `media/` but
+`A.mov` and `AV.mov`.
+
+## A refusal, where a person meets it (`refusal_probe.py`)
+
+`python3 tools/proof/refusal_probe.py`, no port and no running app. The
+PROBE beside `refusal_proof.py`, for the three app paths no MCP call can
+reach. The agent's own path refuses at `AgentServer.performGroupedEdit`'s
+trial and never asks the document, so `ProjectDocument.applyEdit`,
+`updateLiveEdit` and `endLiveEdit` never see a refusal over the wire; this
+is `CLAUDE.md`'s answer for app STRUCTURE with no caller a script can reach
+— a probe compiled out of `app/Sources` over `harness/build.sh`'s own
+swiftc line, cached on modification times, a build failure scored as a
+FAILURE rather than an exit. **15/15** at deepening D2·2 (#10).
+
+It drives one live `ProjectDocument` over two abutting ten-second text
+clips — no media file, so every tick is hand-computable — and scores five
+things: that the core answers the three arms it was handed (a refused move,
+an identity, and an unknown id that throws); that `applyEdit`'s two
+non-applied arms leave the HANDLE where it was and do not rename the undo
+step; that a refused tick mid-drag is swallowed and the gesture ends with no
+step of its own; that ONE undo afterwards puts the project back to before
+the marker edit, leaving the fixture's own step under it; and that the
+invalid-input tier still throws in the core's own words.
+
+**"No error dialog" is measured by the probe answering at all.**
+`ProjectDocument.present(_:)` with no window runs `presentError(_:)`, a
+modal alert nobody is there to dismiss, so a build that treated a refusal as
+the invalid tier would BLOCK — the runner gives it a 120 s timeout and
+scores a hang as the failure it is. The beep is the one consequence nothing
+here can observe; it is a single statement the two non-applied arms share.
+
+**One thing it prints and does not score.** `performGroupedEdit` opens an
+undo group and balances it whatever the edit answered, so an edit that
+changes nothing leaves an EMPTY group behind — a step a person would have to
+press ⌘Z twice past. An identity has always done it, no caller reaches it
+(the agent refuses at its trial, and the menu path does not use that entry
+point), and it is not D2's doing; the note is there so it is found written
+down rather than rediscovered.

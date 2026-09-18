@@ -61,11 +61,11 @@ extension EditorViewController {
         let at = document.playhead
 
         var ops: [ReelOp] = []
-        // `try?` collapses both failures into one nil: a thrown error and the
-        // `None` of a documented refusal. Either way the front track will not
-        // take this clip, so both take the new-track path.
+        // `.project` on a `try?` collapses three answers into one nil: a
+        // throw, an identity and a rule's refusal. Either way the front track
+        // will not take this clip, so all of them take the new-track path.
         if let front = before.tracks.last?.id,
-            (try? document.editedProject.applying(make(front, at))) != nil
+            (try? document.editedProject.applying(make(front, at))).project != nil
         {
             ops = [make(front, at)]
         } else {
@@ -267,7 +267,7 @@ extension EditorViewController {
     static func backgroundMedia(for descriptor: MediaDescriptor, in project: ReelProject) throws
         -> UInt32?
     {
-        if let probed = try project.applying(.addMedia(descriptor: descriptor)) {
+        if let probed = try project.applying(.addMedia(descriptor: descriptor)).project {
             return probed.snapshot.media.last?.id
         }
         let path = descriptor.path.trimmingCharacters(in: .whitespacesAndNewlines)

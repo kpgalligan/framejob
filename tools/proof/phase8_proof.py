@@ -100,10 +100,13 @@ written twice in Swift and both spellings filtered `snapshot.clips` — the
 TOP LEVEL alone — while the core refuses against `every_clip()`, the
 timeline's clips CHAINED with every nest's (`core/src/edit_track.rs`). So
 media used only inside a compound clip walked past the Swift guard with a
-user count of zero and was refused by the core with a bare `Ok(None)`, which
-reaches a caller as "Remove Media made no change. Either the project is
-already in that state, or the edit was refused…". `MediaUsage.swift` is the
-one spelling now. The section builds the fixture over the wire — import, a
+user count of zero and was refused by the core with a reason-less "nothing
+changed", which reached a caller as the shared "Remove Media made no
+change…" and told it nothing. `MediaUsage.swift` is the one spelling now.
+(Deepening D2·2 shortened that shared sentence — an identity says only that
+the project is already in that state — so §2's negative check below is
+against the wording in `tools/proof/refusal_proof.py`, and still holds: this
+refusal is the handler's own, and says neither.) The section builds the fixture over the wire — import, a
 clip, `nest` — and asserts the refusal NAMES the file and the count, that
 the pre-fix sentence is NOT what comes back, that `with_clips: true` removes
 the entry and the nested clip while leaving the nest CLIP itself on the
@@ -806,8 +809,8 @@ def usage_part(mcp):
     check(refusal is not None and "is used by 1 clip." in refusal and "A.mov" in refusal,
           f"…and the refusal NAMES the file and the count: {refusal!r}")
     check(refusal is not None and "made no change" not in refusal,
-          "…and it is NOT the core's reason-less `Ok(None)` sentence, which is what a "
-          "build counting only the timeline's clips answers here")
+          "…and it is NOT the shared \"made no change\" sentence, which is what a build "
+          "counting only the timeline's clips answers here")
     check(refusal is not None and "with_clips: true" in refusal,
           "…and it says how to go on")
 

@@ -548,7 +548,8 @@ final class ProjectDocument: NSDocument {
             ops.append(.relinkMedia(media: media.id, path: candidate.path))
         }
         guard !ops.isEmpty else { return project }
-        return ((try? project.applying(ops)) ?? nil) ?? project
+        // Only `.applied` is a repair; both other arms leave it as opened.
+        return (try? project.applying(ops)).project ?? project
     }
 
     /// Spec §1's opening flow: a movie, sound file or picture becomes a fresh
@@ -611,7 +612,9 @@ final class ProjectDocument: NSDocument {
             throw ReelCoreError(
                 message: "\(descriptor.path) reports a size or frame rate a project cannot use.")
         }
-        guard let withMedia = try base.applying(.addMedia(descriptor: descriptor)) else {
+        // Neither non-applied arm is reachable on a fresh project, and one
+        // that answered with the project unchanged would be worse than this.
+        guard let withMedia = try base.applying(.addMedia(descriptor: descriptor)).project else {
             throw ReelCoreError(message: "The file could not be added to a project.")
         }
         // `add_media` returns a project, not an id (there is one FFI entry
@@ -621,10 +624,11 @@ final class ProjectDocument: NSDocument {
         guard let media = snapshot.media.last, let track = snapshot.tracks.first else {
             return withMedia
         }
-        // A clip the core refuses (an empty media, say) is not fatal: the
-        // project still opens with the file in the Media tab.
+        // A clip the core refuses (an empty media, say) is not fatal, and
+        // neither is an identity or a throw: all three open the project with
+        // the file in the Media tab, which is better than not opening it.
         return (try? withMedia.applying(.addClip(track: track.id, media: media.id, at: 0)))
-            .flatMap { $0 } ?? withMedia
+            .project ?? withMedia
     }
 
     // MARK: - Writing
@@ -1130,28 +1134,25 @@ final class ProjectDocument: NSDocument {
     /// Applies a sequence of ops as ONE undo step — a compound gesture
     /// (freeze frame, a multi-file import) is one thing to undo.
     ///
-    /// Three outcomes, exactly as spec §5.5 defines them:
-    /// * a new project — register undo, count the change, publish;
-    /// * `nil` (valid but changes nothing) — beep and register NO undo step,
-    ///   because a phantom step makes ⌘Z look broken;
-    /// * a throw (invalid arguments) — present the core's own message.
+    /// Four answers (spec §5.5): `.applied` registers undo and publishes,
+    /// `.identity` and `.refused` are BOTH a beep and no undo step, and a
+    /// throw is the core's own message. `ReelEdit` argues the middle two.
     func applyEdit(_ actionName: String, _ ops: [ReelOp]) {
         let current = project
-        let updated: ReelProject?
         do {
-            updated = try current.applying(addressed(ops))
+            switch try current.applying(addressed(ops)) {
+            case .applied(let updated):
+                registerUndo(restoring: current, actionName: actionName)
+                project = updated
+                countEditChange(.changeDone)
+                projectDidChange()
+            case .identity, .refused:
+                // Both arms alike: a beep, and NO undo step.
+                NSSound.beep()
+            }
         } catch {
             present(error)
-            return
         }
-        guard let updated = updated else {
-            NSSound.beep()
-            return
-        }
-        registerUndo(restoring: current, actionName: actionName)
-        project = updated
-        countEditChange(.changeDone)
-        projectDidChange()
     }
 
     /// `applyEdit` for a path that is NOT running inside an AppKit event — the
@@ -1211,25 +1212,24 @@ final class ProjectDocument: NSDocument {
     }
 
     func updateLiveEdit(_ ops: [ReelOp]) {
-        guard let base = liveEditBase else { return }
-        let updated: ReelProject?
-        do {
-            updated = try base.applying(addressed(ops))
-        } catch {
-            // A refused tick is normal mid-gesture (a drag that has strayed
-            // past the source bound): keep the last good frame, do not
-            // interrupt the drag with an alert.
+        guard let base = liveEditBase,
+            case .applied(let updated)? = try? base.applying(addressed(ops))
+        else {
+            // **Every answer but `.applied` is swallowed on purpose** — an
+            // invalid tick, an identity and a rule's refusal alike (spec #8's
+            // eighth decision). A refused tick is NORMAL here and recovers on
+            // the next one; the last good frame stays. Not chatty.
             return
         }
-        guard let updated = updated else { return }
         project = updated
         projectDidChange(isLive: true)
     }
 
     /// Registers ONE undo step from the `beginLiveEdit` snapshot to the
-    /// current handle — none when the gesture changed nothing (same handle)
-    /// — then posts a final `["isLive": false]` so listeners that skipped
-    /// the live ticks refresh exactly once per gesture.
+    /// current handle — none when the gesture changed nothing, which is every
+    /// tick having been refused, an identity or invalid, since
+    /// `updateLiveEdit` replaces the handle only on `.applied` — then a final
+    /// `["isLive": false]` so listeners that skipped the ticks refresh once.
     func endLiveEdit(_ actionName: String) {
         guard let base = liveEditBase else { return }
         liveEditBase = nil

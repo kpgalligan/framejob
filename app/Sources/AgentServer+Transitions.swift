@@ -37,9 +37,10 @@ extension AgentServer {
     /// The clamps are the core's and none is pre-checked: a duration longer
     /// than the material lands shorter, and "not at a hard cut" is the
     /// core's sentence naming which of the three it is. What IS reworded is
-    /// the `None`: `performGroupedEdit`'s fixed text talks about the overlap
-    /// rule, and the reason this op answers `None` is that neither side of
-    /// the cut had a frame of unused material left.
+    /// the IDENTITY: the shared reply says only that the project is already
+    /// in that state (D2·2), and the reason this op answers one is that
+    /// neither side of the cut had a frame of unused material left — a rule
+    /// that will say so itself, and lose this rewording, at D2·3.
     func addTransition(_ a: [String: Any]) throws -> String {
         let document = try target(a)
         let clip = try clipArg(a, "clip", document)
@@ -56,7 +57,7 @@ extension AgentServer {
         // the rule is one of the clamps, and a `None` means the clamps left
         // nothing. Addressed the same way the commit will be, so a scoped
         // call is tried in the container it will land in.
-        if try document.project.applying(addressed(ops, document)) == nil {
+        if try document.project.applying(addressed(ops, document)).project == nil {
             if ripple {
                 throw ToolError(
                     message: "add_transition made no change: with ripple the shift clamped "
