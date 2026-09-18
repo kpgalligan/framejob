@@ -2762,9 +2762,11 @@ identity. Each now says which.
   a person's experience of the two identical, and is deliberate.
 - **`core/src/edit.rs`'s Results section** was already three-armed; it gains
   the same two-line reading rule for its own table, pointing at
-  `Outcome::Identity`. **The file is 895, exactly where it started**: the
-  identity bullet and the non-media paragraph were tightened to pay for it,
-  because a standing table exemption is for TABLE rows.
+  `Outcome::Identity`. **The file is 895, exactly where this ticket found
+  it**: the identity bullet and the non-media paragraph were tightened to pay
+  for the two lines, because a standing table exemption is for TABLE rows and
+  not for contract prose. D2·1's own eight lines are still unpaid, and §6
+  names them.
 - **`README.md`** repeated the FFI contract correctly already. It gains a
   short paragraph where an agent meets the tool list: an edit that did not
   happen says which of the two it was, an identity names no rule, a refusal
@@ -2927,7 +2929,7 @@ refusal in front of `applyEdit`, which is where a person meets it.
 ## 6. D2 — closed
 
 Five tickets on `d2-refusal-reason`, every one landed and reviewed on
-2026-09-17 and 2026-09-18. **An op that changed nothing and an op a rule
+2026-09-18. **An op that changed nothing and an op a rule
 refused are two different answers now**, and the reason a rule gives is the
 rule's own sentence, written once, carried out through the FFI and printed to
 the caller unaltered.
@@ -2959,8 +2961,9 @@ ledger, and failed the proof twice on purpose.
 **The eleven rules that speak**, each in its own sentence, each written once
 however many ops ask it: the overlap rule, a locked track, the last track, a
 track that still holds clips, a media row a clip still shows, a cut with
-nothing left to give a transition, a rippled cut with no room to shift, a
-rippled cut nothing between one frame and the whole request will fit, an
+nothing left to give a transition, a rippled cut whose two clips have no room
+to overlap by shifting, a rippled cut where no overlap between the whole
+request and one frame leaves every track it moves inside the overlap rule, an
 action that would overlap another, an action that would run past its clip,
 and a move to a track index the document has not got. Their sentences are
 written at **fourteen sites** and passed through unaltered at **twenty-seven**
@@ -3049,6 +3052,13 @@ measured rather than asserted.
 - **A refusal's sentence is still not shown to the person at the machine.**
   The beep stays, which is spec kpgalligan/reelcut#8's own out-of-scope, and
   where such a message would live is a design question of its own.
+- **Eight lines of unpaid toll in `core/src/edit.rs`** (887 → 895, over the
+  cap under the table exemption, which is for TABLE rows): D2·1's, the
+  Results section of the contract this candidate changed. D2·5 took two more
+  and paid them inside the file; the SERIES total is these eight, and the
+  next phase to touch that module doc pays them or takes the exemption on
+  purpose. `AgentServer+Audio.swift` is 162 against the 156 it started at and
+  is nowhere near the cap.
 - **Two cross-build references cannot be built again** — `phase5_chrome.py`'s
   sections 3–7 and `recording_probe.py`'s §6b, both skipped by name since
   D2·5, both a consequence of the FFI's fourth parameter. The coverage lost
