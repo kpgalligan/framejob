@@ -2684,7 +2684,7 @@ Judged not real:
 
 ### 5.5 D2·5 — contract and record (kpgalligan/reelcut#13)
 
-**Commits.** `315b7f6` (the ticket) and `SHA2` (the mutant table), with
+**Commits.** `315b7f6` (the ticket) and `dcdc7fc` (the mutant table), with
 `SHA3` holding what its review found.
 
 **What landed.** Documents, doc comments and two rotted instruments. No
