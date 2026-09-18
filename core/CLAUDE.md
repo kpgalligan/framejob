@@ -111,9 +111,15 @@ file is what governs a module now.
   the one a snap rounded it to. Gradient stops are deliberately NOT order-checked: a refusal
   would break dragging one stop past another mid-gesture, so the renderer
   sorts, and the comment says so where the check would have gone.
-- `edit_track.rs` — tracks, markers, the canvas and the media list. Over the
-  cap; the next cut is `set_canvas` with `rescale` / `resnap` /
-  `check_dimension` into an `edit_canvas.rs`.
+- `edit_track.rs` — tracks, markers and the media list: the three lists a
+  clip sits in. The canvas left here at road map 7's D2·3 toll.
+- `edit_canvas.rs` — the document's own shape: `set_canvas` and the three
+  things it does to the rest of the document — `check_dimension` (a
+  dimension is even, because H.264 encodes in macroblocks), `rescale` (a
+  size change moves every clip's `x`, `y` and `scale`, each axis by its own
+  ratio and `scale` by the smaller of the two) and `resnap` (a rate change
+  moves every stored time to the new grid, and drops the second of two
+  markers a coarser grid lands on one tick).
 - `edit_time.rs` — ripple, insert time, `ripple_delete_ranges` (the pairs are
   ordered, MERGED — touching as well as overlapping — then cut and closed
   right to left as ONE edit; the singular delegates to it), `lift_range`
@@ -244,7 +250,7 @@ gives something up BEFORE it takes anything on**: the cut is a PURE MOVE,
 landed and gated alone, so the feature's diff is attributable; budget the cut
 against the pessimistic number, because an estimate here has run about two
 thirds of the truth. Over the cap today and known debt, not licence:
-`edit_clip.rs`, `edit_track.rs` (next cut named above) and `edit.rs`, whose
+`edit_clip.rs` and `edit.rs`, whose
 standing exemption is that its module doc IS the op table (the cut there, if
 ever forced, is the `Op` enum into an `edit_ops.rs`, and never in the same
 phase as a feature). The current list is `wc -l` and

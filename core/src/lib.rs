@@ -19,6 +19,7 @@ pub mod audio_duck;
 pub mod edit;
 pub mod edit_action;
 pub mod edit_background;
+pub mod edit_canvas;
 pub mod edit_clip;
 pub mod edit_edge;
 pub mod edit_insert;
