@@ -3506,9 +3506,8 @@ stop re-typing argument names in Python.
 ### 8.3 D3·3 — the clip tools read the core (kpgalligan/reelcut#17)
 
 **Commits.** `a14f39e` (the prefactor: the table's bound), `e6c600b` (the
-migration, the declarations list and the proof) and `a9e487c` (the mutants
-and the neighbouring proofs), with the review's fixes in the commit named at
-the foot of this section.
+migration, the declarations list and the proof), `a9e487c` (the mutants
+and the neighbouring proofs) and `f8156c9` (what the review found, below).
 
 **The ticket's amendment, and why it came first.** #16 measured two facts
 that would have made two tools WORSE on the way through, so the ticket
