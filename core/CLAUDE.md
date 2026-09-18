@@ -48,12 +48,27 @@ file is what governs a module now.
   answer it gives does not compile; the fourth possibility, a request that
   could not be read, stays the `Err(String)` beside it. Its `Identity` doc
   is also the one place that says which refusals can say why yet.
-- `edit.rs` — the op enum, `OP_NAMES`, `parse` and `apply`. **Its module
-  doc IS the op table**; `app/Sources/ReelOps.swift`'s typed builders,
-  `AgentCatalog*.swift`'s tools and spec §6 mirror it. `parse` answers an
-  `Envelope` — the op AND the envelope's `scope` — and `apply_op(&Op)` knows
-  nothing about nests. The table is the reason this file is over the size
-  cap and stays exempt (below).
+- `edit.rs` — the op enum, `parse` and `apply`. **Its module doc IS the op
+  table's SEMANTICS half** — what each op means, and what an absent
+  optional argument means — where `op_table.rs` is the ARGUMENTS half;
+  `app/Sources/ReelOps.swift`'s typed builders, `AgentCatalog*.swift`'s
+  tools and spec §6 mirror the two together. `OP_NAMES` is re-exported from
+  here, at the path it has always had. `parse` answers an `Envelope` — the
+  op AND the envelope's `scope` — and `apply_op(&Op)` knows nothing about
+  nests. The semantics table is the reason this file is over the size cap
+  and stays exempt (below).
+- `op_table.rs` — the op table as DATA (road map 7's D3): one `OpRow` per
+  op and one `Argument` per argument — its name, its `Kind` and whether the
+  decoder requires it — and `OP_NAMES` as a projection of it, re-exported by
+  `edit.rs` so no caller moved. A published interface, where the `Op` enum
+  and the dispatch are its implementation: the tool catalog reads it rather
+  than restating it. A row holds no prose, no semantics and no default
+  spelled twice; `Kind` is closed, carries each vocabulary's members, and
+  has exactly ONE kind per answer serde gives, because a distinction the
+  decoder cannot see is one no test could prove. Nothing here is the
+  authority — the enum's fields are, and `core/tests/op_table.rs` proves
+  every row by asking the decoder. Capped at 400 lines like any new module:
+  it does NOT inherit `edit.rs`'s table exemption.
 - `scope.rs` — editing INSIDE a nest: the envelope's `scope` key. Builds a
   VIEW project from the nest (its tracks and clips at top level, its frozen
   size as the canvas, the parent's rate, media, `next_id` and nests, no

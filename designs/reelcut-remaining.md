@@ -203,7 +203,10 @@ would be the bare strip with a longer list.
 Every file over the ~600-line cap as of 2026-09-18 — 29 of them, the
 list regenerated row by row against `wc -l` at road map 7's D2·5, which
 closed deepening D2. `core/src/edit_track.rs` came off it there (674 → 522,
-`edit_canvas.rs` cut out of it in D2·3) and nothing joined.
+`edit_canvas.rs` cut out of it in D2·3) and nothing joined. `edit.rs` went
+895 → 838 at road map 7's D3·1, which moved its argument column into
+`op_table.rs` (271, a new module under the 400 cap and with no exemption of
+its own); it is still over and still exempt for its SEMANTICS table.
 Regenerate the list with
 `wc -l app/Sources/*.swift core/src/*.rs | awk '$1>600 && $2!="total"' | sort -rn`
 rather than trusting the numbers here; the standing exemptions are
@@ -229,7 +232,7 @@ row per op.
 | `core/src/edit_clip.rs` | 1028 |
 | `app/Sources/AgentCatalog+Clips.swift` | 941 |
 | `app/Sources/Transcriber.swift` | 934 |
-| `core/src/edit.rs` | 895 |
+| `core/src/edit.rs` | 838 |
 | `app/Sources/AudioDSP.swift` | 890 |
 | `app/Sources/AgentServer+Clips.swift` | 847 |
 | `app/Sources/AgentServer.swift` | 771 |

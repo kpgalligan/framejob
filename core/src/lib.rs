@@ -50,6 +50,7 @@ pub mod model_shape;
 pub mod model_text;
 pub mod motion;
 pub mod nest;
+pub mod op_table;
 pub mod outcome;
 pub mod patch;
 pub mod props_check;

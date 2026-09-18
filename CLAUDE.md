@@ -103,9 +103,11 @@ pixel or sample work in Rust; no ffmpeg dependency in the product.
   project, an identity, or refused in the rule's own sentence. Only the first
   is an undo step. `ProjectDocument` is the single mutation point and undo is
   its stack of handles.
-- Edits are JSON ops through `rc_project_apply`. **The op table is the module
-  doc of `core/src/edit.rs`**; `ReelOps.swift`'s typed builders,
-  `AgentCatalog*.swift`'s tools and spec §6 mirror it — change one, change
+- Edits are JSON ops through `rc_project_apply`. **The op table is two
+  halves**: what an op MEANS is the module doc of `core/src/edit.rs`, and
+  what it TAKES — every argument's name, kind and required-ness — is
+  `core/src/op_table.rs`, as data. `ReelOps.swift`'s typed builders,
+  `AgentCatalog*.swift`'s tools and spec §6 mirror them — change one, change
   all four. The envelope's `scope` key addresses an edit inside a nest.
 - Persisted-state changes bump `RC_FORMAT_VERSION` in `core/src/format.rs`
   **and** the header.
@@ -123,9 +125,10 @@ else is what bloats files:
 
 1. **Core:** the op's semantics in an `impl Project` block in the module of
    its own concern (a new concern is a new module); the row in `edit.rs`'s
-   enum, `OP_NAMES` and module-doc table; a persisted field with a serde
-   default and a `schema_vN.rs`; a new `core/tests/*.rs`. A field lands in the
-   same phase as the thing that renders it.
+   enum and module-doc table, and its arguments in `op_table.rs` (which is
+   where `OP_NAMES` comes from); a persisted field with a serde default and a
+   `schema_vN.rs`; a new `core/tests/*.rs`. A field lands in the same phase as
+   the thing that renders it.
 2. **FFI**, only when a new `rc_*` export is needed: Rust → header →
    `ReelCore.swift`.
 3. **Swift:** the typed builder in `ReelOps.swift`; a small value or model
