@@ -580,9 +580,14 @@ fn the_region_takes_four_named_numbers_and_only_those() {
 
     // A missing member: there is no defensible default for any of the four
     // — a region with no width is not a region — so the type carries none.
+    // The whole sentence, because the PATH is what a caller acts on: an
+    // error at the struct itself prints its path as `"."`, which read as
+    // `region..` until D1·5 collapsed it back onto the region.
     let msg = project.errors(&zoom(json!({"x": 0, "y": 0, "width": 480})));
-    assert_contains(&msg, "op \"add_zoom_action\" is not valid");
-    assert_contains(&msg, "missing field `height`");
+    assert_eq!(
+        msg,
+        "op \"add_zoom_action\" is not valid: bad value at \"region\": missing field `height`"
+    );
 
     // A misspelt one, named beside the four the region does take.
     let msg = project.errors(&zoom(

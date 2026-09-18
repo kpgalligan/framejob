@@ -246,8 +246,13 @@ impl<'de> Deserialize<'de> for ZoomRegion {
             )));
         }
         let members: Members = serde_path_to_error::deserialize(value).map_err(|e| {
+            // `Path`'s root prints as `"."`, not as the empty string — a
+            // missing member is reported AT the struct, so the naive
+            // `format!("region.{path}")` said `region..`, which is a path
+            // no caller can act on. Both spellings of "the whole region"
+            // collapse to `region` here (measured, D1·5).
             let path = e.path().to_string();
-            let at = if path.is_empty() {
+            let at = if path.is_empty() || path == "." {
                 "region".to_string()
             } else {
                 format!("region.{path}")

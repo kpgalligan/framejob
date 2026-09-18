@@ -10,8 +10,12 @@ references are as of the phase that wrote them and are not maintained, and a
 file or a function it describes may since have been DELETED — `app/CLAUDE.md`'s
 map is the list of files that exist, and this one is not edited to follow it.
 Deepening D1 (`designs/reelcut-roadmap-7.md`) took out a whole family at once:
-the agent door's hand readers — `colorArg`, `shapePatchArg`, `gradientArg` and
+the agent door's hand readers and hand checks — `colorArg`, `shapePatchArg`,
+`gradientArg`, `textArg`, `shapeArg`, `unitPoint`, `checkClipPatchTypes`,
+`zoomRegionArg`, `checkActionPatch`, `checkVideoEnums`, `checkTextEnums` and
 the per-group allowed-key sets — which the paragraphs below still argue for.
+`patchArg`, `decodePatch`, `withOpaqueColors` and `nestedNumberArg` are dead
+with them and go in kpgalligan/reelcut#7.
 
 ## Archived text — app/CLAUDE.md — Swift app rules
 

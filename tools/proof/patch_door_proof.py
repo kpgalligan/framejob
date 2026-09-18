@@ -4,8 +4,9 @@ Named for the seam and not for a phase: what it proves is the one door every
 caller-authored object comes through (`core/src/patch.rs`, `CONTEXT.md`'s
 **Patch**), and the doors arrive one deepening ticket at a time
 (`designs/reelcut-roadmap-7.md` §1, kpgalligan/reelcut#1). Deepening D1·3
-built it with `set_video`'s section; D1·4 added eight more; D1·5 adds the
-last two. There is no phase number to put on that.
+built it with `set_video`'s section; D1·4 added eight more; D1·5 added the
+last two, `set_action_end` and `add_zoom_action`'s region. There is no phase
+number to put on that, and every door the app has is here.
 
 **What a patch means, which is the whole of what is checked here.** A patch
 merges key by key at EVERY depth, `null` clears a key and an array replaces
@@ -24,14 +25,18 @@ verbatim rather than by keyword:
 
 `<subject>` is `a video patch`, `an audio patch`, `a text patch`, `a shape
 patch`, `a clip patch` or `an action end patch`; in the last the path carries
-the group (`video.filters[1].kind`). Beside them the RANGE refusals,
+the group (`video.filters[1].kind`), and that door alone does NOT range-check,
+because the state a clip interpolates toward may name a value no stored group
+could hold (spec §5.4). Beside them the RANGE refusals,
 `props_check.rs`'s, spelled with the group's name and NO array index —
 `video.shadow.color must be between 0 and 1, not 2`,
 `shape.gradient.stops[].color must be between 0 and 1, not 2`. A door whose
 caller-authored object is an ARGUMENT rather than a patch — a colour, a
 region — has no group to name, so its wrong TYPE is refused one level out, by
 the op envelope: `op "set_canvas" is not valid: invalid length 3, expected an
-array of length 4`.
+array of length 4`, or, where the argument is an object the core reads as a
+type, `op "add_zoom_action" is not valid: bad value at "region.widht":
+unknown field `widht``.
 
 **Why it has to be driven through the app.** `core/tests/patch_door.rs`
 proves all of this through the FFI. What it cannot see is the Swift agent
@@ -52,12 +57,13 @@ by KIND when D1·4's eight took the single file past the ~600-line cap
 (`CLAUDE.md`'s size rule):
 
     patch_door.py           the harness — the Session and the four helpers
-    patch_door_patches.py   the doors whose object is a PATCH (five of them)
-    patch_door_args.py      the doors whose object is an ARGUMENT (four)
+    patch_door_patches.py   the doors whose object is a PATCH (six of them)
+    patch_door_args.py      the doors whose object is an ARGUMENT (five)
     patch_door_proof.py     this file: what a patch means, and `main`
 
-Each door file's foot carries a marker comment saying which of its own kind
-are still owed and what to copy. There is nothing to run but this script.
+Each door file's foot carries a marker comment saying what a LATER phase's
+door copies; neither is owed a door today. There is nothing to run but this
+script.
 
 Needs no ffmpeg and nothing in `media/` but `A.mov`, which
 `tools/proof/README.md` says how to make. Run it as every other script here
@@ -72,10 +78,10 @@ import sys
 from patch_door import MCP, WORK, ToolError, summary
 from patch_door_args import (
     background_clip_door, canvas_background_door, new_shape_clip_door,
-    new_text_clip_door,
+    new_text_clip_door, zoom_region_door,
 )
 from patch_door_patches import (
-    audio_door, clip_door, shape_door, text_door, video_door,
+    action_end_door, audio_door, clip_door, shape_door, text_door, video_door,
 )
 
 PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 4823
@@ -94,6 +100,8 @@ def main():
     new_shape_clip_door(mcp)
     canvas_background_door(mcp)
     background_clip_door(mcp)
+    action_end_door(mcp)
+    zoom_region_door(mcp)
     summary()
 
 

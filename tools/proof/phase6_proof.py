@@ -1662,16 +1662,16 @@ def actions_part(mcp):
     # the missing `kind` from the defaults, so a sepia base would animate
     # and then switch to a blur with the caller told it worked.
     #
-    # **The two `set_video` refusals here now speak the CORE's words** (D1·3,
-    # kpgalligan/reelcut#4): that door forwards the caller's patch raw, so
-    # the sentence an agent reads is `patch.rs`'s, and it carries the value
-    # sent as well as the index. Both were written against the SWIFT door's
-    # `patch.filters[0]` and went on passing after that door came out, only
-    # because a keyword check cannot tell the two apart — which is why each
-    # is now the whole sentence. `tools/proof/patch_door_proof.py` is where
-    # the seam itself is proved; these two stay because the partial entry is
-    # phase 6's own feature. The two `set_action_end` refusals below are
-    # still the Swift door's, until kpgalligan/reelcut#6 moves them.
+    # **All four refusals here now speak the CORE's words** (D1·3 for the two
+    # `set_video` ones, kpgalligan/reelcut#4; D1·5 for the two
+    # `set_action_end` ones, kpgalligan/reelcut#6): both doors forward the
+    # caller's patch raw, so the sentence an agent reads is `patch.rs`'s, and
+    # it carries the value sent as well as the index. Every one was written
+    # against the SWIFT door's `patch.video.filters[0]` spelling and went on
+    # passing after that door came out, only because a keyword check cannot
+    # tell the two apart — which is why each is now the whole sentence.
+    # `tools/proof/patch_door_proof.py` is where the seam itself is proved;
+    # these four stay because the partial entry is phase 6's own feature.
     partial = animated.error("set_video", clips=[clip],
                              patch={"filters": [{"amount": 1.0}]})
     check(partial is not None
@@ -1680,9 +1680,10 @@ def actions_part(mcp):
     partial_end = animated.error(
         "set_action_end", clip=clip, action=action["id"],
         patch={"video": {"filters": [{"amount": 1.0}]}})
-    check(partial_end is not None and "patch.video.filters[0]" in partial_end,
+    check(partial_end is not None
+          and 'missing key "video.filters[0].kind" in an action end patch' in partial_end,
           f"…and so is one inside an action's END patch, where the idiom is most "
-          f"tempting — got {partial_end!r}")
+          f"tempting, with the GROUP in the path — got {partial_end!r}")
     unknown = animated.error("set_video", clips=[clip],
                              patch={"filters": [{"kind": "glow", "amount": 1.0}]})
     check(unknown is not None
@@ -1693,9 +1694,11 @@ def actions_part(mcp):
     end_blend = animated.error(
         "set_action_end", clip=clip, action=action["id"],
         patch={"video": {"blend": "muliply"}})
-    check(end_blend is not None and "patch.video.blend" in end_blend,
-          f"and a misspelt blend inside an end patch is refused by its dotted key "
-          f"— got {end_blend!r}")
+    check(end_blend is not None
+          and 'bad value at "video.blend" in an action end patch: unknown variant '
+              '`muliply`' in end_blend,
+          f"and a misspelt blend inside an end patch is refused by its dotted key, "
+          f"naming the value sent — got {end_blend!r}")
 
 
 # ---- the catalog and the file --------------------------------------------

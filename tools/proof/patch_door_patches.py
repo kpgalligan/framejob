@@ -502,18 +502,194 @@ def clip_door(mcp):
           "must never get")
 
 
+# ---- set_action_end (D1·5, kpgalligan/reelcut#6) -------------------------
+
+
+def action_end_door(mcp):
+    """`set_action_end` — the sixth patch, and the LAST door D1 moved.
+
+    Its object is a patch of a patch: three group bodies under one envelope,
+    so every path a refusal names carries the group (`video.filters[1].kind`)
+    and the subject is `an action end patch` rather than any one group's.
+    Until this ticket it was the one door still laundering — `patchArg`, the
+    three allowed-key sets, `checkActionPatch` and the two enum checks — and
+    the three holes that left are what the refusals below are chosen for: a
+    wrong TYPE one level down read as a CLEAR, a three-element colour had an
+    alpha filled in, and `withOpaqueColors` reached no further than a key
+    called `color`.
+
+    The fixture stores a value for every key a refusal names, in all three
+    groups, BEFORE anything is refused: a door that dropped, cleared or
+    corrected a key would be merging a real edit into the end state, and the
+    "unchanged" half of `refused` would go red. (`shape`, `video.motion` and
+    the unknown `blurr` have nothing stored behind them; they discriminate on
+    the sentence alone.)"""
+    print("\n10 — set_action_end: an end patch is walked like every other patch")
+    s = Session(mcp, "patch-door-action-end")
+    clip = s.clip_of()
+    s.op("add_action", clip=clip, at=0, duration=2 * SEC)
+    action = s.clip(clip)["actions"][0]["id"]
+
+    def end():
+        return s.clip(clip)["actions"][0]["end"]
+
+    s.op("set_action_end", clip=clip, action=action, patch={
+        "video": {"opacity": 0.5, "blend": "screen",
+                  "shadow": {"color": [0.0, 0.0, 0.0, 1.0], "opacity": 0.8,
+                             "blur": 10.0, "angle": 315.0, "distance": 30.0},
+                  "filters": [{"kind": "sepia", "amount": 1.0}],
+                  "spotlight": {"shape": "ellipse"}},
+        "audio": {"volume": 0.25, "fade_in": 4 * FRAME},
+        "text": {"size": 96.0,
+                 "animation": {"kind": "typewriter", "in": 5 * FRAME, "out": 0}},
+    })
+    stored = end()
+    check(stored["video"]["shadow"]["blur"] == 10
+          and stored["video"]["filters"][0]["kind"] == "sepia"
+          and stored["audio"]["fade_in"] == 4 * FRAME
+          and stored["text"]["animation"]["kind"] == "typewriter",
+          "the fixture's end state holds a shadow, a sepia filter, a fade and an "
+          "animation — a value behind every key the refusals name")
+
+    print("\n10a — a real edit, whose undo step every refusal below must leave alone")
+    start = undo_marker(
+        s, lambda: s.op("set_action_end", clip=clip, action=action,
+                        patch={"video": {"opacity": 0.25}}))
+
+    print("\n10b — a key or a value the vocabulary does not have, refused by path")
+    # The group is in the path and `an action end patch` is the subject, which
+    # is the whole difference between this door's sentences and `set_video`'s.
+    refused(s, "set_action_end", "a misspelt key inside a group",
+            'unknown key "video.opacty" in an action end patch',
+            clip=clip, action=action, patch={"video": {"opacty": 0.5}})
+    refused(s, "set_action_end", "an unknown key INSIDE a filter entry, by INDEX",
+            'unknown key "video.filters[1].kindd" in an action end patch',
+            clip=clip, action=action,
+            patch={"video": {"filters": [{"kind": "blur", "amount": 0.5},
+                                         {"kindd": "sepia", "amount": 1.0}]}})
+    # `checkVideoEnums` and `checkTextEnums` existed for these two, and could
+    # not reach either one's path: a misspelt kind arrived at the core as the
+    # vocabulary's FIRST case, a different effect applied and reported as
+    # success.
+    refused(s, "set_action_end", "a misspelt filter kind, by index",
+            'bad value at "video.filters[1].kind" in an action end patch: '
+            'unknown variant `glow`',
+            clip=clip, action=action,
+            patch={"video": {"filters": [{"kind": "blur", "amount": 0.5},
+                                         {"kind": "glow", "amount": 1.0}]}})
+    refused(s, "set_action_end", "a misspelt text animation kind",
+            'bad value at "text.animation.kind" in an action end patch: '
+            'unknown variant `fade`',
+            clip=clip, action=action,
+            patch={"text": {"animation": {"kind": "fade"}}})
+    refused(s, "set_action_end", "a misspelt blend, two levels in",
+            'bad value at "video.blend" in an action end patch: '
+            'unknown variant `muliply`',
+            clip=clip, action=action, patch={"video": {"blend": "muliply"}})
+    refused(s, "set_action_end", "a misspelt spotlight shape",
+            'bad value at "video.spotlight.shape" in an action end patch: '
+            'unknown variant `circle`',
+            clip=clip, action=action,
+            patch={"video": {"spotlight": {"shape": "circle"}}})
+    # A wrong TYPE one level down, which the round-trip check could not see
+    # at all: `shadow` is a `T??` field, so `5` decoded as `.some(nil)` and
+    # REMOVED the shadow the fixture stores.
+    refused(s, "set_action_end", "a number where the shadow OBJECT belongs",
+            'bad value at "video.shadow" in an action end patch: '
+            'expected an object, not 5',
+            clip=clip, action=action, patch={"video": {"shadow": 5}})
+    refused(s, "set_action_end", "a fraction where a tick count belongs",
+            'bad value at "audio.fade_in" in an action end patch: '
+            'expected a whole number, not 0.5',
+            clip=clip, action=action, patch={"audio": {"fade_in": 0.5}})
+    # A colour is FOUR numbers here too. This is the one door where the
+    # three-element form was still taken: `withOpaqueColors` filled in the
+    # alpha on the way past, so what landed was not what was sent.
+    refused(s, "set_action_end", "a three-element colour, which used to gain an alpha",
+            'bad value at "video.shadow.color" in an action end patch: '
+            'invalid length 3, expected an array of length 4',
+            clip=clip, action=action,
+            patch={"video": {"shadow": {"color": [1.0, 0.0, 0.0]}}})
+    refused(s, "set_action_end", "a filter entry naming only its amount",
+            'missing key "video.filters[0].kind" in an action end patch',
+            clip=clip, action=action,
+            patch={"video": {"filters": [{"amount": 1.0}]}})
+    refused(s, "set_action_end", "an unknown key spelled with a null",
+            'unknown key "video.blurr" in an action end patch',
+            clip=clip, action=action, patch={"video": {"blurr": None}})
+    # §5.4's patch is video, audio and text and there is no fourth: a shape
+    # is not animatable, so the key is not an inert one to keep.
+    refused(s, "set_action_end", "a fourth group",
+            'unknown key "shape" in an action end patch',
+            clip=clip, action=action, patch={"shape": {"width": 640.0}})
+    refused(s, "set_action_end", "a group that is not an object",
+            'bad value at "video" in an action end patch: expected an object, not 5',
+            clip=clip, action=action, patch={"video": 5})
+    refused(s, "set_action_end", "a patch that is not an object at all",
+            "action end patch must be a json object, not 5",
+            clip=clip, action=action, patch=5)
+    # The refusal that is about the OP rather than about the vocabulary, and
+    # the one the handler used to make in its own words: a preset is anchored
+    # to the clip's two ends, so there is nothing for an action to ramp
+    # between. A `null` is still naming it.
+    refused(s, "set_action_end", "a video group naming motion",
+            "video.motion is not an animation target",
+            clip=clip, action=action,
+            patch={"video": {"motion": {"in": {"kind": "fade"}}}})
+    refused(s, "set_action_end", "…and naming it with a null",
+            "video.motion is not an animation target",
+            clip=clip, action=action, patch={"video": {"motion": None}})
+
+    print("\n10c — and not one of them was an undo step")
+    undo_claim(s, start)
+    marker_gone(end()["video"]["opacity"], 0.5)
+
+    print("\n10d — and a good patch merges, key by key, at every depth")
+    s.op("set_action_end", clip=clip, action=action,
+         patch={"video": {"shadow": {"blur": 40.0}}})
+    landed("a one-key shadow patch keeps the colour, the angle and the distance",
+           end()["video"]["shadow"],
+           {"color": [0, 0, 0, 1], "opacity": 0.8, "blur": 40, "angle": 315,
+            "distance": 30})
+    s.op("set_action_end", clip=clip, action=action,
+         patch={"video": {"filters": [{"kind": "noir", "amount": 0.25}]}})
+    landed("a filter LIST replaces rather than merging",
+           end()["video"]["filters"], [{"kind": "noir", "amount": 0.25}])
+
+    print("\n10e — and null REMOVES a key rather than clearing it")
+    # The one thing an end patch spells differently from every other patch,
+    # and the reason the walk passes every null: there is no stored property
+    # to clear, so a null means "stop animating this".
+    s.op("set_action_end", clip=clip, action=action,
+         patch={"video": {"shadow": None}})
+    check("shadow" not in end()["video"] and end()["video"]["blend"] == "screen",
+          "a null takes the key out of the end state altogether, leaving its "
+          "siblings — not stored as a null, and not a cleared property")
+    s.op("set_action_end", clip=clip, action=action, patch={"text": None})
+    check("text" not in end() and "audio" in end(),
+          "…and a whole group set to null goes the same way")
+    # An out-of-range value is NOT refused here, unlike at every other patch
+    # door: the state a clip interpolates toward may name a value no stored
+    # group could hold, and `actions.rs`'s `clamp_video` bounds the evaluated
+    # value instead (spec §5.4). Pinned so the difference is deliberate.
+    s.op("set_action_end", clip=clip, action=action, patch={"video": {"opacity": 5.0}})
+    landed("an out-of-range value is STORED rather than refused, which is this "
+           "door's one documented difference", end()["video"]["opacity"], 5.0)
+
+
 # ---- the next patch door's section goes here ------------------------------
+#
+# **There is no patch door left owed.** D1·5 (kpgalligan/reelcut#6) added the
+# sixth and last of them, `set_action_end`, so what follows is for a door a
+# LATER phase adds: an op that takes a caller-authored patch is a door here
+# the day it lands.
 #
 # Copy any section above whole. What changes is the fixture (a door needs a
 # clip that HAS the group it patches, holding a value the refusals name), the
-# tool, and the subject inside each sentence — `an action end patch` is the
-# one left — plus the group prefix an end patch's paths carry
-# (`video.filters[1].kind`). The four helpers and the sub-sections (the undo
-# marker, the refusals, the undo claim, the merges, the snap) do not change,
-# and neither does their order: the fixture FIRST, so that a refusal names a
-# key the clip already holds a value for. Then one line in
-# `patch_door_proof.py`'s `main`.
-#
-# D1·5 (kpgalligan/reelcut#6): `set_action_end`, whose patch is a patch of
-# three groups. Its sibling that ticket — `add_zoom_action`'s `region` — is
-# an ARGUMENT and its section goes in `patch_door_args.py` instead.
+# tool, and the subject inside each sentence — the six spellings are in
+# `patch_door_proof.py`'s docstring — plus any prefix the paths carry
+# (§10's are `video.filters[1].kind`, because an end patch spans three
+# groups). The four helpers and the sub-sections (the undo marker, the
+# refusals, the undo claim, the merges, the snap) do not change, and neither
+# does their order: the fixture FIRST, so that a refusal names a key the clip
+# already holds a value for. Then one line in `patch_door_proof.py`'s `main`.

@@ -400,16 +400,14 @@ extension AgentServer {
         return (from: from, to: to)
     }
 
-    /// A number one level down inside a shaped argument (`add_zoom_action`'s
-    /// `region`), named by its PATH — `region.width`, not `width`.
+    /// A number one level down inside a shaped argument, named by its PATH —
+    /// `region.width`, not `width`.
     ///
-    /// `patchArg`'s round trip is the guard against a wrong-typed value at
-    /// the top level, and its own doc says why it cannot recurse: one level
-    /// down every field has a real default, so a member set TO its default
-    /// decodes the same as an absent one. A shaped argument that is not a
-    /// patch has no such excuse — its members are all required — so it reads
-    /// them here, one by one, and a `{"width": "wide"}` is refused rather
-    /// than dropped.
+    /// **UNCALLED since D1·5, and kpgalligan/reelcut#7's to delete with the
+    /// rest of the launder.** Its one caller was `zoomRegionArg`, which read
+    /// `add_zoom_action`'s region member by member because `patchArg`'s round
+    /// trip could not see a wrong TYPE one level down. `edit_zoom.rs`'s
+    /// `ZoomRegion` names one by the same path now.
     func nestedNumberArg(
         _ object: [String: Any], _ path: String, _ key: String
     ) throws -> Double? {
@@ -450,9 +448,12 @@ extension AgentServer {
     }
 
     /// A patch object decoded into its typed Swift form — the LAUNDER
-    /// `rawPatchArg` above replaced, and since D1·4 it has ONE caller left:
-    /// `set_action_end`, the last door deepening D1 has not moved
-    /// (kpgalligan/reelcut#6, which takes it; #7 then deletes this).
+    /// `rawPatchArg` above replaced.
+    ///
+    /// **UNCALLED since D1·5 took `set_action_end`, the last of its doors,
+    /// and kpgalligan/reelcut#7's to delete** with `decodePatch` and
+    /// `withOpaqueColors` below — the contract step, which deletes the family
+    /// at once and writes the rule that replaces it.
     ///
     /// It was written to be stricter than the core's serde on both counts a
     /// silent drop can happen: an unknown key is refused by NAME, and a key
@@ -479,8 +480,10 @@ extension AgentServer {
     /// are concrete structs with real defaults, and a field set TO its default
     /// would decode identically with the field removed, so recursing would
     /// refuse perfectly good patches. A wrong-typed value INSIDE a nested
-    /// object is therefore still dropped silently; `checkActionPatch` catches
-    /// its name, nothing catches its type.
+    /// object was therefore dropped silently at every door this ran at — or
+    /// worse: a `T??` field read `5` as a CLEAR, so `{"video": {"shadow": 5}}`
+    /// REMOVED the shadow an action was animating and answered ok (measured,
+    /// D1·5).
     func patchArg<T: Decodable & Equatable>(
         _ a: [String: Any], _ key: String, _ type: T.Type, allowed: Set<String>
     ) throws -> T {
@@ -528,17 +531,18 @@ extension AgentServer {
     }
 
     /// Fills in the alpha of every `[r, g, b]` written under a `color` key,
-    /// at any depth — **the last launder standing, and it is now the ONLY
-    /// door at which a three-element colour is still accepted**.
+    /// at any depth — **UNCALLED since D1·5, and the last place in the app
+    /// where a three-element colour was ever accepted**.
     ///
     /// It was written when `colorArg` took three components at every
     /// colour-only argument, so a caller learnt that three was allowed and
     /// then wrote `{"color": [1, 0, 0]}` in a text or shadow patch. D1·4
     /// deleted `colorArg` and the leniency it taught: a colour is four
     /// numbers each 0–1 at every other door, refused by length and never
-    /// clamped (spec kpgalligan/reelcut#1). This runs from `patchArg` alone,
-    /// so it reaches `set_action_end`'s patch and nothing else, and it goes
-    /// with that door in #6/#7. Keyed on the NAME `color` and applied only
+    /// clamped (spec kpgalligan/reelcut#1). It ran from `patchArg` alone, so
+    /// it reached `set_action_end`'s patch and nothing else; D1·5 took that
+    /// door raw and #7 deletes this with the rest. Keyed on the NAME `color`
+    /// and applied only
     /// to a three-number array, so `video.color` (a `ColorAdjust` object) and
     /// `chroma.key` — the one colour the core really does spell `[r, g, b]` —
     /// are both left alone.

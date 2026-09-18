@@ -2285,9 +2285,10 @@ what it proves is the single door every caller-authored object comes through
 (`core/src/patch.rs`, `CONTEXT.md`'s **Patch**), and the doors arrive one
 deepening ticket at a time (`designs/reelcut-roadmap-7.md` §1). D1·3
 (kpgalligan/reelcut#4) built it with `set_video`'s section, at **39/39**;
-D1·4 (#5) added eight more and it is **199/199**; D1·5 (#6) adds the last
-two. Each door file says in a marked comment where the next one goes and
-what has to change in the copy.
+D1·4 (#5) added eight more, at **199/199**; D1·5 (#6) added the last two —
+`set_action_end` and `add_zoom_action`'s region — and it is **258/258**, with
+every door the app has in it. Each door file says in a marked comment what a
+LATER phase's door copies; neither kind is owed one today.
 
 **It is four files and one script.** The sections outgrew a single file when
 D1·4's eight landed, so the split went by kind — for navigation, since a
@@ -2298,8 +2299,8 @@ past it):
 | File | What is in it |
 |---|---|
 | `patch_door.py` | the harness — `Session`, and the four helpers every section is built out of. Split off ALONE, as a pure move, before a door was added |
-| `patch_door_patches.py` | the doors whose caller-authored object is a PATCH: `set_video`, `set_audio`, `set_text`, `set_shape`, `set_clip` |
-| `patch_door_args.py` | the doors whose object is an ARGUMENT: `add_text_clip`'s `text`, `add_shape_clip`'s `shape`, `set_canvas`'s `background`, `add_background`'s `color` |
+| `patch_door_patches.py` | the doors whose caller-authored object is a PATCH: `set_video`, `set_audio`, `set_text`, `set_shape`, `set_clip`, `set_action_end` |
+| `patch_door_args.py` | the doors whose object is an ARGUMENT: `add_text_clip`'s `text`, `add_shape_clip`'s `shape`, `set_canvas`'s `background`, `add_background`'s `color`, `add_zoom_action`'s `region` |
 | `patch_door_proof.py` | what a patch means, which sentences the core gives, and `main`. The only one to run |
 
 What it asserts, per door: the four refusal sentences VERBATIM rather than
@@ -2315,6 +2316,20 @@ sentence one level out (`op "set_canvas" is not valid: invalid length 3,
 expected an array of length 4`) with `props_check.rs`'s range refusal under
 it; the two new-clip doors also assert that the bare-string shorthand still
 makes a clip with those words, and a shape clip of that kind.
+
+Two doors answer in their own way and §10 and §11 say so. `set_action_end`'s
+patch spans three groups, so every path carries the group
+(`video.filters[1].kind`) and the subject is `an action end patch`; it is the
+one door that does NOT range-check, because an animation may aim past what a
+stored property could hold, and a `null` there REMOVES a key from the end
+state rather than clearing a property. `add_zoom_action`'s region is the one
+op argument the core reads as a TYPE, so a misspelt, missing or wrong-typed
+member is named INSIDE the envelope's sentence
+(``op "add_zoom_action" is not valid: bad value at "region.widht": unknown
+field `widht` ``) and a four-number list is refused rather than read
+positionally; the absent KEY is the one judgement its handler kept, since the
+op reads an absent argument and an explicit null identically and here they
+are opposite edits.
 
 **Why it exists beside `core/tests/patch_door.rs`, which proves the same
 rules through the FFI.** Those tests cannot see the Swift agent door, which
@@ -2336,6 +2351,9 @@ was dropped is two CHECKS now, because it no longer is. D1·4:
 animation kinds and `phase6_proof.py`'s three gradient refusals are the
 core's sentences, and phase 6's "a THREE-component stop colour is accepted
 and means the four-component one" is now a REFUSAL — a colour is four
-numbers at every door, so that script is one check longer (167 → 168). The
-`set_action_end` refusals in both files are still the Swift door's until
-kpgalligan/reelcut#6.
+numbers at every door, so that script is one check longer (167 → 168). D1·5:
+`phase6_proof.py`'s two `set_action_end` refusals (the partial filter entry
+and the misspelt blend inside an end patch) are the core's whole sentences
+with the GROUP in the path, and `phase3_proof.py`'s region check asserts the
+whole of the one refusal its handler kept rather than the word `region`,
+which every refusal at that door said.

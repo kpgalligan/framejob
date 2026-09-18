@@ -884,20 +884,22 @@ extension Gradient {
 /// the second list would be a rule to remember; there is one rule, and it is
 /// "a list is replaced whole".
 ///
-/// **`blend` is a single optional too, and the pairing with `lenient` is
-/// LOAD-BEARING** (phase 6). `VideoProps.blend` is a plain `BlendMode` with
-/// no null form — `.normal` is how a blend is cleared — so nothing here
-/// needs the third state. But the choice also decides whether a MISSPELT
-/// mode is caught: `AgentServer.patchArg` refuses a key by name when
-/// re-decoding the patch without it changes nothing, and `lenient(.blend)`
-/// answers nil for a value it cannot read, which is exactly what an absent
-/// key answers — so `{"blend": "muliply"}` is refused by name. Written as a
-/// `BlendMode??` read through `nullable` it would decode to `.some(nil)`,
-/// differ from absent, pass the round trip, and reach the core as an
-/// explicit null the caller never wrote: here a serde complaint about a
-/// null, and on a field that DOES take one a silent clear — which is the
-/// gap app/CLAUDE.md records against the ten `T??` patch fields. Either
-/// way the one thing never named is the typo.
+/// **`blend` is a single optional too** (phase 6). `VideoProps.blend` is a
+/// plain `BlendMode` with no null form — `.normal` is how a blend is cleared
+/// — so nothing here needs the third state, and a `BlendMode??` read through
+/// `nullable` would be worse than unnecessary: a value it could not read
+/// would decode to `.some(nil)` and reach the core as an explicit null the
+/// caller never wrote, which on a field that DOES take one is a silent clear
+/// — the gap app/CLAUDE.md records against the ten `T??` patch fields.
+///
+/// **What used to hang on that choice no longer does** (deepening D1). The
+/// pairing with `lenient` was once load-bearing for a misspelt MODE, because
+/// the agent door decoded a caller's patch through this type and the round
+/// trip only noticed the typo while `lenient(.blend)` answered nil for it.
+/// No caller-authored object is decoded through these types at all now: the
+/// core answers `bad value at "blend" in a video patch: unknown variant
+/// `muliply`` at every door. These patches are the APP's writers, built from
+/// controls that cannot misspell anything.
 struct VideoPatch: Codable, Equatable {
     var x: Double?
     var y: Double?

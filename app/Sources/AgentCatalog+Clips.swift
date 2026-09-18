@@ -910,11 +910,17 @@ extension AgentServer {
             tool(
                 "set_action_end",
                 "Sets what an action animates TO. The patch is the action's end state and "
-                    + "merges into it — {\"video\": {\"scale\": 0.6, \"x\": 520}} makes the clip "
-                    + "shrink into the corner over the action's span. A key set to null is "
+                    + "merges into it at EVERY depth — {\"video\": {\"scale\": 0.6, \"x\": 520}} "
+                    + "makes the clip shrink into the corner over the action's span, and "
+                    + "{\"video\": {\"shadow\": {\"blur\": 40}}} changes that one key of a shadow "
+                    + "it already animates. A key set to null is "
                     + "REMOVED from the end state, so that property stops being animated. Groups "
                     + "are video, audio and text, with the same keys as set_video / set_audio / "
-                    + "set_text — with ONE exception: video.motion is refused here, because a "
+                    + "set_text — a colour is FOUR numbers here too, and a bad key or value is "
+                    + "refused naming its path with the group in it (video.filters[1].kind), "
+                    + "though values are NOT range-checked: an animation may aim past what a "
+                    + "stored property could hold. ONE exception to the keys: "
+                    + "video.motion is refused here, because a "
                     + "preset is anchored to the clip's two ends rather than being a value to "
                     + "ramp between two states. Set it with set_video.",
                 [

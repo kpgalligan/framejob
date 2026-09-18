@@ -903,9 +903,16 @@ def zoom_part(mcp):
     check(z.frame(4 * SEC) != was[4 * SEC], "one step: the clip is zoomed again")
     check(z.undo() == "Zoom to Region", "and the step under it is the zoom")
     check(z.frame(2 * SEC) == was[2 * SEC], "which restores the base frame byte for byte")
+    # The whole sentence and not the word `region`, which every other refusal
+    # at this door says too: D1·5 (kpgalligan/reelcut#6) took the region raw,
+    # so the MEMBER refusals are the core's now
+    # (`op "add_zoom_action" is not valid: bad value at "region.widht"…`,
+    # proved in `tools/proof/patch_door_proof.py` §11) and this one is the
+    # only judgement the handler kept — the core reads an absent argument and
+    # an explicit null identically, and here they are opposite edits.
     message = z.error("add_zoom_action", clip=clip, at=1 * SEC) or ""
     check(
-        "region" in message,
+        "Missing required argument: region" in message,
         f"an absent region is refused BY NAME, not read as a zoom back (D-B2): "
         f"{message[:60]!r}",
     )

@@ -1,7 +1,7 @@
 # Reelcut — road map 7: deepening
 
-**Status: D1 IN PROGRESS — D1·1 to D1·4 built (§2.1 to §2.4); D1·5 and
-D1·6 not started.**
+**Status: D1 IN PROGRESS — D1·1 to D1·5 built (§2.1 to §2.5); D1·6,
+the contract step, not started.**
 
 Road maps 2 to 6 each added something a person using the app can see. This
 one does not. A **deepening** takes knowledge that is spread across callers
@@ -1064,3 +1064,198 @@ Judged not real:
 
 **Owed.** Nothing for this ticket. `set_action_end` and `add_zoom_action`
 are #6 by design, and the deletion sweep is #7's.
+
+### 2.5 D1·5 — the end-state and region doors forward raw (kpgalligan/reelcut#6)
+
+**Commits.** _(filled in below when they land.)_
+
+**What landed.** The last two doors, and with them the last hand check in
+any handler. Every caller-authored object the agent can send is now the
+core's to read.
+
+- **`set_action_end` is four lines** — `target` → `clipArg` → `actionArg` →
+  `rawPatchArg` → `editResult` — and it is the door that gave up the most
+  per line. What went with it: `checkActionPatch` (the three groups, each
+  against its own allowed-key set, plus the `video.motion` refusal),
+  `checkVideoEnums` (four closed vocabularies and the filter-completeness
+  check), `checkTextEnums`, the `videoPatchKeys` / `audioPatchKeys` /
+  `textPatchKeys` sets, the `patch.isEmpty` refusal and the `patchArg` call
+  — **164 lines out of `AgentServer+Clips.swift`** (1011 → 847), which is
+  what §3 of `designs/reelcut-remaining.md` records against the file.
+- **`add_zoom_action`'s region is forwarded whole.** `zoomRegionArg` read
+  the four members one at a time through `nestedNumberArg` and refused an
+  unknown one by name; it is eight lines now and reads NOTHING about the
+  value. The one judgement it keeps is the ABSENT key, and that one is not
+  a mistake about the call the way `rawPatchArg`'s is — the op reads an
+  absent argument and an explicit null identically, so a forgotten
+  rectangle would be a zoom BACK, the opposite edit.
+- **Two raw factories**, `setActionEndRaw` and `addZoomActionRaw`
+  (`ReelOps.swift` 1090 → 1131, on its standing table exemption). The first
+  is `setVideoRaw`'s five lines with another op name; the second is
+  `setCanvasRaw`'s shape — the raw factory holds the body and the typed one
+  delegates — because a region sits BESIDE ordinary arguments. Its `region`
+  is `Any` and not `Any?`: both callers always have a value to send,
+  `NSNull` for the zoom back, and an `Optional<ZoomRegion>.none` widened to
+  `Any?` would be a non-nil `Any` wrapping a nil.
+- **One core change, and it is a sentence rather than a rule.**
+  `serde_path_to_error` prints the ROOT of a path as `"."`, not as the
+  empty string, so a region missing a member read
+  ``bad value at "region..": missing field `height` `` — a path no caller
+  can act on. `ZoomRegion::deserialize` collapses both spellings onto `region`
+  now, and `core/tests/zoom.rs` asserts the whole sentence where it used to
+  assert ``missing field `height` `` alone. Everything else the two doors
+  needed was already in the core: D1·2 built `check_end_patch` over
+  `patch.rs`'s `check_group_patch` and wrote `ZoomRegion`'s `Deserialize`
+  out by hand, and this ticket only had to stop the Swift side from
+  answering first.
+
+**What an agent sees change.**
+
+- **The end patch's refusals name the GROUP in the path** and say
+  `an action end patch`: `unknown key "video.filters[1].kindd" in an action
+  end patch`, where this side said `Unknown patch.video key "kindd" — allowed
+  keys are blend, chroma, color, …`. A misspelt filter kind, blend,
+  spotlight shape or text animation kind is ``bad value at "<path>" in an
+  action end patch: unknown variant `glow`, expected one of …``.
+- **Three things that used to LAND do not** (all measured against the build
+  at `09879b8`): `{"video": {"shadow": 5}}` was `.some(nil)` through
+  `ActionPatch`'s lenient decode and REMOVED the shadow the action was
+  animating, answering ok; `{"video": {"shadow": {"color": [1,0,0]}}}` had
+  its alpha filled in by `withOpaqueColors`, the last door where a
+  three-element colour was taken; and `{"audio": {"fade_in": 0.5}}` decoded
+  to nothing at all and came back as "made no change".
+- **A nested object MERGES.** `{"video": {"shadow": {"blur": 40}}}` keeps
+  the colour, the angle and the distance; the old door decoded the whole
+  group and re-encoded it, so the same call replaced the shadow from
+  `ShadowProps`' defaults (measured: `opacity` 0.8 → 0.5, `distance` 30 →
+  8).
+- **An empty patch is the core's identity answer** rather than this side's
+  "patch names nothing to change" — the same move `set_canvas`'s
+  `background: null` made in D1·4.
+- **The region's members answer in the envelope's sentence**:
+  ``op "add_zoom_action" is not valid: bad value at "region.widht": unknown
+  field `widht`, expected one of `x`, `y`, `width`, `height` ``, and a
+  four-number LIST is `expected an object, not [0,0,480,270]` rather than a
+  rectangle nobody spelled.
+
+**The proof is 258/258** (199 before), still four files, with one section per
+door and one line each in `main`:
+
+| File | Lines | What changed |
+|---|---|---|
+| `patch_door.py` | 196 | untouched — the harness was complete |
+| `patch_door_patches.py` | 695 | §10, `set_action_end`, the sixth and last patch door |
+| `patch_door_args.py` | 341 | §11, `add_zoom_action`'s region, copied from §8 |
+| `patch_door_proof.py` | 112 | the two imports, the two `main` lines, and the docstring's counts |
+
+§10's order is D1·3's throughout, and its fixture is the reason the
+"unchanged" half of `refused` bites: the action's end state holds a shadow, a
+sepia filter, a blend, a spotlight, a fade and an animation before anything
+is refused, so a door that dropped, cleared or corrected a key would be
+merging a real edit. §11 copies §8 rather than §6, as D1·4's marker comment
+said it should: a region is an argument the core reads as a TYPE, so its
+refusals are the envelope's. Both files' foot markers now say there is no
+door OWED and what a later phase's door would copy.
+
+**Two older assertions moved to the core's wording**, which is the rule §2.3
+left behind — the whole sentence, never a keyword. `phase6_proof.py`'s two
+`set_action_end` refusals asserted `patch.video.filters[0]` and
+`patch.video.blend`, spellings the core does not use, so both were RED
+against the new door until they were moved (168/168 either way once moved).
+`phase3_proof.py`'s region check asserted the word `region` appeared in the
+refusal — true of every refusal at that door, before and after — and asserts
+the whole of `Missing required argument: region` now, the one judgement the
+handler kept.
+
+**Measured.**
+
+- `make test`: 632 passed, 0 failed. `make lint` and `cargo fmt --check`
+  clean. `make typecheck` 0 errors and the 4 known AVFoundation warnings.
+  `make app` succeeded; the startup parity log stayed empty across every
+  run.
+- Twelve proof scripts green on port 4825 — patch_door **258/258**, phase1
+  66/66, phase2 85/85, phase3 **123/123**, phase3_silence_scope 8/8, phase4
+  84/84, phase5 88/88, phase6 **168/168**, phase7 92/92, phase8 79/79,
+  phase9 216/216, remaining 79/79. `recording_proof.py` is **185/186** with 3
+  checks SKIPPED on this host, and the one failure is a MICROPHONE
+  head-loss measurement that fails identically across runs (a flakier first
+  run put three of the mic rows red); it calls neither of this ticket's
+  doors — `grep -c "set_action_end\|add_zoom_action"` on it is 0 — so it is
+  host state, not this change.
+- Line counts: `AgentServer+Clips.swift` 1011 → **847**,
+  `AgentServer+Arguments.swift` 558 → 562, `ReelOps.swift` 1090 → 1131,
+  `AgentCatalog+Clips.swift` 939 → 945. The two that GREW and are over the
+  cap are both mirrors: `ReelOps.swift` is the op table, exempt, and
+  `AgentCatalog+Clips.swift`'s six lines are the `set_action_end`
+  description's, the sentences this ticket made true (D1·4 added nine for
+  the same reason). `AgentServer+Arguments.swift`'s four lines are doc on
+  four functions #7 deletes, so the file's next move is down by about a
+  hundred.
+- `designs/reelcut-remaining.md` §3's table is regenerated: still thirty
+  files, with `AgentServer+Clips.swift` down two rows.
+
+**Mutants.** Seven, each a rebuild of the app and a fresh instance on port
+4825. All seven caught; no survivor.
+
+| Mutant | Score |
+|---|---|
+| `set_action_end` laundered again (`patchArg` + the typed factory) | patch_door **215/238, ABORTED**; phase6 166/168 |
+| the region's hand reader restored (four members read, unknown ones dropped) | patch_door **251/256, ABORTED**; phase3 123/123 |
+| the core's `check_end_patch` made a no-op | patch_door **229/258**; phase6 166/168 |
+| the `video.motion` refusal deleted from `set_action_end` | patch_door **252/258** |
+| `prune_removed` made a no-op (a null stops removing) | patch_door **256/258** |
+| the region's root-path fix reverted (`region..` again) | patch_door **257/258** |
+| **D1·5's whole Swift half reverted** (both files at `09879b8`) | patch_door **219/238, ABORTED**; phase3 123/123; phase6 166/168 |
+
+Two rows are worth reading rather than counting. **phase3 stays green under
+the region mutants**, and that is the honest reason §11 had to exist: its
+only region assertion is about the absent KEY, which a laundering door
+refuses too, so nothing outside the patch door discriminates a member the
+handler quietly dropped. And the last row scores 219 rather than 0 because
+the run ABORTS — an op that unexpectedly succeeds throws where a check was
+waiting for a refusal — which is the shape §2.4 saw too: an aborted score is
+a failure, and the number before it says how far the script got.
+
+**What the next ticket inherits.**
+
+- **Nothing is owed a door.** Every op that takes a caller-authored object
+  forwards it, and both proof files' markers say so.
+- **What is left UNCALLED after this ticket**, for #7's sweep, all four in
+  `app/Sources/AgentServer+Arguments.swift` and each with a doc saying so:
+  `patchArg`, `decodePatch`, `withOpaqueColors` and `nestedNumberArg`. The
+  three that #5 listed in `AgentServer+Clips.swift` — `checkActionPatch`,
+  `checkVideoEnums`, `checkTextEnums` — and the three key sets are gone
+  HERE rather than left, because they lived in the handler file and the
+  ticket's criterion was that the handlers hold no action-patch check.
+- **The two mutants #7 owes** are spec #1's: the launder restored at one
+  door (this ticket ran it at two, rows 1 and 2) and the core's key walk
+  disabled (D1·4 ran it, at 118/151 ABORTED). Both are now measurable
+  against every door at once.
+
+**Documents.** `app/CLAUDE.md`'s `ReelOps.swift` entry (eleven raw factories,
+and why `addZoomActionRaw`'s region is `Any` and not `Any?`), its
+`ProjectSnapshot.swift` entry (NO handler checks a caller's enums or types by
+hand any more) and its `AgentServer+Arguments.swift` entry (every door is
+through; the four uncalled functions named for #7). The catalog's
+`set_action_end` description, which said the patch "merges into it" without
+saying at what depth and promised nothing about colours. `tools/proof/
+README.md`'s patch-door section (the two files' new sections, the two doors
+that answer in their own way, the moved assertions).
+`designs/reelcut-app-notes.md`'s header, whose list of what D1 deleted grew
+by six names. Nothing in `designs/reelcut-design.md` needed changing: §6's
+`add_zoom_action` row already said the region is read the way a patch is
+(D1·2 wrote it), §6's `set_action_end` row already said the end patch is
+walked, and §7's raw-factory paragraph was written generally by D1·3.
+
+**Where a criterion could not be met literally.** #6's fifth criterion says
+the phase-3 region assertion moves "to the core's wording". It could not:
+the assertion is about an ABSENT region, which is the one refusal the
+handler still makes and must, since the core cannot tell an absent argument
+from an explicit null and here they are opposite edits. It was moved from a
+keyword to the whole sentence instead, which is the rule behind the
+criterion, and the core's own region wording is asserted in §11 of the patch
+door.
+
+**Owed.** Nothing for this ticket. The deletion sweep, the rule in the app
+rulebook and the spec's agent section, and the two proof mutants are #7's by
+design.

@@ -9,13 +9,15 @@ import AppKit
 /// A row may have a SECOND factory beside its typed one: a RAW factory that
 /// takes the caller's own object and forwards it unread, which is what the
 /// agent door does at every op deepening D1 has moved (`setVideoRaw` and the
-/// seven beside it; the paste payload factories are the precedent). It is a
+/// ten beside it, the last of them `setActionEndRaw` and `addZoomActionRaw`;
+/// the paste payload factories are the precedent). It is a
 /// second SPELLING of one row, not a second row, and it is here for the rule
 /// above — the table stays the only place in the app where an op is named.
 /// Where the raw and the typed factory differ in ONE argument
-/// (`setCanvasRaw`, `addBackgroundRaw` and the two new-clip ops, whose
-/// caller-authored part is a colour or a patch beside ordinary arguments)
-/// the typed one delegates to the raw one, so a row still has one body.
+/// (`setCanvasRaw`, `addBackgroundRaw`, `addZoomActionRaw` and the two
+/// new-clip ops, whose caller-authored part is a colour, a region or a patch
+/// beside ordinary arguments) the typed one delegates to the raw one, so a
+/// row still has one body.
 ///
 /// The seam is the FFI. `ReelCore.swift` is the only file in the app that
 /// names an `rc_*` symbol and nothing here names one: an op is a VALUE — a
@@ -903,15 +905,39 @@ extension ReelOp {
         clip: UInt32, at: Ticks, duration: Ticks? = nil, region: ZoomRegion?,
         fit: ZoomFit? = nil, curve: Curve? = nil
     ) -> ReelOp {
+        addZoomActionRaw(
+            clip: clip, at: at, duration: duration,
+            region: region.map { $0.dictionary as Any } ?? NSNull(), fit: fit, curve: curve)
+    }
+
+    /// The same op with the `region` the CALLER wrote, forwarded unread — the
+    /// agent door's factory (deepening D1·5, `designs/reelcut-roadmap-7.md`
+    /// §2.5). Only the region differs from the typed factory above, which is
+    /// why that one delegates here, as `setCanvasRaw`'s twin does.
+    ///
+    /// **`region` is `Any` and not `Any?`**, because at this argument an
+    /// absent key and an explicit null are opposite intentions and the core
+    /// cannot tell them apart: a null is the zoom BACK, and the key is
+    /// REQUIRED by the tool (`AgentServer.addZoomAction`) so that a forgotten
+    /// rectangle cannot become one. Both callers therefore always have a
+    /// value to send, `NSNull` for the zoom back — which is what the typed
+    /// factory wrote here before, and the reason the `map` is explicit: an
+    /// `Optional<ZoomRegion>.none` widened straight to `Any?` is a non-nil
+    /// `Any` wrapping a nil.
+    ///
+    /// The core reads the object as a TYPE (`edit_zoom.rs`'s `ZoomRegion`),
+    /// so an unknown member, a missing one and a wrong-typed one are each
+    /// refused by name and a four-number LIST is refused rather than read
+    /// positionally — which is what let the hand reader here go.
+    static func addZoomActionRaw(
+        clip: UInt32, at: Ticks, duration: Ticks? = nil, region: Any,
+        fit: ZoomFit? = nil, curve: Curve? = nil
+    ) -> ReelOp {
         var a = OpArgs()
         a.put("clip", clip)
         a.put("at", at)
         a.put("duration", duration)
-        if let region = region {
-            a.put("region", region.dictionary)
-        } else {
-            a.putNull("region")
-        }
+        a.put("region", region)
         a.put("fit", fit?.rawValue)
         a.put("curve", curve?.rawValue)
         return ReelOp(name: "add_zoom_action", args: a.values)
@@ -931,15 +957,30 @@ extension ReelOp {
         return ReelOp(name: "set_action", args: a.values)
     }
 
+    /// The end patch the CALLER wrote, forwarded to the core byte for byte —
+    /// the sixth and last patch door deepening D1 moved (D1·5,
+    /// `designs/reelcut-roadmap-7.md` §2.5), and `setVideoRaw`'s five lines
+    /// with another op name.
+    ///
+    /// What is different about this one is the SUBJECT the core's refusals
+    /// name: the object spans three groups, so a path carries the group
+    /// (`video.filters[1].kind`) and the sentence says `an action end patch`
+    /// rather than any one group's. `video.motion` is refused by the core
+    /// too, because a preset is anchored to the clip's two ends and an
+    /// action is a ramp between two states.
+    static func setActionEndRaw(clip: UInt32, action: UInt32, patch: Any) -> ReelOp {
+        var a = OpArgs()
+        a.put("clip", clip)
+        a.put("action", action)
+        a.put("patch", patch)
+        return ReelOp(name: "set_action_end", args: a.values)
+    }
+
     /// Merges into the action's end patch. A key the patch sets to null is
     /// REMOVED from the end state — see `VideoPatch.shadow`'s double
     /// optional, which is how "clear it" is spelled.
     static func setActionEnd(clip: UInt32, action: UInt32, patch: ActionPatch) -> ReelOp {
-        var a = OpArgs()
-        a.put("clip", clip)
-        a.put("action", action)
-        a.put("patch", patch.dictionary)
-        return ReelOp(name: "set_action_end", args: a.values)
+        setActionEndRaw(clip: clip, action: action, patch: patch.dictionary)
     }
 
     static func removeAction(clip: UInt32, action: UInt32) -> ReelOp {

@@ -1,11 +1,11 @@
 """The patch door's caller-authored ARGUMENTS, as against its patches.
 
 `patch_door_proof.py` is the whole of this proof — its docstring says what a
-patch means and how a section is built, and its `main` runs these four
+patch means and how a section is built, and its `main` runs these five
 sections in order with the rest. They live here because the file they came
 out of reached the ~600-line cap with its five patch-op doors in it
 (`CLAUDE.md`'s size rule; the harness had already moved to `patch_door.py`),
-and because these four are the doors where the caller's object is an
+and because these five are the doors where the caller's object is an
 ARGUMENT of an op rather than a property patch:
 
 - `add_text_clip`'s `text` and `add_shape_clip`'s `shape` are a `set_text` /
@@ -18,8 +18,10 @@ ARGUMENT of an op rather than a property patch:
   (`op "set_canvas" is not valid: invalid length 3…`) with the range refusal
   coming from `props_check.rs` under them. They are where "a colour is four
   numbers, neither filled in nor clamped" is proved at an argument.
-
-kpgalligan/reelcut#6's `add_zoom_action` region is the next section here.
+- `add_zoom_action`'s `region` is the one op argument that is an OBJECT,
+  read as a TYPE off the envelope, so a misspelt or missing member is
+  named inside the envelope's own sentence. It is where "a region with a
+  mistyped member is never read as a region of nothing" is proved.
 """
 
 from patch_door import (
@@ -241,10 +243,99 @@ def background_clip_door(mcp):
            s.clip(plate)["shape"]["fill"], [0.1, 0.2, 0.3, 1.0])
 
 
+# ---- add_zoom_action's `region` (D1·5, kpgalligan/reelcut#6) --------------
+
+
+def zoom_region_door(mcp):
+    """`add_zoom_action`'s `region` — the one op argument that is an OBJECT.
+
+    Its sentences are §8's kind and not §6's: the core reads the region as a
+    TYPE off the op envelope, and there is no property group to name, so a
+    misspelt or missing member comes back inside
+    `op "add_zoom_action" is not valid: …` with the member's own path after
+    it. The two REQUIREMENTS below are not the envelope's, and each has a
+    reason of its own: the four numbers are `edit_zoom.rs`'s `check_region`
+    (a zero width asks for an infinite scale), and the required KEY is the
+    handler's, the one line it keeps — the op reads an absent argument and
+    an explicit null identically, so a forgotten rectangle would silently
+    become a zoom BACK, the opposite edit.
+
+    The fixture is a clip long enough to hold two actions at different
+    times, so that a refusal below cannot be mistaken for the overlap rule,
+    and the marker edit leaves a real action for the undo claim to take
+    back."""
+    print("\n11 — add_zoom_action: the region goes to the core as the caller wrote it")
+    s = Session(mcp, "patch-door-region")
+    clip = s.clip_of()
+    good = {"x": -120.0, "y": -20.0, "width": 160.0, "height": 90.0}
+
+    print("\n11a — a real edit, whose undo step every refusal below must leave alone")
+    start = undo_marker(
+        s, lambda: s.op("add_zoom_action", clip=clip, at=0, duration=SEC,
+                        region=good))
+
+    print("\n11b — a region the vocabulary does not have, refused by member")
+    refused(s, "add_zoom_action", "a misspelt member, named beside the four",
+            'op "add_zoom_action" is not valid: bad value at "region.widht": '
+            'unknown field `widht`, expected one of `x`, `y`, `width`, `height`',
+            clip=clip, at=4 * SEC, duration=SEC,
+            region=dict(good, widht=1.0))
+    refused(s, "add_zoom_action", "a missing member — there is no default for any",
+            'op "add_zoom_action" is not valid: bad value at "region": '
+            'missing field `height`',
+            clip=clip, at=4 * SEC, duration=SEC,
+            region={"x": 0.0, "y": 0.0, "width": 480.0})
+    refused(s, "add_zoom_action", "a member of the wrong type, by its path",
+            'op "add_zoom_action" is not valid: bad value at "region.width": '
+            'invalid type: string "wide", expected f64',
+            clip=clip, at=4 * SEC, duration=SEC,
+            region=dict(good, width="wide"))
+    # serde reads a struct from a JSON array of its fields in declaration
+    # order, so this would zoom to a rectangle nobody spelled — a spelling no
+    # tool description offers and `get_project` never gives back.
+    refused(s, "add_zoom_action", "a four-number list, never read positionally",
+            'op "add_zoom_action" is not valid: expected an object, not [0,0,480,270]',
+            clip=clip, at=4 * SEC, duration=SEC, region=[0, 0, 480, 270])
+    refused(s, "add_zoom_action", "a number where the region belongs",
+            'op "add_zoom_action" is not valid: expected an object, not 5',
+            clip=clip, at=4 * SEC, duration=SEC, region=5)
+    refused(s, "add_zoom_action", "a region with no extent",
+            "region.width must be greater than 0, not 0",
+            clip=clip, at=4 * SEC, duration=SEC, region=dict(good, width=0.0))
+    # The one refusal this side still makes, and the only one it can: the
+    # core cannot tell an absent key from an explicit null, and those two
+    # mean opposite things here.
+    message = s.error("add_zoom_action", clip=clip, at=4 * SEC, duration=SEC)
+    check(message is not None and "Missing required argument: region" in message,
+          "an absent region is refused BY NAME rather than read as a zoom back "
+          f"— got: {shown(message)}")
+
+    print("\n11c — and not one of them was an undo step, or an action")
+    undo_claim(s, start)
+    check(len(s.clip(clip)["actions"]) == 0,
+          "…and after every refusal above the clip carries no action at all")
+
+    print("\n11d — and both documented forms of the argument still land")
+    s.op("add_zoom_action", clip=clip, at=0, duration=SEC, region=good)
+    action = s.clip(clip)["actions"][0]
+    check(action["end"]["video"]["scale"] > 1
+          and action["end"]["video"]["x"] is not None,
+          "a four-member region lands as the scale and offset that bring it to "
+          "the canvas")
+    s.op("add_zoom_action", clip=clip, at=4 * SEC, duration=SEC, region=None)
+    back = s.clip(clip)["actions"][1]
+    landed("…and an explicit null is still a zoom BACK, to the clip's own scale",
+           back["end"]["video"]["scale"], s.video(clip)["scale"])
+
+
 # ---- the next argument door's section goes here ---------------------------
 #
-# D1·5 (kpgalligan/reelcut#6): `add_zoom_action`'s `region`, forwarded raw.
-# Copy §8 rather than §6: a region is an argument the core reads as a TYPE,
-# so an unknown or a missing member is the envelope's sentence, not the patch
-# walk's. `set_action_end` is a patch op and its section belongs in
-# `patch_door_proof.py` beside the other five.
+# **There is no argument door left owed.** D1·5 (kpgalligan/reelcut#6) added
+# the last of them, `add_zoom_action`'s region; what follows is for an
+# argument a LATER phase adds.
+#
+# Copy §8 or §11 when the core reads the argument as a TYPE off the op
+# envelope — its refusals open `op "<name>" is not valid: …` because there is
+# no property group to name — and §6 when the argument IS a property patch
+# and answers in the patch walk's own sentences. A patch OP's section belongs
+# in `patch_door_patches.py` instead.
