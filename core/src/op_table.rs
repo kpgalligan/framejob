@@ -8,7 +8,7 @@
 //! `edit.rs`'s doc table.
 //!
 //! It is a module of its own because the table is a published interface —
-//! the tool catalog reads it rather than restating it — while the [`Op`]
+//! the tool catalog will read it rather than restate it — while the [`Op`]
 //! enum and the fifty-seven-way dispatch are the implementation of that
 //! interface. [`OP_NAMES`] is a projection of this table and is re-exported
 //! from `edit.rs` under its old name, so no caller anywhere moved.
@@ -109,7 +109,11 @@ impl Kind {
     /// declares them; empty for every kind that is not one.
     ///
     /// Hand-written here and proved against the decoder, which answers an
-    /// unknown member with the whole list.
+    /// unknown member with the whole list. The match is EXHAUSTIVE for
+    /// `scope.rs`'s `refused_inside` reason: a kind added without a line
+    /// here would answer "no members", and the test that compares a
+    /// vocabulary to its own list skips a kind that claims none — so the
+    /// catch-all this does not have would be a new kind silently untested.
     pub const fn values(self) -> &'static [&'static str] {
         match self {
             Transition => &[
@@ -131,7 +135,8 @@ impl Kind {
             Curve => &["linear", "ease_in", "ease_out", "ease_in_out"],
             Fit => &["fit", "fill"],
             Groups => &["video", "audio", "text", "shape"],
-            _ => &[],
+            Ticks | Id | Index | Ids | Ranges | Number | Boolean | Text | Object | Color
+            | FrameRate | Region => &[],
         }
     }
 }

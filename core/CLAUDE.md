@@ -61,8 +61,9 @@ file is what governs a module now.
   op and one `Argument` per argument — its name, its `Kind` and whether the
   decoder requires it — and `OP_NAMES` as a projection of it, re-exported by
   `edit.rs` so no caller moved. A published interface, where the `Op` enum
-  and the dispatch are its implementation: the tool catalog reads it rather
-  than restating it. A row holds no prose, no semantics and no default
+  and the dispatch are its implementation. Nothing outside this module and
+  its test reads a row YET — the catalog and the startup check are the later
+  D3 tickets; `OP_NAMES` is the one part of it already consumed. A row holds no prose, no semantics and no default
   spelled twice; `Kind` is closed, carries each vocabulary's members, and
   has exactly ONE kind per answer serde gives, because a distinction the
   decoder cannot see is one no test could prove. Nothing here is the
@@ -272,9 +273,9 @@ landed and gated alone, so the feature's diff is attributable; budget the cut
 against the pessimistic number, because an estimate here has run about two
 thirds of the truth. Over the cap today and known debt, not licence:
 `edit_clip.rs` and `edit.rs`, whose
-standing exemption is that its module doc IS the op table (the cut there, if
-ever forced, is the `Op` enum into an `edit_ops.rs`, and never in the same
-phase as a feature). The current list is `wc -l` and
+standing exemption is that its module doc IS the op table's semantics half
+(the cut there, if ever forced, is the `Op` enum into an `edit_ops.rs`, and
+never in the same phase as a feature). The current list is `wc -l` and
 `designs/reelcut-remaining.md` §3.
 
 **Dependencies.** `serde` and `serde_json` (the JSON the FFI speaks),

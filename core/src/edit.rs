@@ -146,7 +146,7 @@
 //! | `add_zoom_action` | An `add_action` whose end patch is the `scale`, `x` and `y` that bring `region` to the canvas — the screencast zoom. An absent `duration` is 1 s, an absent `fit` is `fit` and an absent `curve` is `ease_in_out`. `region`'s `x`/`y` are its **CENTRE** and `width`/`height` its size, both SOURCE pixels from the centre of the clip's cropped rect (the spotlight's frame); `fit` shows the whole region, `fill` covers the whole canvas, both measured THROUGH the clip's rotation. Rotation and crop are read from the clip evaluated at `at`; the scale clamps to the layer maximum and the offsets follow the CLAMPED value, so a region too small to fill the canvas still lands centred. `region` absent or `null` is a zoom BACK: the end patch is the clip's base `scale`, `x`, `y`. The region is read the way a patch is: it must BE an object (a four-number list is refused, not read member by member), and an unknown, missing or wrong-typed member is an `Err` naming it. Same refusals as `add_action`; a clip with no video properties is an `Err`. |
 //! | `set_action` | Retimes or re-curves one action; omitted fields keep their value, same overlap checks. |
 //! | `set_action_end` | Merges into the action's `end` patch; a key set to `null` is removed from it, at any depth. Walked for keys and kinds like every other patch, over the three groups §5.4 allows (a `shape` object is an unknown key); values are NOT range-checked. A `video` object naming `motion` is an `Err`. |
-//! | `remove_action` | |
+//! | `remove_action` | Removes the action. |
 //!
 //! The placement equation `add_zoom_action` solves, and the two limits it
 //! carries, are `edit_zoom.rs`'s module doc.
@@ -162,7 +162,7 @@
 //! | `remove_empty_tracks` | Drops every track with no clips, keeping the back-most if that would empty the stack. |
 //! | `add_marker` | A marker at `at`, clamped to ≥ 0, named `Marker <n>` and red unless `name` and `color` say otherwise. Two markers may not share a tick. |
 //! | `set_marker` | Omitted fields keep their value; the same one-marker-per-tick rule. |
-//! | `remove_marker` | |
+//! | `remove_marker` | Removes the marker. |
 //! | `set_canvas` | `rescale_clips`, false when absent, multiplies every clip's `x`, `y` and `scale` by the size ratio; an fps change re-snaps every clip, action and marker time to the new grid, and DROPS a marker a coarser grid lands on a tick another marker already holds. |
 //! | `add_media` | Appends the `media[]` element of spec §5.2 minus its `id` (the host probes the file). A path already in the list changes nothing. |
 //! | `relink_media` | Points a media at another file; an absent or `null` bookmark clears the stale one. |

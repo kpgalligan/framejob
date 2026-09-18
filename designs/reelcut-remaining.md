@@ -232,9 +232,9 @@ row per op.
 | `core/src/edit_clip.rs` | 1028 |
 | `app/Sources/AgentCatalog+Clips.swift` | 941 |
 | `app/Sources/Transcriber.swift` | 934 |
-| `core/src/edit.rs` | 838 |
 | `app/Sources/AudioDSP.swift` | 890 |
 | `app/Sources/AgentServer+Clips.swift` | 847 |
+| `core/src/edit.rs` | 838 |
 | `app/Sources/AgentServer.swift` | 771 |
 | `app/Sources/FFmpegRewrap.swift` | 768 |
 | `app/Sources/Loudness.swift` | 742 |

@@ -94,7 +94,9 @@ fn listed(message: &str) -> Vec<String> {
 
 /// A value of the kind an argument takes. Plausible is not the point —
 /// only the JSON KIND is, because everything past the decoder is some other
-/// test's business.
+/// test's business. Exhaustive, like every other match on [`Kind`] here: a
+/// kind added to the table does not compile until this file says how to
+/// prove it.
 fn value_of(kind: Kind) -> Value {
     match kind {
         Kind::Ticks => json!(0),
@@ -110,7 +112,7 @@ fn value_of(kind: Kind) -> Value {
         Kind::FrameRate => json!([30, 1]),
         Kind::Region => json!({"x": 0.0, "y": 0.0, "width": 1.0, "height": 1.0}),
         Kind::Groups => json!([]),
-        _ => json!(kind.values()[0]),
+        Kind::Transition | Kind::Alignment | Kind::Curve | Kind::Fit => json!(kind.values()[0]),
     }
 }
 
@@ -139,7 +141,9 @@ fn wrong_values(kind: Kind) -> Vec<(Value, String)> {
         Kind::Region => vec![wrong(json!([0, 0, 1, 1]), "expected an object, not")],
         Kind::Groups => vec![wrong(json!("video"), "expected a sequence")],
         Kind::Object => vec![],
-        _ => vec![wrong(json!(5), "expected string or map")],
+        Kind::Transition | Kind::Alignment | Kind::Curve | Kind::Fit => {
+            vec![wrong(json!(5), "expected string or map")]
+        }
     }
 }
 

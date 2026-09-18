@@ -3181,3 +3181,151 @@ identity and a refusal are still told apart by reading the source; the
 also left on the list; and the **cross-build reference instrument**, which
 needs a core of the reference's own era if the meter and the welcome window
 are to be photographed against their "before" again.
+
+## 7. D3 — one op table, published
+
+The candidate D1 and D2 both named and left: **an op is spelled twelve times
+across seven production files and the startup parity check compares NAMES
+only**, so a tool can declare an argument the core has never heard of, or the
+wrong JSON kind for one, and pass every part of the check. The argument, the
+measurements behind it and the sixteen implementation decisions are spec
+kpgalligan/reelcut#14 and are not restated here. In one sentence: **the core
+says what an argument IS, the app says what it is FOR**, and everything
+downstream reads the core's table instead of restating it.
+
+The shape is expand-then-migrate rather than tracer bullets: the table lands
+beside everything that exists, the catalog is migrated group by group behind
+it, and the fifth part of the parity check is turned on last — because until
+every group is migrated it would complain about the ones that are not.
+
+## 8. D3 — the record
+
+### 8.1 D3·1 — the op table, and a test that asks the decoder (kpgalligan/reelcut#15)
+
+**Commits.** `589d5b1` (the ticket) and the review-fix commit named at the
+end of this section.
+
+**What landed.** Core only. No Swift file, no FFI export, no catalog entry,
+no proof script, no format bump; `OP_NAMES` is 57 and the catalog 77, as
+before. The app is byte-for-byte the app it was.
+
+- **`core/src/op_table.rs` is new, 276 lines** — under the 400-line cap for
+  a new module, and it does NOT take `edit.rs`'s standing table exemption,
+  which was a hard acceptance criterion. One `OpRow` per op, in table order,
+  and one `Argument` per argument: its name, its `Kind`, and whether the
+  decoder requires it. **145 arguments over 57 rows.** Nothing else is in a
+  row — no prose, no semantics, no default spelled a second time.
+- **`Kind` is closed, with 17 variants**, four more than the ticket's list of
+  spellings, and the module doc states the rule that fixes the number:
+  **exactly one kind per answer the decoder can give**. Two kinds serde
+  refuses identically would be a distinction the table claims and no test
+  could prove. The four beyond the list are each undecodable as one of the
+  thirteen: `Index` (`usize`, which serde names differently from `u32`),
+  `Ranges` (`Vec<[Ticks; 2]>`, the silence cut's pairs), `Region`
+  (`ZoomRegion` — a caller-authored object whose members the core DECLARES,
+  so not an opaque one), and `Groups` (`Vec<Group>`, the one vocabulary that
+  arrives as a list). `Kind::values` carries each vocabulary's members, and
+  its match is EXHAUSTIVE for `refused_inside`'s reason.
+- **A caller-authored patch is `Kind::Object`, and nothing more** — the five
+  property patches, the action end patch, the two new-clip bodies, the two
+  paste payloads and the media descriptor. Deepening D1 made the core the one
+  validator of what a patch may carry and this table does not restate a word
+  of it.
+- **`OP_NAMES` is a compile-time projection of the table**, re-exported from
+  `edit.rs` under the name and path it has always had. No caller in the core,
+  the FFI, the tests or the app moved, and `core/tests/op_names.rs` passes
+  untouched.
+- **`edit.rs` lost its Arguments column, 895 → 838.** Every default that
+  lived ONLY in that column was folded into the Semantics sentence, because
+  what an absent argument MEANS is semantics: `add_text_clip`'s and
+  `add_shape_clip`'s 5 s, `add_background`'s timeline length,
+  `freeze_frame`'s 2 s, `add_action`'s 1 s, `add_zoom_action`'s 1 s with its
+  `fit` and `ease_in_out`, `add_track`'s front, `add_marker`'s `Marker <n>`
+  and red, `nest`'s `Nest <n>`, `add_transition`'s `center` and
+  `ripple: false`, and `set_canvas`'s `rescale_clips: false`. The two
+  vocabulary lists under the tables now point at `Kind::values` instead of
+  repeating themselves.
+
+**The test is the interesting half.** `core/tests/op_table.rs`, 350 lines,
+six tests, and **the instrument is the decoder itself** — no second list is
+written down for the first to be compared against:
+
+- an argument no op has makes serde answer with the arguments it DOES have,
+  and the answer is compared to the row in both directions AND in order;
+- a required argument left out is answered `missing field`, naming it, and
+  the baseline envelope — which carries no optional argument at all — is read
+  without complaint, so an argument called optional that the decoder really
+  needs fails here;
+- each argument handed a value of another JSON kind is refused with the
+  phrase that kind's own Rust type produces (`expected i64`, `expected u32`,
+  `expected usize`, `expected an array of length 4`, …);
+- a closed vocabulary handed a non-member answers with its whole list, and
+  the list is compared to `Kind::values`;
+- an opaque object is proved opaque by being READ as a string, a number and
+  a list.
+
+**One acceptance criterion could not be met as written, and the reason is
+measured.** It asks the kind proof to assert that the decoder refuses a wrong
+value *"naming that argument"*. `Op` is internally tagged, so serde buffers
+each variant's content and re-reads it through a `ContentDeserializer` of its
+own, and `serde_path_to_error` — which D1 uses inside a patch — answers `.`
+for every field of every op. Tried and recorded, not assumed. The test names
+the argument by CONSTRUCTION instead: every probe is the op's baseline
+envelope, which the required-ness test proves readable, with exactly ONE
+argument replaced, so the only thing that can have failed is the one the
+probe changed. What it asserts in place of the name is the TYPE serde
+wanted, which pins the kind harder than a name would.
+
+**`#[rustfmt::skip]` on `OP_TABLE`** is the first in the tree. rustfmt's
+60-character budget for a call's arguments breaks all but the shortest row
+into four lines, which costs about 165 lines and the 400-line cap the ticket
+made a criterion. The table is laid out by hand, one line per op where one
+fits, inside the same 100 columns rustfmt keeps; `cargo fmt --check` is
+clean.
+
+**Verified.** `make test` **659 passed / 0 failed** (653 before, +6);
+`cargo fmt --check` clean; `make lint` clean; `make typecheck` 0 errors and
+exactly the four known AVFoundation warnings; `make app` BUILD SUCCEEDED;
+the built binary launched on port 4831 and `grep "Reelcut: "` on its log
+printed nothing — so the startup parity check still reads the DERIVED
+`OP_NAMES` as the catalog's 57 ops, which is the projection proved in the
+shipped binary rather than in a unit test.
+
+**An independent oracle, beside the tests.** A throwaway script parsed the
+`Op` enum out of `edit.rs` — every variant, every field and every
+`#[serde(default)]` — and compared it to the table parsed out of
+`op_table.rs`: 57 rows against 57 variants, 0 mismatches in argument name,
+order or required-ness, and exactly one Rust type per `Kind` (modulo
+`Option<…>`), which is the "one kind per answer" rule checked rather than
+asserted.
+
+**The mutants.** Five deliberate failures, each caught by exactly one test
+and by no other:
+
+| Mutant | Score |
+|---|---|
+| `add_transition`'s `align` removed from its row | `the_decoder_lists_exactly_the_arguments_the_table_lists` FAILED, 5 passed |
+| `trim_start`'s `to` changed from `Ticks` to `Id` | `every_argument_is_refused_a_value_of_another_kind` FAILED, 5 passed |
+| `set_reversed`'s `reversed` called optional | `every_required_argument_is_missed_and_every_optional_one_is_not` FAILED, 5 passed |
+| `wipe_down` dropped from `Kind::Transition`'s members | `every_closed_vocabulary_answers_with_its_own_members` FAILED, 5 passed |
+| `set_video`'s `patch` called a string rather than an object | `every_argument_is_refused_a_value_of_another_kind` FAILED, 5 passed |
+
+**What the review found.** The Standards axis found the phase record missing
+with three documents already pointing at it (this section), the ledger row
+edited in place and out of its `sort -rn` order, three documents saying the
+catalog *reads* the table when nothing outside it reads a row yet, and a
+`Kind` match with a catch-all that would let a new vocabulary kind be
+silently skipped by the very test meant to prove it — the inversion of
+`scope.rs`'s `refused_inside`, and the one finding that changed code. The
+Spec axis re-derived all 57 rows against the enum independently, reproduced
+two mutants of its own, and raised the four extra kinds and the unproven
+"naming" half, both answered above. Three findings were judged not real: the
+table having no production consumer YET is the spec's own expand-then-migrate
+sequence; `Kind::Object` having no wrong-kind probe IS the claim the kind
+makes; and `OP_COUNT` having no compile-time tie to the enum's arm count is
+the exposure the old `[&str; 57]` already had.
+
+**Owed.** The whole of D3 past this ticket: the JSON Schema function over the
+17 kinds, the query export, the catalog's migration, the fifth part of the
+parity check, the widening list, and the proof scripts that stop re-typing
+argument names in Python.
