@@ -3506,7 +3506,8 @@ stop re-typing argument names in Python.
 ### 8.3 D3·3 — the clip tools read the core (kpgalligan/reelcut#17)
 
 **Commits.** `a14f39e` (the prefactor: the table's bound) and
-`PLACEHOLDER_TWO` (the migration, the declarations list and the proof).
+`e6c600b` (the migration, the declarations list and the proof) and
+`PLACEHOLDER_THREE` (the mutants and what the review found, below).
 
 **The ticket's amendment, and why it came first.** #16 measured two facts
 that would have made two tools WORSE on the way through, so the ticket
@@ -3668,7 +3669,26 @@ the built binary launched on port 4854 and `grep "Reelcut: "` on its log
 printed nothing — the startup parity check is unchanged, and its fifth part
 is #19's.
 
-**The mutants.** PLACEHOLDER_MUTANTS
+**The neighbours, re-run because this ticket changed what they read.**
+`phase4_proof.py` **84/84** and `phase5_proof.py` **88/88** each assert a
+migrated tool's patch DESCRIPTION (`set_text`, `set_audio`) — the word-for-word
+claim, checked by a script written before the migration existed;
+`phase9_proof.py` **216/216** re-derives the injected `scope` over the wire,
+including `trim_start`'s `{"type": "integer", "minimum": 0}`, which is a
+migrated tool's envelope key; `op_schema_probe.py` **28/28**, unchanged by
+the bound because none of its twelve kind rows is a canvas dimension.
+
+**The mutants.** Four deliberate failures, each run from the committed tree
+and reverted with `git checkout`, each caught by exactly ONE row of the proof
+and each at 21/22 — which is the point: a mutant that took two rows down
+would mean the rows were not independent.
+
+| Mutant | Row that caught it |
+|---|---|
+| the `add_text_clip.text` widening dropped from the list, while `newClipPatchArg` still expands a bare string | *a new text clip's body takes a bare string, and the tool SAYS a string is allowed* — `content 'A bare string', declared ['object']`. **This is the mutant the structural half cannot see**: the catalog and the oracle both read the list, so they still agreed with each other |
+| the catalog strips every `enum` on its way out of `declaredInput` | *all 43 declare exactly the core's arguments, kinds, enums, minimums and required list* |
+| `split.at`'s required-ness row set back to `.theCores`, so the tool demands what the playhead supplies | *split takes the playhead when `at` is left out* — `required ['at']` |
+| `wipe_down` dropped from the CORE's `Kind::Transition` | *set_transition's kinds* — the core's twelve against `TransitionKind.allCases`'s thirteen. Caught twice over: `core/tests/op_table.rs`'s vocabulary test fails on the same mutant |
 
 **Owed.** The fifth part of the parity check and the shared `tools/list`
 schemas accessor (#19); the four other catalog groups; and the proof scripts
