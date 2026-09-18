@@ -2443,7 +2443,8 @@ Judged not real:
 
 ### 5.4 D2·4 — the app's guesses are deleted (kpgalligan/reelcut#12)
 
-**Commits.** `SHA1` (the ticket) and `SHA2` (what its review found, below).
+**Commits.** `06dd67b` (the ticket), `SHA2` (the mutant table) and `SHA3`
+(what its review found, below).
 
 **What landed.** App only — three agent handlers, two proof scripts, the
 app's rulebook and the proof README. No core change, no FFI change, no op
@@ -2554,7 +2555,27 @@ would interrupt the gesture to say something the person is already fixing
 with the mouse. `endLiveEdit` registering no step when every tick was
 swallowed is what makes the two consistent.
 
-**Mutants.** MUTANTS
+**Mutants.** Five, all caught, and the fourth is the one worth reading.
+
+| Mutant | Score |
+|---|---|
+| `addTransition`'s trial-apply and its two sentences put back (the D2·3 state) | refusal **114/116** |
+| `removeMedia`'s `with_clips` count put back | refusal **115/116**, phase8 **76/79** |
+| `removeTrack`'s `with_clips` count put back | refusal **115/116** |
+| the transition's "no room" refusal back to a bare `Outcome::Identity` | refusal **115/116** |
+| the same sentence reporting the request in TICKS where it says frames (300000 for 15) | refusal **115/116** |
+
+The fourth is D2·3's own mutant 7, which that ticket's proof scored
+**113/113** — it could not see the rule at all, because the trial-apply in
+front of it answered the same either way, and `core/tests/refusal.rs` was
+the only instrument that could take it. It is caught here. That is the
+shadow closing, measured rather than asserted, and it is the reason the
+first mutant above is worth its build: with the app's answer back, two
+sections stop measuring the core.
+
+The second mutant is also the one that shows why the app's sentence was the
+worse one for a caller: `C.mov is used by 2 clips.` names neither clip, and
+the core's names both.
 
 **Size.** Nothing grew: every file this ticket touched is smaller or the
 same. `AgentServer+Clips.swift` is at **847**, over the ~600 cap, and its
