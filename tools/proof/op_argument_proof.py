@@ -437,9 +437,15 @@ def main():
           op in verdicts.get("orphan", "") and "clipx" in verdicts.get("orphan", "")
           and "do not take" in verdicts.get("orphan", ""),
           f"{verdicts.get('orphan')!r}")
-    check("…and an APP-STATE tool broken the same way draws nothing — the fifth part skips "
-          f"a tool the core calls no op, as the fourth does ({verdicts.get('appStateTool')})",
-          verdicts.get("appState") == "", f"{verdicts.get('appState')!r}")
+    # Read against the CLEAN verdict rather than against the empty string: on
+    # a build that already has a complaint, "draws nothing" would fail for the
+    # other complaint's sake and name the wrong thing. What the skip claims is
+    # that breaking an app-state tool changes the answer not at all.
+    check("…and an APP-STATE tool broken the same way changes the answer not at all — the "
+          "fifth part skips a tool the core calls no op, as the fourth does "
+          f"({verdicts.get('appStateTool')})",
+          verdicts.get("appState") == verdicts.get("clean"),
+          f"{verdicts.get('appState')!r}")
 
     mcp = MCP(port)
     tools = mcp.schemas()

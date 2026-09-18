@@ -4040,7 +4040,7 @@ sentence for a bound.
 
 ### 8.5 D3·5 — the fifth part of the check, and a proof for all 57 (kpgalligan/reelcut#19)
 
-**Commits.** `PLACEHOLDER_ONE` (the fifth part and the proof),
+**Commits.** `77b0bb8` (the fifth part and the proof),
 `PLACEHOLDER_TWO` (the mutants and the whole proof tree) and
 `PLACEHOLDER_THREE` (what the review found, below).
 
@@ -4208,3 +4208,50 @@ on fresh instances: `op_catalog_proof.py` **23/23** (port 4904) and
 Rust module map, the decision recording where the line falls, the README's
 prose op list, the ledger regenerated row by row, and the series close with
 its measurements.
+
+**The mutants.** Four deliberate failures, each run from the committed tree
+and reverted with `git checkout`, each rebuilt and put to a freshly launched
+instance of its own.
+
+| Mutant | Score | What caught it |
+|---|---|---|
+| the fifth part SILENCED — `argumentFailure` returns nil on its first line | **75/79** | the four *made to complain* rows, and only those. The clean-catalog row and the app-state row still pass, correctly: a check that says nothing says nothing about a clean catalog either. This is the one mutant a single row cannot catch, because what it removes is the instrument |
+| `trim_start`'s `to` renamed `until` in the CORE's table, the catalog untouched | **74/79** | five rows, and the shipped binary's own log first: `Reelcut: these op tools carry a description for an argument they do not take: trim_start — ["to"]`. The tool printed `until` from the table, the sentence written for `to` was attached to nothing, and `until` arrived undescribed — both halves of the prose check, in one mutant. `trim_start`'s misspelt-argument row fails too, because the handler still reads `to`. `core/tests/op_table.rs` FAILED 3 of 8 on the same mutant, which is the table lying to the decoder |
+| `set_track.hidden`'s description removed — the drift this ticket FIXED, put back | **76/79** | the parity log row, naming `set_track — ["hidden"]`, and the clean-catalog row beside it. This is the measurement behind the drift table above: the ten sentences are what the check asks for, and one of them taken away is one line in the log |
+| an INERT declarations row added (`set_speed.rate` again, widening nothing) | **78/79** | *every one of the 15 rows accounts for at least one of them*, naming `set_speed.rate` — one row, and nothing else. The parity log printed NOTHING, which is the honest limit of the fifth part: a row that does nothing is invisible to a check that reads the same list the catalog does, and the proof is what sees it |
+
+**The whole proof tree was re-run on the committed tree**, one script per
+freshly launched instance, and `grep "Reelcut: "` printed nothing on every
+one of the seventeen ports.
+
+| Script | Score |
+|---|---|
+| `phase1_proof` · `phase2_proof` · `phase3_proof` · `phase3_silence_scope` | 66/66 · 85/85 · 123/123 · 8/8 |
+| `phase4_proof` · `phase5_proof` · `phase6_proof` · `phase7_proof` | 84/84 · 88/88 · 168/168 · 92/92 |
+| `phase8_proof` · `phase9_proof` · `patch_door_proof` · `refusal_proof` | 79/79 · 216/216 · 261/261 · 116/116 |
+| `remaining_proof` · `clip_catalog_proof` · `op_catalog_proof` | 79/79 · 24/24 · 23/23 |
+| `op_argument_proof` | **79/79** |
+| `recording_proof` | **121/121**, 66 rows skipped by name |
+| `op_schema_probe` · `phase9_probe` · `refusal_probe` · `remaining_probe` | 28/28 · 48/48 · 15/15 · 170/170 |
+| `preview_validity_probe` · `preview_refresh_probe` · `transition_sheet_probe` | 19/19 (5 skipped) · 0/0 (58 skipped) · 32/32 |
+| `recording_probe` | **858/858**, 43 skipped by name |
+| `phase2…phase9_chrome` | 26/26 · 33/33 · 59/59 · 36/36 (45 skipped) · 70/70 · 78/78 · **144/150** · 62/62 |
+
+**This host was LOCKED for the run, and that is the whole of the difference
+from D3·4's tree.** ScreenCaptureKit lists no display when the console is
+locked and every display is asleep, and a locked console displays nothing in
+any layer and lets no window become key — so `recording_proof` skipped its
+granted tier by name (66 rows), `recording_probe` its 41 display rows,
+`preview_validity_probe` 5 and `preview_refresh_probe` all 58, each printed
+by name with its cause. **`phase8_chrome` is the one that FAILS rather than
+skipping**: its six failures are one cascade from its own first row —
+*PRECONDITION: the probe activated and the editor is both key and main* —
+which a locked console cannot satisfy, and every later row in that section
+reads NONE for want of it. It has no skip for that cause where four other
+instruments do, and giving it one is owed. `phase5_chrome`'s 45 and
+`recording_probe`'s 2 are the standing reference-tree skip.
+
+Nothing in this ticket's diff reaches a window, a display or the recorder:
+the Swift change is the agent catalog's prose and one new file in the parity
+check, and `tools/list` is what every one of the catalog proofs read back
+green.
