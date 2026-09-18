@@ -291,7 +291,7 @@ case "ranges":
 
     // An ordinary rate: the same project at 30 fps ends on its tick, and the
     // builder installs exactly the plan's ranges.
-    let ordinary = try! project.applying([.setCanvas(fps: Fps(num: 30, den: 1))])!
+    let ordinary = try! project.applying([.setCanvas(fps: Fps(num: 30, den: 1))]).project!
     let ordinaryBuilt = build(ordinary)
     answer["ordinary"] = [
         "durationEqualsPlanEnd": ordinaryBuilt.composition.duration

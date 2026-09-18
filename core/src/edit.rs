@@ -173,16 +173,17 @@
 //!
 //! - `Ok(Outcome::Applied(project))` — the new project; the app pushes an
 //!   undo step.
-//! - `Ok(Outcome::Identity)` — the op is valid and nothing needed to
-//!   change. **No undo step**: an identity edit that registered one would
-//!   be a phantom step the user has to undo twice. It carries no sentence,
-//!   because there is no rule to name.
+//! - `Ok(Outcome::Identity)` — valid, nothing needed to change. **No undo
+//!   step** (one is a phantom step), and no sentence: no rule to name.
 //! - `Ok(Outcome::Refused(why))` — a rule declined the op, in the rule's
 //!   own words (the overlap rule's names the two clips and the tick
 //!   counts). **No undo step either**, and the project is exactly as it
 //!   was: a refusal is not an error tier, it is an answer that can say why.
 //! - `Err(message)` — an unknown id, an out-of-range value, a malformed
 //!   envelope. Lowercase, naming the offending value.
+//!
+//! **A "refuses" in the table names the RULE**; which rules say so out
+//! loud, and which are really identities, is [`Outcome::Identity`]'s doc.
 //!
 //! **A `scope` widens the `Err` arm and nothing else.** An op applied
 //! inside a nest can succeed against the view and STILL be refused, because
@@ -192,16 +193,15 @@
 //! [`crate::scope`], which states the contract in full.
 //!
 //! **The non-media rule.** `set_speed`, `rate_stretch`, `freeze_frame` and
-//! `slip` return `Err("clip N is not a media clip")` rather than refusing,
-//! because a `clip` argument naming a text or shape clip for a speed op is
-//! an invalid argument — the same class as an unknown id — and because
-//! an identity there is indistinguishable from "the rate was already that",
-//! which is a bad answer to give the MCP agent. Spec §6 originally worded
-//! the first three rows "refuses"; it was amended to match, so the
-//! siblings, the spec and the error tiers in `core/CLAUDE.md` now all
-//! agree. `slip` draws the line one step further out than its siblings do:
-//! a `still` has a source TIME, and slipping that is exactly what the op
-//! means, so the question the rule asks there is "has this clip a source at
+//! `slip` return `Err("clip N is not a media clip")` rather than refusing:
+//! a `clip` argument naming a text or shape clip for a speed op is an
+//! invalid argument — the same class as an unknown id — and an identity
+//! there is indistinguishable from "the rate was already that", which is a
+//! bad answer to give the MCP agent. Spec §6 originally worded the first
+//! three rows "refuses" and was amended to match, so the siblings, the spec
+//! and `core/CLAUDE.md`'s error tiers agree. `slip` draws the line one step
+//! further out: a `still` has a source TIME and slipping that is exactly
+//! what the op means, so the question there is "has this clip a source at
 //! all", not "is this a media source".
 
 use serde::{Deserialize, Serialize};

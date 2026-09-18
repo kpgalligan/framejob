@@ -477,9 +477,9 @@ fn a_scoped_time_snaps_to_the_documents_frame_grid() {
 
 #[test]
 fn a_scoped_op_that_changes_nothing_reports_no_change() {
-    // The `Ok(None)` arm, which must register no undo step (spec §5.5). An
-    // identity edit and a documented refusal both land here, inside a scope
-    // exactly as outside.
+    // The two non-applied arms, which must register no undo step (spec
+    // §5.5). An identity and a rule's refusal both land here, inside a scope
+    // exactly as outside — `refuses` is the claim they share.
     let base = one_nest();
     base.refuses(&json!({"op": "move_clip", "clips": [6], "delta": 0, "scope": 4}));
     base.refuses(&json!({"op": "set_video", "clips": [6], "patch": {"opacity": 1.0}, "scope": 4}));

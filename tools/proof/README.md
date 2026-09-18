@@ -732,6 +732,17 @@ its window height by arithmetic over the section stack — so a failure there
 is the row landing, not the row being wrong, and finding that out after
 everything else has been written costs a day.
 
+**Its cross-build sections cannot run on this tree any more, and say so by
+name.** Road map 7's D2·1 gave `rc_project_apply` a fourth parameter, and the
+reference commit's own `ReelCore.swift` calls the three-argument export — so
+an app tree that old cannot compile against the CURRENT header, which is what
+the one-core-two-app-trees design requires. No guard in `harness/main.swift`
+fixes that, and nothing in this repo can. `phase5_chrome.py` is therefore
+**36/36 with sections 3 to 7 SKIPPED by name** (81/81 while the reference
+still built), and `recording_probe.py`'s §6b the same, which is why that
+script is **858/858 with 43 skipped** (2 here, 41 the locked console) where it
+was 917/917. A skip is not a pass: both print the reason and the count.
+
 `phase5_chrome.py` is the other half, and phase 5 splits between the two more
 sharply than any phase so far: four of its five features are AUDIO, which a
 still frame can hold no opinion about, so everything above is the MCP
@@ -2129,7 +2140,11 @@ fix wave built (a placement throw unwrapped, the `path` trim removed, a
 named project falling through to a new document, the Goertzel share on the
 wrong scale) are in its docstring with the rows that kill them.
 
-`python3 tools/proof/recording_probe.py`, **876/876** (662 before R2; `--only
+`python3 tools/proof/recording_probe.py`, **858/858 with 43 rows skipped by
+name** — 41 the locked console's granted tier, 2 section 6b's reference build,
+which no longer compiles against the current header (see phase 5's chrome
+above for why, and it is the same cause); 876/876 and 917/917 are its earlier
+scores, when that reference still built (662 before R2; `--only
 <sections>` for iteration), over a probe compiled
 from the whole of `app/Sources` (`remaining_probe.py`'s shape): section 1 the
 file naming, 2 `RecordingConfiguration.make` read back field by field over

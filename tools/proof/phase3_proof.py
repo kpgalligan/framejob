@@ -1141,7 +1141,8 @@ def obscure_action_part(mcp):
     def still(regions, t):
         """The frame a STATIC region list renders — the oracle an animated one
         is compared against. The list is only written when it differs, because
-        writing what is already there is a documented refusal."""
+        writing what is already there is an IDENTITY (spec §5.5) and comes
+        back as an in-band error."""
         if s.clip(clip)["video"]["obscure"] != regions:
             s.op("set_video", clips=[clip], patch={"obscure": regions})
         return s.frame(t)

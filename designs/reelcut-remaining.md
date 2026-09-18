@@ -200,8 +200,10 @@ would be the bare strip with a longer list.
 
 ## 3. The size debt
 
-Every file over the ~600-line cap as of 2026-09-17 — 30 of them, the
-list regenerated at road map 7's D1·6, which closed deepening D1.
+Every file over the ~600-line cap as of 2026-09-18 — 29 of them, the
+list regenerated row by row against `wc -l` at road map 7's D2·5, which
+closed deepening D2. `core/src/edit_track.rs` came off it there (674 → 520,
+`edit_canvas.rs` cut out of it in D2·3) and nothing joined.
 Regenerate the list with
 `wc -l app/Sources/*.swift core/src/*.rs | awk '$1>600 && $2!="total"' | sort -rn`
 rather than trusting the numbers here; the standing exemptions are
@@ -213,10 +215,10 @@ row per op.
 | `app/Sources/ProjectSnapshot.swift` | 2516 |
 | `app/Sources/InspectorPane.swift` | 1665 |
 | `app/Sources/TimelineView.swift` | 1630 |
-| `app/Sources/ReelCore.swift` | 1507 |
+| `app/Sources/ReelCore.swift` | 1500 |
 | `app/Sources/VideoPane.swift` | 1411 |
 | `app/Sources/Compositor.swift` | 1391 |
-| `app/Sources/ProjectDocument.swift` | 1353 |
+| `app/Sources/ProjectDocument.swift` | 1352 |
 | `app/Sources/ReverseRenderer.swift` | 1311 |
 | `app/Sources/ReelOps.swift` | 1131 |
 | `app/Sources/EditorViewController.swift` | 1123 |
@@ -224,16 +226,15 @@ row per op.
 | `app/Sources/PreviewCanvasView.swift` | 1104 |
 | `app/Sources/CanvasSessions.swift` | 1088 |
 | `app/Sources/OptionControls.swift` | 1081 |
-| `core/src/edit_clip.rs` | 1042 |
+| `core/src/edit_clip.rs` | 1028 |
 | `app/Sources/AgentCatalog+Clips.swift` | 941 |
 | `app/Sources/Transcriber.swift` | 934 |
+| `core/src/edit.rs` | 895 |
 | `app/Sources/AudioDSP.swift` | 890 |
-| `core/src/edit.rs` | 887 |
 | `app/Sources/AgentServer+Clips.swift` | 847 |
-| `app/Sources/AgentServer.swift` | 772 |
+| `app/Sources/AgentServer.swift` | 771 |
 | `app/Sources/FFmpegRewrap.swift` | 768 |
 | `app/Sources/Loudness.swift` | 742 |
-| `core/src/edit_track.rs` | 674 |
 | `app/Sources/ExportSheetController.swift` | 639 |
 | `app/Sources/Exporter.swift` | 609 |
 | `app/Sources/ClipPane.swift` | 609 |
@@ -349,6 +350,16 @@ since spec §1 excludes capture); speed ramps (feasible, unasked — `speed` is
 not an action target and the model, the plan and the audio envelopes would all
 have to learn); and the explicit non-goals — LUTs, motion blur, stabilisation,
 optical-flow retiming, auto-reframe, multicam, plugins, other platforms.
+
+**One pre-existing defect nothing can reach**, found by the probe deepening
+D2·2 built and named here because that ticket said it belonged in this
+document: `ProjectDocument.performGroupedEdit` opens an undo group and
+balances it whatever the edit answered, so an edit that changes nothing
+leaves an EMPTY group behind — a step a person would press ⌘Z twice past. It
+has been true since an identity has been possible and no caller reaches it:
+the agent refuses at its own trial first and the menu path does not use that
+entry point. `tools/proof/refusal_probe.py` prints it as a note rather than
+scoring it, so the day a caller does reach it the probe already says so.
 
 Three small things the closing turned up that a third road map would pick up
 on its way past, none worth a phase: `relink_media` could re-probe the file

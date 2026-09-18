@@ -702,7 +702,8 @@ fn the_times_snap_to_the_frame_grid() {
 
 /// The no-overlap rule is `add_action`'s, inherited by composing it rather
 /// than restated: clip 51 already animates over `[0, 1 s)`, so a zoom
-/// starting half a second in refuses — `Ok(None)`, no undo step.
+/// starting half a second in refuses — in `add_action`'s own sentence, and
+/// with no undo step.
 #[test]
 fn a_zoom_that_would_overlap_another_action_refuses() {
     let project = zoom_project();

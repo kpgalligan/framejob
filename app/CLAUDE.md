@@ -17,7 +17,10 @@ detail there.
   `planJSON` are memoised PER HANDLE, so keep handles rather than minting
   them), timecode, snapping, export presets/sizes/settings, `RecipeSource`,
   the `dictionary` extensions on the property types and the typed patches.
-  `deinit` frees the Rust allocation.
+  `deinit` frees the Rust allocation. It also holds **the one read of
+  `rc_project_apply`'s TWO message channels**, in the header's own order — a
+  sentence is a refusal, an error message is invalid input, neither written
+  is an identity — answered as the `ReelEdit` below.
 - `ReelOps.swift` — `OpArgs`, `ReelOp` and one typed factory per row of
   `core/src/edit.rs`'s op table, plus a RAW factory beside the typed one at
   each door that takes a CALLER's own object — ELEVEN of them (`setVideoRaw`,
@@ -522,7 +525,10 @@ this entry rather than growing the list), `ScreenRecorder.shareableContent`'s
 global hop, and the cache's main hop. The recorder adds NO queue of its own:
 framework callbacks are stamped where they land and hopped to main. Colors,
 fonts and metrics come from `DS` tokens; shared controls go in
-`Controls.swift`. Refusals beep (`NSSound.beep()`), errors never crash.
+`Controls.swift`. **A refusal and an identity both beep** (`NSSound.beep()`)
+and neither makes an undo step — that is what makes a person's experience of
+the two identical, and it is deliberate (spec §5.5); only invalid input
+throws, and errors never crash.
 4-space indent, ~100 columns.
 
 **`make typecheck` is authoritative for TYPE errors, and only those.** It

@@ -565,8 +565,8 @@ fn an_unknown_align_is_named_with_the_three_that_are_legal() {
 #[test]
 fn no_handle_at_all_is_the_domain_refusal() {
     // `before` on a clip whose `in` is 0: there is nothing to reveal, the
-    // request clamps below one frame, and the answer is `Ok(None)` — no
-    // undo step, no error.
+    // request clamps below one frame, and the answer is a REFUSAL carrying
+    // the cut's own sentence — no undo step, and not an error.
     cuts().refuses(&add_aligned(13, 20 * FRAME, "before"));
 }
 

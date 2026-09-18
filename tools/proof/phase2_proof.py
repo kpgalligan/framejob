@@ -180,9 +180,11 @@ class Session:
             return str(error)
 
     def refuses(self, tool, **kwargs):
-        """A documented refusal comes back as an in-band error whose message
-        begins "<Op> made no change" — the app's wording for the core's
-        `Ok(None)`, which registers no undo step."""
+        """An IDENTITY comes back as an in-band error whose message begins
+        "<Op> made no change" — the app's wording for an op that was valid
+        and had nothing to change, which registers no undo step. Since road
+        map 7's D2 a rule's REFUSAL says "was refused at <op>: …" instead and
+        would not match here; every call below is an identity."""
         message = self.error(tool, **kwargs)
         return message is not None and "made no change" in message
 

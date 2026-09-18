@@ -32,7 +32,7 @@ changes a file's role or adds a rule. Never append a status paragraph here.
 | `designs/reelcut-roadmap-4.md` | Remove Silences judged by voice — Silero VAD through Core ML (S1), built; its own proof scripts are still owed. Start here for `detect_silence`. |
 | `designs/reelcut-roadmap-5.md` | Transitions second pass (E1) and motion presets (E2), built; their proof scripts are still owed. Start here for transitions or `video.motion`. |
 | `designs/reelcut-roadmap-6.md` | Captions from the cloud (AssemblyAI), DESIGNED and not built; its spike C0 has not run. Start here for transcription. |
-| `designs/reelcut-roadmap-7.md` | The deepening series: §0 the rules it inherits (deep module, seam, the deletion test, the interface is the test surface), §1 D1's plan — the core as the one validator of a caller's patch, tickets #2–#7 — §2 each ticket's record, and §3 what D1 added up to, CLOSED. Start here for how a patch is checked or refused. |
+| `designs/reelcut-roadmap-7.md` | The deepening series, TWO candidates, both closed: §0 the rules it inherits (deep module, seam, the deletion test, the interface is the test surface); §1–§3 D1, the core as the one validator of a caller's patch (tickets #2–#7) — start here for how a patch is checked; §4–§6 D2, an op's three answers and the eleven rules that say why they refused (tickets #9–#13) — start here for what an op ANSWERS, and §6 for where a next candidate starts. |
 | `designs/reelcut-effects-survey.md` | The survey road map 5 came from. E3–E9 (tone, filters, looks, adjustment clips, LUT import, voice effects, background removal) are DEFERRED by the user. Concat is AGPL-3.0: its behaviour was studied, and none of its code, shaders, chains or colour tables may be carried over. |
 | `designs/reelcut-milestones.md` | The per-phase record this file carried until 2026-09-17, moved out verbatim. Not maintained. |
 | `designs/design_handoff_reelcut/` | The shipped chrome cleanup and identity; its README is normative for the redesign's metrics. |
@@ -98,18 +98,23 @@ pixel or sample work in Rust; no ffmpeg dependency in the product.
   contract between the worlds. **The FFI is three files in lockstep**: a Rust
   `#[no_mangle]` export, its entry in the header, and its wrapper in
   `app/Sources/ReelCore.swift` — **the only file that calls `rc_*`**.
-- A handle is an immutable project. **Every edit is pure and returns
-  `Option`** (identity or a documented refusal = `None`, no undo step).
-  `ProjectDocument` is the single mutation point and undo is its stack of
-  handles.
+- A handle is an immutable project. **Every edit is pure and answers one of
+  three arms** (`core/src/outcome.rs`, spec §5.5): applied with the new
+  project, an identity, or refused in the rule's own sentence. Only the first
+  is an undo step. `ProjectDocument` is the single mutation point and undo is
+  its stack of handles.
 - Edits are JSON ops through `rc_project_apply`. **The op table is the module
   doc of `core/src/edit.rs`**; `ReelOps.swift`'s typed builders,
   `AgentCatalog*.swift`'s tools and spec §6 mirror it — change one, change
   all four. The envelope's `scope` key addresses an edit inside a nest.
 - Persisted-state changes bump `RC_FORMAT_VERSION` in `core/src/format.rs`
   **and** the header.
-- Errors: NULL with `err_out` untouched is a refusal or an identity; `err_out`
-  set is invalid input; `"internal error: …"` is a caught panic.
+- Errors: `rc_project_apply` returns NULL three distinguishable ways, and the
+  two message channels are never both written. NULL with NEITHER written is
+  an identity; NULL with `reason_out` set is a refusal and that string is the
+  rule's own sentence; NULL with `err_out` set is invalid input. The first two
+  make no undo step and only the third is an error. `"internal error: …"` is a
+  caught panic.
 
 ### Where a feature lands — the standard recipe
 

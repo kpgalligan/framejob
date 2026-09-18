@@ -238,8 +238,8 @@ struct RecordingLanding {
     // MARK: - The steps, each applied purely and read back
 
     /// `add_media` applied purely; the id it minted, read off the result. A
-    /// path already in the list is the documented IDENTITY (`Ok(None)`,
-    /// `core/src/edit_track.rs`), not a failure, and then the id is the
+    /// path already in the list is the documented IDENTITY
+    /// (`core/src/edit_track.rs`), not a failure, and then the id is the
     /// entry's, matched by the TRIMMED path because that is what the core
     /// stored — `backgroundMedia(for:in:)`'s rule. The op stays in the list
     /// either way: `applying(_ ops:)` runs every later op after an identity,

@@ -18,7 +18,7 @@ import Foundation
 /// live consequence was that
 /// removing media used only inside a nest showed no "and its clips" alert at
 /// all: the pane saw no users, sent a plain `remove_media`, and the core
-/// refused it with `Ok(None)`, which reaches the user as a bare beep. Phase
+/// refused it, which reaches the user as a bare beep. Phase
 /// 8c's "unused only" filter would have been a THIRD copy of the same
 /// mistake, which is what made it worth one file.
 ///

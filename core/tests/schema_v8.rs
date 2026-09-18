@@ -442,8 +442,8 @@ fn a_motions_ticks_are_snapped_to_the_frame_grid_by_the_patch_door() {
         "video.motion.during.period must be at least one tick, not -1"
     );
 
-    // A value already ON the grid that changes nothing is an identity —
-    // `Ok(None)`, no undo step — which is what keeps the snap from turning
+    // A value already ON the grid that changes nothing is an identity — no
+    // undo step, and no sentence — which is what keeps the snap from turning
     // every repeated write into an edit.
     let stored = Handle::from_value(&moving(8, Some(full_motion())));
     stored.refuses(&set_video(json!({ "motion": full_motion() })));
