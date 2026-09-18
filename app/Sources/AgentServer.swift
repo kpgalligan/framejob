@@ -330,15 +330,24 @@ final class AgentServer {
     ///    to 3 cannot see the omission it catches.
     ///
     /// **What it still cannot see.** Nothing validates a call against
-    /// `inputSchema`, and the core publishes op NAMES, not op arguments, so
-    /// a tool whose argument has the wrong TYPE — `add_text_clip`'s `text`
-    /// declared `string` against the op's `text?: object` — passes all
-    /// three. What guards that is the argument vocabulary in
-    /// `AgentServer+Arguments.swift`, which now refuses a present value of
-    /// the wrong type instead of reading it as absent; a drift of that kind
-    /// then surfaces as an error on the first call rather than as a silently
-    /// dropped argument. Publishing the argument names too would close it
-    /// here, and wants a second table in `edit.rs` to be worth its keep.
+    /// `inputSchema`, and these four parts compare NAMES, so a tool whose
+    /// argument has the wrong TYPE — `add_text_clip`'s `text` declared
+    /// `string` against the op's `text?: object`, the drift road map 7's D3
+    /// took as its first example — passes all four. What guards that today
+    /// is the argument vocabulary in `AgentServer+Arguments.swift`, which
+    /// refuses a present value of the wrong type instead of reading it as
+    /// absent; a drift of that kind then surfaces as an error on the first
+    /// call rather than as a silently dropped argument.
+    ///
+    /// **Half the gap is closed and half is not.** The core now publishes
+    /// its op table's ARGUMENTS as well as its names (`rc_op_schemas`), and
+    /// the CLIP group's forty-three tools print that table rather than
+    /// restating it (`AgentCatalog+Clips.swift`), so there is nothing left
+    /// there to drift. The four other groups still declare their own, and a
+    /// FIFTH part comparing every op tool's declared arguments to the core's
+    /// — plus the injected envelope keys, plus `AgentServer.declarations` —
+    /// is the D3 ticket after this one; it waits because until every group
+    /// has migrated it would complain about the ones that have not.
     private static func catalogParityFailure(_ catalog: String) -> String? {
         guard
             let tools = (try? JSONSerialization.jsonObject(with: Data(catalog.utf8)))

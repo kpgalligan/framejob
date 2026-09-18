@@ -84,6 +84,44 @@ extension AgentServer {
         ]
     }
 
+    /// One OP tool: `tool` above, with every argument's STRUCTURE printed
+    /// from the core's published table instead of written here (road map
+    /// 7's D3).
+    ///
+    /// `prose` is what the core cannot know, keyed by argument name — what
+    /// the argument is FOR, the menu item the tool mirrors, the default it
+    /// takes from the playhead. The kind, the constraints, the closed
+    /// vocabulary and the required list arrive from `Self.opSchemas`, and
+    /// where a tool deliberately takes more or less than its op does, the
+    /// difference is a row in `AgentCatalog+Declarations.swift` with a
+    /// reason beside it. **The core says what an argument IS; this says
+    /// what it is FOR.**
+    ///
+    /// It goes through `tool`, not beside it, so the envelope's two
+    /// injected keys are the same code and cannot come to differ: `project`
+    /// on every tool, `scope` on every name the core calls an op.
+    ///
+    /// The old form keeps working untouched — the eight other groups have
+    /// not migrated, and this is the expand half.
+    func opTool(
+        _ name: String, _ description: String, _ prose: [String: String]
+    ) -> [String: Any] {
+        let published = Self.opSchemas[name] ?? ReelOpSchema(properties: [:], required: [])
+        let input = Self.declaredInput(of: name, published, prose)
+        return tool(name, description, input.properties, required: input.required)
+    }
+
+    /// Every op's ARGUMENTS as the core declares them, read once through
+    /// `rc_op_schemas` (`ReelOp.coreSchemas()` → `core/src/op_schema.rs`).
+    ///
+    /// A `static let` for `opNames`' reason: the FFI call and the JSON
+    /// decode behind it happen once per process rather than once per op
+    /// tool. `catalogJSON()` refuses to build a catalog on a map that is
+    /// not exactly the core's op list, which is the same posture — and the
+    /// same kind of silent catastrophe — as the empty-`opNames` guard
+    /// below.
+    static let opSchemas: [String: ReelOpSchema] = ReelOp.coreSchemas()
+
     /// Every op the CORE declares, read once through `rc_op_names`
     /// (`ReelOp.coreNames()` → `OP_NAMES` in `core/src/edit.rs`).
     ///
@@ -165,25 +203,50 @@ extension AgentServer {
                     + "given the scope argument that edits inside a nest. The agent server "
                     + "was not started.")
         }
+        // The same posture one export along: every migrated op tool PRINTS
+        // the core's published arguments (`opTool`), so a schema map that
+        // is not exactly the op list builds tools that quietly declare no
+        // arguments at all — every call refused for a missing one, which
+        // reads as a core bug rather than as a failed FFI read. The core
+        // keys this map by `OP_NAMES` itself (`core/src/op_schema.rs`), so
+        // this can only fire on a read that went wrong.
+        guard Set(Self.opSchemas.keys) == Self.opNames else {
+            let missing = Self.opNames.subtracting(Self.opSchemas.keys).sorted()
+            let extra = Set(Self.opSchemas.keys).subtracting(Self.opNames).sorted()
+            throw ToolFailure(
+                message: "The core's op schemas (rc_op_schemas) are not its op names — with "
+                    + "no schema: \(missing); with no op: \(extra). Every op tool prints its "
+                    + "arguments from that table, so the agent server was not started.")
+        }
         let ticks = Self.ticksNote
+        // The four hoisted locals a SECOND group also asks for. Each is now
+        // a sentence first and a property built from it, because a migrated
+        // tool takes the prose alone — the structure is the core's — while
+        // the groups that have not migrated still take the whole property.
+        // One spelling either way, which is the point of hoisting them.
+        let trackDescription = "Track id (get_project lists them)."
         let trackProperty: [String: Any] = [
-            "type": "integer", "description": "Track id (get_project lists them).",
+            "type": "integer", "description": trackDescription,
         ]
         // The two colour-only ARGUMENTS — `set_canvas`'s background and
         // `add_background`'s plate colour. FOUR numbers since deepening D1·4,
         // not three or four: the alpha is never filled in and a component
         // outside 0–1 is never clamped, because the core is the one validator
         // of a colour now and it names what it refused.
+        let colorDescription: (String) -> String = { role in
+            "\(role) as [r, g, b, a], each 0–1. Four numbers exactly: "
+                + "three is refused by length and a component outside the range is "
+                + "refused by name, neither filled in nor clamped."
+        }
         let colorProperty: (String) -> [String: Any] = { role in
             [
                 "type": "array", "items": ["type": "number"], "minItems": 4, "maxItems": 4,
-                "description": "\(role) as [r, g, b, a], each 0–1. Four numbers exactly: "
-                    + "three is refused by length and a component outside the range is "
-                    + "refused by name, neither filled in nor clamped.",
+                "description": colorDescription(role),
             ]
         }
+        let clipDescription = "Clip id (get_project lists them)."
         let clipProperty: [String: Any] = [
-            "type": "integer", "description": "Clip id (get_project lists them).",
+            "type": "integer", "description": clipDescription,
         ]
 
         var catalog: [[String: Any]] = [
@@ -322,12 +385,12 @@ extension AgentServer {
         // The clip and action rows are `AgentCatalog+Clips.swift`'s, spliced in HERE
         // rather than appended, because the catalog's order is the order an agent reads
         // the tools in. The four locals it is handed are the ones a LATER group asks
-        // for too — `clipProperty` is hoisted here for exactly that reason, since the
-        // transition rows below take the same one — which is why they stayed on this
-        // side of the cut.
+        // for too — the clip SENTENCE is hoisted here for exactly that reason, since
+        // the transition rows below take the property built from it — which is why
+        // they stayed on this side of the cut.
         catalog += clipAndActionTools(
-            ticks: ticks, trackProperty: trackProperty, colorProperty: colorProperty,
-            clipProperty: clipProperty)
+            ticks: ticks, trackDescription: trackDescription,
+            colorDescription: colorDescription, clipDescription: clipDescription)
         // The two transition rows go HERE, beside `set_transition` and
         // `set_transition_duration` at the end of that group, and never at
         // the end of the catalog — `recording_probe.py` reads the last

@@ -106,9 +106,15 @@ pixel or sample work in Rust; no ffmpeg dependency in the product.
 - Edits are JSON ops through `rc_project_apply`. **The op table is two
   halves**: what an op MEANS is the module doc of `core/src/edit.rs`, and
   what it TAKES — every argument's name, kind and required-ness — is
-  `core/src/op_table.rs`, as data. `ReelOps.swift`'s typed builders,
+  `core/src/op_table.rs`, as data, published as JSON Schema by
+  `rc_op_schemas`. `ReelOps.swift`'s typed builders,
   `AgentCatalog*.swift`'s tools and spec §6 mirror them — change one, change
-  all four. The envelope's `scope` key addresses an edit inside a nest.
+  all four — **except that the clip group's tools PRINT the arguments half
+  instead of restating it** (`AgentCatalog.opTool`), so an argument added to
+  one of those ops costs a sentence of prose there and no schema. A tool that
+  takes more or less than its op does says so in
+  `AgentCatalog+Declarations.swift`, one row and one reason each. The
+  envelope's `scope` key addresses an edit inside a nest.
 - Persisted-state changes bump `RC_FORMAT_VERSION` in `core/src/format.rs`
   **and** the header.
 - Errors: `rc_project_apply` returns NULL three distinguishable ways, and the

@@ -19,8 +19,8 @@ detail there.
   the `dictionary` extensions on the property types and the typed patches.
   It is also where the op table is read BACK: `ReelOp.coreNames()` over
   `rc_op_names`, and `ReelOp.coreSchemas()` over `rc_op_schemas` — every
-  op's ARGUMENTS as JSON Schema, keyed by op name. Nothing in the app calls
-  `coreSchemas()` yet; the catalog reads it in a later D3 ticket.
+  op's ARGUMENTS as JSON Schema, keyed by op name, which
+  `AgentCatalog.opTool` prints for the clip group's forty-three tools.
   `deinit` frees the Rust allocation. It also holds **the one read of
   `rc_project_apply`'s TWO message channels**, in the header's own order — a
   sentence is a refusal, an error message is invalid input, neither written
@@ -392,9 +392,26 @@ free.
   `Tracks` / `Media` / `Render` / `History` / `Silence` / `Captions` / `Audio`
   / `Background` / `Scope` / `Transitions` / `Recording`
   (+`RecordingArguments`, +`RecordingResult`) — the handlers, one file per
-  group. `AgentCatalog.swift` (+`Clips`, +`Audio`, +`Transitions`, +`Files`)
-  — the catalog, spliced in ORDER (`recording_probe.py` reads the last
-  eleven names). `target(_:)` resolves the implicit document through
+  group. `AgentCatalog.swift` (+`Clips`, +`Audio`, +`Transitions`, +`Files`,
+  +`Declarations`) — the catalog, spliced in ORDER (`recording_probe.py`
+  reads the last eleven names). **A tool is built one of two ways**: `tool`,
+  which declares its own schema, or `opTool`, which declares PROSE and prints
+  the argument STRUCTURE from the core's published table (`Self.opSchemas`
+  over `rc_op_schemas`). The clip group is `opTool`'s and carries no
+  `"type"`, no `"enum"` and no hand-written required list; the four other
+  groups and every app-state tool are still `tool`'s. `opTool` goes THROUGH
+  `tool`, so `project` and `scope` are injected by one piece of code either
+  way. `AgentCatalog+Declarations.swift` is the one list of places a tool
+  deliberately takes more or less than its op does — a bare-string body, a
+  boolean's string spellings, a null that MEANS something, a range the core
+  clamps to rather than refusing, a default taken from app state, a list the
+  tool will not take empty — each row carrying the op, the argument, what
+  the app adds and why, and the schema DECLARES it. A new row is a decision
+  with a reason, like an entry in `opsWithoutTools`; a leniency the tools
+  have never declared is not a row until someone decides to OFFER it,
+  because a schema narrower than what is accepted costs a caller nothing
+  where a wider one is a promise the app breaks.
+  `target(_:)` resolves the implicit document through
   `NSApp.orderedDocuments`, never `documents.first`, and an explicit path
   through `AgentServer.canonical`. `offMainTools` names the handlers that
   wait for something the main thread must deliver (`import_media`,

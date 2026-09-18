@@ -188,6 +188,7 @@ python3 tools/proof/phase8_proof.py 4823
 python3 tools/proof/phase9_proof.py 4823
 python3 tools/proof/patch_door_proof.py 4823
 python3 tools/proof/refusal_proof.py 4823
+python3 tools/proof/clip_catalog_proof.py 4823
 ```
 
 **Phase 9 takes a SECOND argument**, the log path, defaulting to
@@ -2499,9 +2500,9 @@ down rather than rediscovered.
 `python3 tools/proof/op_schema_probe.py`, no port and no running app. Road
 map 7's D3·2 publishes every op's ARGUMENTS as JSON Schema through
 `rc_op_schemas`, and `ReelOp.coreSchemas()` is the app's one reader of it.
-**Nothing in the app calls that reader yet** — the catalog is migrated in a
-later D3 ticket and `tools/list` returns exactly the schemas it always did —
-so there is no MCP surface to measure, and the instrument is `CLAUDE.md`'s
+It measures the EXPORT rather than what any caller does with it — what the
+catalog does with it is `clip_catalog_proof.py` below — so the instrument is
+`CLAUDE.md`'s
 answer for app STRUCTURE with no caller a script can reach: a probe compiled
 out of `app/Sources` over `harness/build.sh`'s own swiftc line, cached on
 modification times, a build failure scored as a FAILURE rather than an exit.
@@ -2531,3 +2532,45 @@ decoder, not a list retyped here.
 The twelve kind rows are the only literals, and they are about the MAPPING
 rather than about which arguments exist: they are the one claim a probe
 reading the core's own answer cannot make about itself.
+
+## The clip tools against the table (`clip_catalog_proof.py`)
+
+`python3 tools/proof/clip_catalog_proof.py <port>`, against a running
+instance. Road map 7's D3·3 migrated the clip group's 43 op tools to PRINT
+the core's table instead of restating it, and this measures the identity
+that makes that safe from two independent sides: the CATALOG, read over MCP
+off `tools/list` from the running binary, and the TABLE, read out of the
+staticlib by a probe of its own (`coreSchemas()` plus
+`AgentServer.declarations`, built the way `op_schema_probe.py` builds its
+probe and scored the same way when it will not compile). **22/22** at D3·3
+(#17). The probe is built BEFORE the first MCP call, so no swiftc runs while
+the proof is driving the app.
+
+**No argument name is written in the script.** The expectation is computed
+from the table and the declarations by an oracle written in Python rather
+than imported, so a bug in the Swift merge is a failure and not a shared
+opinion; the only names typed are the two ends of the clip group in catalog
+order (`add_clip` … `remove_action`, which is how the group is found without
+a list of 43) and the ops the behavioural section drives, and both are
+checked against the core's op list first.
+
+Four sections. **The group**: the run between those two ends holds exactly
+43 op tools and 2 composites, the composites found by asking the core which
+names it calls ops. **The identity**: every one of the 43 declares exactly
+the core's arguments, kinds, enums, minimums and required list, plus the
+injected `project` and `scope`, modified only by what the declarations list
+names; descriptions are checked for EXISTING, never for content, because
+what an argument is FOR is the app's. **The vocabularies**: the four a
+HANDLER still parses by name — a transition kind, a zoom fit, a curve,
+`paste_attributes`'s groups — against the `enum` the core now publishes,
+which is the one tie the migration would otherwise have cut. **The
+declarations**: each row is true of the running app — the bare-string bodies
+work AND are declared (which is the row a widening deleted from the list
+falls to, since the catalog and the oracle would otherwise still agree with
+each other), a boolean takes `"false"`, the two meaningful nulls are taken
+and required, an empty clip list is refused by name, and `split` takes the
+playhead although the core requires `at`.
+
+It does NOT claim that `set_speed` clamps a rate rather than refusing it:
+that needs a media clip, this script makes none, and the claim is the core's
+own in `core/tests/op_table.rs`.

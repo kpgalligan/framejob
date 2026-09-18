@@ -3505,7 +3505,7 @@ stop re-typing argument names in Python.
 
 ### 8.3 D3·3 — the clip tools read the core (kpgalligan/reelcut#17)
 
-**Commits.** `PLACEHOLDER_ONE` (the prefactor: the table's bound) and
+**Commits.** `a14f39e` (the prefactor: the table's bound) and
 `PLACEHOLDER_TWO` (the migration, the declarations list and the proof).
 
 **The ticket's amendment, and why it came first.** #16 measured two facts
@@ -3545,3 +3545,131 @@ agent — then sends the ends themselves and insists they draw no such answer.
 A bound nothing enforces is what it is really for: a row published for
 `rate` would fail at the first probe, because the core would apply 0.05 and
 say nothing.
+
+
+#### The migration — forty-three tools stop restating the table
+
+`AgentCatalog.swift` gained `opTool(_:_:_:)` beside `tool(_:_:_:required:)`:
+it takes the tool's prose and **a sentence per argument**, and merges the
+structure — kind, constraints, closed vocabulary, required list — in
+underneath from `Self.opSchemas` (`rc_op_schemas`, read once per process).
+It goes THROUGH `tool` rather than beside it, so `project` and `scope` are
+injected by one piece of code and cannot come to differ; `scope` is still
+gated on the core's own op list. The old form keeps working and the four
+other groups have not moved — this is the expand half, and the contract is
+#19's.
+
+**The line counts, which were an acceptance criterion.**
+
+| File | Before | After |
+|---|---|---|
+| `AgentCatalog+Clips.swift` | 941 | **791** |
+| `AgentCatalog.swift` | 472 | 535 |
+| `AgentCatalog+Declarations.swift` | — | 254 (new, under the 400 cap) |
+| `AgentCatalog+Audio.swift` · `+Transitions.swift` · `+Files.swift` | 117 · 112 · 609 | unchanged |
+
+The over-cap file came DOWN 150 lines for the first time, and not by moving
+anything: what went is hand-written structure. Gone from it are every
+`"type"`, every `"enum"` and every `required:` list — counted with `grep -o`
+before and after: **`"type":` 75 → 2, `"enum":` 5 → 0, `required: [` 41 → 0,
+`"minItems":` 5 → 1** — along with `transitionEnum`, `curveNames`,
+`rangesProperty`, `zoomRegionProperty` and `groupsProperty`, four of which
+existed only to carry structure the core now publishes. What is left is
+`clipsProperty`, whose two `"type"`s and one `minItems` are the two
+composites' (`detect_silence`, `normalize_clip`), which have no op behind
+them. **The declarations list is `AgentCatalog+Declarations.swift`**, eleven rows,
+each carrying the op, the argument, what the app adds and why. It takes the
+shape of `opsWithoutTools`, the empty "ops that deliberately have no tool"
+list, and it covers five kinds of difference rather than shorthands alone:
+
+| What the app adds | Rows |
+|---|---|
+| a bare string where the op takes a patch | `add_text_clip.text`, `add_shape_clip.shape` |
+| the string spellings of a whole KIND | every `boolean` argument (`boolArg` reads `"true"`, `"1"`, `"false"`, `"0"`) |
+| a null that MEANS something, and the required-ness that protects it | `set_transition.kind`, `add_zoom_action.region` |
+| a range the core CLAMPS to rather than refusing | `set_speed.rate`, 0.1–10 |
+| a default the app takes from its own state | `split.at`, `paste.at`, `freeze_frame.at` |
+| a list the tool will not take empty | every `clips` argument, `paste_attributes.groups` |
+
+Three of those are the amendment's; three are what the before/after capture
+found would otherwise have got WORSE. **The two required-ness directions are
+opposite mistakes** and both had to be said: a null that means something must
+not be reachable by FORGETTING the key (the core reads an absent argument and
+an explicit null the same way, so a forgotten `region` would silently be a
+zoom BACK), and a default the app takes from the playhead must not be made
+compulsory by the core's word (`split`'s `at` is `req` in the table and ⌘K
+takes the playhead).
+
+**A number read as a boolean is deliberately NOT declared.** `boolArg` also
+answers an `NSNumber`, which is bridging rather than a spelling the
+vocabulary chose, and the same goes for the older leniencies no tool has ever
+declared — a lone id read as a one-element list, an id spelled as a string, a
+bare `[from, to]` read as one range. The direction is the rule, and it is
+written into the list's doc: **a schema narrower than what is accepted costs
+a caller nothing; one wider than what is accepted is a promise the app
+breaks.**
+
+**The before/after capture, and every difference it found.** `tools/list`
+was captured from the binary built at `f3a8d06` and from the migrated one on
+the same client, 77 tools each, the catalog's ORDER byte-identical and every
+tool description and every argument description identical word for word.
+Forty tools differ, in exactly five ways — three fixes, one declared
+widening, one loss taken on purpose:
+
+| # | What an agent saw | What it sees now | Where | Verdict |
+|---|---|---|---|---|
+| 1 | an id declared `{"type": "integer"}` | `minimum: 0` beside it | 34 arguments (`clip` ×19, `track` ×8, `media` ×4, `action` ×3) and the `items` of 12 `clips` lists | **fix** — spec #14's user story 9: a negative id was an error a caller could have avoided |
+| 2 | `ripple_delete_ranges.ranges` declared `minItems: 1` | no minimum | 1 | **fix** — the same tool's own description says "an empty list … changes nothing", which is an identity. The schema and the prose contradicted each other and the schema was the one that was wrong |
+| 3 | a boolean declared `{"type": "boolean"}` | `["boolean", "string"]` | `set_speed.keep_pitch`, `set_reversed.reversed`, `set_enabled.video`, `set_enabled.audio` | **declared** — `boolArg` has always read `"true"` and `"0"`; now an agent can SEE it |
+| 4 | `add_zoom_action.region` with no `additionalProperties` | `additionalProperties: false` | 1 | **fix** — `ZoomRegion`'s `Deserialize` is `deny_unknown_fields`, so a `widht` really is refused by name, and the tool never said so |
+| 5 | a description on each of `region`'s four members | the core's four members, undescribed | 1 | **a loss, taken** — a region's members are part of a VALUE and not arguments (CONTEXT.md), the core declares them, and the argument's own prose already says x and y are the CENTRE and width and height the size |
+
+**The confessed drift was already gone**, which the capture is how we know
+rather than assume. `AgentServer.swift`'s parity-check doc named
+`add_text_clip`'s `text` declared `string` against an `object` as the thing
+four name-comparisons cannot see; the tool has declared `["object",
+"string"]` since deepening D1, so the migration changed nothing there. The
+doc comment was corrected to say so and to say which half of the gap D3 has
+now closed.
+
+**One tie the migration would have cut, and did not.** Four vocabularies are
+parsed by NAME in a handler's refusal — `TransitionKind`, `Curve`, `ZoomFit`
+and `AgentServer.attributeGroups` — and three of them used to reach the
+schema from those same Swift lists, which made schema and refusal agree by
+construction. The schema is the core's now, so the proof compares each Swift
+list to the core's published `enum` instead: the tie is checked where it used
+to be structural.
+
+**The proof.** `tools/proof/clip_catalog_proof.py`, **22/22**, over MCP
+against the built binary, with a probe of its own for the other side of the
+identity — `coreSchemas()` and `AgentServer.declarations`, compiled out of
+`app/Sources` over `harness/build.sh`'s swiftc line and built BEFORE the
+first MCP call. **No argument name is written in the script**: the
+expectation is computed from the table and the declarations by an oracle
+written in Python rather than imported, so a bug in the Swift merge is a
+failure rather than a shared opinion. The only names typed are the two ends
+of the clip group in catalog order — which is how the 43 are found without a
+list of 43 — and the ops the behavioural section drives, both checked
+against the core's op list first. Its sections are the group, the identity
+(all 43), the four vocabularies, and every declaration put to the running
+app: the bare-string bodies work AND are declared, a boolean takes
+`"false"`, `set_transition`'s null CLEARS a transition it first set, both
+meaningful nulls are refused when left out, an empty clip list is refused by
+name, and `split` takes the playhead.
+
+**What it deliberately does not claim**: that `set_speed` CLAMPS rather than
+refusing. That needs a media clip and this script makes none; the claim is
+the core's own, in the bound test above.
+
+**Verified.** `make test` **670 passed / 0 failed** (669 before, +1);
+`cargo fmt --check` clean; `make lint` clean; `make typecheck` 0 errors and
+exactly the four known AVFoundation warnings; `make app` BUILD SUCCEEDED;
+the built binary launched on port 4854 and `grep "Reelcut: "` on its log
+printed nothing — the startup parity check is unchanged, and its fifth part
+is #19's.
+
+**The mutants.** PLACEHOLDER_MUTANTS
+
+**Owed.** The fifth part of the parity check and the shared `tools/list`
+schemas accessor (#19); the four other catalog groups; and the proof scripts
+that still re-type argument names in Python.

@@ -338,6 +338,14 @@ fn every_closed_vocabulary_answers_with_its_own_members() {
 /// this test is really for: `set_speed`'s `rate` CLAMPS to 0.1–10 rather
 /// than refusing, so a row that published it would fail here at the first
 /// probe — the core would apply 0.05 and say nothing.
+///
+/// **The probe has to REACH the range check**, which today it does because
+/// the only bounded argument belongs to `set_canvas`, an op the blank
+/// project above runs. A bound on an op whose baseline envelope is refused
+/// earlier — a clip op, where `value_of(Id)` names a clip this project has
+/// not got — would fail here on that earlier answer instead. The fix then
+/// is to give this test a project that op can run on, never to soften what
+/// it asserts.
 #[test]
 fn every_published_bound_is_one_the_core_refuses_outside() {
     let project = project();
