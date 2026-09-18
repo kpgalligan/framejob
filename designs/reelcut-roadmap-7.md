@@ -3333,7 +3333,7 @@ argument names in Python.
 ### 8.2 D3·2 — the table goes out through the FFI (kpgalligan/reelcut#16)
 
 **Commits.** `ca84058` (the ticket), `b71d71b` (the probe's required-ness
-claim and the mutant table) and `PLACEHOLDER_THREE` (what the review found,
+claim and the mutant table) and `18cd231` (what the review found,
 below).
 
 **What landed.** The table leaves the core. No catalog file and no
