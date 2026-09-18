@@ -2542,7 +2542,7 @@ that makes that safe from two independent sides: the CATALOG, read over MCP
 off `tools/list` from the running binary, and the TABLE, read out of the
 staticlib by a probe of its own (`coreSchemas()` plus
 `AgentServer.declarations`, built the way `op_schema_probe.py` builds its
-probe and scored the same way when it will not compile). **22/22** at D3·3
+probe and scored the same way when it will not compile). **23/23** at D3·3
 (#17). The probe is built BEFORE the first MCP call, so no swiftc runs while
 the proof is driving the app.
 
@@ -2564,7 +2564,9 @@ what an argument is FOR is the app's. **The vocabularies**: the four a
 HANDLER still parses by name — a transition kind, a zoom fit, a curve,
 `paste_attributes`'s groups — against the `enum` the core now publishes,
 which is the one tie the migration would otherwise have cut. **The
-declarations**: each row is true of the running app — the bare-string bodies
+declarations**: every row still names an op and an argument the core has —
+the staleness check `AgentServer.opsWithoutTools` has and this list has not —
+and each row is true of the running app: the bare-string bodies
 work AND are declared (which is the row a widening deleted from the list
 falls to, since the catalog and the oracle would otherwise still agree with
 each other), a boolean takes `"false"`, the two meaningful nulls are taken

@@ -343,11 +343,10 @@ final class AgentServer {
     /// its op table's ARGUMENTS as well as its names (`rc_op_schemas`), and
     /// the CLIP group's forty-three tools print that table rather than
     /// restating it (`AgentCatalog+Clips.swift`), so there is nothing left
-    /// there to drift. The four other groups still declare their own, and a
-    /// FIFTH part comparing every op tool's declared arguments to the core's
-    /// — plus the injected envelope keys, plus `AgentServer.declarations` —
-    /// is the D3 ticket after this one; it waits because until every group
-    /// has migrated it would complain about the ones that have not.
+    /// there for these four parts to miss. The four other groups still
+    /// declare their own arguments by hand, which is why there is no fifth
+    /// part here comparing a tool's declared arguments to the core's: it
+    /// would name every one of them.
     private static func catalogParityFailure(_ catalog: String) -> String? {
         guard
             let tools = (try? JSONSerialization.jsonObject(with: Data(catalog.utf8)))

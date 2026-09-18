@@ -3505,9 +3505,10 @@ stop re-typing argument names in Python.
 
 ### 8.3 D3·3 — the clip tools read the core (kpgalligan/reelcut#17)
 
-**Commits.** `a14f39e` (the prefactor: the table's bound) and
-`e6c600b` (the migration, the declarations list and the proof) and
-`PLACEHOLDER_THREE` (the mutants and what the review found, below).
+**Commits.** `a14f39e` (the prefactor: the table's bound), `e6c600b` (the
+migration, the declarations list and the proof) and `a9e487c` (the mutants
+and the neighbouring proofs), with the review's fixes in the commit named at
+the foot of this section.
 
 **The ticket's amendment, and why it came first.** #16 measured two facts
 that would have made two tools WORSE on the way through, so the ticket
@@ -3566,7 +3567,7 @@ other groups have not moved — this is the expand half, and the contract is
 |---|---|---|
 | `AgentCatalog+Clips.swift` | 941 | **791** |
 | `AgentCatalog.swift` | 472 | 535 |
-| `AgentCatalog+Declarations.swift` | — | 254 (new, under the 400 cap) |
+| `AgentCatalog+Declarations.swift` | — | 273 (new, under the 400 cap) |
 | `AgentCatalog+Audio.swift` · `+Transitions.swift` · `+Files.swift` | 117 · 112 · 609 | unchanged |
 
 The over-cap file came DOWN 150 lines for the first time, and not by moving
@@ -3623,7 +3624,25 @@ widening, one loss taken on purpose:
 | 2 | `ripple_delete_ranges.ranges` declared `minItems: 1` | no minimum | 1 | **fix** — the same tool's own description says "an empty list … changes nothing", which is an identity. The schema and the prose contradicted each other and the schema was the one that was wrong |
 | 3 | a boolean declared `{"type": "boolean"}` | `["boolean", "string"]` | `set_speed.keep_pitch`, `set_reversed.reversed`, `set_enabled.video`, `set_enabled.audio` | **declared** — `boolArg` has always read `"true"` and `"0"`; now an agent can SEE it |
 | 4 | `add_zoom_action.region` with no `additionalProperties` | `additionalProperties: false` | 1 | **fix** — `ZoomRegion`'s `Deserialize` is `deny_unknown_fields`, so a `widht` really is refused by name, and the tool never said so |
-| 5 | a description on each of `region`'s four members | the core's four members, undescribed | 1 | **a loss, taken** — a region's members are part of a VALUE and not arguments (CONTEXT.md), the core declares them, and the argument's own prose already says x and y are the CENTRE and width and height the size |
+| 5 | a description on each of `region`'s four members | the core's four members, undescribed | 1 | **a loss, taken** — see below |
+
+**The one loss, which is the only acceptance criterion this ticket did not
+meet in full.** "Every migrated tool keeps its description prose, word for
+word" holds for every tool description and every ARGUMENT description;
+diffing the two files' string literals, exactly three sentences went and none
+arrived, all three inside `add_zoom_action`'s region: `"The region's CENTRE,
+source px."` (twice, on `x` and `y`), `"Its width in source px."` and `"Its
+height in source px."`. Those are descriptions of a VALUE's members, not of
+an argument — CONTEXT.md draws exactly that line — and the core is what
+declares and refuses those four members, so they now arrive from
+`op_schema.rs` undescribed. **No fact went with them**: the argument's own
+sentence, kept word for word, already says "in SOURCE pixels: x and y are its
+CENTRE measured from the centre of the clip's cropped rect … and width and
+height its size". The alternative was a deep merge for nested `properties` in
+`AgentDeclaration.applied(to:)`, six lines used by one row, to restore three
+sentences that repeat the one above them and to put the app back in the
+business of describing members the core owns; it was rejected for that, and
+the loss recorded here instead.
 
 **The confessed drift was already gone**, which the capture is how we know
 rather than assume. `AgentServer.swift`'s parity-check doc named
@@ -3641,7 +3660,8 @@ construction. The schema is the core's now, so the proof compares each Swift
 list to the core's published `enum` instead: the tie is checked where it used
 to be structural.
 
-**The proof.** `tools/proof/clip_catalog_proof.py`, **22/22**, over MCP
+**The proof.** `tools/proof/clip_catalog_proof.py`, **23/23** (22 before the
+review added the staleness row below), over MCP
 against the built binary, with a probe of its own for the other side of the
 identity — `coreSchemas()` and `AgentServer.declarations`, compiled out of
 `app/Sources` over `harness/build.sh`'s swiftc line and built BEFORE the
@@ -3676,12 +3696,14 @@ claim, checked by a script written before the migration existed;
 `phase9_proof.py` **216/216** re-derives the injected `scope` over the wire,
 including `trim_start`'s `{"type": "integer", "minimum": 0}`, which is a
 migrated tool's envelope key; `op_schema_probe.py` **28/28**, unchanged by
-the bound because none of its twelve kind rows is a canvas dimension.
+the bound because none of its twelve kind rows is a canvas dimension. The
+review's fixes changed no published schema: `tools/list` was captured again
+afterwards and is byte-identical to the capture above.
 
 **The mutants.** Four deliberate failures, each run from the committed tree
 and reverted with `git checkout`, each caught by exactly ONE row of the proof
-and each at 21/22 — which is the point: a mutant that took two rows down
-would mean the rows were not independent.
+and each at 21/22 against the 22 rows it then had — which is the point: a
+mutant that took two rows down would mean the rows were not independent.
 
 | Mutant | Row that caught it |
 |---|---|
@@ -3689,6 +3711,53 @@ would mean the rows were not independent.
 | the catalog strips every `enum` on its way out of `declaredInput` | *all 43 declare exactly the core's arguments, kinds, enums, minimums and required list* |
 | `split.at`'s required-ness row set back to `.theCores`, so the tool demands what the playhead supplies | *split takes the playhead when `at` is left out* — `required ['at']` |
 | `wipe_down` dropped from the CORE's `Kind::Transition` | *set_transition's kinds* — the core's twelve against `TransitionKind.allCases`'s thirteen. Caught twice over: `core/tests/op_table.rs`'s vocabulary test fails on the same mutant |
+
+**What the review found.** Two axes, fixed point `f3a8d06`, spec source the
+ticket with its amendment plus spec kpgalligan/reelcut#14. The **Spec** axis
+re-ran the Rust suite and re-measured every count in this record rather than
+trusting it (941 → 791, 472 → 535, 254, `"enum":` 0, `required: [` 0,
+`"type":` 2 and both inside `clipsProperty`, 43 `opTool(` calls and no `tool(`
+left in the group), found every checkbox met but the word-for-word one —
+which is the region's three member sentences above — and no material scope
+creep: the two kinds of declaration beyond the amendment's three each
+reproduce a schema the pre-migration catalog already published, which is the
+"what an agent sees should not change" criterion rather than an excess of it.
+
+The **Standards** axis found six things, four of which changed code or
+documents:
+
+- **a row that compiles and does nothing.** `declaredInput` asked "is this
+  row about this argument" three different ways — the widening loop passed
+  the fragment's type, the optional filter passed `nil`, and the required
+  loop bypassed the predicate and matched `.argument` only — so a
+  `.everyArgumentTyped` or `.everyArgumentNamed` row carrying `.required` or
+  `.optional` would have been silently inert. One `rows(about:)` predicate
+  now answers it everywhere, asked with the CORE's own published type rather
+  than with a type a previous row may have widened, so the answer does not
+  depend on the order rows are applied in either. The Python oracle carried
+  the same asymmetry and was fixed with it — the two are independent
+  implementations, not independent mistakes;
+- **the declarations list had no staleness check**, where `opsWithoutTools`
+  has one: a row naming a renamed op or argument would go inert with nothing
+  to say so. The proof now asks the same question of the core's table, and
+  the count rose to 23;
+- **the size ledger was stale for a file this ticket touched** —
+  `AgentServer.swift` 771 → 779, eight lines of doc comment;
+- **`PLACEHOLDER_THREE` in this record's own Commits line**, which is exactly
+  the omission `e7c1883` exists to fix for D3·1;
+- **status prose in a frozen file**: the parity check's doc comment said
+  which ticket the fifth part waits for and why. It now says what is true of
+  the code — the four other groups declare their own arguments, which is why
+  no fifth part is here — and the scheduling is this document's.
+
+Two were judged not real. **`alsoKeys` is a blind merge that could relax a
+bound the core published**: true, and the rule ("a row may narrow what the
+core published and never relax it") is now written at the merge rather than
+enforced, because a guard that silently dropped the key would put a row in
+the list that does nothing — the very trap the first finding was. And
+**`opTool` not checking its prose keys against the published arguments**, so
+a misspelt key drops a description in silence: that is the fifth parity
+part's job and #14 sequences it there on purpose.
 
 **Owed.** The fifth part of the parity check and the shared `tools/list`
 schemas accessor (#19); the four other catalog groups; and the proof scripts

@@ -225,27 +225,31 @@ def widened(declaration, fragment):
 
 
 def expected_input(op, table, declarations):
-    """What the tool for `op` must declare, structure only."""
+    """What the tool for `op` must declare, structure only.
+
+    One predicate answers "which rows are about this argument", asked with
+    the CORE's own published type — a row may name a kind, and the answer
+    must not depend on which row was applied first."""
+    def rows(argument):
+        published = table[op]["properties"].get(argument, {})
+        return [d for d in declarations
+                if covers(d, op, argument, published.get("type"))]
+
     properties = {}
     for argument, fragment in table[op]["properties"].items():
         property = fragment
-        for declaration in declarations:
-            if covers(declaration, op, argument, fragment.get("type")):
-                property = widened(declaration, property)
+        for declaration in rows(argument):
+            property = widened(declaration, property)
         properties[argument] = property
     required = [
         argument for argument in table[op]["required"]
-        if not any(
-            covers(d, op, argument, None) and d["requirement"] == "optional"
-            for d in declarations)
+        if not any(d["requirement"] == "optional" for d in rows(argument))
     ]
-    for declaration in declarations:
-        subject = declaration["subject"]
-        if declaration["requirement"] != "required" or subject["kind"] != "argument":
+    for argument in sorted(properties):
+        if argument in required:
             continue
-        if subject["op"] == op and subject["name"] in properties \
-                and subject["name"] not in required:
-            required.append(subject["name"])
+        if any(d["requirement"] == "required" for d in rows(argument)):
+            required.append(argument)
     return properties, required
 
 
@@ -277,8 +281,13 @@ def main():
     declarations = answer["declarations"]
 
     mcp = MCP(port)
-    tools = {tool["name"]: tool for tool in mcp._request("tools/list", {})["tools"]}
-    order = [tool["name"] for tool in mcp._request("tools/list", {})["tools"]]
+    # One read of the catalog, kept both ways round: the ORDER is what finds
+    # the clip group, and the map is what every check below reads. (`mcp.py`
+    # answers names only; the shared schemas accessor is a later ticket's, so
+    # this reaches into the same private request five other scripts do.)
+    listed = mcp._request("tools/list", {})["tools"]
+    tools = {tool["name"]: tool for tool in listed}
+    order = [tool["name"] for tool in listed]
 
     print("\n1 — the group: a contiguous run of the catalog, and the core says which of "
           "it is ops")
@@ -355,6 +364,29 @@ def main():
               f"core {published} vs swift {answer['vocabularies'][key]}")
 
     print("\n4 — every declaration is true of the running app")
+    # `opsWithoutTools` has a staleness check beside it — an entry naming an
+    # op the core does not have is a complaint at startup. The declarations
+    # list has none until the fifth parity part lands, and a row naming a
+    # renamed op or argument would go silently INERT, so the same question
+    # is asked here, of the core's own table.
+    stale = []
+    for declaration in declarations:
+        subject = declaration["subject"]
+        if subject["kind"] == "argument":
+            row = table.get(subject["op"], {}).get("properties", {})
+            if subject["name"] not in row:
+                stale.append(f"{subject['op']}.{subject['name']}")
+        elif subject["kind"] == "everyNamed":
+            if not any(subject["name"] in schema["properties"] for schema in table.values()):
+                stale.append(f"every argument named {subject['name']}")
+        elif not any(fragment.get("type") == subject["type"]
+                     for schema in table.values()
+                     for fragment in schema["properties"].values()):
+            stale.append(f"every argument typed {subject['type']}")
+    check(f"every one of the {len(declarations)} declarations still names something the "
+          "core has — the staleness check `opsWithoutTools` has and this list has not",
+          not stale, json.dumps(stale))
+
     mcp.call("new_project")
     project = mcp.call("get_project")["project"]
     track = project["tracks"][0]["id"]

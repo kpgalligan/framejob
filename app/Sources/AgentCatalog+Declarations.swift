@@ -93,6 +93,16 @@ struct AgentDeclaration {
     /// says `["string", "null"]` and lists only the names contradicts
     /// itself. That is the one rule here that is not a plain overwrite, and
     /// it exists so the null does not cost the tool the core's member list.
+    ///
+    /// **`alsoKeys` is a blind merge, and the rule a row must obey is that
+    /// it may NARROW what the core published and never relax it** — a
+    /// `minimum` tighter than the core's is a truer promise, one looser than
+    /// the core's is a false one, and nothing here can tell the two apart.
+    /// The one row that uses it today (`set_speed.rate`) narrows a kind the
+    /// core published unbounded, which is why the rule is written down
+    /// rather than enforced: a guard that silently dropped the key would put
+    /// a row in the list that does nothing, which is the trap this file's
+    /// one shared predicate exists to avoid.
     func applied(to fragment: [String: Any]) -> [String: Any] {
         var property = fragment
         if !alsoTypes.isEmpty, let core = property["type"] as? String {
@@ -225,11 +235,21 @@ extension AgentServer {
     static func declaredInput(
         of op: String, _ published: ReelOpSchema, _ prose: [String: String]
     ) -> (properties: [String: Any], required: [String]) {
+        // ONE question, asked the same way everywhere below: which rows are
+        // about this argument? The published TYPE is part of the question,
+        // since a row may name a KIND, and it is read from the CORE's own
+        // fragment rather than from a fragment another row has already
+        // widened — so the answer does not depend on the order the rows are
+        // applied in, and a `.required` row on a kind or a name cannot be
+        // silently inert the way a `.argument`-only reading left it.
+        func rows(about argument: String) -> [AgentDeclaration] {
+            let fragment = published.properties[argument] as? [String: Any]
+            return declarations.filter { $0.covers(op, argument, type: fragment?["type"]) }
+        }
         var properties: [String: Any] = [:]
         for (argument, fragment) in published.properties {
             var property = fragment as? [String: Any] ?? [:]
-            for declaration in declarations
-            where declaration.covers(op, argument, type: property["type"]) {
+            for declaration in rows(about: argument) {
                 property = declaration.applied(to: property)
             }
             if let sentence = prose[argument] { property["description"] = sentence }
@@ -237,17 +257,16 @@ extension AgentServer {
         }
         // The core's own order, less what a row calls optional, plus what a
         // row asks for — so a tool's required list stays the table's reading
-        // wherever nothing declares otherwise.
+        // wherever nothing declares otherwise. The additions are read in
+        // ARGUMENT order and not in list order, because `properties` is a
+        // dictionary and a tool's required list may not vary per process.
         var required = published.required.filter { argument in
-            !declarations.contains {
-                $0.covers(op, argument, type: nil) && $0.requirement == .optional
-            }
+            !rows(about: argument).contains { $0.requirement == .optional }
         }
-        for declaration in declarations where declaration.requirement == .required {
-            guard case let .argument(name, of: owner) = declaration.subject, owner == op,
-                properties[name] != nil, !required.contains(name)
+        for argument in properties.keys.sorted() where !required.contains(argument) {
+            guard rows(about: argument).contains(where: { $0.requirement == .required })
             else { continue }
-            required.append(name)
+            required.append(argument)
         }
         return (properties, required)
     }

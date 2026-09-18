@@ -214,9 +214,12 @@ the over-cap file, and the core's own new module, `op_schema.rs` (154), is
 under the 400 cap too. D3·3 migrated the clip group to print that table:
 `AgentCatalog+Clips.swift` went **941 → 791** — still over, and the first
 time it has come DOWN — while `AgentCatalog.swift` (472 → 535) and the new
-`app/Sources/AgentCatalog+Declarations.swift` (254, under the 400 cap) are
+`app/Sources/AgentCatalog+Declarations.swift` (273, under the 400 cap) are
 both under it. That is 150 lines off an over-cap file paid for by deleting
-hand-written structure rather than by moving anything.
+hand-written structure rather than by moving anything. `AgentServer.swift`
+(771 → 779) took eight lines of doc comment correcting what the startup
+parity check says it cannot see, which is inside the frozen file's ~50-line
+allowance.
 Regenerate the list with
 `wc -l app/Sources/*.swift core/src/*.rs | awk '$1>600 && $2!="total"' | sort -rn`
 rather than trusting the numbers here; the standing exemptions are
@@ -245,7 +248,7 @@ row per op.
 | `app/Sources/AgentServer+Clips.swift` | 847 |
 | `core/src/edit.rs` | 838 |
 | `app/Sources/AgentCatalog+Clips.swift` | 791 |
-| `app/Sources/AgentServer.swift` | 771 |
+| `app/Sources/AgentServer.swift` | 779 |
 | `app/Sources/FFmpegRewrap.swift` | 768 |
 | `app/Sources/Loudness.swift` | 742 |
 | `app/Sources/ExportSheetController.swift` | 639 |
