@@ -462,15 +462,26 @@ def main():
           kind == "wipe" and cleared == "" and transition_of(overlapped) is None,
           f"set to {kind!r}, then {cleared[:120]!r}, now {transition_of(overlapped)!r}")
 
-    for op, arguments in [("delete", {"clips": []}), ("split", {"clips": []})]:
+    # Each of the three lists a tool will not take empty, asked the same way:
+    # the REFUSAL and the schema key have to agree, because the oracle above
+    # is built from the same declarations list the catalog is and would move
+    # with it. Only a row that asks the running app can see a declaration
+    # dropped while the behaviour stays — `ranges` is here because it was
+    # dropped exactly that way and no row noticed.
+    for op, argument, arguments in [
+        ("delete", "clips", {"clips": []}),
+        ("split", "clips", {"clips": []}),
+        ("ripple_delete_ranges", "ranges", {"ranges": []}),
+    ]:
         refused = ""
         try:
             mcp.call_with(op, arguments)
         except ToolError as error:
             refused = str(error)
-        check(f"{op} refuses an empty clip list by name, which is what its minItems says",
-              "clips is empty" in refused
-              and tools[op]["inputSchema"]["properties"]["clips"].get("minItems") == 1,
+        check(f"{op} refuses an empty {argument} list by name, which is what its "
+              "minItems says",
+              f"{argument} is empty" in refused
+              and tools[op]["inputSchema"]["properties"][argument].get("minItems") == 1,
               f"refusal {refused[:120]!r}")
 
     mcp.call("set_playhead", t=1200000)

@@ -119,12 +119,12 @@ struct AgentDeclaration {
 extension AgentServer {
 
     /// Every declaration, in one list (`AgentDeclaration`'s doc has the rule
-    /// an entry has to pass). Eleven rows over five kinds of difference: two
+    /// an entry has to pass). Twelve rows over five kinds of difference: two
     /// bare-string shorthands, one reading of a whole JSON kind, two nulls
     /// that mean something, one range the core clamps to rather than
     /// refusing, three times the tool takes from the app what the op would
-    /// have made the caller send, and twice a list the tool will not accept
-    /// empty although the op reads one.
+    /// have made the caller send, and three times a list the tool will not
+    /// accept empty although the op reads one.
     ///
     /// **What is deliberately NOT here.** The argument vocabulary is lenient
     /// in ways no tool has ever declared — a lone id read as a one-element
@@ -205,6 +205,12 @@ extension AgentServer {
             why: "The handler refuses an empty list by name and says which four to choose "
                 + "from. Leaving `groups` out already means every group both clips have, so "
                 + "an empty list cannot be a way of saying \"none\" and is a mistake."),
+        AgentDeclaration(
+            .argument("ranges", of: "ripple_delete_ranges"), alsoKeys: ["minItems": 1],
+            why: "rippleDeleteRanges refuses an empty list by name — \"ranges is empty — name "
+                + "at least one [from, to] pair\" — where the core reads one as an identity. "
+                + "`clips` and `groups` are the same check on the same rule (spec §11's "
+                + "D2-1), and this argument is not a `clips`, so it needs its own row."),
 
         // ---- a default the app takes from its own state --------------------
 
