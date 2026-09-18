@@ -41,14 +41,25 @@ import Foundation
 /// paragraph guessed, and it leaves this file the helper, the project
 /// group, tracks, markers and the canvas, at about 454.
 extension AgentServer {
-    /// One tool. Every tool gets `project` for free: with several projects
-    /// open a call would otherwise be ambiguous, and the property costs
-    /// nothing when only one is.
+    /// One tool, declaring its whole schema. Every tool gets `project` for
+    /// free: with several projects open a call would otherwise be ambiguous,
+    /// and the property costs nothing when only one is.
     ///
-    /// Internal rather than private for one reason and no other:
-    /// `AgentCatalog+Clips.swift` builds forty-five tools with it and
-    /// `AgentCatalog+Files.swift` eleven, and `private` on an extension member
-    /// reaches only its own file.
+    /// **Its own callers are the twenty APP-STATE tools** — the ones with no
+    /// op behind them, which have no row in the core's table to print and so
+    /// spell their arguments out here: the ten of the Projects group below
+    /// (`open_project` … `redo`), the two composites of
+    /// `AgentCatalog+Audio.swift` (`detect_silence`, `normalize_clip`) and
+    /// the eight of `AgentCatalog+Files.swift` (`import_media`,
+    /// `import_captions`, `consolidate_media`, `transcribe`,
+    /// `export_captions`, `render_frame`, `export`, `record_screen`). Every
+    /// op tool is `opTool`'s since road map 7's D3·4, and `opTool` goes
+    /// through here, so this is still where all seventy-seven get `project`
+    /// and where all fifty-seven get `scope`.
+    ///
+    /// Internal rather than private for one reason and no other: three other
+    /// files build tools with it or with `opTool`, and `private` on an
+    /// extension member reaches only its own file.
     func tool(
         _ name: String, _ description: String,
         _ properties: [String: Any], required: [String] = []
@@ -101,8 +112,12 @@ extension AgentServer {
     /// injected keys are the same code and cannot come to differ: `project`
     /// on every tool, `scope` on every name the core calls an op.
     ///
-    /// The old form keeps working untouched — the eight other groups have
-    /// not migrated, and this is the expand half.
+    /// **Every one of the fifty-seven op tools is built here** since road
+    /// map 7's D3·4 — the clip and action rows, the two transitions, the
+    /// three raw media ops, the tracks, the markers and the canvas — so no
+    /// tool anywhere declares an argument's type, its vocabulary or its
+    /// required-ness by hand. What is left in `tool` is the twenty app-state
+    /// tools, which have no op to read.
     func opTool(
         _ name: String, _ description: String, _ prose: [String: String]
     ) -> [String: Any] {
@@ -219,15 +234,11 @@ extension AgentServer {
                     + "arguments from that table, so the agent server was not started.")
         }
         let ticks = Self.ticksNote
-        // The four hoisted locals a SECOND group also asks for. Each is now
-        // a sentence first and a property built from it, because a migrated
-        // tool takes the prose alone — the structure is the core's — while
-        // the groups that have not migrated still take the whole property.
-        // One spelling either way, which is the point of hoisting them.
+        // The three hoisted SENTENCES a second group also asks for. Every op
+        // tool takes the prose alone now — the structure is the core's — so
+        // what is hoisted is the sentence and never a property built from
+        // it. One spelling either way, which is the point of hoisting them.
         let trackDescription = "Track id (get_project lists them)."
-        let trackProperty: [String: Any] = [
-            "type": "integer", "description": trackDescription,
-        ]
         // The two colour-only ARGUMENTS — `set_canvas`'s background and
         // `add_background`'s plate colour. FOUR numbers since deepening D1·4,
         // not three or four: the alpha is never filled in and a component
@@ -238,16 +249,7 @@ extension AgentServer {
                 + "three is refused by length and a component outside the range is "
                 + "refused by name, neither filled in nor clamped."
         }
-        let colorProperty: (String) -> [String: Any] = { role in
-            [
-                "type": "array", "items": ["type": "number"], "minItems": 4, "maxItems": 4,
-                "description": colorDescription(role),
-            ]
-        }
         let clipDescription = "Clip id (get_project lists them)."
-        let clipProperty: [String: Any] = [
-            "type": "integer", "description": clipDescription,
-        ]
 
         var catalog: [[String: Any]] = [
 
@@ -395,43 +397,34 @@ extension AgentServer {
         // `set_transition_duration` at the end of that group, and never at
         // the end of the catalog — `recording_probe.py` reads the last
         // eleven names, which are the FILE tools.
-        catalog += transitionTools(ticks: ticks, clipProperty: clipProperty)
+        catalog += transitionTools(ticks: ticks, clipDescription: clipDescription)
         catalog += [
 
             // MARK: Tracks
 
-            tool(
+            opTool(
                 "add_track",
                 "Adds an empty track. INDEX 0 IS THE BACK of the layer stack — the bottom lane "
                     + "of the timeline, drawn first — and tracks.count is the front, which is "
                     + "what ⇧⌘N adds and where an overlay belongs.",
                 [
-                    "index": [
-                        "type": "integer", "minimum": 0,
-                        "description": "Where in the stack (0 = back). Default: the front.",
-                    ],
-                    "name": ["type": "string", "description": "Track name, e.g. \"Titles\"."],
+                    "index": "Where in the stack (0 = back). Default: the front.",
+                    "name": "Track name, e.g. \"Titles\".",
                 ]),
-            tool(
+            opTool(
                 "remove_track",
                 "Removes a track. A track that still holds clips is refused unless with_clips "
                     + "is true, which removes them with it.",
                 [
-                    "track": trackProperty,
-                    "with_clips": [
-                        "type": "boolean",
-                        "description": "Remove the track's clips too (default false).",
-                    ],
-                ], required: ["track"]),
-            tool(
+                    "track": trackDescription,
+                    "with_clips": "Remove the track's clips too (default false).",
+                ]),
+            opTool(
                 "move_track",
                 "Reorders the layer stack: the track moves to `index`, 0 being the back. A "
                     + "higher index draws in FRONT of the tracks below it.",
-                [
-                    "track": trackProperty,
-                    "index": ["type": "integer", "minimum": 0, "description": "New position."],
-                ], required: ["track", "index"]),
-            tool(
+                ["track": trackDescription, "index": "New position."]),
+            opTool(
                 "set_track",
                 "Renames a track or flips its four switches — the track header's toggles, "
                     + "Track ▸ Hide Video / Mute Audio / Lock Track / Solo. hidden drops its "
@@ -439,59 +432,37 @@ extension AgentServer {
                     + "insert and range edit off it; solo silences every OTHER track in its "
                     + "container (the timeline, or a nest's own tracks) that is not also soloed "
                     + "— mute wins on a track that is both, and pictures are untouched.",
-                [
-                    "track": trackProperty,
-                    "name": ["type": "string"],
-                    "hidden": ["type": "boolean"],
-                    "muted": ["type": "boolean"],
-                    "locked": ["type": "boolean"],
-                    "solo": ["type": "boolean"],
-                ], required: ["track"]),
-            tool(
+                ["track": trackDescription]),
+            opTool(
                 "remove_empty_tracks",
                 "Removes every track that holds no clips — Track ▸ Remove Empty Tracks.",
                 [:]),
 
             // MARK: Markers
 
-            tool(
+            opTool(
                 "add_marker",
                 "Drops a marker on the timeline. Markers snap to frames and two may not share a "
                     + "time, so a second marker on the same frame is refused. A chapter marker "
                     + "also becomes a chapter in the exported file (M2).",
                 [
-                    "at": [
-                        "type": "integer",
-                        "description": "Where, \(ticks) Default: the playhead.",
-                    ],
-                    "name": ["type": "string"],
-                    "chapter": [
-                        "type": "boolean",
-                        "description": "Also a chapter of the exported movie (default false).",
-                    ],
-                    "color": [
-                        "type": "string",
-                        "description": "Colour NAME, e.g. \"red\" — not a hex string.",
-                    ],
+                    "at": "Where, \(ticks) Default: the playhead.",
+                    "chapter": "Also a chapter of the exported movie (default false).",
+                    "color": "Colour NAME, e.g. \"red\" — not a hex string.",
                 ]),
-            tool(
+            opTool(
                 "set_marker",
                 "Moves or renames a marker, or changes its colour or chapter flag.",
                 [
-                    "marker": ["type": "integer", "description": "Marker id."],
-                    "time": ["type": "integer", "description": "New time, \(ticks)"],
-                    "name": ["type": "string"],
-                    "chapter": ["type": "boolean"],
-                    "color": ["type": "string", "description": "Colour name."],
-                ], required: ["marker"]),
-            tool(
-                "remove_marker", "Removes a marker.",
-                ["marker": ["type": "integer", "description": "Marker id."]],
-                required: ["marker"]),
+                    "marker": "Marker id.",
+                    "time": "New time, \(ticks)",
+                    "color": "Colour name.",
+                ]),
+            opTool("remove_marker", "Removes a marker.", ["marker": "Marker id."]),
 
             // MARK: Canvas
 
-            tool(
+            opTool(
                 "set_canvas",
                 "Changes the project's canvas — the fixed frame every clip is composited into. "
                     + "rescale_clips multiplies every clip's x, y and scale by the size ratio, "
@@ -499,29 +470,17 @@ extension AgentServer {
                     + "it the clips keep their pixel positions. Changing fps re-snaps every clip "
                     + "start and duration to the new frame grid.",
                 [
-                    "width": ["type": "integer", "minimum": 16, "maximum": 16384],
-                    "height": ["type": "integer", "minimum": 16, "maximum": 16384],
-                    "fps": [
-                        "type": "array", "items": ["type": "integer"], "minItems": 2,
-                        "maxItems": 2,
-                        "description": "Frame rate as [numerator, denominator]: [30, 1], "
-                            + "[30000, 1001] for 29.97, [24000, 1001] for 23.976.",
-                    ],
-                    "background": colorProperty("Colour behind every layer"),
-                    "rescale_clips": [
-                        "type": "boolean",
-                        "description": "Scale every clip's placement with the canvas "
-                            + "(default false).",
-                    ],
-                    "fit_new_clips": [
-                        "type": "boolean",
-                        "description": "Give a new clip Fit scale when its source is bigger "
-                            + "than the canvas.",
-                    ],
-                    "timecode_frames": [
-                        "type": "boolean",
-                        "description": "Show times as HH:MM:SS:FF rather than HH:MM:SS.mmm.",
-                    ],
+                    // `width` and `height` carry the core's OWN 16–16384 (the
+                    // bound `op_table.rs` publishes because `edit_canvas.rs`
+                    // refuses outside it), and neither has ever carried prose.
+                    "fps": "Frame rate as [numerator, denominator]: [30, 1], "
+                        + "[30000, 1001] for 29.97, [24000, 1001] for 23.976.",
+                    "background": colorDescription("Colour behind every layer"),
+                    "rescale_clips": "Scale every clip's placement with the canvas "
+                        + "(default false).",
+                    "fit_new_clips": "Give a new clip Fit scale when its source is bigger "
+                        + "than the canvas.",
+                    "timecode_frames": "Show times as HH:MM:SS:FF rather than HH:MM:SS.mmm.",
                 ]),
         ]
         // The file rows — Media, Captions, Rendering and export — are

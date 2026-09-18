@@ -3784,3 +3784,114 @@ names its argument, the proof is **24/24**, and removing the new row scores
 **23/24** with exactly that row failing. A generated schema needs at least
 one instrument that is not generated from the same source, or the whole
 comparison is a tautology.
+
+### 8.4 D3·4 — the remaining tools read the core (kpgalligan/reelcut#18)
+
+**Commits.** `PLACEHOLDER_ONE` (the migration and the proof),
+`PLACEHOLDER_TWO` (the mutants and the whole proof tree) and
+`PLACEHOLDER_THREE` (what the review found, below).
+
+**What landed.** The last fourteen op tools stopped restating the table:
+the nine of the Tracks, Markers and Canvas groups in `AgentCatalog.swift`,
+the three raw media ops in `AgentCatalog+Files.swift` and the two of
+`AgentCatalog+Transitions.swift`. **All 57 op tools are `opTool`'s now**,
+and no op tool anywhere declares a `"type"`, an `"enum"` or a required list.
+No Rust file, no FFI export, no handler and no op moved; `make test` is 670,
+as before.
+
+**The line counts, which were an acceptance criterion.** Every catalog file
+this ticket touched came DOWN.
+
+| File | Before | After |
+|---|---|---|
+| `AgentCatalog.swift` | 535 | **494** |
+| `AgentCatalog+Files.swift` | 609 | **601** |
+| `AgentCatalog+Transitions.swift` | 112 | **92** |
+| `AgentCatalog+Declarations.swift` | 279 | 286 (the one new row) |
+| `AgentCatalog+Clips.swift` · `+Audio.swift` | 791 · 117 | unchanged |
+
+`"type":` went 43 → 13 in `AgentCatalog.swift`, 40 → 34 in `+Files.swift`
+and 6 → 0 in `+Transitions.swift`; `"enum":` 3 → 0 in the transitions and
+`required: [` 9 → 4, 8 → 5 and 2 → 0. **Every one left is an app-state
+tool's** — read back line by line, not counted: the two in
+`AgentCatalog.swift` that are not `open_project` and `set_playhead` are
+`tool`'s own signature and `opTool`'s empty fallback.
+
+**The widening the migration needed is one row, and it is the fourth
+playhead.** `add_marker`'s `at` is `req` in the core's table — a marker IS a
+time — and the tool has always taken the playhead when the call leaves it
+out, exactly as M does. Without the row the migration would have made `at`
+compulsory, which is the REGRESSION this ticket was told to watch for: the
+declarations list is thirteen rows now, and `split`, `paste`, `freeze_frame`
+and `add_marker` are one reason written four times. Nothing else needed one.
+
+**The before/after capture, and every difference it found.** `tools/list`
+was captured from the binary built at `17c91cf` and from the migrated one,
+both canonicalised with sorted keys: 77 tools, the catalog's ORDER
+identical, **every tool description and every argument description identical
+word for word** (no prose arrived and none went, which is the criterion D3·3
+could not meet in full). The 20 app-state tools are byte-for-byte what they
+were — `record_screen`'s ten arguments included, which two scripts assert by
+name. Eleven op tools differ, in exactly three ways:
+
+| # | What an agent saw | What it sees now | Where | Verdict |
+|---|---|---|---|---|
+| 1 | an id declared `{"type": "integer"}` | `minimum: 0` beside it | 9 arguments (`clip` ×2, `track` ×3, `marker` ×2, `media` ×2) | **fix** — the same class D3·3 found for the clip group, and now measured against the running app: `remove_track` and `remove_media` refuse a negative id BY NAME, so the schema was silent about a rule the tool has |
+| 2 | a boolean declared `{"type": "boolean"}` | `["boolean", "string"]` | 13 arguments over 8 tools | **declared** — `boolArg` reads `"true"` and `"0"` for every boolean of every op; the row naming the KIND has been in the list since D3·3 and this is where the rest of the kind lives |
+| 3 | `set_canvas.fps` items `{"type": "integer"}` | `minimum: 0` on the items | 1 | **fix** — a frame rate's two terms are `u32` (`Fps`'s `#[serde(from = "[u32; 2]")]`) and `fpsArg` refuses a non-positive one; the list said neither |
+
+**No constraint was lost**, which is the mistake D3·3 made and this ticket
+inherited as its binding lesson: the diff is read in both directions and
+every difference above ADDS a key or declares a spelling the tool already
+accepted. The two bounds the migration was warned about came through
+unchanged: `set_canvas`'s `width` and `height` publish exactly the
+`minimum: 16, maximum: 16384` the catalog used to hand-write (the table's
+`Bound`, sourced from `CANVAS_MIN`/`CANVAS_MAX`), and `add_track`'s `index`
+keeps its `minimum: 0` from `Kind::Index`.
+
+**`set_transition` and `set_transition_duration` are NOT in the transitions
+group** — the ticket said they were. They are `AgentCatalog+Clips.swift`'s
+and D3·3 migrated both; `set_transition.kind`'s declarations row is the one
+the ticket remembered. `AgentCatalog+Transitions.swift` holds
+`add_transition` and `set_transition_style` alone.
+
+**One leniency found and deliberately not declared.** `set_canvas`'s
+`fpsArg` reads a bare `30` as `[30, 1]` where the schema says an array. It
+is a narrowing, like the lone id read as a one-element list and the id
+spelled as a string, and the direction is the rule: a schema narrower than
+what is accepted costs a caller nothing. It is named in the declarations
+list's "what is deliberately NOT here" paragraph rather than declared.
+
+**The proof.** `tools/proof/op_catalog_proof.py`, **22/22**, over MCP with a
+probe of its own. It measures ALL 57 where `clip_catalog_proof.py` measures
+43, and its structural half types no op name at all — the group IS the core's
+op list, so an op that lost its tool is named and an op renamed on both sides
+is still measured. Beside the identity it asserts what the core's table
+carries no prose at all (135 of the 145 published arguments are described by
+the CATALOG and none by the table), that exactly one op tool declares nothing
+but the envelope's two keys, and the five vocabularies a handler still parses
+by name — `add_transition`'s `align` among them, whose tie to
+`TransitionAlign` was structural until this migration made the schema the
+core's.
+
+**Its last section is the lesson from #17's verification, applied.** The
+oracle is built from the same declarations list the catalog is, so a row
+dropped from the list moves both sides together; every claim the fourteen
+make is therefore also put to the RUNNING APP: a marker with no `at` lands
+at the playhead, a track switch takes `"true"`, a negative id is refused by
+name, `set_canvas` refuses a width one step under the bound it publishes and
+names both ends, `add_transition`'s `kind` is refused an explicit null and
+never offered one — the opposite direction of `set_transition`'s row, and the
+reason the two ops cannot share it — and `add_media`'s descriptor is an
+object with no properties that refuses a string by name.
+
+**Verified.** `make test` **670 passed / 0 failed** (unchanged: no Rust file
+moved); `cargo fmt --check` clean; `make lint` clean; `make typecheck` 0
+errors and exactly the four known AVFoundation warnings; `make app` BUILD
+SUCCEEDED; the built binary launched on port 4863 and `grep "Reelcut: "` on
+its log printed nothing — the startup parity check is unchanged, and its
+fifth part is #19's.
+
+**Owed.** The fifth part of the parity check and the shared `tools/list`
+schemas accessor (#19); and the proof scripts that still re-type argument
+names in Python.

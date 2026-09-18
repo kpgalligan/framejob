@@ -339,14 +339,18 @@ final class AgentServer {
     /// absent; a drift of that kind then surfaces as an error on the first
     /// call rather than as a silently dropped argument.
     ///
-    /// **Half the gap is closed and half is not.** The core now publishes
-    /// its op table's ARGUMENTS as well as its names (`rc_op_schemas`), and
-    /// the CLIP group's forty-three tools print that table rather than
-    /// restating it (`AgentCatalog+Clips.swift`), so there is nothing left
-    /// there for these four parts to miss. The four other groups still
-    /// declare their own arguments by hand, which is why there is no fifth
-    /// part here comparing a tool's declared arguments to the core's: it
-    /// would name every one of them.
+    /// **The catalog's half of that gap is closed.** The core publishes its
+    /// op table's ARGUMENTS as well as its names (`rc_op_schemas`), and
+    /// every one of the fifty-seven op tools prints that table rather than
+    /// restating it (`AgentCatalog.opTool`), so no op tool declares an
+    /// argument's type, its vocabulary or its required-ness anywhere for
+    /// these four parts to miss. What is left is a FIFTH part that would
+    /// compare each op tool's declared arguments to the core's — plus the
+    /// two injected envelope keys, plus `AgentServer.declarations` — and so
+    /// catch a hand-written schema that came back, or a prose key naming an
+    /// argument no op has. It is not here yet, and `tools/proof/
+    /// op_catalog_proof.py` is what asks that question today, of the running
+    /// binary rather than at startup.
     private static func catalogParityFailure(_ catalog: String) -> String? {
         guard
             let tools = (try? JSONSerialization.jsonObject(with: Data(catalog.utf8)))

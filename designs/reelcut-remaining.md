@@ -219,7 +219,13 @@ both under it. That is 150 lines off an over-cap file paid for by deleting
 hand-written structure rather than by moving anything. `AgentServer.swift`
 (771 → 779) took eight lines of doc comment correcting what the startup
 parity check says it cannot see, which is inside the frozen file's ~50-line
-allowance.
+allowance. D3·4 migrated the four other groups, and every catalog file it
+touched came DOWN: `AgentCatalog.swift` 535 → **494**,
+`AgentCatalog+Files.swift` 609 → **601** (still over, by one line),
+`AgentCatalog+Transitions.swift` 112 → **92**, against
+`AgentCatalog+Declarations.swift` 279 → **286**, the one widening row the
+migration needed. Sixty-two lines of hand-written schema deleted and seven
+of reason written down.
 Regenerate the list with
 `wc -l app/Sources/*.swift core/src/*.rs | awk '$1>600 && $2!="total"' | sort -rn`
 rather than trusting the numbers here; the standing exemptions are
@@ -254,8 +260,8 @@ row per op.
 | `app/Sources/ExportSheetController.swift` | 639 |
 | `app/Sources/Exporter.swift` | 609 |
 | `app/Sources/ClipPane.swift` | 609 |
-| `app/Sources/AgentCatalog+Files.swift` | 609 |
 | `app/Sources/MediaImporter.swift` | 604 |
+| `app/Sources/AgentCatalog+Files.swift` | 601 |
 | `app/Sources/CompositionBuilder.swift` | 601 |
 
 The notes below are from road map 3's close and name each file's SEAM, which

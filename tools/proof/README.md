@@ -2576,3 +2576,49 @@ playhead although the core requires `at`.
 It does NOT claim that `set_speed` clamps a rate rather than refusing it:
 that needs a media clip, this script makes none, and the claim is the core's
 own in `core/tests/op_table.rs`.
+
+## Every op tool against the table (`op_catalog_proof.py`)
+
+`python3 tools/proof/op_catalog_proof.py <port>`, against a running
+instance. Road map 7's D3·4 migrated the last fourteen op tools — the nine
+track, marker and canvas rows, the three raw media ops and the two
+transitions — so this measures the WHOLE catalog where `clip_catalog_proof.py`
+measures the clip group: the same two independent sides (the CATALOG over
+MCP, the TABLE out of the staticlib through a probe built the way
+`op_schema_probe.py` builds its own and scored the same way when it will not
+compile), and the same oracle written in Python rather than imported.
+**22/22** at D3·4 (#18). The probe is built BEFORE the first MCP call.
+
+**Its structural half types no name at all**, not even the ends of a group:
+the group IS the core's op list (`rc_op_names`), so an op renamed on both
+sides is still measured and an op that lost its tool is named. The
+behavioural half names the seven ops it drives and checks each against that
+list first.
+
+Five sections. **The catalog**: the core declares 57 ops, every one is a
+tool carrying the injected `project` and `scope`, and none of the 20
+app-state tools carries a `scope`. **The identity**: all 57 declare exactly
+the core's arguments, kinds, enums, minimums, maximums and required list,
+modified only by what the declarations list names; exactly one op tool
+declares nothing but the envelope's two keys (`remove_empty_tracks`, the one
+op with no arguments); every op tool carries its own description and prose on
+at least one argument wherever it takes any, and 135 of the 145 published
+arguments carry the app's prose while the core's table carries none of it —
+which is the division of labour, measured rather than asserted. **The vocabularies**: the five a HANDLER still parses by name,
+`add_transition`'s `align` among them, whose tie to `TransitionAlign` was
+structural until the migration made the schema the core's. **The
+declarations**: all 13 rows still name something the core has. **The running
+app**: a marker with no `at` lands at the playhead although the core
+requires it, a track switch takes `"true"`, a negative id is refused by name
+where the schema says `minimum: 0`, `set_canvas` refuses a width one step
+under the bound it publishes and names both ends, `add_transition`'s `kind`
+is refused an explicit null and never offered one (the opposite of
+`set_transition`'s), and `add_media`'s descriptor is an object with no
+properties that refuses a string by name.
+
+That last section is the half a generated schema cannot do without, and
+D3·3's `ripple_delete_ranges.ranges` is why: the oracle is built from the
+same declarations list the catalog is, so a row dropped from the list moves
+BOTH sides of the comparison together and the structural half stays green.
+Only a row that asks the RUNNING APP can see a declaration dropped while the
+behaviour stays.

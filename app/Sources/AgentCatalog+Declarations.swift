@@ -119,22 +119,23 @@ struct AgentDeclaration {
 extension AgentServer {
 
     /// Every declaration, in one list (`AgentDeclaration`'s doc has the rule
-    /// an entry has to pass). Twelve rows over five kinds of difference: two
-    /// bare-string shorthands, one reading of a whole JSON kind, two nulls
-    /// that mean something, one range the core clamps to rather than
-    /// refusing, three times the tool takes from the app what the op would
+    /// an entry has to pass). Thirteen rows over five kinds of difference:
+    /// two bare-string shorthands, one reading of a whole JSON kind, two
+    /// nulls that mean something, one range the core clamps to rather than
+    /// refusing, four times the tool takes from the app what the op would
     /// have made the caller send, and three times a list the tool will not
     /// accept empty although the op reads one.
     ///
     /// **What is deliberately NOT here.** The argument vocabulary is lenient
     /// in ways no tool has ever declared — a lone id read as a one-element
     /// list, an id spelled as a string, a bare `[from, to]` read as one
-    /// range — and this ticket declared none of them, because it changed
-    /// none of them. The direction is what makes that safe: a schema
-    /// narrower than what is accepted costs a caller nothing, where one
-    /// wider than what is accepted is a promise the app breaks. Each of
-    /// those is a row this list can gain the day someone decides the
-    /// shorthand is worth offering.
+    /// range, a bare number read as `set_canvas`'s `[fps, 1]` — and no
+    /// migration has declared one, because none of them changed. The
+    /// direction is what makes that safe: a schema narrower than what is
+    /// accepted costs a caller nothing, where one wider than what is
+    /// accepted is a promise the app breaks. Each of those is a row this
+    /// list can gain the day someone decides the shorthand is worth
+    /// offering.
     static let declarations: [AgentDeclaration] = [
 
         // ---- a bare string where the op takes a patch --------------------
@@ -228,6 +229,12 @@ extension AgentServer {
             .argument("at", of: "freeze_frame"), requirement: .optional,
             why: "The playhead again, for ⇧⌘F: the moment to freeze defaults to where the "
                 + "window is looking."),
+        AgentDeclaration(
+            .argument("at", of: "add_marker"), requirement: .optional,
+            why: "The playhead a fourth time, for M: a marker with no time lands where the "
+                + "window is looking (AgentServer+Tracks.swift). The core requires the tick "
+                + "because a marker IS a time; the app has one to supply and the core has "
+                + "not."),
     ]
 
     /// One op tool's declared input: the core's published structure, each

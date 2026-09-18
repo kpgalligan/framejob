@@ -20,7 +20,7 @@ detail there.
   It is also where the op table is read BACK: `ReelOp.coreNames()` over
   `rc_op_names`, and `ReelOp.coreSchemas()` over `rc_op_schemas` — every
   op's ARGUMENTS as JSON Schema, keyed by op name, which
-  `AgentCatalog.opTool` prints for the clip group's forty-three tools.
+  `AgentCatalog.opTool` prints for all fifty-seven op tools.
   `deinit` frees the Rust allocation. It also holds **the one read of
   `rc_project_apply`'s TWO message channels**, in the header's own order — a
   sentence is a refusal, an error message is invalid input, neither written
@@ -397,9 +397,12 @@ free.
   reads the last eleven names). **A tool is built one of two ways**: `tool`,
   which declares its own schema, or `opTool`, which declares PROSE and prints
   the argument STRUCTURE from the core's published table (`Self.opSchemas`
-  over `rc_op_schemas`). The clip group is `opTool`'s and carries no
-  `"type"`, no `"enum"` and no hand-written required list; the four other
-  groups and every app-state tool are still `tool`'s. `opTool` goes THROUGH
+  over `rc_op_schemas`). **Every one of the fifty-seven op tools is
+  `opTool`'s** and carries no `"type"`, no `"enum"` and no hand-written
+  required list; `tool`'s remaining callers are the twenty APP-STATE tools,
+  which have no op behind them and so nothing to read from the table — the
+  ten of the Projects group, `AgentCatalog+Audio.swift`'s two composites and
+  the eight file tools, `record_screen` among them. `opTool` goes THROUGH
   `tool`, so `project` and `scope` are injected by one piece of code either
   way. `AgentCatalog+Declarations.swift` is the one list of places a tool
   deliberately takes more or less than its op does — a bare-string body, a
