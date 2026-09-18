@@ -3332,7 +3332,8 @@ argument names in Python.
 
 ### 8.2 D3·2 — the table goes out through the FFI (kpgalligan/reelcut#16)
 
-**Commits.** `PLACEHOLDER_ONE` (the ticket).
+**Commits.** `ca84058` (the ticket) and `PLACEHOLDER_TWO` (the probe's
+required-ness claim, the mutant table and what the review found, below).
 
 **What landed.** The table leaves the core. No catalog file and no
 `AgentServer*` file was edited, no op or tool was added, no persisted state
@@ -3408,14 +3409,25 @@ argument, so none is published unexercised; only a closed vocabulary
 publishes an `enum`; and a patch is opaque where a region is not.
 
 **The probe, and what makes it more than a mirror.**
-`tools/proof/op_schema_probe.py`, **27/27**, compiled out of `app/Sources`
+`tools/proof/op_schema_probe.py`, **28/28**, compiled out of `app/Sources`
 over `harness/build.sh`'s own swiftc line. Its middle section sends each of
 the 57 ops an envelope carrying one key no op has, reads the list of fields
-serde says it DID expect, and compares that to the published properties —
-**the decoder is the oracle and no argument name is written in the script**,
-which is the instrument spec #14 asks for in place of the Python literals
-the older proofs carry. The only literals are twelve kind rows, which are
-about the MAPPING rather than about which arguments exist.
+serde says it DID expect, and compares that to the published properties; and
+it sends each op an envelope with NO arguments, which makes serde name the
+first field it could not do without, and insists that field is one the
+schema calls required. **The decoder is the oracle and no argument name is
+written in the script** — the instrument spec #14 asks for in place of the
+Python literals the older proofs carry. The only literals are twelve kind
+rows, which are about the MAPPING rather than about which arguments exist.
+
+**The required-ness half of it is there because a mutant walked through the
+probe untouched.** The first version scored 27/27 against a build whose
+`required` list had dropped `clips` from every op that takes it — the Rust
+test named it, and the probe could not, because an unknown-field refusal
+lists FIELDS and says nothing about which are needed. Asking the decoder a
+second question closed it in fifteen lines, and the mutant now scores 27/28.
+That is the one thing running the deliberate failures found that reading did
+not.
 
 **The catalog is untouched, and that was measured rather than asserted.**
 The binary built before this ticket was still on disk, so `tools/list` was
@@ -3431,6 +3443,17 @@ printed nothing. The header and the NULL-safety sweep agree, which is not a
 courtesy — `null_safety_sweep_covers_every_export_in_the_header` parses
 `reelcut_core.h` and fails on an export declared there and never swept, so
 two of the FFI's three files are checked in lockstep by a test.
+
+**The mutants.** Five deliberate failures, each reverted with `git checkout`
+after the tree was committed, and each caught by both instruments:
+
+| Mutant | `core/tests/op_schemas.rs` | `op_schema_probe.py` |
+|---|---|---|
+| `add_clip` skipped when the map is built | 6 of 10 FAILED | 24/28 |
+| `Kind::Id` and `Kind::Index` lose `minimum: 0` | `every_argument_is_published_as_its_kind_says` FAILED, 9 passed | 26/28 |
+| `Kind::Object` published as a string — spec #14's own confessed drift, `add_text_clip`'s body declared `string` against an `object` | that test and `a_patch_is_opaque_and_a_region_is_not` FAILED, 8 passed | 27/28 |
+| `scope` inserted into every published schema | `no_schema_carries_an_envelope_key` and `every_schema_declares_its_arguments_and_only_them` FAILED, 8 passed | 26/28 |
+| a required argument (`clips`) published as optional | `required_is_what_the_table_requires_in_table_order` FAILED, 9 passed | 27/28 (the check the mutant bought) |
 
 **Owed.** The catalog's migration, the fifth part of the parity check, the
 widening list, the nullability question above, and the proof scripts that

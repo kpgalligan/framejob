@@ -2505,7 +2505,7 @@ so there is no MCP surface to measure, and the instrument is `CLAUDE.md`'s
 answer for app STRUCTURE with no caller a script can reach: a probe compiled
 out of `app/Sources` over `harness/build.sh`'s own swiftc line, cached on
 modification times, a build failure scored as a FAILURE rather than an exit.
-**27/27** at D3·2 (#16). It needs `core/target/release/libreelcut_core.a` —
+**28/28** at D3·2 (#16). It needs `core/target/release/libreelcut_core.a` —
 `make test` or `cd core && cargo build --release` first, or the build check
 fails naming the missing file.
 
@@ -2514,9 +2514,11 @@ names in both directions — two separate exports read separately, so a schema
 map that dropped an op, or invented one, is named. **The identity**: for
 each of the 57 ops the probe sends an envelope carrying one key no op has,
 serde refuses it with the list of fields it DID expect, and that list is
-compared to the published properties — **no argument name is written in the
-script**, which is what spec kpgalligan/reelcut#14 asks for in place of the
-Python literals the older proofs carry. **The envelope**: neither `scope`
+compared to the published properties; and the same op sent with NO arguments
+makes serde name the first field it could not do without, which must be one
+the schema calls required. **No argument name is written in the script**,
+which is what spec kpgalligan/reelcut#14 asks for in place of the Python
+literals the older proofs carry. **The envelope**: neither `scope`
 nor `project` is in any published schema; the catalog injects both.
 **The kinds**: one representative argument per kind against the JSON Schema
 the mapping owes it (an id's `minimum: 0`, ticks with none because a delta

@@ -24,7 +24,11 @@ What it measures, all of it through the wrapper the catalog will use:
     binary's staticlib, which is the instrument spec kpgalligan/reelcut#14
     asks for in place of the Python literals the older proofs use.
   * **`required` is a subset of the properties**, so a schema cannot demand
-    an argument it does not declare.
+    an argument it does not declare — and it is the DECODER's required-ness:
+    the same op sent with no arguments at all makes serde name the first
+    field it could not do without, which must be one the schema calls
+    required, and an op whose schema requires nothing must produce no such
+    complaint.
   * **The envelope's `scope` is in no schema.** It is not an argument of any
     op; the catalog injects it, and it is the fourth part of the startup
     parity check's business, not the table's. `project` likewise.
@@ -98,19 +102,27 @@ answer["schemas"] = schemas
 guard let project = ReelProject.new(width: 1920, height: 1080, fps: .thirty) else {
     fail("ReelProject.new answered nil")
 }
-var decoder: [String: String] = [:]
-for name in names {
-    let op = ReelOp(name: name, args: ["zz_not_an_argument": 1])
+func answered(_ name: String, _ args: [String: Any]) -> String {
     do {
-        _ = try project.applying(op)
-        decoder[name] = ""
+        _ = try project.applying(ReelOp(name: name, args: args))
+        return ""
     } catch let error as ReelCoreError {
-        decoder[name] = error.message
+        return error.message
     } catch {
-        decoder[name] = "\(error)"
+        return "\(error)"
     }
 }
+
+var decoder: [String: String] = [:]
+var bare: [String: String] = [:]
+for name in names {
+    decoder[name] = answered(name, ["zz_not_an_argument": 1])
+    // The same op with NO arguments at all: serde names the FIRST field it
+    // could not do without, which is the decoder's own word on required-ness.
+    bare[name] = answered(name, [:])
+}
 answer["decoder"] = decoder
+answer["bare"] = bare
 
 write(answer)
 '''
@@ -287,6 +299,23 @@ def main():
                 if set(s["required"]) - set(s["properties"])}
     check("no schema requires an argument it does not declare", not unbacked,
           json.dumps(unbacked))
+
+    # The decoder's own word on required-ness: an envelope with NO arguments
+    # makes serde name the FIRST field it could not do without. An op the
+    # schema says requires nothing must not produce one of those at all.
+    missed = {}
+    for name in names:
+        message = answer["bare"].get(name, "")
+        required = schemas.get(name, {}).get("required", [])
+        prefix = f'op "{name}" is not valid: missing field `'
+        if message.startswith(prefix):
+            field = message[len(prefix):].split("`")[0]
+            if field not in required:
+                missed[name] = {"decoder wants": field, "published required": required}
+        elif required:
+            missed[name] = {"decoder wants": None, "published required": required}
+    check("…and every op the decoder will not read without an argument publishes that "
+          "argument as required", not missed, json.dumps(missed, indent=2)[:900])
 
     print("\n3 — the envelope's keys are not arguments")
     intruders = {name: [key for key in ("scope", "project")
