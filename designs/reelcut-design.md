@@ -427,8 +427,10 @@ is enabled.
   property. The built-in REVEALS are their own thing and are
   `text.animation` (format version 5): an *Animation* section of three
   controls — a kind popup (None, Typewriter, Word Fade, Line Rise), In and
-  Out — written through `set_text` as one whole object, since a patch of a
-  nested object is a replacement (§5.2). In and Out are DURATIONS measured
+  Out — written through `set_text` as one whole object, which is the SECTION
+  saying all three controls and not a rule about patches: a patch of a nested
+  object merges key by key (§5.2, §6), so an agent may send `animation` with
+  one key in it and keep the other two. In and Out are DURATIONS measured
   from the clip's own first and last frame, not times.
   The section cannot show the reveal's PROGRESS, and deliberately does not
   try: how far along a reveal is, is a fact about the frame under the
@@ -722,8 +724,23 @@ rate and AVFoundation picks the source frame. Frame rates are rationals
 ### 5.2 Project — the JSON schema (format version 8)
 
 The Rust value, serialized by serde. Small, no pixels. All times are
-ticks, all positions canvas pixels, colors `[r, g, b, a]` floats 0–1,
-angles degrees, opacity/volume 0–1 (volume may exceed 1, up to 4).
+ticks, all positions canvas pixels, colors `[r, g, b, a]` floats 0–1 — FOUR
+numbers, never a three-element form and never clamped, with
+`video.chroma.key` the one `[r, g, b]` in the schema — angles degrees,
+opacity/volume 0–1 (volume may exceed 1, up to 4).
+
+**What a PATCH against this schema means**, once for every op that takes one
+(§6's five `set_*`, `add_text_clip`'s `text`, `add_shape_clip`'s `shape` and
+an action's `end`): it **merges key by key at every depth** — a nested object
+merges into the stored one rather than replacing it, so `{"shadow":
+{"blur": 40}}` keeps the colour and the offset — a key set to **`null`
+clears** that key (in an action's `end`, where the patch IS the stored
+value, it removes the key, which is the same act one level up), and an
+**array replaces** its whole list. A key or a value the vocabulary does not
+have is refused by its dotted path, array indices included, and never
+dropped or corrected (§6, `core/src/patch.rs`,
+`CONTEXT.md`'s **Patch**). The FILE reader is the lenient one and stays so:
+it opens what a newer build wrote (§5.6).
 
 ```json
 {
@@ -1308,6 +1325,15 @@ preset's two edge durations and its `during` period, and a text animation's
 `in` and `out` — which the core snaps after the range checks, so a refusal
 names the number the caller sent. "Refuses" = returns `None` at the FFI (the
 UI beeps or animates back); "error" = `Err`.
+
+**Every op that takes a caller-authored PATCH reads it the one way** (§5.2):
+a nested object MERGES key by key at every depth, a key set to `null` CLEARS
+it, and an array REPLACES its whole list. The core is the one validator of
+what a patch may carry — an unknown key, a value of the wrong JSON kind or a
+misspelt variant at any depth is an error naming the dotted path with array
+indices and the value sent, the project is untouched and no undo step is
+made. The agent door forwards the caller's own object unread (§7.9), so an
+agent and the app's own writers meet exactly the same rules.
 
 **The envelope's one non-argument key: `scope?: u32`.** A nest id. Absent
 (or `null` — the envelope reads the two the same way), every id in the op
@@ -2347,8 +2373,17 @@ it is a recipe option (§7.3), travelling beside the resolved settings rather
 than inside them, because the override table ignores a key it does not
 know — an option posted that way would vanish without a word and the tool
 would report success on an un-burnt file. The result echoes it back for the
-same reason. Handlers
-use `performGroupedEdit` so off-event edits get their own undo group
+same reason.
+
+**Lenient decoding is for what the CORE wrote; nothing a caller wrote is
+decoded through it** (deepening D1): a patch, a colour, a region and a new
+clip's text or shape go to the core as the caller's own object, and the core
+is the one validator of what each may carry (§5.2, §6) — the agent door
+checks only what the core cannot know, which is the target, the scope, an id
+against the container it names, a time, and that a required argument was
+passed at all.
+
+Handlers use `performGroupedEdit` so off-event edits get their own undo group
 (Rasterize's `AgentServer.performGroupedEdit`). Default port 4817; env
 `RC_AGENT_PORT`; launch flag `-AgentServerEnabled YES`.
 

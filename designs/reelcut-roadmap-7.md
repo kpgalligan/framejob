@@ -1,7 +1,9 @@
 # Reelcut — road map 7: deepening
 
-**Status: D1 IN PROGRESS — D1·1 to D1·5 built (§2.1 to §2.5); D1·6,
-the contract step, not started.**
+**Status: D1 BUILT AND CLOSED — all six tickets landed (§2.1 to §2.6), and
+§3 is what they add up to: the core is the one validator of every
+caller-authored object, and 617 lines are out of the agent's handlers. No
+candidate is in progress.**
 
 Road maps 2 to 6 each added something a person using the app can see. This
 one does not. A **deepening** takes knowledge that is spread across callers
@@ -16,7 +18,8 @@ a GitHub issue labelled `spec`, and its tickets are issues labelled
 `ready-for-agent` (`docs/agents/issue-tracker.md`). An issue is a snapshot of
 the design conversation. This document holds what outlasts one: the rules
 the series inherits (§0), each candidate's plan in the order it was built
-(§1), and the record (§2).
+(§1), the record ticket by ticket (§2), and what a closed candidate added up
+to (§3).
 
 ---
 
@@ -1331,3 +1334,269 @@ Judged not real:
 rulebook and the spec's agent section, and the two proof mutants are #7's by
 design. `AgentCatalog+Clips.swift` carries two lines of unpaid toll, named
 above.
+
+---
+
+### 2.6 D1·6 — contract and record (kpgalligan/reelcut#7)
+
+**Commits.** `PLACEHOLDER_TICKET` (the ticket) and `PLACEHOLDER_REVIEW` (what
+its review found, below).
+
+**What landed, and what deliberately did not.** No behaviour changed at any
+door — every door was through after D1·5 — and that is the claim this ticket
+had to make good on rather than the one it had to avoid: the patch door
+scores **261/261 before and after**, the same checks, and no proof assertion
+moved. What changed is that the machinery a later door could have reached
+for is gone, and the rule that replaced the old warning is written where
+someone will meet it.
+
+- **The sweep is four functions and one initialiser.** All four in
+  `AgentServer+Arguments.swift` — `patchArg` with its round-trip check,
+  `decodePatch`, `withOpaqueColors` and `nestedNumberArg` — were verified
+  uncalled and deleted: **562 → 445**, 140 lines removed for 23 added, 65 of
+  the removed being code and the rest the doc that argued for them. Beside
+  them went `ClipPatch`'s lenient `init(from:)` and its `Codable`
+  conformance (`ReelCore.swift` 1508 → **1507**), dead since D1·4 sent
+  `set_clip`'s argument raw and the last `nullable()` reading of a value a
+  CALLER wrote — `ShapePatch`, `Equatable` and nothing more, is the shape it
+  takes now. The twelve names D1·4 and D1·5 listed were checked against the
+  tree and are indeed gone; `zoomRegionArg` is NOT among them and survives
+  as eight lines that read nothing about the region.
+- **The lenient helpers keep honest callers, which is the other half of the
+  rule.** `lenient` has some three hundred call sites and `nullable` eleven,
+  and every one of them decodes what the CORE wrote: the project, the plan,
+  the recipe, export settings, and — the one that looks like a patch and is
+  not — `ActionSnapshot.end`, an `ActionPatch` of `VideoPatch` /
+  `AudioPatch` / `TextPatch` read out of the project JSON. Deleting them
+  would refuse a file a newer build wrote, which is the reason they exist.
+- **The file's header says what is left**, which was the ticket's own test of
+  the deletion: target and scope, an id checked against the CONTAINER it
+  names, a time on the document's frame grid, the scalar coercions, and the
+  in-band refusal — what the core cannot know. "Nothing here reads a
+  caller-authored OBJECT" is the sentence, with `rawPatchArg` named as the
+  way past and the three measured reasons the family went named beside it.
+- **The rule replaces the warning in the app rulebook.** `app/CLAUDE.md`'s
+  Rules section had no rule about this at all — D1·1 to D1·5 corrected the
+  file-map prose and left the old pitfall paragraph deleted rather than
+  replaced. It now carries one: *lenient decoding is for what the CORE wrote;
+  nothing a caller wrote is decoded through it*, with what it is FOR
+  (a newer build's file), what it forbids (a caller's object), and the
+  exemption spelled out so it cannot be read too widely — a scalar enum
+  ARGUMENT parsed by name (`add_zoom_action`'s `fit`, `curveArg`,
+  `set_transition`'s `kind`) is not this, and the core refuses those too.
+- **The spec says it in four places, each about its own subject.** §7.9 gains
+  the rule as a paragraph of its own at the section's foot. §5.2 gains what a
+  PATCH against the schema means — merge at every depth, `null` clears, an
+  array replaces, a refusal by dotted path — beside the sentence that says
+  colours are `[r, g, b, a]`, now reading FOUR numbers, never three and never
+  clamped. §6's preamble gains the same rule against the op table, so a row
+  does not have to carry it. And §4.3's `text.animation` bullet lost "since a
+  patch of a nested object is a replacement (§5.2)" — **the last sentence in
+  the tree that said replace**, checked by grep; the section sends the whole
+  object because it KNOWS all three controls, which is `MotionProps.dictionary`'s
+  reason written out for text.
+- **The README repeated neither**, so nothing there was false; it gained a
+  short paragraph anyway, under the tool list where an agent meets it: a
+  patch is your own object, it merges, an unknown key or a misspelt value is
+  an error naming the path, and a colour is four numbers.
+- **`CONTEXT.md`'s two entries were sharpened, not rewritten.** **Op** now
+  says an op can be REFUSED with a sentence saying what was wrong, and that a
+  refusal leaves the project exactly as it was and makes no undo step — which
+  is the whole of what D1 added to an op's meaning and was missing from a
+  definition that said only "yields a new project or changes nothing".
+  **Patch** now names its three targets (a clip's property group, a clip's own
+  name and label, an action's end state), says a value is never CLAMPED as
+  well as never dropped or corrected, and ends "the core is the one that reads
+  it, wherever it came from". Still a glossary: no implementation detail, no
+  file names.
+- **The handler docs still NAME the deleted functions, in the past tense**,
+  and that is deliberate rather than rot: `set_clip`'s doc says the check it
+  needed was one the launder could not make, `set_shape`'s says what
+  `shapePatchArg` read by hand, and the new header of
+  `AgentServer+Arguments.swift` lists all four it deleted. The precedent is
+  D1·4's and D1·5's, both reviewed: a door explains itself by what it stopped
+  doing, and §2 here is where those names are defined. What is NOT allowed to
+  survive is a sentence in the present tense about a function that is gone,
+  and the three that were (the map entry, `scalarArg`'s doc and the
+  app-notes header) were rewritten.
+- **`designs/reelcut-app-notes.md`'s header** claimed `zoomRegionArg` was
+  deleted (it is not), left `requiredColorArg` out of the list (it is), and
+  said the four functions were still owed. All three corrected, and the rule
+  named so the archived paragraphs below it are read as history.
+
+**Measured.**
+
+- `make test`: **632 passed, 0 failed**. `make lint` and `cargo fmt --check`
+  clean. `make typecheck` 0 errors and the 4 known AVFoundation warnings.
+  `make app` succeeded and the startup parity log was empty on every launch.
+- **Every proof script in the tree**, not only the twelve this series has been
+  running, on port 4826. Over MCP: patch_door **261/261**, phase1 66/66,
+  phase2 85/85, phase3 123/123, phase3_silence_scope 8/8, phase4 84/84,
+  phase5 88/88, phase6 168/168, phase7 92/92, phase8 79/79, phase9 216/216,
+  remaining 79/79. `recording_proof.py` **187/187 with 2 skipped** — the tone
+  rows, because this host's audio output is MUTED and the tap gets the tone
+  unreliably; it is a host-state skip the script reports by name, and it is a
+  better score than D1·5's 185/186 on the same tree.
+  Offscreen: recording_probe 917/917, remaining_probe 170/170, phase9_probe
+  48/48, transition_sheet_probe 32/32, preview_validity_probe 19/19 (5
+  skipped) and preview_refresh_probe 0/0 (58 skipped) — both skip-sets are
+  the LOCKED CONSOLE, which displays nothing in any layer. Chrome: phase2
+  26/26, phase3 33/33, phase4 59/59, phase5 81/81, phase6 70/70, phase7
+  78/78, phase9 62/62 and phase8 **144/150**, which is the documented
+  locked-console score for that script (`designs/reelcut-remaining.md` §4;
+  its section 4 activates a probe and needs a screen).
+- Line counts. `AgentServer+Arguments.swift` 562 → **445**, `ReelCore.swift`
+  1508 → **1507**. Nothing else in the app changed size. Across the whole of
+  D1 the `AgentServer*` family is **6651 → 6034, 617 lines smaller than
+  before the series**, and `AgentServer+Arguments.swift` is 109 lines below
+  where it started.
+- `designs/reelcut-remaining.md` §3 is regenerated from `wc -l`: still the
+  same thirty files, with only `ReelCore.swift` moving (1510 → 1507 — the
+  table's number was two stale as well as one line high). The
+  `AgentServer+Clips.swift` note now carries the family's total.
+
+**Mutants.** Two, the pair spec kpgalligan/reelcut#1 asks for, each a rebuild
+of the app and a fresh instance on port 4826, each reverted afterwards and
+the proof shown green again (261/261, 123/123, 168/168). Both caught.
+
+| Mutant | Score |
+|---|---|
+| the decode-and-re-encode launder restored at ONE door (`set_video`'s patch decoded through the lenient `VideoPatch`, sent on through the typed factory) | patch_door **11/32, ABORTED**; phase3 120/123; phase6 165/168 |
+| the core's key walk (`check_keys`) disabled | patch_door **120/155, ABORTED**; phase3 121/123; phase6 **ABORTED** at 101 on an unhandled refusal |
+
+Three readings, since a mutant table is only worth the rows somebody reads.
+**The launder at one door aborts in §1**, the section for that very door,
+which is why 11 is a smaller number than D1·3's 9/32 was over a proof a
+quarter the size: the run stops the first time an op that should have been
+refused succeeds instead. The last four failures it prints before it stops
+are the leniency itself — a one-key `shadow` patch REPLACED from
+`ShadowProps`' defaults (`opacity` 0.8 → 0.5, `distance` 30 → 8), a `motion`
+patch naming only `in` that drops the stored `out`, a null slot that clears
+the whole motion — and an undo claim, because the edit that should not have
+happened leaves a marker behind. **The key-walk mutant reaches four times as
+far** (120/155 against 11/32) and that is the honest shape of the two halves:
+disabling the walk breaks the UNKNOWN-key half only, while a misspelt
+VARIANT is still refused by the path-tracking typed read D1·1 built, so the
+proof keeps scoring until it reaches an unknown key that now lands. **phase3
+and phase6 barely move** under either — 120/123 and 165/168, 121/123 and an
+abort — which is the same finding D1·5 recorded about the region: outside
+`patch_door.py` almost nothing in the tree discriminates a door that quietly
+corrects a caller from one that refuses. The patch door is the instrument,
+and the older scripts are a guard rail rather than a second opinion.
+
+**What an agent sees change: nothing.** This is the one ticket of the six
+with no behaviour to announce. The two changes agents do see — a nested
+object MERGES where it used to replace, and a colour must be FOUR numbers —
+landed in D1·3 to D1·5 and are named in §3 below.
+
+**Owed.** Nothing. The two tolls D1 leaves are named in §3.
+
+---
+
+## 3. D1 — closed
+
+Six tickets on `d1-patch-door`, every one landed and reviewed on
+2026-09-17. **The core is the one validator of every caller-authored object
+the app can be sent**, and the Swift side no longer has a way to be a second
+one.
+
+**What landed, in one paragraph per ticket.** D1·1 taught `patch.rs` to name
+the dotted path and the offending value in every refusal, array indices
+included, over a path-tracking deserialise (`serde_path_to_error`, the one
+crate the series added to the core). D1·2 changed what a patch may CARRY: a
+`video.filters` entry must name both its keys, an action's end patch is
+walked like any other, a zoom region is an object with four named members,
+and the ticks a motion preset or a text animation carries are snapped in the
+core after the range checks. D1·3 took the first door — `set_video` forwards
+the caller's object — and built `tools/proof/patch_door.py`, the instrument
+the rest of the series is measured with. D1·4 took eight more doors and made
+a colour four numbers everywhere, deleting `colorArg`, `shapePatchArg`,
+`gradientArg` and the rest of the hand readers. D1·5 took the last two,
+`set_action_end` and `add_zoom_action`'s region, and with them the last hand
+check in any handler. D1·6 deleted the shared launder, wrote the rule where
+the warning was, and made the proof fail twice on purpose.
+
+**The two behaviour changes an agent sees**, both deliberate, both in the
+catalog's own text now:
+
+1. **A nested object MERGES**, where at two doors it used to replace.
+   `{"video": {"shadow": {"blur": 40}}}` keeps the colour, the angle and the
+   distance; before D1·5 the same call rebuilt the shadow from
+   `ShadowProps`' defaults (measured: `opacity` 0.8 → 0.5, `distance` 30 →
+   8). `{"motion": {"in": …}}` keeps a stored `out`. `null` still clears a
+   key at any depth, and an array still replaces its whole list.
+2. **A colour is four numbers, `[r, g, b, a]`, each 0–1.** The three-element
+   form is refused by length and a component outside 0–1 is refused rather
+   than clamped, at every door including the two colour-only arguments
+   (`set_canvas`'s background, `add_background`'s colour). `chroma.key` is
+   the one colour the model really does spell `[r, g, b]`, and it is
+   unchanged.
+
+Everything else an agent meets is a refusal where a silent correction used
+to be: a misspelt enum at any depth, an unknown key by its dotted path with
+the array index in it, a wrong-typed value in an optional slot, an
+incomplete filter entry, and a region member spelled `widht`.
+
+**Measured, across the series.**
+
+| | Before D1 | After D1 |
+|---|---|---|
+| `AgentServer*` (the handlers and the argument vocabulary) | 6651 | **6034** (−617) |
+| — `AgentServer+Clips.swift` | 1222 | 847 |
+| — `AgentServer+Arguments.swift` | 554 | 445 |
+| — `AgentServer+Motion.swift` | 157 | deleted |
+| — `AgentServer+Background` / `+Tracks` / `+Render` | 89 / 231 / 561 | 100 / 242 / 563 |
+| `AgentCatalog*` (the tool prose) | 2222 | 2251 (+29) |
+| `ReelOps.swift` (the op table, exempt) | 974 | 1131 (+157 — eleven raw factories) |
+| `ReelCore.swift` | 1503 | 1507 |
+| `core/src/patch.rs` | — | **414** (new) |
+| `core/src/edit_props.rs` | 432 | 331 |
+| `core/src/edit_action.rs` / `edit_zoom.rs` / `props_check.rs` | 258 / 390 / 383 | 321 / 457 / 396 |
+| `make test` | 621 | **632** (`core/tests/patch_door.rs`, 9 tests over 597 lines) |
+| the patch-door proof | — | **261/261** over eleven doors, four files, 1368 lines |
+
+So the deepening's arithmetic is: **617 lines out of the agent's handlers
+and 470 into `core/src`** (687 added against 217 deleted), of which 414 is
+the new patch module — knowledge
+moved behind one interface rather than deleted outright, which is what §0's
+deletion test predicts and what makes the next property the core gains cost
+the Swift side nothing at all.
+
+**The two mutants the series owed**, run in D1·6 against every door at once:
+the launder restored at one door, patch_door **11/32 ABORTED**; the core's
+key walk disabled, patch_door **120/155 ABORTED**. Both reverted, both green
+again.
+
+**What is owed.**
+
+- **Two lines of unpaid toll in `AgentCatalog+Clips.swift`** (939 → 941,
+  over the cap and with no standing exemption), named by D1·5: what it took
+  on is the `set_action_end` description saying what is now true. The next
+  phase to touch that file pays or takes the exemption on purpose.
+- **Four lines in `ReelCore.swift`** (1503 → 1507, also over the cap), from
+  the raw factories' delegation notes in D1·3 and D1·4 less the initialiser
+  D1·6 deleted. Smaller than the toll above and in a file whose named seam
+  (the media and reverse machinery) is a phase of its own.
+- **Nothing else.** No format bump, no new tool, no new export, no change to
+  the tool count, and the startup parity check is untouched — which was
+  spec kpgalligan/reelcut#1's US27 and is why every older fixture still
+  passes.
+
+**What a later deepening should take from this one.** The prefactor-first
+order held: D1·1 and D1·2 made the core able to SAY what the Swift checks
+were saying, so every ticket after them was a deletion and each could be
+reverted on its own to be scored. The proof was born with the first door and
+grew a section per door, so the last three tickets could each be measured
+against every door at once. And the mutant tables are worth more than their
+counts: three of them found that nothing OUTSIDE the new proof discriminates
+the behaviour being deepened, which is the honest reason the instrument had
+to exist rather than a claim that the old scripts would have caught it.
+
+**Where the next candidate starts.** The two spec kpgalligan/reelcut#1 named
+as out of scope and did not close: deriving the catalog, the typed factories
+and the parity check from the core's op table (three mirrors of one list
+that a startup check compares by name only), and a refusal that carries its
+REASON for an op that returns nothing — today an identity and a refusal are
+indistinguishable at the FFI, which is why `editResult`'s "made no change"
+sentence has to guess at the cause and name the overlap rule to a caller who
+sent a patch.

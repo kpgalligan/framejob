@@ -390,14 +390,17 @@ free.
   `requiredColorArg` are gone: a colour is four numbers each 0–1 and nothing
   on this side fills in an alpha or clamps a component. `set_video` went
   through in D1·3, eight more doors in D1·4, and `set_action_end` and
-  `add_zoom_action`'s region in D1·5 — **every door is through**.
-  `patchArg`, `decodePatch`, `withOpaqueColors` and `nestedNumberArg` are
-  UNCALLED and kpgalligan/reelcut#7's to delete; their own docs say why the
-  move happened, and the short of it is that a round trip cannot see a
-  wrong-typed `T??` field (`nullable()` decodes it as a CLEAR), a nested
-  OBJECT decoded and re-serialised is a REPLACEMENT, and
-  `ProjectSnapshot`'s lenient enums turn a misspelt kind into the
-  vocabulary's first case.
+  `add_zoom_action`'s region in D1·5 — **every door is through**, and D1·6
+  deleted the family that used to launder one: `patchArg` and its round-trip
+  check, `decodePatch`, `withOpaqueColors` and `nestedNumberArg`. Three
+  measured reasons they went, worth knowing before writing another one: a
+  round trip cannot see a wrong-typed `T??` field (`nullable()` decodes it
+  as a CLEAR), a nested OBJECT decoded and re-serialised is a REPLACEMENT,
+  and `ProjectSnapshot`'s lenient enums turn a misspelt kind into the
+  vocabulary's first case. What is left in the file is what the core cannot
+  know — target and scope, an id checked against the container it names, a
+  time on the document's frame grid, and the in-band refusal — and its
+  header says so.
 
 **Shared chrome.** `Theme.swift` (`DS` tokens, including the three track
 heights S/M/L per kind), `Controls.swift`, `OptionControls.swift`,
@@ -427,6 +430,22 @@ undo step; any off-event path goes through `ProjectDocument.performGroupedEdit`.
 undo checkpoint `NSDocument` posts inside every save then raises, the
 exception is swallowed inside the file coordinator, and ⌘S and `save_project`
 hang for good.
+
+**Lenient decoding is for what the CORE wrote; nothing a caller wrote is
+decoded through it.** `ProjectSnapshot`/`MotionProps`' `lenient` and
+`nullable` exist so a project, plan, recipe or export setting a NEWER build
+wrote still opens — a misspelt kind becomes the first case, an unreadable
+value a default or a clear. Run over an agent's own object that same
+leniency is a silent correction, so a caller-authored object (a patch, a
+colour, a region, a new clip's text or shape) goes to the core unread
+through `rawPatchArg` and the RAW factory beside its typed one, and the core
+names the dotted path and the value it refused. A scalar enum ARGUMENT
+parsed by name is not this (`add_zoom_action`'s `fit`, `curveArg`,
+`set_transition`'s `kind`): what the rule forbids is decoding a caller's
+object through a lenient type. This replaced "check enums and types by hand
+at every door" in deepening D1 (`designs/reelcut-roadmap-7.md` §2, spec
+§7.9): the hand checks were deleted, not moved, and a new door that wants
+one is a door that has not been read.
 
 **Agent parity.** Every user-visible EDIT gets an MCP mirror: a handler, a
 catalog entry declaring `scope`, and a comment naming the UI path. Handlers

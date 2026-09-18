@@ -1,10 +1,26 @@
 import AppKit
 
-/// The shared argument vocabulary every agent handler reads its call with:
-/// the scalar coercions Rasterize's `AgentServer` carries, plus Reelcut's own
-/// id lookups (which validate against the snapshot so a wrong id is a message
-/// naming the tool that lists the right ones), the tick rule, and the patch
-/// decoders.
+/// The shared argument vocabulary every agent handler reads its call with —
+/// and, since deepening D1, ONLY what the core cannot know: which container
+/// a call means (`scopeArg`), an id checked against that container so a
+/// wrong one is a message naming the tool that lists the right ones, a time
+/// snapped to the document's frame grid, and the scalar coercions
+/// Rasterize's `AgentServer` carries. Each refuses a value it cannot read BY
+/// NAME, which is the in-band error shape every handler returns
+/// (`ToolError` → `isError: true`).
+///
+/// **Nothing here reads a caller-authored OBJECT.** A patch, a colour, a
+/// region — anything whose shape is the model's own vocabulary — goes to the
+/// core unread through `rawPatchArg` below, because the core is the one
+/// validator of what a patch may carry and names the dotted path and the
+/// value in every refusal (`core/src/patch.rs`; the phase is
+/// `designs/reelcut-roadmap-7.md` §2, spec kpgalligan/reelcut#1). The rule
+/// that replaced "check enums and types by hand at every door" is in
+/// `app/CLAUDE.md`: lenient decoding is for what the CORE wrote; nothing a
+/// caller wrote is decoded through it. D1·6 deleted the family that broke it
+/// — `patchArg` and its round-trip check, `decodePatch`, `withOpaqueColors`
+/// and `nestedNumberArg` — so no decoder for a caller's object is left here
+/// for a later door to reach for.
 ///
 /// It lives beside `AgentServer.swift` rather than inside it because that file
 /// is frozen at wiring (app/CLAUDE.md) and this is the piece every
@@ -30,8 +46,8 @@ extension AgentServer {
     /// would make `boolArg(a, "muted") ?? false` and
     /// `stringArg(a, "text")` indistinguishable from the omitted case, so a
     /// mistyped argument would be dropped in silence and the model would
-    /// believe an edit it never made — exactly the failure `patchArg` below
-    /// refuses an unknown key BY NAME to avoid, and exactly how
+    /// believe an edit it never made — the same failure the core refuses BY
+    /// NAME one level in, for a key inside a patch, and exactly how
     /// `add_text_clip`'s `text` came to swallow the object its own op
     /// documents. An argument of the wrong type is a caller bug and is
     /// reported like one.
@@ -400,26 +416,6 @@ extension AgentServer {
         return (from: from, to: to)
     }
 
-    /// A number one level down inside a shaped argument, named by its PATH —
-    /// `region.width`, not `width`.
-    ///
-    /// **UNCALLED since D1·5, and kpgalligan/reelcut#7's to delete with the
-    /// rest of the launder.** Its one caller was `zoomRegionArg`, which read
-    /// `add_zoom_action`'s region member by member because `patchArg`'s round
-    /// trip could not see a wrong TYPE one level down. `edit_zoom.rs`'s
-    /// `ZoomRegion` names one by the same path now.
-    func nestedNumberArg(
-        _ object: [String: Any], _ path: String, _ key: String
-    ) throws -> Double? {
-        guard let raw = object[key], !(raw is NSNull) else { return nil }
-        guard let value = Self.numeric(raw)?.doubleValue
-            ?? (raw as? String).flatMap(Double.init), value.isFinite
-        else {
-            throw ToolError(message: "\(path).\(key) must be a number.")
-        }
-        return value
-    }
-
     /// A caller-authored patch, forwarded to the core UNCHANGED — the door
     /// deepening D1 moves every property op to (`designs/reelcut-roadmap-7.md`
     /// §1, kpgalligan/reelcut#1).
@@ -445,118 +441,5 @@ extension AgentServer {
                     + "to change, e.g. {\"scale\": 0.5})")
         }
         return raw
-    }
-
-    /// A patch object decoded into its typed Swift form — the LAUNDER
-    /// `rawPatchArg` above replaced.
-    ///
-    /// **UNCALLED since D1·5 took `set_action_end`, the last of its doors,
-    /// and kpgalligan/reelcut#7's to delete** with `decodePatch` and
-    /// `withOpaqueColors` below — the contract step, which deletes the family
-    /// at once and writes the rule that replaces it.
-    ///
-    /// It was written to be stricter than the core's serde on both counts a
-    /// silent drop can happen: an unknown key is refused by NAME, and a key
-    /// whose value the patch could not read is refused too, rather than
-    /// either one leaving the model believing an edit it never made. The core
-    /// now refuses both, by their dotted path and with the value, which is
-    /// why the whole of this goes in kpgalligan/reelcut#7.
-    ///
-    /// **Why the second check is a round trip and not a type table.** Every
-    /// `…Patch` decodes leniently, field by field, so the core can add a
-    /// property without breaking this build (`ProjectSnapshot.lenient`) — and
-    /// leniency is exactly wrong for a value a CALLER wrote: `{"content":
-    /// "X", "color": "amber"}` decoded to the words with the colour dropped
-    /// and nothing said (measured). Spelling out a type per key would mean a
-    /// fourth mirror of the patch schemas to fall out of step with, so the
-    /// test is behavioural instead: decode again with the key removed, and if
-    /// that changes nothing then the key changed nothing.
-    ///
-    /// The check covers the patch's TOP-LEVEL keys and does not recurse. It
-    /// is sound there because every field of a `…Patch` is optional, so a
-    /// value that read correctly can never decode to the same thing as no
-    /// value at all — there is no way for this to refuse a patch that would
-    /// have worked. One level down that stops holding: `shadow` and `crop`
-    /// are concrete structs with real defaults, and a field set TO its default
-    /// would decode identically with the field removed, so recursing would
-    /// refuse perfectly good patches. A wrong-typed value INSIDE a nested
-    /// object was therefore dropped silently at every door this ran at — or
-    /// worse: a `T??` field read `5` as a CLEAR, so `{"video": {"shadow": 5}}`
-    /// REMOVED the shadow an action was animating and answered ok (measured,
-    /// D1·5).
-    func patchArg<T: Decodable & Equatable>(
-        _ a: [String: Any], _ key: String, _ type: T.Type, allowed: Set<String>
-    ) throws -> T {
-        guard let object = a[key] as? [String: Any] else {
-            throw ToolError(
-                message: "\(key) must be a JSON object of the properties to change, e.g. "
-                    + "{\"scale\": 0.5}")
-        }
-        let unknown = object.keys.filter { !allowed.contains($0) }.sorted()
-        if let first = unknown.first {
-            throw ToolError(
-                message: "Unknown \(key) key \"\(first)\" — allowed keys are "
-                    + allowed.sorted().joined(separator: ", ") + ".")
-        }
-        guard let decoded = Self.decodePatch(object, type) else {
-            throw ToolError(message: "\(key) could not be read as a property patch.")
-        }
-        // A null is not a dropped value: for a field that takes one it means
-        // "clear it", and for one that does not the documented reading is
-        // "leave it alone" — either way the key is doing what it says.
-        for name in object.keys.sorted() where !(object[name] is NSNull) {
-            var without = object
-            without.removeValue(forKey: name)
-            guard Self.decodePatch(without, type) == decoded else { continue }
-            throw ToolError(
-                message: "\(key).\(name) is not a value this key takes, so it would have "
-                    + "been ignored. Check its type against the tool's schema.")
-        }
-        return decoded
-    }
-
-    /// One decode of a patch object, or nil when it could not be read at all.
-    /// Split out of `patchArg` so the round-trip check runs the very same
-    /// normalisation and decoder the real answer came from — a check against a
-    /// different pipeline would be testing the check.
-    private static func decodePatch<T: Decodable>(
-        _ object: [String: Any], _ type: T.Type
-    ) -> T? {
-        let normalized = withOpaqueColors(object)
-        guard JSONSerialization.isValidJSONObject(normalized),
-            let data = try? JSONSerialization.data(withJSONObject: normalized),
-            let text = String(data: data, encoding: .utf8)
-        else { return nil }
-        return ReelJSON.decode(type, from: text)
-    }
-
-    /// Fills in the alpha of every `[r, g, b]` written under a `color` key,
-    /// at any depth — **UNCALLED since D1·5, and the last place in the app
-    /// where a three-element colour was ever accepted**.
-    ///
-    /// It was written when `colorArg` took three components at every
-    /// colour-only argument, so a caller learnt that three was allowed and
-    /// then wrote `{"color": [1, 0, 0]}` in a text or shadow patch. D1·4
-    /// deleted `colorArg` and the leniency it taught: a colour is four
-    /// numbers each 0–1 at every other door, refused by length and never
-    /// clamped (spec kpgalligan/reelcut#1). It ran from `patchArg` alone, so
-    /// it reached `set_action_end`'s patch and nothing else; D1·5 took that
-    /// door raw and #7 deletes this with the rest. Keyed on the NAME `color`
-    /// and applied only
-    /// to a three-number array, so `video.color` (a `ColorAdjust` object) and
-    /// `chroma.key` — the one colour the core really does spell `[r, g, b]` —
-    /// are both left alone.
-    private static func withOpaqueColors(_ object: [String: Any]) -> [String: Any] {
-        var out = object
-        for (key, value) in object {
-            if let nested = value as? [String: Any] {
-                out[key] = withOpaqueColors(nested)
-            } else if key == "color", let array = value as? [Any], array.count == 3,
-                array.allSatisfy({ ($0 as? NSNumber)?.doubleValue.isFinite == true })
-            {
-                out[key] = array + [1.0]
-            }
-        }
-        return out
     }
 }

@@ -201,7 +201,7 @@ would be the bare strip with a longer list.
 ## 3. The size debt
 
 Every file over the ~600-line cap as of 2026-09-17 — 30 of them, the
-list regenerated at road map 7's D1·5.
+list regenerated at road map 7's D1·6, which closed deepening D1.
 Regenerate the list with
 `wc -l app/Sources/*.swift core/src/*.rs | awk '$1>600 && $2!="total"' | sort -rn`
 rather than trusting the numbers here; the standing exemptions are
@@ -213,7 +213,7 @@ row per op.
 | `app/Sources/ProjectSnapshot.swift` | 2516 |
 | `app/Sources/InspectorPane.swift` | 1665 |
 | `app/Sources/TimelineView.swift` | 1630 |
-| `app/Sources/ReelCore.swift` | 1510 |
+| `app/Sources/ReelCore.swift` | 1507 |
 | `app/Sources/VideoPane.swift` | 1411 |
 | `app/Sources/Compositor.swift` | 1391 |
 | `app/Sources/ProjectDocument.swift` | 1353 |
@@ -257,7 +257,7 @@ when a fix took each over its line — and left two files AT the cap:
 | `ProjectDocument.swift` | 1348 | Stored properties cannot move to an extension; the natural cut is the media/reverse machinery, NOT the scope. `ProjectDocument+DisplayStem.swift` is the shape a pure addition takes meanwhile; road map 3 added ONE internal method (`adoptImported`, +12 lines) so `ProjectDocument+Recording.swift` could build the untitled document by File ▸ Open's own spelling |
 | `TimelineView.swift` | 1630 | Frozen. Of the five lines the cache marker added, one is behaviour (the hit-clearing under `replaced`) |
 | `ExporterWriter.swift` | 1114 | Over since phase 7; its seam — the settings/encoder half — is still unpaid |
-| `AgentServer+Clips.swift` | 1196 | Over since phase 6. Road map 7's D1·3, D1·4 and D1·5 took it to **847** by deleting what the agent door used to check by hand — the last of it `checkActionPatch`, `checkVideoEnums`, `checkTextEnums`, the three per-group key sets and the region reader. What D1·6 still takes is in `AgentServer+Arguments.swift`, not here |
+| `AgentServer+Clips.swift` | 1196 | Over since phase 6. Road map 7's D1·3, D1·4 and D1·5 took it to **847** by deleting what the agent door used to check by hand — the last of it `checkActionPatch`, `checkVideoEnums`, `checkTextEnums`, the three per-group key sets and the region reader. D1·6 took the shared launder out of `AgentServer+Arguments.swift` (562 → **445**, under the cap and not in the list above), so the whole `AgentServer*` family is **617 lines smaller than before D1**. The seam still unpaid here is the clip-placement handlers against the property doors |
 
 **None of this is work on its own.** It is the list a feature phase consults
 so it pays the toll first and alone, the way `d69de99`, `b410125` and

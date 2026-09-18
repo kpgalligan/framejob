@@ -10,12 +10,16 @@ references are as of the phase that wrote them and are not maintained, and a
 file or a function it describes may since have been DELETED — `app/CLAUDE.md`'s
 map is the list of files that exist, and this one is not edited to follow it.
 Deepening D1 (`designs/reelcut-roadmap-7.md`) took out a whole family at once:
-the agent door's hand readers and hand checks — `colorArg`, `shapePatchArg`,
-`gradientArg`, `textArg`, `shapeArg`, `unitPoint`, `checkClipPatchTypes`,
-`zoomRegionArg`, `checkActionPatch`, `checkVideoEnums`, `checkTextEnums` and
-the per-group allowed-key sets — which the paragraphs below still argue for.
-`patchArg`, `decodePatch`, `withOpaqueColors` and `nestedNumberArg` are dead
-with them and go in kpgalligan/reelcut#7.
+the agent door's hand readers and hand checks — `colorArg`,
+`requiredColorArg`, `shapePatchArg`, `gradientArg`, `textArg`, `shapeArg`,
+`unitPoint`, `checkClipPatchTypes`, `checkActionPatch`, `checkVideoEnums`,
+`checkTextEnums`, the per-group allowed-key sets, and in D1·6 `patchArg`
+with its round-trip check, `decodePatch`, `withOpaqueColors`,
+`nestedNumberArg` and `ClipPatch`'s lenient `init(from:)` — all of which the
+paragraphs below still argue for. `zoomRegionArg` survives as eight lines
+that read NOTHING about the region and refuse only an absent one. The rule
+that replaced the paragraphs is in `app/CLAUDE.md`: lenient decoding is for
+what the core wrote; nothing a caller wrote is decoded through it.
 
 ## Archived text — app/CLAUDE.md — Swift app rules
 

@@ -1298,19 +1298,18 @@ struct ShapePatch: Equatable {
 /// it unvalidated — the `Marker.color` policy — so the builder does not
 /// check it either; `ClipLabel.color(named:)` absorbs a name this build
 /// does not know.
-struct ClipPatch: Codable, Equatable {
+///
+/// A WRITER only — `Equatable`, not `Codable`, `ShapePatch`'s shape. Its
+/// lenient `init(from:)` read the agent door's `set_clip` argument until
+/// D1·4 sent that argument to the core unread, and D1·6 deleted it rather
+/// than leave a lenient reading of a caller's object in the tree.
+struct ClipPatch: Equatable {
     var name: String??
     var label: String??
 
     init(name: String?? = nil, label: String?? = nil) {
         self.name = name
         self.label = label
-    }
-
-    init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        name = c.nullable(.name)
-        label = c.nullable(.label)
     }
 
     var dictionary: [String: Any] {
