@@ -323,6 +323,62 @@ fn every_closed_vocabulary_answers_with_its_own_members() {
     }
 }
 
+/// A published BOUND is a rule the core refuses outside, and the proof is
+/// the core's own refusal: each end is put to it one step out and the
+/// answer must name the range — WITH its two numbers, which is what makes
+/// a bound retyped a digit off a failure here rather than a promise an
+/// agent finds out about.
+///
+/// The ends themselves are sent too, and must not draw that answer. They
+/// are not asserted to APPLY: a bounded argument on a clip op would still
+/// meet an unknown id in this blank project, and the claim being made is
+/// about the range and nothing else.
+///
+/// **A bound nothing enforces must not be published**, which is the half
+/// this test is really for: `set_speed`'s `rate` CLAMPS to 0.1–10 rather
+/// than refusing, so a row that published it would fail here at the first
+/// probe — the core would apply 0.05 and say nothing.
+#[test]
+fn every_published_bound_is_one_the_core_refuses_outside() {
+    let project = project();
+    let mut proved = 0;
+    for row in &OP_TABLE {
+        for argument in row.arguments {
+            let Some(bound) = argument.bound else {
+                continue;
+            };
+            proved += 1;
+            let range = format!("must be between {} and {}", bound.min, bound.max);
+            for outside in [i64::from(bound.min) - 1, i64::from(bound.max) + 1] {
+                let op = with(row, argument.name, json!(outside));
+                let message = project.try_apply(&op).expect_err(&format!(
+                    "{}: {} took {outside}, which the published bound says is outside \
+                     {}–{}",
+                    row.name, argument.name, bound.min, bound.max
+                ));
+                assert_contains(&message, &range);
+                assert_contains(&message, &format!("not {outside}"));
+            }
+            for end in [bound.min, bound.max] {
+                let op = with(row, argument.name, json!(end));
+                if let Err(message) = project.try_apply(&op) {
+                    assert!(
+                        !message.contains(&range),
+                        "{}: {} refused {end}, which its own published bound calls legal: \
+                         {message}",
+                        row.name,
+                        argument.name
+                    );
+                }
+            }
+        }
+    }
+    assert!(
+        proved > 0,
+        "no argument carries a bound — this test would pass on an empty table"
+    );
+}
+
 /// An opaque object is opaque: the decoder takes a string where a patch
 /// belongs, and whatever refuses it refuses it further in. That is the
 /// claim `Kind::Object` makes, and it would stop being true the moment a

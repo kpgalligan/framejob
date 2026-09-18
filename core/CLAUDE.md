@@ -58,13 +58,18 @@ file is what governs a module now.
   nests. The semantics table is the reason this file is over the size cap
   and stays exempt (below).
 - `op_table.rs` — the op table as DATA (road map 7's D3): one `OpRow` per
-  op and one `Argument` per argument — its name, its `Kind` and whether the
-  decoder requires it — and `OP_NAMES` as a projection of it, re-exported by
+  op and one `Argument` per argument — its name, its `Kind`, whether the
+  decoder requires it and, for the few that have one, its `Bound` — and
+  `OP_NAMES` as a projection of it, re-exported by
   `edit.rs` so no caller moved. A published interface, where the `Op` enum
   and the dispatch are its implementation. Its one reader in the crate is
-  `op_schema.rs`, which carries the rows out through the FFI; nothing in the
-  APP reads a row yet — the catalog and the startup check are the later D3
-  tickets, and `OP_NAMES` is the part of it already consumed. A row holds no prose, no semantics and no default
+  `op_schema.rs`, which carries the rows out through the FFI; the APP's
+  reader is the clip half of the agent catalog, which prints these rows
+  instead of restating them. **A `Bound` is published only where the core
+  REFUSES outside it** — `set_canvas`'s two dimensions, sourced from
+  `edit_canvas.rs`'s own constants and never retyped — and never where it
+  CLAMPS, which is the app's to say in its prose.
+  A row holds no prose, no semantics and no default
   spelled twice; `Kind` is closed, carries each vocabulary's members, and
   has exactly ONE kind per answer serde gives, because a distinction the
   decoder cannot see is one no test could prove. Nothing here is the

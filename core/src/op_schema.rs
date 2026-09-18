@@ -47,7 +47,7 @@
 
 use serde_json::{json, Map, Value};
 
-use crate::op_table::{Kind, OpRow, OP_TABLE};
+use crate::op_table::{Argument, Kind, OpRow, OP_TABLE};
 
 /// Every op's arguments as JSON Schema, keyed by op name: the whole table
 /// in one object, in `OP_TABLE` order. The keys are exactly `OP_NAMES` —
@@ -72,7 +72,7 @@ pub fn op_schemas() -> Value {
 fn schema_of(row: &OpRow) -> Value {
     let mut properties = Map::new();
     for argument in row.arguments {
-        properties.insert(argument.name.to_string(), schema_of_kind(argument.kind));
+        properties.insert(argument.name.to_string(), schema_of_argument(argument));
     }
     let required: Vec<&str> = row
         .arguments
@@ -85,6 +85,25 @@ fn schema_of(row: &OpRow) -> Value {
         "properties": Value::Object(properties),
         "required": required,
     })
+}
+
+/// One argument as JSON Schema: its [`Kind`], narrowed by its [`Bound`]
+/// where the table gives it one.
+///
+/// A bound is written as `minimum` and `maximum` over whatever the kind
+/// already said, which for the two canvas dimensions REPLACES the `0` that
+/// [`Kind::Id`] carries — 16 is the smaller claim and the true one. It is
+/// published only where the core refuses outside it (`op_table.rs`'s rule),
+/// so a caller may read these two numbers as a rule and not as advice.
+///
+/// [`Bound`]: crate::op_table::Bound
+fn schema_of_argument(argument: &Argument) -> Value {
+    let mut schema = schema_of_kind(argument.kind);
+    if let (Some(bound), Some(object)) = (argument.bound, schema.as_object_mut()) {
+        object.insert("minimum".to_string(), json!(bound.min));
+        object.insert("maximum".to_string(), json!(bound.max));
+    }
+    schema
 }
 
 /// One kind as JSON Schema — the constraint the catalog writes by hand for

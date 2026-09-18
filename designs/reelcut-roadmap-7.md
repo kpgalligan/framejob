@@ -3502,3 +3502,46 @@ paragraph rewrapped, and `spec #14` spelled in full.
 **Owed.** The catalog's migration, the fifth part of the parity check, the
 widening list, the nullability question above, and the proof scripts that
 stop re-typing argument names in Python.
+
+### 8.3 D3·3 — the clip tools read the core (kpgalligan/reelcut#17)
+
+**Commits.** `PLACEHOLDER_ONE` (the prefactor: the table's bound) and
+`PLACEHOLDER_TWO` (the migration, the declarations list and the proof).
+
+**The ticket's amendment, and why it came first.** #16 measured two facts
+that would have made two tools WORSE on the way through, so the ticket
+gained a rule before any tool moved: **a bound the core REFUSES outside
+belongs in the op table and is published; a bound it merely CLAMPS to, a
+null that MEANS something, and a bare-string shorthand are the app's —
+declared, with a reason each.** The first half is the prefactor below; the
+second is the declarations list.
+
+#### The prefactor — a bound in the table
+
+`set_canvas`'s `width` and `height` are refused outside 16–16384 by
+`edit_canvas.rs`, and the catalog hand-wrote that range while the published
+schema said only `minimum: 0`. `Argument` gains an optional `Bound`, and the
+two canvas dimensions are the only rows that take one:
+
+- **`CANVAS_MIN` / `CANVAS_MAX` became `pub(crate)`** and are handed to the
+  row through `within(opt("width", Id), CANVAS_MIN, CANVAS_MAX)`. The bound
+  is SOURCED from the constant the refusal is written against; the two
+  numbers are not typed a second time anywhere.
+- **`Bound` is two `u32`s**, because the one rule that qualifies today is a
+  canvas dimension and a bound follows the constant that enforces it. An
+  argument whose bound is not a whole number is a deliberate widening of the
+  type, not a cast at a call site.
+- **`op_schema.rs` publishes it as `minimum` / `maximum`**, REPLACING the
+  `0` `Kind::Id` carries: 16 is the smaller claim and the true one.
+- **`set_speed`'s `rate` is the near miss and stays out.** The core refuses
+  a non-positive rate and then CLAMPS 0.1–10, so the range is not a rule; it
+  is a row of the declarations list instead, with the clamp as its reason.
+
+**The test is the core's own refusal.** `every_published_bound_is_one_the
+_core_refuses_outside` puts each end one step out and reads the answer back,
+asserting the sentence names the range WITH its two numbers and the value it
+refused — so a bound retyped a digit off fails here rather than reaching an
+agent — then sends the ends themselves and insists they draw no such answer.
+A bound nothing enforces is what it is really for: a row published for
+`rate` would fail at the first probe, because the core would apply 0.05 and
+say nothing.

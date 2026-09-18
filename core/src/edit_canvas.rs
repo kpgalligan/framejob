@@ -26,8 +26,12 @@ use crate::time::{self, Fps, Ticks};
 /// Canvas dimension bounds. The floor is small enough for a thumbnail-sized
 /// document and large enough that the compositor has pixels to work with;
 /// the ceiling is past 8K, where a single frame is already 130 MB.
-const CANVAS_MIN: u32 = 16;
-const CANVAS_MAX: u32 = 16384;
+///
+/// `pub(crate)` because `op_table.rs` publishes this range as `width`'s and
+/// `height`'s bound: the published bound is SOURCED from the constant the
+/// refusal below is written against, never retyped beside it.
+pub(crate) const CANVAS_MIN: u32 = 16;
+pub(crate) const CANVAS_MAX: u32 = 16384;
 
 // ---- helpers -------------------------------------------------------------
 

@@ -40,7 +40,7 @@ use serde_json::{json, Map, Value};
 
 use common::{take_string, Handle};
 use reelcut_core::ffi_query::rc_op_schemas;
-use reelcut_core::op_table::{Kind, OpRow, OP_NAMES, OP_TABLE};
+use reelcut_core::op_table::{Argument, Kind, OpRow, OP_NAMES, OP_TABLE};
 
 /// The export's answer, parsed. Every call frees the string it read, which
 /// is the header's rule for every `char *` the library hands back.
@@ -76,12 +76,28 @@ fn row(name: &str) -> OpRow {
         .unwrap_or_else(|| panic!("no row for {name:?}"))
 }
 
+/// What an argument must publish: its kind, narrowed by its bound where
+/// the table gives it one.
+///
+/// A bound REPLACES the kind's own `minimum`, which for the two canvas
+/// dimensions means 16 rather than `Kind::Id`'s 0 — the smaller claim, and
+/// the one the core enforces. Written out here rather than asked of the
+/// core, so a bound that reached the table and not the schema is named.
+fn expected(argument: &Argument) -> Value {
+    let mut schema = expected_kind(argument.kind);
+    if let (Some(bound), Some(object)) = (argument.bound, schema.as_object_mut()) {
+        object.insert("minimum".to_string(), json!(bound.min));
+        object.insert("maximum".to_string(), json!(bound.max));
+    }
+    schema
+}
+
 /// What each kind must publish, written out here rather than asked of the
 /// core. A closed vocabulary's MEMBERS are read from `Kind::values` on
 /// purpose: which members there are is proved against the decoder in
 /// `core/tests/op_table.rs`, and the claim here is that they reach the
 /// schema, in that order, under `enum`.
-fn expected(kind: Kind) -> Value {
+fn expected_kind(kind: Kind) -> Value {
     let whole = json!({"type": "integer", "minimum": 0});
     match kind {
         Kind::Ticks => json!({"type": "integer"}),
@@ -268,7 +284,7 @@ fn every_argument_is_published_as_its_kind_says() {
         for argument in op.arguments {
             assert_eq!(
                 properties[argument.name],
-                expected(argument.kind),
+                expected(argument),
                 "{}.{}: published as the wrong kind",
                 op.name,
                 argument.name

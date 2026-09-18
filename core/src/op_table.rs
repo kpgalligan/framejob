@@ -20,6 +20,22 @@
 //! field is missing, and a value of the wrong kind makes it answer with the
 //! kind it wanted. A row that lies fails that test.
 //!
+//! ### The bound
+//!
+//! An argument may carry a [`Bound`], and the rule for one is narrow: **a
+//! bound the core REFUSES outside is published; a bound it CLAMPS to is
+//! not.** A published range is a promise a caller can build a call from,
+//! and a range that quietly corrects what it is handed would make that
+//! promise false in the one direction a caller could not see. So
+//! `set_canvas`'s two dimensions carry one — `edit_canvas.rs` refuses
+//! outside 16–16384 by name — and `set_speed`'s `rate`, which refuses a
+//! non-positive rate and then clamps 0.1–10, carries none: the clamp is
+//! the app's to say, in the tool prose that already says it.
+//!
+//! A bound is SOURCED from the constant that enforces it and never retyped
+//! here, which is what `core/tests/op_table.rs` checks by putting each end
+//! to the core and reading the refusal — including the numbers in it.
+//!
 //! ### The kinds
 //!
 //! The vocabulary is closed and spelled the way `edit.rs`'s argument column
@@ -57,6 +73,7 @@
 //!
 //! [`Op`]: crate::edit::Op
 
+use crate::edit_canvas::{CANVAS_MAX, CANVAS_MIN};
 use Kind::*;
 
 /// How many ops there are. `edit.rs`'s enum, its dispatch and this table
@@ -79,6 +96,25 @@ pub struct Argument {
     pub name: &'static str,
     pub kind: Kind,
     pub required: bool,
+    /// The range the core refuses outside, for the few arguments that have
+    /// one (the module doc's rule). `None` is the ordinary case, and it
+    /// means the kind is the whole of what is known — never "unbounded in
+    /// fact".
+    pub bound: Option<Bound>,
+}
+
+/// The two ends of a range an op refuses outside, as the op's own module
+/// spells them.
+///
+/// Whole numbers because the one rule that qualifies today is a canvas
+/// dimension, whose two constants are `u32`, and a bound is taken from the
+/// constant that enforces it. An argument whose bound is not a whole number
+/// is a widening of this type, made deliberately and proved the same way,
+/// rather than a cast written at a call site.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Bound {
+    pub min: u32,
+    pub max: u32,
 }
 
 /// What an argument's value IS — never what it is for (spec §7.9: the core
@@ -147,6 +183,7 @@ const fn req(name: &'static str, kind: Kind) -> Argument {
         name,
         kind,
         required: true,
+        bound: None,
     }
 }
 
@@ -156,6 +193,16 @@ const fn opt(name: &'static str, kind: Kind) -> Argument {
         name,
         kind,
         required: false,
+        bound: None,
+    }
+}
+
+/// [`req`] or [`opt`], bounded — the two ends handed in as the constants
+/// the op's own module refuses by, never as literals.
+const fn within(argument: Argument, min: u32, max: u32) -> Argument {
+    Argument {
+        bound: Some(Bound { min, max }),
+        ..argument
     }
 }
 
@@ -244,7 +291,9 @@ pub const OP_TABLE: [OpRow; OP_COUNT] = [
          opt("color", Text)]),
     op("remove_marker", &[req("marker", Id)]),
     op("set_canvas",
-       &[opt("width", Id), opt("height", Id), opt("fps", FrameRate), opt("background", Color),
+       &[within(opt("width", Id), CANVAS_MIN, CANVAS_MAX),
+         within(opt("height", Id), CANVAS_MIN, CANVAS_MAX),
+         opt("fps", FrameRate), opt("background", Color),
          opt("rescale_clips", Boolean), opt("fit_new_clips", Boolean),
          opt("timecode_frames", Boolean)]),
     op("add_media", &[req("descriptor", Object)]),
