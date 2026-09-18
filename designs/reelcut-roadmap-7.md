@@ -2208,7 +2208,7 @@ files came down or held. Three things are named rather than done:
 ### 5.3 D2·3 — the remaining rules speak (kpgalligan/reelcut#11)
 
 **Commits.** `1f8cf38` (the size toll, alone and pure), `a531fb0` (the
-ticket) and `SHA3` (what its review found, below).
+ticket) and `0b91795` (what its review found, below).
 
 **What landed.** Core only, plus the tests and the proof that measure it and
 four app comments the change made false. No FFI change, no new export, no op
@@ -2383,7 +2383,7 @@ glossary, spec §5.5 and both rulebooks' Errors rules are D2·5's.
 
 **What its review found.** The two-axis review ran against `a531fb0`. The
 standards axis found no hard violation of a documented standard; both axes
-found real things. Fixed in `SHA3`:
+found real things. Fixed in `0b91795`:
 
 - **A latent panic in `clip_list`.** `some[..some.len() - 1]` underflows on
   an empty slice, which `core/CLAUDE.md`'s "no input may panic" forbids
