@@ -282,12 +282,11 @@ def main():
 
     mcp = MCP(port)
     # One read of the catalog, kept both ways round: the ORDER is what finds
-    # the clip group, and the map is what every check below reads. (`mcp.py`
-    # answers names only; the shared schemas accessor is a later ticket's, so
-    # this reaches into the same private request five other scripts do.)
-    listed = mcp._request("tools/list", {})["tools"]
-    tools = {tool["name"]: tool for tool in listed}
-    order = [tool["name"] for tool in listed]
+    # the clip group, and the map is what every check below reads. Both come
+    # from `mcp.schemas()`, the shared accessor road map 7's D3·5 added, and
+    # a dict keeps the catalog's own order.
+    tools = mcp.schemas()
+    order = list(tools)
 
     print("\n1 — the group: a contiguous run of the catalog, and the core says which of "
           "it is ops")

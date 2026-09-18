@@ -62,7 +62,18 @@ class MCP:
         self._post({"jsonrpc": "2.0", "method": method, "params": params or {}}, notify=True)
 
     def tools(self):
-        return [t["name"] for t in self._request("tools/list", {})["tools"]]
+        return list(self.schemas())
+
+    def schemas(self):
+        """Every tool `tools/list` reports, WHOLE — name, description and
+        inputSchema — keyed by name, in the catalog's own order.
+
+        `tools()` above answers names only, so seven scripts used to reach
+        into `_request` for the rest; this is the one accessor they share
+        (road map 7's D3·5). A dict rather than the raw array because every
+        caller but one wanted `{name: tool}` anyway, and `.values()` is the
+        array back in catalog order."""
+        return {tool["name"]: tool for tool in self._request("tools/list", {})["tools"]}
 
     def call(self, name, **arguments):
         """Call a tool with keyword arguments. A tool ARGUMENT spelled `name`

@@ -414,6 +414,15 @@ free.
   have never declared is not a row until someone decides to OFFER it,
   because a schema narrower than what is accepted costs a caller nothing
   where a wider one is a promise the app breaks.
+  `AgentServer+Parity.swift` is the FIFTH part of the startup parity check —
+  the one part that looks INSIDE an op tool's schema: its arguments must be
+  the core's own (both directions, the envelope's two keys and the
+  declarations list apart), each one must carry a description, and a
+  description whose key is no argument is a complaint rather than a sentence
+  `opTool` drops in silence. Parts 1 to 3 stay in the frozen file with the
+  private dispatch table they read and part 4 in `AgentServer+Scope.swift`
+  with the feature it is about; all five assert in debug, log `Reelcut: ` in
+  release and start the server either way.
   `target(_:)` resolves the implicit document through
   `NSApp.orderedDocuments`, never `documents.first`, and an explicit path
   through `AgentServer.canonical`. `offMainTools` names the handlers that

@@ -4037,3 +4037,174 @@ comes out of it, for #19 and for anything after: **a generated artefact is
 checked by asking the thing that generated it a question it did not write
 the answer to** — the running app for a declaration, the core's own refusal
 sentence for a bound.
+
+### 8.5 D3·5 — the fifth part of the check, and a proof for all 57 (kpgalligan/reelcut#19)
+
+**Commits.** `PLACEHOLDER_ONE` (the fifth part and the proof),
+`PLACEHOLDER_TWO` (the mutants and the whole proof tree) and
+`PLACEHOLDER_THREE` (what the review found, below).
+
+**What landed.** The startup parity check's fifth part, the proof that puts
+the property to the running binary, and the shared `tools/list` accessor.
+No Rust file moved (`make test` is 671, as before), no op, no tool, no
+format bump; the catalog is 77 tools and 57 op tools, as it has been since
+road map 5's E1.
+
+- **`app/Sources/AgentServer+Parity.swift` is new, 172 lines** against the
+  400-line cap for a new file. It holds part 5 and nothing else. Parts 1 to
+  3 stay in the frozen `AgentServer.swift` with the PRIVATE dispatch table
+  they read — moving them would have meant widening `handlers` — and part 4
+  stays in `AgentServer+Scope.swift` with the feature it is about. The
+  frozen file came DOWN, 783 → **774**: what it lost is the two paragraphs
+  describing the gap this part closes, and what it gained is one `??` and a
+  fifth bullet.
+- **The comparison is names, in both directions**, per op tool, with the
+  injected `project` and `scope` excluded and `AgentServer.declarations`
+  read for the names a row adds. A mismatch names the op, the argument and
+  the side — *declared by the tool and in neither the table nor the
+  declarations* against *in the table or a declarations row and not declared
+  by the tool*. The union is the core's row exactly today, because all
+  fourteen rows name an argument the table publishes, and it is written as a
+  union anyway: a row naming an argument the core has NOT got makes
+  `declaredInput` emit nothing for it, so the tool cannot declare it and this
+  part says the row is stale — `opsWithoutTools`'s staleness check, at
+  startup instead of in a proof script.
+- **Two complaints about PROSE, which is where the drift was.** #17's review
+  named the first as this ticket's: `opTool` walks the CORE's published
+  properties and hands each one its sentence, so a prose key the table has
+  never heard of reaches nothing and the description is dropped in silence.
+  Nothing in the built catalog remembers it, so `AgentServer.noteProse` is
+  told while the catalog is BUILT — one static keyed by op, written by
+  `opTool` and read by the check, both inside `start()`'s single build on the
+  main thread. The second is the other direction, and it is
+  `AgentCatalog.declaredInput`'s own doc comment made true: an argument with
+  NO description reaches an agent as a bare type, which is spec
+  kpgalligan/reelcut#14's second user story.
+- **App-state tools are skipped by part 4's rule** — `ops.contains(name)`,
+  the core's own op list — and the proof measures that: an app-state tool
+  broken the same way draws nothing.
+- **The reporting is identical to the other four**: one line, every offender
+  in it, `assertionFailure` in debug and `NSLog("Reelcut: %@")` in release,
+  and the server starts either way. Whether a parity failure should stop the
+  launch was not reopened.
+
+**The drift the first run found: ten arguments over four op tools shipping
+to an agent with no description at all.** Nothing was wrong with any NAME —
+the fifth part's headline comparison found zero mismatches in either
+direction, which after four migrations is the honest result and is what the
+record says. What it found is the prose half:
+
+| Op | Arguments with no description | What an agent saw |
+|---|---|---|
+| `set_track` | `name`, `hidden`, `muted`, `locked`, `solo` | five bare types — `["boolean", "string"]` and a `string` — with the four switches explained in the TOOL's description and not one of them on the argument |
+| `set_marker` | `name`, `chapter` | the same, beside `marker`, `time` and `color`, which have always had one |
+| `add_marker` | `name` | the same, beside `at`, `chapter` and `color` |
+| `set_canvas` | `width`, `height` | two bare integers carrying the core's `minimum: 16, maximum: 16384` and no sentence |
+
+**When it drifted, read back from the source rather than guessed.** None of
+the ten is new and none is a migration's doing: `set_canvas`'s two were
+never described (D3·4's own comment says so in the line this ticket
+replaced — *"neither has ever carried prose"*), and the `set_track`,
+`set_marker` and `add_marker` sentences were never written either, because
+`tool(…)` let a schema declare a property without one and nothing anywhere
+asked. They have been in the catalog since road map 2's phase 1. The fix is
+ten sentences and the two canvas ones deliberately do NOT repeat the
+16–16384: the bound is the core's, published from the constants
+`edit_canvas.rs` refuses by, and a number spelled twice is what this whole
+candidate deletes.
+
+**The proof.** `tools/proof/op_argument_proof.py`, **79/79**, over MCP with
+a probe of its own, built BEFORE the first MCP call. It is written against
+the series rule D3·3 and D3·4 each paid for — **a generated artefact is
+checked by asking the thing that generated it a question it did not write
+the answer to** — because the fifth part reads the same table the catalog
+prints and therefore cannot see the class that caused both regressions.
+
+Its five sections: **the fifth part made to complain** (the probe builds the
+catalog this binary registers, puts it to `AgentServer.argumentFailure`,
+which must say nothing, and then puts four broken catalogs to it, each of
+which must be named with its op, its argument and the side — while an
+app-state tool broken the same way draws nothing); **the catalog's size**,
+EXACTLY 77 and the shipped binary's parity log empty; **the attribution**,
+which is a different question from `op_catalog_proof.py`'s and not a third
+copy of its oracle — every difference between a tool's schema and the core's
+table must be one a declarations row NAMES, key by key, and the inverse,
+that every one of the fourteen rows accounts for at least one difference, so
+a row that changes nothing fails here; **the misspelt argument, for all 57**;
+and **the opaque doors**.
+
+**The misspelt-argument section is what the ticket was really asking for,
+and what it proves is not what the ticket predicted.** For each of the 57:
+one CONTROL call with every required argument spelled right, which must not
+be refused for a MISSING argument — that is the tool's required list proved
+SUFFICIENT against the running app — and then one call per required argument
+with that argument misspelt, which must be refused naming it. **That is a
+check that every argument the catalog PRINTS from the core's table is one a
+hand-written handler really reads**, which no comparison of two lists can
+be, and it is the class the fifth part cannot see. The values are derived
+from the core's published kinds rather than typed: an id by name (the five
+entity ids are the only argument names in the file, each checked against the
+core's table first), a time as a second per argument in table order, a
+bound's own minimum, a vocabulary's first member. Six op tools require
+nothing at all and are NAMED rather than counted — `add_background`,
+`add_marker`, `add_track`, `remove_empty_tracks`, `set_canvas`, `split` —
+because a misspelt OPTIONAL argument is silently ignored by every tool, and
+four of the six are the declarations list's own playhead rows.
+
+**The ticket's "the core names it by its dotted path" is false of an
+ARGUMENT, and the section says what is true instead.** An op argument never
+reaches the core's decoder at all — the handlers read arguments one at a
+time and build the op (spec kpgalligan/reelcut#14's twelfth decision) — so
+the sentence naming a misspelt argument is the APP's, in three shapes, all
+anchored to the argument's own name: `Missing required argument: <name>`
+(the shared vocabulary), `<op> needs <name>` (`set_transition`, which lists
+the kinds with it) and `<name> must be <what>` (`set_speed`'s rate,
+`move_track`'s index, `add_media`'s descriptor, `paste`'s payload,
+`set_reversed`'s flag — a handler's own sentence for a reader that answered
+nil). The dotted path is the CORE's and it belongs to a KEY inside a
+caller's object, which is section 4: nine of the eleven opaque doors answer
+`unknown key "nosuchkey" in a video patch` and the like. The two `payload`
+doors are named rather than skipped — `pastePayloadArg` checks a payload is
+an object with clips in it before forwarding, so a payload valid enough to
+reach the core's unknown-key answer is a whole Copy payload this fixture
+does not make — and what IS true of them is asserted instead.
+
+**The shared accessor.** `mcp.py` gained `schemas()`, every tool `tools/list`
+reports keyed by name in catalog order, and `tools()` is now a projection of
+it. **Seven scripts reached into `mcp._request` and not five** as the ticket
+said: `clip_catalog_proof`, `op_catalog_proof`, `phase4_proof`,
+`phase5_proof`, `phase7_proof`, `phase9_proof` and `recording_proof`. All
+seven moved and not one assertion changed; `clip_catalog_proof`'s ORDER read
+is `list(tools)`, which a dict preserves.
+
+**The tool-count handover cost NOTHING, which is the first time that has
+happened to a handover that moved the number.** No script in the tree held
+an exact count to give up: road map 5's E1 had already turned
+`recording_proof.py`'s 75 into a floor, and D3 adds no tool, so the 77 this
+script takes is the count the catalog has carried since E1. What had drifted
+was the PROSE — `recording_proof.py`'s docstring and its section banner
+still called its 75 exact, and `tools/proof/README.md`'s handover paragraph
+still named it the owner. Both corrected, and the README's op-catalog
+section with them (*135 of the 145 arguments described* is 145 of 145 now,
+and *13 declarations rows* is 14).
+
+**One rulebook sentence was amended rather than left false**: the root
+`CLAUDE.md`'s parity rule said FOUR parts and that the check cannot see
+argument TYPES. It says five now, and that what it cannot see is a CALL.
+kpgalligan/reelcut#20 lists that amendment among its own criteria; it is
+done, and what is left there is the spec, the Rust module map, the README's
+prose op list and the ledger's row-by-row regeneration.
+
+**Verified.** `make test` **671 passed / 0 failed** (unchanged: no Rust file
+moved); `cargo fmt --check` clean; `make lint` clean; `make typecheck` 0
+errors and exactly the four known AVFoundation warnings; `make app` BUILD
+SUCCEEDED; the built binary launched on port 4902 and `grep "Reelcut: "` on
+its log printed nothing — which is now the fifth part's silence as well as
+the other four's. The two neighbours that read the same catalog were re-run
+on fresh instances: `op_catalog_proof.py` **23/23** (port 4904) and
+`clip_catalog_proof.py` **24/24** (port 4905).
+
+**Owed.** kpgalligan/reelcut#20: the spec's op-table and agent sections, the
+Rust module map, the decision recording where the line falls, the README's
+prose op list, the ledger regenerated row by row, and the series close with
+its measurements.

@@ -275,8 +275,7 @@ def main():
     declarations = answer["declarations"]
 
     mcp = MCP(port)
-    listed = mcp._request("tools/list", {})["tools"]
-    tools = {tool["name"]: tool for tool in listed}
+    tools = mcp.schemas()
 
     print("\n1 — the catalog is the core's op list plus the app's own tools")
     check(f"the core declares {len(ops)} ops and every one of them is a tool",

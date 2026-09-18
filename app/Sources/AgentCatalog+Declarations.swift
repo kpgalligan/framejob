@@ -265,10 +265,13 @@ extension AgentServer {
     /// argument's prose, and this op's rows from `declarations`.
     ///
     /// The three sources meet HERE and nowhere else, which is what makes
-    /// `opTool` a printing of the table rather than a copy of it. An
-    /// argument with no prose is emitted with the core's structure and no
-    /// description — the fifth part of the startup parity check is what
-    /// turns that into a complaint, and it is a later ticket's.
+    /// `opTool` a printing of the table rather than a copy of it. It walks
+    /// the CORE's published properties, so an argument with no prose is
+    /// emitted with the core's structure and no description, and a sentence
+    /// whose key is not an argument at all is attached to nothing — the
+    /// fifth part of the startup parity check complains about both
+    /// (`AgentServer+Parity.swift`), which is why `opTool` hands it the
+    /// prose map before calling this.
     static func declaredInput(
         of op: String, _ published: ReelOpSchema, _ prose: [String: String]
     ) -> (properties: [String: Any], required: [String]) {

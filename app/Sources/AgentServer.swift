@@ -313,7 +313,7 @@ final class AgentServer {
     /// comment saying why it is the exception.
     private static let opsWithoutTools: Set<String> = []
 
-    /// The enforcement behind the table's contract, in four parts:
+    /// The enforcement behind the table's contract, in five parts:
     ///
     /// 1. `catalogJSON()` and `handlers` name exactly the same tools;
     /// 2. every op the CORE declares has a tool — the list read through
@@ -327,30 +327,20 @@ final class AgentServer {
     /// 4. every OP tool declares `scope` — road map 2's phase 9, and the one
     ///    part that is about a feature rather than about the catalog's shape,
     ///    so it lives in `AgentServer+Scope.swift` and says there why parts 1
-    ///    to 3 cannot see the omission it catches.
+    ///    to 3 cannot see the omission it catches;
+    /// 5. every OP tool declares the CORE's arguments for that op — the one
+    ///    part that looks inside a schema rather than at a set of names, so
+    ///    it lives in `AgentServer+Parity.swift` with the three ways a tool
+    ///    can still be wrong written out there.
     ///
-    /// **What it still cannot see.** Nothing validates a call against
-    /// `inputSchema`, and these four parts compare NAMES, so a tool whose
-    /// argument has the wrong TYPE — `add_text_clip`'s `text` declared
-    /// `string` against the op's `text?: object`, the drift road map 7's D3
-    /// took as its first example — passes all four. What guards that today
-    /// is the argument vocabulary in `AgentServer+Arguments.swift`, which
-    /// refuses a present value of the wrong type instead of reading it as
-    /// absent; a drift of that kind then surfaces as an error on the first
-    /// call rather than as a silently dropped argument.
-    ///
-    /// **The catalog's half of that gap is closed.** The core publishes its
-    /// op table's ARGUMENTS as well as its names (`rc_op_schemas`), and
-    /// every one of the fifty-seven op tools prints that table rather than
-    /// restating it (`AgentCatalog.opTool`), so no op tool declares an
-    /// argument's type, its vocabulary or its required-ness anywhere for
-    /// these four parts to miss. What is left is a FIFTH part that would
-    /// compare each op tool's declared arguments to the core's — plus the
-    /// two injected envelope keys, plus `AgentServer.declarations` — and so
-    /// catch a hand-written schema that came back, or a prose key naming an
-    /// argument no op has. It is not here yet, and `tools/proof/
-    /// op_catalog_proof.py` is what asks that question today, of the running
-    /// binary rather than at startup.
+    /// **What it still cannot see.** Nothing validates a CALL against
+    /// `inputSchema`; what guards that is the argument vocabulary in
+    /// `AgentServer+Arguments.swift`, which refuses a present value of the
+    /// wrong type instead of reading it as absent. And part 5 reads the same
+    /// published table the catalog prints, so a constraint the app still
+    /// enforces that the TABLE stops declaring moves both sides together and
+    /// passes — the class that only a row calling the running tool can
+    /// catch (`tools/proof/op_argument_proof.py`).
     private static func catalogParityFailure(_ catalog: String) -> String? {
         guard
             let tools = (try? JSONSerialization.jsonObject(with: Data(catalog.utf8)))
@@ -379,11 +369,12 @@ final class AgentServer {
         if !stale.isEmpty {
             return "AgentServer.opsWithoutTools names ops the core does not have: \(stale)"
         }
-        // Part 4 lives in `AgentServer+Scope.swift` with the rest of the
-        // scope, where parts 1 to 3 stay here with the table they check: it
-        // is the only part that is about one FEATURE rather than about the
-        // catalog's shape, and this file is frozen at wiring.
+        // Parts 4 and 5 live in files of their own, where parts 1 to 3 stay
+        // here with the private dispatch table they check: part 4 is about
+        // one FEATURE rather than about the catalog's shape, part 5 is the
+        // longest of the five, and this file is frozen at wiring.
         return schemaFailure(tools) ?? Self.scopeFailure(tools, ops)
+            ?? Self.argumentFailure(tools, ops)
     }
 
     /// Part 3: the structural check on each tool's declared input. It cannot

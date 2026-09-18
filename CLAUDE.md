@@ -156,13 +156,15 @@ else is what bloats files:
   files are the parent text for anything not settled here.
 - **Every user-visible edit gets an MCP mirror** (spec §7.9): a handler, a
   catalog entry, and a comment naming the UI path. The startup parity check
-  in `AgentServer.start()` has FOUR parts: catalog names against handler
+  in `AgentServer.start()` has FIVE parts: catalog names against handler
   names, every op in the core's table against the tools (through
   `rc_op_names`, with an explicit allow-list for ops that deliberately have
-  none), each tool's schema shape, and that every op tool declares `scope`.
-  It cannot see argument TYPES — the throwing helpers in
-  `AgentServer+Arguments.swift` are the guard for those: a value a handler
-  cannot read is refused by name, never dropped.
+  none), each tool's schema shape, that every op tool declares `scope`, and
+  that every op tool declares the CORE's own arguments for its op — each one
+  described, and no description for an argument no op has
+  (`AgentServer+Parity.swift`). What it cannot see is a CALL: the throwing
+  helpers in `AgentServer+Arguments.swift` are the guard for that, refusing a
+  value a handler cannot read by name rather than dropping it.
 - **A file at the ~600-line cap gives something up before it takes anything
   on**, as a pure move landed and gated alone. `designs/reelcut-remaining.md`
   §3 is the ledger; new files are capped at 400 lines.

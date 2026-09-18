@@ -124,6 +124,11 @@ extension AgentServer {
         _ name: String, _ description: String, _ prose: [String: String]
     ) -> [String: Any] {
         let published = Self.opSchemas[name] ?? ReelOpSchema(properties: [:], required: [])
+        // A sentence whose key is not one of the core's arguments is
+        // attached to nothing below and the built catalog remembers nothing
+        // about it, so the fifth part of the startup parity check is told
+        // here, while the evidence exists (`AgentServer+Parity.swift`).
+        Self.noteProse(prose, of: name, against: published)
         let input = Self.declaredInput(of: name, published, prose)
         return tool(name, description, input.properties, required: input.required)
     }
@@ -434,7 +439,14 @@ extension AgentServer {
                     + "insert and range edit off it; solo silences every OTHER track in its "
                     + "container (the timeline, or a nest's own tracks) that is not also soloed "
                     + "— mute wins on a track that is both, and pictures are untouched.",
-                ["track": trackDescription]),
+                [
+                    "track": trackDescription,
+                    "name": "New track name.",
+                    "hidden": "Drop the track's picture from the composition.",
+                    "muted": "Silence the track's sound.",
+                    "locked": "Keep every ripple, insert and range edit off this track.",
+                    "solo": "Silence every OTHER track in the container that is not soloed too.",
+                ]),
             opTool(
                 "remove_empty_tracks",
                 "Removes every track that holds no clips — Track ▸ Remove Empty Tracks.",
@@ -449,6 +461,7 @@ extension AgentServer {
                     + "also becomes a chapter in the exported file (M2).",
                 [
                     "at": "Where, \(ticks) Default: the playhead.",
+                    "name": "Marker name. Default: Marker <n>.",
                     "chapter": "Also a chapter of the exported movie (default false).",
                     "color": "Colour NAME, e.g. \"red\" — not a hex string.",
                 ]),
@@ -458,6 +471,8 @@ extension AgentServer {
                 [
                     "marker": "Marker id.",
                     "time": "New time, \(ticks)",
+                    "name": "New marker name.",
+                    "chapter": "Make it a chapter of the exported movie, or stop being one.",
                     "color": "Colour name.",
                 ]),
             opTool("remove_marker", "Removes a marker.", ["marker": "Marker id."]),
@@ -472,9 +487,13 @@ extension AgentServer {
                     + "it the clips keep their pixel positions. Changing fps re-snaps every clip "
                     + "start and duration to the new frame grid.",
                 [
-                    // `width` and `height` carry the core's OWN 16–16384 (the
-                    // bound `op_table.rs` publishes because `edit_canvas.rs`
-                    // refuses outside it), and neither has ever carried prose.
+                    // The 16–16384 is NOT repeated in either sentence: it is
+                    // the core's own bound, published as a minimum and a
+                    // maximum from the constants `edit_canvas.rs` refuses by
+                    // (`op_table.rs`), and a number spelled twice is what
+                    // this whole candidate deletes.
+                    "width": "Canvas width in pixels.",
+                    "height": "Canvas height in pixels.",
                     "fps": "Frame rate as [numerator, denominator]: [30, 1], "
                         + "[30000, 1001] for 29.97, [24000, 1001] for 23.976.",
                     "background": colorDescription("Colour behind every layer"),

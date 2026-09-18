@@ -353,11 +353,10 @@ def catalog_part(mcp):
     for tool in ["transcribe", "export_captions"]:
         check(tool in names, f"{tool} is a tool")
 
-    # The schema SHAPE, read off `tools/list` rather than off the source.
-    # `mcp.py` reports names only — it is the shared client and nothing else
-    # needs the schemas — so this reaches past it for the one thing this phase
-    # claims about them.
-    schemas = {t["name"]: t for t in mcp._request("tools/list", {})["tools"]}
+    # The schema SHAPE, read off `tools/list` rather than off the source,
+    # through the shared client's own `schemas()` (road map 7's D3·5; this
+    # script used to reach past it into the private request).
+    schemas = mcp.schemas()
 
     def schema_of(name):
         """One tool's input schema, or a stand-in that fails every check

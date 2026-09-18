@@ -228,10 +228,17 @@ startup parity check would complain — `grep "Reelcut: " /tmp/reelcut-4823.log`
 must print nothing before a proof run means anything.
 
 **The EXACT tool count belongs to the newest phase's script**, because it is
-what tells a stale binary on the port from the build under test: road map 3's
-`recording_proof.py` asserts **75** (`record_screen`), and phases 1 to 9 keep
-floors (63, 65, 68, 70, 71, 73, 73, 73 and 74) so a later phase's tools never
-fail an older proof. Road map 3's was the fifth handover and cost two rows in
+what tells a stale binary on the port from the build under test: road map 7's
+`op_argument_proof.py` asserts **77** (D3·5), and every script before it keeps
+a floor — phases 1 to 9's 63, 65, 68, 70, 71, 73, 73, 73 and 74, and road map
+3's 75 — so a later phase's tools never fail an older proof. **The sixth
+handover cost nothing**, which is the first time that has happened to a
+handover that MOVED the number: road map 5's E1 had already turned
+`recording_proof.py`'s 75 into a floor when it added two transition tools, and
+road map 7's D3 adds no tool at all, so the 77 it takes is the count the
+catalog has carried since E1 and no older script had to be edited. What the
+scripts' prose said had drifted, though, and this is where that was corrected:
+`recording_proof.py`'s own docstring still called its 75 exact. Road map 3's was the fifth handover and cost two rows in
 one script, both in the same commit as the tool: `phase9_proof.py`'s `TOOLS`
 became a `>=`, and its `APP_STATE_TOOLS` — asserted as an EXACT set, because
 an op tool that lost its scope would leave the count right and the set
@@ -2602,12 +2609,14 @@ the core's arguments, kinds, enums, minimums, maximums and required list,
 modified only by what the declarations list names; exactly one op tool
 declares nothing but the envelope's two keys (`remove_empty_tracks`, the one
 op with no arguments); every op tool carries its own description and prose on
-at least one argument wherever it takes any, and 135 of the 145 published
+at least one argument wherever it takes any, and all 145 published
 arguments carry the app's prose while the core's table carries none of it —
+(135 of 145 until D3·5's fifth parity part made an undescribed argument a
+complaint) —
 which is the division of labour, measured rather than asserted. **The vocabularies**: the five a HANDLER still parses by name,
 `add_transition`'s `align` among them, whose tie to `TransitionAlign` was
 structural until the migration made the schema the core's. **The
-declarations**: all 13 rows still name something the core has. **The running
+declarations**: all 14 rows still name something the core has. **The running
 app**: a marker with no `at` lands at the playhead although the core
 requires it, a track switch takes `"true"`, a negative id is refused by name
 where the schema says `minimum: 0`, `set_canvas` refuses a width one step
@@ -2623,3 +2632,55 @@ same declarations list the catalog is, so a row dropped from the list moves
 BOTH sides of the comparison together and the structural half stays green.
 Only a row that asks the RUNNING APP can see a declaration dropped while the
 behaviour stays.
+
+
+## A misspelt argument, put to all 57 (`op_argument_proof.py`)
+
+`python3 tools/proof/op_argument_proof.py <port>`, against a running
+instance. Road map 7's D3·5, and **the script that owns the exact tool count**
+(77). **79/79** at D3·5 (#19). The probe is built BEFORE the first MCP call.
+
+It exists because of the rule D3·3 and D3·4 each paid for: **a generated
+artefact is checked by asking the thing that generated it a question it did
+not write the answer to.** The startup parity check's fifth part reads the
+same published table the catalog prints, so it cannot see a constraint the app
+still ENFORCES that the table stops DECLARING — so the weight here is on the
+sections that call the running tool.
+
+Five sections. **The fifth part, made to complain**: a probe compiled from
+`app/Sources` builds the catalog this binary registers, puts it to
+`AgentServer.argumentFailure` (which must say nothing), and then puts four
+broken catalogs to it — an op tool with an argument the core has not got, one
+missing an argument the core has, one whose argument lost its description, and
+one whose prose names an argument no op has — each of which must be named with
+its op, its argument and the side that has it, while an APP-STATE tool broken
+the same way must draw nothing. **The catalog's size**: exactly 77 tools, 57
+ops each with a tool, and the shipped binary's own parity log empty. **The
+attribution**: every difference between a tool's schema and the core's table
+is one `AgentServer.declarations` names — not a second computation of the
+merge, which is `op_catalog_proof.py`'s, but a key-by-key attribution, plus
+the inverse, that every row accounts for at least one difference, so a row
+that changes nothing fails here. **The misspelt argument**: for each of the 57,
+one CONTROL call with every required argument spelled right (which must not be
+refused for a missing one — the tool's required list proved SUFFICIENT against
+the running app) and then one call per required argument with that argument
+misspelt, which must be refused naming it. **The opaque doors**: a misspelt key
+inside a caller's own object is named by the CORE, which is where the dotted
+path lives.
+
+**What the misspelt-argument section actually proves**, and it is worth saying
+because the ticket asked for the core's dotted path: an op ARGUMENT never
+reaches the core's decoder at all — the handlers read arguments one at a time
+and build the op — so the sentence that names a misspelt ARGUMENT is the APP's
+(three shapes, all anchored to the argument's own name), and the sentence that
+names a misspelt KEY inside a patch is the core's. The section is therefore a
+check that every argument the catalog PRINTS from the core's table is one a
+hand-written handler really reads.
+
+Its values are derived from the core's published kinds rather than typed: an
+id by name (the five entity ids are the only argument names in the file, and
+each is checked against the core's table first), a time as a second per
+argument in table order, a bound's own minimum, a vocabulary's first member.
+The two `payload` doors are named rather than skipped: the app checks a
+payload's shape before forwarding, so the core cannot be reached through them
+without a whole Copy payload, and what is true of them is asserted instead.

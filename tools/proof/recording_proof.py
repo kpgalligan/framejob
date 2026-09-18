@@ -16,9 +16,10 @@ count rather than passing vacuously.
 
 **The HEADLESS tier always runs** (sections 0–4, on the instance at `port`):
 
-* Section 0, the catalog. EXACTLY 75 tools — this script owns the exact
-  count now (`tools/proof/README.md`'s handover: `phase9_proof.py`'s 74 is a
-  floor since the same commit) — with `record_screen` declaring exactly its
+* Section 0, the catalog. AT LEAST 75 tools — a FLOOR since road map 5's E1
+  added two, and the exact count belongs to road map 7's
+  `op_argument_proof.py` at 77 (`tools/proof/README.md`'s handover) — with
+  `record_screen` declaring exactly its
   ten arguments plus the injected `project`, `seconds` its only required
   one, and NO `scope`: it is an app-state tool like `transcribe`, and
   `AgentCatalog.tool` injects `scope` for the core's op names only. Exactly
@@ -29,8 +30,8 @@ count rather than passing vacuously.
   launching process — and for R2's: `Pause Recording` and `Resume Recording`
   (the status item's two menus), the `Add Recording Segments` undo step, and
   the result keys `pauses`, `segments` and `started_at` beside R1's
-  twenty-four. The catalog count stays 75 — R2 adds no tool, and there is
-  deliberately no tool that pauses — and the parity log is read too.
+  twenty-four. R2 adds no tool — there is deliberately no tool that pauses —
+  and the parity log is read too.
 * Section 1, the refusals, each asserted as the EXACT sentence, each leaving
   `get_project`'s whole answer byte-identical and pushing no undo step. And
   the ORDER: the caller's own mistakes (`seconds` absent, 0, 601, `"x"`;
@@ -340,9 +341,10 @@ SEC = 600_000
 # and this is that script; `phase9_proof.py`'s 74 became a floor in the same
 # commit that added the tool.
 # Road map 5's E1 added `add_transition` and `set_transition_style`, so this
-# is a FLOOR now and the exact count belongs to `e1_proof.py` — the rule
-# `tools/proof/README.md` states, applied to this script the way phase 9's
-# was applied to it.
+# is a FLOOR now and the exact count belongs to the newest phase's script —
+# the rule `tools/proof/README.md` states, applied to this script the way
+# phase 9's was applied to it. That script is road map 7's
+# `op_argument_proof.py`, at 77.
 TOOLS = 75
 
 # `rc_op_names`' own length, asserted as the number of tools declaring
@@ -711,7 +713,7 @@ def stop_launched():
 
 
 def catalog_part(mcp):
-    listed = mcp._request("tools/list", {})["tools"]
+    listed = mcp.schemas().values()
     names = {tool["name"] for tool in listed}
     check(len(names) >= TOOLS,
           f"the catalog holds at least road map 3's {TOOLS} tools (got {len(names)}) — phase "
@@ -1876,7 +1878,7 @@ def main():
     mcp = MCP(PORT, timeout=180)
     print(f"road map 3, R1 and R2 — record_screen, against 127.0.0.1:{PORT}")
     try:
-        section("0 — the catalog: 75 exactly, record_screen's arguments, no scope on it",
+        section("0 — the catalog: 75 or more, record_screen's arguments, no scope on it",
                 catalog_part, mcp)
         section("1 — the refusals, exact and in order, touching nothing", refusal_part, mcp)
         section("2 — the held last frame (lane E), which needs no grant", fixture_part, mcp)
