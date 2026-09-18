@@ -387,6 +387,50 @@ fn every_published_bound_is_one_the_core_refuses_outside() {
     );
 }
 
+/// The other direction, and the one that matters: **a bound the core
+/// ENFORCES has to be published.**
+///
+/// The test above proves that every bound the table declares is real, and
+/// on its own that is half a check — dropping a bound from a row leaves it
+/// green, because a row with no bound makes no claim for it to falsify.
+/// Road map 7 §8.3 is the same asymmetry, found in the catalog: an
+/// instrument built from the thing it checks moves with it.
+///
+/// So this asks the CORE instead. A range the core enforces answers with
+/// its own sentence — `must be between 16 and 16384, not 0`
+/// (`edit_canvas.rs`) — so every whole-number argument is handed two values
+/// no range could contain, and any argument that answers with that sentence
+/// and carries no bound is a bound the table has lost. Nothing has to know
+/// in advance which arguments are bounded, which is what makes it survive a
+/// bound added to an op nobody thought of.
+#[test]
+fn a_bound_the_core_enforces_is_one_the_table_publishes() {
+    let project = project();
+    for row in &OP_TABLE {
+        for argument in row.arguments {
+            if !matches!(argument.kind, Kind::Id | Kind::Index) {
+                continue;
+            }
+            for extreme in [json!(0), json!(u32::MAX)] {
+                let Err(message) = project.try_apply(&with(row, argument.name, extreme.clone()))
+                else {
+                    continue;
+                };
+                if !message.contains("must be between") {
+                    continue;
+                }
+                assert!(
+                    argument.bound.is_some(),
+                    "{}: {} is refused outside a range the core enforces — {message} — and \
+                     the table publishes no bound for it, so the tool cannot say so either",
+                    row.name,
+                    argument.name
+                );
+            }
+        }
+    }
+}
+
 /// An opaque object is opaque: the decoder takes a string where a patch
 /// belongs, and whatever refuses it refuses it further in. That is the
 /// claim `Kind::Object` makes, and it would stop being true the moment a
