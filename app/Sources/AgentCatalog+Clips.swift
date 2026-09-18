@@ -909,20 +909,16 @@ extension AgentServer {
                 ], required: ["clip", "action"]),
             tool(
                 "set_action_end",
-                "Sets what an action animates TO. The patch is the action's end state and "
-                    + "merges into it at EVERY depth — {\"video\": {\"scale\": 0.6, \"x\": 520}} "
-                    + "makes the clip shrink into the corner over the action's span, and "
-                    + "{\"video\": {\"shadow\": {\"blur\": 40}}} changes that one key of a shadow "
-                    + "it already animates. A key set to null is "
-                    + "REMOVED from the end state, so that property stops being animated. Groups "
-                    + "are video, audio and text, with the same keys as set_video / set_audio / "
-                    + "set_text — a colour is FOUR numbers here too, and a bad key or value is "
-                    + "refused naming its path with the group in it (video.filters[1].kind), "
-                    + "though values are NOT range-checked: an animation may aim past what a "
-                    + "stored property could hold. ONE exception to the keys: "
-                    + "video.motion is refused here, because a "
-                    + "preset is anchored to the clip's two ends rather than being a value to "
-                    + "ramp between two states. Set it with set_video.",
+                "Sets what an action animates TO. The patch is the action's end state and MERGES "
+                    + "into it key by key at every depth (a one-key shadow keeps the rest of it); a "
+                    + "key set to null is REMOVED from the end state, so that property stops being "
+                    + "animated. Groups are video, audio and text, with the same keys as set_video "
+                    + "/ set_audio / set_text — a colour is FOUR numbers here too, and a bad key or "
+                    + "value is refused by its path with the group in it (video.filters[1].kind), "
+                    + "though values are NOT range-checked: an animation may aim past what a stored "
+                    + "property could hold. ONE exception: video.motion is refused, a preset being "
+                    + "anchored to the clip's two ends rather than a value to ramp between. Set it "
+                    + "with set_video.",
                 [
                     "clip": clipProperty,
                     "action": ["type": "integer", "description": "Action id."],

@@ -263,14 +263,28 @@ fn read_merged<T: DeserializeOwned>(
     prefix: &str,
 ) -> Result<T, String> {
     serde_path_to_error::deserialize(merged).map_err(|e| {
-        let inside = e.path().to_string();
-        let path = match (prefix, inside.as_str()) {
-            ("", inside) => inside.to_string(),
-            (prefix, "") => prefix.to_string(),
-            (prefix, inside) => format!("{prefix}.{inside}"),
-        };
+        let path = path_under(prefix, &e.path().to_string());
         format!("bad value at \"{path}\" in {subject}: {}", e.inner())
     })
+}
+
+/// Where a `serde_path_to_error` path sits under `prefix` — the one
+/// spelling of that join, because there are two callers and the trap is
+/// invisible from either: `Path`'s ROOT prints as `"."` and not as the
+/// empty string, so the naive `format!("{prefix}.{inside}")` reads
+/// `video..` for an error at the group itself. Both spellings of "the whole
+/// thing" collapse onto `prefix` here.
+///
+/// `edit_zoom.rs`'s `ZoomRegion` is the second caller, and it is what found
+/// this: its `region..` was reachable from the app the moment D1·5 stopped
+/// the Swift side refusing a missing member first.
+pub(crate) fn path_under(prefix: &str, inside: &str) -> String {
+    let inside = if inside == "." { "" } else { inside };
+    match (prefix, inside) {
+        ("", inside) => inside.to_string(),
+        (prefix, "") => prefix.to_string(),
+        (prefix, inside) => format!("{prefix}.{inside}"),
+    }
 }
 
 /// The refusal every walk gives for a key the vocabulary does not have,

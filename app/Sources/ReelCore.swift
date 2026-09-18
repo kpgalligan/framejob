@@ -894,12 +894,10 @@ extension Gradient {
 ///
 /// **What used to hang on that choice no longer does** (deepening D1). The
 /// pairing with `lenient` was once load-bearing for a misspelt MODE, because
-/// the agent door decoded a caller's patch through this type and the round
-/// trip only noticed the typo while `lenient(.blend)` answered nil for it.
-/// No caller-authored object is decoded through these types at all now: the
-/// core answers `bad value at "blend" in a video patch: unknown variant
-/// `muliply`` at every door. These patches are the APP's writers, built from
-/// controls that cannot misspell anything.
+/// the agent door decoded a caller's patch through this type. Nothing a
+/// caller wrote is decoded through these types now — they are the APP's
+/// writers, built from controls that cannot misspell anything — and the core
+/// answers a typo at every door.
 struct VideoPatch: Codable, Equatable {
     var x: Double?
     var y: Double?

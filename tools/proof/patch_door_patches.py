@@ -1,4 +1,4 @@
-"""The patch door's five PATCH-OP sections: `set_video` and its siblings.
+"""The patch door's six PATCH-OP sections: `set_video` and its siblings.
 
 `patch_door_proof.py` is the script — its docstring says what a patch means,
 which sentences the core gives and how a section is built, and its `main`
@@ -7,18 +7,20 @@ runs these in order and then the argument doors in `patch_door_args.py`.
 Everything here is a door whose caller-authored object is a PATCH: a partial
 property object merged into what the clip already holds (`CONTEXT.md`). They
 all answer in the patch walk's own sentences, naming the group — `a video
-patch`, `an audio patch`, `a text patch`, `a shape patch`, `a clip patch` —
-and the dotted path to the mistake.
+patch`, `an audio patch`, `a text patch`, `a shape patch`, `a clip patch`,
+`an action end patch` — and the dotted path to the mistake. The last of
+those is §10's, and it is the one whose paths carry the group inside them
+(`video.filters[1].kind`), since an end patch spans three.
 
 They live beside the script rather than in it under the size rule
-(`CLAUDE.md`): five sections is about five hundred lines, the doors arrive
-one deepening ticket at a time, and the file that has to keep growing is
+(`CLAUDE.md`): six sections is about seven hundred lines, the doors arrived
+one deepening ticket at a time, and the file that had to keep growing was
 this one rather than the one holding the explanation.
 """
 
 from patch_door import (
-    FRAME, SEC, Session, check, landed, marker_gone, refused, undo_claim,
-    undo_marker,
+    FRAME, SEC, Session, check, landed, marker_gone, refused, shown,
+    undo_claim, undo_marker,
 )
 
 
@@ -639,6 +641,18 @@ def action_end_door(mcp):
     refused(s, "set_action_end", "…and naming it with a null",
             "video.motion is not an animation target",
             clip=clip, action=action, patch={"video": {"motion": None}})
+    # The two above are the ONLY refusals in this section a laundering door
+    # could also pass: `refused` matches a substring, and the handler's
+    # deleted sentence CONTAINED the core's
+    # (`patch.video.motion is not an animation target — set it with
+    # set_video.`). So this one says the message ENDS there, which is the
+    # difference between the two doors and nothing else.
+    motion = s.error("set_action_end", clip=clip, action=action,
+                     patch={"video": {"motion": {"in": {"kind": "fade"}}}})
+    check(motion is not None
+          and motion.endswith("video.motion is not an animation target"),
+          "…and the refusal ENDS there: the core's whole sentence, with no tail "
+          f"this side used to add — got: {shown(motion)}")
 
     print("\n10c — and not one of them was an undo step")
     undo_claim(s, start)
@@ -675,6 +689,16 @@ def action_end_door(mcp):
     s.op("set_action_end", clip=clip, action=action, patch={"video": {"opacity": 5.0}})
     landed("an out-of-range value is STORED rather than refused, which is this "
            "door's one documented difference", end()["video"]["opacity"], 5.0)
+    # A behaviour the forwarding changed, pinned as §8d pins `set_canvas`'s:
+    # a patch that names nothing is the core's identity refusal where it used
+    # to be the handler's own "patch names nothing to change". Both refuse;
+    # the sentence moved, and an empty end patch really does change nothing.
+    before = s.text()
+    message = s.error("set_action_end", clip=clip, action=action, patch={})
+    check(message is not None and "made no change" in message,
+          "…and an empty patch is the core's identity refusal, not this side's "
+          f"\"names nothing to change\" — got: {shown(message)}")
+    check(s.text() == before, "…with the end state exactly as it was")
 
 
 # ---- the next patch door's section goes here ------------------------------

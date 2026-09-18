@@ -41,8 +41,12 @@ detail there.
   mirror of spec §5.2 every view draws from. **Its enums decode LENIENTLY**
   — a misspelt kind becomes the first case, a `T??` field a clear — which is
   why a caller-authored object is never decoded through them (below). Since
-  D1·5 took `set_action_end`, the last agent handler that did, NO handler
-  checks a caller's enums or types by hand.
+  D1·5 took `set_action_end`, the last agent handler that did, no handler
+  reads a caller-authored OBJECT at all. A scalar enum argument is a
+  different thing and several handlers still parse one by name
+  (`add_zoom_action`'s `fit`, `curveArg`, `set_transition`'s `kind`): the
+  core refuses those too, and what this rule forbids is decoding a caller's
+  object through a lenient type.
   `MotionProps.dictionary` always writes all three keys, `NSNull` for a nil
   slot, because a core patch of `motion` deep-merges — it is the
   APP's writer saying all three slots, not a replace rule, and since D1·3 it
