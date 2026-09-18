@@ -3895,3 +3895,50 @@ fifth part is #19's.
 **Owed.** The fifth part of the parity check and the shared `tools/list`
 schemas accessor (#19); and the proof scripts that still re-type argument
 names in Python.
+
+**The mutants.** Four deliberate failures, each run from the committed tree
+and reverted with `git checkout`. Three were caught by exactly ONE row, which
+is what says the rows are independent; the fourth was caught by two, and both
+sentences are true of it.
+
+| Mutant | Score | Row that caught it |
+|---|---|---|
+| the `add_marker.at` row dropped from the declarations list, while the handler still takes the playhead | 21/22 | *add_marker takes the playhead when `at` is left out* — `required ['at']`, with the marker still landing at 1200000. **This is the mutant the structural half cannot see**: the catalog and the oracle both read the list, so they still agreed with each other |
+| a WRONG declaration — `add_transition.kind` widened with `null`, which its handler refuses | 21/22 | *add_transition's kind is NOT nullable* — `declared ['string', 'null']` beside the refusal `kind must be one of …`. The direction the list must never take: a schema wider than what is accepted |
+| `after` dropped from the CORE's `Kind::Alignment` | 21/22 | *add_transition's align* — the core's two against `TransitionAlign.allCases`'s three. Caught twice over: `core/tests/op_table.rs`'s `every_closed_vocabulary_answers_with_its_own_members` FAILED on the same mutant |
+| `set_marker` reverted to a hand-written `tool(…)` schema, ids and booleans as they were before the migration | 20/22 | *all 57 declare exactly the core's arguments…* named `set_marker`, AND *a track switch takes a boolean's string spelling, and every boolean argument of every op tool says a string is allowed*, whose quantifier is over the whole catalog. Two true sentences about one mutant rather than one row leaking into another |
+
+**The whole proof tree was re-run, not only what this ticket touched** —
+`kpgalligan/reelcut#16` changed the FFI, so anything building an older
+`app/Sources` is broken by construction and a catalog change reaches
+backwards by the same logic. Every script, on the committed tree:
+
+| Script | Score |
+|---|---|
+| `phase1_proof` · `phase2_proof` · `phase3_proof` · `phase3_silence_scope` | 66/66 · 85/85 · 123/123 · 8/8 |
+| `phase4_proof` · `phase5_proof` · `phase6_proof` · `phase7_proof` | 84/84 · 88/88 · 168/168 · 92/92 |
+| `phase8_proof` · `phase9_proof` · `patch_door_proof` · `refusal_proof` | 79/79 · 216/216 · 261/261 · 116/116 |
+| `remaining_proof` · `clip_catalog_proof` · `op_catalog_proof` | 79/79 · 24/24 · 22/22 |
+| `recording_proof` | **187/187**, 2 rows skipped by name (a Bluetooth output) |
+| `op_schema_probe` · `phase9_probe` · `refusal_probe` · `remaining_probe` | 28/28 · 48/48 · 15/15 · 170/170 |
+| `preview_validity_probe` · `preview_refresh_probe` · `transition_sheet_probe` | 24/24 · 58/58 · 32/32 |
+| `recording_probe` | **899/899**, 2 skipped by name (the reference tree below) |
+| `phase2…phase9_chrome` | 26/26 · 33/33 · 59/59 · **36/36** · 70/70 · 78/78 · 150/150 · 62/62 |
+
+Two scripts print a SKIP by name for one named cause — `phase5_chrome`'s 45
+rows and `recording_probe`'s 2 — and it is the cause the convention already
+records: a reference tree's own `ReelCore.swift` predates D2·1's fourth
+parameter and cannot be made to compile against the current header by
+anything in this repo. `recording_proof` also skips its two tone rows on this
+host, the default output being a Bluetooth device. **One run of
+`recording_proof` scored 186/187 before the one above**: the microphone
+head-loss row, measuring an AirPods Max that started 180 ms after the
+picture — the raw difference the row bounds, where the residual against
+`mic_offset` was 2.1 ms. The next run of the same binary scored 187/187, and
+nothing in this ticket's diff reaches the recorder: `record_screen`'s schema
+is byte-identical, which the capture above measured.
+
+**And the tree was measured again afterwards.** With every mutant reverted
+and the app rebuilt, `tools/list` is byte-identical to the capture taken when
+the migration landed, `op_catalog_proof.py` is 22/22 and the parity log on
+port 4893 printed nothing.
