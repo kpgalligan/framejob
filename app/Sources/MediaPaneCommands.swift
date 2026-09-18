@@ -204,7 +204,7 @@ extension MediaPane {
     /// against and the set `with_clips: true` deletes. Filtering
     /// `snapshot.clips` here — what this line used to do — meant that media
     /// used only inside a compound clip looked unused, went to the core as a
-    /// plain `remove_media`, came back `Ok(None)`, and reached the user as a
+    /// plain `remove_media`, came back refused, and reached the user as a
     /// beep with the alert never shown (`MediaUsage.swift`).
     func remove(_ media: UInt32) {
         guard let entry = binding.snapshot.media(media) else {

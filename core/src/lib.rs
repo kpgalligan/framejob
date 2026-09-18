@@ -19,6 +19,7 @@ pub mod audio_duck;
 pub mod edit;
 pub mod edit_action;
 pub mod edit_background;
+pub mod edit_canvas;
 pub mod edit_clip;
 pub mod edit_edge;
 pub mod edit_insert;
@@ -49,6 +50,7 @@ pub mod model_shape;
 pub mod model_text;
 pub mod motion;
 pub mod nest;
+pub mod outcome;
 pub mod patch;
 pub mod props_check;
 pub mod recipe;
@@ -74,5 +76,6 @@ pub use crate::model::{
     TextAnimationKind, TextProps, TextVAlign, Track, Transition, TransitionKind, VideoProps,
     MAX_FILTERS, MAX_GRADIENT_STOPS, MAX_OBSCURE,
 };
+pub use crate::outcome::Outcome;
 pub use crate::time::{Fps, Ticks, TIMESCALE};
 pub use crate::transition::Overlap;

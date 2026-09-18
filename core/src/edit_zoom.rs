@@ -172,6 +172,7 @@ use serde_json::{json, Value};
 use crate::export::describe;
 use crate::model::{Clip, Curve, Project, VideoProps};
 use crate::nest::rotate;
+use crate::outcome::Outcome;
 use crate::props_check::{SCALE_MAX, SCALE_MIN};
 use crate::time::Ticks;
 
@@ -377,11 +378,11 @@ impl Project {
     /// survives earlier actions. An absent `duration` is `add_action`'s
     /// default and an absent `curve` is `ease_in_out`.
     ///
-    /// Refuses (`None`) wherever `add_action` does — an overlap with
-    /// another action on the clip, or a span running past the clip's end.
-    /// `Err` on an unknown clip, a clip with no video properties (it draws
-    /// nothing, so there is nothing to zoom), a region that is not four
-    /// usable numbers, a negative `at` or a non-positive `duration`.
+    /// Refuses wherever `add_action` does — an overlap with another action
+    /// on the clip, or a span running past the clip's end. `Err` on an
+    /// unknown clip, a clip with no video properties (it draws nothing, so
+    /// there is nothing to zoom), a region that is not four usable numbers,
+    /// a negative `at` or a non-positive `duration`.
     pub fn add_zoom_action(
         &self,
         clip: u32,
@@ -390,7 +391,7 @@ impl Project {
         region: Option<ZoomRegion>,
         fit: Option<ZoomFit>,
         curve: Option<Curve>,
-    ) -> Result<Option<Project>, String> {
+    ) -> Result<Outcome, String> {
         let target = self.require_clip(clip)?.clone();
         // The presence of the group is the aspect (`edit_props.rs`): a clip
         // with no video props draws nothing, so there is no picture to zoom
@@ -413,15 +414,24 @@ impl Project {
         let patch = self.zoom_patch(&target, start, &base, region, fit);
 
         let id = self.next_id;
-        let Some(mut next) = self.add_action(clip, at, duration)? else {
-            return Ok(None);
+        // Every refusal is inherited, in the words of whichever step
+        // declined: this op IS `add_action` + `set_action` + `set_action_end`
+        // (the module doc), so it never writes a sentence of its own.
+        let mut next = match self.add_action(clip, at, duration)? {
+            Outcome::Applied(next) => next,
+            Outcome::Identity => return Ok(Outcome::Identity),
+            Outcome::Refused(why) => return Ok(Outcome::Refused(why)),
         };
         let curve = curve.unwrap_or(DEFAULT_ZOOM_CURVE);
-        if let Some(recurved) = next.set_action(clip, id, None, None, Some(curve))? {
-            next = recurved;
+        match next.set_action(clip, id, None, None, Some(curve))? {
+            Outcome::Applied(recurved) => next = recurved,
+            Outcome::Identity => {}
+            Outcome::Refused(why) => return Ok(Outcome::Refused(why)),
         }
-        if let Some(patched) = next.set_action_end(clip, id, &patch)? {
-            next = patched;
+        match next.set_action_end(clip, id, &patch)? {
+            Outcome::Applied(patched) => next = patched,
+            Outcome::Identity => {}
+            Outcome::Refused(why) => return Ok(Outcome::Refused(why)),
         }
         self.finish(next)
     }

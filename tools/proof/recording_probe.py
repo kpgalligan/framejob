@@ -671,10 +671,23 @@ WELCOME_FILE = "app/Sources/WelcomeWindowController.swift"
 
 passed = 0
 failed = 0
-# Section 9's rows when its tier cannot run — counted and NAMED in the
-# summary, never a vacuous pass (recording_proof.py's rule for host state).
+# Rows a tier could not run — counted and NAMED in the summary, never a
+# vacuous pass (recording_proof.py's rule for host state). Section 9's are
+# host state; section 6b's are the tree's own history (see `skip_rows`).
 skipped = 0
-skip_reason = ""
+skips = []
+
+
+def skip_rows(count, reason):
+    """`count` checks that did not run, and why. A skip is not a pass: the
+    tail names every reason and the count beside it, so a reader sees what
+    was measured and what could not be."""
+    global skipped
+    skipped += count
+    skips.append((count, reason))
+    print(f"  SKIPPED by name: {reason} — {count} rows did not run")
+
+
 STEM_RE = r"Screen Recording \d{4}-\d{2}-\d{2} at \d{2}\.\d{2}\.\d{2}"
 
 
@@ -2405,8 +2418,12 @@ func segments(_ request: [String: Any]) -> [String: Any] {
         let t = d.project.snapshot.tracks[0].id
         d.performGroupedEdit("seed clip", [.addClip(track: t, media: ids[0], at: 0)])
         let frame = d.project.snapshot.canvas.fps.frameDuration
+        // `.project` is nil for BOTH non-applied arms (`ReelEdit.swift`),
+        // which is the reading this row wants: "accepted" asks only whether
+        // the overlap the recorder left was taken as a transition.
         let raw = try d.project.applying(
             .addClip(track: t, media: ids[1], at: 3_000_000 - (frame - frame / 4)))
+            .project
         return [
             "frame": frame, "accepted": raw != nil,
             "clip": raw?.snapshot.clips.last.map(describeClip) ?? [:],
@@ -5859,13 +5876,27 @@ def section_welcome(binary, sources):
     reference, sha, note = build_reference(commit)
     print(f"      reference: {commit} = {sha[:12]}")
     print(f"      compiled with {note.splitlines()[0] if note else '?'}")
-    check("6b: the reference tree built, so there is a 'before' to compare the welcome window "
-          "against — see build_reference for the two instruments it tries",
-          reference is not None, "      " + (note or "").replace("\n", "\n      "))
-    check("6b: … compiled with THIS tree's own harness/main.swift (one program, two app trees) — "
-          "the fallback means the harness names a type the older tree lacks outside the "
-          "HARNESS_REFERENCE_BUILD guard", reference is not None and note.startswith("this tree's own"),
-          (note or "").splitlines()[0] if note else "")
+    # **A reference the instrument cannot reach is a SKIP, not a failure**,
+    # for phase 5's reason and gated the same way (`phase5_chrome.py`, which
+    # states it in full): one core and two app trees means a reference whose
+    # own `ReelCore.swift` predates an FFI change cannot compile at all, and
+    # D2·1's fourth parameter put this reference (pre-R1) out of reach for
+    # good. Anything else that will not build is still the failure it was.
+    ffi_drift = reference is None and "rc_project_apply" in (note or "") \
+        and "app/Sources/ReelCore.swift" in (note or "")
+    if ffi_drift:
+        skip_rows(2, "the reference tree's own ReelCore.swift predates an FFI change and cannot "
+                     "call the current header (road map 7's D2·1 fourth parameter)")
+        print("      " + (note or "").replace("\n", "\n      "))
+    else:
+        check("6b: the reference tree built, so there is a 'before' to compare the welcome window "
+              "against — see build_reference for the two instruments it tries",
+              reference is not None, "      " + (note or "").replace("\n", "\n      "))
+        check("6b: … compiled with THIS tree's own harness/main.swift (one program, two app trees) — "
+              "the fallback means the harness names a type the older tree lacks outside the "
+              "HARNESS_REFERENCE_BUILD guard",
+              reference is not None and note.startswith("this tree's own"),
+              (note or "").splitlines()[0] if note else "")
     tree = os.path.join(BEFORE, "tree", "app", "Sources")
     panel_present = os.path.exists(os.path.join(tree, "RecorderPanelController.swift"))
     welcome_path = os.path.join(tree, "WelcomeWindowController.swift")
@@ -6120,7 +6151,6 @@ def granted_rows_count(folder):
 
 
 def section_granted(binary, sources):
-    global skipped, skip_reason
     print("\nSection 9 — the probe's own GRANTED tier: a real ScreenRecorder() on the main display "
           "under this process's grant (R0 q1: the terminal's), and the panel end to end")
     folder = fresh_dir("granted")
@@ -6133,10 +6163,7 @@ def section_granted(binary, sources):
           f"{answer.get('locked')}, shareable displays = {answer.get('displays')} (listed: "
           f"{answer.get('answered')}{', ' + answer['listFailure'] if answer.get('listFailure') else ''})")
     if answer.get("skipped"):
-        skip_reason = answer["skipped"]
-        count = granted_rows_count(folder)
-        skipped += count
-        print(f"  SKIPPED by name: {skip_reason} — {count} rows did not run")
+        skip_rows(granted_rows_count(folder), answer["skipped"])
         return
     granted_rows(answer, folder)
     shutil.rmtree(folder, ignore_errors=True)
@@ -6519,7 +6546,10 @@ def main():
         for section in sections:
             section(binary, sources)
 
-    tail = f" ({skipped} skipped by name — section 9: {skip_reason})" if skipped else ""
+    tail = ""
+    if skips:
+        tail = " (" + str(skipped) + " skipped by name — " \
+            + "; ".join(f"{n}: {why}" for n, why in skips) + ")"
     print(f"\n{passed}/{passed + failed} checks passed{tail}")
     return 0 if failed == 0 else 1
 

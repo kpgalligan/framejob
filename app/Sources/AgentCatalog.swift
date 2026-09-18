@@ -20,7 +20,7 @@ import Foundation
 ///
 /// **The `scope` was the payment's whole point and it cost ONE line.** It is
 /// injected in `tool` below, for every name the core calls an op, so the
-/// fifty-five rows on the other side of the cut got it without being touched
+/// fifty-seven rows on the other side of the cut got it without being touched
 /// — which is what makes phase 9's diff over there empty and this file's
 /// readable.
 ///
@@ -57,7 +57,7 @@ extension AgentServer {
         schema["project"] = Self.projectProperty
         // Road map 2's phase 9: every §6 OP also takes the envelope's
         // `scope`, and it is injected HERE for the reason `project` is —
-        // one edit site instead of fifty-five, and the op somebody adds in
+        // one edit site instead of fifty-seven, and the op somebody adds in
         // phase 10 cannot arrive with a tool that silently lacks it.
         //
         // Op-ness is the CORE's answer (`Self.opNames`, read through

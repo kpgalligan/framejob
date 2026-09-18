@@ -47,13 +47,17 @@ extension AgentServer {
     /// 4× ceiling stopped a clip short of the level asked for.
     ///
     /// **A second identical call is an identity edit** and comes back as the
-    /// standard "Normalize made no change" refusal, exactly as a second
-    /// `set_audio` with the same volume would. That is the idempotence working,
-    /// not a failure — and it is why the all-skipped case is refused HERE with
-    /// its own message instead: "no clip could be measured" and "every clip is
-    /// already at that level" are different answers, and the shared message
-    /// (which goes on to talk about the overlap rule) would be the wrong one
-    /// for the first.
+    /// shared "Normalize made no change: the project is already in that
+    /// state", exactly as a second `set_audio` with the same volume would:
+    /// the idempotence working, not a failure.
+    ///
+    /// **Measuring nothing is a different answer, and is the one below**
+    /// (spec §11's D2-1, which is why D2·4 left it standing). The level
+    /// comes from `cache/peaks/<media id>.bin`, which is not in the model
+    /// and which the core has never seen (spec §7), so with no reading
+    /// there is no op and the shared reply would be the identity's — which
+    /// would send a caller to look at its volumes when what happened is
+    /// that its peaks were not there to read.
     func normalizeClip(_ a: [String: Any]) throws -> String {
         let document = try target(a)
         let clips = try clipsArg(a, "clips", document)
@@ -63,16 +67,18 @@ extension AgentServer {
                 message: "The project's audio plan could not be read, so there is no level to "
                     + "measure.")
         }
-        let plan = AudioNormalize.plan(input, peakDB: peakDB)
-        // Every named clip was refused. Each reason is already a sentence
-        // naming its clip, so the whole answer is those sentences: a caller
-        // that asked about five clips needs to know which of the five reasons
-        // it hit, and there is no partial success to report beside them.
-        guard !plan.isEmpty else {
-            let reasons = plan.skipped.map { $0.description }.joined(separator: " ")
+        // Nothing was MEASURED — a question about the READ, not a guess at
+        // what the core would answer, so it is asked of `input` and before
+        // there is a plan. Each reason is already a sentence naming its
+        // clip, and a caller that asked about five needs to know which of
+        // the five it hit; there is no partial success to report beside
+        // them.
+        guard !input.isEmpty else {
+            let reasons = input.problems.map { $0.description }.joined(separator: " ")
             throw ToolError(
                 message: "Nothing could be normalised. \(reasons)")
         }
+        let plan = AudioNormalize.plan(input, peakDB: peakDB)
 
         var fields: [String: Any] = [
             // The level that RAN, off the plan rather than off the argument:

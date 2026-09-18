@@ -96,8 +96,9 @@ impl Project {
     /// export is always a mistake, and AVFoundation reports it far later
     /// and far less clearly.
     ///
-    /// `Err` for an unknown preset or a malformed override; there is no
-    /// "changes nothing" case, so this never returns a bare `None`.
+    /// `Err` for an unknown preset or a malformed override. This is a QUERY
+    /// and not an edit: there is no "changes nothing" case, so it has no
+    /// identity arm and no refusal arm (spec §5.5).
     pub fn export_settings(
         &self,
         preset_id: &str,

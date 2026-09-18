@@ -187,6 +187,7 @@ python3 tools/proof/phase7_proof.py 4823
 python3 tools/proof/phase8_proof.py 4823
 python3 tools/proof/phase9_proof.py 4823
 python3 tools/proof/patch_door_proof.py 4823
+python3 tools/proof/refusal_proof.py 4823
 ```
 
 **Phase 9 takes a SECOND argument**, the log path, defaulting to
@@ -212,7 +213,9 @@ it and captures through the harness's own `cacheDisplay` path; the untracked
 it and deleted. `remaining_probe.py` is a third probe: the app arithmetic
 behind `designs/reelcut-remaining.md`'s fixes, one section per item, and its
 last section photographs a bare `TimelineView`'s filmstrip tile the same way
-`phase9_chrome.py` photographs the corner. `phase8_chrome.py` is the one
+`phase9_chrome.py` photographs the corner. `refusal_probe.py` is a fourth:
+the three app paths a refusal reaches that no MCP call can, driven through a
+live `ProjectDocument`. `phase8_chrome.py` is the one
 that puts WINDOWS on screen — its
 `dispatch` mode activates a probe for about a second, because a key window is
 the thing it measures.
@@ -729,6 +732,20 @@ its window height by arithmetic over the section stack — so a failure there
 is the row landing, not the row being wrong, and finding that out after
 everything else has been written costs a day.
 
+**Its cross-build sections cannot run on this tree any more, and say so by
+name.** Road map 7's D2·1 gave `rc_project_apply` a fourth parameter, and the
+reference commit's own `ReelCore.swift` calls the three-argument export — so
+an app tree that old cannot compile against the CURRENT header, which is what
+the one-core-two-app-trees design requires. No guard in `harness/main.swift`
+fixes that, and nothing in this repo can. `phase5_chrome.py` is therefore
+**36/36 with 45 rows SKIPPED by name** — sections 3 to 7, which scored 81/81
+while the reference still built — and `recording_probe.py`'s §6b the same,
+which is why that script is **858/858 with 43 skipped** (2 here, 41 the
+locked console) where it was 917/917. A skip is not a pass: both print the
+reason AND the count, and both gate on the one cause — the error must name
+`rc_project_apply` and the reference tree's own `ReelCore.swift` — so every
+other build failure is still the scored failure it was (root `CLAUDE.md`).
+
 `phase5_chrome.py` is the other half, and phase 5 splits between the two more
 sharply than any phase so far: four of its five features are AUDIO, which a
 still frame can hold no opinion about, so everything above is the MCP
@@ -1072,16 +1089,22 @@ out loud rather than implied.
 `snapshot.clips` — the TOP LEVEL alone — while the core refuses against
 `every_clip()`, the timeline's clips CHAINED with every nest's. So media used
 only inside a compound clip walked past the Swift guard with a user count of
-zero and was refused by the core with a bare `Ok(None)`, which reaches a caller
-as "Remove Media made no change. Either the project is already in that
-state…". The section builds that exact fixture over the wire — import, a clip,
-`nest` — and asserts the refusal NAMES the file and the count, that the
-reason-less sentence is NOT what comes back, that `with_clips: true` takes the
-entry and the NESTED clip while leaving the nest clip itself on the timeline,
+zero and was refused by the core with a reason-less "nothing changed", which
+reached a caller as the shared "Remove Media made no change…" and told it
+nothing. (Deepening D2·2 shortened that shared sentence — an identity now says
+only that the project is already in that state — D2·3 gave the core's own rule
+a sentence naming the clips, and D2·4 deleted the handler's count so that
+sentence is what arrives. `MediaUsage.swift`'s one spelling stays, with the
+Media tab's alert as its only caller.) The section builds that exact fixture
+over the wire — import, a clip,
+`nest` — and asserts the core's sentence WHOLE, which names the CLIP where the
+deleted guard named the file and a count; that an identity's "made no change"
+is NOT what comes back; that `with_clips: true` takes the
+entry and the NESTED clip while leaving the nest clip itself on the timeline;
 and that one undo restores the whole project JSON. The check with the sharpest
 teeth is the both-levels one: media used once at the top level AND once inside
-a nest must be refused with "used by **2** clips", which a build counting the
-top level alone still refuses — with the wrong number. Sections 3 and 4 are the
+a nest is refused naming BOTH clips, where anything counting the top level
+alone names one. Sections 3 and 4 are the
 "nothing else moved" half: the catalog is EXACTLY 73 for the fourth phase
 running (phase 8 adds no op and no tool), no tool name mentions the preview or
 the quality, the parity log is empty for all three instances the run touches,
@@ -2120,7 +2143,11 @@ fix wave built (a placement throw unwrapped, the `path` trim removed, a
 named project falling through to a new document, the Goertzel share on the
 wrong scale) are in its docstring with the rows that kill them.
 
-`python3 tools/proof/recording_probe.py`, **876/876** (662 before R2; `--only
+`python3 tools/proof/recording_probe.py`, **858/858 with 43 rows skipped by
+name** — 41 the locked console's granted tier, 2 section 6b's reference build,
+which no longer compiles against the current header (see phase 5's chrome
+above for why, and it is the same cause); 876/876 and 917/917 are its earlier
+scores, when that reference still built (662 before R2; `--only
 <sections>` for iteration), over a probe compiled
 from the whole of `app/Sources` (`remaining_probe.py`'s shape): section 1 the
 file naming, 2 `RecordingConfiguration.make` read back field by field over
@@ -2357,3 +2384,112 @@ and the misspelt blend inside an end patch) are the core's whole sentences
 with the GROUP in the path, and `phase3_proof.py`'s region check asserts the
 whole of the one refusal its handler kept rather than the word `region`,
 which every refusal at that door said.
+
+## What an op answers (`refusal_proof.py`)
+
+`python3 tools/proof/refusal_proof.py [port]`. **Named for the SEAM, not for
+a phase**, as the patch door is: what it proves is the answer every edit
+comes back with (`core/src/outcome.rs`, `app/Sources/ReelEdit.swift`,
+`CONTEXT.md`'s **Op**), and the rules that can say WHY arrive one deepening
+ticket at a time (`designs/reelcut-roadmap-7.md` §4, kpgalligan/reelcut#8).
+Deepening D2·2 (#10) built it with the overlap rule's section, at
+**39/39** (40/40 after its review); D2·3 (#11) took it to **113/113** with
+one section per rule that found its voice, each a copy of `overlap_rule`;
+and D2·4 (#12), which deleted the app-side answers that stood in front of
+four of them, took it to **116/116**.
+
+An op answers one of three ways: it applied, it was an IDENTITY (valid, and
+nothing needed to change), or it was REFUSED (a rule declined it, in the
+rule's own words). The last two are both "the project did not change" —
+neither registers an undo step, neither is an error tier, and a person at
+the machine gets the same beep for both — and until D2 nothing outside the
+core could tell them apart. The two sentences an agent now reads are
+asserted WHOLE and never by keyword:
+
+    <Action> made no change: the project is already in that state.
+    <Action> was refused at <op>: <the rule's own sentence>
+
+| Section | What it measures |
+|---|---|
+| 1 — the overlap rule | the rule's whole sentence, ids and tick counts included, out of `move_clip`, out of `duplicate` (which names the copy it never made) and out of a SCOPED call; an overlap one frame under the limit still applying, so the number in the sentence is the rule's own boundary; the project unchanged either side of every refusal; and ONE undo putting back the marker edit, so not one of them registered a step |
+| 2 — an identity | four doors (`set_video`, `set_clip`, `set_canvas`, `split`) asked for the value the project already holds, each answering that whole sentence and NOTHING else — an equality, which is the only way to measure "says only that" — and naming no rule |
+| 3 — several ops | `normalize_clip` sends one `set_audio` per clip, so it is where the fold over a list is observable: a list of identities answers the identity, one undo puts both clips back, and a later op still runs after an earlier identity |
+| 4 — a locked track | `close_gap` over a gap that is really there and `insert_clip` with room to spare, both naming the track to unlock (`core/src/edit_time.rs`'s `locked_track`, written once for its three callers); the lock undone and both landing; and the same `close_gap` on a time that is ON a clip still answering the IDENTITY, which is the distinction the whole candidate is about, at one op |
+| 5 — the track stack | the only track in a project, refused with and without `with_clips: true` — the flag is the way past the OTHER refusal and not past this one — a second track making the same call land, a track that still holds clips naming the CLIP rather than a count, and that flag then taking the track and its clip |
+| 6 — a media row | a media one clip still shows, refused naming that clip and `with_clips: true`, and an unused row still going with no argument at all |
+| 7 — the transition cut | a cut with no unused material, refused naming the request in whole FRAMES (15, hand-computed) and `ripple: true`; the same cut taking a RIPPLED transition, which slides the incoming clip by exactly the overlap asked for; and that rippled form on a LOCKED track, which is `locked_track`'s third caller |
+| 8 — the action rules | an action inside another and an action past the clip's end, each out of `add_action` AND `set_action` in the same words; and two boundaries that land — abutting is not overlapping, and an action ending exactly at the clip's end fits |
+| 9 — off the track stack | a two-track selection moved one track too far, naming the clip that would go off the top and the index it would land on, in `move_track`'s own words for the same mistake |
+
+Every refusal and every identity also asserts the ABSENCE of two fragments
+of the paragraph D2·2 deleted ("Either the project is already in that
+state", "the usual reason for a placement op is the overlap rule"). That
+paragraph also began "<Action> made no change", so a check looking only for
+the new words would pass against a build that still sent it.
+
+**Four checks used to measure the APP's sentence and not the core's, and
+said so by name** — a `shadowed` helper at §5d, §6b, §7b and §7d, where
+`AgentServer+Media.swift`'s and `AgentServer+Tracks.swift`'s `with_clips`
+guards and `AgentServer+Transitions.swift`'s trial-apply each asked the same
+question one step earlier and answered in their own words. D2·4
+(kpgalligan/reelcut#12) deleted all four, and those checks are ordinary
+`refused` calls against the core's sentence now; the helper is gone with
+them, and the app's old wording is kept in road map 7 §5.4's own "what
+went" table. The gap
+D2·3 measured with its mutant 7 — the transition rule turned back into a
+bare identity, taken by a core test and invisible here — is closed: the same
+mutant is D2·4's, and this script takes it.
+
+**What section 3 cannot reach, said so it is not rediscovered as a gap.**
+Only three tools send a list of ops — `normalize_clip`, `import_captions`
+and `consolidate_media` — and none can send one where NOTHING applied and
+something was refused: a `set_audio` of a measured gain has no rule to
+decline it, `CaptionLayout` probes its own batch and refuses app-side before
+the shared reply is reached, and `consolidate_media` short-circuits an empty
+plan. The op-naming half of that answer is proved in §1, which goes through
+the same one format string. When a tool gains such a list, its fixture goes
+in §3.
+
+**Why it exists beside `core/tests/refusal.rs`**, which proves the three
+arms through the FFI: those tests cannot see the Swift side of the seam —
+whether the app reads `reason_out` at all, whether the agent's shared reply
+still guesses, and whether a refusal is still no undo step once it has been
+through `ProjectDocument`. It needs no ffmpeg, and nothing in `media/` but
+`A.mov`, `AV.mov` and `B.mov`.
+
+## A refusal, where a person meets it (`refusal_probe.py`)
+
+`python3 tools/proof/refusal_probe.py`, no port and no running app. The
+PROBE beside `refusal_proof.py`, for the three app paths no MCP call can
+reach. The agent's own path refuses at `AgentServer.performGroupedEdit`'s
+trial and never asks the document, so `ProjectDocument.applyEdit`,
+`updateLiveEdit` and `endLiveEdit` never see a refusal over the wire; this
+is `CLAUDE.md`'s answer for app STRUCTURE with no caller a script can reach
+— a probe compiled out of `app/Sources` over `harness/build.sh`'s own
+swiftc line, cached on modification times, a build failure scored as a
+FAILURE rather than an exit. **15/15** at deepening D2·2 (#10).
+
+It drives one live `ProjectDocument` over two abutting ten-second text
+clips — no media file, so every tick is hand-computable — and scores five
+things: that the core answers the three arms it was handed (a refused move,
+an identity, and an unknown id that throws); that `applyEdit`'s two
+non-applied arms leave the HANDLE where it was and do not rename the undo
+step; that a refused tick mid-drag is swallowed and the gesture ends with no
+step of its own; that ONE undo afterwards puts the project back to before
+the marker edit, leaving the fixture's own step under it; and that the
+invalid-input tier still throws in the core's own words.
+
+**"No error dialog" is measured by the probe answering at all.**
+`ProjectDocument.present(_:)` with no window runs `presentError(_:)`, a
+modal alert nobody is there to dismiss, so a build that treated a refusal as
+the invalid tier would BLOCK — the runner gives it a 120 s timeout and
+scores a hang as the failure it is. The beep is the one consequence nothing
+here can observe; it is a single statement the two non-applied arms share.
+
+**One thing it prints and does not score.** `performGroupedEdit` opens an
+undo group and balances it whatever the edit answered, so an edit that
+changes nothing leaves an EMPTY group behind — a step a person would have to
+press ⌘Z twice past. An identity has always done it, no caller reaches it
+(the agent refuses at its trial, and the menu path does not use that entry
+point), and it is not D2's doing; the note is there so it is found written
+down rather than rediscovered.

@@ -1005,9 +1005,9 @@ def frame_part(mcp):
                                 (1280, 720, "a clean double"),
                                 (1000, 800, "neither a multiple of it nor its aspect")):
         canvas = project(mcp)["canvas"]
-        # An op that changes nothing is a documented refusal (spec §5.5) and
-        # arrives here as a ToolError, so the first size — which the fixture
-        # is already at — is set only when it needs setting.
+        # An op that changes nothing is an IDENTITY (spec §5.5) and arrives
+        # here as a ToolError, so the first size — which the fixture is
+        # already at — is set only when it needs setting.
         if (canvas["width"], canvas["height"]) != (width, height):
             mcp.call_with("set_canvas", {"width": width, "height": height})
         outer, inner = pair()

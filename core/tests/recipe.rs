@@ -22,7 +22,7 @@ mod common;
 
 use serde_json::{json, Value};
 
-use common::{array, at, num, take_string, text, Handle};
+use common::{array, at, num, take_string, text, Handle, Outcome};
 use reelcut_core::ffi::rc_timecode_format;
 
 /// The twenty keys of a recipe layer (spec §7.3). Written out rather than
@@ -129,13 +129,14 @@ fn off() -> Value {
 }
 
 /// An op that may be an identity on this project: `set_canvas` refuses to
-/// change nothing (every edit here returns `None` rather than a phantom undo
-/// step), and a test that sets the size or the timecode style a fixture
-/// already has is asking for exactly that.
+/// change nothing (every edit here answers `Outcome::Identity` rather than
+/// a phantom undo step), and a test that sets the size or the timecode
+/// style a fixture already has is asking for exactly that.
 fn settle(handle: &Handle, op: &Value) -> Handle {
     match handle.try_apply(op) {
-        Ok(Some(next)) => next,
-        Ok(None) => handle.duplicate(),
+        Ok(Outcome::Applied(next)) => next,
+        Ok(Outcome::Identity) => handle.duplicate(),
+        Ok(Outcome::Refused(why)) => panic!("a rule refused this op: {why}\n{op}"),
         Err(msg) => panic!("{msg}\n{op}"),
     }
 }

@@ -1194,14 +1194,41 @@ never has to defend itself, and one bad number cannot blank a frame.
 
 ### 5.5 Purity and undo
 
-Every edit is `fn(&Project, args) -> Option<Project>` — `None` means
-nothing would change, so no phantom undo step; invalid arguments are an
-`Err(String)` at the FFI (`err_out`), never a panic. The Swift document
-keeps a stack of handles; `NSUndoManager` records the previous one
-(`ImageDocument.swift` in Rasterize is the template — `applyEdit`,
-`beginLiveEdit`/`updateLiveEdit`/`endLiveEdit`, `countEditChange`,
-`registerUndo` nowhere else). Because the value holds no pixels this is
-cheaper than Rasterize's equivalent.
+Every edit is `fn(&Project, args) -> Result<Outcome, String>`
+(`core/src/outcome.rs`). An op the core UNDERSTOOD answers one of three
+ways:
+
+- **applied**, with the new project — the app pushes an undo step;
+- **an identity** — the project already says what was asked, so nothing
+  would change and there is no phantom undo step, and nothing to explain;
+- **refused**, with the rule's own sentence — the overlap rule names the
+  two clips and the exact tick counts. No undo step either: a refusal is
+  not an error tier, it is an answer that can say why. It crosses the FFI
+  on `rc_project_apply`'s `reason_out`, beside and never with `err_out`.
+
+A request the core could not read is the fourth answer and the `Err` of
+that `Result`: invalid arguments, unknown ids and parse failures, reported
+at the FFI through `err_out`, never a panic. It is not an arm of `Outcome`
+because it is about the REQUEST where a refusal is about the PROJECT.
+
+**An identity and a refusal are identical to the person at the machine** —
+both beep, neither makes an undo step — and differ only in what a caller can
+be told. **Which of §6's "refuses" carry a sentence today is a list that
+grows**, and `Outcome::Identity`'s own doc comment is the one place it is
+kept, so a reader does not grep ten modules for it. Two families are
+identities on purpose and will not join it: an op handed an **empty
+selection** (fourteen ops — eight with a guard of their own, `split` and
+`paste_attributes` through the same answer with none — since nothing was
+asked for, so there is no rule to name), and **a clamp that landed where the
+clip already was** (a slip or a roll the clamps reduce to nothing, a trim whose two
+clamps crossed, a rate stretch outside ×0.1 – ×10), where "nothing needed to
+change" is the honest answer as well as the true one.
+
+The Swift document keeps a stack of handles; `NSUndoManager` records the
+previous one (`ImageDocument.swift` in Rasterize is the template —
+`applyEdit`, `beginLiveEdit`/`updateLiveEdit`/`endLiveEdit`,
+`countEditChange`, `registerUndo` nowhere else). Because the value holds
+no pixels this is cheaper than Rasterize's equivalent.
 
 ### 5.6 Persistence
 
@@ -1325,8 +1352,18 @@ All ops take clip/track/marker *ids*. All time arguments are snapped to
 the frame grid first, and so are the tick values a PATCH carries — a motion
 preset's two edge durations and its `during` period, and a text animation's
 `in` and `out` — which the core snaps after the range checks, so a refusal
-names the number the caller sent. "Refuses" = returns `None` at the FFI (the
-UI beeps or animates back); "error" = `Err`.
+names the number the caller sent.
+
+**How to read a "refuses" below.** An op the core understood answers one of
+three ways (§5.5): it applies, it is an **identity**, or a rule **refuses**
+it and hands back that rule's own sentence. The rows below name the RULE,
+which is what a reader needs — a row that says an op refuses on an empty
+selection or when nothing changes is naming an identity, which carries no
+sentence, and every other "refuses" is a rule that either speaks already or
+is a candidate to. §5.5 says where the one list of the ones that speak is
+kept. Either way the project is exactly as it was and no undo step is made,
+and the UI beeps or animates back; "error" = `Err`, the request itself could
+not be read.
 
 **Every op that takes a caller-authored PATCH reads it the one way** (§5.2):
 a nested object MERGES key by key at every depth, a key set to `null` CLEARS
@@ -1349,7 +1386,7 @@ its frozen pair, the rate / background / switches and the `media[]` and
 twice), applies the op to it, and merges `tracks`, `clips`, `next_id`,
 `media` and `nests` back. So `Project::clip` keeps its one meaning, no op
 gained a nest-aware code path, undo is still one stack of parent handles,
-and `rc_op_names` is still 55 — a scope is an envelope key, not an op.
+and `rc_op_names` is still 57 — a scope is an envelope key, not an op.
 Times inside a scope are the nest's own, measured from its zero; a nest has
 no speed, so `t − nest_clip.start` is the whole mapping.
 
@@ -1368,7 +1405,7 @@ as it works on the timeline, `nest` and `unnest` included: nesting the
 whole of a scope mints a fresh id and puts the new nest clip INSIDE the
 scoped nest, which is a legal extra level and not a cycle.
 
-**A scope widens the third arm of §5.5's answer and nothing else.** Two
+**A scope widens §5.5's invalid-argument answer and nothing else.** Two
 invariants are invisible from inside a view — the caps count the whole
 document (§5.6) and the nesting depth is measured from the timeline down —
 so both are checked once, at the end, on the MERGED parent. *An op may
@@ -1412,8 +1449,8 @@ many clips`, `too many tracks`, `nests are more than 8 deep at nest N`.
 | `set_clip {clips, patch: {name?: string \| null, label?: string \| null}}` | The fifth patch op: sets or clears the clip's own name and label (§5.2). Inside the patch an absent key keeps, `null` clears, and so does an empty string — after the trim a name gets on its way in — because an unnamed clip is `null`, not `""`. Any other key is an **error**, checked before the clip ids. A patch and not two top-level arguments, because the op envelope reads an absent optional and an explicit `null` as the same thing, and "keep" and "clear" have to differ here. A `split`, `duplicate`, `detach_audio` or `paste` carries both along (they clone the clip); `paste_attributes` never does. Refuses if nothing changes. |
 | `set_enabled {clip, video?, audio?}` | Visibility/mute per clip. |
 | `set_transition {clip, kind\|null}` | Sets `transition_in`. With a kind on a clip that already HAS a transition only the `kind` moves — its `curve` and `audio` stay where the person put them (format version 7), because a kind chosen from the popup, the menu or MCP must not reset a curve; a clip that had none gets a minted one (§11, R5-2). `set_transition_duration {clip, duration}` moves the clip so the overlap equals `duration` (subject to the overlap rule). |
-| `add_transition {clip, kind?, duration, align="center", ripple=false}` | Makes an overlap at the HARD CUT before `clip` out of the two clips' unused handles and puts a transition on it — **nothing else on the timeline moves** and the pair's outer edges stay (§11, R5-3). `align` `center` takes half from each side (the odd frame to the incoming clip, and a side that cannot supply its share passes it to the other before the total shrinks), `before` takes it all from the incoming clip's head, `after` all from the outgoing clip's tail. The duration is snapped DOWN to whole frames before the split — snapping two halves separately would lose the odd frame — and then clamped: to each side's handle (a media clip's source window; UNBOUNDED for a still, an image, text or a shape; **0 for a nest's head**, since trimming a nest clip's head moves its contents, and the nest's own remaining length for its tail), to the neighbours on the track, and to the overlap rule, which is stepped down from the larger side until it passes. A request that clamps below one frame is `None`. The incoming clip's `in` moves back by the extension times its speed, and its ACTIONS move with it — where `trim_start` deliberately leaves actions alone, because a transition reveals material in front of a first frame nobody asked to move. `kind` absent uses the clip's own stored kind if it has one, else `cross_dissolve`; a stored transition keeps its style and a new one is minted. **Error** for a non-positive duration, an unknown clip, and for not being at a hard cut — naming which of: no predecessor, a gap, an overlap that already exists. **`ripple: true` makes the overlap by MOVING instead** (§11, R5-3's amendment): no handle is read and `align` is ignored; the incoming clip and every clip at or after the cut on every UNLOCKED track slide left by the snapped duration — `close_gap`'s set, through the same shift — so the timeline gets shorter, the outgoing clip keeps every frame and its place, and no source window or action moves. The duration is capped at half the shorter of the two clips and stepped down a frame at a time until every track something moved on passes the overlap rule; a clip on another track pushed into its neighbour gains a minted `cross_dissolve` (`close_gap`'s rule); markers do not move; an incoming clip on a locked track, or nothing left above one frame, is `None`. The same hard-cut `Err`s apply. |
-| `set_transition_style {clip, curve?, audio?}` | Sets the transition's easing and whether it crossfades the sound; an absent key KEEPS. A separate op rather than two more arguments on `set_transition`, because that one reads an absent `kind` and an explicit `null` as the same thing and so cannot spell "keep". It stores on the same terms — any clip, with or without an overlap — and a clip with no stored transition and at least one key given gets a minted `cross_dissolve` with the style applied. NEITHER key given is `None` whatever the clip holds, and never mints. **Error** for an unknown clip. |
+| `add_transition {clip, kind?, duration, align="center", ripple=false}` | Makes an overlap at the HARD CUT before `clip` out of the two clips' unused handles and puts a transition on it — **nothing else on the timeline moves** and the pair's outer edges stay (§11, R5-3). `align` `center` takes half from each side (the odd frame to the incoming clip, and a side that cannot supply its share passes it to the other before the total shrinks), `before` takes it all from the incoming clip's head, `after` all from the outgoing clip's tail. The duration is snapped DOWN to whole frames before the split — snapping two halves separately would lose the odd frame — and then clamped: to each side's handle (a media clip's source window; UNBOUNDED for a still, an image, text or a shape; **0 for a nest's head**, since trimming a nest clip's head moves its contents, and the nest's own remaining length for its tail), to the neighbours on the track, and to the overlap rule, which is stepped down from the larger side until it passes. A request that clamps below one frame is REFUSED, in a sentence naming the cut, the frames asked for and `ripple: true` as the way past it. The incoming clip's `in` moves back by the extension times its speed, and its ACTIONS move with it — where `trim_start` deliberately leaves actions alone, because a transition reveals material in front of a first frame nobody asked to move. `kind` absent uses the clip's own stored kind if it has one, else `cross_dissolve`; a stored transition keeps its style and a new one is minted. **Error** for a non-positive duration, an unknown clip, and for not being at a hard cut — naming which of: no predecessor, a gap, an overlap that already exists. **`ripple: true` makes the overlap by MOVING instead** (§11, R5-3's amendment): no handle is read and `align` is ignored; the incoming clip and every clip at or after the cut on every UNLOCKED track slide left by the snapped duration — `close_gap`'s set, through the same shift — so the timeline gets shorter, the outgoing clip keeps every frame and its place, and no source window or action moves. The duration is capped at half the shorter of the two clips and stepped down a frame at a time until every track something moved on passes the overlap rule; a clip on another track pushed into its neighbour gains a minted `cross_dissolve` (`close_gap`'s rule); markers do not move; an incoming clip on a locked track, or nothing left above one frame, is REFUSED, each in its own sentence. The same hard-cut `Err`s apply. |
+| `set_transition_style {clip, curve?, audio?}` | Sets the transition's easing and whether it crossfades the sound; an absent key KEEPS. A separate op rather than two more arguments on `set_transition`, because that one reads an absent `kind` and an explicit `null` as the same thing and so cannot spell "keep". It stores on the same terms — any clip, with or without an overlap — and a clip with no stored transition and at least one key given gets a minted `cross_dissolve` with the style applied. NEITHER key given is an IDENTITY whatever the clip holds, and never mints — nothing was asked for, so there is nothing to explain. **Error** for an unknown clip. |
 
 **Actions**
 
@@ -1489,9 +1526,12 @@ void       rc_string_free(char *s);
 /* edits — one entry point. `op` is {"op": "<name>", ...args} (§6), plus the
  * optional envelope key "scope": a nest id, which applies the op INSIDE that
  * nest and returns a whole project (§4.4).
- * Returns a NEW project; NULL with err_out untouched = the op would change
- * nothing (no undo step); NULL with err_out set = invalid op or arguments. */
-RcProject *rc_project_apply(const RcProject *p, const char *op, char **err_out);
+ * Returns a NEW project; NULL with NEITHER message set = an identity, the op
+ * would change nothing (no undo step); NULL with reason_out set = a rule
+ * refused it, in that rule's own sentence (no undo step either); NULL with
+ * err_out set = invalid op or arguments (§5.5). */
+RcProject *rc_project_apply(const RcProject *p, const char *op, char **err_out,
+                            char **reason_out);
 
 /* queries */
 int64_t rc_project_duration(const RcProject *p);
@@ -2407,13 +2447,15 @@ concern is a new module with its own `impl Project` block.
 | `model_motion.rs` | the motion vocabulary (format version 8, road map 5's E2) — `Motion` and the `MotionEdge`, `MotionDuring`, `EdgeMotion` and `DuringMotion` it is made of. Its own module for a seam rather than for room: every other member of the video group is a quantity the compositor reads more or less straight, while these five say only what a clip should DO and the placement that comes out of them is computed at render time by `motion.rs`. Re-exported whole by `model_props.rs`; neither enum's declaration order is load-bearing, and both are closed |
 | `model_query.rs` | reading a project: `Project::new`, id allocation, the `clip` / `track` / `media` / `marker` / `nest` lookups, `clips_on`, `duration`, `validate` with its nesting walk, the three source-window measurements (`content_length`, `source_head`, `source_length`) every placement op clamps against, and `source_size` — the source's pixel size when the model knows it, `None` for text and for a media, nest or shape with no positive size. That last one was TWO private readers, `edit_props.rs`'s and `edit_background.rs`'s stricter one, collapsed here by road map 5's T0f, so a source kind added to `model.rs` is answered once |
 | `time.rs` | `Ticks`, `TIMESCALE`, `Fps`, frame snapping, timecode format/parse (non-drop `HH:MM:SS:FF` and `HH:MM:SS.mmm`) |
-| `edit.rs` | the op enum + serde, `apply(&self, op) -> Result<Option<Project>, String>`; **its module doc is the op schema table**. `parse` answers an `Envelope` — the op AND the envelope's `scope` — which it takes out of the object in the pass that already reads `"op"`, because `Op` is internally tagged with `deny_unknown_fields` on every variant (an envelope key would be a typo to all fifty-five) and serde does not support that attribute with `flatten`. `apply_op(&Op)` is unchanged and knows nothing about nests |
+| `outcome.rs` | what an op ANSWERS (§5.5) — `Outcome`, with `Applied(Project)`, `Identity` and `Refused(String)`. An enum and not a side channel because a site that has not decided which of the three it gives does not compile, which is how the fourteen sites that used to throw a rule's sentence away were found (road map 7's D2). Its `Identity` doc is the ONE place that lists which refusals carry a sentence today, and the two families that stay identities on purpose |
+| `edit.rs` | the op enum + serde, `apply(&self, op) -> Result<Outcome, String>`; **its module doc is the op schema table**. `parse` answers an `Envelope` — the op AND the envelope's `scope` — which it takes out of the object in the pass that already reads `"op"`, because `Op` is internally tagged with `deny_unknown_fields` on every variant (an envelope key would be a typo to all fifty-seven) and serde does not support that attribute with `flatten`. `apply_op(&Op)` is unchanged and knows nothing about nests |
 | `scope.rs` | editing INSIDE a nest — the envelope's `scope` key (road map 2, phase 9). Builds a VIEW project out of the nest, applies the op to it unchanged, and merges `tracks`, `clips`, `next_id`, `media` and `nests` back. Its own module because a scope is a change of CONTAINER rather than an op or a property of one, and because the whole of it is two pure functions and a refusal list, which belong nowhere near the semantics of any single edit. Three readings in it are measured rather than reasoned: the scoped nest's row stays in the view with its tracks and clips **emptied** (whole, it doubles every id in `validate`'s one uniqueness sweep; removed, it dangles every other nest's clip that shows it — the nest-inside-a-nest case the phase exists for); the nests write-back is **union first, orphans after**, because `unnest`'s `nest_is_shown` cannot see the parent's timeline clips from inside a view and would drop a nest a timeline clip still shows; and the caps and the depth are checked ONCE on the merged parent, which is why a scoped op has a wider `Err` arm than any other |
 | `edit_clip.rs` / `edit_props.rs` / `edit_track.rs` / `edit_time.rs` | the §6 ops in `impl Project` blocks: clip placement; the five property patches (`set_video` / `set_audio` / `set_text` / `set_shape`, and `set_clip` for the clip's own name and label), each merged through `patch.rs` and then range-checked; tracks, markers, canvas, media; ripple, insert time, range delete, freeze |
 | `patch.rs` | reading a caller-authored patch: `Group` (the vocabulary the four patches and `paste_attributes` share, and its per-group template), `check_keys` (the walk of keys and JSON kinds, array indices in the path), `merge_group` (the one read of a group patch — walk, deep merge, typed read back) and `check_group_patch` (the same for a group that is not merged into a stored one, which is what `edit_action.rs` composes an end patch's door out of). Every refusal names the dotted path and the offending value, and `COMPLETE_ENTRIES` is where the `video.filters` entry rule is stated. Cut out of `edit_props.rs` under the size rule in D1·2 for `props_check.rs`'s reason: what a patch may CARRY is a fact about the vocabulary, not about an edit, and nothing here is handed a clip |
 | `props_check.rs` | the range checks every value written into a property group passes first — `check_video` / `check_audio` / `check_text` / `check_shape`, the `finite` / `in_range` family under them, and the bounds they check against (§4.3's numbers, which `actions.rs`'s `clamp_video` reads too) — cut out of `edit_props.rs` in phase 2 because a range check is a fact about the vocabulary, not about an edit; a patch and a `paste_attributes` copy run the same checks (`Project::check_group`) |
 | `edit_edge.rs` / `edit_insert.rs` | the cutting moves that keep something fixed on purpose: `slip` and `roll` (the clip's place, and the pair's outer edges); `insert_clip` and `overwrite_clip` (the other tracks, and the timeline's total length) |
 | `edit_action.rs` / `edit_nest.rs` / `edit_paste.rs` | the ops with a concern of their own: actions (the no-overlap rule, and `check_end_patch` — which groups an end patch may name and what a `null` in one removes, over `patch.rs`'s walk and read); `nest` / `unnest`; `paste` (making another document's clips fit) and `paste_attributes` (the same payload's earliest clip's property groups copied onto clips already placed — replaced whole, never merged) |
+| `edit_canvas.rs` | the document's own shape — `set_canvas` and the three readers under it (`check_dimension`, the rescale of every clip and the re-snap of every time to a new grid). Cut out of `edit_track.rs` under the size rule (road map 7's D2·3), a pure move: a canvas is the document's frame, not a track, a marker or a media row |
 | `edit_split.rs` | cutting one clip in two — `split_clip` and the two helpers only it has ever needed, `state_patch` and `narrow_to`. Cut out of `edit_clip.rs` under the size rule (road map 5, E2) and cut HERE because a split is not a placement: every other op there decides where a clip sits, while this one decides what the SECOND clip INHERITS — its base props from the evaluation at the cut, the actions that had not finished rebased to its own clip time with a straddled one narrowed to the keys it animated, and the halves of a preset anchored to the clip's two ends (`video.motion`'s rule, and `text.animation`'s). Every splitter in the crate routes here — `split_clips`, `split_under_playhead`, `clear_range` (so `ripple_delete_range(s)` and `lift_range`), `insert_clip`, `overwrite_clip` and `freeze_frame` — so a rule stated once is a rule they all obey |
 | `edit_transition.rs` | the WRITE half of a transition: `set_transition`, `set_transition_duration`, `set_gained_transitions` (the rule that a clip which gains an overlap gains a transition), and road map 5 E1's `add_transition` and `set_transition_style` with the `TransitionAlign` their op argument is spelled in. Cut out of `edit_clip.rs` under the size rule and cut HERE because placement and transitions are different questions — `edit_clip.rs` decides where a clip SITS, this decides what happens where two of them meet. `transition.rs` is the READ half and nothing here restates it; `set_gained_transitions` is re-exported from `edit_clip.rs`, so every caller's path is unchanged |
 | `edit_zoom.rs` | `add_zoom_action`, the screencast zoom (road map 2, phase 3b) — the one op whose substance is geometry rather than bookkeeping, which is why it is not a fifth function in `edit_action.rs`. **Its module doc is the placement equation**: the two frames (Q, `model_regions.rs`'s source pixels from the cropped rect's centre; C, canvas pixels) and the solve that turns a rectangle drawn on the picture into the `scale` / `x` / `y` an action's end patch carries, rotation and crop included. Composes `add_action` + `set_action` + `set_action_end`, so a drag is one undo step and every `add_action` refusal is inherited rather than copied |
@@ -2497,8 +2539,9 @@ dirty tracking), `RasterCore.swift` (wrapper shape), `AgentServer.swift`
 `EditorViewController+ToolOptions.swift` (descriptor-driven controls),
 and both `CLAUDE.md` files under `core/` and `app/`.
 
-Rules carried over verbatim: pure ops returning `Option` (identity is
-`None`); the three-file lockstep (`ffi_*.rs` → header → `ReelCore.swift`)
+Rules carried over verbatim: pure ops, which here answer three arms rather
+than Rasterize's `Option` (§5.5); the three-file lockstep (`ffi_*.rs` →
+header → `ReelCore.swift`)
 — with JSON ops the header changes rarely, but the op table in `edit.rs`
 and the builders in `ReelCore.swift` still move together; every export
 `catch_unwind` + NULL-tolerant + `err_out`; no panics on any input; the
@@ -2885,7 +2928,8 @@ assisted import.
   (`close_gap`'s refusal) is a different edit. Not being at a hard cut is a
   wrong ARGUMENT (`Err`), because the op is pointed at one cut by a caller
   who meant that cut — unlike `roll`, which a drag can reach at any edge;
-  having no handle is a domain refusal (`Ok(None)`).
+  having no handle is a domain refusal (`Outcome::Refused`, §5.5 — it
+  says so in its own sentence since road map 7's D2·3).
   **Amended 2026-09-16, by the user: when there is no handle, OFFER to
   shift.** Two whole files placed back to back — the most common screencast
   cut — have no handle on either side, so the rule above left Clip ▸
@@ -2908,3 +2952,22 @@ assisted import.
   clock, no previous frame: `render_frame` at a tick is byte-identical run
   after run, preview and export agree, and two clips with the same preset
   at the same clip time are displaced identically.
+- **D2-1 — A refused op says why in the CORE's words; a tool still names an
+  argument the caller left out.** Deepening D2 gave every rule that refuses
+  a sentence of its own and deleted the app's copies
+  (`designs/reelcut-roadmap-7.md` §4–§5), so no agent handler trial-applies
+  an op in order to write a reason. The line between the two, drawn at D2·4
+  because six handlers answer a caller before the core sees the call: **a
+  check that predicts a RULE goes; a check that names the CALL stays.**
+  `set_transition_style` with neither key, `ripple_delete_ranges` with an
+  empty array, and `set_track`, `set_marker` and `set_canvas` with no keys
+  are the second kind — the core answers an identity, correctly, and an
+  identity says only that the project is already in that state, which tells
+  a caller who forgot an argument nothing it can act on. So is
+  `normalize_clip` with nothing it could MEASURE: the peaks are in the
+  package's cache and not in the model, so that is a fact the core cannot
+  have (§7). **This amends the seventh Implementation Decision of
+  kpgalligan/reelcut#8**, which had listed `set_transition_style`'s refusal
+  and `normalize_clip`'s check among the deletions; the first is one of five
+  of a shape, and deleting one of five would leave the tool surface
+  inconsistent for a caller.

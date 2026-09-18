@@ -585,18 +585,17 @@ final class AgentServer {
         let handle = document.project
         let before = handle.snapshot
         do {
-            guard try document.project.applying(ops) != nil else {
-                // `Ok(None)` is BOTH tiers of "no new project" (spec §5.5):
-                // an identity edit and a documented refusal. Claiming the
-                // first outright misinforms a caller whose `duplicate` or
-                // `move_clip` was actually refused by the overlap rule, and
-                // the core does not distinguish the two — so say both.
+            // Two non-applied arms, two answers, and since D2·2 this says
+            // which (spec §5.5). Both are still "the project did not change"
+            // and still in-band; what stopped is the GUESSING.
+            switch try document.project.applying(ops) {
+            case .applied: break
+            case .identity:  // Only that — no rule the caller did not break.
+                throw ToolError(message: "\(actionName) made no change: the project is "
+                    + "already in that state.")
+            case .refused(let refusal):  // The rule's own sentence, and WHICH op.
                 throw ToolError(
-                    message: "\(actionName) made no change. Either the project is already in "
-                        + "that state, or the edit was refused: the usual reason for a "
-                        + "placement op is the overlap rule — a clip may overlap at most one "
-                        + "neighbour on each side, and each overlap must be at most half the "
-                        + "shorter of the two clips. get_project shows what is where.")
+                    message: "\(actionName) was refused at \(refusal.op): \(refusal.reason)")
             }
         } catch let error as ToolError {
             throw error

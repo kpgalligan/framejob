@@ -27,7 +27,7 @@ mod common;
 
 use serde_json::{json, Value};
 
-use common::{array, assert_contains, at, by_id, flag, int, num, text, Handle};
+use common::{array, assert_contains, at, by_id, flag, int, num, text, Handle, Outcome};
 use reelcut_core::OP_NAMES;
 
 /// One frame of the 30 fps canvas every fixture but [`overlap_project`] uses.
@@ -729,8 +729,13 @@ fn every_op_in_the_table_is_reachable() {
     for (name, op) in covered.iter().zip(&table) {
         let changes = !UNCHANGING.contains(name);
         match project.try_apply(op) {
-            Ok(Some(_)) => assert!(changes, "op \"{name}\" was expected to change nothing"),
-            Ok(None) => assert!(!changes, "op \"{name}\" changed nothing: {op}"),
+            Ok(Outcome::Applied(_)) => {
+                assert!(changes, "op \"{name}\" was expected to change nothing")
+            }
+            Ok(Outcome::Identity) => assert!(!changes, "op \"{name}\" changed nothing: {op}"),
+            Ok(Outcome::Refused(why)) => {
+                assert!(!changes, "op \"{name}\" was refused: {why}\n{op}")
+            }
             Err(msg) => panic!("op \"{name}\" errored: {msg}\n{op}"),
         }
     }

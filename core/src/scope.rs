@@ -7,7 +7,7 @@
 //! — `unnest`, edit, `nest` — which is the identity on clip content but
 //! throws the nest clip's own group-level properties away.
 //!
-//! **The fix is not to teach fifty-five ops about nests.** It is to give
+//! **The fix is not to teach fifty-seven ops about nests.** It is to give
 //! the ENVELOPE a scope, and to hand the op a project in which the nest's
 //! own tracks and clips are the top level. Then `Project::clip` keeps its
 //! one meaning, `apply_op` keeps its flat dispatch, every refusal and every
@@ -125,11 +125,15 @@
 //! twice, so both are answered ONCE, at the end, by validating the MERGED
 //! parent. The contract, stated so a caller can rely on it:
 //!
-//! - `Ok(Some(project))` — the view changed and the merged parent holds
-//!   every invariant.
-//! - `Ok(None)` — the op is valid and the view changed nothing (an identity
-//!   edit, or a documented refusal), or the merge came out equal to the
-//!   project it started from. No undo step, exactly as at the top level.
+//! - `Ok(Outcome::Applied(project))` — the view changed and the merged
+//!   parent holds every invariant.
+//! - `Ok(Outcome::Identity)` — the op is valid and the view changed
+//!   nothing, or the merge came out equal to the project it started from.
+//!   No undo step, exactly as at the top level.
+//! - `Ok(Outcome::Refused(why))` — a rule inside the view declined the op,
+//!   in its own words, which come back out of the scope unchanged: a rule
+//!   about clips says the same thing whichever project they were counted
+//!   in. No undo step either.
 //! - `Err(message)` — `scope` names no nest; the op has no meaning inside
 //!   one; the op's own arguments are invalid IN THE VIEW (an id that is not
 //!   in this nest is `no clip with id N`, which is the honest answer);
@@ -143,6 +147,7 @@ use serde_json::Value;
 use crate::edit::Op;
 use crate::export::describe;
 use crate::model::{Canvas, Nest, Project};
+use crate::outcome::Outcome;
 
 /// Reads the envelope's `scope` out of the value `edit::parse` removed.
 ///
@@ -163,8 +168,8 @@ pub(crate) fn read(value: Option<&Value>) -> Result<Option<u32>, String> {
     }
 }
 
-/// The ops with no meaning inside a nest, by name, or `None` for the
-/// forty-eight that work in there unchanged.
+/// The ops with no meaning inside a nest, by name, or `None` for the fifty
+/// that work in there unchanged.
 ///
 /// Exhaustive rather than a short list with a `_` arm, and that is the
 /// point of writing it out: an op added by a later phase does not compile
@@ -266,15 +271,21 @@ impl Project {
     /// answered FIRST, before the op is classified, because `scope` is the
     /// argument that decides which document the caller thinks it is editing
     /// and a mistake there is worth reporting ahead of anything else.
-    pub(crate) fn apply_scoped(&self, op: &Op, scope: u32) -> Result<Option<Project>, String> {
+    pub(crate) fn apply_scoped(&self, op: &Op, scope: u32) -> Result<Outcome, String> {
         let Some(nest) = self.nest(scope) else {
             return Err(format!("no nest with id {scope}"));
         };
         if let Some(name) = refused_inside(op) {
             return Err(format!("{name} has no meaning inside nest {scope}"));
         }
-        let Some(edited) = self.scoped_view(nest).apply_op(op)? else {
-            return Ok(None);
+        let edited = match self.scoped_view(nest).apply_op(op)? {
+            Outcome::Applied(edited) => edited,
+            // Both answers that left the VIEW alone leave the document
+            // alone, and a rule that spoke inside the nest says the same
+            // thing outside it: the sentence is about clips, not about
+            // which project they were counted in.
+            Outcome::Identity => return Ok(Outcome::Identity),
+            Outcome::Refused(why) => return Ok(Outcome::Refused(why)),
         };
         // The one exit every op has. It answers the identity case and it is
         // where the caps and the depth are finally measured, on the MERGED

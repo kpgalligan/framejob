@@ -619,9 +619,9 @@ final class VideoPane: InspectorPaneView {
         }
         /// One slot changed, the rest of the stack as it stands. An index the
         /// model no longer holds yields the list unchanged, which the core
-        /// answers as the identity it is (`None`, a refusal beep, no undo
-        /// step) — the row is a frame behind its rebuild there, and writing a
-        /// guess about which filter was meant would be worse than a beep.
+        /// answers as the identity it is — the same beep a refusal gets, no
+        /// undo step either way. The row is a frame behind its rebuild there,
+        /// and a guess about which filter was meant would be worse.
         func replacing(_ index: Int, _ next: FilterProps) -> [FilterProps] {
             var filters = writeList()
             guard filters.indices.contains(index) else { return filters }

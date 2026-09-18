@@ -41,6 +41,13 @@ file is what governs a module now.
   `source_head`, `content_length`, `source_length`.
 - `time.rs` — `Ticks`, `TIMESCALE`, `Fps`, frame snapping, timecode
   format/parse (non-drop `HH:MM:SS:FF` and `HH:MM:SS.mmm`).
+- `outcome.rs` — `Outcome`, the THREE arms every edit answers with
+  (spec §5.5): applied with the new project, an identity, or refused with
+  the rule's own sentence. An enum and its doc, nothing else. It is an enum
+  rather than a side channel so that a site which has not decided which
+  answer it gives does not compile; the fourth possibility, a request that
+  could not be read, stays the `Err(String)` beside it. Its `Identity` doc
+  is also the one place that says which refusals can say why yet.
 - `edit.rs` — the op enum, `OP_NAMES`, `parse` and `apply`. **Its module
   doc IS the op table**; `app/Sources/ReelOps.swift`'s typed builders,
   `AgentCatalog*.swift`'s tools and spec §6 mirror it. `parse` answers an
@@ -104,14 +111,26 @@ file is what governs a module now.
   the one a snap rounded it to. Gradient stops are deliberately NOT order-checked: a refusal
   would break dragging one stop past another mid-gesture, so the renderer
   sorts, and the comment says so where the check would have gone.
-- `edit_track.rs` — tracks, markers, the canvas and the media list. Over the
-  cap; the next cut is `set_canvas` with `rescale` / `resnap` /
-  `check_dimension` into an `edit_canvas.rs`.
+- `edit_track.rs` — tracks, markers and the media list: the three lists a
+  clip sits in. The canvas left here at road map 7's D2·3 toll. `clip_list`
+  is the ONE spelling of the clips a `with_clips` refusal names — three ids
+  and then a count, so a media used by two hundred clips still answers a
+  sentence a caller can read — shared by `remove_track` and `remove_media`.
+- `edit_canvas.rs` — the document's own shape: `set_canvas` and the three
+  things it does to the rest of the document — `check_dimension` (a
+  dimension is even, because H.264 encodes in macroblocks), `rescale` (a
+  size change moves every clip's `x`, `y` and `scale`, each axis by its own
+  ratio and `scale` by the smaller of the two) and `resnap` (a rate change
+  moves every stored time to the new grid, and drops the second of two
+  markers a coarser grid lands on one tick).
 - `edit_time.rs` — ripple, insert time, `ripple_delete_ranges` (the pairs are
   ordered, MERGED — touching as well as overlapping — then cut and closed
   right to left as ONE edit; the singular delegates to it), `lift_range`
   (the hole left open), `close_gap` (refuses rather than closing part way),
-  freeze frame, and `shift_clips`.
+  freeze frame, `shift_clips`, and `locked_track` — THE locked-track
+  refusal's sentence, written once here for its three callers
+  (`close_gap`, `edit_insert.rs`'s `insert_clip`, `edit_transition.rs`'s
+  rippled form), each passing the clause after the comma.
 - `edit_edge.rs` · `edit_insert.rs` — the cutting moves that keep something
   fixed on purpose: `slip` and `roll` (a `still` slips the frame it holds;
   any other non-media source is an `Err`; roll's predecessor must end
@@ -237,7 +256,7 @@ gives something up BEFORE it takes anything on**: the cut is a PURE MOVE,
 landed and gated alone, so the feature's diff is attributable; budget the cut
 against the pessimistic number, because an estimate here has run about two
 thirds of the truth. Over the cap today and known debt, not licence:
-`edit_clip.rs`, `edit_track.rs` (next cut named above) and `edit.rs`, whose
+`edit_clip.rs` and `edit.rs`, whose
 standing exemption is that its module doc IS the op table (the cut there, if
 ever forced, is the `Op` enum into an `edit_ops.rs`, and never in the same
 phase as a feature). The current list is `wc -l` and
@@ -255,15 +274,22 @@ one home (`TIMESCALE` in `time.rs`; `RC_*` caps in `format.rs`; the
 inspector's bounds in `props_check.rs`).
 
 **Purity.** Every edit takes `&self` and returns a new value — internally
-clone-then-mutate. An op that would change nothing returns `None`, never an
-identical copy: an identical copy registers a phantom undo step in the app.
+clone-then-mutate. An op that would change nothing returns
+`Outcome::Identity`, never an identical copy: an identical copy registers a
+phantom undo step in the app.
 
-**Errors.** Two tiers, no error enum: `Option<T>` = the op is valid but
-changes nothing, or a domain refusal, with the reason in the doc comment;
-`Err(String)` = invalid arguments, unknown ids, parse failures — lowercase
-messages naming the offending value. No input may panic. FFI mapping:
-`None` → NULL with `err_out` untouched; `Err` → `set_err(err_out, …)`;
-caught panic → `"internal error: <what>"`.
+**Errors.** Every edit answers `Result<Outcome, String>` — three arms and
+one tier, no error enum. `Outcome::Applied` = the new project;
+`Outcome::Identity` = the op is valid and nothing needed to change;
+`Outcome::Refused(String)` = a rule declined it, carrying the rule's OWN
+sentence rather than a second one written at the call site; `Err(String)` =
+invalid arguments, unknown ids, parse failures — lowercase messages naming
+the offending value. A refusal is not an error tier: both middle arms leave
+the project untouched and register no undo step. No input may panic. FFI
+mapping (`ffi_edit.rs`): `Applied` → a new handle; `Identity` → NULL with
+neither channel written; `Refused` → NULL with the sentence through
+`reason_out`; `Err` → NULL with the message through `err_out`; caught panic
+→ `"internal error: <what>"`. The two channels are never both written.
 
 **Times.** Every tick value that reaches the model is snapped to the
 document's frame grid before it is stored (`time::snap_to_frame`). Never

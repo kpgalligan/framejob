@@ -38,6 +38,7 @@ use serde_json::Value;
 use crate::actions::{self, MAX_PATCH_DEPTH};
 use crate::export::describe;
 use crate::model::{Action, Curve, Project};
+use crate::outcome::Outcome;
 use crate::patch::{check_group_patch, unknown_key, Group};
 use crate::time::{Ticks, TIMESCALE};
 
@@ -45,16 +46,45 @@ use crate::time::{Ticks, TIMESCALE};
 /// the Actions table offers before the user drags either edge.
 const DEFAULT_ACTION_DURATION: Ticks = TIMESCALE;
 
-/// Whether `[start, start+duration)` touches any action on the clip other
-/// than `skip` (the action being edited). Actions on a clip may not overlap
-/// (spec §5.4); this is the test both `add_action` and `set_action` refuse
-/// on.
-fn actions_overlap(actions: &[Action], skip: Option<u32>, start: Ticks, duration: Ticks) -> bool {
+/// The action on the clip, other than `skip` (the one being edited), that
+/// `[start, start+duration)` runs into — `None` when the span is free.
+/// Actions on a clip may not overlap (spec §5.4); this is the question both
+/// `add_action` and `set_action` refuse on, and it answers the offender
+/// rather than a yes, because the refusal names it.
+fn overlapping_action(
+    actions: &[Action],
+    skip: Option<u32>,
+    start: Ticks,
+    duration: Ticks,
+) -> Option<&Action> {
     let end = start.saturating_add(duration);
     actions
         .iter()
         .filter(|a| Some(a.id) != skip)
-        .any(|a| start < a.start.saturating_add(a.duration) && a.start < end)
+        .find(|a| start < a.start.saturating_add(a.duration) && a.start < end)
+}
+
+/// The two action refusals, written once because `add_action` and
+/// `set_action` ask exactly the same two questions of the same numbers
+/// (deepening D2·3). Each names the span the caller asked for and the span
+/// in its way, which is the pair of numbers a caller needs to pick another
+/// one without asking the project again.
+fn action_overlaps(clip: u32, other: &Action) -> String {
+    format!(
+        "action {} on clip {clip} already runs from {} to {} ticks, and two actions on one \
+         clip may not overlap",
+        other.id,
+        other.start,
+        other.start.saturating_add(other.duration)
+    )
+}
+
+fn action_past_end(clip: u32, start: Ticks, duration: Ticks, length: Ticks) -> String {
+    format!(
+        "an action of {duration} ticks at {start} would end at {}, past clip {clip}'s own \
+         end at {length} ticks",
+        start.saturating_add(duration)
+    )
 }
 
 /// Removes from `value` every key the incoming `patch` set to `null` —
@@ -138,15 +168,16 @@ impl Project {
     /// default, with an empty end patch, so it changes nothing until the
     /// inspector edits it (spec §6).
     ///
-    /// Refuses (`None`) when it would overlap another action on the clip or
-    /// run past the clip's end. `Err` on a negative start or a non-positive
+    /// Refuses when it would overlap another action on the clip
+    /// ([`action_overlaps`]) or run past the clip's end
+    /// ([`action_past_end`]). `Err` on a negative start or a non-positive
     /// duration.
     pub fn add_action(
         &self,
         clip: u32,
         at: Ticks,
         duration: Option<Ticks>,
-    ) -> Result<Option<Project>, String> {
+    ) -> Result<Outcome, String> {
         let target = self.require_clip(clip)?.clone();
         let at = self.snapped(at);
         if at < 0 {
@@ -163,10 +194,15 @@ impl Project {
             }
         };
         if at.saturating_add(duration) > target.duration {
-            return Ok(None);
+            return Ok(Outcome::Refused(action_past_end(
+                clip,
+                at,
+                duration,
+                target.duration,
+            )));
         }
-        if actions_overlap(&target.actions, None, at, duration) {
-            return Ok(None);
+        if let Some(other) = overlapping_action(&target.actions, None, at, duration) {
+            return Ok(Outcome::Refused(action_overlaps(clip, other)));
         }
 
         let mut next = self.clone();
@@ -193,7 +229,7 @@ impl Project {
         start: Option<Ticks>,
         duration: Option<Ticks>,
         curve: Option<Curve>,
-    ) -> Result<Option<Project>, String> {
+    ) -> Result<Outcome, String> {
         let target = self.require_clip(clip)?.clone();
         let existing = target
             .actions
@@ -223,10 +259,17 @@ impl Project {
             }
         };
         if new_start.saturating_add(new_duration) > target.duration {
-            return Ok(None);
+            return Ok(Outcome::Refused(action_past_end(
+                clip,
+                new_start,
+                new_duration,
+                target.duration,
+            )));
         }
-        if actions_overlap(&target.actions, Some(action), new_start, new_duration) {
-            return Ok(None);
+        if let Some(other) =
+            overlapping_action(&target.actions, Some(action), new_start, new_duration)
+        {
+            return Ok(Outcome::Refused(action_overlaps(clip, other)));
         }
 
         let mut next = self.clone();
@@ -265,12 +308,7 @@ impl Project {
     /// not a picture anybody asked for — and the evaluator would put the
     /// base value back anyway, leaving a control that reported success and
     /// did nothing.
-    pub fn set_action_end(
-        &self,
-        clip: u32,
-        action: u32,
-        patch: &Value,
-    ) -> Result<Option<Project>, String> {
+    pub fn set_action_end(&self, clip: u32, action: u32, patch: &Value) -> Result<Outcome, String> {
         let target = self.require_clip(clip)?;
         let existing = target
             .actions
@@ -307,7 +345,7 @@ impl Project {
     }
 
     /// Removes one action from a clip (spec §6).
-    pub fn remove_action(&self, clip: u32, action: u32) -> Result<Option<Project>, String> {
+    pub fn remove_action(&self, clip: u32, action: u32) -> Result<Outcome, String> {
         let target = self.require_clip(clip)?;
         if !target.actions.iter().any(|a| a.id == action) {
             return Err(format!("no action with id {action} on clip {clip}"));

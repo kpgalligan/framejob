@@ -134,7 +134,7 @@ extension EditorViewController {
             // back at the view's top level where the gesture looks for them.
             // Probing the parent with scoped ops would answer a parent
             // project whose top level is the timeline's clips.
-            probed = try document.editedProject.applying(ops)
+            probed = try document.editedProject.applying(ops).project
         } catch {
             return nil
         }

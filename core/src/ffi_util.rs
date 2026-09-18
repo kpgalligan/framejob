@@ -11,20 +11,26 @@ use std::ptr;
 
 use crate::model::Project;
 
-/// Stores a heap-allocated copy of `msg` through `err_out` (if non-NULL).
-/// Interior NUL bytes are replaced so the `CString` conversion cannot fail.
+/// Stores a heap-allocated copy of `msg` through a `char **` out-parameter
+/// (if non-NULL). Interior NUL bytes are replaced so the `CString`
+/// conversion cannot fail.
+///
+/// The header has two such channels and this is the one spelling of both:
+/// `err_out`, which every export carries and which means the request was
+/// invalid, and `rc_project_apply`'s `reason_out`, which carries a rule's
+/// refusal. What they MEAN differs; how they allocate must not.
 ///
 /// # Safety
-/// `err_out` must be NULL or a valid pointer to writable `*mut c_char`.
-pub(crate) unsafe fn set_err(err_out: *mut *mut c_char, msg: &str) {
-    if err_out.is_null() {
+/// `out` must be NULL or a valid pointer to writable `*mut c_char`.
+pub(crate) unsafe fn set_message(out: *mut *mut c_char, msg: &str) {
+    if out.is_null() {
         return;
     }
     let sanitized = msg.replace('\0', " ");
     let cstring = CString::new(sanitized)
         .unwrap_or_else(|_| CString::new("reelcut-core error").expect("static string"));
     unsafe {
-        *err_out = cstring.into_raw();
+        *out = cstring.into_raw();
     }
 }
 
@@ -94,11 +100,11 @@ pub(crate) unsafe fn fallible_op<T, R>(
     match catch_unwind(AssertUnwindSafe(body)) {
         Ok(Ok(value)) => success(value),
         Ok(Err(msg)) => {
-            unsafe { set_err(err_out, &msg) };
+            unsafe { set_message(err_out, &msg) };
             failure
         }
         Err(_) => {
-            unsafe { set_err(err_out, &format!("internal error: {what}")) };
+            unsafe { set_message(err_out, &format!("internal error: {what}")) };
             failure
         }
     }

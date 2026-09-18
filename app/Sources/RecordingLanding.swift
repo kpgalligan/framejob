@@ -238,8 +238,8 @@ struct RecordingLanding {
     // MARK: - The steps, each applied purely and read back
 
     /// `add_media` applied purely; the id it minted, read off the result. A
-    /// path already in the list is the documented IDENTITY (`Ok(None)`,
-    /// `core/src/edit_track.rs`), not a failure, and then the id is the
+    /// path already in the list is the documented IDENTITY
+    /// (`core/src/edit_track.rs`), not a failure, and then the id is the
     /// entry's, matched by the TRIMMED path because that is what the core
     /// stored — `backgroundMedia(for:in:)`'s rule. The op stays in the list
     /// either way: `applying(_ ops:)` runs every later op after an identity,
@@ -249,7 +249,7 @@ struct RecordingLanding {
     ) throws -> UInt32 {
         let op = ReelOp.addMedia(descriptor: descriptor)
         ops.append(op)
-        if let added = try trial.applying(op) {
+        if let added = try trial.applying(op).project {
             trial = added
             guard let id = added.snapshot.media.last?.id else {
                 throw ReelCoreError(message: "\(descriptor.path) was added and is not listed.")
@@ -304,7 +304,7 @@ struct RecordingLanding {
         // Index 0 is the BACK of the stack (§6), so the count is the front.
         let addTrack = ReelOp.addTrack(index: container.tracks.count)
         let track = trial.snapshot.nextId
-        guard let withTrack = try trial.applying(addTrack.scoped(scope)) else {
+        guard let withTrack = try trial.applying(addTrack.scoped(scope)).project else {
             throw ReelCoreError(message: "A track for the recording could not be added.")
         }
         var attempt = withTrack

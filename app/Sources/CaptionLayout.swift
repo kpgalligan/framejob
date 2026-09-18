@@ -279,7 +279,7 @@ enum CaptionLayout {
         // invariant a refusal breaks — a caller-named track can refuse any
         // number of these placements, and then the patch would name clips
         // that do not exist.
-        guard let probed = try project.applying(ops) else { throw LayoutError.refused }
+        guard let probed = try project.applying(ops).project else { throw LayoutError.refused }
         let before = Set(snapshot.clips.map { $0.id })
         let created = probed.snapshot.clips.map { $0.id }.filter { !before.contains($0) }
         guard !created.isEmpty else { throw LayoutError.refused }

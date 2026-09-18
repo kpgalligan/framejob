@@ -161,6 +161,7 @@ use crate::model::{
     AudioProps, BlendMode, Clip, Color, Crop, Enabled, Filter, FilterKind, MediaKind, Project,
     ShapeKind, ShapeProps, Source, Track, VideoProps,
 };
+use crate::outcome::Outcome;
 use crate::props_check::check_shape;
 use crate::time::Ticks;
 
@@ -260,7 +261,7 @@ impl Project {
     /// caller that named both meant one of them), for an unknown media, for
     /// a media with no pictures to show, for a colour outside 0–1, and for a
     /// duration under a frame — and, through [`Project::finish`], when the
-    /// extra track or clip would break a reader cap. Never `None`: the clip
+    /// extra track or clip would break a reader cap. Never an identity: the clip
     /// lands on a track of its own, so there is nothing here to refuse
     /// quietly.
     ///
@@ -275,7 +276,7 @@ impl Project {
         media: Option<u32>,
         color: Option<Color>,
         duration: Option<Ticks>,
-    ) -> Result<Option<Project>, String> {
+    ) -> Result<Outcome, String> {
         if let (Some(media), Some(_)) = (media, color) {
             return Err(format!(
                 "add_background takes a media or a color, not both (media {media})"
@@ -393,10 +394,10 @@ impl Project {
     /// have nothing to scale to the canvas — and for a clip carrying no
     /// video properties at all. `Err` too when
     /// the extra track or clip would break a reader cap, which
-    /// [`Project::finish`] reports through `validate`. Never `None`: a copy
+    /// [`Project::finish`] reports through `validate`. Never an identity: a copy
     /// on a new empty track can neither be an identity nor break the overlap
     /// rule, so there is nothing here to refuse quietly.
-    pub fn add_blurred_background(&self, clip: u32) -> Result<Option<Project>, String> {
+    pub fn add_blurred_background(&self, clip: u32) -> Result<Outcome, String> {
         let target = self.require_clip(clip)?.clone();
         if matches!(target.source, Source::Nest { .. }) {
             return Err(format!(

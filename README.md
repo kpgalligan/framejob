@@ -383,6 +383,16 @@ reported in band (`isError: true`) with a message naming the fix — an unknown
 key, a refused overlap, a media clip an op needs — so a model can correct
 itself instead of seeing a transport error.
 
+An edit that did not happen says which of the two it was. **An identity** —
+the project already says what you asked — reports that it made no change and
+names no rule, so there is nothing to go looking for. **A refusal** is a rule
+declining the edit, and the reply carries that rule's own sentence naming the
+op and the values you can act on: which track is locked, which clips still
+show the media, by how many ticks two clips would overlap and how long the
+shorter one is, and the argument that would let the call through
+(`with_clips: true`, `ripple: true`). Neither leaves an undo step, so a call
+that did not land is safe to retry.
+
 ## Architecture notes
 
 - **Rust decides, AVFoundation and Metal do.** No pixel or sample work happens
@@ -395,10 +405,12 @@ itself instead of seeing a transport error.
   publishing a handle to the compositor's queue safe. Complex data crosses as
   UTF-8 JSON, which is also what gives the MCP agent the same vocabulary the
   app has.
-- `rc_project_apply` returns NULL two distinguishable ways: with `err_out`
-  untouched it means "valid, but changes nothing" (register no undo step), and
-  with `err_out` set it means the arguments were wrong. Getting that
-  distinction wrong is a phantom undo step.
+- `rc_project_apply` returns NULL three distinguishable ways: with neither
+  message set it means "valid, but nothing needed to change"; with
+  `reason_out` set a rule refused the edit and that is the rule's own
+  sentence; with `err_out` set the arguments were wrong. The first two
+  register no undo step — getting that distinction wrong is a phantom undo
+  step — and only the third is an error.
 - Swift wraps the handle in `ReelProject`, whose `deinit` frees the Rust
   allocation; every `char *` the library returns is released with
   `rc_string_free`.

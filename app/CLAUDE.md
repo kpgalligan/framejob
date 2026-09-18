@@ -17,7 +17,10 @@ detail there.
   `planJSON` are memoised PER HANDLE, so keep handles rather than minting
   them), timecode, snapping, export presets/sizes/settings, `RecipeSource`,
   the `dictionary` extensions on the property types and the typed patches.
-  `deinit` frees the Rust allocation.
+  `deinit` frees the Rust allocation. It also holds **the one read of
+  `rc_project_apply`'s TWO message channels**, in the header's own order — a
+  sentence is a refusal, an error message is invalid input, neither written
+  is an identity — answered as the `ReelEdit` below.
 - `ReelOps.swift` — `OpArgs`, `ReelOp` and one typed factory per row of
   `core/src/edit.rs`'s op table, plus a RAW factory beside the typed one at
   each door that takes a CALLER's own object — ELEVEN of them (`setVideoRaw`,
@@ -37,6 +40,17 @@ detail there.
   `scope.rs`'s `refused_inside` (seven names) so one edit can mix a
   document-level op with scoped ones. A table, with
   `edit.rs`'s size exemption.
+- `ReelEdit.swift` — what an op ANSWERS, mirroring `core/src/outcome.rs`:
+  `ReelEdit` (`.applied` / `.identity` / `.refused`), `ReelRefusal` (the op
+  the core declined and the rule's own sentence, carried verbatim), and the
+  fold that applies a LIST — which names no `rc_*` symbol, so it lives here
+  and not next door. **Only `.applied` is an undo step**; the other two are
+  both "the project did not change" and differ only in what a caller can
+  SAY. `.project` is the spelling for a caller that treats a refusal as
+  nothing happened (a probe, a live drag), and there is one on
+  `ReelEdit?` too for the `try?` probes. In the fold **a refusal does not
+  stop the list** — a later op still runs after one, exactly as after an
+  identity — and the FIRST refusal is answered only when nothing applied.
 - `ProjectSnapshot.swift` · `MotionProps.swift` — the `Codable`, READ-ONLY
   mirror of spec §5.2 every view draws from. **Its enums decode LENIENTLY**
   — a misspelt kind becomes the first case, a `T??` field a clear — which is
@@ -422,6 +436,31 @@ undo checkpoint `NSDocument` posts inside every save then raises, the
 exception is swallowed inside the file coordinator, and ⌘S and `save_project`
 hang for good.
 
+**A refusal is the CORE's sentence, and nothing on this side writes one.**
+An op answers `.applied`, `.identity` or `.refused` (`ReelEdit.swift`); a
+person hears a beep for both non-applied arms, and an agent hears
+`<Action> made no change: the project is already in that state.` or
+`<Action> was refused at <op>: <the rule's own sentence>`, written once in
+`AgentServer.performGroupedEdit`. **No handler applies an op to see what
+would happen and then writes its own reason**, and none re-derives a rule's
+arithmetic to predict one. Spec §11's **D2-1** is the line: a check that
+predicts a RULE goes, a check that names the CALL stays — an argument a
+handler cannot read or was not given (`AgentServer+Arguments.swift`), or a
+composite's own reading, like `normalize_clip` with nothing it could
+MEASURE. Prose that TEACHES a rule before the call belongs in a tool
+description; prose that explains a refusal after it is the core's to write.
+
+**Two callers swallow a refusal on purpose.** `ReelProject.scoped(_:)` drops
+the core's message because every caller is a VIEW asking about view state
+`clampViewState` has already cleared, so a nil is a race with an undo and
+not a failure to report. `ProjectDocument.updateLiveEdit` swallows every
+answer but `.applied` because a refused tick is NORMAL mid-drag — the edge
+is past a neighbour for a moment — and recovers on the next one with the
+last good frame still on screen, where a drag that spoke would interrupt the
+gesture to say what the person is already fixing with the mouse;
+`endLiveEdit` then registers no step at all. Neither is a gap to be closed
+(kpgalligan/reelcut#8's eighth decision).
+
 **Lenient decoding is for what the CORE wrote; nothing a caller wrote is
 decoded through it.** `ProjectSnapshot`/`MotionProps`' `lenient` and
 `nullable` exist so a project, plan, recipe or export setting a NEWER build
@@ -486,7 +525,10 @@ this entry rather than growing the list), `ScreenRecorder.shareableContent`'s
 global hop, and the cache's main hop. The recorder adds NO queue of its own:
 framework callbacks are stamped where they land and hopped to main. Colors,
 fonts and metrics come from `DS` tokens; shared controls go in
-`Controls.swift`. Refusals beep (`NSSound.beep()`), errors never crash.
+`Controls.swift`. **A refusal and an identity both beep** (`NSSound.beep()`)
+and neither makes an undo step — that is what makes a person's experience of
+the two identical, and it is deliberate (spec §5.5); only invalid input
+throws, and errors never crash.
 4-space indent, ~100 columns.
 
 **`make typecheck` is authoritative for TYPE errors, and only those.** It

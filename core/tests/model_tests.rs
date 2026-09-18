@@ -1792,8 +1792,14 @@ fn text_that_is_not_utf8_is_reported_rather_than_crashing() {
 
     let live = Handle::new(1920, 1080, 30, 1);
     let mut err: *mut c_char = ptr::null_mut();
-    assert!(unsafe { rc_project_apply(live.as_ptr(), bytes.as_ptr(), &mut err) }.is_null());
+    let mut reason: *mut c_char = ptr::null_mut();
+    assert!(
+        unsafe { rc_project_apply(live.as_ptr(), bytes.as_ptr(), &mut err, &mut reason) }.is_null()
+    );
     assert_eq!(take_string(err).as_deref(), Some("op is not valid UTF-8"));
+    // Invalid input is not a refusal: the two channels are never both
+    // written.
+    assert_eq!(take_string(reason), None);
 
     // The exports with no `err_out` answer with their failure value.
     let mut out: i64 = 99;
@@ -1949,12 +1955,20 @@ fn sweep_every_export_with_nulls() -> Vec<String> {
     // rc_project_apply — both pointers, separately and together. A NULL
     // project is a caller bug (err_out set), NOT "changes nothing".
     let mut err: *mut c_char = ptr::null_mut();
-    assert!(unsafe { rc_project_apply(ptr::null(), op.as_ptr(), &mut err) }.is_null());
+    assert!(
+        unsafe { rc_project_apply(ptr::null(), op.as_ptr(), &mut err, ptr::null_mut()) }.is_null()
+    );
     assert_eq!(take_string(err).as_deref(), Some("project is NULL"));
     let mut err: *mut c_char = ptr::null_mut();
-    assert!(unsafe { rc_project_apply(live.as_ptr(), ptr::null(), &mut err) }.is_null());
+    assert!(
+        unsafe { rc_project_apply(live.as_ptr(), ptr::null(), &mut err, ptr::null_mut()) }
+            .is_null()
+    );
     assert_eq!(take_string(err).as_deref(), Some("op is NULL"));
-    assert!(unsafe { rc_project_apply(ptr::null(), ptr::null(), ptr::null_mut()) }.is_null());
+    assert!(unsafe {
+        rc_project_apply(ptr::null(), ptr::null(), ptr::null_mut(), ptr::null_mut())
+    }
+    .is_null());
     cover("rc_project_apply");
 
     assert_eq!(unsafe { rc_project_duration(ptr::null()) }, 0);

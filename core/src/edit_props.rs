@@ -41,6 +41,7 @@ use serde_json::Value;
 
 use crate::export::describe;
 use crate::model::{BlendMode, Clip, Project, Source, TextProps, VideoProps};
+use crate::outcome::Outcome;
 use crate::patch::{merge_group, Group};
 use crate::props_check::{check_audio, check_shape, check_text, check_video};
 
@@ -60,7 +61,8 @@ use crate::props_check::{check_audio, check_shape, check_text, check_video};
 /// on any MENTION of the key would fail an all-or-nothing paste of an
 /// ordinary look — one that never touched blend — onto a nest clip, for a
 /// value that changes nothing. `{"blend": "normal"}` on a nest clip is
-/// therefore the identity and answers `None` through the usual `finish`.
+/// therefore the identity and answers [`Outcome::Identity`] through the
+/// usual `finish`.
 ///
 /// It lives HERE rather than in `props_check.rs` because it is not a fact
 /// about the vocabulary: the value is perfectly legal and it is the CLIP it
@@ -87,24 +89,24 @@ fn check_blend(clip: &Clip, props: &VideoProps) -> Result<(), String> {
 
 impl Project {
     /// Merges `patch` into every named clip's video props (spec §6).
-    /// Refuses (`None`) when nothing changes; `Err` for an unknown clip, a
-    /// clip with no video props, an unknown key, or a value out of range.
-    pub fn set_video(&self, clips: &[u32], patch: &Value) -> Result<Option<Project>, String> {
+    /// An identity when nothing changes; `Err` for an unknown clip, a clip
+    /// with no video props, an unknown key, or a value out of range.
+    pub fn set_video(&self, clips: &[u32], patch: &Value) -> Result<Outcome, String> {
         self.patch_clips(clips, patch, Group::Video)
     }
 
     /// Merges `patch` into every named clip's audio props (spec §6).
-    pub fn set_audio(&self, clips: &[u32], patch: &Value) -> Result<Option<Project>, String> {
+    pub fn set_audio(&self, clips: &[u32], patch: &Value) -> Result<Outcome, String> {
         self.patch_clips(clips, patch, Group::Audio)
     }
 
     /// Merges `patch` into every named text clip's text props (spec §6).
-    pub fn set_text(&self, clips: &[u32], patch: &Value) -> Result<Option<Project>, String> {
+    pub fn set_text(&self, clips: &[u32], patch: &Value) -> Result<Outcome, String> {
         self.patch_clips(clips, patch, Group::Text)
     }
 
     /// Merges `patch` into every named shape clip's shape props (spec §6).
-    pub fn set_shape(&self, clips: &[u32], patch: &Value) -> Result<Option<Project>, String> {
+    pub fn set_shape(&self, clips: &[u32], patch: &Value) -> Result<Outcome, String> {
         self.patch_clips(clips, patch, Group::Shape)
     }
 
@@ -117,8 +119,8 @@ impl Project {
     /// too: `set_track`'s rule for a name, except that "unnamed" is `None`
     /// here, so the app's fallback name returns. `Err` for an unknown clip,
     /// an unknown key, or a value that is neither a string nor `null`;
-    /// `None` when nothing changes.
-    pub fn set_clip(&self, clips: &[u32], patch: &Value) -> Result<Option<Project>, String> {
+    /// an identity when nothing changes.
+    pub fn set_clip(&self, clips: &[u32], patch: &Value) -> Result<Outcome, String> {
         let Some(fields) = patch.as_object() else {
             return Err(format!(
                 "clip patch must be a json object, not {}",
@@ -241,12 +243,7 @@ impl Project {
     /// A clip that does not HAVE the group is an error, not a silent skip:
     /// the group's presence is what "this clip has audio" / "this is a text
     /// clip" means, and inventing it would put text props on a video clip.
-    fn patch_clips(
-        &self,
-        clips: &[u32],
-        patch: &Value,
-        group: Group,
-    ) -> Result<Option<Project>, String> {
+    fn patch_clips(&self, clips: &[u32], patch: &Value, group: Group) -> Result<Outcome, String> {
         if !patch.is_object() {
             return Err(format!(
                 "{} patch must be a json object, not {}",
@@ -256,7 +253,7 @@ impl Project {
         }
         let ids: Vec<u32> = self.selected_clips(clips)?.iter().map(|c| c.id).collect();
         if ids.is_empty() {
-            return Ok(None);
+            return Ok(Outcome::Identity);
         }
 
         let mut next = self.clone();

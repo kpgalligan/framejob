@@ -96,7 +96,7 @@ extension EditorViewController {
         guard let document = document else { return nil }
         let probed: ReelProject?
         do {
-            probed = try document.editedProject.applying(ops)
+            probed = try document.editedProject.applying(ops).project
         } catch {
             return nil
         }
@@ -190,20 +190,23 @@ extension EditorViewController {
             NSSound.beep()
             return
         }
-        // Every `add_transition` in the batch can come back `Ok(None)` —
+        // Every `add_transition` in the batch can come back REFUSED —
         // neither side of the cut had a frame to spare, which is EVERY cut
-        // between two clips that each use their whole file. That refusal
-        // has to be SAID (road map 5 §3g): a bare beep is all `applyEdit`
-        // gives a batch of identities, and a person placing whole
-        // recordings back to back has no way to guess that a transition is
-        // built from footage beyond the cut. So TRY the batch first, on the
-        // container the edit lands in (`inspectorProbe`'s trial), and ask
-        // the clips themselves — a landed `add_transition` leaves its clip
-        // overlapping its predecessor. A throw is left to `applyEdit`, which
-        // presents the core's own sentence.
+        // between two clips that each use their whole file, and since
+        // deepening D2·3 the core says so in its own sentence. `.project` is
+        // nil for that arm as it is for an identity, so the trial below
+        // reads the same either way. That has to be
+        // SAID (road map 5 §3g): a bare beep is all `applyEdit` gives a
+        // batch that changed nothing, and a person placing whole recordings
+        // back to back has no way to guess that a transition is built from
+        // footage beyond the cut. So TRY the batch first, on the container
+        // the edit lands in (`inspectorProbe`'s trial), and ask the clips
+        // themselves — a landed `add_transition` leaves its clip overlapping
+        // its predecessor. A throw is left to `applyEdit`, which presents
+        // the core's own sentence.
         let trial: ProjectSnapshot?
         do {
-            trial = try document.editedProject.applying(ops)?.snapshot
+            trial = try document.editedProject.applying(ops).project?.snapshot
         } catch {
             document.applyEdit("Set Transition", ops)
             return

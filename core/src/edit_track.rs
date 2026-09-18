@@ -1,13 +1,14 @@
-//! Tracks, markers, the canvas and the media list — spec §6, table
+//! Tracks, markers and the media list — spec §6, table
 //! "Tracks, markers, canvas, media".
 //!
 //! One `impl Project` block for everything a clip sits *in* rather than
-//! everything a clip *is*: the track stack, the marker list, the document's
-//! size and rate, and the media the clips point at. `edit_clip.rs` owns the
-//! clips themselves; the rules both obey are written there and called from
+//! everything a clip *is*: the track stack, the marker list, and the media
+//! the clips point at. The fourth member of that table's row, the canvas,
+//! is `edit_canvas.rs`, cut out of here under the size rule; `edit_clip.rs`
+//! owns the clips themselves; the rules both obey are written there and called from
 //! here — [`Project::snapped`] for every tick argument, [`Project::finish`]
-//! as the single exit that turns an identity result into `None` and a
-//! broken invariant into `Err`.
+//! as the single exit that turns an identity result into
+//! [`Outcome::Identity`] and a broken invariant into `Err`.
 //!
 //! Three invariants this module is responsible for:
 //!
@@ -23,17 +24,9 @@
 use serde_json::Value;
 
 use crate::export::describe;
-use crate::model::{
-    Clip, Color, Marker, Media, MediaKind, Project, Source, Track, DEFAULT_MARKER_COLOR,
-};
-use crate::props_check::{color_ok, SCALE_MAX, SCALE_MIN};
-use crate::time::{self, Fps, Ticks};
-
-/// Canvas dimension bounds. The floor is small enough for a thumbnail-sized
-/// document and large enough that the compositor has pixels to work with;
-/// the ceiling is past 8K, where a single frame is already 130 MB.
-const CANVAS_MIN: u32 = 16;
-const CANVAS_MAX: u32 = 16384;
+use crate::model::{Clip, Marker, Media, MediaKind, Project, Source, Track, DEFAULT_MARKER_COLOR};
+use crate::outcome::Outcome;
+use crate::time::Ticks;
 
 /// Media dimension ceiling. Nothing decodes at this size — it exists so a
 /// probe that reports garbage (or a hand-written project) cannot put a
@@ -72,110 +65,28 @@ fn uses_media(clip: &Clip, media: u32) -> bool {
     )
 }
 
-/// A canvas dimension: inside the bounds AND even.
+/// The clips of a `with_clips` refusal, as English (deepening D2·3).
 ///
-/// Even is not fussiness: H.264 and HEVC encode in macroblocks over a
-/// chroma-subsampled plane, so an odd width or height is either refused by
-/// the encoder or silently padded. Catching it here makes it a message
-/// about the canvas field the user just typed instead of an export that
-/// fails an hour later.
-fn check_dimension(key: &str, value: u32) -> Result<(), String> {
-    if !(CANVAS_MIN..=CANVAS_MAX).contains(&value) {
-        return Err(format!(
-            "{key} must be between {CANVAS_MIN} and {CANVAS_MAX}, not {value}"
-        ));
+/// Both refusals that `with_clips` is the way past — a track that still
+/// holds clips and a media a clip still shows — name the clips a caller
+/// would otherwise have to ask for, so this is written once. At most three
+/// ids are listed and the rest are a count: a media used by two hundred
+/// clips would otherwise answer with a sentence nothing could read, and the
+/// first three plus the total is everything the caller acts on.
+/// Both callers ask only when they have at least one, and the empty arm is
+/// here anyway: `split_last` rather than `some[..len - 1]`, because the
+/// index form underflows on an empty slice and the crate's rule is that no
+/// input may panic (`core/CLAUDE.md`, Errors). A third caller that forgets
+/// the guard gets a poor sentence rather than a caught panic.
+fn clip_list(ids: &[u32]) -> String {
+    let named: Vec<String> = ids.iter().take(3).map(|id| id.to_string()).collect();
+    let rest = ids.len().saturating_sub(named.len());
+    match (named.split_last(), rest) {
+        (None, _) => "no clips".to_string(),
+        (Some((last, [])), 0) => format!("clip {last}"),
+        (Some((last, front)), 0) => format!("clips {} and {last}", front.join(", ")),
+        (Some(_), more) => format!("clips {} and {more} more", named.join(", ")),
     }
-    if !value.is_multiple_of(2) {
-        return Err(format!(
-            "{key} must be even (h.264 encodes in macroblocks), not {value}"
-        ));
-    }
-    Ok(())
-}
-
-/// Multiplies every clip's placement by the canvas size ratio, so a layout
-/// built for one canvas lands in the same relative place on the next (spec
-/// §6, `rescale_clips`).
-///
-/// `x` and `y` are per-axis offsets in canvas pixels, so each follows its
-/// OWN axis ratio — that is what keeps a layer's distance from an edge
-/// proportional when the aspect ratio changes too. `scale` is one uniform
-/// factor and cannot follow two ratios, so it follows the SMALLER of them:
-/// the same `min` Fit uses, which means a layer that fitted the old canvas
-/// still fits the new one, where the larger ratio could push it off an
-/// edge.
-///
-/// Action `end` patches are deliberately NOT rescaled: a patch is opaque
-/// JSON (`actions.rs` interprets it), and the op is defined on the clip's
-/// props. An animated move on a resized canvas therefore keeps its old
-/// target, which is visible and fixable, unlike a patch this function
-/// half-understood and rewrote.
-fn rescale(project: &mut Project, old_width: u32, old_height: u32) {
-    if old_width == 0 || old_height == 0 {
-        return;
-    }
-    let width_ratio = f64::from(project.canvas.width) / f64::from(old_width);
-    let height_ratio = f64::from(project.canvas.height) / f64::from(old_height);
-    if !(width_ratio.is_finite() && height_ratio.is_finite()) {
-        return;
-    }
-    let scale_ratio = width_ratio.min(height_ratio);
-    for clip in project.clips.iter_mut() {
-        if let Some(video) = clip.video.as_mut() {
-            video.x *= width_ratio;
-            video.y *= height_ratio;
-            // Clamped to the same range `set_video` accepts, so a chain of
-            // shrinks cannot leave a scale the inspector refuses to show.
-            video.scale = (video.scale * scale_ratio).clamp(SCALE_MIN, SCALE_MAX);
-        }
-    }
-}
-
-/// Re-snaps every stored time to the canvas's CURRENT frame grid, after
-/// that grid has changed.
-///
-/// Nothing sub-frame may live in the model (spec §6), and yesterday's grid
-/// is not today's: a 24 fps boundary is not a 30 fps boundary, so every
-/// clip start and duration, every action span and every marker time has to
-/// move to the nearest new boundary.
-///
-/// Two clamps keep the result valid: a duration that would round to zero
-/// becomes one frame (a zero-length clip is what `validate` rejects), and
-/// an action is kept inside its clip.
-fn resnap(project: &mut Project) {
-    let fps = project.canvas.fps;
-    let frame = project.frame();
-    for clip in project.clips.iter_mut() {
-        clip.start = time::snap_to_frame(clip.start, fps).max(0);
-        clip.duration = time::snap_to_frame(clip.duration, fps).max(frame);
-        let last_start = clip.duration.saturating_sub(frame).max(0);
-        for action in clip.actions.iter_mut() {
-            action.start = time::snap_to_frame(action.start, fps).clamp(0, last_start);
-            action.duration = time::snap_to_frame(action.duration, fps)
-                .max(frame)
-                .min(clip.duration.saturating_sub(action.start))
-                .max(1);
-        }
-    }
-    for marker in project.markers.iter_mut() {
-        marker.time = time::snap_to_frame(marker.time, fps).max(0);
-    }
-    // A coarser grid can land two markers on one tick, which markers may
-    // never share. The alternative — refusing a document-wide rate change
-    // because two marks are 3 ms apart — is far worse than dropping the
-    // second of them, so the first in the list keeps the tick.
-    //
-    // A linear scan over a `Vec` rather than a set: markers are capped at
-    // 1024 and this runs only on a rate change.
-    let mut taken: Vec<Ticks> = Vec::with_capacity(project.markers.len());
-    project.markers.retain(|marker| {
-        if taken.contains(&marker.time) {
-            false
-        } else {
-            taken.push(marker.time);
-            true
-        }
-    });
 }
 
 // ---- the ops -------------------------------------------------------------
@@ -197,11 +108,7 @@ impl Project {
     /// above it under the user. A name of only whitespace is treated as
     /// absent. `Err` for an index past the end, or (through `finish`) for
     /// exceeding the track cap.
-    pub fn add_track(
-        &self,
-        index: Option<usize>,
-        name: Option<&str>,
-    ) -> Result<Option<Project>, String> {
+    pub fn add_track(&self, index: Option<usize>, name: Option<&str>) -> Result<Outcome, String> {
         let at = match index {
             None => self.tracks.len(),
             Some(given) if given <= self.tracks.len() => given,
@@ -234,20 +141,36 @@ impl Project {
         self.finish(next)
     }
 
-    /// Removes a track. Refuses (`None`) on a track that still holds clips
-    /// unless `with_clips`, which removes those clips with it, and refuses
-    /// to remove the LAST track: a project always has somewhere to put a
-    /// clip, and an empty track stack is a UI with nothing to drop onto.
+    /// Removes a track. Refuses on a track that still holds clips unless
+    /// `with_clips`, which removes those clips with it, and refuses to
+    /// remove the LAST track: a project always has somewhere to put a clip,
+    /// and an empty track stack is a UI with nothing to drop onto.
+    ///
+    /// Both refusals carry their own sentence. The last-track one is asked
+    /// FIRST, because `with_clips: true` is the way past the other and past
+    /// this one it is not: a caller told about the clips would send it and
+    /// be refused again.
     ///
     /// `Err` only for an unknown track.
-    pub fn remove_track(&self, track: u32, with_clips: bool) -> Result<Option<Project>, String> {
+    pub fn remove_track(&self, track: u32, with_clips: bool) -> Result<Outcome, String> {
         self.require_track(track)?;
         if self.tracks.len() <= 1 {
-            return Ok(None);
+            return Ok(Outcome::Refused(format!(
+                "track {track} is the only track left, and a project must always have one"
+            )));
         }
-        let occupied = self.clips.iter().any(|c| c.track == track);
-        if occupied && !with_clips {
-            return Ok(None);
+        let held: Vec<u32> = self
+            .clips
+            .iter()
+            .filter(|c| c.track == track)
+            .map(|c| c.id)
+            .collect();
+        if !held.is_empty() && !with_clips {
+            return Ok(Outcome::Refused(format!(
+                "track {track} still holds {}; pass with_clips: true to remove the track \
+                 and its clips",
+                clip_list(&held)
+            )));
         }
 
         let mut next = self.clone();
@@ -260,9 +183,9 @@ impl Project {
     /// tracks it passes over the other way — the layer reorder the timeline
     /// drag makes (spec §6).
     ///
-    /// `Err` for an unknown track or an index past the end; `None` when the
-    /// track is already there.
-    pub fn move_track(&self, track: u32, index: usize) -> Result<Option<Project>, String> {
+    /// `Err` for an unknown track or an index past the end; an identity
+    /// when the track is already there.
+    pub fn move_track(&self, track: u32, index: usize) -> Result<Outcome, String> {
         let from = self.require_track_index(track)?;
         if index >= self.tracks.len() {
             return Err(format!(
@@ -271,7 +194,7 @@ impl Project {
             ));
         }
         if index == from {
-            return Ok(None);
+            return Ok(Outcome::Identity);
         }
 
         let mut next = self.clone();
@@ -294,7 +217,7 @@ impl Project {
         muted: Option<bool>,
         locked: Option<bool>,
         solo: Option<bool>,
-    ) -> Result<Option<Project>, String> {
+    ) -> Result<Outcome, String> {
         self.require_track(track)?;
         let mut next = self.clone();
         if let Some(found) = next.tracks.iter_mut().find(|t| t.id == track) {
@@ -323,7 +246,7 @@ impl Project {
     /// If that would empty the stack, the back-most track survives: it is
     /// the one a fresh project starts with, and keeping the bottom of the
     /// stack means the surviving track is where a drop lands.
-    pub fn remove_empty_tracks(&self) -> Result<Option<Project>, String> {
+    pub fn remove_empty_tracks(&self) -> Result<Outcome, String> {
         let mut next = self.clone();
         next.tracks
             .retain(|t| self.clips.iter().any(|c| c.track == t.id));
@@ -349,7 +272,7 @@ impl Project {
         name: Option<&str>,
         chapter: Option<bool>,
         color: Option<&str>,
-    ) -> Result<Option<Project>, String> {
+    ) -> Result<Outcome, String> {
         let at = self.snapped(at).max(0);
         if let Some(existing) = self.markers.iter().find(|m| m.time == at) {
             return Err(format!("marker {} is already at {at} ticks", existing.id));
@@ -388,7 +311,7 @@ impl Project {
         name: Option<&str>,
         chapter: Option<bool>,
         color: Option<&str>,
-    ) -> Result<Option<Project>, String> {
+    ) -> Result<Outcome, String> {
         self.require_marker(marker)?;
         let time = match time {
             None => None,
@@ -422,94 +345,10 @@ impl Project {
     }
 
     /// Removes a marker. `Err` only for an unknown id.
-    pub fn remove_marker(&self, marker: u32) -> Result<Option<Project>, String> {
+    pub fn remove_marker(&self, marker: u32) -> Result<Outcome, String> {
         self.require_marker(marker)?;
         let mut next = self.clone();
         next.markers.retain(|m| m.id != marker);
-        self.finish(next)
-    }
-
-    // ---- canvas ----------------------------------------------------------
-
-    /// Sets any subset of the document's canvas fields (spec §6). An
-    /// omitted argument keeps its value.
-    ///
-    /// `rescale_clips` multiplies every clip's `x`, `y` and `scale` by the
-    /// size ratio (see [`rescale`]) so a finished layout survives a resize.
-    /// Changing `fps` re-snaps EVERY stored time to the new grid — clip
-    /// starts and durations, action spans, marker times (see [`resnap`]) —
-    /// because nothing sub-frame may live in the model.
-    ///
-    /// `Err` for a dimension outside 16..16384 or odd (H.264 needs even
-    /// dimensions), a frame rate with a zero term, or a background channel
-    /// outside 0..1.
-    ///
-    /// The rate change is deliberately NOT re-checked against the overlap
-    /// rule: re-snapping moves each edge by less than one frame, so an
-    /// overlap can grow by at most a frame, and refusing a document-wide
-    /// rate change over a one-frame drift would be worse than the drift.
-    #[allow(clippy::too_many_arguments)]
-    // The argument list IS the op's argument list (spec §6); a struct would
-    // hold exactly the same seven optional fields and one more name.
-    pub fn set_canvas(
-        &self,
-        width: Option<u32>,
-        height: Option<u32>,
-        fps: Option<Fps>,
-        background: Option<Color>,
-        rescale_clips: bool,
-        fit_new_clips: Option<bool>,
-        timecode_frames: Option<bool>,
-    ) -> Result<Option<Project>, String> {
-        let width = match width {
-            None => self.canvas.width,
-            Some(given) => {
-                check_dimension("canvas width", given)?;
-                given
-            }
-        };
-        let height = match height {
-            None => self.canvas.height,
-            Some(given) => {
-                check_dimension("canvas height", given)?;
-                given
-            }
-        };
-        let fps = match fps {
-            None => self.canvas.fps,
-            Some(given) if given.is_valid() => given,
-            Some(given) => {
-                return Err(format!(
-                    "canvas fps must be [num, den] with non-zero terms, not [{}, {}]",
-                    given.num, given.den
-                ))
-            }
-        };
-        if let Some(background) = background.as_ref() {
-            color_ok("canvas background", background)?;
-        }
-
-        let mut next = self.clone();
-        next.canvas.width = width;
-        next.canvas.height = height;
-        next.canvas.fps = fps;
-        if let Some(background) = background {
-            next.canvas.background = background;
-        }
-        if let Some(fit_new_clips) = fit_new_clips {
-            next.canvas.fit_new_clips = fit_new_clips;
-        }
-        if let Some(timecode_frames) = timecode_frames {
-            next.canvas.timecode_frames = timecode_frames;
-        }
-
-        let resized = width != self.canvas.width || height != self.canvas.height;
-        if rescale_clips && resized {
-            rescale(&mut next, self.canvas.width, self.canvas.height);
-        }
-        if fps != self.canvas.fps {
-            resnap(&mut next);
-        }
         self.finish(next)
     }
 
@@ -524,17 +363,17 @@ impl Project {
     /// a value; reading `next_id` first is how the caller learns the id it
     /// is about to be able to `add_clip` with.
     ///
-    /// Adding a file whose path is already in the list changes nothing
-    /// (`None`): two entries for one path would each carry their own
+    /// Adding a file whose path is already in the list changes nothing (an
+    /// identity): two entries for one path would each carry their own
     /// bookmark, thumbnails and peaks, and relinking one would leave the
-    /// other missing. The caller that gets `None` looks the path up to find
-    /// the id that is already there.
+    /// other missing. The caller that gets it looks the path up to find the
+    /// id that is already there.
     ///
     /// `Err` for a descriptor that is not an object, an unknown or `id`
     /// key, a value that does not match the schema, an empty path, a
     /// negative duration, or a media with pixels whose size or rate is not
     /// usable.
-    pub fn add_media(&self, descriptor: &Value) -> Result<Option<Project>, String> {
+    pub fn add_media(&self, descriptor: &Value) -> Result<Outcome, String> {
         let Value::Object(fields) = descriptor else {
             return Err(format!(
                 "a media descriptor must be a json object, not {}",
@@ -602,7 +441,7 @@ impl Project {
         }
 
         if self.media.iter().any(|m| m.path == path) {
-            return Ok(None);
+            return Ok(Outcome::Identity);
         }
 
         let mut next = self.clone();
@@ -629,7 +468,7 @@ impl Project {
         media: u32,
         path: &str,
         bookmark: Option<&str>,
-    ) -> Result<Option<Project>, String> {
+    ) -> Result<Outcome, String> {
         self.require_media(media)?;
         let path = path.trim();
         if path.is_empty() {
@@ -647,20 +486,29 @@ impl Project {
         self.finish(next)
     }
 
-    /// Removes a media entry. Refuses (`None`) while clips still show it
-    /// unless `with_clips`, which removes those clips with it (spec §6) —
-    /// the model has no "missing on purpose" state, and a clip pointing at
-    /// an id that is gone is what `validate` rejects.
-    pub fn remove_media(&self, media: u32, with_clips: bool) -> Result<Option<Project>, String> {
+    /// Removes a media entry. Refuses while clips still show it unless
+    /// `with_clips`, which removes those clips with it (spec §6) — the
+    /// model has no "missing on purpose" state, and a clip pointing at an
+    /// id that is gone is what `validate` rejects. The refusal names the
+    /// clips ([`clip_list`]) and the argument that would let it through.
+    pub fn remove_media(&self, media: u32, with_clips: bool) -> Result<Outcome, String> {
         self.require_media(media)?;
         // A nest references the project's `media[]` like everything else
         // (spec §5.2, one id space), so a clip INSIDE one counts as usage
         // and is removed with `with_clips` — but the nest CLIP is not
         // itself a user of the media and stays put. Taking it out would
         // throw away everything else in the group over one file.
-        let used = self.every_clip().any(|c| uses_media(c, media));
-        if used && !with_clips {
-            return Ok(None);
+        let used: Vec<u32> = self
+            .every_clip()
+            .filter(|c| uses_media(c, media))
+            .map(|c| c.id)
+            .collect();
+        if !used.is_empty() && !with_clips {
+            return Ok(Outcome::Refused(format!(
+                "media {media} is still used by {}; pass with_clips: true to remove the \
+                 media and its clips",
+                clip_list(&used)
+            )));
         }
 
         let mut next = self.clone();

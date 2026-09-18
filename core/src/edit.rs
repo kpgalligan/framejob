@@ -81,7 +81,7 @@
 //! `add_media`, `relink_media`, `remove_media` (a nest references the
 //! parent's `media[]` in the parent's one id space, so a media edit inside
 //! a scope is an edit OUTSIDE it wearing a scope, which is the one thing a
-//! scope exists to prevent). Everything else — all forty-eight — works
+//! scope exists to prevent). Everything else — all fifty — works
 //! inside a nest as it works on the timeline, `nest` and `unnest`
 //! included.
 //!
@@ -100,7 +100,7 @@
 //! | `trim_start` | `clip: u32, to: ticks` | New start `to`; a media `in` advances by `(to − start) × speed`. Clamped to the source head and to one frame before the end. |
 //! | `trim_end` | `clip: u32, to: ticks` | New end `to`, clamped to `start + one frame` and to the source's remaining length. |
 //! | `rate_stretch` | `clip: u32, to_end: ticks` | `speed = content length / (to_end − start)`; duration follows and actions rescale. A non-media source is an `Err`, not a refusal. |
-//! | `slip` | `clip: u32, delta: ticks` | Slides the source under a fixed clip: `in += delta × speed`, start and duration unchanged, clamped so the window stays inside the media. A `still` moves its `at` instead. A slip the clamps reduce to nothing is `None`; a source with nothing to slip is an `Err`. |
+//! | `slip` | `clip: u32, delta: ticks` | Slides the source under a fixed clip: `in += delta × speed`, start and duration unchanged, clamped so the window stays inside the media. A `still` moves its `at` instead. A slip the clamps reduce to nothing is an identity; a source with nothing to slip is an `Err`. |
 //! | `roll` | `clip: u32, to: ticks` | Moves a hard cut: this clip's start and its predecessor's end both become `to`. The predecessor is the clip on the track ending EXACTLY at this one's start; with none — a gap, or an overlap, whose length is `set_transition_duration`'s — it refuses. Clamped to one frame and to the source available on each side. |
 //! | `split` | `clips?: [u32], at: ticks` | Cuts at project time `at`. With `clips` absent, cuts every clip on an unlocked track that `at` is strictly inside. |
 //! | `delete` | `clips: [u32]` | Removes the clips; the gaps stay. |
@@ -116,19 +116,19 @@
 //! | `detach_audio` | `clip: u32` | Clears the clip's `enabled.audio` and puts an audio-only twin on the track below, inserting a track when there is none. |
 //! | `duplicate` | `clips: [u32]` | Copies each clip one selection-span later on its own track, with fresh ids. |
 //! | `paste` | `at: ticks, track?: u32, payload: object` | Inserts the clips of a clipboard payload — `{"clips": […], "media": […]}`, what Copy wrote — with fresh ids, the earliest landing at `at` and the rest keeping their offsets. A payload clip's `track` is a DEPTH from the front (0 = front-most), so `track` says where depth 0 lands (default: the front) and the rest follow by the same index delta; tracks missing behind it are added. Media is matched to `media[]` by path and appended when absent. A clip the overlap rule refuses goes on a new track in front; an empty clip list changes nothing. |
-//! | `paste_attributes` | `clips: [u32], payload: object, groups?: [video \| audio \| text \| shape]` | Copies the payload's EARLIEST clip's property groups (at one start the front-most, then the lower id — never the array's first, which is creation order) onto each clip: video and audio whole, text but content, shape but kind, width, height, from and to. Default: every group both sides have; a named group either side lacks is an Err. Speed, enabled, actions, transition and identity stay. None when nothing changes. |
+//! | `paste_attributes` | `clips: [u32], payload: object, groups?: [video \| audio \| text \| shape]` | Copies the payload's EARLIEST clip's property groups (at one start the front-most, then the lower id — never the array's first, which is creation order) onto each clip: video and audio whole, text but content, shape but kind, width, height, from and to. Default: every group both sides have; a named group either side lacks is an Err. Speed, enabled, actions, transition and identity stay. An identity when nothing changes. |
 //! | `nest` | `clips: [u32], name?: string = "Nest <n>"` | Collapses the selection into ONE clip showing a nest, on the front-most track the selection occupied, running from the earliest start to the latest end. The clips move whole — ids, props, actions, transitions — keeping their relative times (earliest → 0) and their track order; the nest's canvas is frozen at the project's current size. Refuses on an empty selection, on a lone nest clip, and when the nest clip would break the overlap rule. |
 //! | `unnest` | `clip: u32` | The inverse: the nest's clips return at `clip.start + their own start`, with fresh ids, on tracks counted back from the nest clip's own (front-most nest track first), and the nest clip goes. `nest` then `unnest` is the identity on clip content, ids aside. A clip the overlap rule refuses lands on a new track in front, as `paste` does; a nest clip trimmed shorter than its contents gives ALL of them back (a nest has no in point); the nest is dropped when nothing else shows it. `Err` when `clip` is not a nest clip. |
 //! | `set_video` | `clips: [u32], patch: object` | Merges the patch into each clip's video props (spec §5.2). |
 //! | `set_audio` | `clips: [u32], patch: object` | Merges the patch into each clip's audio props. |
 //! | `set_text` | `clips: [u32], patch: object` | Merges the patch into each clip's text props. |
 //! | `set_shape` | `clips: [u32], patch: object` | Merges the patch into each clip's shape props. |
-//! | `set_clip` | `clips: [u32], patch: {name?: string \| null, label?: string \| null}` | Sets or clears the clip's own name and label; absent keeps, null or an empty string clears. Unknown keys are an Err. A split, duplicate, detach or paste carries both. None when nothing changes. |
+//! | `set_clip` | `clips: [u32], patch: {name?: string \| null, label?: string \| null}` | Sets or clears the clip's own name and label; absent keeps, null or an empty string clears. Unknown keys are an Err. A split, duplicate, detach or paste carries both. An identity when nothing changes. |
 //! | `set_enabled` | `clip: u32, video?: bool, audio?: bool` | The per-clip hide and mute switches; omitted fields keep their value. |
 //! | `set_transition` | `clip: u32, kind?: transition` | Sets `transition_in`; absent or `null` clears it. The overlap with the predecessor IS the duration. |
 //! | `set_transition_duration` | `clip: u32, duration: ticks` | Moves the clip so its overlap with its predecessor is exactly `duration`. |
-//! | `add_transition` | `clip: u32, kind?: transition, duration: ticks, align?: center \| before \| after = center, ripple?: bool = false` | Makes an overlap at the HARD CUT before `clip` out of the two clips' unused handles and puts a transition on it — nothing else on the timeline moves. `center` takes half from each side (the odd frame to the incoming clip) and passes a side's shortfall to the other; `before` takes it all from the incoming clip's head, `after` all from the outgoing clip's tail. The duration is snapped down to whole frames and CLAMPED — to each handle, to the neighbours on the track, and to the overlap rule — so a request too long for the material lands shorter rather than refusing; below one frame is None. A nest gives no head, and a nest tail ends at the nest's own length. The incoming clip's actions move with its new first frame. `kind` absent uses the clip's stored kind if it has one, else cross_dissolve; a stored transition keeps its curve and crossfade, a new one is minted (eased, crossfading). Err for a non-positive duration, an unknown clip, and for not being at a hard cut — naming which of no predecessor, a gap, an existing overlap. `ripple?: bool = false`: when true no handle is read and `align` is ignored — the overlap is made by SHIFTING the incoming clip and every clip at or after it on every unlocked track left by the snapped duration, so the timeline gets shorter and no source window changes; the duration is capped at half the shorter of the two clips and stepped down a frame at a time until every track something moved on passes the overlap rule, another track's clip that gains an overlap gets a minted cross_dissolve (`close_gap`'s rule), markers do not move, and an incoming clip on a locked track is None. |
-//! | `set_transition_style` | `clip: u32, curve?: curve, audio?: bool` | Sets the transition's easing and whether it crossfades the two clips' sound; an absent key keeps. A clip with no stored transition and at least one key given gets a minted `cross_dissolve` with the style applied; NEITHER key given is None and never mints. A separate op from `set_transition` because that one reads an absent `kind` as a clear and so cannot spell "keep". |
+//! | `add_transition` | `clip: u32, kind?: transition, duration: ticks, align?: center \| before \| after = center, ripple?: bool = false` | Makes an overlap at the HARD CUT before `clip` out of the two clips' unused handles and puts a transition on it — nothing else on the timeline moves. `center` takes half from each side (the odd frame to the incoming clip) and passes a side's shortfall to the other; `before` takes it all from the incoming clip's head, `after` all from the outgoing clip's tail. The duration is snapped down to whole frames and CLAMPED — to each handle, to the neighbours on the track, and to the overlap rule — so a request too long for the material lands shorter rather than refusing; below one frame refuses. A nest gives no head, and a nest tail ends at the nest's own length. The incoming clip's actions move with its new first frame. `kind` absent uses the clip's stored kind if it has one, else cross_dissolve; a stored transition keeps its curve and crossfade, a new one is minted (eased, crossfading). Err for a non-positive duration, an unknown clip, and for not being at a hard cut — naming which of no predecessor, a gap, an existing overlap. `ripple?: bool = false`: when true no handle is read and `align` is ignored — the overlap is made by SHIFTING the incoming clip and every clip at or after it on every unlocked track left by the snapped duration, so the timeline gets shorter and no source window changes; the duration is capped at half the shorter of the two clips and stepped down a frame at a time until every track something moved on passes the overlap rule, another track's clip that gains an overlap gets a minted cross_dissolve (`close_gap`'s rule), markers do not move, and an incoming clip on a locked track refuses. |
+//! | `set_transition_style` | `clip: u32, curve?: curve, audio?: bool` | Sets the transition's easing and whether it crossfades the two clips' sound; an absent key keeps. A clip with no stored transition and at least one key given gets a minted `cross_dissolve` with the style applied; NEITHER key given is an identity and never mints. A separate op from `set_transition` because that one reads an absent `kind` as a clear and so cannot spell "keep". |
 //!
 //! `transition` is one of `cross_dissolve`, `fade_black`, `fade_white`,
 //! `push_left`, `push_right`, `push_up`, `push_down`, `wipe`, `slide`,
@@ -167,18 +167,25 @@
 //!
 //! ### Results
 //!
-//! [`Project::apply`] returns the three-way answer the whole editor is
-//! built on (spec §5.5):
+//! [`Project::apply`] returns the answer the whole editor is built on
+//! (spec §5.5): [`Outcome`]'s three arms for an op that was understood, and
+//! `Err` for a request that was not.
 //!
-//! - `Ok(Some(project))` — the new project; the app pushes an undo step.
-//! - `Ok(None)` — the op is valid and changes nothing, or it is a
-//!   documented refusal (the overlap rule, a non-empty track). **No undo
-//!   step**: an identity edit that registered one would be a phantom step
-//!   the user has to undo twice.
+//! - `Ok(Outcome::Applied(project))` — the new project; the app pushes an
+//!   undo step.
+//! - `Ok(Outcome::Identity)` — valid, nothing needed to change. **No undo
+//!   step** (one is a phantom step), and no sentence: no rule to name.
+//! - `Ok(Outcome::Refused(why))` — a rule declined the op, in the rule's
+//!   own words (the overlap rule's names the two clips and the tick
+//!   counts). **No undo step either**, and the project is exactly as it
+//!   was: a refusal is not an error tier, it is an answer that can say why.
 //! - `Err(message)` — an unknown id, an out-of-range value, a malformed
 //!   envelope. Lowercase, naming the offending value.
 //!
-//! **A `scope` widens the third arm and nothing else.** An op applied
+//! **A "refuses" in the table names the RULE**; which rules say so out
+//! loud, and which are really identities, is [`Outcome::Identity`]'s doc.
+//!
+//! **A `scope` widens the `Err` arm and nothing else.** An op applied
 //! inside a nest can succeed against the view and STILL be refused, because
 //! two invariants are invisible from in there: the caps count the whole
 //! document, and the nesting depth is measured from the timeline down. Both
@@ -186,16 +193,15 @@
 //! [`crate::scope`], which states the contract in full.
 //!
 //! **The non-media rule.** `set_speed`, `rate_stretch`, `freeze_frame` and
-//! `slip` return `Err("clip N is not a media clip")` rather than refusing,
-//! because a `clip` argument naming a text or shape clip for a speed op is
-//! an invalid argument — the same class as an unknown id — and because
-//! `Ok(None)` there is indistinguishable from "the rate was already that",
-//! which is a bad answer to give the MCP agent. Spec §6 originally worded
-//! the first three rows "refuses"; it was amended to match, so the
-//! siblings, the spec and the error tiers in `core/CLAUDE.md` now all
-//! agree. `slip` draws the line one step further out than its siblings do:
-//! a `still` has a source TIME, and slipping that is exactly what the op
-//! means, so the question the rule asks there is "has this clip a source at
+//! `slip` return `Err("clip N is not a media clip")` rather than refusing:
+//! a `clip` argument naming a text or shape clip for a speed op is an
+//! invalid argument — the same class as an unknown id — and an identity
+//! there is indistinguishable from "the rate was already that", which is a
+//! bad answer to give the MCP agent. Spec §6 originally worded the first
+//! three rows "refuses" and was amended to match, so the siblings, the spec
+//! and `core/CLAUDE.md`'s error tiers agree. `slip` draws the line one step
+//! further out: a `still` has a source TIME and slipping that is exactly
+//! what the op means, so the question there is "has this clip a source at
 //! all", not "is this a media source".
 
 use serde::{Deserialize, Serialize};
@@ -205,6 +211,7 @@ use crate::edit_transition::TransitionAlign;
 use crate::edit_zoom::{ZoomFit, ZoomRegion};
 use crate::export::describe;
 use crate::model::{Color, Curve, Project, TransitionKind};
+use crate::outcome::Outcome;
 use crate::patch::Group;
 use crate::scope;
 use crate::time::{Fps, Ticks};
@@ -637,8 +644,8 @@ pub enum Op {
 ///
 /// A struct rather than a bare [`Op`] because `scope` is the envelope's
 /// key and not any op's argument — it is spelled once, it means the same
-/// thing over all fifty-five, and folding it into the enum would mean
-/// fifty-five copies of one optional field. [`Project::apply_op`] still
+/// thing over all fifty-seven, and folding it into the enum would mean
+/// fifty-seven copies of one optional field. [`Project::apply_op`] still
 /// takes an `&Op` and knows nothing about nests.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Envelope {
@@ -664,7 +671,7 @@ pub struct Envelope {
 /// envelope key. A `#[serde(flatten)]` wrapper is not the way round it
 /// either: serde documents `deny_unknown_fields` as unsupported with
 /// `flatten`, and it would silently stop refusing typos. Removing the key
-/// before the typed decode keeps all three — the refusal, all fifty-five
+/// before the typed decode keeps all three — the refusal, all fifty-seven
 /// variants, and an envelope key that is not an argument.
 pub fn parse(op_json: &str) -> Result<Envelope, String> {
     let mut value: Value =
@@ -707,13 +714,14 @@ pub fn parse(op_json: &str) -> Result<Envelope, String> {
 
 impl Project {
     /// Applies one op envelope (the module table) and returns the new
-    /// project, `Ok(None)` when it would change nothing, or `Err` when the
+    /// project, the arm of [`Outcome`] that says why it did not, or `Err`
+    /// when the
     /// envelope or its arguments are invalid.
     ///
     /// With a `scope` the op runs inside that nest instead
     /// ([`crate::scope`]); without one this is the dispatch below and
     /// nothing more.
-    pub fn apply(&self, op_json: &str) -> Result<Option<Project>, String> {
+    pub fn apply(&self, op_json: &str) -> Result<Outcome, String> {
         let envelope = parse(op_json)?;
         match envelope.scope {
             None => self.apply_op(&envelope.op),
@@ -724,7 +732,7 @@ impl Project {
     /// The dispatch table. Deliberately nothing but calls: an op that needs
     /// adaptation gets it in the `edit_*` module that owns it, so that the
     /// JSON envelope and the semantics can never drift apart here.
-    pub fn apply_op(&self, op: &Op) -> Result<Option<Project>, String> {
+    pub fn apply_op(&self, op: &Op) -> Result<Outcome, String> {
         match op {
             // ---- clips ---------------------------------------------------
             Op::AddClip { track, media, at } => self.add_clip(*track, *media, *at),

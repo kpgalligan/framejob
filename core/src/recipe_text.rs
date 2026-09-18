@@ -382,7 +382,7 @@ const BURN_IN_SIZE_FRACTION: f64 = 0.03;
 ///
 /// Clearance under the plate is `0.5·H − (0.44·H + 0.65·round(0.03·H) + 12)`
 /// ≈ `0.0405·H − 12` px: about 32 px at 1080, and NEGATIVE below H ≈ 296.
-/// `CANVAS_MIN` is 16 (`edit_track.rs`), so a legal 640×288 canvas has its
+/// `CANVAS_MIN` is 16 (`edit_canvas.rs`), so a legal 640×288 canvas has its
 /// plate cut by the bottom of the frame. Same fixed-padding term as above,
 /// same cure.
 const BURN_IN_Y_FRACTION: f64 = 0.44;

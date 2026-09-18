@@ -61,11 +61,11 @@ extension EditorViewController {
         let at = document.playhead
 
         var ops: [ReelOp] = []
-        // `try?` collapses both failures into one nil: a thrown error and the
-        // `None` of a documented refusal. Either way the front track will not
-        // take this clip, so both take the new-track path.
+        // `.project` on a `try?` collapses three answers into one nil: a
+        // throw, an identity and a rule's refusal. Either way the front track
+        // will not take this clip, so all of them take the new-track path.
         if let front = before.tracks.last?.id,
-            (try? document.editedProject.applying(make(front, at))) != nil
+            (try? document.editedProject.applying(make(front, at))).project != nil
         {
             ops = [make(front, at)]
         } else {
@@ -246,14 +246,15 @@ extension EditorViewController {
     /// for that path.
     ///
     /// **A file already in the media list is not a failure.** `add_media`
-    /// deduplicates by path and answers the documented identity (`Ok(None)`,
-    /// which `ReelProject.applying` maps to nil) rather than an error, and its
-    /// own doc says what a caller does with that answer: "The caller that gets
-    /// `None` looks the path up to find the id that is already there"
-    /// (`core/src/edit_track.rs`). Reading the nil as "could not be added"
-    /// refused two entirely ordinary sequences — Add Background ▸ Image… twice
-    /// with one picture, and using a picture that is already in the Media tab
-    /// — with a sentence that is not true, and placed nothing. `commitImport`
+    /// deduplicates by path and answers the documented identity (which
+    /// `ReelProject.applying` answers as `.identity`, with no handle) rather
+    /// than an error, and its own doc says what a caller does with that
+    /// answer: "The caller that gets it looks the path up to find the id that
+    /// is already there" (`core/src/edit_track.rs`). Reading the absent
+    /// handle as "could not be added" refused two entirely ordinary sequences
+    /// — Add Background ▸ Image… twice with one picture, and using a picture
+    /// that is already in the Media tab — with a sentence that is not true,
+    /// and placed nothing. `commitImport`
     /// has absorbed the same identity silently since M1; a duplicate drop into
     /// the Media tab is a no-op, and this command owes the file the same
     /// reading.
@@ -267,7 +268,7 @@ extension EditorViewController {
     static func backgroundMedia(for descriptor: MediaDescriptor, in project: ReelProject) throws
         -> UInt32?
     {
-        if let probed = try project.applying(.addMedia(descriptor: descriptor)) {
+        if let probed = try project.applying(.addMedia(descriptor: descriptor)).project {
             return probed.snapshot.media.last?.id
         }
         let path = descriptor.path.trimmingCharacters(in: .whitespacesAndNewlines)

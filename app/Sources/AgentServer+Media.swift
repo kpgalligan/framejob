@@ -287,23 +287,22 @@ extension AgentServer {
     /// still in use refuses without `with_clips`, which is the alert's second
     /// button.
     ///
-    /// The count is `clipsUsing`, which walks the NESTS as well as the
-    /// timeline, because that is the set the core refuses against
-    /// (`every_clip()`) and the set `with_clips: true` deletes. Filtering
-    /// `snapshot.clips` here — what this line used to do — let a file used
-    /// only inside a compound clip past this guard, to be refused by the core
-    /// with `Ok(None)` and reported as a bare "refused" with no reason in it.
-    /// One spelling of the question now, in `MediaUsage.swift`.
+    /// **The refusal is the core's** since deepening D2·4: "media 3 is still
+    /// used by clips 7 and 9; pass with_clips: true to remove the media and
+    /// its clips". This handler used to count the users itself and answer
+    /// first, naming the FILE where the core names the clip ids — the better
+    /// sentence for a person and the worse one for a caller that has to name
+    /// a clip — and the count it took was the one thing about it worth
+    /// keeping: `clipsUsing` walks the NESTS as well as the timeline, which
+    /// is the set the core refuses against (`every_clip()`) and the set
+    /// `with_clips: true` deletes. Phase 8c fixed that count here; the core
+    /// always had it right, and the app asks the question at the Media tab's
+    /// alert only (`MediaPaneCommands.swift`, still through
+    /// `MediaUsage.swift`'s one spelling).
     func removeMedia(_ a: [String: Any]) throws -> String {
         let document = try target(a)
         let media = try mediaArg(a, "media", document)
         let withClips = try boolArg(a, "with_clips")
-        let users = document.project.snapshot.clipsUsing(media.id).count
-        if users > 0, withClips != true {
-            throw ToolError(
-                message: "\(media.name) is used by \(users) clip" + (users == 1 ? "" : "s")
-                    + ". Pass with_clips: true to remove them too.")
-        }
         return try editResult(
             document, "Remove Media", [.removeMedia(media: media.id, withClips: withClips)],
             ["media": Int(media.id)])

@@ -183,10 +183,11 @@ extension EditorViewController {
         let time = document.playhead
         // `applying` is pure (§5.5): this handle is published nowhere and
         // registers no undo step. It exists to be rendered and then dropped.
-        // Both of its "no" answers — a refusal, meaning no clip had anything
-        // to suppress, and a throw — leave the document's own handle as the
-        // right frame to sample, which is what `try?` collapses them to.
-        let project = (try? document.editedProject.applying([session.suppression]))
+        // Its other answers — an identity, meaning no clip had anything to
+        // suppress, a refusal, and a throw — leave the document's own handle
+        // as the right frame to sample, which is what `.project` on a `try?`
+        // collapses them to.
+        let project = (try? document.editedProject.applying([session.suppression])).project
             ?? document.editedProject
         EditorViewController.eyedropperQueue.async { [weak self] in
             let frame = Exporter.renderFrame(

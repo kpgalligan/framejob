@@ -771,6 +771,15 @@ def runs(values):
 # The checks.
 
 RESULTS = []
+# Checks that could not run, and why. A skip is not a pass: `report` names
+# every reason AND the count, so a reader sees what was measured and what
+# could not be.
+SKIPS = []
+# What sections 2 to 7 scored the last time the reference build worked:
+# 81/81 against the 36 sections 8 and 9 score alone. Hard-coded because the
+# rows cannot be counted without running them, and a skip that prints no
+# number is the thing `tools/proof/README.md` forbids.
+CROSS_BUILD_ROWS = 45
 
 
 def check(name, ok, detail=""):
@@ -778,6 +787,11 @@ def check(name, ok, detail=""):
     print(f"  {'PASS' if ok else 'FAIL'}: {name}")
     if detail:
         print(detail if detail.startswith("      ") else "      " + detail)
+
+
+def skip(count, reason):
+    SKIPS.append((count, reason))
+    print(f"  SKIPPED by name: {reason} — {count} rows did not run")
 
 
 def same_file(a, b):
@@ -1215,7 +1229,11 @@ def reading_checks(binary):
 
 def report():
     passed = sum(RESULTS)
-    print(f"\n{passed}/{len(RESULTS)} checks passed")
+    tail = ""
+    if SKIPS:
+        total = sum(n for n, _ in SKIPS)
+        tail = f" ({total} skipped by name — " + "; ".join(why for _, why in SKIPS) + ")"
+    print(f"\n{passed}/{len(RESULTS)} checks passed{tail}")
     sys.exit(0 if passed == len(RESULTS) else 1)
 
 
@@ -1471,14 +1489,32 @@ def main():
 
     if reference is None:
         # Sections 3–7 are all cross-build comparisons and there is nothing to
-        # compare against; section 8 needs no reference at all, so it still
-        # runs and is still scored. The failure is a CHECK rather than an exit
-        # so that this reads as "the instrument rotted" and not as "the proof
-        # was never run".
+        # compare against; sections 8 and 9 need no reference at all, so they
+        # still run and are still scored. It is a CHECK or a SKIP rather than
+        # an exit so that this reads as "the instrument rotted" and not as
+        # "the proof was never run".
+        #
+        # **A reference the instrument cannot reach is a SKIP, not a
+        # failure.** The two builds are deliberately one core and two app
+        # trees, so a reference commit whose `ReelCore.swift` predates a
+        # change to the FFI cannot compile against the CURRENT header at all
+        # — nothing in this repo can make it, and no guard in
+        # `harness/main.swift` is the fix. Road map 7's D2·1 added
+        # `rc_project_apply`'s fourth parameter, which put this reference
+        # (pre-meter) permanently out of reach. Anything else that will not
+        # build is still the failure it was.
         print("\n2. the reference build — the tree one commit before the meter existed")
-        check("the reference tree built, so there is a 'before' to compare the chrome "
-              "against — see build_reference for the two instruments it tries",
-              False, "      " + note.replace("\n", "\n      "))
+        ffi_drift = "rc_project_apply" in note and "app/Sources/ReelCore.swift" in note
+        if ffi_drift:
+            skip(CROSS_BUILD_ROWS,
+                 "the reference tree's own ReelCore.swift predates an FFI change and cannot "
+                 "call the current header (road map 7's D2·1 fourth parameter); sections 3 "
+                 "to 7 (every cross-build comparison) did not run")
+            print("      " + note.replace("\n", "\n      "))
+        else:
+            check("the reference tree built, so there is a 'before' to compare the chrome "
+                  "against — see build_reference for the two instruments it tries",
+                  False, "      " + note.replace("\n", "\n      "))
         print("   sections 3–7 are cross-build comparisons and cannot run without it.")
         reading_checks(binary)
         gain_checks()

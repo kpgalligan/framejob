@@ -5,7 +5,7 @@ import AppKit
 /// mirrors the double-click (road map 2's phase 9).
 ///
 /// **The whole surface is arguments on tools that already existed.** No op
-/// was added — `rc_op_names` is still 55 — so the catalog grew one property,
+/// was added — `rc_op_names` was unchanged — so the catalog grew one property,
 /// injected once in `AgentCatalog.tool` for every name the core calls an op,
 /// and one tool, which is not an op either. What that buys is the thing the
 /// spec designed and left (§4.4): every row of §6 can now name a clip, a

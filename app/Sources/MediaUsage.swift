@@ -1,7 +1,7 @@
 import Foundation
 
 /// "Is this media used, and by what?" — the ONE spelling of a question the
-/// app asks in three places and used to answer differently in each.
+/// app asks in two places and used to answer differently in each.
 ///
 /// The core is the authority and the answer is not the obvious one:
 /// `remove_media` refuses while `self.every_clip().any(uses_media)`
@@ -12,11 +12,13 @@ import Foundation
 /// media used only inside an orphaned nest is used.
 ///
 /// Swift had written the test twice and got it wrong both times: the Media
-/// tab's Remove and `AgentServer.removeMedia` each filtered
-/// `snapshot.clips` — the TOP LEVEL alone. The live consequence was that
+/// tab's Remove and the `remove_media` TOOL each filtered
+/// `snapshot.clips` — the TOP LEVEL alone. (The tool asks nothing now: the
+/// core refuses in its own words naming the clips, road map 7's D2·4.) The
+/// live consequence was that
 /// removing media used only inside a nest showed no "and its clips" alert at
 /// all: the pane saw no users, sent a plain `remove_media`, and the core
-/// refused it with `Ok(None)`, which reaches the user as a bare beep. Phase
+/// refused it, which reaches the user as a bare beep. Phase
 /// 8c's "unused only" filter would have been a THIRD copy of the same
 /// mistake, which is what made it worth one file.
 ///
@@ -35,8 +37,9 @@ extension ProjectSnapshot {
         return used
     }
 
-    /// Whether anything shows it. The question `remove_media` asks before it
-    /// refuses, and the one the Media tab's "unused only" filter asks per row.
+    /// Whether anything shows it — the question the Media tab's "unused only"
+    /// filter asks per row, and the one the core asks inside `remove_media`
+    /// before it refuses.
     func usesMedia(_ media: UInt32) -> Bool {
         clips.contains { $0.source.mediaID == media }
             || nests.contains { nest in nest.clips.contains { $0.source.mediaID == media } }
