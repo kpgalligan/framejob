@@ -20,12 +20,14 @@
 //!    ([`Project::snapped`]), durations included. Nothing sub-frame ever
 //!    reaches the model.
 //! 2. **Placement is checked, never repaired.** A move, trim or duplicate
-//!    that would break the overlap rule returns `Ok(None)` — the UI
-//!    animates it back. The rule itself lives in `transition.rs` and is
-//!    called, never restated.
+//!    that would break the overlap rule is REFUSED, in the rule's own
+//!    sentence ([`Outcome::Refused`]) — the UI animates it back. The rule
+//!    itself lives in `transition.rs` and is called, never restated, which
+//!    is why the sentence the caller reads is the one the rule wrote.
 //! 3. **Every op leaves the project valid.** [`Project::finish`] is the
-//!    single exit: it returns `None` when the result equals the input (no
-//!    phantom undo step) and turns a broken invariant into `Err`.
+//!    single exit: it answers [`Outcome::Identity`] when the result equals
+//!    the input (no phantom undo step) and turns a broken invariant into
+//!    `Err`.
 //!
 //! The pieces those three rules are made of — `snapped`, `frame`, the
 //! `require_*` lookups, `finish`, `selected_clips` and `clip_end` — are
@@ -46,6 +48,7 @@ use crate::model::{
     Action, AudioProps, Clip, Enabled, Media, MediaKind, Project, ShapeKind, ShapeProps, Source,
     TextProps, Track, VideoProps,
 };
+use crate::outcome::Outcome;
 use crate::patch::{merge_group, Group};
 use crate::props_check::{check_shape, check_text, SCALE_MAX, SCALE_MIN};
 use crate::time::{self, Ticks, TIMESCALE};
@@ -139,16 +142,20 @@ impl Project {
             .ok_or_else(|| format!("no track with id {id}"))
     }
 
-    /// The single exit of every op: identity is `None` (never a copy, which
-    /// would register a phantom undo step), and a result that broke an
-    /// invariant is an `Err` rather than a project the rest of the crate
-    /// cannot reason about.
-    pub(crate) fn finish(&self, next: Project) -> Result<Option<Project>, String> {
+    /// The single exit of every op: a result equal to the input is
+    /// [`Outcome::Identity`] (never a copy, which would register a phantom
+    /// undo step), and a result that broke an invariant is an `Err` rather
+    /// than a project the rest of the crate cannot reason about.
+    ///
+    /// It never answers [`Outcome::Refused`]: a rule that says no does so
+    /// where it is asked, with its own sentence, before anything is built
+    /// for this to judge.
+    pub(crate) fn finish(&self, next: Project) -> Result<Outcome, String> {
         if next == *self {
-            return Ok(None);
+            return Ok(Outcome::Identity);
         }
         next.validate()?;
-        Ok(Some(next))
+        Ok(Outcome::Applied(next))
     }
 
     /// How long a clip showing the WHOLE of `media` is — what `add_clip`
@@ -278,10 +285,10 @@ impl Project {
     ///
     /// `video` is `null` for an audio-only file and `audio` is `null` for a
     /// file with no audio track, which is how the inspector knows which
-    /// tabs to enable. Refuses (`None`) when the placement breaks the
-    /// overlap rule; `Err` for an unknown track or media, or a media with
-    /// no usable duration.
-    pub fn add_clip(&self, track: u32, media: u32, at: Ticks) -> Result<Option<Project>, String> {
+    /// tabs to enable. Refuses when the placement breaks the overlap rule;
+    /// `Err` for an unknown track or media, or a media with no usable
+    /// duration.
+    pub fn add_clip(&self, track: u32, media: u32, at: Ticks) -> Result<Outcome, String> {
         self.require_track(track)?;
         let found = self.require_media(media)?.clone();
         // A drag can start left of zero; the timeline has no negative time.
@@ -322,11 +329,8 @@ impl Project {
             name: None,
             label: None,
         };
-        if self
-            .check_overlap_rule(std::slice::from_ref(&clip), track, &[])
-            .is_err()
-        {
-            return Ok(None);
+        if let Err(why) = self.check_overlap_rule(std::slice::from_ref(&clip), track, &[]) {
+            return Ok(Outcome::Refused(why));
         }
         next.clips.push(clip);
         set_gained_transitions(&mut next, &[track]);
@@ -337,15 +341,15 @@ impl Project {
     /// seconds by default, with `text` merged over it as a `set_text`
     /// patch (spec §6, §4.3).
     ///
-    /// Refuses (`None`) on an overlap-rule violation; `Err` for an unknown
-    /// track, a non-positive duration, or a bad patch.
+    /// Refuses on an overlap-rule violation, in the rule's own sentence;
+    /// `Err` for an unknown track, a non-positive duration, or a bad patch.
     pub fn add_text_clip(
         &self,
         track: u32,
         at: Ticks,
         duration: Option<Ticks>,
         text: Option<&Value>,
-    ) -> Result<Option<Project>, String> {
+    ) -> Result<Outcome, String> {
         let title = TextProps {
             content: TITLE_CONTENT.to_string(),
             font: TITLE_FONT.to_string(),
@@ -389,7 +393,7 @@ impl Project {
         at: Ticks,
         duration: Option<Ticks>,
         shape: Option<&Value>,
-    ) -> Result<Option<Project>, String> {
+    ) -> Result<Outcome, String> {
         let props = match shape {
             None => ShapeProps::default(),
             Some(patch) => {
@@ -440,7 +444,7 @@ impl Project {
         at: Ticks,
         duration: Option<Ticks>,
         described: Described,
-    ) -> Result<Option<Project>, String> {
+    ) -> Result<Outcome, String> {
         self.require_track(track)?;
         let at = self.snapped(at).max(0);
         let duration = match duration {
@@ -478,11 +482,8 @@ impl Project {
             name: None,
             label: None,
         };
-        if self
-            .check_overlap_rule(std::slice::from_ref(&clip), track, &[])
-            .is_err()
-        {
-            return Ok(None);
+        if let Err(why) = self.check_overlap_rule(std::slice::from_ref(&clip), track, &[]) {
+            return Ok(Outcome::Refused(why));
         }
         next.clips.push(clip);
         set_gained_transitions(&mut next, &[track]);
@@ -500,18 +501,18 @@ impl Project {
     /// selection (by track order, then start), which is what makes a
     /// two-track selection land two tracks apart.
     ///
-    /// Refuses (`None`) when a clip would land outside the track list or
-    /// the overlap rule fails on any affected track. A clip that gains a
-    /// predecessor overlap and has no transition gets a cross dissolve.
+    /// Refuses when a clip would land outside the track list or the overlap
+    /// rule fails on any affected track. A clip that gains a predecessor
+    /// overlap and has no transition gets a cross dissolve.
     pub fn move_clips(
         &self,
         clips: &[u32],
         delta: Ticks,
         track: Option<u32>,
-    ) -> Result<Option<Project>, String> {
+    ) -> Result<Outcome, String> {
         let selection = self.selected_clips(clips)?;
         if selection.is_empty() {
-            return Ok(None);
+            return Ok(Outcome::Identity);
         }
 
         // Snapping the delta keeps a dragged clip on the grid: every start
@@ -553,7 +554,7 @@ impl Project {
                     .ok()
                     .and_then(|index| self.tracks.get(index))
                 else {
-                    return Ok(None);
+                    return Ok(Outcome::Identity);
                 };
                 moved.track = destination.id;
             }
@@ -571,8 +572,8 @@ impl Project {
             }
         }
         for track in &affected {
-            if self.check_overlap_rule(&candidates, *track, &[]).is_err() {
-                return Ok(None);
+            if let Err(why) = self.check_overlap_rule(&candidates, *track, &[]) {
+                return Ok(Outcome::Refused(why));
             }
         }
 
@@ -610,7 +611,7 @@ impl Project {
     /// they are clip-relative, and rebasing them would have to drop or bake
     /// whatever fell off the front, which is lossy and makes trimming back
     /// out not an identity.
-    pub fn trim_start(&self, clip: u32, to: Ticks) -> Result<Option<Project>, String> {
+    pub fn trim_start(&self, clip: u32, to: Ticks) -> Result<Outcome, String> {
         let target = self.require_clip(clip)?.clone();
         let end = clip_end(&target);
         let latest = end.saturating_sub(self.frame());
@@ -622,7 +623,7 @@ impl Project {
         // The two clamps can cross when the source has almost nothing left
         // in front: then there is no legal new start, so nothing happens.
         if to > latest || to == target.start {
-            return Ok(None);
+            return Ok(Outcome::Identity);
         }
 
         let delta = to.saturating_sub(target.start);
@@ -647,11 +648,8 @@ impl Project {
         }
         moved.start = to;
         moved.duration = end.saturating_sub(to);
-        if self
-            .check_overlap_rule(&[moved.clone()], moved.track, &[])
-            .is_err()
-        {
-            return Ok(None);
+        if let Err(why) = self.check_overlap_rule(&[moved.clone()], moved.track, &[]) {
+            return Ok(Outcome::Refused(why));
         }
 
         let mut next = self.clone();
@@ -665,7 +663,7 @@ impl Project {
     /// Moves the clip's end edge to `to`, clamped to the source's remaining
     /// length (media sources) and to at least one frame of clip (spec §6).
     /// The source in point and the actions are untouched.
-    pub fn trim_end(&self, clip: u32, to: Ticks) -> Result<Option<Project>, String> {
+    pub fn trim_end(&self, clip: u32, to: Ticks) -> Result<Outcome, String> {
         let target = self.require_clip(clip)?.clone();
         let earliest = target.start.saturating_add(self.frame());
         let mut to = self.snapped(to).max(earliest);
@@ -673,16 +671,13 @@ impl Project {
             to = to.min(target.start.saturating_add(available));
         }
         if to < earliest || to == clip_end(&target) {
-            return Ok(None);
+            return Ok(Outcome::Identity);
         }
 
         let mut moved = target.clone();
         moved.duration = to.saturating_sub(target.start);
-        if self
-            .check_overlap_rule(&[moved.clone()], moved.track, &[])
-            .is_err()
-        {
-            return Ok(None);
+        if let Err(why) = self.check_overlap_rule(&[moved.clone()], moved.track, &[]) {
+            return Ok(Outcome::Refused(why));
         }
 
         let mut next = self.clone();
@@ -697,10 +692,10 @@ impl Project {
     /// source range it shows: `speed = source_len / (to_end - start)`
     /// (spec §6). Media sources only.
     ///
-    /// Refuses (`None`) when the resulting rate falls outside ×0.1 – ×10,
-    /// when the new length is under a frame, or when the placement breaks
-    /// the overlap rule. Actions keep their clip-relative fraction.
-    pub fn rate_stretch(&self, clip: u32, to_end: Ticks) -> Result<Option<Project>, String> {
+    /// Refuses when the resulting rate falls outside ×0.1 – ×10, when the
+    /// new length is under a frame, or when the placement breaks the
+    /// overlap rule. Actions keep their clip-relative fraction.
+    pub fn rate_stretch(&self, clip: u32, to_end: Ticks) -> Result<Outcome, String> {
         let target = self.require_clip(clip)?.clone();
         if !matches!(target.source, Source::Media { .. }) {
             return Err(format!("clip {clip} is not a media clip"));
@@ -708,22 +703,19 @@ impl Project {
         let to_end = self.snapped(to_end);
         let duration = to_end.saturating_sub(target.start);
         if duration < self.frame() {
-            return Ok(None);
+            return Ok(Outcome::Identity);
         }
         let rate = self.content_length(&target) as f64 / duration as f64;
         if !rate.is_finite() || !(SPEED_MIN..=SPEED_MAX).contains(&rate) {
-            return Ok(None);
+            return Ok(Outcome::Identity);
         }
 
         let mut moved = target.clone();
         moved.speed = rate;
         moved.duration = duration;
         self.rescale_actions(&mut moved.actions, target.duration, duration);
-        if self
-            .check_overlap_rule(&[moved.clone()], moved.track, &[])
-            .is_err()
-        {
-            return Ok(None);
+        if let Err(why) = self.check_overlap_rule(&[moved.clone()], moved.track, &[]) {
+            return Ok(Outcome::Refused(why));
         }
 
         let mut next = self.clone();
@@ -739,7 +731,7 @@ impl Project {
     /// Cuts each named clip at project time `at` (spec §6). A clip `at` is
     /// not strictly inside is skipped; when nothing can be cut the whole op
     /// refuses (`None`). `Err` only for an unknown clip id.
-    pub fn split_clips(&self, clips: &[u32], at: Ticks) -> Result<Option<Project>, String> {
+    pub fn split_clips(&self, clips: &[u32], at: Ticks) -> Result<Outcome, String> {
         let at = self.snapped(at);
         let ids: Vec<u32> = self.selected_clips(clips)?.iter().map(|c| c.id).collect();
         let mut next = self.clone();
@@ -748,14 +740,14 @@ impl Project {
             cut |= split_clip(&mut next, id, at);
         }
         if !cut {
-            return Ok(None);
+            return Ok(Outcome::Identity);
         }
         self.finish(next)
     }
 
     /// Cuts every clip on an UNLOCKED track that `at` falls strictly inside
     /// — ⌘K with no selection (spec §6, §9).
-    pub fn split_under_playhead(&self, at: Ticks) -> Result<Option<Project>, String> {
+    pub fn split_under_playhead(&self, at: Ticks) -> Result<Outcome, String> {
         let at = self.snapped(at);
         let ids: Vec<u32> = self
             .clips
@@ -765,7 +757,7 @@ impl Project {
             .map(|c| c.id)
             .collect();
         if ids.is_empty() {
-            return Ok(None);
+            return Ok(Outcome::Identity);
         }
         let mut next = self.clone();
         let mut cut = false;
@@ -773,17 +765,17 @@ impl Project {
             cut |= split_clip(&mut next, id, at);
         }
         if !cut {
-            return Ok(None);
+            return Ok(Outcome::Identity);
         }
         self.finish(next)
     }
 
     /// Removes the named clips. Gaps stay — rippling is `edit_time`'s job
     /// (spec §6).
-    pub fn delete_clips(&self, clips: &[u32]) -> Result<Option<Project>, String> {
+    pub fn delete_clips(&self, clips: &[u32]) -> Result<Outcome, String> {
         let ids: Vec<u32> = self.selected_clips(clips)?.iter().map(|c| c.id).collect();
         if ids.is_empty() {
-            return Ok(None);
+            return Ok(Outcome::Identity);
         }
         let mut next = self.clone();
         next.clips.retain(|c| !ids.contains(&c.id));
@@ -794,22 +786,22 @@ impl Project {
     /// own tracks (spec §6): the copies start one span-length later, so a
     /// multi-clip selection keeps its internal timing exactly.
     ///
-    /// Clips and their actions get fresh ids. Refuses (`None`) when the
-    /// copies would break the overlap rule.
-    pub fn duplicate_clips(&self, clips: &[u32]) -> Result<Option<Project>, String> {
+    /// Clips and their actions get fresh ids. Refuses when the copies would
+    /// break the overlap rule.
+    pub fn duplicate_clips(&self, clips: &[u32]) -> Result<Outcome, String> {
         let selection: Vec<Clip> = self
             .selected_clips(clips)?
             .into_iter()
             .cloned()
             .collect::<Vec<Clip>>();
         if selection.is_empty() {
-            return Ok(None);
+            return Ok(Outcome::Identity);
         }
         let span_start = selection.iter().map(|c| c.start).min().unwrap_or(0);
         let span_end = selection.iter().map(clip_end).max().unwrap_or(0);
         let delta = span_end.saturating_sub(span_start);
         if delta <= 0 {
-            return Ok(None);
+            return Ok(Outcome::Identity);
         }
 
         let mut next = self.clone();
@@ -828,8 +820,8 @@ impl Project {
             copies.push(copy);
         }
         for track in &affected {
-            if self.check_overlap_rule(&copies, *track, &[]).is_err() {
-                return Ok(None);
+            if let Err(why) = self.check_overlap_rule(&copies, *track, &[]) {
+                return Ok(Outcome::Refused(why));
             }
         }
         next.clips.extend(copies);
@@ -846,14 +838,14 @@ impl Project {
     /// The rate is clamped to the inspector's ×0.1 – ×10 rather than
     /// refused, because a slider or an MCP call that asks for ×20 wants the
     /// fastest thing available. `Err` for a non-media clip or a rate that
-    /// is not a positive finite number; refuses (`None`) on an overlap-rule
+    /// is not a positive finite number; refuses on an overlap-rule
     /// violation.
     pub fn set_speed(
         &self,
         clip: u32,
         rate: f64,
         keep_pitch: Option<bool>,
-    ) -> Result<Option<Project>, String> {
+    ) -> Result<Outcome, String> {
         let target = self.require_clip(clip)?.clone();
         if !matches!(target.source, Source::Media { .. }) {
             return Err(format!("clip {clip} is not a media clip"));
@@ -877,11 +869,8 @@ impl Project {
         if let (Some(keep), Some(audio)) = (keep_pitch, moved.audio.as_mut()) {
             audio.keep_pitch = keep;
         }
-        if self
-            .check_overlap_rule(&[moved.clone()], moved.track, &[])
-            .is_err()
-        {
-            return Ok(None);
+        if let Err(why) = self.check_overlap_rule(&[moved.clone()], moved.track, &[]) {
+            return Ok(Outcome::Refused(why));
         }
 
         let mut next = self.clone();
@@ -907,10 +896,10 @@ impl Project {
     /// convention, and every trim, split and `source_length` in the crate
     /// would need to know which one was in force.
     ///
-    /// A non-media source is an `Err` and not a refusal — the non-media rule
-    /// (`edit.rs`, Results). `Ok(None)` when the clip already plays that
-    /// way.
-    pub fn set_reversed(&self, clip: u32, reversed: bool) -> Result<Option<Project>, String> {
+    /// A non-media source is an `Err` and not a refusal — the non-media
+    /// rule (`edit.rs`, Results). An identity when the clip already plays
+    /// that way.
+    pub fn set_reversed(&self, clip: u32, reversed: bool) -> Result<Outcome, String> {
         let target = self.require_clip(clip)?;
         let Source::Media {
             media,
@@ -921,7 +910,7 @@ impl Project {
             return Err(format!("clip {clip} is not a media clip"));
         };
         if current == reversed {
-            return Ok(None);
+            return Ok(Outcome::Identity);
         }
 
         let mut next = self.clone();
@@ -944,20 +933,20 @@ impl Project {
     /// point, duration and speed. Its VIDEO props are carried over too, so
     /// re-enabling video on it is not lossy.
     ///
-    /// Refuses (`None`) when the media has no audio, when the audio is
-    /// already detached, or when the new clip would break the overlap rule
-    /// on the track below.
-    pub fn detach_audio(&self, clip: u32) -> Result<Option<Project>, String> {
+    /// Refuses when the media has no audio, when the audio is already
+    /// detached, or when the new clip would break the overlap rule on the
+    /// track below.
+    pub fn detach_audio(&self, clip: u32) -> Result<Outcome, String> {
         let target = self.require_clip(clip)?.clone();
         let Source::Media { media, .. } = target.source else {
             // Stills, images, text and shapes have no audio to detach.
-            return Ok(None);
+            return Ok(Outcome::Identity);
         };
         let Some(found) = self.media(media) else {
-            return Ok(None);
+            return Ok(Outcome::Identity);
         };
         if !found.has_audio || !target.enabled.audio {
-            return Ok(None);
+            return Ok(Outcome::Identity);
         }
         let index = self.require_track_index(target.track)?;
 
@@ -1002,11 +991,8 @@ impl Project {
         // The transition describes an overlap on the ORIGINAL track.
         audio_clip.transition_in = None;
 
-        if self
-            .check_overlap_rule(&[audio_clip.clone()], below, &[])
-            .is_err()
-        {
-            return Ok(None);
+        if let Err(why) = self.check_overlap_rule(&[audio_clip.clone()], below, &[]) {
+            return Ok(Outcome::Refused(why));
         }
         if let Some(slot) = next.clip_mut(clip) {
             slot.enabled.audio = false;
@@ -1026,7 +1012,7 @@ impl Project {
         clip: u32,
         video: Option<bool>,
         audio: Option<bool>,
-    ) -> Result<Option<Project>, String> {
+    ) -> Result<Outcome, String> {
         self.require_clip(clip)?;
         let mut next = self.clone();
         if let Some(slot) = next.clip_mut(clip) {

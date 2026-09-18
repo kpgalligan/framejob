@@ -10,10 +10,10 @@
 //!
 //! Both are therefore *conservative* ops, and both are written to refuse
 //! rather than approximate. A slip that has run out of source at one end
-//! stops, and a slip that could not move at all is `None` — the alternative
-//! is a drag that silently becomes a different, shorter edit than the
-//! gesture asked for. A roll needs a hard cut to move: with a gap, or with
-//! an overlap (which IS a transition, whose length is
+//! stops, and a slip that could not move at all is an identity — the
+//! alternative is a drag that silently becomes a different, shorter edit
+//! than the gesture asked for. A roll needs a hard cut to move: with a gap,
+//! or with an overlap (which IS a transition, whose length is
 //! `set_transition_duration`'s job), there is nothing here to roll.
 //!
 //! The arithmetic is `model_query.rs`'s — `content_length`, `source_head`
@@ -23,6 +23,7 @@
 
 use crate::edit_clip::clip_end;
 use crate::model::{Project, Source};
+use crate::outcome::Outcome;
 use crate::time::Ticks;
 
 impl Project {
@@ -37,7 +38,7 @@ impl Project {
     ///
     /// Clamped so the window stays inside the media — `in ≥ 0` at the head,
     /// `in + duration × speed ≤ media.duration` at the tail — and a slip
-    /// the clamps reduce to nothing is `None`.
+    /// the clamps reduce to nothing is an identity.
     ///
     /// A `still` has one source TIME rather than a window, so it moves that
     /// instead, clamped inside the media the same way. Every other source
@@ -46,14 +47,14 @@ impl Project {
     /// **The source kind is decided FIRST**, before the delta is even
     /// measured. A text clip named for a slip is an invalid argument
     /// whatever the delta was, and letting a sub-frame delta short-circuit
-    /// to `Ok(None)` would answer "valid, changes nothing" to a call that
+    /// to an identity would answer "valid, changes nothing" to a call that
     /// was never valid — the one answer the non-media rule exists to stop
     /// the MCP agent being given.
     ///
     /// Nothing moves, so there is no overlap to check and no transition can
     /// be gained; the actions are clip-relative and stay exactly where they
     /// are.
-    pub fn slip(&self, clip: u32, delta: Ticks) -> Result<Option<Project>, String> {
+    pub fn slip(&self, clip: u32, delta: Ticks) -> Result<Outcome, String> {
         let target = self.require_clip(clip)?.clone();
         let (media, current) = match target.source {
             Source::Media { media, r#in, .. } => (media, r#in),
@@ -72,7 +73,7 @@ impl Project {
             0
         };
         if moved_by == 0 {
-            return Ok(None);
+            return Ok(Outcome::Identity);
         }
 
         // The last legal position of what the clip shows. A window is
@@ -92,7 +93,7 @@ impl Project {
         };
         let slipped = current.saturating_add(moved_by).clamp(0, last);
         if slipped == current {
-            return Ok(None);
+            return Ok(Outcome::Identity);
         }
 
         let mut next = self.clone();
@@ -129,14 +130,14 @@ impl Project {
     /// semantics, so `in` follows), and the predecessor may only reach
     /// forward as far as its remaining source allows (it grows at the END,
     /// a plain end trim, so its `in` does not move). A `to` the clamps
-    /// leave equal to the current cut is `None`, and so is a pair of clamps
-    /// that cross — a cut with no legal position is not one this op can
-    /// move.
+    /// leave equal to the current cut is an identity, and so is a pair of
+    /// clamps that cross — a cut with no legal position is not one this op
+    /// can move.
     ///
     /// Neither clip's outer edge moves, so the pair still abuts exactly and
     /// no transition can be gained; the actions on both are clip-relative
     /// and stay where they are, as they do for a trim.
-    pub fn roll(&self, clip: u32, to: Ticks) -> Result<Option<Project>, String> {
+    pub fn roll(&self, clip: u32, to: Ticks) -> Result<Outcome, String> {
         let target = self.require_clip(clip)?.clone();
         let Some(previous) = self
             .clips_on_track(target.track)
@@ -144,7 +145,7 @@ impl Project {
             .find(|c| c.id != target.id && clip_end(c) == target.start)
             .cloned()
         else {
-            return Ok(None);
+            return Ok(Outcome::Identity);
         };
 
         let frame = self.frame();
@@ -165,11 +166,11 @@ impl Project {
         let earliest = self.snapped_up(earliest);
         let latest = self.snapped_down(latest);
         if earliest > latest {
-            return Ok(None);
+            return Ok(Outcome::Identity);
         }
         let to = self.snapped(to).clamp(earliest, latest);
         if to == target.start {
-            return Ok(None);
+            return Ok(Outcome::Identity);
         }
 
         let mut moved = target.clone();
@@ -201,11 +202,10 @@ impl Project {
         // because every placement op checks, and because a track that
         // already held something the rule dislikes should not have it made
         // worse by an edit that thought it was safe.
-        if self
-            .check_overlap_rule(&[moved.clone(), grown.clone()], target.track, &[])
-            .is_err()
+        if let Err(why) =
+            self.check_overlap_rule(&[moved.clone(), grown.clone()], target.track, &[])
         {
-            return Ok(None);
+            return Ok(Outcome::Refused(why));
         }
 
         let mut next = self.clone();

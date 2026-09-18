@@ -85,6 +85,7 @@ use crate::edit_clip::set_gained_transitions;
 use crate::export::describe;
 use crate::format::MAX_TRACKS;
 use crate::model::{Clip, Media, Nest, Project, ShapeProps, Source, TextProps, Track};
+use crate::outcome::Outcome;
 use crate::patch::Group;
 use crate::time::Ticks;
 
@@ -411,16 +412,11 @@ impl Project {
     /// Tracks missing BEHIND the destination are added; a clip the overlap
     /// rule refuses on its target track goes on a new track in front.
     ///
-    /// `Ok(None)` for an empty clip list — the only answer that changes
+    /// An identity for an empty clip list — the only answer that changes
     /// nothing, since the fallback track means a placement cannot fail.
     /// `Err` for a malformed payload, an unknown `track`, a clip naming a
     /// media the payload does not carry, or a depth past the track cap.
-    pub fn paste(
-        &self,
-        at: Ticks,
-        track: Option<u32>,
-        payload: &Value,
-    ) -> Result<Option<Project>, String> {
+    pub fn paste(&self, at: Ticks, track: Option<u32>, payload: &Value) -> Result<Outcome, String> {
         let payload = parse_payload(payload)?;
         // An explicit destination is an id from THIS project, so an unknown
         // one is a caller bug and an error — unlike anything in the payload.
@@ -432,7 +428,7 @@ impl Project {
             None => self.tracks.len() as i64 - 1,
         };
         if payload.clips.is_empty() {
-            return Ok(None);
+            return Ok(Outcome::Identity);
         }
         let deepest = payload.clips.iter().map(|c| c.track).max().unwrap_or(0) as i64;
         // Bounded BEFORE anything is allocated: `track` is a depth here, and
@@ -554,7 +550,7 @@ impl Project {
     /// the group, one a target lacks is `Err("clip N has no audio
     /// properties")`, the patches' answer — because a caller who asked for
     /// it would otherwise never learn it did not happen. An empty explicit
-    /// list, an identity paste and an empty selection are all `None`. The
+    /// list, an identity paste and an empty selection are all identities. The
     /// copied groups then pass the range checks a patch does, so a payload
     /// written by hand cannot smuggle in a value the inspector would refuse.
     pub fn paste_attributes(
@@ -562,7 +558,7 @@ impl Project {
         clips: &[u32],
         payload: &Value,
         groups: Option<&[Group]>,
-    ) -> Result<Option<Project>, String> {
+    ) -> Result<Outcome, String> {
         let payload = parse_payload(payload)?;
         let earliest = |c: &&Clip| (c.start, c.track, c.id);
         let Some(source) = payload.clips.iter().min_by_key(earliest) else {

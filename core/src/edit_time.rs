@@ -27,6 +27,7 @@
 
 use crate::edit_clip::{clip_end, set_gained_transitions};
 use crate::model::{Clip, Enabled, Project, Source, VideoProps};
+use crate::outcome::Outcome;
 use crate::time::{Ticks, TIMESCALE};
 
 /// Default freeze length (spec §6). Two seconds is long enough for a hold
@@ -118,11 +119,16 @@ fn ordered_range(project: &Project, from: Ticks, to: Ticks) -> Option<(Ticks, Ti
 /// The one thing this does NOT do is decide what happens to the hole, which
 /// is the whole difference between a lift and a ripple delete.
 fn clear_range(project: &Project, start: Ticks, end: Ticks) -> Result<Project, String> {
+    // A splitter has no rule to refuse with — it either cut something or it
+    // did not — so both of its non-applied answers mean "nothing was cut at
+    // this bound". A splitter that ever gains a rule has to be given a way
+    // out of here first: this function answers a `Project`, not an
+    // [`Outcome`], so it has nowhere to put a sentence.
     let mut current = match project.split_under_playhead(start)? {
-        Some(split) => split,
-        None => project.clone(),
+        Outcome::Applied(split) => split,
+        Outcome::Identity | Outcome::Refused(_) => project.clone(),
     };
-    if let Some(split) = current.split_under_playhead(end)? {
+    if let Outcome::Applied(split) = current.split_under_playhead(end)? {
         current = split;
     }
 
@@ -159,10 +165,10 @@ impl Project {
     /// — and does move them.)
     ///
     /// `Err` on an unknown clip id; `None` for an empty selection.
-    pub fn ripple_delete(&self, clips: &[u32]) -> Result<Option<Project>, String> {
+    pub fn ripple_delete(&self, clips: &[u32]) -> Result<Outcome, String> {
         let selection = self.selected_clips(clips)?;
         if selection.is_empty() {
-            return Ok(None);
+            return Ok(Outcome::Identity);
         }
         let ids: Vec<u32> = selection.iter().map(|c| c.id).collect();
         let spans = union(
@@ -202,15 +208,15 @@ impl Project {
     /// exactly what it had.
     ///
     /// The bounds are snapped, clamped to 0 and ordered, so a drag that
-    /// ended left of where it began is the same range. An empty range is
-    /// `None`.
+    /// ended left of where it began is the same range. An empty range is an
+    /// identity.
     ///
     /// It is [`Project::ripple_delete_ranges`] with one pair, and nothing
     /// else: with a single span there is nothing for the merge to merge and
     /// nothing for the right-to-left loop to order, so the two are
     /// step-for-step the same edit. Keeping a second body here would be a
     /// second implementation of one algorithm, free to drift.
-    pub fn ripple_delete_range(&self, from: Ticks, to: Ticks) -> Result<Option<Project>, String> {
+    pub fn ripple_delete_range(&self, from: Ticks, to: Ticks) -> Result<Outcome, String> {
         self.ripple_delete_ranges(&[[from, to]])
     }
 
@@ -251,8 +257,8 @@ impl Project {
     /// clip count it would take to get there.
     ///
     /// An empty list, a list of empty ranges, and a list that merges to
-    /// nothing all change nothing (`None`).
-    pub fn ripple_delete_ranges(&self, ranges: &[[Ticks; 2]]) -> Result<Option<Project>, String> {
+    /// nothing all change nothing.
+    pub fn ripple_delete_ranges(&self, ranges: &[[Ticks; 2]]) -> Result<Outcome, String> {
         // Snapped FIRST, merged after: two ranges three ticks apart are the
         // same range once both bounds are on the frame grid, and only a
         // merge that runs afterwards can see it.
@@ -264,7 +270,7 @@ impl Project {
                 .collect(),
         );
         if spans.is_empty() {
-            return Ok(None);
+            return Ok(Outcome::Identity);
         }
 
         let mut next = self.clone();
@@ -294,10 +300,10 @@ impl Project {
     ///
     /// The bounds are snapped, clamped to 0 and ordered, so a drag that
     /// ended left of where it began is the same range. An empty range, or
-    /// one that held nothing an unlocked track could give up, is `None`.
-    pub fn lift_range(&self, from: Ticks, to: Ticks) -> Result<Option<Project>, String> {
+    /// one that held nothing an unlocked track could give up, is an identity.
+    pub fn lift_range(&self, from: Ticks, to: Ticks) -> Result<Outcome, String> {
         let Some((start, end)) = ordered_range(self, from, to) else {
-            return Ok(None);
+            return Ok(Outcome::Identity);
         };
         // No shift, so nothing can be brought into contact with anything
         // and no transition can be gained.
@@ -311,7 +317,7 @@ impl Project {
     /// The gap is bounded by the nearest clip edges ON `track` — the last
     /// end at or before `at`, or 0 when nothing precedes it, and the first
     /// start after it. A playhead ON a clip is not in a gap, and a gap with
-    /// nothing after it is not one to close: both are `None`.
+    /// nothing after it is not one to close: both are identities.
     ///
     /// The shift is the ripple's, timeline-wide over unlocked tracks with
     /// straddlers staying put, so the material that follows the gap keeps
@@ -329,14 +335,14 @@ impl Project {
     /// `insert_time`, where no collision is possible, moves them).
     ///
     /// `Err` for an unknown track.
-    pub fn close_gap(&self, track: u32, at: Ticks) -> Result<Option<Project>, String> {
+    pub fn close_gap(&self, track: u32, at: Ticks) -> Result<Outcome, String> {
         if self.require_track(track)?.locked {
-            return Ok(None);
+            return Ok(Outcome::Identity);
         }
         let at = self.snapped(at).max(0);
         let ordered = self.clips_on_track(track);
         if ordered.iter().any(|c| c.start <= at && at < clip_end(c)) {
-            return Ok(None);
+            return Ok(Outcome::Identity);
         }
         let start = ordered
             .iter()
@@ -345,10 +351,10 @@ impl Project {
             .max()
             .unwrap_or(0);
         let Some(end) = ordered.iter().map(|c| c.start).filter(|s| *s > at).min() else {
-            return Ok(None);
+            return Ok(Outcome::Identity);
         };
         if end <= start {
-            return Ok(None);
+            return Ok(Outcome::Identity);
         }
 
         // Only the tracks something actually moves on can gain an overlap,
@@ -367,8 +373,8 @@ impl Project {
         let mut next = self.clone();
         shift_clips(&mut next, end, start.saturating_sub(end));
         for id in &touched {
-            if next.check_overlap_rule(&[], *id, &[]).is_err() {
-                return Ok(None);
+            if let Err(why) = next.check_overlap_rule(&[], *id, &[]) {
+                return Ok(Outcome::Refused(why));
             }
         }
         set_gained_transitions(&mut next, &touched);
@@ -386,15 +392,15 @@ impl Project {
     /// every mark at or after `at` moves by the same length, and the ones
     /// before it never reach `at`.
     ///
-    /// `Err` for a length still negative after snapping; `None` for zero.
-    pub fn insert_time(&self, at: Ticks, length: Ticks) -> Result<Option<Project>, String> {
+    /// `Err` for a length still negative after snapping; an identity for zero.
+    pub fn insert_time(&self, at: Ticks, length: Ticks) -> Result<Outcome, String> {
         let at = self.snapped(at).max(0);
         let length = self.snapped(length);
         if length < 0 {
             return Err(format!("insert length must not be negative, not {length}"));
         }
         if length == 0 {
-            return Ok(None);
+            return Ok(Outcome::Identity);
         }
 
         let mut next = self.clone();
@@ -427,14 +433,14 @@ impl Project {
     /// a copied action would animate away from the frame the cut matched.
     ///
     /// `Err` for an unknown clip, a non-media source, an `at` outside the
-    /// clip, or a duration under one frame; `None` if the still would break
-    /// the overlap rule.
+    /// clip, or a duration under one frame; refused, in the rule's own
+    /// sentence, if the still would break the overlap rule.
     pub fn freeze_frame(
         &self,
         clip: u32,
         at: Ticks,
         duration: Option<Ticks>,
-    ) -> Result<Option<Project>, String> {
+    ) -> Result<Outcome, String> {
         let target = self.require_clip(clip)?.clone();
         let Source::Media { media, r#in, .. } = target.source else {
             return Err(format!("clip {clip} is not a media clip"));
@@ -482,11 +488,16 @@ impl Project {
 
         let video = self.evaluate_clip(&target, clip_t).video;
         let mut next = match self.split_clips(&[clip], at)? {
-            Some(split) => split,
-            None => self.clone(),
+            Outcome::Applied(split) => split,
+            // The playhead sat on a clip boundary: nothing to cut, and the
+            // freeze still has somewhere to go.
+            Outcome::Identity => self.clone(),
+            Outcome::Refused(why) => return Ok(Outcome::Refused(why)),
         };
-        if let Some(inserted) = next.insert_time(at, duration)? {
-            next = inserted;
+        match next.insert_time(at, duration)? {
+            Outcome::Applied(inserted) => next = inserted,
+            Outcome::Identity => {}
+            Outcome::Refused(why) => return Ok(Outcome::Refused(why)),
         }
 
         let still = Clip {
@@ -525,11 +536,8 @@ impl Project {
             name: None,
             label: None,
         };
-        if next
-            .check_overlap_rule(std::slice::from_ref(&still), still.track, &[])
-            .is_err()
-        {
-            return Ok(None);
+        if let Err(why) = next.check_overlap_rule(std::slice::from_ref(&still), still.track, &[]) {
+            return Ok(Outcome::Refused(why));
         }
         next.clips.push(still);
         self.finish(next)

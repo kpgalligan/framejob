@@ -395,10 +395,12 @@ itself instead of seeing a transport error.
   publishing a handle to the compositor's queue safe. Complex data crosses as
   UTF-8 JSON, which is also what gives the MCP agent the same vocabulary the
   app has.
-- `rc_project_apply` returns NULL two distinguishable ways: with `err_out`
-  untouched it means "valid, but changes nothing" (register no undo step), and
-  with `err_out` set it means the arguments were wrong. Getting that
-  distinction wrong is a phantom undo step.
+- `rc_project_apply` returns NULL three distinguishable ways: with neither
+  message set it means "valid, but nothing needed to change"; with
+  `reason_out` set a rule refused the edit and that is the rule's own
+  sentence; with `err_out` set the arguments were wrong. The first two
+  register no undo step — getting that distinction wrong is a phantom undo
+  step — and only the third is an error.
 - Swift wraps the handle in `ReelProject`, whose `deinit` frees the Rust
   allocation; every `char *` the library returns is released with
   `rc_string_free`.

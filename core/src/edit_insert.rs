@@ -24,6 +24,7 @@
 
 use crate::edit_clip::clip_end;
 use crate::model::Project;
+use crate::outcome::Outcome;
 use crate::time::Ticks;
 
 impl Project {
@@ -44,17 +45,13 @@ impl Project {
     /// locked track everywhere else. `close_gap` refuses for the same
     /// reason.
     ///
-    /// `Err` for an unknown track or media, or a media with no duration;
-    /// `None` for a locked destination track, or when the clip could not be
-    /// placed after the room was made.
-    pub fn insert_clip(
-        &self,
-        track: u32,
-        media: u32,
-        at: Ticks,
-    ) -> Result<Option<Project>, String> {
+    /// `Err` for an unknown track or media, or a media with no duration; a
+    /// locked destination track refuses, and so does anything the inner
+    /// `split`, `insert_time` or `add_clip` refused — this op answers in the
+    /// words of whichever step declined.
+    pub fn insert_clip(&self, track: u32, media: u32, at: Ticks) -> Result<Outcome, String> {
         if self.require_track(track)?.locked {
-            return Ok(None);
+            return Ok(Outcome::Identity);
         }
         let found = self.require_media(media)?.clone();
         let at = self.snapped(at).max(0);
@@ -66,14 +63,24 @@ impl Project {
             .filter(|c| c.start < at && at < clip_end(c))
             .map(|c| c.id)
             .collect();
-        let mut next = self
-            .split_clips(&straddling, at)?
-            .unwrap_or_else(|| self.clone());
-        if let Some(opened) = next.insert_time(at, length)? {
-            next = opened;
+        let mut next = match self.split_clips(&straddling, at)? {
+            Outcome::Applied(split) => split,
+            // Nothing straddled the insertion point, which is the ordinary
+            // case: carry on with the project as it is.
+            Outcome::Identity => self.clone(),
+            Outcome::Refused(why) => return Ok(Outcome::Refused(why)),
+        };
+        match next.insert_time(at, length)? {
+            Outcome::Applied(opened) => next = opened,
+            Outcome::Identity => {}
+            Outcome::Refused(why) => return Ok(Outcome::Refused(why)),
         }
-        let Some(placed) = next.add_clip(track, media, at)? else {
-            return Ok(None);
+        // A composition answers in the words of whichever step declined, so
+        // the overlap rule's sentence reaches the caller through here too.
+        let placed = match next.add_clip(track, media, at)? {
+            Outcome::Applied(placed) => placed,
+            Outcome::Identity => return Ok(Outcome::Identity),
+            Outcome::Refused(why) => return Ok(Outcome::Refused(why)),
         };
         self.finish(placed)
     }
@@ -92,13 +99,9 @@ impl Project {
     /// — while a lock still decides what may shift, which here is nothing.
     ///
     /// `Err` for an unknown track or media, or a media with no duration;
-    /// `None` when the clip could not be placed after the span was cleared.
-    pub fn overwrite_clip(
-        &self,
-        track: u32,
-        media: u32,
-        at: Ticks,
-    ) -> Result<Option<Project>, String> {
+    /// whatever `add_clip` answered when the clip could not be placed after
+    /// the span was cleared, in its own words.
+    pub fn overwrite_clip(&self, track: u32, media: u32, at: Ticks) -> Result<Outcome, String> {
         self.require_track(track)?;
         let found = self.require_media(media)?.clone();
         let at = self.snapped(at).max(0);
@@ -114,9 +117,10 @@ impl Project {
                 .filter(|c| c.start < bound && bound < clip_end(c))
                 .map(|c| c.id)
                 .collect();
-            let split = next.split_clips(&cut, bound)?;
-            if let Some(project) = split {
-                next = project;
+            match next.split_clips(&cut, bound)? {
+                Outcome::Applied(project) => next = project,
+                Outcome::Identity => {}
+                Outcome::Refused(why) => return Ok(Outcome::Refused(why)),
             }
         }
         let inside: Vec<u32> = next
@@ -127,8 +131,10 @@ impl Project {
             .collect();
         next.clips.retain(|c| !inside.contains(&c.id));
 
-        let Some(placed) = next.add_clip(track, media, at)? else {
-            return Ok(None);
+        let placed = match next.add_clip(track, media, at)? {
+            Outcome::Applied(placed) => placed,
+            Outcome::Identity => return Ok(Outcome::Identity),
+            Outcome::Refused(why) => return Ok(Outcome::Refused(why)),
         };
         self.finish(placed)
     }

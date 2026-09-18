@@ -26,6 +26,7 @@ use serde::{Deserialize, Serialize};
 use crate::edit_clip::clip_end;
 use crate::edit_time::{shift_clips, unlocked_tracks};
 use crate::model::{Clip, Curve, Project, Source, Transition, TransitionKind};
+use crate::outcome::Outcome;
 use crate::time::Ticks;
 
 /// Where the overlap [`Project::add_transition`] makes is taken FROM.
@@ -134,7 +135,7 @@ impl Project {
         &self,
         clip: u32,
         kind: Option<TransitionKind>,
-    ) -> Result<Option<Project>, String> {
+    ) -> Result<Outcome, String> {
         let stored = self.require_clip(clip)?.transition_in;
         let mut next = self.clone();
         if let Some(slot) = next.clip_mut(clip) {
@@ -159,7 +160,7 @@ impl Project {
     /// is — no predecessor, a gap, an existing overlap — because this op is
     /// pointed at one cut by a caller who meant THAT cut, unlike `roll`,
     /// which a drag can reach at any edge. **Having no handle is a domain
-    /// refusal** (`Ok(None)`): a shorter transition is the same edit at a
+    /// refusal**: a shorter transition is the same edit at a
     /// size the media allows, so the duration is clamped rather than
     /// refused, and only a request that clamps below one whole frame gives
     /// up.
@@ -201,7 +202,7 @@ impl Project {
     ///    the answer is not monotone in an obvious direction: a failure
     ///    steps the total down one frame, taken from the larger side, and
     ///    retries. The loop is bounded by step 4's own frame count.
-    /// 7. Nothing left to give — below one frame — is `Ok(None)`.
+    /// 7. Nothing left to give — below one frame — is a refusal.
     /// 8. Write: A grows at the end, B grows at the front and its `in`
     ///    moves back by the same timeline time TIMES its speed, the
     ///    arithmetic `trim_start` and `roll` both use.
@@ -224,7 +225,7 @@ impl Project {
         duration: Ticks,
         align: Option<TransitionAlign>,
         ripple: bool,
-    ) -> Result<Option<Project>, String> {
+    ) -> Result<Outcome, String> {
         // 0. The one wrong ARGUMENT that is not about the timeline.
         if duration <= 0 {
             return Err(format!("duration must be positive, not {duration}"));
@@ -241,7 +242,7 @@ impl Project {
             .collect();
         let index = match ordered.iter().position(|c| c.id == clip) {
             Some(index) => index,
-            None => return Ok(None),
+            None => return Ok(Outcome::Identity),
         };
         let previous = index.checked_sub(1).and_then(|i| ordered.get(i));
         let earlier = match previous {
@@ -315,7 +316,7 @@ impl Project {
         // 6 and 7. The overlap rule, stepping down from the larger side.
         loop {
             if a + b <= 0 {
-                return Ok(None);
+                return Ok(Outcome::Identity);
             }
             let (grown, moved) = extended(&earlier, &later, a * frame, b * frame);
             if self
@@ -374,17 +375,17 @@ impl Project {
     /// handle form's posture. A clip on another track that the shift pushes
     /// into its predecessor gains a minted `cross_dissolve`, which is
     /// `close_gap`'s rule for the same shift. An incoming clip on a LOCKED
-    /// track cannot move, and nothing below one frame is left: both `None`.
+    /// track cannot move, and nothing below one frame is left: both refuse.
     pub(crate) fn add_transition_by_shift(
         &self,
         earlier: &Clip,
         later: &Clip,
         kind: Option<TransitionKind>,
         duration: Ticks,
-    ) -> Result<Option<Project>, String> {
+    ) -> Result<Outcome, String> {
         let unlocked = unlocked_tracks(self);
         if !unlocked.contains(&later.track) {
-            return Ok(None);
+            return Ok(Outcome::Identity);
         }
         let frame = self.frame();
         let cut = later.start;
@@ -418,7 +419,7 @@ impl Project {
             }
             frames -= 1;
         }
-        Ok(None)
+        Ok(Outcome::Identity)
     }
 
     /// How many whole frames the INCOMING clip could be extended backward
@@ -480,10 +481,10 @@ impl Project {
         clip: u32,
         curve: Option<Curve>,
         audio: Option<bool>,
-    ) -> Result<Option<Project>, String> {
+    ) -> Result<Outcome, String> {
         let stored = self.require_clip(clip)?.transition_in;
         if curve.is_none() && audio.is_none() {
-            return Ok(None);
+            return Ok(Outcome::Identity);
         }
         let mut next = self.clone();
         if let Some(slot) = next.clip_mut(clip) {
@@ -504,14 +505,10 @@ impl Project {
     /// `duration` (spec §6) — the transition's length IS that overlap, so
     /// there is nothing else to set.
     ///
-    /// Refuses (`None`) when the clip has no predecessor on its track, when
-    /// the new start would be negative, or when the result breaks the
-    /// overlap rule. `Err` on a negative duration.
-    pub fn set_transition_duration(
-        &self,
-        clip: u32,
-        duration: Ticks,
-    ) -> Result<Option<Project>, String> {
+    /// Refuses when the clip has no predecessor on its track, when the new
+    /// start would be negative, or when the result breaks the overlap rule.
+    /// `Err` on a negative duration.
+    pub fn set_transition_duration(&self, clip: u32, duration: Ticks) -> Result<Outcome, String> {
         let target = self.require_clip(clip)?.clone();
         let duration = self.snapped(duration);
         if duration < 0 {
@@ -522,25 +519,22 @@ impl Project {
         let ordered = self.clips_on_track(target.track);
         let index = match ordered.iter().position(|c| c.id == clip) {
             Some(index) => index,
-            None => return Ok(None),
+            None => return Ok(Outcome::Identity),
         };
         let Some(previous) = index.checked_sub(1).and_then(|i| ordered.get(i)) else {
-            return Ok(None);
+            return Ok(Outcome::Identity);
         };
         // The overlap is the tail of the previous clip the later one covers,
         // so the later one starts exactly `duration` before that tail ends.
         let start = clip_end(previous).saturating_sub(duration);
         if start < 0 {
-            return Ok(None);
+            return Ok(Outcome::Identity);
         }
 
         let mut moved = target.clone();
         moved.start = start;
-        if self
-            .check_overlap_rule(&[moved.clone()], moved.track, &[])
-            .is_err()
-        {
-            return Ok(None);
+        if let Err(why) = self.check_overlap_rule(&[moved.clone()], moved.track, &[]) {
+            return Ok(Outcome::Refused(why));
         }
 
         let mut next = self.clone();

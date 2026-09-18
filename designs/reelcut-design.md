@@ -1194,9 +1194,19 @@ never has to defend itself, and one bad number cannot blank a frame.
 
 ### 5.5 Purity and undo
 
-Every edit is `fn(&Project, args) -> Option<Project>` — `None` means
-nothing would change, so no phantom undo step; invalid arguments are an
-`Err(String)` at the FFI (`err_out`), never a panic. The Swift document
+Every edit is `fn(&Project, args) -> Outcome` (`core/src/outcome.rs`), and
+an op answers one of three ways:
+
+- **applied**, with the new project — the app pushes an undo step;
+- **an identity** — the project already says what was asked, so nothing
+  would change and there is no phantom undo step, and nothing to explain;
+- **refused**, with the rule's own sentence — the overlap rule names the
+  two clips and the exact tick counts. No undo step either: a refusal is
+  not an error tier, it is an answer that can say why. It crosses the FFI
+  on `rc_project_apply`'s `reason_out`, beside and never with `err_out`.
+
+Invalid arguments remain an `Err(String)` at the FFI (`err_out`), never a
+panic. The Swift document
 keeps a stack of handles; `NSUndoManager` records the previous one
 (`ImageDocument.swift` in Rasterize is the template — `applyEdit`,
 `beginLiveEdit`/`updateLiveEdit`/`endLiveEdit`, `countEditChange`,
@@ -1368,7 +1378,7 @@ as it works on the timeline, `nest` and `unnest` included: nesting the
 whole of a scope mints a fresh id and puts the new nest clip INSIDE the
 scoped nest, which is a legal extra level and not a cycle.
 
-**A scope widens the third arm of §5.5's answer and nothing else.** Two
+**A scope widens §5.5's invalid-argument answer and nothing else.** Two
 invariants are invisible from inside a view — the caps count the whole
 document (§5.6) and the nesting depth is measured from the timeline down —
 so both are checked once, at the end, on the MERGED parent. *An op may
@@ -1489,9 +1499,12 @@ void       rc_string_free(char *s);
 /* edits — one entry point. `op` is {"op": "<name>", ...args} (§6), plus the
  * optional envelope key "scope": a nest id, which applies the op INSIDE that
  * nest and returns a whole project (§4.4).
- * Returns a NEW project; NULL with err_out untouched = the op would change
- * nothing (no undo step); NULL with err_out set = invalid op or arguments. */
-RcProject *rc_project_apply(const RcProject *p, const char *op, char **err_out);
+ * Returns a NEW project; NULL with NEITHER message set = an identity, the op
+ * would change nothing (no undo step); NULL with reason_out set = a rule
+ * refused it, in that rule's own sentence (no undo step either); NULL with
+ * err_out set = invalid op or arguments (§5.5). */
+RcProject *rc_project_apply(const RcProject *p, const char *op, char **err_out,
+                            char **reason_out);
 
 /* queries */
 int64_t rc_project_duration(const RcProject *p);

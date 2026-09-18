@@ -135,15 +135,26 @@ void rc_project_free(RcProject *p);
  * "nests are more than 8 deep at nest N". A caller must not assume a valid
  * scoped edit landed.
  *
- * Returns a NEW project on success. Returns NULL in two distinguishable
- * cases:
- *   - `*err_out` UNTOUCHED (still NULL): the op is valid but would change
- *     nothing. The caller registers NO undo step (an identity edit is a
- *     phantom undo step) — the UI beeps or animates the gesture back.
+ * Returns a NEW project on success. Returns NULL in three distinguishable
+ * cases, which is why there are two message channels and not one:
+ *   - NEITHER written (both still NULL): the op is valid and nothing needed
+ *     to change — an identity edit. The caller registers NO undo step (an
+ *     identity edit that registered one is a phantom undo step), and tells
+ *     its own caller only that: a rule named here would be a rule the caller
+ *     did not break.
+ *   - `*reason_out` SET: a rule refused the op, and this is that rule's own
+ *     sentence, naming what the caller could act on ("clips 3 and 4 would
+ *     overlap by 8000 ticks, more than half of the shorter clip (6000
+ *     ticks)"). Still NO undo step, and NOT an error: the project is exactly
+ *     as it was, and the UI beeps or animates the gesture back.
  *   - `*err_out` SET: the op or its arguments are invalid.
- * The caller must therefore initialise its `char *err = NULL;` before the
- * call and test it after a NULL return. */
-RcProject *rc_project_apply(const RcProject *p, const char *op, char **err_out);
+ * The two channels are never both written, and `reason_out` may be NULL for
+ * a caller that does not want the sentence. The caller must therefore
+ * initialise its `char *err = NULL; char *reason = NULL;` before the call
+ * and test both after a NULL return. Either message is freed with
+ * rc_string_free. */
+RcProject *rc_project_apply(const RcProject *p, const char *op, char **err_out,
+                            char **reason_out);
 
 /* Every op name `rc_project_apply` accepts, as a JSON array of strings in
  * the order of that table. The host reads it to check its MCP tool catalog

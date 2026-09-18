@@ -41,6 +41,7 @@
 
 use crate::edit_clip::{clip_end, set_gained_transitions};
 use crate::model::{AudioProps, Clip, Enabled, Nest, Project, Source, Track, VideoProps};
+use crate::outcome::Outcome;
 
 /// A track with a fresh id, copying `from`'s name and its hidden / muted /
 /// locked / solo state.
@@ -85,28 +86,28 @@ impl Project {
     /// the nest clip covers exactly the span they covered, on the front-most
     /// track any of them was on.
     ///
-    /// Refuses (`None`) on an empty selection, on a selection of one clip
-    /// that is already a nest (grouping a group alone changes nothing a user
-    /// can see), and when the nest clip would break the overlap rule against
-    /// whatever was NOT selected. `Err` on an unknown clip id or a selection
+    /// An empty selection, and a selection of one clip that is already a
+    /// nest (grouping a group alone changes nothing a user can see), are
+    /// identities. A nest clip that would break the overlap rule against
+    /// whatever was NOT selected is refused, in the rule's own sentence. `Err` on an unknown clip id or a selection
     /// that would put the project past the track cap.
-    pub fn nest_clips(&self, clips: &[u32], name: Option<&str>) -> Result<Option<Project>, String> {
+    pub fn nest_clips(&self, clips: &[u32], name: Option<&str>) -> Result<Outcome, String> {
         let selected: Vec<Clip> = self
             .selected_clips(clips)?
             .into_iter()
             .cloned()
             .collect::<Vec<_>>();
         if selected.is_empty() {
-            return Ok(None);
+            return Ok(Outcome::Identity);
         }
         if selected.len() == 1 && matches!(selected[0].source, Source::Nest { .. }) {
-            return Ok(None);
+            return Ok(Outcome::Identity);
         }
 
         let earliest = selected.iter().map(|c| c.start).min().unwrap_or(0);
         let latest = selected.iter().map(clip_end).max().unwrap_or(0);
         if latest <= earliest {
-            return Ok(None);
+            return Ok(Outcome::Identity);
         }
 
         // The source tracks, back-most first, so the nest's own stack keeps
@@ -127,7 +128,7 @@ impl Project {
         // (`format::check_caps`), so a selection that would overrun the cap
         // is caught by `finish` rather than counted twice here.
         let Some((_, front_track)) = sources.last().copied() else {
-            return Ok(None);
+            return Ok(Outcome::Identity);
         };
 
         let mut next = self.clone();
@@ -199,8 +200,8 @@ impl Project {
             label: None,
         });
 
-        if next.check_overlap_rule(&[], front_track, &[]).is_err() {
-            return Ok(None);
+        if let Err(why) = next.check_overlap_rule(&[], front_track, &[]) {
+            return Ok(Outcome::Refused(why));
         }
         set_gained_transitions(&mut next, &[front_track]);
         self.finish(next)
@@ -218,7 +219,7 @@ impl Project {
     /// The nest itself is dropped when nothing else shows it; a second clip
     /// showing it keeps it, which is why the returned clips are copies.
     /// `Err` when `clip` is not a nest clip.
-    pub fn unnest_clip(&self, clip: u32) -> Result<Option<Project>, String> {
+    pub fn unnest_clip(&self, clip: u32) -> Result<Outcome, String> {
         let target = self.require_clip(clip)?.clone();
         let Source::Nest { project } = target.source else {
             return Err(format!("clip {clip} is not a nest clip"));

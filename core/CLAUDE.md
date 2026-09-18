@@ -41,6 +41,13 @@ file is what governs a module now.
   `source_head`, `content_length`, `source_length`.
 - `time.rs` — `Ticks`, `TIMESCALE`, `Fps`, frame snapping, timecode
   format/parse (non-drop `HH:MM:SS:FF` and `HH:MM:SS.mmm`).
+- `outcome.rs` — `Outcome`, the THREE arms every edit answers with
+  (spec §5.5): applied with the new project, an identity, or refused with
+  the rule's own sentence. An enum and its doc, nothing else. It is an enum
+  rather than a side channel so that a site which has not decided which
+  answer it gives does not compile; the fourth possibility, a request that
+  could not be read, stays the `Err(String)` beside it. Its `Identity` doc
+  is also the one place that says which refusals can say why yet.
 - `edit.rs` — the op enum, `OP_NAMES`, `parse` and `apply`. **Its module
   doc IS the op table**; `app/Sources/ReelOps.swift`'s typed builders,
   `AgentCatalog*.swift`'s tools and spec §6 mirror it. `parse` answers an
@@ -255,15 +262,22 @@ one home (`TIMESCALE` in `time.rs`; `RC_*` caps in `format.rs`; the
 inspector's bounds in `props_check.rs`).
 
 **Purity.** Every edit takes `&self` and returns a new value — internally
-clone-then-mutate. An op that would change nothing returns `None`, never an
-identical copy: an identical copy registers a phantom undo step in the app.
+clone-then-mutate. An op that would change nothing returns
+`Outcome::Identity`, never an identical copy: an identical copy registers a
+phantom undo step in the app.
 
-**Errors.** Two tiers, no error enum: `Option<T>` = the op is valid but
-changes nothing, or a domain refusal, with the reason in the doc comment;
-`Err(String)` = invalid arguments, unknown ids, parse failures — lowercase
-messages naming the offending value. No input may panic. FFI mapping:
-`None` → NULL with `err_out` untouched; `Err` → `set_err(err_out, …)`;
-caught panic → `"internal error: <what>"`.
+**Errors.** Every edit answers `Result<Outcome, String>` — three arms and
+one tier, no error enum. `Outcome::Applied` = the new project;
+`Outcome::Identity` = the op is valid and nothing needed to change;
+`Outcome::Refused(String)` = a rule declined it, carrying the rule's OWN
+sentence rather than a second one written at the call site; `Err(String)` =
+invalid arguments, unknown ids, parse failures — lowercase messages naming
+the offending value. A refusal is not an error tier: both middle arms leave
+the project untouched and register no undo step. No input may panic. FFI
+mapping (`ffi_edit.rs`): `Applied` → a new handle; `Identity` → NULL with
+neither channel written; `Refused` → NULL with the sentence through
+`reason_out`; `Err` → NULL with the message through `err_out`; caught panic
+→ `"internal error: <what>"`. The two channels are never both written.
 
 **Times.** Every tick value that reaches the model is snapped to the
 document's frame grid before it is stored (`time::snap_to_frame`). Never

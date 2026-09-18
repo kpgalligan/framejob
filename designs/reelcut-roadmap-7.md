@@ -2,8 +2,9 @@
 
 **Status: D1 BUILT AND CLOSED — all six tickets landed (§2.1 to §2.6), and
 §3 is what they add up to: the core is the one validator of every
-caller-authored object, and 617 lines are out of the agent's handlers. No
-candidate is in progress.**
+caller-authored object, and 617 lines are out of the agent's handlers. D2 IS
+IN PROGRESS on `d2-refusal-reason`: its plan is §4 and its record §5, one
+entry per ticket as it lands.**
 
 Road maps 2 to 6 each added something a person using the app can see. This
 one does not. A **deepening** takes knowledge that is spread across callers
@@ -1671,3 +1672,220 @@ REASON for an op that returns nothing — today an identity and a refusal are
 indistinguishable at the FFI, which is why `editResult`'s "made no change"
 sentence has to guess at the cause and name the overlap rule to a caller who
 sent a patch.
+
+
+---
+
+## 4. D2 — a refusal that says why
+
+**Spec:** kpgalligan/reelcut#8.
+
+**The problem.** An op that changes nothing and an op a rule refused look
+the same from outside the core: NULL with `err_out` untouched. The reason
+EXISTS at the moment of the refusal — the overlap rule writes a full
+sentence naming the two clips and the exact tick counts — and fourteen sites
+threw it away and answered "nothing" instead. Three layers then invented
+answers to fill the silence: the agent's shared reply guessed a paragraph
+(the action "made no change", then "either the project is already in that
+state, or the edit was refused", then a lecture about the overlap rule, sent
+even to a caller who changed a font size); three Swift handlers trial-applied
+the op first so they could write a better sentence themselves, one of them
+re-deriving the overlap rule's own arithmetic; and the core's own test helper
+for "this op changes nothing" could not tell a no-op from a rejection either.
+While verifying D1, every deliberately sabotaged door produced the same
+paragraph about the overlap rule in reply to a PROPERTY patch, which is the
+clearest demonstration of the problem.
+
+**The shape.** The seam is the existing one again: the op envelope through
+`rc_project_apply`. An op answers one of three ways — applied with the new
+project, an identity, or refused with the rule's own sentence — as a Rust
+enum rather than a side channel, so a site that has not decided which answer
+it gives does not compile. The sentence crosses the FFI on a NEW
+out-parameter of the same entry point, beside `err_out` and never with it;
+"no handle and no message" still means an identity and still means no undo
+step, so the five app paths that rely on that are unaffected. The
+invalid-input tier is unchanged in meaning and in wording. The Swift
+compensation is then deleted: the trial-applies, the hand-written sentences
+and the re-derived arithmetic, leaving the tool prose that TEACHES a rule
+before the call (which is not the same thing as explaining a refusal after
+it) and the two places that swallow a refusal on purpose — a scoped view and
+a live drag — with the reason written into the app's rulebook. There is no
+new export, no new tool and no format bump, and a person at the machine sees
+exactly what they saw before: a beep, and no undo step.
+
+**The tickets, in blocking order.** #9 → #10 → #11 → #12 → #13.
+
+| Ticket | Title | Blocked by |
+|---|---|---|
+| kpgalligan/reelcut#9 | D2·1: the core answers in three arms, and the overlap rule speaks | — |
+| kpgalligan/reelcut#10 | D2·2: the app switches on three arms, and an agent hears the overlap rule | #9 |
+| kpgalligan/reelcut#11 | D2·3: the remaining rules speak | #10 |
+| kpgalligan/reelcut#12 | D2·4: the app's guesses are deleted | #11 |
+| kpgalligan/reelcut#13 | D2·5: contract and record | #12 |
+
+D2·1 is the prefactor and is core-only: the type change, the FFI's third
+answer, and the first rule to find its voice. D2·2 is the other wide change —
+the app's five "nothing happened" paths and the agent's reply — and it is
+where the MCP proof for this seam is born, with the overlap section every
+later ticket copies. D2·3 gives the remaining rules their sentences (a
+locked track, the last track, a media row still in use, a cut with nothing
+left to give, an action that would overlap another). D2·4 is the deletion
+ticket the prefactor pays for. D2·5 is the contract step: the glossary, the
+spec and both rulebooks, the proof failed twice on purpose, and the record
+closed. The two wide changes are deliberately not mixed with anything else.
+
+**Out of scope, and named so it is not rediscovered.** Showing a refusal's
+sentence to the person using the app — the beep stays, and where such a
+message would live is a design question of its own. Turning refusals into
+machine-readable codes: the sentence is prose, as D1's refusals are. The
+roughly nine "empty selection" answers, which are TRUE identities and stay
+that way. Any change to the invalid-input tier, the op table, the tool
+count, the startup parity check or the persisted format. A refusal arm for
+the QUERY exports, which keep returning nothing with no message. And the
+other architecture-review candidates, in particular deriving the catalog and
+the typed builders from the core's op table.
+
+---
+
+## 5. D2 — the record
+
+One entry per ticket, written when it lands.
+
+### 5.1 D2·1 — the core answers in three arms (kpgalligan/reelcut#9)
+
+**Commits.** The ticket's commit, and the review-fix commit named here when
+it lands.
+
+**What landed.** Core, the FFI's three files, and the documents those
+sentences live in. The app's BEHAVIOUR is unchanged — `ReelCore.swift`
+passes NULL for the new channel — so neither a person nor an agent sees any
+of this yet; D2·2 is where they do.
+
+- **`core/src/outcome.rs` is new, 73 lines**: `Outcome`, with
+  `Applied(Project)`, `Identity` and `Refused(String)`, and the doc that
+  says what each arm means, what a composed op must do with the two it did
+  not expect, and why the invalid-input tier is NOT a fourth arm. Every
+  `impl Project` edit now answers `Result<Outcome, String>` — 65 signatures
+  across fourteen modules.
+- **The compiler found the sites, which is the reason it is a type and not
+  a flag.** 89 `Ok(None)`s were each made to say which answer they are, and
+  the type change also surfaced eight composition sites no one had listed:
+  `insert_clip` (three), `overwrite_clip` (two), `freeze_frame` (two) and
+  `add_zoom_action` (three) each consumed an inner op's answer through `let
+  Some(…) else` or `unwrap_or_else`, which would have turned an inner
+  refusal into "nothing happened". They now match all three arms and pass a
+  refusal straight back, so a composition answers in the words of whichever
+  step declined. `clear_range` is the one place that deliberately folds a
+  refusal into "nothing was cut": it answers a `Project` rather than an
+  `Outcome`, a splitter has no rule to refuse with, and the comment says a
+  splitter that ever gains one has to be given a way out of there first.
+- **The overlap rule speaks, at fourteen sites.** Ten were the
+  `check_overlap_rule(…).is_err()` shape and four were a loop or a
+  candidate search; the ten that were refusals now read `if let Err(why) =
+  … { return Ok(Outcome::Refused(why)) }` and hand the rule's own sentence
+  on verbatim. The four that are SEARCHES — `edit_paste.rs` and
+  `edit_nest.rs` looking for a track a clip will fit on, and
+  `edit_transition.rs`'s two step-down loops — are unchanged and are not
+  refusals.
+- **The FFI's fourth parameter.** `rc_project_apply(p, op, err_out,
+  reason_out)`: a handle means applied, NULL with neither channel written
+  means an identity, NULL with `reason_out` set is the refusal, NULL with
+  `err_out` set is invalid input and is untouched. The two channels are
+  never both written, and `reason_out` may be NULL for a caller that does
+  not want the sentence — which is exactly what `ReelCore.swift` passes
+  until D2·2. `ffi_util.rs`'s `set_err` is now `set_message`, because it is
+  the one spelling of BOTH channels: what they mean differs, how they
+  allocate must not.
+- **Which refusals can say why.** Only the overlap rule, per the spec's
+  third Implementation Decision. The rules whose words are owed to D2·3 — a
+  locked track, the last track, a media row a clip still shows, a cut with
+  nothing left to give a transition, an action that would overlap another —
+  answer `Outcome::Identity` for now. A doc comment that says an op
+  "refuses" is describing the DOMAIN and stays; `Outcome::Identity`'s own
+  doc is the ONE place that lists which of them can say so out loud, so the
+  next reader does not have to grep for a marker in ten modules.
+
+**Tests.** A new file, `core/tests/refusal.rs`, nine tests through the FFI:
+the overlap rule's sentence from a move, from a trim and from the
+two-neighbours case, the same sentence coming back out of a `scope`, a
+refusal that still passes `refuses` (the no-undo-step claim 91 call sites
+make), a refusal against a NULL `reason_out`, an applied op with no
+sentence, three true identities with no sentence, and invalid input
+unchanged in wording. Every expected sentence is written out WHOLE, ids and
+tick counts included, hand-computed from a one-tick-per-frame fixture: a
+keyword match would pass on a sentence that had lost exactly the part a
+caller reads.
+
+`core/tests/common/mod.rs` learned the third arm. `Handle::try_apply` now
+answers a test-side `Outcome` mirroring the core's, and is where the
+header's invariants are asserted once for the whole suite: a handle never
+comes back with a message on either channel, and the two channels are never
+both written. `Handle::refuses` keeps its meaning — "no handle, so no undo
+step" — and all 91 of its call sites, accepting either non-applied arm. The
+new `Handle::refuses_with(op, sentence)` is the one that pins WHICH and in
+what words, and it compares the whole sentence. `Handle::errors` and
+`Handle::apply` each gained an arm that now names a refusal's sentence in
+its panic, which is a better failure message than either had.
+
+**Mutants.** Three, all caught:
+
+| Mutant | Score |
+|---|---|
+| the sentence discarded at the FFI (`Refused` returns NULL without writing `reason_out`) | 4 of 9 tests failed |
+| a rule's refusal turned back into a bare identity (`move_clips`' overlap check) | 3 of 9 failed |
+| a handle returned WITH a sentence (the invariant `try_apply` asserts) | 1 of 9 failed |
+
+The third failed nothing until `an_applied_op_carries_no_sentence` was
+added: the other eight tests never apply an op successfully, so the
+invariant was being asserted for the rest of the suite but not by this file.
+That test is the reason the mutant is scored rather than a claim.
+
+**Verification.** `make test` 641 passed / 0 failed (632 before, plus the
+nine new), `make lint` clean,
+`cargo fmt --check` clean, `make typecheck` 0 errors and the 4 known
+AVFoundation warnings, `make app` built, the startup parity log empty, and
+the proof scripts run below.
+
+**Size.** `core/src/edit_clip.rs` 1042 → 1029, `edit_track.rs` 674 → 671,
+`edit_transition.rs` 553 → 547 and `edit_paste.rs` 600 → 596: every
+over-cap core file this touched came DOWN, because `Refuses (\`None\`)` is
+shorter than what replaced the value spelling. Two files over the cap grew
+and the toll is named here rather than paid: **`core/src/edit.rs` 887 → 895**
+(the standing table exemption; the eight lines are the Results section of
+the contract this ticket changed, which is what the AC asked for) and
+**`app/Sources/ReelCore.swift` 1507 → 1510** (three lines in the one doc
+comment the FFI lockstep rule requires this ticket to rewrite). The new
+module is 73 lines against a 400-line cap.
+
+**Documents.**
+
+- `core/CLAUDE.md` gains the `outcome.rs` map entry; its Purity rule says
+  `Outcome::Identity` where it said `None`, and its Errors rule now states
+  three arms and one tier with the full FFI mapping.
+- Spec §5.5 states the three answers; §7's header quote carries the new
+  signature; the sentence that said a scope "widens the third arm" now says
+  it widens the invalid-argument answer, since `Err` is no longer third.
+  The op table (§6), the glossary and `app/CLAUDE.md` are D2·5's.
+- `README.md`'s FFI bullet says three distinguishable NULLs.
+- About thirty doc comments that spelled an op's answer `None` now speak in
+  domain words ("an identity", "refuses", "in the rule's own sentence"),
+  including `edit.rs`'s Results section, `edit_clip.rs`'s three rules,
+  `scope.rs`'s contract, `edit_track.rs`'s module doc and
+  `check_overlap_rule`'s own.
+
+**What the next tickets inherit.**
+
+- **The three-armed shape, verbatim**, for D2·3 to copy: a rule refuses with
+  `if let Err(why) = <the rule> { return Ok(Outcome::Refused(why)) }`, and a
+  composed op matches all three arms and returns the two it did not expect
+  unchanged.
+- **The test shape, verbatim**: `Handle::refuses_with(&op, "<the whole
+  sentence>")`, with the numbers hand-computed in the test.
+- **`reason_out` is already wired and already tested against NULL**, so
+  D2·2's Swift change is a read at one call site, not a contract change.
+- The mutant that matters for D2·2 is the first one above: discard the
+  sentence at the FFI and the old ambiguity comes straight back.
+
+**Owed.** The eight lines in `edit.rs` and three in `ReelCore.swift`, named
+under Size above. No proof script: this ticket adds no app behaviour to
+photograph, and D2·2 is where the seam's proof is born.

@@ -6,8 +6,8 @@
 //! size and rate, and the media the clips point at. `edit_clip.rs` owns the
 //! clips themselves; the rules both obey are written there and called from
 //! here — [`Project::snapped`] for every tick argument, [`Project::finish`]
-//! as the single exit that turns an identity result into `None` and a
-//! broken invariant into `Err`.
+//! as the single exit that turns an identity result into
+//! [`Outcome::Identity`] and a broken invariant into `Err`.
 //!
 //! Three invariants this module is responsible for:
 //!
@@ -26,6 +26,7 @@ use crate::export::describe;
 use crate::model::{
     Clip, Color, Marker, Media, MediaKind, Project, Source, Track, DEFAULT_MARKER_COLOR,
 };
+use crate::outcome::Outcome;
 use crate::props_check::{color_ok, SCALE_MAX, SCALE_MIN};
 use crate::time::{self, Fps, Ticks};
 
@@ -197,11 +198,7 @@ impl Project {
     /// above it under the user. A name of only whitespace is treated as
     /// absent. `Err` for an index past the end, or (through `finish`) for
     /// exceeding the track cap.
-    pub fn add_track(
-        &self,
-        index: Option<usize>,
-        name: Option<&str>,
-    ) -> Result<Option<Project>, String> {
+    pub fn add_track(&self, index: Option<usize>, name: Option<&str>) -> Result<Outcome, String> {
         let at = match index {
             None => self.tracks.len(),
             Some(given) if given <= self.tracks.len() => given,
@@ -234,20 +231,20 @@ impl Project {
         self.finish(next)
     }
 
-    /// Removes a track. Refuses (`None`) on a track that still holds clips
-    /// unless `with_clips`, which removes those clips with it, and refuses
-    /// to remove the LAST track: a project always has somewhere to put a
-    /// clip, and an empty track stack is a UI with nothing to drop onto.
+    /// Removes a track. Refuses on a track that still holds clips unless
+    /// `with_clips`, which removes those clips with it, and refuses to
+    /// remove the LAST track: a project always has somewhere to put a clip,
+    /// and an empty track stack is a UI with nothing to drop onto.
     ///
     /// `Err` only for an unknown track.
-    pub fn remove_track(&self, track: u32, with_clips: bool) -> Result<Option<Project>, String> {
+    pub fn remove_track(&self, track: u32, with_clips: bool) -> Result<Outcome, String> {
         self.require_track(track)?;
         if self.tracks.len() <= 1 {
-            return Ok(None);
+            return Ok(Outcome::Identity);
         }
         let occupied = self.clips.iter().any(|c| c.track == track);
         if occupied && !with_clips {
-            return Ok(None);
+            return Ok(Outcome::Identity);
         }
 
         let mut next = self.clone();
@@ -262,7 +259,7 @@ impl Project {
     ///
     /// `Err` for an unknown track or an index past the end; `None` when the
     /// track is already there.
-    pub fn move_track(&self, track: u32, index: usize) -> Result<Option<Project>, String> {
+    pub fn move_track(&self, track: u32, index: usize) -> Result<Outcome, String> {
         let from = self.require_track_index(track)?;
         if index >= self.tracks.len() {
             return Err(format!(
@@ -271,7 +268,7 @@ impl Project {
             ));
         }
         if index == from {
-            return Ok(None);
+            return Ok(Outcome::Identity);
         }
 
         let mut next = self.clone();
@@ -294,7 +291,7 @@ impl Project {
         muted: Option<bool>,
         locked: Option<bool>,
         solo: Option<bool>,
-    ) -> Result<Option<Project>, String> {
+    ) -> Result<Outcome, String> {
         self.require_track(track)?;
         let mut next = self.clone();
         if let Some(found) = next.tracks.iter_mut().find(|t| t.id == track) {
@@ -323,7 +320,7 @@ impl Project {
     /// If that would empty the stack, the back-most track survives: it is
     /// the one a fresh project starts with, and keeping the bottom of the
     /// stack means the surviving track is where a drop lands.
-    pub fn remove_empty_tracks(&self) -> Result<Option<Project>, String> {
+    pub fn remove_empty_tracks(&self) -> Result<Outcome, String> {
         let mut next = self.clone();
         next.tracks
             .retain(|t| self.clips.iter().any(|c| c.track == t.id));
@@ -349,7 +346,7 @@ impl Project {
         name: Option<&str>,
         chapter: Option<bool>,
         color: Option<&str>,
-    ) -> Result<Option<Project>, String> {
+    ) -> Result<Outcome, String> {
         let at = self.snapped(at).max(0);
         if let Some(existing) = self.markers.iter().find(|m| m.time == at) {
             return Err(format!("marker {} is already at {at} ticks", existing.id));
@@ -388,7 +385,7 @@ impl Project {
         name: Option<&str>,
         chapter: Option<bool>,
         color: Option<&str>,
-    ) -> Result<Option<Project>, String> {
+    ) -> Result<Outcome, String> {
         self.require_marker(marker)?;
         let time = match time {
             None => None,
@@ -422,7 +419,7 @@ impl Project {
     }
 
     /// Removes a marker. `Err` only for an unknown id.
-    pub fn remove_marker(&self, marker: u32) -> Result<Option<Project>, String> {
+    pub fn remove_marker(&self, marker: u32) -> Result<Outcome, String> {
         self.require_marker(marker)?;
         let mut next = self.clone();
         next.markers.retain(|m| m.id != marker);
@@ -460,7 +457,7 @@ impl Project {
         rescale_clips: bool,
         fit_new_clips: Option<bool>,
         timecode_frames: Option<bool>,
-    ) -> Result<Option<Project>, String> {
+    ) -> Result<Outcome, String> {
         let width = match width {
             None => self.canvas.width,
             Some(given) => {
@@ -524,17 +521,17 @@ impl Project {
     /// a value; reading `next_id` first is how the caller learns the id it
     /// is about to be able to `add_clip` with.
     ///
-    /// Adding a file whose path is already in the list changes nothing
-    /// (`None`): two entries for one path would each carry their own
+    /// Adding a file whose path is already in the list changes nothing (an
+    /// identity): two entries for one path would each carry their own
     /// bookmark, thumbnails and peaks, and relinking one would leave the
-    /// other missing. The caller that gets `None` looks the path up to find
-    /// the id that is already there.
+    /// other missing. The caller that gets it looks the path up to find the
+    /// id that is already there.
     ///
     /// `Err` for a descriptor that is not an object, an unknown or `id`
     /// key, a value that does not match the schema, an empty path, a
     /// negative duration, or a media with pixels whose size or rate is not
     /// usable.
-    pub fn add_media(&self, descriptor: &Value) -> Result<Option<Project>, String> {
+    pub fn add_media(&self, descriptor: &Value) -> Result<Outcome, String> {
         let Value::Object(fields) = descriptor else {
             return Err(format!(
                 "a media descriptor must be a json object, not {}",
@@ -602,7 +599,7 @@ impl Project {
         }
 
         if self.media.iter().any(|m| m.path == path) {
-            return Ok(None);
+            return Ok(Outcome::Identity);
         }
 
         let mut next = self.clone();
@@ -629,7 +626,7 @@ impl Project {
         media: u32,
         path: &str,
         bookmark: Option<&str>,
-    ) -> Result<Option<Project>, String> {
+    ) -> Result<Outcome, String> {
         self.require_media(media)?;
         let path = path.trim();
         if path.is_empty() {
@@ -647,11 +644,11 @@ impl Project {
         self.finish(next)
     }
 
-    /// Removes a media entry. Refuses (`None`) while clips still show it
-    /// unless `with_clips`, which removes those clips with it (spec §6) —
-    /// the model has no "missing on purpose" state, and a clip pointing at
-    /// an id that is gone is what `validate` rejects.
-    pub fn remove_media(&self, media: u32, with_clips: bool) -> Result<Option<Project>, String> {
+    /// Removes a media entry. Refuses while clips still show it unless
+    /// `with_clips`, which removes those clips with it (spec §6) — the
+    /// model has no "missing on purpose" state, and a clip pointing at an
+    /// id that is gone is what `validate` rejects.
+    pub fn remove_media(&self, media: u32, with_clips: bool) -> Result<Outcome, String> {
         self.require_media(media)?;
         // A nest references the project's `media[]` like everything else
         // (spec §5.2, one id space), so a clip INSIDE one counts as usage
@@ -660,7 +657,7 @@ impl Project {
         // throw away everything else in the group over one file.
         let used = self.every_clip().any(|c| uses_media(c, media));
         if used && !with_clips {
-            return Ok(None);
+            return Ok(Outcome::Identity);
         }
 
         let mut next = self.clone();

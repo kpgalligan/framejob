@@ -38,6 +38,7 @@ use serde_json::Value;
 use crate::actions::{self, MAX_PATCH_DEPTH};
 use crate::export::describe;
 use crate::model::{Action, Curve, Project};
+use crate::outcome::Outcome;
 use crate::patch::{check_group_patch, unknown_key, Group};
 use crate::time::{Ticks, TIMESCALE};
 
@@ -138,15 +139,15 @@ impl Project {
     /// default, with an empty end patch, so it changes nothing until the
     /// inspector edits it (spec §6).
     ///
-    /// Refuses (`None`) when it would overlap another action on the clip or
-    /// run past the clip's end. `Err` on a negative start or a non-positive
+    /// Refuses when it would overlap another action on the clip or run past
+    /// the clip's end. `Err` on a negative start or a non-positive
     /// duration.
     pub fn add_action(
         &self,
         clip: u32,
         at: Ticks,
         duration: Option<Ticks>,
-    ) -> Result<Option<Project>, String> {
+    ) -> Result<Outcome, String> {
         let target = self.require_clip(clip)?.clone();
         let at = self.snapped(at);
         if at < 0 {
@@ -163,10 +164,10 @@ impl Project {
             }
         };
         if at.saturating_add(duration) > target.duration {
-            return Ok(None);
+            return Ok(Outcome::Identity);
         }
         if actions_overlap(&target.actions, None, at, duration) {
-            return Ok(None);
+            return Ok(Outcome::Identity);
         }
 
         let mut next = self.clone();
@@ -193,7 +194,7 @@ impl Project {
         start: Option<Ticks>,
         duration: Option<Ticks>,
         curve: Option<Curve>,
-    ) -> Result<Option<Project>, String> {
+    ) -> Result<Outcome, String> {
         let target = self.require_clip(clip)?.clone();
         let existing = target
             .actions
@@ -223,10 +224,10 @@ impl Project {
             }
         };
         if new_start.saturating_add(new_duration) > target.duration {
-            return Ok(None);
+            return Ok(Outcome::Identity);
         }
         if actions_overlap(&target.actions, Some(action), new_start, new_duration) {
-            return Ok(None);
+            return Ok(Outcome::Identity);
         }
 
         let mut next = self.clone();
@@ -265,12 +266,7 @@ impl Project {
     /// not a picture anybody asked for — and the evaluator would put the
     /// base value back anyway, leaving a control that reported success and
     /// did nothing.
-    pub fn set_action_end(
-        &self,
-        clip: u32,
-        action: u32,
-        patch: &Value,
-    ) -> Result<Option<Project>, String> {
+    pub fn set_action_end(&self, clip: u32, action: u32, patch: &Value) -> Result<Outcome, String> {
         let target = self.require_clip(clip)?;
         let existing = target
             .actions
@@ -307,7 +303,7 @@ impl Project {
     }
 
     /// Removes one action from a clip (spec §6).
-    pub fn remove_action(&self, clip: u32, action: u32) -> Result<Option<Project>, String> {
+    pub fn remove_action(&self, clip: u32, action: u32) -> Result<Outcome, String> {
         let target = self.require_clip(clip)?;
         if !target.actions.iter().any(|a| a.id == action) {
             return Err(format!("no action with id {action} on clip {clip}"));

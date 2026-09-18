@@ -7,16 +7,23 @@
 //! through `rc_project_free`, and turning the header's three-way answer
 //! into a Rust value a test can match on.
 //!
-//! That three-way answer is the reason [`Handle::try_apply`] exists and is
-//! worth reading before writing a test (spec §5.5, and the doc comment on
+//! That answer is the reason [`Handle::try_apply`] exists and is worth
+//! reading before writing a test (spec §5.5, and the doc comment on
 //! `rc_project_apply`):
 //!
-//! - a new handle — the edit changed something;
-//! - NULL with `err_out` UNTOUCHED — the op is valid but changes nothing
-//!   (an identity edit or a documented refusal); the app registers no undo
-//!   step. Here: `Ok(None)`, asserted with [`Handle::refuses`].
+//! - a new handle — the edit changed something. Here:
+//!   `Ok(Outcome::Applied)`, asserted with [`Handle::apply`].
+//! - NULL with NEITHER message channel written — the op is valid and
+//!   nothing needed to change. Here: `Ok(Outcome::Identity)`.
+//! - NULL with `reason_out` SET — a rule refused the op, in its own words.
+//!   Here: `Ok(Outcome::Refused)`, asserted with [`Handle::refuses_with`].
 //! - NULL with `err_out` SET — the op or an argument is invalid. Here:
 //!   `Err(message)`, asserted with [`Handle::errors`].
+//!
+//! The two middle answers are the two that register NO undo step, and
+//! [`Handle::refuses`] is the assertion for exactly that much — it is what
+//! the suite's ninety-odd "this op changes nothing" call sites mean, and it
+//! accepts either of them.
 //!
 //! Add to this file rather than re-deriving a helper inside a test: a
 //! second copy of the pointer dance is a second place for a leak to hide.
@@ -116,6 +123,26 @@ impl OpText for Value {
 }
 
 // ---- project handles -----------------------------------------------------
+
+/// The three answers an op gives (spec §5.5), as a test sees them through
+/// `rc_project_apply` — the mirror of the core's own `Outcome`, with a
+/// [`Handle`] where the core has a project.
+///
+/// The fourth answer, "the request itself could not be read", is not an arm:
+/// it is the `Err` of [`Handle::try_apply`]'s `Result`, so a test that only
+/// cares whether an op was valid can still use `?` and read the message.
+#[derive(Debug)]
+pub enum Outcome {
+    /// A new handle: the op changed the project, and the app pushes an undo
+    /// step.
+    Applied(Handle),
+    /// Neither channel written: the op was valid and nothing needed to
+    /// change. No undo step, and nothing to explain.
+    Identity,
+    /// `reason_out` written: a rule refused the op, in this sentence. No
+    /// undo step either, and the project is exactly as it was.
+    Refused(String),
+}
 
 /// An owned `RcProject` handle: the same opaque, immutable pointer the app
 /// holds, freed on drop so a failing test cannot leak a project.
@@ -236,29 +263,47 @@ impl Handle {
         unsafe { rc_project_duration(self.ptr) }
     }
 
-    /// Applies one op the header's way, mapping the three answers onto
-    /// `Ok(Some)` / `Ok(None)` / `Err` (see this module's doc).
-    pub fn try_apply(&self, op: &(impl OpText + ?Sized)) -> Result<Option<Handle>, String> {
+    /// Applies one op the header's way, mapping its four answers onto
+    /// [`Outcome`] and this `Result`'s `Err` (see this module's doc).
+    ///
+    /// It is also where the header's invariants are asserted once for the
+    /// whole suite: a handle never comes back with a message on either
+    /// channel, and the two channels are never both written. A test that
+    /// reads an answer through any other route is reading past them.
+    pub fn try_apply(&self, op: &(impl OpText + ?Sized)) -> Result<Outcome, String> {
         let text = cstring(&op.op_text());
         let mut err: *mut c_char = ptr::null_mut();
-        let next = unsafe { rc_project_apply(self.ptr, text.as_ptr(), &mut err) };
-        match (next.is_null(), take_string(err)) {
-            (true, Some(msg)) => Err(msg),
-            (true, None) => Ok(None),
-            (false, None) => Ok(Some(Handle { ptr: next })),
-            (false, Some(msg)) => {
-                unsafe { rc_project_free(next) };
-                panic!("rc_project_apply returned a handle AND the error {msg:?}")
-            }
+        let mut reason: *mut c_char = ptr::null_mut();
+        let next = unsafe { rc_project_apply(self.ptr, text.as_ptr(), &mut err, &mut reason) };
+        // Taken before anything can panic, so neither string leaks and the
+        // handle is owned by a `Handle` that frees it on the way out.
+        let handle = (!next.is_null()).then(|| Handle { ptr: next });
+        let err = take_string(err);
+        let reason = take_string(reason);
+        match (&handle, &err, &reason) {
+            (Some(_), None, None) => Ok(Outcome::Applied(handle.expect("just matched"))),
+            (None, None, None) => Ok(Outcome::Identity),
+            (None, None, Some(_)) => Ok(Outcome::Refused(reason.expect("just matched"))),
+            (None, Some(_), None) => Err(err.expect("just matched")),
+            (handle, err, reason) => panic!(
+                "rc_project_apply broke the header's contract — handle: {}, \
+                 err_out: {err:?}, reason_out: {reason:?}\n{}",
+                handle.is_some(),
+                op.op_text()
+            ),
         }
     }
 
     /// Applies an op that MUST change something.
     pub fn apply(&self, op: &(impl OpText + ?Sized)) -> Handle {
         match self.try_apply(op) {
-            Ok(Some(next)) => next,
-            Ok(None) => panic!(
+            Ok(Outcome::Applied(next)) => next,
+            Ok(Outcome::Identity) => panic!(
                 "this op was expected to change the project, but it changed nothing: {}",
+                op.op_text()
+            ),
+            Ok(Outcome::Refused(why)) => panic!(
+                "this op was expected to change the project, but a rule refused it: {why}\n{}",
                 op.op_text()
             ),
             Err(msg) => panic!(
@@ -277,12 +322,17 @@ impl Handle {
         current
     }
 
-    /// Asserts the op is VALID but changes nothing — NULL with `err_out`
-    /// untouched, the answer that must register no undo step.
+    /// Asserts the op is VALID and leaves the project alone — NULL with no
+    /// error, the answer that must register no undo step. Either arm that
+    /// does that passes: an identity and a refusal are the same thing to the
+    /// undo stack, which is what this assertion is about.
+    ///
+    /// To pin WHICH of the two, and in what words, use
+    /// [`Handle::refuses_with`].
     pub fn refuses(&self, op: &(impl OpText + ?Sized)) {
         match self.try_apply(op) {
-            Ok(None) => {}
-            Ok(Some(_)) => panic!(
+            Ok(Outcome::Identity) | Ok(Outcome::Refused(_)) => {}
+            Ok(Outcome::Applied(_)) => panic!(
                 "this op was expected to change nothing, but it applied: {}",
                 op.op_text()
             ),
@@ -293,17 +343,54 @@ impl Handle {
         }
     }
 
+    /// Asserts a RULE refused the op, in exactly these words.
+    ///
+    /// The WHOLE sentence, never a keyword: what a caller gets out of a
+    /// refusal is the ids and the numbers in it, and a `contains` check
+    /// passes on a sentence that has lost exactly those. An identity fails
+    /// here on purpose — "nothing needed to change" is a different answer
+    /// from "a rule said no", and telling them apart is what the refusal
+    /// channel is for.
+    pub fn refuses_with(&self, op: &(impl OpText + ?Sized), reason: &str) {
+        match self.try_apply(op) {
+            Ok(Outcome::Refused(why)) => assert_eq!(
+                why,
+                reason,
+                "the rule refused this op in other words than expected: {}",
+                op.op_text()
+            ),
+            Ok(Outcome::Identity) => panic!(
+                "this op was expected to be refused with a reason, but it was an \
+                 identity — no rule spoke: {}",
+                op.op_text()
+            ),
+            Ok(Outcome::Applied(_)) => panic!(
+                "this op was expected to be refused, but it applied: {}",
+                op.op_text()
+            ),
+            Err(msg) => panic!(
+                "this op was expected to be refused by a rule, but the request \
+                 itself was invalid: {msg}\n{}",
+                op.op_text()
+            ),
+        }
+    }
+
     /// Asserts the op is INVALID and returns the message, for the caller to
     /// check names the offending value.
     pub fn errors(&self, op: &(impl OpText + ?Sized)) -> String {
         match self.try_apply(op) {
             Err(msg) => msg,
-            Ok(Some(_)) => panic!(
+            Ok(Outcome::Applied(_)) => panic!(
                 "this op was expected to error, but it applied: {}",
                 op.op_text()
             ),
-            Ok(None) => panic!(
+            Ok(Outcome::Identity) => panic!(
                 "this op was expected to error, but it only changed nothing: {}",
+                op.op_text()
+            ),
+            Ok(Outcome::Refused(why)) => panic!(
+                "this op was expected to error, but a rule refused it instead: {why}\n{}",
                 op.op_text()
             ),
         }

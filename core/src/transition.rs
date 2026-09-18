@@ -268,8 +268,10 @@ impl Project {
     /// timeline track) depends on it holding everywhere.
     ///
     /// `Ok(())` or an `Err` naming the first violation, which the calling
-    /// op turns into a refusal (`None` at the FFI, an animate-back in the
-    /// UI).
+    /// op hands straight on as its refusal — `Outcome::Refused` carrying
+    /// THIS sentence, `reason_out` at the FFI, an animate-back in the UI.
+    /// The rule is therefore written once: the clip ids and the tick counts
+    /// a caller acts on are the ones computed here.
     pub fn check_overlap_rule(
         &self,
         candidates: &[Clip],
