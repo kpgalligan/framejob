@@ -337,7 +337,8 @@ def main():
         got = schemas.get(op, {}).get("properties", {}).get(argument) or {}
         inner = (got.get("items") or {}) if is_list else got
         members = inner.get("enum")
-        check(f"{label} — {op}.{argument} is a string with a non-empty enum",
+        shape = "a list of strings" if is_list else "a string"
+        check(f"{label} — {op}.{argument} is {shape} with a non-empty enum",
               got.get("type") == ("array" if is_list else "string")
               and inner.get("type") == "string"
               and isinstance(members, list) and len(members) > 0
