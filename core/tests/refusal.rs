@@ -337,6 +337,14 @@ fn a_track_that_still_holds_clips_names_them_and_the_way_on() {
     // The way on works, which is what makes the sentence advice rather
     // than decoration.
     project.apply(&json!({"op": "remove_track", "track": 5, "with_clips": true}));
+    // One clip is the singular form of the same sentence — the arm of
+    // `clip_list` that says "clip", not "clips".
+    let one_left = project.apply(&json!({"op": "delete", "clips": [11]}));
+    one_left.refuses_with(
+        &json!({"op": "remove_track", "track": 4}),
+        "track 4 still holds clip 10; pass with_clips: true to remove the track and \
+         its clips",
+    );
 }
 
 #[test]
@@ -380,6 +388,14 @@ fn a_media_a_clip_still_shows_names_the_clips_and_the_way_on() {
         &json!({"op": "remove_media", "media": 3}),
         "media 3 is still used by clips 15 and 16; pass with_clips: true to remove the \
          media and its clips",
+    );
+    // Three is the longest list that is still a list: at four the tail
+    // becomes a count, above.
+    let three = project.apply(&json!({"op": "delete", "clips": [22]}));
+    three.refuses_with(
+        &json!({"op": "remove_media", "media": 7}),
+        "media 7 is still used by clips 17, 18 and 19; pass with_clips: true to remove \
+         the media and its clips",
     );
     // Media 2 is shown by nothing: no rule to break, so the op applies.
     project.apply(&json!({"op": "remove_media", "media": 2}));
@@ -443,8 +459,8 @@ fn a_pair_too_short_to_halve_says_so_rather_than_naming_the_rule() {
     // overlap rule.
     project.refuses_with(
         &json!({"op": "add_transition", "clip": 22, "duration": 1, "ripple": true}),
-        "clips 19 and 22 have no room to overlap by shifting: 1 frames were asked for and \
-         half of the shorter clip is 0 frames",
+        "clips 19 and 22 have no room to overlap by shifting: the overlap asked for is 1 \
+         frames and half of the shorter clip is 0 frames",
     );
 }
 
@@ -481,12 +497,12 @@ fn an_action_that_would_run_past_the_clip_names_both_ends() {
     // 1100: the sentence names the end it wanted and the end it has.
     project.refuses_with(
         &json!({"op": "add_action", "clip": 10, "at": 900, "duration": 200}),
-        "an action at 900 ticks for 200 would end at 1100, past clip 10's own end at 1000 \
+        "an action of 200 ticks at 900 would end at 1100, past clip 10's own end at 1000 \
          ticks",
     );
     project.refuses_with(
         &json!({"op": "set_action", "clip": 10, "action": 20, "duration": 1200}),
-        "an action at 0 ticks for 1200 would end at 1200, past clip 10's own end at 1000 \
+        "an action of 1200 ticks at 0 would end at 1200, past clip 10's own end at 1000 \
          ticks",
     );
     // The boundary: an action that ends exactly at the clip's end is fine.

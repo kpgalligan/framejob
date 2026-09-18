@@ -73,17 +73,19 @@ fn uses_media(clip: &Clip, media: u32) -> bool {
 /// ids are listed and the rest are a count: a media used by two hundred
 /// clips would otherwise answer with a sentence nothing could read, and the
 /// first three plus the total is everything the caller acts on.
+/// Both callers ask only when they have at least one, and the empty arm is
+/// here anyway: `split_last` rather than `some[..len - 1]`, because the
+/// index form underflows on an empty slice and the crate's rule is that no
+/// input may panic (`core/CLAUDE.md`, Errors). A third caller that forgets
+/// the guard gets a poor sentence rather than a caught panic.
 fn clip_list(ids: &[u32]) -> String {
     let named: Vec<String> = ids.iter().take(3).map(|id| id.to_string()).collect();
     let rest = ids.len().saturating_sub(named.len());
-    match (named.as_slice(), rest) {
-        ([one], 0) => format!("clip {one}"),
-        (some, 0) => format!(
-            "clips {} and {}",
-            some[..some.len() - 1].join(", "),
-            some[some.len() - 1]
-        ),
-        (some, more) => format!("clips {} and {more} more", some.join(", ")),
+    match (named.split_last(), rest) {
+        (None, _) => "no clips".to_string(),
+        (Some((last, [])), 0) => format!("clip {last}"),
+        (Some((last, front)), 0) => format!("clips {} and {last}", front.join(", ")),
+        (Some(_), more) => format!("clips {} and {more} more", named.join(", ")),
     }
 }
 

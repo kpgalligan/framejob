@@ -2207,8 +2207,8 @@ files came down or held. Three things are named rather than done:
 
 ### 5.3 D2·3 — the remaining rules speak (kpgalligan/reelcut#11)
 
-**Commits.** `1f8cf38` (the size toll, alone and pure) and `c9875f3` (the
-ticket).
+**Commits.** `1f8cf38` (the size toll, alone and pure), `a531fb0` (the
+ticket) and `SHA3` (what its review found, below).
 
 **What landed.** Core only, plus the tests and the proof that measure it and
 four app comments the change made false. No FFI change, no new export, no op
@@ -2225,10 +2225,10 @@ beeps and still leaves the undo stack alone.
 | a track that still holds clips | `edit_track::remove_track` | `track 5 still holds clips 12 and 13; pass with_clips: true to remove the track and its clips` |
 | a media row a clip still shows | `edit_track::remove_media` | `media 1 is still used by clips 10, 11, 12 and 1 more; pass with_clips: true to remove the media and its clips` |
 | a cut with nothing left to give | `edit_transition::add_transition` | `the cut before clip 16 has no room for an overlap: the 100 frames asked for clamp to nothing against the two clips' unused material, their neighbours and the overlap rule; pass ripple: true to make the overlap by shifting the timeline left instead` |
-| a rippled cut with nowhere to shift | `edit_transition::add_transition_by_shift` | `clips 19 and 22 have no room to overlap by shifting: 1 frames were asked for and half of the shorter clip is 0 frames` · `clips 15 and 16 cannot overlap by shifting: no overlap from 1000 frames down to one leaves every track the shift moves inside the overlap rule` |
+| a rippled cut with nowhere to shift | `edit_transition::add_transition_by_shift` | `clips 19 and 22 have no room to overlap by shifting: the overlap asked for is 1 frames and half of the shorter clip is 0 frames` · `clips 15 and 16 cannot overlap by shifting: no overlap from 1000 frames down to one leaves every track the shift moves inside the overlap rule` |
 | an action that would overlap another | `edit_action`, one function for `add_action` and `set_action` | `action 20 on clip 10 already runs from 0 to 400 ticks, and two actions on one clip may not overlap` |
-| an action past its clip | the same pair | `an action at 900 ticks for 200 would end at 1100, past clip 10's own end at 1000 ticks` |
-| a move off the track stack | `edit_clip::move_clips` | `clip 12 would land on track index 5, which is out of range (0..5)` |
+| an action past its clip | the same pair | `an action of 200 ticks at 900 would end at 1100, past clip 10's own end at 1000 ticks` |
+| a move off the track stack | `edit_clip::move_clips` | `clip 17 would land on track index 5, which is out of range (0..5)` |
 
 Four things about that table are decisions, not accidents:
 
@@ -2264,7 +2264,12 @@ spec's list (#8, decision 3), and paying `edit_clip.rs`'s toll to add them
 would be a second pure move in a ticket that already made one. The family is
 named in `Outcome::Identity`'s doc as where a next ticket starts.
 
-**Four of the rules cannot be heard over MCP, and that is D2·4's.** An
+**The ticket's first criterion is met through the FFI for every rule and
+over MCP for five of them.** Said plainly, because the review said it
+plainly: of the ticket's five named rules, a locked track, the last track
+and the action rule arrive over MCP in the core's words; **a media row a
+clip still shows and a cut with nothing left to give do not**, and neither
+does the locked-track rule's third caller. An
 app-side guard asks the same question one step earlier and answers in its
 own words: `AgentServer+Media.swift`'s and `AgentServer+Tracks.swift`'s
 `with_clips` guards, and `AgentServer+Transitions.swift`'s trial-apply,
@@ -2331,8 +2336,10 @@ under the 400-line new-file cap) — the cut `core/CLAUDE.md` had already
 named, not one line of logic changed. `edit_track.rs` 671 → 473 → **520**
 with the ticket, off the over-cap list for the first time.
 
-`edit_clip.rs` is over the cap with no named seam, so its +5 lines were paid
-for INSIDE the file, the way D2·1's and D2·2's reviews set the precedent:
+`edit_clip.rs` is over the cap with no named seam, so the five lines its
+refusal added were paid for INSIDE the file — fifteen added against fifteen
+deleted, a net nothing — the way D2·1's and D2·2's reviews set the
+precedent:
 `split_under_playhead` was a second copy of `split_clips`'s loop and now
 CALLS it, which the crate's own "one implementation per algorithm" rule
 wanted anyway. The file is **1028**, exactly where it started. Nothing else
@@ -2373,3 +2380,63 @@ glossary, spec §5.5 and both rulebooks' Errors rules are D2·5's.
 - **`designs/reelcut-remaining.md` §3's table** still lists
   `core/src/edit_track.rs` at 674 and `core/src/edit_clip.rs` at 1042. D2·5
   regenerates it against the tree; `edit_track.rs` comes off it.
+
+**What its review found.** The two-axis review ran against `a531fb0`. The
+standards axis found no hard violation of a documented standard; both axes
+found real things. Fixed in `SHA3`:
+
+- **A latent panic in `clip_list`.** `some[..some.len() - 1]` underflows on
+  an empty slice, which `core/CLAUDE.md`'s "no input may panic" forbids
+  however unreachable it is today. It is `split_last` now, with the empty
+  arm written out, and the tests gained the two counts that were untested:
+  ONE clip (the singular arm) and THREE (the longest list that is still a
+  list). Found twice, once by the adversarial read-back this repo's recipe
+  asks for and once by the standards axis.
+- **The record named a commit that is not on the branch** (`c9875f3`, from
+  an amend), and claimed `edit_clip.rs` grew by five lines where the diff is
+  fifteen added against fifteen deleted. Exactly the slip D2·2's record had
+  to fix, made the same way.
+- **The "verbatim" table was not verbatim.** It quoted `clip 12 would land
+  on track index 5` where the code and the test say `clip 17`. In a table
+  the next two tickets are told to quote from, a wrong id is the whole
+  defect.
+- **`actions_overlap` read as a predicate** after it was changed to answer
+  the offending action; it is `overlapping_action`, and its doc says what it
+  answers rather than what it tests.
+- **`phase1_proof.py`'s new `refused_with` was weaker than its docstring** —
+  it promised the whole sentence and matched the tail alone, which is the
+  finding D2·2's review made about `refused()` one ticket earlier. It pins
+  `was refused at <op>: <sentence>` now, the same bar `refusal_proof.py`
+  holds.
+- **Two sentences read badly to the caller they are for.** "1 frames were
+  asked for" is now "the overlap asked for is 1 frames" (the crate does not
+  pluralise a unit — "500 ticks" — but the verb can agree with the noun),
+  and "an action at 900 ticks for 200" is "an action of 200 ticks at 900",
+  so both numbers carry their unit.
+- **A comment claimed a sentence names the number the caller sent.** It
+  names the request in whole FRAMES, which is the unit every clamp above it
+  is measured in; the comment says so.
+- **The module map was not updated for two shared helpers.**
+  `core/CLAUDE.md`'s `edit_time.rs` entry names `locked_track` and its three
+  callers, and its `edit_track.rs` entry names `clip_list`.
+
+Judged not real:
+
+- *Three rules beyond the spec's list are scope creep.* Two are siblings in
+  the same `if` chain of the same op as a rule the ticket named, where
+  silence on one of two would re-create the ambiguity inside one function;
+  the third is a site whose own comment had called it a refusal for as long
+  as it has existed. All three are argued above and named in the record,
+  which is what decision 3's "only refusals that already have a reason" is
+  protecting.
+- *`split_under_playhead` rewritten to call `split_clips` is unasked.* It is
+  the size toll, which the cap rule requires a file at the cap to pay before
+  it takes anything on, and it is the crate's own "one implementation per
+  algorithm" rule applied to a second copy of one loop. Behaviour-preserving,
+  and both reviews verified that independently.
+- *AC1 is unmet for two of the five rules.* Agreed and not fixed here: the
+  shadows are `AgentServer`'s, deleting them is #12's whole subject, and
+  #12's own criterion is that this proof asserts the core's wording at those
+  ops. Doing it here would change the sentences `phase8_proof.py` asserts,
+  which is the other half of that ticket. Stated above rather than papered
+  over, and measured by mutant 7.

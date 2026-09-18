@@ -46,11 +46,12 @@ use crate::time::{Ticks, TIMESCALE};
 /// the Actions table offers before the user drags either edge.
 const DEFAULT_ACTION_DURATION: Ticks = TIMESCALE;
 
-/// Whether `[start, start+duration)` touches any action on the clip other
-/// than `skip` (the action being edited). Actions on a clip may not overlap
-/// (spec §5.4); this is the test both `add_action` and `set_action` refuse
-/// on.
-fn actions_overlap(
+/// The action on the clip, other than `skip` (the one being edited), that
+/// `[start, start+duration)` runs into — `None` when the span is free.
+/// Actions on a clip may not overlap (spec §5.4); this is the question both
+/// `add_action` and `set_action` refuse on, and it answers the offender
+/// rather than a yes, because the refusal names it.
+fn overlapping_action(
     actions: &[Action],
     skip: Option<u32>,
     start: Ticks,
@@ -80,7 +81,7 @@ fn action_overlaps(clip: u32, other: &Action) -> String {
 
 fn action_past_end(clip: u32, start: Ticks, duration: Ticks, length: Ticks) -> String {
     format!(
-        "an action at {start} ticks for {duration} would end at {}, past clip {clip}'s own \
+        "an action of {duration} ticks at {start} would end at {}, past clip {clip}'s own \
          end at {length} ticks",
         start.saturating_add(duration)
     )
@@ -200,7 +201,7 @@ impl Project {
                 target.duration,
             )));
         }
-        if let Some(other) = actions_overlap(&target.actions, None, at, duration) {
+        if let Some(other) = overlapping_action(&target.actions, None, at, duration) {
             return Ok(Outcome::Refused(action_overlaps(clip, other)));
         }
 
@@ -265,7 +266,8 @@ impl Project {
                 target.duration,
             )));
         }
-        if let Some(other) = actions_overlap(&target.actions, Some(action), new_start, new_duration)
+        if let Some(other) =
+            overlapping_action(&target.actions, Some(action), new_start, new_duration)
         {
             return Ok(Outcome::Refused(action_overlaps(clip, other)));
         }

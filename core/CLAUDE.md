@@ -112,7 +112,10 @@ file is what governs a module now.
   would break dragging one stop past another mid-gesture, so the renderer
   sorts, and the comment says so where the check would have gone.
 - `edit_track.rs` — tracks, markers and the media list: the three lists a
-  clip sits in. The canvas left here at road map 7's D2·3 toll.
+  clip sits in. The canvas left here at road map 7's D2·3 toll. `clip_list`
+  is the ONE spelling of the clips a `with_clips` refusal names — three ids
+  and then a count, so a media used by two hundred clips still answers a
+  sentence a caller can read — shared by `remove_track` and `remove_media`.
 - `edit_canvas.rs` — the document's own shape: `set_canvas` and the three
   things it does to the rest of the document — `check_dimension` (a
   dimension is even, because H.264 encodes in macroblocks), `rescale` (a
@@ -124,7 +127,10 @@ file is what governs a module now.
   ordered, MERGED — touching as well as overlapping — then cut and closed
   right to left as ONE edit; the singular delegates to it), `lift_range`
   (the hole left open), `close_gap` (refuses rather than closing part way),
-  freeze frame, and `shift_clips`.
+  freeze frame, `shift_clips`, and `locked_track` — THE locked-track
+  refusal's sentence, written once here for its three callers
+  (`close_gap`, `edit_insert.rs`'s `insert_clip`, `edit_transition.rs`'s
+  rippled form), each passing the clause after the comma.
 - `edit_edge.rs` · `edit_insert.rs` — the cutting moves that keep something
   fixed on purpose: `slip` and `roll` (a `still` slips the frame it holds;
   any other non-media source is an `Err`; roll's predecessor must end

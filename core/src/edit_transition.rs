@@ -319,8 +319,10 @@ impl Project {
                 // Three clamps can land here — the two handles, the
                 // neighbours on the track, and the step-down below — so the
                 // sentence names all three rather than guessing which one
-                // it was, and names the number the caller sent, which is
-                // the one it would change.
+                // it was. The number in it is the request in whole FRAMES
+                // (`requested`, the caller's ticks divided by the grid),
+                // which is the unit every clamp above is measured in and
+                // the one a caller has to change.
                 return Ok(Outcome::Refused(format!(
                     "the cut before clip {clip} has no room for an overlap: the {requested} \
                      frames asked for clamp to nothing against the two clips' unused \
@@ -426,8 +428,8 @@ impl Project {
         let mut frames = asked.min(allowed);
         if frames <= 0 {
             return Ok(Outcome::Refused(format!(
-                "clips {} and {} have no room to overlap by shifting: {asked} frames were \
-                 asked for and half of the shorter clip is {allowed} frames",
+                "clips {} and {} have no room to overlap by shifting: the overlap asked \
+                 for is {asked} frames and half of the shorter clip is {allowed} frames",
                 earlier.id, later.id
             )));
         }

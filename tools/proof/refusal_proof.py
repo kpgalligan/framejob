@@ -754,12 +754,12 @@ def the_action_rules(mcp):
     print("\n8d — an action that would run past the clip's own end, at both ops")
     refused(s, "add_action", "add_action",
             "an action whose span would end past the clip",
-            f"an action at {9 * SEC} ticks for {2 * SEC} would end at {11 * SEC}, past "
+            f"an action of {2 * SEC} ticks at {9 * SEC} would end at {11 * SEC}, past "
             f"clip {clip}'s own end at {10 * SEC} ticks",
             clip=clip, at=9 * SEC, duration=2 * SEC)
     refused(s, "set_action", "set_action",
             "…and the same when an existing action is stretched past it",
-            f"an action at 0 ticks for {12 * SEC} would end at {12 * SEC}, past clip "
+            f"an action of {12 * SEC} ticks at 0 would end at {12 * SEC}, past clip "
             f"{clip}'s own end at {10 * SEC} ticks",
             clip=clip, action=first, duration=12 * SEC)
 

@@ -86,16 +86,21 @@ class Session:
     def refused_with(self, tool, tail, **kwargs):
         """A RULE'S refusal, which since deepening D2·3 arrives in the rule's
         own words rather than as the identity's sentence
-        (`designs/reelcut-roadmap-7.md` §5.3). The WHOLE sentence is
-        compared, never a keyword: what a caller acts on is the ids and the
-        numbers in it, and a `contains` check passes on a sentence that has
-        lost exactly those."""
+        (`designs/reelcut-roadmap-7.md` §5.3).
+
+        The reply must END in `was refused at <op>: <the whole sentence>`,
+        which is `refusal_proof.py`'s own bar: the sentence entire, ids and
+        numbers included, never a keyword — a `contains` check passes on a
+        sentence that has lost exactly the part a caller reads — and the op
+        named, since a call may carry several. The identity's phrase must be
+        absent, because that is what this answer used to be."""
         try:
             self.op(tool, **kwargs)
             return False
         except ToolError as error:
             message = " ".join(str(error).split())
-            return message.endswith(tail) and "made no change" not in message
+            return (message.endswith(f"was refused at {tool}: {tail}")
+                    and "made no change" not in message)
 
 
 def placement(clips, clip):
