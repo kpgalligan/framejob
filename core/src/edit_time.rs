@@ -63,6 +63,17 @@ fn union(mut spans: Vec<Span>) -> Vec<Span> {
     out
 }
 
+/// THE locked-track refusal, written once (spec §5.5, deepening D2·3).
+///
+/// Three ops refuse over a lock — `close_gap` and `insert_clip` on their
+/// destination track, `add_transition`'s ripple form on the incoming clip's
+/// track — and each has its own consequence to report, so `what` is the
+/// clause after the comma. What every caller acts on is the same: the id of
+/// the track to unlock.
+pub(crate) fn locked_track(track: u32, what: &str) -> String {
+    format!("track {track} is locked, so {what}")
+}
+
 /// The ids of every track a timeline-wide shift may touch.
 pub(crate) fn unlocked_tracks(project: &Project) -> Vec<u32> {
     project
@@ -322,10 +333,10 @@ impl Project {
     ///
     /// The shift is the ripple's, timeline-wide over unlocked tracks with
     /// straddlers staying put, so the material that follows the gap keeps
-    /// its relative timing on every track. **A locked `track` refuses**:
-    /// its own clips are the ones that would not move, and closing a gap by
-    /// shifting everything except the track the gap is on is not what
-    /// anyone asked for.
+    /// its relative timing on every track. **A locked `track` refuses in
+    /// [`locked_track`]'s words**: its own clips are the ones that would not
+    /// move, and closing a gap by shifting everything except the track the
+    /// gap is on is not what anyone asked for.
     ///
     /// **Refuses when the shift would break the overlap rule** anywhere it
     /// moved something, rather than closing as far as it can. A gap closes
@@ -338,7 +349,10 @@ impl Project {
     /// `Err` for an unknown track.
     pub fn close_gap(&self, track: u32, at: Ticks) -> Result<Outcome, String> {
         if self.require_track(track)?.locked {
-            return Ok(Outcome::Identity);
+            return Ok(Outcome::Refused(locked_track(
+                track,
+                "the gap on it cannot be closed",
+            )));
         }
         let at = self.snapped(at).max(0);
         let ordered = self.clips_on_track(track);

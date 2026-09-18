@@ -548,13 +548,18 @@ impl Project {
                 let from = self.require_track_index(clip.track)? as i64;
                 let to = from.saturating_add(index_delta);
                 // A selection dragged off either end of the track list is a
-                // refusal, not a clamp: clamping would silently stack two
-                // clips on one track.
+                // refusal and not a clamp — clamping would silently stack
+                // two clips on one track — and it says so in `move_track`'s
+                // own words for the same mistake.
                 let Some(destination) = usize::try_from(to)
                     .ok()
                     .and_then(|index| self.tracks.get(index))
                 else {
-                    return Ok(Outcome::Identity);
+                    return Ok(Outcome::Refused(format!(
+                        "clip {} would land on track index {to}, which is out of range (0..{})",
+                        clip.id,
+                        self.tracks.len()
+                    )));
                 };
                 moved.track = destination.id;
             }
@@ -747,6 +752,12 @@ impl Project {
 
     /// Cuts every clip on an UNLOCKED track that `at` falls strictly inside
     /// — ⌘K with no selection (spec §6, §9).
+    ///
+    /// The SELECTION is all this op computes; the cutting is
+    /// [`Project::split_clips`]'s, called rather than copied, so the two
+    /// spellings of ⌘K cannot answer differently. An empty selection is its
+    /// identity, which is the same answer a list of clips none of which
+    /// straddles `at` gets there.
     pub fn split_under_playhead(&self, at: Ticks) -> Result<Outcome, String> {
         let at = self.snapped(at);
         let ids: Vec<u32> = self
@@ -756,18 +767,7 @@ impl Project {
             .filter(|c| c.start < at && at < clip_end(c))
             .map(|c| c.id)
             .collect();
-        if ids.is_empty() {
-            return Ok(Outcome::Identity);
-        }
-        let mut next = self.clone();
-        let mut cut = false;
-        for id in ids {
-            cut |= split_clip(&mut next, id, at);
-        }
-        if !cut {
-            return Ok(Outcome::Identity);
-        }
-        self.finish(next)
+        self.split_clips(&ids, at)
     }
 
     /// Removes the named clips. Gaps stay — rippling is `edit_time`'s job

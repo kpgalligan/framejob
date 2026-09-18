@@ -2204,3 +2204,172 @@ files came down or held. Three things are named rather than done:
   `addMedia`, a handful more) where it is describing the core's old spelling.
   Only the comments this ticket made FALSE were fixed; the sweep is D2·5's,
   with spec §6, the glossary and `app/CLAUDE.md`'s Rules.
+
+### 5.3 D2·3 — the remaining rules speak (kpgalligan/reelcut#11)
+
+**Commits.** `1f8cf38` (the size toll, alone and pure) and `c9875f3` (the
+ticket).
+
+**What landed.** Core only, plus the tests and the proof that measure it and
+four app comments the change made false. No FFI change, no new export, no op
+added or reworded in any of the four mirrors, no format bump, no new tool,
+and nothing a person at the machine sees differently: a refused edit still
+beeps and still leaves the undo stack alone.
+
+**The sentences, verbatim**, because #12 and #13 quote them:
+
+| Rule | Where | The sentence |
+|---|---|---|
+| a locked track | `edit_time::locked_track`, one function for three callers | `track 5 is locked, so the gap on it cannot be closed` · `…so an insert cannot open room on it` · `…so clip 13 cannot be shifted left to make the overlap` |
+| the last track | `edit_track::remove_track` | `track 4 is the only track left, and a project must always have one` |
+| a track that still holds clips | `edit_track::remove_track` | `track 5 still holds clips 12 and 13; pass with_clips: true to remove the track and its clips` |
+| a media row a clip still shows | `edit_track::remove_media` | `media 1 is still used by clips 10, 11, 12 and 1 more; pass with_clips: true to remove the media and its clips` |
+| a cut with nothing left to give | `edit_transition::add_transition` | `the cut before clip 16 has no room for an overlap: the 100 frames asked for clamp to nothing against the two clips' unused material, their neighbours and the overlap rule; pass ripple: true to make the overlap by shifting the timeline left instead` |
+| a rippled cut with nowhere to shift | `edit_transition::add_transition_by_shift` | `clips 19 and 22 have no room to overlap by shifting: 1 frames were asked for and half of the shorter clip is 0 frames` · `clips 15 and 16 cannot overlap by shifting: no overlap from 1000 frames down to one leaves every track the shift moves inside the overlap rule` |
+| an action that would overlap another | `edit_action`, one function for `add_action` and `set_action` | `action 20 on clip 10 already runs from 0 to 400 ticks, and two actions on one clip may not overlap` |
+| an action past its clip | the same pair | `an action at 900 ticks for 200 would end at 1100, past clip 10's own end at 1000 ticks` |
+| a move off the track stack | `edit_clip::move_clips` | `clip 12 would land on track index 5, which is out of range (0..5)` |
+
+Four things about that table are decisions, not accidents:
+
+- **A rule with more than one site writes its sentence once.** Three ops
+  refuse over a lock and pass a clause to `locked_track`; two ops ask the
+  same two questions of an action and call the same two writers; two ops are
+  the way past a `with_clips` refusal and both name their clips through
+  `clip_list`. Two ops cannot drift apart on one rule.
+- **Where an argument would let the op through, the sentence names that
+  argument** — `with_clips: true`, `ripple: true`. That is the part a caller
+  ACTS on, and it is the difference between a reason and a description.
+- **A clip list is capped at three ids and a count** (`clip_list`). A media
+  used by two hundred clips would otherwise answer with a sentence nothing
+  could read; three ids plus the total is everything a caller needs to start.
+- **`remove_track` asks the last-track question FIRST**, because
+  `with_clips: true` is the way past its other refusal and past this one it
+  is not: a caller told about the clips would send it and be refused again.
+  The proof sends it and scores the same sentence either way.
+
+**Two rules beyond the ticket's five, and one short of the brief's seven.**
+`remove_track`'s "still holds clips" and `add_action`'s "past the clip's
+end" are siblings of two of the five — the same `if` chain, the same doc
+sentence, the same op — and a function that speaks for one of its two
+refusals and not the other re-creates the ambiguity this candidate exists to
+remove. The brief also named two smaller ones from `Outcome::Identity`'s
+doc; the move to a track index the document has not got landed (its own
+comment had called it a refusal since it was written, over a line that
+answered an identity), and **a trim whose two clamps crossed did not**. It
+is one of a family — a slip or a roll the clamps reduce to nothing, a rate
+stretch outside ×0.1 – ×10 — where the clamp landing on where the clip
+already is makes an identity the honest answer too, none of them is on the
+spec's list (#8, decision 3), and paying `edit_clip.rs`'s toll to add them
+would be a second pure move in a ticket that already made one. The family is
+named in `Outcome::Identity`'s doc as where a next ticket starts.
+
+**Four of the rules cannot be heard over MCP, and that is D2·4's.** An
+app-side guard asks the same question one step earlier and answers in its
+own words: `AgentServer+Media.swift`'s and `AgentServer+Tracks.swift`'s
+`with_clips` guards, and `AgentServer+Transitions.swift`'s trial-apply,
+which catches `.project == nil` and so catches a refusal exactly as it
+caught an identity. Behaviour is therefore UNCHANGED at those four doors,
+which is this ticket's other claim. The proof scores them through a
+`shadowed` helper rather than `refused`, asserting the app's sentence WHOLE,
+so the checks D2·4 has to move are already written and their old answers are
+on record. #12's own acceptance criterion — "the proof asserts the core's
+wording at each of those ops" — is where they change.
+
+**`Outcome::Identity`'s doc is rewritten**, and is still the one place that
+says which refusals can say why. It now lists the rules that speak, the
+family that does not (above), and the nine or so empty-selection answers
+that stay identities on purpose.
+
+**Tests.** `core/tests/refusal.rs` goes from 220 lines to 514: one fixture
+(`rules_project`, five tracks at 600 000 fps — ONE TICK per frame — so every
+expected number is hand-computed and no snap moves it) and twelve tests, each
+asserting a WHOLE sentence through `Handle::refuses_with` and each with a
+BOUNDARY beside it that applies: an unlocked track closes its gap, a cut with
+handles takes its transition, an abutting action lands, a move onto a track
+the stack has lands. `make test` 641 → **653 passed / 0 failed**.
+
+**The proof.** `tools/proof/refusal_proof.py` **40/40 → 113/113**, six new
+sections (4 to 9) each shaped like §1's `overlap_rule`: a fixture with
+hand-computed numbers, `undo_marker`, the refusals with their whole
+sentences and the absence of the deleted paragraph, a boundary read back
+through `get_project`, and `undo_claim`. §4 also scores the distinction the
+whole candidate is about at ONE op: `close_gap` on a locked track is the
+rule's sentence and `close_gap` on a time that is on a clip is still the
+identity's.
+
+`tools/proof/phase1_proof.py` keeps its **66/66** with two checks rewritten:
+its locked-track `close_gap` and `insert_clip` asserted "made no change",
+which is now the wrong answer, and they assert the rule's whole sentence
+through a new `refused_with` helper (`endswith`, and the identity's phrase
+ABSENT). Its old `refuses` helper keeps its meaning for genuine identities.
+
+**Mutants.** Eight, all caught, and the seventh is the one worth reading.
+
+| Mutant | Score |
+|---|---|
+| `close_gap`'s locked refusal back to a bare identity | refusal 112/113, phase1 65/66 |
+| `locked_track` drops the track id ("a track is locked") | refusal 111/113, phase1 64/66 |
+| the last-track refusal back to a bare identity | refusal 111/113 |
+| the past-the-end sentence reports the CLIP's end where the action's belongs | refusal 111/113 |
+| the overlap sentence drops the action id | refusal 111/113 |
+| the off-the-stack refusal back to a bare identity | refusal 112/113 |
+| the transition's "no room" refusal back to a bare identity | **refusal 113/113** — and `core/tests/refusal.rs` 20/21 |
+| `clip_list` loses its three-id cap | `core/tests/refusal.rs` 20/21 |
+
+The seventh is the shadow measured rather than asserted: the app's
+trial-apply answers before the core is asked, so the MCP proof cannot tell
+that rule's refusal from its identity and the core test is the only
+instrument that can. The eighth is the same shape for a sentence no MCP
+caller can reach at all. Both are the reason those sections are `shadowed`
+and not `refused`, and both become proof mutants at D2·4.
+
+**Size.** The toll was paid first and alone (`1f8cf38`): `edit_track.rs` was
+671 and had to take three refusals, so `set_canvas` with `check_dimension`,
+`rescale` and `resnap` left for `core/src/edit_canvas.rs` (**224** lines,
+under the 400-line new-file cap) — the cut `core/CLAUDE.md` had already
+named, not one line of logic changed. `edit_track.rs` 671 → 473 → **520**
+with the ticket, off the over-cap list for the first time.
+
+`edit_clip.rs` is over the cap with no named seam, so its +5 lines were paid
+for INSIDE the file, the way D2·1's and D2·2's reviews set the precedent:
+`split_under_playhead` was a second copy of `split_clips`'s loop and now
+CALLS it, which the crate's own "one implementation per algorithm" rule
+wanted anyway. The file is **1028**, exactly where it started. Nothing else
+this ticket touched is near the cap: `edit_time.rs` **560**,
+`edit_transition.rs` **584**, `edit_action.rs` **357**, `edit_insert.rs`
+**145**, `outcome.rs` **105**.
+
+**Verification.** `make test` 653 passed / 0 failed, `make lint` and
+`cargo fmt --check` clean, `make typecheck` 0 errors and the 4 known
+AVFoundation warnings, `make app` built, the startup parity log empty at
+every launch. Every proof script run against the rebuilt binary on a freshly
+launched instance of its own: **refusal 113/113**, phase1 **66/66**, phase2
+**85/85**, phase3 **123/123**, phase3_silence_scope **8/8**, phase4
+**84/84**, phase5 **88/88**, phase6 **168/168**, phase7 **92/92**, phase8
+**79/79**, phase9 **216/216**, patch_door **261/261**, remaining **79/79**,
+recording **121/121** with the granted tier skipped by name (a locked
+console, no shareable display: 66 checks). `refusal_probe.py`, which needs no
+running app, is **15/15** and still prints its note about the empty undo
+group `performGroupedEdit` leaves.
+
+**Documents.** `core/CLAUDE.md`'s module map gains `edit_canvas.rs` and
+`edit_track.rs` loses its "next cut" note and its place on the over-cap list;
+`tools/proof/README.md` gains the six sections in the proof's table, the
+paragraph naming the four shadowed checks, and a correction to its phase 8
+section. Spec §6's op table needs no change — every row already describes
+these refusals, and what moved is the CHANNEL, not the semantics. The
+glossary, spec §5.5 and both rulebooks' Errors rules are D2·5's.
+
+**Owed.**
+
+- **The four shadowed rules**, above: D2·4's, and the proof's `shadowed`
+  helper is where each check becomes a `refused`.
+- **The clamped edge family** — a slip or a roll the clamps reduce to
+  nothing, a roll with no predecessor, a trim whose two clamps crossed, a
+  rate stretch outside ×0.1 – ×10, `detach_audio` with no audio,
+  `set_transition_duration` with no predecessor — still answers `Identity`,
+  named in `Outcome::Identity`'s doc.
+- **`designs/reelcut-remaining.md` §3's table** still lists
+  `core/src/edit_track.rs` at 674 and `core/src/edit_clip.rs` at 1042. D2·5
+  regenerates it against the tree; `edit_track.rs` comes off it.

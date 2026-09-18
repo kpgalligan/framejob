@@ -218,3 +218,297 @@ fn a_refusal_tolerates_a_caller_that_passes_no_reason_channel() {
     assert!(next.is_null(), "a refused op returns no handle");
     assert!(err.is_null(), "a refusal is not an error");
 }
+
+// ---- the rules that found their words at D2·3 ----------------------------
+
+/// The fixture the rules of kpgalligan/reelcut#11 are asked against, at the
+/// same 600 000 fps — ONE TICK per frame — as [`overlap_project`], so every
+/// number in an expected sentence is hand-computable and no snap moves it.
+///
+/// Track 4 "A" holds clips 10 (0 – 1000, with action 20 across 0 – 400) and
+/// 11 (3000 – 4000), leaving a gap 1000 – 3000 to close. Track 5 "B" is
+/// LOCKED and holds clips 12 (0 – 1000) and 13 (1000 – 2000), which abut at
+/// a hard cut. Track 6 "C" holds clips 15 (0 – 2000) and 16 (2000 – 4000),
+/// which abut too and are cut from media 3 — 2000 ticks long, so each clip
+/// shows the whole file and neither side of their cut has one unused frame
+/// to give a transition. Media 2 is imported and shown by nothing.
+///
+/// Two more tracks exist for the RIPPLE form of a transition, which makes
+/// its overlap by shifting rather than out of handles. Track 8 "D" holds
+/// clips 17 (0 – 2500) and 18 (2000 – 3000), already overlapping by exactly
+/// 500 — half of the shorter of the two, the most the overlap rule allows —
+/// so any leftward shift at all breaks it, and clip 18 starts at 2000, which
+/// is the cut on track 6, so the shift touches this track. Track 9 "E" holds
+/// clips 19 (0 – 1) and 22 (1 – 2), one tick each: half of the shorter of
+/// them is under a frame.
+fn rules_project() -> Handle {
+    Handle::from_json(
+        r#"{
+  "version": 1,
+  "canvas": {"width": 1920, "height": 1080, "fps": [600000, 1], "background": [0, 0, 0, 1],
+             "fit_new_clips": true, "timecode_frames": true},
+  "media": [
+    {"id": 1, "path": "/m/talk.mov", "kind": "video", "duration": 36000000,
+     "width": 1920, "height": 1080, "fps": [30, 1], "has_video": true, "has_audio": true},
+    {"id": 2, "path": "/m/spare.mov", "kind": "video", "duration": 36000000,
+     "width": 1920, "height": 1080, "fps": [30, 1], "has_video": true, "has_audio": true},
+    {"id": 3, "path": "/m/short.mov", "kind": "video", "duration": 2000,
+     "width": 1920, "height": 1080, "fps": [30, 1], "has_video": true, "has_audio": true},
+    {"id": 7, "path": "/m/other.mov", "kind": "video", "duration": 36000000,
+     "width": 1920, "height": 1080, "fps": [30, 1], "has_video": true, "has_audio": true}
+  ],
+  "tracks": [{"id": 4, "name": "A"}, {"id": 5, "name": "B", "locked": true},
+             {"id": 6, "name": "C"}, {"id": 8, "name": "D"}, {"id": 9, "name": "E"}],
+  "clips": [
+    {"id": 10, "track": 4, "start": 0, "duration": 1000,
+     "source": {"kind": "media", "media": 1, "in": 0}, "video": {}, "audio": {},
+     "actions": [{"id": 20, "start": 0, "duration": 400, "end": {}}]},
+    {"id": 11, "track": 4, "start": 3000, "duration": 1000,
+     "source": {"kind": "media", "media": 1, "in": 0}, "video": {}, "audio": {}},
+    {"id": 12, "track": 5, "start": 0, "duration": 1000,
+     "source": {"kind": "media", "media": 1, "in": 0}, "video": {}, "audio": {}},
+    {"id": 13, "track": 5, "start": 1000, "duration": 1000,
+     "source": {"kind": "media", "media": 1, "in": 0}, "video": {}, "audio": {}},
+    {"id": 15, "track": 6, "start": 0, "duration": 2000,
+     "source": {"kind": "media", "media": 3, "in": 0}, "video": {}, "audio": {}},
+    {"id": 16, "track": 6, "start": 2000, "duration": 2000,
+     "source": {"kind": "media", "media": 3, "in": 0}, "video": {}, "audio": {}},
+    {"id": 17, "track": 8, "start": 0, "duration": 2500,
+     "source": {"kind": "media", "media": 7, "in": 0}, "video": {}, "audio": {}},
+    {"id": 18, "track": 8, "start": 2000, "duration": 1000,
+     "source": {"kind": "media", "media": 7, "in": 0}, "video": {}, "audio": {}},
+    {"id": 19, "track": 9, "start": 0, "duration": 1,
+     "source": {"kind": "media", "media": 7, "in": 0}, "video": {}, "audio": {}},
+    {"id": 22, "track": 9, "start": 1, "duration": 1,
+     "source": {"kind": "media", "media": 7, "in": 0}, "video": {}, "audio": {}}
+  ],
+  "nests": [],
+  "markers": [],
+  "next_id": 30
+}"#,
+    )
+}
+
+// ---- a locked track ------------------------------------------------------
+
+#[test]
+fn a_locked_track_says_so_at_every_op_that_needs_to_move_it() {
+    let project = rules_project();
+    // Three ops, one rule, one sentence shape: each names track 5 and what
+    // it is the lock stopped. A caller reading any of them knows to unlock
+    // the track rather than to move the clip.
+    project.refuses_with(
+        &json!({"op": "close_gap", "track": 5, "at": 2500}),
+        "track 5 is locked, so the gap on it cannot be closed",
+    );
+    project.refuses_with(
+        &json!({"op": "insert_clip", "track": 5, "media": 2, "at": 0}),
+        "track 5 is locked, so an insert cannot open room on it",
+    );
+    project.refuses_with(
+        &json!({"op": "add_transition", "clip": 13, "duration": 100, "ripple": true}),
+        "track 5 is locked, so clip 13 cannot be shifted left to make the overlap",
+    );
+}
+
+#[test]
+fn an_unlocked_track_is_the_boundary_of_that_rule() {
+    let project = rules_project();
+    // The same three calls on track 4, which is not locked: the gap
+    // 1000 – 3000 closes, and an insert lands. Without this the sentences
+    // above would pass against a build that refused every track.
+    project.apply(&json!({"op": "close_gap", "track": 4, "at": 2500}));
+    project.apply(&json!({"op": "insert_clip", "track": 4, "media": 2, "at": 0}));
+}
+
+// ---- the track stack -----------------------------------------------------
+
+#[test]
+fn a_track_that_still_holds_clips_names_them_and_the_way_on() {
+    let project = rules_project();
+    // Track 5 holds clips 12 and 13. The sentence lists them — a caller
+    // that reads it knows what `with_clips` would take with the track —
+    // and names the argument that would let it through.
+    project.refuses_with(
+        &json!({"op": "remove_track", "track": 5}),
+        "track 5 still holds clips 12 and 13; pass with_clips: true to remove the track \
+         and its clips",
+    );
+    // The way on works, which is what makes the sentence advice rather
+    // than decoration.
+    project.apply(&json!({"op": "remove_track", "track": 5, "with_clips": true}));
+}
+
+#[test]
+fn the_last_track_says_it_is_the_last() {
+    let project = rules_project();
+    // Down to one track, the long way, because the rule is about the state
+    // and not about the argument: both removals below apply.
+    let one = project.apply_all(&[
+        json!({"op": "remove_track", "track": 5, "with_clips": true}),
+        json!({"op": "remove_track", "track": 6, "with_clips": true}),
+        json!({"op": "remove_track", "track": 8, "with_clips": true}),
+        json!({"op": "remove_track", "track": 9, "with_clips": true}),
+    ]);
+    one.refuses_with(
+        &json!({"op": "remove_track", "track": 4, "with_clips": true}),
+        "track 4 is the only track left, and a project must always have one",
+    );
+    // …and the rule outranks the clips it holds: `with_clips: true` is the
+    // way past the other refusal and not past this one.
+    one.refuses_with(
+        &json!({"op": "remove_track", "track": 4}),
+        "track 4 is the only track left, and a project must always have one",
+    );
+}
+
+// ---- the media list ------------------------------------------------------
+
+#[test]
+fn a_media_a_clip_still_shows_names_the_clips_and_the_way_on() {
+    let project = rules_project();
+    // Media 1 is shown by clips 10, 11, 12 and 13 — more than the sentence
+    // names one by one, so the tail is a count rather than a list that
+    // could run to a hundred ids.
+    project.refuses_with(
+        &json!({"op": "remove_media", "media": 1}),
+        "media 1 is still used by clips 10, 11, 12 and 1 more; pass with_clips: true to \
+         remove the media and its clips",
+    );
+    // Media 3 is shown by exactly two, which is the short form.
+    project.refuses_with(
+        &json!({"op": "remove_media", "media": 3}),
+        "media 3 is still used by clips 15 and 16; pass with_clips: true to remove the \
+         media and its clips",
+    );
+    // Media 2 is shown by nothing: no rule to break, so the op applies.
+    project.apply(&json!({"op": "remove_media", "media": 2}));
+    project.apply(&json!({"op": "remove_media", "media": 3, "with_clips": true}));
+}
+
+// ---- a cut with nothing left to give a transition -------------------------
+
+#[test]
+fn a_cut_with_no_unused_material_says_how_much_it_has() {
+    let project = rules_project();
+    // Clips 15 and 16 each show the whole of media 3 (2000 ticks), so the
+    // outgoing clip has nothing after its out point and the incoming clip
+    // nothing before its in point. The sentence names the number the caller
+    // sent, which is the one it would change, and the way that does not
+    // need handles at all.
+    project.refuses_with(
+        &json!({"op": "add_transition", "clip": 16, "duration": 100}),
+        "the cut before clip 16 has no room for an overlap: the 100 frames asked for clamp \
+         to nothing against the two clips' unused material, their neighbours and the \
+         overlap rule; pass ripple: true to make the overlap by shifting the timeline \
+         left instead",
+    );
+}
+
+#[test]
+fn a_cut_with_handles_to_spare_is_the_boundary_of_that_rule() {
+    let project = rules_project();
+    // The same cut, one track over: clips 12 and 13 are cut from media 1
+    // (36 000 000 ticks), so both handles are long. Track 5 is locked,
+    // which stops the RIPPLE form and not this one — the handle form moves
+    // nothing that a lock could hold.
+    project.apply(&json!({"op": "add_transition", "clip": 13, "duration": 100}));
+}
+
+#[test]
+fn a_ripple_that_every_length_would_break_says_what_it_tried() {
+    let project = rules_project();
+    // Track 8 holds clips 17 and 18 already overlapping by exactly 500 —
+    // half of the shorter of the two, the most the rule allows — and clip
+    // 18 starts at the cut, so the shift touches that track. Every length
+    // from 1000 frames down to one adds to that overlap and breaks it.
+    project.refuses_with(
+        &json!({"op": "add_transition", "clip": 16, "duration": 1000, "ripple": true}),
+        "clips 15 and 16 cannot overlap by shifting: no overlap from 1000 frames down to \
+         one leaves every track the shift moves inside the overlap rule",
+    );
+    // Take track 8 out of the way and the same call lands, so the sentence
+    // above is about the rule and not about the ripple form as such.
+    let clear = project.apply(&json!({"op": "remove_track", "track": 8, "with_clips": true}));
+    clear.apply(&json!({"op": "add_transition", "clip": 16, "duration": 1000, "ripple": true}));
+}
+
+#[test]
+fn a_pair_too_short_to_halve_says_so_rather_than_naming_the_rule() {
+    let project = rules_project();
+    // Clips 19 and 22 are one tick each at 600 000 fps — one frame — so
+    // half of the shorter of them is under a frame and there is no length
+    // to step down from. A different sentence from the one above on
+    // purpose: what a caller acts on here is the clips' length, not the
+    // overlap rule.
+    project.refuses_with(
+        &json!({"op": "add_transition", "clip": 22, "duration": 1, "ripple": true}),
+        "clips 19 and 22 have no room to overlap by shifting: 1 frames were asked for and \
+         half of the shorter clip is 0 frames",
+    );
+}
+
+// ---- an action that would overlap another --------------------------------
+
+#[test]
+fn an_action_that_would_overlap_another_names_the_one_in_the_way() {
+    let project = rules_project();
+    // Clip 10 carries action 20 across 0 – 400. A new action at 200 for
+    // 100 lands inside it: the sentence names the action a caller would
+    // move, and the span it is asking about.
+    project.refuses_with(
+        &json!({"op": "add_action", "clip": 10, "at": 200, "duration": 100}),
+        "action 20 on clip 10 already runs from 0 to 400 ticks, and two actions on one \
+         clip may not overlap",
+    );
+    // `set_action` refuses on the same test and in the same words: a second
+    // action moved back on top of the first.
+    let two = project.apply(&json!({"op": "add_action", "clip": 10, "at": 500, "duration": 100}));
+    two.refuses_with(
+        &json!({"op": "set_action", "clip": 10, "action": 30, "start": 300}),
+        "action 20 on clip 10 already runs from 0 to 400 ticks, and two actions on one \
+         clip may not overlap",
+    );
+    // …and the same move to a free span applies, so the sentence is about
+    // the collision and not about `set_action`.
+    two.apply(&json!({"op": "set_action", "clip": 10, "action": 30, "start": 400}));
+}
+
+#[test]
+fn an_action_that_would_run_past_the_clip_names_both_ends() {
+    let project = rules_project();
+    // Clip 10 is 1000 ticks long. An action of 200 at 900 would end at
+    // 1100: the sentence names the end it wanted and the end it has.
+    project.refuses_with(
+        &json!({"op": "add_action", "clip": 10, "at": 900, "duration": 200}),
+        "an action at 900 ticks for 200 would end at 1100, past clip 10's own end at 1000 \
+         ticks",
+    );
+    project.refuses_with(
+        &json!({"op": "set_action", "clip": 10, "action": 20, "duration": 1200}),
+        "an action at 0 ticks for 1200 would end at 1200, past clip 10's own end at 1000 \
+         ticks",
+    );
+    // The boundary: an action that ends exactly at the clip's end is fine.
+    project.apply(&json!({"op": "add_action", "clip": 10, "at": 900, "duration": 100}));
+}
+
+// ---- a move off the track stack ------------------------------------------
+
+#[test]
+fn a_move_off_the_track_stack_names_the_index_it_would_land_on() {
+    let project = rules_project();
+    // Five tracks, indices 0 – 4. Clips 15 (track 6, index 2) and 17
+    // (track 8, index 3) moved to track 9 (index 4) travel two tracks each:
+    // 15 lands on 4 and 17 would land on 5, which the document has not got.
+    // The comment on this rule has called it a refusal since it was written
+    // — clamping would silently stack two clips on one track — and this is
+    // the ticket where it says so out loud.
+    project.refuses_with(
+        &json!({"op": "move_clip", "clips": [15, 17], "delta": 0, "track": 9}),
+        "clip 17 would land on track index 5, which is out of range (0..5)",
+    );
+    // The boundary: a move onto a track the stack HAS lands. The time delta
+    // is there to clear clip 11, since the overlap rule still applies.
+    project.apply(&json!({"op": "move_clip", "clips": [22], "delta": 4000, "track": 4}));
+}

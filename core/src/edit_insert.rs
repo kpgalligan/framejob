@@ -23,6 +23,7 @@
 //! needs.
 
 use crate::edit_clip::clip_end;
+use crate::edit_time::locked_track;
 use crate::model::Project;
 use crate::outcome::Outcome;
 use crate::time::Ticks;
@@ -46,12 +47,15 @@ impl Project {
     /// reason.
     ///
     /// `Err` for an unknown track or media, or a media with no duration; a
-    /// locked destination track refuses, and so does anything the inner
-    /// `split`, `insert_time` or `add_clip` refused — this op answers in the
-    /// words of whichever step declined.
+    /// locked destination track refuses in [`locked_track`]'s words, and so
+    /// does anything the inner `split`, `insert_time` or `add_clip` refused
+    /// — this op answers in the words of whichever step declined.
     pub fn insert_clip(&self, track: u32, media: u32, at: Ticks) -> Result<Outcome, String> {
         if self.require_track(track)?.locked {
-            return Ok(Outcome::Identity);
+            return Ok(Outcome::Refused(locked_track(
+                track,
+                "an insert cannot open room on it",
+            )));
         }
         let found = self.require_media(media)?.clone();
         let at = self.snapped(at).max(0);

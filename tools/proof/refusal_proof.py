@@ -443,6 +443,380 @@ def several_ops(mcp):
     landed("…because the second op still ran", s.clip(second)["audio"]["volume"], volume)
 
 
+# ---- the rules D2·3 gave words to (kpgalligan/reelcut#11) ----------------
+#
+# Five rules, five sections, each shaped like `overlap_rule`. Two of them —
+# the media row and the cut with nothing left to give — never reach the core
+# over MCP, because an app-side guard asks the same question one step
+# earlier and answers in its own words. Their sections say what that guard
+# still says, WHOLE, so the day D2·4 deletes it the check that has to move
+# is already written down and its old answer is on record.
+
+
+def shadowed(s, tool, what, sentence, **call):
+    """A refusal the APP answers before the core is asked — scored exactly as
+    `refused` scores a real one, minus the op name the app does not put in.
+
+    The core has its own sentence for each of these since D2·3 and nobody
+    can hear it: `AgentServer+Media.swift`'s and `AgentServer+Tracks.swift`'s
+    guards and `AgentServer+Transitions.swift`'s trial-apply each answer
+    first. Deleting them is D2·4's (kpgalligan/reelcut#12), whose own
+    acceptance criterion is that the proof asserts the CORE's wording at
+    these ops; until then this is what a caller hears, and an unchanged
+    answer is this ticket's claim ("nothing silently becomes an identity")."""
+    before = s.text()
+    message = s.error(tool, **call)
+    after = s.text()
+    whole = f"{tool}: {sentence}"
+    flat = " ".join(str(message).split()) if message is not None else None
+    check(flat == whole, f"{what} — {whole!r}; got: {shown(message)}")
+    check(message is not None and not any(g in message for g in GUESSES),
+          "…and not one word of the paragraph that used to guess at the reason")
+    check(before == after,
+          f"…and the project is unchanged after it ({len(before)} chars either side)")
+
+
+def locked_track(mcp):
+    """A locked track, at the two ops that reach the core with one.
+
+    The rule: `close_gap` and `insert_clip` both have to MOVE what is on the
+    destination track, and a lock is exactly the promise that nothing there
+    moves, so both refuse up front rather than by collision
+    (`core/src/edit_time.rs`'s `locked_track`, which writes the sentence once
+    for all three of its callers). What a caller acts on is the track id in
+    it: unlock that track, not move the clip.
+
+    The third caller, a RIPPLED `add_transition`, is section 7's — its
+    sentence is shadowed by the same trial-apply that shadows the cut rule.
+
+    The fixture is two ten-second clips with a ten-second gap between them,
+    so `close_gap` has a real gap to be stopped from closing: the refusal is
+    the lock's and not "there is no gap here", which is a different answer
+    (an identity) and is scored below."""
+    print("\n4 — a locked track says which track is locked")
+    s = Session(mcp, "refusal-locked")
+    media = s.media("A.mov")
+    track = s.project()["tracks"][0]["id"]
+    a = s.place(media, 0)
+    b = s.place(media, 20 * SEC)
+    landed("the fixture is two ten-second clips with a ten-second gap between them",
+           [[c["start"], c["duration"]] for c in s.project()["clips"]],
+           [[0, 10 * SEC], [20 * SEC, 10 * SEC]])
+
+    print("\n4a — a real edit, whose undo step every answer below must leave alone")
+    start = undo_marker(s, lambda: s.op("set_clip", clips=[a], patch={"name": "Marker"}))
+
+    print("\n4b — the lock goes on, and both ops name it")
+    s.op("set_track", track=track, locked=True)
+    refused(s, "close_gap", "close_gap",
+            "a gap that is really there, on a track that may not move",
+            f"track {track} is locked, so the gap on it cannot be closed",
+            track=track, at=15 * SEC)
+    refused(s, "insert_clip", "insert_clip",
+            "an insert onto the same track, with room to spare",
+            f"track {track} is locked, so an insert cannot open room on it",
+            track=track, media=media, at=40 * SEC)
+
+    print("\n4c — the lock comes off, and the same call lands")
+    # Undone rather than set back, so the only edit left on the stack above
+    # the marker is the one 4c makes and undoes itself.
+    s.op("undo")
+    applied(s, "close_gap", "the gap closes once the track is unlocked",
+            track=track, at=15 * SEC)
+    landed("…and the later clip moved to the gap's start, so that was the whole edit",
+           s.clip(b)["start"], 10 * SEC)
+    s.op("undo")
+    landed("…undone again, so the fixture is back where 4b found it",
+           s.clip(b)["start"], 20 * SEC)
+
+    print("\n4d — and a gap that is not there is still an IDENTITY, not this rule")
+    # The distinction the whole candidate is about, at one op: same tool,
+    # same track, two different answers.
+    identity(s, "close_gap", "Close Gap",
+             "a time that is ON a clip is not in a gap, which no rule declined",
+             track=track, at=1 * SEC)
+
+    print("\n4e — and not one of them was an undo step")
+    undo_claim(s, start)
+
+
+def the_track_stack(mcp):
+    """The last track in a project, and the track that still holds clips.
+
+    Two refusals in one op, and the order between them matters: the
+    last-track one is asked FIRST, because `with_clips: true` is the way past
+    the other and past this one it is not. A caller told about the clips
+    would send it and be refused again.
+
+    Only the first of the two reaches the core over MCP.
+    `AgentServer+Tracks.swift` asks "does this track still hold clips" before
+    the core does, and answers in its own words; the second call below
+    records what that guard says."""
+    print("\n5 — the track stack: the last track, and the one still holding clips")
+    s = Session(mcp, "refusal-tracks")
+    media = s.media("A.mov")
+    first = s.project()["tracks"][0]["id"]
+    landed("a new project has exactly one track", len(s.project()["tracks"]), 1)
+
+    print("\n5a — the only track in the project, with nothing on it at all")
+    # No clips, so the app's own guard is not in the way and the call
+    # reaches the core. `with_clips: true` is sent as well, because the
+    # sentence has to be the same either way: that flag is the way past the
+    # OTHER refusal and not past this one.
+    refused(s, "remove_track", "remove_track",
+            "removing the only track a project has",
+            f"track {first} is the only track left, and a project must always have one",
+            track=first)
+    refused(s, "remove_track", "remove_track",
+            "…and with_clips: true does not get past it, because this is not that rule",
+            f"track {first} is the only track left, and a project must always have one",
+            track=first, with_clips=True)
+
+    print("\n5b — a second track, so the rule stops applying")
+    second = s.op("add_track", kind="video")["new_tracks"][0]
+    applied(s, "remove_track", "with two tracks the same call lands", track=second)
+    landed("…and the project is back to one track", len(s.project()["tracks"]), 1)
+
+    print("\n5c — a clip and a second track, and then the marker edit")
+    # Both are real edits and both are made BEFORE the marker, so 5e's
+    # single undo is the marker's and the claim it makes is exact.
+    clip = s.place(media, 0)
+    s.op("add_track", kind="video")
+    start = undo_marker(s, lambda: s.op("set_clip", clips=[clip], patch={"name": "Marker"}))
+
+    print("\n5d — the other refusal, which the app still answers first")
+    # The core's sentence here is "track N still holds clip M; pass
+    # with_clips: true to remove the track and its clips" and nobody hears
+    # it: the guard in `AgentServer+Tracks.swift` names the track's NAME and
+    # the count instead. Unchanged by this ticket, on purpose.
+    name = [t for t in s.project()["tracks"] if t["id"] == first][0]["name"]
+    shadowed(s, "remove_track",
+             "a track that still holds clips is refused by the app, in the app's words",
+             f'Track {first} ("{name}") still holds 1 clip. Pass with_clips: true to '
+             "remove them too.",
+             track=first)
+
+    print("\n5e — and it was not an undo step either")
+    undo_claim(s, start)
+
+
+def the_media_list(mcp):
+    """A media row a clip still shows.
+
+    The core's rule: a media entry cannot go while any clip anywhere in the
+    document still shows it, because the model has no "missing on purpose"
+    state and a clip pointing at an id that is gone is what `validate`
+    rejects. Since D2·3 it says so naming the clips and the argument that
+    would let it through.
+
+    Nobody hears that either. `AgentServer+Media.swift`'s guard asks the
+    same question through `MediaUsage` — which walks the nests, the fix
+    phase 8 made — and answers naming the FILE and the count, which is the
+    better sentence for a person and the worse one for a caller that has to
+    name a clip. Which of the two survives is D2·4's; this section records
+    what arrives today, and that an unused media still goes with no
+    argument at all."""
+    print("\n6 — a media row a clip still shows")
+    s = Session(mcp, "refusal-media")
+    media = s.media("A.mov")
+    spare = s.media("B.mov")       # imported before the marker: 6d undoes ONE edit
+    clip = s.place(media, 0)
+
+    print("\n6a — a real edit, whose undo step the answers below must leave alone")
+    start = undo_marker(s, lambda: s.op("set_clip", clips=[clip], patch={"name": "Marker"}))
+
+    print("\n6b — the app's guard answers before the core is asked")
+    shadowed(s, "remove_media",
+             "a media one clip still shows is refused, in the app's words",
+             "A.mov is used by 1 clip. Pass with_clips: true to remove them too.",
+             media=media)
+
+    print("\n6c — the boundary: an unused row goes with no argument at all")
+    applied(s, "remove_media", "a media in nobody's use is removed as it asks",
+            media=spare)
+    landed("…and the media list is back to the one file the clip shows",
+           [m["id"] for m in s.project()["media"]], [media])
+
+    print("\n6d — and neither answer was an undo step")
+    s.op("undo")                   # the removal of B.mov, which WAS a real edit
+    undo_claim(s, start)
+
+
+def the_transition_cut(mcp):
+    """A cut with no unused material left to give a transition.
+
+    The core's rule, and the one with the most arithmetic behind it: an
+    overlap at a hard cut is built out of the two clips' unused source — the
+    frames after the outgoing clip's out point and before the incoming
+    clip's in point — clamped again by the neighbours on the track and by
+    the overlap rule. When all of that leaves nothing, the core now says how
+    many frames were asked for and names `ripple: true`, the way that needs
+    no handles at all.
+
+    Shadowed, like section 6. `AgentServer+Transitions.swift` trial-applies
+    the op and writes two sentences of its own, one per form, because the
+    shared reply used to be the overlap rule's paragraph. Both are asserted
+    WHOLE below: they are what D2·4 replaces, and a ticket that changes them
+    by a word should have to come here.
+
+    The fixture is section 1's — two abutting ten-second clips, each showing
+    the whole of a ten-second file, so neither side has one frame to give."""
+    print("\n7 — a cut with nothing left to give a transition")
+    s = Session(mcp, "refusal-transition")
+    media = s.media("A.mov")
+    a = s.place(media, 0)
+    b = s.place(media, 10 * SEC)
+    landed("the fixture is two abutting clips, each showing its whole file",
+           [[c["start"], c["duration"]] for c in s.project()["clips"]],
+           [[0, 10 * SEC], [10 * SEC, 10 * SEC]])
+
+    print("\n7a — a real edit, whose undo step the answers below must leave alone")
+    start = undo_marker(s, lambda: s.op("set_clip", clips=[a], patch={"name": "Marker"}))
+
+    print("\n7b — the handle form, in the app's words")
+    shadowed(s, "add_transition",
+             "a cut whose two clips have no unused material is refused",
+             "add_transition made no change: neither side of the cut has media beyond it. "
+             "An overlap is built out of the source before the incoming clip's in point "
+             "and after the outgoing clip's out point, and a request that clamps below one "
+             "frame is refused. Pass ripple: true to make the overlap by sliding the "
+             "incoming clip and everything after it left, or trim one of the two clips.",
+             clip=b, duration=SEC // 2)
+
+    print("\n7c — and the rippled form, which has somewhere to go")
+    # The same cut with `ripple: true` LANDS here: nothing is read out of
+    # the source, the incoming clip simply slides left. That is what makes
+    # 7b's sentence about the material and not about the cut.
+    applied(s, "add_transition", "the same cut takes a rippled transition",
+            clip=b, duration=SEC // 2, ripple=True)
+    landed("…and the incoming clip slid left by exactly the overlap asked for",
+           s.clip(b)["start"], 10 * SEC - SEC // 2)
+    s.op("undo")
+
+    print("\n7d — a LOCKED track is where the rippled form has nowhere to go")
+    track = s.project()["tracks"][0]["id"]
+    s.op("set_track", track=track, locked=True)
+    shadowed(s, "add_transition",
+             "a rippled transition on a locked track is refused, in the app's words",
+             "add_transition made no change: with ripple the shift clamped below one frame "
+             "— the incoming clip's track is locked, a clip is too short for the overlap "
+             "rule, or sliding a clip on another track into its neighbour would break that "
+             "track's overlap rule.",
+             clip=b, duration=SEC // 2, ripple=True)
+    s.op("undo")                   # the lock, which WAS a real edit
+
+    print("\n7e — and not one of them was an undo step")
+    undo_claim(s, start)
+
+
+def the_action_rules(mcp):
+    """An action that would overlap another, or run past its clip.
+
+    Two refusals stated in one doc sentence, at two ops each, and both reach
+    the core over MCP with nothing in the way. Actions on a clip may not
+    overlap (spec §5.4) and an action is a span of CLIP time that has to fit
+    inside it; what a caller acts on is in both sentences — which action is
+    in the way and where it runs, or where the action it asked for would end
+    against where the clip does.
+
+    Every number below is hand-computed from a ten-second clip on a 30 fps
+    canvas: 600 000 ticks to the second, 20 000 to the frame."""
+    print("\n8 — an action that would overlap another, or run past its clip")
+    s = Session(mcp, "refusal-actions")
+    media = s.media("A.mov")
+    clip = s.place(media, 0)
+    landed("the fixture is one ten-second clip", s.clip(clip)["duration"], 10 * SEC)
+    first = s.op("add_action", clip=clip, at=0, duration=2 * SEC)["new_actions"][0]
+    second = s.op("add_action", clip=clip, at=4 * SEC, duration=SEC)["new_actions"][0]
+
+    print("\n8a — a real edit, whose undo step every answer below must leave alone")
+    start = undo_marker(s, lambda: s.op("set_clip", clips=[clip], patch={"name": "Marker"}))
+
+    print("\n8b — a second action inside the first, at both ops")
+    refused(s, "add_action", "add_action",
+            "an action that would start inside the one already there",
+            f"action {first} on clip {clip} already runs from 0 to {2 * SEC} ticks, and "
+            "two actions on one clip may not overlap",
+            clip=clip, at=SEC, duration=SEC)
+    refused(s, "set_action", "set_action",
+            "…and the same words when an EXISTING action is dragged back onto it",
+            f"action {first} on clip {clip} already runs from 0 to {2 * SEC} ticks, and "
+            "two actions on one clip may not overlap",
+            clip=clip, action=second, start=SEC)
+
+    print("\n8c — the boundary: an action that starts exactly where the other ends")
+    applied(s, "set_action", "abutting is not overlapping, so the same drag one tick "
+            "later lands", clip=clip, action=second, start=2 * SEC)
+    landed("…and it LANDED at the tick asked for",
+           [a["start"] for a in s.clip(clip)["actions"] if a["id"] == second], [2 * SEC])
+    s.op("undo")
+
+    print("\n8d — an action that would run past the clip's own end, at both ops")
+    refused(s, "add_action", "add_action",
+            "an action whose span would end past the clip",
+            f"an action at {9 * SEC} ticks for {2 * SEC} would end at {11 * SEC}, past "
+            f"clip {clip}'s own end at {10 * SEC} ticks",
+            clip=clip, at=9 * SEC, duration=2 * SEC)
+    refused(s, "set_action", "set_action",
+            "…and the same when an existing action is stretched past it",
+            f"an action at 0 ticks for {12 * SEC} would end at {12 * SEC}, past clip "
+            f"{clip}'s own end at {10 * SEC} ticks",
+            clip=clip, action=first, duration=12 * SEC)
+
+    print("\n8e — the boundary: an action that ends exactly at the clip's end")
+    applied(s, "add_action", "an action ending exactly at the clip's end lands",
+            clip=clip, at=9 * SEC, duration=SEC)
+    s.op("undo")
+
+    print("\n8f — and not one of them was an undo step")
+    undo_claim(s, start)
+
+
+def off_the_track_stack(mcp):
+    """A move to a track index the document has not got.
+
+    The smallest of the rules and the one whose silence was the plainest
+    contradiction: the comment beside it has read "a selection dragged off
+    either end of the track list is a refusal, not a clamp" since it was
+    written, and the line under it answered an identity. It says the index
+    now, in `move_track`'s own words for the same mistake.
+
+    A selection spanning two tracks is what reaches it: the whole selection
+    moves by the index offset of its FIRST clip (by track order), so a
+    two-track selection moved to the front-most track puts its second clip
+    one past the end."""
+    print("\n9 — a move to a track index the document has not got")
+    s = Session(mcp, "refusal-stack")
+    media = s.media("A.mov")
+    lower = s.op("add_track", kind="video")["new_tracks"][0]
+    upper = s.op("add_track", kind="video")["new_tracks"][0]
+    landed("three tracks, indices 0 to 2", len(s.project()["tracks"]), 3)
+    a = s.place(media, 0, track=lower)
+    b = s.place(media, 0, track=upper)
+
+    print("\n9a — a real edit, whose undo step the answer below must leave alone")
+    start = undo_marker(s, lambda: s.op("set_clip", clips=[a], patch={"name": "Marker"}))
+
+    print("\n9b — a two-track selection moved one track too far")
+    # Clip a is on index 1 and clip b on index 2; the anchor is the lower of
+    # the two, so moving to index 2 moves BOTH up one and b would land on
+    # index 3, which is one past the end of a three-track stack.
+    refused(s, "move_clip", "move_clip",
+            "the clip that would go off the top of the stack is the one named",
+            f"clip {b} would land on track index 3, which is out of range (0..3)",
+            clips=[a, b], delta=0, track=upper)
+
+    print("\n9c — the boundary: the same move one track lower lands")
+    applied(s, "move_clip", "a move onto a track the stack HAS applies",
+            clips=[a], delta=10 * SEC, track=upper)
+    landed("…and it landed on that track, at the tick the delta asks for",
+           [s.clip(a)["track"], s.clip(a)["start"]], [upper, 10 * SEC])
+    s.op("undo")
+
+    print("\n9d — and it was not an undo step")
+    undo_claim(s, start)
+
+
 def summary(aborted=None):
     """The last line, and the exit status. An op that unexpectedly refused or
     errored — a `ToolError` no check was waiting for — aborts the run and is
@@ -467,18 +841,29 @@ def main():
     overlap_rule(mcp)
     identity_says_only_that(mcp)
     several_ops(mcp)
+    locked_track(mcp)
+    the_track_stack(mcp)
+    the_media_list(mcp)
+    the_transition_cut(mcp)
+    the_action_rules(mcp)
+    off_the_track_stack(mcp)
     summary()
 
 
 # ---- the next rule's section goes here ------------------------------------
 #
-# D2·3 (kpgalligan/reelcut#11) gives the remaining rules their sentences — a
-# locked track, the last track, a media row a clip still shows, a cut with
-# nothing left to give a transition, and an action that would overlap
-# another. Each is a function shaped like `overlap_rule` above: the fixture,
-# a marker edit, the refusals with their WHOLE sentences, and one `undo`
+# Sections 4 to 9 are D2·3's (kpgalligan/reelcut#11), and the shape has not
+# changed: a fixture whose numbers are hand-computed, a marker edit, the
+# refusals with their WHOLE sentences, a boundary that LANDS, and one `undo`
 # closing the batch. `Outcome::Identity`'s doc in `core/src/outcome.rs` is
-# the list of which rules are still owed one.
+# the list of which rules can say why and which are still owed a sentence.
+#
+# Three places to come back to. `shadowed` marks a refusal the app answers
+# before the core is asked — sections 5d, 6b, 7b and 7d — and each of those
+# becomes a `refused` against the core's own sentence when D2·4
+# (kpgalligan/reelcut#12) deletes the guard or the trial-apply in front of
+# it. The core's sentences are in `core/tests/refusal.rs` meanwhile, which
+# is where they are proved today.
 
 if __name__ == "__main__":
     try:

@@ -51,16 +51,35 @@ pub enum Outcome {
     /// rule here would go looking for one it did not break.
     ///
     /// **Not every "refuses" in this crate's doc comments reaches a caller
-    /// as [`Outcome::Refused`] yet.** The overlap rule found its channel
-    /// first, because it already wrote a full sentence; the rules whose
-    /// words are still owed — a locked track, the last track, a media row a
-    /// clip still shows, a cut with nothing left to give a transition, and
-    /// an action that would overlap another — answer `Identity` until road
-    /// map 7's D2·3 writes them, and so do a few smaller ones the spec did
-    /// not name (a move to a track index the document has not got, a trim
-    /// whose two clamps crossed). A doc comment saying an op "refuses" is
+    /// as [`Outcome::Refused`].** A doc comment saying an op "refuses" is
     /// describing the DOMAIN, which is what a reader needs; this is the one
     /// place that says which of them can say so out loud.
+    ///
+    /// The rules that speak, after road map 7's D2·1 and D2·3: the overlap
+    /// rule (`transition.rs`, the sentence every placement op hands on), a
+    /// locked track (`edit_time.rs`'s `locked_track`, at `close_gap`,
+    /// `insert_clip` and a rippled transition), the last track and a track
+    /// that still holds clips, a media row a clip still shows
+    /// (`edit_track.rs`), a cut with nothing left to give a transition and
+    /// the two ways a rippled one has nowhere to shift to
+    /// (`edit_transition.rs`), an action that would overlap another or run
+    /// past its clip (`edit_action.rs`), and a move to a track index the
+    /// document has not got (`edit_clip.rs`).
+    ///
+    /// **What still answers `Identity` although a doc comment calls it a
+    /// refusal**, and is therefore where a next ticket would start: the
+    /// clamped edge ops in `edit_edge.rs` and `edit_clip.rs` — a slip or a
+    /// roll the clamps reduce to nothing, a roll with no predecessor, a
+    /// trim whose two clamps crossed, a rate stretch outside ×0.1 – ×10 —
+    /// `detach_audio` on a clip with no audio to detach, and
+    /// `set_transition_duration` with no predecessor or no room in front.
+    /// Every one of them is a clamp that landed on where the clip already
+    /// was, which is the case where an identity is also the honest answer;
+    /// none was named by the spec (kpgalligan/reelcut#8, decision 3).
+    ///
+    /// The nine or so **empty-selection** answers are not on that list at
+    /// all: an op handed an empty list of clips is a TRUE identity and
+    /// stays one, deliberately (the same spec, decision 4).
     Identity,
 
     /// A rule declined the op, in the rule's own words. **No undo step**,
@@ -71,5 +90,16 @@ pub enum Outcome {
     /// verbatim so it is written once: "clips 3 and 4 would overlap by 8000
     /// ticks, more than half of the shorter clip (6000 ticks)". It names
     /// what a caller could act on, and it is prose, not a code.
+    ///
+    /// **Every rule's sentence names the value, not the rule.** Which track
+    /// is locked, which clips still show the media, how many frames the cut
+    /// has left, which action is in the way: a caller that reads one knows
+    /// what to send instead without asking the project again. Where an
+    /// argument would let the op through, the sentence names that argument
+    /// (`with_clips: true`, `ripple: true`) — advice a caller can act on,
+    /// not a second description of the rule. A rule with more than one site
+    /// writes its sentence once and the sites pass a clause
+    /// (`edit_time::locked_track`, `edit_action`'s two, `edit_track`'s
+    /// `clip_list`), so two ops cannot drift apart on the same rule.
     Refused(String),
 }

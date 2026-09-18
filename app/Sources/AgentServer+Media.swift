@@ -292,8 +292,14 @@ extension AgentServer {
     /// (`every_clip()`) and the set `with_clips: true` deletes. Filtering
     /// `snapshot.clips` here — what this line used to do — let a file used
     /// only inside a compound clip past this guard, to be refused by the core
-    /// with `Ok(None)` and reported as a bare "refused" with no reason in it.
-    /// One spelling of the question now, in `MediaUsage.swift`.
+    /// with nothing said and reported as a bare "refused" with no reason in
+    /// it. One spelling of the question now, in `MediaUsage.swift`.
+    ///
+    /// Since deepening D2·3 the core has a sentence of its own here
+    /// ("media 3 is still used by clips 7 and 9; pass with_clips: true …"),
+    /// which this guard SHADOWS: it names the file where the core names the
+    /// ids, and it is the same question asked one step earlier. Whether one
+    /// of the two should go is D2·4's, not this guard's to decide.
     func removeMedia(_ a: [String: Any]) throws -> String {
         let document = try target(a)
         let media = try mediaArg(a, "media", document)

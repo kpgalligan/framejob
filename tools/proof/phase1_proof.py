@@ -74,14 +74,28 @@ class Session:
         return self.op("import_media", path=os.path.join(MEDIA, name))["media"]
 
     def refuses(self, tool, **kwargs):
-        """A documented refusal comes back as an in-band error whose message
-        begins "<Op> made no change" — the app's wording for the core's
-        `Ok(None)`, which registers no undo step."""
+        """An IDENTITY comes back as an in-band error whose message begins
+        "<Op> made no change" — the app's wording for the core's
+        `Outcome::Identity`, which registers no undo step."""
         try:
             self.op(tool, **kwargs)
             return False
         except ToolError as error:
             return "made no change" in str(error)
+
+    def refused_with(self, tool, tail, **kwargs):
+        """A RULE'S refusal, which since deepening D2·3 arrives in the rule's
+        own words rather than as the identity's sentence
+        (`designs/reelcut-roadmap-7.md` §5.3). The WHOLE sentence is
+        compared, never a keyword: what a caller acts on is the ids and the
+        numbers in it, and a `contains` check passes on a sentence that has
+        lost exactly those."""
+        try:
+            self.op(tool, **kwargs)
+            return False
+        except ToolError as error:
+            message = " ".join(str(error).split())
+            return message.endswith(tail) and "made no change" not in message
 
 
 def placement(clips, clip):
@@ -243,10 +257,17 @@ def main():
     )
     check(s.refuses("close_gap", track=picture, at=4 * SEC), "there is no gap left to close")
     check(s.refuses("close_gap", track=picture, at=SEC), "a time on a clip is not in a gap")
-    check(s.refuses("close_gap", track=bed, at=5 * SEC), "a locked track refuses")
     check(
-        s.refuses("insert_clip", track=bed, media=c_id, at=20 * SEC),
-        "and a locked track refuses an insert with room to spare",
+        s.refused_with(
+            "close_gap", f"track {bed} is locked, so the gap on it cannot be closed",
+            track=bed, at=5 * SEC),
+        "a locked track refuses, naming the track to unlock",
+    )
+    check(
+        s.refused_with(
+            "insert_clip", f"track {bed} is locked, so an insert cannot open room on it",
+            track=bed, media=c_id, at=20 * SEC),
+        "and a locked track refuses an insert with room to spare, in the same rule's words",
     )
     s.op("undo")
     check(

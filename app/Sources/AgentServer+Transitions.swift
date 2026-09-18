@@ -36,11 +36,16 @@ extension AgentServer {
     ///
     /// The clamps are the core's and none is pre-checked: a duration longer
     /// than the material lands shorter, and "not at a hard cut" is the
-    /// core's sentence naming which of the three it is. What IS reworded is
-    /// the IDENTITY: the shared reply says only that the project is already
-    /// in that state, and the reason this op answers one is that neither side
-    /// of the cut had a frame of unused material left, which is a rule and
-    /// not a no-op.
+    /// core's sentence naming which of the three it is.
+    ///
+    /// **The trial below now SHADOWS a sentence the core has.** Since
+    /// deepening D2·3 a cut with nothing left to give answers
+    /// `Outcome::Refused` naming the frames asked for, and the rippled form
+    /// has three sentences of its own (a locked track, a pair too short to
+    /// halve, every length breaking the overlap rule) — all of which
+    /// `.project == nil` catches and replaces with the two below. Deleting
+    /// the trial is D2·4's, which is the ticket that makes the core's words
+    /// arrive.
     func addTransition(_ a: [String: Any]) throws -> String {
         let document = try target(a)
         let clip = try clipArg(a, "clip", document)
@@ -52,11 +57,12 @@ extension AgentServer {
             .addTransition(
                 clip: clip.id, kind: kind, duration: duration, align: align, ripple: ripple)
         ]
-        // The trial `performGroupedEdit` runs would report this op's domain
-        // refusal in the overlap rule's words, which is the wrong diagnosis:
-        // the rule is one of the clamps, and a `None` means the clamps left
-        // nothing. Addressed the same way the commit will be, so a scoped
-        // call is tried in the container it will land in.
+        // `.project` is nil for an identity AND for a refusal, so the two
+        // sentences below are sent in place of whatever the core said. That
+        // was the whole point of the trial when the core said nothing;
+        // since D2·3 it says more than these do, and D2·4 deletes this.
+        // Addressed the same way the commit will be, so a scoped call is
+        // tried in the container it will land in.
         if try document.project.applying(addressed(ops, document)).project == nil {
             if ripple {
                 throw ToolError(

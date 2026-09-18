@@ -190,9 +190,12 @@ extension EditorViewController {
             NSSound.beep()
             return
         }
-        // Every `add_transition` in the batch can come back an IDENTITY —
+        // Every `add_transition` in the batch can come back REFUSED —
         // neither side of the cut had a frame to spare, which is EVERY cut
-        // between two clips that each use their whole file. That has to be
+        // between two clips that each use their whole file, and since
+        // deepening D2·3 the core says so in its own sentence. `.project` is
+        // nil for that arm as it is for an identity, so the trial below
+        // reads the same either way. That has to be
         // SAID (road map 5 §3g): a bare beep is all `applyEdit` gives a
         // batch that changed nothing, and a person placing whole recordings
         // back to back has no way to guess that a transition is built from

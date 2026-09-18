@@ -33,6 +33,11 @@ extension AgentServer {
     /// non-empty track refuses without `with_clips`, which is the question the
     /// UI puts in an alert; here it is a message the model can answer by
     /// retrying with the flag.
+    ///
+    /// That guard SHADOWS the core's own sentence for the same rule since
+    /// deepening D2·3, exactly as `removeMedia`'s does; the core's OTHER
+    /// refusal here — the last track in the project — has no guard in front
+    /// of it and arrives in the core's words.
     func removeTrack(_ a: [String: Any]) throws -> String {
         let document = try target(a)
         let track = try trackArg(a, "track", document)

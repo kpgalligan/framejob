@@ -24,7 +24,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::edit_clip::clip_end;
-use crate::edit_time::{shift_clips, unlocked_tracks};
+use crate::edit_time::{locked_track, shift_clips, unlocked_tracks};
 use crate::model::{Clip, Curve, Project, Source, Transition, TransitionKind};
 use crate::outcome::Outcome;
 use crate::time::Ticks;
@@ -316,7 +316,17 @@ impl Project {
         // 6 and 7. The overlap rule, stepping down from the larger side.
         loop {
             if a + b <= 0 {
-                return Ok(Outcome::Identity);
+                // Three clamps can land here — the two handles, the
+                // neighbours on the track, and the step-down below — so the
+                // sentence names all three rather than guessing which one
+                // it was, and names the number the caller sent, which is
+                // the one it would change.
+                return Ok(Outcome::Refused(format!(
+                    "the cut before clip {clip} has no room for an overlap: the {requested} \
+                     frames asked for clamp to nothing against the two clips' unused \
+                     material, their neighbours and the overlap rule; pass ripple: true to \
+                     make the overlap by shifting the timeline left instead"
+                )));
             }
             let (grown, moved) = extended(&earlier, &later, a * frame, b * frame);
             if self
@@ -374,8 +384,13 @@ impl Project {
     /// moved on passes the overlap rule — clamped rather than refused, the
     /// handle form's posture. A clip on another track that the shift pushes
     /// into its predecessor gains a minted `cross_dissolve`, which is
-    /// `close_gap`'s rule for the same shift. An incoming clip on a LOCKED
-    /// track cannot move, and nothing below one frame is left: both refuse.
+    /// `close_gap`'s rule for the same shift.
+    ///
+    /// Three refusals, each in its own sentence: an incoming clip on a
+    /// LOCKED track cannot move ([`locked_track`]); a pair whose shorter
+    /// clip is under two frames has no half to give; and a shift every
+    /// length of which would break the overlap rule somewhere it moved
+    /// something.
     pub(crate) fn add_transition_by_shift(
         &self,
         earlier: &Clip,
@@ -385,7 +400,13 @@ impl Project {
     ) -> Result<Outcome, String> {
         let unlocked = unlocked_tracks(self);
         if !unlocked.contains(&later.track) {
-            return Ok(Outcome::Identity);
+            return Ok(Outcome::Refused(locked_track(
+                later.track,
+                &format!(
+                    "clip {} cannot be shifted left to make the overlap",
+                    later.id
+                ),
+            )));
         }
         let frame = self.frame();
         let cut = later.start;
@@ -398,7 +419,19 @@ impl Project {
         }
 
         let shorter = earlier.duration.min(later.duration);
-        let mut frames = (duration / frame).min(shorter / 2 / frame);
+        let asked = duration / frame;
+        let allowed = shorter / 2 / frame;
+        // Asked first, so a request under a frame and a pair too short to
+        // halve are told apart by the two numbers rather than by a guess.
+        let mut frames = asked.min(allowed);
+        if frames <= 0 {
+            return Ok(Outcome::Refused(format!(
+                "clips {} and {} have no room to overlap by shifting: {asked} frames were \
+                 asked for and half of the shorter clip is {allowed} frames",
+                earlier.id, later.id
+            )));
+        }
+        let most = frames;
         while frames > 0 {
             let mut next = self.clone();
             shift_clips(&mut next, cut, -(frames * frame));
@@ -419,7 +452,11 @@ impl Project {
             }
             frames -= 1;
         }
-        Ok(Outcome::Identity)
+        Ok(Outcome::Refused(format!(
+            "clips {} and {} cannot overlap by shifting: no overlap from {most} frames down \
+             to one leaves every track the shift moves inside the overlap rule",
+            earlier.id, later.id
+        )))
     }
 
     /// How many whole frames the INCOMING clip could be extended backward

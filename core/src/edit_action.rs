@@ -50,12 +50,40 @@ const DEFAULT_ACTION_DURATION: Ticks = TIMESCALE;
 /// than `skip` (the action being edited). Actions on a clip may not overlap
 /// (spec §5.4); this is the test both `add_action` and `set_action` refuse
 /// on.
-fn actions_overlap(actions: &[Action], skip: Option<u32>, start: Ticks, duration: Ticks) -> bool {
+fn actions_overlap(
+    actions: &[Action],
+    skip: Option<u32>,
+    start: Ticks,
+    duration: Ticks,
+) -> Option<&Action> {
     let end = start.saturating_add(duration);
     actions
         .iter()
         .filter(|a| Some(a.id) != skip)
-        .any(|a| start < a.start.saturating_add(a.duration) && a.start < end)
+        .find(|a| start < a.start.saturating_add(a.duration) && a.start < end)
+}
+
+/// The two action refusals, written once because `add_action` and
+/// `set_action` ask exactly the same two questions of the same numbers
+/// (deepening D2·3). Each names the span the caller asked for and the span
+/// in its way, which is the pair of numbers a caller needs to pick another
+/// one without asking the project again.
+fn action_overlaps(clip: u32, other: &Action) -> String {
+    format!(
+        "action {} on clip {clip} already runs from {} to {} ticks, and two actions on one \
+         clip may not overlap",
+        other.id,
+        other.start,
+        other.start.saturating_add(other.duration)
+    )
+}
+
+fn action_past_end(clip: u32, start: Ticks, duration: Ticks, length: Ticks) -> String {
+    format!(
+        "an action at {start} ticks for {duration} would end at {}, past clip {clip}'s own \
+         end at {length} ticks",
+        start.saturating_add(duration)
+    )
 }
 
 /// Removes from `value` every key the incoming `patch` set to `null` —
@@ -139,8 +167,9 @@ impl Project {
     /// default, with an empty end patch, so it changes nothing until the
     /// inspector edits it (spec §6).
     ///
-    /// Refuses when it would overlap another action on the clip or run past
-    /// the clip's end. `Err` on a negative start or a non-positive
+    /// Refuses when it would overlap another action on the clip
+    /// ([`action_overlaps`]) or run past the clip's end
+    /// ([`action_past_end`]). `Err` on a negative start or a non-positive
     /// duration.
     pub fn add_action(
         &self,
@@ -164,10 +193,15 @@ impl Project {
             }
         };
         if at.saturating_add(duration) > target.duration {
-            return Ok(Outcome::Identity);
+            return Ok(Outcome::Refused(action_past_end(
+                clip,
+                at,
+                duration,
+                target.duration,
+            )));
         }
-        if actions_overlap(&target.actions, None, at, duration) {
-            return Ok(Outcome::Identity);
+        if let Some(other) = actions_overlap(&target.actions, None, at, duration) {
+            return Ok(Outcome::Refused(action_overlaps(clip, other)));
         }
 
         let mut next = self.clone();
@@ -224,10 +258,16 @@ impl Project {
             }
         };
         if new_start.saturating_add(new_duration) > target.duration {
-            return Ok(Outcome::Identity);
+            return Ok(Outcome::Refused(action_past_end(
+                clip,
+                new_start,
+                new_duration,
+                target.duration,
+            )));
         }
-        if actions_overlap(&target.actions, Some(action), new_start, new_duration) {
-            return Ok(Outcome::Identity);
+        if let Some(other) = actions_overlap(&target.actions, Some(action), new_start, new_duration)
+        {
+            return Ok(Outcome::Refused(action_overlaps(clip, other)));
         }
 
         let mut next = self.clone();

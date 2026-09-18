@@ -1078,9 +1078,11 @@ only inside a compound clip walked past the Swift guard with a user count of
 zero and was refused by the core with a reason-less "nothing changed", which
 reached a caller as the shared "Remove Media made no change…" and told it
 nothing. (Deepening D2·2 shortened that shared sentence — an identity now says
-only that the project is already in that state — so the negative check below
-is against the wording in `refusal_proof.py`, and still holds: this refusal is
-the handler's own and says neither.) The section builds that exact fixture
+only that the project is already in that state — and D2·3 gave the core's own
+rule a sentence naming the clips, which this handler's guard SHADOWS by asking
+one step earlier. The negative check below is against the wording in
+`refusal_proof.py`, and still holds: this refusal is the handler's own and
+says neither.) The section builds that exact fixture
 over the wire — import, a clip,
 `nest` — and asserts the refusal NAMES the file and the count, that the
 reason-less sentence is NOT what comes back, that `with_clips: true` takes the
@@ -2373,8 +2375,8 @@ comes back with (`core/src/outcome.rs`, `app/Sources/ReelEdit.swift`,
 `CONTEXT.md`'s **Op**), and the rules that can say WHY arrive one deepening
 ticket at a time (`designs/reelcut-roadmap-7.md` §4, kpgalligan/reelcut#8).
 Deepening D2·2 (#10) built it with the overlap rule's section, at
-**39/39**; D2·3 (#11) adds one section per rule that finds its voice, each a
-copy of `overlap_rule`.
+**39/39** (40/40 after its review); D2·3 (#11) took it to **113/113** with
+one section per rule that found its voice, each a copy of `overlap_rule`.
 
 An op answers one of three ways: it applied, it was an IDENTITY (valid, and
 nothing needed to change), or it was REFUSED (a rule declined it, in the
@@ -2392,12 +2394,32 @@ asserted WHOLE and never by keyword:
 | 1 — the overlap rule | the rule's whole sentence, ids and tick counts included, out of `move_clip`, out of `duplicate` (which names the copy it never made) and out of a SCOPED call; an overlap one frame under the limit still applying, so the number in the sentence is the rule's own boundary; the project unchanged either side of every refusal; and ONE undo putting back the marker edit, so not one of them registered a step |
 | 2 — an identity | four doors (`set_video`, `set_clip`, `set_canvas`, `split`) asked for the value the project already holds, each answering that whole sentence and NOTHING else — an equality, which is the only way to measure "says only that" — and naming no rule |
 | 3 — several ops | `normalize_clip` sends one `set_audio` per clip, so it is where the fold over a list is observable: a list of identities answers the identity, one undo puts both clips back, and a later op still runs after an earlier identity |
+| 4 — a locked track | `close_gap` over a gap that is really there and `insert_clip` with room to spare, both naming the track to unlock (`core/src/edit_time.rs`'s `locked_track`, written once for its three callers); the lock undone and both landing; and the same `close_gap` on a time that is ON a clip still answering the IDENTITY, which is the distinction the whole candidate is about, at one op |
+| 5 — the track stack | the only track in a project, refused with and without `with_clips: true` — the flag is the way past the OTHER refusal and not past this one — and a second track making the same call land |
+| 6 — a media row | the app's guard still answering first (below), and an unused row still going with no argument at all |
+| 7 — the transition cut | the app's two sentences still answering first (below), and the same cut taking a RIPPLED transition, which slides the incoming clip by exactly the overlap asked for |
+| 8 — the action rules | an action inside another and an action past the clip's end, each out of `add_action` AND `set_action` in the same words; and two boundaries that land — abutting is not overlapping, and an action ending exactly at the clip's end fits |
+| 9 — off the track stack | a two-track selection moved one track too far, naming the clip that would go off the top and the index it would land on, in `move_track`'s own words for the same mistake |
 
 Every refusal and every identity also asserts the ABSENCE of two fragments
 of the paragraph D2·2 deleted ("Either the project is already in that
 state", "the usual reason for a placement op is the overlap rule"). That
 paragraph also began "<Action> made no change", so a check looking only for
 the new words would pass against a build that still sent it.
+
+**Four checks measure the APP's sentence and not the core's, and say so by
+name** (`shadowed` rather than `refused`, §5d, §6b, §7b and §7d). The core
+has a sentence for each of those rules since D2·3 and nobody can hear it:
+`AgentServer+Media.swift`'s and `AgentServer+Tracks.swift`'s `with_clips`
+guards and `AgentServer+Transitions.swift`'s trial-apply each ask the same
+question one step earlier and answer in their own words. They are asserted
+WHOLE anyway, because they are what D2·4 (kpgalligan/reelcut#12) replaces —
+its own acceptance criterion is that this proof asserts the CORE's wording
+at those ops — and because an unchanged answer is D2·3's claim that nothing
+silently became an identity. Meanwhile those rules are proved through the
+FFI in `core/tests/refusal.rs`, and the measure of the gap is D2·3's mutant
+7: the transition rule turned back into a bare identity takes a core test
+and leaves this script at 113/113.
 
 **What section 3 cannot reach, said so it is not rediscovered as a gap.**
 Only three tools send a list of ops — `normalize_clip`, `import_captions`
@@ -2414,7 +2436,7 @@ arms through the FFI: those tests cannot see the Swift side of the seam —
 whether the app reads `reason_out` at all, whether the agent's shared reply
 still guesses, and whether a refusal is still no undo step once it has been
 through `ProjectDocument`. It needs no ffmpeg, and nothing in `media/` but
-`A.mov` and `AV.mov`.
+`A.mov`, `AV.mov` and `B.mov`.
 
 ## A refusal, where a person meets it (`refusal_probe.py`)
 

@@ -65,6 +65,28 @@ fn uses_media(clip: &Clip, media: u32) -> bool {
     )
 }
 
+/// The clips of a `with_clips` refusal, as English (deepening D2·3).
+///
+/// Both refusals that `with_clips` is the way past — a track that still
+/// holds clips and a media a clip still shows — name the clips a caller
+/// would otherwise have to ask for, so this is written once. At most three
+/// ids are listed and the rest are a count: a media used by two hundred
+/// clips would otherwise answer with a sentence nothing could read, and the
+/// first three plus the total is everything the caller acts on.
+fn clip_list(ids: &[u32]) -> String {
+    let named: Vec<String> = ids.iter().take(3).map(|id| id.to_string()).collect();
+    let rest = ids.len().saturating_sub(named.len());
+    match (named.as_slice(), rest) {
+        ([one], 0) => format!("clip {one}"),
+        (some, 0) => format!(
+            "clips {} and {}",
+            some[..some.len() - 1].join(", "),
+            some[some.len() - 1]
+        ),
+        (some, more) => format!("clips {} and {more} more", some.join(", ")),
+    }
+}
+
 // ---- the ops -------------------------------------------------------------
 
 impl Project {
@@ -122,15 +144,31 @@ impl Project {
     /// remove the LAST track: a project always has somewhere to put a clip,
     /// and an empty track stack is a UI with nothing to drop onto.
     ///
+    /// Both refusals carry their own sentence. The last-track one is asked
+    /// FIRST, because `with_clips: true` is the way past the other and past
+    /// this one it is not: a caller told about the clips would send it and
+    /// be refused again.
+    ///
     /// `Err` only for an unknown track.
     pub fn remove_track(&self, track: u32, with_clips: bool) -> Result<Outcome, String> {
         self.require_track(track)?;
         if self.tracks.len() <= 1 {
-            return Ok(Outcome::Identity);
+            return Ok(Outcome::Refused(format!(
+                "track {track} is the only track left, and a project must always have one"
+            )));
         }
-        let occupied = self.clips.iter().any(|c| c.track == track);
-        if occupied && !with_clips {
-            return Ok(Outcome::Identity);
+        let held: Vec<u32> = self
+            .clips
+            .iter()
+            .filter(|c| c.track == track)
+            .map(|c| c.id)
+            .collect();
+        if !held.is_empty() && !with_clips {
+            return Ok(Outcome::Refused(format!(
+                "track {track} still holds {}; pass with_clips: true to remove the track \
+                 and its clips",
+                clip_list(&held)
+            )));
         }
 
         let mut next = self.clone();
@@ -449,7 +487,8 @@ impl Project {
     /// Removes a media entry. Refuses while clips still show it unless
     /// `with_clips`, which removes those clips with it (spec §6) — the
     /// model has no "missing on purpose" state, and a clip pointing at an
-    /// id that is gone is what `validate` rejects.
+    /// id that is gone is what `validate` rejects. The refusal names the
+    /// clips ([`clip_list`]) and the argument that would let it through.
     pub fn remove_media(&self, media: u32, with_clips: bool) -> Result<Outcome, String> {
         self.require_media(media)?;
         // A nest references the project's `media[]` like everything else
@@ -457,9 +496,17 @@ impl Project {
         // and is removed with `with_clips` — but the nest CLIP is not
         // itself a user of the media and stays put. Taking it out would
         // throw away everything else in the group over one file.
-        let used = self.every_clip().any(|c| uses_media(c, media));
-        if used && !with_clips {
-            return Ok(Outcome::Identity);
+        let used: Vec<u32> = self
+            .every_clip()
+            .filter(|c| uses_media(c, media))
+            .map(|c| c.id)
+            .collect();
+        if !used.is_empty() && !with_clips {
+            return Ok(Outcome::Refused(format!(
+                "media {media} is still used by {}; pass with_clips: true to remove the \
+                 media and its clips",
+                clip_list(&used)
+            )));
         }
 
         let mut next = self.clone();
