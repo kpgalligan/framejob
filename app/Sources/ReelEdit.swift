@@ -13,8 +13,8 @@ import Foundation
 /// `ReelCore.swift`.** It mirrors the core module by module — the core gave
 /// the answer a module of its own for the same reason (`outcome.rs`) — and
 /// `ReelCore.swift` stood at 1507 lines against app/CLAUDE.md's ~600 cap, and
-/// a file at the cap gives something up before it takes anything on. What it
-/// gave up is the list fold below, which never touched the FFI.
+/// a file at that cap gives something up before it takes anything on. What
+/// it gave up is the list fold below, which never touched the FFI.
 ///
 /// **The rule the whole app leans on**: only `.applied` is an undo step.
 /// `.identity` and `.refused` are BOTH "the project did not change" — a
@@ -31,7 +31,7 @@ import Foundation
 /// Nothing on this side rewords it, appends to it or parses it: it is prose
 /// for a caller to read, not a code to switch on.
 struct ReelRefusal {
-    /// The op-table name of the op that was refused (`move_clips`,
+    /// The op-table name of the op that was refused (`move_clip`,
     /// `trim_start`, …). For a LIST applied in order it is the op the
     /// refusal came from, which is the whole reason it is carried: a call
     /// that groups several ops has to say WHICH one to fix, and the answer

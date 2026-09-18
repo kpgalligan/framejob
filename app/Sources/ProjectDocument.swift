@@ -1212,9 +1212,8 @@ final class ProjectDocument: NSDocument {
     }
 
     func updateLiveEdit(_ ops: [ReelOp]) {
-        guard let base = liveEditBase,
-            case .applied(let updated)? = try? base.applying(addressed(ops))
-        else {
+        guard let base = liveEditBase else { return }
+        guard case .applied(let updated)? = try? base.applying(addressed(ops)) else {
             // **Every answer but `.applied` is swallowed on purpose** — an
             // invalid tick, an identity and a rule's refusal alike (spec #8's
             // eighth decision). A refused tick is NORMAL here and recovers on

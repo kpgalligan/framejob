@@ -59,9 +59,9 @@ extension EditorViewController {
     /// selects it so it can be moved, faded or transformed straight away.
     ///
     /// No refusal beep of its own: `ProjectDocument.applyEdit` already beeps
-    /// for the core's `Ok(None)` — an empty selection, a lone nest clip, or a
-    /// nest clip the overlap rule will not have — and a second one here would
-    /// double it. The only beep left is the guard below, which the menu
+    /// for both of the core's "nothing changed" answers — an identity (an
+    /// empty selection, a lone nest clip) and the overlap rule's refusal of a
+    /// nest clip that will not fit — and a second one here would double it. The only beep left is the guard below, which the menu
     /// validation makes unreachable from the menu but not from the key
     /// equivalent's own path.
     func nestSelection() {

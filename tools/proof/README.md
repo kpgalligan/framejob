@@ -1075,9 +1075,13 @@ out loud rather than implied.
 `snapshot.clips` — the TOP LEVEL alone — while the core refuses against
 `every_clip()`, the timeline's clips CHAINED with every nest's. So media used
 only inside a compound clip walked past the Swift guard with a user count of
-zero and was refused by the core with a bare `Ok(None)`, which reaches a caller
-as "Remove Media made no change. Either the project is already in that
-state…". The section builds that exact fixture over the wire — import, a clip,
+zero and was refused by the core with a reason-less "nothing changed", which
+reached a caller as the shared "Remove Media made no change…" and told it
+nothing. (Deepening D2·2 shortened that shared sentence — an identity now says
+only that the project is already in that state — so the negative check below
+is against the wording in `refusal_proof.py`, and still holds: this refusal is
+the handler's own and says neither.) The section builds that exact fixture
+over the wire — import, a clip,
 `nest` — and asserts the refusal NAMES the file and the count, that the
 reason-less sentence is NOT what comes back, that `with_clips: true` takes the
 entry and the NESTED clip while leaving the nest clip itself on the timeline,

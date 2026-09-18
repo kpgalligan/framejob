@@ -197,7 +197,7 @@ def refused(s, tool, op, what, sentence, **call):
     message = s.error(tool, **call)
     after = s.text()
     tail = f"was refused at {op}: {sentence}"
-    check(message is not None and tail in message,
+    check(message is not None and message.endswith(tail),
           f"{what} — …{tail!r}; got: {shown(message)}")
     check(message is not None and not any(g in message for g in GUESSES),
           "…and not one word of the paragraph that used to guess at the reason")
@@ -305,11 +305,14 @@ def overlap_rule(mcp):
             f"shorter clip ({half} ticks)",
             clips=[b], delta=-over)
     # One frame under the limit is the same rule NOT refusing, which is what
-    # makes the refusal above a rule and not a blanket.
+    # makes the refusal above a rule and not a blanket — and it is read BACK
+    # off the project, because an absent error is not a placement.
     applied(s, "move_clip",
             "…while an overlap one frame UNDER the limit is allowed, so the number in "
             "the sentence is the rule's own boundary",
             clips=[b], delta=-(half - FRAME))
+    landed("…and that move LANDED, at the tick the delta asks for",
+           s.clip(b)["start"], 10 * SEC - (half - FRAME))
     s.op("undo")
 
     print("\n1c — and the same sentence out of a DIFFERENT op, about the clip it would mint")

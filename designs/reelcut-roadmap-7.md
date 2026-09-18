@@ -1966,7 +1966,8 @@ the seam's proof is born.
 
 ### 5.2 D2·2 — the app switches on three arms (kpgalligan/reelcut#10)
 
-**Commits.** `SHA1` (the ticket) and `SHA2` (what its review found, below).
+**Commits.** `25d3030` (the ticket) and `SHA2` (what its review found,
+below).
 
 **What landed.** The app side of the seam D2·1 opened, and the seam's proof.
 `ReelCore.swift` reads `reason_out` at last, the five app paths that read
@@ -1993,9 +1994,13 @@ handed a paragraph of guesses. No core change, no FFI change, no new tool.
   declined — and `.applied` still comes back whenever ANY op applied, which
   is byte for byte what the method decided before. What is new is that the
   FIRST refusal is remembered and answered when nothing applied at all.
-  Making a refusal abort the list was considered and rejected: it would
-  change what lands for a recording's landing and a caption import, which is
-  not this ticket's business.
+  **That is a NARROWING of the ticket's sixth line, said plainly**: a list
+  where one op applied and another was refused answers `.applied`, and that
+  refusal's sentence is dropped. Making a refusal abort the list instead was
+  considered and rejected — it would change what LANDS for a recording's
+  landing and a caption import, which is not this ticket's business — and no
+  tool can produce the case today (below). A ticket that wants the dropped
+  sentence reported beside a partial success is a ticket of its own.
 - **The five paths each say which arm they handle.** `applyEdit` switches,
   and its two non-applied arms are one case: a beep, and no undo step, which
   is what makes a person's experience of the two identical. `updateLiveEdit`
@@ -2024,7 +2029,7 @@ handed a paragraph of guesses. No core change, no FFI change, no new tool.
   candidate removes, re-created in prose.
 
 **The proof, born here.** `tools/proof/refusal_proof.py`, named for the seam
-and not for a phase (the patch door is the precedent), **39/39**. Three
+and not for a phase (the patch door is the precedent), **40/40**. Three
 sections: the overlap rule speaking out of `move_clip`, out of `duplicate`
 (which names the copy it never made) and out of a SCOPED call, with an
 overlap one frame under the limit still applying so the number in the
@@ -2069,12 +2074,16 @@ goes through because `performGroupedEdit` always passes a list.
 | the agent's identity arm keeps guessing (the deleted paragraph restored) | 10 of 39 failed |
 | the op name dropped from the refusal reply | 3 of 39 failed |
 | `applyEdit` registers an undo step for a refusal (the phantom step) | 4 of 15 probe checks failed |
+| a lecture APPENDED after the rule's sentence (the sixth, added by the review) | 3 of 40 failed |
 
 The third is the widest because every identity in §2 and §3 is an equality
 against the whole sentence: a build that appends a lecture moves the string
 and is caught at four doors, not just at the one an eye would check. The
 fifth is scored by the probe rather than the proof, which is the reason the
-probe exists — no MCP call can put a refusal in front of `applyEdit`.
+probe exists — no MCP call can put a refusal in front of `applyEdit`. The
+sixth exists because the review found the refusal helper asserting its
+sentence with `in` while its own docstring promised the reply ENDS in it: it
+is the mutant only the fix catches, and the `in` it replaced passed it.
 
 **Verification.** `make test` 641 passed / 0 failed (no core change, so the
 number is D2·1's), `make lint` and `cargo fmt --check` clean, `make typecheck`
@@ -2082,7 +2091,8 @@ number is D2·1's), `make lint` and `cargo fmt --check` clean, `make typecheck`
 startup parity log empty at every launch below.
 
 Every proof script was run against the rebuilt binary, each on a freshly
-launched instance of its own: **refusal 39/39**, phase1 **66/66**, phase2
+launched instance of its own: **refusal 39/39** (40/40 after the review's
+fix), phase1 **66/66**, phase2
 **85/85**, phase3 **123/123**, phase3_silence_scope **8/8**, phase4
 **84/84**, phase5 **88/88**, phase6 **168/168**, phase7 **92/92**, phase8
 **79/79**, phase9 **216/216**, patch_door **261/261**, remaining **79/79**,
@@ -2107,6 +2117,61 @@ is 122 lines against a 400-line cap; the proof script is 484 and the probe
 core's edge"; `tools/proof/README.md` gains a section for the proof and one
 for the probe, and both are in its run list. Spec §6's op table, the
 glossary and `app/CLAUDE.md`'s Rules are still D2·5's.
+
+**What its review found.** The two-axis review ran against `25d3030`, twice
+on each axis (the first pair of agents was re-run after a lost hand-off, and
+the second pair found one thing the first had not). Fixed:
+
+- **The refusal helper was weaker than its own docstring.** `refused()`
+  promised the reply "must END in the rule's own sentence" and asserted it
+  with `in`, so a build that appended a lecture after the sentence would
+  have passed — the exact failure this candidate exists to prevent. It is
+  `message.endswith(tail)` now, and the sixth mutant is that lecture.
+- **The boundary claim rested on an absent error.** "an overlap one frame
+  UNDER the limit is allowed" scored only that nothing threw; it now reads
+  the clip's start back through `get_project` (the README's rule that a
+  claim is a placement read back, a byte comparison or a sample
+  comparison). That is the fortieth check.
+- **Two more doc comments this ticket made false**, both missed by the first
+  sweep and both in files it was already editing:
+  `EditorViewController+Inspector.swift`'s transition batch ("can come back
+  `Ok(None)`") and `EditorViewController+Nest.swift`'s ⌘G, which listed the
+  overlap rule's REFUSAL among the identities `applyEdit` beeps for — the
+  very distinction this ticket draws, blurred in prose.
+- **`tools/proof/README.md` still quoted the deleted paragraph as live
+  behaviour** in its phase 8 section, although `phase8_proof.py`'s own
+  docstring had been re-read. The mirror is re-read now, and says which
+  script the negative check is measured against.
+- **`updateLiveEdit`'s merged guard made its comment cover a case that is
+  not an answer** (no gesture in progress). The guard is two again, one line
+  SHORTER than the merged form, and the comment is about the three answers
+  only.
+- **A forward-looking clause in `AgentServer+Transitions.swift`** promising
+  what D2·3 would do, and two slips of my own in `ReelEdit.swift` (a doubled
+  conjunction, and `move_clips` where the op table says `move_clip`).
+- **The record said `SHA1`/`SHA2`.** Both are filled.
+
+Judged not real:
+
+- *The size toll was not "landed and gated alone".* It was a tightening, not
+  a pure move, and D2·1's own review set that precedent (`2148190` tightened
+  `ReelCore.swift` back to 1507 inside the fix commit). No file grew.
+- *`ReelEdit.swift`'s doc names a future ticket* ("until road map 7's D2·3
+  gives them their sentences"). It mirrors `Outcome::Identity`'s doc, which
+  D2·1 shipped and its review accepted as the ONE place that list lives; a
+  Swift mirror that pointed nowhere would be worse.
+- *The `.project` accessor at sixteen call sites is a Message Chain, and a
+  third arm would be Shotgun Surgery across all of them.* The sixteen are
+  the callers that never wanted anything but the handle, and collapsing
+  them in one named accessor is what keeps the five paths that DO decide
+  legible. A fourth arm is a core change first.
+- *The "byte-identical project" is a canonical re-encoding of `get_project`
+  rather than the package bytes.* That is the patch door's own definition
+  and its argument (`Session.text`): two encodings of one project compare
+  equal and two different projects cannot.
+- *Checkbox 3 is only partly demonstrated.* Agreed, and said so above and in
+  §3 of the proof rather than papered over: the mechanism is there, and no
+  tool can reach the case.
 
 **What the next tickets inherit.**
 

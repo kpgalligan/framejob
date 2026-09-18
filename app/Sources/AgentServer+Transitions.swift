@@ -38,9 +38,9 @@ extension AgentServer {
     /// than the material lands shorter, and "not at a hard cut" is the
     /// core's sentence naming which of the three it is. What IS reworded is
     /// the IDENTITY: the shared reply says only that the project is already
-    /// in that state (D2·2), and the reason this op answers one is that
-    /// neither side of the cut had a frame of unused material left — a rule
-    /// that will say so itself, and lose this rewording, at D2·3.
+    /// in that state, and the reason this op answers one is that neither side
+    /// of the cut had a frame of unused material left, which is a rule and
+    /// not a no-op.
     func addTransition(_ a: [String: Any]) throws -> String {
         let document = try target(a)
         let clip = try clipArg(a, "clip", document)
