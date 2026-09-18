@@ -3329,3 +3329,109 @@ the exposure the old `[&str; 57]` already had. The fixes are `ade23da`.
 17 kinds, the query export, the catalog's migration, the fifth part of the
 parity check, the widening list, and the proof scripts that stop re-typing
 argument names in Python.
+
+### 8.2 D3·2 — the table goes out through the FFI (kpgalligan/reelcut#16)
+
+**Commits.** `PLACEHOLDER_ONE` (the ticket).
+
+**What landed.** The table leaves the core. No catalog file and no
+`AgentServer*` file was edited, no op or tool was added, no persisted state
+changed and `RC_FORMAT_VERSION` did not move — this is the expand half of
+the spec's expand-then-migrate sequence, and **nothing in the app reads a
+schema yet**.
+
+- **`core/src/op_schema.rs` is new, 154 lines** against the 400-line cap for
+  a new module, and like `op_table.rs` it takes no exemption. `op_schemas()`
+  answers one JSON-Schema object per op — `{"type": "object", "properties":
+  {…}, "required": […]}` — and `schema_of_kind` is the one function turning
+  a `Kind` into JSON. Its match is **exhaustive over all 17 kinds**: D3·1's
+  review found that a catch-all in `Kind::values` would have let a new kind
+  be silently skipped by the test meant to prove it, and the same posture is
+  taken here.
+- **Its own module rather than more of `op_table.rs`**, which had 124 lines
+  of headroom. The two change for different reasons — a row when an OP does,
+  this when the published DIALECT does — and a table's cap is not a budget
+  to spend on a wire format.
+- **`rc_op_schemas` is the export**, beside `rc_op_names` in
+  `ffi_query.rs`, with the same contract: no handle, never NULL, nothing
+  persisted, no format bump. The three files moved together — the Rust
+  export, the hand-maintained header, and `ReelCore.swift`, still the only
+  file in the app that names an `rc_*` symbol.
+- **`ReelOp.coreSchemas()` is the Swift wrapper**, answering
+  `[String: ReelOpSchema]` — `properties` and `required`, which are exactly
+  the two arguments `AgentServer.tool(_:_:_:required:)` takes, so the
+  migration ticket has nothing to reshape. `ReelCore.swift` went
+  **1500 → 1563**; it is over the cap and in the ledger, and the addition
+  was unavoidable because no other file may call `rc_*`.
+
+**The mapping, which is where the kind vocabulary earns its keep.** Every
+constraint below is hand-written per property in the catalog today.
+
+| Kind | Published as |
+|---|---|
+| `Ticks` | `{"type": "integer"}` — **no minimum**, because a `delta`, a `slip` and a `roll` are negative every working day |
+| `Id`, `Index` | `{"type": "integer", "minimum": 0}` — `u32` and `usize` are one thing to a schema; the table keeps them apart because serde names them differently |
+| `Ids` | an array of those |
+| `Ranges` | an array of two-element integer arrays, the length included |
+| `Number`, `Boolean`, `Text` | number, boolean, string |
+| `Object` | `{"type": "object"}` and **no `properties`** |
+| `Color`, `FrameRate` | arrays of exactly 4 numbers / 2 whole numbers |
+| `Transition`, `Alignment`, `Curve`, `Fit` | a string with `Kind::values`'s members as `enum` |
+| `Groups` | an array of those strings |
+| `Region` | an object with `x`, `y`, `width`, `height`, all four `required` and `additionalProperties: false` |
+
+**Three decisions inside that table, each with its reason in the source.**
+A **patch** is opaque — D1 made the core the one validator of what one may
+carry, so the schema says only that an object belongs there; the `"object"`
+is the OP's rule and not the decoder's, which takes any json at all. A
+**region** is the deliberate opposite, because `ZoomRegion`'s four members
+are declared by the core and refused by name. And **an op carries no
+`additionalProperties`**, because the catalog merges `project` and `scope`
+in over this and a closed object would refuse the two keys every tool has.
+
+**What is NOT published, and is the next ticket's to notice.** Nullability.
+`set_transition`'s `kind: null` clears and `add_zoom_action`'s
+`region: null` is a zoom BACK; both tools declare `["object", "null"]` or
+`["string", "null"]` by hand today, and the table has no field for it —
+that a null MEANS something is semantics, which is `edit.rs`'s doc table.
+The migration either widens those two deliberately or gains a column.
+
+**The core test.** `core/tests/op_schemas.rs`, 342 lines, ten tests, through
+the FFI the way `op_names.rs` tests the names export: the published keys are
+the table's names in both directions; every published name is an op
+`rc_project_apply` dispatches on (so the chain does not rest on `OP_NAMES`);
+each schema's properties are that row's arguments in both directions;
+`required` is the table's required list in table order; no schema carries
+`scope` or `project`; every argument matches a hand-written oracle,
+exhaustive over `Kind`; every one of the 17 kinds is carried by at least one
+argument, so none is published unexercised; only a closed vocabulary
+publishes an `enum`; and a patch is opaque where a region is not.
+
+**The probe, and what makes it more than a mirror.**
+`tools/proof/op_schema_probe.py`, **27/27**, compiled out of `app/Sources`
+over `harness/build.sh`'s own swiftc line. Its middle section sends each of
+the 57 ops an envelope carrying one key no op has, reads the list of fields
+serde says it DID expect, and compares that to the published properties —
+**the decoder is the oracle and no argument name is written in the script**,
+which is the instrument spec #14 asks for in place of the Python literals
+the older proofs carry. The only literals are twelve kind rows, which are
+about the MAPPING rather than about which arguments exist.
+
+**The catalog is untouched, and that was measured rather than asserted.**
+The binary built before this ticket was still on disk, so `tools/list` was
+captured from it and from the new build on the same port: **77 tools,
+byte-identical JSON**, and the startup parity log printed nothing either
+time.
+
+**Verified.** `make test` **669 passed / 0 failed** (659 before, +10);
+`cargo fmt --check` clean; `make lint` clean; `make typecheck` 0 errors and
+exactly the four known AVFoundation warnings; `make app` BUILD SUCCEEDED;
+the built binary launched on port 4841 and `grep "Reelcut: "` on its log
+printed nothing. The header and the NULL-safety sweep agree, which is not a
+courtesy — `null_safety_sweep_covers_every_export_in_the_header` parses
+`reelcut_core.h` and fails on an export declared there and never swept, so
+two of the FFI's three files are checked in lockstep by a test.
+
+**Owed.** The catalog's migration, the fifth part of the parity check, the
+widening list, the nullability question above, and the proof scripts that
+stop re-typing argument names in Python.

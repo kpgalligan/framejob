@@ -61,15 +61,28 @@ file is what governs a module now.
   op and one `Argument` per argument — its name, its `Kind` and whether the
   decoder requires it — and `OP_NAMES` as a projection of it, re-exported by
   `edit.rs` so no caller moved. A published interface, where the `Op` enum
-  and the dispatch are its implementation. Nothing outside this module and
-  its test reads a row YET — the catalog and the startup check are the later
-  D3 tickets; `OP_NAMES` is the one part of it already consumed. A row holds no prose, no semantics and no default
+  and the dispatch are its implementation. Its one reader in the crate is
+  `op_schema.rs`, which carries the rows out through the FFI; nothing in the
+  APP reads a row yet — the catalog and the startup check are the later D3
+  tickets, and `OP_NAMES` is the part of it already consumed. A row holds no prose, no semantics and no default
   spelled twice; `Kind` is closed, carries each vocabulary's members, and
   has exactly ONE kind per answer serde gives, because a distinction the
   decoder cannot see is one no test could prove. Nothing here is the
   authority — the enum's fields are, and `core/tests/op_table.rs` proves
   every row by asking the decoder. Capped at 400 lines like any new module:
   it does NOT inherit `edit.rs`'s table exemption.
+- `op_schema.rs` — `op_table.rs` written as JSON Schema, which is what
+  `rc_op_schemas` publishes (road map 7's D3·2): one object per op, its
+  properties the arguments and its `required` the ones the decoder will not
+  do without. **The match over `Kind` is exhaustive** — a kind added to the
+  table does not compile until this says what JSON it is — and it is a
+  module of its own because a row changes when an OP does and this changes
+  when the published DIALECT does. It says nothing about what an argument is
+  FOR (the catalog's prose), nothing about what a patch may CARRY
+  (`Kind::Object` is an object with no properties; D1 left the core the one
+  validator of that), and nothing about `additionalProperties` on an op,
+  because the catalog merges `project` and `scope` in afterwards. Tested
+  through the FFI in `core/tests/op_schemas.rs`.
 - `scope.rs` — editing INSIDE a nest: the envelope's `scope` key. Builds a
   VIEW project from the nest (its tracks and clips at top level, its frozen
   size as the canvas, the parent's rate, media, `next_id` and nests, no

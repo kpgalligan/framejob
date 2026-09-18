@@ -17,7 +17,12 @@ detail there.
   `planJSON` are memoised PER HANDLE, so keep handles rather than minting
   them), timecode, snapping, export presets/sizes/settings, `RecipeSource`,
   the `dictionary` extensions on the property types and the typed patches.
-  `deinit` frees the Rust allocation. It also holds **the one read of
+  It is also where the op table is read BACK — `ReelOp.coreNames()` over
+  `rc_op_names` and, since road map 7's D3·2, `ReelOp.coreSchemas()` over
+  `rc_op_schemas`: every op's ARGUMENTS as JSON Schema, keyed by op name, in
+  the `ReelOpSchema` (properties + required) the catalog's `tool` helper
+  takes. Nothing calls `coreSchemas()` yet; the catalog is migrated in a
+  later D3 ticket. `deinit` frees the Rust allocation. It also holds **the one read of
   `rc_project_apply`'s TWO message channels**, in the header's own order — a
   sentence is a refusal, an error message is invalid input, neither written
   is an identity — answered as the `ReelEdit` below.

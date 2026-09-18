@@ -1,8 +1,8 @@
 //! C FFI: the read-only queries (`rc_project_duration`,
 //! `rc_project_composition_plan`, `rc_project_frame_recipe`,
 //! `rc_project_frame_recipe_opts`, `rc_project_clip_state`,
-//! `rc_project_snap_candidates`, `rc_snap_resolve`, `rc_op_names` and the
-//! three `rc_export_*` queries in the header).
+//! `rc_project_snap_candidates`, `rc_snap_resolve`, `rc_op_names`,
+//! `rc_op_schemas` and the three `rc_export_*` queries in the header).
 //!
 //! Thin shims only, all of them pure: a query never changes the project
 //! and never allocates a handle. Every JSON answer here is COMPACT, unlike
@@ -29,6 +29,7 @@ use crate::ffi_util::{
     fallible_op, out_string, project_get, project_json, read_cstr, read_opt_cstr,
 };
 use crate::model::Project;
+use crate::op_schema;
 use crate::recipe::RecipeOptions;
 use crate::snap;
 use crate::time::Ticks;
@@ -215,6 +216,39 @@ pub unsafe extern "C" fn rc_op_names() -> *mut c_char {
                 serde_json::to_string(&edit::OP_NAMES[..])
                     .map_err(|e| format!("op names are not serializable: {e}"))
             },
+            out_string,
+        )
+    }
+}
+
+/// Every op's ARGUMENTS as JSON Schema: an object mapping each name
+/// [`rc_op_names`] reports to
+/// `{"type": "object", "properties": {…}, "required": […]}` for that op —
+/// `crate::op_schema::op_schemas`, built out of `op_table.rs`.
+///
+/// It is exported for the same reason [`rc_op_names`] is, one level
+/// further in: the MCP catalog in `app/Sources/AgentCatalog*.swift` writes
+/// every op tool's argument types, `minimum`s, `enum`s and `required` list
+/// by hand today, and the only way those cannot drift from what the core
+/// decodes is to print the side that owns them. The core says what an
+/// argument IS; the app's prose says what it is FOR, and this carries none
+/// of it — nor the envelope's `scope`, which is not an argument of any op.
+///
+/// A query, so it takes no handle, changes nothing persisted and is never
+/// NULL; adding it moves no format version.
+///
+/// # Safety
+/// Takes no pointers; declared `unsafe` only so the whole exported surface
+/// reads the same way. The returned string is freed with
+/// [`crate::ffi::rc_string_free`].
+#[no_mangle]
+pub unsafe extern "C" fn rc_op_schemas() -> *mut c_char {
+    unsafe {
+        fallible_op(
+            ptr::null_mut(),
+            "listing op schemas",
+            ptr::null_mut(),
+            || Ok(op_schema::op_schemas().to_string()),
             out_string,
         )
     }

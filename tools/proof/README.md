@@ -2493,3 +2493,39 @@ press ⌘Z twice past. An identity has always done it, no caller reaches it
 (the agent refuses at its trial, and the menu path does not use that entry
 point), and it is not D2's doing; the note is there so it is found written
 down rather than rediscovered.
+
+## The op table, read back through the app (`op_schema_probe.py`)
+
+`python3 tools/proof/op_schema_probe.py`, no port and no running app. Road
+map 7's D3·2 publishes every op's ARGUMENTS as JSON Schema through
+`rc_op_schemas`, and `ReelOp.coreSchemas()` is the app's one reader of it.
+**Nothing in the app calls that reader yet** — the catalog is migrated in a
+later D3 ticket and `tools/list` returns exactly the schemas it always did —
+so there is no MCP surface to measure, and the instrument is `CLAUDE.md`'s
+answer for app STRUCTURE with no caller a script can reach: a probe compiled
+out of `app/Sources` over `harness/build.sh`'s own swiftc line, cached on
+modification times, a build failure scored as a FAILURE rather than an exit.
+**27/27** at D3·2 (#16). It needs `core/target/release/libreelcut_core.a` —
+`make test` or `cd core && cargo build --release` first, or the build check
+fails naming the missing file.
+
+Five sections. **The map**: `coreSchemas()`'s keys against `coreNames()`'s
+names in both directions — two separate exports read separately, so a schema
+map that dropped an op, or invented one, is named. **The identity**: for
+each of the 57 ops the probe sends an envelope carrying one key no op has,
+serde refuses it with the list of fields it DID expect, and that list is
+compared to the published properties — **no argument name is written in the
+script**, which is what spec kpgalligan/reelcut#14 asks for in place of the
+Python literals the older proofs carry. **The envelope**: neither `scope`
+nor `project` is in any published schema; the catalog injects both.
+**The kinds**: one representative argument per kind against the JSON Schema
+the mapping owes it (an id's `minimum: 0`, ticks with none because a delta
+is negative, a patch as an object with no properties, a region as the four
+members the core declares and closes). **The vocabularies**: each of the
+five arrives as a string — or a list of them — with a non-empty `enum`;
+WHICH members it has is `core/tests/op_table.rs`'s claim against the
+decoder, not a list retyped here.
+
+The twelve kind rows are the only literals, and they are about the MAPPING
+rather than about which arguments exist: they are the one claim a probe
+reading the core's own answer cannot make about itself.

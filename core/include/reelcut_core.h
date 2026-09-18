@@ -162,6 +162,23 @@ RcProject *rc_project_apply(const RcProject *p, const char *op, char **err_out,
  * it. Never NULL. */
 char *rc_op_names(void);
 
+/* Every op's ARGUMENTS as JSON Schema: a JSON object mapping each name
+ * rc_op_names reports to
+ *   {"type": "object", "properties": {...}, "required": [...]}
+ * for that op, with one property per argument — an id is an integer with a
+ * minimum of 0, ticks an integer (a delta is negative), a closed vocabulary
+ * a string with its members enumerated, and a caller-authored patch an
+ * object with NO declared properties, because the core is the one validator
+ * of what a patch may carry and this says only that an object belongs there.
+ *
+ * The host merges its own PROSE over this to build its MCP tool schemas: the
+ * core says what an argument is, the host says what it is for. The envelope's
+ * "scope" is not an argument of any op and is in no schema here; the host
+ * injects it, as it does "project".
+ *
+ * A query — no handle, nothing persisted changes, and never NULL. */
+char *rc_op_schemas(void);
+
 /* --------------------------------------------------------------- queries */
 
 /* End of the last clip, in ticks. 0 for an empty project or NULL. */
