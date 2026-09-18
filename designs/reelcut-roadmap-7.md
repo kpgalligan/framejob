@@ -4010,3 +4010,30 @@ log printed nothing. The two neighbours that read the same list were re-run
 after the fix: `clip_catalog_proof.py` **24/24** — its oracle reads the
 declarations too — and `op_schema_probe.py` **28/28**, which asserts the
 CORE's frame rate and is untouched by a narrowing the app makes.
+
+**The orchestrator's verification found the same asymmetry one layer down**
+(`dd32de9`). D3·3's prefactor proved that every bound the table PUBLISHES is
+one the core refuses outside. That is half a check: a row with no bound makes
+no claim, so nothing falsifies its absence. Measured rather than reasoned —
+the mutant was run — dropping `set_canvas.width`'s bound from the table left
+`core/tests/op_table.rs` green at 7/7 AND `op_catalog_proof.py` green at
+23/23, because the catalog and the proof's oracle both read the table and
+move together with it. An agent would have lost a constraint the app still
+enforces, exactly as it would have lost `ranges`' `minItems` in §8.3.
+
+The new test asks the CORE instead of the table. A range the core enforces
+answers in its own sentence — `canvas width must be between 16 and 16384,
+not 0` — so every whole-number argument is handed two values no range could
+contain, and an argument that answers with that sentence while carrying no
+bound is a bound the table has lost. Nothing has to know in advance which
+arguments are bounded, so a bound added later to an op nobody has thought of
+is covered by construction. `make test` 670 → **671**; the mutant scores
+**7/8**, naming `set_canvas: width`.
+
+**Twice now, the same shape.** Both regressions were a constraint the app
+still enforced that the schema stopped declaring, and both were invisible to
+an instrument derived from the thing it was checking. The series rule that
+comes out of it, for #19 and for anything after: **a generated artefact is
+checked by asking the thing that generated it a question it did not write
+the answer to** — the running app for a declaration, the core's own refusal
+sentence for a bound.
