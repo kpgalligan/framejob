@@ -2444,7 +2444,7 @@ Judged not real:
 ### 5.4 D2·4 — the app's guesses are deleted (kpgalligan/reelcut#12)
 
 **Commits.** `06dd67b` (the ticket), `aefb0b9` (the mutant table) and
-`SHA3` (what its review found, below).
+`4d54d69` (what its review found, below).
 
 **What landed.** App only — three agent handlers, two proof scripts, the
 app's rulebook and the proof README. No core change, no FFI change, no op
@@ -2629,7 +2629,7 @@ still D2·5's.
 
 **What its review found.** The two-axis review ran against `aefb0b9`. Both
 axes found real things; neither found a hard violation of a documented
-standard in the CODE. Fixed in `SHA3`:
+standard in the CODE. Fixed in `4d54d69`:
 
 - **A spec decision reversed in a commit message.** The spec axis put it
   exactly right: the reason for keeping `set_transition_style`'s refusal was
