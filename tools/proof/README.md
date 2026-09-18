@@ -2416,7 +2416,8 @@ guards and `AgentServer+Transitions.swift`'s trial-apply each asked the same
 question one step earlier and answered in their own words. D2·4
 (kpgalligan/reelcut#12) deleted all four, and those checks are ordinary
 `refused` calls against the core's sentence now; the helper is gone with
-them, and the app's old wording is kept in road map 7 §5.3's table. The gap
+them, and the app's old wording is kept in road map 7 §5.4's own "what
+went" table. The gap
 D2·3 measured with its mutant 7 — the transition rule turned back into a
 bare identity, taken by a core test and invisible here — is closed: the same
 mutant is D2·4's, and this script takes it.

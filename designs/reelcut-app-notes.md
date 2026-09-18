@@ -977,11 +977,12 @@ lockstep are in the root `CLAUDE.md`; the full design is
   automatic: `ProjectSnapshot`'s enums decode leniently, so a misspelt
   `kind` or `align` that reached a typed value would become the first case
   and the caller be told its wipe had landed. It also refuses a keyless
-  `set_transition_style` (the core's own answer is `None`, which reads as
-  "made no change" to a caller who simply forgot an argument) and rewords
-  `add_transition`'s `None`, whose cause is that neither side of the cut
-  had a frame of unused material rather than the overlap rule
-  `performGroupedEdit`'s fixed text names.
+  `set_transition_style`, which is an argument the caller forgot rather
+  than a rule saying no — the core's own answer is an identity, and an
+  identity says only that the project is already in that state. It used to
+  REWORD `add_transition`'s two refusals as well, trial-applying the op to
+  see whether it would land; deepening D2·4 (road map 7 §5.4) deleted that
+  trial and both sentences, and the core's own words arrive instead.
   One gap in that guard worth knowing: `patchArg`'s round-trip check
   cannot see a wrong-typed value for a `T??` field — the `nullable()`
   decoder in `ProjectSnapshot.swift` swallows every decode error and

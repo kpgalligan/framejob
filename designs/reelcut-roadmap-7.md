@@ -2443,8 +2443,8 @@ Judged not real:
 
 ### 5.4 D2·4 — the app's guesses are deleted (kpgalligan/reelcut#12)
 
-**Commits.** `06dd67b` (the ticket), `SHA2` (the mutant table) and `SHA3`
-(what its review found, below).
+**Commits.** `06dd67b` (the ticket), `aefb0b9` (the mutant table) and
+`SHA3` (what its review found, below).
 
 **What landed.** App only — three agent handlers, two proof scripts, the
 app's rulebook and the proof README. No core change, no FFI change, no op
@@ -2458,16 +2458,17 @@ the whole app-side change is three functions getting shorter.
 | Where | What it was | Lines |
 |---|---|---|
 | `AgentServer+Transitions.swift` | `addTransition`'s trial-apply (`.project == nil`, which caught a refusal exactly as it caught an identity) and the two sentences it chose between — the handle form's "neither side of the cut has media beyond it…" and the rippled form's "with ripple the shift clamped below one frame — … or … or …" | −27 +6 |
-| `AgentServer+Tracks.swift` | `removeTrack`'s clip count and `Track 1 ("Video 1") still holds 1 clip. Pass with_clips: true to remove them too.` | −6 |
+| `AgentServer+Tracks.swift` | `removeTrack`'s clip count and `Track 1 ("Track 1") still holds 1 clip. Pass with_clips: true to remove them too.` | −6 |
 | `AgentServer+Media.swift` | `removeMedia`'s user count and `A.mov is used by 1 clip. Pass with_clips: true to remove them too.` | −6 |
 
 Thirty-nine lines of code and inline comment out, six back. The three files
 go 140 → **123**, 247 → **243** and 327 → **320**: twenty-eight lines
 smaller with their doc comments counted, and what a caller hears at those
 four refusals is now the core's own sentence through `performGroupedEdit`'s
-one format string. The sentences the app used to write are kept in §5.3's
-table and in the proof sections that assert the new ones, so a reader can
-still see what they said.
+one format string. The sentences the app used to write are kept in the table
+ABOVE and in the comments of the proof sections that assert the new ones, so
+a reader can still see what they said; §5.3's table is the core's own
+sentences, which is a different list.
 
 **What stayed, and why each is not a duplicate.** The spec's seventh
 decision named five things to delete. Three are above; the other two were
@@ -2490,8 +2491,9 @@ CALL, or reports something the core cannot know, stays.**
   `cache/peaks/<media id>.bin`, which is not in the model and which the core
   has never seen (spec §7). With no reading there is no op to send, so the
   shared reply would be the identity's — and "the project is already in that
-  state" is FALSE here, since nothing was measured against that state at
-  all. The check is restated against `input` rather than `plan`, so that it
+  state" would send a caller to look at its volumes when what happened is
+  that its peaks were not there to read.
+  The check is restated against `input` rather than `plan`, so that it
   asks about the READ and not about what the core would answer, and its old
   justification — the shared message "goes on to talk about the overlap
   rule" — is gone, because since D2·2 it does not.
@@ -2508,8 +2510,15 @@ CALL, or reports something the core cannot know, stays.**
   was the false part, and is rewritten to say it names an argument. The same
   false claim was found and fixed in `ripple_delete_ranges`, which is not on
   the spec's list at all and said the shared reply "would report [it] as the
-  overlap-rule refusal". Sweeping all six, or none, is a decision of its
-  own, under Owed.
+  overlap-rule refusal".
+
+  **A ticket does not reverse a spec decision in a commit message**, so the
+  line this paragraph draws is written where decisions live: spec §11's
+  **D2-1**, added before the fix and naming the amendment to #8's seventh
+  decision. Its rule is the one above — a check that predicts a RULE goes, a
+  check that names the CALL stays — and it covers `normalize_clip` too. The
+  code-review's spec axis is what asked for it, in those words: the reason
+  was sound and the order was wrong.
 - **`EditorViewController+Inspector.setTransitionKindCommand`'s trial-apply**
   stays. It is a UI path deciding whether to put up the Shift Clips Left
   SHEET for a person, which is the one thing spec #8 puts out of scope
@@ -2580,8 +2589,10 @@ the core's names both.
 **Size.** Nothing grew: every file this ticket touched is smaller or the
 same. `AgentServer+Clips.swift` is at **847**, over the ~600 cap, and its
 one comment was reworded three lines for three, so the file at the cap took
-nothing on. `AgentServer+Audio.swift` is **166** (+10, all doc) and nowhere
-near it. `designs/reelcut-remaining.md` §3's two `AgentServer` rows are
+nothing on. `AgentServer+Audio.swift` is **162**, six longer than the 156 it
+started at: a doc paragraph that says why its check is not a guess, where
+the six it replaced said the shared reply lectured about the overlap rule.
+It is nowhere near the cap. `designs/reelcut-remaining.md` §3's two `AgentServer` rows are
 unchanged by this ticket and are still D2·5's to regenerate.
 
 **Verification.** `make test` **653 passed / 0 failed** (D2·3's number; no
@@ -2607,13 +2618,64 @@ still D2·5's.
 
 **Owed.**
 
-- **The six argument checks**, above: they are one family and should be
-  swept or kept together. D2·5 is the contract ticket and is where the line
-  belongs if it is to be drawn in a rulebook.
+- **Nothing about the six argument checks**: spec §11's D2-1 settles them,
+  and `app/CLAUDE.md`'s new rule says the same thing where a Swift author
+  will read it. Named here only so D2·5 does not re-open it.
 - **The clamped-edge family** still answers `Identity`, named in
   `Outcome::Identity`'s doc — D2·3's bequest, untouched here.
 - **`Ok(None)` in app-side doc comments** where they describe the core's old
   spelling. Only the comments this ticket made FALSE were fixed; the sweep
   is still D2·5's.
 
-**What its review found.** REVIEW
+**What its review found.** The two-axis review ran against `aefb0b9`. Both
+axes found real things; neither found a hard violation of a documented
+standard in the CODE. Fixed in `SHA3`:
+
+- **A spec decision reversed in a commit message.** The spec axis put it
+  exactly right: the reason for keeping `set_transition_style`'s refusal was
+  sound and the ORDER was wrong, because the root rulebook says a phase that
+  needs a new decision records it BEFORE the code. Spec §11 gains **D2-1**,
+  which draws the line for all six argument checks and for `normalize_clip`
+  and names the amendment to #8's seventh decision; `app/CLAUDE.md`'s rule
+  and `AgentServer+Audio.swift`'s doc point at it.
+- **A false pointer, three times.** "the app's old wording is kept in road
+  map 7 §5.3's table" — §5.3's table is the CORE's sentences, and the app's
+  deleted ones are in §5.4's own "what went" table. In
+  `tools/proof/README.md`, in `refusal_proof.py`'s section comment and in
+  this record: every reader sent for the old answers would have found the
+  new ones.
+- **`MediaUsage.swift` was left stale by its own neighbour's fix.** Its
+  header still said the question is asked in THREE places (two now) and
+  `usesMedia`'s doc still called itself "the question `remove_media` asks
+  before it refuses". The ticket updated the comment POINTING at that file
+  and not the file.
+- **History in a rulebook.** The new `app/CLAUDE.md` rule said "deepening
+  D2·4 deleted the last of those", which is a record's sentence, not a
+  rule's. Both paragraphs are tighter as well: +25 lines rather than +30.
+- **A quoted sentence that was not verbatim.** This record's table and §5d's
+  comment both said `Track 1 ("Video 1")` where the fixture's track is
+  called "Track 1" — the same defect D2·3's review caught one ticket
+  earlier, in a table the next ticket is told to quote from.
+- **Two claims this record made about its own change.** The Audio file's
+  growth was called "all doc" when three lines were the guard's comment, and
+  the identity's sentence was called FALSE where what is wrong with it is
+  that it points a caller at its volumes instead of its cache. Both are
+  rewritten, and the file is **162** against the 156 it started at.
+- **`designs/reelcut-app-notes.md` still described the deleted rewording**
+  as live behaviour, and `aefb0b9` was not named in the Commits line.
+
+Judged not real:
+
+- *`phase8_proof.py`'s `with_clips: true` check is implied by the
+  whole-sentence check above it.* True while that check passes; when it
+  fails, this one still says whether the reply tells a caller how to go on,
+  which is what a transcript is for — and it did exactly that under mutant
+  2.
+- *§5's batch needs two undos now.* §6d and §7e already do that, for the
+  same reason: a boundary that LANDS is a real edit and is undone by name
+  before `undo_claim` makes the single-undo claim about the marker.
+- *`AgentServer+Audio.swift` grew in a ticket whose criterion is that the
+  handlers get smaller.* The criterion is about the three handlers that
+  wrote refusal sentences, and all three shrank. The fourth file gained a
+  paragraph saying why its check is not one of them, which is what the
+  ticket asked the record and the rulebook to make legible.

@@ -2924,3 +2924,22 @@ assisted import.
   clock, no previous frame: `render_frame` at a tick is byte-identical run
   after run, preview and export agree, and two clips with the same preset
   at the same clip time are displaced identically.
+- **D2-1 — A refused op says why in the CORE's words; a tool still names an
+  argument the caller left out.** Deepening D2 gave every rule that refuses
+  a sentence of its own and deleted the app's copies
+  (`designs/reelcut-roadmap-7.md` §4–§5), so no agent handler trial-applies
+  an op in order to write a reason. The line between the two, drawn at D2·4
+  because six handlers answer a caller before the core sees the call: **a
+  check that predicts a RULE goes; a check that names the CALL stays.**
+  `set_transition_style` with neither key, `ripple_delete_ranges` with an
+  empty array, and `set_track`, `set_marker` and `set_canvas` with no keys
+  are the second kind — the core answers an identity, correctly, and an
+  identity says only that the project is already in that state, which tells
+  a caller who forgot an argument nothing it can act on. So is
+  `normalize_clip` with nothing it could MEASURE: the peaks are in the
+  package's cache and not in the model, so that is a fact the core cannot
+  have (§7). **This amends the seventh Implementation Decision of
+  kpgalligan/reelcut#8**, which had listed `set_transition_style`'s refusal
+  and `normalize_clip`'s check among the deletions; the first is one of five
+  of a shape, and deleting one of five would leave the tool surface
+  inconsistent for a caller.

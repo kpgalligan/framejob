@@ -453,7 +453,8 @@ def several_ops(mcp):
 # a trial-apply — and all four are `refused` now, against the CORE's
 # sentence, which is what that ticket's third criterion asks for. The
 # helper went with them; the sentences it used to assert are in road map 7
-# §5.3's table, which is where the old answers stay on record.
+# §5.4's "what went" table, which is where the old answers stay on record
+# (§5.3's table is the CORE's sentences, which is a different list).
 
 
 def locked_track(mcp):
@@ -566,7 +567,7 @@ def the_track_stack(mcp):
 
     print("\n5d — the other refusal, in the core's words since D2·4")
     # `AgentServer+Tracks.swift` used to count the clips and answer first,
-    # naming the track's NAME and a count — 'Track 1 ("Video 1") still holds
+    # naming the track's NAME and a count — 'Track 1 ("Track 1") still holds
     # 1 clip. Pass with_clips: true to remove them too.' That guard is gone,
     # so what arrives is the rule's own sentence, and the id in it is the
     # CLIP a caller has to deal with rather than a number it has to go and

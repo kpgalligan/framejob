@@ -48,19 +48,16 @@ extension AgentServer {
     ///
     /// **A second identical call is an identity edit** and comes back as the
     /// shared "Normalize made no change: the project is already in that
-    /// state", exactly as a second `set_audio` with the same volume would.
-    /// That is the idempotence working, not a failure.
+    /// state", exactly as a second `set_audio` with the same volume would:
+    /// the idempotence working, not a failure.
     ///
-    /// **The all-measured-nothing case is answered HERE, and deepening D2·4
-    /// left it standing on purpose.** "No clip could be measured" and "every
-    /// clip is already at that level" are different answers, and the core
-    /// can only give the second: the level comes from
-    /// `cache/peaks/<media id>.bin`, which is not in the model and which the
-    /// core has never seen (spec §7). With no reading there is no op to
-    /// send, so the shared reply would be the identity's — and that sentence
-    /// would be FALSE here, since the project is not at that level at all
-    /// and nothing was measured against it. What this reports is a fact only
-    /// the app holds, per clip, and it is not a rule's refusal restated.
+    /// **Measuring nothing is a different answer, and is the one below**
+    /// (spec §11's D2-1, which is why D2·4 left it standing). The level
+    /// comes from `cache/peaks/<media id>.bin`, which is not in the model
+    /// and which the core has never seen (spec §7), so with no reading
+    /// there is no op and the shared reply would be the identity's — which
+    /// would send a caller to look at its volumes when what happened is
+    /// that its peaks were not there to read.
     func normalizeClip(_ a: [String: Any]) throws -> String {
         let document = try target(a)
         let clips = try clipsArg(a, "clips", document)
@@ -70,13 +67,12 @@ extension AgentServer {
                 message: "The project's audio plan could not be read, so there is no level to "
                     + "measure.")
         }
-        // Nothing was MEASURED — a question about the read, not a guess at
-        // what the core would answer, which is why it is asked of `input`
-        // and before there is a plan at all. Each reason is already a
-        // sentence naming its clip, so the whole answer is those sentences:
-        // a caller that asked about five clips needs to know which of the
-        // five reasons it hit, and there is no partial success to report
-        // beside them.
+        // Nothing was MEASURED — a question about the READ, not a guess at
+        // what the core would answer, so it is asked of `input` and before
+        // there is a plan. Each reason is already a sentence naming its
+        // clip, and a caller that asked about five needs to know which of
+        // the five it hit; there is no partial success to report beside
+        // them.
         guard !input.isEmpty else {
             let reasons = input.problems.map { $0.description }.joined(separator: " ")
             throw ToolError(
