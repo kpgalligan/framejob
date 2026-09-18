@@ -1339,8 +1339,8 @@ above.
 
 ### 2.6 D1·6 — contract and record (kpgalligan/reelcut#7)
 
-**Commits.** `89ace12` (the ticket) and `PLACEHOLDER_REVIEW` (what its review
-found, below).
+**Commits.** `89ace12` (the ticket) and `cc9ab58` (what its review found,
+below).
 
 **What landed, and what deliberately did not.** No behaviour changed at any
 door — every door was through after D1·5 — and that is the claim this ticket
