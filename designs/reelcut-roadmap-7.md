@@ -2684,8 +2684,10 @@ Judged not real:
 
 ### 5.5 D2·5 — contract and record (kpgalligan/reelcut#13)
 
-**Commits.** `315b7f6` (the ticket) and `dcdc7fc` (the mutant table), with
-`SHA3` holding what its review found.
+**Commits.** `315b7f6` (the ticket), `dcdc7fc` (the mutant table), `bfbc2ac`
+and `33a8ecc` (the adversarial read-back: four corrections to the record, and
+the one design document that is not a closed record), and `c91c6fc` (what
+its review found, below).
 
 **What landed.** Documents, doc comments and two rotted instruments. No
 behaviour changed anywhere — no core logic, no FFI, no op added or reworded
@@ -2928,7 +2930,8 @@ point of phase 8c — where a year's worth of scripts would once have passed it.
 **And the probe's one failing check is the one no MCP call can reach**: a
 refusal in front of `applyEdit`, which is where a person meets it.
 
-**What its review found.** The two-axis review ran against `bfbc2ac`. The
+**What its review found.** The two-axis review ran against `bfbc2ac`, and
+everything below landed in `c91c6fc`. The
 spec axis found all seven acceptance criteria met; both axes found the same
 two numbers wrong, and the standards axis found two lines of my own making.
 Fixed in the follow-up commit:
