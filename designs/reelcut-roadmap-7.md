@@ -1067,7 +1067,8 @@ are #6 by design, and the deletion sweep is #7's.
 
 ### 2.5 D1·5 — the end-state and region doors forward raw (kpgalligan/reelcut#6)
 
-**Commits.** `d8b9c58` (the ticket) and the review-fix commit below.
+**Commits.** `d8b9c58` (the ticket) and `8c156da` (what its review found,
+below).
 
 **What landed.** The last two doors, and with them the last hand check in
 any handler. Every caller-authored object the agent can send is now the
