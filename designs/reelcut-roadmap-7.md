@@ -1966,7 +1966,7 @@ the seam's proof is born.
 
 ### 5.2 D2·2 — the app switches on three arms (kpgalligan/reelcut#10)
 
-**Commits.** `25d3030` (the ticket) and `SHA2` (what its review found,
+**Commits.** `25d3030` (the ticket) and `3042b3e` (what its review found,
 below).
 
 **What landed.** The app side of the seam D2·1 opened, and the seam's proof.
