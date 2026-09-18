@@ -19,9 +19,9 @@
 //!
 //! - **What an argument is FOR.** The core says what an argument IS; the
 //!   prose naming the menu item a tool mirrors, and the app state a default
-//!   comes from, is the catalog's and stays there (spec #14's Out of
-//!   Scope).
-//! - **What a **patch** may carry.** [`Kind::Object`] is
+//!   comes from, is the catalog's and stays there (spec
+//!   kpgalligan/reelcut#14's Out of Scope).
+//! - **What a caller-authored patch may carry.** [`Kind::Object`] is
 //!   `{"type": "object"}` with no `properties`: deepening D1 made the core
 //!   the one validator of a caller's patch, one step further in, and a
 //!   schema listing its keys would be that validator restated somewhere it

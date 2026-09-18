@@ -208,8 +208,10 @@ closed deepening D2. `core/src/edit_track.rs` came off it there (674 → 522,
 `op_table.rs` (271, a new module under the 400 cap and with no exemption of
 its own); it is still over and still exempt for its SEMANTICS table. D3·2
 added the FFI wrapper for the published table to `ReelCore.swift`
-(1500 → 1563), which stays where it was in this list; its own new module,
-`op_schema.rs` (154), is under the 400 cap too.
+(1500 → 1542), which stays where it was in this list; the value type it
+answers went to a new `app/Sources/ReelOpSchema.swift` (27) rather than into
+the over-cap file, and the core's own new module, `op_schema.rs` (154), is
+under the 400 cap too.
 Regenerate the list with
 `wc -l app/Sources/*.swift core/src/*.rs | awk '$1>600 && $2!="total"' | sort -rn`
 rather than trusting the numbers here; the standing exemptions are
@@ -221,7 +223,7 @@ row per op.
 | `app/Sources/ProjectSnapshot.swift` | 2516 |
 | `app/Sources/InspectorPane.swift` | 1665 |
 | `app/Sources/TimelineView.swift` | 1630 |
-| `app/Sources/ReelCore.swift` | 1563 |
+| `app/Sources/ReelCore.swift` | 1542 |
 | `app/Sources/VideoPane.swift` | 1411 |
 | `app/Sources/Compositor.swift` | 1391 |
 | `app/Sources/ProjectDocument.swift` | 1352 |

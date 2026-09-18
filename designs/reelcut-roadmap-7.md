@@ -3332,8 +3332,9 @@ argument names in Python.
 
 ### 8.2 D3·2 — the table goes out through the FFI (kpgalligan/reelcut#16)
 
-**Commits.** `ca84058` (the ticket) and `PLACEHOLDER_TWO` (the probe's
-required-ness claim, the mutant table and what the review found, below).
+**Commits.** `ca84058` (the ticket), `b71d71b` (the probe's required-ness
+claim and the mutant table) and `PLACEHOLDER_THREE` (what the review found,
+below).
 
 **What landed.** The table leaves the core. No catalog file and no
 `AgentServer*` file was edited, no op or tool was added, no persisted state
@@ -3362,8 +3363,11 @@ schema yet**.
   `[String: ReelOpSchema]` — `properties` and `required`, which are exactly
   the two arguments `AgentServer.tool(_:_:_:required:)` takes, so the
   migration ticket has nothing to reshape. `ReelCore.swift` went
-  **1500 → 1563**; it is over the cap and in the ledger, and the addition
-  was unavoidable because no other file may call `rc_*`.
+  **1500 → 1542**: it is over the cap, so only the part that had to be there
+  went in — the function naming `rc_op_schemas` — and the value type it
+  answers is `app/Sources/ReelOpSchema.swift` (27 lines, new), for
+  `ReelEdit.swift`'s reason: it names no `rc_*` symbol, so the rule that
+  keeps every one of those in one file does not keep it.
 
 **The mapping, which is where the kind vocabulary earns its keep.** Every
 constraint below is hand-written per property in the catalog today.
@@ -3454,6 +3458,46 @@ after the tree was committed, and each caught by both instruments:
 | `Kind::Object` published as a string — spec #14's own confessed drift, `add_text_clip`'s body declared `string` against an `object` | that test and `a_patch_is_opaque_and_a_region_is_not` FAILED, 8 passed | 27/28 |
 | `scope` inserted into every published schema | `no_schema_carries_an_envelope_key` and `every_schema_declares_its_arguments_and_only_them` FAILED, 8 passed | 26/28 |
 | a required argument (`clips`) published as optional | `required_is_what_the_table_requires_in_table_order` FAILED, 9 passed | 27/28 (the check the mutant bought) |
+
+**What the review found.** Two axes, fixed point `e7c1883`, spec source the
+ticket plus #14. The **Spec** axis re-ran both instruments rather than
+trusting this record — the ten Rust tests, the probe's 28, `cargo fmt
+--check` and `make lint` — and re-derived the kind mapping against the real
+Rust types rather than against `op_table.rs`'s prose (`Fps`'s
+`#[serde(from = "[u32; 2]")]`, `Color = [f64; 4]`, `Group`'s
+`rename_all = "snake_case"`): all twelve acceptance criteria met, no scope
+creep, and the one compulsory extra — the NULL-safety sweep — compulsory
+because the sweep fails on an export the header declares and it never calls.
+
+The **Standards** axis found eight things, five of which changed code or
+documents:
+
+- **the record's `PLACEHOLDER_TWO`**, which is the very omission `e7c1883`,
+  the commit before this ticket, exists to fix;
+- **`ReelCore.swift` taking 63 lines while over its cap** when only the
+  function naming `rc_op_schemas` had to be there. `ReelOpSchema` went to a
+  file of its own for `ReelEdit.swift`'s reason — it names no `rc_*` symbol
+  — and the over-cap file took 42 lines instead of 63;
+- **`no_schema_carries_an_envelope_key` tested `required` by a SUBSTRING**
+  of the serialized list, which an argument named `projects` would have
+  failed spuriously; it reads the array now;
+- **a test whose name did not say what it asserted** —
+  `every_kind_the_table_uses_is_carried_by_an_argument` over a body that
+  asserts a count — now `all_seventeen_kinds_are_carried_by_an_argument`,
+  with the pigeonhole and where the 17 comes from written out;
+- **the test module doc claimed its oracle was "the one deliberate second
+  spelling"** when the probe carries a third; it names the third now and
+  says why a probe in another process cannot import either.
+
+Two were judged not real. The map entries saying **"nothing calls it yet"**
+are a file's role today rather than status: `op_table.rs`'s entry in
+`core/CLAUDE.md` carries exactly that sentence, put there by D3·1's own
+review one commit earlier. And **`expected` being a transcription of
+`schema_of_kind`** rather than an independently invented mapping is what
+every oracle in this tree is; what would make it worthless is being DERIVED
+from the thing it checks, which it is not — mutants 2 and 3 change one site
+and the test names it. The remaining two were cosmetic and taken: a
+paragraph rewrapped, and `spec #14` spelled in full.
 
 **Owed.** The catalog's migration, the fifth part of the parity check, the
 widening list, the nullability question above, and the proof scripts that

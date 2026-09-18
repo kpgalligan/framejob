@@ -17,12 +17,11 @@ detail there.
   `planJSON` are memoised PER HANDLE, so keep handles rather than minting
   them), timecode, snapping, export presets/sizes/settings, `RecipeSource`,
   the `dictionary` extensions on the property types and the typed patches.
-  It is also where the op table is read BACK — `ReelOp.coreNames()` over
-  `rc_op_names` and, since road map 7's D3·2, `ReelOp.coreSchemas()` over
-  `rc_op_schemas`: every op's ARGUMENTS as JSON Schema, keyed by op name, in
-  the `ReelOpSchema` (properties + required) the catalog's `tool` helper
-  takes. Nothing calls `coreSchemas()` yet; the catalog is migrated in a
-  later D3 ticket. `deinit` frees the Rust allocation. It also holds **the one read of
+  It is also where the op table is read BACK: `ReelOp.coreNames()` over
+  `rc_op_names`, and `ReelOp.coreSchemas()` over `rc_op_schemas` — every
+  op's ARGUMENTS as JSON Schema, keyed by op name. Nothing in the app calls
+  `coreSchemas()` yet; the catalog reads it in a later D3 ticket.
+  `deinit` frees the Rust allocation. It also holds **the one read of
   `rc_project_apply`'s TWO message channels**, in the header's own order — a
   sentence is a refusal, an error message is invalid input, neither written
   is an identity — answered as the `ReelEdit` below.
@@ -45,6 +44,12 @@ detail there.
   `scope.rs`'s `refused_inside` (seven names) so one edit can mix a
   document-level op with scoped ones. A table, with
   `edit.rs`'s size exemption.
+- `ReelOpSchema.swift` — what an op TAKES, mirroring what
+  `core/src/op_schema.rs` publishes: the `properties` and `required` of one
+  op's arguments, which are the two things `AgentServer.tool` takes. Here
+  rather than next door for `ReelEdit.swift`'s reason — it names no `rc_*`
+  symbol — and `properties` stays `[String: Any]` because a Swift type per
+  kind would be another spelling of the table.
 - `ReelEdit.swift` — what an op ANSWERS, mirroring `core/src/outcome.rs`:
   `ReelEdit` (`.applied` / `.identity` / `.refused`), `ReelRefusal` (the op
   the core declined and the rule's own sentence, carried verbatim), and the

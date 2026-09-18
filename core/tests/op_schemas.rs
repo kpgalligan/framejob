@@ -22,14 +22,17 @@
 //! names to the dispatcher directly, so the chain does not rest on
 //! `OP_NAMES` alone.
 //!
-//! [`expected`] is the one deliberate second spelling, and it is of the
+//! [`expected`] is a deliberate second spelling, and it is of the
 //! kind→schema MAPPING rather than of the table: a test that asked the core
 //! for the schema of a kind would agree with any mapping at all. Its match
 //! is exhaustive for the reason every match on `Kind` in these tests is — a
 //! kind added to the table does not compile until this file says what JSON
-//! it is — and [`every_kind_the_table_uses_is_carried_by_an_argument`] is
-//! what stops a kind being published wrongly with no argument standing on
-//! it to notice.
+//! it is — and [`all_seventeen_kinds_are_carried_by_an_argument`] is what
+//! stops a kind being published wrongly with no argument standing on it to
+//! notice. `tools/proof/op_schema_probe.py` carries a THIRD, of twelve
+//! representative rows: it is another process in another language reading
+//! the app's wrapper, so it cannot import either of these, and a mapping
+//! edited in one place is caught by the other two.
 
 mod common;
 
@@ -229,7 +232,14 @@ fn required_is_what_the_table_requires_in_table_order() {
 fn no_schema_carries_an_envelope_key() {
     let map = published();
     for op in &OP_TABLE {
-        let required = schema(&map, op)["required"].to_string();
+        // Membership, not a substring of the serialized list: an argument
+        // named `projects` would pass one and fail the other.
+        let required: Vec<&str> = schema(&map, op)["required"]
+            .as_array()
+            .unwrap_or_else(|| panic!("{}: required must be an array", op.name))
+            .iter()
+            .map(|name| name.as_str().expect("required holds strings"))
+            .collect();
         for key in ["scope", "project"] {
             assert!(
                 !properties(&map, op).contains_key(key),
@@ -237,7 +247,7 @@ fn no_schema_carries_an_envelope_key() {
                 op.name
             );
             assert!(
-                !required.contains(key),
+                !required.contains(&key),
                 "{}: {key:?} is named in required",
                 op.name
             );
@@ -267,13 +277,15 @@ fn every_argument_is_published_as_its_kind_says() {
     }
 }
 
-/// The test above only checks a kind some argument HAS, so this is what
-/// says there is no seventeenth kind sitting unexercised: every kind the
-/// vocabulary declares is carried by at least one argument. A kind added to
-/// the table and used lands here as 18 and asks for a line; a kind added
-/// and used by nothing is a kind the table does not need.
+/// The test above only reaches a kind some argument HAS, so this is what
+/// says none is sitting unexercised: the number of DISTINCT kinds in use is
+/// `Kind`'s whole variant count, which by the pigeonhole is every one of
+/// them. The 17 is that variant count, written here because Rust will not
+/// count an enum's arms for a test; the exhaustive matches in
+/// `op_schema.rs` and in [`expected`] are what keep it honest, since a
+/// kind added to the vocabulary does not compile until both say what it is.
 #[test]
-fn every_kind_the_table_uses_is_carried_by_an_argument() {
+fn all_seventeen_kinds_are_carried_by_an_argument() {
     let mut kinds: Vec<Kind> = Vec::new();
     for op in &OP_TABLE {
         for argument in op.arguments {
