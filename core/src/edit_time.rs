@@ -128,8 +128,9 @@ fn clear_range(project: &Project, start: Ticks, end: Ticks) -> Result<Project, S
         Outcome::Applied(split) => split,
         Outcome::Identity | Outcome::Refused(_) => project.clone(),
     };
-    if let Outcome::Applied(split) = current.split_under_playhead(end)? {
-        current = split;
+    match current.split_under_playhead(end)? {
+        Outcome::Applied(split) => current = split,
+        Outcome::Identity | Outcome::Refused(_) => {}
     }
 
     let unlocked = unlocked_tracks(&current);
@@ -164,7 +165,7 @@ impl Project {
     /// is the opposite case — one point, one length, no collision possible
     /// — and does move them.)
     ///
-    /// `Err` on an unknown clip id; `None` for an empty selection.
+    /// `Err` on an unknown clip id; an identity for an empty selection.
     pub fn ripple_delete(&self, clips: &[u32]) -> Result<Outcome, String> {
         let selection = self.selected_clips(clips)?;
         if selection.is_empty() {

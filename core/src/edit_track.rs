@@ -257,8 +257,8 @@ impl Project {
     /// tracks it passes over the other way — the layer reorder the timeline
     /// drag makes (spec §6).
     ///
-    /// `Err` for an unknown track or an index past the end; `None` when the
-    /// track is already there.
+    /// `Err` for an unknown track or an index past the end; an identity
+    /// when the track is already there.
     pub fn move_track(&self, track: u32, index: usize) -> Result<Outcome, String> {
         let from = self.require_track_index(track)?;
         if index >= self.tracks.len() {

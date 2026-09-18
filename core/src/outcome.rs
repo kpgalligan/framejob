@@ -56,7 +56,9 @@ pub enum Outcome {
     /// words are still owed — a locked track, the last track, a media row a
     /// clip still shows, a cut with nothing left to give a transition, and
     /// an action that would overlap another — answer `Identity` until road
-    /// map 7's D2·3 writes them. A doc comment saying an op "refuses" is
+    /// map 7's D2·3 writes them, and so do a few smaller ones the spec did
+    /// not name (a move to a track index the document has not got, a trim
+    /// whose two clamps crossed). A doc comment saying an op "refuses" is
     /// describing the DOMAIN, which is what a reader needs; this is the one
     /// place that says which of them can say so out loud.
     Identity,

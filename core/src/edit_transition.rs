@@ -473,8 +473,8 @@ impl Project {
     /// overlap is simply undrawn until one exists. With NO stored
     /// transition and at least one key given it mints
     /// (`cross_dissolve`, spec §11 R5-2) and applies the style over it;
-    /// with NEITHER key given it is `None` whatever the clip holds and
-    /// never mints — asking for no change is not a way to make a
+    /// with NEITHER key given it is an identity whatever the clip holds
+    /// and never mints — asking for no change is not a way to make a
     /// transition. `Err` for an unknown clip.
     pub fn set_transition_style(
         &self,

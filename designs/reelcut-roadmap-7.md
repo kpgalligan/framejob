@@ -1753,40 +1753,42 @@ One entry per ticket, written when it lands.
 
 ### 5.1 D2·1 — the core answers in three arms (kpgalligan/reelcut#9)
 
-**Commits.** The ticket's commit, and the review-fix commit named here when
-it lands.
+**Commits.** `5cd4fcf` (the ticket) and `REVIEWSHA` (what its review found,
+below).
 
 **What landed.** Core, the FFI's three files, and the documents those
 sentences live in. The app's BEHAVIOUR is unchanged — `ReelCore.swift`
 passes NULL for the new channel — so neither a person nor an agent sees any
 of this yet; D2·2 is where they do.
 
-- **`core/src/outcome.rs` is new, 73 lines**: `Outcome`, with
+- **`core/src/outcome.rs` is new, 75 lines**: `Outcome`, with
   `Applied(Project)`, `Identity` and `Refused(String)`, and the doc that
   says what each arm means, what a composed op must do with the two it did
   not expect, and why the invalid-input tier is NOT a fourth arm. Every
   `impl Project` edit now answers `Result<Outcome, String>` — 65 signatures
   across fourteen modules.
 - **The compiler found the sites, which is the reason it is a type and not
-  a flag.** 89 `Ok(None)`s were each made to say which answer they are, and
-  the type change also surfaced eight composition sites no one had listed:
-  `insert_clip` (three), `overwrite_clip` (two), `freeze_frame` (two) and
-  `add_zoom_action` (three) each consumed an inner op's answer through `let
-  Some(…) else` or `unwrap_or_else`, which would have turned an inner
-  refusal into "nothing happened". They now match all three arms and pass a
-  refusal straight back, so a composition answers in the words of whichever
-  step declined. `clear_range` is the one place that deliberately folds a
-  refusal into "nothing was cut": it answers a `Project` rather than an
-  `Outcome`, a splitter has no rule to refuse with, and the comment says a
-  splitter that ever gains one has to be given a way out of there first.
-- **The overlap rule speaks, at fourteen sites.** Ten were the
-  `check_overlap_rule(…).is_err()` shape and four were a loop or a
-  candidate search; the ten that were refusals now read `if let Err(why) =
-  … { return Ok(Outcome::Refused(why)) }` and hand the rule's own sentence
-  on verbatim. The four that are SEARCHES — `edit_paste.rs` and
-  `edit_nest.rs` looking for a track a clip will fit on, and
-  `edit_transition.rs`'s two step-down loops — are unchanged and are not
-  refusals.
+  a flag.** 73 `Ok(None)`s in the edit modules were each made to say which
+  answer they are, and the type change also surfaced the composition sites
+  no one had listed: `insert_clip`, `overwrite_clip`, `freeze_frame`,
+  `add_zoom_action` and the scoped apply each consumed an inner op's answer
+  through `let Some(…) else`, `if let Some(…)` or `unwrap_or_else`, which
+  would have turned an inner refusal into "nothing happened". They now match
+  all three arms, in **eleven** pass-through arms, so a composition answers
+  in the words of whichever step declined. `clear_range` is the one place
+  that deliberately folds a refusal into "nothing was cut": it answers a
+  `Project` rather than an `Outcome`, a splitter has no rule to refuse with,
+  and the comment says a splitter that ever gains one has to be given a way
+  out of there first.
+- **The overlap rule speaks, at all fourteen sites that dropped its
+  sentence.** Each now reads `if let Err(why) = … {
+  return Ok(Outcome::Refused(why)) }` and hands the rule's own words on
+  verbatim: nine in `edit_clip.rs`, two in `edit_time.rs`, one each in
+  `edit_edge.rs`, `edit_nest.rs` and `edit_transition.rs`. The other four
+  `check_overlap_rule` call sites are SEARCHES, not refusals —
+  `edit_paste.rs` and `edit_nest.rs`'s `unnest` looking for a track a clip
+  will fit on, and `edit_transition.rs`'s two step-down loops — and are
+  unchanged.
 - **The FFI's fourth parameter.** `rc_project_apply(p, op, err_out,
   reason_out)`: a handle means applied, NULL with neither channel written
   means an identity, NULL with `reason_out` set is the refusal, NULL with
@@ -1841,21 +1843,36 @@ invariant was being asserted for the rest of the suite but not by this file.
 That test is the reason the mutant is scored rather than a claim.
 
 **Verification.** `make test` 641 passed / 0 failed (632 before, plus the
-nine new), `make lint` clean,
-`cargo fmt --check` clean, `make typecheck` 0 errors and the 4 known
-AVFoundation warnings, `make app` built, the startup parity log empty, and
-the proof scripts run below.
+nine new), `make lint` clean, `cargo fmt --check` clean, `make typecheck` 0
+errors and the 4 known AVFoundation warnings, `make app` built, and the
+startup parity log empty (`grep "Reelcut: " /tmp/reelcut-4841.log` printed
+nothing at every launch below).
 
-**Size.** `core/src/edit_clip.rs` 1042 → 1029, `edit_track.rs` 674 → 671,
+Every existing proof script was run against the rebuilt binary, each on a
+freshly launched instance of its own: phase1 **66/66**, phase2 **85/85**,
+phase3 **123/123**, phase3_silence_scope **8/8**, phase4 **84/84**, phase5
+**88/88**, phase6 **168/168**, phase7 **92/92**, phase8 **79/79**, phase9
+**216/216**, patch_door **261/261**, remaining **79/79**, recording
+**121/121** with the granted tier skipped by name (a locked console, no
+shareable display: 66 checks). **A run per instance is not optional**: the
+first pass shared one instance across phases 1 to 5 and phase 6 then hung
+on the known past-forty-documents deadlock, which reads exactly like a
+regression and is not one. The relaunch is now by tracked pid file, because
+`pkill -f` on the absolute binary path does not match an instance launched
+by a relative one.
+
+**Size.** `core/src/edit_clip.rs` 1042 → 1028, `edit_track.rs` 674 → 671,
 `edit_transition.rs` 553 → 547 and `edit_paste.rs` 600 → 596: every
-over-cap core file this touched came DOWN, because `Refuses (\`None\`)` is
-shorter than what replaced the value spelling. Two files over the cap grew
-and the toll is named here rather than paid: **`core/src/edit.rs` 887 → 895**
-(the standing table exemption; the eight lines are the Results section of
-the contract this ticket changed, which is what the AC asked for) and
-**`app/Sources/ReelCore.swift` 1507 → 1510** (three lines in the one doc
-comment the FFI lockstep rule requires this ticket to rewrite). The new
-module is 73 lines against a 400-line cap.
+over-cap core file this touched came DOWN, because the retired `(\`None\`)`
+spelling was longer than the domain words that replaced it.
+`app/Sources/ReelCore.swift` is back at **1507**, its size before the
+ticket: the doc comment the FFI lockstep rule requires it to rewrite was
+tightened until the file paid for what it took on, which is what the rule
+asks of a file at the cap. **`core/src/edit.rs` 887 → 895** is the one
+unpaid growth, under its standing table exemption: the eight lines are the
+Results section of the contract this ticket changed, which is what the
+acceptance criteria asked for. The new module is 75 lines and the new test
+file 220, against a 400-line cap.
 
 **Documents.**
 
@@ -1873,6 +1890,59 @@ module is 73 lines against a 400-line cap.
   `scope.rs`'s contract, `edit_track.rs`'s module doc and
   `check_overlap_rule`'s own.
 
+**What its review found.** The two-axis review ran against `a981bbd`.
+Fixed:
+
+- **Five doc comments still spelled an op's answer `None`** after the
+  sweep, and two of them MISNAMED the arm — `set_video`'s "Refuses
+  (`None`) when nothing changes" and `split_clips`' "when nothing can be
+  cut the whole op refuses (`None`)" are identities, which is the very
+  ambiguity this ticket removes, re-created in prose. With them,
+  `ripple_delete`, `move_track` and `set_transition_style`.
+- **`edit.rs`'s op table was half-converted**: `slip` and
+  `set_transition_style` had been updated and `paste_attributes`,
+  `set_clip` and `add_transition` had not. It is the caller-facing table
+  and the worst place to leave a retired spelling.
+- **`clear_range` guarded its two bounds differently** — an exhaustive
+  `match` at the first and an `if let` at the second, which would not stop
+  compiling if an arm were added. Both are exhaustive now.
+- **`ReelCore.swift` had taken on three lines** with nothing given up,
+  against the rule for a file at the cap. The doc comment the FFI lockstep
+  requires it to rewrite was tightened until the file was back at 1507.
+- **Numbers in this record were wrong**: "89 `Ok(None)`s" was the raw grep
+  count including doc comments and three unrelated modules (the real
+  figure is 73 code sites in the edit modules); "ten of fourteen overlap
+  sites" was miscounted (all fourteen speak, and the four left alone are
+  searches); `edit_clip.rs` is 1028, not 1029. The commit message carries
+  the first two wrong numbers; this paragraph is the correction.
+- **The Verification paragraph ended in a dangling clause** ("the proof
+  scripts run below") with no scores below it. The scores are there now.
+- **Spec §5.5 said `fn(&Project, args) -> Outcome`**, dropping the
+  `Result`; it now names all four answers and says why the fourth is not
+  an arm.
+
+Judged not real:
+
+- *The eleven composition arms are a Repeated Switch that wants a
+  combinator.* Writing all three arms at every site is the enum's stated
+  reason for existing: a combinator would hide the decision the compiler is
+  there to force, and D2·3 copying the shape is the point, not a cost.
+- *`Handle::refuses` is now a mysterious name — it passes on an identity
+  OR a refusal.* It asserts "no undo step", which is what its 91 call
+  sites mean, and the ticket settled that it keeps its name and its sites.
+  `refuses_with` is the sharp one.
+- *`clear_range` folding a refusal into "nothing was cut" is a third
+  swallow, where the spec sanctions two.* The spec's two are app-side, and
+  this one is unreachable: a splitter has no rule to refuse with. It is
+  named here and at the site rather than hidden, with the condition that
+  would make it real.
+- *Rewriting `core/CLAUDE.md`'s Purity and Errors rules and `README.md`'s
+  FFI bullet is D2·5's work.* Leaving them would leave the core's own
+  rulebook false about the type every edit now returns, and the header
+  change forces spec §7's quote anyway. Recorded as a deliberate
+  pull-forward; the op table (§6), the glossary and `app/CLAUDE.md` are
+  still D2·5's.
+
 **What the next tickets inherit.**
 
 - **The three-armed shape, verbatim**, for D2·3 to copy: a rule refuses with
@@ -1886,6 +1956,10 @@ module is 73 lines against a 400-line cap.
 - The mutant that matters for D2·2 is the first one above: discard the
   sentence at the FFI and the old ambiguity comes straight back.
 
-**Owed.** The eight lines in `edit.rs` and three in `ReelCore.swift`, named
-under Size above. No proof script: this ticket adds no app behaviour to
-photograph, and D2·2 is where the seam's proof is born.
+**Owed.** The eight lines in `edit.rs`, named under Size above. Three rows
+of `designs/reelcut-remaining.md` §3 are stale by this ticket
+(`edit_clip.rs` 1042 → 1028, `edit_track.rs` 674 → 671, `edit.rs` 887 → 895,
+`ReelCore.swift` is back where it was); the ledger already says to regenerate
+rather than trust its numbers, and D2·5 is where it is regenerated. No proof
+script: this ticket adds no app behaviour to photograph, and D2·2 is where
+the seam's proof is born.

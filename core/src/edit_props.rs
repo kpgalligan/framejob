@@ -89,8 +89,8 @@ fn check_blend(clip: &Clip, props: &VideoProps) -> Result<(), String> {
 
 impl Project {
     /// Merges `patch` into every named clip's video props (spec §6).
-    /// Refuses (`None`) when nothing changes; `Err` for an unknown clip, a
-    /// clip with no video props, an unknown key, or a value out of range.
+    /// An identity when nothing changes; `Err` for an unknown clip, a clip
+    /// with no video props, an unknown key, or a value out of range.
     pub fn set_video(&self, clips: &[u32], patch: &Value) -> Result<Outcome, String> {
         self.patch_clips(clips, patch, Group::Video)
     }

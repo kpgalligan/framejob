@@ -730,7 +730,7 @@ impl Project {
 
     /// Cuts each named clip at project time `at` (spec §6). A clip `at` is
     /// not strictly inside is skipped; when nothing can be cut the whole op
-    /// refuses (`None`). `Err` only for an unknown clip id.
+    /// is an identity. `Err` only for an unknown clip id.
     pub fn split_clips(&self, clips: &[u32], at: Ticks) -> Result<Outcome, String> {
         let at = self.snapped(at);
         let ids: Vec<u32> = self.selected_clips(clips)?.iter().map(|c| c.id).collect();

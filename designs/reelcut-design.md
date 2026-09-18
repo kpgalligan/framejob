@@ -1194,8 +1194,9 @@ never has to defend itself, and one bad number cannot blank a frame.
 
 ### 5.5 Purity and undo
 
-Every edit is `fn(&Project, args) -> Outcome` (`core/src/outcome.rs`), and
-an op answers one of three ways:
+Every edit is `fn(&Project, args) -> Result<Outcome, String>`
+(`core/src/outcome.rs`). An op the core UNDERSTOOD answers one of three
+ways:
 
 - **applied**, with the new project — the app pushes an undo step;
 - **an identity** — the project already says what was asked, so nothing
@@ -1205,13 +1206,15 @@ an op answers one of three ways:
   not an error tier, it is an answer that can say why. It crosses the FFI
   on `rc_project_apply`'s `reason_out`, beside and never with `err_out`.
 
-Invalid arguments remain an `Err(String)` at the FFI (`err_out`), never a
-panic. The Swift document
-keeps a stack of handles; `NSUndoManager` records the previous one
-(`ImageDocument.swift` in Rasterize is the template — `applyEdit`,
-`beginLiveEdit`/`updateLiveEdit`/`endLiveEdit`, `countEditChange`,
-`registerUndo` nowhere else). Because the value holds no pixels this is
-cheaper than Rasterize's equivalent.
+A request the core could not read is the fourth answer and the `Err` of
+that `Result`: invalid arguments, unknown ids and parse failures, reported
+at the FFI through `err_out`, never a panic. It is not an arm of `Outcome`
+because it is about the REQUEST where a refusal is about the PROJECT. The
+Swift document keeps a stack of handles; `NSUndoManager` records the
+previous one (`ImageDocument.swift` in Rasterize is the template —
+`applyEdit`, `beginLiveEdit`/`updateLiveEdit`/`endLiveEdit`,
+`countEditChange`, `registerUndo` nowhere else). Because the value holds
+no pixels this is cheaper than Rasterize's equivalent.
 
 ### 5.6 Persistence
 

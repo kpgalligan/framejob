@@ -21,7 +21,7 @@ import AppKit
 ///    one across threads is safe.
 ///  - `deinit` frees the Rust allocation, and every `char *` the library
 ///    returns goes through `takeString` / `takeErrorMessage`, which free it.
-///  - `rc_project_apply` returning NULL means three different things — see
+///  - `rc_project_apply` returning NULL means three things — see
 ///    `applying(_:)`. Getting that wrong is a phantom undo step.
 
 /// Error thrown by the Rust core, carrying the message from `err_out`.
@@ -325,14 +325,11 @@ final class ReelProject {
 
     /// Applies one op and returns the resulting project.
     ///
-    /// Returns nil when the op left the project alone, which the core says
-    /// two ways: an identity (nothing needed to change) and a refusal (a
-    /// rule said no, in its own words, through the header's `reason_out`).
-    /// Either is NO undo step — one that registered a step would be a
-    /// phantom — and the UI beeps or animates the gesture back. Throws when
-    /// the op or its arguments are invalid, with the core's own message.
-    /// Passing NULL for `reason_out` is the header's "a caller that does not
-    /// want the sentence": reading it is road map 7's D2·2.
+    /// Returns nil when the op left the project alone: an identity (nothing
+    /// needed to change) or a refusal (a rule said no, in its own words,
+    /// through `reason_out` — NULL here until D2·2 reads it). Either is NO
+    /// undo step; the UI beeps or animates the gesture back. Throws when the
+    /// op or its arguments are invalid, with the core's own message.
     func applying(_ op: ReelOp) throws -> ReelProject? {
         var err: UnsafeMutablePointer<CChar>? = nil
         guard let handle = rc_project_apply(ptr, op.json, &err, nil) else {
