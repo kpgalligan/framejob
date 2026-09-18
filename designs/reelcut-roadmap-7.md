@@ -1753,7 +1753,7 @@ One entry per ticket, written when it lands.
 
 ### 5.1 D2·1 — the core answers in three arms (kpgalligan/reelcut#9)
 
-**Commits.** `5cd4fcf` (the ticket) and `REVIEWSHA` (what its review found,
+**Commits.** `5cd4fcf` (the ticket) and `2148190` (what its review found,
 below).
 
 **What landed.** Core, the FFI's three files, and the documents those
