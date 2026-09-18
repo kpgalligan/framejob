@@ -460,8 +460,10 @@ extension AgentServer {
     /// core's default for the preset.
     ///
     /// A value that is neither is refused by NAME, never read as absent — the
-    /// `patchArg` rule (`AgentServer+Arguments.swift`): a `size` dropped in
-    /// silence would export at the wrong size and report success. A custom
+    /// rule every reader in `AgentServer+Arguments.swift` keeps, and the root
+    /// `CLAUDE.md`'s: a value a handler cannot read is refused by name, never
+    /// dropped. A `size` dropped in silence would export at the wrong size
+    /// and report success. A custom
     /// size outside the sheet's own field range is refused the same way,
     /// where the sheet clamps: a tool has no field to clamp in view of the
     /// caller, and the sheet's reason — a mistyped digit must not reach the

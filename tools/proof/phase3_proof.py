@@ -903,9 +903,16 @@ def zoom_part(mcp):
     check(z.frame(4 * SEC) != was[4 * SEC], "one step: the clip is zoomed again")
     check(z.undo() == "Zoom to Region", "and the step under it is the zoom")
     check(z.frame(2 * SEC) == was[2 * SEC], "which restores the base frame byte for byte")
+    # The whole sentence and not the word `region`, which every other refusal
+    # at this door says too: D1·5 (kpgalligan/reelcut#6) took the region raw,
+    # so the MEMBER refusals are the core's now
+    # (`op "add_zoom_action" is not valid: bad value at "region.widht"…`,
+    # proved in `tools/proof/patch_door_proof.py` §11) and this one is the
+    # only judgement the handler kept — the core reads an absent argument and
+    # an explicit null identically, and here they are opposite edits.
     message = z.error("add_zoom_action", clip=clip, at=1 * SEC) or ""
     check(
-        "region" in message,
+        "Missing required argument: region" in message,
         f"an absent region is refused BY NAME, not read as a zoom back (D-B2): "
         f"{message[:60]!r}",
     )
@@ -1373,19 +1380,31 @@ def schema_part(mcp):
         "4" in message and "5" in message,
         f"and a fifth region is refused rather than silently dropped: {message[:90]!r}",
     )
-    # Measured, not a check, and not phase 3's: the agent's video patch is
-    # decoded into typed Swift structs and re-serialized, so an unknown key
-    # INSIDE a nested object is dropped before the core's own unknown-key
-    # check can name it. `shadow` and `filters` behave the same way, so this is
-    # a standing property of the MCP path rather than anything `obscure`
-    # introduced — and the core itself refuses it (core/tests/schema_v4.rs).
+    # This was a printed NOTE and not a check for as long as it was true: the
+    # agent's video patch was decoded into typed Swift structs and
+    # re-serialized, so an unknown key INSIDE a nested object was dropped
+    # before the core's own unknown-key check could name it, for `shadow` and
+    # `filters` as much as for a region. **D1·3 (kpgalligan/reelcut#4) closed
+    # it**: `set_video` forwards the caller's patch to the core unread, so the
+    # two calls below are refused by their dotted path, and what used to be a
+    # note about a standing defect is two claims. They stay HERE, beside the
+    # region list they were written for, rather than moving to
+    # `tools/proof/patch_door_proof.py`: a misspelt key inside an `obscure`
+    # entry is phase 3's own shape.
     inside = v3.error(
         "set_video", clips=[target], patch={"obscure": [{"kind": "blur", "amont": 0.5}]})
+    check(
+        inside is not None and 'unknown key "obscure[0].amont" in a video patch' in inside,
+        f"a misspelt key INSIDE a region is refused by its dotted path, index and all: "
+        f"{inside!r}",
+    )
     older_one = v3.error("set_video", clips=[target], patch={"shadow": {"blurr": 8}})
-    print(
-        "  note a misspelt key INSIDE a region is dropped by the agent's patch "
-        f"decoder (obscure: {inside}; the older shadow: {older_one}) — the same "
-        "for every nested object, and not new in phase 3")
+    check(
+        older_one is not None
+        and 'unknown key "shadow.blurr" in a video patch' in older_one,
+        f"and so is one inside the older `shadow`, which is the same rule and not a "
+        f"second one: {older_one!r}",
+    )
 
 
 def main():

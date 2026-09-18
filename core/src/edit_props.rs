@@ -12,16 +12,16 @@
 //!
 //! Three things run through all of it:
 //!
-//! 1. **A patch is a subset of one group**, merged with `actions::merge` —
-//!    the same deep merge action evaluation uses, so a field is patchable
-//!    the moment `model.rs` declares it and there is no second list of
-//!    patchable keys to forget to update.
-//! 2. **An unknown key is an `Err`**, unlike an action's `end` patch. A
-//!    typed Swift builder and an MCP call both reach these ops, and a key
-//!    silently dropped here is a bug the user would never see. The check
-//!    runs against a fully-populated template of the group, so
-//!    `{"shadow": {"blurr": 8}}` is caught even when the clip's shadow is
-//!    currently `null`.
+//! 1. **A patch is a subset of one group**, read by `patch.rs`'s
+//!    [`merge_group`] — the walk of keys and JSON kinds against the group's
+//!    template, the deep merge and the typed read back, so a field is
+//!    patchable the moment `model.rs` declares it and there is no second
+//!    list of patchable keys to forget to update. That module was cut out
+//!    of this one under the size rule, and it holds every sentence about
+//!    what a patch may CARRY; nothing here restates them.
+//! 2. **A mistake is named, never dropped.** A typed Swift builder and an
+//!    MCP call both reach these ops, and a key silently dropped here is a
+//!    bug the user would never see.
 //! 3. **Values are named, never clamped.** A channel outside 0–1 is a units
 //!    mistake (0–255) and a scale of 50 is a typo; silently clamping them
 //!    would leave the user looking at a number the inspector did not
@@ -37,154 +37,12 @@
 //! is a fact about the CLIP and not about the vocabulary, and nothing in
 //! `props_check.rs` is handed a clip to ask.
 
-use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::actions::{self, MAX_PATCH_DEPTH};
 use crate::export::describe;
-use crate::model::{
-    AudioProps, BlendMode, Chroma, Clip, Compressor, Filter, Motion, ObscureRegion, Project,
-    Reflection, Shadow, ShapeProps, Source, Spotlight, TextProps, VideoProps,
-};
+use crate::model::{BlendMode, Clip, Project, Source, TextProps, VideoProps};
+use crate::patch::{merge_group, Group};
 use crate::props_check::{check_audio, check_shape, check_text, check_video};
-
-// ---- property groups -----------------------------------------------------
-
-/// The four property groups a patch can address — and, as `video | audio |
-/// text | shape` on the wire, the names `paste_attributes` takes. Carries
-/// the group's name for error messages and its template for the
-/// unknown-key check.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum Group {
-    Video,
-    Audio,
-    Text,
-    Shape,
-}
-
-impl Group {
-    pub(crate) fn name(self) -> &'static str {
-        match self {
-            Group::Video => "video",
-            Group::Audio => "audio",
-            Group::Text => "text",
-            Group::Shape => "shape",
-        }
-    }
-
-    /// A fully-populated instance of the group, serialized: every optional
-    /// sub-object present, so the key check can see inside `shadow`,
-    /// `chroma`, `reflection`, `spotlight`, `duck`, `compressor`,
-    /// `outline`, `backdrop`, `animation`, `stroke` and `gradient` even when
-    /// the clip
-    /// currently has `null` there — and one `filters` entry and one `obscure` region, so
-    /// it can see inside the elements of the two arrays of objects too.
-    /// Both entries are load-bearing: `check_keys` reads the FIRST element
-    /// of the template's array as the reference for every element it is
-    /// given, so a list left at its empty default would hand it no
-    /// reference at all and a misspelling inside a region would be dropped
-    /// in silence — the very failure the array arm was written for.
-    /// `Gradient::default()` earns its place twice over for that reason: it
-    /// is the only optional sub-object that CONTAINS an array of objects,
-    /// and its own default carries two stops, so `stops[].at` and
-    /// `stops[].color` get a reference without this arm naming them.
-    fn template(self) -> Value {
-        match self {
-            Group::Video => actions::to_json(&VideoProps {
-                shadow: Some(Shadow::default()),
-                chroma: Some(Chroma::default()),
-                filters: vec![Filter::default()],
-                reflection: Some(Reflection::default()),
-                spotlight: Some(Spotlight::default()),
-                obscure: vec![ObscureRegion::default()],
-                motion: Some(Motion::template()),
-                ..VideoProps::default()
-            }),
-            Group::Audio => actions::to_json(&AudioProps {
-                duck: Some(crate::model::Duck::default()),
-                compressor: Some(Compressor::default()),
-                ..AudioProps::default()
-            }),
-            Group::Text => actions::to_json(&TextProps {
-                outline: Some(crate::model::Outline::default()),
-                backdrop: Some(crate::model::Backdrop::default()),
-                width: Some(0.0),
-                animation: Some(crate::model::TextAnimation::default()),
-                ..TextProps::default()
-            }),
-            Group::Shape => actions::to_json(&ShapeProps {
-                stroke: Some(crate::model::Stroke::default()),
-                fill: Some([0.0, 0.0, 0.0, 1.0]),
-                gradient: Some(crate::model::Gradient::default()),
-                ..ShapeProps::default()
-            }),
-        }
-    }
-}
-
-/// Rejects any key in `patch` the group's schema does not have, naming the
-/// dotted path. Recursion is bounded by the same depth action patches use;
-/// past it the check stops rather than descending an arbitrary tree, and
-/// serde drops whatever it finds there.
-fn check_keys(
-    patch: &Value,
-    template: &Value,
-    group: Group,
-    path: &str,
-    depth: u32,
-) -> Result<(), String> {
-    // An array of objects — `video.filters`, and from format version 4
-    // `video.obscure` — is where the schema puts keys inside an array, and
-    // every element has the SAME shape, so the template's first entry
-    // describes all of them. Without this a misspelled
-    // `{"filters": [{"amont": 1}]}` would be dropped in silence by serde,
-    // which is exactly the failure this check exists to prevent.
-    // Arrays of numbers (a colour, `from`/`to`) fall through it harmlessly:
-    // a number against a number has no keys to check.
-    if let (Value::Array(given), Value::Array(known)) = (patch, template) {
-        if depth < MAX_PATCH_DEPTH {
-            if let Some(reference) = known.first() {
-                for value in given {
-                    check_keys(value, reference, group, path, depth + 1)?;
-                }
-            }
-        }
-        return Ok(());
-    }
-    let (Value::Object(given), Value::Object(known)) = (patch, template) else {
-        // A leaf or a `null` (clearing an optional group): no keys to
-        // check.
-        return Ok(());
-    };
-    if depth >= MAX_PATCH_DEPTH {
-        return Ok(());
-    }
-    for (key, value) in given {
-        let Some(reference) = known.get(key) else {
-            return Err(format!(
-                "unknown key \"{path}{key}\" in a {} patch",
-                group.name()
-            ));
-        };
-        check_keys(value, reference, group, &format!("{path}{key}."), depth + 1)?;
-    }
-    Ok(())
-}
-
-/// Checks the patch's shape and merges it into `base` (already serialized).
-/// The merge itself is `actions::merge` — the one deep merge in the crate.
-pub(crate) fn merge_group(base: &Value, patch: &Value, group: Group) -> Result<Value, String> {
-    if !patch.is_object() {
-        return Err(format!(
-            "{} patch must be a json object, not {}",
-            group.name(),
-            describe(patch)
-        ));
-    }
-    check_keys(patch, &group.template(), group, "", 0)?;
-    Ok(actions::merge(base, patch))
-}
 
 /// The one check a video group cannot make on its own: a NEST clip may not
 /// carry a blend mode (format version 6).
@@ -210,10 +68,11 @@ pub(crate) fn merge_group(base: &Value, patch: &Value, group: Group) -> Result<V
 /// clip. Both callers — the patch path and `paste_attributes`' `check_group`
 /// — run this one function, so the two give the identical message.
 ///
-/// It is not the whole story either: `set_action_end` validates nothing but
-/// "is it an object", so an end patch can still carry a blend onto a nest
-/// clip. `actions.rs`'s `clamp_video` is what closes that door, for the
-/// recipe, `clip_state` and both export writers at once.
+/// It is not the whole story either: `set_action_end` checks the VOCABULARY
+/// and never the clip, and a blend mode is a legal value, so an end patch
+/// can still carry one onto a nest clip. `actions.rs`'s `clamp_video` is
+/// what closes that door, for the recipe, `clip_state` and both export
+/// writers at once.
 fn check_blend(clip: &Clip, props: &VideoProps) -> Result<(), String> {
     if props.blend != BlendMode::Normal && matches!(clip.source, Source::Nest { .. }) {
         return Err(format!(
@@ -305,6 +164,52 @@ impl Project {
         self.finish(next)
     }
 
+    /// Puts a motion preset's two edge durations and its `during` period on
+    /// the document's frame grid — the core's Times rule (core/CLAUDE.md:
+    /// every tick value that reaches the model is snapped first) applied at
+    /// the patch door, where before D1·2 a comment in `props_check.rs` said
+    /// "the inspector snaps" and left an agent's value sub-frame.
+    ///
+    /// It runs AFTER the range check, so a refusal names the number the
+    /// caller actually sent: a `duration` of −1 is a sign mistake and is
+    /// refused, where snapping first would have turned it into a legal 0 and
+    /// said nothing. Snapping cannot undo that check — a non-negative
+    /// duration snaps to a non-negative one — with one exception, and
+    /// `period` carries its own floor for it: it divides in every `during`
+    /// formula, so a period under half a frame would snap to 0 and stop the
+    /// motion the caller asked for. On the grid the smallest period there
+    /// is is one frame, so that is where it lands.
+    fn snap_motion(&self, props: &mut VideoProps) {
+        let Some(motion) = props.motion.as_mut() else {
+            return;
+        };
+        for edge in [motion.r#in.as_mut(), motion.out.as_mut()]
+            .into_iter()
+            .flatten()
+        {
+            edge.duration = self.snapped(edge.duration);
+        }
+        if let Some(during) = motion.during.as_mut() {
+            during.period = self.snapped(during.period).max(self.frame());
+        }
+    }
+
+    /// The same for a text animation's two timings ([`Self::snap_motion`]
+    /// argues the order and the rounding). Both are DURATIONS, so 0 is
+    /// legal and a reveal shorter than half a frame lands there: it is a
+    /// reveal no frame could show.
+    ///
+    /// `pub(crate)` for the one text patch that is not `set_text`:
+    /// `add_text_clip`'s, which runs the same merge and the same check in
+    /// `edit_clip.rs` and must land on the same grid.
+    pub(crate) fn snap_animation(&self, props: &mut TextProps) {
+        let Some(animation) = props.animation.as_mut() else {
+            return;
+        };
+        animation.r#in = self.snapped(animation.r#in);
+        animation.out = self.snapped(animation.out);
+    }
+
     /// The range check for ONE of a clip's groups — what `paste_attributes`
     /// runs on each group it has just replaced, and only on those, so a
     /// payload written by hand meets the bounds a patch does and a group the
@@ -366,9 +271,7 @@ impl Project {
                         .video
                         .clone()
                         .ok_or_else(|| format!("clip {id} has no video properties"))?;
-                    let merged = merge_group(&actions::to_json(&base), patch, group)?;
-                    let mut props: VideoProps = serde_json::from_value(merged)
-                        .map_err(|e| format!("video patch does not match the schema: {e}"))?;
+                    let mut props = merge_group(&base, patch, group)?;
                     // One spelling of "no motion" (format version 8): a
                     // patch that clears the last filled slot leaves a
                     // `Motion` with three `None`s behind, which round-trips
@@ -383,6 +286,7 @@ impl Project {
                     }
                     check_video(&props, self.source_size(&clip))?;
                     check_blend(&clip, &props)?;
+                    self.snap_motion(&mut props);
                     if let Some(slot) = next.clip_mut(id) {
                         slot.video = Some(props);
                     }
@@ -391,9 +295,7 @@ impl Project {
                     let base = clip
                         .audio
                         .ok_or_else(|| format!("clip {id} has no audio properties"))?;
-                    let merged = merge_group(&actions::to_json(&base), patch, group)?;
-                    let props: AudioProps = serde_json::from_value(merged)
-                        .map_err(|e| format!("audio patch does not match the schema: {e}"))?;
+                    let props = merge_group(&base, patch, group)?;
                     check_audio(&props)?;
                     if let Some(slot) = next.clip_mut(id) {
                         slot.audio = Some(props);
@@ -404,10 +306,9 @@ impl Project {
                         .text
                         .clone()
                         .ok_or_else(|| format!("clip {id} has no text properties"))?;
-                    let merged = merge_group(&actions::to_json(&base), patch, group)?;
-                    let props: TextProps = serde_json::from_value(merged)
-                        .map_err(|e| format!("text patch does not match the schema: {e}"))?;
+                    let mut props = merge_group(&base, patch, group)?;
                     check_text(&props)?;
+                    self.snap_animation(&mut props);
                     if let Some(slot) = next.clip_mut(id) {
                         slot.text = Some(props);
                     }
@@ -417,9 +318,7 @@ impl Project {
                         .shape
                         .clone()
                         .ok_or_else(|| format!("clip {id} has no shape properties"))?;
-                    let merged = merge_group(&actions::to_json(&base), patch, group)?;
-                    let props: ShapeProps = serde_json::from_value(merged)
-                        .map_err(|e| format!("shape patch does not match the schema: {e}"))?;
+                    let props = merge_group(&base, patch, group)?;
                     check_shape(&props)?;
                     if let Some(slot) = next.clip_mut(id) {
                         slot.shape = Some(props);

@@ -38,8 +38,17 @@
 //!   it swallows, then the nest clip.
 //! - Unknown keys are an error, in the envelope and in every property
 //!   patch: a typo in a hand-written op or an agent call is a mistake to
-//!   report, not a silent no-op. The one exception is an action's `end`
-//!   patch, which is evaluated leniently and keeps what it does not know.
+//!   report, not a silent no-op. In a property patch a value of the wrong
+//!   kind and a misspelt variant are errors too — never read as a clear,
+//!   and a list or an object is never read field by field as something
+//!   else — and the refusal names the dotted path to the mistake, array
+//!   indices included, and the value sent: `unknown key "filters[1].kindd"
+//!   in a video patch`, `bad value at "shadow" in a video patch: expected
+//!   an object, not 5`. An action's `end` patch is walked the same way —
+//!   the three groups it may name are `video`, `audio` and `text`, and its
+//!   paths carry the group (`unknown key "video.filters[1].kindd" in an
+//!   action end patch`) — but its VALUES are not range-checked, because an
+//!   end state may name what no stored group could hold.
 //!   `set_clip` is the fifth patch op. In every patch an absent key keeps
 //!   and a `null` clears an OPTIONAL field (a shadow, a duck, a text
 //!   `width`; a required one refuses it by name) — in `set_clip` the field
@@ -130,9 +139,9 @@
 //! | Op | Arguments | Semantics |
 //! |---|---|---|
 //! | `add_action` | `clip: u32, at: ticks, duration?: ticks = 1 s` | A new action at CLIP time `at` (the caller subtracts `clip.start`), end patch empty. Refuses when it would overlap another action or run past the clip. |
-//! | `add_zoom_action` | `clip: u32, at: ticks, duration?: ticks = 1 s, region?: {x, y, width, height} \| null, fit?: fit \| fill = fit, curve?: curve = ease_in_out` | An `add_action` whose end patch is the `scale`, `x` and `y` that bring `region` to the canvas — the screencast zoom. `region`'s `x`/`y` are its **CENTRE** and `width`/`height` its size, both SOURCE pixels from the centre of the clip's cropped rect (the spotlight's frame); `fit` shows the whole region, `fill` covers the whole canvas, both measured THROUGH the clip's rotation. Rotation and crop are read from the clip evaluated at `at`; the scale clamps to the layer maximum and the offsets follow the CLAMPED value, so a region too small to fill the canvas still lands centred. `region` absent or `null` is a zoom BACK: the end patch is the clip's base `scale`, `x`, `y`. Same refusals as `add_action`; a clip with no video properties is an `Err`. |
+//! | `add_zoom_action` | `clip: u32, at: ticks, duration?: ticks = 1 s, region?: {x, y, width, height} \| null, fit?: fit \| fill = fit, curve?: curve = ease_in_out` | An `add_action` whose end patch is the `scale`, `x` and `y` that bring `region` to the canvas — the screencast zoom. `region`'s `x`/`y` are its **CENTRE** and `width`/`height` its size, both SOURCE pixels from the centre of the clip's cropped rect (the spotlight's frame); `fit` shows the whole region, `fill` covers the whole canvas, both measured THROUGH the clip's rotation. Rotation and crop are read from the clip evaluated at `at`; the scale clamps to the layer maximum and the offsets follow the CLAMPED value, so a region too small to fill the canvas still lands centred. `region` absent or `null` is a zoom BACK: the end patch is the clip's base `scale`, `x`, `y`. The region is read the way a patch is: it must BE an object (a four-number list is refused, not read member by member), and an unknown, missing or wrong-typed member is an `Err` naming it. Same refusals as `add_action`; a clip with no video properties is an `Err`. |
 //! | `set_action` | `clip: u32, action: u32, start?: ticks, duration?: ticks, curve?: curve` | Retimes or re-curves one action; omitted fields keep their value, same overlap checks. |
-//! | `set_action_end` | `clip: u32, action: u32, patch: object` | Merges into the action's `end` patch; a key set to `null` is removed from it. |
+//! | `set_action_end` | `clip: u32, action: u32, patch: object` | Merges into the action's `end` patch; a key set to `null` is removed from it, at any depth. Walked for keys and kinds like every other patch, over the three groups §5.4 allows (a `shape` object is an unknown key); values are NOT range-checked. A `video` object naming `motion` is an `Err`. |
 //! | `remove_action` | `clip: u32, action: u32` | |
 //!
 //! `curve` is one of `linear`, `ease_in`, `ease_out`, `ease_in_out`. The
@@ -192,11 +201,11 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::edit_props::Group;
 use crate::edit_transition::TransitionAlign;
 use crate::edit_zoom::{ZoomFit, ZoomRegion};
 use crate::export::describe;
 use crate::model::{Color, Curve, Project, TransitionKind};
+use crate::patch::Group;
 use crate::scope;
 use crate::time::{Fps, Ticks};
 

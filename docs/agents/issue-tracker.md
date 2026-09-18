@@ -27,7 +27,7 @@ GitHub shares one number space across issues and PRs, so a bare `#42` may be eit
 
 ## When a skill says "publish to the issue tracker"
 
-Create a GitHub issue.
+Create a GitHub issue. A spec (the output of `/to-spec`) gets the `spec` label and never `ready-for-agent`, whatever the skill says: that label is a work order to a polling agent, and a spec is an input. Only the tickets `/to-tickets` produces carry `ready-for-agent`.
 
 ## When a skill says "fetch the relevant ticket"
 

@@ -54,7 +54,7 @@ mod common;
 
 use serde_json::{json, Value};
 
-use common::{at, int, text, Handle};
+use common::{array, at, int, text, Handle};
 
 /// Ticks per second (spec §5.1), written out rather than imported so a
 /// change to `time::TIMESCALE` fails these tests instead of moving with
@@ -290,11 +290,14 @@ fn an_unknown_kind_is_refused_by_the_enum_itself() {
     // The enum is closed, and this is what that bought: there is no neutral
     // animation to fall back to the way a filter's `amount` can fall back
     // to 0, so a kind nothing downstream could draw is refused at the serde
-    // boundary rather than range-checked a long way from the type.
+    // boundary rather than range-checked a long way from the type. The
+    // refusal names the path in the key walk's spelling (D1·1,
+    // kpgalligan/reelcut#2; it used to open "text patch does not match the
+    // schema:" and say nothing of where).
     let msg = plain().errors(&set_text(json!({ "animation": { "kind": "fade" } })));
     assert!(
-        msg.starts_with("text patch does not match the schema:"),
-        "the schema refusal, got {msg:?}"
+        msg.starts_with("bad value at \"animation.kind\" in a text patch: "),
+        "the schema refusal, with its path, got {msg:?}"
     );
     assert!(
         msg.contains("unknown variant `fade`"),
@@ -367,4 +370,68 @@ fn paste_attributes_carries_the_animation_and_re_checks_it() {
         "payload": payload_with(json!({ "kind": "line_rise", "in": -2 }))
     }));
     assert_eq!(msg, "text.animation.in must not be negative, not -2");
+}
+
+// ---- the frame grid ------------------------------------------------------
+
+#[test]
+fn the_animations_timings_are_snapped_to_the_frame_grid_by_the_patch_door() {
+    // The core's Times rule — every tick value that reaches the model is
+    // snapped first (core/CLAUDE.md) — holds for these two as of D1·2
+    // (kpgalligan/reelcut#3). It did not before: the comment beside the
+    // check in `props_check.rs` said the inspector snapped, which left an
+    // agent's value sub-frame and made two callers of one op disagree.
+    // The canvas is 30 fps, so a frame is 20 000 ticks.
+    let project = plain();
+    let snapped = project
+        .apply(&set_text(json!({
+            "animation": { "kind": "line_rise", "in": 310_000, "out": 9_999 }
+        })))
+        .value();
+    assert_eq!(
+        at(&snapped, "/clips/0/text/animation"),
+        &json!({ "kind": "line_rise", "in": 320_000, "out": 0 }),
+        "15.5 frames rounds half away from zero; half a frame is no un-reveal at all"
+    );
+
+    // The sign check runs on what the CALLER sent, so a negative timing is
+    // still named rather than snapped into a legal 0.
+    assert_eq!(
+        project.errors(&set_text(
+            json!({ "animation": { "kind": "typewriter", "in": -1 } })
+        )),
+        "text.animation.in must not be negative, not -1"
+    );
+
+    // A value already on the grid that changes nothing is an identity —
+    // no undo step — and so is a sub-frame value that snaps onto it.
+    let on_the_grid = json!({ "kind": "line_rise", "in": 320_000, "out": 0 });
+    let handle = Handle::from_value(&snapped);
+    handle.refuses(&set_text(json!({ "animation": on_the_grid })));
+    handle.refuses(&set_text(json!({ "animation": { "in": 320_000 + 9_999 } })));
+
+    // A NEW text clip's animation lands on the same grid: it is the same
+    // merge and the same check one file over (`edit_clip.rs`), and a door
+    // that snapped only some of the time would be the exception this
+    // ticket removed.
+    let born = plain().apply(&json!({
+        "op": "add_text_clip", "track": 2, "at": 12 * SEC,
+        "text": { "content": "New", "animation": { "kind": "typewriter", "in": 310_000 } }
+    }));
+    let project = born.value();
+    let clips = array(&project, "/clips");
+    assert_eq!(
+        at(clips.last().expect("the new clip"), "/text/animation/in"),
+        &json!(320_000)
+    );
+
+    // The FILE is not snapped, which is the same split the filter entry
+    // has: `word_fade`'s `out` is 22.5 frames and opens exactly as written
+    // (`an_animation_round_trips_whole` reads it back key for key). A file
+    // opens as what it says; an op is what puts a value on the grid.
+    let from_a_file = Handle::from_value(&animated()).value();
+    assert_eq!(
+        at(&from_a_file, "/clips/0/text/animation/out"),
+        &json!(450_000)
+    );
 }

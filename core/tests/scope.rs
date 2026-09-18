@@ -821,8 +821,12 @@ fn every_op() -> Vec<(&'static str, Value)> {
         ),
         (
             "set_action_end",
+            // The group is named, because an end patch is a subset of
+            // `video` / `audio` / `text` (spec §5.4) and a bare `opacity`
+            // is an unknown key. It read as one here for as long as the op
+            // validated nothing: the op "worked" and animated nothing.
             json!({"op":"set_action_end","clip":7,"action":8,
-          "patch":{"opacity":0.0}}),
+          "patch":{"video":{"opacity":0.0}}}),
         ),
         (
             "remove_action",

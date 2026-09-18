@@ -270,15 +270,19 @@ fn a_patch_deep_merges_a_motion_rather_than_replacing_it() {
     // key, so naming one slot keeps the other two. The replace-whole rule
     // lives at the two Swift edges (`VideoPatch.dictionary` and
     // `motionPatchArg`) and deliberately NOT here.
+    //
+    // The duration is a FIFTH of a second because this canvas is 30 fps and
+    // the door snaps (D1·2): a quarter-second is seven and a half frames
+    // and would land on eight, which is a different claim from this test's.
     let after = Handle::from_value(&moving(8, Some(full_motion())))
         .apply(&set_video(json!({
-            "motion": { "in": { "kind": "pop", "duration": SEC / 4 } }
+            "motion": { "in": { "kind": "pop", "duration": SEC / 5 } }
         })))
         .value();
     assert_eq!(
         at(&after, "/clips/0/video/motion"),
         &json!({
-            "in": { "kind": "pop", "duration": SEC / 4 },
+            "in": { "kind": "pop", "duration": SEC / 5 },
             "out": { "kind": "zoom_out", "duration": SEC },
             "during": { "kind": "shake", "amount": 0.25, "period": 2 * SEC }
         })
@@ -385,6 +389,71 @@ fn every_range_check_refuses_by_name() {
     assert_eq!(num(&zero, "/clips/0/video/motion/in/duration"), 0.0);
 }
 
+// ---- the frame grid ------------------------------------------------------
+
+#[test]
+fn a_motions_ticks_are_snapped_to_the_frame_grid_by_the_patch_door() {
+    // The core's Times rule — every tick value that reaches the model is
+    // snapped first (core/CLAUDE.md) — holds for these two as of D1·2
+    // (kpgalligan/reelcut#3). It did not before: the comment in
+    // `props_check.rs` said "the inspector snaps", which left an agent's
+    // value sub-frame and made two callers of one op disagree.
+    //
+    // The canvas is 30 fps, so a frame is 20 000 ticks.
+    let handle = plain();
+    let snapped = handle
+        .apply(&set_video(json!({
+            "motion": { "in": { "kind": "fade", "duration": 310_000 },
+                        "out": { "kind": "pop", "duration": 9_999 },
+                        "during": { "kind": "pulse", "amount": 0.5, "period": 1_200_001 } }
+        })))
+        .value();
+    assert_eq!(
+        at(&snapped, "/clips/0/video/motion"),
+        &json!({
+            // 15.5 frames, rounded half AWAY from zero like every other
+            // snapped length in the crate.
+            "in": { "kind": "fade", "duration": 320_000 },
+            // Half a frame: the nearest boundary is 0, which is a legal
+            // duration and means that end of the clip does not move.
+            "out": { "kind": "pop", "duration": 0 },
+            "during": { "kind": "pulse", "amount": 0.5, "period": 1_200_000 }
+        })
+    );
+
+    // `period` is the one value with no zero — it divides in every `during`
+    // formula — so it lands on the FIRST frame rather than on the nearest
+    // one when the nearest is nothing. The range check that says "at least
+    // one tick" runs on what the caller sent, so a negative one is still
+    // named rather than snapped into legality.
+    let floored = handle
+        .apply(&set_video(json!({
+            "motion": { "during": { "kind": "pulse", "amount": 0.5, "period": 5 } }
+        })))
+        .value();
+    assert_eq!(
+        num(&floored, "/clips/0/video/motion/during/period"),
+        20_000.0
+    );
+    assert_eq!(
+        handle.errors(&set_video(json!({
+            "motion": { "during": { "kind": "pulse", "period": -1 } }
+        }))),
+        "video.motion.during.period must be at least one tick, not -1"
+    );
+
+    // A value already ON the grid that changes nothing is an identity —
+    // `Ok(None)`, no undo step — which is what keeps the snap from turning
+    // every repeated write into an edit.
+    let stored = Handle::from_value(&moving(8, Some(full_motion())));
+    stored.refuses(&set_video(json!({ "motion": full_motion() })));
+    // ...and a sub-frame value that snaps ONTO the stored one is the same
+    // identity, for the same reason.
+    stored.refuses(&set_video(json!({
+        "motion": { "in": { "kind": "slide_up", "duration": SEC / 2 + 9_999 } }
+    })));
+}
+
 #[test]
 fn a_misspelt_key_is_refused_by_name_at_every_level() {
     // `Group::template`'s doing: `check_keys` recurses into objects against
@@ -411,20 +480,23 @@ fn a_misspelt_key_is_refused_by_name_at_every_level() {
 fn an_unknown_kind_is_refused_at_the_serde_boundary() {
     // Both enums are closed, so a misspelt kind is a schema error on the
     // way in rather than a value clamped later — there is no neutral motion
-    // to fall back to.
+    // to fall back to. The refusal names the slot's path and the value sent
+    // (D1·1, kpgalligan/reelcut#2; it used to read "video patch does not
+    // match the schema" and say nothing of which slot).
     let handle = plain();
+    let msg = handle.errors(&set_video(
+        json!({ "motion": { "in": { "kind": "slide_lft" } } }),
+    ));
+    common::assert_contains(&msg, "bad value at \"motion.in.kind\" in a video patch: ");
+    common::assert_contains(&msg, "`slide_lft`");
+    let msg = handle.errors(&set_video(
+        json!({ "motion": { "during": { "kind": "wobble" } } }),
+    ));
     common::assert_contains(
-        &handle.errors(&set_video(
-            json!({ "motion": { "in": { "kind": "slide_lft" } } }),
-        )),
-        "video patch does not match the schema",
+        &msg,
+        "bad value at \"motion.during.kind\" in a video patch: ",
     );
-    common::assert_contains(
-        &handle.errors(&set_video(
-            json!({ "motion": { "during": { "kind": "wobble" } } }),
-        )),
-        "video patch does not match the schema",
-    );
+    common::assert_contains(&msg, "`wobble`");
 }
 
 // ---- not an animation target ---------------------------------------------

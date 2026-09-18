@@ -13,12 +13,16 @@
 //! the frame snapping and [`Project::finish`] are `edit_clip.rs`'s
 //! `pub(crate)` helpers, called and never restated.
 //!
-//! One asymmetry is deliberate and worth stating: an action's `end` patch is
-//! LENIENT where `set_video` and its siblings are strict. `set_action_end`
-//! merges whatever it is given and keeps keys it does not know, because a
-//! half-written animation must stay editable and a project from a newer
-//! build must survive a round trip through this one. The evaluator is the
-//! line of defence instead — it clamps every value it produces (spec §5.4).
+//! One asymmetry is deliberate and worth stating, and D1·2 moved where it
+//! falls. An end patch is walked for keys and types like every other patch
+//! ([`check_end_patch`], over `patch.rs`'s walk), so a misspelt key here is
+//! refused by its path rather than stored and silently ignored; what stays
+//! LENIENT is the VALUE, because the state a clip interpolates toward may
+//! name something no stored group could hold, and because a half-written
+//! animation must stay editable. The evaluator is the line of defence for
+//! that — it clamps every value it produces (spec §5.4). The forward
+//! compatibility the old leniency was for lives in the FILE reader, which
+//! keeps an `end` object exactly as it found it.
 //!
 //! It has exactly ONE refusal beyond "the patch must be an object", and it
 //! is about a key that is not a value at all: `video.motion` (format
@@ -34,6 +38,7 @@ use serde_json::Value;
 use crate::actions::{self, MAX_PATCH_DEPTH};
 use crate::export::describe;
 use crate::model::{Action, Curve, Project};
+use crate::patch::{check_group_patch, unknown_key, Group};
 use crate::time::{Ticks, TIMESCALE};
 
 /// Default duration for `add_action`: one second of animation, the length
@@ -73,6 +78,56 @@ fn prune_removed(value: &mut Value, patch: &Value, depth: u32) {
             prune_removed(slot, sub, depth + 1);
         }
     }
+}
+
+/// What a refusal calls this op's patch. It is not one group's — the paths
+/// inside it carry the group's name (`video.filters[1].kind`) — so it
+/// cannot be a `Group`'s own subject.
+const END_PATCH: &str = "an action end patch";
+
+/// The groups §5.4's end patch may name. `shape` is not among them, and its
+/// absence is a refusal rather than an omission: `evaluate_clip` passes a
+/// clip's shape through untouched, so the key would be stored, reported as
+/// success and animate nothing.
+const END_GROUPS: [Group; 3] = [Group::Video, Group::Audio, Group::Text];
+
+/// Walks an end patch's keys, kinds and values the way every other patch
+/// is walked (`patch.rs`'s `check_group_patch`), group by group, and
+/// refuses by the dotted path.
+///
+/// What belongs to THIS door rather than to a property group, and is why
+/// the walk is composed here rather than called:
+///
+/// - **Three groups and no fourth.** Spec §5.4's patch is a subset of
+///   `video`, `audio` and `text`. `shape` is refused rather than kept,
+///   because `evaluate_clip` passes a clip's shape through untouched: the
+///   key would be stored, reported as success, and animate nothing.
+/// - **A `null` is a REMOVAL at every depth**, not a clear. The walk sees
+///   it (so `{"video": {"blurr": null}}` is still an unknown key) and the
+///   typed read does not (so `{"video": {"crop": null}}` is "stop animating
+///   the crop" rather than a required field being cleared) —
+///   `check_group_patch` is where that split lives, and [`prune_removed`]
+///   below applies the same rule to the STORED end state.
+fn check_end_patch(patch: &Value) -> Result<(), String> {
+    let Value::Object(groups) = patch else {
+        return Ok(());
+    };
+    for (key, body) in groups {
+        // The three groups, by their own names rather than by three string
+        // literals: a group renamed in `patch.rs` cannot drift from the
+        // door that lists it.
+        let group = END_GROUPS
+            .into_iter()
+            .find(|group| group.name() == key)
+            .ok_or_else(|| unknown_key(key, END_PATCH))?;
+        // A group set to `null` removes the whole group from the end state,
+        // which is the same removal one key deep.
+        if body.is_null() {
+            continue;
+        }
+        check_group_patch(body, group, END_PATCH, key)?;
+    }
+    Ok(())
 }
 
 impl Project {
@@ -192,17 +247,24 @@ impl Project {
     /// REMOVES it, which is how the inspector stops animating one property
     /// without deleting the action (spec §6).
     ///
-    /// Unknown keys are kept, not rejected: an end patch is evaluated
-    /// leniently (`actions.rs`), and a project written by a newer build
-    /// must survive a round trip through this one.
+    /// The patch is walked like every other one (`patch.rs`'s
+    /// `check_end_patch`): an unknown key, a value of the wrong JSON kind
+    /// and a misspelt variant are each refused, naming the dotted path with
+    /// the group's name in it and the value sent. What it does NOT do is
+    /// range-check — the state a clip interpolates toward may legitimately
+    /// name a value no stored group could hold, and `actions.rs`'s
+    /// `clamp_video` bounds the evaluated value instead (spec §5.4).
     ///
-    /// The ONE exception, and the op's only refusal past the top-level
-    /// object check: a `video` object naming `motion` is an `Err`. A preset
-    /// is anchored to the clip's two ends and an action is a ramp between
-    /// two states, so there is nothing to interpolate — half a slide into
-    /// half a spin is not a picture anybody asked for — and the evaluator
-    /// would put the base value back anyway, leaving a control that
-    /// reported success and did nothing.
+    /// A `null` is the one value the walk lets past at any depth, because
+    /// here it is a REMOVAL rather than a clear.
+    ///
+    /// The refusal that is about this op rather than about the vocabulary:
+    /// a `video` object naming `motion` is an `Err`. A preset is anchored to
+    /// the clip's two ends and an action is a ramp between two states, so
+    /// there is nothing to interpolate — half a slide into half a spin is
+    /// not a picture anybody asked for — and the evaluator would put the
+    /// base value back anyway, leaving a control that reported success and
+    /// did nothing.
     pub fn set_action_end(
         &self,
         clip: u32,
@@ -230,6 +292,7 @@ impl Project {
         {
             return Err("video.motion is not an animation target".to_string());
         }
+        check_end_patch(patch)?;
         let mut merged = actions::merge(&existing.end, patch);
         prune_removed(&mut merged, patch, 0);
 

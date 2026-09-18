@@ -324,6 +324,15 @@ count of each is `rc_op_names`' length and the catalog's, and the startup
 parity check compares them, so it is one number in the code and not one
 here.
 
+**A `patch` argument is your own object, and the core reads it.** It merges
+key by key at every depth — a nested object keeps the keys you left out, a
+key set to `null` clears it, an array replaces its whole list — and an
+unknown key or a misspelt value at any depth is an error naming the dotted
+path to it and the value you sent (`filters[1].kindd`), never a different
+edit made quietly. Nothing is corrected or clamped on the way: a colour is
+four numbers, `[r, g, b, a]`, each 0–1 — `video.chroma.key`, which names a
+hue rather than paints with it, is the one `[r, g, b]` in the model.
+
 | Tool | |
 |---|---|
 | `open_project {path}` | a `.reelcut` package, or any movie/sound/picture, which opens as a new untitled project around it |

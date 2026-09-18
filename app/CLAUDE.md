@@ -19,17 +19,37 @@ detail there.
   the `dictionary` extensions on the property types and the typed patches.
   `deinit` frees the Rust allocation.
 - `ReelOps.swift` — `OpArgs`, `ReelOp` and one typed factory per row of
-  `core/src/edit.rs`'s op table; there is no untyped op-JSON call site
-  anywhere else. `scope` is a member folded into `json`;
-  `documentLevelNames` MIRRORS `scope.rs`'s `refused_inside` (seven names) so
-  one edit can mix a document-level op with scoped ones. A table, with
+  `core/src/edit.rs`'s op table, plus a RAW factory beside the typed one at
+  each door that takes a CALLER's own object — ELEVEN of them (`setVideoRaw`,
+  `setAudioRaw`, `setTextRaw`, `setShapeRaw`, `setClipRaw`,
+  `setActionEndRaw`, `addTextClipRaw`, `addShapeClipRaw`, `setCanvasRaw`,
+  `addBackgroundRaw`, `addZoomActionRaw`), which takes the
+  caller's own object as `Any` — never `[String: Any]`, so a non-object is
+  refused by the CORE in the words that name the group — and forwards it;
+  there is no untyped op-JSON call site anywhere else. Where only ONE
+  argument is the caller's (a colour, a region, a new clip's patch) the typed
+  factory DELEGATES to the raw one, mapping its optional explicitly, because
+  an `Optional<T>.none` widened to `Any?` is a non-nil `Any` wrapping a nil.
+  `addZoomActionRaw`'s region is `Any` and not `Any?`: an absent key and an
+  explicit null are opposite intentions there, and only the tool can tell
+  them apart.
+  `scope` is a member folded into `json`; `documentLevelNames` MIRRORS
+  `scope.rs`'s `refused_inside` (seven names) so one edit can mix a
+  document-level op with scoped ones. A table, with
   `edit.rs`'s size exemption.
 - `ProjectSnapshot.swift` · `MotionProps.swift` — the `Codable`, READ-ONLY
   mirror of spec §5.2 every view draws from. **Its enums decode LENIENTLY**
   — a misspelt kind becomes the first case, a `T??` field a clear — which is
-  why every agent handler checks enums and types by hand (below).
+  why a caller-authored object is never decoded through them (below): no
+  agent handler reads a caller-authored OBJECT at all. A scalar enum
+  argument is a different thing and several handlers still parse one by name
+  (`add_zoom_action`'s `fit`, `curveArg`, `set_transition`'s `kind`): the
+  core refuses those too, and what this rule forbids is decoding a caller's
+  object through a lenient type.
   `MotionProps.dictionary` always writes all three keys, `NSNull` for a nil
-  slot, because a core patch of `motion` deep-merges.
+  slot, because a core patch of `motion` deep-merges — it is the
+  APP's writer saying all three slots, not a replace rule, and it is the only
+  edge that writes a whole motion.
 
 **The document.**
 - `ProjectDocument.swift` (+`DisplayStem`, +`Recording`) — NSDocument,
@@ -346,7 +366,7 @@ free.
 **The agent.**
 - `AgentServer.swift` (frozen) and `AgentServer+Project` / `Clips` /
   `Tracks` / `Media` / `Render` / `History` / `Silence` / `Captions` / `Audio`
-  / `Background` / `Scope` / `Transitions` / `Motion` / `Recording`
+  / `Background` / `Scope` / `Transitions` / `Recording`
   (+`RecordingArguments`, +`RecordingResult`) — the handlers, one file per
   group. `AgentCatalog.swift` (+`Clips`, +`Audio`, +`Transitions`, +`Files`)
   — the catalog, spliced in ORDER (`recording_probe.py` reads the last
@@ -357,17 +377,21 @@ free.
   `transcribe`, `record_screen`, `export`, …); the criterion is "waits on
   main", not "touches the disk".
 - `AgentServer+Arguments.swift` — the shared argument vocabulary
-  (`intArg`, `timeArg`, `rangesArg`, `colorArg`, `patchArg`, …), each refusing
-  a value it cannot read BY NAME. Three gaps to design around: `patchArg`'s
-  round trip cannot see a wrong-typed `T??` field (`nullable()` decodes it as
-  a CLEAR), so `set_clip` and `motion` check by hand and the other object-valued
-  `T??` fields still clear on a wrong type; a nested OBJECT in a patch is
-  decoded and re-serialised, so it is a REPLACEMENT — an omitted key comes
-  back as the default and a misspelt one is dropped — except `gradient` and
-  `motion`, which are read by hand and refuse by name; and `ProjectSnapshot`'s
-  lenient enums mean `checkVideoEnums` / `checkTextEnums` must run at EVERY
-  door a patch comes through (`set_*`, `add_*_clip`, `set_action_end`), not
-  the one it was written for.
+  (`intArg`, `timeArg`, `rangesArg`, `rawPatchArg`, …), each refusing a
+  value it cannot read BY NAME, and ONLY what the core cannot know: target
+  and scope, an id checked against the container it names, a time on the
+  document's frame grid, and the in-band refusal. **`rawPatchArg` is the
+  door every op that takes a caller-authored object goes through**: it reads
+  nothing about the value and hands the object to the core, which is the one
+  validator of what a patch may carry and names the dotted path and the
+  value in every refusal (`core/src/patch.rs`). Its one refusal is the
+  ABSENT argument, a mistake about the CALL. A colour-only ARGUMENT
+  (`set_canvas`'s background, `add_background`'s colour) goes the same way,
+  straight off the call: a colour is four numbers each 0–1 and nothing on
+  this side fills in an alpha or clamps a component. **There is no decoder
+  for a caller's object in this file and a new door does not add one** (the
+  rule under Rules; what was deleted and what it measured,
+  `designs/reelcut-roadmap-7.md` §2–§3).
 
 **Shared chrome.** `Theme.swift` (`DS` tokens, including the three track
 heights S/M/L per kind), `Controls.swift`, `OptionControls.swift`,
@@ -397,6 +421,26 @@ undo step; any off-event path goes through `ProjectDocument.performGroupedEdit`.
 undo checkpoint `NSDocument` posts inside every save then raises, the
 exception is swallowed inside the file coordinator, and ⌘S and `save_project`
 hang for good.
+
+**Lenient decoding is for what the CORE wrote; nothing a caller wrote is
+decoded through it.** `ProjectSnapshot`/`MotionProps`' `lenient` and
+`nullable` exist so a project, plan, recipe or export setting a NEWER build
+wrote still opens — a misspelt kind becomes the first case, an unreadable
+value a default or a clear. Run over an agent's own object that same
+leniency is a silent correction, so a caller-authored object (a patch, a
+colour, a region, a new clip's text or shape) goes to the core unread
+through `rawPatchArg` and the RAW factory beside its typed one, and the core
+names the dotted path and the value it refused. A scalar enum ARGUMENT
+parsed by name is not this (`add_zoom_action`'s `fit`, `curveArg`,
+`set_transition`'s `kind`): what the rule forbids is decoding a caller's
+object through a lenient type, and the ONE caller-authored object the app
+still reads by hand is `add_media`'s descriptor, which is a media row rather
+than a patch and has no op of its own to be refused by
+(`AgentServer+Media.swift`'s `mediaDescriptor`, named here so it is an
+exception on purpose). The hand checks this rule replaced were deleted
+rather than moved, so a new door that wants one is a door that has not been
+read; the spec says the same in §7.9, and what went and what it measured is
+`designs/reelcut-roadmap-7.md` §2–§3.
 
 **Agent parity.** Every user-visible EDIT gets an MCP mirror: a handler, a
 catalog entry declaring `scope`, and a comment naming the UI path. Handlers

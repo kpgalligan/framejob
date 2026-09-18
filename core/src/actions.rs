@@ -419,10 +419,12 @@ fn clamp_video(mut props: VideoProps, is_nest: bool) -> VideoProps {
     }
     // The nest rule, closed here rather than only at the op. `set_video`
     // refuses a blend on a nest clip by name (`edit_props.rs`'s
-    // `check_blend`), but an action's `end` patch validates nothing beyond
-    // "is it an object", so `set_action_end {"video": {"blend": "multiply"}}`
-    // would otherwise sail past every check the op path has and reach the
-    // uniform block anyway. Forcing it in the evaluator closes the recipe,
+    // `check_blend`), but an action's `end` patch is checked against the
+    // VOCABULARY and never against the clip (`edit_action.rs`), and
+    // `multiply` is a perfectly legal mode, so
+    // `set_action_end {"video": {"blend": "multiply"}}` would otherwise
+    // sail past every check the op path has and reach the uniform block
+    // anyway. Forcing it in the evaluator closes the recipe,
     // `clip_state` and both export writers at once, which no per-op check
     // can — this is the ONE place an evaluated value is produced.
     //

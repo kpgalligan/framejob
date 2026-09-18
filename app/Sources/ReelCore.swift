@@ -884,20 +884,20 @@ extension Gradient {
 /// the second list would be a rule to remember; there is one rule, and it is
 /// "a list is replaced whole".
 ///
-/// **`blend` is a single optional too, and the pairing with `lenient` is
-/// LOAD-BEARING** (phase 6). `VideoProps.blend` is a plain `BlendMode` with
-/// no null form — `.normal` is how a blend is cleared — so nothing here
-/// needs the third state. But the choice also decides whether a MISSPELT
-/// mode is caught: `AgentServer.patchArg` refuses a key by name when
-/// re-decoding the patch without it changes nothing, and `lenient(.blend)`
-/// answers nil for a value it cannot read, which is exactly what an absent
-/// key answers — so `{"blend": "muliply"}` is refused by name. Written as a
-/// `BlendMode??` read through `nullable` it would decode to `.some(nil)`,
-/// differ from absent, pass the round trip, and reach the core as an
-/// explicit null the caller never wrote: here a serde complaint about a
-/// null, and on a field that DOES take one a silent clear — which is the
-/// gap app/CLAUDE.md records against the ten `T??` patch fields. Either
-/// way the one thing never named is the typo.
+/// **`blend` is a single optional too** (phase 6). `VideoProps.blend` is a
+/// plain `BlendMode` with no null form — `.normal` is how a blend is cleared
+/// — so nothing here needs the third state, and a `BlendMode??` read through
+/// `nullable` would be worse than unnecessary: a value it could not read
+/// would decode to `.some(nil)` and reach the core as an explicit null the
+/// caller never wrote, which on a field that DOES take one is a silent clear
+/// — the gap app/CLAUDE.md records against the ten `T??` patch fields.
+///
+/// **What used to hang on that choice no longer does** (deepening D1). The
+/// pairing with `lenient` was once load-bearing for a misspelt MODE, because
+/// the agent door decoded a caller's patch through this type. Nothing a
+/// caller wrote is decoded through these types now — they are the APP's
+/// writers, built from controls that cannot misspell anything — and the core
+/// answers a typo at every door.
 struct VideoPatch: Codable, Equatable {
     var x: Double?
     var y: Double?
@@ -914,11 +914,14 @@ struct VideoPatch: Codable, Equatable {
     var spotlight: SpotlightProps??
     var obscure: [ObscureProps]?
     var blend: BlendMode?
-    /// **`motion` is a `T??` like the four object-valued fields above, but
-    /// it is NOT read by `patchArg`** (format version 8): a motion has two
-    /// levels of nested objects, so `AgentServer+Motion.swift` reads it by
-    /// hand and `setVideo` strips the key first — which is why this one has
-    /// NO gap in the `T??` family app/CLAUDE.md records. `.some(nil)` AND
+    /// **`motion` is a `T??` like the four object-valued fields above, and
+    /// since D1·3 no agent's patch reaches it** (format version 8): the MCP
+    /// door forwards the caller's object to the core unread, where
+    /// `patch.rs` walks a motion's two levels of nested objects and refuses a
+    /// misspelt key or kind by its dotted path. This type is the APP's
+    /// writer now — the inspector's Motion section and Clip ▸ Motion ▸ — so
+    /// it has no gap in the `T??` family app/CLAUDE.md records because
+    /// nothing a caller wrote is decoded through it. `.some(nil)` AND
     /// `.some(an empty MotionProps)` both write `NSNull`, since the core
     /// normalises an all-`None` motion to `None` anyway.
     var motion: MotionProps??
@@ -967,8 +970,10 @@ struct VideoPatch: Codable, Equatable {
         obscure = c.lenient(.obscure)
         // `lenient`, never `nullable` — the struct doc says what that buys.
         blend = c.lenient(.blend)
-        // `nullable`, because a motion HAS a null form; the gap that costs
-        // the other `T??` fields is closed by `motionPatchArg`, not here.
+        // `nullable`, because a motion HAS a null form. Since D1·3 nothing
+        // decodes an agent's `motion` through this initialiser at all — the
+        // caller's object goes to the core unread — so the gap the other
+        // `T??` fields carry does not arise here either.
         motion = c.nullable(.motion)
     }
 
@@ -1210,14 +1215,14 @@ struct TextPatch: Codable, Equatable {
 /// since a gradient never clears the `fill` underneath it — and
 /// `.some(value)` sets it.
 ///
-/// It is a nested object, so it inherits the replacement rule the MCP path
-/// records for `shadow` and `obscure`: a key left out of it comes back as
-/// its default rather than as what the shape had, so every writer sends the
-/// whole gradient. What it does NOT inherit is the SILENCE. The other
-/// nested objects are dropped into a typed struct by the generic decoder,
-/// which gets to a misspelt key before the core's `deny_unknown_fields`
-/// can name it; this patch is the one read by hand in `AgentServer`, so a
-/// key misspelt inside a gradient can be refused by name there.
+/// It is a nested object, so the core MERGES it key by key into a stored
+/// one (§5.2). The writers here still send the whole gradient, and the
+/// reason is the OTHER case: a stored `null` is not an object, so turning a
+/// gradient on replaces the null with what the patch carries and the keys
+/// left out come from `Gradient::default()`. A section that knows every key
+/// is right whichever of the two a clip is in. Since deepening D1·4 a key
+/// misspelt inside a gradient is refused by the CORE, by its dotted path
+/// with the stop's index in it, at this door and every other.
 struct ShapePatch: Equatable {
     var kind: ShapeKind?
     var width: Double?
@@ -1293,19 +1298,18 @@ struct ShapePatch: Equatable {
 /// it unvalidated — the `Marker.color` policy — so the builder does not
 /// check it either; `ClipLabel.color(named:)` absorbs a name this build
 /// does not know.
-struct ClipPatch: Codable, Equatable {
+///
+/// A WRITER only — `Equatable`, not `Codable`, `ShapePatch`'s shape. Its
+/// lenient `init(from:)` read the agent door's `set_clip` argument until
+/// D1·4 sent that argument to the core unread, and D1·6 deleted it rather
+/// than leave a lenient reading of a caller's object in the tree.
+struct ClipPatch: Equatable {
     var name: String??
     var label: String??
 
     init(name: String?? = nil, label: String?? = nil) {
         self.name = name
         self.label = label
-    }
-
-    init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        name = c.nullable(.name)
-        label = c.nullable(.label)
     }
 
     var dictionary: [String: Any] {

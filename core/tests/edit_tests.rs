@@ -2285,14 +2285,19 @@ fn set_action_end_merges_and_a_null_removes_a_key() {
     let end = at(&array(by_id(&pruned, "/clips", 10), "/actions")[0], "/end");
     assert_eq!(end, &json!({"video": {"scale": 0.6}}));
 
-    // An end patch is evaluated leniently, so an unknown key is kept rather
-    // than refused — unlike a `set_video` patch.
-    let kept = project
-        .apply(&json!({"op": "set_action_end", "clip": 10, "action": 11,
-                       "patch": {"video": {"from_a_newer_build": 1}}}))
-        .value();
-    let end = at(&array(by_id(&kept, "/clips", 10), "/actions")[0], "/end");
-    assert_eq!(int(end, "/video/from_a_newer_build"), 1);
+    // An unknown key is REFUSED by its path, exactly as a `set_video` patch
+    // is (D1·2, kpgalligan/reelcut#3). This case used to assert that the key
+    // was kept, for forward compatibility — a project written by a newer
+    // build had to survive a round trip. That promise belongs to the FILE
+    // reader and is still kept there (`model_tests.rs`'s
+    // `an_action_end_patch_keeps_the_keys_it_is_given`, which round-trips
+    // this very key); an op is not a file, and a key an agent misspelt here
+    // animated nothing and was reported as success.
+    assert_eq!(
+        project.errors(&json!({"op": "set_action_end", "clip": 10, "action": 11,
+                               "patch": {"video": {"from_a_newer_build": 1}}})),
+        "unknown key \"video.from_a_newer_build\" in an action end patch",
+    );
 
     assert_contains(
         &project.errors(&json!({"op": "set_action_end", "clip": 10, "action": 11,

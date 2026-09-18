@@ -90,12 +90,13 @@ extension AgentServer {
         // lists) and a video chain that is long enough already.
         //
         // Three things are in the text because a caller meets each of them
-        // immediately: that the handler REPLACES the whole object (so a slot
-        // left out is cleared, unlike every other key in this patch, which
-        // merges); that it is not an animation target; and that get_project
-        // reports the clip UN-MOVED, which is what makes an edit work on the
-        // numbers a person typed and would otherwise read as the tool
-        // ignoring the preset.
+        // immediately: that it MERGES slot by slot like every other nested
+        // object (deepening D1·3 — the agent door used to replace the whole
+        // object, and the two Swift writers still send all three slots, which
+        // is the same thing said a different way); that it is not an
+        // animation target; and that get_project reports the clip UN-MOVED,
+        // which is what makes an edit work on the numbers a person typed and
+        // would otherwise read as the tool ignoring the preset.
         let edgeNames = EdgeMotion.allCases.map { $0.rawValue }
         let duringNames = DuringMotion.allCases.map { $0.rawValue }
         let motionClause: String =
@@ -103,9 +104,14 @@ extension AgentServer {
             + "{kind: \(edgeNames.joined(separator: "|")), duration: ticks} measured from the "
             + "clip's first and last frame, during is {kind: "
             + "\(duringNames.joined(separator: "|")), amount: 0–1, period: ticks} over the "
-            + "whole clip and drift ignores its period. Unlike every other key here this one "
-            + "REPLACES: a slot left out or set to null is cleared, and a motion with no slot "
-            + "left reads back as null. in + out longer than the clip scales both down to "
+            + "whole clip and drift ignores its period. Like every other object here it "
+            + "MERGES: a slot you leave out keeps what is stored, a slot set to null clears "
+            + "that slot, {motion: null} clears the whole preset, and a motion with no slot "
+            + "left reads back as null. The two durations are snapped to the document's "
+            + "frame grid and the period is snapped with a floor of ONE frame (it divides "
+            + "in every during formula and has no zero), so get_project can answer with a "
+            + "tick count near the one you sent rather than the one itself. "
+            + "in + out longer than the clip scales both down to "
             + "meet rather than refusing. It is NOT an animation target — set_action_end "
             + "refuses it — and get_project reports the clip UN-MOVED, since the preset "
             + "becomes placement only when a frame is rendered)"
@@ -137,13 +143,17 @@ extension AgentServer {
             + obscureClause
             + blendClause
             + motionClause
-            + ". A colour is [r, g, b] or "
-            + "[r, g, b, a], each 0–1; chroma's key is the one that takes no alpha."
+            + ". A colour is FOUR numbers, [r, g, b, a], each 0–1: three is refused by "
+            + "length and a component outside the range is refused by name, neither "
+            + "filled in nor clamped. chroma's key is the one exception, three numbers "
+            + "with no alpha."
         let audioPatchDescription =
             "Audio properties to merge. Keys: volume (0–4, 1 = unity), muted, fade_in, "
             + "fade_out (ticks), duck (null or {level, attack, release}), mono, keep_pitch, "
             + "pan (-1 hard left … +1 hard right), compressor (null or {threshold_db, ratio, "
-            + "attack, release, makeup_db} — the two times in ticks), noise_reduction (0–1)."
+            + "attack, release, makeup_db} — the two times in ticks), noise_reduction (0–1). "
+            + "duck and compressor are OBJECTS and they MERGE: a key you leave out keeps what "
+            + "is stored, and {duck: null} clears the whole thing."
         // `text.animation`'s clause, its own explicitly-typed local for the
         // reason `obscureClause` is: the kind names are a non-literal operand
         // and the text chain is long enough already.
@@ -152,23 +162,25 @@ extension AgentServer {
             ", animation (null or {kind: \(animationNames.joined(separator: "|")), in, out} — "
             + "how the words arrive and leave. in and out are DURATIONS in ticks measured from "
             + "the clip's own first and last frame, not times; either may be 0 for no ramp at "
-            + "that end, and in + out longer than the clip simply shows a partial reveal. Like "
-            + "shadow and backdrop it is an OBJECT and is REPLACED whole rather than merged, so "
-            + "send every key you want: one you leave out arrives as its default, a 1 s "
-            + "typewriter with no un-reveal)"
+            + "that end, and in + out longer than the clip simply shows a partial reveal, and "
+            + "both are snapped to the document's frame grid. Like shadow and backdrop it "
+            + "MERGES: a key you leave out keeps what is stored, and {animation: null} clears "
+            + "the whole thing)"
         let textPatchDescription: String =
             "Text properties to merge. Keys: content, font (a PostScript name), size (px), "
             + "color, align (left|center|right), valign (top|middle|bottom), line_spacing, "
             + "tracking, outline (null or {width, color}), backdrop (null or {color, padding, "
             + "radius}), width (null for auto-sizing, or a wrap width in px)"
             + animationClause
-            + ". A colour is [r, g, b] or [r, g, b, a], each 0–1."
+            + ". A colour is FOUR numbers, [r, g, b, a], each 0–1: three is refused by "
+            + "length and a component outside the range is refused by name, neither "
+            + "filled in nor clamped."
         // `shape.gradient`'s clause, its own local for the budget reason the
-        // other hoisted clauses give — and worth a line of its own, because it
-        // is the one patch member that names its own mistakes: the shape patch
-        // is built by hand rather than decoded, so a key misspelt INSIDE
-        // gradient is refused by name, which shadow, chroma and an obscure
-        // region cannot manage.
+        // other hoisted clauses give. It used to be worth a line of its own as
+        // the only patch member that named its own mistakes, the shape patch
+        // being hand-read rather than decoded; since D1·1 the core names a
+        // misspelt key inside ANY nested object by its dotted path, stop
+        // indices included, so the gradient is no longer the exception.
         let gradientKindNames = GradientKind.allCases.map { $0.rawValue }
         let gradientClause: String =
             ", gradient (null, or {kind: \(gradientKindNames.joined(separator: "|")), "
@@ -178,8 +190,9 @@ extension AgentServer {
             + "ramp; the stops need NOT be sorted, and the renderer sorts them. angle is "
             + "degrees from the RIGHT turning counter-clockwise, the convention shadow's angle "
             + "uses, and means nothing for radial, which is an ellipse inscribed in the box. "
-            + "line and arrow have no area and ignore it. Like stroke it is an OBJECT and is "
-            + "REPLACED whole rather than merged, so send every key you want)"
+            + "line and arrow have no area and ignore it. Like stroke it MERGES: a key you "
+            + "leave out keeps what is stored, {gradient: null} clears it and brings the flat "
+            + "fill back out, and the stops are a LIST, so sending one replaces them all)"
         // Interpolated rather than concatenated: a `+` chain this long with
         // a non-literal operand in it is what tips the whole `catalog`
         // literal past the type checker's budget.
@@ -190,7 +203,9 @@ extension AgentServer {
             + "corners), arrow_start, arrow_end, and from / to — the endpoints of a line or "
             + "arrow as UNIT coordinates in its box, e.g. from [0, 1] to [1, 0]"
             + gradientClause
-            + ". A colour is [r, g, b] or [r, g, b, a], each 0–1."
+            + ". A colour is FOUR numbers, [r, g, b, a], each 0–1: three is refused by "
+            + "length and a component outside the range is refused by name, neither "
+            + "filled in nor clamped."
         // The fifth patch, `set_clip`'s. The label names are `ClipLabel`'s —
         // the one home of the marker-colour vocabulary — read rather than
         // restated, and typed for the same budget reason as the four above.
@@ -716,10 +731,15 @@ extension AgentServer {
                 "Changes the clips' BASE video properties — position, scale, rotation, opacity, "
                     + "crop, corner radius, shadow, colour, chroma key, filters, reflection, "
                     + "spotlight and motion (what the clip does on its way in, on its way out "
-                    + "and all the way through). The patch MERGES: keys you leave out keep "
-                    + "their values, and shadow, chroma, reflection or spotlight set to null "
-                    + "clears it. Filters and motion are the exceptions — the filter array "
-                    + "replaces, so send the whole stack, and a motion replaces slot by slot. "
+                    + "and all the way through). The patch MERGES AT EVERY DEPTH: keys you "
+                    + "leave out keep their values, inside a nested object too — a patch of "
+                    + "just {shadow: {blur: 20}} keeps the shadow's colour, angle and "
+                    + "distance — and shadow, chroma, reflection, spotlight or motion set to "
+                    + "null clears it. A LIST is the exception: filters and obscure each "
+                    + "replace whole, so send the whole stack and [] to clear it. A key or a "
+                    + "value the vocabulary does not have is an error naming its dotted path "
+                    + "(array indices included) and the value you sent; nothing is dropped, "
+                    + "corrected or clamped. "
                     + "Placement is spec §5.3: the source rectangle is centred at the "
                     + "canvas centre plus (x, y), scaled, then rotated about that centre, and "
                     + "crop removes edges in place without shifting the content. To animate a "
@@ -889,14 +909,16 @@ extension AgentServer {
                 ], required: ["clip", "action"]),
             tool(
                 "set_action_end",
-                "Sets what an action animates TO. The patch is the action's end state and "
-                    + "merges into it — {\"video\": {\"scale\": 0.6, \"x\": 520}} makes the clip "
-                    + "shrink into the corner over the action's span. A key set to null is "
-                    + "REMOVED from the end state, so that property stops being animated. Groups "
-                    + "are video, audio and text, with the same keys as set_video / set_audio / "
-                    + "set_text — with ONE exception: video.motion is refused here, because a "
-                    + "preset is anchored to the clip's two ends rather than being a value to "
-                    + "ramp between two states. Set it with set_video.",
+                "Sets what an action animates TO. The patch is the action's end state and MERGES "
+                    + "into it key by key at every depth (a one-key shadow keeps the rest of it); a "
+                    + "key set to null is REMOVED from the end state, so that property stops being "
+                    + "animated. Groups are video, audio and text, with the same keys as set_video "
+                    + "/ set_audio / set_text — a colour is FOUR numbers here too, and a bad key or "
+                    + "value is refused by its path with the group in it (video.filters[1].kind), "
+                    + "though values are NOT range-checked: an animation may aim past what a stored "
+                    + "property could hold. ONE exception: video.motion is refused, a preset being "
+                    + "anchored to the clip's two ends rather than a value to ramp between. Set it "
+                    + "with set_video.",
                 [
                     "clip": clipProperty,
                     "action": ["type": "integer", "description": "Action id."],

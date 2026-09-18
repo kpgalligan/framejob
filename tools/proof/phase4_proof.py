@@ -1105,10 +1105,17 @@ def schema_part(mcp, session):
     )
 
     target = project["clips"][0]["id"]
+    # The core's whole sentence, not a keyword. `set_text` forwards the
+    # caller's patch since deepening D1·4 (kpgalligan/reelcut#5), so the
+    # Swift `checkTextEnums` that used to answer here is gone — and a check
+    # looking only for "typewriter" passed against BOTH doors, which is how
+    # an assertion survives a change it was meant to see.
+    # `tools/proof/patch_door_proof.py` §3 proves this door in full.
     message = v4.error(
         "set_text", clips=[target], patch={"animation": {"kind": "fade", "in": SEC}}) or ""
     check(
-        "typewriter" in message and "word_fade" in message and "line_rise" in message,
+        'bad value at "animation.kind" in a text patch: unknown variant `fade`' in message
+        and "typewriter" in message and "word_fade" in message and "line_rise" in message,
         f"a kind outside the closed enum is refused BY NAME: {message[:110]!r}",
     )
     message = v4.error(
@@ -1127,17 +1134,19 @@ def schema_part(mcp, session):
     )
 
     # `add_text_clip` is the OTHER door a text patch comes through, and it
-    # reads the patch with the same lenient decoder: "fade" decodes to
+    # used to read the patch with the same lenient decoder: "fade" decoded to
     # `typewriter` on the Swift side, so a build that checked the vocabulary
-    # only in `set_text` MAKES this clip, answers ok, and hands back a
-    # typewriter nobody asked for. Both doors, one vocabulary.
+    # only in `set_text` MADE this clip, answered ok, and handed back a
+    # typewriter nobody asked for. Both doors forward the caller's object
+    # now, so both answer in the one sentence — which is the claim, and the
+    # reason it is asserted whole.
     guard_track = v4.tracks()[0]["id"]
     before = len(v4.project()["clips"])
     message = v4.error(
         "add_text_clip", track=guard_track, at=20 * SEC, duration=2 * SEC,
         text={"content": "Hi", "animation": {"kind": "fade", "in": SEC}}) or ""
     check(
-        "typewriter" in message and "word_fade" in message and "line_rise" in message,
+        'bad value at "animation.kind" in a text patch: unknown variant `fade`' in message,
         f"add_text_clip refuses the same kind BY NAME, not silently: {message[:110]!r}",
     )
     check(

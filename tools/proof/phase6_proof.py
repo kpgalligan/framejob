@@ -123,12 +123,12 @@ Two colour rules the fixture obeys, both measured rather than assumed:
   is; `paste_attributes`, which is WHY the refusal is written that way —
   the group is replaced whole, so refusing every paste that mentioned
   `blend` would fail an all-or-nothing paste of an ordinary look; and
-  `set_action_end`, which stores the mode (an end patch validates nothing
-  but its shape) and must still DRAW `normal`, since `clamp_video` forces
-  it. Beside them the documented limit on the other side — a blend set on a
-  clip BEFORE it is nested is carried inside and blends against the whole
-  canvas below the nest, because a nest is flattened rather than composited
-  offscreen.
+  `set_action_end`, which stores the mode (that door checks the vocabulary
+  and never the clip, and `multiply` is a legal mode) and must still DRAW
+  `normal`, since `clamp_video` forces it. Beside them the documented limit
+  on the other side — a blend set on a clip BEFORE it is nested is carried
+  inside and blends against the whole canvas below the nest, because a nest
+  is flattened rather than composited offscreen.
 * **8** the same arithmetic over a DECODED picture rather than a drawn one,
   which is what says `video.blend` belongs to the LAYER and not to a source
   kind. **Not the `qtrle` card `README.md` gives**: on macOS 26.5.1 an
@@ -945,19 +945,24 @@ def nest_part(mcp):
           "…while `{blend: \"normal\"}` on one is the identity and answers \"made no "
           f"change\", so `paste_attributes` of an ordinary look still works — got {identity!r}")
     misspelt = s.error("set_video", clips=[nest], patch={"blend": "muliply"})
-    check(misspelt is not None and "blend" in misspelt,
-          f"a misspelt mode is refused naming the key — got {misspelt!r}")
+    check(misspelt is not None
+          and 'bad value at "blend" in a video patch' in misspelt
+          and "muliply" in misspelt,
+          f"a misspelt mode is refused naming the key AND the value — the core's "
+          f"own sentence since D1·3, where this door used to answer — got "
+          f"{misspelt!r}")
 
-    # The `set_action_end` back door. An end patch validates nothing but "is
-    # it an object", so the mode IS stored — and `clamp_video` forces
-    # `BlendMode::Normal` for a nest clip, which closes the recipe,
-    # `clip_state` and both export writers at once.
+    # The `set_action_end` back door. That door walks keys and types (D1·2)
+    # but never sees the CLIP, and `multiply` is a perfectly legal mode, so
+    # the mode IS stored — and `clamp_video` forces `BlendMode::Normal` for
+    # a nest clip, which closes the recipe, `clip_state` and both export
+    # writers at once.
     s.op("add_action", clip=nest, at=0, duration=SEC)
     action = s.clip(nest)["actions"][0]["id"]
     s.op("set_action_end", clip=nest, action=action, patch={"video": {"blend": "multiply"}})
     check(s.clip(nest)["actions"][0]["end"] == {"video": {"blend": "multiply"}},
-          "an action's end patch on a nest clip STORES the mode (an end patch validates "
-          "nothing but its shape)")
+          "an action's end patch on a nest clip STORES the mode (that door checks the "
+          "vocabulary, not the clip)")
     # And it never DRAWS — read that for exactly what it is, which is a
     # FLOOR and not the clamp's proof. A nest clip contributes no layer of
     # its own: `recipe.rs::frame_recipe` maps over the flattened INNER
@@ -1307,22 +1312,28 @@ def gradient_rules_part(mcp):
           f"an `at` outside 0–1 is refused by its dotted key — got {outside!r}")
     conic = s.error("set_shape", clips=[clip], patch={
         "gradient": gradient("conic", stops=[stop(0, A_STOP), stop(1, B_STOP)])})
-    check(conic is not None and "gradient.kind" in conic and "conic" in conic,
+    check(conic is not None
+          and 'bad value at "gradient.kind" in a shape patch: unknown variant `conic`' in conic,
           f"a geometry outside the closed enum is refused rather than decoded "
           f"leniently into `linear` — got {conic!r}")
-    # The win worth pinning: because `shapePatchArg` is HAND-BUILT, a key
-    # misspelt INSIDE `gradient` is refused BY NAME. `shadow` (since M3),
-    # `chroma`, an `obscure` region and `animation` all go through the
-    # generic decoder, which drops the unknown key in silence and sends every
-    # key the caller omitted as its default.
+    # The three sentences below are the CORE's since deepening D1·4
+    # (kpgalligan/reelcut#5), which took `set_shape` raw and deleted the
+    # hand-built `shapePatchArg` and `gradientArg` this phase wrote. What
+    # was worth pinning then — that a key misspelt INSIDE `gradient` is
+    # refused by name, which no other nested object in a patch managed — is
+    # now true of every one of them, `shadow`, `chroma`, an `obscure` region
+    # and `animation` included, and it is the whole sentence that is
+    # asserted: a check for "stpos" alone passed against both doors.
+    # `tools/proof/patch_door_proof.py` §4 proves this door in full.
     typo = s.error("set_shape", clips=[clip],
                    patch={"gradient": {"kind": "linear", "stpos": []}})
-    check(typo is not None and "stpos" in typo,
+    check(typo is not None and 'unknown key "gradient.stpos" in a shape patch' in typo,
           f"a key misspelt inside `gradient` is refused BY NAME — got {typo!r}")
     stop_typo = s.error("set_shape", clips=[clip], patch={
         "gradient": {"stops": [{"at": 0, "colour": grey(A_STOP)},
                                {"at": 1, "color": grey(B_STOP)}]}})
-    check(stop_typo is not None and "stops[0]" in stop_typo and "colour" in stop_typo,
+    check(stop_typo is not None
+          and 'unknown key "gradient.stops[0].colour" in a shape patch' in stop_typo,
           f"…and one misspelt inside a STOP is refused by its index — got {stop_typo!r}")
     check(s.frame() == plain and s.clip(clip)["shape"]["gradient"] is None,
           "…and after six refusals the clip still has no gradient and renders the "
@@ -1357,21 +1368,30 @@ def gradient_rules_part(mcp):
           "an UNSORTED stop list is accepted and renders the SORTED ramp, byte for "
           "byte — the core leaves the order alone on purpose and the renderer sorts")
 
-    # A three-component stop colour, which `withOpaqueColors` could not have
-    # reached: it recurses into nested dictionaries but not into arrays of
-    # them, so this only works because the reader is hand-built.
-    s.op("set_shape", clips=[clip], patch={
+    # A three-component stop colour, which the hand-built reader accepted and
+    # completed with an opaque alpha. Deepening D1·4 (kpgalligan/reelcut#5)
+    # ended that: a colour is FOUR numbers at every door, the length is
+    # refused by the core's own type, and the frame is the one it was — the
+    # claim this check makes now, where it used to claim the opposite.
+    refusal = s.error("set_shape", clips=[clip], patch={
         "gradient": {"kind": "linear", "angle": 0,
                      "stops": [stop(0.25, A_STOP, components=3),
                                stop(0.75, B_STOP, components=3)]}})
+    check(refusal is not None
+          and 'bad value at "gradient.stops[0].color" in a shape patch: invalid length 3'
+          in refusal,
+          f"a THREE-component stop colour is REFUSED by its length — got {refusal!r}")
     check(s.frame() == ordered,
-          "a THREE-component stop colour is accepted and means the four-component "
-          "one, byte for byte")
+          "…and the frame is the one the four-component ramp drew, byte for byte")
+    # The same claim read off the MODEL rather than off the frame: what is
+    # stored is still the unsorted pair sent above, so re-sending exactly
+    # that is the identity. Were the refused patch to have landed instead,
+    # this would be a real edit and answer nothing.
     identity = s.error("set_shape", clips=[clip], patch={
-        "gradient": gradient("linear", 0.0, [stop(0.25, A_STOP), stop(0.75, B_STOP)])})
+        "gradient": gradient("linear", 0.0, [stop(0.75, B_STOP), stop(0.25, A_STOP)])})
     check(identity is not None and "made no change" in identity,
-          "…and re-sending it WITH the alpha is the identity, which is the same claim "
-          f"read off the model rather than off the frame — got {identity!r}")
+          "…and the stops the clip still holds are the ones sent BEFORE the refusal, "
+          f"since re-sending those is the identity — got {identity!r}")
 
     # `{gradient: null}` is an exact inverse, because setting one never
     # cleared `fill`.
@@ -1638,31 +1658,47 @@ def actions_part(mcp):
 
     # The refusal that makes the natural agent spelling loud rather than
     # wrong. `{"filters": [{"amount": 1}]}` is the core's documented idiom for
-    # "the same filter, more of it"; over MCP the decoder COMPLETES the
-    # missing `kind` from the defaults, so a sepia base would animate and
-    # then switch to a blur with the caller told it worked.
+    # "the same filter, more of it"; over MCP the decoder used to COMPLETE
+    # the missing `kind` from the defaults, so a sepia base would animate
+    # and then switch to a blur with the caller told it worked.
+    #
+    # **All four refusals here now speak the CORE's words** (D1·3 for the two
+    # `set_video` ones, kpgalligan/reelcut#4; D1·5 for the two
+    # `set_action_end` ones, kpgalligan/reelcut#6): both doors forward the
+    # caller's patch raw, so the sentence an agent reads is `patch.rs`'s, and
+    # it carries the value sent as well as the index. Every one was written
+    # against the SWIFT door's `patch.video.filters[0]` spelling and went on
+    # passing after that door came out, only because a keyword check cannot
+    # tell the two apart — which is why each is now the whole sentence.
+    # `tools/proof/patch_door_proof.py` is where the seam itself is proved;
+    # these four stay because the partial entry is phase 6's own feature.
     partial = animated.error("set_video", clips=[clip],
                              patch={"filters": [{"amount": 1.0}]})
-    check(partial is not None and "patch.filters[0]" in partial
-          and "kind and amount" in partial,
+    check(partial is not None
+          and 'missing key "filters[0].kind" in a video patch' in partial,
           f"a filter entry missing `kind` is refused BY INDEX — got {partial!r}")
     partial_end = animated.error(
         "set_action_end", clip=clip, action=action["id"],
         patch={"video": {"filters": [{"amount": 1.0}]}})
-    check(partial_end is not None and "patch.video.filters[0]" in partial_end,
+    check(partial_end is not None
+          and 'missing key "video.filters[0].kind" in an action end patch' in partial_end,
           f"…and so is one inside an action's END patch, where the idiom is most "
-          f"tempting — got {partial_end!r}")
+          f"tempting, with the GROUP in the path — got {partial_end!r}")
     unknown = animated.error("set_video", clips=[clip],
                              patch={"filters": [{"kind": "glow", "amount": 1.0}]})
-    check(unknown is not None and "patch.filters[0].kind" in unknown,
-          f"a filter kind outside the closed set is refused by index too — got "
-          f"{unknown!r}")
+    check(unknown is not None
+          and 'bad value at "filters[0].kind" in a video patch' in unknown
+          and "glow" in unknown,
+          f"a filter kind outside the closed set is refused by index too, naming the "
+          f"value sent — got {unknown!r}")
     end_blend = animated.error(
         "set_action_end", clip=clip, action=action["id"],
         patch={"video": {"blend": "muliply"}})
-    check(end_blend is not None and "patch.video.blend" in end_blend,
-          f"and a misspelt blend inside an end patch is refused by its dotted key "
-          f"— got {end_blend!r}")
+    check(end_blend is not None
+          and 'bad value at "video.blend" in an action end patch: unknown variant '
+              '`muliply`' in end_blend,
+          f"and a misspelt blend inside an end patch is refused by its dotted key, "
+          f"naming the value sent — got {end_blend!r}")
 
 
 # ---- the catalog and the file --------------------------------------------

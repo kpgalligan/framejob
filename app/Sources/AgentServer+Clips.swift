@@ -5,37 +5,12 @@ import AppKit
 /// same name and the same argument names.
 ///
 /// Every handler is the canonical shape — `target(a)`, validate the ids
-/// against the snapshot, build the typed `ReelOp`, `performGroupedEdit`,
+/// against the snapshot, build the `ReelOp`, `performGroupedEdit`,
 /// `jsonResult` — and carries a comment naming the UI path it mirrors
-/// (app/CLAUDE.md's agent-parity rule). No op JSON is written here: the typed
-/// builders in `ReelCore.swift` are the only place that spells one.
+/// (app/CLAUDE.md's agent-parity rule). No op JSON is written here: the
+/// factories in `ReelOps.swift` are the only place that spells one, the RAW
+/// factories every patch handler below reaches for included.
 extension AgentServer {
-
-    // MARK: - Patch vocabularies
-
-    /// The keys each patch accepts, from the §5.2 property groups. Used to
-    /// refuse an unknown key BY NAME rather than let the core's lenient serde
-    /// drop it — a silently ignored typo leaves a model believing it made an
-    /// edit it did not.
-    static let videoPatchKeys: Set<String> = [
-        "x", "y", "scale", "rotation", "opacity", "crop", "corner_radius", "shadow", "color",
-        "chroma", "filters", "reflection", "spotlight", "obscure", "blend", "motion",
-    ]
-    static let audioPatchKeys: Set<String> = [
-        "volume", "muted", "fade_in", "fade_out", "duck", "mono", "keep_pitch", "pan",
-        "compressor", "noise_reduction",
-    ]
-    static let textPatchKeys: Set<String> = [
-        "content", "font", "size", "color", "align", "valign", "line_spacing", "tracking",
-        "outline", "backdrop", "width", "animation",
-    ]
-    static let shapePatchKeys: Set<String> = [
-        "kind", "width", "height", "stroke", "fill", "arrow_start", "arrow_end", "radius",
-        "from", "to", "gradient",
-    ]
-    /// The fifth patch's two keys: a clip's own name and its label
-    /// (`ClipPatch`, spec §5.2's `name` and `label`).
-    static let clipPatchKeys: Set<String> = ["name", "label"]
 
     /// The four property groups `paste_attributes` can be told to carry —
     /// `Group` in `core/src/edit_props.rs`, spelled as the wire spells it, in
@@ -66,10 +41,10 @@ extension AgentServer {
         let track = try trackArg(a, "track", document)
         let at = try timeArg(a, "at", document)
         let duration = try optionalTimeArg(a, "duration", document)
-        let text = try textArg(a, "text")
+        let text = newClipPatchArg(a, "text", shorthand: "content")
         return try editResult(
             document, "Add Text",
-            [.addTextClip(track: track.id, at: at, duration: duration, text: text)])
+            [.addTextClipRaw(track: track.id, at: at, duration: duration, text: text)])
     }
 
     /// `add_shape_clip` — the toolbar's Add Shape menu
@@ -85,63 +60,43 @@ extension AgentServer {
         let track = try trackArg(a, "track", document)
         let at = try timeArg(a, "at", document)
         let duration = try optionalTimeArg(a, "duration", document)
-        let shape = try shapeArg(a, "shape")
+        let shape = newClipPatchArg(a, "shape", shorthand: "kind")
         return try editResult(
             document, "Add Shape",
-            [.addShapeClip(track: track.id, at: at, duration: duration, shape: shape)])
+            [.addShapeClipRaw(track: track.id, at: at, duration: duration, shape: shape)])
     }
 
-    /// `add_text_clip`'s `text`: the `set_text` PATCH the op documents
-    /// (`core/src/edit.rs`), with a bare string accepted as shorthand for
-    /// `{"content": …}`.
+    /// `add_text_clip`'s `text` and `add_shape_clip`'s `shape`: the
+    /// `set_text` / `set_shape` PATCH each op documents (`core/src/edit.rs`),
+    /// forwarded to the core unread, with a bare string accepted as shorthand
+    /// for `{"<shorthand>": …}` — `content` for the words of a title, `kind`
+    /// for the geometry of a shape.
     ///
-    /// **Why keep the shorthand.** It cannot be ambiguous — a JSON string is
-    /// never a JSON object, and `content` is the only thing a caller who
-    /// writes bare words can mean — and a string is what this tool declared
-    /// for its whole life, so no existing caller has to be rewritten to get
-    /// the fix. What it replaces was worse than either half: the string was
-    /// the ONLY accepted form, and the object the op documents was read with
-    /// `stringArg`, which answered nil for it and dropped it in silence, so
-    /// a fully specified title arrived as the Title placeholder.
-    private func textArg(_ a: [String: Any], _ key: String) throws -> TextPatch? {
-        guard let raw = a[key], !(raw is NSNull) else { return nil }
-        if let words = raw as? String { return TextPatch(content: words) }
-        guard let object = raw as? [String: Any] else {
-            throw ToolError(
-                message: "\(key) must be the words, or a set_text patch object — e.g. "
-                    + "\"Chapter One\" or {\"content\": \"Chapter One\", \"size\": 96}.")
-        }
-        let patch = try patchArg(a, key, TextPatch.self, allowed: Self.textPatchKeys)
-        // This is the OTHER door a text patch comes through, so it needs the
-        // enum check `set_text` runs — `patchArg`'s round trip cannot see
-        // inside a `T??` field, and `TextAnimationKind` decodes leniently, so
-        // {"animation": {"kind": "fade"}} would reach the core as a
-        // typewriter and the caller be told the clip they asked for was made.
-        try Self.checkTextEnums(object, key)
-        return patch
-    }
-
-    /// `add_shape_clip`'s `shape`, the same way: the `set_shape` patch the
-    /// op documents, with a bare kind name as shorthand for `{"kind": …}` —
-    /// which is the only form the tool used to take, and which the Add Shape
-    /// menu still means.
-    private func shapeArg(_ a: [String: Any], _ key: String) throws -> ShapePatch? {
-        guard let raw = a[key], !(raw is NSNull) else { return nil }
-        if let name = raw as? String {
-            guard let kind = ShapeKind(rawValue: name) else {
-                throw ToolError(
-                    message: "\(key) must be one of "
-                        + ShapeKind.allCases.map { $0.rawValue }.joined(separator: ", ")
-                        + ", or a set_shape patch object (got \"\(name)\").")
-            }
-            return ShapePatch(kind: kind)
-        }
-        guard raw is [String: Any] else {
-            throw ToolError(
-                message: "\(key) must be a kind name, or a set_shape patch object — e.g. "
-                    + "\"arrow\" or {\"kind\": \"arrow\", \"width\": 400}.")
-        }
-        return try shapePatchArg(a, key)
+    /// **The shorthand is the one thing this reads**, and it is kept
+    /// deliberately (spec kpgalligan/reelcut#1's Out of Scope): it cannot be
+    /// ambiguous — a JSON string is never a JSON object, and there is only
+    /// one thing a caller who writes bare words or a bare kind name can mean
+    /// — and a string is what both tools declared for their whole lives, so
+    /// no existing caller has to be rewritten. It PRODUCES a whole patch,
+    /// which is then forwarded; it is not a lenient reading of one, and the
+    /// value inside it is the core's to judge, so a bare `"square"` comes
+    /// back as ``bad value at "kind" in a shape patch: unknown variant
+    /// `square` `` rather than as a sentence written here.
+    ///
+    /// Everything else goes on whole, `Any` and not `[String: Any]`, so that
+    /// a number or a list where the patch belongs is refused by the CORE in
+    /// the words that name the group (`text patch must be a json object, not
+    /// 5`). An explicit `null` goes on whole too, rather than being stripped
+    /// here — `Option<Value>` reads one as ABSENT (`core/src/edit.rs`), which
+    /// is the op envelope's rule for every optional argument, so the clip
+    /// lands on the core's Title preset or its default rectangle. nil is the
+    /// key being missing, and that is the only thing this answers about.
+    private func newClipPatchArg(
+        _ a: [String: Any], _ key: String, shorthand: String
+    ) -> Any? {
+        guard let raw = a[key] else { return nil }
+        if let words = raw as? String { return [shorthand: words] }
+        return raw
     }
 
     /// `insert_clip` — Edit ▸ Insert at Playhead
@@ -514,195 +469,82 @@ extension AgentServer {
     /// because that is what dragging a handle inside an animated span means.
     /// The agent says which it wants — `set_video` changes the clip's BASE
     /// props, `set_action_end` an action's end state.
+    ///
+    /// **The patch goes to the core UNREAD** (deepening D1·3,
+    /// `designs/reelcut-roadmap-7.md` §2.3). Decoding the object into a
+    /// `VideoPatch`, checking an allowed-key set, reading `motion` by hand
+    /// and checking four closed enums are all `core/src/patch.rs`'s now, and
+    /// its refusals name the dotted path (array indices included) and the
+    /// value sent. Two things an agent sees change with it: a nested object
+    /// MERGES where the decode-and-re-encode replaced it (a one-key `shadow`
+    /// patch keeps the colour and the offset, a `motion` naming only `in`
+    /// keeps the stored `out`), and a colour must be four numbers, since
+    /// nothing fills in an alpha on the way past any more.
+    ///
+    /// What is left is what the core cannot know: which document, which
+    /// clips, and that `patch` was passed at all.
     func setVideo(_ a: [String: Any]) throws -> String {
         let document = try target(a)
         let clips = try clipsArg(a, "clips", document)
-        // `motion` (format version 8) is read BY HAND and stripped before
-        // `patchArg` sees it: that helper cannot look inside a nested
-        // object and a motion has two levels of them, so the generic
-        // decoder would drop a misspelt key in silence
-        // (`AgentServer+Motion.swift` argues it). The copy is what keeps
-        // the two readers off each other's key.
-        var rest = a
-        var object = a["patch"] as? [String: Any] ?? [:]
-        let motion = try motionPatchArg(object, "motion", document)
-        object.removeValue(forKey: "motion")
-        rest["patch"] = object
-        var patch = try patchArg(rest, "patch", VideoPatch.self, allowed: Self.videoPatchKeys)
-        try Self.checkVideoEnums(object, "patch")
-        patch.motion = motion
-        guard !patch.isEmpty else {
-            throw ToolError(message: "patch names nothing to change.")
-        }
-        return try editResult(document, "Video Properties", [.setVideo(clips: clips, patch: patch)])
-    }
-
-    /// The five string ENUMS a video patch can carry, checked by hand, plus
-    /// the one PARTIAL entry the decoder cannot report.
-    ///
-    /// `patchArg`'s round-trip test catches a value the patch could not read,
-    /// but only at the top level, and its own doc says why it cannot recurse:
-    /// one level down every field has a real default, so a value that decoded
-    /// TO that default is indistinguishable from a value that was absent.
-    /// `filters[].kind`, `spotlight.shape` and an obscure region's `shape`
-    /// and `kind` are exactly that case and the worst version of it —
-    /// `ProjectSnapshot` decodes all four leniently, on purpose, so that a
-    /// file naming a filter this build has never heard of still opens rather
-    /// than blanking the whole project. The cost is that
-    /// `{"kind": "glow"}` reaches the core as `blur`: not a nuance dropped but
-    /// a DIFFERENT filter applied, and the caller told it worked (measured).
-    ///
-    /// So the closed sets are checked here, against the enums themselves —
-    /// no new list to fall out of step with, and the refusal names the value.
-    ///
-    /// **A filter entry is checked for COMPLETENESS as well**, and it is the
-    /// same defect one step further on. `{"filters": [{"amount": 1.0}]}` is the
-    /// core's own documented idiom for "the same filter, more of it" — an end
-    /// patch's entries are merged over the base ones — and it is the most
-    /// natural thing an agent will write. Over MCP it cannot work: `FilterProps`
-    /// has no optionals, so the decoder fills the missing `kind` with `blur`,
-    /// a `sepia` base animates and then switches to a blur, and the caller is
-    /// told it worked (measured). Two lines refusing the partial entry by index
-    /// are worth more than a wrong picture reported as success, and there is no
-    /// second reading of it: the key is either there or it is not.
-    private static func checkVideoEnums(_ object: [String: Any], _ path: String) throws {
-        if let filters = object["filters"] as? [[String: Any]] {
-            let known = FilterKind.allCases.map { $0.rawValue }
-            for (i, filter) in filters.enumerated() {
-                guard let kind = filter["kind"], let amount = filter["amount"],
-                    !(kind is NSNull), !(amount is NSNull)
-                else {
-                    throw ToolError(
-                        message: "\(path).filters[\(i)] must name both kind and amount. An "
-                            + "entry missing either is COMPLETED from the defaults (a blur at "
-                            + "half strength) rather than merged over the filter already "
-                            + "there, so the one that lands is not the one you meant.")
-                }
-                guard let name = kind as? String, FilterKind(rawValue: name) != nil else {
-                    throw ToolError(
-                        message: "\(path).filters[\(i)].kind is not a filter — it must "
-                            + "be one of " + known.joined(separator: ", ") + ".")
-                }
-            }
-        }
-        // `video.blend` (format version 6). A top-level key rather than a
-        // nested one, so — unlike the four above — `patchArg`'s round trip
-        // DOES catch a misspelling here: `VideoPatch.blend` is a single
-        // optional read through the fallback-less `lenient` (`ReelCore.swift`
-        // argues that pairing at length), so `"muliply"` decodes to nil,
-        // exactly as an absent key does, the without-the-key decode comes back
-        // equal, and `set_video` refuses `patch.blend` by name before this
-        // function is ever called.
-        //
-        // The arm is still load-bearing, at the two doors that round trip does
-        // not reach. `set_action_end` is the first: `checkActionPatch` runs
-        // ahead of `patchArg` there, and even afterwards the top-level round
-        // trip cannot see inside a group — `ActionPatch(video: VideoPatch())`
-        // is not equal to `ActionPatch(video: nil)`, so a video group holding
-        // nothing but a misspelt key survives it and would go to the core as
-        // `{"video": {}}`. An explicit `{"blend": null}` is the second:
-        // `patchArg`'s loop exempts nulls by design, so this is what answers
-        // one — and refusing it is right, because `blend` has no null form at
-        // all (`normal` is how a blend is cleared) and a caller who wrote one
-        // meant something the key cannot mean.
-        if let blend = object["blend"] {
-            let known = BlendMode.allCases.map { $0.rawValue }
-            guard let name = blend as? String, BlendMode(rawValue: name) != nil else {
-                throw ToolError(
-                    message: "\(path).blend is not a blend mode — it must be one of "
-                        + known.joined(separator: ", ") + ".")
-            }
-        }
-        if let spotlight = object["spotlight"] as? [String: Any], let shape = spotlight["shape"] {
-            let known = SpotShape.allCases.map { $0.rawValue }
-            guard let name = shape as? String, SpotShape(rawValue: name) != nil else {
-                throw ToolError(
-                    message: "\(path).spotlight.shape is not a shape — it must be one of "
-                        + known.joined(separator: ", ") + ".")
-            }
-        }
-        // An obscure region carries BOTH closed vocabularies, and both decode
-        // leniently: an unknown `shape` reads as a rectangle and an unknown
-        // `kind` as `pixelate`, so "ellipse-ish" and "sepia" would both be
-        // taken and something else applied. `shape` is `SpotShape` — the same
-        // two shapes as the spotlight's, one home for the vocabulary — and
-        // `kind` is `ObscureKind`'s own two.
-        if let regions = object["obscure"] as? [[String: Any]] {
-            let shapes = SpotShape.allCases.map { $0.rawValue }
-            let kinds = ObscureKind.allCases.map { $0.rawValue }
-            for (i, region) in regions.enumerated() {
-                if let shape = region["shape"] {
-                    guard let name = shape as? String, SpotShape(rawValue: name) != nil else {
-                        throw ToolError(
-                            message: "\(path).obscure[\(i)].shape is not a shape — it must be "
-                                + "one of " + shapes.joined(separator: ", ") + ".")
-                    }
-                }
-                guard let kind = region["kind"] else { continue }
-                guard let name = kind as? String, ObscureKind(rawValue: name) != nil else {
-                    throw ToolError(
-                        message: "\(path).obscure[\(i)].kind is not a way to obscure — it must "
-                            + "be one of " + kinds.joined(separator: ", ") + ".")
-                }
-            }
-        }
-    }
-
-    /// The one closed vocabulary a text patch carries: `animation.kind`.
-    ///
-    /// `TextAnimationKind` decodes leniently on this side, so `"fade"` would
-    /// read as `typewriter` and a caller would be told an animation they did
-    /// not ask for had been applied — the same hole `checkVideoEnums` closes
-    /// for a filter, a spotlight and an obscure region. The core's own serde
-    /// refuses the string outright, but only once the patch reaches it, and
-    /// `patchArg`'s round-trip guard cannot see inside a `T??` field.
-    private static func checkTextEnums(_ object: [String: Any], _ path: String) throws {
-        guard let animation = object["animation"] as? [String: Any],
-            let kind = animation["kind"]
-        else { return }
-        let known = TextAnimationKind.allCases.map { $0.rawValue }
-        guard let name = kind as? String, TextAnimationKind(rawValue: name) != nil else {
-            throw ToolError(
-                message: "\(path).animation.kind is not a text animation — it must be one of "
-                    + known.joined(separator: ", ") + ".")
-        }
+        let patch = try rawPatchArg(a, "patch")
+        return try editResult(
+            document, "Video Properties", [.setVideoRaw(clips: clips, patch: patch)])
     }
 
     /// `set_audio` — the Audio tab (`AudioPane`) and the timeline's fade
     /// handles (`FadeHandleSession`).
+    ///
+    /// **The patch goes to the core UNREAD**, as `set_video`'s does (D1·4
+    /// after D1·3, `designs/reelcut-roadmap-7.md` §2.4). Its group holds no
+    /// enum at all, so what the forwarding buys here is the nested object: a
+    /// `duck` or a `compressor` MERGES now instead of being replaced from
+    /// defaults, and a misspelt key inside one is
+    /// `unknown key "duck.levl" in an audio patch` instead of a dropped key
+    /// and a duck the caller did not write.
     func setAudio(_ a: [String: Any]) throws -> String {
         let document = try target(a)
         let clips = try clipsArg(a, "clips", document)
-        let patch = try patchArg(a, "patch", AudioPatch.self, allowed: Self.audioPatchKeys)
-        guard !patch.isEmpty else {
-            throw ToolError(message: "patch names nothing to change.")
-        }
-        return try editResult(document, "Audio Properties", [.setAudio(clips: clips, patch: patch)])
+        let patch = try rawPatchArg(a, "patch")
+        return try editResult(
+            document, "Audio Properties", [.setAudioRaw(clips: clips, patch: patch)])
     }
 
     /// `set_text` — the Text tab (`TextPane`) and the canvas's inline text
     /// editing (`PreviewCanvasView.commitTextEditing`).
+    ///
+    /// **The patch goes to the core UNREAD** (D1·4). The one closed
+    /// vocabulary this door used to check by hand went with it — `bad value
+    /// at "animation.kind" in a text patch: unknown variant `fade`` is the
+    /// core's sentence now — and so did
+    /// the alpha `withOpaqueColors` used to fill into a three-component
+    /// `color`, `outline.color` or `backdrop.color`. The animation's `in` and
+    /// `out` are snapped to the frame grid by the core (D1·2), which is the
+    /// same promise the inspector's own stepper made.
     func setText(_ a: [String: Any]) throws -> String {
         let document = try target(a)
         let clips = try clipsArg(a, "clips", document)
-        let patch = try patchArg(a, "patch", TextPatch.self, allowed: Self.textPatchKeys)
-        try Self.checkTextEnums(a["patch"] as? [String: Any] ?? [:], "patch")
-        guard !patch.isEmpty else {
-            throw ToolError(message: "patch names nothing to change.")
-        }
-        return try editResult(document, "Text Properties", [.setText(clips: clips, patch: patch)])
+        let patch = try rawPatchArg(a, "patch")
+        return try editResult(
+            document, "Text Properties", [.setTextRaw(clips: clips, patch: patch)])
     }
 
     /// `set_shape` — the Shape tab (`ShapePane`) and the canvas's endpoint and
     /// box handles (`CanvasEndpointSession`, `CanvasScaleSession`).
+    ///
+    /// **The patch goes to the core UNREAD** (D1·4), and this is the door
+    /// that lost the most: `shapePatchArg` read all eleven keys by hand,
+    /// three-state `stroke` and `fill` included, and `gradientArg` read the
+    /// gradient and every stop under it, because `ShapePatch` is the one
+    /// patch that is not `Codable`. The core walks all of it against
+    /// `ShapeProps`' own template, so `gradient.stops[1].att` is named by its
+    /// INDEX and the three-component stop colour that reader accepted is
+    /// refused by length.
     func setShape(_ a: [String: Any]) throws -> String {
         let document = try target(a)
         let clips = try clipsArg(a, "clips", document)
-        let patch = try shapePatchArg(a, "patch")
-        guard !patch.isEmpty else {
-            throw ToolError(message: "patch names nothing to change.")
-        }
-        return try editResult(document, "Shape Properties", [.setShape(clips: clips, patch: patch)])
+        let patch = try rawPatchArg(a, "patch")
+        return try editResult(
+            document, "Shape Properties", [.setShapeRaw(clips: clips, patch: patch)])
     }
 
     /// `set_clip` — the clip's own name and label: the inline rename over the
@@ -712,35 +554,21 @@ extension AgentServer {
     /// commit), Clip ▸ Rename… ⇧⌘R and Clip ▸ Label ▸
     /// (`EditorViewController+Identity.swift`).
     ///
-    /// Read through `patchArg` like the other four patches, then one check of
-    /// its own: both keys are three-state strings (`ClipPatch`), and
-    /// for a `String??` field a value of the wrong type decodes as
-    /// `.some(nil)` — a CLEAR — which the round trip in `patchArg` cannot
-    /// tell from a real null (measured: `{"label": 7}` read as "remove the
-    /// label"). The label's VALUE is not policed beyond its type: the core
-    /// stores a colour name unvalidated, the policy `add_marker`'s `color`
-    /// already has, so a project from a newer build still opens here.
+    /// **The patch goes to the core UNREAD** (D1·4). Both keys are
+    /// three-state strings (`ClipPatch`), and for a `String??` field a value
+    /// of the wrong type decodes as `.some(nil)` — a CLEAR — which is why
+    /// this door needed a hand check of its own that `patchArg` could not
+    /// make (measured: `{"label": 7}` read as "remove the label"). The core
+    /// reads the two keys itself and answers `"label" in a clip patch must be
+    /// a string or null, not 7`. The label's VALUE is still not policed: the
+    /// core stores a colour name unvalidated, the policy `add_marker`'s
+    /// `color` already has, so a project from a newer build still opens here.
     func setClip(_ a: [String: Any]) throws -> String {
         let document = try target(a)
         let clips = try clipsArg(a, "clips", document)
-        let patch = try patchArg(a, "patch", ClipPatch.self, allowed: Self.clipPatchKeys)
-        try Self.checkClipPatchTypes(a["patch"] as? [String: Any] ?? [:], "patch")
-        guard !patch.isEmpty else {
-            throw ToolError(message: "patch names nothing to change.")
-        }
-        return try editResult(document, "Clip Properties", [.setClip(clips: clips, patch: patch)])
-    }
-
-    /// The type check `patchArg` cannot make for a `String??` field: each of
-    /// the clip patch's keys, when present, is a string or null and nothing
-    /// else. Runs AFTER `patchArg`, so an unknown key is still that function's
-    /// error, named the same way it is for every other patch.
-    private static func checkClipPatchTypes(_ object: [String: Any], _ path: String) throws {
-        for key in clipPatchKeys.sorted() {
-            guard let value = object[key], !(value is NSNull), !(value is String) else { continue }
-            throw ToolError(
-                message: "\(path).\(key) must be a string, or null to clear it.")
-        }
+        let patch = try rawPatchArg(a, "patch")
+        return try editResult(
+            document, "Clip Properties", [.setClipRaw(clips: clips, patch: patch)])
     }
 
     /// `set_enabled` — the per-clip video/audio switches of spec §5.2, the two
@@ -835,6 +663,16 @@ extension AgentServer {
     /// tri-state argument idiom, which `set_clip` settled in phase 2 — so a
     /// forgotten rectangle would silently become a zoom BACK, the opposite
     /// edit. Requiring the key means a caller says `null` on purpose.
+    ///
+    /// **The region goes to the core UNREAD** (deepening D1·5,
+    /// `designs/reelcut-roadmap-7.md` §2.5). It is the one op ARGUMENT that
+    /// is a caller-authored object, and `edit_zoom.rs`'s `ZoomRegion` reads
+    /// it the way a patch is read: an unknown member is named beside the four
+    /// the region takes, a missing one is named (there is no defensible
+    /// default for any of them), a wrong-typed one is named by its path, and
+    /// a four-number LIST is refused rather than read positionally. The
+    /// hand reader that used to do all of that member by member is gone with
+    /// it.
     func addZoomAction(_ a: [String: Any]) throws -> String {
         let document = try target(a)
         let clip = try clipArg(a, "clip", document)
@@ -852,10 +690,14 @@ extension AgentServer {
             fit = parsed
         }
         let curve = try curveArg(a, "curve")
+        // The undo step's NAME is the one thing left that reads the region,
+        // and it reads only whether it is a null: a zoom back and a zoom to
+        // a rectangle are different edits to a person looking at the Edit
+        // menu. What the object CONTAINS is the core's.
         return try addedActionResult(
-            document, clip, region == nil ? "Zoom Back" : "Zoom to Region",
+            document, clip, region is NSNull ? "Zoom Back" : "Zoom to Region",
             [
-                .addZoomAction(
+                .addZoomActionRaw(
                     clip: clip.id, at: at, duration: duration, region: region, fit: fit,
                     curve: curve)
             ])
@@ -892,17 +734,25 @@ extension AgentServer {
         return try jsonResult(result)
     }
 
-    /// `add_zoom_action`'s `region`: the rectangle to zoom to, or nil for an
-    /// explicit null, which is a zoom BACK. An ABSENT key is refused — see
-    /// the handler above for why the tool draws a line the op does not.
+    /// `add_zoom_action`'s `region`, forwarded to the core UNREAD — the
+    /// argument half of `rawPatchArg`, and the same one line of judgement
+    /// (deepening D1·5).
     ///
-    /// Its four members are read one at a time through `nestedNumberArg`
-    /// rather than decoded: `patchArg`'s round trip cannot see a wrong TYPE
-    /// one level down (its own doc says why), and a region whose `width`
-    /// arrived as a string would otherwise be a zoom to somewhere nobody
-    /// asked for. An unknown member is refused by name, as the core's
-    /// `deny_unknown_fields` would, but here it can say what the region takes.
-    private func zoomRegionArg(_ a: [String: Any], _ key: String) throws -> ZoomRegion? {
+    /// It reads NOTHING about the value. The core's `ZoomRegion` is the one
+    /// validator of what a region may be, and it answers with the member's
+    /// own path (`bad value at "region.width": invalid type: string "wide",
+    /// expected f64`), where the hand reader here read the four members one
+    /// at a time and had to spell what a region takes itself. An explicit
+    /// `NSNull` is forwarded as it was written: the op reads a `null` as
+    /// absent and both mean a zoom BACK.
+    ///
+    /// **The ABSENT key is the one thing left**, and unlike `rawPatchArg`'s
+    /// it is not merely a mistake about the call — it is the distinction the
+    /// core cannot make. An absent optional and an explicit null are one
+    /// thing to the envelope, so a forgotten rectangle would be a zoom back
+    /// rather than an error; the handler above says why the tool draws a
+    /// line the op does not.
+    private func zoomRegionArg(_ a: [String: Any], _ key: String) throws -> Any {
         guard let raw = a[key] else {
             throw ToolError(
                 message: "Missing required argument: \(key) — the rectangle to zoom to, as "
@@ -910,28 +760,7 @@ extension AgentServer {
                     + "measured from the centre of the clip's cropped rect. Pass null to zoom "
                     + "BACK to the clip's own scale and position.")
         }
-        if raw is NSNull { return nil }
-        guard let object = raw as? [String: Any] else {
-            throw ToolError(
-                message: "\(key) must be {x, y, width, height} — the region in source pixels, "
-                    + "x and y its centre — or null to zoom back.")
-        }
-        let members = ["x", "y", "width", "height"]
-        if let unknown = object.keys.filter({ !members.contains($0) }).sorted().first {
-            throw ToolError(
-                message: "Unknown \(key) key \"\(unknown)\" — a region is "
-                    + members.joined(separator: ", ") + ".")
-        }
-        var values: [Double] = []
-        for name in members {
-            guard let value = try nestedNumberArg(object, key, name) else {
-                throw ToolError(
-                    message: "\(key).\(name) is missing — a region is all four of "
-                        + members.joined(separator: ", ") + ".")
-            }
-            values.append(value)
-        }
-        return ZoomRegion(x: values[0], y: values[1], width: values[2], height: values[3])
+        return raw
     }
 
     /// An action's easing curve, by the name the model spells it with. One
@@ -976,21 +805,34 @@ extension AgentServer {
     /// `set_action_end` — every inspector field written while the playhead is
     /// inside an action (`InspectorBinding.ops(video:for:)`). The patch is the
     /// action's END state, merged; a key set to null is REMOVED from it.
+    ///
+    /// **The patch goes to the core UNREAD** (deepening D1·5,
+    /// `designs/reelcut-roadmap-7.md` §2.5) — the LAST door of the six, and
+    /// the one that used to check the most: `checkActionPatch` walked three
+    /// allowed-key sets, `checkVideoEnums` and `checkTextEnums` ran here
+    /// alone, and `patchArg`'s round trip decoded the whole thing through
+    /// `ActionPatch`. The core walks it group by group now
+    /// (`edit_action.rs`'s `check_end_patch` over `patch.rs`), so every
+    /// refusal carries the group in its path — `unknown key
+    /// "video.filters[1].kindd" in an action end patch` — and three things
+    /// that used to LAND do not: a wrong-typed value one level down (a
+    /// number where `shadow` belongs read as "clear the shadow"), a
+    /// three-element colour (`withOpaqueColors` filled in the alpha), and a
+    /// one-key nested object, which REPLACED what the end state held and now
+    /// merges into it.
+    ///
+    /// Two refusals are still made away from `patch.rs` and both are about
+    /// this OP: `video.motion` is not an animation target
+    /// (`edit_action.rs`), and an empty patch is the core's identity answer
+    /// rather than this side's "nothing to change".
     func setActionEnd(_ a: [String: Any]) throws -> String {
         let document = try target(a)
         let clip = try clipArg(a, "clip", document)
         let action = try actionArg(a, "action", clip)
-        try checkActionPatch(a, "patch")
-        let patch = try patchArg(
-            a, "patch", ActionPatch.self, allowed: ["video", "audio", "text"])
-        guard !patch.isEmpty else {
-            throw ToolError(
-                message: "patch names nothing to change — it takes video, audio and/or text "
-                    + "objects, e.g. {\"video\": {\"scale\": 0.6}}.")
-        }
+        let patch = try rawPatchArg(a, "patch")
         return try editResult(
             document, "Action End",
-            [.setActionEnd(clip: clip.id, action: action.id, patch: patch)])
+            [.setActionEndRaw(clip: clip.id, action: action.id, patch: patch)])
     }
 
     /// `remove_action` — the Video tab's action-row Remove button.
@@ -1002,221 +844,4 @@ extension AgentServer {
             document, "Remove Action", [.removeAction(clip: clip.id, action: action.id)])
     }
 
-    // MARK: - Patch decoding
-
-    /// The nested half of `set_action_end`'s validation: the top level is
-    /// checked by `patchArg`, each group's keys here.
-    private func checkActionPatch(_ a: [String: Any], _ key: String) throws {
-        guard let object = a[key] as? [String: Any] else {
-            throw ToolError(
-                message: "\(key) must be a JSON object with video, audio and/or text groups, "
-                    + "e.g. {\"video\": {\"opacity\": 0}}")
-        }
-        let groups: [(String, Set<String>)] = [
-            ("video", Self.videoPatchKeys), ("audio", Self.audioPatchKeys),
-            ("text", Self.textPatchKeys),
-        ]
-        for (name, allowed) in groups {
-            guard let raw = object[name], !(raw is NSNull) else { continue }
-            guard let nested = raw as? [String: Any] else {
-                throw ToolError(message: "\(key).\(name) must be a JSON object.")
-            }
-            // Motion is not an animation target (format version 8, spec
-            // §5.4), refused BY NAME before the unknown-key filter below,
-            // which would let it through — `motion` IS a legal video patch
-            // key. The core refuses it too (`edit_action.rs`); this names
-            // the op that does take it.
-            if name == "video", nested["motion"] != nil {
-                throw ToolError(
-                    message: "\(key).video.motion is not an animation target — set it with "
-                        + "set_video.")
-            }
-            let unknown = nested.keys.filter { !allowed.contains($0) }.sorted()
-            if let first = unknown.first {
-                throw ToolError(
-                    message: "Unknown \(key).\(name) key \"\(first)\" — allowed keys are "
-                        + allowed.sorted().joined(separator: ", ") + ".")
-            }
-            // An action's end state carries the same patches `set_video` and
-            // `set_text` do, so it carries the same lenient enums.
-            if name == "video" { try Self.checkVideoEnums(nested, "\(key).\(name)") }
-            if name == "text" { try Self.checkTextEnums(nested, "\(key).\(name)") }
-        }
-    }
-
-    /// `ShapePatch` is the one patch that is not `Codable` (it never appears
-    /// inside an action's end patch — spec §5.4 covers video, audio and text
-    /// only), so it is built by hand. `stroke` and `fill` are three-state, the
-    /// way `ShapePatch` spells it: absent leaves the paint alone, null clears
-    /// it, an object or a colour sets it.
-    private func shapePatchArg(_ a: [String: Any], _ key: String) throws -> ShapePatch {
-        guard let object = a[key] as? [String: Any] else {
-            throw ToolError(
-                message: "\(key) must be a JSON object of the shape properties to change, "
-                    + "e.g. {\"kind\": \"arrow\"}")
-        }
-        let unknown = object.keys.filter { !Self.shapePatchKeys.contains($0) }.sorted()
-        if let first = unknown.first {
-            throw ToolError(
-                message: "Unknown \(key) key \"\(first)\" — allowed keys are "
-                    + Self.shapePatchKeys.sorted().joined(separator: ", ") + ".")
-        }
-        var patch = ShapePatch()
-        if let name = try stringArg(object, "kind") {
-            guard let kind = ShapeKind(rawValue: name) else {
-                throw ToolError(
-                    message: "kind must be one of "
-                        + ShapeKind.allCases.map { $0.rawValue }.joined(separator: ", ")
-                        + " (got \"\(name)\").")
-            }
-            patch.kind = kind
-        }
-        patch.width = try doubleArg(object, "width")
-        patch.height = try doubleArg(object, "height")
-        patch.radius = try doubleArg(object, "radius")
-        patch.arrowStart = try boolArg(object, "arrow_start")
-        patch.arrowEnd = try boolArg(object, "arrow_end")
-        if let raw = object["stroke"] {
-            if raw is NSNull {
-                patch.stroke = .some(nil)
-            } else {
-                guard let stroke = raw as? [String: Any], let width = try doubleArg(stroke, "width")
-                else {
-                    throw ToolError(
-                        message: "stroke must be null or {\"width\": 6, \"color\": "
-                            + "[r, g, b, a]}.")
-                }
-                patch.stroke = .some(
-                    StrokeProps(width: width, color: try requiredColorArg(stroke, "color")))
-            }
-        }
-        if let raw = object["fill"] {
-            if raw is NSNull {
-                patch.fill = .some(nil)
-            } else {
-                patch.fill = .some(try requiredColorArg(object, "fill"))
-            }
-        }
-        patch.from = try unitPoint(object, "from")
-        patch.to = try unitPoint(object, "to")
-        patch.gradient = try gradientArg(object, "gradient")
-        return patch
-    }
-
-    /// `shape.gradient` (format version 6), three-state like `stroke`: absent
-    /// leaves the fill alone, null clears the gradient and brings the flat
-    /// `fill` back out from under it, an object sets it.
-    ///
-    /// **Hand-read, and that buys something no other nested object in a patch
-    /// has.** `withOpaqueColors` — the helper that fills in a three-component
-    /// colour's alpha for every other patch — recurses into nested
-    /// DICTIONARIES but not into arrays of them, so a stop written
-    /// `{"at": 0, "color": [0, 0, 0]}` would reach serde as a three-element
-    /// array and come back "invalid length 3", naming neither the key nor the
-    /// patch. Widening that helper is the wrong fix: it sits on every patch
-    /// shape and would change behaviour well outside this feature. It never
-    /// sees this object anyway, because `ShapePatch` is the one patch built by
-    /// hand rather than decoded — so the stops are read here, by name, taking
-    /// three or four components exactly as `colorArg` does.
-    ///
-    /// The win worth writing down: because the reader is hand-built, a
-    /// MISSPELT key inside `gradient` is refused BY NAME. `shadow` (since M3),
-    /// `chroma`, an `obscure` region and `animation` cannot manage that — they
-    /// go through the generic decoder, which drops the unknown key silently
-    /// and sends every key the caller omitted as its own default. `gradient`
-    /// is the first nested object in a patch that names its own mistakes. It
-    /// is still a REPLACEMENT rather than a merge, like all of them, so a
-    /// caller sends every key it wants.
-    ///
-    /// What is NOT decided here is the RANGE of anything: the stop count, the
-    /// 0–1 range of `at` and the finiteness of `angle` are `props_check.rs`'s,
-    /// and its messages name the field the same way this one does. (A colour
-    /// component is the exception in the other direction — `colorArg` clamps
-    /// it to 0–1 before the core ever sees it, exactly as it does for every
-    /// other colour argument in the app.) `kind` is checked here because a
-    /// lenient decode would turn an unknown geometry into `linear` and report
-    /// success — the same hole `checkVideoEnums` closes for a filter.
-    private func gradientArg(_ object: [String: Any], _ key: String) throws -> Gradient?? {
-        guard let raw = object[key] else { return nil }
-        if raw is NSNull { return .some(nil) }
-        guard let gradient = raw as? [String: Any] else {
-            throw ToolError(
-                message: "\(key) must be null or {\"kind\": \"linear\", \"stops\": "
-                    + "[{\"at\": 0, \"color\": [r, g, b, a]}, …], \"angle\": 0}.")
-        }
-        let allowed: Set<String> = ["kind", "stops", "angle"]
-        let unknown = gradient.keys.filter { !allowed.contains($0) }.sorted()
-        if let first = unknown.first {
-            throw ToolError(
-                message: "Unknown \(key) key \"\(first)\" — allowed keys are "
-                    + allowed.sorted().joined(separator: ", ") + ".")
-        }
-        var kind = Gradient().kind
-        if let name = try stringArg(gradient, "kind") {
-            guard let read = GradientKind(rawValue: name) else {
-                throw ToolError(
-                    message: "\(key).kind must be one of "
-                        + GradientKind.allCases.map { $0.rawValue }.joined(separator: ", ")
-                        + " (got \"\(name)\").")
-            }
-            kind = read
-        }
-        // Every key defaults, the way the core's `#[serde(default)]` on the
-        // container and on a stop makes them default, so `{"gradient": {}}`
-        // means here exactly what it means in a hand-written op: the type's
-        // own default, black to white, left to right. That is the feature's
-        // first impression and it must not depend on which door it came
-        // through.
-        var stops = Gradient.defaultStops
-        if let raw = gradient["stops"] {
-            guard let entries = raw as? [Any] else {
-                throw ToolError(
-                    message: "\(key).stops must be an array of {\"at\": 0–1, \"color\": "
-                        + "[r, g, b, a]} — two or more of them, since one stop is a flat "
-                        + "colour and fill already spells that.")
-            }
-            stops = []
-            for (i, entry) in entries.enumerated() {
-                guard let stop = entry as? [String: Any] else {
-                    throw ToolError(
-                        message: "\(key).stops[\(i)] must be {\"at\": 0–1, \"color\": "
-                            + "[r, g, b, a]}.")
-                }
-                let stopKeys: Set<String> = ["at", "color"]
-                if let first = stop.keys.filter({ !stopKeys.contains($0) }).sorted().first {
-                    throw ToolError(
-                        message: "Unknown \(key).stops[\(i)] key \"\(first)\" — allowed keys "
-                            + "are at, color.")
-                }
-                let fallback = GradientStop()
-                stops.append(
-                    GradientStop(
-                        at: try doubleArg(stop, "at") ?? fallback.at,
-                        color: try colorArg(stop, "color") ?? fallback.color))
-            }
-        }
-        return .some(
-            Gradient(
-                kind: kind, stops: stops,
-                angle: try doubleArg(gradient, "angle") ?? Gradient().angle))
-    }
-
-    /// A `from` / `to` endpoint: unit coordinates in the shape's box, for
-    /// lines and arrows only (spec §5.2).
-    private func unitPoint(_ object: [String: Any], _ key: String) throws -> [Double]? {
-        guard let raw = object[key], !(raw is NSNull) else { return nil }
-        guard let array = raw as? [Any], array.count == 2 else {
-            throw ToolError(
-                message: "\(key) must be [x, y] in unit coordinates of the shape's box "
-                    + "(0,0 is its top-left corner).")
-        }
-        var point: [Double] = []
-        for value in array {
-            guard let number = (value as? NSNumber)?.doubleValue, number.isFinite else {
-                throw ToolError(message: "\(key) must contain two numbers.")
-            }
-            point.append(number)
-        }
-        return point
-    }
 }

@@ -417,16 +417,29 @@ def main():
         s.refuses("set_clip", clips=[a], patch={"name": "  Talk, take 2  ", "label": "blue"}),
         "and so is the same name padded, with the same label",
     )
+    # The three refusals below are the CORE's since deepening D1·4
+    # (kpgalligan/reelcut#5): `set_clip` forwards the caller's patch and the
+    # Swift reader that used to answer `patch.label must be a string` is
+    # gone. The whole sentence is asserted rather than a keyword, because a
+    # keyword check for "nmae" or "string" passed against both doors and so
+    # proved nothing about which one answered — `tools/proof/patch_door_proof.py`
+    # §5 is where this door is proved in full.
     message = s.error("set_clip", clips=[a], patch={"nmae": "x"}) or ""
-    check("nmae" in message, f"an unknown patch key is an error naming it: {message!r}")
+    check(
+        'unknown key "nmae" in a clip patch' in message,
+        f"an unknown patch key is an error naming it: {message!r}",
+    )
     message = s.error("set_clip", clips=[a], patch={"label": 7}) or ""
     check(
-        "patch.label" in message and "string" in message,
+        '"label" in a clip patch must be a string or null, not 7' in message,
         f"{{label: 7}} is refused by name: {message!r}",
     )
     check(s.clip(a)["label"] == "blue", "and the label is unchanged afterwards")
     message = s.error("set_clip", clips=[a], patch={"name": ["Talk"]}) or ""
-    check("patch.name" in message, f"{{name: [..]}} is refused by name too: {message!r}")
+    check(
+        '"name" in a clip patch must be a string or null, not ["Talk"]' in message,
+        f"{{name: [..]}} is refused by name too: {message!r}",
+    )
     check(s.clip(a)["name"] == "Talk, take 2", "and the name is unchanged")
 
     is_error, message = s.raw("set_clip", {"clips": [a], "name": "Stray"})

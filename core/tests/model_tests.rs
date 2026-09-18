@@ -997,23 +997,32 @@ fn unknown_keys_are_ignored_and_dropped_on_write() {
 #[test]
 fn an_action_end_patch_keeps_the_keys_it_is_given() {
     // The one exception, and it is deliberate: `end` is opaque JSON here,
-    // merged and evaluated leniently by actions.rs, and `set_action_end`
-    // keeps unknown keys on purpose. Losing them on save would silently
-    // change a project the agent wrote.
+    // merged and evaluated leniently by actions.rs. Losing a key on save
+    // would silently change a project a NEWER build wrote — the file would
+    // open, the animation it described would be gone, and the loss would be
+    // written back over the original.
+    //
+    // This is the whole of that promise since D1·2 (kpgalligan/reelcut#3):
+    // the OP refuses `video.from_a_newer_build` by its path
+    // (`edit_tests.rs`'s `set_action_end_merges_and_a_null_removes_a_key`),
+    // and the reader below keeps the very same key through an open and a
+    // save. Strictness at the op never costs a file.
     let project = Handle::from_value(&json!({
         "tracks": [{ "id": 1 }],
         "clips": [{
             "id": 2, "track": 1, "start": 0, "duration": 600_000,
             "source": { "kind": "text" },
             "actions": [{ "id": 3, "start": 0, "duration": 600_000,
-                          "end": { "video": { "scale": 0.5 }, "not_a_property": 7 } }]
+                          "end": { "video": { "scale": 0.5, "from_a_newer_build": 1 },
+                                   "not_a_property": 7 } }]
         }],
         "next_id": 4
     }))
     .value();
     assert_eq!(
         at(&project, "/clips/0/actions/0/end"),
-        &json!({ "video": { "scale": 0.5 }, "not_a_property": 7 })
+        &json!({ "video": { "scale": 0.5, "from_a_newer_build": 1 },
+                 "not_a_property": 7 })
     );
 }
 

@@ -158,13 +158,14 @@ final class ShapePane: InspectorPaneView {
     /// Three rules out of the schema show up here as UI, and none of them is
     /// this file's invention:
     ///
-    ///  - **Every write sends the WHOLE object.** A nested object in a patch
-    ///    is a REPLACEMENT — `actions::merge` replaces a non-object base
-    ///    rather than merging into it, and on the MCP path the decoder gets
-    ///    there first — so a key left out of one comes back as its DEFAULT
-    ///    and not as what the clip had. `shadow` has carried that since M3
-    ///    and `obscure` since phase 3; `edited` below is where `gradient`
-    ///    joins them.
+    ///  - **Every write sends the WHOLE object.** The core MERGES a nested
+    ///    object into a stored one key by key (§5.2), but a stored `null` is
+    ///    not an object: `actions::merge` replaces it with what the patch
+    ///    carries, and the keys left out then come from `Gradient::default()`
+    ///    rather than from what the clip had. This section is where a
+    ///    gradient is turned ON from null, so it sends every key and is right
+    ///    in both cases. `shadow` has carried that since M3 and `obscure`
+    ///    since phase 3; `edited` below is where `gradient` joins them.
     ///  - **The Fill rows above stay live.** A gradient takes precedence over
     ///    `fill` and does not clear it, which is what makes this section's
     ///    Reset — one `{gradient: null}` — an exact inverse rather than a

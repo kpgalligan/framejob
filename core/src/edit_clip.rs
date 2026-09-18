@@ -41,13 +41,12 @@
 
 use serde_json::Value;
 
-use crate::actions;
-use crate::edit_props::{merge_group, Group};
 use crate::edit_split::split_clip;
 use crate::model::{
     Action, AudioProps, Clip, Enabled, Media, MediaKind, Project, ShapeKind, ShapeProps, Source,
     TextProps, Track, VideoProps,
 };
+use crate::patch::{merge_group, Group};
 use crate::props_check::{check_shape, check_text, SCALE_MAX, SCALE_MIN};
 use crate::time::{self, Ticks, TIMESCALE};
 
@@ -357,10 +356,12 @@ impl Project {
         let props = match text {
             None => title,
             Some(patch) => {
-                let merged = merge_group(&actions::to_json(&title), patch, Group::Text)?;
-                let props: TextProps = serde_json::from_value(merged)
-                    .map_err(|e| format!("text patch does not match the schema: {e}"))?;
+                let mut props = merge_group(&title, patch, Group::Text)?;
                 check_text(&props)?;
+                // The same door `set_text` is, ticks included
+                // (`edit_props.rs`'s `snap_animation`, and the Times rule
+                // it keeps).
+                self.snap_animation(&mut props);
                 props
             }
         };
@@ -410,9 +411,7 @@ impl Project {
                     arrow_end: matches!(kind, Some(ShapeKind::Arrow)),
                     ..ShapeProps::default()
                 };
-                let merged = merge_group(&actions::to_json(&base), patch, Group::Shape)?;
-                let props: ShapeProps = serde_json::from_value(merged)
-                    .map_err(|e| format!("shape patch does not match the schema: {e}"))?;
+                let props = merge_group(&base, patch, Group::Shape)?;
                 check_shape(&props)?;
                 props
             }

@@ -19,12 +19,15 @@ import Foundation
 /// one sentence, so they travel together.
 ///
 /// **`MotionProps.dictionary` ALWAYS writes three keys**, `NSNull` for a
-/// nil slot, and that is load-bearing rather than tidy: a raw core patch
+/// nil slot, and that is load-bearing rather than tidy: a core patch
 /// DEEP-MERGES `motion` (`merge_group` → `actions::merge`), so a
 /// `MotionProps` holding only an `in` sent as `{"in": …}` would leave a
 /// stored `out` in place — choosing None from a popup would appear to do
-/// nothing and beep. Replace-whole lives at this edge and at
-/// `motionPatchArg`'s, never in the core.
+/// nothing and beep. **This is the ONLY edge that replaces**, and since
+/// D1·3 it is the only one that could be: an agent's `motion` goes to the
+/// core as the caller wrote it and merges slot by slot like every other
+/// nested object, so a whole object here is not a second rule but the same
+/// rule spelled out by a writer that knows all three slots.
 
 // MARK: - Kinds
 
