@@ -2684,8 +2684,8 @@ Judged not real:
 
 ### 5.5 D2·5 — contract and record (kpgalligan/reelcut#13)
 
-**Commits.** `SHA1` (the ticket) and `SHA2` (the mutant table), with `SHA3`
-holding what its review found.
+**Commits.** `315b7f6` (the ticket) and `SHA2` (the mutant table), with
+`SHA3` holding what its review found.
 
 **What landed.** Documents, doc comments and two rotted instruments. No
 behaviour changed anywhere — no core logic, no FFI, no op added or reworded
@@ -2885,6 +2885,41 @@ both at their starting counts for the same reason. `core/src/outcome.rs` 105
 → **114**, well under the cap and the file whose whole job is holding that
 list. Nothing else changed size.
 
+**Mutants.** Two, the pair spec kpgalligan/reelcut#8 asks for, each a rebuild
+of the core and the app and a fresh instance on port 4845, each reverted
+afterwards and every score shown green again (refusal 116/116, phase1 66/66,
+phase8 79/79, `core/tests/refusal.rs` 21/21, refusal_probe 15/15). Both
+caught, at every level that can see them.
+
+| Mutant | Score |
+|---|---|
+| the reason DISCARDED as it crosses the FFI (`ffi_edit.rs`'s `Refused` arm returns NULL without writing `reason_out`) | `core/tests/refusal.rs` **7/21**; refusal **100/116**; phase1 **64/66**; phase8 **74/79**; refusal_probe **14/15** |
+| a rule's refusal turned back into a bare identity (`edit_track::remove_media`'s `with_clips` refusal) | `core/tests/refusal.rs` **20/21**; refusal **115/116**; phase8 **74/79** |
+
+Three readings, since a mutant table is only worth the rows somebody reads.
+**The first mutant is the whole candidate, undone in four lines**, and what
+it prints is the ambiguity itself: every refusal in the tree comes back as
+`Remove Media made no change: the project is already in that state.`,
+`Set Transition made no change…`, `Add Action made no change…` — the identity's
+sentence, word for word, for eleven different rules. Fourteen of `refusal.rs`'s
+twenty-one tests fall and sixteen proof checks, and the seven tests that
+survive are the identity, the boundary and the invalid-input ones, which is
+exactly right: the mutant takes away the ability to SAY, not the ability to
+refuse. **It reaches three older scripts as well** — phase1's two rewritten
+locked-track checks and phase8's five `remove_media` ones — which is a
+different shape from D1, where three mutant tables in a row found that nothing
+outside the new proof discriminated the behaviour. Here the older scripts
+moved with D2·3 and D2·4 and are a second opinion now.
+**The second mutant is the narrow one and is the more interesting of the
+two**: it is D2·3's mutant 7 read the other way round. That ticket could not
+score `remove_media` over MCP at all, because `AgentServer+Media.swift`'s own
+`with_clips` count answered a step earlier and answered the same whichever arm
+the core took. D2·4 deleted that count, so the same sabotage now costs five
+checks in `phase8_proof.py` — including the nested-media one that is the whole
+point of phase 8c — where a year's worth of scripts would once have passed it.
+**And the probe's one failing check is the one no MCP call can reach**: a
+refusal in front of `applyEdit`, which is where a person meets it.
+
 **Owed.** Nothing from this ticket. What D2 leaves is §6 below.
 
 ---
@@ -2986,8 +3021,11 @@ before — the sentences are new information, not moved information. That is
 the honest reading: D1 was a deduplication and D2 is a capability, and a
 deepening can be either.
 
-**The four mutants the series owed**, two in D2·1 and D2·2 against the core
-and the app, two here against the whole tree at once. Every one caught, and
+**The mutants the series ran: three in D2·1, six in D2·2, eight in D2·3,
+five in D2·4 and two in D2·5 — twenty-four, every one caught.** D2·5's pair
+is the spec's own: the reason discarded at the FFI (`core/tests/refusal.rs`
+7/21, refusal 100/116, and three older scripts moving too) and a rule's
+refusal turned back into a bare identity (refusal 115/116, phase8 74/79). And
 D2·3's seventh mutant is the row worth reading: the transition's "no room"
 refusal turned back into a bare identity scored **113/113** under D2·3's
 proof, because the app's own trial-apply in front of it answered the same
