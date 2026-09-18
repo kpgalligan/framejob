@@ -3761,3 +3761,26 @@ part's job and #14 sequences it there on purpose.
 **Owed.** The fifth part of the parity check and the shared `tools/list`
 schemas accessor (#19); the four other catalog groups; and the proof scripts
 that still re-type argument names in Python.
+
+**The orchestrator's verification found one more, and it is the one worth
+reading** (`22a0d47`). This ticket's capture recorded
+`ripple_delete_ranges.ranges` losing its `minItems: 1` as one of three
+FIXES. It is not a fix. `AgentServer+Clips.swift`'s `rippleDeleteRanges`
+refuses an empty list by name — *"ranges is empty — name at least one
+[from, to] pair"* — exactly as `delete` and `split` refuse an empty `clips`
+and `paste_attributes` an empty `groups`, and all three of those kept the
+key through a declarations row. Measured over MCP against the built binary,
+not read off the source: the tool refused `{"ranges": []}` while its schema
+had stopped saying so. `ranges` now has the row its two siblings have and
+the list is twelve.
+
+**Why nothing caught it, which is the lesson.** `clip_catalog_proof.py`'s
+oracle is built from the same declarations list the catalog is built from,
+so a row dropped from the list moves BOTH sides of that comparison together
+and the proof stays green. Only a row that asks the RUNNING APP can see a
+declaration dropped while the behaviour stays, and there were two such rows
+— `delete` and `split` — for three lists. The loop now covers all three and
+names its argument, the proof is **24/24**, and removing the new row scores
+**23/24** with exactly that row failing. A generated schema needs at least
+one instrument that is not generated from the same source, or the whole
+comparison is a tautology.
