@@ -70,6 +70,15 @@ extension AgentServer {
     /// build on the main thread. Keyed by op rather than appended to, so a
     /// second build answers what the second catalog says rather than what
     /// both said.
+    ///
+    /// **The order is a data dependency, not a convention**, which is what
+    /// makes this state safe where a global usually is not: the check takes
+    /// the catalog STRING `catalogJSON()` returned, so a caller cannot ask
+    /// the question without having built the catalog that answers it. The one
+    /// residue is an op that stopped being an op tool between two builds in
+    /// one process, whose entry would linger — and parts 1 and 2 complain
+    /// about that tool first, because a tool with no op and an op with no
+    /// tool are theirs.
     private(set) static var proseWithoutArgument: [String: [String]] = [:]
 
     /// `AgentCatalog.opTool` says which sentences it was given for which op,

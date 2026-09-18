@@ -4041,7 +4041,7 @@ sentence for a bound.
 ### 8.5 D3·5 — the fifth part of the check, and a proof for all 57 (kpgalligan/reelcut#19)
 
 **Commits.** `77b0bb8` (the fifth part and the proof),
-`PLACEHOLDER_TWO` (the mutants and the whole proof tree) and
+`c8fbe12` (the mutants and the whole proof tree) and
 `PLACEHOLDER_THREE` (what the review found, below).
 
 **What landed.** The startup parity check's fifth part, the proof that puts
@@ -4113,8 +4113,9 @@ ten sentences and the two canvas ones deliberately do NOT repeat the
 `edit_canvas.rs` refuses by, and a number spelled twice is what this whole
 candidate deletes.
 
-**The proof.** `tools/proof/op_argument_proof.py`, **79/79**, over MCP with
-a probe of its own, built BEFORE the first MCP call. It is written against
+**The proof.** `tools/proof/op_argument_proof.py`, **86/86** (79 before the
+review added the optional half of section 3), over MCP with a probe of its
+own, built BEFORE the first MCP call. It is written against
 the series rule D3·3 and D3·4 each paid for — **a generated artefact is
 checked by asking the thing that generated it a question it did not write
 the answer to** — because the fifth part reads the same table the catalog
@@ -4145,11 +4146,23 @@ be, and it is the class the fifth part cannot see. The values are derived
 from the core's published kinds rather than typed: an id by name (the five
 entity ids are the only argument names in the file, each checked against the
 core's table first), a time as a second per argument in table order, a
-bound's own minimum, a vocabulary's first member. Six op tools require
-nothing at all and are NAMED rather than counted — `add_background`,
-`add_marker`, `add_track`, `remove_empty_tracks`, `set_canvas`, `split` —
-because a misspelt OPTIONAL argument is silently ignored by every tool, and
-four of the six are the declarations list's own playhead rows.
+bound's own minimum, a vocabulary's first member. **Six op tools require
+nothing at all** — `add_background`, `add_marker`, `add_track`,
+`remove_empty_tracks`, `set_canvas`, `split`, four of them for the
+declarations list's own playhead rows — so no call of theirs can be refused
+for a missing argument and that shape cannot reach them. Their arguments are
+measured the only other way there is, which the review added: a misspelt
+OPTIONAL argument is dropped in SILENCE, so what is read is what the op DID —
+the same call twice, once right and once misspelt, answering two different
+projects, in either of two shapes (the argument ALONE against the op alone,
+which is the only shape `add_background` takes because it refuses a media and
+a colour together; or every argument right against this one misspelt, which is
+the only shape `set_canvas`'s `rescale_clips` takes because it scales a
+placement WITH a size and does nothing without one). `remove_empty_tracks` has
+no argument at all, and `split`'s `clips` is the one this fixture cannot
+separate — the playhead sits inside the only clip at that time — named in the
+script with its reason and asserted to be the WHOLE of the exceptions, so a
+second one is a failure rather than a quiet addition.
 
 **The ticket's "the core names it by its dotted path" is false of an
 ARGUMENT, and the section says what is true instead.** An op argument never
@@ -4255,3 +4268,65 @@ Nothing in this ticket's diff reaches a window, a display or the recorder:
 the Swift change is the agent catalog's prose and one new file in the parity
 check, and `tools/list` is what every one of the catalog proofs read back
 green.
+
+**What the review found.** Two axes, fixed point `10b301b`, spec source the
+ticket plus spec kpgalligan/reelcut#14. The **Spec** axis re-derived the drift
+from `10b301b`'s own catalog against `op_table.rs` rather than trusting the
+table above — exactly ten undescribed over `set_track` (5), `set_marker` (2),
+`add_marker` (1) and `set_canvas` (2), zero orphan prose, zero of either at
+HEAD — confirmed both directions, the envelope exclusion, the declarations
+read, the op/argument/side naming, the app-state skip as part 4's own rule and
+the reporting chained into the same `assertionFailure` + `NSLog`, and found no
+implementation wrong and no material scope creep. It judged the dotted-path
+substitution JUSTIFIED by decision 12 rather than a weakened claim, and
+stronger than what was asked, since it also proves each required list
+sufficient against the running app.
+
+Five findings changed code or documents:
+
+- **"a misspelt argument for all 57" reached 51.** The six that require
+  nothing were named rather than probed, and the Spec axis put the hole in
+  spec #14's own words — user story 6, *"an argument I send is never dropped
+  and never refused for being unknown"* — with nothing in the tree catching an
+  optional misspelling. Closed as the optional half above: 56 of the 57 now
+  have an argument misspelt and an answer read, and the 57th
+  (`remove_empty_tracks`) has no argument to misspell. It cost the two shapes
+  and one named exception, and it is the only part of this ticket that found a
+  question nothing in the tree was asking;
+- **`PLACEHOLDER_TWO` in this record's own Commits line**, which is the third
+  consecutive ticket with that finding — `e7c1883` exists to fix it for D3·1,
+  D3·3's review found it and D3·4's review found it again;
+- **`recording_proof.py` had a SECOND stale exact-count comment** two lines
+  above the one this ticket corrected, saying "this is that script" — so the
+  record's "both corrected" overclaimed by one. All three sentences say
+  floor now;
+- **duplicated prose in `set_track`**, which is this candidate's own sin: the
+  four switch sentences added for the fifth part repeated the tool
+  description's own clauses almost word for word, in a file whose new comment
+  three hunks away says *"a number spelled twice is what this whole candidate
+  deletes"*. Each switch names the MENU ITEM it mirrors now — `Track ▸ Hide
+  Video`, `Mute Audio`, `Lock Track`, `Solo` — which is the per-argument fact
+  the rulebook asks for and the description does not carry per argument;
+- **`ID_ARGUMENTS` held six names under a comment, a docstring and a record
+  all calling it "the five entity ids"**: five ENTITIES, six names, because
+  `clips` is a list of the id space `clip` draws from. Said that way now.
+
+Two more were taken as written: the README's handover paragraph ran on
+mid-sentence into the paragraph it was spliced before, and its op-catalog
+section nested a parenthetical between two em dashes.
+
+Three were judged not real. **The collector `proseWithoutArgument` is a
+hidden side effect of a builder** — true, and it stays: the evidence exists
+only while the catalog is built, and the ORDER that makes it safe is a data
+dependency rather than a convention, because the check takes the catalog
+STRING `catalogJSON()` returned and cannot be asked without it. That argument
+is written at the property now, with the one residue it leaves (an op that
+stopped being an op tool mid-process, which parts 1 and 2 name first).
+**`build_probe`, `run_probe` and `covers` duplicate `op_catalog_proof.py`'s**
+— the tree's one-script-one-file convention, judged not real for the same
+reason in D3·4's review: two independent copies make a bug in one a failure
+rather than a shared opinion, and what WAS hoisted in this ticket is the
+shared CLIENT, not an instrument. **Three parity parts each dig
+`inputSchema → properties` out of an untyped dictionary** — two lines at three
+call sites in three files, one of them frozen; a shared helper would make two
+files depend on a third to save four lines.

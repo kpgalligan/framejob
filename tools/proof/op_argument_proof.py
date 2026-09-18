@@ -44,8 +44,17 @@ The sections, in order:
    SUFFICIENT against the running app — and then one call per required
    argument with that argument misspelt, which must be refused naming it. The
    values are derived from the core's published kinds; the only names written
-   here are the five entity ids, and each is checked against the core's table
-   first.
+   here are the six that name the five ENTITIES an id can point at, and each
+   is checked against the core's table first.
+
+   **Six op tools require nothing**, so no call of theirs can be refused for
+   a missing argument and the rows above cannot reach them. Their arguments
+   are measured the only other way there is: a misspelt OPTIONAL argument is
+   dropped in SILENCE by every tool, so what is read is what the op DID —
+   the same call twice, once spelled right and once misspelt, answering two
+   different projects. One argument of one op cannot be separated that way
+   with this fixture, and it is named in the script with its reason and
+   asserted to be the whole of the exceptions.
 4. **A misspelt key INSIDE an opaque object is named by the CORE**, which is
    where the dotted path lives. An op ARGUMENT never reaches the core's
    decoder — the handlers read arguments one at a time and build the op
@@ -298,11 +307,13 @@ def explains(declaration, key):
 # --------------------------------------------------------------------------
 # Section 3's values, derived from the core's published kinds.
 
-# The five entity ids. These are the only argument NAMES this script types,
-# because a valid clip id is not a valid track id — one id space, so the kind
-# alone cannot say which entity an integer names. Each is checked against the
-# core's table before it is used, so a rename fails here loudly rather than
-# leaving a row asserting the old spelling.
+# The five ENTITIES an id can name, under six argument names (`clips` is a
+# list of the same id space `clip` draws from). These are the only argument
+# names this script types, because a valid clip id is not a valid track id —
+# one id space, so the published kind alone cannot say which entity an integer
+# names. Each is checked against the core's table before it is used, so a
+# rename fails here loudly rather than leaving a row asserting the old
+# spelling.
 ID_ARGUMENTS = ("clip", "clips", "track", "media", "action", "marker")
 
 
@@ -548,7 +559,8 @@ def main():
         "action": project["clips"][0]["actions"][0]["id"],
         "marker": project["markers"][0]["id"],
     }
-    check("the five entity ids this script names are all arguments the core still has — a "
+    check("the six names for the five entities this script types are all arguments the "
+          "core still has — a "
           "rename fails here rather than leaving the rows below asserting the old spelling",
           all(any(name in table[op]["properties"] for op in group) for name in ID_ARGUMENTS)
           and set(ids) == set(ID_ARGUMENTS),
@@ -590,17 +602,111 @@ def main():
               not wrong and not misspelt,
               f"named as missing although present: {wrong}; not named when misspelt: "
               f"{json.dumps(misspelt)}")
-    # The other end of the same sentence, and the limit of what this section
-    # can claim: a misspelt OPTIONAL argument is silently ignored by every
-    # tool, so an op that requires nothing cannot be measured here at all.
-    # Named rather than counted, because four of the six are the declarations
-    # list's own doing — the playhead rows that make `at` optional.
+    # The six that require nothing, named rather than counted — four of them
+    # for the declarations list's own playhead rows, which make `at` optional.
     check(f"…and the {len(nothing_required)} op tools that require nothing are NAMED rather "
-          "than counted: a misspelling of an optional argument is silently ignored, and four "
-          "of these are the playhead rows of the declarations list",
+          "than counted: no call of theirs can be refused for a missing argument, so the rows "
+          "above cannot reach them, and four of these are the playhead rows",
           nothing_required == ["add_background", "add_marker", "add_track",
                                "remove_empty_tracks", "set_canvas", "split"],
           json.dumps(nothing_required))
+
+    # …and the hole that leaves, closed the only way it can be. A misspelt
+    # OPTIONAL argument is dropped in silence — there is no refusal to read —
+    # so what is read instead is what the op DID. Every argument of all six,
+    # so an argument no handler reads is named here whether its op requires
+    # anything or not.
+    def applied_project(name, arguments):
+        """The whole project after `name` ran, undone again — or None if the
+        call was refused, with the sentence."""
+        text, answer = refusal(name, arguments)
+        if answer is None:
+            return None, text
+        after = json.dumps(mcp.call("get_project")["project"], sort_keys=True)
+        mcp.call("undo")
+        return after, ""
+
+    def candidates(argument, fragment):
+        """Values to try for one optional argument, in order. The first is
+        `value_for`'s; the rest exist because an argument whose value is what
+        the project ALREADY says changes nothing when it is read and nothing
+        when it is not — a boolean already set, `[30, 1]` on a 30 fps
+        project, black on a black canvas — and that is a fact about the
+        value, not about the handler."""
+        first = value_for(argument, fragment, ids, 600000)
+        if isinstance(first, bool):
+            return [first, not first]
+        if first == [0, 0, 0, 1]:
+            return [first, [1, 0, 0, 1]]
+        if first == [30, 1]:
+            return [first, [24, 1]]
+        return [first]
+
+    def reads(name, argument, value, whole):
+        """Whether the app reads `argument`: the same call twice, once with
+        it spelled right and once misspelt, answering two different projects.
+
+        TWO shapes, because one is not enough for six ops at once. ALONE —
+        the argument by itself against the op by itself — is the only shape
+        `add_background` can take, since it refuses a media and a colour
+        together. WHOLE — every argument right against this one misspelt —
+        is the only shape `set_canvas`'s `rescale_clips` can take, since it
+        scales a clip's placement WITH a size and does nothing without
+        one."""
+        arguments = dict(whole) if whole else {}
+        arguments[argument] = value
+        right, text = applied_project(name, arguments)
+        if right is None:
+            return False, f"refused: {text[:120]}"
+        del arguments[argument]
+        arguments[argument + "x"] = value
+        blind, text = applied_project(name, arguments)
+        if blind == right:
+            return False, "the project came out as if the argument were not there"
+        return True, ""
+
+    # The one argument this fixture cannot separate, named with its reason
+    # and asserted as the WHOLE of the exceptions, so a second one is a
+    # failure rather than a quiet addition.
+    UNSEPARABLE = {
+        "split.clips": "the playhead sits inside the only clip at that time, so naming that "
+                       "clip and letting the app choose it are the same edit — a limit of the "
+                       "fixture, not of the tool",
+    }
+    # A free tick: the fixture's own marker is at 0 and two markers may not
+    # share a time, so `add_marker` would be refused at the playhead it was
+    # left at rather than measured.
+    mcp.call("set_playhead", t=300000)
+    unread, unexpected = [], []
+    for name in nothing_required:
+        published = table[name]["properties"]
+        declared = sorted(published)
+        if not declared:
+            check(f"{name} takes no argument at all — the one row of the core's table with no "
+                  "arguments in it, so there is nothing of its to misspell", True)
+            continue
+        whole = arguments_for(declared, published, ids)
+        blind = {}
+        for argument in declared:
+            why = ""
+            for value in candidates(argument, published[argument]):
+                for shape in (None, whole):
+                    seen, why = reads(name, argument, value, shape)
+                    if seen:
+                        break
+                if seen:
+                    break
+            if not seen:
+                blind[argument] = why
+                key = f"{name}.{argument}"
+                (unread if key in UNSEPARABLE else unexpected).append(key)
+        check(f"{name} — every one of {declared} CHANGES what the op did, so misspelling it "
+              "is a different project: the only way to see an optional argument no handler "
+              "reads", all(f"{name}.{a}" in UNSEPARABLE for a in blind), json.dumps(blind)[:400])
+    check(f"…and the {len(UNSEPARABLE)} argument this fixture cannot separate is the one named "
+          f"in the script, with its reason: {sorted(UNSEPARABLE)}",
+          sorted(unread) == sorted(UNSEPARABLE) and not unexpected,
+          f"unseparable {sorted(unread)}, unexpected {sorted(unexpected)}")
 
     print("\n4 — a misspelt key inside an opaque object is named by the CORE")
     doors = sorted(

@@ -230,12 +230,12 @@ of reason written down. The one file that went UP is `AgentServer.swift`
 allowance, correcting what the parity check's own comment says it cannot
 see. D3·5 turned the fifth part of that check ON and the frozen file came
 DOWN for it — `AgentServer.swift` **783 → 774**, because the part itself is
-`app/Sources/AgentServer+Parity.swift` (172, a new file under the 400 cap)
-and what the frozen file lost is the two paragraphs describing the gap that
-part has now closed. `AgentCatalog.swift` 496 → **515** and
-`AgentCatalog+Declarations.swift` 310 → **313**, both under the cap: ten
-argument descriptions the fifth part turned from a silence into a complaint,
-and the doc that says so.
+`app/Sources/AgentServer+Parity.swift` (**181** with what its review added, a
+new file under the 400 cap) and what the frozen file lost is the two
+paragraphs describing the gap that part has now closed. `AgentCatalog.swift`
+496 → **520** and `AgentCatalog+Declarations.swift` 310 → **313**, both under
+the cap: ten argument descriptions the fifth part turned from a silence into
+a complaint, and the doc that says so.
 Regenerate the list with
 `wc -l app/Sources/*.swift core/src/*.rs | awk '$1>600 && $2!="total"' | sort -rn`
 rather than trusting the numbers here; the standing exemptions are

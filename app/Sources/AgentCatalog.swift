@@ -440,12 +440,17 @@ extension AgentServer {
                     + "container (the timeline, or a nest's own tracks) that is not also soloed "
                     + "— mute wins on a track that is both, and pictures are untouched.",
                 [
+                    // The four switches name the MENU ITEM each one mirrors
+                    // and nothing else: what each DOES is the sentence above,
+                    // and a sentence written twice is what this candidate
+                    // exists to delete. The description an agent reads comes
+                    // with these in one tool object, so nothing is lost.
                     "track": trackDescription,
                     "name": "New track name.",
-                    "hidden": "Drop the track's picture from the composition.",
-                    "muted": "Silence the track's sound.",
-                    "locked": "Keep every ripple, insert and range edit off this track.",
-                    "solo": "Silence every OTHER track in the container that is not soloed too.",
+                    "hidden": "Track ▸ Hide Video.",
+                    "muted": "Track ▸ Mute Audio.",
+                    "locked": "Track ▸ Lock Track.",
+                    "solo": "Track ▸ Solo.",
                 ]),
             opTool(
                 "remove_empty_tracks",

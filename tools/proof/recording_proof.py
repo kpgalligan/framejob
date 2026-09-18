@@ -337,8 +337,8 @@ SELFTEST = os.path.join(RECORDINGS, f"{os.getpid()}-selftest")
 SEC = 600_000
 
 # The whole catalog after road map 3's R1: phase 9's 74 plus `record_screen`.
-# The EXACT count belongs to the newest phase's script (tools/proof/README.md)
-# and this is that script; `phase9_proof.py`'s 74 became a floor in the same
+# The EXACT count belonged to this script when road map 3 wrote it
+# (tools/proof/README.md's handover rule); `phase9_proof.py`'s 74 became a floor in the same
 # commit that added the tool.
 # Road map 5's E1 added `add_transition` and `set_transition_style`, so this
 # is a FLOOR now and the exact count belongs to the newest phase's script —

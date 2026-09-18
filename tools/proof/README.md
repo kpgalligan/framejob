@@ -231,14 +231,16 @@ must print nothing before a proof run means anything.
 what tells a stale binary on the port from the build under test: road map 7's
 `op_argument_proof.py` asserts **77** (D3·5), and every script before it keeps
 a floor — phases 1 to 9's 63, 65, 68, 70, 71, 73, 73, 73 and 74, and road map
-3's 75 — so a later phase's tools never fail an older proof. **The sixth
-handover cost nothing**, which is the first time that has happened to a
-handover that MOVED the number: road map 5's E1 had already turned
-`recording_proof.py`'s 75 into a floor when it added two transition tools, and
-road map 7's D3 adds no tool at all, so the 77 it takes is the count the
-catalog has carried since E1 and no older script had to be edited. What the
-scripts' prose said had drifted, though, and this is where that was corrected:
-`recording_proof.py`'s own docstring still called its 75 exact. Road map 3's was the fifth handover and cost two rows in
+3's 75 — so a later phase's tools never fail an older proof.
+**The sixth handover cost nothing**, which is the first time that has
+happened to a handover that MOVED the number: road map 5's E1 had already
+turned `recording_proof.py`'s 75 into a floor when it added two transition
+tools, and road map 7's D3 adds no tool at all, so the 77 is the count the
+catalog has carried since E1 and no older script had to be edited. Its PROSE
+had drifted, though, and that is what D3·5 corrected:
+`recording_proof.py`'s docstring, its section banner and one comment all
+still called its 75 exact.
+Road map 3's was the fifth handover and cost two rows in
 one script, both in the same commit as the tool: `phase9_proof.py`'s `TOOLS`
 became a `>=`, and its `APP_STATE_TOOLS` — asserted as an EXACT set, because
 an op tool that lost its scope would leave the count right and the set
@@ -2610,10 +2612,10 @@ modified only by what the declarations list names; exactly one op tool
 declares nothing but the envelope's two keys (`remove_empty_tracks`, the one
 op with no arguments); every op tool carries its own description and prose on
 at least one argument wherever it takes any, and all 145 published
-arguments carry the app's prose while the core's table carries none of it —
-(135 of 145 until D3·5's fifth parity part made an undescribed argument a
-complaint) —
-which is the division of labour, measured rather than asserted. **The vocabularies**: the five a HANDLER still parses by name,
+arguments carry the app's prose while the core's table carries none of it
+(135 of them until D3·5's fifth parity part made an undescribed argument a
+complaint) — which is the division of labour, measured rather than
+asserted. **The vocabularies**: the five a HANDLER still parses by name,
 `add_transition`'s `align` among them, whose tie to `TransitionAlign` was
 structural until the migration made the schema the core's. **The
 declarations**: all 14 rows still name something the core has. **The running
@@ -2638,7 +2640,8 @@ behaviour stays.
 
 `python3 tools/proof/op_argument_proof.py <port>`, against a running
 instance. Road map 7's D3·5, and **the script that owns the exact tool count**
-(77). **79/79** at D3·5 (#19). The probe is built BEFORE the first MCP call.
+(77). **86/86** at D3·5 (#19); 79 of those rows before the review added the
+optional half of section 3. The probe is built BEFORE the first MCP call.
 
 It exists because of the rule D3·3 and D3·4 each paid for: **a generated
 artefact is checked by asking the thing that generated it a question it did
@@ -2664,7 +2667,13 @@ that changes nothing fails here. **The misspelt argument**: for each of the 57,
 one CONTROL call with every required argument spelled right (which must not be
 refused for a missing one — the tool's required list proved SUFFICIENT against
 the running app) and then one call per required argument with that argument
-misspelt, which must be refused naming it. **The opaque doors**: a misspelt key
+misspelt, which must be refused naming it. **Six op tools require nothing**, so
+that shape cannot reach them: their arguments are measured by what the op DID
+instead, the same call twice answering two different projects, because a
+misspelt OPTIONAL argument is dropped in silence and there is no refusal to
+read. `split`'s `clips` is the one argument this fixture cannot separate — the
+playhead sits inside the only clip at that time — and it is named in the script
+with its reason and asserted to be the whole of the exceptions. **The opaque doors**: a misspelt key
 inside a caller's own object is named by the CORE, which is where the dotted
 path lives.
 
