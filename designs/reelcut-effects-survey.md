@@ -639,13 +639,19 @@ move to a new `core/src/edit_transition.rs` as a pure move, gated alone;
     otherwise.
   - **Refusals.** Not at a hard cut — no predecessor, a gap, an existing
     overlap — and a head handle asked of a nest are `Err` naming the case.
-    That departs from `roll`, whose gap refusal is `Ok(None)`, and the
+    That departs from `roll`, whose gap refusal is an IDENTITY (it is one
+    of the clamped-edge family road map 7 §6 names), and the
     argument goes in the module doc: `roll` is reached by a DRAG that can
     land on any edge, while `add_transition` is pointed at one cut by a
     caller who meant that cut, so a wrong cut is a wrong argument
     (core/CLAUDE.md's `Err` class). A cut with less than a frame of handle is
-    `Ok(None)` — a domain refusal — and the tool reports it as "made no
-    change: neither side of the cut has media to give".
+    a domain refusal, and the tool reports the reason.
+    **Superseded 2026-09-18 by road map 7's D2 (§4–§6):** the paragraph as
+    written said `Ok(None)` and quoted the tool's answer as "made no change:
+    neither side of the cut has media to give", which the APP wrote from a
+    trial-apply. Both are gone — an op answers three arms, and the sentence
+    is `edit_transition.rs`'s own, naming the cut, the frames asked for and
+    `ripple: true`.
 - `refused_inside` classifies both ops as allowed inside a scope (the match
   is exhaustive, so the compiler insists).
 
@@ -731,8 +737,8 @@ and the catalog move in lockstep.
   handle and centres; an odd frame count lands on the grid; a nest incoming
   clip refuses `center` and accepts `after`; a zoom action on the incoming
   clip stays on the same source frame; the four `Err` refusals by name and
-  the no-handle `made no change`; one undo restores the document byte for
-  byte; Remove Silences proposes nothing inside the overlap.
+  the no-handle refusal's own sentence (the Superseded note above); one undo
+  restores the document byte for byte; Remove Silences proposes nothing inside the overlap.
 - Mutants: `cos` and `sin` swapped; the `Side` limit removed (the last
   sample swells back); `minted` writing linear; `align` ignored; speed
   applied twice to a handle; the action rebase removed; the detector's

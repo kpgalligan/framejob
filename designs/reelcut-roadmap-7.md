@@ -2782,8 +2782,13 @@ which D2·1's sweep of `core/src` had not reached, one in `core/src/export.rs`
 (a QUERY, which has neither middle arm — it says so now), and three in
 `tools/proof` where a comment called an IDENTITY a documented refusal
 (`phase2_proof.py`'s `refuses` helper, `phase3_proof.py`, `phase9_proof.py`).
-Two of the seven were saying the opposite of the code rather than merely
-spelling it the old way, which is the reason for the sweep:
+`designs/reelcut-effects-survey.md`'s E1 paragraph — the one DESIGN document
+that is not a closed record, since E3–E9 are still live there — quoted the
+app's deleted sentence as the tool's answer and called `roll`'s gap refusal
+`Ok(None)`; the design is left as it was written and a dated **Superseded**
+note says what D2 changed, which is the shape spec §11's own amendments take.
+Two of the seven app comments were saying the opposite of the code rather
+than merely spelling it the old way, which is the reason for the sweep:
 
 - **`ClipPane.swift` on the typed In and Out fields** listed the clamp
   landing where the edge already is, the two clamps crossing, and the overlap
