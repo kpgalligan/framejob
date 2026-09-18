@@ -102,18 +102,22 @@ timeline's clips CHAINED with every nest's (`core/src/edit_track.rs`). So
 media used only inside a compound clip walked past the Swift guard with a
 user count of zero and was refused by the core with a reason-less "nothing
 changed", which reached a caller as the shared "Remove Media made no
-change…" and told it nothing. `MediaUsage.swift` is the one spelling now.
-(Deepening D2·2 shortened that shared sentence — an identity says only that
-the project is already in that state — so §2's negative check below is
-against the wording in `tools/proof/refusal_proof.py`, and still holds: this
-refusal is the handler's own, and says neither.) The section builds the fixture over the wire — import, a
-clip, `nest` — and asserts the refusal NAMES the file and the count, that
-the pre-fix sentence is NOT what comes back, that `with_clips: true` removes
-the entry and the nested clip while leaving the nest CLIP itself on the
-timeline, and that one undo puts the whole project JSON back. The check with
-the sharpest teeth is the both-levels one: media used once at the top level
-AND once inside a nest must be refused with "used by **2** clips", which a
-build counting the top level alone still refuses — with the wrong number.
+change…" and told it nothing. `MediaUsage.swift` is the one spelling now,
+and the Media tab's alert is its only caller: deepening D2·4
+(kpgalligan/reelcut#12) deleted the agent handler's count, so what an agent
+hears is **the core's own sentence**, "media 3 is still used by clip 7; pass
+with_clips: true to remove the media and its clips". The section asserts it
+WHOLE, which is a stronger claim than the file-and-count one it replaced —
+the clip id is the thing a caller acts on, and it is the id the core names
+at the moment it refuses. It builds the fixture over the wire — import, a
+clip, `nest` — and asserts that the identity's "made no change" is NOT what
+comes back, that `with_clips: true` removes the entry and the nested clip
+while leaving the nest CLIP itself on the timeline, and that one undo puts
+the whole project JSON back. The check with the sharpest teeth is the
+both-levels one: media used once at the top level AND once inside a nest is
+refused naming BOTH clips, where anything counting the top level alone names
+one. `refusal_proof.py` §6 is this rule's own section and the two moved
+together.
 
 **Sections 3 and 4 are the "nothing else moved" half.** The catalog is
 EXACTLY 73 tools, the number phase 6 took and phase 7 kept: phase 8 adds no
@@ -806,11 +810,14 @@ def usage_part(mcp):
 
     refusal = s.error("remove_media", media=hidden)
     check(refusal is not None, "remove_media refuses it without with_clips")
-    check(refusal is not None and "is used by 1 clip." in refusal and "A.mov" in refusal,
-          f"…and the refusal NAMES the file and the count: {refusal!r}")
+    check(refusal is not None
+          and refusal.endswith(
+              f"was refused at remove_media: media {hidden} is still used by clip "
+              f"{inside}; pass with_clips: true to remove the media and its clips"),
+          f"…and the refusal NAMES the clip inside the nest: {refusal!r}")
     check(refusal is not None and "made no change" not in refusal,
-          "…and it is NOT the shared \"made no change\" sentence, which is what a build "
-          "counting only the timeline's clips answers here")
+          "…and it is NOT an identity's \"made no change\", which is what a core "
+          "counting only the timeline's clips would make of this")
     check(refusal is not None and "with_clips: true" in refusal,
           "…and it says how to go on")
 
@@ -842,9 +849,13 @@ def usage_part(mcp):
     check(len(top) == 1 and len(nested) == 1,
           f"C.mov is used once at the top level and once inside a nest ({top}, {nested})")
     refusal = s.error("remove_media", media=shared)
-    check(refusal is not None and "is used by 2 clips." in refusal,
-          f"…and the refusal counts BOTH: {refusal!r} — a build filtering snapshot.clips "
-          "refuses this one too, saying 1")
+    check(refusal is not None
+          and refusal.endswith(
+              f"was refused at remove_media: media {shared} is still used by clips "
+              f"{visible} and {buried}; pass with_clips: true to remove the media and "
+              "its clips"),
+          f"…and the refusal names BOTH clips, the timeline's first and the nest's "
+          f"after it: {refusal!r} — a count of the top level alone would name one")
 
     # (c) the contrast: top-level usage behaves as it always did. A DIFFERENT
     # file, because a second import of one path is an identity edit and is
@@ -855,9 +866,11 @@ def usage_part(mcp):
     check(plain != shared, "B.mov is a media entry of its own")
     alone = s.op("add_clip", track=fourth, media=plain, at=0)["new_clips"][0]
     refusal = s.error("remove_media", media=plain)
-    check(refusal is not None and "is used by 1 clip." in refusal,
-          f"media used only at the TOP level refuses with the count it always did: "
-          f"{refusal!r}")
+    check(refusal is not None
+          and refusal.endswith(
+              f"was refused at remove_media: media {plain} is still used by clip "
+              f"{alone}; pass with_clips: true to remove the media and its clips"),
+          f"media used only at the TOP level refuses in the same words: {refusal!r}")
     s.op("remove_media", media=plain, with_clips=True)
     project = s.project()
     check(plain not in [m["id"] for m in project["media"]]

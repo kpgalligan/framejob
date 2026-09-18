@@ -2440,3 +2440,159 @@ Judged not real:
   ops. Doing it here would change the sentences `phase8_proof.py` asserts,
   which is the other half of that ticket. Stated above rather than papered
   over, and measured by mutant 7.
+
+### 5.4 D2·4 — the app's guesses are deleted (kpgalligan/reelcut#12)
+
+**Commits.** `SHA1` (the ticket) and `SHA2` (what its review found, below).
+
+**What landed.** App only — three agent handlers, two proof scripts, the
+app's rulebook and the proof README. No core change, no FFI change, no op
+added or reworded in any of the four mirrors, no format bump, no new tool,
+and nothing a person at the machine sees differently. D2·3 gave all four of
+these rules their words; this is the deletion that prefactor paid for, and
+the whole app-side change is three functions getting shorter.
+
+**What went.**
+
+| Where | What it was | Lines |
+|---|---|---|
+| `AgentServer+Transitions.swift` | `addTransition`'s trial-apply (`.project == nil`, which caught a refusal exactly as it caught an identity) and the two sentences it chose between — the handle form's "neither side of the cut has media beyond it…" and the rippled form's "with ripple the shift clamped below one frame — … or … or …" | −27 +6 |
+| `AgentServer+Tracks.swift` | `removeTrack`'s clip count and `Track 1 ("Video 1") still holds 1 clip. Pass with_clips: true to remove them too.` | −6 |
+| `AgentServer+Media.swift` | `removeMedia`'s user count and `A.mov is used by 1 clip. Pass with_clips: true to remove them too.` | −6 |
+
+Thirty-nine lines of code and inline comment out, six back. The three files
+go 140 → **123**, 247 → **243** and 327 → **320**: twenty-eight lines
+smaller with their doc comments counted, and what a caller hears at those
+four refusals is now the core's own sentence through `performGroupedEdit`'s
+one format string. The sentences the app used to write are kept in §5.3's
+table and in the proof sections that assert the new ones, so a reader can
+still see what they said.
+
+**What stayed, and why each is not a duplicate.** The spec's seventh
+decision named five things to delete. Three are above; the other two were
+verified against the code and kept. The line the whole server can be read by
+is: **a check that predicts a RULE's refusal goes; a check that names the
+CALL, or reports something the core cannot know, stays.**
+
+- **`SilenceDetector+Walls.overlapWalls`** re-derives the half rule
+  (`[B.start − ov, A.end + ov]`, so the nearest legal cut leaves `2·ov`
+  across the overlap) and is NOT predicting a refusal: it shapes the ranges
+  Remove Silences PROPOSES, before any op exists. The op those ranges go to,
+  `ripple_delete_ranges`, does not check the overlap rule at all
+  (`core/src/edit_time.rs` clears, shifts and calls
+  `set_gained_transitions`; `validate` has no overlap check either), so
+  deleting the walls would not move a refusal into the core — it would let
+  Remove Silences quietly build a project the rule forbids. A
+  proposal-shaper, not a second copy of a refusal.
+- **`normalizeClip`'s all-skipped answer** reports what could not be
+  MEASURED, and the measurement is Swift's: the level comes from
+  `cache/peaks/<media id>.bin`, which is not in the model and which the core
+  has never seen (spec §7). With no reading there is no op to send, so the
+  shared reply would be the identity's — and "the project is already in that
+  state" is FALSE here, since nothing was measured against that state at
+  all. The check is restated against `input` rather than `plan`, so that it
+  asks about the READ and not about what the core would answer, and its old
+  justification — the shared message "goes on to talk about the overlap
+  rule" — is gone, because since D2·2 it does not.
+- **Six argument checks** answer a caller who left something out, and none
+  is a rule's refusal restated: `set_transition_style` with neither key,
+  `ripple_delete_ranges` with an empty array, and `set_track`, `set_marker`
+  and `set_canvas` with no keys. The core answers `Outcome::Identity` for
+  each — correctly, since nothing was asked for — and an identity has
+  nothing to say beyond that. **The spec named `set_transition_style`'s
+  among the deletions and this ticket did not make it**: the other five are
+  the same shape and are untouched, so deleting one of six would leave the
+  server inconsistent for a caller and the record with no line to draw. What
+  its doc comment CLAIMED — that the shared reply "would be the wrong one" —
+  was the false part, and is rewritten to say it names an argument. The same
+  false claim was found and fixed in `ripple_delete_ranges`, which is not on
+  the spec's list at all and said the shared reply "would report [it] as the
+  overlap-rule refusal". Sweeping all six, or none, is a decision of its
+  own, under Owed.
+- **`EditorViewController+Inspector.setTransitionKindCommand`'s trial-apply**
+  stays. It is a UI path deciding whether to put up the Shift Clips Left
+  SHEET for a person, which is the one thing spec #8 puts out of scope
+  ("showing a refusal's sentence to the person using the app"), and it
+  writes no refusal sentence for any caller — a throw is left to `applyEdit`,
+  which presents the core's own. Named here so the next reader does not find
+  it and think it was missed.
+- **The tool descriptions that teach the overlap rule** — five, in
+  `AgentCatalog+Clips.swift`, `+Transitions.swift` and `+Files.swift` — stay,
+  as the ticket says: prose that teaches a rule BEFORE a call is not prose
+  that explains a refusal after it.
+
+**All four `shadowed` checks are real assertions now**, which is the
+ticket's third criterion, and the helper is deleted with them.
+`refusal_proof.py` **113/113 → 116/116**: §5d and §6b assert the core's
+sentence naming the CLIP where the app named a file or a count, §7b asserts
+the request in whole FRAMES (15, hand-computed from half a second at 30 fps
+and scored as a line of its own), and §7d asserts `locked_track`'s third
+caller — the one §4 could not reach. The three added checks are §7b's frame
+arithmetic and a new §5e, which sends the argument the new sentence NAMES
+(`with_clips: true`) and reads back that the track and its clip both went.
+
+`phase8_proof.py` keeps its **79/79** with three checks rewritten. Its §2 is
+phase 8c's defect fix — "is this media used" walks the nests — and it
+asserted the handler's `is used by N clips.`; the same fixture asserts the
+core's whole sentence now, and the both-levels check has MORE teeth than
+before: media used once at the top level and once inside a nest is refused
+naming BOTH clip ids, where a count of the top level alone names one.
+`MediaUsage.swift` stays with the Media tab's alert as its only caller,
+which is where a person reads a file name.
+
+**The rulebook line the ticket asked for** is two paragraphs in
+`app/CLAUDE.md`'s Rules. The first says a refusal is the core's sentence and
+no handler writes one, with what a handler may still refuse by name (the
+call, and a composite's own reading). The second says why the two deliberate
+swallows swallow: `ReelProject.scoped(_:)` drops `no nest with id N` because
+every caller is a VIEW asking about view state `clampViewState` has already
+cleared, so a nil there is a race with an undo; and `updateLiveEdit`
+swallows every answer but `.applied` because a refused tick is NORMAL
+mid-drag — the edge is past a neighbour for a moment — and recovers on the
+next tick with the last good frame still on screen, where a drag that spoke
+would interrupt the gesture to say something the person is already fixing
+with the mouse. `endLiveEdit` registering no step when every tick was
+swallowed is what makes the two consistent.
+
+**Mutants.** MUTANTS
+
+**Size.** Nothing grew: every file this ticket touched is smaller or the
+same. `AgentServer+Clips.swift` is at **847**, over the ~600 cap, and its
+one comment was reworded three lines for three, so the file at the cap took
+nothing on. `AgentServer+Audio.swift` is **166** (+10, all doc) and nowhere
+near it. `designs/reelcut-remaining.md` §3's two `AgentServer` rows are
+unchanged by this ticket and are still D2·5's to regenerate.
+
+**Verification.** `make test` **653 passed / 0 failed** (D2·3's number; no
+Rust changed), `make lint` and `cargo fmt --check` clean, `make typecheck` 0
+errors and the 4 known AVFoundation warnings, `make app` built, the startup
+parity log empty at every launch. Every proof script run against the rebuilt
+binary on a freshly launched instance of its own: **refusal 116/116**,
+phase1 **66/66**, phase2 **85/85**, phase3 **123/123**, phase3_silence_scope
+**8/8**, phase4 **84/84**, phase5 **88/88**, phase6 **168/168**, phase7
+**92/92**, phase8 **79/79**, phase9 **216/216**, patch_door **261/261**,
+remaining **79/79**, recording **121/121** with the granted tier skipped by
+name (a locked console, no shareable display: 66 checks). `refusal_probe.py`
+is **15/15** and still prints its note about the empty undo group
+`performGroupedEdit` leaves.
+
+**Documents.** `app/CLAUDE.md` gains the two Rules paragraphs above.
+`tools/proof/README.md`: the refusal section's score line, §5 to §7 of its
+table, the `shadowed` paragraph (now the account of what was deleted), and
+the phase 8 section's §2 paragraph. Spec §6's op table needs no change —
+every row already describes these refusals, and what moved is which SIDE
+says them. The glossary, spec §5.5 and both rulebooks' Errors rules are
+still D2·5's.
+
+**Owed.**
+
+- **The six argument checks**, above: they are one family and should be
+  swept or kept together. D2·5 is the contract ticket and is where the line
+  belongs if it is to be drawn in a rulebook.
+- **The clamped-edge family** still answers `Identity`, named in
+  `Outcome::Identity`'s doc — D2·3's bequest, untouched here.
+- **`Ok(None)` in app-side doc comments** where they describe the core's old
+  spelling. Only the comments this ticket made FALSE were fixed; the sweep
+  is still D2·5's.
+
+**What its review found.** REVIEW

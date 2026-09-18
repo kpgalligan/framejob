@@ -30,24 +30,20 @@ extension AgentServer {
     }
 
     /// `remove_track` — Track ▸ Remove Track (`removeTrackCommand`). A
-    /// non-empty track refuses without `with_clips`, which is the question the
-    /// UI puts in an alert; here it is a message the model can answer by
-    /// retrying with the flag.
+    /// non-empty track refuses without `with_clips`, which is the question
+    /// the UI puts in an alert; over MCP it is the core's own sentence,
+    /// naming the clips and the argument that would let the op through.
     ///
-    /// That guard SHADOWS the core's own sentence for the same rule since
-    /// deepening D2·3, exactly as `removeMedia`'s does; the core's OTHER
-    /// refusal here — the last track in the project — has no guard in front
-    /// of it and arrives in the core's words.
+    /// **Both of this op's refusals arrive from the core** since deepening
+    /// D2·4 deleted the count this handler used to take first: the last
+    /// track in the project, and a track that still holds clips
+    /// (`core/src/edit_track.rs`, which asks them in that order because
+    /// `with_clips: true` is the way past the second and not past the
+    /// first).
     func removeTrack(_ a: [String: Any]) throws -> String {
         let document = try target(a)
         let track = try trackArg(a, "track", document)
         let withClips = try boolArg(a, "with_clips")
-        let clips = try idScope(document).clips(onTrack: track.id).count
-        if clips > 0, withClips != true {
-            throw ToolError(
-                message: "Track \(track.id) (\"\(track.name)\") still holds \(clips) clip"
-                    + (clips == 1 ? "" : "s") + ". Pass with_clips: true to remove them too.")
-        }
         return try editResult(
             document, "Remove Track", [.removeTrack(track: track.id, withClips: withClips)])
     }

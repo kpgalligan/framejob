@@ -1078,19 +1078,19 @@ only inside a compound clip walked past the Swift guard with a user count of
 zero and was refused by the core with a reason-less "nothing changed", which
 reached a caller as the shared "Remove Media made no change…" and told it
 nothing. (Deepening D2·2 shortened that shared sentence — an identity now says
-only that the project is already in that state — and D2·3 gave the core's own
-rule a sentence naming the clips, which this handler's guard SHADOWS by asking
-one step earlier. The negative check below is against the wording in
-`refusal_proof.py`, and still holds: this refusal is the handler's own and
-says neither.) The section builds that exact fixture
+only that the project is already in that state — D2·3 gave the core's own rule
+a sentence naming the clips, and D2·4 deleted the handler's count so that
+sentence is what arrives. `MediaUsage.swift`'s one spelling stays, with the
+Media tab's alert as its only caller.) The section builds that exact fixture
 over the wire — import, a clip,
-`nest` — and asserts the refusal NAMES the file and the count, that the
-reason-less sentence is NOT what comes back, that `with_clips: true` takes the
-entry and the NESTED clip while leaving the nest clip itself on the timeline,
+`nest` — and asserts the core's sentence WHOLE, which names the CLIP where the
+deleted guard named the file and a count; that an identity's "made no change"
+is NOT what comes back; that `with_clips: true` takes the
+entry and the NESTED clip while leaving the nest clip itself on the timeline;
 and that one undo restores the whole project JSON. The check with the sharpest
 teeth is the both-levels one: media used once at the top level AND once inside
-a nest must be refused with "used by **2** clips", which a build counting the
-top level alone still refuses — with the wrong number. Sections 3 and 4 are the
+a nest is refused naming BOTH clips, where anything counting the top level
+alone names one. Sections 3 and 4 are the
 "nothing else moved" half: the catalog is EXACTLY 73 for the fourth phase
 running (phase 8 adds no op and no tool), no tool name mentions the preview or
 the quality, the parity log is empty for all three instances the run touches,
@@ -2376,7 +2376,9 @@ comes back with (`core/src/outcome.rs`, `app/Sources/ReelEdit.swift`,
 ticket at a time (`designs/reelcut-roadmap-7.md` §4, kpgalligan/reelcut#8).
 Deepening D2·2 (#10) built it with the overlap rule's section, at
 **39/39** (40/40 after its review); D2·3 (#11) took it to **113/113** with
-one section per rule that found its voice, each a copy of `overlap_rule`.
+one section per rule that found its voice, each a copy of `overlap_rule`;
+and D2·4 (#12), which deleted the app-side answers that stood in front of
+four of them, took it to **116/116**.
 
 An op answers one of three ways: it applied, it was an IDENTITY (valid, and
 nothing needed to change), or it was REFUSED (a rule declined it, in the
@@ -2395,9 +2397,9 @@ asserted WHOLE and never by keyword:
 | 2 — an identity | four doors (`set_video`, `set_clip`, `set_canvas`, `split`) asked for the value the project already holds, each answering that whole sentence and NOTHING else — an equality, which is the only way to measure "says only that" — and naming no rule |
 | 3 — several ops | `normalize_clip` sends one `set_audio` per clip, so it is where the fold over a list is observable: a list of identities answers the identity, one undo puts both clips back, and a later op still runs after an earlier identity |
 | 4 — a locked track | `close_gap` over a gap that is really there and `insert_clip` with room to spare, both naming the track to unlock (`core/src/edit_time.rs`'s `locked_track`, written once for its three callers); the lock undone and both landing; and the same `close_gap` on a time that is ON a clip still answering the IDENTITY, which is the distinction the whole candidate is about, at one op |
-| 5 — the track stack | the only track in a project, refused with and without `with_clips: true` — the flag is the way past the OTHER refusal and not past this one — and a second track making the same call land |
-| 6 — a media row | the app's guard still answering first (below), and an unused row still going with no argument at all |
-| 7 — the transition cut | the app's two sentences still answering first (below), and the same cut taking a RIPPLED transition, which slides the incoming clip by exactly the overlap asked for |
+| 5 — the track stack | the only track in a project, refused with and without `with_clips: true` — the flag is the way past the OTHER refusal and not past this one — a second track making the same call land, a track that still holds clips naming the CLIP rather than a count, and that flag then taking the track and its clip |
+| 6 — a media row | a media one clip still shows, refused naming that clip and `with_clips: true`, and an unused row still going with no argument at all |
+| 7 — the transition cut | a cut with no unused material, refused naming the request in whole FRAMES (15, hand-computed) and `ripple: true`; the same cut taking a RIPPLED transition, which slides the incoming clip by exactly the overlap asked for; and that rippled form on a LOCKED track, which is `locked_track`'s third caller |
 | 8 — the action rules | an action inside another and an action past the clip's end, each out of `add_action` AND `set_action` in the same words; and two boundaries that land — abutting is not overlapping, and an action ending exactly at the clip's end fits |
 | 9 — off the track stack | a two-track selection moved one track too far, naming the clip that would go off the top and the index it would land on, in `move_track`'s own words for the same mistake |
 
@@ -2407,19 +2409,17 @@ state", "the usual reason for a placement op is the overlap rule"). That
 paragraph also began "<Action> made no change", so a check looking only for
 the new words would pass against a build that still sent it.
 
-**Four checks measure the APP's sentence and not the core's, and say so by
-name** (`shadowed` rather than `refused`, §5d, §6b, §7b and §7d). The core
-has a sentence for each of those rules since D2·3 and nobody can hear it:
+**Four checks used to measure the APP's sentence and not the core's, and
+said so by name** — a `shadowed` helper at §5d, §6b, §7b and §7d, where
 `AgentServer+Media.swift`'s and `AgentServer+Tracks.swift`'s `with_clips`
-guards and `AgentServer+Transitions.swift`'s trial-apply each ask the same
-question one step earlier and answer in their own words. They are asserted
-WHOLE anyway, because they are what D2·4 (kpgalligan/reelcut#12) replaces —
-its own acceptance criterion is that this proof asserts the CORE's wording
-at those ops — and because an unchanged answer is D2·3's claim that nothing
-silently became an identity. Meanwhile those rules are proved through the
-FFI in `core/tests/refusal.rs`, and the measure of the gap is D2·3's mutant
-7: the transition rule turned back into a bare identity takes a core test
-and leaves this script at 113/113.
+guards and `AgentServer+Transitions.swift`'s trial-apply each asked the same
+question one step earlier and answered in their own words. D2·4
+(kpgalligan/reelcut#12) deleted all four, and those checks are ordinary
+`refused` calls against the core's sentence now; the helper is gone with
+them, and the app's old wording is kept in road map 7 §5.3's table. The gap
+D2·3 measured with its mutant 7 — the transition rule turned back into a
+bare identity, taken by a core test and invisible here — is closed: the same
+mutant is D2·4's, and this script takes it.
 
 **What section 3 cannot reach, said so it is not rediscovered as a gap.**
 Only three tools send a list of ops — `normalize_clip`, `import_captions`

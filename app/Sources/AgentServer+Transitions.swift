@@ -38,14 +38,15 @@ extension AgentServer {
     /// than the material lands shorter, and "not at a hard cut" is the
     /// core's sentence naming which of the three it is.
     ///
-    /// **The trial below now SHADOWS a sentence the core has.** Since
-    /// deepening D2·3 a cut with nothing left to give answers
-    /// `Outcome::Refused` naming the frames asked for, and the rippled form
-    /// has three sentences of its own (a locked track, a pair too short to
-    /// halve, every length breaking the overlap rule) — all of which
-    /// `.project == nil` catches and replaces with the two below. Deleting
-    /// the trial is D2·4's, which is the ticket that makes the core's words
-    /// arrive.
+    /// **Nothing is tried first.** This handler used to apply the op to the
+    /// handle, see `.project == nil` and write one of two sentences of its
+    /// own, because the shared reply could say nothing but "made no change".
+    /// Since deepening D2·3 the core refuses a cut with nothing left to give
+    /// in its own words — naming the frames asked for and `ripple: true` —
+    /// and the rippled form has three sentences of its own (a locked track,
+    /// a pair too short to halve, every length breaking the overlap rule).
+    /// D2·4 deleted the trial and both sentences, so what a caller hears
+    /// here is the rule's own, through `performGroupedEdit`.
     func addTransition(_ a: [String: Any]) throws -> String {
         let document = try target(a)
         let clip = try clipArg(a, "clip", document)
@@ -53,33 +54,12 @@ extension AgentServer {
         let duration = try timeArg(a, "duration", document)
         let align = try alignArg(a, "align")
         let ripple = try boolArg(a, "ripple") ?? false
-        let ops: [ReelOp] = [
-            .addTransition(
-                clip: clip.id, kind: kind, duration: duration, align: align, ripple: ripple)
-        ]
-        // `.project` is nil for an identity AND for a refusal, so the two
-        // sentences below are sent in place of whatever the core said. That
-        // was the whole point of the trial when the core said nothing;
-        // since D2·3 it says more than these do, and D2·4 deletes this.
-        // Addressed the same way the commit will be, so a scoped call is
-        // tried in the container it will land in.
-        if try document.project.applying(addressed(ops, document)).project == nil {
-            if ripple {
-                throw ToolError(
-                    message: "add_transition made no change: with ripple the shift clamped "
-                        + "below one frame — the incoming clip's track is locked, a clip is "
-                        + "too short for the overlap rule, or sliding a clip on another track "
-                        + "into its neighbour would break that track's overlap rule.")
-            }
-            throw ToolError(
-                message: "add_transition made no change: neither side of the cut has media "
-                    + "beyond it. An overlap is built out of the source before the incoming "
-                    + "clip's in point and after the outgoing clip's out point, and a request "
-                    + "that clamps below one frame is refused. Pass ripple: true to make the "
-                    + "overlap by sliding the incoming clip and everything after it left, or "
-                    + "trim one of the two clips.")
-        }
-        return try editResult(document, "Set Transition", ops)
+        return try editResult(
+            document, "Set Transition",
+            [
+                .addTransition(
+                    clip: clip.id, kind: kind, duration: duration, align: align, ripple: ripple)
+            ])
     }
 
     /// `set_transition_style` — the Curve popup and the Crossfade Audio
@@ -87,12 +67,15 @@ extension AgentServer {
     /// (`VideoPane+Transition.swift`, undo names "Transition Curve" and
     /// "Transition Audio").
     ///
-    /// A call with NEITHER key is refused here rather than sent as the
-    /// core's `None`. The core is right to answer `None` — asking for no
-    /// change is not a way to make a transition — but a tool answering
-    /// "made no change" to a caller who simply forgot an argument is a
-    /// diagnosis they cannot act on, and the two readers below already
-    /// establish that whatever was sent was legible.
+    /// **A call with NEITHER key is an ARGUMENT that is missing, not a rule
+    /// that said no**, which is why deepening D2·4 left this guard standing
+    /// where it deleted the trial-apply above. The core answers
+    /// `Outcome::Identity` for it, and rightly — nothing was asked for, so
+    /// nothing changed — and an identity has nothing to say beyond that
+    /// (`core/src/outcome.rs`). There is therefore no core sentence for this
+    /// one to shadow: it names the tool's own two keys to a caller who
+    /// forgot both, the way `set_track`, `set_marker`, `set_canvas` and
+    /// `ripple_delete_ranges` name theirs.
     func setTransitionStyle(_ a: [String: Any]) throws -> String {
         let document = try target(a)
         let clip = try clipArg(a, "clip", document)

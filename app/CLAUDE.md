@@ -433,6 +433,35 @@ undo checkpoint `NSDocument` posts inside every save then raises, the
 exception is swallowed inside the file coordinator, and ⌘S and `save_project`
 hang for good.
 
+**A refusal is the CORE's sentence, and nothing on this side writes one.**
+An op answers `.applied`, `.identity` or `.refused` (`ReelEdit.swift`), and
+the two non-applied arms are both "the project did not change": a beep and
+no undo step for a person, and for an agent
+`<Action> made no change: the project is already in that state.` or
+`<Action> was refused at <op>: <the rule's own sentence>`, both written once
+in `AgentServer.performGroupedEdit`. **No handler applies an op to see what
+would happen and then writes its own reason** — deepening D2·4 deleted the
+last of those — and none re-derives a rule's arithmetic to predict one. What
+a handler still refuses by name is the CALL: an argument it cannot read, one
+it was not given, an id that names nothing (`AgentServer+Arguments.swift`),
+and a composite's own reading — `normalize_clip` with nothing it could
+MEASURE, which is a fact about the peaks cache and so a fact the core cannot
+have. Prose that TEACHES a rule before the call belongs in a tool
+description; prose that explains a refusal after it is the core's to write.
+
+**Two callers swallow a refusal on purpose, and both are right to.**
+`ReelProject.scoped(_:)` drops the core's message, because every caller is a
+VIEW asking about view state it has already clamped (`clampViewState`
+clears a scope whose nest is gone), so a nil there is a race with an undo
+and not a failure to report. `ProjectDocument.updateLiveEdit` swallows every
+answer but `.applied`, because a refused tick is NORMAL mid-drag — the edge
+is past a neighbour for a moment — and it recovers on the next tick with the
+last good frame still on screen; a drag that spoke would be chatty and would
+interrupt the gesture to say something the person is already fixing by
+moving the mouse. `endLiveEdit` registers no step when every tick was
+swallowed, which is what makes the two consistent. Neither is a gap to be
+closed (spec #8's eighth decision).
+
 **Lenient decoding is for what the CORE wrote; nothing a caller wrote is
 decoded through it.** `ProjectSnapshot`/`MotionProps`' `lenient` and
 `nullable` exist so a project, plan, recipe or export setting a NEWER build

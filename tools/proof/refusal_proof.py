@@ -445,35 +445,15 @@ def several_ops(mcp):
 
 # ---- the rules D2·3 gave words to (kpgalligan/reelcut#11) ----------------
 #
-# Five rules, five sections, each shaped like `overlap_rule`. Two of them —
-# the media row and the cut with nothing left to give — never reach the core
-# over MCP, because an app-side guard asks the same question one step
-# earlier and answers in its own words. Their sections say what that guard
-# still says, WHOLE, so the day D2·4 deletes it the check that has to move
-# is already written down and its old answer is on record.
-
-
-def shadowed(s, tool, what, sentence, **call):
-    """A refusal the APP answers before the core is asked — scored exactly as
-    `refused` scores a real one, minus the op name the app does not put in.
-
-    The core has its own sentence for each of these since D2·3 and nobody
-    can hear it: `AgentServer+Media.swift`'s and `AgentServer+Tracks.swift`'s
-    guards and `AgentServer+Transitions.swift`'s trial-apply each answer
-    first. Deleting them is D2·4's (kpgalligan/reelcut#12), whose own
-    acceptance criterion is that the proof asserts the CORE's wording at
-    these ops; until then this is what a caller hears, and an unchanged
-    answer is this ticket's claim ("nothing silently becomes an identity")."""
-    before = s.text()
-    message = s.error(tool, **call)
-    after = s.text()
-    whole = f"{tool}: {sentence}"
-    flat = " ".join(str(message).split()) if message is not None else None
-    check(flat == whole, f"{what} — {whole!r}; got: {shown(message)}")
-    check(message is not None and not any(g in message for g in GUESSES),
-          "…and not one word of the paragraph that used to guess at the reason")
-    check(before == after,
-          f"…and the project is unchanged after it ({len(before)} chars either side)")
+# Five rules, five sections, each shaped like `overlap_rule`. Four checks in
+# them used to be scored by a `shadowed` helper rather than by `refused`,
+# because an app-side guard asked the same question one step earlier and
+# answered in its own words: §5d, §6b, §7b and §7d. D2·4
+# (kpgalligan/reelcut#12) deleted those guards — two `with_clips` counts and
+# a trial-apply — and all four are `refused` now, against the CORE's
+# sentence, which is what that ticket's third criterion asks for. The
+# helper went with them; the sentences it used to assert are in road map 7
+# §5.3's table, which is where the old answers stay on record.
 
 
 def locked_track(mcp):
@@ -486,8 +466,8 @@ def locked_track(mcp):
     for all three of its callers). What a caller acts on is the track id in
     it: unlock that track, not move the clip.
 
-    The third caller, a RIPPLED `add_transition`, is section 7's — its
-    sentence is shadowed by the same trial-apply that shadows the cut rule.
+    The third caller, a RIPPLED `add_transition`, is section 7's — §7d,
+    where the trial-apply that used to answer over it is gone.
 
     The fixture is two ten-second clips with a ten-second gap between them,
     so `close_gap` has a real gap to be stopped from closing: the refusal is
@@ -548,10 +528,10 @@ def the_track_stack(mcp):
     the other and past this one it is not. A caller told about the clips
     would send it and be refused again.
 
-    Only the first of the two reaches the core over MCP.
-    `AgentServer+Tracks.swift` asks "does this track still hold clips" before
-    the core does, and answers in its own words; the second call below
-    records what that guard says."""
+    Both reach the core over MCP since D2·4. `AgentServer+Tracks.swift` used
+    to ask "does this track still hold clips" before the core did and to
+    answer in its own words; §5d is where that guard was, and §5e sends the
+    argument its replacement names."""
     print("\n5 — the track stack: the last track, and the one still holding clips")
     s = Session(mcp, "refusal-tracks")
     media = s.media("A.mov")
@@ -578,25 +558,33 @@ def the_track_stack(mcp):
     landed("…and the project is back to one track", len(s.project()["tracks"]), 1)
 
     print("\n5c — a clip and a second track, and then the marker edit")
-    # Both are real edits and both are made BEFORE the marker, so 5e's
+    # Both are real edits and both are made BEFORE the marker, so 5f's
     # single undo is the marker's and the claim it makes is exact.
     clip = s.place(media, 0)
     s.op("add_track", kind="video")
     start = undo_marker(s, lambda: s.op("set_clip", clips=[clip], patch={"name": "Marker"}))
 
-    print("\n5d — the other refusal, which the app still answers first")
-    # The core's sentence here is "track N still holds clip M; pass
-    # with_clips: true to remove the track and its clips" and nobody hears
-    # it: the guard in `AgentServer+Tracks.swift` names the track's NAME and
-    # the count instead. Unchanged by this ticket, on purpose.
-    name = [t for t in s.project()["tracks"] if t["id"] == first][0]["name"]
-    shadowed(s, "remove_track",
-             "a track that still holds clips is refused by the app, in the app's words",
-             f'Track {first} ("{name}") still holds 1 clip. Pass with_clips: true to '
-             "remove them too.",
-             track=first)
+    print("\n5d — the other refusal, in the core's words since D2·4")
+    # `AgentServer+Tracks.swift` used to count the clips and answer first,
+    # naming the track's NAME and a count — 'Track 1 ("Video 1") still holds
+    # 1 clip. Pass with_clips: true to remove them too.' That guard is gone,
+    # so what arrives is the rule's own sentence, and the id in it is the
+    # CLIP a caller has to deal with rather than a number it has to go and
+    # look up. `clip_list`'s singular arm is what writes "clip N".
+    refused(s, "remove_track", "remove_track",
+            "a track that still holds clips names the clip, not a count",
+            f"track {first} still holds clip {clip}; pass with_clips: true to remove the "
+            "track and its clips",
+            track=first)
 
-    print("\n5e — and it was not an undo step either")
+    print("\n5e — and the argument that sentence names is the way past it")
+    applied(s, "remove_track", "with_clips: true removes the track and its clip",
+            track=first, with_clips=True)
+    landed("…and the clip went with the track",
+           [c["id"] for c in s.project()["clips"]], [])
+
+    print("\n5f — and not one of the refusals was an undo step")
+    s.op("undo")                   # the removal, which WAS a real edit
     undo_claim(s, start)
 
 
@@ -609,13 +597,15 @@ def the_media_list(mcp):
     rejects. Since D2·3 it says so naming the clips and the argument that
     would let it through.
 
-    Nobody hears that either. `AgentServer+Media.swift`'s guard asks the
-    same question through `MediaUsage` — which walks the nests, the fix
-    phase 8 made — and answers naming the FILE and the count, which is the
+    That is what arrives since D2·4. `AgentServer+Media.swift` used to ask
+    the same question first through `MediaUsage` — which walks the nests,
+    the fix phase 8 made — and to answer naming the FILE and a count, the
     better sentence for a person and the worse one for a caller that has to
-    name a clip. Which of the two survives is D2·4's; this section records
-    what arrives today, and that an unused media still goes with no
-    argument at all."""
+    name a clip. The guard is gone and the core's sentence is what this
+    section asserts; the Media tab's ALERT still asks it, which is the place
+    a person reads a file name (`MediaPaneCommands.swift`).
+    `phase8_proof.py` §2 is the other half of this and moved with it: its
+    both-levels check now reads the core's clip ids rather than a count."""
     print("\n6 — a media row a clip still shows")
     s = Session(mcp, "refusal-media")
     media = s.media("A.mov")
@@ -625,11 +615,15 @@ def the_media_list(mcp):
     print("\n6a — a real edit, whose undo step the answers below must leave alone")
     start = undo_marker(s, lambda: s.op("set_clip", clips=[clip], patch={"name": "Marker"}))
 
-    print("\n6b — the app's guard answers before the core is asked")
-    shadowed(s, "remove_media",
-             "a media one clip still shows is refused, in the app's words",
-             "A.mov is used by 1 clip. Pass with_clips: true to remove them too.",
-             media=media)
+    print("\n6b — the core's own sentence, naming the clip and the way past it")
+    # The guard `AgentServer+Media.swift` used to answer with said
+    # "A.mov is used by 1 clip. Pass with_clips: true to remove them too."
+    # — the file, and a count. What a caller acts on is the clip id.
+    refused(s, "remove_media", "remove_media",
+            "a media one clip still shows names that clip",
+            f"media {media} is still used by clip {clip}; pass with_clips: true to remove "
+            "the media and its clips",
+            media=media)
 
     print("\n6c — the boundary: an unused row goes with no argument at all")
     applied(s, "remove_media", "a media in nobody's use is removed as it asks",
@@ -653,11 +647,12 @@ def the_transition_cut(mcp):
     many frames were asked for and names `ripple: true`, the way that needs
     no handles at all.
 
-    Shadowed, like section 6. `AgentServer+Transitions.swift` trial-applies
-    the op and writes two sentences of its own, one per form, because the
-    shared reply used to be the overlap rule's paragraph. Both are asserted
-    WHOLE below: they are what D2·4 replaces, and a ticket that changes them
-    by a word should have to come here.
+    Until D2·4 `AgentServer+Transitions.swift` trial-applied the op and
+    wrote two sentences of its own, one per form, because `.project == nil`
+    was all it could see and the shared reply used to be the overlap rule's
+    paragraph. The trial is deleted, so both forms answer in the core's
+    words, and the two numbers below — 15 frames, and the locked track's id
+    — are what the app could never have said.
 
     The fixture is section 1's — two abutting ten-second clips, each showing
     the whole of a ten-second file, so neither side has one frame to give."""
@@ -673,15 +668,19 @@ def the_transition_cut(mcp):
     print("\n7a — a real edit, whose undo step the answers below must leave alone")
     start = undo_marker(s, lambda: s.op("set_clip", clips=[a], patch={"name": "Marker"}))
 
-    print("\n7b — the handle form, in the app's words")
-    shadowed(s, "add_transition",
-             "a cut whose two clips have no unused material is refused",
-             "add_transition made no change: neither side of the cut has media beyond it. "
-             "An overlap is built out of the source before the incoming clip's in point "
-             "and after the outgoing clip's out point, and a request that clamps below one "
-             "frame is refused. Pass ripple: true to make the overlap by sliding the "
-             "incoming clip and everything after it left, or trim one of the two clips.",
-             clip=b, duration=SEC // 2)
+    print("\n7b — the handle form, in the core's words")
+    # The request in whole FRAMES is what the sentence names, because that
+    # is the unit every clamp above it is measured in: half a second at 30
+    # fps is 15 frames, hand-computed here and not read back off anything.
+    frames = (SEC // 2) // FRAME
+    landed("half a second is fifteen frames on this project's grid", frames, 15)
+    refused(s, "add_transition", "add_transition",
+            "a cut whose two clips have no unused material names the frames asked for",
+            f"the cut before clip {b} has no room for an overlap: the {frames} frames "
+            "asked for clamp to nothing against the two clips' unused material, their "
+            "neighbours and the overlap rule; pass ripple: true to make the overlap by "
+            "shifting the timeline left instead",
+            clip=b, duration=SEC // 2)
 
     print("\n7c — and the rippled form, which has somewhere to go")
     # The same cut with `ripple: true` LANDS here: nothing is read out of
@@ -694,15 +693,19 @@ def the_transition_cut(mcp):
     s.op("undo")
 
     print("\n7d — a LOCKED track is where the rippled form has nowhere to go")
+    # `locked_track`'s third caller, the one §4 could not reach: the app's
+    # trial-apply used to answer here with a sentence offering all three
+    # reasons the shift can clamp to nothing ("the incoming clip's track is
+    # locked, a clip is too short …, or sliding a clip on another track …").
+    # The core knows WHICH, and names the track to unlock and the clip that
+    # cannot move.
     track = s.project()["tracks"][0]["id"]
     s.op("set_track", track=track, locked=True)
-    shadowed(s, "add_transition",
-             "a rippled transition on a locked track is refused, in the app's words",
-             "add_transition made no change: with ripple the shift clamped below one frame "
-             "— the incoming clip's track is locked, a clip is too short for the overlap "
-             "rule, or sliding a clip on another track into its neighbour would break that "
-             "track's overlap rule.",
-             clip=b, duration=SEC // 2, ripple=True)
+    refused(s, "add_transition", "add_transition",
+            "a rippled transition on a locked track names the track and the clip",
+            f"track {track} is locked, so clip {b} cannot be shifted left to make the "
+            "overlap",
+            clip=b, duration=SEC // 2, ripple=True)
     s.op("undo")                   # the lock, which WAS a real edit
 
     print("\n7e — and not one of them was an undo step")
@@ -858,12 +861,12 @@ def main():
 # closing the batch. `Outcome::Identity`'s doc in `core/src/outcome.rs` is
 # the list of which rules can say why and which are still owed a sentence.
 #
-# Three places to come back to. `shadowed` marks a refusal the app answers
-# before the core is asked — sections 5d, 6b, 7b and 7d — and each of those
-# becomes a `refused` against the core's own sentence when D2·4
-# (kpgalligan/reelcut#12) deletes the guard or the trial-apply in front of
-# it. The core's sentences are in `core/tests/refusal.rs` meanwhile, which
-# is where they are proved today.
+# Every rule that speaks is now measured HERE as well as in
+# `core/tests/refusal.rs`: D2·4 (kpgalligan/reelcut#12) deleted the four
+# app-side answers that stood in front of §5d, §6b, §7b and §7d, and there
+# is no `shadowed` helper any more. What is still owed a sentence is the
+# clamped-edge family in `Outcome::Identity`'s doc, and a section for one of
+# those goes here the day it finds its voice.
 
 if __name__ == "__main__":
     try:

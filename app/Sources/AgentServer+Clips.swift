@@ -253,9 +253,9 @@ extension AgentServer {
                 message: "Missing required argument: ranges (an array of [from, to] pairs, "
                     + "each a time in ticks). detect_silence returns them in this shape.")
         }
-        // An empty list is `Ok(None)` in the core — "nothing to do" — which
-        // `performGroupedEdit` would report as the overlap-rule refusal.
-        // Naming it here says the true thing.
+        // An empty list is the core's IDENTITY — "nothing to do" — which
+        // says only that the project is already in that state. No rule
+        // refused it, so the ARGUMENT is what is named here.
         guard !ranges.isEmpty else {
             throw ToolError(message: "ranges is empty — name at least one [from, to] pair.")
         }
