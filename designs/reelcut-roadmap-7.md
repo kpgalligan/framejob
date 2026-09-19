@@ -4592,8 +4592,9 @@ moved, so `make test` stands at 671.
 
 **Owed.** Nothing of this candidate's. The series' own owed items are §9's,
 and the one this ticket found and deliberately did not fix is the locked
-console's effect on `tools/proof/phase8_chrome.py`, recorded there as
-unconfirmed.
+console's effect on `tools/proof/phase8_chrome.py` — which this ticket's own
+two-state control then measured, and which §9 records as PAID after the
+close.
 
 ## 9. D3 — closed
 
@@ -4779,30 +4780,6 @@ before/after captures and the two verifications:
 
 **What is owed.**
 
-- **`tools/proof/phase8_chrome.py` still has no named skip for a locked
-  console**, where `phase5_chrome`, `recording_proof`, `recording_probe`,
-  `preview_validity_probe` and `preview_refresh_probe` all print one. D3·5's
-  tree scored it **144/150**, six failures cascading from its own first row —
-  *PRECONDITION: the probe activated and the editor is both key and main* —
-  and could not say whether the cause was host state or ours, because that
-  host's console was locked and stayed locked. **D3·6's tree answered it, and
-  the answer is measured rather than argued.** The console was LOCKED when
-  that run began — `recording_proof` skipped its granted tier by name, 66
-  rows, printing *console locked: True, display asleep: True* — and UNLOCKED
-  by the time the chrome scripts ran (`IOConsoleLocked` read false), and
-  `phase8_chrome` then scored **150/150** with that PRECONDITION row PASSING.
-  `recording_probe` tells the same story from the other end: 858/858 with 43
-  rows skipped under D3·5's lock, **899/899 with 2** here. So the six failures
-  are HOST STATE and not ours, and what is owed is the skip itself: a locked
-  console should cost that script one named line, as it does its five
-  neighbours, instead of six failures that read like a regression.
-  **The orchestrator then ran the other half of the control**: the same
-  build, on a console that had been locked again (`IOConsoleLocked = Yes`
-  read at the machine), scored **144/150** with the same six rows and the
-  same first one. Two states, one build, two scores — 150 unlocked and 144
-  locked — which is what turns a plausible reading into a measured one.
-  Every failing row is about a window being key or main; not one of them
-  goes near a catalog.
 - **A few argument names are still Python literals**, and the list is
   shorter than the earlier records assumed — it was re-derived here rather
   than repeated. The four new scripts type none (`op_argument_proof.py`'s six
@@ -4831,6 +4808,52 @@ before/after captures and the two verifications:
   window can be photographed against their "before" again.
 - **Nothing else.** No format bump, no new op, no new tool, no change to the
   op count, the tool count or what a person at the machine sees.
+
+**Paid after the close.**
+
+- **`tools/proof/phase8_chrome.py` now skips a locked console BY NAME**,
+  where `phase5_chrome`, `recording_proof`, `recording_probe`,
+  `preview_validity_probe` and `preview_refresh_probe` all printed one and it
+  did not. D3·5's
+  tree scored it **144/150**, six failures cascading from its own first row —
+  *PRECONDITION: the probe activated and the editor is both key and main* —
+  and could not say whether the cause was host state or ours, because that
+  host's console was locked and stayed locked. **D3·6's tree answered it, and
+  the answer is measured rather than argued.** The console was LOCKED when
+  that run began — `recording_proof` skipped its granted tier by name, 66
+  rows, printing *console locked: True, display asleep: True* — and UNLOCKED
+  by the time the chrome scripts ran (`IOConsoleLocked` read false), and
+  `phase8_chrome` then scored **150/150** with that PRECONDITION row PASSING.
+  `recording_probe` tells the same story from the other end: 858/858 with 43
+  rows skipped under D3·5's lock, **899/899 with 2** here. So the six failures
+  are HOST STATE and not ours, and what was owed was the skip itself: a
+  locked console should cost that script named lines, as it does its five
+  neighbours, instead of six failures that read like a regression.
+  **The orchestrator then ran the other half of the control**: the same
+  build, on a console that had been locked again (`IOConsoleLocked = Yes`
+  read at the machine), scored **144/150** with the same six rows and the
+  same first one. Two states, one build, two scores — 150 unlocked and 144
+  locked — which is what turns a plausible reading into a measured one.
+  Every failing row is about a window being key or main; not one of them
+  goes near a catalog.
+  **What landed**, after the close and before the next candidate: the script
+  reads `IOConsoleLocked` the way its two probe neighbours do, asks the
+  dispatch mode ONCE instead of three times on a locked console — a process
+  that cannot activate can never satisfy the precondition, so a retry is
+  waste — and skips the SIX readings that need the focus by name. The
+  seventh, the sheet, is the same reading either way and is still scored,
+  which is why the arithmetic closes exactly: 150 unlocked = 144 scored + 6
+  skipped. Verified both ways on one build: **150/150** with the console
+  unlocked, and **144/144 with 6 skipped by name** with the reading forced —
+  forced, because the console at this machine was unlocked, and the six rows
+  skipped are by construction the six that `ready` gates, which is the same
+  six the locked control measured failing. **The skip is exactly as wide as
+  the lock and no wider**, proved by a mutation rather than asserted: the
+  dispatch probe made to answer NOTHING on a locked console still scores
+  142/145 and exits 1, failing *the dispatch probe answered*, the sheet
+  precondition and the end-of-run *every probe invocation answered*. A lock
+  that could swallow a rotted instrument would have been a worse bargain than
+  the six failures it replaced.
 
 **What a later deepening should take from this one.**
 

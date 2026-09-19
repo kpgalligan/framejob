@@ -180,6 +180,16 @@ in this tree rather than guessed:
     retries on the PRECONDITION alone (the app active, the editor key AND
     main). Once that holds the first answer is scored and no second attempt is
     made, so nothing here re-rolls a failing GUARANTEE.
+  · **A LOCKED CONSOLE.** A process on a locked console cannot ACTIVATE at
+    all, so there is no key window to demand and the retry above can never
+    succeed. That is HOST STATE and not this tree's, so the six readings that
+    need the focus are SKIPPED BY NAME — `console_locked()`, the same reading
+    `preview_refresh_probe.py` and `preview_validity_probe.py` take — while
+    the seventh, the sheet, is the same reading either way and is still
+    scored. Measured on ONE build, both ways: **150/150** with the console
+    unlocked, **144/144 with 6 skipped** with it locked. Before this the
+    locked run read 144/150, and six failures about a window being key look
+    exactly like a regression in the thing section 4 exists to catch.
 
 Run it with no port and no media:
 
@@ -2125,6 +2135,7 @@ def rows_equal(a, b, y0, y1, x0, x1):
 # The checks.
 
 RESULTS = []
+SKIPS = []
 
 
 def check(name, ok, detail=""):
@@ -2132,6 +2143,30 @@ def check(name, ok, detail=""):
     print(f"  {'PASS' if ok else 'FAIL'}: {name}")
     if detail:
         print(detail if detail.startswith("      ") else "      " + detail)
+
+
+def skip(name, reason):
+    """A row host state has put out of reach. It is NAMED and counted and it
+    is not a pass: it never reaches `RESULTS`, so the score below is over the
+    rows that were actually measured (`recording_proof.py`'s rule, and
+    `preview_refresh_probe.py`'s)."""
+    SKIPS.append(name)
+    print(f"  SKIP: {name}")
+    print(f"      {reason}")
+
+
+def console_locked():
+    """Is the console locked? Host state is a proof INPUT, read and never
+    assumed (`recording_proof.py`). A process on a locked console cannot
+    activate, so it has neither a key window nor a main one, and section 4 —
+    the only section that needs either — skips those six readings by name.
+    The reading is `preview_refresh_probe.py`'s and
+    `preview_validity_probe.py`'s, copied like every other helper here so one
+    script can be run without the others."""
+    out = subprocess.run(["ioreg", "-n", "Root", "-d1", "-a"],
+                         capture_output=True, text=True).stdout
+    marker = out.find("<key>IOConsoleLocked</key>")
+    return marker >= 0 and out[marker:marker + 60].find("<true/>") >= 0
 
 
 def same_file(a, b):
@@ -2562,8 +2597,15 @@ def main():
     # is on the PRECONDITION alone (the app active, the editor key and main);
     # once that holds, the first answer is the one scored and a second
     # attempt is never made, so nothing here re-rolls a failing GUARANTEE.
+    # The third spoiler is the one not worth retrying: a process that cannot
+    # activate can never satisfy the precondition, so a locked console is
+    # asked ONCE and the six readings that need the focus are skipped below.
+    locked = console_locked()
+    if locked:
+        print("      (the console is LOCKED, so the probe is asked once and the six readings "
+              "that\n       need the keyboard focus are skipped by name)")
     dispatch, error, attempts, preconditions = None, None, 0, []
-    for attempts in range(1, 4):
+    for attempts in range(1, 2 if locked else 4):
         dispatch, error = run_probe(probe, "dispatch", {
             "mode": "dispatch", "package": packages["dispatch"]}, timeout=120, activate=True)
         first = next((s for s in (dispatch or {}).get("stages", [])
@@ -2585,44 +2627,56 @@ def main():
     # plain window alike — so the answer would be a passing lie.
     ready = (alone.get("appActive") is True and alone.get("editorIsKey") is True
              and alone.get("editorIsMain") is True)
-    check("PRECONDITION: the probe activated and the editor is both key and main before the "
-          "panel is opened — without this every reading below is NONE for a panel and a "
-          "plain window alike, and the section would pass against both",
-          ready,
-          "; ".join(preconditions)
-          + f"; re-asked for the focus {alone.get('refocusEditor', dispatch.get('refocusEditor'))}"
-          + f"/{dispatch.get('refocusPreview')} times before the two readings")
+
+    def focused(name, ok, detail=""):
+        """One of the six rows whose precondition is a key window. On a locked
+        console it is not askable, and a row that is not askable is skipped by
+        name rather than scored against an answer nothing could have given."""
+        if locked:
+            skip(name, "the console is locked, and a process that cannot activate has "
+                       "neither a key window nor a main one")
+        else:
+            check(name, ok, detail)
+
+    focused("PRECONDITION: the probe activated and the editor is both key and main before the "
+            "panel is opened — without this every reading below is NONE for a panel and a "
+            "plain window alike, and the section would pass against both",
+            ready,
+            "; ".join(preconditions)
+            + "; re-asked for the focus "
+            + f"{alone.get('refocusEditor', dispatch.get('refocusEditor'))}"
+            + f"/{dispatch.get('refocusPreview')} times before the two readings")
     check("PRECONDITION: nothing put a SHEET up over the editor — a sheet is a window and "
           "takes KEY, which is what the six-file fixture's deliberately absent files did "
           "through `offerRelinkIfNeeded` before this mode was given a shape-clip package "
           "of its own",
           dispatch.get("attachedSheet") is False, f"attachedSheet {dispatch.get('attachedSheet')}")
-    check("with the editor alone, ⌘E / ⌘T / ⌘0 all resolve to the editor's view controller",
-          ready and set(alone.get("targets", {}).values()) == {"EditorViewController"},
-          str(alone.get("targets")))
-    check("PRECONDITION: opening the preview makes the PANEL key",
-          ready and preview.get("secondIsKey") is True and dispatch.get("panelIsPanel") is True,
-          f"key {preview.get('keyWindow')!r}, class {preview.get('secondClass')}")
-    check("…and leaves the EDITOR main, which a titled `NSWindow` would not: measured by the "
-          "build lane, a plain window becomes key AND main and every target below goes NONE",
-          ready and preview.get("secondIsMain") is False
-          and preview.get("editorIsMain") is True,
-          f"panel isMain {preview.get('secondIsMain')}, editor isMain "
-          f"{preview.get('editorIsMain')}, main window {preview.get('mainWindow')!r}")
-    check("THE GUARANTEE: with the panel key, ⌘E Export…, ⌘T Split and ⌘0 Zoom to Fit STILL "
-          "resolve to the editor's controller — nothing forwards them, the panel simply "
-          "never became main",
-          ready and set(preview.get("targets", {}).values()) == {"EditorViewController"},
-          str(preview.get("targets")))
-    check("…and the File menu's Export… item validates ENABLED with the preview focused, "
-          "which is the thing a person would actually notice going dead. Its own two "
-          "preconditions are reported beside it — the controller still has its document "
-          "(it is a WEAK reference) and the project has a duration — because a `false` from "
-          "either of those reads exactly like the defect this section hunts",
-          ready and preview.get("exportEnabled") is True and alone.get("exportEnabled") is True,
-          f"alone {alone.get('exportEnabled')}, preview key {preview.get('exportEnabled')}; "
-          f"document held {preview.get('controllerHasDocument')}, duration "
-          f"{preview.get('duration')} ticks")
+    focused("with the editor alone, ⌘E / ⌘T / ⌘0 all resolve to the editor's view controller",
+            ready and set(alone.get("targets", {}).values()) == {"EditorViewController"},
+            str(alone.get("targets")))
+    focused("PRECONDITION: opening the preview makes the PANEL key",
+            ready and preview.get("secondIsKey") is True and dispatch.get("panelIsPanel") is True,
+            f"key {preview.get('keyWindow')!r}, class {preview.get('secondClass')}")
+    focused("…and leaves the EDITOR main, which a titled `NSWindow` would not: measured by the "
+            "build lane, a plain window becomes key AND main and every target below goes NONE",
+            ready and preview.get("secondIsMain") is False
+            and preview.get("editorIsMain") is True,
+            f"panel isMain {preview.get('secondIsMain')}, editor isMain "
+            f"{preview.get('editorIsMain')}, main window {preview.get('mainWindow')!r}")
+    focused("THE GUARANTEE: with the panel key, ⌘E Export…, ⌘T Split and ⌘0 Zoom to Fit STILL "
+            "resolve to the editor's controller — nothing forwards them, the panel simply "
+            "never became main",
+            ready and set(preview.get("targets", {}).values()) == {"EditorViewController"},
+            str(preview.get("targets")))
+    focused("…and the File menu's Export… item validates ENABLED with the preview focused, "
+            "which is the thing a person would actually notice going dead. Its own two "
+            "preconditions are reported beside it — the controller still has its document "
+            "(it is a WEAK reference) and the project has a duration — because a `false` from "
+            "either of those reads exactly like the defect this section hunts",
+            ready and preview.get("exportEnabled") is True and alone.get("exportEnabled") is True,
+            f"alone {alone.get('exportEnabled')}, preview key {preview.get('exportEnabled')}; "
+            f"document held {preview.get('controllerHasDocument')}, duration "
+            f"{preview.get('duration')} ticks")
 
     # ------------------------------------------------------------------
     # 5. One player, two layers.
@@ -3307,7 +3361,8 @@ def main():
           "through a probe to say what the compositor then\ndoes with them.")
 
     passed = sum(RESULTS)
-    print(f"\n{passed}/{len(RESULTS)} checks passed")
+    print(f"\n{passed}/{len(RESULTS)} checks passed"
+          + (f", {len(SKIPS)} skipped by name" if SKIPS else ""))
     sys.exit(0 if passed == len(RESULTS) else 1)
 
 

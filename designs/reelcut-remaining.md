@@ -355,9 +355,14 @@ and the closing above added the rest.
   section 4 shows the tile turn blue offscreen; the Relink… sheet in the
   running app has not been watched doing it.
 - **`phase8_chrome.py` needs an unlocked console** for section 4's six dispatch
-  checks. They score 150/150 with the screen unlocked and fail on their own
-  precondition when it is locked. That is the script refusing to pass
-  vacuously, not a defect.
+  checks — the only rows in this suite that need a KEY WINDOW, and a process on
+  a locked console cannot activate to have one. The script no longer fails them
+  there: it reads `IOConsoleLocked` and SKIPS the six by name, so the score
+  reads **150/150** unlocked and **144/144 with 6 skipped by name** locked
+  rather than 144/150 and six failures that looked like a regression. The skip
+  is honest and not a pass — those six are simply UNMEASURED on a locked
+  machine, which is why they are listed here: only a run at an unlocked screen
+  asks them at all.
 
 ---
 

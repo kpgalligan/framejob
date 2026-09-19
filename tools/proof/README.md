@@ -1645,8 +1645,8 @@ taken the window answers true and sticks — which is the fix as well as the
 proof. A build that moves the one call scores 125/125 and nothing else here
 moves.
 
-**Two things spoiled section 4 before it worked, and both are recorded because
-each reads exactly like the defect.** A SHEET: `viewDidAppear` calls
+**Three things spoil section 4, and all three are recorded because each
+reads exactly like the defect.** A SHEET: `viewDidAppear` calls
 `offerRelinkIfNeeded`, and every media entry in the six-file fixture points at
 a path that does not exist — deliberately, so no thumbnail decode ever runs —
 so the Relink sheet went up and took the key window. The cure is the FIXTURE
@@ -1667,6 +1667,24 @@ re-rolls a failing guarantee. Every answer also carries
 `open -n` is asked for a PATH but LaunchServices resolves bundle IDENTIFIERS,
 and a mutation run holds two copies of one bundle under one id, where a mutant
 that was never consulted would read exactly like a survivor.
+
+**The third spoiler is HOST STATE, and it is the one the script now skips by
+name.** A process on a LOCKED console cannot activate at all, so there is no
+key window to demand and the retry above can never succeed — the precondition
+is not merely unmet, it is unaskable. The script reads `IOConsoleLocked`
+(`preview_refresh_probe.py`'s and `preview_validity_probe.py`'s reading,
+copied), asks the dispatch mode ONCE instead of three times, and SKIPS the six
+readings that need the focus by name; the seventh, the sheet, is the same
+reading either way and is still scored. Measured on ONE build, both ways:
+**150/150** with the console unlocked and **144/144 with 6 skipped by name**
+with it locked. Before the skip, that locked run read **144/150** — six
+failures, every one of them about a window being key or main, which is
+indistinguishable at a glance from the panel defect section 4 exists to catch.
+A skip is not a pass: the six never reach the score, and a DEAD dispatch probe
+on a locked console still fails by name (mutation: the probe forced to answer
+nothing scores 142/145 with the same six skipped, failing "the dispatch probe
+answered", the sheet precondition and the end-of-run "every probe invocation
+answered"), so the lock cannot hide a rotted instrument.
 
 Mutation-tested against **six** deliberate breakages, each a copy of a clean
 snapshot with ONE edit in it and the script run from inside the copy — never
