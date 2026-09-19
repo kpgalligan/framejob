@@ -4042,7 +4042,7 @@ sentence for a bound.
 
 **Commits.** `77b0bb8` (the fifth part and the proof), `c8fbe12` (the
 mutants and the whole proof tree), `3d120bb` (what the review found, below)
-and `PLACEHOLDER_FOUR` (the fifth mutant, and all five re-scored against the
+and `dd61cb1` (the fifth mutant, and all five re-scored against the
 rows the review added).
 
 **What landed.** The startup parity check's fifth part, the proof that puts
