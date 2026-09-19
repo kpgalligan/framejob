@@ -4796,6 +4796,13 @@ before/after captures and the two verifications:
   are HOST STATE and not ours, and what is owed is the skip itself: a locked
   console should cost that script one named line, as it does its five
   neighbours, instead of six failures that read like a regression.
+  **The orchestrator then ran the other half of the control**: the same
+  build, on a console that had been locked again (`IOConsoleLocked = Yes`
+  read at the machine), scored **144/150** with the same six rows and the
+  same first one. Two states, one build, two scores — 150 unlocked and 144
+  locked — which is what turns a plausible reading into a measured one.
+  Every failing row is about a window being key or main; not one of them
+  goes near a catalog.
 - **A few argument names are still Python literals**, and the list is
   shorter than the earlier records assumed — it was re-derived here rather
   than repeated. The four new scripts type none (`op_argument_proof.py`'s six
