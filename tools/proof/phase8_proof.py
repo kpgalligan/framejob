@@ -539,7 +539,10 @@ def build_fixture(session):
     back = session.tracks()[0]
     media = session.op("import_media", path=os.path.join(MEDIA, "A.mov"))["media"]
     session.op("add_clip", track=back, media=media, at=0)
-    front = session.op("add_track", kind="video")["new_tracks"][0]
+    # `add_track` takes `index` and `name` and nothing else; the `kind` this
+    # line used to send was dropped in silence until kpgalligan/reelcut#21's
+    # gate, which refuses it by name.
+    front = session.op("add_track")["new_tracks"][0]
     session.op(
         "add_shape_clip", track=front, at=0, duration=6 * SEC,
         shape={"kind": "rectangle", "width": 200, "height": 100,
@@ -796,7 +799,7 @@ def decoded_frames(path, count=3):
 def usage_part(mcp):
     s = Session(mcp, "phase8-usage")
     back = s.tracks()[0]
-    front = s.op("add_track", kind="video")["new_tracks"][0]
+    front = s.op("add_track")["new_tracks"][0]  # no `kind`: see line 542
 
     # (a) media used ONLY inside a nest — the case both old spellings missed.
     hidden = s.op("import_media", path=os.path.join(MEDIA, "A.mov"))["media"]
@@ -842,7 +845,7 @@ def usage_part(mcp):
     # in the sentence.
     shared = s.op("import_media", path=os.path.join(MEDIA, "C.mov"))["media"]
     visible = s.op("add_clip", track=front, media=shared, at=0)["new_clips"][0]
-    third = s.op("add_track", kind="video")["new_tracks"][0]
+    third = s.op("add_track")["new_tracks"][0]
     buried = s.op("add_clip", track=third, media=shared, at=0)["new_clips"][0]
     s.opw("nest", {"clips": [buried], "name": "Second"})
     top, nested = users(s.project(), shared)
@@ -861,7 +864,7 @@ def usage_part(mcp):
     # file, because a second import of one path is an identity edit and is
     # refused — one media entry per file, which is also why (d) below can
     # only re-import what (c) has just removed.
-    fourth = s.op("add_track", kind="video")["new_tracks"][0]
+    fourth = s.op("add_track")["new_tracks"][0]
     plain = s.op("import_media", path=os.path.join(MEDIA, "B.mov"))["media"]
     check(plain != shared, "B.mov is a media entry of its own")
     alone = s.op("add_clip", track=fourth, media=plain, at=0)["new_clips"][0]

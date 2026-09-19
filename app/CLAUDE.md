@@ -423,6 +423,14 @@ free.
   private dispatch table they read and part 4 in `AgentServer+Scope.swift`
   with the feature it is about; all five assert in debug, log `Reelcut: ` in
   release and start the server either way.
+  `AgentServer+Gate.swift` is the CALL-time half of the same contract
+  (kpgalligan/reelcut#21): one comparison in `dispatch`, for all
+  seventy-seven tools, of a caller's keys against the schema the tool
+  published, every stranger refused by name — the tool, the strangers and
+  the whole of what it takes — before the scope or any handler reads a
+  thing. Its map is read once from the catalog string `start()` registered.
+  What it cannot see is a declared argument no handler reads, which is the
+  optional half of `op_argument_proof.py`'s section 3.
   `target(_:)` resolves the implicit document through
   `NSApp.orderedDocuments`, never `documents.first`, and an explicit path
   through `AgentServer.canonical`. `offMainTools` names the handlers that
@@ -433,7 +441,9 @@ free.
   (`intArg`, `timeArg`, `rangesArg`, `rawPatchArg`, …), each refusing a
   value it cannot read BY NAME, and ONLY what the core cannot know: target
   and scope, an id checked against the container it names, a time on the
-  document's frame grid, and the in-band refusal. **`rawPatchArg` is the
+  document's frame grid, and the in-band refusal. A whole number is read
+  EXACTLY: `3.0` is 3 and `3.7` is refused, never truncated (`whole`).
+  **`rawPatchArg` is the
   door every op that takes a caller-authored object goes through**: it reads
   nothing about the value and hands the object to the core, which is the one
   validator of what a patch may carry and names the dotted path and the

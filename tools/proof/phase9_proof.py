@@ -1300,10 +1300,13 @@ def refusal_part(mcp):
     check(refusal(mcp, "trim_start", {"clip": inner, "to": 0, "scope": None}) == plain_miss,
           "and an explicit null scope is the same call as no scope at all — the envelope's "
           "standing rule that absent and null mean one thing")
-    check(refusal(mcp, "get_project", {"scope": 4242}) is None
-          and refusal(mcp, "render_frame", {"t": 0, "scope": 4242}) is None,
-          "while a scope sent to a tool that is not an op is the ignored extra key it "
-          "always was — dispatch reads one only for the 55")
+    stray = refusal(mcp, "get_project", {"scope": 4242})
+    check(stray == "get_project does not take scope. It takes project."
+          and (refusal(mcp, "render_frame", {"t": 0, "scope": 4242}) or "").startswith(
+              "render_frame does not take scope. It takes "),
+          "while a scope sent to a tool that is not an op is refused by the argument gate as "
+          "a key that tool never published (kpgalligan/reelcut#21) — until then it was the "
+          f"ignored extra key, read only for the ops: {stray!r}")
 
     # The seam the orchestrator measured and fixed: an EXPLICIT scope
     # outranks the open view, in both directions.

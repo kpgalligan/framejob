@@ -447,23 +447,17 @@ def main():
     is_error, message = s.raw("set_clip", {"clips": [a], "name": "Stray"})
     check(is_error, f"a top-level name argument (no patch) is refused: {message[:60]!r}")
     check(s.clip(a)["name"] == "Talk, take 2", "and nothing changed")
-    # Measured, not a check: the server has no unknown-argument guard, so a
-    # stray top-level `name` BESIDE a valid patch is dropped rather than
-    # refused. Sent with a patch that is an identity, so the only way this
-    # call could succeed is by honouring the stray key.
+    # A stray top-level `name` BESIDE a valid patch. Until
+    # kpgalligan/reelcut#21 this was measured rather than checked — the
+    # server had no unknown-argument guard, so the key was dropped and the
+    # identity patch made the call a "made no change" refusal. The argument
+    # gate now refuses the stranger by name before the patch is read.
     is_error, message = s.raw(
         "set_clip", {"clips": [a], "patch": {"label": "blue"}, "name": "Stray"}
     )
-    stray = s.clip(a)["name"]
-    if is_error and "made no change" in message and stray == "Talk, take 2":
-        print("  note a stray top-level name beside a valid patch is IGNORED (identity refusal)")
-    else:
-        print(
-            "  note a stray top-level name beside a valid patch: "
-            f"error={is_error}, name={stray!r}"
-        )
-        if stray != "Talk, take 2":
-            s.op("set_clip", clips=[a], patch={"name": "Talk, take 2"})
+    check(is_error and "does not take name" in message and s.clip(a)["name"] == "Talk, take 2",
+          f"a stray top-level name beside a valid patch is refused by the gate, naming it: "
+          f"{message[:70]!r}")
 
     text_before = s.text()
     s.op("set_clip", clips=[a], patch={"name": "Other"})

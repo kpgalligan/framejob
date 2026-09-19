@@ -230,6 +230,13 @@ nothing else) and `app/Sources/ReelOpSchema.swift` (**27**).
 `AgentServer.swift`, frozen, is **771 → 774**: twelve lines of doc comment
 taken across D3·3 and D3·4 and nine given back at D3·5, when the two
 paragraphs describing the gap that part has now closed stopped being true.
+Then **774 → 785** at kpgalligan/reelcut#21: the argument gate's two wiring
+lines in `start()` and `dispatch`, and the comments saying that a call's keys
+are now checked and that a stray `scope` is refused rather than ignored. The
+gate itself is `app/Sources/AgentServer+Gate.swift` (**101** of 400);
+`AgentServer+Arguments.swift` is 445 → **458** for the exact whole-number
+read and `AgentServer+Parity.swift` 183 → **186** for the envelope list the
+two files now share.
 `ReelCore.swift` is **1500 → 1542** and stays where it was in this list — it
 is over the cap, so only the part that had to be there went in, the function
 naming `rc_op_schemas`, and the value type it answers went to
@@ -262,7 +269,7 @@ row per op.
 | `app/Sources/AgentServer+Clips.swift` | 847 |
 | `core/src/edit.rs` | 838 |
 | `app/Sources/AgentCatalog+Clips.swift` | 791 |
-| `app/Sources/AgentServer.swift` | 774 |
+| `app/Sources/AgentServer.swift` | 785 |
 | `app/Sources/FFmpegRewrap.swift` | 768 |
 | `app/Sources/Loudness.swift` | 742 |
 | `app/Sources/ExportSheetController.swift` | 639 |

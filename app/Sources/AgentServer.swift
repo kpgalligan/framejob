@@ -117,6 +117,8 @@ final class AgentServer {
             ProcessInfo.processInfo.environment["RC_AGENT_PORT"]
             .flatMap(UInt16.init) ?? Self.defaultPort
         let catalog = try catalogJSON()
+        // The gate reads this same string at every call (AgentServer+Gate.swift).
+        Self.noteArguments(in: catalog)
         // Nothing else forces the catalog and the dispatch table to agree, so
         // debug builds refuse to start the server on a mismatch. `make app`
         // builds Release, where an `assert` is compiled out — which would make
@@ -180,14 +182,21 @@ final class AgentServer {
         guard let handler = Self.handlers[tool] else {
             throw ToolError(message: "Unknown tool: \(tool)")
         }
+        // The gate (AgentServer+Gate.swift): every key the caller wrote is
+        // one this tool published, or the call is refused here by name before
+        // the scope or any handler reads a thing. It is here for the reason
+        // the scope read below is — the one place that holds the name and
+        // the arguments of all seventy-seven.
+        try Self.checkArgumentNames(tool, a)
         // The envelope's `scope` is read ONCE, here, because this is the only
         // place that holds both the tool's name and its arguments for all
         // seventy-seven of them — a read inside each handler would be
         // fifty-seven edit sites across two files, every one of them able to
         // forget. It is read for exactly the tools whose schema declares it
-        // (`AgentCatalog.opNames`, the core's own op list), so a stray
-        // `scope` on `get_project` or `export` is the ignored extra key it
-        // has always been rather than a silently honoured one. The `defer`
+        // (`AgentCatalog.opNames`, the core's own op list), and a `scope` on
+        // `get_project` or `export` is refused by the gate above as a key
+        // those tools never published, where it used to be an ignored extra
+        // key rather than a silently honoured one. The `defer`
         // is what makes the property a per-CALL value rather than state: the
         // next call starts with no scope of its own whatever this one asked
         // for or threw, and falls back to the view like any other.
@@ -333,10 +342,12 @@ final class AgentServer {
     ///    it lives in `AgentServer+Parity.swift` with the three ways a tool
     ///    can still be wrong written out there.
     ///
-    /// **What it still cannot see.** Nothing validates a CALL against
-    /// `inputSchema`; what guards that is the argument vocabulary in
-    /// `AgentServer+Arguments.swift`, which refuses a present value of the
-    /// wrong type instead of reading it as absent. And part 5 reads the same
+    /// **What it still cannot see.** A CALL. Its KEYS are the gate's
+    /// (`AgentServer+Gate.swift`), which refuses a name no tool published
+    /// before any handler runs, and each VALUE's type is the argument
+    /// vocabulary's (`AgentServer+Arguments.swift`), which refuses a present
+    /// value of the wrong type instead of reading it as absent. And part 5
+    /// reads the same
     /// published table the catalog prints, so a constraint the app still
     /// enforces that the TABLE stops declaring moves both sides together and
     /// passes — the class that only a row calling the running tool can

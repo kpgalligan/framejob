@@ -2368,9 +2368,13 @@ argument the table has never heard of, which is how a misspelt prose key is
 caught rather than dropped in silence. App-state tools are skipped by the same rule
 part 4 uses — the core's own op list, which has no row for a tool with no op
 behind it. What no comparison of two lists can see is a
-CALL: that an argument the catalog prints is one a hand-written handler really
-reads is put to the running binary by `tools/proof/op_argument_proof.py`
-instead, one misspelt argument per op.
+CALL. A call's KEYS are compared to the tool's published schema at the
+dispatch — the argument gate, kpgalligan/reelcut#21, for all seventy-seven
+tools — so a name no tool published is refused naming the tool and what it
+takes, where it used to be dropped in silence; and that an argument the
+catalog prints is one a hand-written handler really reads is put to the
+running binary by `tools/proof/op_argument_proof.py`, one left-out argument
+per op.
 
 The scope is read ONCE per call, at the dispatch, and an op with no `scope`
 of its own follows the nest the app has OPEN — a call and the window agree
@@ -3041,3 +3045,23 @@ assisted import.
   promise the app breaks.** This is what makes the *One JSON op entry point*
   decision above true as it was written — "the MCP catalog is the same table"
   — where until D3 the catalog was a hand copy of one.
+- **#21 — A call is checked against the schema its tool published, at the
+  door, for every tool.** The agent handlers read a caller's arguments by
+  name and build the op, so an argument no handler read collided with
+  nothing and was dropped in silence — an optional argument misspelt, an
+  argument no op takes, a required one misspelt and reported as the right
+  name missing. The fix is one comparison at dispatch
+  (`AgentServer+Gate.swift`): the caller's keys against the tool's published
+  `inputSchema`, every stranger refused naming the tool, the strangers and
+  the whole of what the tool takes. Two choices, taken with the fix
+  (`designs/reelcut-roadmap-7.md` §11.6): it covers **all seventy-seven
+  tools** and not the fifty-seven ops, because the app-state tools have the
+  same defect and the comparison reads a published schema either way; and it
+  speaks the **app's** sentence rather than the core's serde wording, because
+  twenty tools have no core sentence to borrow and `noSuchId` set the house
+  style. **What it deliberately is not** is the handlers forwarding a
+  caller's op to the core unread — §11 measured that at 21 named refusals, 6
+  app-state defaults, 11 per-op transforms and one correctness guard, and the
+  gate buys the same contract and gives up none of them. The same class one
+  reader down went with it: a whole number is read exactly, so `3.7` where an
+  id belongs is refused and never truncated to 3.

@@ -21,7 +21,7 @@ The one list of the ops and their arguments, kept by the core and published by i
 _Avoid_: schema, op list, the op enum (the enum is one implementation of the table)
 
 **Argument**:
-One named value an **Op** takes, checked against the op table. An argument is part of the CALL: the core knows what it is — ticks, an id, a boolean, a closed vocabulary — and the app says what it is FOR. Distinct from a **Patch**'s keys, which are part of a VALUE and are checked against the property vocabulary instead: `set_video` takes the two arguments `clips` and `patch`, and everything inside that patch is not an argument at all.
+One named value an **Op** takes, checked against the op table. An argument is part of the CALL: the core knows what it is — ticks, an id, a boolean, a closed vocabulary — and the app says what it is FOR. Distinct from a **Patch**'s keys, which are part of a VALUE and are checked against the property vocabulary instead: `set_video` takes the two arguments `clips` and `patch`, and everything inside that patch is not an argument at all. A name no tool published is not an argument either: it is refused at the door, naming the tool and what it does take, and never dropped.
 _Avoid_: parameter, field, key, option
 
 **Patch**:

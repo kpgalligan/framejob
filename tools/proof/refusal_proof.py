@@ -554,7 +554,10 @@ def the_track_stack(mcp):
             track=first, with_clips=True)
 
     print("\n5b — a second track, so the rule stops applying")
-    second = s.op("add_track", kind="video")["new_tracks"][0]
+    # `add_track` takes `index` and `name` and nothing else; the `kind` these
+    # calls used to send was dropped in silence until kpgalligan/reelcut#21's
+    # gate, which refuses it by name.
+    second = s.op("add_track")["new_tracks"][0]
     applied(s, "remove_track", "with two tracks the same call lands", track=second)
     landed("…and the project is back to one track", len(s.project()["tracks"]), 1)
 
@@ -562,7 +565,7 @@ def the_track_stack(mcp):
     # Both are real edits and both are made BEFORE the marker, so 5f's
     # single undo is the marker's and the claim it makes is exact.
     clip = s.place(media, 0)
-    s.op("add_track", kind="video")
+    s.op("add_track")
     start = undo_marker(s, lambda: s.op("set_clip", clips=[clip], patch={"name": "Marker"}))
 
     print("\n5d — the other refusal, in the core's words since D2·4")
@@ -792,8 +795,8 @@ def off_the_track_stack(mcp):
     print("\n9 — a move to a track index the document has not got")
     s = Session(mcp, "refusal-stack")
     media = s.media("A.mov")
-    lower = s.op("add_track", kind="video")["new_tracks"][0]
-    upper = s.op("add_track", kind="video")["new_tracks"][0]
+    lower = s.op("add_track")["new_tracks"][0]
+    upper = s.op("add_track")["new_tracks"][0]
     landed("three tracks, indices 0 to 2", len(s.project()["tracks"]), 3)
     a = s.place(media, 0, track=lower)
     b = s.place(media, 0, track=upper)

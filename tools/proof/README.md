@@ -2656,12 +2656,14 @@ Only a row that asks the RUNNING APP can see a declaration dropped while the
 behaviour stays.
 
 
-## A misspelt argument, put to all 57 (`op_argument_proof.py`)
+## A stranger argument, put to all 77 (`op_argument_proof.py`)
 
 `python3 tools/proof/op_argument_proof.py <port>`, against a running
-instance. Road map 7's D3·5, and **the script that owns the exact tool count**
-(77). **86/86** at D3·5 (#19); 79 of those rows before the review added the
-optional half of section 3. The probe is built BEFORE the first MCP call.
+instance. Road map 7's D3·5, then the **argument gate** of
+kpgalligan/reelcut#21, and **the script that owns the exact tool count**
+(77). **116/116** at #21; 86/86 at D3·5 (#19), 79 of those rows before the
+review added the optional half of section 3. The probe is built BEFORE the
+first MCP call.
 
 It exists because of the rule D3·3 and D3·4 each paid for: **a generated
 artefact is checked by asking the thing that generated it a question it did
@@ -2670,7 +2672,7 @@ same published table the catalog prints, so it cannot see a constraint the app
 still ENFORCES that the table stops DECLARING — so the weight here is on the
 sections that call the running tool.
 
-Five sections. **The fifth part, made to complain**: a probe compiled from
+Six sections. **The fifth part, made to complain**: a probe compiled from
 `app/Sources` builds the catalog this binary registers, puts it to
 `AgentServer.argumentFailure` (which must say nothing), and then puts four
 broken catalogs to it — an op tool with an argument the core has not got, one
@@ -2683,28 +2685,63 @@ attribution**: every difference between a tool's schema and the core's table
 is one `AgentServer.declarations` names — not a second computation of the
 merge, which is `op_catalog_proof.py`'s, but a key-by-key attribution, plus
 the inverse, that every row accounts for at least one difference, so a row
-that changes nothing fails here. **The misspelt argument**: for each of the 57,
-one CONTROL call with every required argument spelled right (which must not be
-refused for a missing one — the tool's required list proved SUFFICIENT against
-the running app) and then one call per required argument with that argument
-misspelt, which must be refused naming it. **Six op tools require nothing**, so
-that shape cannot reach them: their arguments are measured by what the op DID
-instead, the same call twice answering two different projects, because a
-misspelt OPTIONAL argument is dropped in silence and there is no refusal to
-read. `split`'s `clips` is the one argument this fixture cannot separate — the
-playhead sits inside the only clip at that time — and it is named in the script
-with its reason and asserted to be the whole of the exceptions. **The opaque doors**: a misspelt key
-inside a caller's own object is named by the CORE, which is where the dotted
-path lives.
+that changes nothing fails here. **The stranger argument**: for each of the
+57 op tools, one CONTROL call with every required argument spelled right
+(which must not be refused for a missing one — the tool's required list
+proved SUFFICIENT against the running app); one call per required argument
+with that argument LEFT OUT, which must be refused naming it — the handler
+reads it; and one call per argument the core publishes, required or not, with
+that argument MISSPELT beside the control, plus one carrying two names no op
+has, each of which must draw the gate's sentence — the tool, the stranger
+and EXACTLY what the tool takes, read back out of the sentence and compared
+as a set to the core's row, the declarations' rows and the envelope's two
+keys. That last row is what reaches all 57, `remove_empty_tracks` included,
+where the refusal rows reached 51 before the gate. **Six op tools require
+nothing**, so no left-out row can reach them; the gate reads a NAME against
+the schema and never whether anything reads the value, so for those six what
+is read instead is what the op DID — the same call twice, once with the
+argument and once without it, answering two different projects. `split`'s
+`clips` is the one argument this fixture cannot separate — the playhead sits
+inside the only clip at that time — and it is named in the script with its
+reason and asserted to be the whole of the exceptions. Then **a fraction
+where a whole number belongs** — `trim_start {clip: 3.5}` and
+`delete {clips: [3.5]}` — is refused rather than truncated to clip 3, and
+`{clip: 3.0}` is still the id. **The opaque doors**: a misspelt key inside a
+caller's own object is named by the CORE, which is where the dotted path
+lives. **The twenty tools the core calls no op**: the same two strangers,
+sent alone, and the list the gate speaks compared to the catalog's, the one
+spelling a hand-written schema has — placed LAST, because on a broken gate
+every one of those calls reaches its handler and `new_project` opens a
+document over the fixture.
 
-**What the misspelt-argument section actually proves**, and it is worth saying
-because the ticket asked for the core's dotted path: an op ARGUMENT never
-reaches the core's decoder at all — the handlers read arguments one at a time
-and build the op — so the sentence that names a misspelt ARGUMENT is the APP's
-(three shapes, all anchored to the argument's own name), and the sentence that
-names a misspelt KEY inside a patch is the core's. The section is therefore a
-check that every argument the catalog PRINTS from the core's table is one a
-hand-written handler really reads.
+**What the stranger-argument section actually proves.** An op ARGUMENT still
+never reaches the core's decoder — the handlers read arguments one at a time
+and build the op — so the sentence that names a stranger is the APP's, one
+sentence for all 77, and the sentence that names a misspelt KEY inside a
+patch is the core's. The section proves both halves of the app's: that every
+argument the catalog PRINTS is one a hand-written handler really reads (the
+left-out rows), and that every name a caller writes which the catalog does
+not print is refused before any handler runs (the gate rows).
+
+**Made to fail on purpose.** With the gate's one call in `dispatch` commented
+out and `intArg`'s exact read put back to `intValue`, one build scored
+**37/116, exit 1**: all 57 op rows red (a misspelt required argument back to
+"Missing required argument: clip", the two strangers back to "applied"), all
+20 app-state rows red, both fraction rows red (`delete {clips: [3.5]}`
+APPLIED, to clip 3), and no row outside those three groups. The first mutant
+run, with the twenty rows placed before section 4, also turned the six door
+rows red — `new_project` carrying two strangers had opened a document over
+the fixture — which is why the twenty are last.
+
+**Four other proofs changed with the gate**, each a live instance of the
+defect in an instrument: `phase8_proof.py` and `refusal_proof.py` sent
+`add_track` a `kind` it does not take, dropped in silence since they were
+written (the argument is gone, the fixtures unchanged); `phase2_proof.py`
+MEASURED the missing guard with a stray `name` beside an identity patch, and
+that measurement is now a check (85 → 86); `phase9_proof.py` asserted a
+`scope` on `get_project` and `render_frame` was "the ignored extra key it
+always was", and now asserts the gate's refusal. Every other MCP proof scored
+what it scored before, one fresh instance each.
 
 Its values are derived from the core's published kinds rather than typed: an
 id by name (six names for five entities — `clips` is a list of the id space

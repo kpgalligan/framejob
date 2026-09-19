@@ -55,10 +55,13 @@ import Foundation
 /// release, and the server starts either way.
 extension AgentServer {
 
-    /// The two keys `AgentCatalog.tool` injects into every op tool's schema.
-    /// They belong to the envelope rather than to the op (spec §6), so the
-    /// core's table has never heard of either and neither is compared.
-    private static let envelopeKeys: Set<String> = ["project", "scope"]
+    /// The two keys `AgentCatalog.tool` injects — `project` into every
+    /// tool's schema, `scope` into every op tool's. They belong to the
+    /// envelope rather than to the op (spec §6), so the core's table has
+    /// never heard of either and neither is compared here. In this order
+    /// because the gate (`AgentServer+Gate.swift`) lists them last, after a
+    /// tool's own arguments, in its refusal.
+    static let envelopeKeys: [String] = ["project", "scope"]
 
     /// Prose `AgentCatalog.opTool` was handed for arguments the core's table
     /// has not got, keyed by op.

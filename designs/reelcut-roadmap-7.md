@@ -5310,3 +5310,92 @@ thing a later session might otherwise assume was checked.
   `op_argument_proof.py` asserts, but it was derived rather than observed.
 - Nothing here was checked against a RUNNING app. Both scouts read source; the
   only things measured at the machine are §11.4's two.
+
+### 11.8 The gate, landed — kpgalligan/reelcut#21
+
+**What landed** (2026-09-19). One comparison at dispatch,
+`app/Sources/AgentServer+Gate.swift` (101 lines). `start()` reads the catalog
+string it has just registered into each tool's published property names, and
+`dispatch` compares a caller's keys against them before the scope or any
+handler reads a thing. A stranger is refused in the app's sentence —
+`add_track does not take nmae. It takes index, name, project and scope.` —
+the tool, every stranger, and the whole of what the tool takes, its own
+arguments first and the envelope's two last. It covers all 77 tools and
+speaks the app's sentence: the two choices §11.6 took, now also spec §11's
+entry for #21. Nothing was deleted and no handler moved, so the 21 refusals,
+6 defaults and 11 transforms of §11.2 are all still where they were — which is
+the whole reason this is a gate and not a forward. `AgentServer.swift`, frozen,
+took two wiring lines and the comment that used to say a stray `scope` on
+`get_project` was "the ignored extra key it has always been"; it is refused
+now, and the comment says so.
+
+**The sibling defect §11.4 found went with it.** `intArg` and the element read
+inside `clipsArg` now ask a JSON double to be exactly a whole number (`whole`
+in `AgentServer+Arguments.swift`, `Int(exactly:)` on the double and the plain
+`intValue` on an integer-typed number), so `clip: 3.7` is "clip must be a
+whole number." rather than clip 3, and `3.0` is still 3. The two frame-rate
+pair readers (`AgentServer+Media.swift`, `AgentServer+Tracks.swift`) still
+read `intValue` on each half and are named here as the residue rather than
+fixed: neither half is an id, and a fractional numerator there is a different
+question from this one.
+
+**Two audits before a line was written**, both clean, and both are why the
+gate could go in without a single schema changing: a regex walk of every
+`*Arg(a, "…")` read per handler, with the helpers each handler calls, found
+**0 of 77** handlers reading a key its schema does not declare; and an AST
+walk of every literal call in `tools/proof/` found **0** literal stray keys.
+A wider walk after the fact — every wrapper that takes a tool name, not only
+`call` and `call_with` — found what the narrow one had missed, and each is a
+live instance of the defect in the repo's own instruments: `phase8_proof.py`
+and `refusal_proof.py` sent `add_track` a `kind` it does not take (five
+calls, dropped in silence since they were written; the argument is gone and
+the fixtures are unchanged, because it never did anything); `phase2_proof.py`
+MEASURED the defect — "the server has no unknown-argument guard" — with a
+stray `name` beside an identity patch, and that measurement is now a check
+that the gate refuses it; and `phase9_proof.py` asserted a `scope` on
+`get_project` and `render_frame` was "the ignored extra key it always was",
+which is now the gate's refusal by name.
+
+**What was measured.**
+
+- `make typecheck` 0 errors and the same 4 AVFoundation warnings; `make app`;
+  the startup parity log empty on every instance this record launched.
+- `tools/proof/op_argument_proof.py`: **116/116, exit 0** on the gated build
+  (86/86 at D3·5). Section 3 now reaches **57 of 57** by refusal: for every
+  op, every argument the core publishes is misspelt beside a valid control and
+  must draw the gate's sentence with EXACTLY the core's row ∪ the
+  declarations' rows ∪ {`project`, `scope`} — read back out of the sentence
+  and compared as a set — and two names no op has must draw it too, which is
+  how `remove_empty_tracks` is reached. The 51 ops with a required argument
+  are also each LEFT OUT one argument at a time, which is the
+  "the handler reads it" row the misspelling used to be. A new section 5
+  sends the same two strangers to all 20 app-state tools and compares the
+  gate's list to the catalog's, last on purpose. Two fraction rows and one
+  `3.0` control.
+- **Made to fail on purpose**, one build with the gate's call in `dispatch`
+  commented out and `whole` put back to `intValue`: **37/116, exit 1** — all
+  57 op rows red (a misspelt required argument back to "Missing required
+  argument: clip", the strangers back to "applied"), all 20 app-state rows
+  red, both fraction rows red (`delete {clips: [3.5]}` APPLIED, to clip 3),
+  and no row outside those three groups. The first mutant run, with the
+  twenty rows placed before section 4, also took six door rows down: the two
+  strangers had reached `new_project`'s handler and opened a document over
+  the fixture. The reorder is the instrument's answer to its own side
+  effect, and the mutant was run again against the script that ships.
+- Of §11.7's four unmeasured things, the third is now observed rather than
+  derived: section 3's control and left-out rows put every tool's published
+  required list to the running app, and section 2 attributes every
+  difference from the core's to a declarations row.
+- Every other MCP proof, one fresh instance each, on the final build:
+  phase 1 66/66, phase 2 **86/86** (85 before — its measurement of the
+  defect became a check of the fix), phase 3 123/123, phase 3's silence
+  scope 8/8, phase 4 84/84, phase 5 88/88, phase 6 168/168, phase 7 92/92,
+  phase 8 **79/79** (after its four `add_track kind` calls lost the
+  argument; the first run of the set stopped in its section 2 on exactly the
+  gate's sentence, because one of the four had been missed), phase 9
+  216/216, `refusal_proof.py` 116/116, `patch_door_proof.py` 261/261,
+  `op_catalog_proof.py` 23/23, `clip_catalog_proof.py` 24/24,
+  `remaining_proof.py` 79/79; every parity log empty. `recording_proof.py`
+  was not run — it records the screen for real — and its calls were
+  audited: none carries a key its tool does not declare. The proof README's
+  214 for phase 9 and 23 for the clip catalog predate this change.

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""A misspelt argument, put to all fifty-seven ops (road map 7's D3·5).
+"""A stranger argument, put to all seventy-seven tools (road map 7's D3·5, and
+the gate of kpgalligan/reelcut#21).
 
 The startup parity check gained a FIFTH part with this ticket: every op tool's
 declared arguments must be the core's own, every argument must carry a
@@ -38,23 +39,34 @@ The sections, in order:
    type, an enum, a minimum, an items, a required list — must have a row that
    says so, and each row must be visible somewhere, so a row that does nothing
    is a failure too.
-3. **A misspelt argument, for all fifty-seven ops.** For each op tool: one
-   CONTROL call with every required argument spelled right, which must not be
-   refused for a missing argument — that is the tool's required list proved
-   SUFFICIENT against the running app — and then one call per required
-   argument with that argument misspelt, which must be refused naming it. The
-   values are derived from the core's published kinds; the only names written
-   here are the six that name the five ENTITIES an id can point at, and each
-   is checked against the core's table first.
+3. **A stranger argument, for every op tool.** For each of the fifty-seven:
+   one CONTROL call with every required argument spelled
+   right, which must not be refused for a missing argument — that is the
+   tool's required list proved SUFFICIENT against the running app; one call
+   per required argument with that argument LEFT OUT, which must be refused
+   naming it — the handler reads it; and one call per argument the core
+   publishes, required or not, with that argument MISSPELT beside the
+   control, plus one carrying two names no op has, each of which must draw
+   the GATE's sentence (kpgalligan/reelcut#21, `AgentServer+Gate.swift`):
+   the tool, the stranger, and exactly what the tool takes, read back out of
+   the sentence and compared to the core's row, the declarations' rows and
+   the envelope's two keys. The values are derived from the core's published
+   kinds; the only names written here are the six that name the five
+   ENTITIES an id can point at, and each is checked against the core's table
+   first.
 
-   **Six op tools require nothing**, so no call of theirs can be refused for
-   a missing argument and the rows above cannot reach them. Their arguments
-   are measured the only other way there is: a misspelt OPTIONAL argument is
-   dropped in SILENCE by every tool, so what is read is what the op DID —
-   the same call twice, once spelled right and once misspelt, answering two
+   **Six op tools require nothing**, so no left-out row can reach them. The
+   gate reads a NAME against the schema and never whether anything reads the
+   value, so a declared argument no handler reads would pass it in silence:
+   for these six, what is read instead is what the op DID — the same call
+   twice, once with the argument and once without it, answering two
    different projects. One argument of one op cannot be separated that way
    with this fixture, and it is named in the script with its reason and
    asserted to be the whole of the exceptions.
+
+   And **a fraction where a whole number belongs** — #21's sibling, `3.7`
+   read as the id 3 — is refused rather than truncated, through the scalar
+   reader and the clip-list one.
 4. **A misspelt key INSIDE an opaque object is named by the CORE**, which is
    where the dotted path lives. An op ARGUMENT never reaches the core's
    decoder — the handlers read arguments one at a time and build the op
@@ -62,6 +74,11 @@ The sections, in order:
    names a misspelt ARGUMENT is the app's, and the sentence that names a
    misspelt KEY is the core's, which deepening D1 made the one validator of a
    patch.
+5. **The twenty tools the core calls no op**, which the gate covers the same
+   way: the same two strangers, sent alone, and the list the gate speaks
+   compared to the catalog's — the one spelling a hand-written schema has.
+   Last on purpose: on a broken gate every one of these calls reaches its
+   handler, and `new_project` opens a document over the fixture.
 
 A probe that will not build is a scored FAILURE, never an exit. The probe is
 built BEFORE the first MCP call, so no swiftc runs while the proof is driving
@@ -403,7 +420,7 @@ def names_as_missing(text, argument):
 def main():
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 4903
     log = f"/tmp/reelcut-{port}.log"
-    print("a misspelt argument, put to all fifty-seven ops\n")
+    print("a stranger argument, put to all seventy-seven tools\n")
 
     binary, error = build_probe()
     check("the probe builds — an instrument that will not compile is a FAILURE here, "
@@ -534,7 +551,7 @@ def main():
           "— a row that changes nothing is a row that does nothing", not idle,
           json.dumps(idle))
 
-    print("\n3 — a misspelt argument, for every op tool")
+    print("\n3 — a stranger argument, for every op tool")
     mcp.call("new_project")
     mcp.call("import_media", path=MEDIA)
     project = mcp.call("get_project")["project"]
@@ -572,13 +589,36 @@ def main():
         except ToolError as error:
             return str(error), None
 
+    def gated(text, name, strangers, takes):
+        """Whether `text` is the gate's own sentence for `name` — the tool,
+        every stranger, and after "It takes" EXACTLY `takes`. The list is
+        read back out of the sentence rather than searched for, so a list
+        that has lost a name or gained one fails here; the sentence's shape
+        is the app's contract, as `noSuchId`'s is. `mcp.ToolError` puts the
+        tool's name and a colon in front of what the app said, and that
+        prefix is taken off first."""
+        text = text[len(name) + 2:] if text.startswith(name + ": ") else text
+        found = re.fullmatch(r"(\S+) does not take (.+?)\. It takes (.+)\.", text)
+        if not found or found.group(1) != name:
+            return False
+        return (set(re.split(r", | and ", found.group(2))) == set(strangers)
+                and set(re.split(r", | and ", found.group(3))) == set(takes))
+
+    def rows_for(name):
+        """Arguments the declarations list adds to `name` beyond the core's
+        row — none today, and read anyway: the fifth part says a tool
+        declares the core's row PLUS its rows, and this section must not be
+        narrower than the check it exists to second."""
+        return {d["subject"]["name"] for d in declarations
+                if d["subject"]["kind"] == "argument" and d["subject"]["op"] == name}
+
+    # Two names no op has, sent together so the sentence's plural is read too.
+    STRANGERS = {"nosuchargument": 1, "nor_this_one": True}
     nothing_required = []
     for name in group:
-        required = tools[name]["inputSchema"].get("required", [])
-        if not required:
-            nothing_required.append(name)
-            continue
         published = table[name]["properties"]
+        required = tools[name]["inputSchema"].get("required", [])
+        takes = set(published) | rows_for(name) | {"project", "scope"}
         arguments = arguments_for(required, published, ids)
         # The control: with every required argument spelled right, nothing may
         # be refused for a MISSING one. That is the tool's required list proved
@@ -588,34 +628,56 @@ def main():
         if applied is not None:
             mcp.call("undo")
         wrong = [a for a in required if names_as_missing(text, a)]
-        misspelt = {}
+        # LEFT OUT: each required argument in turn, which must be refused as
+        # missing BY NAME — that is the handler reading it. Before the gate
+        # this row was a misspelling, which no longer reaches a handler.
+        unread = {}
         for argument in required:
-            probe = {a: v for a, v in arguments.items() if a != argument}
-            probe[argument + "x"] = arguments[argument]
-            text, applied = refusal(name, probe)
+            text, applied = refusal(name, {a: v for a, v in arguments.items() if a != argument})
             if applied is not None:
                 mcp.call("undo")
             if not names_as_missing(text, argument):
-                misspelt[argument] = text[:160] or "applied"
-        check(f"{name} — every one of {required} is refused BY NAME when it is misspelt, and "
-              "asked for by none of them when it is not",
-              not wrong and not misspelt,
-              f"named as missing although present: {wrong}; not named when misspelt: "
-              f"{json.dumps(misspelt)}")
+                unread[argument] = text[:160] or "applied"
+        # MISSPELT: every argument the core publishes, required or not, beside
+        # the control — and then the two names no op has. Each must draw the
+        # gate's sentence: the tool, the stranger, and exactly what it takes.
+        ungated = {}
+        for stranger in sorted(published) + [None]:
+            probe = dict(arguments)
+            if stranger is None:
+                added = dict(STRANGERS)
+            else:
+                probe.pop(stranger, None)
+                added = {stranger + "x": value_for(stranger, published[stranger], ids, 600000)}
+            probe.update(added)
+            text, applied = refusal(name, probe)
+            if applied is not None:
+                mcp.call("undo")
+            if not gated(text, name, added, takes):
+                ungated[", ".join(sorted(added))] = text[:160] or "applied"
+        check(f"{name} — every one of {required} is refused as MISSING when left out; every "
+              f"one of {sorted(published)} and two names no op has are refused by the GATE "
+              "when misspelt, naming the tool and exactly what it takes",
+              not wrong and not unread and not ungated,
+              f"named as missing although present: {wrong}; not named when left out: "
+              f"{json.dumps(unread)}; not gated: {json.dumps(ungated)}")
+        if not required:
+            nothing_required.append(name)
     # The six that require nothing, named rather than counted — four of them
     # for the declarations list's own playhead rows, which make `at` optional.
     check(f"…and the {len(nothing_required)} op tools that require nothing are NAMED rather "
-          "than counted: no call of theirs can be refused for a missing argument, so the rows "
-          "above cannot reach them, and four of these are the playhead rows",
+          "than counted: no call of theirs can be refused for a missing argument, so the "
+          "left-out rows above cannot reach them, and four of these are the playhead rows",
           nothing_required == ["add_background", "add_marker", "add_track",
                                "remove_empty_tracks", "set_canvas", "split"],
           json.dumps(nothing_required))
 
-    # …and the hole that leaves, closed the only way it can be. A misspelt
-    # OPTIONAL argument is dropped in silence — there is no refusal to read —
-    # so what is read instead is what the op DID. Every argument of all six,
-    # so an argument no handler reads is named here whether its op requires
-    # anything or not.
+    # …and the hole that leaves, closed the only way it can be. The gate
+    # reads a NAME against the schema and never whether anything reads the
+    # value, so a declared argument no handler reads passes it in silence —
+    # and for these six no left-out row can say otherwise. What is read
+    # instead is what the op DID. Every argument of all six, so an argument
+    # no handler reads is named here whether its op requires anything or not.
     def applied_project(name, arguments):
         """The whole project after `name` ran, undone again — or None if the
         call was refused, with the sentence."""
@@ -644,7 +706,7 @@ def main():
 
     def reads(name, argument, value, whole):
         """Whether the app reads `argument`: the same call twice, once with
-        it spelled right and once misspelt, answering two different projects.
+        it and once without it, answering two different projects.
 
         TWO shapes, because one is not enough for six ops at once. ALONE —
         the argument by itself against the op by itself — is the only shape
@@ -659,7 +721,6 @@ def main():
         if right is None:
             return False, f"refused: {text[:120]}"
         del arguments[argument]
-        arguments[argument + "x"] = value
         blind, text = applied_project(name, arguments)
         if blind == right:
             return False, "the project came out as if the argument were not there"
@@ -700,13 +761,34 @@ def main():
                 blind[argument] = why
                 key = f"{name}.{argument}"
                 (unread if key in UNSEPARABLE else unexpected).append(key)
-        check(f"{name} — every one of {declared} CHANGES what the op did, so misspelling it "
+        check(f"{name} — every one of {declared} CHANGES what the op did, so leaving it out "
               "is a different project: the only way to see an optional argument no handler "
               "reads", all(f"{name}.{a}" in UNSEPARABLE for a in blind), json.dumps(blind)[:400])
     check(f"…and the {len(UNSEPARABLE)} argument this fixture cannot separate is the one named "
           f"in the script, with its reason: {sorted(UNSEPARABLE)}",
           sorted(unread) == sorted(UNSEPARABLE) and not unexpected,
           f"unseparable {sorted(unread)}, unexpected {sorted(unexpected)}")
+
+    print("\n…and a fraction where a whole number belongs")
+    # The sibling defect #21 names: `intArg` read `NSNumber.intValue`, so a
+    # clip id of 3.7 was clip 3 and the edit landed on a clip nobody named.
+    text, applied = refusal("trim_start", {"clip": clip + 0.5, "to": 600000})
+    if applied is not None:
+        mcp.call("undo")
+    check("trim_start {clip: <id>.5} is refused as 'clip must be a whole number' rather than "
+          "truncated to the clip below it", "clip must be a whole number" in text,
+          text[:160] or "applied")
+    text, applied = refusal("delete", {"clips": [clip + 0.5]})
+    if applied is not None:
+        mcp.call("undo")
+    check("…and delete {clips: [<id>.5]} the same, through the list reader",
+          "clips must contain clip ids" in text, text[:160] or "applied")
+    text, applied = refusal("trim_start", {"clip": float(clip), "to": 600000})
+    if applied is not None:
+        mcp.call("undo")
+    check("…while {clip: <id>.0} is still the id — a whole number spelled as a float is a "
+          "typing slip, not a fraction",
+          "clip must be" not in text and not names_as_missing(text, "clip"), text[:160])
 
     print("\n4 — a misspelt key inside an opaque object is named by the CORE")
     doors = sorted(
@@ -753,6 +835,24 @@ def main():
         check(f"{name}.payload — the APP names payload.clips first, so the core is not "
               "reached: one reader for the two tools, and a Copy payload is not something "
               "this fixture can make", "payload.clips must be" in text, f"{text[:200]!r}")
+
+    print("\n5 — the twenty tools the core calls no op, which the gate covers the same way")
+    others = sorted(set(tools) - ops)
+    check(f"there are {TOOLS - OPS} of them", len(others) == TOOLS - OPS, json.dumps(others))
+    for name in others:
+        # A hand-written schema is the only spelling these have, so the list
+        # the gate speaks is compared to the catalog's — what a caller reads
+        # over tools/list, which here is the contract itself rather than a
+        # second copy of it. The strangers go ALONE, and this section is LAST
+        # on purpose: on the working gate no handler runs, and on a broken
+        # one every handler does — `new_project` opens a document over the
+        # fixture — so these rows sit after every row that needs it.
+        takes = set(tools[name]["inputSchema"]["properties"])
+        text, applied = refusal(name, dict(STRANGERS))
+        check(f"{name} — two names it never published are refused by the gate, naming the tool "
+              f"and exactly {sorted(takes)}", gated(text, name, STRANGERS, takes),
+              text[:160] or f"applied: {json.dumps(applied)[:80]}")
+
 
     print(f"\n{passed}/{passed + failed} checks passed")
     return 1 if failed else 0

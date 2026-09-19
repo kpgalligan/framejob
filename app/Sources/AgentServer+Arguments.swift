@@ -55,7 +55,10 @@ extension AgentServer {
     /// **What is still coerced.** A string spelling of a number or a flag
     /// (`"30"`, `"true"`) is a JSON-typing slip, not a semantic one, and
     /// every one of them is unambiguous, so those keep working. `"yes"`,
-    /// `[]` and `{}` are not among them and are now errors.
+    /// `[]` and `{}` are not among them and are now errors. So is a FRACTION
+    /// where a whole number belongs: `3.0` is the id 3 spelled as a float,
+    /// and `3.7` is not an id at all — `intValue` made it 3 in silence until
+    /// kpgalligan/reelcut#21, an edit landing on a clip nobody named.
     private func scalarArg<T>(
         _ a: [String: Any], _ key: String, _ expected: String, _ read: (Any) -> T?
     ) throws -> T? {
@@ -68,8 +71,17 @@ extension AgentServer {
 
     func intArg(_ a: [String: Any], _ key: String) throws -> Int? {
         try scalarArg(a, key, "a whole number") { raw in
-            Self.numeric(raw)?.intValue ?? (raw as? String).flatMap(Int.init)
+            Self.numeric(raw).flatMap(Self.whole) ?? (raw as? String).flatMap(Int.init)
         }
+    }
+
+    /// `number` as the whole number it IS, or nil for a fraction. A JSON
+    /// `3.0` arrives as a double and is 3; a `3.7` is nothing here, where
+    /// `intValue` would have answered 3. Exactness is asked of a DOUBLE
+    /// only: an integer-typed `NSNumber` is exact as it stands and is read
+    /// as it stands, with no trip through a double on the way.
+    static func whole(_ number: NSNumber) -> Int? {
+        CFNumberIsFloatType(number) ? Int(exactly: number.doubleValue) : number.intValue
     }
 
     func doubleArg(_ a: [String: Any], _ key: String) throws -> Double? {
@@ -243,7 +255,8 @@ extension AgentServer {
         let scope = try idScope(document)
         var ids: [UInt32] = []
         for value in raw {
-            guard let number = (value as? NSNumber)?.intValue ?? (value as? String).flatMap(Int.init),
+            guard let number = Self.numeric(value).flatMap(Self.whole)
+                    ?? (value as? String).flatMap(Int.init),
                 number >= 0, number <= Int(UInt32.max)
             else {
                 throw ToolError(message: "\(key) must contain clip ids (integers).")
