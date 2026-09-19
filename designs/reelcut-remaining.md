@@ -223,7 +223,7 @@ over-cap file here has come DOWN without anything being moved out of it;
 part of the parity check turned from a silence into a complaint; and
 `AgentCatalog+Audio.swift` **117**, untouched, its two tools having no op
 behind them. Three new app files stand against that, all under the 400-line
-cap: `app/Sources/AgentCatalog+Declarations.swift` (**314** — the fourteen
+cap: `app/Sources/AgentCatalog+Declarations.swift` (**313** — the fourteen
 rows where a tool deliberately takes more or less than its op, with a reason
 each), `app/Sources/AgentServer+Parity.swift` (**183** — the fifth part and
 nothing else) and `app/Sources/ReelOpSchema.swift` (**27**).

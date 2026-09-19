@@ -4389,9 +4389,13 @@ three of this series' reviews found a placeholder left in its place.
 
 **What landed.** Documents, and seventeen corrections to sentences that had
 gone false — thirteen of them this series' doing. No behaviour anywhere:
-the only code touched is doc comments, `make test` is 671 as before,
-`tools/list` is byte-identical, and no op, tool, export, format version or
-count moved.
+the only code touched is doc comments, `make test` is 671 as before, and no
+op, tool, export, format version or count moved. The catalog was not
+captured before and after — there was nothing in it to change — and what
+stands for that instead is the three catalog scripts run against the rebuilt
+binary: `op_catalog_proof.py` 23/23, `clip_catalog_proof.py` 24/24 and
+`op_argument_proof.py` 86/86, the last of which asserts the tool count is
+EXACTLY 77.
 
 - **The rulebook.** The root `CLAUDE.md`'s two sentences were already
   amended by #19 and were VERIFIED here rather than trusted — the op table is
@@ -4409,9 +4413,13 @@ count moved.
   app-state skip and the one thing no comparison of two lists can see; §11
   gained **D3-1**, the decision this candidate drew — *the core says what an
   argument IS; the app says what it is FOR*, with the line the series
-  actually used and the direction rule under it. §7.10's Rust module map
-  already had `op_table.rs` and `op_schema.rs`, added by the tickets that
-  wrote them; that was checked rather than added twice.
+  actually used and the direction rule under it. **That decision is written
+  LATE and the record says so**: the rulebook asks a phase to record a new
+  §11 decision before the code, and this one was drawn at D3·3 as that
+  ticket's own amendment and only written into the spec here, because #20 is
+  the ticket that was given it. What was not re-litigated is the line itself.
+  §7.10's Rust module map already had `op_table.rs` and `op_schema.rs`, added
+  by the tickets that wrote them; that was checked rather than added twice.
 - **The README.** The prose op list was missing `add_transition` and
   `set_transition_style` — spec kpgalligan/reelcut#14's user story 26 — and
   its lead-in still said a tool matches the op table by hand. All 57 rows of
@@ -4530,6 +4538,59 @@ what it leaves owed. The two probes that still skip (`preview_validity_probe`
 `phase5_chrome`'s 45 and `recording_probe`'s 2, which are the standing
 reference-tree skip.
 
+**What the review found.** Two axes, fixed point `26f393c`, spec source the
+ticket plus spec kpgalligan/reelcut#14. The **Spec** axis went criterion by
+criterion and re-derived every number here rather than trusting it: twelve
+met, the twenty-five mutant scores reproducing row for row against §8.1–§8.5,
+the drift table reproducing, and no material scope creep. The **Standards**
+axis re-derived the §3 ledger row for row and every count in the tree, and
+found no over-cap file grown and no status paragraph added anywhere.
+
+Six findings changed documents, and the first is this ticket's own sin:
+
+- **`AgentCatalog+Declarations.swift` is 313 lines and was written 314** — in
+  the ledger and in §9's table — by the ticket whose stated method is
+  regenerating against `wc -l`. It was 314 for one edit of mine and came back
+  to 313 when a paragraph was re-wrapped, and the number was carried rather
+  than re-taken. It propagated into "497 lines back", which is 496. Both
+  corrected, and the lesson is the one the ticket is about: a measurement is
+  taken once, at the end.
+- **The production-diff row did not reproduce.** 16 files and +1666/−741
+  against an actual +1665/−741, and the scope silently left out
+  `core/include/reelcut_core.h` (+17), one of the FFI's three files by the
+  rulebook's own words. It reads 17 files, **+1682 / −741** now, and the
+  verdict's "bigger by 925 lines" is **941**.
+- **`core/CLAUDE.md` line 72 was 130 columns** in a bullet that wraps at ~75:
+  the re-wrap that fixed one long line made another.
+- **Three ragged wraps** the insertions left behind, in spec §7.9, `README.md`
+  and `tools/proof/README.md`.
+- **Two imprecise sentences.** Spec §7.9 said app-state tools are skipped "by
+  part 4's own rule", where the truth is that part 5 applies the SAME rule
+  part 4 does — the core's op list — rather than depending on part 4; and the
+  declarations doc called `set_canvas.fps` "a range" where it is a floor on
+  the items.
+- **A claim this record made and had not measured**: *`tools/list` is
+  byte-identical*. No capture was taken before the rebuild, so nothing backed
+  it. What replaces it is what was measured — the three catalog scripts
+  against the rebuilt binary, `op_argument_proof.py` among them asserting the
+  catalog is EXACTLY 77 tools.
+
+Two were judged not real. **Spec §11's D3-1 is recorded after the code**:
+true, and it is #20's own instruction rather than a slip — the line was drawn
+at D3·3 as that ticket's amendment, and the record says so plainly now
+instead of implying the decision preceded the work. And **the D3 measurement
+narrative is written twice**, in the §3 ledger and in §9's table: the
+rulebook puts the over-cap LEDGER in `designs/reelcut-remaining.md` §3 and a
+phase's RECORD in its road map, so each has to carry its own number. What
+they must not do is disagree — which is exactly what the first finding was.
+
+**What was re-run for the fixes.** One Swift doc comment changed, so the app
+was rebuilt and the three scripts that read the catalog were re-run on fresh
+instances: `op_catalog_proof.py` **23/23**, `clip_catalog_proof.py` **24/24**
+and `op_argument_proof.py` **86/86**, `grep "Reelcut: "` empty on all three
+ports. `cargo fmt --check` and `make typecheck` re-run clean; no Rust source
+moved, so `make test` stands at 671.
+
 **Owed.** Nothing of this candidate's. The series' own owed items are §9's,
 and the one this ticket found and deliberately did not fix is the locked
 console's effect on `tools/proof/phase8_chrome.py`, recorded there as
@@ -4586,7 +4647,7 @@ tickets).
 | — `AgentCatalog.swift` | 472 | 524 |
 | — `AgentCatalog+Files.swift` · `+Transitions.swift` | 609 · 112 | **601** · **92** |
 | — `AgentCatalog+Audio.swift` (two composites, no op behind them) | 117 | 117 |
-| `app/Sources/AgentCatalog+Declarations.swift` | — | **314** (new, 14 rows) |
+| `app/Sources/AgentCatalog+Declarations.swift` | — | **313** (new, 14 rows) |
 | `app/Sources/AgentServer+Parity.swift` | — | **183** (new, part 5 alone) |
 | `app/Sources/ReelOpSchema.swift` | — | **27** (new) |
 | `app/Sources/AgentServer.swift` (frozen) | 771 | 774 |
@@ -4595,7 +4656,7 @@ tickets).
 | `core/src/op_table.rs` | — | **325** of its 400 cap (new) |
 | `core/src/op_schema.rs` | — | **173** of its 400 cap (new) |
 | `core/src/ffi_query.rs` | 328 | 363 |
-| the whole production diff | — | 16 files, **+1666 / −741** |
+| the whole production diff (`core/src`, `app/Sources`, the header) | — | 17 files, **+1682 / −741** |
 | hand-written `"type":` in the catalog | 172 | **57** |
 | hand-written `"enum":` | 14 | **6** |
 | hand-written `required: [` | 60 | **10** |
@@ -4637,10 +4698,11 @@ a person at the machine:
 **Deduplication or capability: this one is a deduplication that bought a
 check, and the deduplication is the smaller half.** The five catalog files
 lost 126 lines and 193 hand-written declarations, which is real; but
-`AgentCatalog+Declarations.swift` (314) and `AgentServer+Parity.swift` (183)
-put 497 lines back, and `core/src` grew by 481 even with `edit.rs` down 57.
-The honest arithmetic is that the production tree is BIGGER by **925 lines**
-(+1666 / −741 over sixteen files), and the duplication removed is measured in
+`AgentCatalog+Declarations.swift` (313) and `AgentServer+Parity.swift` (183)
+put 496 lines back, and `core/src` grew by 482 even with `edit.rs` down 57.
+The honest arithmetic is that the production tree is BIGGER by **941 lines**
+(+1682 / −741 over seventeen files, the hand-maintained header among them),
+and the duplication removed is measured in
 declarations rather than in lines. What those lines bought is the thing D1's
 and D2's arithmetic also bought: **an op tool has no PLACE left to write an
 argument schema in** — `opTool` takes prose and nothing else, and a

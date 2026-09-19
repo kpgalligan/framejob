@@ -2365,15 +2365,16 @@ not got is named as stale. Because the catalog prints STRUCTURE and writes
 only PROSE, the same part also complains about an argument that would reach an
 agent with no description at all, and about a description written for an
 argument the table has never heard of, which is how a misspelt prose key is
-caught rather than dropped in silence. App-state tools are skipped by part 4's
-own rule — the core's op list. What no comparison of two lists can see is a
+caught rather than dropped in silence. App-state tools are skipped by the same rule
+part 4 uses — the core's own op list, which has no row for a tool with no op
+behind it. What no comparison of two lists can see is a
 CALL: that an argument the catalog prints is one a hand-written handler really
 reads is put to the running binary by `tools/proof/op_argument_proof.py`
 instead, one misspelt argument per op.
 
-The scope
-is read ONCE per call, at the dispatch, and an op with no `scope` of its own
-follows the nest the app has OPEN — a call and the window agree about which
+The scope is read ONCE per call, at the dispatch, and an op with no `scope`
+of its own follows the nest the app has OPEN — a call and the window agree
+about which
 container they mean, or `get_project` would list clips the very next op could
 not name. An EXPLICIT scope outranks the open view. Plus
 `set_scope {nest?, clip?}` (the mirror of the double-click and Clip ▸ Open

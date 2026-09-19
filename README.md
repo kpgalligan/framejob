@@ -303,8 +303,8 @@ module doc of `core/src/edit.rs`, and what it TAKES is `core/src/op_table.rs`,
 which every op tool PRINTS rather than restates, so a tool's arguments are
 the core's by construction and only its prose is the app's. Same name, same
 argument names — and each of them also takes **`scope`**, a nest id, which
-applies that one op inside
-that nest (`core/src/scope.rs`). Seven refuse it by name, because they have
+applies that one op inside that nest (`core/src/scope.rs`). Seven refuse it
+by name, because they have
 no meaning in there: the three marker ops, `set_canvas` and the three media
 ops. And a scoped op can fail where an unscoped one cannot, which is worth
 knowing before reading a result: the clip and track caps and the nesting

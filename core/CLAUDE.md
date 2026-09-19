@@ -69,8 +69,9 @@ file is what governs a module now.
   published only where the core REFUSES outside it** — `set_canvas`'s two
   dimensions, sourced from `edit_canvas.rs`'s own constants and never
   retyped — and never where it CLAMPS, which is the app's to say in its
-  prose. A row holds no prose, no semantics and no default spelled twice; `Kind` is closed, carries each vocabulary's members, and
-  has exactly ONE kind per answer serde gives, because a distinction the
+  prose. A row holds no prose, no semantics and no default spelled twice;
+  `Kind` is closed, carries each vocabulary's members, and has exactly ONE
+  kind per answer serde gives, because a distinction the
   decoder cannot see is one no test could prove. Nothing here is the
   authority — the enum's fields are, and `core/tests/op_table.rs` proves
   every row by asking the decoder. Capped at 400 lines like any new module:

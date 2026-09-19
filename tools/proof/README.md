@@ -2691,8 +2691,8 @@ hand-written handler really reads.
 Its values are derived from the core's published kinds rather than typed: an
 id by name (six names for five entities — `clips` is a list of the id space
 `clip` draws from — the only argument names the script types, each checked
-against the core's table first), a time as a second per
-argument in table order, a bound's own minimum, a vocabulary's first member.
+against the core's table first), a time as a second per argument in table
+order, a bound's own minimum, a vocabulary's first member.
 The two `payload` doors are named rather than skipped: the app checks a
 payload's shape before forwarding, so the core cannot be reached through them
 without a whole Copy payload, and what is true of them is asserted instead.

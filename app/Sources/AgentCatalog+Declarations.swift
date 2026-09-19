@@ -98,8 +98,8 @@ struct AgentDeclaration {
     /// it may NARROW what the core published and never relax it** — a
     /// `minimum` tighter than the core's is a truer promise, one looser than
     /// the core's is a false one, and nothing here can tell the two apart.
-    /// All five rows that use it today NARROW — `set_speed.rate` and
-    /// `set_canvas.fps` a range, and three lists a `minItems` — which is why
+    /// All five rows that use it today NARROW — `set_speed.rate` a range,
+    /// `set_canvas.fps` a floor on its items, three lists a `minItems` — so
     /// the rule is written down rather than enforced: a guard that silently
     /// dropped the key would put a row in the list that does nothing, which
     /// is the trap this file's one shared predicate exists to avoid.
