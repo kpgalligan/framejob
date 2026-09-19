@@ -5077,5 +5077,236 @@ Not answered here, and each changes the size of the thing:
    it is app arithmetic or core arithmetic, which is D3's own question asked
    about a number rather than about an argument.
 
-**The other candidates §9 names still stand**, and the one §9 recommends is
-still the agent handlers forwarding a caller's whole op to the core unread.
+**The other candidates §9 names still stand**, except the one §9 recommends:
+the agent handlers forwarding a caller's whole op to the core unread was
+measured in §11 and retired, and the defect it existed to fix is tracked as
+kpgalligan/reelcut#21.
+
+---
+
+## 11. The candidate §9 recommended, measured — the handler forward
+
+**Measured on 2026-09-19, before any grilling round was answered, and not
+started.** §9 closed D3 by naming the next candidate: *"the agent handlers
+forward a caller's whole OP to the core unread"* — D1's rule one level up,
+from the Patch to the envelope. Two scouts measured what that would cost
+before a single design question was put to the user, and the answer changed
+the candidate's shape. This section is those measurements. Nothing in it is a
+decision. §0 holds the rules any deepening here inherits.
+
+The sentence at the end of §9 should now be read with this section beside it:
+the candidate it names is **possible and not advisable in the form it names**,
+and the thing worth doing is smaller than the thing it describes.
+
+### 11.1 The forward is mechanically possible — that part holds
+
+Checked over all 57 ops mechanically, not sampled: `OP_TABLE`'s argument names
+parsed out of `core/src/op_table.rs`, and every `a.put("…")` preceding each
+`ReelOp(name:)` parsed out of `app/Sources/ReelOps.swift`.
+
+- **Zero key-name mismatches.** For all 57 ops the set of keys the app writes
+  is exactly the set of argument names the core publishes. Swift's camelCase
+  parameters (`toEnd`, `withClips`, `keepPitch`, `rescaleClips`) are mapped to
+  the wire spelling at the `put` call.
+- **Zero renames** between the caller's key and the core's argument, measured
+  the same way over the 57 handler bodies.
+- **One path.** `ReelOp(name:)` is constructed in 57 places, all inside
+  `ReelOps.swift`; a repo-wide grep finds none elsewhere. `app/CLAUDE.md`'s
+  rule that no op JSON is written by hand anywhere else HOLDS.
+- **D1 already built the seam.** Eleven `…Raw` factories forward a caller's
+  object unread today (`addTextClipRaw`, `setVideoRaw`, `addZoomActionRaw`,
+  `setCanvasRaw` and seven more). What is left to forward is exactly the
+  SCALAR layer — which is the layer every coercion and every guard lives in.
+
+**The classification of the 57 handlers**, a handler counting in more than one
+bucket:
+
+| Bucket | Count |
+|---|---|
+| Pure forward — no per-op transform, no app-state default, no extra work | 41 |
+| …of those, byte-identical to what the caller wrote | 24 |
+| …of those, value-changed only by the shared tick snap | 17 |
+| Forward + an argument defaulted from APP STATE | 6 |
+| Forward + a per-op transform written in that handler | 11 |
+| More than the op (work after the edit) | 4 |
+| Handlers applying more than one op | **0** |
+| Handlers that mutate selection, playhead, scope or range | **0** |
+
+### 11.2 What a blind forward would cost — 21 refusals
+
+The handlers are not only reading arguments. They hold **21 refusals the core
+would not make**, and almost every one converts a silent `Outcome::Identity`
+into a sentence naming what the caller left out. Losing them is the reason
+the candidate as named is not advisable.
+
+Seventeen are per-op, of the shape *"`set_track` needs at least one of name,
+hidden, muted, locked, solo."* — `set_track`, `set_marker`, `set_canvas`,
+`set_action`, `set_enabled`, `set_transition_style`, `lift_range`,
+`ripple_delete_range`, `ripple_delete_ranges`, `insert_time`, `paste`,
+`paste_attributes` (twice), `set_transition`, `set_transition_duration`,
+`add_zoom_action`, `set_canvas`'s `fps` pair. Four are cross-cutting: the
+empty-`clips` refusal over the twelve ops with that argument, an explicit
+null `kind` on `add_transition`, `checkDocumentLevelTicks`, and
+`relink_media`'s file-exists check.
+
+**Three of them are not niceties.**
+
+- **`checkDocumentLevelTicks`** (`app/Sources/AgentServer+Scope.swift:243`)
+  refuses `add_marker`, and `set_marker` when it carries a time, whenever a
+  nest is OPEN in the view and the call sent no explicit `scope`. Without it
+  the op is sent unscoped, the core accepts it, and **the marker lands at the
+  wrong project time with an `ok` on it**. There is no core equivalent. This
+  is a correctness guard, not a message.
+- **`add_zoom_action.region`.** The core cannot tell an absent key from an
+  explicit null — both mean a zoom BACK, stated at
+  `core/src/edit_zoom.rs:229`. The TOOL therefore requires the key
+  (`app/Sources/ReelOps.swift:918`) so that a forgotten rectangle cannot
+  become a zoom-back. A raw forward deletes that distinction and a forgotten
+  rectangle silently becomes a zoom-back. **The clearest single regression a
+  forward would cause.**
+- **`set_transition.kind`.** The op calls it optional and reads a null as
+  "clear"; the tool makes it required so that a forgotten kind is not a
+  clear. Same shape as the zoom case, already carried as a declarations row.
+
+**Two refusals survive a forward** because they live in the shared tail rather
+than in a handler: `AgentServer.swift:596` turning the core's Identity into
+*"made no change: the project is already in that state"* for all 57, and the
+handle-pointer guard at `:627`.
+
+**Six handlers fill an argument the caller omitted, from app state**, which no
+forward can do: `split`, `freeze_frame`, `paste` and `add_marker` default `at`
+to `document.playhead`; `add_track` defaults `index` to the track count of the
+container the call is editing; `relink_media` mints a security-scoped
+bookmark. All four `at` rows are already declared optional-at-the-tool in
+`AgentCatalog+Declarations.swift`.
+
+**Eleven handlers transform per op**, the largest being `add_media`, which
+decodes the caller's `descriptor` by hand and re-encodes it into nine
+always-present keys with seven defaults. The rest are enum round-trips to
+`rawValue`, `fps`'s bare-number expansion to `[n, 1]`, and the bare-string
+expansions for `add_text_clip.text` and `add_shape_clip.shape`.
+
+**And the envelope does not survive as-is**: the core strips `"scope"` before
+the typed decode (`core/src/edit.rs:649`) but does NOT strip `"project"`, so
+a whole-envelope forward trips `deny_unknown_fields` on the one key every tool
+carries.
+
+### 11.3 What the core actually says, if it were asked
+
+Measured from `core/src` and from the assertions in `core/tests`, with the
+serde format strings traced into the vendored crate rather than assumed.
+
+- **An unknown key is refused and the legal fields are LISTED**:
+  `op "delete" is not valid: unknown field `clipid`, expected `clips``.
+  `core/tests/op_table.rs:220` drives all 57 ops through the FFI and asserts
+  the list serde prints is exactly the table's argument names.
+- **A missing required field** is pinned with `assert_eq!` over all 91
+  required arguments (`core/tests/op_table.rs:244`) — no trailing
+  `at line…column…`, because the typed decode is `from_value` and not
+  `from_str`.
+- **A wrong type names the TYPE and never the ARGUMENT**, and this cannot be
+  fixed by adding the path tracker. `Op` is internally tagged, so serde
+  buffers each variant and replays it; `serde_path_to_error` gets no path out
+  of that and answers `.`. Recorded as a measured fact in
+  `core/tests/op_table.rs:19`. On a seven-argument op with two tick
+  arguments, `invalid type: string "soon", expected i64` does not say which.
+  **Today the Swift reader names it.** This is the one place a forward would
+  make an agent's life harder rather than easier.
+- **A decode failure is the `err_out` arm** — invalid input, not a refusal
+  and not an identity. Confirmed at `core/src/ffi_util.rs:102` and pinned for
+  every call in the suite by `core/tests/common/mod.rs:274`.
+
+### 11.4 Two measurements taken at this machine
+
+The core scout named the JSON float question as something it could not settle
+by reading the tree, and would not guess at. It was settled by running it,
+which is the honest way to answer it. Darwin's Foundation, which is the only
+one this app ships against:
+
+- **A whole float survives the round trip as an integer.** `3.0` → `3`,
+  `90000.0` → `90000`, `3e0` → `3`, `-2.0` → `-2`, and Swift's own
+  `Double(3.0)` also writes `3`. `JSONSerialization` parses them as doubles
+  (`objCType d`) and re-emits them with no decimal point, so serde accepts
+  them as `i64`. **A forward would not break a caller whose encoder writes
+  whole floats.** This behaviour is observed and NOT documented: anything that
+  depends on it wants a proof row pinning it, not a comment trusting it.
+- **A fractional number is silently truncated TODAY.** `intArg` reads
+  `NSNumber.intValue`, so `"clip": 3.7` becomes clip 3 and `-3.7` becomes
+  `-3`, with nothing said. Measured directly. This is the same class of defect
+  as the silent drop below — a wrong call given a plausible answer — and it
+  is not currently recorded anywhere else.
+
+### 11.5 The defect the candidate exists to fix, stated exactly
+
+- **A misspelt REQUIRED argument** is reported, but under the wrong name. The
+  correct key is absent so its reader throws *"Missing required argument: to"*
+  — the caller is never told that `too` was the thing it wrote.
+- **A misspelt OPTIONAL argument is dropped in SILENCE and the edit
+  succeeds.** `add_track {index: 2, nmae: "B roll"}` applies and the track
+  lands with the core's default name. `tools/proof/op_argument_proof.py`
+  section 3 records this as a measured property of every tool.
+- **An argument no op takes is ignored entirely.** No handler ever enumerates
+  the caller's keys, so `trim_start {clip: 5, to: 100, ripple: true}` applies
+  cleanly. The core WOULD have refused it by name; it never gets the chance,
+  because an op argument never reaches the core's decoder at all.
+
+### 11.6 The smaller shape the measurement points at, and what was decided
+
+**Decided on 2026-09-19, by the user delegating the call**: this is logged as
+a DEFECT and not as a fourth deepening, and **the deepening series ends at
+three candidates**. The reason is the measurement above. A deepening puts a lot
+of behaviour behind a small interface; what is left here is one comparison at
+a chokepoint that nobody makes. Calling it D4 would misdescribe both the change
+and the series, and it would leave §9's closing sentence looking like a plan
+that was followed rather than one that was measured and retired.
+
+What the defect is, and the shape of its fix:
+
+Every tool already PUBLISHES its own argument list, and
+`AgentServer+Parity.swift` already computes each tool's legitimate set at
+startup (the core's table ∪ the declarations rows). **Nothing asks that
+question at CALL time.** One comparison at dispatch — the caller's keys
+against the schema that tool published, the strangers refused by name — would
+fix the silent drop for every tool at once while keeping all 21 refusals, all
+6 app-state defaults, all 11 transforms and every lenient reader. It deletes
+nothing, so it pays no size toll. **Tracked as kpgalligan/reelcut#21.**
+
+**The instrument must not read the catalog.** This is D3's own rule, paid for
+twice there: a check derived from the thing it checks cannot see a constraint
+go missing. The instrument is a misspelt argument sent over MCP to the RUNNING
+app — which `op_argument_proof.py` section 3 already is, reaching 51 of 57
+today for exactly the reason this section is about.
+
+**Two choices inside that shape, taken here so a later session does not
+re-open them.** The gate covers **all 77 tools** and not only the 57 ops —
+the app-state tools have the same defect and the comparison reads a published
+schema either way. And it speaks the **app's** sentence, naming the tool and
+listing what it does take, rather than the core's serde wording: the gate
+enforces the TOOL's published schema, twenty of those tools have no core
+sentence to borrow, and the app's existing refusals (`AgentIdScope.noSuchId`)
+already set that house style.
+
+**The size ledger a rewrite would have to pay first**, and a gate would not:
+`AgentServer+Clips.swift` is **847** lines against a ~600 cap,
+`AgentServer.swift` is **774** and frozen at wiring, `AgentServer+Scope.swift`
+is **592**, `AgentServer+Render.swift` **563**, `AgentServer+Recording.swift`
+exactly **400**. The whole `AgentServer*.swift` group is 6215 lines over 19
+files.
+
+### 11.7 What is NOT measured
+
+Carried from the scouts' own limits rather than glossed, because each is a
+thing a later session might otherwise assume was checked.
+
+- Whether `Project::snapped` is really called for every tick argument of every
+  op. 50 call sites across 12 `edit_*.rs` files were counted and the doc
+  comment claiming universality was read; the 27 tick-taking ops were not
+  checked one by one.
+- Whether a `null` sent for one of the four defaulted `bool` fields is tested
+  anywhere. No such test was found; the claim that it is a decode error is
+  derived from serde's types, not from an assertion in `core/tests`.
+- The exact required-list each tool publishes at runtime. It was derived from
+  the catalog's own computation and agrees with the count
+  `op_argument_proof.py` asserts, but it was derived rather than observed.
+- Nothing here was checked against a RUNNING app. Both scouts read source; the
+  only things measured at the machine are §11.4's two.
