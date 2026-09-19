@@ -2751,3 +2751,47 @@ order, a bound's own minimum, a vocabulary's first member.
 The two `payload` doors are named rather than skipped: the app checks a
 payload's shape before forwarding, so the core cannot be reached through them
 without a whole Copy payload, and what is true of them is asserted instead.
+
+## The marquee, from anywhere empty (`marquee_probe.py`)
+
+`python3 tools/proof/marquee_probe.py`, no port and no running app,
+**28/28**. Spec §4.4's rubber band has been in the tree since M1
+(`RangeSession`), and it could only START inside a lane:
+`TimelineContentView.hit(at:)` answered `.none` for the 4 pt strip under the
+ruler and for everything below the last lane, and `beginGesture` swallows
+`.none` — so with one or two tracks, the room a person naturally presses in
+to band the clips above it did nothing at all. The fix is a hit case,
+`.outside`, and one `beginMarquee` that both it and `.lane` call
+(2026-09-19).
+
+A gesture is not an op and a selection is view state, so no MCP call can
+reach any of it, and a photograph cannot show what a press DID. The
+instrument is `refusal_probe.py`'s: a probe compiled out of `app/Sources`
+over `harness/build.sh`'s own swiftc line, cached on modification times, a
+build failure a scored FAILURE. It puts a bare `TimelineView` at 1000 × 320
+over two tracks of four text clips (A 0–10 s and B 12–20 s on the back
+track, C 2–8 s and D 14–22 s on the front) and drives the three entry
+points a mouse event reaches — `beginGesture`, `continueGesture`,
+`endGesture` — with synthetic points, reading the hit test, the live
+session, the selection and every post through `onSelectionChanged` and
+`onEdit`. Five sections: what a press lands on (a lane's gap is `.lane`,
+the room below and the strip above are `.outside`, the header column under
+the lanes is still `.none`, and the room below the lanes is INSIDE the
+content view's frame, which is what makes a real press there reach the hit
+test); the band from a lane, the control; the band from below, from above,
+and ⇧ from below adding; a press with no drag (a click clears and posts
+once, a ⇧-click keeps, a double-click below closes no gap where one in a
+lane's gap still asks for Close Gap); and the band's rules wherever it
+starts (⇧ adds, a band over nothing ends empty, a locked track is skipped,
+a band with no height still reads as the line it is).
+
+**Made to fail on purpose**, twice. The new guard put back to `.none` —
+the old code — scores **19/28** and takes exactly the nine rows that press
+outside a lane, and nothing else. `beginMarquee` without its clear scores
+**27/28**, taking the bare-click row alone: a DRAG over nothing still ends
+empty because `RangeSession` replaces rather than adds, so the click with
+no drag is the one row that can see the press-time clear.
+
+What it cannot see is a real `mouseDown` delivered by AppKit below the
+lanes — `designs/reelcut-remaining.md` §4 lists it for a person at the
+machine.

@@ -651,12 +651,12 @@ final class TimelineView: NSView, NSTextFieldDelegate {
                 closeGap(row: row, at: time)
                 break
             }
-            if !flags.contains(.shift), !selection.isEmpty {
-                selection = []
-                onSelectionChanged?(selection)
-            }
-            marquee = RangeSession(
-                origin: point, additive: flags.contains(.shift), base: selection, current: point)
+            beginMarquee(at: point, flags: flags)
+
+        case .outside:
+            // Above the first lane or below the last: the same band, with
+            // no row to close a gap in, so a double-click is two bands.
+            beginMarquee(at: point, flags: flags)
         }
         content.needsDisplay = true
     }
@@ -870,6 +870,21 @@ final class TimelineView: NSView, NSTextFieldDelegate {
         guard selection != ids else { return }
         selection = ids
         onSelectionChanged?(selection)
+    }
+
+    /// A press on empty timeline space — a lane's gap, or above or below
+    /// the lanes: a bare press clears the selection and ⇧ keeps it, then the
+    /// band starts (`RangeSession`). One body for `.lane` and `.outside`, so
+    /// the two places a band can start cannot drift apart. The clear is
+    /// posted at the press rather than at the first drag, which is what
+    /// makes a bare CLICK on empty space deselect.
+    private func beginMarquee(at point: CGPoint, flags: NSEvent.ModifierFlags) {
+        if !flags.contains(.shift), !selection.isEmpty {
+            selection = []
+            onSelectionChanged?(selection)
+        }
+        marquee = RangeSession(
+            origin: point, additive: flags.contains(.shift), base: selection, current: point)
     }
 
     private func selectClip(_ id: UInt32, flags: NSEvent.ModifierFlags) {
@@ -1193,9 +1208,8 @@ final class TimelineContentView: NSView {
             return .header(row: row)
         }
 
-        guard let row = layout.row(atY: point.y), let track = owner.track(atRow: row) else {
-            return .none
-        }
+        guard let row = layout.row(atY: point.y) else { return .outside }
+        guard let track = owner.track(atRow: row) else { return .none }
         for clip in snapshot.clips(onTrack: track.id) {
             let rect = layout.clipRect(clip, row: row)
             guard point.x >= rect.minX - 1, point.x <= rect.maxX + 1 else { continue }

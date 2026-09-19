@@ -251,7 +251,7 @@ row per op.
 |---|---|
 | `app/Sources/ProjectSnapshot.swift` | 2516 |
 | `app/Sources/InspectorPane.swift` | 1665 |
-| `app/Sources/TimelineView.swift` | 1630 |
+| `app/Sources/TimelineView.swift` | 1644 |
 | `app/Sources/ReelCore.swift` | 1542 |
 | `app/Sources/VideoPane.swift` | 1411 |
 | `app/Sources/Compositor.swift` | 1391 |
@@ -293,7 +293,7 @@ when a fix took each over its line — and left two files AT the cap:
 | `CompositionBuilder.swift` | 601 | AT the cap since road map 3's held tail (+83); the next addition pays first — the audio-parameter half (`audioParameters` and the `AudioTap.make` call) is the natural cut |
 | `ReelOps.swift` | 925 | Created by `b410125` at 853. It is a TABLE — one factory per row of `edit.rs`'s op table — so it has the same standing exemption `edit.rs` has on the Rust side |
 | `ProjectDocument.swift` | 1348 | Stored properties cannot move to an extension; the natural cut is the media/reverse machinery, NOT the scope. `ProjectDocument+DisplayStem.swift` is the shape a pure addition takes meanwhile; road map 3 added ONE internal method (`adoptImported`, +12 lines) so `ProjectDocument+Recording.swift` could build the untitled document by File ▸ Open's own spelling |
-| `TimelineView.swift` | 1630 | Frozen. Of the five lines the cache marker added, one is behaviour (the hit-clearing under `replaced`) |
+| `TimelineView.swift` | 1644 | Frozen. Of the five lines the cache marker added, one is behaviour (the hit-clearing under `replaced`); the marquee's `.outside` case and `beginMarquee` added fourteen net on 2026-09-19, the dispatch the file says it holds |
 | `ExporterWriter.swift` | 1114 | Over since phase 7; its seam — the settings/encoder half — is still unpaid |
 | `AgentServer+Clips.swift` | 1196 | Over since phase 6. Road map 7's D1·3, D1·4 and D1·5 took it to **847** by deleting what the agent door used to check by hand — the last of it `checkActionPatch`, `checkVideoEnums`, `checkTextEnums`, the three per-group key sets and the region reader. D1·6 took the shared launder out of `AgentServer+Arguments.swift` (562 → **445**, under the cap and not in the list above), so the whole `AgentServer*` family is **617 lines smaller than before D1**. The seam still unpaid here is the clip-placement handlers against the property doors |
 
@@ -370,6 +370,12 @@ and the closing above added the rest.
   is honest and not a pass — those six are simply UNMEASURED on a locked
   machine, which is why they are listed here: only a run at an unlocked screen
   asks them at all.
+- **The band from below the lanes, with a real mouse.** `marquee_probe.py`
+  (2026-09-19) drives `TimelineView`'s three gesture entry points with
+  synthetic points and shows the room below the lanes is inside the
+  content view's frame, so a real press there reaches the same hit test;
+  nobody has yet pressed a mouse there in the running app and watched the
+  band draw and the selection block count up.
 
 ---
 

@@ -167,6 +167,26 @@ lockstep are in the root `CLAUDE.md`; the full design is
   covers. And **the in/out range is cleared on every scope change**
   (`setNestPath`), because a pair of ticks means one thing inside a nest and
   another to an export.
+- `TimelineView.swift` · `TimelineSessions.swift` — **the marquee's reach
+  (2026-09-19).** `RangeSession` had banded a selection since M1, but a
+  band could only START inside a lane: `hit(at:)` answered `.none` for the
+  4 pt strip under the ruler and for everything below the last lane, and
+  `beginGesture` swallows `.none` — so with one or two tracks the room a
+  person naturally presses in to band the clips above it did nothing. The
+  frozen file grew a `.outside` hit case for that room (the header column
+  under the lanes stays `.none`, and so does a content view with no owner)
+  and one private `beginMarquee` that both `.lane` and `.outside` call, so
+  the two starting places cannot drift: a bare press clears the selection
+  AT THE PRESS, ⇧ keeps it, then the band starts. Fourteen lines net,
+  inside the frozen file's allowance, because they are the dispatch the
+  file says it holds. A double-click in that room closes no gap — there is
+  no row to name — which is why `.lane` keeps its row and `.outside`
+  carries nothing. Measured by `tools/proof/marquee_probe.py`, a probe over
+  `app/Sources` that drives the three gesture entry points with synthetic
+  points, **28/28**; the old guard put back takes exactly the nine rows
+  that press outside a lane (19/28), and the clear removed takes the
+  bare-click row alone (27/28). A real mouse pressed there is
+  `reelcut-remaining.md` §4's.
 - `LayerRenderers.swift` · `LayerRenderersText.swift` — text and shape
   descriptions to textures, and
   since format version 5 the three text REVEALS (spec §5.2's

@@ -652,8 +652,12 @@ begins, which was the whole complaint.
   new length.
 - Overlapping a neighbour on the same track makes a transition (default
   Cross Dissolve). Clips never push each other.
-- Marquee-select on an empty lane; ⇧-click adds; ⌘A selects all; ⌥⌘A
-  selects everything after the playhead (then drag to insert time).
+- Marquee-select from any empty timeline space — a lane's gap, the strip
+  under the ruler, or the room below the last lane, which with two tracks
+  is most of the pane — across tracks, skipping locked ones; a bare press
+  clears the selection first and ⇧ keeps it. ⇧-click adds; ⌘A selects
+  all; ⌥⌘A selects everything after the playhead (then drag to insert
+  time).
 - ⌘T splits the selected clips at the playhead, or every unlocked clip
   under the playhead when nothing is selected.
 - W / E trim the selected clip's start / end to the playhead.

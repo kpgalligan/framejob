@@ -39,9 +39,17 @@ enum TimelineHit: Equatable {
     case clip(UInt32)
     case clipEdge(UInt32, TimelineEdge)
     case fade(UInt32, TimelineEdge)
-    /// Empty lane: a marquee.
+    /// Empty lane: a marquee. The row is for the double-click, which closes
+    /// the gap it landed in.
     case lane(row: Int, time: Ticks)
-    /// Outside everything (below the last lane).
+    /// Empty space ABOVE the first lane or BELOW the last, right of the
+    /// header column: a marquee too. With two tracks most of the pane is
+    /// this — the place a person naturally starts a band — and a press here
+    /// once answered `.none` and did nothing. It names no row, so a
+    /// double-click here closes no gap.
+    case outside
+    /// Nothing: the header column under the last lane, or a content view
+    /// with no owner.
     case none
 }
 
@@ -298,8 +306,9 @@ struct RollSession {
 
 // MARK: - Marquee
 
-/// Rubber-band selection on an empty lane. ⇧ adds to what was already
-/// selected; a bare drag replaces it.
+/// Rubber-band selection from empty timeline space — a lane's gap, or the
+/// room above the first lane and below the last (`TimelineHit.lane` and
+/// `.outside`). ⇧ adds to what was already selected; a bare drag replaces it.
 struct RangeSession {
     let origin: CGPoint
     let additive: Bool
