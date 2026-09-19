@@ -4873,3 +4873,186 @@ identity and a refusal are still told apart by reading the source; the
 **source-window arithmetic written ten times**; and the **cross-build
 reference instrument**, which has now been unbuildable for two whole
 deepenings.
+
+---
+
+## 10. The next candidate, scouted — the source window
+
+**Scouted on 2026-09-18, after D3 merged, and not started.** Nothing here is
+a plan: it is the measurement a grilling session would otherwise have to
+re-derive, written down because the claim it replaces was a single sentence
+in an architecture review and three of that sentence's four numbers turned
+out to be wrong or ambiguous. Read §0 first for the rules any deepening in
+this series inherits.
+
+**The review's claim, verbatim**: *"'Advance in by Δ × speed, round, guard,
+saturate' is written six times in the core and four more in Swift, the
+head/tail clamp takes three arithmetic forms, the commit tail is copied
+eleven times, and the reversed mirror is spelled twice."*
+
+### 10.1 What is actually duplicated, counted
+
+**The three readers are already one module and are not the problem.**
+`core/src/model_query.rs:134` `content_length`, `:155` `source_head` and
+`:174` `source_length` sit in one `impl Project` block, each with a doc that
+names the other two. Their nine callers are `edit_clip.rs:625, 675, 713,
+858`, `edit_edge.rs:91, 154, 157` and `edit_transition.rs:469, 484`. **The
+one hazard in them is an asymmetry the signatures do not carry**:
+`content_length` answers in SOURCE ticks (× speed) while `source_head` and
+`source_length` answer in TIMELINE ticks (÷ speed). Only the prose says so,
+and three of the arithmetic forms below exist because a caller had to convert
+back.
+
+**"Advance in by Δ × speed" — six sites in the core, confirmed.** Every one
+multiplies a tick delta by `clip.speed`, rounds, guards on `is_finite`
+falling back to `0`, then `saturating_add`s into `r#in` and takes `.max(0)`:
+`edit_clip.rs:642` (`trim_start`), `edit_edge.rs:69` (`slip`),
+`edit_edge.rs:183` (`roll`), `edit_split.rs:103` (`split_clip`, where every
+splitter routes), `edit_time.rs:489` (`freeze_frame`) and
+`edit_transition.rs:102` (`add_transition`, the only one that SUBTRACTS).
+Four of the six already carry a comment pointing at one of the others —
+`edit_edge.rs:34`, `edit_transition.rs:99`, `edit_clip.rs:611`, `edit.rs:104`
+— which is the shape of a module that wants to exist.
+
+**"Four more in Swift" is the number to distrust.** There are five sites, and
+**none of them is a gesture session**: `TimelineSessions.swift` contains no
+`speed` token at all, and `TrimSession`, `SlipSession` and `RollSession` hand
+raw timeline ticks to the op on purpose (`TimelineSessions.swift:245`, `:277`
+say why). `ClipPane`'s timing section types straight into `trim_start` /
+`trim_end` and clamps nothing (`ClipPane.swift:196`). So the app does **not**
+duplicate the edit arithmetic — the five sites are a PREVIEW
+(`TimelineView.swift:951`, the filmstrip and waveform), three ANALYSIS
+readers (`MediaPeaks.swift:173`, `Transcriber.swift:488` and `:675`, the last
+being the inverse) and one SHEET readout (`SpeedSheetController.swift:167`),
+and two of those already document themselves as deliberate mirrors of the
+core's own function. **Any candidate that promises to delete Swift code here
+is promising something that is not there.**
+
+**The head/tail clamp really does take three forms, and they disagree about
+more than spelling.**
+
+- **Form A, clamp the edge TIME in timeline space** against `source_head` /
+  `source_length` offset from the clip's `start`: `edit_clip.rs:625` and
+  `:675`, `edit_edge.rs:154` (which clamps against two different clips).
+- **Form B, clamp the IN POINT in source space** against
+  `media.duration − content_length`: `edit_edge.rs:87` (`slip`), with its own
+  `Source::Still` arm.
+- **Form C, reduce head and tail to a COUNT OF WHOLE FRAMES**:
+  `edit_transition.rs:466` and `:484`.
+
+The disagreement worth recording is what `None` means. In Form A a `None`
+from the reader means **unbounded, apply no clamp**; in Form C it means
+**zero handle**, and `Source::Nest` means zero while `_ => return None` means
+unbounded — two opposite meanings inside one `Option` in one function. And
+the tail is spelled four ways across the crate: `source_length − duration`
+(Form A), `duration − content_length` (Form B), `duration − frame`
+(`edit_time.rs:499`, `freeze_frame`) and `duration − 1`
+(`evaluate.rs:245`, `segment_of`).
+
+**"The commit tail is copied eleven times" depends entirely on where the
+block is cut, and the honest answer is a range**: 5 byte-exact copies
+(`edit_clip.rs:656`, `:684`, `:722`, `:872`, `edit_transition.rs:575`), 14
+`check_overlap_rule` → `Ok(Outcome::Refused(why))` guards, 17
+`set_gained_transitions` + `self.finish(next)` pairs, 12 functions carrying
+both, and 10 where the guard is the pre-commit trial on `self` rather than on
+`next` — 11 if `roll` is counted, which has the guard and the finish but
+deliberately no `set_gained_transitions`. **This is a second candidate
+wearing the first one's clothes**: the commit tail is about purity, the
+overlap rule and undo, not about the source window, and it should be judged
+on its own.
+
+**The reversed mirror is spelled twice, both in Swift, and the core has none
+on purpose.** `core/src/edit_clip.rs:891` argues it: `in` is measured in the
+stream the clip PLAYS, so reversing keeps `in` and shows different frames,
+and "advancing it to keep the same frames would be a second convention, and
+every trim, split and `source_length` in the crate would need to know which
+one was in force." The two app spellings are `MediaPeaks.swift:142` (pivot
+`lo = pivot − last`, `hi = pivot − first`) and `ReverseRenderer.swift:704`
+and `:712` (`total − following`). **They agree by convention only** — both
+pivot on the media's MODEL duration — with nothing shared and nothing
+asserting they match.
+
+### 10.2 The two bugs: both fixed, and that is the point
+
+**Neither is open, and a candidate that says otherwise is wrong.** Both are
+road map 2's, in `designs/reelcut-roadmap-2.md`'s "Reviewed, and five real
+defects fixed", and each has a named regression test and a "why" comment at
+the site.
+
+- **`whole_media_length` handed back an unsnapped constant**
+  (`reelcut-roadmap-2.md:443`): 3 000 000 ticks is not on a 30000/1001 grid,
+  where five seconds is 3 003 000, so **every overwrite of an imported still
+  on a /1001 timeline was a silent no-op**. Fixed at `edit_clip.rs:170`;
+  test `core/tests/insert.rs:331`.
+- **`roll` clamped a snapped `to` to UNSNAPPED bounds**
+  (`reelcut-roadmap-2.md:452`): both source bounds are floored divisions by a
+  clip's speed, so a clamped roll could write a sub-frame time into two clips
+  at once. Fixed at `edit_edge.rs:160` with a directional snap pair; test
+  `core/tests/edge.rs:500`.
+
+**What they are evidence OF is the case for the candidate**: both were
+arithmetic that was correct in the function that owned it and wrong in the
+function that copied the idea, and both were found by a reviewer rather than
+by a type. That is the argument for a module, and it is a better argument
+than "ten copies", which is not what the tree holds.
+
+### 10.3 What the scout found that the review did not
+
+These are unverified readings, recorded so a candidate starts by testing them
+rather than by discovering them.
+
+- **`evaluate.rs:229` is a verbatim second copy of `content_length` with a
+  different fallback** — `clip.duration` where the reader answers
+  `clip.duration.max(1)`. Two functions that are meant to agree (the reader's
+  own doc says "the same quantity `evaluate::segment_of` inserts into the
+  composition, so a speed edit here and the segment there agree") and differ
+  by one in the degenerate case.
+- **`TimelineView.sourceTime` applies no reversed mirror**
+  (`TimelineView.swift:951`), so a reversed clip's drawn filmstrip and
+  waveform index the forward cache unmirrored, where `MediaPeaks` mirrors.
+  `CompositionBuilder` is documented as deliberately not mirroring because it
+  swaps the asset instead; this one carries no such note. **Worth a probe
+  before anything is designed.**
+- **The `source_in` test helper is written out in four test files**
+  (`edge.rs:147`, `edit_tests.rs:506`, `insert.rs:113`,
+  `add_transition.rs:164`) instead of living in `core/tests/common/`.
+- **Two design documents cite `roll`'s snap-inward bounds by a stale line
+  number** — `reelcut-roadmap-5.md:228` and `reelcut-effects-survey.md:619`
+  both say `edit_edge.rs:159-166`, and the code is at 160–167.
+
+### 10.4 The test surface that already exists
+
+507 `#[test]`s across 30 files, of which about **51 touch source-window
+arithmetic**: `core/tests/edge.rs` is 16 of 16 and is the dedicated file,
+`edit_tests.rs` 9 of 53, `add_transition.rs` 6 of 34, `scope.rs` 10 of 38
+(the same ops re-proved inside a nest), `evaluate_tests.rs` 4 of 55,
+`insert.rs` 3 of 10. **There is no test file named for the three readers** —
+they are proved only through the ops that clamp against them, which is the
+seam a deepening would change. Over MCP, `tools/proof/phase1_proof.py` is the
+one script that reads an in-point back (`:110` `source_in`, the slip section
+at `:127`, the roll section at `:161`); no proof script measures
+`source_head`, `source_length` or `content_length` directly.
+
+### 10.5 What a grilling session still has to settle
+
+Not answered here, and each changes the size of the thing:
+
+1. **Is the module the three READERS with their units made explicit, or the
+   six MOVERS, or both?** The readers are already one module; the movers are
+   six copies of one equation. A candidate that takes only the movers is
+   small and does not touch the `None` ambiguity.
+2. **Does a source window become a TYPE** — one that cannot be handed a
+   timeline tick where a source tick belongs — or does it stay functions with
+   better names? The four-way tail spelling and the source/timeline asymmetry
+   are the evidence for a type; §0's own rule is that one adapter means a
+   hypothetical seam.
+3. **Does the commit tail come along?** It shares the same functions and
+   nothing else. Recommendation on the evidence above: no, it is its own
+   candidate.
+4. **What happens to the reversed mirror?** The core refuses it on principle
+   and the app spells it twice. Making it one spelling means deciding whether
+   it is app arithmetic or core arithmetic, which is D3's own question asked
+   about a number rather than about an argument.
+
+**The other candidates §9 names still stand**, and the one §9 recommends is
+still the agent handlers forwarding a caller's whole op to the core unread.
