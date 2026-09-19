@@ -144,7 +144,7 @@ extension ReelOp {
     /// `"<op> has no meaning inside nest N"` to.
     ///
     /// **The core owns this list and this is a mirror of it**, in the same
-    /// sense that `AgentCatalog.swift` mirrors the op table: change one,
+    /// sense that the typed factories above mirror the op table: change one,
     /// change both. It is seven names rather than a rule, so it can be
     /// checked by eye, and it is written here rather than at a call site
     /// because two copies of it is what would drift.

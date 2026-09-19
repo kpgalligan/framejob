@@ -1423,7 +1423,7 @@ many clips`, `too many tracks`, `nests are more than 8 deep at nest N`.
 | `add_blurred_background {clip}` | The screencast backdrop: `clip` copied onto a NEW back-most track at the same start, duration, speed and source window — so the two play the same frames — scaled to FILL the canvas, centred, uncropped, blended `normal` and blurred at full strength. The copy is muted (`enabled` becomes `{video: true, audio: false}`, `detach_audio`'s pair read the other way) and drops its `audio.duck` — the one field of that group that lowers OTHER material, so a copy keeping it would duck the mix including the clip it came from — along with its transition, its actions, its label and its `video.motion` (format version 8 — a backdrop that slid in or pulsed behind the clip it copies would be two pictures of one recording disagreeing about where they are, and a slide would leave the canvas showing down one side, which is the one thing a background exists to prevent); it is named "Blurred Background". `Err` for an unknown clip, a NEST (flattening drops a nest clip's own filters, so the copy would come out sharp), a source with no pixel size (text, audio-only), or a clip with no video properties. Both of these mint TWO objects — a track and the clip on it — and the TRACK takes the `next_id` the call was made with, the clip the one after. |
 | `insert_clip {track, media, at}` | The INSERT edit: the clip `at` is strictly inside on `track` is split, every unlocked track opens by the media's whole length (`insert_time`), then the media lands at `at`. Only the destination track is cut — a straddler on another track rides the shift whole, which is what keeps a bed unbroken. One op, so one undo step and one tool. Refuses when the clip could not be placed after the room was made, which is what a locked destination track gives. |
 | `overwrite_clip {track, media, at}` | The OVERWRITE edit: `[at, at + media length)` is cleared on `track` ALONE — cut at both bounds, whatever is left inside removed — and the media lands there. Nothing shifts and no other track is touched; the named track is cleared whether or not it is locked, exactly as `ripple_delete` removes the clips it was given. |
-| `move_clip {clips, delta, track}` | Shifts by `delta` ticks (may be negative; clamps at 0) and optionally to another track (all selected clips keep their relative track offsets). **Overlap rule** on the destination track: a clip may overlap at most one neighbour on each side, and each overlap must be ≤ half of the shorter of the two clips; anything else refuses. An overlap is a transition; a clip that gains a predecessor overlap gets `transition_in = cross_dissolve` if it had none. |
+| `move_clip {clips, delta, track?}` | Shifts by `delta` ticks (may be negative; clamps at 0) and optionally to another track (all selected clips keep their relative track offsets). **Overlap rule** on the destination track: a clip may overlap at most one neighbour on each side, and each overlap must be ≤ half of the shorter of the two clips; anything else refuses. An overlap is a transition; a clip that gains a predecessor overlap gets `transition_in = cross_dissolve` if it had none. |
 | `trim_start {clip, to}` | New start `to`; source in advances by `(to − start) × speed`. Clamps: `to ≥ start − in/speed` (source bound), `to < end − one frame`. |
 | `trim_end {clip, to}` | New end `to`; clamps to the source's remaining length (`media` sources) and `> start`. |
 | `rate_stretch {clip, to_end}` | `speed = source_len / (to_end − start)`; duration follows. Media sources only — a non-media clip is an **error**, not a refusal, so an MCP caller gets a message it can correct from (the UI never offers it). |
@@ -1436,7 +1436,7 @@ many clips`, `too many tracks`, `nests are more than 8 deep at nest N`.
 | `lift_range {from, to}` | `ripple_delete_range` without the close: every unlocked clip is split at both bounds and the middles removed, and NOTHING moves — every clip after the range keeps the moment it had, and so do the markers. ⌫ with a range and nothing selected, where ⌘⌫ ripples. |
 | `insert_time {at, length}` | Shifts every unlocked clip whose start ≥ `at` right by `length`. Straddling clips are left in place. |
 | `close_gap {track, at}` | Closes the empty span on `track` that contains `at`, bounded by the nearest clip edges there (0 in front when nothing precedes it): everything from the gap's far side shifts left by its length, across every unlocked track, straddlers staying put. Refuses on a locked `track`, on an `at` that is on a clip, when there is no clip after the gap, and when the shift would break the overlap rule — a gap closes fully or not at all, because a partial close leaves the user unable to tell whether the op ran. Markers do not move. |
-| `set_speed {clip, rate, keep_pitch}` | `duration = source_len / rate`; actions keep their clip-relative *fraction* of the clip. Media sources only, an **error** on any other kind (as `rate_stretch`). Rate is clamped to ×0.1–×10. |
+| `set_speed {clip, rate, keep_pitch?}` | `duration = source_len / rate`; actions keep their clip-relative *fraction* of the clip. Media sources only, an **error** on any other kind (as `rate_stretch`). Rate is clamped to ×0.1–×10. |
 | `set_reversed {clip, reversed}` | Plays the media back to front, or forward again. The core does no pixel work, so this changes neither the plan nor the recipe: Swift substitutes a pre-rendered reversed asset for that media's segments (§11). `in` is measured in the direction the clip PLAYS, so reversing keeps the in point and therefore shows different frames; the alternative would put two conventions into every trim and split. Media sources only, an **error** on any other kind. |
 | `freeze_frame {clip, at, duration=2 s}` | `split` at `at`, `insert_time(at, duration)`, then a `still {media, at: source time}` clip filling the gap on the same track with the original's video props, LESS its `video.motion` (format version 8): a still is a new clip with new ends, so one taken mid-arrival would otherwise arrive again and one taken anywhere would carry a departure onto a frame that is meant to hold. The placement it keeps is the un-moved one, since evaluation never applies a preset, so a freeze taken mid-motion jumps to where the inspector said the clip was. Media sources only, an **error** on any other kind (as `rate_stretch`). |
 | `detach_audio {clip}` | `enabled.audio = false` on the clip; a new clip with `enabled = {video: false, audio: true}`, same source/in/duration/speed and the audio props, on the track below (a track is inserted at index 0 if needed). Refuses if the media has no audio or audio is already detached. |
@@ -1466,15 +1466,28 @@ many clips`, `too many tracks`, `nests are more than 8 deep at nest N`.
 
 | Op | Semantics |
 |---|---|
-| `add_track {index, name?}` | Inserts (index 0 = back). |
+| `add_track {index?, name?}` | Inserts (index 0 = back). |
 | `remove_track {track, with_clips=false}` | Refuses on a non-empty track unless `with_clips`. |
 | `move_track {track, index}` · `set_track {track, name?, hidden?, muted?, locked?, solo?}` | Omitted fields keep their value. `solo` (format version 3) is §5.2's container rule — while any track in the set is soloed every other is treated as muted, mute wins, audio only, a nest's tracks judged among themselves — applied as a 0 envelope in `audio.rs` (§7.2) and never in the plan, so a solo toggle changes ramps and nothing else. |
 | `remove_empty_tracks` | |
 | `add_marker {at, name?, chapter?, color?}` · `set_marker {marker, time?, name?, chapter?, color?}` · `remove_marker {marker}` | Markers snap to frames; two markers may not share a time. Default color `red`. |
 | `set_canvas {width?, height?, fps?, background?, rescale_clips?, fit_new_clips?, timecode_frames?}` | `rescale_clips` multiplies every clip's `x`, `y`, `scale` by the size ratio. Changing fps re-snaps every clip start and duration. |
-| `add_media {descriptor}` → returns the id · `relink_media {media, path, bookmark}` · `remove_media {media, with_clips=false}` | The descriptor is the `media[]` element minus `id`; the host probes the file. |
+| `add_media {descriptor}` → returns the id · `relink_media {media, path, bookmark?}` · `remove_media {media, with_clips=false}` | The descriptor is the `media[]` element minus `id`; the host probes the file. |
 
-Every op is also an MCP tool with the same name and arguments (§7.9).
+**This table is the SEMANTICS half of the op table, and it has a second
+half.** What an op MEANS is written here and in `core/src/edit.rs`'s module
+doc — including what an absent argument means, which is why the defaults are
+spelled in the rows above. What an op TAKES — every argument's name, its JSON
+kind and whether the decoder requires it — is DATA, in `core/src/op_table.rs`,
+one row per op and one `Argument` per argument, published as one JSON Schema
+per op by `rc_op_schemas` (road map 7's D3). An argument carries a range there
+only where the core REFUSES outside it, sourced from the constant that
+enforces it; a range the core merely clamps to is not a promise and is not
+published. `OP_NAMES` is a projection of that table rather than a list beside
+it, so the op count is one number in one place.
+
+Every op is also an MCP tool with the same name, and that tool PRINTS the
+arguments half rather than restating it (§7.9).
 
 ## 7. Architecture — Rust decides, AVFoundation and Metal do
 
@@ -1920,7 +1933,7 @@ pass nothing, because each wants the picture rather than a deliverable.
 
 | File | Owns |
 |---|---|
-| `ReelCore.swift` | the **only** `rc_*` caller; `ReelProject` (handle + lazy `ProjectSnapshot`), typed op builders, `RecipeSource` |
+| `ReelCore.swift` · `ReelOps.swift` · `ReelEdit.swift` · `ReelOpSchema.swift` | the core's edge. `ReelCore.swift` is the **only** `rc_*` caller: `ReelProject` (handle + lazy `ProjectSnapshot`), `RecipeSource`, the typed patches, and the op table read BACK — `ReelOp.coreNames()` over `rc_op_names` and `ReelOp.coreSchemas()` over `rc_op_schemas`, which `AgentCatalog.opTool` prints (§7.9). `ReelOps.swift` is the typed op builders, cut out of it under the size rule — one factory per row of the op table, plus the eleven RAW factories that forward a caller's own object; `ReelEdit.swift` is the three arms an edit answers (§5.5) and `ReelOpSchema.swift` the value `coreSchemas()` answers, both their own files because neither names an `rc_*` symbol |
 | `MotionProps.swift` | `video.motion`'s Swift vocabulary (format version 8): `EdgeMotion` and `DuringMotion` with their display names, `MotionEdge`, `MotionDuring` and `MotionProps`, all decoded leniently and all with the core's own defaults mirrored rather than derived. Its `dictionary`s live here rather than beside every other property type's in `ReelCore.swift`, which is far over the ~600-line cap — and `MotionProps.dictionary` ALWAYS writes three keys, `NSNull` for a nil slot, because a core patch deep-merges a motion (§6) and a slot left out would leave the old one in place. Since D1·3 it is the ONLY writer of a whole motion: an agent's patch is the caller's object, forwarded unread, and merges slot by slot |
 | `ProjectDocument.swift` | NSDocument, `.reelcut` package read/write, the single mutation point (`applyEdit`, live-edit trio), undo as a handle stack, dirty counting, and the FIVE pieces of view state (playhead, selection, in/out range, `selectedMedia`, `nestPath`). `nestPath` is §4.4's nest scope as the PATH it was entered by — one step per level, each naming the nest and the nest CLIP that showed it, because a nest can be shown by two clips at two different starts. `scope` is its last step's nest and is what every op is stamped with (`ReelOp.scoped(_:)`), except the seven the core refuses inside a nest, which are sent unscoped; `editedProject` is the memoised `rc_project_scoped` handle every view of the TIMELINE draws from, where `project` stays the document for save, export, captions, consolidate and the Document and Media tabs |
 | `EditorViewController+NestScope.swift` · `TimelineView+NestScope.swift` | going inside a nest and coming back out (§4.4): Open / Close Nest, the double-click, the playhead mapping, and the breadcrumb the ruler draws in the corner over the track headers — one stored property, one closure, one draw call, one hit token and one gesture case in the frozen `TimelineView.swift`, `TimelineView+Candidates.swift`'s split exactly |
@@ -2340,6 +2353,24 @@ difference is a row of `AgentCatalog+Declarations.swift` with the op, the
 argument, what the app adds and why, and the schema declares it, so an agent
 can SEE a shorthand rather than discover it. What still declares a schema of
 its own is the twenty APP-STATE tools, which have no op to read one from.
+
+**A fifth part of the startup parity check holds that identity up**
+(`AgentServer+Parity.swift`, road map 7's D3·5). For every op tool the
+declared argument names must be exactly the core's for that op, plus the
+injected `project` and `scope`, plus whatever a declarations row names — in
+both directions, so an argument the core has that no tool declares and an
+argument a tool declares that no op has are each named with the op, the
+argument and the side, and a declarations row naming an argument the core has
+not got is named as stale. Because the catalog prints STRUCTURE and writes
+only PROSE, the same part also complains about an argument that would reach an
+agent with no description at all, and about a description written for an
+argument the table has never heard of, which is how a misspelt prose key is
+caught rather than dropped in silence. App-state tools are skipped by part 4's
+own rule — the core's op list. What no comparison of two lists can see is a
+CALL: that an argument the catalog prints is one a hand-written handler really
+reads is put to the running binary by `tools/proof/op_argument_proof.py`
+instead, one misspelt argument per op.
+
 The scope
 is read ONCE per call, at the dispatch, and an op with no `scope` of its own
 follows the nest the app has OPEN — a call and the window agree about which
@@ -2990,3 +3021,22 @@ assisted import.
   and `normalize_clip`'s check among the deletions; the first is one of five
   of a shape, and deleting one of five would leave the tool surface
   inconsistent for a caller.
+- **D3-1 — The core says what an argument IS; the app says what it is FOR.**
+  Deepening D3 made the op table a published interface
+  (`designs/reelcut-roadmap-7.md` §7–§9): `core/src/op_table.rs` holds one row
+  per op and one `Argument` per argument — name, `Kind`, required — and
+  `rc_op_schemas` publishes it as JSON Schema, which all fifty-seven op tools
+  PRINT instead of hand-writing a `"type"`, an `"enum"` or a `required` list.
+  The app keeps what the core cannot know: the sentence naming the menu item a
+  tool mirrors and what the argument is for. **Where the line falls in the
+  hard cases**, drawn at D3·3 because two tools would otherwise have got worse
+  on the way through: a bound the core REFUSES outside is the core's and is
+  published from the table, sourced from the constant the refusal is written
+  against and never retyped; a bound the core merely CLAMPS to, a null that
+  MEANS something, and a bare-string shorthand are the APP's, each a row of
+  `AgentCatalog+Declarations.swift` carrying the op, the argument, what the
+  app adds and why. The direction is the whole of the rule: **a schema
+  narrower than what a tool accepts costs a caller nothing; one wider is a
+  promise the app breaks.** This is what makes the *One JSON op entry point*
+  decision above true as it was written — "the MCP catalog is the same table"
+  — where until D3 the catalog was a hand copy of one.

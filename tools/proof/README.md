@@ -189,6 +189,8 @@ python3 tools/proof/phase9_proof.py 4823
 python3 tools/proof/patch_door_proof.py 4823
 python3 tools/proof/refusal_proof.py 4823
 python3 tools/proof/clip_catalog_proof.py 4823
+python3 tools/proof/op_catalog_proof.py 4823
+python3 tools/proof/op_argument_proof.py 4823
 ```
 
 **Phase 9 takes a SECOND argument**, the log path, defaulting to
@@ -2687,8 +2689,9 @@ check that every argument the catalog PRINTS from the core's table is one a
 hand-written handler really reads.
 
 Its values are derived from the core's published kinds rather than typed: an
-id by name (the five entity ids are the only argument names in the file, and
-each is checked against the core's table first), a time as a second per
+id by name (six names for five entities — `clips` is a list of the id space
+`clip` draws from — the only argument names the script types, each checked
+against the core's table first), a time as a second per
 argument in table order, a bound's own minimum, a vocabulary's first member.
 The two `payload` doors are named rather than skipped: the app checks a
 payload's shape before forwarding, so the core cannot be reached through them

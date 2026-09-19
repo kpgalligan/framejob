@@ -46,7 +46,7 @@ struct AgentDeclaration {
     /// key, and a default the app takes from its own state must not be made
     /// compulsory by the core's word.
     enum Requirement {
-        /// The core's answer stands, which is every argument but five.
+        /// The core's answer stands, which is every argument but six.
         case theCores
         /// The tool asks for an argument the core calls optional.
         case required
@@ -98,11 +98,11 @@ struct AgentDeclaration {
     /// it may NARROW what the core published and never relax it** — a
     /// `minimum` tighter than the core's is a truer promise, one looser than
     /// the core's is a false one, and nothing here can tell the two apart.
-    /// The one row that uses it today (`set_speed.rate`) narrows a kind the
-    /// core published unbounded, which is why the rule is written down
-    /// rather than enforced: a guard that silently dropped the key would put
-    /// a row in the list that does nothing, which is the trap this file's
-    /// one shared predicate exists to avoid.
+    /// All five rows that use it today NARROW — `set_speed.rate` and
+    /// `set_canvas.fps` a range, and three lists a `minItems` — which is why
+    /// the rule is written down rather than enforced: a guard that silently
+    /// dropped the key would put a row in the list that does nothing, which
+    /// is the trap this file's one shared predicate exists to avoid.
     func applied(to fragment: [String: Any]) -> [String: Any] {
         var property = fragment
         if !alsoTypes.isEmpty, let core = property["type"] as? String {

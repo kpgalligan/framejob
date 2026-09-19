@@ -64,13 +64,12 @@ file is what governs a module now.
   `edit.rs` so no caller moved. A published interface, where the `Op` enum
   and the dispatch are its implementation. Its one reader in the crate is
   `op_schema.rs`, which carries the rows out through the FFI; the APP's
-  reader is the clip half of the agent catalog, which prints these rows
-  instead of restating them. **A `Bound` is published only where the core
-  REFUSES outside it** — `set_canvas`'s two dimensions, sourced from
-  `edit_canvas.rs`'s own constants and never retyped — and never where it
-  CLAMPS, which is the app's to say in its prose.
-  A row holds no prose, no semantics and no default
-  spelled twice; `Kind` is closed, carries each vocabulary's members, and
+  reader is every one of the fifty-seven op tools in the agent catalog,
+  which print these rows instead of restating them. **A `Bound` is
+  published only where the core REFUSES outside it** — `set_canvas`'s two
+  dimensions, sourced from `edit_canvas.rs`'s own constants and never
+  retyped — and never where it CLAMPS, which is the app's to say in its
+  prose. A row holds no prose, no semantics and no default spelled twice; `Kind` is closed, carries each vocabulary's members, and
   has exactly ONE kind per answer serde gives, because a distinction the
   decoder cannot see is one no test could prove. Nothing here is the
   authority — the enum's fields are, and `core/tests/op_table.rs` proves

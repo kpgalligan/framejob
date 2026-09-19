@@ -712,9 +712,9 @@ extension ReelOp {
 
     /// Every op name the core accepts, in the order of its table
     /// (`OP_NAMES` in `core/src/edit.rs`), read through the FFI rather than
-    /// copied into Swift: a copy is one more spelling to drift, and the one
-    /// caller — `AgentServer`'s startup parity check — exists precisely to
-    /// catch drift. Empty only if the core failed, which it does not.
+    /// copied into Swift: a copy is one more spelling to drift, and its one
+    /// reader — `AgentCatalog.opNames`, which three things share — is there
+    /// to catch it. Empty only if the core failed, which it does not.
     ///
     /// The first member of `ReelOp` that did NOT go to `ReelOps.swift` with
     /// the struct and its factories: it names an `rc_*` symbol, and this

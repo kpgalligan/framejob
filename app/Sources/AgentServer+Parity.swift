@@ -8,8 +8,10 @@ import Foundation
 /// **What the first four cannot see.** Every one of them compares NAME SETS
 /// — the catalog against the dispatch table, the core's op list against the
 /// catalog, each schema's shape, the `scope` on every op tool — so not one
-/// of them ever looks INSIDE an op tool's `properties`. Road map 7's D3 is
-/// what makes this part possible at all: until every op tool PRINTED the
+/// of them ever compares an op tool's `properties` to the core's row: part 3
+/// reads a schema's shape and part 4 asks whether one key is in it, and
+/// neither asks WHICH arguments are there. Road map 7's D3 is what makes
+/// this part possible at all: until every op tool PRINTED the
 /// core's published table (`AgentCatalog.opTool` over `rc_op_schemas`) each
 /// tool's arguments were hand-written and there was no second spelling to
 /// compare them against.

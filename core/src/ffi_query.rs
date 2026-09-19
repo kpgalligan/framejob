@@ -227,10 +227,11 @@ pub unsafe extern "C" fn rc_op_names() -> *mut c_char {
 /// `crate::op_schema::op_schemas`, built out of `op_table.rs`.
 ///
 /// It is exported for the same reason [`rc_op_names`] is, one level
-/// further in: the MCP catalog in `app/Sources/AgentCatalog*.swift` writes
-/// every op tool's argument types, `minimum`s, `enum`s and `required` list
-/// by hand today, and the only way those cannot drift from what the core
-/// decodes is to print the side that owns them. The core says what an
+/// further in: the MCP catalog in `app/Sources/AgentCatalog*.swift` used to
+/// write every op tool's argument types, `minimum`s, `enum`s and `required`
+/// list by hand, and the only way those cannot drift from what the core
+/// decodes is to print the side that owns them — which all fifty-seven op
+/// tools have done since road map 7's D3·4. The core says what an
 /// argument IS; the app's prose says what it is FOR, and this carries none
 /// of it — nor the envelope's `scope`, which is not an argument of any op.
 ///

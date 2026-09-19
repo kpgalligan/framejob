@@ -5,9 +5,11 @@ import Foundation
 /// The MCP tool catalog `AgentServer` registers with the core: every tool's
 /// name, description, and JSON-Schema input. The names here must match
 /// `AgentServer.handlers` exactly — `start()` checks the parity and traps in
-/// debug builds, logs in Release — and every op tool's name and arguments must
-/// match the op table in spec §6 and the module doc of `core/src/edit.rs`,
-/// because those three spellings are one contract.
+/// debug builds, logs in Release — and every op tool's NAME must match the
+/// core's own op list, while its ARGUMENTS are PRINTED from
+/// `core/src/op_table.rs` through `rc_op_schemas` rather than matched against
+/// it. What an op MEANS is still spec §6 and `core/src/edit.rs`'s module doc,
+/// which is what this file's prose mirrors.
 ///
 /// **Half of it is `AgentCatalog+Clips.swift`**, which holds the forty clip
 /// rows, the five action rows and the patch vocabulary they alone are written
@@ -40,8 +42,10 @@ import Foundation
 /// was false by that one.) The move was about 400 lines, not the 300 this
 /// paragraph guessed, and it left this file the helper, the project group,
 /// tracks, markers and the canvas, at about 454 — which road map 7's D3
-/// took to 535 and then back to under 500, the helper having grown and the
-/// nine op rows having lost their hand-written schemas.
+/// took to 535 as the helper grew, back to 496 as the nine op rows lost
+/// their hand-written schemas, and up again with the ten argument
+/// descriptions the fifth parity part turned from a silence into a
+/// complaint. `designs/reelcut-remaining.md` §3 has the number today.
 extension AgentServer {
     /// One tool, declaring its whole schema. Every tool gets `project` for
     /// free: with several projects open a call would otherwise be ambiguous,
@@ -153,7 +157,7 @@ extension AgentServer {
     /// tools, and the startup parity check asks that each of them has a tool
     /// AND that the tool declares the property. One list, so the three
     /// cannot disagree — and a `static let`, so the FFI call and the JSON
-    /// decode behind it happen once per process instead of seventy-five
+    /// decode behind it happen once per process instead of seventy-seven
     /// times per catalog build.
     ///
     /// **An empty answer is a silent catastrophe, so it is not allowed to be

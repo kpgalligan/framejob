@@ -2,11 +2,13 @@
 
 **Status: road map 2 is complete, and the debt it left is paid.** All ten
 phases are done and `designs/reelcut-roadmap-2.md` §1 carries the commit of
-each. `make test` is at 494, `make lint` and `cargo fmt --check` are clean,
-`make typecheck` is at 0 errors and its four deliberate AVFoundation
-warnings, the catalog is 75 tools and the parity log is empty, and every
-proof script passes: 66, 85, 121, 8, 84, 88, 167, 92, 79, 214 and 79 over
-MCP and 26, 33, 59, 81, 70, 78, 150, 48, 62 and 141 offscreen.
+each. **On the day it closed** `make test` was at 494, `make lint` and
+`cargo fmt --check` were clean, `make typecheck` was at 0 errors and its four
+deliberate AVFoundation warnings, the catalog was 75 tools and the parity log
+empty, and every proof script passed: 66, 85, 121, 8, 84, 88, 167, 92, 79,
+214 and 79 over MCP and 26, 33, 59, 81, 70, 78, 150, 48, 62 and 141
+offscreen. Those counts are that day's; §3 is the part of this file that is
+kept current.
 
 This file was written as the honest remainder when the road map closed: the
 debt two large phases left behind, plus the checks no script can make. §1 and
@@ -201,41 +203,37 @@ would be the bare strip with a longer list.
 ## 3. The size debt
 
 Every file over the ~600-line cap as of 2026-09-18 — 29 of them, the
-list regenerated row by row against `wc -l` at road map 7's D2·5, which
-closed deepening D2. `core/src/edit_track.rs` came off it there (674 → 522,
-`edit_canvas.rs` cut out of it in D2·3) and nothing joined. `edit.rs` went
-895 → 838 at road map 7's D3·1, which moved its argument column into
-`op_table.rs` (271, a new module under the 400 cap and with no exemption of
-its own); it is still over and still exempt for its SEMANTICS table. D3·2
-added the FFI wrapper for the published table to `ReelCore.swift`
-(1500 → 1542), which stays where it was in this list; the value type it
-answers went to a new `app/Sources/ReelOpSchema.swift` (27) rather than into
-the over-cap file, and the core's own new module, `op_schema.rs` (154), is
-under the 400 cap too. D3·3 migrated the clip group to print that table:
-`AgentCatalog+Clips.swift` went **941 → 791** — still over, and the first
-time it has come DOWN — while `AgentCatalog.swift` (472 → 535) and the new
-`app/Sources/AgentCatalog+Declarations.swift` (273, under the 400 cap) are
-both under it. That is 150 lines off an over-cap file paid for by deleting
-hand-written structure rather than by moving anything. `AgentServer.swift`
-(771 → 779) took eight lines of doc comment correcting what the startup
-parity check says it cannot see, which is inside the frozen file's ~50-line
-allowance. D3·4 migrated the four other groups, and every catalog file it
-touched came DOWN: `AgentCatalog.swift` 535 → **496**,
-`AgentCatalog+Files.swift` 609 → **601** (still over, by one line),
-`AgentCatalog+Transitions.swift` 112 → **92**, against
-`AgentCatalog+Declarations.swift` 279 → **310**, the widening row the
-migration needed and the narrowing its review added. Sixty-two lines of hand-written schema deleted and seven
-of reason written down. The one file that went UP is `AgentServer.swift`
-(779 → **783**), four more lines of the frozen file's ~50-line doc
-allowance, correcting what the parity check's own comment says it cannot
-see. D3·5 turned the fifth part of that check ON and the frozen file came
-DOWN for it — `AgentServer.swift` **783 → 774**, because the part itself is
-`app/Sources/AgentServer+Parity.swift` (**181** with what its review added, a
-new file under the 400 cap) and what the frozen file lost is the two
-paragraphs describing the gap that part has now closed. `AgentCatalog.swift`
-496 → **520** and `AgentCatalog+Declarations.swift` 310 → **313**, both under
-the cap: ten argument descriptions the fifth part turned from a silence into
-a complaint, and the doc that says so.
+list regenerated row by row against `wc -l` at road map 7's D3·6, which
+closed deepening D3. `core/src/edit_track.rs` came off it at D2·3
+(674 → 522, `edit_canvas.rs` cut out of it) and nothing has joined since.
+
+**What deepening D3 did to this list**, measured against `main` rather than
+summed from the tickets (road map 7 §7–§9). `core/src/edit.rs` lost its
+Arguments column, **895 → 838**: still over, and still exempt for the
+SEMANTICS table that is the rest of it. That column is now data in two new
+core modules, both under the 400-line cap for a new module and neither taking
+`edit.rs`'s exemption — `core/src/op_table.rs` (**325** of 400) and
+`core/src/op_schema.rs` (**173** of 400). On the app side the five catalog
+files went **2251 → 2125** together as the structure they used to hand-write
+moved to the core: `AgentCatalog+Clips.swift` **941 → 791**, the first time an
+over-cap file here has come DOWN without anything being moved out of it;
+`AgentCatalog+Files.swift` 609 → **601** (over by one line);
+`AgentCatalog+Transitions.swift` 112 → **92**; `AgentCatalog.swift`
+472 → **524**, which took `opTool` and ten argument descriptions the fifth
+part of the parity check turned from a silence into a complaint; and
+`AgentCatalog+Audio.swift` **117**, untouched, its two tools having no op
+behind them. Three new app files stand against that, all under the 400-line
+cap: `app/Sources/AgentCatalog+Declarations.swift` (**314** — the fourteen
+rows where a tool deliberately takes more or less than its op, with a reason
+each), `app/Sources/AgentServer+Parity.swift` (**183** — the fifth part and
+nothing else) and `app/Sources/ReelOpSchema.swift` (**27**).
+`AgentServer.swift`, frozen, is **771 → 774**: twelve lines of doc comment
+taken across D3·3 and D3·4 and nine given back at D3·5, when the two
+paragraphs describing the gap that part has now closed stopped being true.
+`ReelCore.swift` is **1500 → 1542** and stays where it was in this list — it
+is over the cap, so only the part that had to be there went in, the function
+naming `rc_op_schemas`, and the value type it answers went to
+`ReelOpSchema.swift` instead.
 Regenerate the list with
 `wc -l app/Sources/*.swift core/src/*.rs | awk '$1>600 && $2!="total"' | sort -rn`
 rather than trusting the numbers here; the standing exemptions are

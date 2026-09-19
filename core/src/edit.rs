@@ -10,8 +10,8 @@
 //! **The table below IS what an op MEANS**, and [`crate::op_table`] is
 //! what one TAKES: its rows are the argument names, kinds and required-ness
 //! that used to be a markdown column here, as data a caller can read.
-//! `app/Sources/ReelOps.swift`'s typed builders and `AgentCatalog.swift`'s
-//! MCP tools mirror the two together.
+//! `app/Sources/ReelOps.swift`'s typed builders mirror the two together, and
+//! `AgentCatalog*.swift`'s tools PRINT the arguments half (`rc_op_schemas`).
 //!
 //! Reading the table:
 //!

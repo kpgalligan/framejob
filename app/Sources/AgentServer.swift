@@ -182,8 +182,8 @@ final class AgentServer {
         }
         // The envelope's `scope` is read ONCE, here, because this is the only
         // place that holds both the tool's name and its arguments for all
-        // seventy-five of them — a read inside each handler would be
-        // fifty-eight edit sites across two files, every one of them able to
+        // seventy-seven of them — a read inside each handler would be
+        // fifty-seven edit sites across two files, every one of them able to
         // forget. It is read for exactly the tools whose schema declares it
         // (`AgentCatalog.opNames`, the core's own op list), so a stray
         // `scope` on `get_project` or `export` is the ignored extra key it
