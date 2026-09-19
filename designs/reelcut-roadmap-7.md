@@ -4383,9 +4383,8 @@ files depend on a third to save four lines.
 
 ### 8.6 D3·6 — contract and record (kpgalligan/reelcut#20)
 
-**Commits.** Written into this line by the commit that closes the section,
-once the review's are known — the convention `e7c1883` set for D3·1 after
-three of this series' reviews found a placeholder left in its place.
+**Commits.** `acb75ed` (the documents, the read-back and this section) and
+`f39614b` (what the review found, below).
 
 **What landed.** Documents, and seventeen corrections to sentences that had
 gone false — thirteen of them this series' doing. No behaviour anywhere:
