@@ -32,7 +32,7 @@ changes a file's role or adds a rule. Never append a status paragraph here.
 | `designs/reelcut-roadmap-4.md` | Remove Silences judged by voice — Silero VAD through Core ML (S1), built; its own proof scripts are still owed. Start here for `detect_silence`. |
 | `designs/reelcut-roadmap-5.md` | Transitions second pass (E1) and motion presets (E2), built; their proof scripts are still owed. Start here for transitions or `video.motion`. |
 | `designs/reelcut-roadmap-6.md` | Captions from the cloud (AssemblyAI), DESIGNED and not built; its spike C0 has not run. Start here for transcription. |
-| `designs/reelcut-roadmap-7.md` | The deepening series, TWO candidates, both closed: §0 the rules it inherits (deep module, seam, the deletion test, the interface is the test surface); §1–§3 D1, the core as the one validator of a caller's patch (tickets #2–#7) — start here for how a patch is checked; §4–§6 D2, an op's three answers and the eleven rules that say why they refused (tickets #9–#13) — start here for what an op ANSWERS, and §6 for where a next candidate starts. |
+| `designs/reelcut-roadmap-7.md` | The deepening series, THREE candidates, all closed: §0 the rules it inherits (deep module, seam, the deletion test, the interface is the test surface); §1–§3 D1, the core as the one validator of a caller's patch (tickets #2–#7) — start here for how a patch is checked; §4–§6 D2, an op's three answers and the eleven rules that say why they refused (tickets #9–#13) — start here for what an op ANSWERS; §7–§9 D3, one op table published (tickets #15–#20) — start here for where an op's arguments are written down, and §9 for where a next candidate starts. |
 | `designs/reelcut-effects-survey.md` | The survey road map 5 came from. E3–E9 (tone, filters, looks, adjustment clips, LUT import, voice effects, background removal) are DEFERRED by the user. Concat is AGPL-3.0: its behaviour was studied, and none of its code, shaders, chains or colour tables may be carried over. |
 | `designs/reelcut-milestones.md` | The per-phase record this file carried until 2026-09-17, moved out verbatim. Not maintained. |
 | `designs/design_handoff_reelcut/` | The shipped chrome cleanup and identity; its README is normative for the redesign's metrics. |
@@ -103,10 +103,18 @@ pixel or sample work in Rust; no ffmpeg dependency in the product.
   project, an identity, or refused in the rule's own sentence. Only the first
   is an undo step. `ProjectDocument` is the single mutation point and undo is
   its stack of handles.
-- Edits are JSON ops through `rc_project_apply`. **The op table is the module
-  doc of `core/src/edit.rs`**; `ReelOps.swift`'s typed builders,
-  `AgentCatalog*.swift`'s tools and spec §6 mirror it — change one, change
-  all four. The envelope's `scope` key addresses an edit inside a nest.
+- Edits are JSON ops through `rc_project_apply`. **The op table is two
+  halves**: what an op MEANS is the module doc of `core/src/edit.rs`, and
+  what it TAKES — every argument's name, kind and required-ness — is
+  `core/src/op_table.rs`, as data, published as JSON Schema by
+  `rc_op_schemas`. `ReelOps.swift`'s typed builders,
+  `AgentCatalog*.swift`'s tools and spec §6 mirror them — change one, change
+  all four — **except that every op TOOL prints the arguments half instead of
+  restating it** (`AgentCatalog.opTool`), so an argument added to an op costs
+  a sentence of prose there and no schema. A tool that takes more or less
+  than its op does says so in `AgentCatalog+Declarations.swift`, one row and
+  one reason each. The envelope's `scope` key addresses an edit inside a
+  nest.
 - Persisted-state changes bump `RC_FORMAT_VERSION` in `core/src/format.rs`
   **and** the header.
 - Errors: `rc_project_apply` returns NULL three distinguishable ways, and the
@@ -123,9 +131,10 @@ else is what bloats files:
 
 1. **Core:** the op's semantics in an `impl Project` block in the module of
    its own concern (a new concern is a new module); the row in `edit.rs`'s
-   enum, `OP_NAMES` and module-doc table; a persisted field with a serde
-   default and a `schema_vN.rs`; a new `core/tests/*.rs`. A field lands in the
-   same phase as the thing that renders it.
+   enum and module-doc table, and its arguments in `op_table.rs` (which is
+   where `OP_NAMES` comes from); a persisted field with a serde default and a
+   `schema_vN.rs`; a new `core/tests/*.rs`. A field lands in the same phase as
+   the thing that renders it.
 2. **FFI**, only when a new `rc_*` export is needed: Rust → header →
    `ReelCore.swift`.
 3. **Swift:** the typed builder in `ReelOps.swift`; a small value or model
@@ -147,13 +156,15 @@ else is what bloats files:
   files are the parent text for anything not settled here.
 - **Every user-visible edit gets an MCP mirror** (spec §7.9): a handler, a
   catalog entry, and a comment naming the UI path. The startup parity check
-  in `AgentServer.start()` has FOUR parts: catalog names against handler
+  in `AgentServer.start()` has FIVE parts: catalog names against handler
   names, every op in the core's table against the tools (through
   `rc_op_names`, with an explicit allow-list for ops that deliberately have
-  none), each tool's schema shape, and that every op tool declares `scope`.
-  It cannot see argument TYPES — the throwing helpers in
-  `AgentServer+Arguments.swift` are the guard for those: a value a handler
-  cannot read is refused by name, never dropped.
+  none), each tool's schema shape, that every op tool declares `scope`, and
+  that every op tool declares the CORE's own arguments for its op — each one
+  described, and no description for an argument no op has
+  (`AgentServer+Parity.swift`). What it cannot see is a CALL: the throwing
+  helpers in `AgentServer+Arguments.swift` are the guard for that, refusing a
+  value a handler cannot read by name rather than dropping it.
 - **A file at the ~600-line cap gives something up before it takes anything
   on**, as a pure move landed and gated alone. `designs/reelcut-remaining.md`
   §3 is the ledger; new files are capped at 400 lines.

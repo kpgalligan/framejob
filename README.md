@@ -298,10 +298,13 @@ runs. It is off by default.
 
 ### The tools
 
-**One tool per row of the op table** in spec §6 and the module doc of
-`core/src/edit.rs`, with the same name and the same argument names — and each
-of them also takes **`scope`**, a nest id, which applies that one op inside
-that nest (`core/src/scope.rs`). Seven refuse it by name, because they have
+**One tool per row of the op table** — what an op MEANS is spec §6 and the
+module doc of `core/src/edit.rs`, and what it TAKES is `core/src/op_table.rs`,
+which every op tool PRINTS rather than restates, so a tool's arguments are
+the core's by construction and only its prose is the app's. Same name, same
+argument names — and each of them also takes **`scope`**, a nest id, which
+applies that one op inside that nest (`core/src/scope.rs`). Seven refuse it
+by name, because they have
 no meaning in there: the three marker ops, `set_canvas` and the three media
 ops. And a scoped op can fail where an unscoped one cannot, which is worth
 knowing before reading a result: the clip and track caps and the nesting
@@ -317,7 +320,8 @@ are more than 8 deep". The ops themselves:
 `freeze_frame`, `detach_audio`, `duplicate`, `paste`, `paste_attributes`,
 `nest`, `unnest`, `set_video`, `set_audio`, `set_text`, `set_shape`,
 `set_clip`, `set_enabled`,
-`set_transition`, `set_transition_duration`, the four action ops and
+`set_transition`, `set_transition_duration`, `add_transition`,
+`set_transition_style`, the four action ops and
 `add_zoom_action` beside them, and the
 track, marker, canvas and media ops — plus the app-state tools below. The
 count of each is `rc_op_names`' length and the catalog's, and the startup

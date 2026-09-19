@@ -8,6 +8,20 @@ import Foundation
 /// the forty-five are not ops (`detect_silence` and `normalize_clip`, the
 /// composites phases 3 and 5 added); the other forty-three are spec §6 rows.
 ///
+/// **The forty-three PRINT the core's table rather than restating it** (road
+/// map 7's D3·3): every one is built with `opTool`, which takes this file's
+/// prose and merges the structure — the kind, the constraints, the closed
+/// vocabulary, the required list — in underneath from `rc_op_schemas`. So
+/// there is no `"type"`, no `"enum"` and no hand-written required list in
+/// this file, and adding an argument to one of these ops costs a sentence
+/// here rather than a schema. The two composites are still `tool`'s, because
+/// no op stands behind them; so are the four other groups.
+///
+/// **What this file still says is what the core cannot know**: which menu item
+/// a tool mirrors, what a default is taken from, what a **Patch** may carry,
+/// and — through `AgentCatalog+Declarations.swift` — where a tool
+/// deliberately accepts more or less than its op does.
+///
 /// A pure move out of `AgentCatalog.swift`, which stood at 1552 lines against
 /// app/CLAUDE.md's ~600 cap with road map 2's phase 9 about to put a `scope`
 /// property on every op tool's schema and a `set_scope` tool beside them. The
@@ -16,7 +30,8 @@ import Foundation
 /// bodies untouched, and so did the twenty-four hoisted locals nothing outside
 /// them reads — the five patch descriptions, the enum-name lists and clauses
 /// they are built from, and `rangesProperty`, `zoomRegionProperty` and
-/// `groupsProperty`.
+/// `groupsProperty`. Of those three only their SENTENCES are left: the
+/// structure each of them hand-wrote is the core's now.
 ///
 /// **The actions travel with the clips**, which is the one decision in the
 /// cut: `set_action_end` takes the very `video` / `audio` / `text` patches
@@ -25,36 +40,34 @@ import Foundation
 /// a clip's own span in CLIP time, not an object of its own.
 ///
 /// What stayed behind is what a SECOND group also asks: `ticks` is every
-/// group's, `trackProperty` is Tracks' as well and `colorProperty` is Canvas',
-/// so the three arrive as ARGUMENTS rather than as a second spelling here.
-/// This array is spliced back in where it was rather than appended, because
-/// the catalog's order is the order an agent reads the tools in.
+/// group's, the track sentence is Tracks' as well and the colour sentence is
+/// Canvas', so the three arrive as ARGUMENTS rather than as a second spelling
+/// here. This array is spliced back in where it was rather than appended,
+/// because the catalog's order is the order an agent reads the tools in.
 ///
 /// **The toll is one widening**: `tool(_:_:_:required:)` is internal rather
 /// than private, since `private` on an extension member reaches only its own
-/// file and every entry below is built with it. `projectProperty` and
-/// `ticksNote` did NOT have to follow it — the first is read only inside
-/// `tool`, which did not move, and the second only into the `ticks` argument.
+/// file and every entry below is built with it or with `opTool` beside it.
+/// `projectProperty` and `ticksNote` did NOT have to follow it — the first is
+/// read only inside `tool`, which did not move, and the second only into the
+/// `ticks` argument.
 extension AgentServer {
 
     /// The clip and action rows of `catalogJSON()`'s array, in its order.
     func clipAndActionTools(
-        ticks: String, trackProperty: [String: Any],
-        colorProperty: (String) -> [String: Any], clipProperty: [String: Any]
+        ticks: String, trackDescription: String,
+        colorDescription: (String) -> String, clipDescription: String
     ) -> [[String: Any]] {
+        let clipsDescription = "Clip ids (get_project lists them)."
+        // The one property this file still builds whole: `detect_silence` and
+        // `normalize_clip` have no op behind them, so they take the old form
+        // and the sentence is shared with the migrated rows above them.
         let clipsProperty: [String: Any] = [
             "type": "array", "items": ["type": "integer"], "minItems": 1,
-            "description": "Clip ids (get_project lists them).",
+            "description": clipsDescription,
         ]
         let shapeNames = ShapeKind.allCases.map { $0.rawValue }
         let filterNames = FilterKind.allCases.map { $0.rawValue }
-        let transitionNames = TransitionKind.allCases.map { $0.rawValue }
-        // `null` is a legal value of `set_transition`'s kind — it is how a
-        // transition is removed — so the enum has to carry it beside the
-        // names, which makes the array heterogeneous.
-        var transitionEnum: [Any] = transitionNames
-        transitionEnum.append(NSNull())
-        let curveNames = Curve.allCases.map { $0.rawValue }
         let obscureNames = ObscureKind.allCases.map { $0.rawValue }
         // The obscure list's clause, kept as its own explicitly-typed local
         // rather than spliced into the video chain below: that chain already
@@ -213,50 +226,24 @@ extension AgentServer {
         let clipPatchDescription: String =
             "name and/or label; a key set to null clears it. Labels are the marker colours: "
             + "\(labelNames.joined(separator: ", "))."
-        // `ripple_delete_ranges`' list of pairs and `add_zoom_action`'s
-        // region, hoisted out of the `catalog` literal for the same reason
-        // the patch descriptions above are: a nested schema written inline
-        // there is the kind of expression that tips the whole literal past
-        // the type checker's budget.
-        let rangesProperty: [String: Any] = [
-            "type": "array", "minItems": 1,
-            "items": [
-                "type": "array", "items": ["type": "integer"], "minItems": 2, "maxItems": 2,
-            ] as [String: Any],
-            "description": "The spans to cut, each a [from, to] pair \(ticks)",
-        ]
-        // `region` is nullable — null is the zoom BACK — and REQUIRED, which
-        // is the one place that distinction can be made: the op reads an
-        // absent argument and an explicit null the same way, so a forgotten
-        // rectangle would silently become the opposite edit.
-        let zoomRegionProperty: [String: Any] = [
-            "type": ["object", "null"],
-            "properties": [
-                "x": ["type": "number", "description": "The region's CENTRE, source px."],
-                "y": ["type": "number", "description": "The region's CENTRE, source px."],
-                "width": ["type": "number", "description": "Its width in source px."],
-                "height": ["type": "number", "description": "Its height in source px."],
-            ] as [String: Any],
-            "required": ["x", "y", "width", "height"],
-            "description": "The rectangle to zoom to, in SOURCE pixels: x and y are its "
-                + "CENTRE measured from the centre of the clip's cropped rect — the frame "
-                + "video.spotlight and video.obscure use — and width and height its size. "
-                + "null is a zoom BACK to the clip's own scale and position; the key is "
-                + "required so a forgotten rectangle cannot become that by accident.",
-        ]
-        // `paste_attributes`'s group list, its enum read from the handler's
-        // own list so the schema and the check cannot disagree.
-        let groupsProperty: [String: Any] = [
-            "type": "array", "minItems": 1,
-            "items": ["type": "string", "enum": Self.attributeGroups] as [String: Any],
-            "description": "Which property groups travel. Default: every group both clips "
-                + "have; an empty list is refused.",
-        ]
+        // `add_zoom_action`'s region, the one argument whose own MEMBERS the
+        // core declares and refuses by name (`core/src/edit_zoom.rs`), so the
+        // four of them arrive printed, required and closed, and what is left
+        // to say here is the frame they are measured in. The sentence says
+        // what each member means, which is why the per-member descriptions
+        // this hand-written property used to carry are not missed: a
+        // region's members are part of a VALUE, not arguments of the op.
+        let zoomRegionDescription =
+            "The rectangle to zoom to, in SOURCE pixels: x and y are its "
+            + "CENTRE measured from the centre of the clip's cropped rect — the frame "
+            + "video.spotlight and video.obscure use — and width and height its size. "
+            + "null is a zoom BACK to the clip's own scale and position; the key is "
+            + "required so a forgotten rectangle cannot become that by accident."
         var rows: [[String: Any]] = [
 
             // MARK: Clips
 
-            tool(
+            opTool(
                 "add_clip",
                 "Places a whole media file as one clip at `at` on `track` — dragging a Media-tab "
                     + "row onto a track. The clip starts at source time 0 and runs the media's "
@@ -266,68 +253,50 @@ extension AgentServer {
                     + "overlap at most one neighbour on each side, and each overlap must be at "
                     + "most half of the shorter of the two clips (an overlap IS a transition).",
                 [
-                    "track": trackProperty,
-                    "media": [
-                        "type": "integer",
-                        "description": "Media id — import_media returns one.",
-                    ],
-                    "at": ["type": "integer", "description": "Start on the timeline, \(ticks)"],
-                ], required: ["track", "media", "at"]),
-            tool(
+                    "track": trackDescription,
+                    "media": "Media id — import_media returns one.",
+                    "at": "Start on the timeline, \(ticks)",
+                ]),
+            opTool(
                 "add_text_clip",
                 "Adds a text clip — a title. It has no source, so it can be any length; the "
                     + "default is 5 s of the Title preset, centred. Style it afterwards with "
                     + "set_text and place it with set_video (x, y, scale).",
                 [
-                    "track": trackProperty,
-                    "at": ["type": "integer", "description": "Start, \(ticks)"],
-                    "duration": [
-                        "type": "integer",
-                        "description": "Length \(ticks) Default 5 s (3000000).",
-                    ],
-                    // The op takes a set_text PATCH (`core/src/edit.rs`), and
-                    // this used to declare a bare string — so an object was
-                    // read as absent and the clip got the placeholder. Both
-                    // forms are declared because a string and an object can
-                    // never be confused for one another, and the string is
-                    // the spelling every caller written against the old tool
-                    // already uses.
-                    "text": [
-                        "type": ["object", "string"],
-                        "description": "The words, or the styling too. A plain string is "
-                            + "shorthand for {\"content\": …}; an object is a set_text patch "
-                            + "merged over the Title preset. " + textPatchDescription
-                            + " Default: the Title preset's placeholder.",
-                    ],
-                ], required: ["track", "at"]),
-            tool(
+                    "track": trackDescription,
+                    "at": "Start, \(ticks)",
+                    "duration": "Length \(ticks) Default 5 s (3000000).",
+                    // The op takes a set_text PATCH, which is what the core
+                    // publishes; the STRING beside it is the app's shorthand
+                    // and is a declared row rather than a type written here
+                    // (`AgentCatalog+Declarations.swift`).
+                    "text": "The words, or the styling too. A plain string is "
+                        + "shorthand for {\"content\": …}; an object is a set_text patch "
+                        + "merged over the Title preset. " + textPatchDescription
+                        + " Default: the Title preset's placeholder.",
+                ]),
+            opTool(
                 "add_shape_clip",
                 "Adds a shape clip — a rectangle, ellipse, line or arrow drawn over the video. "
                     + "Like text it has no source and any duration; set_shape changes its "
                     + "geometry and paint, set_video places it.",
                 [
-                    "track": trackProperty,
-                    "at": ["type": "integer", "description": "Start, \(ticks)"],
-                    "duration": [
-                        "type": "integer",
-                        "description": "Length \(ticks) Default 5 s (3000000).",
-                    ],
+                    "track": trackDescription,
+                    "at": "Start, \(ticks)",
+                    "duration": "Length \(ticks) Default 5 s (3000000).",
                     // Optional, as the op is: omitted, the core's default
                     // rectangle lands. Declaring it a REQUIRED kind name put
                     // that default out of reach and made the box and the
                     // paint need a following set_shape.
-                    "shape": [
-                        "type": ["object", "string"],
-                        "description": "Which shape, and how it is drawn. A plain string is a "
-                            + "kind — " + shapeNames.joined(separator: ", ")
-                            + " — and an object is a set_shape patch merged over the default "
-                            + "rectangle. " + shapePatchDescription + " Omit it for that "
-                            + "rectangle; a rounded one is a rectangle with a radius, not a "
-                            + "kind of its own. An arrow is created with its head on — pass "
-                            + "arrow_end: false for a bare diagonal.",
-                    ],
-                ], required: ["track", "at"]),
-            tool(
+                    "shape": "Which shape, and how it is drawn. A plain string is a "
+                        + "kind — " + shapeNames.joined(separator: ", ")
+                        + " — and an object is a set_shape patch merged over the default "
+                        + "rectangle. " + shapePatchDescription + " Omit it for that "
+                        + "rectangle; a rounded one is a rectangle with a radius, not a "
+                        + "kind of its own. An arrow is created with its head on — pass "
+                        + "arrow_end: false for a bare diagonal.",
+                ]),
+            opTool(
                 "add_background",
                 "Puts a backdrop on a NEW back-most track, starting at 0 and running the "
                     + "timeline's length — Clip ▸ Add Background. With no arguments at all it "
@@ -342,21 +311,15 @@ extension AgentServer {
                     + "alternatives: passing both is an error, and so is a duration under one "
                     + "frame or a media with no pictures.",
                 [
-                    "media": [
-                        "type": "integer",
-                        "description": "Media id to show as the background — get_project lists "
-                            + "them and import_media adds a file. Omit for a colour plate. A "
-                            + "timed media is NOT clamped to its own length, so a short movie "
-                            + "used here shows nothing for the rest of the timeline.",
-                    ],
-                    "color": colorProperty("The plate's colour; white when omitted"),
-                    "duration": [
-                        "type": "integer",
-                        "description": "Length \(ticks) Default: the whole timeline's length, "
-                            + "and never less than one frame.",
-                    ],
+                    "media": "Media id to show as the background — get_project lists "
+                        + "them and import_media adds a file. Omit for a colour plate. A "
+                        + "timed media is NOT clamped to its own length, so a short movie "
+                        + "used here shows nothing for the rest of the timeline.",
+                    "color": colorDescription("The plate's colour; white when omitted"),
+                    "duration": "Length \(ticks) Default: the whole timeline's length, "
+                        + "and never less than one frame.",
                 ]),
-            tool(
+            opTool(
                 "add_blurred_background",
                 "The screencast backdrop — Clip ▸ Add Blurred Background. `clip` is copied "
                     + "onto a NEW back-most track at the same start, duration, speed and "
@@ -373,8 +336,8 @@ extension AgentServer {
                     + "flattening drops a nest clip's own filters, so the copy would come out "
                     + "sharp), a source with no pixel size (a text clip, an audio-only one), "
                     + "or a clip carrying no video properties.",
-                ["clip": clipProperty], required: ["clip"]),
-            tool(
+                ["clip": clipDescription]),
+            opTool(
                 "insert_clip",
                 "The INSERT edit — Edit ▸ Insert at Playhead, or ⌥-dropping a Media-tab row. "
                     + "Makes room for the whole media at `at`: the clip `at` is inside on "
@@ -383,14 +346,11 @@ extension AgentServer {
                     + "cut — a clip straddling `at` on another track rides the shift whole, "
                     + "which is what keeps a music bed unbroken. One undo step.",
                 [
-                    "track": trackProperty,
-                    "media": [
-                        "type": "integer",
-                        "description": "Media id — import_media returns one.",
-                    ],
-                    "at": ["type": "integer", "description": "Where to insert, \(ticks)"],
-                ], required: ["track", "media", "at"]),
-            tool(
+                    "track": trackDescription,
+                    "media": "Media id — import_media returns one.",
+                    "at": "Where to insert, \(ticks)",
+                ]),
+            opTool(
                 "overwrite_clip",
                 "The OVERWRITE edit — Edit ▸ Overwrite at Playhead, or ⇧⌥-dropping a Media-tab "
                     + "row. Takes the room instead of making it: the span the media needs is "
@@ -398,14 +358,11 @@ extension AgentServer {
                     + "removed — and nothing shifts, so the cut's length and every other track "
                     + "are untouched. One undo step.",
                 [
-                    "track": trackProperty,
-                    "media": [
-                        "type": "integer",
-                        "description": "Media id — import_media returns one.",
-                    ],
-                    "at": ["type": "integer", "description": "Where to overwrite, \(ticks)"],
-                ], required: ["track", "media", "at"]),
-            tool(
+                    "track": trackDescription,
+                    "media": "Media id — import_media returns one.",
+                    "at": "Where to overwrite, \(ticks)",
+                ]),
+            opTool(
                 "move_clip",
                 "Shifts clips along the timeline by delta ticks (negative moves left; starts "
                     + "clamp at 0) and optionally onto another track — the timeline's clip drag. "
@@ -415,46 +372,31 @@ extension AgentServer {
                     + "clip that gains an overlap with the clip before it also gains a "
                     + "cross_dissolve transition if it had none.",
                 [
-                    "clips": clipsProperty,
-                    "delta": [
-                        "type": "integer",
-                        "description": "How far to shift, \(ticks) Negative moves earlier.",
-                    ],
-                    "track": [
-                        "type": "integer",
-                        "description": "Destination track id for the first clip; omit to stay "
-                            + "on the current tracks.",
-                    ],
-                ], required: ["clips", "delta"]),
-            tool(
+                    "clips": clipsDescription,
+                    "delta": "How far to shift, \(ticks) Negative moves earlier.",
+                    "track": "Destination track id for the first clip; omit to stay "
+                        + "on the current tracks.",
+                ]),
+            opTool(
                 "trim_start",
                 "Moves a clip's START to `to`, keeping the content in place: the source "
                     + "in-point advances by the same amount, so nothing after the new start "
                     + "shifts. Clamped by the source's own beginning and by the clip's end (a "
                     + "clip is at least one frame long).",
-                [
-                    "clip": clipProperty,
-                    "to": ["type": "integer", "description": "New start, \(ticks)"],
-                ], required: ["clip", "to"]),
-            tool(
+                ["clip": clipDescription, "to": "New start, \(ticks)"]),
+            opTool(
                 "trim_end",
                 "Moves a clip's END to `to`. Clamped by how much source is left after the "
                     + "in-point and by the clip's start.",
-                [
-                    "clip": clipProperty,
-                    "to": ["type": "integer", "description": "New end, \(ticks)"],
-                ], required: ["clip", "to"]),
-            tool(
+                ["clip": clipDescription, "to": "New end, \(ticks)"]),
+            opTool(
                 "rate_stretch",
                 "Stretches a clip to end at `to_end` by changing its SPEED instead of trimming "
                     + "it — the whole source still plays, faster or slower (⌥-dragging the end "
                     + "edge). Media clips only: a text, shape, image or freeze clip has no "
                     + "source to stretch and is an error.",
-                [
-                    "clip": clipProperty,
-                    "to_end": ["type": "integer", "description": "New end, \(ticks)"],
-                ], required: ["clip", "to_end"]),
-            tool(
+                ["clip": clipDescription, "to_end": "New end, \(ticks)"]),
+            opTool(
                 "slip",
                 "Slides the SOURCE under a fixed clip — ⌥⇧-dragging a clip's body. What the "
                     + "clip shows changes; where it sits does not, so nothing downstream moves. "
@@ -464,13 +406,10 @@ extension AgentServer {
                     + "nothing. A freeze clip moves the frame it holds instead. Media and "
                     + "freeze clips only: any other kind is an error.",
                 [
-                    "clip": clipProperty,
-                    "delta": [
-                        "type": "integer",
-                        "description": "How far to slide the source, \(ticks)",
-                    ],
-                ], required: ["clip", "delta"]),
-            tool(
+                    "clip": clipDescription,
+                    "delta": "How far to slide the source, \(ticks)",
+                ]),
+            opTool(
                 "roll",
                 "Moves a hard CUT — ⌥⇧-dragging a clip's edge. This clip's start and its "
                     + "predecessor's end both become `to`: one clip grows by exactly what the "
@@ -479,11 +418,8 @@ extension AgentServer {
                     + "one's start; with a gap or an overlap there instead, nothing changes (an "
                     + "overlap is a transition — use set_transition_duration). Clamped so each "
                     + "clip keeps a frame and neither asks for source it does not have.",
-                [
-                    "clip": clipProperty,
-                    "to": ["type": "integer", "description": "Where the cut moves to, \(ticks)"],
-                ], required: ["clip", "to"]),
-            tool(
+                ["clip": clipDescription, "to": "Where the cut moves to, \(ticks)"]),
+            opTool(
                 "split",
                 "Cuts clips in two at `at` — ⌘K. The second piece keeps playing the source from "
                     + "where the first stopped, and each keeps the animation actions that fall "
@@ -492,36 +428,27 @@ extension AgentServer {
                     + "command does with nothing selected. Refused when `at` is not strictly "
                     + "inside a clip.",
                 [
-                    "clips": [
-                        "type": "array", "items": ["type": "integer"], "minItems": 1,
-                        "description": "Clip ids; omit to split every unlocked clip at `at`.",
-                    ],
-                    "at": [
-                        "type": "integer",
-                        "description": "Where to cut, \(ticks) Default: the playhead.",
-                    ],
+                    "clips": "Clip ids; omit to split every unlocked clip at `at`.",
+                    "at": "Where to cut, \(ticks) Default: the playhead.",
                 ]),
-            tool(
+            opTool(
                 "delete",
                 "Removes clips and LEAVES the gaps where they were — ⌫. Use ripple_delete to "
                     + "close them.",
-                ["clips": clipsProperty], required: ["clips"]),
-            tool(
+                ["clips": clipsDescription]),
+            opTool(
                 "ripple_delete",
                 "Removes clips and closes the gaps: everything starting after each removed span "
                     + "on an UNLOCKED track slides left by that span's length — ⌘⌫. Clips on "
                     + "locked tracks and clips that straddle a span stay where they are.",
-                ["clips": clipsProperty], required: ["clips"]),
-            tool(
+                ["clips": clipsDescription]),
+            opTool(
                 "ripple_delete_range",
                 "Cuts a time range out of the whole timeline: every unlocked clip is split at "
                     + "both bounds, the middles are removed, and the rest slides left by the "
                     + "range's length. The in/out-range form of ⌘⌫.",
-                [
-                    "from": ["type": "integer", "description": "Range start, \(ticks)"],
-                    "to": ["type": "integer", "description": "Range end, \(ticks)"],
-                ], required: ["from", "to"]),
-            tool(
+                ["from": "Range start, \(ticks)", "to": "Range end, \(ticks)"]),
+            opTool(
                 "ripple_delete_ranges",
                 "Cuts SEVERAL time ranges out of the whole timeline as ONE edit — what Clip ▸ "
                     + "Remove Silences… sends. Each pair is put in order (a reversed pair is "
@@ -532,7 +459,7 @@ extension AgentServer {
                     + "undo step however many ranges there are, which is the point. Markers do "
                     + "not move, as under every ripple. An empty list, and a list that merges "
                     + "to nothing, change nothing. detect_silence returns ranges in this shape.",
-                ["ranges": rangesProperty], required: ["ranges"]),
+                ["ranges": "The spans to cut, each a [from, to] pair \(ticks)"]),
         ]
         // detect_silence and normalize_clip are `AgentCatalog+Audio.swift`'s,
         // spliced in HERE rather than appended, so the catalog's order is
@@ -540,7 +467,7 @@ extension AgentServer {
         // the two hoisted locals they read.
         rows += audioTools(ticks: ticks, clipsProperty: clipsProperty)
         rows += [
-            tool(
+            opTool(
                 "lift_range",
                 "Cuts a time range out and LEAVES the hole — ⌫ with an in/out range and nothing "
                     + "selected. Every unlocked clip is split at both bounds and the middles "
@@ -548,20 +475,17 @@ extension AgentServer {
                     + "it had, which is what makes this the safe cut when a mix or a caption "
                     + "track is already timed. Use ripple_delete_range to close the hole "
                     + "instead.",
-                [
-                    "from": ["type": "integer", "description": "Range start, \(ticks)"],
-                    "to": ["type": "integer", "description": "Range end, \(ticks)"],
-                ], required: ["from", "to"]),
-            tool(
+                ["from": "Range start, \(ticks)", "to": "Range end, \(ticks)"]),
+            opTool(
                 "insert_time",
                 "Opens a gap: every unlocked clip starting at or after `at` moves right by "
                     + "`length`. Straddling clips are left in place, so this makes room without "
                     + "cutting anything — split first if you want the gap inside a clip.",
                 [
-                    "at": ["type": "integer", "description": "Where the gap opens, \(ticks)"],
-                    "length": ["type": "integer", "description": "How much room, \(ticks)"],
-                ], required: ["at", "length"]),
-            tool(
+                    "at": "Where the gap opens, \(ticks)",
+                    "length": "How much room, \(ticks)",
+                ]),
+            opTool(
                 "close_gap",
                 "Closes the empty span on `track` that contains `at` — double-clicking a gap in "
                     + "a lane, or Clip ▸ Close Gap. The gap is bounded by the nearest clip "
@@ -571,32 +495,27 @@ extension AgentServer {
                     + "when the shift would break the overlap rule — a gap closes fully or not "
                     + "at all.",
                 [
-                    "track": trackProperty,
-                    "at": [
-                        "type": "integer",
-                        "description": "A time inside the gap, \(ticks)",
-                    ],
-                ], required: ["track", "at"]),
-            tool(
+                    "track": trackDescription,
+                    "at": "A time inside the gap, \(ticks)",
+                ]),
+            opTool(
                 "set_speed",
                 "Changes a clip's playback rate — Clip ▸ Speed…. The duration follows (source "
                     + "length ÷ rate) and the clip's animation actions keep their relative "
                     + "position inside it. Rate is clamped to 0.1–10. Media clips only: any "
                     + "other kind is an error.",
                 [
-                    "clip": clipProperty,
-                    "rate": [
-                        "type": "number", "minimum": 0.1, "maximum": 10,
-                        "description": "1 = normal, 2 = twice as fast (half as long), 0.5 = "
-                            + "slow motion.",
-                    ],
-                    "keep_pitch": [
-                        "type": "boolean",
-                        "description": "Keep the audio's pitch while the speed changes "
-                            + "(default: the clip's current setting).",
-                    ],
-                ], required: ["clip", "rate"]),
-            tool(
+                    "clip": clipDescription,
+                    // The 0.1–10 range is a declared row, not a bound here:
+                    // the core CLAMPS to it rather than refusing outside it,
+                    // so the op table may not publish it
+                    // (`AgentCatalog+Declarations.swift`).
+                    "rate": "1 = normal, 2 = twice as fast (half as long), 0.5 = "
+                        + "slow motion.",
+                    "keep_pitch": "Keep the audio's pitch while the speed changes "
+                        + "(default: the clip's current setting).",
+                ]),
+            opTool(
                 "set_reversed",
                 "Plays a media clip back to front, or forward again — Clip ▸ Reverse. Nothing "
                     + "about the timeline moves: the clip keeps its start, its duration and its "
@@ -606,41 +525,32 @@ extension AgentServer {
                     + "the app side the first time they are needed, so the first render_frame or "
                     + "export after this may take a moment.",
                 [
-                    "clip": clipProperty,
-                    "reversed": [
-                        "type": "boolean",
-                        "description": "true plays it backwards, false forwards again.",
-                    ],
-                ], required: ["clip", "reversed"]),
-            tool(
+                    "clip": clipDescription,
+                    "reversed": "true plays it backwards, false forwards again.",
+                ]),
+            opTool(
                 "freeze_frame",
                 "Holds one frame: the clip is split at `at`, a gap of `duration` is opened, and "
                     + "a still of that exact source frame fills it with the clip's own video "
                     + "properties — ⇧⌘F. Media clips only.",
                 [
-                    "clip": clipProperty,
-                    "at": [
-                        "type": "integer",
-                        "description": "The moment to freeze, \(ticks) Default: the playhead.",
-                    ],
-                    "duration": [
-                        "type": "integer",
-                        "description": "How long to hold \(ticks) Default 2 s (1200000).",
-                    ],
-                ], required: ["clip"]),
-            tool(
+                    "clip": clipDescription,
+                    "at": "The moment to freeze, \(ticks) Default: the playhead.",
+                    "duration": "How long to hold \(ticks) Default 2 s (1200000).",
+                ]),
+            opTool(
                 "detach_audio",
                 "Splits a clip's audio onto its own clip on the track below (inserting one when "
                     + "there is none), muting the original's audio and hiding the new clip's "
                     + "video — ⌥⌘D. The two can then be trimmed and moved apart. Refused when "
                     + "the media has no audio or the audio is already detached.",
-                ["clip": clipProperty], required: ["clip"]),
-            tool(
+                ["clip": clipDescription]),
+            opTool(
                 "duplicate",
                 "Copies clips onto the same tracks, placed immediately after the originals' "
                     + "span — ⌘D. Follow with move_clip to put them anywhere else.",
-                ["clips": clipsProperty], required: ["clips"]),
-            tool(
+                ["clips": clipsDescription]),
+            opTool(
                 "paste",
                 "Inserts a clipboard payload's clips with fresh ids — ⌘V. The earliest clip in "
                     + "the payload lands exactly at `at` and the others keep their offsets from "
@@ -656,22 +566,13 @@ extension AgentServer {
                     + "refuses on its target track is placed on a new track in front rather "
                     + "than dropped.",
                 [
-                    "at": [
-                        "type": "integer",
-                        "description": "Where the earliest clip lands, \(ticks) Default: the "
-                            + "playhead.",
-                    ],
-                    "track": [
-                        "type": "integer",
-                        "description": "Track id for the payload's depth 0; the rest follow by "
-                            + "the same offset. Default: the front-most track.",
-                    ],
-                    "payload": [
-                        "type": "object",
-                        "description": "{\"clips\": [...], \"media\": [...]} — see above.",
-                    ],
-                ], required: ["payload"]),
-            tool(
+                    "at": "Where the earliest clip lands, \(ticks) Default: the "
+                        + "playhead.",
+                    "track": "Track id for the payload's depth 0; the rest follow by "
+                        + "the same offset. Default: the front-most track.",
+                    "payload": "{\"clips\": [...], \"media\": [...]} — see above.",
+                ]),
+            opTool(
                 "paste_attributes",
                 "Copies the payload's EARLIEST clip's property groups onto each of the clips — "
                     + "Edit ▸ Paste Attributes (⌥⌘V). The payload is the same Copy payload "
@@ -687,15 +588,18 @@ extension AgentServer {
                     + "the clip's own name and label stay. Refused (no change) when nothing "
                     + "would change.",
                 [
-                    "clips": clipsProperty,
-                    "payload": [
-                        "type": "object",
-                        "description": "{\"clips\": [...], \"media\": [...]} — what Copy puts "
-                            + "on the pasteboard; see paste.",
-                    ],
-                    "groups": groupsProperty,
-                ], required: ["clips", "payload"]),
-            tool(
+                    "clips": clipsDescription,
+                    "payload": "{\"clips\": [...], \"media\": [...]} — what Copy puts "
+                        + "on the pasteboard; see paste.",
+                    // The four member names are the CORE's list now, printed
+                    // from `Group` (`core/src/patch.rs`) rather than from the
+                    // handler's copy of it; `AgentServer.attributeGroups` is
+                    // still what a refusal here names, and the clip-catalog
+                    // proof compares the two.
+                    "groups": "Which property groups travel. Default: every group both clips "
+                        + "have; an empty list is refused.",
+                ]),
+            opTool(
                 "nest",
                 "Collapses clips into ONE clip that stands for the group — ⌘G. The clips move "
                     + "whole (properties, actions, transitions) onto the nest's own tracks, "
@@ -709,13 +613,10 @@ extension AgentServer {
                     + "an empty selection, on a single clip that is already a nest, and when the "
                     + "nest clip would overlap something that was not selected.",
                 [
-                    "clips": clipsProperty,
-                    "name": [
-                        "type": "string",
-                        "description": "What to call the group. Default: Nest <n>.",
-                    ],
-                ], required: ["clips"]),
-            tool(
+                    "clips": clipsDescription,
+                    "name": "What to call the group. Default: Nest <n>.",
+                ]),
+            opTool(
                 "unnest",
                 "Opens a nest clip: its contents return to the timeline and the nest clip goes — "
                     + "⇧⌘G. The exact inverse of nest apart from the ids, which are minted "
@@ -725,8 +626,8 @@ extension AgentServer {
                     + "rather than being dropped. A nest clip trimmed shorter than its contents "
                     + "gives ALL of them back — trimming a nest hides content rather than "
                     + "cutting it. An error on any clip that is not a nest.",
-                ["clip": clipProperty], required: ["clip"]),
-            tool(
+                ["clip": clipDescription]),
+            opTool(
                 "set_video",
                 "Changes the clips' BASE video properties — position, scale, rotation, opacity, "
                     + "crop, corner radius, shadow, colour, chroma key, filters, reflection, "
@@ -744,40 +645,28 @@ extension AgentServer {
                     + "canvas centre plus (x, y), scaled, then rotated about that centre, and "
                     + "crop removes edges in place without shifting the content. To animate a "
                     + "property instead, add_action and then set_action_end.",
-                [
-                    "clips": clipsProperty,
-                    "patch": ["type": "object", "description": videoPatchDescription],
-                ], required: ["clips", "patch"]),
-            tool(
+                ["clips": clipsDescription, "patch": videoPatchDescription]),
+            opTool(
                 "set_audio",
                 "Changes the clips' BASE audio properties — volume, mute, fades, ducking, mono, "
                     + "pitch preservation, pan, compression and noise reduction. Merges like "
                     + "set_video; duck or compressor set to null removes it.",
-                [
-                    "clips": clipsProperty,
-                    "patch": ["type": "object", "description": audioPatchDescription],
-                ], required: ["clips", "patch"]),
-            tool(
+                ["clips": clipsDescription, "patch": audioPatchDescription]),
+            opTool(
                 "set_text",
                 "Changes a text clip's words and typography. Merges like set_video; outline, "
                     + "backdrop and width set to null clear them (a null width restores "
                     + "auto-sizing). Position and scale are set_video's, not this tool's.",
-                [
-                    "clips": clipsProperty,
-                    "patch": ["type": "object", "description": textPatchDescription],
-                ], required: ["clips", "patch"]),
-            tool(
+                ["clips": clipsDescription, "patch": textPatchDescription]),
+            opTool(
                 "set_shape",
                 "Changes a shape clip's geometry and paint. Merges like set_video; stroke or "
                     + "fill set to null removes that half of the paint. Position and scale are "
                     + "set_video's, not this tool's. Changing kind changes ONLY the kind — an "
                     + "arrow made this way keeps whatever arrow_end it had, unlike one created "
                     + "by add_shape_clip.",
-                [
-                    "clips": clipsProperty,
-                    "patch": ["type": "object", "description": shapePatchDescription],
-                ], required: ["clips", "patch"]),
-            tool(
+                ["clips": clipsDescription, "patch": shapePatchDescription]),
+            opTool(
                 "set_clip",
                 "Names or labels clips — the timeline's inline rename (double-click the name "
                     + "strip), the Clip tab's name field, Clip ▸ Rename… (⇧⌘R) and Clip ▸ "
@@ -788,48 +677,41 @@ extension AgentServer {
                     + "split, duplicate, detach or paste carries both along; paste_attributes "
                     + "never does. The label is a colour name drawn as a dot on the clip, "
                     + "stored as given, so keep to the six names.",
-                [
-                    "clips": clipsProperty,
-                    "patch": ["type": "object", "description": clipPatchDescription],
-                ], required: ["clips", "patch"]),
-            tool(
+                ["clips": clipsDescription, "patch": clipPatchDescription]),
+            opTool(
                 "set_enabled",
                 "Turns one clip's video and/or audio on or off — the two halves detach_audio "
                     + "flips. A disabled half contributes nothing to the composition but the "
                     + "clip stays where it is.",
                 [
-                    "clip": clipProperty,
-                    "video": ["type": "boolean", "description": "Show this clip's picture."],
-                    "audio": ["type": "boolean", "description": "Play this clip's sound."],
-                ], required: ["clip"]),
-            tool(
+                    "clip": clipDescription,
+                    "video": "Show this clip's picture.",
+                    "audio": "Play this clip's sound.",
+                ]),
+            opTool(
                 "set_transition",
                 "Sets the transition INTO a clip — the one that plays across its overlap with "
                     + "the clip before it on the same track. The transition's duration IS that "
                     + "overlap, so a clip with no overlap ignores it: make one with move_clip or "
                     + "set_transition_duration. kind null removes it.",
                 [
-                    "clip": clipProperty,
-                    "kind": [
-                        "type": ["string", "null"], "enum": transitionEnum,
-                        "description": "The transition, or null to remove it.",
-                    ] as [String: Any],
-                ], required: ["clip", "kind"]),
-            tool(
+                    "clip": clipDescription,
+                    // The null beside the core's thirteen names, and the
+                    // required-ness that keeps a forgotten kind from becoming
+                    // one, are both declared rows
+                    // (`AgentCatalog+Declarations.swift`).
+                    "kind": "The transition, or null to remove it.",
+                ]),
+            opTool(
                 "set_transition_duration",
                 "Makes a clip's transition last `duration` by MOVING the clip so its overlap "
                     + "with the clip before it equals that. Subject to the overlap rule, so a "
                     + "duration past half the shorter clip is refused.",
-                [
-                    "clip": clipProperty,
-                    "duration": [
-                        "type": "integer", "description": "Overlap length, \(ticks)",
-                    ],
-                ], required: ["clip", "duration"]),
+                ["clip": clipDescription, "duration": "Overlap length, \(ticks)"]),
 
             // MARK: Actions
 
-            tool(
+            opTool(
                 "add_action",
                 "Adds an animation span to a clip: over `duration` starting at `at`, the clip's "
                     + "properties ease from whatever they are to the span's END state. The end "
@@ -838,17 +720,11 @@ extension AgentServer {
                     + "timeline's. Refused when it would overlap another action or run past the "
                     + "clip's end. The new action's id comes back as new_actions.",
                 [
-                    "clip": clipProperty,
-                    "at": [
-                        "type": "integer",
-                        "description": "Where the animation starts, in CLIP time, \(ticks)",
-                    ],
-                    "duration": [
-                        "type": "integer",
-                        "description": "How long it runs \(ticks) Default 1 s (600000).",
-                    ],
-                ], required: ["clip", "at"]),
-            tool(
+                    "clip": clipDescription,
+                    "at": "Where the animation starts, in CLIP time, \(ticks)",
+                    "duration": "How long it runs \(ticks) Default 1 s (600000).",
+                ]),
+            opTool(
                 "add_zoom_action",
                 "Adds an animation that zooms the picture to a rectangle — the screencast "
                     + "zoom, and what the canvas's Z mode and the Video tab's Zoom to Region… "
@@ -865,49 +741,29 @@ extension AgentServer {
                     + "The new action's id comes back as new_actions, and set_action_end adds "
                     + "to what the same action animates.",
                 [
-                    "clip": clipProperty,
-                    "at": [
-                        "type": "integer",
-                        "description": "Where the zoom starts, in CLIP time, \(ticks)",
-                    ],
-                    "duration": [
-                        "type": "integer",
-                        "description": "How long it runs \(ticks) Default 1 s (600000).",
-                    ],
-                    "region": zoomRegionProperty,
-                    "fit": [
-                        "type": "string", "enum": ZoomFit.allCases.map { $0.rawValue },
-                        "description": "fit shows the whole region (the default); fill covers "
-                            + "the whole canvas, cropping whatever the region's shape does not "
-                            + "match.",
-                    ],
-                    "curve": [
-                        "type": "string", "enum": curveNames,
-                        "description": "How the zoom eases. Default ease_in_out, not linear: "
-                            + "a zoom that starts and stops abruptly is the thing this exists "
-                            + "to avoid.",
-                    ],
-                ], required: ["clip", "at", "region"]),
-            tool(
+                    "clip": clipDescription,
+                    "at": "Where the zoom starts, in CLIP time, \(ticks)",
+                    "duration": "How long it runs \(ticks) Default 1 s (600000).",
+                    "region": zoomRegionDescription,
+                    "fit": "fit shows the whole region (the default); fill covers "
+                        + "the whole canvas, cropping whatever the region's shape does not "
+                        + "match.",
+                    "curve": "How the zoom eases. Default ease_in_out, not linear: "
+                        + "a zoom that starts and stops abruptly is the thing this exists "
+                        + "to avoid.",
+                ]),
+            opTool(
                 "set_action",
                 "Moves or re-times an action, or changes its easing curve. Same overlap checks "
                     + "as add_action.",
                 [
-                    "clip": clipProperty,
-                    "action": [
-                        "type": "integer",
-                        "description": "Action id (get_project lists each clip's actions).",
-                    ],
-                    "start": [
-                        "type": "integer", "description": "New start in CLIP time, \(ticks)",
-                    ],
-                    "duration": ["type": "integer", "description": "New length, \(ticks)"],
-                    "curve": [
-                        "type": "string", "enum": curveNames,
-                        "description": "How the values ease from start to end.",
-                    ],
-                ], required: ["clip", "action"]),
-            tool(
+                    "clip": clipDescription,
+                    "action": "Action id (get_project lists each clip's actions).",
+                    "start": "New start in CLIP time, \(ticks)",
+                    "duration": "New length, \(ticks)",
+                    "curve": "How the values ease from start to end.",
+                ]),
+            opTool(
                 "set_action_end",
                 "Sets what an action animates TO. The patch is the action's end state and MERGES "
                     + "into it key by key at every depth (a one-key shadow keeps the rest of it); a "
@@ -920,21 +776,15 @@ extension AgentServer {
                     + "anchored to the clip's two ends rather than a value to ramp between. Set it "
                     + "with set_video.",
                 [
-                    "clip": clipProperty,
-                    "action": ["type": "integer", "description": "Action id."],
-                    "patch": [
-                        "type": "object",
-                        "description": "{video?: {...}, audio?: {...}, text?: {...}} — the "
-                            + "properties the animation ends at.",
-                    ],
-                ], required: ["clip", "action", "patch"]),
-            tool(
+                    "clip": clipDescription,
+                    "action": "Action id.",
+                    "patch": "{video?: {...}, audio?: {...}, text?: {...}} — the "
+                        + "properties the animation ends at.",
+                ]),
+            opTool(
                 "remove_action",
                 "Removes an animation span. The clip keeps its base properties.",
-                [
-                    "clip": clipProperty,
-                    "action": ["type": "integer", "description": "Action id."],
-                ], required: ["clip", "action"]),
+                ["clip": clipDescription, "action": "Action id."]),
         ]
         return rows
     }

@@ -562,7 +562,7 @@ def one_nest(mcp):
 
 
 def catalog_part(mcp):
-    listed = mcp._request("tools/list", {})["tools"]
+    listed = mcp.schemas().values()
     names = {tool["name"] for tool in listed}
     check(len(names) >= TOOLS,
           f"the catalog holds at least phase 9's {TOOLS} tools (got {len(names)}) — phase 7's "

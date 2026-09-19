@@ -182,8 +182,8 @@ final class AgentServer {
         }
         // The envelope's `scope` is read ONCE, here, because this is the only
         // place that holds both the tool's name and its arguments for all
-        // seventy-five of them — a read inside each handler would be
-        // fifty-eight edit sites across two files, every one of them able to
+        // seventy-seven of them — a read inside each handler would be
+        // fifty-seven edit sites across two files, every one of them able to
         // forget. It is read for exactly the tools whose schema declares it
         // (`AgentCatalog.opNames`, the core's own op list), so a stray
         // `scope` on `get_project` or `export` is the ignored extra key it
@@ -313,7 +313,7 @@ final class AgentServer {
     /// comment saying why it is the exception.
     private static let opsWithoutTools: Set<String> = []
 
-    /// The enforcement behind the table's contract, in four parts:
+    /// The enforcement behind the table's contract, in five parts:
     ///
     /// 1. `catalogJSON()` and `handlers` name exactly the same tools;
     /// 2. every op the CORE declares has a tool — the list read through
@@ -327,18 +327,20 @@ final class AgentServer {
     /// 4. every OP tool declares `scope` — road map 2's phase 9, and the one
     ///    part that is about a feature rather than about the catalog's shape,
     ///    so it lives in `AgentServer+Scope.swift` and says there why parts 1
-    ///    to 3 cannot see the omission it catches.
+    ///    to 3 cannot see the omission it catches;
+    /// 5. every OP tool declares the CORE's arguments for that op — the one
+    ///    part that looks inside a schema rather than at a set of names, so
+    ///    it lives in `AgentServer+Parity.swift` with the three ways a tool
+    ///    can still be wrong written out there.
     ///
-    /// **What it still cannot see.** Nothing validates a call against
-    /// `inputSchema`, and the core publishes op NAMES, not op arguments, so
-    /// a tool whose argument has the wrong TYPE — `add_text_clip`'s `text`
-    /// declared `string` against the op's `text?: object` — passes all
-    /// three. What guards that is the argument vocabulary in
-    /// `AgentServer+Arguments.swift`, which now refuses a present value of
-    /// the wrong type instead of reading it as absent; a drift of that kind
-    /// then surfaces as an error on the first call rather than as a silently
-    /// dropped argument. Publishing the argument names too would close it
-    /// here, and wants a second table in `edit.rs` to be worth its keep.
+    /// **What it still cannot see.** Nothing validates a CALL against
+    /// `inputSchema`; what guards that is the argument vocabulary in
+    /// `AgentServer+Arguments.swift`, which refuses a present value of the
+    /// wrong type instead of reading it as absent. And part 5 reads the same
+    /// published table the catalog prints, so a constraint the app still
+    /// enforces that the TABLE stops declaring moves both sides together and
+    /// passes — the class that only a row calling the running tool can
+    /// catch (`tools/proof/op_argument_proof.py`).
     private static func catalogParityFailure(_ catalog: String) -> String? {
         guard
             let tools = (try? JSONSerialization.jsonObject(with: Data(catalog.utf8)))
@@ -367,11 +369,12 @@ final class AgentServer {
         if !stale.isEmpty {
             return "AgentServer.opsWithoutTools names ops the core does not have: \(stale)"
         }
-        // Part 4 lives in `AgentServer+Scope.swift` with the rest of the
-        // scope, where parts 1 to 3 stay here with the table they check: it
-        // is the only part that is about one FEATURE rather than about the
-        // catalog's shape, and this file is frozen at wiring.
+        // Parts 4 and 5 live in files of their own, where parts 1 to 3 stay
+        // here with the private dispatch table they check: part 4 is about
+        // one FEATURE rather than about the catalog's shape, part 5 is the
+        // longest of the five, and this file is frozen at wiring.
         return schemaFailure(tools) ?? Self.scopeFailure(tools, ops)
+            ?? Self.argumentFailure(tools, ops)
     }
 
     /// Part 3: the structural check on each tool's declared input. It cannot

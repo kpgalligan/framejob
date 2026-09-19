@@ -2,11 +2,13 @@
 
 **Status: road map 2 is complete, and the debt it left is paid.** All ten
 phases are done and `designs/reelcut-roadmap-2.md` §1 carries the commit of
-each. `make test` is at 494, `make lint` and `cargo fmt --check` are clean,
-`make typecheck` is at 0 errors and its four deliberate AVFoundation
-warnings, the catalog is 75 tools and the parity log is empty, and every
-proof script passes: 66, 85, 121, 8, 84, 88, 167, 92, 79, 214 and 79 over
-MCP and 26, 33, 59, 81, 70, 78, 150, 48, 62 and 141 offscreen.
+each. **On the day it closed** `make test` was at 494, `make lint` and
+`cargo fmt --check` were clean, `make typecheck` was at 0 errors and its four
+deliberate AVFoundation warnings, the catalog was 75 tools and the parity log
+empty, and every proof script passed: 66, 85, 121, 8, 84, 88, 167, 92, 79,
+214 and 79 over MCP and 26, 33, 59, 81, 70, 78, 150, 48, 62 and 141
+offscreen. Those counts are that day's; §3 is the part of this file that is
+kept current.
 
 This file was written as the honest remainder when the road map closed: the
 debt two large phases left behind, plus the checks no script can make. §1 and
@@ -201,9 +203,37 @@ would be the bare strip with a longer list.
 ## 3. The size debt
 
 Every file over the ~600-line cap as of 2026-09-18 — 29 of them, the
-list regenerated row by row against `wc -l` at road map 7's D2·5, which
-closed deepening D2. `core/src/edit_track.rs` came off it there (674 → 522,
-`edit_canvas.rs` cut out of it in D2·3) and nothing joined.
+list regenerated row by row against `wc -l` at road map 7's D3·6, which
+closed deepening D3. `core/src/edit_track.rs` came off it at D2·3
+(674 → 522, `edit_canvas.rs` cut out of it) and nothing has joined since.
+
+**What deepening D3 did to this list**, measured against `main` rather than
+summed from the tickets (road map 7 §7–§9). `core/src/edit.rs` lost its
+Arguments column, **895 → 838**: still over, and still exempt for the
+SEMANTICS table that is the rest of it. That column is now data in two new
+core modules, both under the 400-line cap for a new module and neither taking
+`edit.rs`'s exemption — `core/src/op_table.rs` (**325** of 400) and
+`core/src/op_schema.rs` (**173** of 400). On the app side the five catalog
+files went **2251 → 2125** together as the structure they used to hand-write
+moved to the core: `AgentCatalog+Clips.swift` **941 → 791**, the first time an
+over-cap file here has come DOWN without anything being moved out of it;
+`AgentCatalog+Files.swift` 609 → **601** (over by one line);
+`AgentCatalog+Transitions.swift` 112 → **92**; `AgentCatalog.swift`
+472 → **524**, which took `opTool` and ten argument descriptions the fifth
+part of the parity check turned from a silence into a complaint; and
+`AgentCatalog+Audio.swift` **117**, untouched, its two tools having no op
+behind them. Three new app files stand against that, all under the 400-line
+cap: `app/Sources/AgentCatalog+Declarations.swift` (**313** — the fourteen
+rows where a tool deliberately takes more or less than its op, with a reason
+each), `app/Sources/AgentServer+Parity.swift` (**183** — the fifth part and
+nothing else) and `app/Sources/ReelOpSchema.swift` (**27**).
+`AgentServer.swift`, frozen, is **771 → 774**: twelve lines of doc comment
+taken across D3·3 and D3·4 and nine given back at D3·5, when the two
+paragraphs describing the gap that part has now closed stopped being true.
+`ReelCore.swift` is **1500 → 1542** and stays where it was in this list — it
+is over the cap, so only the part that had to be there went in, the function
+naming `rc_op_schemas`, and the value type it answers went to
+`ReelOpSchema.swift` instead.
 Regenerate the list with
 `wc -l app/Sources/*.swift core/src/*.rs | awk '$1>600 && $2!="total"' | sort -rn`
 rather than trusting the numbers here; the standing exemptions are
@@ -215,7 +245,7 @@ row per op.
 | `app/Sources/ProjectSnapshot.swift` | 2516 |
 | `app/Sources/InspectorPane.swift` | 1665 |
 | `app/Sources/TimelineView.swift` | 1630 |
-| `app/Sources/ReelCore.swift` | 1500 |
+| `app/Sources/ReelCore.swift` | 1542 |
 | `app/Sources/VideoPane.swift` | 1411 |
 | `app/Sources/Compositor.swift` | 1391 |
 | `app/Sources/ProjectDocument.swift` | 1352 |
@@ -227,20 +257,20 @@ row per op.
 | `app/Sources/CanvasSessions.swift` | 1088 |
 | `app/Sources/OptionControls.swift` | 1081 |
 | `core/src/edit_clip.rs` | 1028 |
-| `app/Sources/AgentCatalog+Clips.swift` | 941 |
 | `app/Sources/Transcriber.swift` | 934 |
-| `core/src/edit.rs` | 895 |
 | `app/Sources/AudioDSP.swift` | 890 |
 | `app/Sources/AgentServer+Clips.swift` | 847 |
-| `app/Sources/AgentServer.swift` | 771 |
+| `core/src/edit.rs` | 838 |
+| `app/Sources/AgentCatalog+Clips.swift` | 791 |
+| `app/Sources/AgentServer.swift` | 774 |
 | `app/Sources/FFmpegRewrap.swift` | 768 |
 | `app/Sources/Loudness.swift` | 742 |
 | `app/Sources/ExportSheetController.swift` | 639 |
 | `app/Sources/Exporter.swift` | 609 |
 | `app/Sources/ClipPane.swift` | 609 |
-| `app/Sources/AgentCatalog+Files.swift` | 609 |
 | `app/Sources/MediaImporter.swift` | 604 |
 | `app/Sources/CompositionBuilder.swift` | 601 |
+| `app/Sources/AgentCatalog+Files.swift` | 601 |
 
 The notes below are from road map 3's close and name each file's SEAM, which
 is what a phase needs before it pays; the counts in them are as of that day.

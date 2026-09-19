@@ -11,19 +11,20 @@ import AppKit
 /// catalog, which is where `tools/proof/recording_probe.py` reads the last
 /// eleven names from.
 ///
-/// `scope` arrives on both for free: `tool()` puts it on every row whose name
-/// the CORE calls an op (`rc_op_names`), so an op tool cannot be declared
-/// without one.
+/// Both rows are `opTool`'s (road map 7's D3·4): the PROSE is here and the
+/// structure — the two vocabularies among it — is printed from the core's
+/// published table, so the thirteen kinds and the three alignments are the
+/// core's own list rather than `TransitionKind.allCases` restated. `scope`
+/// arrives on both for free: `tool()`, which `opTool` goes through, puts one
+/// on every row whose name the CORE calls an op (`rc_op_names`), so an op
+/// tool cannot be declared without one.
 extension AgentServer {
-    /// The transition rows, given the two locals the clip group already
-    /// hoisted — the ticks sentence and the clip-id property — so neither is
-    /// spelled a second time.
-    func transitionTools(ticks: String, clipProperty: [String: Any]) -> [[String: Any]] {
-        let transitionNames = TransitionKind.allCases.map { $0.rawValue }
-        let curveNames = Curve.allCases.map { $0.rawValue }
-        let alignNames = TransitionAlign.allCases.map { $0.rawValue }
+    /// The transition rows, given the two SENTENCES the clip group already
+    /// hoisted — the ticks note and the clip-id prose — so neither is spelled
+    /// a second time.
+    func transitionTools(ticks: String, clipDescription: String) -> [[String: Any]] {
         return [
-            tool(
+            opTool(
                 "add_transition",
                 "Makes an overlap at the HARD CUT before a clip and puts a transition on it — "
                     + "Clip ▸ Transition ▸ <kind> on a clip that abuts the one before it. The "
@@ -56,33 +57,18 @@ extension AgentServer {
                     + "on another track pushed into its neighbour gets a cross_dissolve; "
                     + "markers do not move.",
                 [
-                    "clip": clipProperty,
-                    "kind": [
-                        "type": "string", "enum": transitionNames,
-                        "description":
-                            "The transition. Absent uses the clip's stored kind, else "
-                            + "cross_dissolve. Not nullable — set_transition clears.",
-                    ] as [String: Any],
-                    "duration": [
-                        "type": "integer",
-                        "description": "Requested overlap length, \(ticks) Clamped, never "
-                            + "refused for being too long.",
-                    ],
-                    "align": [
-                        "type": "string", "enum": alignNames,
-                        "description":
-                            "Which side the overlap comes out of. Default center. Ignored "
-                            + "with ripple.",
-                    ] as [String: Any],
-                    "ripple": [
-                        "type": "boolean",
-                        "description":
-                            "Make the overlap by sliding the incoming clip and everything "
-                            + "after it left, for two clips with no footage beyond the cut. "
-                            + "Default false.",
-                    ],
-                ], required: ["clip", "duration"]),
-            tool(
+                    "clip": clipDescription,
+                    "kind": "The transition. Absent uses the clip's stored kind, else "
+                        + "cross_dissolve. Not nullable — set_transition clears.",
+                    "duration": "Requested overlap length, \(ticks) Clamped, never "
+                        + "refused for being too long.",
+                    "align": "Which side the overlap comes out of. Default center. Ignored "
+                        + "with ripple.",
+                    "ripple": "Make the overlap by sliding the incoming clip and everything "
+                        + "after it left, for two clips with no footage beyond the cut. "
+                        + "Default false.",
+                ]),
+            opTool(
                 "set_transition_style",
                 "Sets how a transition is EASED and whether it crossfades the two clips' "
                     + "sound — the Curve popup and the Crossfade Audio checkbox in the Clip "
@@ -97,16 +83,10 @@ extension AgentServer {
                     + "straight-line pair dips 3 dB. A project written before this existed "
                     + "reads as linear with no crossfade, exactly as it always sounded.",
                 [
-                    "clip": clipProperty,
-                    "curve": [
-                        "type": "string", "enum": curveNames,
-                        "description": "How the transition's progress is eased.",
-                    ] as [String: Any],
-                    "audio": [
-                        "type": "boolean",
-                        "description": "Crossfade the two clips' sound across the overlap.",
-                    ],
-                ], required: ["clip"]),
+                    "clip": clipDescription,
+                    "curve": "How the transition's progress is eased.",
+                    "audio": "Crossfade the two clips' sound across the overlap.",
+                ]),
         ]
     }
 }

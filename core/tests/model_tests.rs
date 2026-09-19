@@ -35,9 +35,10 @@ use reelcut_core::ffi_agent::{
 };
 use reelcut_core::ffi_edit::rc_project_apply;
 use reelcut_core::ffi_query::{
-    rc_export_presets, rc_export_settings, rc_export_sizes, rc_op_names, rc_project_clip_state,
-    rc_project_composition_plan, rc_project_duration, rc_project_frame_recipe,
-    rc_project_frame_recipe_opts, rc_project_snap_candidates, rc_snap_resolve,
+    rc_export_presets, rc_export_settings, rc_export_sizes, rc_op_names, rc_op_schemas,
+    rc_project_clip_state, rc_project_composition_plan, rc_project_duration,
+    rc_project_frame_recipe, rc_project_frame_recipe_opts, rc_project_snap_candidates,
+    rc_snap_resolve,
 };
 
 /// Every `TransitionKind`, every `ShapeKind`, every `Curve` — the wire
@@ -2037,6 +2038,12 @@ fn sweep_every_export_with_nulls() -> Vec<String> {
     let ops = take_string(unsafe { rc_op_names() }).expect("op names are never NULL");
     assert_contains(&ops, "\"add_shape_clip\"");
     cover("rc_op_names");
+
+    // rc_op_schemas takes no pointers either, and answers one schema per
+    // op — `core/tests/op_schemas.rs` is where its contents are checked.
+    let schemas = take_string(unsafe { rc_op_schemas() }).expect("op schemas are never NULL");
+    assert_contains(&schemas, "\"add_shape_clip\"");
+    cover("rc_op_schemas");
 
     let presets = take_string(unsafe { rc_export_presets() }).expect("presets are never NULL");
     assert_contains(&presets, "\"h264\"");

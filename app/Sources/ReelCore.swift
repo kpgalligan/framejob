@@ -12,8 +12,10 @@ import AppKit
 /// `ReelOp` and its one static factory per row of the op table are next door
 /// in `ReelOps.swift`, the size payment this file owed at 2242 lines, and
 /// what an op ANSWERS is in `ReelEdit.swift`, the payment it owed at 1507.
-/// Only `ReelOp.coreNames()` stayed behind, because it reads `rc_op_names()`
-/// and the rule above admits no second file.
+/// Only `ReelOp.coreNames()` and `ReelOp.coreSchemas()` stayed behind — the
+/// op table read BACK, its names and its arguments — because they read
+/// `rc_op_names()` and `rc_op_schemas()` and the rule above admits no second
+/// file.
 ///
 /// Three conventions carried from Rasterize's `RasterCore.swift`:
 ///
@@ -666,18 +668,58 @@ enum ReelExport {
     }
 }
 
-// MARK: - Op names
+// MARK: - The op table, read back
 
 extension ReelOp {
+    /// Every op's arguments as JSON Schema, keyed by op name — `OP_TABLE`
+    /// in `core/src/op_table.rs`, projected by `core/src/op_schema.rs` and
+    /// read through the FFI rather than restated in Swift, which is the
+    /// whole point of the export: the catalog can print what the core
+    /// accepts instead of keeping a hand copy that can be wrong about a
+    /// type, a vocabulary or a required list and still pass every part of
+    /// the startup parity check.
+    ///
+    /// The keys are `coreNames()`'s names, and neither list is derived from
+    /// the other on this side: they are two views of one table in the core.
+    ///
+    /// Empty only if the core failed or its answer could not be read, which
+    /// it does not — and an empty answer is a catastrophe rather than "no
+    /// arguments", so a caller treats it the way `AgentCatalog` already
+    /// treats an empty `coreNames()`: it refuses to build on one.
+    ///
+    /// The second member of `ReelOp` that did NOT go to `ReelOps.swift`,
+    /// for `coreNames()`'s reason: it names an `rc_*` symbol, and this file
+    /// is the only one that may.
+    static func coreSchemas() -> [String: ReelOpSchema] {
+        guard let json = takeString(rc_op_schemas()),
+            let data = json.data(using: .utf8),
+            let object = try? JSONSerialization.jsonObject(with: data),
+            let map = object as? [String: Any]
+        else { return [:] }
+        var schemas: [String: ReelOpSchema] = [:]
+        for (name, value) in map {
+            // A row that is not an object is dropped rather than defaulted:
+            // the op then has no schema at all, which the caller's own
+            // check can see, where an empty one would look like an op that
+            // takes nothing.
+            guard let schema = value as? [String: Any] else { continue }
+            schemas[name] = ReelOpSchema(
+                properties: schema["properties"] as? [String: Any] ?? [:],
+                required: schema["required"] as? [String] ?? [])
+        }
+        return schemas
+    }
+
     /// Every op name the core accepts, in the order of its table
     /// (`OP_NAMES` in `core/src/edit.rs`), read through the FFI rather than
-    /// copied into Swift: a copy is one more spelling to drift, and the one
-    /// caller — `AgentServer`'s startup parity check — exists precisely to
-    /// catch drift. Empty only if the core failed, which it does not.
+    /// copied into Swift: a copy is one more spelling to drift, and its one
+    /// reader — `AgentCatalog.opNames`, which three things share — is there
+    /// to catch it. Empty only if the core failed, which it does not.
     ///
-    /// The one member of `ReelOp` that did NOT go to `ReelOps.swift` with the
-    /// struct and its factories: it names an `rc_*` symbol, and this file is
-    /// the only one that may.
+    /// The first member of `ReelOp` that did NOT go to `ReelOps.swift` with
+    /// the struct and its factories: it names an `rc_*` symbol, and this
+    /// file is the only one that may. `coreSchemas()` above stayed for the
+    /// same rule.
     static func coreNames() -> [String] {
         guard let json = takeString(rc_op_names()) else { return [] }
         return ReelJSON.decode([String].self, from: json) ?? []

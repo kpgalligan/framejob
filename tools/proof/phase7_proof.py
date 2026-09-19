@@ -1072,7 +1072,7 @@ def catalog_part(mcp):
           "adds no op and no tool, so it inherited the count rather than raising it, and "
           "phase 9's set_scope is what turned the assertion into a floor")
 
-    schemas = {t["name"]: t for t in mcp._request("tools/list", {})["tools"]}
+    schemas = mcp.schemas()
 
     def schema_of(name):
         """One tool's schema, or a stand-in that fails every check below

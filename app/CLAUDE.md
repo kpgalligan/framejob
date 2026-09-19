@@ -17,6 +17,10 @@ detail there.
   `planJSON` are memoised PER HANDLE, so keep handles rather than minting
   them), timecode, snapping, export presets/sizes/settings, `RecipeSource`,
   the `dictionary` extensions on the property types and the typed patches.
+  It is also where the op table is read BACK: `ReelOp.coreNames()` over
+  `rc_op_names`, and `ReelOp.coreSchemas()` over `rc_op_schemas` — every
+  op's ARGUMENTS as JSON Schema, keyed by op name, which
+  `AgentCatalog.opTool` prints for all fifty-seven op tools.
   `deinit` frees the Rust allocation. It also holds **the one read of
   `rc_project_apply`'s TWO message channels**, in the header's own order — a
   sentence is a refusal, an error message is invalid input, neither written
@@ -40,6 +44,12 @@ detail there.
   `scope.rs`'s `refused_inside` (seven names) so one edit can mix a
   document-level op with scoped ones. A table, with
   `edit.rs`'s size exemption.
+- `ReelOpSchema.swift` — what an op TAKES, mirroring what
+  `core/src/op_schema.rs` publishes: the `properties` and `required` of one
+  op's arguments, which are the two things `AgentServer.tool` takes. Here
+  rather than next door for `ReelEdit.swift`'s reason — it names no `rc_*`
+  symbol — and `properties` stays `[String: Any]` because a Swift type per
+  kind would be another spelling of the table.
 - `ReelEdit.swift` — what an op ANSWERS, mirroring `core/src/outcome.rs`:
   `ReelEdit` (`.applied` / `.identity` / `.refused`), `ReelRefusal` (the op
   the core declined and the rule's own sentence, carried verbatim), and the
@@ -382,9 +392,38 @@ free.
   `Tracks` / `Media` / `Render` / `History` / `Silence` / `Captions` / `Audio`
   / `Background` / `Scope` / `Transitions` / `Recording`
   (+`RecordingArguments`, +`RecordingResult`) — the handlers, one file per
-  group. `AgentCatalog.swift` (+`Clips`, +`Audio`, +`Transitions`, +`Files`)
-  — the catalog, spliced in ORDER (`recording_probe.py` reads the last
-  eleven names). `target(_:)` resolves the implicit document through
+  group. `AgentCatalog.swift` (+`Clips`, +`Audio`, +`Transitions`, +`Files`,
+  +`Declarations`) — the catalog, spliced in ORDER (`recording_probe.py`
+  reads the last eleven names). **A tool is built one of two ways**: `tool`,
+  which declares its own schema, or `opTool`, which declares PROSE and prints
+  the argument STRUCTURE from the core's published table (`Self.opSchemas`
+  over `rc_op_schemas`). **Every one of the fifty-seven op tools is
+  `opTool`'s** and carries no `"type"`, no `"enum"` and no hand-written
+  required list; `tool`'s remaining callers are the twenty APP-STATE tools,
+  which have no op behind them and so nothing to read from the table — the
+  ten of the Projects group, `AgentCatalog+Audio.swift`'s two composites and
+  the eight file tools, `record_screen` among them. `opTool` goes THROUGH
+  `tool`, so `project` and `scope` are injected by one piece of code either
+  way. `AgentCatalog+Declarations.swift` is the one list of places a tool
+  deliberately takes more or less than its op does — a bare-string body, a
+  boolean's string spellings, a null that MEANS something, a range the core
+  clamps to rather than refusing, a default taken from app state, a list the
+  tool will not take empty — each row carrying the op, the argument, what
+  the app adds and why, and the schema DECLARES it. A new row is a decision
+  with a reason, like an entry in `opsWithoutTools`; a leniency the tools
+  have never declared is not a row until someone decides to OFFER it,
+  because a schema narrower than what is accepted costs a caller nothing
+  where a wider one is a promise the app breaks.
+  `AgentServer+Parity.swift` is the FIFTH part of the startup parity check —
+  the one part that looks INSIDE an op tool's schema: its arguments must be
+  the core's own (both directions, the envelope's two keys and the
+  declarations list apart), each one must carry a description, and a
+  description whose key is no argument is a complaint rather than a sentence
+  `opTool` drops in silence. Parts 1 to 3 stay in the frozen file with the
+  private dispatch table they read and part 4 in `AgentServer+Scope.swift`
+  with the feature it is about; all five assert in debug, log `Reelcut: ` in
+  release and start the server either way.
+  `target(_:)` resolves the implicit document through
   `NSApp.orderedDocuments`, never `documents.first`, and an explicit path
   through `AgentServer.canonical`. `offMainTools` names the handlers that
   wait for something the main thread must deliver (`import_media`,

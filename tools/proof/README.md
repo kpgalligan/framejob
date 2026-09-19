@@ -188,6 +188,9 @@ python3 tools/proof/phase8_proof.py 4823
 python3 tools/proof/phase9_proof.py 4823
 python3 tools/proof/patch_door_proof.py 4823
 python3 tools/proof/refusal_proof.py 4823
+python3 tools/proof/clip_catalog_proof.py 4823
+python3 tools/proof/op_catalog_proof.py 4823
+python3 tools/proof/op_argument_proof.py 4823
 ```
 
 **Phase 9 takes a SECOND argument**, the log path, defaulting to
@@ -227,10 +230,19 @@ startup parity check would complain — `grep "Reelcut: " /tmp/reelcut-4823.log`
 must print nothing before a proof run means anything.
 
 **The EXACT tool count belongs to the newest phase's script**, because it is
-what tells a stale binary on the port from the build under test: road map 3's
-`recording_proof.py` asserts **75** (`record_screen`), and phases 1 to 9 keep
-floors (63, 65, 68, 70, 71, 73, 73, 73 and 74) so a later phase's tools never
-fail an older proof. Road map 3's was the fifth handover and cost two rows in
+what tells a stale binary on the port from the build under test: road map 7's
+`op_argument_proof.py` asserts **77** (D3·5), and every script before it keeps
+a floor — phases 1 to 9's 63, 65, 68, 70, 71, 73, 73, 73 and 74, and road map
+3's 75 — so a later phase's tools never fail an older proof.
+**The sixth handover cost nothing**, which is the first time that has
+happened to a handover that MOVED the number: road map 5's E1 had already
+turned `recording_proof.py`'s 75 into a floor when it added two transition
+tools, and road map 7's D3 adds no tool at all, so the 77 is the count the
+catalog has carried since E1 and no older script had to be edited. Its PROSE
+had drifted, though, and that is what D3·5 corrected:
+`recording_proof.py`'s docstring, its section banner and one comment all
+still called its 75 exact.
+Road map 3's was the fifth handover and cost two rows in
 one script, both in the same commit as the tool: `phase9_proof.py`'s `TOOLS`
 became a `>=`, and its `APP_STATE_TOOLS` — asserted as an EXACT set, because
 an op tool that lost its scope would leave the count right and the set
@@ -2493,3 +2505,194 @@ press ⌘Z twice past. An identity has always done it, no caller reaches it
 (the agent refuses at its trial, and the menu path does not use that entry
 point), and it is not D2's doing; the note is there so it is found written
 down rather than rediscovered.
+
+## The op table, read back through the app (`op_schema_probe.py`)
+
+`python3 tools/proof/op_schema_probe.py`, no port and no running app. Road
+map 7's D3·2 publishes every op's ARGUMENTS as JSON Schema through
+`rc_op_schemas`, and `ReelOp.coreSchemas()` is the app's one reader of it.
+It measures the EXPORT rather than what any caller does with it — what the
+catalog does with it is `clip_catalog_proof.py` below — so the instrument is
+`CLAUDE.md`'s
+answer for app STRUCTURE with no caller a script can reach: a probe compiled
+out of `app/Sources` over `harness/build.sh`'s own swiftc line, cached on
+modification times, a build failure scored as a FAILURE rather than an exit.
+**28/28** at D3·2 (#16). It needs `core/target/release/libreelcut_core.a` —
+`make test` or `cd core && cargo build --release` first, or the build check
+fails naming the missing file.
+
+Five sections. **The map**: `coreSchemas()`'s keys against `coreNames()`'s
+names in both directions — two separate exports read separately, so a schema
+map that dropped an op, or invented one, is named. **The identity**: for
+each of the 57 ops the probe sends an envelope carrying one key no op has,
+serde refuses it with the list of fields it DID expect, and that list is
+compared to the published properties; and the same op sent with NO arguments
+makes serde name the first field it could not do without, which must be one
+the schema calls required. **No argument name is written in the script**,
+which is what spec kpgalligan/reelcut#14 asks for in place of the Python
+literals the older proofs carry. **The envelope**: neither `scope`
+nor `project` is in any published schema; the catalog injects both.
+**The kinds**: one representative argument per kind against the JSON Schema
+the mapping owes it (an id's `minimum: 0`, ticks with none because a delta
+is negative, a patch as an object with no properties, a region as the four
+members the core declares and closes). **The vocabularies**: each of the
+five arrives as a string — or a list of them — with a non-empty `enum`;
+WHICH members it has is `core/tests/op_table.rs`'s claim against the
+decoder, not a list retyped here.
+
+The twelve kind rows are the only literals, and they are about the MAPPING
+rather than about which arguments exist: they are the one claim a probe
+reading the core's own answer cannot make about itself.
+
+## The clip tools against the table (`clip_catalog_proof.py`)
+
+`python3 tools/proof/clip_catalog_proof.py <port>`, against a running
+instance. Road map 7's D3·3 migrated the clip group's 43 op tools to PRINT
+the core's table instead of restating it, and this measures the identity
+that makes that safe from two independent sides: the CATALOG, read over MCP
+off `tools/list` from the running binary, and the TABLE, read out of the
+staticlib by a probe of its own (`coreSchemas()` plus
+`AgentServer.declarations`, built the way `op_schema_probe.py` builds its
+probe and scored the same way when it will not compile). **23/23** at D3·3
+(#17). The probe is built BEFORE the first MCP call, so no swiftc runs while
+the proof is driving the app.
+
+**No argument name is written in the script.** The expectation is computed
+from the table and the declarations by an oracle written in Python rather
+than imported, so a bug in the Swift merge is a failure and not a shared
+opinion; the only names typed are the two ends of the clip group in catalog
+order (`add_clip` … `remove_action`, which is how the group is found without
+a list of 43) and the ops the behavioural section drives, and both are
+checked against the core's op list first.
+
+Four sections. **The group**: the run between those two ends holds exactly
+43 op tools and 2 composites, the composites found by asking the core which
+names it calls ops. **The identity**: every one of the 43 declares exactly
+the core's arguments, kinds, enums, minimums and required list, plus the
+injected `project` and `scope`, modified only by what the declarations list
+names; descriptions are checked for EXISTING, never for content, because
+what an argument is FOR is the app's. **The vocabularies**: the four a
+HANDLER still parses by name — a transition kind, a zoom fit, a curve,
+`paste_attributes`'s groups — against the `enum` the core now publishes,
+which is the one tie the migration would otherwise have cut. **The
+declarations**: every row still names an op and an argument the core has —
+the staleness check `AgentServer.opsWithoutTools` has and this list has not —
+and each row is true of the running app: the bare-string bodies
+work AND are declared (which is the row a widening deleted from the list
+falls to, since the catalog and the oracle would otherwise still agree with
+each other), a boolean takes `"false"`, the two meaningful nulls are taken
+and required, an empty clip list is refused by name, and `split` takes the
+playhead although the core requires `at`.
+
+It does NOT claim that `set_speed` clamps a rate rather than refusing it:
+that needs a media clip, this script makes none, and the claim is the core's
+own in `core/tests/op_table.rs`.
+
+## Every op tool against the table (`op_catalog_proof.py`)
+
+`python3 tools/proof/op_catalog_proof.py <port>`, against a running
+instance. Road map 7's D3·4 migrated the last fourteen op tools — the nine
+track, marker and canvas rows, the three raw media ops and the two
+transitions — so this measures the WHOLE catalog where `clip_catalog_proof.py`
+measures the clip group: the same two independent sides (the CATALOG over
+MCP, the TABLE out of the staticlib through a probe built the way
+`op_schema_probe.py` builds its own and scored the same way when it will not
+compile), and the same oracle written in Python rather than imported.
+**23/23** at D3·4 (#18). The probe is built BEFORE the first MCP call.
+
+**Its structural half types no name at all**, not even the ends of a group:
+the group IS the core's op list (`rc_op_names`), so an op renamed on both
+sides is still measured and an op that lost its tool is named. The
+behavioural half names the seven ops it drives and checks each against that
+list first.
+
+Five sections. **The catalog**: the core declares 57 ops, every one is a
+tool carrying the injected `project` and `scope`, and none of the 20
+app-state tools carries a `scope`. **The identity**: all 57 declare exactly
+the core's arguments, kinds, enums, minimums, maximums and required list,
+modified only by what the declarations list names; exactly one op tool
+declares nothing but the envelope's two keys (`remove_empty_tracks`, the one
+op with no arguments); every op tool carries its own description and prose on
+at least one argument wherever it takes any, and all 145 published
+arguments carry the app's prose while the core's table carries none of it
+(135 of them until D3·5's fifth parity part made an undescribed argument a
+complaint) — which is the division of labour, measured rather than
+asserted. **The vocabularies**: the five a HANDLER still parses by name,
+`add_transition`'s `align` among them, whose tie to `TransitionAlign` was
+structural until the migration made the schema the core's. **The
+declarations**: all 14 rows still name something the core has. **The running
+app**: a marker with no `at` lands at the playhead although the core
+requires it, a track switch takes `"true"`, a negative id is refused by name
+where the schema says `minimum: 0`, `set_canvas` refuses a width one step
+under the bound it publishes and names both ends and a frame rate with a
+zero term where its items say `minimum: 1`, `add_transition`'s `kind` is
+refused an explicit null and never offered one (the opposite of
+`set_transition`'s), and `add_media`'s descriptor is an object with no
+properties that refuses a string by name.
+
+That last section is the half a generated schema cannot do without, and
+D3·3's `ripple_delete_ranges.ranges` is why: the oracle is built from the
+same declarations list the catalog is, so a row dropped from the list moves
+BOTH sides of the comparison together and the structural half stays green.
+Only a row that asks the RUNNING APP can see a declaration dropped while the
+behaviour stays.
+
+
+## A misspelt argument, put to all 57 (`op_argument_proof.py`)
+
+`python3 tools/proof/op_argument_proof.py <port>`, against a running
+instance. Road map 7's D3·5, and **the script that owns the exact tool count**
+(77). **86/86** at D3·5 (#19); 79 of those rows before the review added the
+optional half of section 3. The probe is built BEFORE the first MCP call.
+
+It exists because of the rule D3·3 and D3·4 each paid for: **a generated
+artefact is checked by asking the thing that generated it a question it did
+not write the answer to.** The startup parity check's fifth part reads the
+same published table the catalog prints, so it cannot see a constraint the app
+still ENFORCES that the table stops DECLARING — so the weight here is on the
+sections that call the running tool.
+
+Five sections. **The fifth part, made to complain**: a probe compiled from
+`app/Sources` builds the catalog this binary registers, puts it to
+`AgentServer.argumentFailure` (which must say nothing), and then puts four
+broken catalogs to it — an op tool with an argument the core has not got, one
+missing an argument the core has, one whose argument lost its description, and
+one whose prose names an argument no op has — each of which must be named with
+its op, its argument and the side that has it, while an APP-STATE tool broken
+the same way must draw nothing. **The catalog's size**: exactly 77 tools, 57
+ops each with a tool, and the shipped binary's own parity log empty. **The
+attribution**: every difference between a tool's schema and the core's table
+is one `AgentServer.declarations` names — not a second computation of the
+merge, which is `op_catalog_proof.py`'s, but a key-by-key attribution, plus
+the inverse, that every row accounts for at least one difference, so a row
+that changes nothing fails here. **The misspelt argument**: for each of the 57,
+one CONTROL call with every required argument spelled right (which must not be
+refused for a missing one — the tool's required list proved SUFFICIENT against
+the running app) and then one call per required argument with that argument
+misspelt, which must be refused naming it. **Six op tools require nothing**, so
+that shape cannot reach them: their arguments are measured by what the op DID
+instead, the same call twice answering two different projects, because a
+misspelt OPTIONAL argument is dropped in silence and there is no refusal to
+read. `split`'s `clips` is the one argument this fixture cannot separate — the
+playhead sits inside the only clip at that time — and it is named in the script
+with its reason and asserted to be the whole of the exceptions. **The opaque doors**: a misspelt key
+inside a caller's own object is named by the CORE, which is where the dotted
+path lives.
+
+**What the misspelt-argument section actually proves**, and it is worth saying
+because the ticket asked for the core's dotted path: an op ARGUMENT never
+reaches the core's decoder at all — the handlers read arguments one at a time
+and build the op — so the sentence that names a misspelt ARGUMENT is the APP's
+(three shapes, all anchored to the argument's own name), and the sentence that
+names a misspelt KEY inside a patch is the core's. The section is therefore a
+check that every argument the catalog PRINTS from the core's table is one a
+hand-written handler really reads.
+
+Its values are derived from the core's published kinds rather than typed: an
+id by name (six names for five entities — `clips` is a list of the id space
+`clip` draws from — the only argument names the script types, each checked
+against the core's table first), a time as a second per argument in table
+order, a bound's own minimum, a vocabulary's first member.
+The two `payload` doors are named rather than skipped: the app checks a
+payload's shape before forwarding, so the core cannot be reached through them
+without a whole Copy payload, and what is true of them is asserted instead.

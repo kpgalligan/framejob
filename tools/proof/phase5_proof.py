@@ -554,7 +554,7 @@ def catalog_part(mcp):
     )
     check("normalize_clip" in names, "normalize_clip is a tool")
 
-    schemas = {t["name"]: t for t in mcp._request("tools/list", {})["tools"]}
+    schemas = mcp.schemas()
 
     def schema_of(name):
         """One tool's schema, or a stand-in that fails every check below

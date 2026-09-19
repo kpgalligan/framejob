@@ -8,11 +8,14 @@ import Foundation
 /// the two of Captions (a transcript made, a caption file written), the two
 /// of Rendering and export (a frame, and the movie) and, since road map 3,
 /// the one of Recording (a movie the app wrote itself). Three of the eleven
-/// are ops (`add_media`, `relink_media`, `remove_media`), so `tool` gives
-/// them a `scope` as it gives every op; the other eight are app-state tools
-/// of spec §7.9 — `record_screen` among them, declaring NO `scope` by
-/// construction, since `tool` injects one for the core's op names only and
-/// the parity check's fourth part reads those.
+/// are ops (`add_media`, `relink_media`, `remove_media`), so they are built
+/// with `opTool` — their arguments PRINTED from the core's published table
+/// (road map 7's D3) — and get a `scope` as every op does; the other eight
+/// are app-state tools of spec §7.9 with no op behind them and nothing to
+/// read from that table, so they declare their schemas whole through `tool`.
+/// `record_screen` is among those, declaring NO `scope` by construction,
+/// since `tool` injects one for the core's op names only and the parity
+/// check's fourth part reads those.
 ///
 /// A pure move out of `AgentCatalog.swift`, which stood at 807 lines against
 /// app/CLAUDE.md's ~600 cap — road map 2's phase 9 had put it back over the
@@ -241,44 +244,33 @@ extension AgentServer {
                     + "pointing at the original, so the project always still opens. This can "
                     + "take a while and copies as many bytes as the footage weighs.",
                 [:]),
-            tool(
+            opTool(
                 "add_media",
                 "The raw op behind import_media: adds a media entry from a descriptor you "
                     + "supply — the media[] element of the project JSON minus its id (path, "
                     + "bookmark, kind, duration, width, height, fps [num, den], has_video, "
                     + "has_audio, has_alpha). Probing files is the host's job, so unless you are "
                     + "replaying a project's own JSON, call import_media and let it probe.",
-                [
-                    "descriptor": [
-                        "type": "object",
-                        "description": "The media entry to add; only path is required.",
-                    ]
-                ], required: ["descriptor"]),
-            tool(
+                ["descriptor": "The media entry to add; only path is required."]),
+            opTool(
                 "relink_media",
                 "Points a media entry at a file that moved — the Relink… sheet. Every clip using "
                     + "it comes back; a bookmark for the new location is stored so the next move "
                     + "is followed automatically. get_project's missing_media names the entries "
                     + "that need this.",
                 [
-                    "media": ["type": "integer", "description": "Media id."],
-                    "path": ["type": "string", "description": "Where the file is now."],
-                    "bookmark": [
-                        "type": "string",
-                        "description": "Base64 security bookmark; omit and one is made for you.",
-                    ],
-                ], required: ["media", "path"]),
-            tool(
+                    "media": "Media id.",
+                    "path": "Where the file is now.",
+                    "bookmark": "Base64 security bookmark; omit and one is made for you.",
+                ]),
+            opTool(
                 "remove_media",
                 "Removes a media entry from the project. Media still used by clips is refused "
                     + "unless with_clips is true, which removes those clips with it.",
                 [
-                    "media": ["type": "integer", "description": "Media id."],
-                    "with_clips": [
-                        "type": "boolean",
-                        "description": "Remove the clips using it too (default false).",
-                    ],
-                ], required: ["media"]),
+                    "media": "Media id.",
+                    "with_clips": "Remove the clips using it too (default false).",
+                ]),
 
             // MARK: Captions
             //

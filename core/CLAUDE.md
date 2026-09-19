@@ -48,12 +48,46 @@ file is what governs a module now.
   answer it gives does not compile; the fourth possibility, a request that
   could not be read, stays the `Err(String)` beside it. Its `Identity` doc
   is also the one place that says which refusals can say why yet.
-- `edit.rs` — the op enum, `OP_NAMES`, `parse` and `apply`. **Its module
-  doc IS the op table**; `app/Sources/ReelOps.swift`'s typed builders,
-  `AgentCatalog*.swift`'s tools and spec §6 mirror it. `parse` answers an
-  `Envelope` — the op AND the envelope's `scope` — and `apply_op(&Op)` knows
-  nothing about nests. The table is the reason this file is over the size
-  cap and stays exempt (below).
+- `edit.rs` — the op enum, `parse` and `apply`. **Its module doc IS the op
+  table's SEMANTICS half** — what each op means, and what an absent
+  optional argument means — where `op_table.rs` is the ARGUMENTS half;
+  `app/Sources/ReelOps.swift`'s typed builders, `AgentCatalog*.swift`'s
+  tools and spec §6 mirror the two together. `OP_NAMES` is re-exported from
+  here, at the path it has always had. `parse` answers an `Envelope` — the
+  op AND the envelope's `scope` — and `apply_op(&Op)` knows nothing about
+  nests. The semantics table is the reason this file is over the size cap
+  and stays exempt (below).
+- `op_table.rs` — the op table as DATA (road map 7's D3): one `OpRow` per
+  op and one `Argument` per argument — its name, its `Kind`, whether the
+  decoder requires it and, for the few that have one, its `Bound` — and
+  `OP_NAMES` as a projection of it, re-exported by
+  `edit.rs` so no caller moved. A published interface, where the `Op` enum
+  and the dispatch are its implementation. Its one reader in the crate is
+  `op_schema.rs`, which carries the rows out through the FFI; the APP's
+  reader is every one of the fifty-seven op tools in the agent catalog,
+  which print these rows instead of restating them. **A `Bound` is
+  published only where the core REFUSES outside it** — `set_canvas`'s two
+  dimensions, sourced from `edit_canvas.rs`'s own constants and never
+  retyped — and never where it CLAMPS, which is the app's to say in its
+  prose. A row holds no prose, no semantics and no default spelled twice;
+  `Kind` is closed, carries each vocabulary's members, and has exactly ONE
+  kind per answer serde gives, because a distinction the
+  decoder cannot see is one no test could prove. Nothing here is the
+  authority — the enum's fields are, and `core/tests/op_table.rs` proves
+  every row by asking the decoder. Capped at 400 lines like any new module:
+  it does NOT inherit `edit.rs`'s table exemption.
+- `op_schema.rs` — `op_table.rs` written as JSON Schema, which is what
+  `rc_op_schemas` publishes (road map 7's D3·2): one object per op, its
+  properties the arguments and its `required` the ones the decoder will not
+  do without. **The match over `Kind` is exhaustive** — a kind added to the
+  table does not compile until this says what JSON it is — and it is a
+  module of its own because a row changes when an OP does and this changes
+  when the published DIALECT does. It says nothing about what an argument is
+  FOR (the catalog's prose), nothing about what a patch may CARRY
+  (`Kind::Object` is an object with no properties; D1 left the core the one
+  validator of that), and nothing about `additionalProperties` on an op,
+  because the catalog merges `project` and `scope` in afterwards. Tested
+  through the FFI in `core/tests/op_schemas.rs`.
 - `scope.rs` — editing INSIDE a nest: the envelope's `scope` key. Builds a
   VIEW project from the nest (its tracks and clips at top level, its frozen
   size as the canvas, the parent's rate, media, `next_id` and nests, no
@@ -257,9 +291,9 @@ landed and gated alone, so the feature's diff is attributable; budget the cut
 against the pessimistic number, because an estimate here has run about two
 thirds of the truth. Over the cap today and known debt, not licence:
 `edit_clip.rs` and `edit.rs`, whose
-standing exemption is that its module doc IS the op table (the cut there, if
-ever forced, is the `Op` enum into an `edit_ops.rs`, and never in the same
-phase as a feature). The current list is `wc -l` and
+standing exemption is that its module doc IS the op table's semantics half
+(the cut there, if ever forced, is the `Op` enum into an `edit_ops.rs`, and
+never in the same phase as a feature). The current list is `wc -l` and
 `designs/reelcut-remaining.md` §3.
 
 **Dependencies.** `serde` and `serde_json` (the JSON the FFI speaks),

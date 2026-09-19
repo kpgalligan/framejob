@@ -3181,3 +3181,1695 @@ identity and a refusal are still told apart by reading the source; the
 also left on the list; and the **cross-build reference instrument**, which
 needs a core of the reference's own era if the meter and the welcome window
 are to be photographed against their "before" again.
+
+## 7. D3 — one op table, published
+
+**Spec:** kpgalligan/reelcut#14.
+
+The candidate D1 and D2 both named and left: **an op is spelled twelve times
+across seven production files and the startup parity check compares NAMES
+only**, so a tool can declare an argument the core has never heard of, or the
+wrong JSON kind for one, and pass every part of the check. The argument, the
+measurements behind it and the sixteen implementation decisions are spec
+kpgalligan/reelcut#14 and are not restated here. In one sentence: **the core
+says what an argument IS, the app says what it is FOR**, and everything
+downstream reads the core's table instead of restating it.
+
+The shape is expand-then-migrate rather than tracer bullets: the table lands
+beside everything that exists, the catalog is migrated group by group behind
+it, and the fifth part of the parity check is turned on last — because until
+every group is migrated it would complain about the ones that are not.
+
+**The tickets, in blocking order.** #15 → #16 → #17 → #18 → #19 → #20.
+
+| Ticket | Title | Blocked by |
+|---|---|---|
+| kpgalligan/reelcut#15 | D3·1: the op table, and a test that asks the decoder | — |
+| kpgalligan/reelcut#16 | D3·2: the table goes out through the FFI | #15 |
+| kpgalligan/reelcut#17 | D3·3: the clip tools read the core, and the widening list is born | #16 |
+| kpgalligan/reelcut#18 | D3·4: the remaining tools read the core | #17 |
+| kpgalligan/reelcut#19 | D3·5: the fifth part of the check, and a proof for all 57 | #18 |
+| kpgalligan/reelcut#20 | D3·6: contract and record | #19 |
+
+D3·1 and D3·2 are the expand half and are core-only: the table as data with
+`OP_NAMES` a projection of it, then the same table as JSON Schema through a
+new query export. Neither changes a tool. D3·3 migrates the clip group — the
+biggest, and the one that pays for the shape every later group copies — and is
+where the declarations list is born. D3·4 migrates the four other groups, so
+all fifty-seven op tools print. D3·5 turns the fifth part of the parity check
+on, which is only safe once nothing is left to complain about, and drives the
+property against the running binary. D3·6 is the contract step: the rulebook,
+the spec, the README, the ledger and this record.
+
+**Out of scope, and named so it is not rediscovered.** Prose moving to the
+core — a tool's description names the menu item it mirrors and the app state
+its default comes from, and those are facts the core has not got. The agent
+handlers going on reading arguments one at a time: forwarding a caller's whole
+OP unread is D1's rule one level up and is the candidate that starts where
+this one ends, but it rewrites fifty-seven handlers and does not belong inside
+a catalog change. Code generation of any kind, including the app's typed op
+builders, which stay hand-written so the Swift compiler keeps guarding every
+call site. Whether a parity failure should stop the launch. Any change to the
+op count, the tool count, the persisted format or what a person at the machine
+sees. And the three things road map 7 already owes — the clamped-edge family
+that still answers `Identity`, the source-window arithmetic written ten times,
+and the two cross-build reference instruments that can no longer be built.
+
+## 8. D3 — the record
+
+### 8.1 D3·1 — the op table, and a test that asks the decoder (kpgalligan/reelcut#15)
+
+**Commits.** `589d5b1` (the ticket) and `ade23da` (what its review found,
+below).
+
+**What landed.** Core only. No Swift file, no FFI export, no catalog entry,
+no proof script, no format bump; `OP_NAMES` is 57 and the catalog 77, as
+before. The app is byte-for-byte the app it was.
+
+- **`core/src/op_table.rs` is new, 276 lines** — under the 400-line cap for
+  a new module, and it does NOT take `edit.rs`'s standing table exemption,
+  which was a hard acceptance criterion. One `OpRow` per op, in table order,
+  and one `Argument` per argument: its name, its `Kind`, and whether the
+  decoder requires it. **145 arguments over 57 rows.** Nothing else is in a
+  row — no prose, no semantics, no default spelled a second time.
+- **`Kind` is closed, with 17 variants**, four more than the ticket's list of
+  spellings, and the module doc states the rule that fixes the number:
+  **exactly one kind per answer the decoder can give**. Two kinds serde
+  refuses identically would be a distinction the table claims and no test
+  could prove. The four beyond the list are each undecodable as one of the
+  thirteen: `Index` (`usize`, which serde names differently from `u32`),
+  `Ranges` (`Vec<[Ticks; 2]>`, the silence cut's pairs), `Region`
+  (`ZoomRegion` — a caller-authored object whose members the core DECLARES,
+  so not an opaque one), and `Groups` (`Vec<Group>`, the one vocabulary that
+  arrives as a list). `Kind::values` carries each vocabulary's members, and
+  its match is EXHAUSTIVE for `refused_inside`'s reason.
+- **A caller-authored patch is `Kind::Object`, and nothing more** — the five
+  property patches, the action end patch, the two new-clip bodies, the two
+  paste payloads and the media descriptor. Deepening D1 made the core the one
+  validator of what a patch may carry and this table does not restate a word
+  of it.
+- **`OP_NAMES` is a compile-time projection of the table**, re-exported from
+  `edit.rs` under the name and path it has always had. No caller in the core,
+  the FFI, the tests or the app moved, and `core/tests/op_names.rs` passes
+  untouched.
+- **`edit.rs` lost its Arguments column, 895 → 838.** Every default that
+  lived ONLY in that column was folded into the Semantics sentence, because
+  what an absent argument MEANS is semantics: `add_text_clip`'s and
+  `add_shape_clip`'s 5 s, `add_background`'s timeline length,
+  `freeze_frame`'s 2 s, `add_action`'s 1 s, `add_zoom_action`'s 1 s with its
+  `fit` and `ease_in_out`, `add_track`'s front, `add_marker`'s `Marker <n>`
+  and red, `nest`'s `Nest <n>`, `add_transition`'s `center` and
+  `ripple: false`, and `set_canvas`'s `rescale_clips: false`. The two
+  vocabulary lists under the tables now point at `Kind::values` instead of
+  repeating themselves.
+
+**The test is the interesting half.** `core/tests/op_table.rs`, 350 lines,
+six tests, and **the instrument is the decoder itself** — no second list is
+written down for the first to be compared against:
+
+- an argument no op has makes serde answer with the arguments it DOES have,
+  and the answer is compared to the row in both directions AND in order;
+- a required argument left out is answered `missing field`, naming it, and
+  the baseline envelope — which carries no optional argument at all — is read
+  without complaint, so an argument called optional that the decoder really
+  needs fails here;
+- each argument handed a value of another JSON kind is refused with the
+  phrase that kind's own Rust type produces (`expected i64`, `expected u32`,
+  `expected usize`, `expected an array of length 4`, …);
+- a closed vocabulary handed a non-member answers with its whole list, and
+  the list is compared to `Kind::values`;
+- an opaque object is proved opaque by being READ as a string, a number and
+  a list.
+
+**One acceptance criterion could not be met as written, and the reason is
+measured.** It asks the kind proof to assert that the decoder refuses a wrong
+value *"naming that argument"*. `Op` is internally tagged, so serde buffers
+each variant's content and re-reads it through a `ContentDeserializer` of its
+own, and `serde_path_to_error` — which D1 uses inside a patch — answers `.`
+for every field of every op. Tried and recorded, not assumed. The test names
+the argument by CONSTRUCTION instead: every probe is the op's baseline
+envelope, which the required-ness test proves readable, with exactly ONE
+argument replaced, so the only thing that can have failed is the one the
+probe changed. What it asserts in place of the name is the TYPE serde
+wanted, which pins the kind harder than a name would.
+
+**`#[rustfmt::skip]` on `OP_TABLE`** is the first in the tree. rustfmt's
+60-character budget for a call's arguments breaks all but the shortest row
+into four lines, which costs about 165 lines and the 400-line cap the ticket
+made a criterion. The table is laid out by hand, one line per op where one
+fits, inside the same 100 columns rustfmt keeps; `cargo fmt --check` is
+clean.
+
+**Verified.** `make test` **659 passed / 0 failed** (653 before, +6);
+`cargo fmt --check` clean; `make lint` clean; `make typecheck` 0 errors and
+exactly the four known AVFoundation warnings; `make app` BUILD SUCCEEDED;
+the built binary launched on port 4831 and `grep "Reelcut: "` on its log
+printed nothing — so the startup parity check still reads the DERIVED
+`OP_NAMES` as the catalog's 57 ops, which is the projection proved in the
+shipped binary rather than in a unit test.
+
+**An independent oracle, beside the tests.** A throwaway script parsed the
+`Op` enum out of `edit.rs` — every variant, every field and every
+`#[serde(default)]` — and compared it to the table parsed out of
+`op_table.rs`: 57 rows against 57 variants, 0 mismatches in argument name,
+order or required-ness, and exactly one Rust type per `Kind` (modulo
+`Option<…>`), which is the "one kind per answer" rule checked rather than
+asserted.
+
+**The mutants.** Five deliberate failures, each caught by exactly one test
+and by no other:
+
+| Mutant | Score |
+|---|---|
+| `add_transition`'s `align` removed from its row | `the_decoder_lists_exactly_the_arguments_the_table_lists` FAILED, 5 passed |
+| `trim_start`'s `to` changed from `Ticks` to `Id` | `every_argument_is_refused_a_value_of_another_kind` FAILED, 5 passed |
+| `set_reversed`'s `reversed` called optional | `every_required_argument_is_missed_and_every_optional_one_is_not` FAILED, 5 passed |
+| `wipe_down` dropped from `Kind::Transition`'s members | `every_closed_vocabulary_answers_with_its_own_members` FAILED, 5 passed |
+| `set_video`'s `patch` called a string rather than an object | `every_argument_is_refused_a_value_of_another_kind` FAILED, 5 passed |
+
+**What the review found.** The Standards axis found the phase record missing
+with three documents already pointing at it (this section), the ledger row
+edited in place and out of its `sort -rn` order, three documents saying the
+catalog *reads* the table when nothing outside it reads a row yet, and a
+`Kind` match with a catch-all that would let a new vocabulary kind be
+silently skipped by the very test meant to prove it — the inversion of
+`scope.rs`'s `refused_inside`, and the one finding that changed code. The
+Spec axis re-derived all 57 rows against the enum independently, reproduced
+two mutants of its own, and raised the four extra kinds and the unproven
+"naming" half, both answered above. Three findings were judged not real: the
+table having no production consumer YET is the spec's own expand-then-migrate
+sequence; `Kind::Object` having no wrong-kind probe IS the claim the kind
+makes; and `OP_COUNT` having no compile-time tie to the enum's arm count is
+the exposure the old `[&str; 57]` already had. The fixes are `ade23da`.
+
+**Owed.** The whole of D3 past this ticket: the JSON Schema function over the
+17 kinds, the query export, the catalog's migration, the fifth part of the
+parity check, the widening list, and the proof scripts that stop re-typing
+argument names in Python.
+
+### 8.2 D3·2 — the table goes out through the FFI (kpgalligan/reelcut#16)
+
+**Commits.** `ca84058` (the ticket), `b71d71b` (the probe's required-ness
+claim and the mutant table) and `18cd231` (what the review found,
+below).
+
+**What landed.** The table leaves the core. No catalog file and no
+`AgentServer*` file was edited, no op or tool was added, no persisted state
+changed and `RC_FORMAT_VERSION` did not move — this is the expand half of
+the spec's expand-then-migrate sequence, and **nothing in the app reads a
+schema yet**.
+
+- **`core/src/op_schema.rs` is new, 154 lines** against the 400-line cap for
+  a new module, and like `op_table.rs` it takes no exemption. `op_schemas()`
+  answers one JSON-Schema object per op — `{"type": "object", "properties":
+  {…}, "required": […]}` — and `schema_of_kind` is the one function turning
+  a `Kind` into JSON. Its match is **exhaustive over all 17 kinds**: D3·1's
+  review found that a catch-all in `Kind::values` would have let a new kind
+  be silently skipped by the test meant to prove it, and the same posture is
+  taken here.
+- **Its own module rather than more of `op_table.rs`**, which had 124 lines
+  of headroom. The two change for different reasons — a row when an OP does,
+  this when the published DIALECT does — and a table's cap is not a budget
+  to spend on a wire format.
+- **`rc_op_schemas` is the export**, beside `rc_op_names` in
+  `ffi_query.rs`, with the same contract: no handle, never NULL, nothing
+  persisted, no format bump. The three files moved together — the Rust
+  export, the hand-maintained header, and `ReelCore.swift`, still the only
+  file in the app that names an `rc_*` symbol.
+- **`ReelOp.coreSchemas()` is the Swift wrapper**, answering
+  `[String: ReelOpSchema]` — `properties` and `required`, which are exactly
+  the two arguments `AgentServer.tool(_:_:_:required:)` takes, so the
+  migration ticket has nothing to reshape. `ReelCore.swift` went
+  **1500 → 1542**: it is over the cap, so only the part that had to be there
+  went in — the function naming `rc_op_schemas` — and the value type it
+  answers is `app/Sources/ReelOpSchema.swift` (27 lines, new), for
+  `ReelEdit.swift`'s reason: it names no `rc_*` symbol, so the rule that
+  keeps every one of those in one file does not keep it.
+
+**The mapping, which is where the kind vocabulary earns its keep.** Every
+constraint below is hand-written per property in the catalog today.
+
+| Kind | Published as |
+|---|---|
+| `Ticks` | `{"type": "integer"}` — **no minimum**, because a `delta`, a `slip` and a `roll` are negative every working day |
+| `Id`, `Index` | `{"type": "integer", "minimum": 0}` — `u32` and `usize` are one thing to a schema; the table keeps them apart because serde names them differently |
+| `Ids` | an array of those |
+| `Ranges` | an array of two-element integer arrays, the length included |
+| `Number`, `Boolean`, `Text` | number, boolean, string |
+| `Object` | `{"type": "object"}` and **no `properties`** |
+| `Color`, `FrameRate` | arrays of exactly 4 numbers / 2 whole numbers |
+| `Transition`, `Alignment`, `Curve`, `Fit` | a string with `Kind::values`'s members as `enum` |
+| `Groups` | an array of those strings |
+| `Region` | an object with `x`, `y`, `width`, `height`, all four `required` and `additionalProperties: false` |
+
+**Three decisions inside that table, each with its reason in the source.**
+A **patch** is opaque — D1 made the core the one validator of what one may
+carry, so the schema says only that an object belongs there; the `"object"`
+is the OP's rule and not the decoder's, which takes any json at all. A
+**region** is the deliberate opposite, because `ZoomRegion`'s four members
+are declared by the core and refused by name. And **an op carries no
+`additionalProperties`**, because the catalog merges `project` and `scope`
+in over this and a closed object would refuse the two keys every tool has.
+
+**What is NOT published, and is the next ticket's to notice.** Nullability.
+`set_transition`'s `kind: null` clears and `add_zoom_action`'s
+`region: null` is a zoom BACK; both tools declare `["object", "null"]` or
+`["string", "null"]` by hand today, and the table has no field for it —
+that a null MEANS something is semantics, which is `edit.rs`'s doc table.
+The migration either widens those two deliberately or gains a column.
+
+**The core test.** `core/tests/op_schemas.rs`, 342 lines, ten tests, through
+the FFI the way `op_names.rs` tests the names export: the published keys are
+the table's names in both directions; every published name is an op
+`rc_project_apply` dispatches on (so the chain does not rest on `OP_NAMES`);
+each schema's properties are that row's arguments in both directions;
+`required` is the table's required list in table order; no schema carries
+`scope` or `project`; every argument matches a hand-written oracle,
+exhaustive over `Kind`; every one of the 17 kinds is carried by at least one
+argument, so none is published unexercised; only a closed vocabulary
+publishes an `enum`; and a patch is opaque where a region is not.
+
+**The probe, and what makes it more than a mirror.**
+`tools/proof/op_schema_probe.py`, **28/28**, compiled out of `app/Sources`
+over `harness/build.sh`'s own swiftc line. Its middle section sends each of
+the 57 ops an envelope carrying one key no op has, reads the list of fields
+serde says it DID expect, and compares that to the published properties; and
+it sends each op an envelope with NO arguments, which makes serde name the
+first field it could not do without, and insists that field is one the
+schema calls required. **The decoder is the oracle and no argument name is
+written in the script** — the instrument spec #14 asks for in place of the
+Python literals the older proofs carry. The only literals are twelve kind
+rows, which are about the MAPPING rather than about which arguments exist.
+
+**The required-ness half of it is there because a mutant walked through the
+probe untouched.** The first version scored 27/27 against a build whose
+`required` list had dropped `clips` from every op that takes it — the Rust
+test named it, and the probe could not, because an unknown-field refusal
+lists FIELDS and says nothing about which are needed. Asking the decoder a
+second question closed it in fifteen lines, and the mutant now scores 27/28.
+That is the one thing running the deliberate failures found that reading did
+not.
+
+**The catalog is untouched, and that was measured rather than asserted.**
+The binary built before this ticket was still on disk, so `tools/list` was
+captured from it and from the new build on the same port: **77 tools,
+byte-identical JSON**, and the startup parity log printed nothing either
+time.
+
+**Verified.** `make test` **669 passed / 0 failed** (659 before, +10);
+`cargo fmt --check` clean; `make lint` clean; `make typecheck` 0 errors and
+exactly the four known AVFoundation warnings; `make app` BUILD SUCCEEDED;
+the built binary launched on port 4841 and `grep "Reelcut: "` on its log
+printed nothing. The header and the NULL-safety sweep agree, which is not a
+courtesy — `null_safety_sweep_covers_every_export_in_the_header` parses
+`reelcut_core.h` and fails on an export declared there and never swept, so
+two of the FFI's three files are checked in lockstep by a test.
+
+**The mutants.** Five deliberate failures, each reverted with `git checkout`
+after the tree was committed, and each caught by both instruments:
+
+| Mutant | `core/tests/op_schemas.rs` | `op_schema_probe.py` |
+|---|---|---|
+| `add_clip` skipped when the map is built | 6 of 10 FAILED | 24/28 |
+| `Kind::Id` and `Kind::Index` lose `minimum: 0` | `every_argument_is_published_as_its_kind_says` FAILED, 9 passed | 26/28 |
+| `Kind::Object` published as a string — spec #14's own confessed drift, `add_text_clip`'s body declared `string` against an `object` | that test and `a_patch_is_opaque_and_a_region_is_not` FAILED, 8 passed | 27/28 |
+| `scope` inserted into every published schema | `no_schema_carries_an_envelope_key` and `every_schema_declares_its_arguments_and_only_them` FAILED, 8 passed | 26/28 |
+| a required argument (`clips`) published as optional | `required_is_what_the_table_requires_in_table_order` FAILED, 9 passed | 27/28 (the check the mutant bought) |
+
+**What the review found.** Two axes, fixed point `e7c1883`, spec source the
+ticket plus #14. The **Spec** axis re-ran both instruments rather than
+trusting this record — the ten Rust tests, the probe's 28, `cargo fmt
+--check` and `make lint` — and re-derived the kind mapping against the real
+Rust types rather than against `op_table.rs`'s prose (`Fps`'s
+`#[serde(from = "[u32; 2]")]`, `Color = [f64; 4]`, `Group`'s
+`rename_all = "snake_case"`): all twelve acceptance criteria met, no scope
+creep, and the one compulsory extra — the NULL-safety sweep — compulsory
+because the sweep fails on an export the header declares and it never calls.
+
+The **Standards** axis found eight things, five of which changed code or
+documents:
+
+- **the record's `PLACEHOLDER_TWO`**, which is the very omission `e7c1883`,
+  the commit before this ticket, exists to fix;
+- **`ReelCore.swift` taking 63 lines while over its cap** when only the
+  function naming `rc_op_schemas` had to be there. `ReelOpSchema` went to a
+  file of its own for `ReelEdit.swift`'s reason — it names no `rc_*` symbol
+  — and the over-cap file took 42 lines instead of 63;
+- **`no_schema_carries_an_envelope_key` tested `required` by a SUBSTRING**
+  of the serialized list, which an argument named `projects` would have
+  failed spuriously; it reads the array now;
+- **a test whose name did not say what it asserted** —
+  `every_kind_the_table_uses_is_carried_by_an_argument` over a body that
+  asserts a count — now `all_seventeen_kinds_are_carried_by_an_argument`,
+  with the pigeonhole and where the 17 comes from written out;
+- **the test module doc claimed its oracle was "the one deliberate second
+  spelling"** when the probe carries a third; it names the third now and
+  says why a probe in another process cannot import either.
+
+Two were judged not real. The map entries saying **"nothing calls it yet"**
+are a file's role today rather than status: `op_table.rs`'s entry in
+`core/CLAUDE.md` carries exactly that sentence, put there by D3·1's own
+review one commit earlier. And **`expected` being a transcription of
+`schema_of_kind`** rather than an independently invented mapping is what
+every oracle in this tree is; what would make it worthless is being DERIVED
+from the thing it checks, which it is not — mutants 2 and 3 change one site
+and the test names it. The remaining two were cosmetic and taken: a
+paragraph rewrapped, and `spec #14` spelled in full.
+
+**Owed.** The catalog's migration, the fifth part of the parity check, the
+widening list, the nullability question above, and the proof scripts that
+stop re-typing argument names in Python.
+
+### 8.3 D3·3 — the clip tools read the core (kpgalligan/reelcut#17)
+
+**Commits.** `a14f39e` (the prefactor: the table's bound), `e6c600b` (the
+migration, the declarations list and the proof), `a9e487c` (the mutants
+and the neighbouring proofs) and `f8156c9` (what the review found, below).
+
+**The ticket's amendment, and why it came first.** #16 measured two facts
+that would have made two tools WORSE on the way through, so the ticket
+gained a rule before any tool moved: **a bound the core REFUSES outside
+belongs in the op table and is published; a bound it merely CLAMPS to, a
+null that MEANS something, and a bare-string shorthand are the app's —
+declared, with a reason each.** The first half is the prefactor below; the
+second is the declarations list.
+
+#### The prefactor — a bound in the table
+
+`set_canvas`'s `width` and `height` are refused outside 16–16384 by
+`edit_canvas.rs`, and the catalog hand-wrote that range while the published
+schema said only `minimum: 0`. `Argument` gains an optional `Bound`, and the
+two canvas dimensions are the only rows that take one:
+
+- **`CANVAS_MIN` / `CANVAS_MAX` became `pub(crate)`** and are handed to the
+  row through `within(opt("width", Id), CANVAS_MIN, CANVAS_MAX)`. The bound
+  is SOURCED from the constant the refusal is written against; the two
+  numbers are not typed a second time anywhere.
+- **`Bound` is two `u32`s**, because the one rule that qualifies today is a
+  canvas dimension and a bound follows the constant that enforces it. An
+  argument whose bound is not a whole number is a deliberate widening of the
+  type, not a cast at a call site.
+- **`op_schema.rs` publishes it as `minimum` / `maximum`**, REPLACING the
+  `0` `Kind::Id` carries: 16 is the smaller claim and the true one.
+- **`set_speed`'s `rate` is the near miss and stays out.** The core refuses
+  a non-positive rate and then CLAMPS 0.1–10, so the range is not a rule; it
+  is a row of the declarations list instead, with the clamp as its reason.
+
+**The test is the core's own refusal.** `every_published_bound_is_one_the
+_core_refuses_outside` puts each end one step out and reads the answer back,
+asserting the sentence names the range WITH its two numbers and the value it
+refused — so a bound retyped a digit off fails here rather than reaching an
+agent — then sends the ends themselves and insists they draw no such answer.
+A bound nothing enforces is what it is really for: a row published for
+`rate` would fail at the first probe, because the core would apply 0.05 and
+say nothing.
+
+
+#### The migration — forty-three tools stop restating the table
+
+`AgentCatalog.swift` gained `opTool(_:_:_:)` beside `tool(_:_:_:required:)`:
+it takes the tool's prose and **a sentence per argument**, and merges the
+structure — kind, constraints, closed vocabulary, required list — in
+underneath from `Self.opSchemas` (`rc_op_schemas`, read once per process).
+It goes THROUGH `tool` rather than beside it, so `project` and `scope` are
+injected by one piece of code and cannot come to differ; `scope` is still
+gated on the core's own op list. The old form keeps working and the four
+other groups have not moved — this is the expand half, and the contract is
+#19's.
+
+**The line counts, which were an acceptance criterion.**
+
+| File | Before | After |
+|---|---|---|
+| `AgentCatalog+Clips.swift` | 941 | **791** |
+| `AgentCatalog.swift` | 472 | 535 |
+| `AgentCatalog+Declarations.swift` | — | 273 (new, under the 400 cap) |
+| `AgentCatalog+Audio.swift` · `+Transitions.swift` · `+Files.swift` | 117 · 112 · 609 | unchanged |
+
+The over-cap file came DOWN 150 lines for the first time, and not by moving
+anything: what went is hand-written structure. Gone from it are every
+`"type"`, every `"enum"` and every `required:` list — counted with `grep -o`
+before and after: **`"type":` 75 → 2, `"enum":` 5 → 0, `required: [` 41 → 0,
+`"minItems":` 5 → 1** — along with `transitionEnum`, `curveNames`,
+`rangesProperty`, `zoomRegionProperty` and `groupsProperty`, four of which
+existed only to carry structure the core now publishes. What is left is
+`clipsProperty`, whose two `"type"`s and one `minItems` are the two
+composites' (`detect_silence`, `normalize_clip`), which have no op behind
+them. **The declarations list is `AgentCatalog+Declarations.swift`**, eleven rows,
+each carrying the op, the argument, what the app adds and why. It takes the
+shape of `opsWithoutTools`, the empty "ops that deliberately have no tool"
+list, and it covers five kinds of difference rather than shorthands alone:
+
+| What the app adds | Rows |
+|---|---|
+| a bare string where the op takes a patch | `add_text_clip.text`, `add_shape_clip.shape` |
+| the string spellings of a whole KIND | every `boolean` argument (`boolArg` reads `"true"`, `"1"`, `"false"`, `"0"`) |
+| a null that MEANS something, and the required-ness that protects it | `set_transition.kind`, `add_zoom_action.region` |
+| a range the core CLAMPS to rather than refusing | `set_speed.rate`, 0.1–10 |
+| a default the app takes from its own state | `split.at`, `paste.at`, `freeze_frame.at` |
+| a list the tool will not take empty | every `clips` argument, `paste_attributes.groups` |
+
+Three of those are the amendment's; three are what the before/after capture
+found would otherwise have got WORSE. **The two required-ness directions are
+opposite mistakes** and both had to be said: a null that means something must
+not be reachable by FORGETTING the key (the core reads an absent argument and
+an explicit null the same way, so a forgotten `region` would silently be a
+zoom BACK), and a default the app takes from the playhead must not be made
+compulsory by the core's word (`split`'s `at` is `req` in the table and ⌘K
+takes the playhead).
+
+**A number read as a boolean is deliberately NOT declared.** `boolArg` also
+answers an `NSNumber`, which is bridging rather than a spelling the
+vocabulary chose, and the same goes for the older leniencies no tool has ever
+declared — a lone id read as a one-element list, an id spelled as a string, a
+bare `[from, to]` read as one range. The direction is the rule, and it is
+written into the list's doc: **a schema narrower than what is accepted costs
+a caller nothing; one wider than what is accepted is a promise the app
+breaks.**
+
+**The before/after capture, and every difference it found.** `tools/list`
+was captured from the binary built at `f3a8d06` and from the migrated one on
+the same client, 77 tools each, the catalog's ORDER byte-identical and every
+tool description and every argument description identical word for word.
+Forty tools differ, in exactly five ways — three fixes, one declared
+widening, one loss taken on purpose:
+
+| # | What an agent saw | What it sees now | Where | Verdict |
+|---|---|---|---|---|
+| 1 | an id declared `{"type": "integer"}` | `minimum: 0` beside it | 34 arguments (`clip` ×19, `track` ×8, `media` ×4, `action` ×3) and the `items` of 12 `clips` lists | **fix** — spec #14's user story 9: a negative id was an error a caller could have avoided |
+| 2 | `ripple_delete_ranges.ranges` declared `minItems: 1` | no minimum | 1 | **fix** — the same tool's own description says "an empty list … changes nothing", which is an identity. The schema and the prose contradicted each other and the schema was the one that was wrong |
+| 3 | a boolean declared `{"type": "boolean"}` | `["boolean", "string"]` | `set_speed.keep_pitch`, `set_reversed.reversed`, `set_enabled.video`, `set_enabled.audio` | **declared** — `boolArg` has always read `"true"` and `"0"`; now an agent can SEE it |
+| 4 | `add_zoom_action.region` with no `additionalProperties` | `additionalProperties: false` | 1 | **fix** — `ZoomRegion`'s `Deserialize` is `deny_unknown_fields`, so a `widht` really is refused by name, and the tool never said so |
+| 5 | a description on each of `region`'s four members | the core's four members, undescribed | 1 | **a loss, taken** — see below |
+
+**The one loss, which is the only acceptance criterion this ticket did not
+meet in full.** "Every migrated tool keeps its description prose, word for
+word" holds for every tool description and every ARGUMENT description;
+diffing the two files' string literals, exactly three sentences went and none
+arrived, all three inside `add_zoom_action`'s region: `"The region's CENTRE,
+source px."` (twice, on `x` and `y`), `"Its width in source px."` and `"Its
+height in source px."`. Those are descriptions of a VALUE's members, not of
+an argument — CONTEXT.md draws exactly that line — and the core is what
+declares and refuses those four members, so they now arrive from
+`op_schema.rs` undescribed. **No fact went with them**: the argument's own
+sentence, kept word for word, already says "in SOURCE pixels: x and y are its
+CENTRE measured from the centre of the clip's cropped rect … and width and
+height its size". The alternative was a deep merge for nested `properties` in
+`AgentDeclaration.applied(to:)`, six lines used by one row, to restore three
+sentences that repeat the one above them and to put the app back in the
+business of describing members the core owns; it was rejected for that, and
+the loss recorded here instead.
+
+**The confessed drift was already gone**, which the capture is how we know
+rather than assume. `AgentServer.swift`'s parity-check doc named
+`add_text_clip`'s `text` declared `string` against an `object` as the thing
+four name-comparisons cannot see; the tool has declared `["object",
+"string"]` since deepening D1, so the migration changed nothing there. The
+doc comment was corrected to say so and to say which half of the gap D3 has
+now closed.
+
+**One tie the migration would have cut, and did not.** Four vocabularies are
+parsed by NAME in a handler's refusal — `TransitionKind`, `Curve`, `ZoomFit`
+and `AgentServer.attributeGroups` — and three of them used to reach the
+schema from those same Swift lists, which made schema and refusal agree by
+construction. The schema is the core's now, so the proof compares each Swift
+list to the core's published `enum` instead: the tie is checked where it used
+to be structural.
+
+**The proof.** `tools/proof/clip_catalog_proof.py`, **23/23** (22 before the
+review added the staleness row below), over MCP
+against the built binary, with a probe of its own for the other side of the
+identity — `coreSchemas()` and `AgentServer.declarations`, compiled out of
+`app/Sources` over `harness/build.sh`'s swiftc line and built BEFORE the
+first MCP call. **No argument name is written in the script**: the
+expectation is computed from the table and the declarations by an oracle
+written in Python rather than imported, so a bug in the Swift merge is a
+failure rather than a shared opinion. The only names typed are the two ends
+of the clip group in catalog order — which is how the 43 are found without a
+list of 43 — and the ops the behavioural section drives, both checked
+against the core's op list first. Its sections are the group, the identity
+(all 43), the four vocabularies, and every declaration put to the running
+app: the bare-string bodies work AND are declared, a boolean takes
+`"false"`, `set_transition`'s null CLEARS a transition it first set, both
+meaningful nulls are refused when left out, an empty clip list is refused by
+name, and `split` takes the playhead.
+
+**What it deliberately does not claim**: that `set_speed` CLAMPS rather than
+refusing. That needs a media clip and this script makes none; the claim is
+the core's own, in the bound test above.
+
+**Verified.** `make test` **670 passed / 0 failed** (669 before, +1);
+`cargo fmt --check` clean; `make lint` clean; `make typecheck` 0 errors and
+exactly the four known AVFoundation warnings; `make app` BUILD SUCCEEDED;
+the built binary launched on port 4854 and `grep "Reelcut: "` on its log
+printed nothing — the startup parity check is unchanged, and its fifth part
+is #19's.
+
+**The neighbours, re-run because this ticket changed what they read.**
+`phase4_proof.py` **84/84** and `phase5_proof.py` **88/88** each assert a
+migrated tool's patch DESCRIPTION (`set_text`, `set_audio`) — the word-for-word
+claim, checked by a script written before the migration existed;
+`phase9_proof.py` **216/216** re-derives the injected `scope` over the wire,
+including `trim_start`'s `{"type": "integer", "minimum": 0}`, which is a
+migrated tool's envelope key; `op_schema_probe.py` **28/28**, unchanged by
+the bound because none of its twelve kind rows is a canvas dimension. The
+review's fixes changed no published schema: `tools/list` was captured again
+afterwards and is byte-identical to the capture above.
+
+**The mutants.** Four deliberate failures, each run from the committed tree
+and reverted with `git checkout`, each caught by exactly ONE row of the proof
+and each at 21/22 against the 22 rows it then had — which is the point: a
+mutant that took two rows down would mean the rows were not independent.
+
+| Mutant | Row that caught it |
+|---|---|
+| the `add_text_clip.text` widening dropped from the list, while `newClipPatchArg` still expands a bare string | *a new text clip's body takes a bare string, and the tool SAYS a string is allowed* — `content 'A bare string', declared ['object']`. **This is the mutant the structural half cannot see**: the catalog and the oracle both read the list, so they still agreed with each other |
+| the catalog strips every `enum` on its way out of `declaredInput` | *all 43 declare exactly the core's arguments, kinds, enums, minimums and required list* |
+| `split.at`'s required-ness row set back to `.theCores`, so the tool demands what the playhead supplies | *split takes the playhead when `at` is left out* — `required ['at']` |
+| `wipe_down` dropped from the CORE's `Kind::Transition` | *set_transition's kinds* — the core's twelve against `TransitionKind.allCases`'s thirteen. Caught twice over: `core/tests/op_table.rs`'s vocabulary test fails on the same mutant |
+
+**What the review found.** Two axes, fixed point `f3a8d06`, spec source the
+ticket with its amendment plus spec kpgalligan/reelcut#14. The **Spec** axis
+re-ran the Rust suite and re-measured every count in this record rather than
+trusting it (941 → 791, 472 → 535, 254, `"enum":` 0, `required: [` 0,
+`"type":` 2 and both inside `clipsProperty`, 43 `opTool(` calls and no `tool(`
+left in the group), found every checkbox met but the word-for-word one —
+which is the region's three member sentences above — and no material scope
+creep: the two kinds of declaration beyond the amendment's three each
+reproduce a schema the pre-migration catalog already published, which is the
+"what an agent sees should not change" criterion rather than an excess of it.
+
+The **Standards** axis found six things, four of which changed code or
+documents:
+
+- **a row that compiles and does nothing.** `declaredInput` asked "is this
+  row about this argument" three different ways — the widening loop passed
+  the fragment's type, the optional filter passed `nil`, and the required
+  loop bypassed the predicate and matched `.argument` only — so a
+  `.everyArgumentTyped` or `.everyArgumentNamed` row carrying `.required` or
+  `.optional` would have been silently inert. One `rows(about:)` predicate
+  now answers it everywhere, asked with the CORE's own published type rather
+  than with a type a previous row may have widened, so the answer does not
+  depend on the order rows are applied in either. The Python oracle carried
+  the same asymmetry and was fixed with it — the two are independent
+  implementations, not independent mistakes;
+- **the declarations list had no staleness check**, where `opsWithoutTools`
+  has one: a row naming a renamed op or argument would go inert with nothing
+  to say so. The proof now asks the same question of the core's table, and
+  the count rose to 23;
+- **the size ledger was stale for a file this ticket touched** —
+  `AgentServer.swift` 771 → 779, eight lines of doc comment;
+- **`PLACEHOLDER_THREE` in this record's own Commits line**, which is exactly
+  the omission `e7c1883` exists to fix for D3·1;
+- **status prose in a frozen file**: the parity check's doc comment said
+  which ticket the fifth part waits for and why. It now says what is true of
+  the code — the four other groups declare their own arguments, which is why
+  no fifth part is here — and the scheduling is this document's.
+
+Two were judged not real. **`alsoKeys` is a blind merge that could relax a
+bound the core published**: true, and the rule ("a row may narrow what the
+core published and never relax it") is now written at the merge rather than
+enforced, because a guard that silently dropped the key would put a row in
+the list that does nothing — the very trap the first finding was. And
+**`opTool` not checking its prose keys against the published arguments**, so
+a misspelt key drops a description in silence: that is the fifth parity
+part's job and #14 sequences it there on purpose.
+
+**Owed.** The fifth part of the parity check and the shared `tools/list`
+schemas accessor (#19); the four other catalog groups; and the proof scripts
+that still re-type argument names in Python.
+
+**The orchestrator's verification found one more, and it is the one worth
+reading** (`22a0d47`). This ticket's capture recorded
+`ripple_delete_ranges.ranges` losing its `minItems: 1` as one of three
+FIXES. It is not a fix. `AgentServer+Clips.swift`'s `rippleDeleteRanges`
+refuses an empty list by name — *"ranges is empty — name at least one
+[from, to] pair"* — exactly as `delete` and `split` refuse an empty `clips`
+and `paste_attributes` an empty `groups`, and all three of those kept the
+key through a declarations row. Measured over MCP against the built binary,
+not read off the source: the tool refused `{"ranges": []}` while its schema
+had stopped saying so. `ranges` now has the row its two siblings have and
+the list is twelve.
+
+**Why nothing caught it, which is the lesson.** `clip_catalog_proof.py`'s
+oracle is built from the same declarations list the catalog is built from,
+so a row dropped from the list moves BOTH sides of that comparison together
+and the proof stays green. Only a row that asks the RUNNING APP can see a
+declaration dropped while the behaviour stays, and there were two such rows
+— `delete` and `split` — for three lists. The loop now covers all three and
+names its argument, the proof is **24/24**, and removing the new row scores
+**23/24** with exactly that row failing. A generated schema needs at least
+one instrument that is not generated from the same source, or the whole
+comparison is a tautology.
+
+### 8.4 D3·4 — the remaining tools read the core (kpgalligan/reelcut#18)
+
+**Commits.** `74e9b29` (the migration and the proof), `4a0b33f` (the
+mutants and the whole proof tree) and `dcd9466` (what the review found,
+below — including the one row the review added).
+
+**What landed.** The last fourteen op tools stopped restating the table:
+the nine of the Tracks, Markers and Canvas groups in `AgentCatalog.swift`,
+the three raw media ops in `AgentCatalog+Files.swift` and the two of
+`AgentCatalog+Transitions.swift`. **All 57 op tools are `opTool`'s now**,
+and no op tool anywhere declares a `"type"`, an `"enum"` or a required list.
+No Rust file, no FFI export, no handler and no op moved; `make test` is 670,
+as before.
+
+**The line counts, which were an acceptance criterion.** Every catalog file
+this ticket touched came DOWN.
+
+| File | Before | After |
+|---|---|---|
+| `AgentCatalog.swift` | 535 | **494** (496 after the review fix) |
+| `AgentCatalog+Files.swift` | 609 | **601** |
+| `AgentCatalog+Transitions.swift` | 112 | **92** |
+| `AgentCatalog+Declarations.swift` | 279 | 310 (two new rows, one of them the review's) |
+| `AgentCatalog+Clips.swift` · `+Audio.swift` | 791 · 117 | unchanged |
+
+`"type":` went 43 → 13 in `AgentCatalog.swift`, 40 → 34 in `+Files.swift`
+and 6 → 0 in `+Transitions.swift`; `"enum":` 3 → 0 in the transitions and
+`required: [` 9 → 4, 8 → 5 and 2 → 0. **Not one of the survivors belongs to
+an op tool**, which was read back line by line rather than counted: in
+`AgentCatalog.swift` the thirteen `"type":` are the helper's own three
+(`tool`'s schema object, `projectProperty`, `scopeProperty`) and ten across
+seven app-state rows, and two of the four `required: [` are `tool`'s
+signature and `opTool`'s empty fallback while the others are `open_project`
+and `set_playhead`; in `+Files.swift` every one is one of the eight file
+tools with no op behind it.
+
+**The widening the migration needed is one row, and it is the fourth
+playhead.** `add_marker`'s `at` is `req` in the core's table — a marker IS a
+time — and the tool has always taken the playhead when the call leaves it
+out, exactly as M does. Without the row the migration would have made `at`
+compulsory, which is the REGRESSION this ticket was told to watch for: the
+declarations list is thirteen rows now, and `split`, `paste`, `freeze_frame`
+and `add_marker` are one reason written four times. Nothing else needed one.
+
+**The before/after capture, and every difference it found.** `tools/list`
+was captured from the binary built at `17c91cf` and from the migrated one,
+both canonicalised with sorted keys: 77 tools, the catalog's ORDER
+identical, **every tool description and every argument description identical
+word for word** (no prose arrived and none went, which is the criterion D3·3
+could not meet in full). The 20 app-state tools are byte-for-byte what they
+were — `record_screen`'s ten arguments included, which two scripts assert by
+name. Eleven op tools differ, in exactly three ways:
+
+| # | What an agent saw | What it sees now | Where | Verdict |
+|---|---|---|---|---|
+| 1 | an id declared `{"type": "integer"}` | `minimum: 0` beside it | 9 arguments (`clip` ×2, `track` ×3, `marker` ×2, `media` ×2) | **fix** — the same class D3·3 found for the clip group, and now measured against the running app: `remove_track` and `remove_media` refuse a negative id BY NAME, so the schema was silent about a rule the tool has |
+| 2 | a boolean declared `{"type": "boolean"}` | `["boolean", "string"]` | 13 arguments over 8 tools | **declared** — `boolArg` reads `"true"` and `"0"` for every boolean of every op; the row naming the KIND has been in the list since D3·3 and this is where the rest of the kind lives |
+| 3 | `set_canvas.fps` items `{"type": "integer"}` | `minimum: 0` on the items | 1 | **fix** — a frame rate's two terms are `u32` (`Fps`'s `#[serde(from = "[u32; 2]")]`) and `fpsArg` refuses a non-positive one; the list said neither |
+
+**No constraint was lost**, which is the mistake D3·3 made and this ticket
+inherited as its binding lesson: the diff is read in both directions and
+every difference above ADDS a key or declares a spelling the tool already
+accepted. The two bounds the migration was warned about came through
+unchanged: `set_canvas`'s `width` and `height` publish exactly the
+`minimum: 16, maximum: 16384` the catalog used to hand-write (the table's
+`Bound`, sourced from `CANVAS_MIN`/`CANVAS_MAX`), and `add_track`'s `index`
+keeps its `minimum: 0` from `Kind::Index`.
+
+**`set_transition` and `set_transition_duration` are NOT in the transitions
+group** — the ticket said they were. They are `AgentCatalog+Clips.swift`'s
+and D3·3 migrated both; `set_transition.kind`'s declarations row is the one
+the ticket remembered. `AgentCatalog+Transitions.swift` holds
+`add_transition` and `set_transition_style` alone.
+
+**One leniency found and deliberately not declared.** `set_canvas`'s
+`fpsArg` reads a bare `30` as `[30, 1]` where the schema says an array. It
+is a narrowing, like the lone id read as a one-element list and the id
+spelled as a string, and the direction is the rule: a schema narrower than
+what is accepted costs a caller nothing. It is named in the declarations
+list's "what is deliberately NOT here" paragraph rather than declared.
+
+**The proof.** `tools/proof/op_catalog_proof.py`, **22/22**, over MCP with a
+probe of its own. It measures ALL 57 where `clip_catalog_proof.py` measures
+43, and its structural half types no op name at all — the group IS the core's
+op list, so an op that lost its tool is named and an op renamed on both sides
+is still measured. Beside the identity it asserts what the core's table
+carries no prose at all (135 of the 145 published arguments are described by
+the CATALOG and none by the table), that exactly one op tool declares nothing
+but the envelope's two keys, and the five vocabularies a handler still parses
+by name — `add_transition`'s `align` among them, whose tie to
+`TransitionAlign` was structural until this migration made the schema the
+core's.
+
+**Its last section is the lesson from #17's verification, applied.** The
+oracle is built from the same declarations list the catalog is, so a row
+dropped from the list moves both sides together; every claim the fourteen
+make is therefore also put to the RUNNING APP: a marker with no `at` lands
+at the playhead, a track switch takes `"true"`, a negative id is refused by
+name, `set_canvas` refuses a width one step under the bound it publishes and
+names both ends, `add_transition`'s `kind` is refused an explicit null and
+never offered one — the opposite direction of `set_transition`'s row, and the
+reason the two ops cannot share it — and `add_media`'s descriptor is an
+object with no properties that refuses a string by name.
+
+**Verified.** `make test` **670 passed / 0 failed** (unchanged: no Rust file
+moved); `cargo fmt --check` clean; `make lint` clean; `make typecheck` 0
+errors and exactly the four known AVFoundation warnings; `make app` BUILD
+SUCCEEDED; the built binary launched on port 4863 and `grep "Reelcut: "` on
+its log printed nothing — the startup parity check is unchanged, and its
+fifth part is #19's.
+
+**`clip_catalog_proof.py` stays, and what it is FOR has narrowed.** Its
+structural half is now a strict subset of the new script's — 43 of the 57 —
+and the two oracles are independent copies, so a bug in one must be fixed
+twice. What it still holds alone is its group section (a contiguous run of
+the catalog with the two composites inside it, found by asking the core) and
+its own behavioural rows, which drive the clip group's shorthands. Read it
+as the clip group's behaviour and this one as the catalog's shape.
+
+**Owed.** The fifth part of the parity check and the shared `tools/list`
+schemas accessor (#19); and the proof scripts that still re-type argument
+names in Python.
+
+**The mutants.** Four deliberate failures, each run from the committed tree
+and reverted with `git checkout`. Three were caught by exactly ONE row, which
+is what says the rows are independent; the fourth was caught by two, and both
+sentences are true of it.
+
+| Mutant | Score | Row that caught it |
+|---|---|---|
+| the `add_marker.at` row dropped from the declarations list, while the handler still takes the playhead | 21/22 | *add_marker takes the playhead when `at` is left out* — `required ['at']`, with the marker still landing at 1200000. **This is the mutant the structural half cannot see**: the catalog and the oracle both read the list, so they still agreed with each other |
+| a WRONG declaration — `add_transition.kind` widened with `null`, which its handler refuses | 21/22 | *add_transition's kind is NOT nullable* — `declared ['string', 'null']` beside the refusal `kind must be one of …`. The direction the list must never take: a schema wider than what is accepted |
+| `after` dropped from the CORE's `Kind::Alignment` | 21/22 | *add_transition's align* — the core's two against `TransitionAlign.allCases`'s three. Caught twice over: `core/tests/op_table.rs`'s `every_closed_vocabulary_answers_with_its_own_members` FAILED on the same mutant |
+| `set_marker` reverted to a hand-written `tool(…)` schema, ids and booleans as they were before the migration | 20/22 | *all 57 declare exactly the core's arguments…* named `set_marker`, AND *a track switch takes a boolean's string spelling, and every boolean argument of every op tool says a string is allowed*, whose quantifier is over the whole catalog. Two true sentences about one mutant rather than one row leaking into another |
+
+**The whole proof tree was re-run, not only what this ticket touched** —
+`kpgalligan/reelcut#16` changed the FFI, so anything building an older
+`app/Sources` is broken by construction and a catalog change reaches
+backwards by the same logic. Every script, on the committed tree:
+
+| Script | Score |
+|---|---|
+| `phase1_proof` · `phase2_proof` · `phase3_proof` · `phase3_silence_scope` | 66/66 · 85/85 · 123/123 · 8/8 |
+| `phase4_proof` · `phase5_proof` · `phase6_proof` · `phase7_proof` | 84/84 · 88/88 · 168/168 · 92/92 |
+| `phase8_proof` · `phase9_proof` · `patch_door_proof` · `refusal_proof` | 79/79 · 216/216 · 261/261 · 116/116 |
+| `remaining_proof` · `clip_catalog_proof` · `op_catalog_proof` | 79/79 · 24/24 · 22/22 |
+| `recording_proof` | **187/187**, 2 rows skipped by name (a Bluetooth output) |
+| `op_schema_probe` · `phase9_probe` · `refusal_probe` · `remaining_probe` | 28/28 · 48/48 · 15/15 · 170/170 |
+| `preview_validity_probe` · `preview_refresh_probe` · `transition_sheet_probe` | 24/24 · 58/58 · 32/32 |
+| `recording_probe` | **899/899**, 2 skipped by name (the reference tree below) |
+| `phase2…phase9_chrome` | 26/26 · 33/33 · 59/59 · **36/36** · 70/70 · 78/78 · 150/150 · 62/62 |
+
+Two scripts print a SKIP by name for one named cause — `phase5_chrome`'s 45
+rows and `recording_probe`'s 2 — and it is the cause the convention already
+records: a reference tree's own `ReelCore.swift` predates D2·1's fourth
+parameter and cannot be made to compile against the current header by
+anything in this repo. `recording_proof` also skips its two tone rows on this
+host, the default output being a Bluetooth device. **One run of
+`recording_proof` scored 186/187 before the one above**: the microphone
+head-loss row, measuring an AirPods Max that started 180 ms after the
+picture — the raw difference the row bounds, where the residual against
+`mic_offset` was 2.1 ms. The next run of the same binary scored 187/187, and
+nothing in this ticket's diff reaches the recorder: `record_screen`'s schema
+is byte-identical, which the capture above measured.
+
+**And the tree was measured again afterwards.** With every mutant reverted
+and the app rebuilt, `tools/list` is byte-identical to the capture taken when
+the migration landed, `op_catalog_proof.py` is 22/22 and the parity log on
+port 4893 printed nothing.
+
+**What the review found.** Two axes, fixed point `17c91cf`, spec source the
+ticket plus spec kpgalligan/reelcut#14. The **Spec** axis re-derived the
+counts rather than trusting this record (58 `opTool(` occurrences less the
+one declaration = 57 call sites; every surviving `"type"`, `"enum"` and
+`required:` read back to an app-state tool by name; `record_screen`'s two
+by-name assertions unmoved in both scripts), went tool by tool over the
+fourteen handlers against the argument vocabulary to ask whether any other
+row was owed, and found no scope creep. The **Standards** axis re-derived
+every line and grep count here and found all of them exact.
+
+Five findings changed code or documents:
+
+- **`set_canvas.fps` published `minimum: 0` on its items while `fpsArg`
+  refuses a zero term BY NAME** — a schema one step WIDER than what is
+  accepted, which is the one direction the declarations list exists to
+  close, and the only row of the capture table with no running-app check
+  behind it. It is a row now, the second that NARROWS rather than widens
+  (`set_speed.rate` is the first), and the proof asks the running app:
+  `{"fps": [0, 1]}` refused by name while the items say `minimum: 1`. The
+  pre-migration schema promised even a negative term, so this was a gap
+  rather than a regression — and it is the fourth difference an agent sees:
+  `set_canvas.fps` items `minimum` 0 → **1**;
+- **`PLACEHOLDER_ONE` and `PLACEHOLDER_TWO` in this record's own Commits
+  line**, which is the omission `e7c1883` exists to fix and which D3·3's
+  review found in the same place;
+- **the size ledger was stale for the one file that went UP** —
+  `AgentServer.swift` 779 → 783, four lines of doc comment, which the §3
+  prose and its table now carry. D3·3's review found the same thing about
+  the same file;
+- **an arithmetic sentence in this record was wrong**: the thirteen `"type":`
+  left in `AgentCatalog.swift` are three helper occurrences and ten across
+  seven app-state rows, not "the two that are not `open_project` and
+  `set_playhead`". The conclusion held and the arithmetic did not;
+- **`AgentCatalog.swift`'s header still ended "at about 454"** — the number
+  the R1·toll left it at, two migrations ago.
+
+Three were judged not real. **`AgentCatalog+Declarations.swift` 279 → 286
+breaks "every catalog file touched comes down or stays level"**: it does, and
+it is the price of the criterion one line above it, which says a widening the
+migrated groups need is added to this list; the four files that hold TOOLS
+all came down. **The "at least one of" guard four tools carry** — a call
+naming none of a tool's optional keys is refused — is a rule about the CALL
+rather than about an argument, no shape in `Subject` addresses it, and every
+tool that has one says so in its own prose; it is named in the list's doc now
+rather than declared. And **`op_catalog_proof.py` duplicating the other
+script's probe and oracle** is the tree's one-script-one-file convention, and
+the two being independent copies is what makes a bug in one a failure rather
+than a shared opinion.
+
+The proof is **23/23** with the new row, `tools/list` differs from the
+migration capture by exactly the one fragment above, and port 4894's parity
+log printed nothing. The two neighbours that read the same list were re-run
+after the fix: `clip_catalog_proof.py` **24/24** — its oracle reads the
+declarations too — and `op_schema_probe.py` **28/28**, which asserts the
+CORE's frame rate and is untouched by a narrowing the app makes.
+
+**The orchestrator's verification found the same asymmetry one layer down**
+(`dd32de9`). D3·3's prefactor proved that every bound the table PUBLISHES is
+one the core refuses outside. That is half a check: a row with no bound makes
+no claim, so nothing falsifies its absence. Measured rather than reasoned —
+the mutant was run — dropping `set_canvas.width`'s bound from the table left
+`core/tests/op_table.rs` green at 7/7 AND `op_catalog_proof.py` green at
+23/23, because the catalog and the proof's oracle both read the table and
+move together with it. An agent would have lost a constraint the app still
+enforces, exactly as it would have lost `ranges`' `minItems` in §8.3.
+
+The new test asks the CORE instead of the table. A range the core enforces
+answers in its own sentence — `canvas width must be between 16 and 16384,
+not 0` — so every whole-number argument is handed two values no range could
+contain, and an argument that answers with that sentence while carrying no
+bound is a bound the table has lost. Nothing has to know in advance which
+arguments are bounded, so a bound added later to an op nobody has thought of
+is covered by construction. `make test` 670 → **671**; the mutant scores
+**7/8**, naming `set_canvas: width`.
+
+**Twice now, the same shape.** Both regressions were a constraint the app
+still enforced that the schema stopped declaring, and both were invisible to
+an instrument derived from the thing it was checking. The series rule that
+comes out of it, for #19 and for anything after: **a generated artefact is
+checked by asking the thing that generated it a question it did not write
+the answer to** — the running app for a declaration, the core's own refusal
+sentence for a bound.
+
+### 8.5 D3·5 — the fifth part of the check, and a proof for all 57 (kpgalligan/reelcut#19)
+
+**Commits.** `77b0bb8` (the fifth part and the proof), `c8fbe12` (the
+mutants and the whole proof tree), `3d120bb` (what the review found, below)
+and `dd61cb1` (the fifth mutant, and all five re-scored against the
+rows the review added).
+
+**What landed.** The startup parity check's fifth part, the proof that puts
+the property to the running binary, and the shared `tools/list` accessor.
+No Rust file moved (`make test` is 671, as before), no op, no tool, no
+format bump; the catalog is 77 tools and 57 op tools, as it has been since
+road map 5's E1.
+
+- **`app/Sources/AgentServer+Parity.swift` is new, 172 lines** against the
+  400-line cap for a new file. It holds part 5 and nothing else. Parts 1 to
+  3 stay in the frozen `AgentServer.swift` with the PRIVATE dispatch table
+  they read — moving them would have meant widening `handlers` — and part 4
+  stays in `AgentServer+Scope.swift` with the feature it is about. The
+  frozen file came DOWN, 783 → **774**: what it lost is the two paragraphs
+  describing the gap this part closes, and what it gained is one `??` and a
+  fifth bullet.
+- **The comparison is names, in both directions**, per op tool, with the
+  injected `project` and `scope` excluded and `AgentServer.declarations`
+  read for the names a row adds. A mismatch names the op, the argument and
+  the side — *declared by the tool and in neither the table nor the
+  declarations* against *in the table or a declarations row and not declared
+  by the tool*. The union is the core's row exactly today, because all
+  fourteen rows name an argument the table publishes, and it is written as a
+  union anyway: a row naming an argument the core has NOT got makes
+  `declaredInput` emit nothing for it, so the tool cannot declare it and this
+  part says the row is stale — `opsWithoutTools`'s staleness check, at
+  startup instead of in a proof script.
+- **Two complaints about PROSE, which is where the drift was.** #17's review
+  named the first as this ticket's: `opTool` walks the CORE's published
+  properties and hands each one its sentence, so a prose key the table has
+  never heard of reaches nothing and the description is dropped in silence.
+  Nothing in the built catalog remembers it, so `AgentServer.noteProse` is
+  told while the catalog is BUILT — one static keyed by op, written by
+  `opTool` and read by the check, both inside `start()`'s single build on the
+  main thread. The second is the other direction, and it is
+  `AgentCatalog.declaredInput`'s own doc comment made true: an argument with
+  NO description reaches an agent as a bare type, which is spec
+  kpgalligan/reelcut#14's second user story.
+- **App-state tools are skipped by part 4's rule** — `ops.contains(name)`,
+  the core's own op list — and the proof measures that: an app-state tool
+  broken the same way draws nothing.
+- **The reporting is identical to the other four**: one line, every offender
+  in it, `assertionFailure` in debug and `NSLog("Reelcut: %@")` in release,
+  and the server starts either way. Whether a parity failure should stop the
+  launch was not reopened.
+
+**The drift the first run found: ten arguments over four op tools shipping
+to an agent with no description at all.** Nothing was wrong with any NAME —
+the fifth part's headline comparison found zero mismatches in either
+direction, which after four migrations is the honest result and is what the
+record says. What it found is the prose half:
+
+| Op | Arguments with no description | What an agent saw |
+|---|---|---|
+| `set_track` | `name`, `hidden`, `muted`, `locked`, `solo` | five bare types — `["boolean", "string"]` and a `string` — with the four switches explained in the TOOL's description and not one of them on the argument |
+| `set_marker` | `name`, `chapter` | the same, beside `marker`, `time` and `color`, which have always had one |
+| `add_marker` | `name` | the same, beside `at`, `chapter` and `color` |
+| `set_canvas` | `width`, `height` | two bare integers carrying the core's `minimum: 16, maximum: 16384` and no sentence |
+
+**When it drifted, read back from the source rather than guessed.** None of
+the ten is new and none is a migration's doing: `set_canvas`'s two were
+never described (D3·4's own comment says so in the line this ticket
+replaced — *"neither has ever carried prose"*), and the `set_track`,
+`set_marker` and `add_marker` sentences were never written either, because
+`tool(…)` let a schema declare a property without one and nothing anywhere
+asked. They have been in the catalog since road map 2's phase 1. The fix is
+ten sentences and the two canvas ones deliberately do NOT repeat the
+16–16384: the bound is the core's, published from the constants
+`edit_canvas.rs` refuses by, and a number spelled twice is what this whole
+candidate deletes.
+
+**The proof.** `tools/proof/op_argument_proof.py`, **86/86** (79 before the
+review added the optional half of section 3), over MCP with a probe of its
+own, built BEFORE the first MCP call. It is written against
+the series rule D3·3 and D3·4 each paid for — **a generated artefact is
+checked by asking the thing that generated it a question it did not write
+the answer to** — because the fifth part reads the same table the catalog
+prints and therefore cannot see the class that caused both regressions.
+
+Its five sections: **the fifth part made to complain** (the probe builds the
+catalog this binary registers, puts it to `AgentServer.argumentFailure`,
+which must say nothing, and then puts four broken catalogs to it, each of
+which must be named with its op, its argument and the side — while an
+app-state tool broken the same way draws nothing); **the catalog's size**,
+EXACTLY 77 and the shipped binary's parity log empty; **the attribution**,
+which is a different question from `op_catalog_proof.py`'s and not a third
+copy of its oracle — every difference between a tool's schema and the core's
+table must be one a declarations row NAMES, key by key, and the inverse,
+that every one of the fourteen rows accounts for at least one difference, so
+a row that changes nothing fails here; **the misspelt argument, for all 57**;
+and **the opaque doors**.
+
+**The misspelt-argument section is what the ticket was really asking for,
+and what it proves is not what the ticket predicted.** For each of the 57:
+one CONTROL call with every required argument spelled right, which must not
+be refused for a MISSING argument — that is the tool's required list proved
+SUFFICIENT against the running app — and then one call per required argument
+with that argument misspelt, which must be refused naming it. **That is a
+check that every argument the catalog PRINTS from the core's table is one a
+hand-written handler really reads**, which no comparison of two lists can
+be, and it is the class the fifth part cannot see. The values are derived
+from the core's published kinds rather than typed: an id by name (the five
+entity ids are the only argument names in the file, each checked against the
+core's table first), a time as a second per argument in table order, a
+bound's own minimum, a vocabulary's first member. **Six op tools require
+nothing at all** — `add_background`, `add_marker`, `add_track`,
+`remove_empty_tracks`, `set_canvas`, `split`, four of them for the
+declarations list's own playhead rows — so no call of theirs can be refused
+for a missing argument and that shape cannot reach them. Their arguments are
+measured the only other way there is, which the review added: a misspelt
+OPTIONAL argument is dropped in SILENCE, so what is read is what the op DID —
+the same call twice, once right and once misspelt, answering two different
+projects, in either of two shapes (the argument ALONE against the op alone,
+which is the only shape `add_background` takes because it refuses a media and
+a colour together; or every argument right against this one misspelt, which is
+the only shape `set_canvas`'s `rescale_clips` takes because it scales a
+placement WITH a size and does nothing without one). `remove_empty_tracks` has
+no argument at all, and `split`'s `clips` is the one this fixture cannot
+separate — the playhead sits inside the only clip at that time — named in the
+script with its reason and asserted to be the WHOLE of the exceptions, so a
+second one is a failure rather than a quiet addition.
+
+**The ticket's "the core names it by its dotted path" is false of an
+ARGUMENT, and the section says what is true instead.** An op argument never
+reaches the core's decoder at all — the handlers read arguments one at a
+time and build the op (spec kpgalligan/reelcut#14's twelfth decision) — so
+the sentence naming a misspelt argument is the APP's, in three shapes, all
+anchored to the argument's own name: `Missing required argument: <name>`
+(the shared vocabulary), `<op> needs <name>` (`set_transition`, which lists
+the kinds with it) and `<name> must be <what>` (`set_speed`'s rate,
+`move_track`'s index, `add_media`'s descriptor, `paste`'s payload,
+`set_reversed`'s flag — a handler's own sentence for a reader that answered
+nil). The dotted path is the CORE's and it belongs to a KEY inside a
+caller's object, which is section 4: nine of the eleven opaque doors answer
+`unknown key "nosuchkey" in a video patch` and the like. The two `payload`
+doors are named rather than skipped — `pastePayloadArg` checks a payload is
+an object with clips in it before forwarding, so a payload valid enough to
+reach the core's unknown-key answer is a whole Copy payload this fixture
+does not make — and what IS true of them is asserted instead.
+
+**The shared accessor.** `mcp.py` gained `schemas()`, every tool `tools/list`
+reports keyed by name in catalog order, and `tools()` is now a projection of
+it. **Seven scripts reached into `mcp._request` and not five** as the ticket
+said: `clip_catalog_proof`, `op_catalog_proof`, `phase4_proof`,
+`phase5_proof`, `phase7_proof`, `phase9_proof` and `recording_proof`. All
+seven moved and not one assertion changed; `clip_catalog_proof`'s ORDER read
+is `list(tools)`, which a dict preserves.
+
+**The tool-count handover cost NOTHING, which is the first time that has
+happened to a handover that moved the number.** No script in the tree held
+an exact count to give up: road map 5's E1 had already turned
+`recording_proof.py`'s 75 into a floor, and D3 adds no tool, so the 77 this
+script takes is the count the catalog has carried since E1. What had drifted
+was the PROSE — `recording_proof.py`'s docstring and its section banner
+still called its 75 exact, and `tools/proof/README.md`'s handover paragraph
+still named it the owner. Both corrected, and the README's op-catalog
+section with them (*135 of the 145 arguments described* is 145 of 145 now,
+and *13 declarations rows* is 14).
+
+**One rulebook sentence was amended rather than left false**: the root
+`CLAUDE.md`'s parity rule said FOUR parts and that the check cannot see
+argument TYPES. It says five now, and that what it cannot see is a CALL.
+kpgalligan/reelcut#20 lists that amendment among its own criteria; it is
+done, and what is left there is the spec, the Rust module map, the README's
+prose op list and the ledger's row-by-row regeneration.
+
+**Verified.** `make test` **671 passed / 0 failed** (unchanged: no Rust file
+moved); `cargo fmt --check` clean; `make lint` clean; `make typecheck` 0
+errors and exactly the four known AVFoundation warnings; `make app` BUILD
+SUCCEEDED; the built binary launched on port 4902 and `grep "Reelcut: "` on
+its log printed nothing — which is now the fifth part's silence as well as
+the other four's. The two neighbours that read the same catalog were re-run
+on fresh instances: `op_catalog_proof.py` **23/23** (port 4904) and
+`clip_catalog_proof.py` **24/24** (port 4905).
+
+**Owed.** kpgalligan/reelcut#20: the spec's op-table and agent sections, the
+Rust module map, the decision recording where the line falls, the README's
+prose op list, the ledger regenerated row by row, and the series close with
+its measurements.
+
+**The mutants.** Five deliberate failures, each run from the committed tree
+and reverted with `git checkout`, each rebuilt and put to a freshly launched
+instance of its own. The four the ticket asked for were first scored against
+the 79 rows the proof had before its review; these are all five against the
+86 it has now.
+
+| Mutant | Score | What caught it |
+|---|---|---|
+| the fifth part SILENCED — `argumentFailure` returns nil on its first line | **82/86** | the four *made to complain* rows, and only those. The clean-catalog row and the app-state row still pass, correctly: a check that says nothing says nothing about a clean catalog either. This is the one mutant no single row can catch, because what it removes is the instrument |
+| `trim_start`'s `to` renamed `until` in the CORE's table, the catalog untouched | **82/86** | four rows, and the shipped binary's own log first: `Reelcut: these op tools carry a description for an argument they do not take: trim_start — ["to"]`. The tool printed `until` from the table, the sentence written for `to` was attached to nothing, and `until` arrived undescribed — both halves of the prose check, in one mutant. `trim_start`'s misspelt-argument row fails too, because the handler still reads `to`. `core/tests/op_table.rs` FAILED 3 of 8 on the same mutant, which is the table lying to the decoder |
+| `set_track.hidden`'s description removed — the drift this ticket FIXED, put back | **84/86** | the parity log row, naming `set_track — ["hidden"]`, and the clean-catalog row beside it. This is the measurement behind the drift table above: the ten sentences are what the check asks for, and one of them taken away is one line in the log |
+| an INERT declarations row added (`set_speed.rate` again, widening nothing) | **85/86** | *every one of the 15 rows accounts for at least one of them*, naming `set_speed.rate` — one row, and nothing else. The parity log printed NOTHING, which is the honest limit of the fifth part: a row that does nothing is invisible to a check that reads the same list the catalog does, and the proof is what sees it |
+| an optional argument NO HANDLER READS — `add_track`'s handler stops passing `name` on | **84/86** | *add_track — every one of ['index', 'name'] CHANGES what the op did*, and the row that asserts the named exception is the whole of them. **The parity log printed NOTHING**, and that is the mutant this ticket exists to be honest about: the catalog still prints `name` from the core's table, every list still agrees with every other list, and only a call to the running tool can see that nothing reads it |
+
+**The whole proof tree was re-run on the committed tree**, one script per
+freshly launched instance, and `grep "Reelcut: "` printed nothing on every
+one of the seventeen ports.
+
+| Script | Score |
+|---|---|
+| `phase1_proof` · `phase2_proof` · `phase3_proof` · `phase3_silence_scope` | 66/66 · 85/85 · 123/123 · 8/8 |
+| `phase4_proof` · `phase5_proof` · `phase6_proof` · `phase7_proof` | 84/84 · 88/88 · 168/168 · 92/92 |
+| `phase8_proof` · `phase9_proof` · `patch_door_proof` · `refusal_proof` | 79/79 · 216/216 · 261/261 · 116/116 |
+| `remaining_proof` · `clip_catalog_proof` · `op_catalog_proof` | 79/79 · 24/24 · 23/23 |
+| `op_argument_proof` | **86/86** (79/79 when the tree was run; the review added seven rows and the script was re-run alone on port 4971) |
+| `recording_proof` | **121/121**, 66 rows skipped by name |
+| `op_schema_probe` · `phase9_probe` · `refusal_probe` · `remaining_probe` | 28/28 · 48/48 · 15/15 · 170/170 |
+| `preview_validity_probe` · `preview_refresh_probe` · `transition_sheet_probe` | 19/19 (5 skipped) · 0/0 (58 skipped) · 32/32 |
+| `recording_probe` | **858/858**, 43 skipped by name |
+| `phase2…phase9_chrome` | 26/26 · 33/33 · 59/59 · 36/36 (45 skipped) · 70/70 · 78/78 · **144/150** · 62/62 |
+
+**This host was LOCKED for the run, and that is the whole of the difference
+from D3·4's tree.** ScreenCaptureKit lists no display when the console is
+locked and every display is asleep, and a locked console displays nothing in
+any layer and lets no window become key — so `recording_proof` skipped its
+granted tier by name (66 rows), `recording_probe` its 41 display rows,
+`preview_validity_probe` 5 and `preview_refresh_probe` all 58, each printed
+by name with its cause. **`phase8_chrome` is the one that FAILS rather than
+skipping**: its six failures are one cascade from its own first row —
+*PRECONDITION: the probe activated and the editor is both key and main* —
+which a locked console cannot satisfy, and every later row in that section
+reads NONE for want of it. It has no skip for that cause where four other
+instruments do, and giving it one is owed. `phase5_chrome`'s 45 and
+`recording_probe`'s 2 are the standing reference-tree skip.
+
+Nothing in this ticket's diff reaches a window, a display or the recorder:
+the Swift change is the agent catalog's prose and one new file in the parity
+check, and `tools/list` is what every one of the catalog proofs read back
+green.
+
+**What the review's own fixes changed, and what was re-run for them.** Four
+argument descriptions (`set_track`'s switches) and one Python file. No proof
+script anywhere asserts a word of `set_track`'s prose — every one of the nine
+that names the tool CALLS it — so the scripts re-run after the fixes are the
+three that read the catalog's shape plus the two that drive that tool:
+`op_argument_proof` **86/86**, `op_catalog_proof` **23/23**,
+`clip_catalog_proof` **24/24**, `phase1_proof` **66/66** and `phase2_proof`
+**85/85**, parity log empty on all five ports.
+
+**What the review found.** Two axes, fixed point `10b301b`, spec source the
+ticket plus spec kpgalligan/reelcut#14. The **Spec** axis re-derived the drift
+from `10b301b`'s own catalog against `op_table.rs` rather than trusting the
+table above — exactly ten undescribed over `set_track` (5), `set_marker` (2),
+`add_marker` (1) and `set_canvas` (2), zero orphan prose, zero of either at
+HEAD — confirmed both directions, the envelope exclusion, the declarations
+read, the op/argument/side naming, the app-state skip as part 4's own rule and
+the reporting chained into the same `assertionFailure` + `NSLog`, and found no
+implementation wrong and no material scope creep. It judged the dotted-path
+substitution JUSTIFIED by decision 12 rather than a weakened claim, and
+stronger than what was asked, since it also proves each required list
+sufficient against the running app.
+
+Five findings changed code or documents:
+
+- **"a misspelt argument for all 57" reached 51.** The six that require
+  nothing were named rather than probed, and the Spec axis put the hole in
+  spec #14's own words — user story 6, *"an argument I send is never dropped
+  and never refused for being unknown"* — with nothing in the tree catching an
+  optional misspelling. Closed as the optional half above: 56 of the 57 now
+  have an argument misspelt and an answer read, and the 57th
+  (`remove_empty_tracks`) has no argument to misspell. It cost the two shapes
+  and one named exception, and it is the only part of this ticket that found a
+  question nothing in the tree was asking;
+- **`PLACEHOLDER_TWO` in this record's own Commits line**, which is the third
+  consecutive ticket with that finding — `e7c1883` exists to fix it for D3·1,
+  D3·3's review found it and D3·4's review found it again;
+- **`recording_proof.py` had a SECOND stale exact-count comment** two lines
+  above the one this ticket corrected, saying "this is that script" — so the
+  record's "both corrected" overclaimed by one. All three sentences say
+  floor now;
+- **duplicated prose in `set_track`**, which is this candidate's own sin: the
+  four switch sentences added for the fifth part repeated the tool
+  description's own clauses almost word for word, in a file whose new comment
+  three hunks away says *"a number spelled twice is what this whole candidate
+  deletes"*. Each switch names the MENU ITEM it mirrors now — `Track ▸ Hide
+  Video`, `Mute Audio`, `Lock Track`, `Solo` — which is the per-argument fact
+  the rulebook asks for and the description does not carry per argument;
+- **`ID_ARGUMENTS` held six names under a comment, a docstring and a record
+  all calling it "the five entity ids"**: five ENTITIES, six names, because
+  `clips` is a list of the id space `clip` draws from. Said that way now.
+
+Two more were taken as written: the README's handover paragraph ran on
+mid-sentence into the paragraph it was spliced before, and its op-catalog
+section nested a parenthetical between two em dashes.
+
+Three were judged not real. **The collector `proseWithoutArgument` is a
+hidden side effect of a builder** — true, and it stays: the evidence exists
+only while the catalog is built, and the ORDER that makes it safe is a data
+dependency rather than a convention, because the check takes the catalog
+STRING `catalogJSON()` returned and cannot be asked without it. That argument
+is written at the property now, with the one residue it leaves (an op that
+stopped being an op tool mid-process, which parts 1 and 2 name first).
+**`build_probe`, `run_probe` and `covers` duplicate `op_catalog_proof.py`'s**
+— the tree's one-script-one-file convention, judged not real for the same
+reason in D3·4's review: two independent copies make a bug in one a failure
+rather than a shared opinion, and what WAS hoisted in this ticket is the
+shared CLIENT, not an instrument. **Three parity parts each dig
+`inputSchema → properties` out of an untyped dictionary** — two lines at three
+call sites in three files, one of them frozen; a shared helper would make two
+files depend on a third to save four lines.
+
+### 8.6 D3·6 — contract and record (kpgalligan/reelcut#20)
+
+**Commits.** `acb75ed` (the documents, the read-back and this section) and
+`f39614b` (what the review found, below).
+
+**What landed.** Documents, and seventeen corrections to sentences that had
+gone false — thirteen of them this series' doing. No behaviour anywhere:
+the only code touched is doc comments, `make test` is 671 as before, and no
+op, tool, export, format version or count moved. The catalog was not
+captured before and after — there was nothing in it to change — and what
+stands for that instead is the three catalog scripts run against the rebuilt
+binary: `op_catalog_proof.py` 23/23, `clip_catalog_proof.py` 24/24 and
+`op_argument_proof.py` 86/86, the last of which asserts the tool count is
+EXACTLY 77.
+
+- **The rulebook.** The root `CLAUDE.md`'s two sentences were already
+  amended by #19 and were VERIFIED here rather than trusted — the op table is
+  named as two halves (semantics in `edit.rs`'s module doc, arguments in
+  `op_table.rs`), the parity check says FIVE parts and enumerates all five,
+  and what it says it cannot see is a CALL. The per-side files were swept for
+  the same sentences: `app/CLAUDE.md`'s agent map already carried `opTool`,
+  the declarations list and the fifth part; `core/CLAUDE.md`'s `op_table.rs`
+  entry still said the app's reader is *the clip half* of the catalog, which
+  was D3·3's truth and has been false since D3·4. Its road-map row now calls
+  D3 closed and points at §9.
+- **The spec.** §6 gained the paragraph that says it is the SEMANTICS half
+  and names `op_table.rs` as the other, with the bound rule in it; §7.9
+  gained the fifth part of the parity check, both its prose complaints, the
+  app-state skip and the one thing no comparison of two lists can see; §11
+  gained **D3-1**, the decision this candidate drew — *the core says what an
+  argument IS; the app says what it is FOR*, with the line the series
+  actually used and the direction rule under it. **That decision is written
+  LATE and the record says so**: the rulebook asks a phase to record a new
+  §11 decision before the code, and this one was drawn at D3·3 as that
+  ticket's own amendment and only written into the spec here, because #20 is
+  the ticket that was given it. What was not re-litigated is the line itself.
+  §7.10's Rust module map already had `op_table.rs` and `op_schema.rs`, added
+  by the tickets that wrote them; that was checked rather than added twice.
+- **The README.** The prose op list was missing `add_transition` and
+  `set_transition_style` — spec kpgalligan/reelcut#14's user story 26 — and
+  its lead-in still said a tool matches the op table by hand. All 57 rows of
+  `OP_TABLE` were then put to the corrected list programmatically: 41 named
+  outright, the other 16 covered by the two group clauses, and no op named
+  there that no longer exists.
+- **The ledger.** `designs/reelcut-remaining.md` §3 was REGENERATED with
+  `wc -l … | awk '$1>600' | sort -rn` rather than edited: 29 rows, every
+  number matching, `core/src/edit_track.rs` still off it and nothing joined.
+  Its prose was rewritten from the five tickets' running commentary into one
+  paragraph measured against `main`, with every new module against its cap.
+
+**The adversarial read-back, and the seventeen sentences it found false.**
+D2's equivalent ticket found four; this one assumed its own and went
+looking. Four of the seventeen predate D3 and are swept here because they
+are the same KIND of rot — a count written as a word, a map entry naming a
+file's old contents, a status paragraph left in the present tense.
+
+| Where | What it said | What is true |
+|---|---|---|
+| `core/src/ffi_query.rs` | the catalog writes every op tool's types, minimums, enums and required list **"by hand today"** | written at D3·2, when it did; false since D3·4, when the last of the fifty-seven stopped |
+| `core/src/edit.rs` module doc | "`AgentCatalog.swift`'s MCP tools mirror the two together" | they mirror the semantics half in prose and PRINT the arguments half |
+| `core/CLAUDE.md` | the app's reader is "the clip half of the agent catalog" | every one of the fifty-seven op tools |
+| `AgentCatalog.swift` header | "every op tool's name and arguments must match the op table in spec §6 and the module doc of `core/src/edit.rs`, because those three spellings are one contract" | only the NAME is matched; the arguments are printed, and there are no longer three spellings |
+| `AgentCatalog.swift` header | D3 "took to 535 and then back to under 500" | 496 at D3·4 and over 500 again at D3·5; it now points at the ledger for the number today |
+| `AgentCatalog.swift` | the FFI call happens once "instead of **seventy-five** times per catalog build" | 77 — `handlers` has 77 entries and the catalog 77 tools |
+| `AgentServer.swift` (frozen) | the scope is read once "for all **seventy-five** of them — a read inside each handler would be **fifty-eight** edit sites" | 77 tools and 57 op tools; a count written as a word, inherited from before the series and swept now because D3·5 corrected the same 75 in `recording_proof.py`'s prose |
+| `AgentCatalog+Declarations.swift` | the core's required-ness answer stands for "every argument but **five**" | six rows carry a `requirement` — `add_marker.at` arrived at D3·4, after the sentence |
+| `AgentCatalog+Declarations.swift` | "**the one row** that uses `alsoKeys` today (`set_speed.rate`)" | five rows, four of them added after that sentence, and all five NARROW |
+| `AgentServer+Parity.swift` | of the first four parts, "not one of them ever looks INSIDE an op tool's `properties`" | part 3 reads a schema's shape and part 4 asks whether `scope` is in it; what none of them does is compare the properties to the core's row |
+| `ReelOps.swift` | `documentLevelNames` is a mirror "in the same sense that `AgentCatalog.swift` mirrors the op table" | the catalog is exactly what stopped being a mirror; the analogy now points at the typed factories above it, which still are one |
+| `ReelCore.swift` | `coreNames()`'s "**the one caller** — `AgentServer`'s startup parity check" | its one reader is `AgentCatalog.opNames`, which three things share (the `scope` injection, the dispatch's scope read, the check) |
+| `tools/proof/README.md` | the copy-pasteable run block | omitted `op_catalog_proof.py` and `op_argument_proof.py`, the second of which owns the exact tool count |
+| `tools/proof/README.md` | "the **five entity ids** are the only argument names in the file" | six names for five entities — the correction D3·5's review made in the script and not in the README |
+| `designs/reelcut-design.md` §6 | `move_clip {…, track}`, `set_speed {…, keep_pitch}`, `add_track {index, …}`, `relink_media {…, bookmark}` | all four are `opt` in the table and are written `?` now. This was latent until §6 declared itself the semantics half and deferred required-ness to the table, which is this ticket's own doing |
+| `designs/reelcut-design.md` §7.4 | `ReelCore.swift` owns "typed op builders" | they left for `ReelOps.swift` under the size rule; `ReelOps.swift`, `ReelEdit.swift` and `ReelOpSchema.swift` had no row at all, and now share one |
+| `designs/reelcut-remaining.md` head | "`make test` **is** at 494 … the catalog **is** 75 tools" | road map 2's closing numbers in the present tense, three road maps ago; dated now, with §3 named as the part of that file kept current |
+
+**The whole of §6 was then checked against the table rather than only the four
+rows.** A script parsed every `{…}` header in §6 and compared it to `OP_TABLE`
+name by name and required-ness by required-ness: 57 rows, the four above the
+only disagreements, and three apparent ones that are not — `set_clip`'s
+`patch: {name?…}` (the `?` is inside the patch), `set_transition {clip,
+kind|null}` and `add_zoom_action`'s `region: {…} | null`, both of which say
+optional in their own spelling and in their prose.
+
+**What was checked and found already true**, so the sweep's completeness is
+on the record: the root `CLAUDE.md`'s five-part sentence and its "what it
+cannot see is a CALL" (#19's amendment, verified not trusted); `CONTEXT.md`'s
+two new terms, **Op table** and **Argument**, which say what the code does;
+spec §7.10's `op_table.rs` and `op_schema.rs` rows; `core/CLAUDE.md`'s and
+`app/CLAUDE.md`'s entries for all five new files; `tools/proof/README.md`'s
+section for each of the four new scripts; and every count in the tree that
+could have rotted — 57 ops, 57 op tools, 77 tools, 20 app-state tools, 145
+published arguments, 17 kinds, 14 declarations rows, six op tools that
+require nothing, the 43 + 2 of the clip group and the 9 + 3 + 2 of D3·4's
+fourteen — each re-counted in the code rather than read off a sentence.
+
+**One measurement worth its own line: not one surviving hand-written
+declaration belongs to an op tool.** Attributing each remaining `"type":`,
+`"enum":`, `required: [` and `"minItems":` in the five catalog files to the
+call site that encloses it puts all 77 of them inside a `tool(…)` call, a
+schema helper or `opTool`'s own empty-required fallback — which is D3·4's
+line-by-line read-back repeated by machine, and the claim the close rests on.
+
+**Verified.** `make test` **671 passed / 0 failed** (unchanged: no Rust
+behaviour moved); `cargo fmt --check` clean; `make lint` clean; `make
+typecheck` 0 errors and exactly the four known AVFoundation warnings; `make
+app` BUILD SUCCEEDED. No new proof claim was written, so no mutant was run
+here — the instruments this ticket leans on are the five earlier tickets',
+and the twenty-five deliberate failures behind them are in §9.
+
+**The whole proof tree was run, not only what this ticket touched** — all
+thirty-three scripts, one MCP script per freshly launched instance, and
+`grep "Reelcut: "` printed nothing on every port. `recording_spike.py` is
+excluded by name, as it was from D3·4's and D3·5's trees: it is road map 3's
+R0 spike rather than a proof.
+
+| Script | Score |
+|---|---|
+| `phase1_proof` · `phase2_proof` · `phase3_proof` · `phase3_silence_scope` | 66/66 · 85/85 · 123/123 · 8/8 |
+| `phase4_proof` · `phase5_proof` · `phase6_proof` · `phase7_proof` | 84/84 · 88/88 · 168/168 · 92/92 |
+| `phase8_proof` · `phase9_proof` · `patch_door_proof` · `refusal_proof` | 79/79 · 216/216 · 261/261 · 116/116 |
+| `remaining_proof` · `clip_catalog_proof` · `op_catalog_proof` · `op_argument_proof` | 79/79 · 24/24 · 23/23 · 86/86 |
+| `recording_proof` | **187/187**, 2 rows skipped by name (the host's output is muted) |
+| `op_schema_probe` · `phase9_probe` · `refusal_probe` · `remaining_probe` | 28/28 · 48/48 · 15/15 · 170/170 |
+| `preview_validity_probe` · `preview_refresh_probe` · `transition_sheet_probe` | 19/19 (5 skipped) · 0/0 (58 skipped) · 32/32 |
+| `recording_probe` | **899/899**, 2 skipped by name (the reference tree) |
+| `phase2…phase9_chrome` | 26/26 · 33/33 · 59/59 · 36/36 (45 skipped) · 70/70 · 78/78 · **150/150** · 62/62 |
+
+**Two passes, and the reason is a lesson about the rule rather than about the
+scripts.** The first pass ran the seventeen MCP scripts green and then hit
+this ticket's own editing: `swiftc` refuses a file that changed during its
+build, so `remaining_probe` and `preview_validity_probe` came back 0/1 with
+*input file … was modified during the build* where a result should have
+been. The repo's "never run `make app` or any `swiftc` while a proof is
+running" rule is usually read as being about BUILDS; an editor breaks it
+just as well, and a probe compiled from `app/Sources` is a build. Everything
+whose swiftc build predated or raced the edits was re-run on the rebuilt
+tree with nothing being touched — the three catalog proofs, `recording_proof`,
+five probes and the first two chrome scripts — and the table above is the
+score each one has on the committed tree.
+
+**The host changed under the run, which is how the one thing this series owed
+got answered.** The console was LOCKED for the early scripts, so
+`recording_proof` skipped its granted tier by name (66 rows, *console locked:
+True, display asleep: True*); it was UNLOCKED by the time the chrome scripts
+ran, and stayed so for the re-run. The two states are visible in the scores:
+`recording_proof` 121/121 with 66 skipped under the lock and **187/187** with
+2 after it, `recording_probe` 858/858 with 43 skipped at D3·5 and **899/899**
+with 2 here, and — the one that matters — **`phase8_chrome` 144/150 at D3·5
+and 150/150 here**, with the *PRECONDITION: the probe activated and the
+editor is both key and main* row passing. §9 records what that settles and
+what it leaves owed. The two probes that still skip (`preview_validity_probe`
+5, `preview_refresh_probe` 58) print their own cause by name, as does
+`phase5_chrome`'s 45 and `recording_probe`'s 2, which are the standing
+reference-tree skip.
+
+**What the review found.** Two axes, fixed point `26f393c`, spec source the
+ticket plus spec kpgalligan/reelcut#14. The **Spec** axis went criterion by
+criterion and re-derived every number here rather than trusting it: twelve
+met, the twenty-five mutant scores reproducing row for row against §8.1–§8.5,
+the drift table reproducing, and no material scope creep. The **Standards**
+axis re-derived the §3 ledger row for row and every count in the tree, and
+found no over-cap file grown and no status paragraph added anywhere.
+
+Six findings changed documents, and the first is this ticket's own sin:
+
+- **`AgentCatalog+Declarations.swift` is 313 lines and was written 314** — in
+  the ledger and in §9's table — by the ticket whose stated method is
+  regenerating against `wc -l`. It was 314 for one edit of mine and came back
+  to 313 when a paragraph was re-wrapped, and the number was carried rather
+  than re-taken. It propagated into "497 lines back", which is 496. Both
+  corrected, and the lesson is the one the ticket is about: a measurement is
+  taken once, at the end.
+- **The production-diff row did not reproduce.** 16 files and +1666/−741
+  against an actual +1665/−741, and the scope silently left out
+  `core/include/reelcut_core.h` (+17), one of the FFI's three files by the
+  rulebook's own words. It reads 17 files, **+1682 / −741** now, and the
+  verdict's "bigger by 925 lines" is **941**.
+- **`core/CLAUDE.md` line 72 was 130 columns** in a bullet that wraps at ~75:
+  the re-wrap that fixed one long line made another.
+- **Three ragged wraps** the insertions left behind, in spec §7.9, `README.md`
+  and `tools/proof/README.md`.
+- **Two imprecise sentences.** Spec §7.9 said app-state tools are skipped "by
+  part 4's own rule", where the truth is that part 5 applies the SAME rule
+  part 4 does — the core's op list — rather than depending on part 4; and the
+  declarations doc called `set_canvas.fps` "a range" where it is a floor on
+  the items.
+- **A claim this record made and had not measured**: *`tools/list` is
+  byte-identical*. No capture was taken before the rebuild, so nothing backed
+  it. What replaces it is what was measured — the three catalog scripts
+  against the rebuilt binary, `op_argument_proof.py` among them asserting the
+  catalog is EXACTLY 77 tools.
+
+Two were judged not real. **Spec §11's D3-1 is recorded after the code**:
+true, and it is #20's own instruction rather than a slip — the line was drawn
+at D3·3 as that ticket's amendment, and the record says so plainly now
+instead of implying the decision preceded the work. And **the D3 measurement
+narrative is written twice**, in the §3 ledger and in §9's table: the
+rulebook puts the over-cap LEDGER in `designs/reelcut-remaining.md` §3 and a
+phase's RECORD in its road map, so each has to carry its own number. What
+they must not do is disagree — which is exactly what the first finding was.
+
+**What was re-run for the fixes.** One Swift doc comment changed, so the app
+was rebuilt and the three scripts that read the catalog were re-run on fresh
+instances: `op_catalog_proof.py` **23/23**, `clip_catalog_proof.py` **24/24**
+and `op_argument_proof.py` **86/86**, `grep "Reelcut: "` empty on all three
+ports. `cargo fmt --check` and `make typecheck` re-run clean; no Rust source
+moved, so `make test` stands at 671.
+
+**Owed.** Nothing of this candidate's. The series' own owed items are §9's,
+and the one this ticket found and deliberately did not fix is the locked
+console's effect on `tools/proof/phase8_chrome.py`, recorded there as
+unconfirmed.
+
+## 9. D3 — closed
+
+Six tickets on `d3-op-table`, every one landed and reviewed on 2026-09-18.
+**An op's arguments are written down once, in the core, and every op tool
+PRINTS them.** The core says what an argument IS — its name, its JSON kind,
+whether the decoder requires it, and the range the core refuses outside — and
+the app says what it is FOR, in prose and in a short list of the places where
+a tool deliberately takes more or less than its op does.
+
+**What landed, in one paragraph per ticket.** D3·1 and D3·2 are the expand
+half and are core-only, with the app byte-for-byte the app it was.
+`core/src/op_table.rs` is the table as DATA — 57 rows, 145 arguments, a
+closed `Kind` with 17 variants under the rule that fixes the number (exactly
+one kind per answer the decoder can give) — and `OP_NAMES` became a
+projection of it, so `edit.rs` lost its Arguments column (895 → 838) and every
+default that lived only in that column moved into the Semantics sentence,
+where meaning belongs. Its test is the interesting half: the instrument is the
+DECODER, not a second list, so an argument no op has makes serde answer with
+the arguments it does have and a required one left out makes it name the
+missing field. D3·2 published the same table as JSON Schema —
+`core/src/op_schema.rs`, `rc_op_schemas` beside `rc_op_names`, the FFI's three
+files in lockstep — and is where the kind vocabulary earns its keep: the id's
+`minimum: 0`, the vocabulary's `enum`, the colour's four numbers and the
+region's four declared members all fall out of a match that is exhaustive over
+all 17 kinds. D3·3 migrated the clip group: `AgentCatalog.opTool` takes the
+tool's prose and a sentence per argument and merges the core's structure in
+underneath, `AgentCatalog+Clips.swift` came DOWN 941 → 791 by deleting
+hand-written structure rather than moving anything, and the ticket gained its
+amendment before any tool moved — **a bound the core REFUSES outside belongs
+in the table; a bound it merely CLAMPS to, a null that MEANS something and a
+bare-string shorthand are the app's** — which is `Argument`'s `Bound` on one
+side and `AgentCatalog+Declarations.swift` on the other. D3·4 migrated the
+four remaining groups, so all 57 op tools print and not one of them declares
+a `"type"`, an `"enum"` or a required list anywhere in the tree. D3·5 turned
+the fifth part of the startup parity check on — `AgentServer+Parity.swift`,
+names in both directions plus the two prose complaints — and wrote the proof
+that asks the RUNNING app what no comparison of two lists can: 56 of the 57
+op tools are sent a misspelt argument and the answer is read back. D3·6 is
+this one: the rulebook's two sentences, the spec's §6, §7.9 and §11, the
+README's prose op list, the ledger regenerated row by row, and this record.
+
+**Measured, across the series** (against `main`, not summed from the
+tickets).
+
+| | Before D3 | After D3 |
+|---|---|---|
+| the five catalog files, together | 2251 | **2125** (−126) |
+| — `AgentCatalog+Clips.swift` | 941 | **791** |
+| — `AgentCatalog.swift` | 472 | 524 |
+| — `AgentCatalog+Files.swift` · `+Transitions.swift` | 609 · 112 | **601** · **92** |
+| — `AgentCatalog+Audio.swift` (two composites, no op behind them) | 117 | 117 |
+| `app/Sources/AgentCatalog+Declarations.swift` | — | **313** (new, 14 rows) |
+| `app/Sources/AgentServer+Parity.swift` | — | **183** (new, part 5 alone) |
+| `app/Sources/ReelOpSchema.swift` | — | **27** (new) |
+| `app/Sources/AgentServer.swift` (frozen) | 771 | 774 |
+| `app/Sources/ReelCore.swift` | 1500 | 1542 |
+| `core/src/edit.rs` (exempt, semantics only now) | 895 | **838** |
+| `core/src/op_table.rs` | — | **325** of its 400 cap (new) |
+| `core/src/op_schema.rs` | — | **173** of its 400 cap (new) |
+| `core/src/ffi_query.rs` | 328 | 363 |
+| the whole production diff (`core/src`, `app/Sources`, the header) | — | 17 files, **+1682 / −741** |
+| hand-written `"type":` in the catalog | 172 | **57** |
+| hand-written `"enum":` | 14 | **6** |
+| hand-written `required: [` | 60 | **10** |
+| hand-written `"minItems":` · `"minimum":` · `"maximum":` · `"items":` | 10 · 16 · 10 · 11 | 4 · 11 · 7 · 5 |
+| `make test` | 653 | **671** (+18, over two new test files of 828 lines) |
+| the new proof scripts | — | **2114** lines over four files |
+| ops · op tools · tools · published arguments | 57 · 57 · 77 · — | 57 · 57 · 77 · **145** |
+
+**179 hand-written `"type"`, `"enum"`, `required:` and `"minItems"`
+declarations went, and every one of the 77 survivors belongs to a tool with no
+op behind it.** That was read back rather than counted: attributing each
+survivor to the call site that encloses it puts all 77 inside a `tool(…)`
+call, a schema helper, or `opTool`'s own empty-required fallback — not one
+inside an `opTool(…)` call. (The other three keys in the table above —
+`minimum`, `maximum` and `items` — account for fourteen more.)
+
+**The two behaviour changes a caller sees**, both for an agent and neither for
+a person at the machine:
+
+1. **A tool's schema is now the core's own answer about what it accepts.**
+   43 id arguments and the items of 12 `clips` lists gained `minimum: 0`; 17
+   boolean arguments gained the string spellings `boolArg` has always read;
+   `add_zoom_action.region` gained the `additionalProperties: false` that
+   `ZoomRegion`'s `deny_unknown_fields` has always enforced; `set_canvas`'s
+   `width` and `height` publish 16–16384 from the constants `edit_canvas.rs`
+   refuses by rather than from a number typed twice; and `set_canvas.fps`'s
+   items say `minimum: 1`, which is what `fpsArg` really refuses at. Fifty-one of the
+   57 op tools changed across the two captures — the 20 app-state tools are
+   byte-for-byte what they were — and every difference was read in both
+   directions, because the one that matters is a schema WIDER than what the
+   app accepts.
+2. **Every published argument carries a sentence.** Ten did not — five on
+   `set_track`, two on `set_marker`, one on `add_marker`, two on `set_canvas`
+   — and had not since road map 2's phase 1, reaching an agent as a bare type.
+   The fifth part of the check is why they are gone and why the next one
+   cannot ship: an argument with no description, and a description written for
+   an argument no op has, are both a `Reelcut: ` line at startup.
+
+**Deduplication or capability: this one is a deduplication that bought a
+check, and the deduplication is the smaller half.** The five catalog files
+lost 126 lines and 193 hand-written declarations, which is real; but
+`AgentCatalog+Declarations.swift` (313) and `AgentServer+Parity.swift` (183)
+put 496 lines back, and `core/src` grew by 482 even with `edit.rs` down 57.
+The honest arithmetic is that the production tree is BIGGER by **941 lines**
+(+1682 / −741 over seventeen files, the hand-maintained header among them),
+and the duplication removed is measured in
+declarations rather than in lines. What those lines bought is the thing D1's
+and D2's arithmetic also bought: **an op tool has no PLACE left to write an
+argument schema in** — `opTool` takes prose and nothing else, and a
+hand-written `tool(…)` that came back for an op is what
+`op_catalog_proof.py` names by op (D3·4's fourth mutant, 20/22). An
+argument added to an op costs one row in the core and one sentence in the
+catalog, and forgetting the sentence is a complaint at startup instead of a
+tool an agent quietly cannot use. D1 was a deduplication (617 lines out of the
+handlers), D2 was a capability (eleven rules that could now speak), and D3 is
+a **contract**: the same information, moved to the side that owns it, with a
+check that it stays there.
+
+**The mutants the series ran: five in D3·1, five in D3·2, four in D3·3 and
+a fifth in its verification, four in D3·4 and a fifth in its verification,
+and five in D3·5 — twenty-five, every one caught.** Three are worth
+reading. D3·2's fifth (a required argument published as optional) scored
+**27/27** against the probe's first version and 27/28 against the one the
+mutant bought: an unknown-field refusal lists FIELDS and says nothing about
+which are needed, so the probe had to ask the decoder a second question.
+D3·5's first (the fifth part SILENCED, **82/86**) is the one no single row can
+catch, because what it removes is the instrument. And D3·5's fifth (an
+optional argument no handler reads, **84/86**) is the one the parity log says
+NOTHING about: every list still agrees with every other list, and only a call
+to the running tool can see that nothing reads it.
+
+**All twenty-five, with their scores**, so the close carries them and not
+only the count (the per-ticket tables in §8 say which row caught each):
+
+| Ticket | Mutant | Score |
+|---|---|---|
+| D3·1 | `add_transition`'s `align` dropped from its row | 1 of 6 Rust tests FAILED |
+| D3·1 | `trim_start`'s `to` changed `Ticks` → `Id` | 1 of 6 FAILED |
+| D3·1 | `set_reversed`'s `reversed` called optional | 1 of 6 FAILED |
+| D3·1 | `wipe_down` dropped from `Kind::Transition` | 1 of 6 FAILED |
+| D3·1 | `set_video`'s `patch` called a string | 1 of 6 FAILED |
+| D3·2 | `add_clip` skipped when the schema map is built | 6 of 10 Rust FAILED · probe 24/28 |
+| D3·2 | `Kind::Id` and `Kind::Index` lose `minimum: 0` | 1 of 10 FAILED · 26/28 |
+| D3·2 | `Kind::Object` published as a string (#14's confessed drift) | 2 of 10 FAILED · 27/28 |
+| D3·2 | `scope` inserted into every published schema | 2 of 10 FAILED · 26/28 |
+| D3·2 | a required `clips` published as optional | 1 of 10 FAILED · 27/28 (the row the mutant bought) |
+| D3·3 | the `add_text_clip.text` widening dropped from the list | 21/22 |
+| D3·3 | the catalog strips every `enum` on its way out | 21/22 |
+| D3·3 | `split.at`'s required-ness row set back to the core's | 21/22 |
+| D3·3 | `wipe_down` dropped from the CORE's vocabulary | 21/22, and `op_table.rs` FAILED too |
+| D3·3 verification | the new `ripple_delete_ranges.ranges` row removed | 23/24 |
+| D3·4 | the `add_marker.at` row dropped from the list | 21/22 |
+| D3·4 | `add_transition.kind` widened with `null`, which its handler refuses | 21/22 |
+| D3·4 | `after` dropped from the CORE's `Kind::Alignment` | 21/22, and `op_table.rs` FAILED too |
+| D3·4 | `set_marker` reverted to a hand-written `tool(…)` | 20/22 |
+| D3·4 verification | `set_canvas.width`'s bound dropped from the table | `op_table.rs` **7/8**, and every other instrument green |
+| D3·5 | the fifth part SILENCED | 82/86 |
+| D3·5 | `trim_start`'s `to` renamed `until` in the CORE's table | 82/86, a parity-log line, and `op_table.rs` 3 of 8 FAILED |
+| D3·5 | `set_track.hidden`'s description removed (the drift, put back) | 84/86 |
+| D3·5 | an INERT declarations row added | 85/86, parity log silent |
+| D3·5 | an optional argument no handler reads | 84/86, parity log silent |
+
+**The drift, every instance, with what an agent would have seen.** The fifth
+part's first run found **zero** mismatched argument names in either direction
+— after four migrations, that is the honest result — and **ten arguments over
+four op tools with no description at all**, none of them a migration's doing
+and all of them in the catalog since phase 1. The rest came out of the two
+before/after captures and the two verifications:
+
+| Found by | What was wrong | What an agent would have seen |
+|---|---|---|
+| D3·1's confession, measured at D3·3 | `add_text_clip`'s `text` declared `string` against an `object` — the drift the parity check's own doc named | already fixed in D1; the capture is how we know rather than assume |
+| D3·3's capture | 34 ids and 12 list items with no `minimum`, a region with no `additionalProperties` | a negative id, or a misspelt region member, refused on the call rather than avoided |
+| D3·3's capture | `ripple_delete_ranges.ranges` declared `minItems: 1` against a tool prose that says an empty list changes nothing | the schema and the prose contradicted each other |
+| D3·3's verification | that same `minItems` then REMOVED as a "fix" — the handler refuses an empty list by name | a constraint the app still enforces, silently dropped from the schema |
+| D3·4's capture | 9 more ids, 13 more booleans, `set_canvas.fps`'s items | the same class, in the other four groups |
+| D3·4's review | `set_canvas.fps` items published `minimum: 0` where `fpsArg` refuses a zero term by name | a schema one step WIDER than what is accepted |
+| D3·4's verification | a bound dropped from the table left every instrument green | an agent would have lost 16–16384 while the app still enforced it |
+| D3·5's first run | ten arguments with no description | a bare type, with the tool description explaining it and nothing on the argument |
+| D3·5's review | "a misspelt argument for all 57" reached 51 | an optional argument misspelt is dropped in SILENCE, and nothing in the tree asked |
+
+**What is owed.**
+
+- **`tools/proof/phase8_chrome.py` still has no named skip for a locked
+  console**, where `phase5_chrome`, `recording_proof`, `recording_probe`,
+  `preview_validity_probe` and `preview_refresh_probe` all print one. D3·5's
+  tree scored it **144/150**, six failures cascading from its own first row —
+  *PRECONDITION: the probe activated and the editor is both key and main* —
+  and could not say whether the cause was host state or ours, because that
+  host's console was locked and stayed locked. **D3·6's tree answered it, and
+  the answer is measured rather than argued.** The console was LOCKED when
+  that run began — `recording_proof` skipped its granted tier by name, 66
+  rows, printing *console locked: True, display asleep: True* — and UNLOCKED
+  by the time the chrome scripts ran (`IOConsoleLocked` read false), and
+  `phase8_chrome` then scored **150/150** with that PRECONDITION row PASSING.
+  `recording_probe` tells the same story from the other end: 858/858 with 43
+  rows skipped under D3·5's lock, **899/899 with 2** here. So the six failures
+  are HOST STATE and not ours, and what is owed is the skip itself: a locked
+  console should cost that script one named line, as it does its five
+  neighbours, instead of six failures that read like a regression.
+  **The orchestrator then ran the other half of the control**: the same
+  build, on a console that had been locked again (`IOConsoleLocked = Yes`
+  read at the machine), scored **144/150** with the same six rows and the
+  same first one. Two states, one build, two scores — 150 unlocked and 144
+  locked — which is what turns a plausible reading into a measured one.
+  Every failing row is about a window being key or main; not one of them
+  goes near a catalog.
+- **A few argument names are still Python literals**, and the list is
+  shorter than the earlier records assumed — it was re-derived here rather
+  than repeated. The four new scripts type none (`op_argument_proof.py`'s six
+  id spellings are checked against the core's table first), and `mcp.py`'s
+  `schemas()` took seven scripts off `mcp._request`. What is left in the
+  older scripts is every literal but one about an APP-STATE tool, which has
+  no table to read from — `transcribe`, `export_captions`, `normalize_clip`,
+  `export`, `render_frame`, `record_screen`, `set_scope` — plus
+  `phase9_proof.py`'s reading of `trim_start`'s injected `scope`, which it
+  re-derives, and two PROSE claims about an op tool's argument:
+  `phase4_proof.py` on `set_text`'s `patch` description and
+  `phase5_proof.py` on `set_audio`'s. Spec kpgalligan/reelcut#14's user
+  story 23 is therefore all but paid, and what would finish it is a schema
+  read for the app-state tools, which is the one thing D3 deliberately did
+  not give the core.
+- **Nullability is the app's and is declared rather than published.**
+  `set_transition.kind` and `add_zoom_action.region` are nulls that MEAN
+  something, and the table has no column for one; both are declarations rows.
+  A later phase that wants the core to own them adds the column.
+- **The three items road map 7 carried into this series and this series did
+  not take**: the **clamped-edge family** that still answers `Identity` (named
+  in `Outcome::Identity`'s doc), the **source-window arithmetic written ten
+  times**, and the **two cross-build reference instruments** —
+  `phase5_chrome.py`'s sections 3–7 and `recording_probe.py`'s §6b — which
+  need a core of the reference's own era before the meter and the welcome
+  window can be photographed against their "before" again.
+- **Nothing else.** No format bump, no new op, no new tool, no change to the
+  op count, the tool count or what a person at the machine sees.
+
+**What a later deepening should take from this one.**
+
+- **A generated artefact is checked by asking the thing that generated it a
+  question it did not write the answer to.** Twice in this series a constraint
+  the app still enforced stopped being declared and every instrument stayed
+  green, because the catalog and the proof's oracle both read the same list
+  and moved together. The running app answers a declaration; the core's own
+  refusal sentence answers a bound. That rule was paid for twice and is the
+  most transferable thing here.
+- **Expand-then-migrate, with the check turned on LAST.** The table and its
+  export landed beside a catalog that did not read them, the groups moved one
+  ticket at a time, and the fifth part went on when there was nothing left for
+  it to complain about. Each migration left the tree green and each was
+  measured by a `tools/list` capture taken before and after, byte for byte.
+- **A before/after capture of the published surface is the migration's real
+  test.** Every difference of the 51 tools that changed was read in BOTH
+  directions and given a verdict — fix, declared, or a loss taken on purpose —
+  and the one loss (three sentences describing a region's four members) is
+  recorded rather than glossed.
+- **The direction is the rule.** A schema narrower than what a tool accepts
+  costs a caller nothing; one wider is a promise the app breaks. Every
+  declarations row is on one side of that line and says which.
+- **A count written as a word rots exactly like a count written in digits.**
+  Seven of this ticket's seventeen corrections were counts — *every argument
+  but five*, *the one row*, *seventy-five* twice, *fifty-eight*, *the five
+  entity ids*, *back to under 500* — and three tickets in a row had a
+  `PLACEHOLDER` left in their own record's Commits line.
+
+**Where the next candidate starts.** Spec kpgalligan/reelcut#14's twelfth
+implementation decision names it, and it is the same one D1's close named:
+**the agent handlers forward a caller's whole OP to the core unread**, which
+is D1's rule one level up — from the Patch to the envelope — and which this
+candidate deliberately left alone because it rewrites fifty-seven handlers.
+The table this series published is what it would forward against, and the
+misspelt-argument section of `op_argument_proof.py` is the instrument that
+would prove each handler still reads what the catalog prints. Beside it, from
+this series' own findings: the **clamped-edge family**, the last place an
+identity and a refusal are still told apart by reading the source; the
+**source-window arithmetic written ten times**; and the **cross-build
+reference instrument**, which has now been unbuildable for two whole
+deepenings.
