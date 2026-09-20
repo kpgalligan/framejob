@@ -2873,6 +2873,99 @@ What it cannot see is a real `mouseDown` delivered by AppKit below the
 lanes — `designs/reelcut-remaining.md` §4 lists it for a person at the
 machine.
 
+## The reversed mirror, spelled once (`source_mirror_probe.py`)
+
+`python3 tools/proof/source_mirror_probe.py`, no port and no running app,
+**40/40**. Road map 7 §10's phase C (2026-09-20, spec §11's **D4-6**): the
+app's reversed mirror — a tick `p` of the played stream reads the forward
+file at `pivot − p`, the pivot being the media's MODEL duration — was spelled
+TWICE by convention, in `MediaPeaks.window` and in
+`ReverseRenderer.walkBackwards`, with nothing shared and nothing asserting
+the two agreed, and a THIRD reader, `TimelineView.sourceTime`, applied none
+at all, so a reversed clip's filmstrip and waveform drew the forward file's
+picture. `app/Sources/ReverseMirror.swift` is now the one home and all three
+call it; the same phase made `SpeedSheetController`'s "→ duration" readout
+the CORE's answer rather than a Swift quotient.
+
+None of it is reachable over MCP — a drawn waveform is not an op, a
+renderer's presentation stamps are not a placement, and a sheet's readout is
+not project state — so the instrument is `marquee_probe.py`'s: a probe
+compiled out of `app/Sources` over `harness/build.sh`'s own swiftc line,
+cached on modification times, a build failure a scored FAILURE. Five
+sections:
+
+- **§1 one spelling.** The tick and the window mirrors against numbers
+  computed by hand; `MediaPeaks.window` over 1–2 s of a reversed whole-file
+  clip answering buckets **400…500**, the range it answered BEFORE the mirror
+  moved (100…199 unmirrored, which is the half the mirror exists to avoid
+  reading) — the claim `silence2_proof.py`'s claim 9 and `phase5_proof.py`'s
+  5c depend on; and the `CMTime` overload agreeing with the tick one under
+  `CompositionBuilder.time`.
+- **§2 the drawn timeline.** One 6 s AUDIO media — no file needed, the
+  descriptor is the media — with a hand-written `cache/peaks/<id>.bin` loud
+  over its first half and silent over its second, a forward and a reversed
+  whole-file clip on two tracks, a bare `TimelineView` at 1000 × 320 and
+  `cacheDisplay` into a bitmap; lit pixels counted per half of each clip's
+  waveform region, thresholded on the region's own range so no clip tint has
+  to be known. Forward is loud LEFT, reversed loud RIGHT, and the reversed
+  clip's loud COLUMNS are the forward clip's mirrored bar the blank one at
+  its head. Plus the arithmetic under the picture, at ×1 and ×2.
+- **§3 the renderer.** A real `ReverseRenderer(job:).run()` over
+  `media/AV.mov`, both files' video stamps read back with `AVAssetReader`
+  (DECODED: a compressed read of these two files answers 149 stamps for a
+  150-frame source and 152 for its reversal, which is the container's
+  business and not the walk's). The output is the walk `[T − following]` from
+  the end of the source: same frame count, first stamp exactly 0, strictly
+  ascending, and each stamp within ONE unit of the output track's own
+  timescale — nothing in `ReverseRenderer` sets `mediaTimeScale`, so the
+  writer is free to requantise. A missing `media/AV.mov` is a SKIP printed by
+  name; "Making the test media" above has the recipe.
+- **§4 the five Swift mirrors of core arithmetic**, each against the PLAN of
+  the same project after phase B changed what `set_speed` writes: §10.8's
+  vector (a) — a whole-file clip of a 6 233 613-tick media is 6 220 000 and
+  ×2 makes it 3 100 000 — with `Transcriber`'s source length and the
+  segment's `source_duration` both 6 200 000; a one-frame clip at ×1.00003
+  reading 20 001 source ticks, ROUND and not floor; `TimelineView.sourceTime`
+  and `MediaPeaks.sourceTick` agreeing at all 155 frame boundaries of the ×2
+  clip and still inside the file at its last tick; and `Transcriber.project`,
+  the inverse.
+- **§5 the readout.** `SpeedSheetController.lengths` against the durations
+  read back after really applying its own ops, in all three arms `set_speed`
+  answers: HELD TO THE FILE (6 220 000 → 3 100 000 at ×2, where the quotient
+  it replaced printed 3 110 000); APPLIED INTO THE NEIGHBOUR (A at ×0.5
+  overlaps B by 400 000 against a limit of 1 000 000, so it applies at its
+  full 2 000 000 and B gains a minted cross dissolve, which the readout does
+  not show); REFUSED (C at ×0.5 overlaps D by 1 000 000 against a limit of
+  600 000, so it reads 1 000 000 → 1 000 000 and `applying` answers the
+  overlap rule's own sentence verbatim); and MIXED ([A, C] reads
+  2 000 000 → 3 000 000, the applied clip's new length beside the refused
+  clip's old one, which is what Apply writes).
+
+**Made to fail on purpose**, five ways, each patched into a tree COPY with
+the patch asserting its text occurs exactly once:
+
+| Mutant | Score | What it took |
+|---|---|---|
+| the reversed arm dropped from `TimelineView.sourceTime` | **36/40** | both §2 picture rows and both reversed arithmetic rows, and nothing else in the file |
+| `ReverseMirror.mirrored(_ window:)` returns the window unmirrored | **38/40** | §1's window row and its `MediaPeaks.window` row |
+| the `CMTime` overload returns `time` | **35/37** | §1's agreement row, and §3 outright — `run()` throws, because a writer input refuses a non-ascending append |
+| `lengths` put back to `(duration × speed / rate).rounded()` | **34/40** | §5's held, refused and mixed rows and their read-backs; the APPLIED row survives, 2 000 000 either way, which is why the other three exist |
+| `Transcriber.contentLength` rounds DOWN | **39/40** | §4's 20 001 row alone |
+
+**The before-numbers, for the record.** Run against the unchanged tree on
+2026-09-20, §2 scored 4/5: the reversed clip's waveform was loud on the LEFT,
+18 028 lit pixels against 760 on the right — the forward clip's own split
+pixel for pixel — and its `sourceTime` answered the forward clip's ticks
+exactly. `designs/reelcut-roadmap-7.md` §10.9 carries the table.
+
+**The one-tick-high mirror is a known limit, not a defect to chase here**: a
+reversed tick `p` covers the forward file's tick `T − 1 − p` and the app
+answers `T − p`, which is the blank column at the head of the reversed clip
+in §2 and one extra bucket at an exactly aligned window end. It is not fixed
+because `silence2_proof.py:353` spells the mirror in Python ON PURPOSE — a
+reference walk must not import what it checks — and claim 9 walks these
+numbers tick-exact.
+
 ## Remove Silences by voice (`silence2_proof.py`, `silence2_probe.py`)
 
 Road map 4's S1 — quiet judged by Silero VAD through Core ML — and the two

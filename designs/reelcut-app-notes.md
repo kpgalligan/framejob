@@ -206,6 +206,29 @@ lockstep are in the root `CLAUDE.md`; the full design is
   that press outside a lane (19/28), and the clear removed takes the
   bare-click row alone (27/28). A real mouse pressed there is
   `reelcut-remaining.md` §4's.
+- `TimelineView.swift` · `MediaPeaks.swift` · `ReverseRenderer.swift` ·
+  `ReverseMirror.swift` — **the timeline drew reversed clips unmirrored,
+  from M3 until 2026-09-20.** A reversed clip's `in` point is measured in
+  the stream it PLAYS, and the peaks and thumbnails on disk are of the
+  FORWARD file — nothing ever writes either for `cache/reversed/`, which is
+  not a media entry at all — so every reader has to mirror about the media's
+  model duration. `MediaPeaks` did and `ReverseRenderer` did, agreeing by
+  convention with nothing shared; `TimelineView.sourceTime` did NOT, and had
+  not since Reverse landed in M3, so a reversed clip's filmstrip and
+  waveform drew the forward file's picture. Nobody had noticed because the
+  answer is always a plausible number and the only reader that could
+  contradict it — `CompositionBuilder` — substitutes the reversed asset and
+  so is right for a different reason, which its own comment says. Road map 7
+  §10.3 suspected it, §10's phase C probed it on the unchanged tree (the
+  reversed clip's waveform came out loud on the same side as the forward
+  one's, 18 028 lit pixels against 760, pixel for pixel), and the fix is a
+  new `in media:` parameter and a reversed arm INSIDE `sourceTime`, so the
+  filmstrip and the waveform cannot diverge. The mirror itself moved to
+  `ReverseMirror.swift`, which all three readers now call and which states
+  the convention once (spec §11, D4-6); it is deliberately one tick HIGH,
+  because `silence2_proof.py`'s claim 9 walks the current numbers
+  tick-exact. `designs/reelcut-roadmap-7.md` §10.9 is the record and
+  `tools/proof/source_mirror_probe.py` the instrument, **40/40**.
 - `LayerRenderers.swift` · `LayerRenderersText.swift` — text and shape
   descriptions to textures, and
   since format version 5 the three text REVEALS (spec §5.2's

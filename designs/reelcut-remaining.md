@@ -282,6 +282,23 @@ new file. `app/Sources/ReelOps.swift` is 1131 → **1144**, a doc comment on
 `setSpeed` and one on `addBackground`; it is an exempt table and the row
 below is updated. Nothing came off this list and nothing joined it.
 
+**What §10's phase C did to it** (2026-09-20, `wc -l` against the tree as
+phase C found it — phases A and B's, uncommitted). Two files over the cap
+took nothing on: `app/Sources/ReverseRenderer.swift` is **1311**, unchanged
+to the line — its two subtractions now call `ReverseMirror` and the prose in
+its type doc and in `walkBackwards` that used to restate the mirror gave the
+three lines back — and `app/Sources/Transcriber.swift` is **934**, one
+`private` removed so a probe can pin `project(_:in:)`.
+`app/Sources/ReelOps.swift` is 1144 → **1143** (one sentence deleted from
+`setSpeed`, which is no longer true). The FROZEN
+`app/Sources/TimelineView.swift` is 1644 → **1652**: `sourceTime` gained the
+`in media:` parameter, the reversed arm and the five lines saying why, which
+is the dispatch that file holds. The new file is
+`app/Sources/ReverseMirror.swift` (**88** of the 400-line cap for a new one).
+`app/Sources/SpeedSheetController.swift` is 219 → **246** and
+`app/Sources/MediaPeaks.swift` 236 → **228**, both well under. Nothing came
+off this list and nothing joined it.
+
 Regenerate the list with
 `wc -l app/Sources/*.swift core/src/*.rs | awk '$1>600 && $2!="total"' | sort -rn`
 rather than trusting the numbers here; the standing exemptions are
@@ -292,13 +309,13 @@ row per op.
 |---|---|
 | `app/Sources/ProjectSnapshot.swift` | 2516 |
 | `app/Sources/InspectorPane.swift` | 1665 |
-| `app/Sources/TimelineView.swift` | 1644 |
+| `app/Sources/TimelineView.swift` | 1652 |
 | `app/Sources/ReelCore.swift` | 1542 |
 | `app/Sources/VideoPane.swift` | 1411 |
 | `app/Sources/Compositor.swift` | 1391 |
 | `app/Sources/ProjectDocument.swift` | 1352 |
 | `app/Sources/ReverseRenderer.swift` | 1311 |
-| `app/Sources/ReelOps.swift` | 1144 |
+| `app/Sources/ReelOps.swift` | 1143 |
 | `app/Sources/EditorViewController.swift` | 1123 |
 | `app/Sources/ExporterWriter.swift` | 1114 |
 | `app/Sources/PreviewCanvasView.swift` | 1104 |
@@ -334,7 +351,7 @@ when a fix took each over its line — and left two files AT the cap:
 | `CompositionBuilder.swift` | 601 | AT the cap since road map 3's held tail (+83); the next addition pays first — the audio-parameter half (`audioParameters` and the `AudioTap.make` call) is the natural cut |
 | `ReelOps.swift` | 925 | Created by `b410125` at 853. It is a TABLE — one factory per row of `edit.rs`'s op table — so it has the same standing exemption `edit.rs` has on the Rust side |
 | `ProjectDocument.swift` | 1348 | Stored properties cannot move to an extension; the natural cut is the media/reverse machinery, NOT the scope. `ProjectDocument+DisplayStem.swift` is the shape a pure addition takes meanwhile; road map 3 added ONE internal method (`adoptImported`, +12 lines) so `ProjectDocument+Recording.swift` could build the untitled document by File ▸ Open's own spelling |
-| `TimelineView.swift` | 1644 | Frozen. Of the five lines the cache marker added, one is behaviour (the hit-clearing under `replaced`); the marquee's `.outside` case and `beginMarquee` added fourteen net on 2026-09-19, the dispatch the file says it holds |
+| `TimelineView.swift` | 1652 | Frozen. Of the five lines the cache marker added, one is behaviour (the hit-clearing under `replaced`); the marquee's `.outside` case and `beginMarquee` added fourteen net on 2026-09-19, and road map 7 §10's phase C eight more for `sourceTime`'s reversed arm on 2026-09-20 — the dispatch the file says it holds |
 | `ExporterWriter.swift` | 1114 | Over since phase 7; its seam — the settings/encoder half — is still unpaid |
 | `AgentServer+Clips.swift` | 1196 | Over since phase 6. Road map 7's D1·3, D1·4 and D1·5 took it to **847** by deleting what the agent door used to check by hand — the last of it `checkActionPatch`, `checkVideoEnums`, `checkTextEnums`, the three per-group key sets and the region reader. D1·6 took the shared launder out of `AgentServer+Arguments.swift` (562 → **445**, under the cap and not in the list above), so the whole `AgentServer*` family is **617 lines smaller than before D1**. The seam still unpaid here is the clip-placement handlers against the property doors |
 
@@ -540,15 +557,16 @@ left there**, both recorded in §10.8 as well:
   overlap question, and because the markers rule (`resnap` drops the second
   of two markers a coarser grid lands on one tick) would need an answer per
   nest. Found by phase B's scout and recorded nowhere before this.
-- **`SpeedSheetController.syncReadout`'s "→ duration" is the UN-HELD
-  number.** It computes `source length / rate` unsnapped and unbounded,
-  which was already a frame or so away from what `set_speed` writes; since
-  D4-3 the op also holds that duration to what the file still holds at the
-  new rate, so at a file's TAIL the readout can be up to a frame further
-  out than it was. No Swift behaviour changed in phase B and nothing is
-  filed: the fix is either to route the readout through the core (a query
-  that does not exist) or to say in the sheet that the number is an
-  estimate.
+- ~~**`SpeedSheetController.syncReadout`'s "→ duration" is the UN-HELD
+  number.**~~ **CLOSED by §10's phase C** (2026-09-20, spec §11's D4-6).
+  The readout is now the CORE's answer: `SpeedSheetController.lengths`
+  applies the sheet's own `set_speed` ops to the immutable handle and reads
+  the durations back, so it says the held number, the overlap rule's
+  refusals and a mixed selection's sum without a second copy of the
+  arithmetic in Swift and without a new `rc_*` export. What phase C
+  deliberately did NOT fix is recorded in §10.9: the sheet's HINT still
+  says only that a speed change opens or leaves a gap, and the readout shows
+  a length rather than the cross dissolve a neighbour gains.
 
 ---
 

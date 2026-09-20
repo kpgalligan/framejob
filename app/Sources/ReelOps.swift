@@ -536,8 +536,7 @@ extension ReelOp {
     /// frame and then held to what the file still holds AT THE NEW RATE
     /// (spec §11, D4-3), so a clip sitting at the tail of its file can come
     /// back up to a frame shorter than the arithmetic asked for — and ×2
-    /// then ×1 there is not an identity. `SpeedSheetController`'s readout
-    /// is the un-held number and can differ from it by that frame.
+    /// then ×1 there is not an identity.
     static func setSpeed(clip: UInt32, rate: Double, keepPitch: Bool? = nil) -> ReelOp {
         var a = OpArgs()
         a.put("clip", clip)

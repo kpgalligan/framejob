@@ -963,10 +963,18 @@ final class TimelineView: NSView, NSTextFieldDelegate {
 
     /// Source time under a timeline time, for the filmstrip and the waveform.
     /// Source advances at `speed` per timeline tick (spec §6 `set_speed`).
-    static func sourceTime(of clip: ClipSnapshot, at time: Ticks) -> Ticks {
+    ///
+    /// **Mirrored when the clip plays backwards** (`ReverseMirror`, spec §11
+    /// D4-6): the caches both callers index are the FORWARD file's, while `in`
+    /// and this offset are measured in the stream the clip PLAYS. It is inside
+    /// this function so the filmstrip and the waveform cannot diverge; the
+    /// compositor needs no mirror because it swaps the asset instead.
+    static func sourceTime(of clip: ClipSnapshot, in media: MediaSnapshot, at t: Ticks) -> Ticks {
         let rate = clip.speed > 0 ? clip.speed : 1
-        let offset = Double(time - clip.start) * rate
-        return clip.source.sourceIn + TimelineLayout.ticks(clamping: offset)
+        let offset = Double(t - clip.start) * rate
+        let source = clip.source.sourceIn + TimelineLayout.ticks(clamping: offset)
+        guard clip.source.isReversed else { return source }
+        return ReverseMirror.mirrored(source, about: media.duration)
     }
 }
 

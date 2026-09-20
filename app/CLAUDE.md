@@ -109,6 +109,11 @@ detail there.
 - `ReverseRenderer.swift` — `Source::Media.reversed` resolved to
   `cache/reversed/<id>-<digest>.mov`, rendered on demand behind a sheet,
   substituted per CLIP by `CompositionBuilder`.
+- `ReverseMirror.swift` — the app's ONE spelling of the reversed mirror and
+  its pivot (spec §11, D4-6), in the three units its readers hold it in:
+  `MediaPeaks.window`, `TimelineView.sourceTime` and `ReverseRenderer`. The
+  core keeps no mirror on purpose; `CompositionBuilder` needs none because it
+  swaps the asset.
 
 **Frozen files.** `EditorViewController.swift`, `TimelineView.swift`,
 `PreviewCanvasView.swift`, `AgentServer.swift` are **frozen at current
@@ -319,8 +324,8 @@ free.
   counted; a NEST is a wall. `SileroVAD` is the streaming Core ML wrapper over
   the vendored compiled model, NOT `async`, with one process-wide
   `NSLock`-guarded unavailability reason that never retries until relaunch.
-  `MediaPeaks` is the one spelling of the project → source window arithmetic,
-  including the reversed MIRROR.
+  `MediaPeaks` is the one spelling of the project → source window arithmetic;
+  the reversed MIRROR it applies is `ReverseMirror`'s.
 - `AudioNormalize.swift` — Normalize Clip as a value type: peaks in, ops out,
   measured PRE-FADER from the plan segment, REPLACING `volume` so a second
   press is a no-op, always to BASE props.

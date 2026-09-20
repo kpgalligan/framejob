@@ -9,10 +9,17 @@ import AppKit
 /// `EditorViewController+Export.swift` refuses to open the sheet at all when
 /// nothing in the selection qualifies.
 ///
-/// The duration readout is computed in Swift and is the ONE thing here the
-/// core does not answer: `duration = source length / rate` is the op's own
-/// definition (§6), and asking the core would mean applying the edit to find
-/// out what it would do.
+/// **The duration readout is the CORE's answer, not a copy of it** (spec §11,
+/// D4-6). It applies the sheet's own ops to the immutable handle and reads the
+/// durations back: an edit is pure (§5.5), so asking costs a discarded handle
+/// and needs no new export. A quotient in Swift could not say what `set_speed`
+/// really writes — the duration is snapped to the nearest frame and then held
+/// to what the FILE holds at the new rate (D4-3), and a clip slowed into its
+/// neighbour is either APPLIED at its full new length, the neighbour gaining a
+/// minted cross dissolve, or REFUSED by the overlap rule and left as it was.
+/// `applying` runs past a refusal, so a mixed selection reads the applied
+/// clips' new lengths beside the refused clips' old ones, which is exactly
+/// what Apply will write.
 final class SpeedSheetController: NSViewController, NSTextFieldDelegate {
     /// Weak, like every sheet's back-reference: the document must be free to
     /// close even with a dialog mid-air.
@@ -150,25 +157,46 @@ final class SpeedSheetController: NSViewController, NSTextFieldDelegate {
 
     private var keepPitch: Bool { pitchCheckbox.state == .on }
 
-    /// "3 clips · 00:00:12:00 → 00:00:06:00". The source length is
-    /// `duration × speed` (§5.2's speed is a rate, so the clip is that much
-    /// shorter than its source), and the new length is that over the new rate
-    /// — the op's own arithmetic, spelled once.
+    /// The ops Apply sends — one `set_speed` per clip, in the selection's own
+    /// order — so what the readout asks about and what Apply writes are one
+    /// list and cannot drift. `applyClicked` calls it.
+    static func ops(for clips: [UInt32], rate: Double, keepPitch: Bool) -> [ReelOp] {
+        clips.map { .setSpeed(clip: $0, rate: rate, keepPitch: keepPitch) }
+    }
+
+    /// What the selection measures now, and what it measures once those ops
+    /// have run — the two numbers the readout prints, both read off a project.
+    ///
+    /// `after` is summed from the handle the ops make, not from arithmetic
+    /// here, which is the whole of the type doc's claim. A clip the core
+    /// refused is absent from nothing — it is still in the applied snapshot,
+    /// at the length it had — so a refusal reads as "no change" for that clip
+    /// and the rest of the selection still counts.
+    static func lengths(
+        of clips: [UInt32], rate: Double, keepPitch: Bool, in project: ReelProject
+    ) -> (before: Ticks, after: Ticks) {
+        let snapshot = project.snapshot
+        let ops = Self.ops(for: clips, rate: rate, keepPitch: keepPitch)
+        let applied = ((try? project.applying(ops)).project ?? project).snapshot
+        var before: Ticks = 0
+        var after: Ticks = 0
+        for id in clips {
+            guard let clip = snapshot.clip(id), clip.speed > 0 else { continue }
+            before += clip.duration
+            after += applied.clip(id)?.duration ?? clip.duration
+        }
+        return (before, after)
+    }
+
+    /// "3 clips · 00:00:12:00 → 00:00:06:00".
     private func syncReadout() {
-        guard let snapshot = document?.editedProject.snapshot else {
+        guard let project = document?.editedProject else {
             durationLabel.stringValue = ""
             return
         }
-        var before: Ticks = 0
-        var after: Ticks = 0
-        let rate = self.rate
-        for id in clips {
-            guard let clip = snapshot.clip(id), clip.speed > 0 else { continue }
-            let source = Double(clip.duration) * clip.speed
-            before += clip.duration
-            after += Ticks((source / rate).rounded())
-        }
-        let fps = snapshot.canvas.fps
+        let (before, after) = Self.lengths(
+            of: clips, rate: rate, keepPitch: keepPitch, in: project)
+        let fps = project.snapshot.canvas.fps
         let count = clips.count == 1 ? "1 clip" : "\(clips.count) clips"
         durationLabel.stringValue =
             count + " · " + ReelTime.format(before, fps: fps, frames: true) + " → "
@@ -213,7 +241,6 @@ final class SpeedSheetController: NSViewController, NSTextFieldDelegate {
         guard ratesDiffer || rate != originalRate || keepPitch != originalKeepPitch else { return }
         guard let document = document, !clips.isEmpty else { return }
         document.applyEdit(
-            "Set Speed",
-            clips.map { .setSpeed(clip: $0, rate: rate, keepPitch: keepPitch) })
+            "Set Speed", Self.ops(for: clips, rate: rate, keepPitch: keepPitch))
     }
 }

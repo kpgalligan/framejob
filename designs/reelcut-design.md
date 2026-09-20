@@ -1952,7 +1952,8 @@ pass nothing, because each wants the picture rather than a deliverable.
 | `FrameWriter.swift` | a CGImage and a format in, a written file out (PNG / JPEG / HEIC) — the ONE writer File ▸ Save Frame… and `render_frame` both call, which is what makes their PNGs byte-identical by construction rather than by luck; PNG passes NIL destination properties, and JPEG flattens a transparent canvas onto black because the container has no alpha |
 | `AudioTap.swift` · `AudioDSP.swift` · `LevelMeter.swift` · `LevelMeterView.swift` | the sample-level audio the plan cannot carry: one `MTAudioProcessingTap` per composition audio track running noise reduction, the compressor and the Mix stage (the mono fold, then the pan), and the level meter's model and its one view — the model publishing a raw per-channel peak and RMS lock-free off the render thread, the view owning the ballistics |
 | `MediaPane.swift` · `MediaRowView.swift` · `MediaListFilter.swift` · `MediaPaneCommands.swift` · `MediaUsage.swift` · `MediaReveal.swift` | the Media tab (§4.3): the pane and its find band, the row and the drag it sources, the filter as a VALUE (search, order, unused-only), the seven commands a row calls back into, the ONE answer to "is this file used" — which walks the nests the way the core's `every_clip()` does, and which Remove and `remove_media` ask too — and the reveal, which selects and then scrolls |
-| `MediaPeaks.swift` · `AudioNormalize.swift` · `SilenceDetector.swift` · `SilenceDetector+Walls.swift` | the waveform cache and the two questions asked of it: `MediaPeaks` is the one mapping from a plan segment's source window to peak buckets (the reversed mirror included, and `window`/`bucketIndex(_:bucket:)` generalised over the bucket size for `MediaSpeech` since road map 4), `AudioNormalize` turns a clip's peak into a `set_audio` op (Normalize, `normalize_clip`) and `SilenceDetector` turns peak × envelope, or since road map 4 the cached Silero VAD probability, into the quiet spans — `Mode` (`voice` / `level`), the gain floor and the per-voice level fallback (a media is named when any of its scoped segments fell back). `SilenceDetector+Walls.swift` is the nest walls, the OVERLAP walls (road map 5's E1 — one per transition on every unlocked track, widened by the overlap's own length each side and subtracted like a nest wall but never reported) and the frame-grid snap, a pure move out at road map 4's toll 1 |
+| `MediaPeaks.swift` · `AudioNormalize.swift` · `SilenceDetector.swift` · `SilenceDetector+Walls.swift` | the waveform cache and the two questions asked of it: `MediaPeaks` is the one mapping from a plan segment's source window to peak buckets (`window`/`bucketIndex(_:bucket:)` generalised over the bucket size for `MediaSpeech` since road map 4; the reversed mirror it applies is `ReverseMirror`'s), `AudioNormalize` turns a clip's peak into a `set_audio` op (Normalize, `normalize_clip`) and `SilenceDetector` turns peak × envelope, or since road map 4 the cached Silero VAD probability, into the quiet spans — `Mode` (`voice` / `level`), the gain floor and the per-voice level fallback (a media is named when any of its scoped segments fell back). `SilenceDetector+Walls.swift` is the nest walls, the OVERLAP walls (road map 5's E1 — one per transition on every unlocked track, widened by the overlap's own length each side and subtracted like a nest wall but never reported) and the frame-grid snap, a pure move out at road map 4's toll 1 |
+| `ReverseMirror.swift` | the app's ONE spelling of the reversed mirror (§11, D4-6): the pivot for a clip — the media's MODEL duration, nil when the clip plays forwards or its media is unknown (a clip inside a CLOSED nest never reaches it, because its callers look a clip up at the top level: road map 7 §10.9's recorded limit) — and the subtraction in the three units its three readers hold it in, a tick for `TimelineView.sourceTime`, a window for `MediaPeaks.window` and a `CMTime` for `ReverseRenderer.walkBackwards`. The core keeps no mirror on purpose (`set_reversed`, §6), and `CompositionBuilder` needs none because it swaps the asset |
 | `SileroVAD.swift` · `MediaSpeech.swift` · `MediaImporter+Speech.swift` | road map 4's voice model: `SileroVAD` is the streaming Core ML wrapper over `app/Resources/Models/silero_vad.mlmodelc` — the process-wide `isAvailable`/`markUnavailable` pair, `NSLock`-guarded — `MediaSpeech` is the chunk grid (`chunkTicks`, `chunkCount`) and the cache `Loader`/`speechMax` over `MediaPeaks.window`, and `MediaImporter+Speech.swift` is the await-free head check and the reader/inference pass `MediaImporter.swift`'s `speech(for:url:stamp:into:)` calls — run AFTER `peaks` in `generateCaches`'s order, so the peaks `.bin`'s withdrawal is never held behind a full-file decode and an inference |
 | `Loudness.swift` | BS.1770-4 integrated loudness and true peak over plain float buffers — no AVFoundation, no player, no tap — plus the export gain that follows from a measurement and the 16-bit scaler that applies it |
 | `TimelineView.swift` | custom `NSView` in an `NSScrollView`; drawing from the snapshot; gesture sessions (`ClipDragSession`, `TrimSession`, `RangeSession`, `MarkerDragSession`) as structs; `on*` closures to the VC |
@@ -3190,3 +3191,51 @@ assisted import.
   the source, where it used to be an identity — `roll`'s answer at the same
   edge, taken on purpose. No persisted field changes, so
   `RC_FORMAT_VERSION` stays 8.
+- **D4-6 — the reversed mirror is APP arithmetic with ONE home, and the
+  Speed sheet's readout is the core's own answer.**
+  `designs/reelcut-roadmap-7.md` §10.6's fourth decision, built as phase C.
+  The core keeps no mirror — `edit_clip.rs`'s `set_reversed` argues why: `in`
+  is measured in the stream the clip PLAYS, and a second convention would
+  have to be known by every trim, split and source-length reader in the
+  crate. Swift therefore owns it, and `app/Sources/ReverseMirror.swift` is
+  the one place it is written: **a reversed-stream tick `p` reads the forward
+  file at `pivot − p`, where the pivot is the media's MODEL duration** — the
+  number `ReverseRenderer` renders against and the number `in` is measured
+  from. `MediaPeaks.window`, `ReverseRenderer.walkBackwards` and
+  `TimelineView.sourceTime` all call it; they agreed by convention before and
+  nothing asserted that they did. Two costs, taken: the shared spelling is
+  ONE TICK HIGH (a reversed tick `p` covers forward tick `T − 1 − p`, and the
+  answer is `T − p`), which can take in one extra bucket at an exactly
+  aligned window end and leaves one blank waveform column at the head of a
+  whole-file reversed clip, and it is not fixed here because
+  `tools/proof/silence2_proof.py`'s claim 9 walks the current numbers
+  tick-exact; and the pivot is nil for a clip inside a CLOSED nest, where
+  `Project::clip` cannot see it, which OPENING the nest resolves.
+  **The timeline now draws a reversed clip MIRRORED.** It did not before:
+  `TimelineView.sourceTime` took no `media` and applied no mirror, so a
+  reversed clip's filmstrip and waveform indexed the FORWARD cache
+  unmirrored and showed the wrong end of the file — measured, and the mirror
+  now lives inside that one function so the filmstrip and the waveform cannot
+  diverge. `CompositionBuilder` still applies none, deliberately: it
+  substitutes the pre-rendered reversed asset, so its times are already in
+  the played stream.
+  **The Speed sheet's "→ duration" readout is what the core would write**,
+  obtained by applying the sheet's OWN `set_speed` ops to the immutable
+  handle and reading the durations back (`ReelProject.applying`), not by a
+  second copy of the arithmetic in Swift. An edit is pure (§5.5), so asking
+  costs a discarded handle and needs no new `rc_*` export. It therefore says
+  the three things `set_speed` really answers, which the quotient it replaced
+  could not: the new duration is `duration_at_speed` — nearest frame, then
+  held to what the FILE still holds at the new rate (D4-3) — and is NEVER
+  held to a neighbour, so a clip slowed into the clip after it is (i)
+  APPLIED at its full new length when the overlap is at most half the shorter
+  of the two clips and reaches one neighbour only, the neighbour gaining a
+  minted cross dissolve, and (ii) REFUSED in the overlap rule's own sentence
+  past that half or on reaching two neighbours, where the clip keeps the
+  length it had. A mixed selection sums the applied clips' new lengths and
+  the refused clips' old ones, because `applying` runs past a refusal — which
+  is exactly what Apply writes. **Declined**: an `rc_*` query for a speed
+  preview (the handle already answers), holding a slowed clip to its
+  neighbour in the core (a speed change opens or leaves a gap, §6), and
+  fixing the one-tick offset. No persisted field changes, no op-table change
+  and no new export, so `RC_FORMAT_VERSION` stays 8.

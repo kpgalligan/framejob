@@ -672,7 +672,7 @@ final class Transcriber {
     /// with no source-window term left. Clamped into the clip, since a
     /// recogniser may hand back a word whose duration runs past the audio it
     /// was given.
-    private static func project(_ t: Double, in job: Job) -> Ticks {
+    static func project(_ t: Double, in job: Job) -> Ticks {
         let speed = job.speed.isFinite && job.speed > 0 ? job.speed : 1
         let offset = ReelTime.ticks(seconds: max(0, t) / speed)
         return min(job.start + max(0, offset), job.start + job.duration)

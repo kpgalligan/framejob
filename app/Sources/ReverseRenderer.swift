@@ -350,14 +350,12 @@ final class ReverseSource {
 /// `AVAssetReader` per slice.
 ///
 /// **The arithmetic that makes the reversed file line up with the model.**
-/// `Source::Media.reversed` measures `in` in the REVERSED stream (see
-/// `Source::Media` in `core/src/model.rs`), which only works if the reversal
-/// is exactly as long as the original. So the pivot is the media's own
-/// duration `T` as the model recorded it, and a frame shown at source time `p`
-/// until `p'` is written at `T − p'`. Frame durations therefore come out of
-/// the gaps between presentation stamps rather than out of a nominal rate,
-/// which keeps a variable-rate source exact instead of nearly right, and the
-/// written stream tiles `[0, T)` with no seam.
+/// The pivot is the media's own duration `T` as the model recorded it and the
+/// subtraction is `ReverseMirror`'s, which states the convention and why the
+/// app owns it; the reversal works only because it is exactly as long as the
+/// original. Frame durations come out of the gaps between presentation stamps
+/// rather than out of a nominal rate, which keeps a variable-rate source exact
+/// instead of nearly right, and the written stream tiles `[0, T)` with no seam.
 ///
 /// **What it does NOT do.**
 /// * It does not carry the source's `preferredTransform`, and must not. A
@@ -577,11 +575,10 @@ final class ReverseRenderer {
     ///
     /// **The timing.** `following` is the presentation stamp of the frame
     /// AFTER the one being written — the whole of the arithmetic, and the
-    /// reason a slice boundary costs nothing: a frame shown from `p` until
-    /// `following` is written at `T − following`, and the next frame back
-    /// supplies its own `following` when its turn comes. It starts at `T`, so
-    /// the source's last frame lands at zero, and it decreases strictly, so
-    /// every append is later than the last one.
+    /// reason a slice boundary costs nothing: `ReverseMirror` mirrors it, and
+    /// the next frame back supplies its own `following` when its turn comes.
+    /// It starts at `T`, so the source's last frame lands at zero, and it
+    /// decreases strictly, so every append is later than the last one.
     ///
     /// **Why the samples are fed on demand rather than in time order.** An
     /// `AVAssetWriter` interleaves its tracks and will not take from one input
@@ -701,15 +698,18 @@ final class ReverseRenderer {
                     // one frame per instant — so the answer is to drop the
                     // duplicate rather than lose the file over it.
                     guard frame.time < following else { continue }
-                    pictures.append((time: total - following, buffer: frame.buffer))
+                    pictures.append(
+                        (time: ReverseMirror.mirrored(following, about: total),
+                         buffer: frame.buffer))
                     following = frame.time
                 }
             }
             if audioInput != nil, let format = Self.audioFormat {
+                let forward = ReverseMirror.mirrored(start, about: total)
                 sounds.append(
                     contentsOf: Self.audioBlocks(
                         read.audio, format: format, from: &written,
-                        covering: Self.audioFrames(in: total - start)))
+                        covering: Self.audioFrames(in: forward)))
             }
 
             try feed(untilOneEmpty: true, videoDone: &videoDone, audioDone: &audioDone)

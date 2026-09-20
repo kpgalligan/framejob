@@ -4905,10 +4905,11 @@ deepenings.
 ## 10. The next candidate, scouted — the source window
 
 **Scouted on 2026-09-18, after D3 merged; grilled and split in three on
-2026-09-19; PHASES A AND B ARE BUILT and C is not started.** §10.1 to §10.5
+2026-09-19; ALL THREE PHASES ARE BUILT and the candidate is CLOSED on
+2026-09-20 (§10.10).** §10.1 to §10.5
 are the scout's measurement, left exactly as it was written; §10.6 is what
 the grilling session decided and what it left for phases B and C; §10.7 is
-phase A's record and §10.8 is phase B's. Nothing in §10.1–§10.5 is
+phase A's record, §10.8 is phase B's and §10.9 is phase C's. Nothing in §10.1–§10.5 is
 a plan: it is the measurement a grilling session would otherwise have to
 re-derive, written down because the claim it replaces was a single sentence
 in an architecture review and three of that sentence's four numbers turned
@@ -5142,7 +5143,7 @@ A changes Swift behaviour.
   through `longest_duration_on_grid`, plus whether `trim_end` on an
   `Unmeasured` window should stay unbounded. Built; §10.8 is its record, and
   spec §11's D4-2 to D4-5 are what it decided before the code.
-- **Phase C — the reversed mirror**, above. Not started.
+- **Phase C — the reversed mirror**, above. Built; §10.9 is its record.
 
 **Left by name, because bringing it under the module would CHANGE an
 answer.** Each is phase B's to judge, not phase A's to move:
@@ -5428,7 +5429,245 @@ file.
    own stated cost and is spec §11's to hold, not a defect to file.
 
 **What phase C still has**, unchanged by this: the reversed mirror, and
-`TimelineView.sourceTime`, which applies none (§10.6's fourth decision).
+`TimelineView.sourceTime`, which applies none (§10.6's fourth decision) —
+answered on 2026-09-20 in §10.9, where the reading turned out to be a defect.
+
+### 10.9 Phase C, the record
+
+**Landed 2026-09-20, uncommitted on top of phases A and B.** No `rc_*` export
+was added, so `core/include/reelcut_core.h` and `app/Sources/ReelCore.swift`
+were not touched; `core/` is untouched entirely (`make test` 699, `make lint`
+and `cargo fmt --check` all green with no Rust file changed);
+`RC_FORMAT_VERSION` stays 8; the op table, the catalog and the startup parity
+check are all unaffected, since no op and no tool changed.
+
+**The decision came first**, as §0 requires: spec §11's **D4-6** — the
+reversed mirror is APP arithmetic with ONE home and the Speed sheet's readout
+is the core's own answer, obtained by applying the sheet's ops to the
+immutable handle.
+
+**§10.3's unverified reading was a DEFECT, and the probe found it before any
+code moved.** `TimelineView.sourceTime` took no media and applied no mirror,
+so a reversed clip's filmstrip and waveform indexed the FORWARD caches
+unmirrored and drew the wrong end of the file. Measured on the unchanged tree
+with `tools/proof/source_mirror_probe.py`'s §2 — a bare `TimelineView` over
+one 6 s audio media whose hand-written peaks cache is loud over its first half
+and silent over its second, a forward and a reversed whole-file clip, the
+drawn waveform regions read back out of a bitmap:
+
+| | lit pixels LEFT | lit pixels RIGHT |
+|---|---|---|
+| the forward clip | 18 028 | 760 |
+| the reversed clip, BEFORE | **18 028** | **760** |
+| the reversed clip, AFTER | 724 | 18 030 |
+
+The two "before" rows are the same split pixel for pixel: the reversed clip
+drew the forward clip's picture. Its `sourceTime` at 0, ¼, ½, ¾ and 0.999 of
+the clip read 0 / 900 000 / 1 800 000 / 2 700 000 / 3 596 400 — the forward
+clip's answers exactly, where the mirror answers 3 600 000 / 2 700 000 /
+1 800 000 / 900 000 / 3 600.
+
+**What landed.** `app/Sources/ReverseMirror.swift` (**88** lines of the
+400-line cap for a new file) is the one home of the mirror and its pivot:
+`pivot(for:in:)` — the media's MODEL duration, nil when the clip plays
+forwards or its media is unknown — and `mirrored` in the three units its
+readers hold it in, a `Ticks`, a `ClosedRange<Ticks>` and a `CMTime`. The
+convention prose that was in `MediaPeaks`' and `ReverseRenderer`'s type docs
+is now there, once. Its three callers:
+
+- `MediaPeaks.window` mirrors the whole window in one call and
+  `reversedPivot` is `ReverseMirror.pivot` asked about a plan SEGMENT.
+  **Its numbers did not move**, which is the claim `silence2_proof.py`'s
+  claim 9 and `phase5_proof.py`'s 5c depend on.
+- `ReverseRenderer.walkBackwards`' two subtractions (`total − following`,
+  `total − start`) call the `CMTime` overload.
+- `TimelineView.sourceTime(of:in:at:)` — the new `in media:` parameter and
+  the reversed arm, with the reason written at the site. The mirror is
+  INSIDE that function so the filmstrip and the waveform cannot diverge, and
+  its two callers in `TimelineClipDrawing.swift` pass the `media` each
+  already held. `CompositionBuilder` still applies none and says why: it
+  swaps the asset.
+
+**The Speed sheet asks the core.** `SpeedSheetController.ops(for:rate:keepPitch:)`
+is the list Apply sends and `lengths(of:rate:keepPitch:in:)` applies it to the
+handle and sums the durations read back (`ProjectDocument`'s own probe
+pattern, `(try? project.applying(ops)).project ?? project`). The readout's
+string is unchanged; what it SAYS is not. Three rows, all pinned:
+
+| | before | after, now | after, the quotient it replaced |
+|---|---|---|---|
+| held to the file — §10.8's vector (a) at ×2 | 6 220 000 | **3 100 000** | 3 110 000 |
+| applied into a neighbour — A at ×0.5, overlap 400 000, limit 1 000 000 | 1 000 000 | **2 000 000** | 2 000 000 |
+| refused — C at ×0.5, overlap 1 000 000, limit 600 000 | 1 000 000 | **1 000 000** | 2 000 000 |
+| mixed — [A, C] at ×0.5 | 2 000 000 | **3 000 000** | 4 000 000 |
+
+**The spec was wrong by omission about the neighbour, and the core was read
+rather than guessed.** `set_speed` (`core/src/edit_clip.rs`) never holds a
+duration to a neighbour: it writes `duration_at_speed` and then calls
+`check_overlap_rule` (`core/src/transition.rs`), which PERMITS an overlap up
+to half the shorter clip onto ONE neighbour — the op applies and
+`set_gained_transitions` mints that neighbour a cross dissolve — and REFUSES
+past that half or on reaching two. The probe pins all three arms, the refused
+row against the rule's own sentence verbatim, and B's `transitionIn` going
+from nil to non-nil in the applied snapshot.
+
+**The instrument.** `tools/proof/source_mirror_probe.py`, **40 claims in five
+sections**, compiled out of `app/Sources` over `harness/build.sh`'s own
+`swiftc` line: §1 the one spelling (the hand numbers, `MediaPeaks.window`'s
+400…500 unchanged, the `CMTime` overload agreeing with the tick one under
+`CompositionBuilder.time`), §2 the drawn timeline above plus the arithmetic at
+×1 and ×2, §3 a real reverse of `media/AV.mov` with its 150 output stamps read
+back, §4 the five Swift mirrors against the PLAN of the same project, §5 the
+readout. **Five mutants, each in a tree COPY, each patch asserting its text
+occurs exactly once:**
+
+| Mutant | Score | What it took |
+|---|---|---|
+| the reversed arm dropped from `sourceTime` | 36/40 | both §2 picture rows and both reversed arithmetic rows — and NOTHING else, which is the measure of how invisible the defect was |
+| `mirrored(window:)` returns the window unmirrored | 38/40 | §1's window row and its `MediaPeaks.window` row |
+| the `CMTime` overload returns `time` | 35/37 | §1's agreement row, and §3 outright: `run()` throws, because a writer input refuses a non-ascending append |
+| `lengths` put back to `(duration × speed / rate).rounded()` | 34/40 | §5's held, refused and mixed rows and their read-backs; the APPLIED row survives, 2 000 000 either way, which is why the other three exist |
+| `Transcriber.contentLength` rounds DOWN | 39/40 | §4's 20 001 row alone |
+
+**Gates and proofs.** `make typecheck` 0 errors and the baseline 4
+AVFoundation warnings; `make test` **699**, `make lint`, `cargo fmt --check`
+(no Rust file changed); `make app`. Then `source_mirror_probe.py` **40/40**,
+and five scripts each on its own freshly launched instance killed by PID with
+`grep "Reelcut: "` printing nothing first: `silence2_proof.py` **61/61**
+(claim 9 is the MCP-side witness that the mirror did not move, and it runs
+`phase3_proof.py` 123/123 and `phase3_silence_scope.py` 8/8 inside itself),
+`phase5_proof.py` **88/88** (5c reads the mirror through `normalize_clip`),
+`phase4_proof.py` **84/84** (it drives `set_reversed`), and the two probes
+with no port, `silence2_probe.py` **61/61** and `marquee_probe.py` **28/28**
+(the bare `TimelineView` still builds and draws). Every score is its README
+baseline.
+
+**`wc -l`, against the tree as phase C found it** (phases A and B's,
+uncommitted):
+
+| File | Before | After |
+|---|---|---|
+| `app/Sources/ReverseMirror.swift` | — | **88** (cap 400) |
+| `app/Sources/ReverseRenderer.swift` | 1311 | **1311** (over the cap, unchanged — the toll was paid in prose) |
+| `app/Sources/Transcriber.swift` | 934 | **934** (over the cap; one `private` removed) |
+| `app/Sources/TimelineView.swift` | 1644 | **1652** (frozen: the parameter, the arm and the reason) |
+| `app/Sources/ReelOps.swift` | 1144 | **1143** |
+| `app/Sources/MediaPeaks.swift` | 236 | **228** |
+| `app/Sources/SpeedSheetController.swift` | 219 | **246** |
+| `app/Sources/TimelineClipDrawing.swift` | 450 | **450** |
+
+**Three limits, recorded and NOT fixed here.**
+
+1. **The shared spelling is one tick HIGH.** A reversed tick `p` covers the
+   forward file's tick `T − 1 − p`; the app answers `T − p`. The cost is one
+   extra bucket at an exactly aligned window end and one blank waveform
+   column at the head of a whole-file reversed clip whose duration is a
+   bucket multiple — visible in the table above as the reversed clip's 724
+   against the forward clip's 760. It stays because `silence2_proof.py`'s
+   claim 9 walks these numbers tick-exact in Python ON PURPOSE (a reference
+   walk must not import what it checks), so moving them moves the reference.
+2. **The pivot is nil for a clip inside a CLOSED nest**, because
+   `Project::clip` searches the top level only — unchanged from
+   `MediaPeaks.reversedPivot`'s own limit, with the same escape since road
+   map 2's phase 9: OPEN the nest and the scoped snapshot puts that clip at
+   the top level. `TimelineView` draws from the scoped snapshot and is
+   unaffected either way.
+3. **The Speed sheet's HINT still says only that a speed change opens or
+   leaves a gap** (`SpeedSheetController.swift`'s `makeSheetView`). It says
+   nothing of the overlap the applied arm can leave, nothing of the refusal
+   the other arm answers, and the readout shows a LENGTH rather than the
+   cross dissolve the neighbour gains. Rewording it was out of scope; this
+   is where it is written down.
+
+**What was NOT touched, deliberately**: `core/` at all, `ReelCore.swift`,
+`ProjectDocument.swift`, `CompositionBuilder.swift` (601, at the cap, and its
+no-mirror note stands), `SilenceDetector*.swift`, and
+`tools/proof/silence2_proof.py`, whose Python spelling of the mirror is a
+reference and must not be routed anywhere.
+
+### 10.10 The source window — closed
+
+Three phases on one candidate, all landed and reviewed between 2026-09-19 and
+2026-09-20. **A media clip's window is one module's arithmetic, every writer
+of one reads the same bound, and the app's reversed mirror has one home**;
+what is left of the review's original sentence is a candidate of its own, by
+name.
+
+**What the candidate promised, and what the measurement said.** The
+architecture review's claim was four numbers (§10's opening) and three of
+them were wrong or ambiguous: the "six times in the core" held, "four more in
+Swift" was five and none of them was an edit — a preview, three analysis
+readers and a sheet readout — "the commit tail is copied eleven times"
+depends entirely on where the block is cut, and "the reversed mirror is
+spelled twice" was true but understated, because a THIRD reader applied no
+mirror at all. **No candidate that promised to delete Swift edit arithmetic
+could have delivered it**; what the tree actually held was one module's worth
+of core duplication, one genuine app defect and a second candidate wearing
+the first one's clothes.
+
+**What landed, one paragraph per phase.** Phase A (§10.7) moved the three
+readers, the mover, the bound and the two tail readers into
+`core/src/source_window.rs` as a PURE MOVE, put the unit in each name and
+replaced the `Option` whose `None` meant "unbounded" in one caller and "zero
+handle" in another with a three-way `SourceBound`; every caller came down.
+Phase B (§10.8) made the invariant TRUE at the five writers #22 did not
+cover — `set_speed`, `paste`, `absorb_nests`, `unnest` and `add_background` —
+through five new functions in that module, with six measured overruns before
+and none after, and `rate_stretch` recorded rather than fixed because its own
+arithmetic already held. Phase C (§10.9) made the app's reversed mirror one
+file, found and fixed the timeline's unmirrored draw that §10.3 had only
+suspected, and made the Speed sheet's readout the core's own answer rather
+than a Swift quotient.
+
+**Measured, across the candidate.**
+
+| | Before | After |
+|---|---|---|
+| `core/src/model_query.rs` | 503 | 440 |
+| `core/src/source_window.rs` | — | **396** of 400 |
+| the six callers that restated the mover | 220 / 210 / 586 / 594 / 560 / 1036 | 197 / 195 / 571 / 591 / 555 / 1021 |
+| `core/tests` for the window | proved only through the ops | **+3 files, 22 tests** (`source_window.rs`, `source_invariant.rs`, `source_edges.rs`) |
+| `make test` | 632 at D1's close | **699** |
+| the app's spellings of the mirror | 2, agreeing by convention; a third applying none | **1**, `ReverseMirror.swift` (88), called by all three |
+| the Speed sheet's readout | a Swift quotient, un-snapped and un-bounded | the core's answer, three arms, pinned by 10 probe rows |
+| spec §11 | #22 | **D4-1 … D4-6** |
+
+**What was DECLINED, each on the record.** A tick newtype per unit (§10.6's
+second decision: the unit went in the NAME, because a newtype would touch
+every tick in the crate for a seam §0 calls hypothetical). A mirror in the
+CORE (§10.6's fourth, and `set_reversed`'s own argument: `in` is measured in
+the stream the clip plays, and a second convention would have to be known by
+every trim, split and source-length reader). Letting the plan's degenerate
+threshold win over the reader's (D4-1). `trim_end` on an `Unmeasured` window
+becoming bounded (D4-2). Holding a slowed clip to its neighbour, and an
+`rc_*` query for a speed preview (D4-6). And fixing the one-tick-high mirror,
+which would move a reference walk that exists to catch exactly this
+arithmetic drifting (§10.9).
+
+**What a next candidate would be.** **The commit tail**, named by §10.1 and
+declined by §10.6's third decision as a candidate in its own right: 5
+byte-exact copies, 14 `check_overlap_rule` → `Refused` guards, 17
+`set_gained_transitions` + `finish` pairs, 12 functions carrying both, and 10
+where the guard is the pre-commit trial on `self` rather than on `next`. It
+shares these functions with the source window and nothing else — it is about
+purity, the overlap rule and undo — and it is recorded in
+`designs/reelcut-remaining.md` §5 as well. Two smaller things are written
+down and belong to nobody yet: `set_canvas`'s `resnap` not walking clips
+inside nests (remaining §5, a document-wide rate change with its own overlap
+question), and the Speed sheet's hint, which says nothing of either arm
+(§10.9).
+
+**What this candidate is worth to the next one.** The order that held was
+DECISION, then PROBE, then code: D4-1 to D4-6 were written into spec §11
+before the phase they govern, and phase C's §2 was run against the unchanged
+tree first, which is the only reason its "before" column exists at all. Every
+phase measured its vectors through the FFI or through a compiled probe BEFORE
+changing anything, and phase B's table of six predicted overruns — five that
+reproduced and one that did not — is what made "fixed" mean something. And
+the mutants earned their place twice over: phase C's first mutant took four
+rows and nothing else in the whole tree, which is the honest measure of how
+invisible a wrong mirror is, not a claim that some older script would have
+caught it.
 
 ---
 

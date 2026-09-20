@@ -23,15 +23,13 @@ import Foundation
 /// 1. `bucketTicks` — how much source time one float covers;
 /// 2. `sourceTick` — project time under a segment, at the plan's resolved rate;
 /// 3. `bucketIndex` — the floor, spelled out for negatives;
-/// 4. the reversed mirror inside `peak`.
+/// 4. the reversed mirror `window` applies, which is `ReverseMirror`'s.
 ///
-/// The mirror is the piece a reader is most likely to drop. A reversed clip's
-/// `in` point is measured in the REVERSED stream, and the only peaks file that
-/// exists is of the forward one — nothing ever generates peaks for
-/// `cache/reversed/…`, which is not a media entry at all — so the window is
-/// mirrored about the media's model duration, the pivot `ReverseRenderer`
-/// renders against. Without it a reversed clip is measured against the wrong
-/// end of its own file, which reads as a plausible number and is simply wrong.
+/// The mirror is the piece a reader is most likely to drop — without it a
+/// reversed clip is measured against the wrong end of its own file, which
+/// reads as a plausible number and is simply wrong. It is no longer spelled
+/// here: `ReverseMirror` is its one home and states the convention, the pivot
+/// and what it costs (spec §11, D4-6).
 ///
 /// **`envelope` arrived the same way, one phase later.** It is the plan's
 /// piecewise-linear mix gain at a tick — the OTHER half of every level this app
@@ -136,35 +134,29 @@ enum MediaPeaks {
         let first = sourceTick(segment, at: from)
         let last = max(first, sourceTick(segment, at: to) - 1)
 
-        var lo = first
-        var hi = last
+        var source = first...last
         if let pivot = reversedPivot {
-            lo = pivot - last
-            hi = pivot - first
+            source = ReverseMirror.mirrored(source, about: pivot)
         }
 
-        let lower = max(0, bucketIndex(lo, bucket: bucketTicks))
-        let upper = min(count - 1, bucketIndex(hi, bucket: bucketTicks))
+        let lower = max(0, bucketIndex(source.lowerBound, bucket: bucketTicks))
+        let upper = min(count - 1, bucketIndex(source.upperBound, bucket: bucketTicks))
         guard lower <= upper else { return nil }
         return lower...upper
     }
 
     /// The pivot a reversed clip's window is mirrored about, or nil when the
-    /// clip plays forwards.
+    /// clip plays forwards — `ReverseMirror.pivot` asked about a plan SEGMENT,
+    /// which is the unit every caller here holds.
     ///
     /// `reversed` is deliberately NOT in the plan (a reversed clip and a
     /// forward one must produce byte-identical plan JSON, or the
     /// rebuild-vs-refresh test breaks), so it is read back off the clip — which
     /// answers nil for a clip inside a nest, because `Project::clip` searches
-    /// the top level only. Such a clip is measured unmirrored while the nest
-    /// is CLOSED — a recorded limit, not a bug, and one with an escape since
-    /// road map 2's phase 9: OPEN the nest (⌘↓) and the scoped view puts that
-    /// clip at the top level, where the pivot is found. The limit is
-    /// conditional now, not permanent; this sentence used to say no op could
-    /// address it, which was true until an op could name a nested clip.
+    /// the top level only. `ReverseMirror.pivot` records what that costs and
+    /// the escape road map 2's phase 9 gave it.
     static func reversedPivot(for segment: PlanSegment, in snapshot: ProjectSnapshot) -> Ticks? {
-        guard snapshot.clip(segment.clip)?.source.isReversed == true else { return nil }
-        return snapshot.media(segment.media)?.duration
+        snapshot.clip(segment.clip).flatMap { ReverseMirror.pivot(for: $0, in: snapshot) }
     }
 
     /// Source time under a project tick, at the rate the plan resolved:
