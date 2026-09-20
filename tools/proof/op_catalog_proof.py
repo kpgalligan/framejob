@@ -467,7 +467,7 @@ def main():
     refused = refusal("set_canvas", {"fps": [0, 1]})
     check("set_canvas refuses a frame rate with a zero term by name, and the tool narrows "
           "the core's whole numbers to say so",
-          "fps must be" in refused
+          "fps[0] must be" in refused
           and (declared("set_canvas", "fps", "items") or {}).get("minimum") == 1,
           f"refusal {refused[:120]!r}, items {declared('set_canvas', 'fps', 'items')}")
 

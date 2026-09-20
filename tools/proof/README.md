@@ -2707,7 +2707,10 @@ measures the clip group: the same two independent sides (the CATALOG over
 MCP, the TABLE out of the staticlib through a probe built the way
 `op_schema_probe.py` builds its own and scored the same way when it will not
 compile), and the same oracle written in Python rather than imported.
-**23/23** at D3·4 (#18). The probe is built BEFORE the first MCP call.
+**23/23** at D3·4 (#18), and **23/23** again on 2026-09-20 — the term
+readers changed one row's SENTENCE and no row's verdict: `set_canvas
+{fps: [0, 1]}` is now refused as `fps[0] must be…`, so the row reads the
+path with the name. The probe is built BEFORE the first MCP call.
 
 **Its structural half types no name at all**, not even the ends of a group:
 the group IS the core's op list (`rc_op_names`), so an op renamed on both
@@ -2752,9 +2755,9 @@ behaviour stays.
 `python3 tools/proof/op_argument_proof.py <port>`, against a running
 instance. Road map 7's D3·5, then the **argument gate** of
 kpgalligan/reelcut#21, and **the script that owns the exact tool count**
-(77). **116/116** at #21; 86/86 at D3·5 (#19), 79 of those rows before the
-review added the optional half of section 3. The probe is built BEFORE the
-first MCP call.
+(77). **133/133** on 2026-09-20, when the frame-rate TERM rows landed;
+116/116 at #21; 86/86 at D3·5 (#19), 79 of those rows before the review added
+the optional half of section 3. The probe is built BEFORE the first MCP call.
 
 It exists because of the rule D3·3 and D3·4 each paid for: **a generated
 artefact is checked by asking the thing that generated it a question it did
@@ -2797,9 +2800,20 @@ inside the only clip at that time — and it is named in the script with its
 reason and asserted to be the whole of the exceptions. Then **a fraction
 where a whole number belongs** — `trim_start {clip: 3.5}` and
 `delete {clips: [3.5]}` — is refused rather than truncated to clip 3, and
-`{clip: 3.0}` is still the id. **The opaque doors**: a misspelt key inside a
-caller's own object is named by the CORE, which is where the dotted path
-lives. **The twenty tools the core calls no op**: the same two strangers,
+`{clip: 3.0}` is still the id. Then **a TERM of a frame rate**, the 17 rows
+of 2026-09-20 that closed `designs/reelcut-remaining.md` §5's residue: the
+two `[numerator, denominator]` readers took each half through `intValue`
+after the gate, so `set_canvas {fps: [29.97, 1]}` was 29 fps in silence;
+both now read through `rateTerm`, and a fraction, a zero, a negative,
+`Int64.max`, one past u32, a string and a JSON `true` are each refused BY
+THEIR PATH (`fps[0]`, `fps[1]`, `descriptor.fps[0]`), a list of the wrong
+length is refused as a PAIR, a bare `1e30` no longer traps on `Int(number)`,
+the app still answers with `canvas.fps` untouched after all of them, and
+`[30000, 1001]` and `[30000.0, 1001.0]` still apply and read back — through
+`set_canvas` and through `add_media`'s descriptor.
+**The opaque doors**: a misspelt key inside a caller's own object is named
+by the CORE, which is where the dotted path lives.
+**The twenty tools the core calls no op**: the same two strangers,
 sent alone, and the list the gate speaks compared to the catalog's, the one
 spelling a hand-written schema has — placed LAST, because on a broken gate
 every one of those calls reaches its handler and `new_project` opens a
@@ -2823,6 +2837,24 @@ APPLIED, to clip 3), and no row outside those three groups. The first mutant
 run, with the twenty rows placed before section 4, also turned the six door
 rows red — `new_project` carrying two strangers had opened a document over
 the fixture — which is why the twenty are last.
+
+**And again for the term rows, 2026-09-20.** With `rateTerm`'s read put back
+to `(raw as? NSNumber)?.intValue` and only `> 0` kept, a tree copy on its own
+port scored **126/133, exit 1**: seven rows red and every one of them in the
+new group — `[29.97, 1]`, `[30000, 1001.5]` and `[true, 1]` APPLIED where
+they must be refused (the run prints `applied`; what rate each stored was not
+read back), `[9223372036854775807, 1]`, `[4294967296, 1]` and the bare `1e30`
+came back as the CORE's serde complaint ("expected u32") rather than the
+app's sentence, and `add_media`'s descriptor row printed `applied; media 1 →
+1`, its count then read AFTER the undo, which is why that row now counts
+before it (re-scored 133/133 on a fresh instance after the reorder; the
+reordered count was NOT re-run against the mutant, where the row already
+went red on its sentence half). The rows that stayed green under it are the ones the old `> 0` already
+covered — a zero term, a negative term, a string term, a list of the wrong
+length — and the two controls. The mutant also shows what the old bare-number
+path did differently from this mutant: `intValue` SATURATES at `Int64.max`
+where the shipped `Int(number)` TRAPPED, so `set_canvas {fps: 1e30}` was a
+crash and not a wrong rate.
 
 **Four other proofs changed with the gate**, each a live instance of the
 defect in an instrument: `phase8_proof.py` and `refusal_proof.py` sent

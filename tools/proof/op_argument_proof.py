@@ -67,6 +67,15 @@ The sections, in order:
    And **a fraction where a whole number belongs** — #21's sibling, `3.7`
    read as the id 3 — is refused rather than truncated, through the scalar
    reader and the clip-list one.
+
+   And **a TERM of a frame rate**, the last two readers still on `intValue`
+   after the gate (`designs/reelcut-remaining.md` §5's residue, closed
+   2026-09-20): `set_canvas`'s pair and `add_media`'s descriptor pair both go
+   through `rateTerm` now, so a fraction, a zero, a negative, `Int64.max`,
+   one past u32, a string and a JSON `true` are each refused BY THEIR PATH —
+   `fps[0]`, `fps[1]`, `descriptor.fps[0]` — a pair of the wrong length is
+   refused as a pair, a bare `1e30` no longer TRAPS on `Int(number)`, and
+   `[30000, 1001]` and `[30000.0, 1001.0]` still apply and read back.
 4. **A misspelt key INSIDE an opaque object is named by the CORE**, which is
    where the dotted path lives. An op ARGUMENT never reaches the core's
    decoder — the handlers read arguments one at a time and build the op
@@ -789,6 +798,84 @@ def main():
     check("…while {clip: <id>.0} is still the id — a whole number spelled as a float is a "
           "typing slip, not a fraction",
           "clip must be" not in text and not names_as_missing(text, "clip"), text[:160])
+
+    print("\n…and a TERM of a frame rate, which two readers still truncated")
+    # `designs/reelcut-remaining.md` §5's residue, closed 2026-09-20: the two
+    # `[numerator, denominator]` readers took each half through
+    # `NSNumber.intValue` AFTER the gate, so `[29.97, 1]` was 29 fps in
+    # silence and a whole double past Int.max TRAPPED. Both now go through
+    # `rateTerm` (`AgentServer+Arguments.swift`) and every term is refused by
+    # its own path, the way `rangePair` names an end of a range. Each row's
+    # extreme is the one road map 4's reader review paid for.
+    TERM = "must be a whole number from 1 to 4294967295"
+    canvas_before = mcp.call("get_project")["project"]["canvas"]["fps"]
+    terms = [
+        ([29.97, 1], "fps[0]", "a fraction where the numerator goes — 29 fps until today"),
+        ([30000, 1001.5], "fps[1]", "a fraction where the denominator goes"),
+        ([0, 1], "fps[0]", "a zero term, which the app now refuses before the core does"),
+        ([30, 0], "fps[1]", "a zero denominator"),
+        ([30, -1], "fps[1]", "a negative term, which the core takes only as invalid input"),
+        ([9223372036854775807, 1], "fps[0]", "Int64.max, the extreme road map 4 paid for"),
+        ([4294967296, 1], "fps[0]", "one past u32 — core/src/time.rs is what a term must fit"),
+        (["30", 1], "fps[0]", "a term that is a STRING, where intArg would take it"),
+        ([True, 1], "fps[0]", "a term that is JSON true, which arrives as an NSNumber"),
+    ]
+    for value, path, why in terms:
+        text, applied = refusal("set_canvas", {"fps": value})
+        if applied is not None:
+            mcp.call("undo")
+        check(f"set_canvas {{fps: {json.dumps(value)}}} — {why}: refused as '{path} {TERM}'",
+              f"{path} {TERM}" in text, text[:160] or "applied")
+    for value in ([30], [30, 1, 1]):
+        text, applied = refusal("set_canvas", {"fps": value})
+        if applied is not None:
+            mcp.call("undo")
+        check(f"set_canvas {{fps: {json.dumps(value)}}} — a list of the wrong length is refused "
+              "as a PAIR, naming fps rather than a term",
+              "fps must be [numerator, denominator]" in text, text[:160] or "applied")
+    text, applied = refusal("set_canvas", {"fps": 1e30})
+    if applied is not None:
+        mcp.call("undo")
+    check("set_canvas {fps: 1e30} — a bare whole double past Int.max is refused naming fps, "
+          f"where Int(number) TRAPPED: a live crash until today ('fps {TERM}')",
+          f"fps {TERM}" in text, text[:160] or "applied")
+    canvas_after = mcp.call("get_project")["project"]["canvas"]["fps"]
+    check(f"…and after every one of them the app still answers, with canvas.fps still "
+          f"{canvas_before} — nothing truncated in, nothing trapped",
+          canvas_after == canvas_before, f"{canvas_before} → {canvas_after}")
+    for value in ([30000, 1001], [30000.0, 1001.0]):
+        text, applied = refusal("set_canvas", {"fps": value})
+        read_back = None
+        if applied is not None:
+            read_back = mcp.call("get_project")["project"]["canvas"]["fps"]
+            mcp.call("undo")
+        check(f"…while set_canvas {{fps: {json.dumps(value)}}} APPLIES and reads back as "
+              "[30000, 1001] — a whole number spelled as a float is still the term it is",
+              read_back == [30000, 1001], text[:160] or json.dumps(read_back))
+    # A descriptor the CORE accepts once the app is through with it: a media
+    # with pixels must carry a positive width and height, and a path the
+    # project has not got already (the same path is the core's IDENTITY arm,
+    # not an edit) — both the core's own rules and neither this reader's.
+    descriptor = {
+        "path": os.path.join(os.path.dirname(MEDIA), "B.mov"), "width": 1920, "height": 1080}
+    media_before = len(mcp.call("get_project")["project"]["media"])
+    text, applied = refusal("add_media", {"descriptor": dict(descriptor, fps=[29.97, 1])})
+    # Counted BEFORE the undo: counted after it, a media the call wrongly added
+    # is already gone and "no media added" could not fail.
+    media_after = len(mcp.call("get_project")["project"]["media"])
+    if applied is not None:
+        mcp.call("undo")
+    check("add_media's DESCRIPTOR is the second reader, and its term is named by the same "
+          f"path with the object in front of it: 'descriptor.fps[0] {TERM}', no media added",
+          f"descriptor.fps[0] {TERM}" in text and media_after == media_before,
+          f"{text[:160] or 'applied'}; media {media_before} → {media_after}")
+    text, applied = refusal("add_media", {"descriptor": dict(descriptor, fps=[30000, 1001])})
+    added = None
+    if applied is not None:
+        added = mcp.call("get_project")["project"]["media"][-1].get("fps")
+        mcp.call("undo")
+    check("…while the same descriptor with [30000, 1001] applies and the new media row carries "
+          "that exact rate", added == [30000, 1001], text[:160] or json.dumps(added))
 
     print("\n4 — a misspelt key inside an opaque object is named by the CORE")
     doors = sorted(

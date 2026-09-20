@@ -240,13 +240,11 @@ extension AgentServer {
             kind = parsed
         }
         var fps = Fps.thirty
-        if let array = object["fps"] as? [Any], array.count == 2,
-            let num = (array[0] as? NSNumber)?.intValue,
-            let den = (array[1] as? NSNumber)?.intValue, num > 0, den > 0 {
-            fps = Fps(num: num, den: den)
+        if let array = object["fps"] as? [Any] {
+            fps = try fpsPair(array, "descriptor.fps")
         } else if object["fps"] != nil, !(object["fps"] is NSNull) {
             throw ToolError(
-                message: "fps must be [numerator, denominator], e.g. [30000, 1001].")
+                message: "descriptor.fps must be [numerator, denominator], e.g. [30000, 1001].")
         }
         return MediaDescriptor(
             path: (path as NSString).expandingTildeInPath,

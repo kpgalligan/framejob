@@ -429,6 +429,50 @@ extension AgentServer {
         return (from: from, to: to)
     }
 
+    /// One term of a frame rate: a whole number in 1…4294967295.
+    ///
+    /// The bound is the core's own type — `Fps` is `[u32; 2]`
+    /// (`core/src/time.rs:32`), and a term outside it is serde's invalid
+    /// input, not a rule's sentence worth surfacing. A ZERO term the core
+    /// does refuse in its own words (`core/src/edit_canvas.rs:204`,
+    /// `core/src/edit_track.rs:438`), but the app refuses first so both
+    /// terms are answered the same way.
+    ///
+    /// **Stricter than `intArg`**, and deliberately: a numeric STRING is
+    /// refused here, as it is in `scopeArg`, because a rate is two terms
+    /// that must agree and a caller who spelled one of them `"30"` has made
+    /// a typing mistake worth seeing. A whole DOUBLE is still accepted
+    /// (`whole`'s rule — `30000.0` is 30000), a fraction is not: `29.97`
+    /// truncated through `intValue` was a rate nobody asked for.
+    func rateTerm(_ raw: Any, _ path: String) throws -> Int {
+        guard let value = Self.numeric(raw).flatMap(Self.whole), value >= 1,
+            value <= Int(UInt32.max)
+        else {
+            throw ToolError(
+                message: "\(path) must be a whole number from 1 to 4294967295, not "
+                    + "\(Self.describe(raw)).")
+        }
+        return value
+    }
+
+    /// A `[numerator, denominator]` pair, each term read through `rateTerm`
+    /// under its own path — `fps[0]`, `descriptor.fps[1]` — the way
+    /// `rangePair` names each end of a range.
+    ///
+    /// The two callers are `fpsArg` (`AgentServer+Tracks.swift`, for
+    /// `set_canvas`) and `mediaDescriptor` (`AgentServer+Media.swift`, for
+    /// `add_media`); a second reader with its own copy of the rule is the
+    /// drift this file exists to prevent.
+    func fpsPair(_ pair: [Any], _ path: String) throws -> Fps {
+        guard pair.count == 2 else {
+            throw ToolError(
+                message: "\(path) must be [numerator, denominator], e.g. [30, 1] or "
+                    + "[30000, 1001].")
+        }
+        return Fps(
+            num: try rateTerm(pair[0], "\(path)[0]"), den: try rateTerm(pair[1], "\(path)[1]"))
+    }
+
     /// A caller-authored patch, forwarded to the core UNCHANGED — the door
     /// deepening D1 moves every property op to (`designs/reelcut-roadmap-7.md`
     /// §1, kpgalligan/reelcut#1).

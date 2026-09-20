@@ -237,7 +237,11 @@ are now checked and that a stray `scope` is refused rather than ignored. The
 gate itself is `app/Sources/AgentServer+Gate.swift` (**101** of 400);
 `AgentServer+Arguments.swift` is 445 → **458** for the exact whole-number
 read and `AgentServer+Parity.swift` 183 → **186** for the envelope list the
-two files now share.
+two files now share. Then 2026-09-20's frame-rate term readers:
+`AgentServer+Arguments.swift` 458 → **502** for `rateTerm` and `fpsPair` and
+their doc comments, while the two callers came DOWN —
+`AgentServer+Tracks.swift` 243 → **240** and `AgentServer+Media.swift`
+320 → **318** — none of the three on this ledger and none near the ~600 cap.
 `ReelCore.swift` is **1500 → 1542** and stays where it was in this list — it
 is over the cap, so only the part that had to be there went in, the function
 naming `rc_op_schemas`, and the value type it answers went to
@@ -659,16 +663,38 @@ and posts at it, the guard is gone, and two rows there swap the `.bin` under
 an open sheet with nothing pending and watch the readout follow. A copy with
 the guard restored scores 64/65, taking the first of the two.
 
-Two more, found 2026-09-19 and worth a line each: `docs/agents/triage-labels.md`
-names a `needs-triage` label the repository does not have (`gh label list`
-shows `bug`, `spec`, `ready-for-agent` and GitHub's defaults), so a report
-that needs the maintainer's eye — kpgalligan/reelcut#22 was one, closed
-2026-09-19 — carries `bug` alone; either create the label or change the
-table's right-hand column.
-And the two frame-rate pair readers in `AgentServer+Media.swift` and
-`AgentServer+Tracks.swift` still read `intValue` on each half after the
-argument gate (road map 7 §11's named residue), so a fractional numerator is
-truncated in silence where every other integer argument is refused by name.
+Two more, found 2026-09-19, **both closed 2026-09-20**:
+
+- **The triage labels the document names and the repository lacked.**
+  `docs/agents/triage-labels.md` maps five roles to five label strings and
+  only `ready-for-agent` and `wontfix` existed, so `gh issue create --label
+  needs-triage` failed — observed 2026-09-19 when kpgalligan/reelcut#22 was
+  filed: `gh` answered that the label `needs-triage` was not found, and #22
+  went in with `bug` alone. The three missing ones — `needs-triage`,
+  `needs-info`, `ready-for-human` — were CREATED with
+  `gh label create`, each described in the document's own Meaning column;
+  `gh label list` now prints all five roles plus `spec` and GitHub's
+  defaults. Nothing else on GitHub changed: `spec` keeps its empty
+  description, and issues **#23–#27**, filed 2026-09-20 with `bug` alone
+  (#27 with `spec` too) because `needs-triage` did not exist, PREDATE the
+  label and were deliberately NOT relabelled. The document gained a note that
+  this repo carries a sixth label, `spec`, which never takes
+  `ready-for-agent`.
+- **The two frame-rate pair readers on `intValue`.** `fpsArg`
+  (`AgentServer+Tracks.swift`) and `mediaDescriptor`
+  (`AgentServer+Media.swift`) read each half of a `[numerator, denominator]`
+  pair with `NSNumber.intValue` after the argument gate (road map 7 §11's
+  named residue), so `set_canvas {fps: [29.97, 1]}` was 29 fps in silence.
+  Both now read through `rateTerm`/`fpsPair` in
+  `AgentServer+Arguments.swift`, which refuses a term by its own path —
+  `fps[0]`, `fps[1]`, `descriptor.fps[0]` — and the bare-number path lost
+  the `Int(number)` that TRAPPED on `set_canvas {fps: 1e30}`, a live crash
+  READ from Swift's `Int(Double)` precondition at the removed line rather
+  than reproduced (the mutant's `intValue` saturates instead of trapping).
+  `designs/reelcut-app-notes.md`'s "Two frame-rate pair readers, 2026-09-20"
+  has what each refused before and refuses now; the 17 proof rows are
+  `tools/proof/op_argument_proof.py`'s term group (133/133, and 126/133 with
+  the read put back).
 
 **Two more, found by road map 7 §10's phase B (2026-09-20) and deliberately
 left there**, both recorded in §10.8 as well:
@@ -788,4 +814,4 @@ above the table before the change (first run 40–50 s, then ~9 s and
    that cannot be closed by writing code.
 2. **§3** is consulted, not done.
 3. **§5** is a decision, and the user's.
-4. **§6** landed 2026-09-19 and is not yet committed.
+4. **§6** landed 2026-09-19, committed as `2d69fa4`.

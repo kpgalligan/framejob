@@ -215,19 +215,16 @@ extension AgentServer {
     /// §5.1. A bare number is accepted as `[n, 1]`, since "30" is what a model
     /// reaches for first — but 29.97 has no exact integer spelling, so a
     /// fractional bare number is refused with the pair it should have sent.
+    ///
+    /// Both halves of a pair, and the bare number, go through `rateTerm`
+    /// (`AgentServer+Arguments.swift`), so a term that is not a whole number
+    /// in 1…4294967295 is refused BY ITS PATH — `fps[0]`, `fps[1]` — where
+    /// `intValue` truncated `[29.97, 1]` to 29 fps in silence and `Int(number)`
+    /// TRAPPED on a whole double past `Int.max` (`fps: 1e30`).
     private func fpsArg(_ a: [String: Any], _ key: String) throws -> Fps? {
         guard let raw = a[key], !(raw is NSNull) else { return nil }
         if let array = raw as? [Any] {
-            guard array.count == 2,
-                let num = (array[0] as? NSNumber)?.intValue,
-                let den = (array[1] as? NSNumber)?.intValue,
-                num > 0, den > 0
-            else {
-                throw ToolError(
-                    message: "\(key) must be [numerator, denominator], e.g. [30, 1] or "
-                        + "[30000, 1001].")
-            }
-            return Fps(num: num, den: den)
+            return try fpsPair(array, key)
         }
         guard let number = (raw as? NSNumber)?.doubleValue, number > 0, number.isFinite else {
             throw ToolError(
@@ -238,6 +235,6 @@ extension AgentServer {
                 message: "\(key) must be exact: pass the rational pair — 29.97 is [30000, 1001], "
                     + "23.976 is [24000, 1001], 59.94 is [60000, 1001].")
         }
-        return Fps(num: Int(number), den: 1)
+        return Fps(num: try rateTerm(raw, key), den: 1)
     }
 }

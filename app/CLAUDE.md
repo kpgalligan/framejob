@@ -451,6 +451,11 @@ free.
   and scope, an id checked against the container it names, a time on the
   document's frame grid, and the in-band refusal. A whole number is read
   EXACTLY: `3.0` is 3 and `3.7` is refused, never truncated (`whole`).
+  `fpsPair` reads a rate's two terms, each through `rateTerm` and each
+  refused by its own path (`fps[0]`, `descriptor.fps[1]`), for the two
+  callers that spell a `[numerator, denominator]` pair — `fpsArg`
+  (`AgentServer+Tracks.swift`) and `mediaDescriptor`
+  (`AgentServer+Media.swift`).
   **`rawPatchArg` is the
   door every op that takes a caller-authored object goes through**: it reads
   nothing about the value and hands the object to the core, which is the one

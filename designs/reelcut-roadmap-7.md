@@ -5924,7 +5924,15 @@ whole number." rather than clip 3, and `3.0` is still 3. The two frame-rate
 pair readers (`AgentServer+Media.swift`, `AgentServer+Tracks.swift`) still
 read `intValue` on each half and are named here as the residue rather than
 fixed: neither half is an id, and a fractional numerator there is a different
-question from this one.
+question from this one. **That residue was closed 2026-09-20**: both pairs
+read through `rateTerm`/`fpsPair` in `AgentServer+Arguments.swift`, every
+term refused by its own path (`fps[0]`, `descriptor.fps[1]`), and
+`fpsArg`'s bare-number path lost the `Int(number)` that TRAPPED on
+`set_canvas {fps: 1e30}` (a trap read from Swift's `Int(Double)`
+precondition at the removed line, not reproduced by a run: the mutant's
+`intValue` saturates instead) — see `designs/reelcut-app-notes.md`'s "Two
+frame-rate pair readers, 2026-09-20" and `op_argument_proof.py`'s term group
+(133/133; 126/133 with the read put back).
 
 **Two audits before a line was written**, both clean, and both are why the
 gate could go in without a single schema changing: a regex walk of every

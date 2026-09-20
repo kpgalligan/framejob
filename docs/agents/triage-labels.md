@@ -12,4 +12,6 @@ The skills speak in terms of five canonical triage roles. This file maps those r
 
 When a skill mentions a role (e.g. "apply the AFK-ready triage label"), use the corresponding label string from this table.
 
+This repo carries a **sixth** label the five roles have no room for: `spec`, for an issue that IS a spec (`docs/agents/issue-tracker.md:30`) or that needs a spec §11 decision before it can be built (#27 is one). An issue labelled `spec` never takes `ready-for-agent` — that label is a work order to a polling agent, and a spec is an input.
+
 Edit the right-hand column to match whatever vocabulary you actually use.

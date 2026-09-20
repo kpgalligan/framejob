@@ -2015,3 +2015,64 @@ keeps the mode armed while the same clip stays the target — so a `during`
 added or cleared while armed left the pill stale. `regionNote(_:clip:)` is
 now re-read in `syncRegionMode`, where every `refreshCanvas` passes, and
 `note` is a `var` that redraws on change.
+
+## Two frame-rate pair readers, 2026-09-20 — the last `intValue` after the gate
+
+`designs/reelcut-remaining.md` §5's residue, and road map 7 §11's: the
+argument gate (kpgalligan/reelcut#21) made every SCALAR argument exact, and
+two readers of a `[numerator, denominator]` PAIR were left taking each half
+through `NSNumber.intValue`.
+
+**What they did before.** `fpsArg` (`AgentServer+Tracks.swift`, read only by
+`set_canvas`) accepted an array of two whose halves were any `NSNumber` with
+`intValue > 0`: `[29.97, 1]` APPLIED as 29 fps and `[30000, 1001.5]` as
+`[30000, 1001]`, both in silence, and `[true, 1]` was 1 fps, since a JSON
+boolean arrives as an `NSNumber` too. `[9223372036854775807, 1]` and
+`[4294967296, 1]` reached the core and came back as serde's "expected u32",
+which names no argument of the tool. Its BARE-number path was worse than
+silent: it ended in `Int(number)`, and `set_canvas {fps: 1e30}` — finite,
+positive, equal to its own `rounded()` — TRAPPED there. That is the
+`Int(number)` trap, a live crash reachable from any caller, fixed here.
+The trap is READ, not measured: it is Swift's documented `Int(Double)`
+precondition applied to the removed `return Fps(num: Int(number), den: 1)`
+(baseline `AgentServer+Tracks.swift:241`), and no run in this repo crashed
+an instance on it — the mutant that puts `intValue` back SATURATES at
+`Int64.max` instead of trapping, so it can only show the wrong-sentence
+half of that row.
+`mediaDescriptor` (`AgentServer+Media.swift`, read only by `add_media`) had
+the same pair test spelled a second time, and its refusal named `fps` with
+no object in front of it.
+
+**What they do now.** `AgentServer+Arguments.swift` gained `rateTerm` and
+`fpsPair` (458 → **502** lines, `wc -l`), beside `rangePair`, which they are
+modelled on: a term is refused as
+`"<path> must be a whole number from 1 to 4294967295, not <value>."`, the
+bound being the core's own type (`Fps` is `[u32; 2]`, `core/src/time.rs:32`),
+and a pair of the wrong length as
+`"<path> must be [numerator, denominator], e.g. [30, 1] or [30000, 1001]."`
+Each term carries its own path — `fps[0]`, `fps[1]`, `descriptor.fps[0]` —
+so a caller is told WHICH half it was. A term is stricter than `intArg` on
+purpose: a numeric STRING is refused, as `scopeArg` refuses one, because a
+rate is two terms that must agree. A whole double is still a whole number
+(`[30000.0, 1001.0]` is `[30000, 1001]`, `whole`'s rule). Both callers came
+DOWN — `AgentServer+Tracks.swift` 243 → **240**, `AgentServer+Media.swift`
+320 → **318** — because the two hand-spelled pair tests went. No schema,
+catalog, declarations, core or FFI change: the published `items.minimum: 1`
+was already true, and `AgentCatalog+Declarations.swift`'s row saying `fpsArg`
+refuses a zero term BY NAME still holds, with the name now `fps[0]`.
+
+**Who refuses first.** The app does, for every term. The core refuses a ZERO
+term in its own sentence (`core/src/edit_canvas.rs:204`,
+`core/src/edit_track.rs:438`) but a negative or above-`u32` term only as
+serde invalid input, which names the op and not the argument — no sentence
+worth surfacing, so the app answers all four cases the same way.
+
+**Proof.** `tools/proof/op_argument_proof.py`'s term group, 17 rows, 116 →
+**133/133**: the fractions, the zero, the negative, `Int64.max`, one past
+u32, a string term, a JSON `true`, `[30]` and `[30, 1, 1]`, the bare `1e30`,
+a row that the app still answers with `canvas.fps` unchanged after all of
+them, the two controls that apply and read back, and the same through
+`add_media`'s descriptor. Made to fail in a tree copy with `rateTerm`'s read
+put back to `intValue` with only `> 0`: **126/133, exit 1**, seven rows red
+and all of them in the new group. `op_catalog_proof.py` is 23/23 either way;
+one row's sentence there moved from `fps must be` to `fps[0] must be`.
