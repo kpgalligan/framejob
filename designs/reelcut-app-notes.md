@@ -91,7 +91,26 @@ lockstep are in the root `CLAUDE.md`; the full design is
   slots; `structural(video:for:)` puts `motion` on the BASE props even
   inside an action (the core refuses it in `set_action_end`). Preview sets
   the in/out range to the clip and turns Loop on, and both stay.
-- `AgentServer+Motion.swift` — reading `motion` out of a `set_video` patch
+  **Proved 2026-09-19** by the four instruments road map 5 §4e and §6e owe:
+  `tools/proof/e2_proof.py` (61 claims over MCP — every preset's arithmetic
+  read off a rendered PNG, the tent, the composition rules, what a split and
+  a ripple delete leave behind, and an `apng` export measured frame by
+  frame) and `tools/proof/e2_chrome.py` (24 — the timeline's wedges and the
+  During glyph measured in points against a card with no motion, the
+  section's seven rows with the alpha each control is composited at, the
+  three submenus and their checkmarks, and the two commands driven in a real
+  window). Two of that pair's rows are what this entry's last two sentences
+  claim: `setMotionDuring` with tag −1 leaves the arrival in place, and the
+  section's In popup driven with the playhead INSIDE an action writes the
+  base motion and leaves the action's `end` with no `motion` in it.
+  `tools/proof/e1_proof.py` and `tools/proof/e1_chrome.py` are the same pair
+  for E1's transitions.
+- `AgentServer+Motion.swift` — **DELETED by road map 7's D1·3 (`eb17289`),
+  where `set_video` began forwarding the caller's patch to the core
+  unread; `motion` goes over the wire as written and is refused by the
+  core's own decoder. The entry below is history, kept because it says what
+  the file did and why a later reader may find it named in road map 5.**
+  Reading `motion` out of a `set_video` patch
   BY HAND, `gradientArg`'s posture rather than the generic decoder's: a
   misspelt key at every level, a kind outside either vocabulary and a wrong
   type are all refused BY NAME. `patchArg`'s round trip cannot see inside a
@@ -1215,6 +1234,34 @@ lockstep are in the root `CLAUDE.md`; the full design is
   be held behind a full-file decode and an inference. `CacheStamp` is
   UNCHANGED — `SpeechStamp` WRAPS it with the model name and the chunk
   size, so a model change rebuilds speech caches and no filmstrip.
+  **Proved 2026-09-19** by `tools/proof/silence2_probe.py` (61/61, claims
+  12–17) and `silence2_proof.py` (59/59) — the road map's §8 has the scores
+  and the ten mutants. Two things the probe wrote down that are not
+  obvious from reading these three files. The pass POSTED its withdrawal
+  **without `replaced`**: `speech` cleared a stale cache and posted at
+  `MediaImporter.swift:594–596`, exactly as `peaks` does at `:529–540`, and
+  only `thumbnails` set that flag (`:375–395`) — so an observer that tested
+  for it saw nothing there, and §4g's "`replaced` on the first post" was read
+  as wrong about the tree, not the other way round. And `writeSpeech`'s `.bin`
+  is NOT bit-identical to `SileroVAD.probabilities(of:)` over the same file:
+  30–70 of 325 chunks differ by at most 0.0022, because the pass reads with
+  `alwaysCopiesSampleData = false` and a reader that does not gets different
+  block sizes out of the 48 kHz → 16 kHz converter. Every decision at 0.5 is
+  the same, and `feed` in 1000-sample buffers plus `flush` reproduces
+  `probabilities(of:)` float for float — which is the row that proves the
+  remainder is carried, and the one to keep if either is ever tightened.
+  **2026-09-19, the withdrawal now posts `replaced`.** The paragraph above
+  records what the tree DID; §4g's claim 14 was right about what it should
+  do. `speech` clears a stale `.bin` and posts before the decode, and that
+  post opens a pass replacing a file already on disk — the flag's own
+  meaning — so it carries `replaced: true`
+  (`MediaImporter.swift`'s `speech`). `writeSpeech`'s ARRIVAL post still does
+  not, and `peaks` still posts without it at either end; the flag's only
+  reader is `TimelineView.invalidate`, which acts on it for `thumbs` alone,
+  so nothing downstream moved. Probe claim 14 now asserts §4g's wording —
+  the FIRST post carries it, the SECOND does not — and a mutant that drops it
+  takes that row and only that row (60/61). See
+  `designs/reelcut-roadmap-4.md` §8.
 - `SilenceDetector.swift` · `SilenceDetector+Walls.swift` ·
   `SilenceSheetController.swift` ·
   `TimelineView+Candidates.swift` — Remove Silences (Clip ▸ Remove
@@ -1226,17 +1273,35 @@ lockstep are in the root `CLAUDE.md`; the full design is
   whose envelope alone lands full scale at or under `thresholdDB` is quiet
   in EITHER mode before the model is consulted, which is what keeps the
   sheet's hint and the tool's catalog sentence about a turned-down, faded or
-  ducked clip TRUE in voice mode. Then a media that holds **no voice
-  anywhere** — `speechMax` over its whole segment under `voiceConfidence`,
-  computed once per scoped voice — falls back to the level test for its
-  whole span (`Outcome.judgedByLevel`). Then a media whose speech cache has
-  not landed is NEVER quiet (`Outcome.voicePending`), the missing-peaks rule
-  repeated. `detect` stays PURE and SYNCHRONOUS — the sheet re-detects per
-  slider tick — so the model is never loaded on that path: `Input.read`
-  reads only `SileroVAD.isAvailable`. `SilenceDetector+Walls.swift` is the
+  ducked clip TRUE in voice mode. Then a voice whose SOURCE WINDOW holds
+  **no voice** — `speechMax` over its whole segment under `voiceConfidence`,
+  computed once per scoped voice and read there — falls back to the level
+  test for its whole span, its media named in `Outcome.judgedByLevel`. Then
+  a media whose speech cache has not landed is NEVER quiet
+  (`Outcome.voicePending`), the missing-peaks rule repeated. `detect` stays
+  PURE and SYNCHRONOUS — the sheet re-detects per slider tick — so the model
+  is never loaded on that path: `Input.read` reads only
+  `SileroVAD.isAvailable`. `SilenceDetector+Walls.swift` is the
   nest walls and the directional frame snap, a pure move out at road map
   4's toll 1 (`NestExtent` and the five functions widened to internal for
-  it). The detector is pure
+  it).
+  **2026-09-19, the fallback is keyed per VOICE.** It was computed per voice
+  and READ per media: `detect` filled a `Set<UInt32>` of media holding no
+  voice and asked `contains(segment.media)` inside the walk, so a file that
+  is voice then tone, split in two, had its VOICE clip judged by level along
+  with its tone clip. `detect` now builds one
+  `[(voice: Voice, byLevel: Bool)]` with a single `scoped.map` and the walk
+  passes `entry.byLevel` to `isQuiet`, so each scoped segment is judged by
+  the window it actually plays. **The naming rule that follows:**
+  `Outcome.judgedByLevel` keeps its type and stays a list of distinct MEDIA —
+  a media with one window judged by level and another by voice IS named,
+  because the sheet's note and the tool's note name FILES and a per-segment
+  list would name nothing a person can see; the three sentences say "in at
+  least one clip … there" so the note is true of a mixed file. MCP claim 4's
+  two-clip variant scores the voice half tick for tick against the walk now
+  (60/60), and the pre-fix read, put back as a mutant, takes that row alone
+  (59/60). See `designs/reelcut-roadmap-4.md` §8.
+  The detector is pure
   arithmetic over values: `Input.read` is the one seam that takes a
   snapshot, a plan, a selection and the peak files off a `ProjectDocument`,
   and everything after it is a function of those — which is what lets the

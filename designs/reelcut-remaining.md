@@ -370,12 +370,40 @@ and the closing above added the rest.
   is honest and not a pass — those six are simply UNMEASURED on a locked
   machine, which is why they are listed here: only a run at an unlocked screen
   asks them at all.
+- **Remove Silences judged by VOICE, listened to** — road map 4 §4h's three,
+  now that §4g's instruments have landed (`silence2_proof.py` 60/60,
+  `silence2_probe.py` 61/61, 2026-09-19): a narrated screencast recorded by
+  the app's own recorder with the microphone on, run through Voice mode with
+  the truth marked BY EAR and the spans compared, which q7 is the reason for
+  — the one real mixed recording in hand defeats both VADs and nobody has
+  listened to it; a cut heard across a voice-mode boundary, to say whether
+  60–100 ms of offset lag plus 0.1 s of padding is breathing room or a
+  clipped word, and whether the padding default should drop to 0.05 s; and
+  the sheet's note when one file is PENDING while another is judged by
+  level. The probe reads that note's two halves separately and scores each,
+  but it has never put both on screen at once and nobody has looked at the
+  sentence they make together.
 - **The band from below the lanes, with a real mouse.** `marquee_probe.py`
   (2026-09-19) drives `TimelineView`'s three gesture entry points with
   synthetic points and shows the room below the lanes is inside the
   content view's frame, so a real press there reaches the same hit test;
   nobody has yet pressed a mouse there in the running app and watched the
   band draw and the selection block count up.
+- **Transitions and motion, watched and heard** — road map 5 §4g's and
+  §6g's checks, now that §4e's and §6e's instruments have landed
+  (`e1_proof.py` 95/95, `e2_proof.py` 61/61, `e1_chrome.py` 14/14,
+  `e2_chrome.py` 24/24, 2026-09-19). §4g: a crossfade across a Remove
+  Silences cut sounding even rather than dipped or bumped; an eased push
+  FEELING better than the linear one; the Transition submenu at a hard cut
+  doing what a person expects; and the three wipes reading as the direction
+  their names say — the proof measures which SIDE the incoming colour is on
+  and where the boundary sits, which is not the same as "it reads as up".
+  §6g: whether each preset's numbers look right at ordinary clip lengths
+  (the tables in §5b are starting points, not measurements); whether `pop`'s
+  overshoot reads as a pop; that the Preview button loops the clip; whether
+  a drag begun mid-motion is tolerable, since the inspector and the canvas
+  see the clip UN-MOVED while the picture moves; and that the wedges read at
+  S, M and L track heights — `e2_chrome.py` measures them at M only.
 
 ---
 
@@ -409,6 +437,19 @@ the agent refuses at its own trial first and the menu path does not use that
 entry point. `tools/proof/refusal_probe.py` prints it as a note rather than
 scoring it, so the day a caller does reach it the probe already says so.
 
+**One HOST limit with a cost at export**, measured by `e1_proof.py` §5 and
+recorded in `designs/reelcut-roadmap-5.md` §12 (2026-09-19): AVFoundation does
+not apply a mix input's first volume point for some twelve milliseconds, so
+the first 25 ms of an incoming clip come out at about half full scale whatever
+the ramp asks for — and the same burst is there at a hard cut with the clip
+MUTED, which is where the proof scores it, so nothing in Reelcut is what puts
+it there. It is bigger than road map 5 §4e's own sentence expects ("one LSB
+within 8 ms of a ramp edge") and it is in the exported file, not only in
+preview. Nothing is filed for it and no fix is attempted here: what a later
+road map could try is giving the first breakpoint a lead-in — a ramp that
+starts before the clip does — and re-measuring with `e1_proof.py`'s §5 rows,
+whose window 0 is printed and whose hard-cut row is what would move.
+
 Three small things the closing turned up that a third road map would pick up
 on its way past, none worth a phase: `relink_media` could re-probe the file
 it is pointed at (§2a's recorded limit); the panel and MCP spellings of a
@@ -419,6 +460,16 @@ sheet measured from a file that an MCP `relink_media` then swapped away (the
 sheet is modal, so nothing else can) stay until the sheet is reopened — a
 one-line guard, left because no proof can drive the sheet and the tree does
 not ship a fix without one.
+
+Two more, found 2026-09-19 and worth a line each: `docs/agents/triage-labels.md`
+names a `needs-triage` label the repository does not have (`gh label list`
+shows `bug`, `spec`, `ready-for-agent` and GitHub's defaults), so a report
+that needs the maintainer's eye — kpgalligan/reelcut#22 is one — carries
+`bug` alone; either create the label or change the table's right-hand column.
+And the two frame-rate pair readers in `AgentServer+Media.swift` and
+`AgentServer+Tracks.swift` still read `intValue` on each half after the
+argument gate (road map 7 §11's named residue), so a fractional numerator is
+truncated in silence where every other integer argument is refused by name.
 
 ---
 

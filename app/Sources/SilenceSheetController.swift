@@ -348,8 +348,8 @@ final class SilenceSheetController: NSViewController, NSTextFieldDelegate {
             let listed = names.isEmpty
                 ? "\(outcome.judgedByLevel.count) file(s)" : names.joined(separator: ", ")
             notes.append(
-                "\(outcome.judgedByLevel.count) file(s) hold no voice and are judged by "
-                    + "level: \(listed).")
+                "\(outcome.judgedByLevel.count) file(s) hold no voice in at least one clip "
+                    + "and are judged by level there: \(listed).")
         }
         if !outcome.protectedNests.isEmpty {
             // The detector will not propose a span that reaches into a nest

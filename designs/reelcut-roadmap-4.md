@@ -1,7 +1,7 @@
 # Reelcut — road map 4: Remove Silences, second pass
 
-**Status: BUILT — S1 landed in `1c3e92e` (2026-09-15); its own proof
-instruments (§4g) are still owed.** The spike (S0) was RUN on 2026-09-13 and
+**Status: BUILT and PROVED — S1 landed in `1c3e92e` (2026-09-15) and §4g's
+two instruments on 2026-09-19.** The spike (S0) was RUN on 2026-09-13 and
 its answers are pasted below before any plan leans on them; §8 is the record
 of what landed, what was verified and what is owed. The sections between
 are the plan as it was written.
@@ -565,8 +565,142 @@ the built binary, the three new argument refusals exact, and phase 3's
 `phase3_proof.py` 121/121 and `phase3_silence_scope.py` 8/8 unchanged — the
 fallback is what makes a tone fixture answer what it always did.
 
-**Owed, as of this record:** the phase's own proof instruments — §4g's
-`tools/proof/silence2_proof.py` (11 claims) and `silence2_probe.py` (6 more)
-with 8 named mutants — so the voice path's edges, the cache's stamp rules and
-the wrapper's trace are unproved by a tracked instrument; the reader review;
-and §4h's checks by a person at the machine.
+**The proofs (2026-09-19).** §4g's two instruments landed against the
+UNMODIFIED tree at **59/59** and **61/61**, and score **60/60** over MCP
+(claims 1–11) and **61/61** over the probe (claims 12–17) against the tree
+the two fixes below left — `tools/proof/silence2_proof.py` and
+`tools/proof/silence2_probe.py`, the second compiled from the whole of
+`app/Sources`, with
+`tools/proof/silence2_trace.json` — 325 chunks, keyed on the sha256 of the
+DECODED samples of `clean.wav` — as claim 12's pin. `tools/proof/README.md`
+has the per-claim account.
+
+**What made the MCP half worth running** is that it does not measure the
+voice answer against a tolerance. It carries a Python REFERENCE WALK of
+`SilenceDetector.detect` + `refine` over `MediaPeaks.window`'s arithmetic at
+the 32 ms grid, reads the probabilities the app itself wrote into
+`cache/speech/<id>.bin`, and asserts the answer TICK FOR TICK — forward at 30
+fps, at 100 fps where one frame is one bucket, and mirrored for a reversed
+clip about the MEDIA's duration. Making that mirror exact cost one correction
+to the plan as §4g wrote it: the walk has to carry the segment's own
+`source_duration` (`evaluate.rs:229–248`) rather than assume it equals the
+clip's duration, because a whole clip's duration is `snapped(media.duration)`
+and the two differ off the frame grid. The truth itself is measured per run —
+the −40 dBFS level pass over `say`'s digital silence — so nothing is pinned
+to how long this host's voice happened to talk for.
+
+**The ten mutants, each in a copy of the tree** (the app rebuilt in the
+copy and its binary on its own port; the probe compiled from the copy; the
+staticlib copied in unchanged, since every mutation is in `app/Sources`):
+
+| Mutant | Score | What it took |
+|---|---|---|
+| probability forced to 1 (`SileroVAD.step`) | **33/59** | every voice row of claims 1, 2, 3, 4, 8, 9, 11 and phase 3's re-run |
+| the level fallback removed (`detect`) | **52/60** | claim 4's TONE rows — the tone answers one span across the whole clip in voice mode — and claim 5 with it; the new head row PASSES, the merged span dropped from both sides by its `< V` filter |
+| max → mean over a step (`speechMax`) | **54/59** | claim 1(a), **1(c) at 100 fps**, claim 9 and claim 11's precondition; nothing else |
+| the window test made whole-file (`detect`) | **57/60** | claim 4's two-clip TONE rows alone: the tone half is no longer judged by level; the head row passes for the same reason |
+| **the fallback keyed per MEDIA** (`detect`, the pre-fix read) | **59/60** | the new head row ALONE — the voice clip of a voice-then-tone file is judged by level, and the walk over its own segment says so |
+| `voice_confidence` accepted with `mode: "level"` | **58/59** | claim 10's first refusal, and only that |
+| the LSTM state not fed back (`step`) | **57/61** | claim 12(c) amplitude AND decisions, and 12(d) both ways |
+| the 64-sample context not carried (`step`) | **59/61** | claim 12(c) and 12(d) amplitude; the decisions survive it, which is worth knowing |
+| `speechModel` dropped from `SpeechStamp` | **53/61** | claim 13's three marker rows and the whole of claim 14 — a foreign marker no longer rebuilds |
+| **`replaced` dropped from the withdrawal post** (`speech`) | **60/61** | claim 14's `replaced` row alone |
+
+Five of those ten were not re-run after the two fixes below and are quoted
+against the N they had **at the time** (59 and 61): the probability forced to
+1, max → mean, `voice_confidence` accepted with `mode: "level"`, the LSTM
+state, and the 64-sample context. The five that were re-run are scored
+against today's 60 and 61, on a tree rebuilt in a copy with this run's own
+fixtures.
+
+**The sensitivity line claim 1(c) prints** (not scored) says the mean rule IS
+visible on this host's fixture: at a 100 fps canvas it answers
+`[(1734000, 2514000), (4110000, 4644000)]` where the max rule answers
+`[(1734000, 2508000), (4116000, 4644000)]` — two edges, one at each pause —
+so the max→mean mutant is scored on that row and needed no exemption.
+
+**The earlier proofs, re-run against the final binary**, each quoted with the
+N it had at the time: `phase2_proof.py` **86/86** (85 at the time),
+`phase3_proof.py` **123/123** (121 at the time), `phase3_silence_scope.py`
+**8/8**, `phase5_proof.py` **88/88**, `remaining_proof.py` **79/79**. Claim 5
+runs the two phase 3 scripts INSIDE `silence2_proof.py` as well, because
+`mode` defaulting to voice is what makes a tone fixture answer what it always
+did and that is a claim to run rather than assume; their counts are printed
+there and their FULL score is what is asserted, since a later road map adding
+a row to one of them is not this phase's failure.
+
+**Four deviations from §4g's text**, each recorded rather than worked around:
+(i) §4g's "edges INWARD (asserted by sign)" holds at the START only — an END
+may overrun the truth, because the model calls speech up to a chunk before
+the next word and `snapDownToFrame` only takes an end DOWN to the grid, so
+the bound is q6's own row plus one chunk (`OVERRUN` = 0.07 s on clean and
+hum3, 0.10 s on quiet2) and the sign is asserted at the start alone;
+(ii) claim 3's "six ranges" is a property of that fixture's pink noise, so
+it is printed — it WAS six on this host — and the lead-in span q6 recorded
+(the soft first word missed at that SNR, §5) is printed too, not scored; (iii) claim 12's pin is keyed on the samples'
+sha256 rather than the file's, because ffmpeg's WAV muxer writes an
+`ISFT Lavf<version>` tag and the bytes move with a brew upgrade while the
+samples do not; a different `say` is a SKIP printed by name with both hashes;
+(iv) claim 11 trims the clip to the last whole frame INSIDE the file before
+exporting. Without that the clip's duration is `snapped(media.duration)`,
+which rounds UP past the end of the file, so the plan plays the segment at
+0.9990 and AVFoundation RESAMPLES it — two exports of the same material then
+drift by about seventeen samples and the claim would be measuring the
+resampler. At rate 1 the cut export is BYTE-identical to the uncut one with
+the proposed spans excised, which is stronger than the tolerance §4g asked
+for. The overrun itself is a core defect older than this phase, filed as
+kpgalligan/reelcut#22 with the two fix shapes it has to choose between.
+
+**Two defects the instruments measured, FIXED 2026-09-19** (not committed
+here), which is what took the MCP half from 59 rows to 60:
+
+- **The level fallback is decided per VOICE, not per media.** `detect` built
+  a `Set` of media that hold no voice and read it back per media, so in claim
+  4's two-clip fixture the voice half of a voice-then-tone file was judged by
+  level along with the tone half. It now builds one
+  `[(voice: Voice, byLevel: Bool)]` by a single `scoped.map` and the walk
+  passes `entry.byLevel` to `isQuiet`, so each scoped segment is judged by
+  the window it actually plays (`SilenceDetector.swift`, `detect`). **The
+  naming decision:** `Outcome.judgedByLevel` keeps its type and stays a list
+  of distinct MEDIA — a media with one window judged by level and another by
+  voice IS named, because the sheet's note and the tool's note name FILES and
+  a per-segment list would name nothing a person can see. The three sentences
+  say "in at least one clip … there" so the note is true of a mixed file
+  (`AgentServer+Silence.swift`, `SilenceSheetController.swift`,
+  `AgentCatalog+Audio.swift`; `app/CLAUDE.md` and spec §7.4's row follow).
+  Claim 4's two-clip variant now SCORES the voice half: its spans are
+  compared tick for tick against the reference walk over clip A's own
+  segment, filtered on both sides to the spans ending STRICTLY before the
+  split (`r[1] < ticks_of(VOICE_LENGTH)`). The filter is the row's honesty —
+  the voice clip ends in a quiet run of its own (`clean.wav`'s last chunk,
+  then digital padding to 11.000 s, about 0.63 s), and a build that judges
+  the tone clip by voice merges that run past the split into one span the
+  walk over clip A alone can never answer. 11.0 s is exactly 330 frames at 30
+  fps, so on the fixed tree the run ends ON the filter's bound and `<` drops
+  it from `found` and from the walk alike. The printed note says level mode
+  answers something DIFFERENT before the split on this host, which is the
+  row's power.
+- **The speech withdrawal posts `replaced`.** `speech` clears a stale `.bin`
+  and posts first; that post opens a pass replacing a file already on disk,
+  which is exactly what the flag means, so it now carries it
+  (`MediaImporter.swift`, `postCacheChange(…, replaced: true)`;
+  `MediaCacheFiles.swift`'s two doc sentences name it as the flag's second
+  carrier). `writeSpeech`'s ARRIVAL post still does not, and `peaks` still
+  posts without it either way. Probe claim 14's row is §4g's own wording
+  again: the FIRST post carries it, the SECOND does not. Nothing downstream
+  moves — `replaced`'s only reader is `TimelineView.invalidate`, which acts
+  on it for `thumbs` alone — and `remaining_probe.py`, which filters its
+  `replaced` rows by kind, still scores 170/170.
+
+**One limit the instruments measured and did not fix**, out of this phase's
+scope and printed by the probe: `writeSpeech`'s own `.bin` is not
+bit-identical to `probabilities(of:)` over the same file — 30 to 70 of 325 chunks differ by at
+most 0.0022, because the pass reads with `alwaysCopiesSampleData = false` and
+the runner's own reader does not, so the 48 kHz → 16 kHz converter hands the
+two paths different block sizes. Every DECISION at 0.5 is the same, and
+feeding `probabilities(of:)`'s samples through `feed` in 1000-sample buffers
+with a `flush` answers it back float for float, which is the row the
+streaming rules are actually proved on.
+
+**Owed, as of this record:** the reader review, and §4h's checks by a person
+at the machine (listed in `designs/reelcut-remaining.md` §4).

@@ -108,10 +108,10 @@ enum SilenceDetector {
 
     /// How a moment is judged quiet — road map 4's S1. `voice` asks the
     /// cached Silero VAD probability (`cache/speech/<id>.bin`) and falls
-    /// back to `level` per media that holds no voice anywhere, or for every
-    /// media at once when the model cannot be used this process; `level` is
-    /// today's rule, byte for byte, and what a media with no voice cache yet
-    /// is judged by too.
+    /// back to `level` per VOICE whose source window holds no voice, or for
+    /// every media at once when the model cannot be used this process;
+    /// `level` is today's rule, byte for byte, and what a media with no
+    /// voice cache yet is judged by too.
     enum Mode: String, CaseIterable {
         case voice
         case level
@@ -201,9 +201,9 @@ enum SilenceDetector {
         /// The mode the run actually used — `settings.mode`, echoed back for
         /// the same reason `scope` is.
         let mode: Mode
-        /// Distinct media, in scope, that hold no voice anywhere and were
-        /// therefore judged by level even in `voice` mode. Always `[]` in
-        /// `level` mode.
+        /// Distinct media, in scope, with at least one scoped voice whose
+        /// source window holds no voice and was therefore judged by level
+        /// even in `voice` mode. Always `[]` in `level` mode.
         let judgedByLevel: [UInt32]
         /// Distinct media, in scope, whose `cache/speech/<id>.bin` has not
         /// landed yet — never quiet by the model, judged by level until it
@@ -398,61 +398,59 @@ enum SilenceDetector {
                 protectedNests: [], mode: settings.mode, judgedByLevel: [], voicePending: [])
         }
 
-        // Road map 4's voice mode: per scoped voice, whether its media holds
-        // no voice anywhere in the segment (judged by level for its whole
-        // span) or its speech cache has not landed (never quiet by the
-        // model). Both are empty in `.level` mode.
+        // Road map 4's voice mode, judged PER VOICE: a window holding no
+        // voice falls back to level for its whole span and names its media,
+        // mixed or not; a pending cache is never quiet by the model. Both
+        // sets stay empty in `.level` mode.
         var judgedByLevelMedia: Set<UInt32> = []
         var voicePendingMedia: Set<UInt32> = []
-        if settings.mode == .voice {
-            for voice in scoped {
-                guard let speech = voice.speech else {
-                    voicePendingMedia.insert(voice.segment.media)
-                    continue
-                }
-                let whole = Double(
-                    MediaSpeech.speechMax(
-                        speech, over: voice.segment, from: voice.segment.start, to: voice.end,
-                        reversedPivot: voice.reversedPivot))
-                if whole < settings.voiceConfidence {
-                    judgedByLevelMedia.insert(voice.segment.media)
-                }
+        let judged: [(voice: Voice, byLevel: Bool)] = scoped.map { voice in
+            guard settings.mode == .voice else { return (voice, false) }
+            guard let speech = voice.speech else {
+                voicePendingMedia.insert(voice.segment.media)
+                return (voice, false)
             }
+            let whole = Double(
+                MediaSpeech.speechMax(
+                    speech, over: voice.segment, from: voice.segment.start, to: voice.end,
+                    reversedPivot: voice.reversedPivot))
+            guard whole < settings.voiceConfidence else { return (voice, false) }
+            judgedByLevelMedia.insert(voice.segment.media)
+            return (voice, true)
         }
 
         let step = MediaPeaks.bucketTicks
         let limit = Double(AudioDSP.gain(fromDecibels: Float(settings.thresholdDB)))
-        let ordered = scoped.sorted { $0.segment.start < $1.segment.start }
-        let domainStart = max(0, ordered.map { $0.segment.start }.min() ?? 0)
-        let domainEnd = ordered.map { $0.end }.max() ?? domainStart
+        let ordered = judged.sorted { $0.voice.segment.start < $1.voice.segment.start }
+        let domainStart = max(0, ordered.map { $0.voice.segment.start }.min() ?? 0)
+        let domainEnd = ordered.map { $0.voice.end }.max() ?? domainStart
 
         // The walk is aligned to absolute multiples of a bucket rather than to
         // the first segment, so two projects that differ only in where their
         // audio starts round the same way.
         var t = (domainStart / step) * step
         var next = 0
-        var active: [Voice] = []
+        var active: [(voice: Voice, byLevel: Bool)] = []
         var runStart: Ticks?
         var runs: [Span] = []
         while t < domainEnd {
             let slotEnd = t + step
-            while next < ordered.count, ordered[next].segment.start < slotEnd {
+            while next < ordered.count, ordered[next].voice.segment.start < slotEnd {
                 active.append(ordered[next])
                 next += 1
             }
-            active.removeAll { $0.end <= t }
+            active.removeAll { $0.voice.end <= t }
 
             var covered = false
             var quiet = true
-            for voice in active {
-                let from = max(t, voice.segment.start)
-                let to = min(slotEnd, voice.end)
+            for entry in active {
+                let from = max(t, entry.voice.segment.start)
+                let to = min(slotEnd, entry.voice.end)
                 guard to > from else { continue }
                 covered = true
                 if !isQuiet(
-                    voice, from: from, to: to, limit: limit, mode: settings.mode,
-                    voiceConfidence: settings.voiceConfidence,
-                    byLevel: judgedByLevelMedia.contains(voice.segment.media)) {
+                    entry.voice, from: from, to: to, limit: limit, mode: settings.mode,
+                    voiceConfidence: settings.voiceConfidence, byLevel: entry.byLevel) {
                     quiet = false
                     break
                 }
@@ -557,9 +555,9 @@ enum SilenceDetector {
     /// under `thresholdDB`, so a turned-down, faded or ducked voice never
     /// holds a cut up, in EITHER mode, before the model is ever consulted —
     /// the mix promise the sheet's hint and the tool's catalog entry both
-    /// make. `byLevel` (a media that holds no voice anywhere, computed once
-    /// per voice over its whole segment) and `.level` mode both fall through
-    /// to the level test unchanged; otherwise a pending speech cache is
+    /// make. `byLevel` (this VOICE's source window holds no voice, computed
+    /// once per voice over its whole segment) and `.level` mode both fall
+    /// through to the level test unchanged; otherwise a pending cache is
     /// never quiet, and the model's answer is the MAX Silero probability
     /// over the step, never the mean.
     private static func isQuiet(

@@ -313,13 +313,14 @@ free.
   or `level`, and is PURE and synchronous over `Input.read`'s snapshot so the
   sheet re-detects per control change. Per step, in this ORDER: the gain
   FLOOR (`peak × envelope`, so mute and solo fall out of the plan's zero
-  envelope), then a media with no voice anywhere falls back to level, then a
-  media whose speech cache has not landed is never quiet. A silenced clip is
-  dropped from either scope rather than counted; a NEST is a wall. `SileroVAD`
-  is the streaming Core ML wrapper over the vendored compiled model, NOT
-  `async`, with one process-wide `NSLock`-guarded unavailability reason that
-  never retries until relaunch. `MediaPeaks` is the one spelling of the
-  project → source window arithmetic, including the reversed MIRROR.
+  envelope), then a voice whose source window holds no voice falls back to
+  level (its media named), then a media whose speech cache has not landed is
+  never quiet. A silenced clip is dropped from either scope rather than
+  counted; a NEST is a wall. `SileroVAD` is the streaming Core ML wrapper over
+  the vendored compiled model, NOT `async`, with one process-wide
+  `NSLock`-guarded unavailability reason that never retries until relaunch.
+  `MediaPeaks` is the one spelling of the project → source window arithmetic,
+  including the reversed MIRROR.
 - `AudioNormalize.swift` — Normalize Clip as a value type: peaks in, ops out,
   measured PRE-FADER from the plan segment, REPLACING `volume` so a second
   press is a no-op, always to BASE props.

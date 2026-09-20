@@ -1,9 +1,10 @@
 # Reelcut — road map 5: transitions and motion (E1, E2)
 
-**Status: BUILT — E1 and E2's core in `e8028a2` (2026-09-16),
+**Status: BUILT AND PROVED — E1 and E2's core in `e8028a2` (2026-09-16),
 `add_transition`'s `ripple` form in `5da056c` (2026-09-16), E2's chrome in
-`6dda2c7` (2026-09-17); both phases' own proof instruments and the reader
-review are still owed — §12 is the record.** Two phases, taken on
+`6dda2c7` (2026-09-17), and §4e's and §6e's four instruments on 2026-09-19.
+What is left is the reader review (§4f, §6f), the four `6dda2c7` nits and
+§4g's and §6g's checks by a person — §12 is the record.** Two phases, taken on
 2026-09-15 from the
 survey of another editor's transitions, effects and filters
 (`designs/reelcut-effects-survey.md`): **E1**, transitions learn direction,
@@ -1359,15 +1360,202 @@ transition_sheet_probe 32/32; an UNTRACKED probe over `app/Sources` 17/17
 (menu selectors, per-clip writes, one undo restoring `project.json` byte for
 byte, checkmarks, Preview). 12 files, +503 / −11.
 
+**The proofs (2026-09-19).** §4e's and §6e's four instruments, written and
+run against the tree as it stood — which carried road map 4's uncommitted S1
+work, seven files: `app/CLAUDE.md` and, under `app/Sources/`,
+`AgentCatalog+Audio.swift`, `AgentServer+Silence.swift`,
+`MediaCacheFiles.swift`, `MediaImporter.swift`, `SilenceDetector.swift` and
+`SilenceSheetController.swift` (captured to `tools/proof/work/e1-before.txt`
+before the first edit). **Nothing under `app/` or `core/` was changed**: the
+four scripts are new files and every claim below is a placement read back
+through `get_project`, a byte comparison of two PNGs, a sample-for-sample
+comparison of two decoded exports, or a number a mutant moves.
+
+- `tools/proof/e1_proof.py` — **95/95**, over MCP against TWO instances: this
+  build on 4825 and the build at `1c3e92e` on 4826. Sections 0–6 are §4e's
+  table.
+- `tools/proof/e1_chrome.py` — **14/14**, the harness on both trees plus a
+  probe compiled from `app/Sources`.
+- `tools/proof/e2_proof.py` — **61/61**, over MCP on one instance, sections
+  1–7 being §6e's table (with a `0` for the two floors).
+- `tools/proof/e2_chrome.py` — **24/24**, the harness and a second probe.
+
+`tools/proof/README.md` has a section on all four saying what each measures.
+The reference build is the whole tree at `1c3e92e` — the commit before E1's
+first toll; `e8028a2` is E1 and E2 together — extracted with
+`git archive | tar -x` into `tools/proof/work/e1-reference` and built there.
+It reads only version-6 packages, so every cross-build fixture is
+hand-written back to version 6, which is also exactly the file a person who
+used the app last month has on disk.
+
+**The twenty-five mutants**, each in a copy of the tree with the app rebuilt
+in the copy on its own port, every patch asserting its replaced text occurs
+exactly once, the original tree never mutated:
+
+| Mutant | Score | The rows it took |
+|---|---|---|
+| `cos`/`sin` swapped | 88/95 | all seven §5 crossfade rows |
+| the `Side` close removed | 92/95 | the outgoing clip's last 25 ms, and the summed power in both overlaps |
+| `minted` writing linear | 87/95 | §3's minted kind and its seam, §5's minted flag, and five crossfade rows |
+| `set_transition` minting over a stored style | 94/95 | §1's "a kind change keeps the style", alone |
+| `align` ignored | 84/95 | §4's `before` and `after` (4), the speed and nest bullets built on them (4), and §5's nested pair (3) |
+| the speed applied twice in `extended` | 94/95 | §4's speed row, alone |
+| the action rebase removed | 92/95 | the action's `start`, its end, and the frame at it |
+| the step-down removed | 93/95 | the clamped overlap and the overlap rule's bound |
+| the overlap walls removed | 93/95 | §6(a)'s wall and §6(b)'s crossfade dip |
+| the menu batch unfiltered | 12/14 | the batch's overlap and its "no sheet" |
+| `wipe_up` given `(0, 1)` | 94/95 | §2's `wipe_up`, alone |
+| the `NSNull` rule removed | 23/24 | During ▸ None, alone |
+| the `rem_euclid` removed | 60/61 | the whole spin on a dissolve's incoming half, alone |
+| the guards removed | 60/61 | the hand-written `period: 0`, alone |
+| `motion::apply` in `evaluate_clip` | 39/61 | 22, including §6's "a split MID-ARRIVAL writes two pieces still at the origin" — the row it was built for |
+| the totals replaced instead of multiplied | 60/61 | §5's two slots, alone |
+| the text fallback used for a shape | 58/61 | the ROTATED card, the cropped zoom and the action's slide — NOT §2's plain card, whose half-extent IS `W/2` and so cannot tell the fallback apart |
+| the period read as a clip fraction | 55/61 | §4's shake, the eighth-turn and the whole spin, the bounce, and two composition rows |
+| the tent removed | 58/61 | §5's meeting frame and both of its 0.75 samples |
+| the pivot compensation removed | 60/61 | §3's cropped visible centre, alone |
+| the split rule removed | 57/61 | both split rows and both ripple-delete rows |
+| the `evaluate_clip` restore removed | 60/61 | §1's end patch, alone |
+| the `set_action_end` refusal removed | 60/61 | §1's refusal, alone |
+| `structural` not widened | 23/24 | the popup inside an action, alone |
+| `drift` using `P` | 60/61 | §4's drift, alone |
+
+**Three mutants survived their first fixture, and the FIXTURE was
+strengthened rather than the mutant excused.** Each is a fact about the tree
+worth having written down:
+
+1. **A whole `spin` is a rotation the compositor cannot see.** Without the
+   `rem_euclid`, the layer reaches Swift at 360° and `Float(360·π/180)`'s
+   `sin` is ~1.7e-7 — five hundredths of a pixel across the canvas. What it
+   moves is a GUARD: `MetalRenderer.partnerBox` answers nil for a partner
+   that is rotated at all, and the outgoing half of a cross dissolve then
+   loses its coverage correction. So §4 measures the reduction on a
+   dissolve's INCOMING clip, which is the case `motion.rs`'s module doc
+   names.
+2. **A NaN reaches Swift as a field's DEFAULT, not as a broken frame.** With
+   both guards gone a degenerate `period` makes every placed field NaN,
+   serde writes JSON `null`, and the decoder reads x 0 / scale 1 — which on a
+   card already at the origin is the same picture. §1's fixture now sits at
+   x 100 and scale 1.5.
+3. **An end patch that differs only by a KIND leaves the same picture.** The
+   action loop interpolates the whole state, and a string it can only take
+   whole, so the restore's absence was invisible. §1's hand-written end patch
+   now differs by a NUMBER (a two-second period against the base's one).
+
+**Nine deviations from §4e's and §6e's text, each measured:**
+
+(i) the tool counts are FLOORS here and exact on the reference, because since
+road map 7's D3 `op_argument_proof.py` owns the exact number
+(`tools/proof/README.md`); (ii) "writes version 7" is version 8, since both
+phases landed in `e8028a2`; (iii) `spin`'s "quarter period" is an EIGHTH at
+A = 0.5, where the turn is `720·A·t/P`; (iv) p = 0.25 is read on a TWO-second
+overlap, because a one-second one puts it off the 30 fps grid; (v) §6(b)'s
+control is a faded tail rather than an `audio: false` pair, since the walls
+deliberately ignore `audio`; (vi) the version-6 export is compared within
+this build's own measured wobble, which came out 0 — byte-identical;
+(vii) the tent is a 4 s card with 3 s edges, since a 3 s card with 2 s edges
+has its half-edges between frames; (viii) the action row's clip is `AV.mov`,
+since an `.m4a` clip has no video group to render; (ix) the `apng` export is
+at the CANVAS's size and not the preset's 960 × 540 — an image format is
+written with the picture fitted inside the size, aspect kept and never
+upscaled (`core/src/export_size.rs`), so a 640 × 360 canvas writes
+640 × 360.
+
+**Seven more, about the instruments rather than the claims:** the tools are
+`split` and `set_speed {clip, rate}`, not the `split_clip` and
+`set_speed {clips, speed}` §6e's prose used; `e1_chrome.py` measures the
+section's body as the vertical EXTENT of what opening it changes rather than
+by `shift_match`, because Transition is the LAST section in a shape clip's
+stack and nothing below it moves (the difference between the two trees is
+what cancels the insets, and it came out 129 − 71 = 58 = 2 × 29 pt); the
+Crossfade Audio row carries NO `InspectorRowLabel` — `inspectorCheckRow`
+passes nil and the title is inside the private `OptionCheckboxControl` — so
+it is counted as a control rather than read by name; a row's LIVENESS is
+read off `alphaValue` (1, or 0.42) because `OptionControl` has no
+`isEnabled` and `isActive` is private; `e2_chrome.py` photographs the
+INSPECTOR at 1600 pt and the timeline at §6e's 1440 × 862, because Motion is
+the tenth section in a shape clip's stack and its header is below the fold at
+862 (measured: opening it changed zero pixels); the During GLYPH is scored at
+± 3 pt on its width and ± 6 pt from the clip's right edge where §6e's text
+says 11 pt ± 1, because 11 pt is the BOX `TimelineClipDrawing.swift` lays out
+and what a render can measure is the SYMBOL drawn in it, whose antialiasing
+reaches about a point and a half past each edge — the claim kept is one mark
+of that width at the strip's right end, inside the 16 pt strip; and both
+proof scripts carry a `settle` helper for a call that sets a STATE rather
+than making a change,
+without which a mutant whose `minted` writes `linear` turns four set-up calls
+into identities and the script ABORTS instead of scoring. No `private` member
+was widened for any of them.
+
+**Two limits measured and recorded, neither of them E1's:**
+
+- **AVFoundation does not apply a mix input's first volume point for some
+  twelve milliseconds.** The incoming clip of a crossfade reads about half
+  of full scale over the first 25 ms whatever the ramp asks for, and the same
+  burst appears at a HARD CUT with the clip MUTED — which is where it was
+  pinned down and why it is not the crossfade's. §5 scores every window from
+  25 ms on and PRINTS the first one. **The hard cut is a ROW** (added by the
+  review pass below): the same fixture with no transition on it and the
+  incoming clip muted reads 0.496 of the tone in its first 25 ms and
+  −139.9 dBFS in every window after, beside the overlap's own 0.507 — so the
+  exclusion of window 0 rests on a measurement and not on a paragraph. The
+  row has no ramp in it, so it guards nothing about a ramp: the cut's edge
+  against the overlap's own is printed beside it, not scored. §4e's own text
+  anticipates the shape of it ("M3 measured
+  AVFoundation's mix wobbling by one LSB within 8 ms of a ramp edge"); the
+  size is larger than that sentence expects, which is why it is under Owed.
+- **`toneA.m4a` and `toneB.m4a` are 2 986 400 ticks, not 3 000 000.** The
+  README calls them five seconds and ffmpeg wrote them as five seconds; AAC's
+  padding makes the decoded file 149 frames. So §4's "two-second handle" is
+  really 59 frames, and `e1_proof.py` MEASURES each handle rather than
+  assuming it — an expectation written against the nominal length would have
+  been measuring the encoder.
+
+**The review pass (2026-09-19), and what it moved.** The four instruments
+were read whole against this section; the verdict was fix-required on three
+rows and nothing under `app/` or `core/` was touched by any of the fixes.
+(1) §5's exclusion of window 0 was PROSE — the hard cut it rests on was
+asserted and printed but measured nowhere, so `e1_proof.py` §5 ends with a
+hard-cut-muted session that scores it, and the script went 94 → **95**.
+(2) `e2_chrome.py`'s "…and so is Amount, where there is no `during`" read
+Amount's alpha only on a fixture that HAS one, so it now reads a third
+fixture with no `during` at all and asserts 0.42 there beside the 1 — the
+same shape as the In Duration row above it, and the score stays 24.
+(3) `e2_proof.py` carried a superseded comment calling the end patch's motion
+a spin whose whole turn is the identity, three lines above the `pulse` the
+fixture actually writes; the stale lines are gone. **Every one of the
+twenty-five mutants was re-run after those edits**, in the same tree copy on
+the same port, which is where the scores in the table above come from: each
+e1 score moved by exactly one on both sides (the new row is a hard cut with
+no transition on it, so no patch in the eleven reaches it), the two
+`e2_chrome` mutants stayed at 23/24 with the strengthened Amount row, and
+every `e2_proof` score is unchanged. The three nits were taken as well: the
+mix limit entered under Owed and in `designs/reelcut-remaining.md` §5, the
+glyph's widened tolerance added to the instrument deviations above, and
+`e1_chrome.py` and `e2_chrome.py` named in `tools/proof/README.md`'s launch
+list and its offscreen paragraph. A second reading, after those fixes, found
+the new hard-cut row's comment claiming a guard it does not give — a ramp
+defect passes a row with no ramp in it — so the clause is gone from the
+comment and from this record, and the edge comparison stays printed, not
+scored. The same reading counted SEVENTEEN documents open on the build
+instance by the end of `e1_proof.py`, one past the sixteen the plan
+budgeted: harmless against the deadlock past forty, written down so the
+number is true.
+
 **Owed, as of this record:**
 
-- E1's and E2's own proof instruments — `e1_proof.py`, `e1_chrome.py`,
-  `e2_proof.py`, `e2_chrome.py` / probe — with their named mutants (§4e,
-  §6e), and the reader review (§4f, §6f). Everything verified above is the
-  pre-existing proofs re-run, 114 new core tests, and one tracked probe for
-  the sheet.
+- The reader review (§4f, §6f): four readers per phase, each with one
+  question and the diff.
 - Four review nits from `6dda2c7`: any negative menu tag reads as None; the
   glyph infers the label dot from `nameEnd`; the zoom hint's note is fixed at
   arm time; `phase6_chrome.py`'s comment still says 1600 measures
-  identically to 1400.
-- §4g's and §6g's checks by a person at the machine.
+  identically to 1400. No claim in the four instruments reaches any of them.
+- §4g's and §6g's checks by a person at the machine, now listed in
+  `designs/reelcut-remaining.md` §4.
+- **The mix's first twelve milliseconds**, the limit measured above: it is
+  bigger than §4e's own sentence expects and it is in the EXPORTED file, so
+  it is owed a decision rather than only a paragraph. Entered in
+  `designs/reelcut-remaining.md` §5 as one host limit a later road map would
+  pick up — a lead-in on the first breakpoint, re-measured against
+  `e1_proof.py` §5's hard-cut row. Nothing is filed on the tracker for it
+  and no fix is attempted here: AVFoundation is what does it.

@@ -579,20 +579,20 @@ enum MediaImporter {
     ///
     /// Skipped when `speechIsCurrent` (`MediaImporter+Speech.swift`'s head
     /// check) says the marker, the model and the chunk size all still agree,
-    /// or when there is no audio to analyse at all. A stale cache is cleared
-    /// and posted at once — `clearSpeech`'s doc argues the order, `peaks`'
-    /// posture repeated for the voice cache — and then `SileroVAD.isAvailable`
-    /// is asked exactly once: a model that has already been marked
-    /// unavailable this process (a nil bundle, or an earlier thrown
-    /// prediction) is not retried, so a project full of media does not pay
-    /// for the same failure once per file.
+    /// or when there is no audio at all. A stale cache is cleared and posted
+    /// at once — `clearSpeech`'s doc argues the order — and that withdrawal is
+    /// the first post of a pass replacing a `.bin` on disk, so it carries
+    /// `replaced` (§4g claim 14), the one way it differs from `peaks`'. Then
+    /// `SileroVAD.isAvailable` is asked exactly once: a model already marked
+    /// unavailable this process (a nil bundle, an earlier thrown prediction) is
+    /// not retried, so a project full of media pays for it once, not per file.
     static func speech(
         for media: MediaSnapshot, url: URL, stamp: CacheStamp?, into cacheDir: URL
     ) async {
         guard media.hasAudio, media.duration > 0 else { return }
         guard !speechIsCurrent(for: media, stamp: stamp, in: cacheDir) else { return }
         if clearSpeech(for: media.id, in: cacheDir) {
-            postCacheChange(media: media.id, kind: speechKind)
+            postCacheChange(media: media.id, kind: speechKind, replaced: true)
         }
         guard SileroVAD.isAvailable else { return }
         let asset = AVURLAsset(url: url)

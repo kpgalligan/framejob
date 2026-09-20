@@ -97,8 +97,8 @@ extension AgentServer {
         }
         if !outcome.judgedByLevel.isEmpty {
             notes.append(
-                "\(outcome.judgedByLevel.count) media file(s) hold no voice and were judged "
-                    + "by level instead.")
+                "\(outcome.judgedByLevel.count) media file(s) hold no voice in at least one "
+                    + "clip and were judged by level there.")
         }
         if !notes.isEmpty { result["note"] = notes.joined(separator: " ") }
         result["project"] = summary(document)

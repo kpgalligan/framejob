@@ -148,6 +148,47 @@ there is nothing to decode anywhere in that file. `phase7_proof.py` is the half
 that needs a decoder, because ProRes 4444's alpha is a pixel format only
 `ffprobe` can name.
 
+**Road map 4's voice proofs add nothing to `media/` either, and they make
+their own recordings.** `silence2_proof.py` writes `work/silence2/fixtures/`
+on its first run (or on `--remake`): `speech.aiff` from `say`, the five mixes
+from `tools/proof/silence_spike/README.md` VERBATIM — so what the S0 spike
+measured and what S1 is proved against are the same signals — plus
+`clean.wav` (the speech at 48 kHz), `tone.wav` (the `silence.mov` recipe
+above, audio only), `voicetone.wav` (the speech padded to exactly 11.000 s
+with the tone after it) and a silent `mute.mov`. They are NOT in `media/`
+and must not go there: `media/speech.aiff` is phase 4's different text, and
+the whole point of these is that they are `say`'s output on THIS machine.
+Which is also why nothing in either script hard-codes a second of the
+recording — the TRUTH is measured per run, as the −40 dBFS level pass over
+the file's digital silence, and the pinned trace is keyed on the samples'
+own sha256. `silence2_probe.py` reuses the same directory and makes it by
+IMPORTING `silence2_proof.py`'s recipes rather than copying them.
+
+**Road map 5's transition proof needs a SECOND BINARY, built from an older
+tree.** Four of E1's claims are about what did NOT move — a version-6
+project's overlap still drawing linearly and sounding silent — and "exactly
+as it did" is only checkable against a build that never had `curve` and
+`audio`. So `e1_proof.py` and `e1_chrome.py` are run against the tree at
+`1c3e92e`, the commit before E1's first toll, extracted and built beside the
+repository and never inside it:
+
+```sh
+mkdir -p tools/proof/work/e1-reference
+git archive 1c3e92e | tar -x -C tools/proof/work/e1-reference
+(cd tools/proof/work/e1-reference && make app)
+```
+
+That build's format version is SIX and the core refuses a file from the
+future, so every fixture the two builds share is hand-written back to version
+6 (`as_version` in `e1_proof.py`, and the package `e1_chrome.py` writes) —
+which is also exactly the file a person who used the app last month has on
+disk. It answers 75 tools and 55 ops where this build answers 77 and 57,
+which is how a row knows which instance it is talking to; `e1_proof.py`
+scores that first and SKIPS the cross-build rows by name if the reference
+does not answer. `e1_chrome.py` builds the reference tree's own harness out
+of `tools/proof/work/e1-reference/tools/proof/harness/build.sh`, and takes
+`--reference DIR` for a copy kept somewhere else.
+
 Then launch YOUR OWN instance on YOUR OWN port and only ever kill that one
 (`pgrep -f "MacOS/Reelcut"` lists them; another session may have one running).
 **A direct launch of the binary runs under the TERMINAL's grants** — road map
@@ -180,6 +221,7 @@ python3 tools/proof/phase1_proof.py 4823
 python3 tools/proof/phase2_proof.py 4823
 python3 tools/proof/phase3_proof.py 4823
 python3 tools/proof/phase3_silence_scope.py 4823
+python3 tools/proof/silence2_proof.py 4823
 python3 tools/proof/phase4_proof.py 4823
 python3 tools/proof/phase5_proof.py 4823
 python3 tools/proof/phase6_proof.py 4823
@@ -191,6 +233,25 @@ python3 tools/proof/refusal_proof.py 4823
 python3 tools/proof/clip_catalog_proof.py 4823
 python3 tools/proof/op_catalog_proof.py 4823
 python3 tools/proof/op_argument_proof.py 4823
+python3 tools/proof/e2_proof.py 4823
+```
+
+`e1_proof.py` is the one script that takes TWO ports — its own and the
+reference build's — and it is run on its own instance, after the reference
+line above:
+
+```sh
+(RC_AGENT_PORT=4824 tools/proof/work/e1-reference/build/Build/Products/Release/Reelcut.app/Contents/MacOS/Reelcut \
+   -ApplePersistenceIgnoreState YES -AgentServerEnabled YES > /tmp/reelcut-4824.log 2>&1 &)
+python3 tools/proof/e1_proof.py 4823 4824
+```
+
+Road map 5's other two instruments take no port at all — they are offscreen,
+and are run beside the two above:
+
+```sh
+python3 tools/proof/e1_chrome.py
+python3 tools/proof/e2_chrome.py
 ```
 
 **Phase 9 takes a SECOND argument**, the log path, defaulting to
@@ -204,7 +265,10 @@ are already there.
 
 The offscreen scripts take no port and are run on their own —
 `python3 tools/proof/phase2_chrome.py` and its successors through
-`phase9_chrome.py`; each paragraph below says what its own one renders into.
+`phase9_chrome.py`, and beside them road map 5's `e1_chrome.py` and
+`e2_chrome.py`, each of which builds its own harness and its own probe from
+`app/Sources` (`e1_chrome.py` builds a SECOND harness, from the reference
+tree); each paragraph below says what its own one renders into.
 Phase 9 has two offscreen scripts: `phase9_probe.py` is a PROBE rather than a
 photograph, for the reason its own section gives, and `phase9_chrome.py` is
 the photograph of the one thing the harness cannot take — the breadcrumb's
@@ -234,6 +298,11 @@ what tells a stale binary on the port from the build under test: road map 7's
 `op_argument_proof.py` asserts **77** (D3·5), and every script before it keeps
 a floor — phases 1 to 9's 63, 65, 68, 70, 71, 73, 73, 73 and 74, and road map
 3's 75 — so a later phase's tools never fail an older proof.
+Road map 5's own proof landed AFTER D3 and asserts FLOORS for that reason:
+`e1_proof.py` and `e2_proof.py` want `>= 77` and `>= 57` of this build, so a
+later phase that adds a tool does not have to come back and edit them — and
+`e1_proof.py`'s `== 75` / `== 55` for the REFERENCE build are exact, because
+that tree is frozen at a commit.
 **The sixth handover cost nothing**, which is the first time that has
 happened to a handover that MOVED the number: road map 5's E1 had already
 turned `recording_proof.py`'s 75 into a floor when it added two transition
@@ -1174,7 +1243,9 @@ person's eyes: two builds agreeing byte for byte is an isolation claim, not a
 picture.
 
 `phase9_proof.py` is phase 9's MCP half (`python3 tools/proof/phase9_proof.py
-[port] [log path]`, **214/214**, about seven seconds). It was 184 for the
+[port] [log path]`, **216/216** on 2026-09-19 — 214 when section 9 landed,
+and two rows more since road map 7, whose records carry the 216 — about seven
+seconds). It was 184 for the
 phase's own gate and twenty-eight checks short of what phase 9 measured: the
 review's fix wave proved two MCP-coherence fixes in
 `work/lane9_marker_scope_mcp.py`, untracked (28 checks — the "29" this tree's
@@ -1333,8 +1404,8 @@ made in-process against one `scoped_view`; what this file adds is that the app,
 the renderer and the tools all agree with that handle once it is open. And
 three sections EXIT EARLY under a mutant that breaks scoping outright, which is
 why `double-ids` scores out of 120 rather than 184 — 184 being the baseline at
-the time; the script is 214 since section 9 landed, and the nine have not been
-re-run against it — `scoped_edit` turns the first refused op of a section into
+the time; the script is 216 now (214 when section 9 landed), and the nine have not
+been re-run against it — `scoped_edit` turns the first refused op of a section into
 a scored failure and stops, because a crash is a worse detection than a failure
 and a section that raised would leave every claim below it unrun.
 
@@ -2572,7 +2643,8 @@ off `tools/list` from the running binary, and the TABLE, read out of the
 staticlib by a probe of its own (`coreSchemas()` plus
 `AgentServer.declarations`, built the way `op_schema_probe.py` builds its
 probe and scored the same way when it will not compile). **23/23** at D3·3
-(#17). The probe is built BEFORE the first MCP call, so no swiftc runs while
+(#17), **24/24** since D3·4 (#18) added a row, and 24/24 again on 2026-09-19.
+The probe is built BEFORE the first MCP call, so no swiftc runs while
 the proof is driving the app.
 
 **No argument name is written in the script.** The expectation is computed
@@ -2795,3 +2867,345 @@ no drag is the one row that can see the press-time clear.
 What it cannot see is a real `mouseDown` delivered by AppKit below the
 lanes — `designs/reelcut-remaining.md` §4 lists it for a person at the
 machine.
+
+## Remove Silences by voice (`silence2_proof.py`, `silence2_probe.py`)
+
+Road map 4's S1 — quiet judged by Silero VAD through Core ML — and the two
+instruments §4g owes it, landed 2026-09-19 against the unmodified tree.
+
+`python3 tools/proof/silence2_proof.py [port] [--remake]`, port 4823 by
+default, **60/60**, against a running instance. It makes its own fixtures
+(above), and then measures claims 1–11:
+
+* **1, the clean fixture.** The default voice answer is compared three ways.
+  Against a PYTHON REFERENCE WALK of `SilenceDetector.detect` + `refine` over
+  `MediaPeaks.window`'s arithmetic at the 32 ms grid, reading the
+  probabilities the app itself wrote into `cache/speech/<id>.bin` — TICK FOR
+  TICK, not within a bucket, because a bucket of slack hides every mutant the
+  max-over-a-step rule has. Against the TRUTH, the −40 dBFS level pass over
+  the file's digital silence: the start lands LATE (q6's offset lag) and by
+  at most 0.15 s, and the end within `OVERRUN` of it. And again at a
+  `set_canvas fps=[100, 1]` canvas, where one frame IS one bucket so the snap
+  absorbs nothing — the row the max→mean mutant is scored on. The walk
+  carries the segment's own `source_duration` rather than assuming it equals
+  the clip's duration: a whole clip's duration is `snapped(media.duration)`,
+  so off the grid the two differ and `sourceTick` drifts.
+* **2, `hum3.wav`** — the headline. A −32 dBFS hum the shipped rule is blind
+  to: level at −40 answers NOTHING, voice answers both pauses, within 0.10 s
+  of the bounds it found in the clean file.
+* **3, `quiet2.wav`.** Level answers more ranges than voice does, and at
+  least one of them lies wholly outside both real pauses — a cut into a word.
+  Voice answers the two pauses. The COUNT (§4g said six; it was six here) and
+  the lead-in span q6 recorded are printed, not scored.
+* **4, a tone, and the fallback.** A voice whose source window holds no
+  voice is judged by level for its whole span, so on a tone file voice and
+  level answer the same ranges and the same total and the media is named in
+  `judged_by_level` — which is what makes phase 3's fixtures answer what they
+  always did. The two-clip variant (voice for 11 s, then the tone, split at
+  11 s) checks that the tone clip answers the tone's TWO gaps and never one
+  span across itself, AND that the voice clip is judged by the MODEL: its
+  spans tick for tick against the reference walk over clip A's own segment.
+  Both sides of that row are filtered to the spans ending strictly before the
+  split, because the voice clip ends in a quiet run of its own that a build
+  judging the tone clip by voice merges past the split — 11.0 s is exactly
+  330 frames at 30 fps, so on a correct tree the run ends ON the bound and
+  `<` drops it from both sides. Level mode's own spans before the split are
+  printed beside it, which is how the row says it has power on this host.
+* **6 and 7, the scope rule and the nest wall**, both in voice mode: a muted
+  clip and a solo-silenced one propose nothing (the gain FLOOR runs before
+  the model), and no proposed span reaches into a nest while the identical
+  dead air in front of it still is.
+* **8, a cache withheld.** The `.bin` deleted with its marker left behind:
+  the media is named in `voice_pending`, folded into `pending_peaks`, and
+  NOTHING inside it is proposed, while level mode still answers the truth. A
+  `relink_media` to a fresh copy rebuilds it and the answer comes back.
+* **9, reversed.** The mirrored walk about the MEDIA's duration, tick for
+  tick, and not equal to the forward answer.
+* **10, the refusals**, word for word — the two `voice_confidence` rules, the
+  misspelt `mode`, and a misspelt ARGUMENT, which the gate refuses by name
+  before the handler runs.
+* **11, the cut.** `ripple_delete_ranges` of the voice answer, exported as
+  `audio_wav`: the decoded PCM is the uncut export with each span excised,
+  BYTE identical. The clip is trimmed to the last whole frame inside the file
+  first — otherwise its `snapped` duration outruns the source, the plan plays
+  it at 0.9990 and AVFoundation's resampler, not the cut, is what gets
+  measured (two exports of the same material drift about seventeen samples).
+* **5, LAST**, because it opens eighteen more documents: `phase3_proof.py`
+  and `phase3_silence_scope.py` run as subprocesses against the same binary
+  and must score FULL. Their counts are printed rather than asserted.
+
+`python3 tools/proof/silence2_probe.py [--pin]`, no port and no running app,
+**61/61**. `phase9_probe.py`'s instrument — `app/Sources` whole, `build.sh`'s
+own swiftc line, mtime staleness, a build failure a scored FAILURE — with
+`app/Resources/Models` copied beside the binary as `build.sh` does it, and a
+SECOND copy of the binary in `nomodel/` with none beside it. It runs three
+modes and four processes:
+
+* **12, the wrapper.** `writeSpeech`'s `.bin`, `probabilities(of:)`, the same
+  samples fed in 1000-sample buffers with a `flush`, the SPIKE's own loop at
+  `.cpuOnly` over its own `MLModel`, and a pinned trace. The streaming row is
+  the EXACT one (float for float, which is what proves the remainder is
+  carried across `feed` calls); the pass's `.bin` is within the 0.01 the row
+  enforces with identical decisions, because the pass reads with
+  `alwaysCopiesSampleData = false` and this runner's reader does not, so the
+  48 kHz → 16 kHz converter hands the two paths different block sizes. The
+  spike's loop stops at the last COMPLETE chunk, so it is compared over the
+  common prefix.
+* **`silence2_trace.json`** is the pin: 325 chunks at three decimal places,
+  keyed on `sha256` of the DECODED samples of `clean.wav` rather than the
+  file's bytes, since ffmpeg's WAV muxer writes an `ISFT Lavf<version>` tag
+  and the bytes move with a brew upgrade while the samples do not. A
+  different `say` is a SKIP printed by name with both hashes, never a
+  failure; `--pin` rewrites it from this host's run.
+* **13, 14, 15, the pass.** The marker's two new fields (`speechModel`,
+  `speechChunkSamples`) and that it WRAPS the ordinary `CacheStamp` byte for
+  byte; a second call that does nothing and posts nothing; a marker naming
+  another model that rebuilds. Then the ORDER, with the notification observed
+  as it arrives and the disk read at that instant: a stale `.bin` under a
+  foreign marker produces exactly two posts, the old file is already GONE at
+  the first and the new bytes are there at the second, and the FIRST carries
+  `replaced` while the second does not — the withdrawal opens a pass that
+  replaces a file on disk, which is what the flag means; `peaks` posts
+  without it.
+  And a movie with no audio writes nothing, whether its record claims audio
+  (the relink shape) or admits it has none.
+* **17, the sheet**, driven through a real `ProjectDocument` and a real
+  window: the Judge by popup's rows and its Voice default, "2 cuts", two
+  candidate spans washed on the timeline, Remove enabled. Then the speech
+  cache cleared: "No cuts", the pending note, Remove disabled — and with the
+  bytes put back WITHOUT a post, a `thumbs` notification changes nothing
+  while a `peaks` or a `speech` one brings the cuts back.
+* **16, no model at all**, in its OWN process because unavailability is
+  process-wide and never retried: `isAvailable` false, the input's
+  `voiceAvailable` false, the sheet on Level with the Voice row disabled and
+  the reason written under it, the tool's refusal sentence, and a call with
+  no `mode` falling back to level and SAYING so.
+
+**Made to fail on purpose**, ten times, each mutant a copy of the tree with
+the app rebuilt in the copy on its own port and the probe compiled from the
+copy (the staticlib is copied in unchanged — every mutation is in
+`app/Sources`). Against the MCP half's 60: the level fallback removed
+**52/60** (claim 4's tone rows and phase 3's re-run), the window test made
+whole-file **57/60** (claim 4's two-clip tone rows alone), and the fallback
+keyed per MEDIA — the pre-fix read — **59/60** (the two-clip variant's VOICE
+row alone). Against the probe's 61: `speechModel` dropped from `SpeechStamp`
+**53/61** (claim 13's marker rows and the whole of claim 14), and `replaced`
+dropped from the withdrawal post **60/61** (that row alone). Five more are
+quoted with the N they had at the time and were not re-run: the probability
+forced to 1 **33/59**, max→mean over a step **54/59** (claims 1a, 1c and 9),
+`voice_confidence` accepted with `mode: "level"` **58/59** (one row), the
+LSTM state not fed back **57/61** (claim 12's amplitude and its decisions)
+and the 64-sample context not carried **59/61** (the amplitude only — the
+decisions survive it). The max→mean mutant needed no exemption: the
+sensitivity line claim 1(c) prints says the mean rule moves two edges at 100
+fps on this host's fixture.
+
+Phases 2, 3, 3-silence and 5 and the remaining-work proof were re-run against
+the same binary and score **86, 123, 8, 88 and 79**.
+
+What neither can see is a narrated screencast marked by ear, a cut LISTENED
+to across a voice-mode boundary, and the sheet's note when one file is
+pending while another is judged by level — `designs/reelcut-remaining.md` §4
+lists all three for a person at the machine.
+
+## Transitions and motion (`e1_proof.py`, `e1_chrome.py`, `e2_proof.py`, `e2_chrome.py`)
+
+Road map 5's E1 and E2 — transitions learning direction, easing and an audio
+crossfade, and clips learning In / Out / During motion presets — and the four
+instruments §4e and §6e owe them, landed 2026-09-19 against the tree as it
+stood.
+
+`python3 tools/proof/e1_proof.py [port] [reference_port]`, 4825 and 4826 by
+default, **95/95**, against TWO running instances: this build and the build
+at `1c3e92e` (the reference paragraph in "Running one" says how to make it).
+Fixtures are `media/`'s two tones, `AV.mov` and `silence.mov`, plus shape
+cards the app draws; **the tones are TRIMMED first**, because a file placed
+whole has no handle and `add_transition` is built from handles. The handles
+are MEASURED and not assumed: `toneA.m4a` is written as five seconds and
+decodes to 2 986 400 ticks, which snaps to 149 frames, so "a two-second
+handle" is really 59 — a fixture that assumed 60 would be measuring ffmpeg's
+padding rather than the op.
+
+* **0, the two instances.** 77 tools and 57 ops as FLOORS here, `== 75` and
+  `== 55` on the reference, and both parity logs grepped empty. The two
+  counts are what tells the instances apart.
+* **1, the schema.** A hand-written version-6 file opens with `curve:
+  linear, audio: false`; a copy of it saves as version 8 with `audio` the
+  LAST key of `transition_in`, read off the text; `set_transition` over a
+  stored style keeps the curve and the flag; and `set_transition_style` at a
+  hard cut stores a MINTED transition that nothing draws (the frame at the
+  cut is byte-identical before and after).
+* **2, the three wipes.** At p = 0.25 on a two-second overlap: which SIDE
+  the incoming colour is on and where the boundary sits, to a pixel —
+  `wipe_left` at column 480, `wipe_up` at row 270, `wipe_down` at row 90 —
+  then `ease_in_out` moving the first to 640·(1 − smoothstep(0.25)) = 540.
+  The overlap is two seconds because a one-second one puts p = 0.25 off the
+  30 fps grid. And the old `wipe` renders BYTE-IDENTICAL to the reference
+  build on the version-6 fixture.
+* **3, the push and the dissolve.** A minted `push_left`'s seam at
+  smoothstep(0.25) and at 0.25 under `linear`; five ticks of a version-6
+  cross dissolve byte-identical to the reference build.
+* **4, `add_transition`.** Centre, `before`, `after`, the step-down against
+  the overlap rule, the odd frame landing on B, a 2× clip whose head is
+  converted ONCE, a nest (which answers a zero head, so `center` takes the
+  whole overlap from A's tail and `before` has nowhere to take it from), an
+  action rebased so it still renders the same SOURCE frame at its end, the
+  five refusals by their own words, and one `undo` restoring `get_project`
+  byte for byte. **Every bullet starts from P0** — `undo` until the dump
+  matches, asserted — or from its own named session, because the step-down
+  reads both clips' durations and a bullet built on the last one's leftovers
+  would be measuring a different rule.
+* **5, the crossfade**, exported as `audio_wav` and decoded to PCM: each
+  tone's level by projection onto its OWN frequency (a Goertzel filter) in
+  25 ms windows — 11 cycles of 440 Hz and 22 of 880 Hz at 48 kHz, so neither
+  leaks into the other's bin — tracking `cos` and `sin` of the eased
+  progress within 0.3 dB and summing flat within 0.5 dB; a muted incoming
+  clip; a version-6 export sample-identical to the reference build's within
+  this build's own measured wobble (0); a nested pair, where the inner
+  overlap still obeys the law and the outer one fades the nest out; and a
+  HARD CUT with the incoming clip muted, which is what says the first 25 ms
+  the other rows skip belong to the host's mix — no transition and no ramp
+  there, and the same half-scale burst (0.496 of the tone, then −140 dBFS
+  from 25 ms on).
+* **6, Remove Silences.** A quiet run that crosses a cut is proposed with no
+  transition there and wholly suppressed with one, the wall being the
+  overlap widened by its own length; the answer's KEY SET is the same either
+  way, so a wall is never reported; and the crossfade's own dip is inside
+  the wall, with a faded tail on its own as the control that says the
+  detector can see a dip at all.
+
+`python3 tools/proof/e1_chrome.py [--reference DIR]`, no port, **14/14**.
+The harness on BOTH trees over one hand-written version-6 package, and a
+probe built from `app/Sources`.
+
+* **The section's body is two rows taller than it was**: the vertical EXTENT
+  of the pixels that opening `video.transition` changes, measured on each
+  tree, and the claim is the DIFFERENCE — 129 − 71 = 58 pt = 2 × 29
+  (`DS.controlHeight` + `InspectorMetrics.rowSpacing`). The difference is
+  what makes it a measurement: the extent includes the header's disclosure
+  triangle and the body's insets, and those are the same on both trees, so
+  they cancel. A `shift_match` measurement does NOT apply here — Transition
+  is the LAST section in a shape clip's stack (the audio group below it is
+  empty), so opening it moves nothing and there is no shift to find.
+* **The menu**: `TransitionKind.allCases` with the case index as the tag,
+  the three wipes at 10–12, None alone under a separator at −1.
+* **The validator**: a KIND enabled at a hard cut and at an overlap and dead
+  at a gap and on a first clip; None enabled for every selection, because a
+  clip can carry a stored transition the timeline does not draw; and the
+  checkmark on the kind the clip stores and on nothing else.
+* **The rows**: Kind, Curve and Duration as labels, plus one checkbox.
+  Crossfade Audio carries NO row label — `inspectorCheckRow` passes nil and
+  the title lives inside `OptionCheckboxControl`, which is private — so it is
+  counted rather than read by name, and nothing private is widened.
+* **The batch**: Clip ▸ Transition ▸ Cross Dissolve over a selection of two,
+  one at a hard cut and one at a gap, makes the overlap at the cut, leaves
+  the other clip exactly where it was rather than aborting the selection, and
+  puts up no sheet.
+
+`python3 tools/proof/e2_proof.py [port]`, 4825 by default, **61/61**, one
+instance. Cards on a black backdrop; `NONE` is the same session with the
+motion cleared, re-rendered and put back, which is the control half the rows
+here are measured against.
+
+* **1, the schema**: a version-7 file opens with `motion: null`; a save
+  writes version 8 with `motion` the LAST key of the video object; three
+  nulls normalise back to null; a misspelt key, an unknown kind, a negative
+  duration and a zero period are each refused BY NAME; `set_action_end`
+  refuses a motion; and two files nothing in the app can write — an action
+  whose `end` carries a motion, which draws the BASE motion, and a
+  hand-written `period: 0`, which is inactive and draws no NaN. Both of
+  those fixtures are placed and sized so the wrong answer is a DIFFERENT
+  picture: a NaN reaches the recipe as JSON null and Swift reads a field's
+  default, which on a card already at the origin is the same frame.
+* **2, the slides**: off the canvas at the first frame, byte-identical to no
+  motion at `in`, and the leading edge at `ease_out(0.5)` — on a plain card,
+  on a 30°-ROTATED one (its bounding box) and on a CROPPED one, where the
+  pivot is the VISIBLE centre.
+* **3, `fade`, `zoom_in`, `pop`**: the eased opacity, the box and the
+  opacity at `u` = 0.5, the same for a cropped card about its visible centre,
+  and `pop` passing 1.0 at u = 0.6 and 0.8 and landing on exactly 1 at u = 1.
+* **4, the four continuous presets**: one whole period of a `spin` is
+  byte-identical to no motion — measured twice, once plainly and once on the
+  INCOMING half of a cross dissolve, which is the only place a rotation of
+  360 that is not exactly 0 SHOWS (`partnerBox` answers nil for a rotated
+  partner and the outgoing layer loses its coverage correction); an eighth
+  of a turn as a 45° bounding box; a `shake` identical on a 60 s clip and a
+  5 s one at the same clip time; a `drift` read against the CLIP; a `bounce`
+  lifted by exactly 0.08·A·H.
+* **5, composition**: the tent (a 4 s card with 3 s edges, so both halves
+  land on the grid), an action moving `x` under an arrival, two slots
+  MULTIPLYING, and a nest scaling every inner layer about the nest clip's
+  placed centre.
+* **6, the model rules**: `get_project` un-moved while the frame moves, and
+  a split taken MID-ARRIVAL writing two pieces that are still at the origin
+  — which is the half a render check cannot see, since `split_clip` writes
+  the second piece's props straight out of `evaluate_clip`; then the split
+  and ripple-delete rules for the two edge slots, and a split text clip's
+  first half still ending fully revealed.
+* **7, the export path**: an `apng` of a one-second in/out range taken apart
+  with ffmpeg, frame 13 at t = 12/25 s having the card's leading column where
+  `ease_out` puts it. The APNG comes out at the CANVAS's size and not the
+  preset's 960 × 540: an image format is written with the picture fitted
+  inside the size, aspect kept and never upscaled (`core/src/export_size.rs`).
+
+`python3 tools/proof/e2_chrome.py`, no port, **24/24**.
+
+* **The wedges**, measured as the pixels that differ from the same card with
+  no motion: an arrival's triangle over x 132–174 and a departure's over
+  279–300 on a four-second card at the default 42 pt/s zoom, both inside the
+  16 pt name strip. A `during` draws no wedge at all — it is continuous and
+  has no length to show — and one 11 pt glyph at the strip's right end.
+* **The section**, opened with `expandSections=video.motion`: the changed
+  pixels are inside the inspector column and span a body at least seven rows
+  deep. It is rendered at 1600 pt rather than 862: Motion is the tenth
+  section in a shape clip's stack and its header is below the fold at the
+  window every other chrome script photographs.
+* **The menu**: three slots and a Preview, `EdgeMotion.allCases` in In and
+  Out and `DuringMotion.allCases` in During with None at −1, every one dead
+  with nothing selected, the stored kind checked and the empty slots
+  checking None — and two clips that DISAGREE checking nothing at all in
+  that slot while still checking None in the slots they agree on.
+* **The rows and their liveness**: the seven labels in order, and Period,
+  In Duration and Amount live or dead according to what the clip carries —
+  each read on a fixture that HAS the thing and on one that does not, so
+  three fixtures: a `pulse` with an arrival, a `drift`, and a clip with an
+  arrival and no `during` at all.
+  Liveness is read off `alphaValue` (1, or 0.42 when the row is off), since
+  a control's own `isActive` is private.
+* **Two commands in a real window**: During ▸ None clearing the during and
+  KEEPING the arrival (a `motion` patch replaces the whole object, so the
+  command has to carry the other two slots), and the section's In popup —
+  driven by ObjC dispatch on `itemPicked:`, the message the menu itself
+  sends — writing the clip's BASE motion with the playhead inside an action
+  and leaving that action's `end` with no `motion` in it.
+
+**Twenty-five mutants**, each in a copy of the tree under a scratch
+directory with the app rebuilt in the copy on its own port, every patch
+asserting its replaced text occurs exactly once, and the original tree never
+touched. E1: `cos`/`sin` swapped, the `Side` close removed, `minted` writing
+linear, `set_transition` minting over a stored style, `align` ignored, the
+speed applied twice in `extended`, the action rebase removed, the step-down
+removed, the overlap walls removed, the menu batch unfiltered, `wipe_up`
+given `(0, 1)`. E2: the `NSNull` rule removed from `MotionProps`, the
+`rem_euclid` removed, the guards removed, `motion::apply` added to
+`evaluate_clip`, the totals replaced instead of multiplied, the text
+fallback used for a shape, the period read as a fraction of the clip, the
+tent removed, the pivot compensation removed, the split rule removed, the
+`evaluate_clip` restore removed, the `set_action_end` refusal removed,
+`structural` not widened, `drift` using the period. Every score is in
+`designs/reelcut-roadmap-5.md` §12, with the rows each one took.
+
+Three of those mutants SURVIVED their first fixture and the fixture was
+strengthened rather than the mutant excused, which is worth knowing before
+writing another row here: a whole `spin` reduces to a rotation the
+compositor cannot see, so it had to be measured on a dissolve's incoming
+half; a degenerate `period` makes every field NaN and a NaN reaches Swift as
+a field DEFAULT, so the card had to be moved off the origin; and an action's
+end patch that differs only by a KIND leaves the same picture at every tick,
+because the action loop interpolates and a string it can only take whole, so
+the patch had to differ by a number.
+
+What neither pair can see is in `designs/reelcut-remaining.md` §4: a
+crossfade across a Remove Silences cut HEARD, an eased push FELT, the three
+wipes read as directions, and whether each preset's numbers look right at an
+ordinary clip length.

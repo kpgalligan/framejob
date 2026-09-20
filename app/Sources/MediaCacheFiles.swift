@@ -53,7 +53,10 @@ import UniformTypeIdentifiers
 /// strip finished), `MediaImporter.replacedKey` as `true`. The kind stays
 /// `thumbs` for those, so an observer that never heard of the flag behaves
 /// exactly as it did; the timeline reads it to drop the decoded tiles it is
-/// holding, which are the old film's.
+/// holding, which are the old film's. The voice cache's withdrawal post
+/// (`MediaImporter.speech`, kind `speech`) is the flag's second carrier: it,
+/// too, opens a pass that replaces a file already on disk. `peaks` posts
+/// without it.
 ///
 /// Thumbnails post repeatedly as they accumulate, so an observer must be
 /// cheap: mark the lane dirty and redraw, never rebuild the timeline.
@@ -71,7 +74,9 @@ extension MediaImporter {
     static let peaksKind = "peaks"
     static let speechKind = "speech"
     /// Present (and `true`) only on the first post from a pass that replaced
-    /// a strip that was on disk; absent otherwise, never `false`.
+    /// a file that was on disk — a `thumbs` rebuild, or the `speech`
+    /// withdrawal at `MediaImporter.speech`'s head; absent otherwise, never
+    /// `false`.
     static let replacedKey = "replaced"
 
     // MARK: - Cache layout
