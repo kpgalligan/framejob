@@ -14,4 +14,6 @@ serde_path_to_error = "0.1.20"
 tiny_http = "0.12"
 
 [profile.release]
-lto = true
+# No LTO: cargo skips it for a staticlib+rlib unit anyway, and asking for it
+# fat-LTOs each of the 32 test binaries (designs/reelcut-remaining.md §6).
+incremental = true

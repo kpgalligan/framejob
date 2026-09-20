@@ -15,7 +15,8 @@ debt two large phases left behind, plus the checks no script can make. §1 and
 §2 were that debt and are now CLOSED; they stay here as the record of what
 closed them, because each one taught something the next reader should not
 have to relearn. §3, §4 and §5 are what is still open, and none of them is a
-task with a diff at the end of it.
+task with a diff at the end of it; §6, added 2026-09-19, was the one that
+was, and its diff landed the same day.
 
 Three rules from `designs/reelcut-roadmap-2.md` §0 governed the closing and
 are not restated per item: a file at the ~600-line cap gives something up
@@ -473,9 +474,95 @@ truncated in silence where every other integer argument is refused by name.
 
 ---
 
+## 6. The Rust build settings, measured 2026-09-19
+
+`core/Cargo.toml`'s one profile line, `[profile.release] lto = true`, does
+NOT reach the shipped staticlib and DOES reach every test binary — the
+reverse of what it is there for. Cargo passes no `-C lto` to a unit whose
+crate types include `rlib` (rustc cannot LTO an rlib, so cargo skips the
+whole unit), and the lib is `["staticlib", "rlib"]`; the `-v` line for the
+lib carries `--crate-type staticlib --crate-type rlib -C opt-level=3
+-C strip=debuginfo` and nothing else, and `libreelcut_core.a` has 437
+members, 17 of them the crate's own codegen units, at 32 MB. With
+`crate-type = ["staticlib"]` alone cargo does pass `-C lto=fat`, the build
+takes 29.5 s instead of 11.6 s and the archive is 8 MB — and every
+integration test then fails to compile (`error[E0433]: failed to resolve:
+use of unresolved module or unlinked crate reelcut_core`), because a test
+links the rlib. Product LTO would therefore cost a crate split (a shim crate
+that is `["staticlib"]` only, over the lib crate) and eighteen seconds per
+`make app`; nothing measured says the core's JSON, arithmetic and plan work
+would repay it. The parent `~/devel/rasterize/core/Cargo.toml` has the same
+line over the same two crate types, unmeasured there.
+
+What the line does do is give each of the 31 integration-test binaries, and
+the lib's own empty harness, a fat LTO over the whole crate graph from
+bitcode, so one edit re-optimises the crate 32 times. Measured on the M2 Max
+(8P+4E, 12 jobs — cargo's default `-j` and the right one), in a copy of
+`core/` with one target directory per variant, wall clock in seconds:
+
+| `[profile.release]` | cold build | build after edit | test build after edit | test run |
+|---|---|---|---|---|
+| `lto = true` (today; fat) | 17.4 | 11.7 | 166.3 | 6.8 |
+| `lto = "thin"` | 17.4 | 11.2 | 172.0 | 6.8 |
+| `lto = false` (thin-local, the default) | 16.9 | 11.6 | 26.2 | 6.7 |
+| `lto = false`, `incremental = true` | 16.2 | 1.0 | 3.0 | 6.6 |
+| dev profile, no `--release` | 12.1 | 1.1 | 3.2 | 9.9 |
+
+The "after edit" columns above are a comment inserted at the top of
+`outcome.rs`, which incremental hashing all but skips; with a real statement
+added to `time.rs::snap_to_frame`, which the crate inlines everywhere,
+`lto = false` + `incremental = true` measures 4.5 s to rebuild the staticlib,
+6.1 s to rebuild every test binary and 8.7 s for the whole of
+`cargo test --release`. A touched but unchanged file is the floor at 0.9 s
+and 3.1 s. The other levers do not move: rust-lld through `-fuse-ld=lld`
+against Apple ld-prime 1230.1 is 27.2 s against 26.2 s for the test build
+(noise), and the `.a` itself is never linked on the Rust side at all;
+`opt-level = 1` in dev is slower cold (19.4 s) and no faster warm;
+`cargo test --doc` is 0.4 s and `[lib] test = false` saves 0.2 s; the deps
+are some five seconds of a cold build, so sccache has nothing to save; the
+671 tests run in under seven seconds across 31 binaries, so nextest has
+nothing to parallelise yet. `panic = "abort"` is not available: `ffi_agent.rs`
+catches unwinds. `make test` stays `--release`, as the rule says: the dev
+profile is no faster to build and 3 s slower to run, and it would test a
+configuration the app does not ship.
+
+**LANDED 2026-09-19, uncommitted: two lines in `core/Cargo.toml`** — in
+`[profile.release]` itself,
+because `make rust`, `make test`, the Xcode pre-build script and
+`LIBRARY_SEARCH_PATHS` all hard-code `release`, so a custom profile would
+have to be threaded through four places:
+
+```toml
+[profile.release]
+# No LTO: cargo skips it for a staticlib+rlib unit anyway, and asking for it
+# fat-LTOs each of the 32 test binaries (166 s per edit; §6 of remaining).
+incremental = true
+```
+
+That is `lto = true` deleted and `incremental = true` added; the shipped
+`.a` is then codegen'd in up to 256 units instead of 16 (583 archive
+members, 163 of them the crate's, 22 MB), and
+`CARGO_INCREMENTAL=0 cargo build --release` is the one-off way back to 16
+when a product build should be.
+
+Measured in place after it landed: the first `make test`, a full rebuild
+and run, 28.9 s, 671 passed; then with a comment line inserted at the top
+of `outcome.rs` and removed again, `cargo build --release` 0.8 s and
+`make test` 6.5 s and 8.6 s on two successive edits (the run itself is
+~6.5 s of that), against ~12 s and ~173 s before; `make lint` clean in
+2.9 s; `make app` BUILD SUCCEEDED; the built app launched on its own port
+with an empty parity log, published 77 tools, and answered `new_project`
+and `get_project` through the core, and the argument gate refused a
+stranger key by name. The cold build is unchanged. The expectation written
+above the table before the change (first run 40–50 s, then ~9 s and
+1–5 s) held, and the first run was faster than expected.
+
+---
+
 ## What is left, in order
 
 1. **§4** whenever there is a person at the machine; it is the only list here
    that cannot be closed by writing code.
 2. **§3** is consulted, not done.
 3. **§5** is a decision, and the user's.
+4. **§6** landed 2026-09-19 and is not yet committed.

@@ -25,7 +25,7 @@ changes a file's role or adds a rule. Never append a status paragraph here.
 | Document | What it is |
 |---|---|
 | `designs/reelcut-design.md` | **The normative spec.** §5 schemas, §6 op table, §7 architecture, §9 keys and menus, §10 acceptance steps, §11 decisions already made — not to be re-litigated. |
-| `designs/reelcut-remaining.md` | What is left: §3 the size-debt ledger a phase consults before paying a toll, §4 what only a person at the machine can check, §5 where the next road map starts. |
+| `designs/reelcut-remaining.md` | What is left: §3 the size-debt ledger a phase consults before paying a toll, §4 what only a person at the machine can check, §5 where the next road map starts, §6 the Rust build settings, measured, and the two `Cargo.toml` lines that landed from it. |
 | `designs/reelcut-roadmap.md` | M1–M3: how each was proved, the known limits. |
 | `designs/reelcut-roadmap-2.md` | Ten phases, all built. §0 is the rules every phase inherits; §2 holds each phase's record. |
 | `designs/reelcut-roadmap-3.md` | Screen recording (R1) and pause/resume (R2), built. Start here for the recorder. |
