@@ -112,18 +112,13 @@ fn rescale(project: &mut Project, old_width: u32, old_height: u32) {
 fn resnap(project: &mut Project) {
     let fps = project.canvas.fps;
     let frame = project.frame();
-    // By index: the source bound is read off the PROJECT (the clip's media)
-    // while the clip itself is about to be mutated.
+    // By index: the new duration is read off the PROJECT (the clip's media
+    // is what bounds it) while the clip itself is about to be mutated.
     for index in 0..project.clips.len() {
-        let available = project
-            .longest_duration_on_grid(&project.clips[index])
-            .or_unbounded();
+        let duration = project.duration_resnapped(&project.clips[index]);
         let clip = &mut project.clips[index];
         clip.start = time::snap_to_frame(clip.start, fps).max(0);
-        clip.duration = time::snap_to_frame(clip.duration, fps).max(frame);
-        if let Some(available) = available {
-            clip.duration = clip.duration.min(available).max(frame);
-        }
+        clip.duration = duration;
         let last_start = clip.duration.saturating_sub(frame).max(0);
         for action in clip.actions.iter_mut() {
             action.start = time::snap_to_frame(action.start, fps).clamp(0, last_start);

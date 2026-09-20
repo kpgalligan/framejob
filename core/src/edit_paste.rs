@@ -217,7 +217,6 @@ fn absorb_nests(
             tracks.insert(track.id, id);
             track.id = id;
         }
-        let frame = project.frame();
         for clip in copy.clips.iter_mut() {
             clip.id = project.allocate_id();
             for action in clip.actions.iter_mut() {
@@ -226,10 +225,11 @@ fn absorb_nests(
             clip.track = tracks.get(&clip.track).copied().unwrap_or(clip.track);
             clip.source = remap_source(&clip.source, media, &map);
             clip.start = project.snapped(clip.start).max(0);
-            clip.duration = project.snapped(clip.duration).max(frame);
+            // The speed BEFORE the duration: the bound is measured at it.
             if !(clip.speed.is_finite() && clip.speed > 0.0) {
                 clip.speed = 1.0;
             }
+            clip.duration = project.duration_resnapped(clip);
             resnap_actions(project, clip);
         }
         project.nests.push(copy);
@@ -482,19 +482,22 @@ impl Project {
             for action in clip.actions.iter_mut() {
                 action.id = next.allocate_id();
             }
-            clip.start = self
-                .snapped(at.saturating_add(source.start.saturating_sub(earliest)))
-                .max(0);
-            clip.duration = self.snapped(source.duration).max(self.frame());
-            resnap_actions(self, &mut clip);
             clip.source = remap_source(&source.source, &media, &nests);
             // The payload is trusted about WHAT a clip is and checked about
             // what it would do to the project, so a nonsense rate — which
             // only a hand-written payload can carry — falls back to 1:1
-            // rather than reaching `source_length` and the composition.
+            // rather than reaching the bound below and the composition.
             if !(clip.speed.is_finite() && clip.speed > 0.0) {
                 clip.speed = 1.0;
             }
+            clip.start = self
+                .snapped(at.saturating_add(source.start.saturating_sub(earliest)))
+                .max(0);
+            // `next` and not `self`: the media this clip names was absorbed
+            // into it above, and only a project that HOLDS the media can
+            // measure how much window is left (spec §11, D4-4).
+            clip.duration = next.duration_resnapped(&clip);
+            resnap_actions(self, &mut clip);
 
             // The target track, then the fallbacks already added, then a new
             // one. A brand-new track holds nothing, so the last arm always

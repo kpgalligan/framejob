@@ -287,9 +287,15 @@ extension ReelOp {
     /// one thing a background is for, and it is the same scale
     /// `add_blurred_background` gives its copy, so the two commands agree.
     ///
+    /// A VIDEO or AUDIO plate is held to its own file's length, whatever
+    /// `duration` says and whatever the timeline is, so it never outruns
+    /// what it shows; an image plate has no source bound and runs as long
+    /// as it was asked to (spec §11, D4-4).
+    ///
     /// Errors on `media` and `color` together (they are alternatives, and a
     /// caller that named both meant one of them), an unknown media, a media
-    /// with no pictures, a colour outside 0–1, or a duration under a frame.
+    /// with no pictures, a colour outside 0–1, a duration under a frame, or
+    /// a timed media shorter than one frame — `add_clip`'s own sentence.
     static func addBackground(
         media: UInt32? = nil, color: RGBA? = nil, duration: Ticks? = nil
     ) -> ReelOp {
@@ -525,6 +531,13 @@ extension ReelOp {
     }
 
     /// Media sources only; actions keep their clip-relative fraction.
+    ///
+    /// The duration the core writes is `source length / rate` snapped to a
+    /// frame and then held to what the file still holds AT THE NEW RATE
+    /// (spec §11, D4-3), so a clip sitting at the tail of its file can come
+    /// back up to a frame shorter than the arithmetic asked for — and ×2
+    /// then ×1 there is not an identity. `SpeedSheetController`'s readout
+    /// is the un-held number and can differ from it by that frame.
     static func setSpeed(clip: UInt32, rate: Double, keepPitch: Bool? = nil) -> ReelOp {
         var a = OpArgs()
         a.put("clip", clip)

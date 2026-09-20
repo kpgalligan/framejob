@@ -259,6 +259,29 @@ grew is `core/src/lib.rs`, 83 → **84**, which is the module declaration.
 `app/Sources/Transcriber.swift` stays **934**: phase A changed two of its
 comments and nothing else. Nothing came off this list and nothing joined it.
 
+**What §10's phase B did to it** (2026-09-20, `wc -l` against the tree as
+phase B found it — phase A's, uncommitted). Phase B is a FEATURE, not a
+move, so the test is the opposite one: no file over the cap took anything
+on. `core/src/edit_clip.rs` is **1021**, unchanged to the line — the four
+call sites that now read the module cost lines and `whole_media_length`'s
+and `set_speed`'s own prose gave the same number back, since the module
+states the arithmetic they used to restate. The catalog file
+`app/Sources/AgentCatalog+Clips.swift` is **792**, unchanged to the line for
+the same reason, two tool sentences rewritten inside their own wrapping.
+Under the cap:
+`core/src/source_window.rs` 251 → **396** of its 400-line cap, which is the
+warning for the phase after this one; `core/src/edit_paste.rs` 596 →
+**599**; `core/src/edit_background.rs` 468 → **479**;
+`core/src/edit_nest.rs` 323 → **326**; `core/src/evaluate.rs` 588 → **591**
+(a comment); `core/src/edit_canvas.rs` 241 → **236**;
+`core/src/edit_transition.rs` 572 → **571**; `core/src/edit_edge.rs` and
+`core/src/edit.rs` unchanged at **197** and **838**. The two new test files
+are `core/tests/source_invariant.rs` (**360**) and
+`core/tests/source_edges.rs` (**176**), both under the 400-line cap for a
+new file. `app/Sources/ReelOps.swift` is 1131 → **1144**, a doc comment on
+`setSpeed` and one on `addBackground`; it is an exempt table and the row
+below is updated. Nothing came off this list and nothing joined it.
+
 Regenerate the list with
 `wc -l app/Sources/*.swift core/src/*.rs | awk '$1>600 && $2!="total"' | sort -rn`
 rather than trusting the numbers here; the standing exemptions are
@@ -275,7 +298,7 @@ row per op.
 | `app/Sources/Compositor.swift` | 1391 |
 | `app/Sources/ProjectDocument.swift` | 1352 |
 | `app/Sources/ReverseRenderer.swift` | 1311 |
-| `app/Sources/ReelOps.swift` | 1131 |
+| `app/Sources/ReelOps.swift` | 1144 |
 | `app/Sources/EditorViewController.swift` | 1123 |
 | `app/Sources/ExporterWriter.swift` | 1114 |
 | `app/Sources/PreviewCanvasView.swift` | 1104 |
@@ -286,7 +309,7 @@ row per op.
 | `app/Sources/AudioDSP.swift` | 890 |
 | `app/Sources/AgentServer+Clips.swift` | 847 |
 | `core/src/edit.rs` | 838 |
-| `app/Sources/AgentCatalog+Clips.swift` | 791 |
+| `app/Sources/AgentCatalog+Clips.swift` | 792 |
 | `app/Sources/AgentServer.swift` | 785 |
 | `app/Sources/FFmpegRewrap.swift` | 768 |
 | `app/Sources/Loudness.swift` | 742 |
@@ -502,6 +525,30 @@ And the two frame-rate pair readers in `AgentServer+Media.swift` and
 `AgentServer+Tracks.swift` still read `intValue` on each half after the
 argument gate (road map 7 §11's named residue), so a fractional numerator is
 truncated in silence where every other integer argument is refused by name.
+
+**Two more, found by road map 7 §10's phase B (2026-09-20) and deliberately
+left there**, both recorded in §10.8 as well:
+
+- **`set_canvas`'s `resnap` does not re-snap clips INSIDE nests.**
+  `core/src/edit_canvas.rs`'s `resnap` walks `project.clips` only, so a rate
+  change leaves every nested clip on the OLD frame grid; the document is
+  then a mixture, and nothing says so. Phase B's `unnest` vector is how it
+  shows: a nest made at 30 fps and opened at 24 gives back clips whose
+  stored times were never on the 24 fps grid, which is why `unnest` now
+  re-snaps and bounds each one (spec §11, D4-4). Not fixed there because a
+  rate change reaching inside nests is a document-wide edit with its own
+  overlap question, and because the markers rule (`resnap` drops the second
+  of two markers a coarser grid lands on one tick) would need an answer per
+  nest. Found by phase B's scout and recorded nowhere before this.
+- **`SpeedSheetController.syncReadout`'s "→ duration" is the UN-HELD
+  number.** It computes `source length / rate` unsnapped and unbounded,
+  which was already a frame or so away from what `set_speed` writes; since
+  D4-3 the op also holds that duration to what the file still holds at the
+  new rate, so at a file's TAIL the readout can be up to a frame further
+  out than it was. No Swift behaviour changed in phase B and nothing is
+  filed: the fix is either to route the readout through the core (a query
+  that does not exist) or to say in the sheet that the number is an
+  estimate.
 
 ---
 

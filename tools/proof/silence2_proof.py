@@ -27,7 +27,9 @@ from its `duration`, so `sourceTick` is given both (`core/src/evaluate.rs`,
 `core/src/edit_clip.rs`). A whole-file clip at rate 1 is the case where the
 two now agree: its duration is the media's snapped DOWN, so the segment plays
 at rate exactly 1 (spec §11, kpgalligan/reelcut#22); claim 1(d) is the row
-where they differ, so the walk's scale factor is not an identity everywhere.
+where they differ — a ×2 clip whose segment is EXACTLY twice its duration,
+since every site that writes a window is now held to the file (spec §11,
+D4-3) — so the walk's scale factor is not an identity everywhere.
 
 Three of the four deviations from §4g recorded in
 `designs/reelcut-roadmap-4.md` §8 belong to this half, each asserted here as
@@ -648,24 +650,25 @@ def clean_part(mcp):
     # could drop unseen. A trim cannot break the equality — at rate 1 the plan
     # resolves `min(duration, media.duration − in)`, which a shorter window
     # only makes smaller — so this row changes the clip's SPEED instead, which
-    # is what the factor is made of. At ×2 the plan's `duration × speed`
-    # (6 240 000) overruns the file, so `source_duration` is the clamp's
-    # `media.duration − in` (6 233 613) and the ratio is 1.99795, not 2: a
-    # walk that used `× speed` in place of the plan's own ratio misses these
-    # ticks too. That sharper half rests on the `set_speed` overrun spec §11
-    # leaves uncovered (road map 7 §10's candidate); when that lands the
-    # ratio is exactly 2 and only the `!=` half stays sharp. The session is
-    # left at ×2 and handed on to `refusal_part`, which asserts argument
-    # sentences only.
+    # is what the factor is made of. At ×2 the segment is EXACTLY twice the
+    # duration: `set_speed` snaps the duration and then holds it to what the
+    # file still holds at the new rate (spec §11, D4-3), where it used to
+    # write a nearest-snapped 3 120 000 whose 6 240 000 ticks of source
+    # overran the file and came back clamped at a ratio of 1.99795. So the
+    # ratio is asserted exactly here, and a walk that used `× speed` in place
+    # of the plan's own ratio is now EQUIVALENT rather than sharp — what
+    # stays sharp is the factor itself (a dropped `sourceTick` factor moves
+    # these ticks) and the spans against the walk. The session is left at ×2
+    # and handed on to `refusal_part`, which asserts argument sentences only.
     s.op("set_speed", clip=clip, rate=2)
     sped = s.segment(clip, media)
     twice = detect(s, padding=0)
     walked_sped = expected_spans(
         p, sped, twice["voice_confidence"], twice["min_length"], 0, s.frame())
     check(
-        sped.source_duration != sped.duration and spans(twice) == walked_sped,
-        f"1d at ×2 the segment's source range ({sped.source_duration}) and its "
-        f"duration ({sped.duration}) DIFFER, and the voice answer is still the "
+        sped.source_duration == 2 * sped.duration and spans(twice) == walked_sped,
+        f"1d at ×2 the segment's source range ({sped.source_duration}) is EXACTLY "
+        f"twice its duration ({sped.duration}), and the voice answer is still the "
         f"walk over that segment tick for tick: {spans(twice)} vs "
         f"{walked_sped}")
     return s, truth, spans(answer), spans(bare)

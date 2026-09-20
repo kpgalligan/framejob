@@ -36,6 +36,26 @@
 //! [`SourceBound::or_empty`] as nothing available — and the choice is
 //! visible at the call site instead of buried in a reader's doc.
 //!
+//! **Every site that WRITES a media clip's window reads the one bound
+//! here**, and which function it reads says what it is writing (spec §11,
+//! D4-2 to D4-5). A site that writes a DURATION measures the window from
+//! tick 0 — [`Project::longest_duration_on_grid`], and through it
+//! [`Project::duration_resnapped`] (`set_canvas`'s re-snap, `paste`'s two
+//! loops, `unnest`) and [`Project::duration_at_speed`] (`set_speed`);
+//! `whole_media_length` is the same measurement of a whole file. A site
+//! that writes an END measures it from the clip's OWN start —
+//! [`Project::latest_end_on_grid`], which `trim_end` and `roll` clamp
+//! against — and a site that writes a START reads
+//! [`Project::earliest_start_on_grid`] (`trim_start`, `roll` and
+//! `add_transition`'s head handle). The two directions are not the same
+//! number: the end has to land on the grid, so for a start that is off it,
+//! and by a tick at a rate whose frame is not a whole tick count
+//! (24981/1000), `start + longest_duration_on_grid` is not
+//! `latest_end_on_grid`. That is why
+//! [`Project::longest_duration_on_grid_of`] takes the pieces with `start`
+//! among them rather than a clip, and why routing the existing sites
+//! through it moved no answer.
+//!
 //! Nothing here edits: every function takes `&self` or a `&Source` and
 //! returns a value.
 
@@ -113,6 +133,18 @@ pub(crate) fn in_advanced(source_in: Ticks, timeline: Ticks, speed: f64) -> Tick
     source_in
         .saturating_add(timeline_to_source(timeline, speed))
         .max(0)
+}
+
+/// How much TIMELINE time a window starting at `source_in` still has in
+/// `media` at `speed`, unsnapped: `(duration − in) / speed`, FLOORED, so a
+/// clip can never outrun its source by a partial frame.
+///
+/// The one place that division is written. `speed` is the caller's to
+/// guard — both callers answer `Unmeasured` for a speed that is not a
+/// positive finite number before they get here.
+fn available_on_timeline(media: &Media, source_in: Ticks, speed: f64) -> Ticks {
+    let remaining = media.duration.saturating_sub(source_in).max(0);
+    (remaining as f64 / speed).floor() as Ticks
 }
 
 /// A media source with its `in` moved by [`in_advanced`]; every other source
@@ -201,26 +233,139 @@ impl Project {
         if !(clip.speed.is_finite() && clip.speed > 0.0) {
             return SourceBound::Unmeasured;
         }
-        let remaining = media.duration.saturating_sub(source_in).max(0);
-        SourceBound::Timeline((remaining as f64 / clip.speed).floor() as Ticks)
+        SourceBound::Timeline(available_on_timeline(media, source_in, clip.speed))
     }
 
-    /// THE bound a media clip's duration is held to:
-    /// [`Project::source_length_on_timeline`] with its measurement snapped
-    /// DOWN to the canvas frame grid.
+    /// THE bound, from the pieces: the longest TIMELINE duration a window
+    /// of `media` from `source_in` at `speed`, placed at `start`, could
+    /// have and still END on the frame grid inside the file.
     ///
-    /// The division above is floored and lands anywhere, so a length taken
+    /// The division is floored and lands anywhere, so a length taken
     /// straight from it is not on the grid; snapped to the NEAREST frame it
     /// rounds UP past the end of the file whenever the last frame is more
     /// than half a frame short, which is exactly the defect spec §11's #22
     /// closed. Down, `in + duration × speed ≤ media.duration` holds by
     /// construction and the plan hands the clip a segment that plays at
-    /// rate 1.
-    pub fn longest_duration_on_grid(&self, clip: &Clip) -> SourceBound {
-        match self.source_length_on_timeline(clip) {
-            SourceBound::Timeline(length) => SourceBound::Timeline(self.snapped_down(length)),
-            bound => bound,
+    /// exactly the clip's speed.
+    ///
+    /// **`start` is a parameter because the two readings differ** (spec
+    /// §11, D4-2). At `start = 0` this is `snapped_down(available)`, a grid
+    /// LENGTH — what a site that writes a DURATION wants. At
+    /// `start = clip.start` the clip's END is what lands on the grid, which
+    /// is not the same number when the start is off the grid, nor at a rate
+    /// whose frame is not a whole tick count. `Unmeasured` for a speed that
+    /// is not a positive finite number: the window is there, the arithmetic
+    /// is not.
+    pub(crate) fn longest_duration_on_grid_of(
+        &self,
+        start: Ticks,
+        media: &Media,
+        source_in: Ticks,
+        speed: f64,
+    ) -> SourceBound {
+        if !(speed.is_finite() && speed > 0.0) {
+            return SourceBound::Unmeasured;
         }
+        let available = available_on_timeline(media, source_in, speed);
+        let end = self.snapped_down(start.saturating_add(available));
+        SourceBound::Timeline(end.saturating_sub(start).max(0))
+    }
+
+    /// THE bound a media clip's DURATION is held to:
+    /// [`Project::longest_duration_on_grid_of`] measured at start 0, which
+    /// is the whole window snapped DOWN to the canvas frame grid.
+    ///
+    /// `Unbounded` for a source with no window and `Unmeasured` for an
+    /// unknown media, exactly as [`Project::source_length_on_timeline`]
+    /// answers them.
+    pub fn longest_duration_on_grid(&self, clip: &Clip) -> SourceBound {
+        let (media_id, source_in) = match &clip.source {
+            Source::Media { media, r#in, .. } => (*media, *r#in),
+            _ => return SourceBound::Unbounded,
+        };
+        let Some(media) = self.media(media_id) else {
+            return SourceBound::Unmeasured;
+        };
+        self.longest_duration_on_grid_of(0, media, source_in, clip.speed)
+    }
+
+    /// The latest timeline POSITION a media clip's end edge may reach — its
+    /// own start plus the bound measured THERE, so the end lands on the
+    /// frame grid and inside the file.
+    ///
+    /// `None` means apply no clamp, and it is the `or_unbounded` reading
+    /// both callers (`trim_end`, `roll`'s tail) already took: a source with
+    /// no window cannot be argued with, and neither can one whose
+    /// arithmetic is unmeasurable (spec §11, D4-2).
+    pub(crate) fn latest_end_on_grid(&self, clip: &Clip) -> Option<Ticks> {
+        let (media_id, source_in) = match &clip.source {
+            Source::Media { media, r#in, .. } => (*media, *r#in),
+            _ => return None,
+        };
+        let media = self.media(media_id)?;
+        let bound = self
+            .longest_duration_on_grid_of(clip.start, media, source_in, clip.speed)
+            .or_unbounded()?;
+        Some(clip.start.saturating_add(bound))
+    }
+
+    /// The earliest timeline POSITION a media clip's front edge may reach:
+    /// its start less its head, snapped UP so the edge lands on a frame
+    /// that is really inside the source (spec §11, D4-5).
+    ///
+    /// A timeline position and therefore NOT a [`SourceBound`]:
+    /// [`SourceBound::or_empty`]'s `Some(0)` is a LENGTH, and a caller
+    /// reading it as a position would take it for "back to tick 0". `None`
+    /// is no window and no clamp; an `Unmeasured` head is EMPTY, which is
+    /// what all three callers read it as. The answer may be NEGATIVE — a
+    /// clip may start before tick 0 in the arithmetic if not in the model —
+    /// so each caller keeps its own `.max(0)`.
+    pub(crate) fn earliest_start_on_grid(&self, clip: &Clip) -> Option<Ticks> {
+        let head = self.source_head_on_timeline(clip).or_empty()?;
+        Some(self.snapped_up(clip.start.saturating_sub(head)))
+    }
+
+    /// What every RE-SNAP of a media clip's duration writes: the stored
+    /// duration on this document's grid, at least one frame, and never
+    /// longer than the window the file still holds (spec §11, D4-4).
+    ///
+    /// `set_canvas`'s re-snap, `paste`'s clip loop, `paste`'s nest absorb
+    /// and `unnest` all write this one number. The one-frame floor is
+    /// applied LAST and so wins over the bound: a media shorter than a
+    /// canvas frame still leaves a clip a frame long, which is one of the
+    /// cases `evaluate.rs`'s last-line clamp stays for.
+    ///
+    /// Preconditions: the clip's media resolves in `self` (an unmeasurable
+    /// window is simply not clamped), and a degenerate `speed` has already
+    /// been set to 1.0 where the caller does that.
+    pub(crate) fn duration_resnapped(&self, clip: &Clip) -> Ticks {
+        let frame = self.frame();
+        let snapped = self.snapped(clip.duration).max(frame);
+        match self.longest_duration_on_grid(clip).or_unbounded() {
+            Some(bound) => snapped.min(bound).max(frame),
+            None => snapped,
+        }
+    }
+
+    /// What `set_speed` writes: the clip's own content length played at
+    /// `rate`, snapped to the NEAREST frame and then held to the bound
+    /// measured AT THAT RATE (spec §11, D4-3).
+    ///
+    /// The content length is read off `clip` AS GIVEN — at its OLD speed,
+    /// since that is the window it is showing — but the bound is measured
+    /// on a copy running at `rate`, because that is the speed the segment
+    /// will play at and the one the invariant has to hold for. A quotient
+    /// that is not finite leaves the duration alone. `rate` arrives already
+    /// clamped to ×0.1 – ×10.
+    pub(crate) fn duration_at_speed(&self, clip: &Clip, rate: f64) -> Ticks {
+        let scaled = self.content_length_in_source(clip) as f64 / rate;
+        if !scaled.is_finite() {
+            return clip.duration;
+        }
+        let mut at_rate = clip.clone();
+        at_rate.speed = rate;
+        at_rate.duration = scaled.round() as Ticks;
+        self.duration_resnapped(&at_rate)
     }
 
     /// The last SOURCE tick a clip's window could START at and still fit

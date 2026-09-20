@@ -265,12 +265,15 @@ impl Project {
     /// lands on a track of its own, so there is nothing here to refuse
     /// quietly.
     ///
-    /// The one thing it does NOT do is clamp a timed media to its own
-    /// length. A background runs the TIMELINE's length by definition, so a
-    /// five-second video used as one on a minute-long cut shows nothing for
-    /// fifty-five seconds; the app's only caller offers an image, which has
-    /// no source bound at all, and a person who reaches for a movie can
-    /// trim it like any other clip.
+    /// A timed media — video or audio — IS clamped to its own length,
+    /// whether the duration was given or defaulted to the timeline's (spec
+    /// §11, D4-4). It reads [`Project::whole_media_length`], which is what
+    /// `add_clip` gives a clip of the same file, so the plate ends where
+    /// its file does and its segment plays at rate 1. What that paragraph
+    /// used to say — that an unclamped plate "shows nothing" past the end
+    /// of its media — was measured FALSE: the plan stretched a six-second
+    /// file over a twelve-second plate at rate 0.5. An image plate is
+    /// unclamped still, having no source bound at all.
     pub fn add_background(
         &self,
         media: Option<u32>,
@@ -282,7 +285,7 @@ impl Project {
                 "add_background takes a media or a color, not both (media {media})"
             ));
         }
-        let duration = self.plate_duration(duration)?;
+        let mut duration = self.plate_duration(duration)?;
 
         // Everything that can refuse is decided against `self`, before a
         // track exists to leave behind.
@@ -297,11 +300,19 @@ impl Project {
                 }
                 let source = match found.kind {
                     MediaKind::Image => Source::Image { media: id },
-                    MediaKind::Video | MediaKind::Audio => Source::Media {
-                        media: id,
-                        r#in: 0,
-                        reversed: false,
-                    },
+                    MediaKind::Video | MediaKind::Audio => {
+                        // A timed plate is held INSIDE its own file, by the
+                        // same function `add_clip` measures a whole media
+                        // with — so the plate's two `Err` sentences are
+                        // that op's, and the segment plays at rate 1
+                        // (spec §11, D4-4).
+                        duration = duration.min(self.whole_media_length(&found)?);
+                        Source::Media {
+                            media: id,
+                            r#in: 0,
+                            reversed: false,
+                        }
+                    }
                 };
                 // FILL, not `add_clip`'s Fit: a plate that leaves the canvas
                 // showing down one side has failed at the one thing a

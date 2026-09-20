@@ -661,11 +661,20 @@ build that keeps the nearest snap scores **57/61** there. The review of that
 change asked for the coverage it cost: with every clip the script walks now a
 whole-file clip at rate 1, `MediaPeaks.sourceTick`'s
 `source_duration / duration` factor is an IDENTITY in every row, so claim
-1(d) was added — the clean clip at ×2, where the two differ (6 233 613
-against 3 120 000, not even a whole 2) and the answer is still the walk over
-that segment tick for tick. That row took the MCP half from 60 to **61/61**,
-and a build with the factor dropped from `sourceTick` scores **60/61**,
-taking 1(d) alone (both measured 2026-09-19). A trim cannot stand in for it:
+1(d) was added — the clean clip at ×2, where the two differ and the answer
+is still the walk over that segment tick for tick. That row took the MCP half
+from 60 to **61/61**, and a build with the factor dropped from `sourceTick`
+scores **60/61**, taking 1(d) alone (both measured 2026-09-19). **Rewritten
+2026-09-20** by road map 7 §10's phase B: at ×2 the segment used to be the
+clamp's own 6 233 613 against a duration of 3 120 000 — a ratio of 1.99795,
+because `set_speed` was one of the writers #22 did not cover — and the row
+said so while that stood. `set_speed` now holds the duration it snaps to
+what the file still holds AT THE NEW RATE (spec §11, D4-3), so the numbers
+are 6 200 000 against 3 100 000 and the row asserts the ratio is EXACTLY 2.
+Its two halves have swapped sharpness with that: the `× speed` in place of
+the plan's ratio mutant is now EQUIVALENT, and what stays sharp is the
+factor itself and the spans against the walk (road map 7 §10.8). A trim
+cannot stand in for it:
 at rate 1 the plan resolves `min(duration, media.duration − in)`, which a
 shorter window only makes smaller.
 

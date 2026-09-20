@@ -163,13 +163,12 @@ impl Project {
     /// gives one, and therefore how much room `insert_clip` opens and how
     /// much span `overwrite_clip` clears.
     ///
-    /// **A timed media's length snaps DOWN** (spec §11). The nearest snap
-    /// rounds UP past the end of the file when the last frame is more than
-    /// half short, and the segment then plays at a rate just under 1;
-    /// down-snapped, `in + duration × speed ≤ media.duration` holds and the
-    /// rate is exactly 1. The price is up to one frame of the tail, and a
-    /// media shorter than a frame, which is an `Err` naming the frame as a
-    /// media with no duration at all has always been an `Err`.
+    /// **A timed media's length is THE bound at 1:1**, snapped DOWN
+    /// (`source_window.rs`, spec §11): the nearest snap rounds UP past the
+    /// end of the file, down-snapped `in + duration × speed ≤
+    /// media.duration` holds and the rate is exactly 1. The price is a
+    /// frame of the tail, and a media shorter than a frame, which is an
+    /// `Err` naming the frame as one with no duration always has been.
     ///
     /// An image has no source bound and keeps the NEAREST snap of its
     /// descriptor's length or of the default — a constant is not on the
@@ -187,7 +186,12 @@ impl Project {
                 media.id, media.duration
             )),
             MediaKind::Video | MediaKind::Audio => {
-                let duration = self.snapped_down(media.duration);
+                // THE bound (`source_window.rs`) over the whole file from
+                // tick 0 at 1:1; a literal 1.0 is always measurable.
+                let duration = self
+                    .longest_duration_on_grid_of(0, media, 0, 1.0)
+                    .or_unbounded()
+                    .unwrap_or(0);
                 if duration <= 0 {
                     return Err(format!(
                         "media {} is shorter than a frame ({} ticks; a frame is {} ticks)",
@@ -618,9 +622,10 @@ impl Project {
     /// by `(to - start) × speed` so the frame under the edge does not move
     /// (spec §6).
     ///
-    /// Clamped to the source bound (`to ≥ start - in/speed`) and to leaving
-    /// at least one frame of clip. Actions are deliberately left alone:
-    /// they are clip-relative, and rebasing them would have to drop or bake
+    /// Clamped to the source bound — `to ≥ start - in/speed` snapped UP to
+    /// a frame, `source_window.rs`'s `earliest_start_on_grid` (spec §11,
+    /// D4-5) — and to leaving at least one frame of clip. Actions are
+    /// deliberately left alone: clip-relative, rebasing would drop or bake
     /// whatever fell off the front, which is lossy and makes trimming back
     /// out not an identity.
     pub fn trim_start(&self, clip: u32, to: Ticks) -> Result<Outcome, String> {
@@ -629,8 +634,8 @@ impl Project {
         let latest = end.saturating_sub(self.frame());
         let mut to = self.snapped(to).min(latest).max(0);
 
-        if let Some(head) = self.source_head_on_timeline(&target).or_empty() {
-            to = to.max(target.start.saturating_sub(head).max(0));
+        if let Some(earliest) = self.earliest_start_on_grid(&target) {
+            to = to.max(earliest.max(0));
         }
         // The two clamps can cross when the source has almost nothing left
         // in front: then there is no legal new start, so nothing happens.
@@ -657,15 +662,16 @@ impl Project {
 
     /// Moves the clip's end edge to `to`, clamped to the source's remaining
     /// length (media sources) and to at least one frame of clip (spec §6).
-    /// The source in point and the actions are untouched. The source bound
-    /// is a BOUND, so it is snapped DOWN like `roll`'s: the last frame at
-    /// or before the end of the file, never the one past it (spec §11).
+    /// The source in point and the actions are untouched. The bound is
+    /// `source_window.rs`'s `latest_end_on_grid`, measured at this clip's
+    /// OWN start: the last frame at or before the end of the file, and
+    /// never the one past it (spec §11, #22 and D4-2).
     pub fn trim_end(&self, clip: u32, to: Ticks) -> Result<Outcome, String> {
         let target = self.require_clip(clip)?.clone();
         let earliest = target.start.saturating_add(self.frame());
         let mut to = self.snapped(to).max(earliest);
-        if let Some(available) = self.source_length_on_timeline(&target).or_unbounded() {
-            to = to.min(self.snapped_down(target.start.saturating_add(available)));
+        if let Some(latest) = self.latest_end_on_grid(&target) {
+            to = to.min(latest);
         }
         if to < earliest || to == clip_end(&target) {
             return Ok(Outcome::Identity);
@@ -823,8 +829,9 @@ impl Project {
 
     // ---- speed and audio detach ------------------------------------------
 
-    /// Sets the clip's playback rate: `duration = source_len / rate`, with
-    /// the actions keeping their clip-relative fraction (spec §6). Media
+    /// Sets the clip's playback rate: `duration = source_len / rate` held
+    /// to what the file holds AT THAT RATE (`duration_at_speed`, spec §11
+    /// D4-3), actions keeping their clip-relative fraction (spec §6). Media
     /// sources only; `keep_pitch`, when given, sets the time-pitch flag.
     ///
     /// The rate is clamped to the inspector's ×0.1 – ×10 rather than
@@ -847,17 +854,10 @@ impl Project {
         }
         let rate = rate.clamp(SPEED_MIN, SPEED_MAX);
 
-        let scaled = self.content_length_in_source(&target) as f64 / rate;
-        let duration = if scaled.is_finite() {
-            self.snapped(scaled.round() as Ticks).max(self.frame())
-        } else {
-            target.duration
-        };
-
         let mut moved = target.clone();
         moved.speed = rate;
-        moved.duration = duration;
-        self.rescale_actions(&mut moved.actions, target.duration, duration);
+        moved.duration = self.duration_at_speed(&target, rate);
+        self.rescale_actions(&mut moved.actions, target.duration, moved.duration);
         if let (Some(keep), Some(audio)) = (keep_pitch, moved.audio.as_mut()) {
             audio.keep_pitch = keep;
         }

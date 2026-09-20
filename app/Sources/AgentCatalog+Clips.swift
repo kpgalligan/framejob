@@ -307,10 +307,10 @@ extension AgentServer {
                     + "a color to paint the plate another colour, or a media to put that "
                     + "picture there instead, at FILL scale — where add_clip would Fit it, "
                     + "because a plate that leaves the canvas showing down one side has "
-                    + "failed at the one thing a background is for. A full-canvas GRADIENT is this "
-                    + "clip and a set_shape {gradient} after it. media and color are "
-                    + "alternatives: passing both is an error, and so is a duration under one "
-                    + "frame or a media with no pictures.",
+                    + "failed at that. A video or audio plate stops where its file does, an "
+                    + "image runs the timeline. A full-canvas GRADIENT is this clip and a "
+                    + "set_shape {gradient} after it. media and color are alternatives: both "
+                    + "is an error, as is a sub-frame duration or media, or one with no pictures.",
                 [
                     "media": "Media id to show as the background — get_project lists "
                         + "them and import_media adds a file. Omit for a colour plate. A "
@@ -502,9 +502,9 @@ extension AgentServer {
             opTool(
                 "set_speed",
                 "Changes a clip's playback rate — Clip ▸ Speed…. The duration follows (source "
-                    + "length ÷ rate) and the clip's animation actions keep their relative "
-                    + "position inside it. Rate is clamped to 0.1–10. Media clips only: any "
-                    + "other kind is an error.",
+                    + "length ÷ rate, snapped and then held to what the file holds at the new "
+                    + "rate, so a whole-file clip can come out a frame short); actions keep "
+                    + "their place. Rate is clamped to 0.1–10. Any non-media clip is an error.",
                 [
                     "clip": clipDescription,
                     // The 0.1–10 range is a declared row, not a bound here:

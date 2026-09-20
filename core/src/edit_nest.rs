@@ -278,7 +278,10 @@ impl Project {
             moved.start = next
                 .snapped(target.start.saturating_add(source.start))
                 .max(0);
-            moved.duration = next.snapped(source.duration).max(next.frame());
+            // And held to what the media still holds: a nest made before an
+            // fps change carries clips on the OLD grid, since `resnap`
+            // walks the timeline's clips only (spec §11, D4-4).
+            moved.duration = next.duration_resnapped(&moved);
 
             let wanted = next
                 .tracks

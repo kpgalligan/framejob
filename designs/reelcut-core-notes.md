@@ -905,3 +905,61 @@ its MEDIA-rate still margin; whether `trim_end` on an `Unmeasured` window
 should stay unbounded; `trim_start`'s head clamp, which has no inward snap
 where `roll`'s pair does and may therefore write an off-grid start
 (UNVERIFIED, for phase B to probe); and the app's reversed mirror (phase C).
+
+## 2026-09-20 — the invariant at every writer (road map 7 §10, phase B)
+
+Phase A made the source window one module; phase B made **`in + duration ×
+speed ≤ media.duration`, with `duration` on the canvas grid, true at every
+op that writes a media clip's window** — through the module's one bound, and
+never with a local clamp. The decisions are spec §11's **D4-2** to **D4-5**,
+written before the code; the vectors, the mutants and the scores are
+`designs/reelcut-roadmap-7.md` §10.8.
+
+**Five functions, all in `source_window.rs`'s `impl Project`.**
+`longest_duration_on_grid_of(start, media, in, speed)` is THE bound from the
+pieces, and `start` is a parameter because the two readings of it are not the
+same number: at 0 it is a grid LENGTH (what a site writing a DURATION wants,
+and what `longest_duration_on_grid(clip)` has always answered), at
+`clip.start` the clip's END lands on the grid (what `trim_end` and `roll`
+write). `latest_end_on_grid` and `earliest_start_on_grid` are the two
+timeline POSITIONS an edge is held to — positions, so NOT a `SourceBound`,
+since `or_empty`'s `Some(0)` is a length and would read as "back to tick 0".
+`duration_resnapped` is what every re-snap of a media duration writes and
+`duration_at_speed` what `set_speed` writes. The unsnapped division is a
+private `available_on_timeline`, shared with `source_length_on_timeline`.
+
+**Where it landed, and what moved.** `whole_media_length`, `trim_end`,
+`roll`'s two bounds, `head_handle_frames` and `resnap` read the module with
+NO answer change — `make test` green with every existing test file
+untouched is the claim. The answers that DID move, each measured before and
+after: `set_speed` at ×2 on a whole-file clip (3 120 000 → 3 100 000, and
+the plan's ratio 1.99795 → exactly 2), `paste`'s clip loop and its
+`absorb_nests` (660 000 → 640 000 over a 655 000-tick media), `unnest` after
+an fps change (650 000 → 625 000 over 645 000), `add_background`'s timed
+plate (12 000 000 at rate 0.5 → 6 000 000 at rate 1, which overturned that
+op's "the one thing it does NOT do is clamp" paragraph — its "shows nothing"
+was false) and `trim_start`'s head clamp (an off-grid 135 000 → 140 000, the
+UNVERIFIED reading §10.6 left for this phase, CONFIRMED). `rate_stretch`
+needed no change: it writes `speed = content / duration` and moves neither
+the content length nor `in`, so `round(d × (c/d)) == c` and the window it had
+is the window it keeps.
+
+**Two orderings are load-bearing.** In `paste`'s clip loop and in
+`absorb_nests` the nonsense-speed fallback now runs BEFORE the duration line,
+because the bound is measured at the clip's speed; and `paste` measures
+against `next`, not `self`, because `next` is the project the payload's media
+was absorbed into.
+
+`edit_clip.rs` is over the cap and took nothing on: the lines the new call
+sites cost were given back by `whole_media_length`'s and `set_speed`'s own
+prose, which the module now states. `source_window.rs` is **396** of its
+400-line cap, which is the next reader's warning: the phase after this one
+gives something up before it takes anything on.
+
+Not covered, and left by name: `evaluate.rs`'s `segment_of`, both halves
+(its `duration − 1` answers "which tick can AVFoundation be handed" where
+`last_in_point` answers "where may a window start"; its still margin is one
+MEDIA frame because that is the range it inserts) — the comment there now
+names which writers are covered and what still reaches it; `set_canvas`'s
+`resnap` not walking clips INSIDE nests (`designs/reelcut-remaining.md` §5);
+and the app's reversed mirror (phase C).

@@ -4905,10 +4905,10 @@ deepenings.
 ## 10. The next candidate, scouted — the source window
 
 **Scouted on 2026-09-18, after D3 merged; grilled and split in three on
-2026-09-19, and PHASE A IS BUILT.** §10.1 to §10.5 are the scout's
-measurement, left exactly as it was written; §10.6 is what the grilling
-session decided and what it left for phases B and C; §10.7 is phase A's
-record. Nothing in §10.1–§10.5 is
+2026-09-19; PHASES A AND B ARE BUILT and C is not started.** §10.1 to §10.5
+are the scout's measurement, left exactly as it was written; §10.6 is what
+the grilling session decided and what it left for phases B and C; §10.7 is
+phase A's record and §10.8 is phase B's. Nothing in §10.1–§10.5 is
 a plan: it is the measurement a grilling session would otherwise have to
 re-derive, written down because the claim it replaces was a single sentence
 in an architecture review and three of that sentence's four numbers turned
@@ -5140,7 +5140,8 @@ A changes Swift behaviour.
   `rate_stretch`, `paste`, `unnest` and `add_background` (spec §11, #22's
   closing paragraph), plus routing `trim_end` and `whole_media_length`
   through `longest_duration_on_grid`, plus whether `trim_end` on an
-  `Unmeasured` window should stay unbounded. Not started.
+  `Unmeasured` window should stay unbounded. Built; §10.8 is its record, and
+  spec §11's D4-2 to D4-5 are what it decided before the code.
 - **Phase C — the reversed mirror**, above. Not started.
 
 **Left by name, because bringing it under the module would CHANGE an
@@ -5257,6 +5258,177 @@ closed — that is phase B's, not phase A's.
 `designs/reelcut-roadmap-5.md` and `designs/reelcut-effects-survey.md` both
 cited `roll`'s snap-inward bounds by a line number that had already moved,
 and now name the file and the function instead.
+
+### 10.8 Phase B, the record
+
+**Landed 2026-09-20, uncommitted on top of phase A.** No `rc_*` export was
+added, so `core/include/reelcut_core.h` and `app/Sources/ReelCore.swift` were
+not touched; `op_table.rs` is untouched (no argument changed), so the startup
+parity check is unaffected; `RC_FORMAT_VERSION` stays 8; no Swift BEHAVIOUR
+changed (two doc comments and two tool sentences, below).
+
+**The decisions came first**, as §0 requires: spec §11's **D4-2** (the bound
+takes the pieces, `start` among them, and `trim_end` on an `Unmeasured`
+window stays unbounded), **D4-3** (`set_speed` snaps NEAREST and is then held
+to the bound at the NEW rate), **D4-4** (every re-snap of a media duration is
+one function, and a timed plate is held to its file) and **D4-5** (a head
+bound is snapped UP, in one spelling). #22's entry lost its "what the rule
+does NOT cover" list for a pointer to them.
+
+**Every vector was measured through the FFI on the UNCHANGED tree first**, in
+a scratch test that was deleted, and then again after. All six overruns the
+scout predicted reproduced exactly, and the one it predicted would NOT
+reproduce did not:
+
+| Vector | Before | After |
+|---|---|---|
+| (a) `set_speed` ×2 on `add_clip` of a 6 233 613-tick media, 30 fps | duration 3 120 000, plan `source_duration` **6 233 613**, ratio **1.99795** | duration 3 100 000, `source_duration` 6 200 000, ratio **exactly 2** |
+| (b) `rate_stretch` of the same clip to 3 120 000 | speed 1.99359, `source_duration` 6 220 000 = `duration × speed` — **no overrun** | unchanged, no code change |
+| (c) `paste` of a 650 000-tick payload clip over a 655 000-tick media | **660 000** (the 30 fps re-snap, past the file) | 640 000 |
+| (c′) the same clip inside a payload NEST (`absorb_nests`) | **660 000** | 640 000 |
+| (d) `unnest` after `set_canvas {fps: [24,1]}`, media 645 000 | **650 000** (26 frames at 24 fps, past the file) | 625 000 |
+| (e) `add_background {media}`, a 6 000 000 video on a 12 000 000 timeline | duration 12 000 000, plan rate **0.5** | duration 6 000 000, rate 1 |
+| (f) `trim_start` far left, ×2, `in` 130 000, start 200 000 | start **135 000** — a sub-frame time in the model | start 140 000, `in` 10 000 |
+| PIN `trim_end` far right, hand-written start 205 000, media 1 100 000, ×2 | end 740 000 | end 740 000, unchanged |
+
+**(b) is the one site that needed no code, and the reason is arithmetic, not
+luck**: `rate_stretch` writes `speed = content / duration` and touches
+neither the content length nor `in`, and `round(d × (c/d)) == c` for any tick
+count the model can hold, so the window it had is the window it keeps. It is
+recorded here rather than fixed, per the spec's own instruction for that
+case.
+
+**What the module gained.** Five functions in `core/src/source_window.rs`,
+all in the one `impl Project` block: `longest_duration_on_grid_of` (the bound
+from the pieces, `start` among them), `latest_end_on_grid` and
+`earliest_start_on_grid` (the two timeline POSITIONS an edge is held to),
+`duration_resnapped` (what every re-snap writes) and `duration_at_speed`
+(what `set_speed` writes). `longest_duration_on_grid`'s signature and answer
+are unchanged — it is now that first function measured at start 0 — and the
+unsnapped division it shares with `source_length_on_timeline` is a private
+`available_on_timeline`, written once.
+
+**`wc -l`, against the tree as phase B found it** (phase A's, uncommitted):
+
+| File | Before | After |
+|---|---|---|
+| `core/src/source_window.rs` | 251 | **396** (cap 400) |
+| `core/src/edit_clip.rs` | 1021 | **1021** (over the cap, unchanged — the toll was paid in prose) |
+| `core/src/edit_paste.rs` | 596 | **599** |
+| `core/src/edit_canvas.rs` | 241 | **236** |
+| `core/src/edit_edge.rs` | 197 | **197** |
+| `core/src/edit_transition.rs` | 572 | **571** |
+| `core/src/edit_nest.rs` | 323 | **326** |
+| `core/src/edit_background.rs` | 468 | **479** |
+| `core/src/edit.rs` | 838 | **838** |
+| `core/src/evaluate.rs` | 588 | **591** (comment only) |
+| `app/Sources/AgentCatalog+Clips.swift` | 792 | **792** (over the cap: net zero, as required) |
+| `app/Sources/ReelOps.swift` | 1131 | **1144** |
+
+`edit_clip.rs` is over the cap and took nothing on: `whole_media_length`'s
+and `set_speed`'s prose gave back what the new call sites cost, to the line.
+
+**The test surface.** `core/tests/source_invariant.rs`, **360** lines and
+nine tests (`set_speed` ×2 and its PIN, `paste`, `absorb_nests`, `unnest`,
+the video plate, a given plate duration, the image plate that must NOT be
+clamped, and the plate's inherited `Err`), and
+`core/tests/source_edges.rs`, **176** lines and four (the two `trim_start`
+rows and the two `trim_end` PINs) — a second file only because the first
+would have passed the 400-line cap for a new one. Every row's vector is one
+of the table above, and every claim reads the placement back AND the plan's
+segment, because the plan is where the defect showed.
+
+**Five mutants, each patched into a tree COPY, each patch asserting its text
+occurs exactly once, each killed by name:**
+
+| Mutant | Tests that fail |
+|---|---|
+| `duration_at_speed` measures the bound at the OLD speed | `a_whole_file_clip_set_to_double_speed_plays_at_exactly_double_speed` |
+| the bound is dropped from `duration_resnapped` | that one, plus `a_pasted_clip_is_re_snapped_onto_the_grid_and_then_inside_its_file`, `a_clip_inside_a_pasted_nest_is_held_to_its_file_too`, `an_unnested_clip_is_re_snapped_onto_the_grid_and_then_inside_its_file`, and the existing `a_rate_change_keeps_the_window_inside_the_media` and `a_coarser_grid_holds_the_clip_to_the_bound_snapped_down_to_the_new_frame` |
+| `latest_end_on_grid` measures from 0 | `a_far_right_trim_of_an_off_grid_clip_still_lands_on_the_grid` (the PIN row: the answer becomes an off-grid 745 000) |
+| `snapped_up` dropped from `earliest_start_on_grid` | `a_far_left_trim_lands_on_a_frame_rather_than_on_the_floored_head`, `a_far_left_trim_of_an_off_grid_clip_with_no_head_moves_it_onto_the_grid` |
+| the `min` dropped from `add_background` | `a_video_background_ends_where_its_file_does_rather_than_stretching`, `a_given_background_duration_is_held_to_the_file_as_well` |
+
+**No existing assertion moved.** `make test` is green with every file
+unchanged — `media_window.rs`'s six, `source_window.rs`'s nine, `edge.rs`'s
+sixteen `roll` rows, `add_transition.rs`, `insert.rs`, `background.rs`,
+`paste.rs`, `nest.rs`, `scope.rs` included — which is the claim that routing
+`trim_end`, `roll`, `head_handle_frames`, `resnap` and `whole_media_length`
+through the new functions changed no answer.
+
+**Gates and proofs.** `cargo fmt --check`, `make test`, `make lint`,
+`make typecheck` (0 errors, the baseline 4 AVFoundation warnings), `make app`.
+Then twelve scripts, each on its own freshly launched instance killed by PID,
+with `grep "Reelcut: "` printing nothing first: `silence2_proof.py`
+**61/61** (running `phase3_proof.py` 123/123 and `phase3_silence_scope.py`
+8/8 inside itself), `phase1_proof.py` **66/66**, `phase3_proof.py`
+**123/123**, `phase5_proof.py` **88/88**, `phase6_proof.py` **168/168**,
+`phase9_proof.py` **216/216**, `e1_proof.py` **95/95** against the reference
+build on its second port, `e2_proof.py` **61/61**, `recording_proof.py`
+**187/187** with its two tone rows skipped by name, and the three probes with
+no port: `silence2_probe.py` **61/61**, `phase9_probe.py` **48/48**,
+`recording_probe.py` **858/858 with 43 rows skipped by name**. Every score is
+its README baseline.
+
+**Two host-state notes, named rather than absorbed.** `recording_proof.py`
+scored 187/187 where the README records **186/187** "on THIS host", the
+failing row being the Bluetooth input's head loss: the default input was not
+that headset today, so the row passed. And `recording_probe.py`'s FIRST run
+scored 889/899 — the granted tier's preflight found a shareable display and
+the capture then did not ("No display with id 1 is shareable"), ten failures
+in section 9c because the console locked mid-run; the re-run scored the
+README's 858/858 with 41 rows skipped for the locked console and 2 for the
+reference build. Host state is a proof input, and neither number is about
+this phase's code.
+
+**`silence2_proof.py` claim 1(d), rewritten.** It asserted the segment and
+the duration DIFFER at ×2 and printed the 1.99795 ratio as a defect it was
+waiting on; it now asserts `source_duration == 2 × duration` exactly, and
+still asserts the spans against the reference walk. Made to fail on purpose:
+a tree COPY whose `duration_at_speed` measures the bound at the OLD speed,
+built whole and run on its own port, scores **60/61**, taking 1(d) and
+nothing else. **The sharpness has moved inside that row**: the mutant that
+walks with `× speed` in place of the plan's own ratio is now EQUIVALENT,
+because the ratio IS the speed; what stays sharp is the factor-dropped
+`MediaPeaks.sourceTick` mutant (60/61, measured 2026-09-19) and the spans.
+`tools/proof/README.md` and `designs/reelcut-roadmap-4.md` §8 carry the same
+correction.
+
+**`segment_of` stays where it is, both halves, and here is why.** Its
+in-point clamp is `duration − 1` where `last_in_point` answers
+`duration − content_length`, and the two answer different questions: the
+plan's is "which tick can AVFoundation be handed" and the reader's is "where
+may a window START and still fit". Swapping them would re-frame every
+hand-written file and every document minted before #22, which is exactly the
+material the clamp exists for. Its still margin is one MEDIA frame rather
+than `last_still_time`'s canvas frame because the media frame is the range it
+INSERTS, and the file's last media frame covers the canvas-frame stop either
+way. The comment there now names which writers are covered and what still
+reaches it.
+
+**Covered by construction, no code change** (listed so the next reader does
+not re-derive it): `tail_handle_frames`, `slip`, `freeze_frame`,
+`split_clip`, `add_blurred_background` and `duplicate_clips` each shrink a
+window, copy one that already fits, or floor to a whole frame inside the
+file.
+
+**Three residues, each with a home.**
+
+1. **`set_canvas`'s `resnap` does not re-snap clips INSIDE nests** —
+   `edit_canvas.rs` walks `project.clips` only, and this phase's own vector
+   (d) is how the overrun arises. Not fixed here (it is a rate change with a
+   document-wide blast radius and its own overlap question); recorded in
+   `designs/reelcut-remaining.md` §5.
+2. **`SpeedSheetController.syncReadout`'s "→ duration" is the un-held
+   number** — unsnapped and unbounded — so at a file's tail it can now differ
+   from what `set_speed` writes by up to a frame more than before. No Swift
+   behaviour changed this phase; recorded in remaining §5 and in
+   `ReelOps.setSpeed`'s doc.
+3. **×2 then ×1 at a file's tail is no longer an identity**, which is D4-3's
+   own stated cost and is spec §11's to hold, not a defect to file.
+
+**What phase C still has**, unchanged by this: the reversed mirror, and
+`TimelineView.sourceTime`, which applies none (§10.6's fourth decision).
 
 ---
 

@@ -229,15 +229,18 @@ impl Project {
                 // much that is (spec §11, D4-1).
                 let length = self.content_length_in_source(clip);
                 // The core's own ops no longer mint a window past the end
-                // of a file — a media clip's length is snapped DOWN at all
-                // three sites that write it (spec §11) — so this clamp is
-                // the LAST line of defence rather than the ordinary path:
-                // hand-written JSON may put `in` outside the file
-                // altogether, a document minted before that rule may carry
-                // an overrun, and `resnap`'s one-frame floor can still
-                // outrun a media shorter than a frame (nothing in the
-                // schema forbids any of it; `validate` polices ids and
-                // spans, not source bounds). BOTH ends are clamped to what
+                // of a file: EVERY site that writes a media clip's window
+                // reads one bound (spec §11, #22 and D4-2 to D4-5) —
+                // `add_clip`'s whole length, `trim_end`, `roll`, `resnap`,
+                // `set_speed`, `paste`'s two loops, `unnest` and
+                // `add_background`'s plate. So this clamp is the LAST line
+                // of defence rather than the ordinary path, and what still
+                // reaches it is hand-written JSON putting `in` outside the
+                // file, a document minted before those rules, and the
+                // one-frame floor those writers apply after the bound, for
+                // a media shorter than a frame (nothing in the schema
+                // forbids any of it; `validate` polices ids and spans, not
+                // source bounds). BOTH ends are clamped to what
                 // the file holds, because handing AVFoundation a range that
                 // starts or ends past an asset makes the insert throw —
                 // clamped, it becomes a stretch of the last frame, which

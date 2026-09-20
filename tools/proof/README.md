@@ -2899,10 +2899,15 @@ default, **61/61**, against a running instance. It makes its own fixtures
   the reason claim 11 can compare bytes. Which leaves the scale factor
   `sourceTick` divides by an identity in every row above, so **1(d)** runs
   the clean clip once more at **×2**, the one place in the suite where
-  `source_duration` (6 233 613) and `duration` (3 120 000) differ and their
-  ratio is not even a whole 2: the answer is still the walk over THAT segment
-  tick for tick. A build with the factor dropped from `MediaPeaks.sourceTick`
-  scores **60/61**, taking 1(d) and nothing else (measured 2026-09-19).
+  `source_duration` and `duration` differ: the segment is now EXACTLY twice
+  the duration (6 200 000 against 3 100 000), because `set_speed` holds the
+  duration it snaps to what the file still holds at the new rate (spec §11,
+  D4-3) — it used to write 3 120 000 and come back at a ratio of 1.99795 —
+  and the answer is still the walk over THAT segment tick for tick. A build
+  with the factor dropped from `MediaPeaks.sourceTick` scores **60/61**,
+  taking 1(d) and nothing else (measured 2026-09-19); the `× speed` in place
+  of the plan's ratio mutant, which that row used to take as well, is
+  EQUIVALENT now that the ratio is whole (road map 7 §10.8).
 * **2, `hum3.wav`** — the headline. A −32 dBFS hum the shipped rule is blind
   to: level at −40 answers NOTHING, voice answers both pauses, within 0.10 s
   of the bounds it found in the clean file.

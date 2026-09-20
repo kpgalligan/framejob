@@ -115,8 +115,10 @@ normative: §5.2 is the project schema, §6 the op table, §7 the architecture.
   there (over the empty black canvas multiply reads black and screen
   changes nothing), and **Clip ▸ Add Background** is the answer: a plate on
   a new back-most track, a colour or an image, running the timeline's
-  length. **Clip ▸ Add Blurred Background** is the screencast move — the
-  selected clip copied behind itself, blown up to fill the canvas and
+  length — a plate of a MOVIE runs its own file's length instead, so the
+  footage plays at its own speed. **Clip ▸ Add Blurred Background** is the
+  screencast move — the selected clip copied behind itself, blown up to
+  fill the canvas and
   blurred, playing exactly the same frames because it keeps the same source
   window, and muted so the mix does not play the recording twice. Shapes
   can be filled with a **gradient** instead of a flat colour, linear or

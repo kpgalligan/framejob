@@ -141,18 +141,18 @@ impl Project {
         let frame = self.frame();
         let mut earliest = previous.start.saturating_add(frame);
         let mut latest = clip_end(&target).saturating_sub(frame);
-        if let Some(head) = self.source_head_on_timeline(&target).or_empty() {
-            earliest = earliest.max(target.start.saturating_sub(head).max(0));
+        if let Some(start) = self.earliest_start_on_grid(&target) {
+            earliest = earliest.max(start.max(0));
         }
-        if let Some(available) = self.source_length_on_timeline(&previous).or_unbounded() {
-            latest = latest.min(previous.start.saturating_add(available));
+        if let Some(end) = self.latest_end_on_grid(&previous) {
+            latest = latest.min(end);
         }
-        // The two source bounds are FLOORED divisions by a clip's speed, so
-        // neither is on the frame grid; snapping the input alone would then
-        // let the clamp write an off-grid tick into both clips' start and
-        // duration. Each bound is snapped INWARD — up at the bottom, down
-        // at the top — so the cut lands on a frame that is still inside the
-        // source both clips have.
+        // The two source bounds arrive on the grid (`source_window.rs`
+        // snaps each inward, and this pair is where that rule came from),
+        // but the one-frame bounds are measured from the clips' own starts,
+        // which a hand-written document may put off it. So both are snapped
+        // INWARD again — up at the bottom, down at the top — and the cut
+        // lands on a frame that is still inside the source both clips have.
         let earliest = self.snapped_up(earliest);
         let latest = self.snapped_down(latest);
         if earliest > latest {

@@ -450,16 +450,15 @@ impl Project {
     /// by, or `None` for a source with no window at all. See
     /// [`Project::add_transition`] step 2 for why a nest answers `Some(0)`.
     fn head_handle_frames(&self, clip: &Clip, frame: Ticks) -> Option<Ticks> {
-        let head = match clip.source {
-            Source::Nest { .. } => 0,
-            // EMPTY, not unbounded: a window that cannot be measured
-            // supplies no handle.
-            _ => self.source_head_on_timeline(clip).or_empty()?,
-        };
-        // Snapped INWARD from the earliest start the handle allows, so the
+        // The earliest start the handle allows, snapped INWARD, so the
         // count is whole frames of material that is really there even when
-        // the clip's own start is not on the grid.
-        let earliest = self.snapped_up(clip.start.saturating_sub(head));
+        // the clip's own start is not on the grid — `source_window.rs`'s
+        // one spelling of it (spec §11, D4-5), which reads an unmeasurable
+        // head as EMPTY rather than as unbounded, as this op needs.
+        let earliest = match clip.source {
+            Source::Nest { .. } => self.snapped_up(clip.start),
+            _ => self.earliest_start_on_grid(clip)?,
+        };
         Some(clip.start.saturating_sub(earliest).max(0) / frame)
     }
 

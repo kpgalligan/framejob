@@ -45,7 +45,18 @@ file is what governs a module now.
   `last_in_point` and `last_still_time` answer in SOURCE ticks;
   `source_head_on_timeline`, `source_length_on_timeline` and
   `longest_duration_on_grid` — the bound, snapped DOWN (spec §11, #22) — in
-  TIMELINE ticks. A measurement is a `SourceBound` and not an `Option`,
+  TIMELINE ticks. **Every site that WRITES a media clip's window reads the
+  bound here, and which function it reads says what it writes** (spec §11,
+  D4-2 to D4-5): `longest_duration_on_grid_of` is the bound from the pieces,
+  with the clip's `start` among them, because a DURATION is measured from 0
+  and an END from the clip's own start and the two are not the same number;
+  `latest_end_on_grid` and `earliest_start_on_grid` are the timeline
+  POSITIONS `trim_end` / `roll` and `trim_start` / `roll` /
+  `head_handle_frames` clamp to (positions, so not a `SourceBound`);
+  `duration_resnapped` is what every RE-SNAP of a media duration writes
+  (`resnap`, `paste` twice, `unnest`) and `duration_at_speed` what
+  `set_speed` writes. No local clamp anywhere else. A measurement is a
+  `SourceBound` and not an `Option`,
   because `None` meant "unbounded, apply no clamp" to a trim and "no handle
   at all" to a transition: the three arms are `Unbounded` (a source with no
   window), `Unmeasured` (a media window that exists and cannot be measured)
@@ -119,11 +130,14 @@ file is what governs a module now.
 - `edit_clip.rs` — clip placement: `add_clip`, move, trim, duplicate, delete,
   join, detach, `fit_scale` and `fill_scale` (Fit is a RESCUE for oversized
   footage and honours `canvas.fit_new_clips`; Fill is a REQUIREMENT, ignores
-  it, scales up as readily as down and clamps to `SCALE_MAX`). `whole_media_length`
-  and `trim_end` hold a media clip's window INSIDE its file — the length and
-  the tail clamp snap DOWN, so `in + duration × speed ≤ media.duration` and
-  the plan's rate is exactly 1 (spec §11); the third site is
-  `edit_canvas.rs`'s `resnap`. Over the cap, known debt (below).
+  it, scales up as readily as down and clamps to `SCALE_MAX`). `whole_media_length`,
+  `trim_end` and `set_speed` hold a media clip's window INSIDE its file, each
+  through `source_window.rs`'s one bound, so
+  `in + duration × speed ≤ media.duration` and the plan's segment rate is
+  exactly the clip's speed (spec §11, #22 and D4-2 to D4-5); the other
+  writers are `edit_canvas.rs`'s `resnap`, `edit_paste.rs`'s two loops,
+  `edit_nest.rs`'s `unnest` and `edit_background.rs`'s timed plate. Over
+  the cap, known debt (below).
 - `edit_split.rs` — `split_clip` and what the SECOND clip inherits: base
   props from the evaluation at the cut, unfinished actions rebased, a
   straddled one narrowed, presets and motion halves anchored to the two
