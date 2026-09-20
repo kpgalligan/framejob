@@ -963,3 +963,21 @@ MEDIA frame because that is the range it inserts) — the comment there now
 names which writers are covered and what still reaches it; `set_canvas`'s
 `resnap` not walking clips INSIDE nests (`designs/reelcut-remaining.md` §5);
 and the app's reversed mirror (phase C).
+
+## `edit_transition_shift.rs`, 2026-09-20 — the E1 reader review's toll T
+
+`add_transition_by_shift` and its doc comment moved out of
+`edit_transition.rs` whole, unchanged, into a file of its own, so that the
+review's three `add_transition` fixes had room under the ~600-line cap. A
+pure move, landed and gated alone by `make test` and `make lint` before any
+fix touched the file: the function was already `pub(crate)` with one caller
+(`add_transition`'s `ripple` arm), so nothing's visibility or path changed,
+and the three imports it took with it — `locked_track`, `shift_clips`,
+`unlocked_tracks` — left `edit_transition.rs` with none. `edit_transition.rs`
+went 571 → 477; the new file is 114.
+
+The seam is the one the new module doc states: the handle form spends
+unused SOURCE and moves nothing, the shift form spends the TIMELINE and
+moves `close_gap`'s set by `close_gap`'s rules. That is also why the review
+routed `shift_clips`' off-grid shift at an inexact canvas rate to
+`close_gap`'s posture rather than to E1 (road map 5 §12, R1·1).

@@ -539,6 +539,82 @@ if let rows = request["rows"] as? [String: Any] {
     answer["sections"] = sections(controller.view)
 }
 
+/// The Transition section's own controls, by row label. The section is the
+/// LAST one in the stack, so its labels are unambiguous.
+func transitionControl(_ root: NSView, _ label: String) -> NSView? {
+    guard let section = walk(root).compactMap({ $0 as? InspectorSection }).last else { return nil }
+    let inside = walk(section)
+    // The checkbox carries its own title and so has no row label of its own
+    // — which is one of section 2's own claims.
+    if label == "Crossfade Audio" {
+        return inside.first { $0 is OptionCheckboxControl }
+    }
+    guard let found = inside.compactMap({ $0 as? InspectorRowLabel })
+        .first(where: { $0.stringValue == label }),
+        let parent = found.superview,
+        let index = parent.subviews.firstIndex(of: found) else { return nil }
+    for view in parent.subviews[(index + 1)...] where view is OptionControl {
+        return view
+    }
+    return nil
+}
+
+func storedTransition(_ document: ProjectDocument, _ clip: UInt32) -> [String: Any] {
+    guard let found = document.project.snapshot.clips.first(where: { $0.id == clip }),
+          let transition = found.transitionIn
+    else { return [:] }
+    return ["kind": transition.kind.rawValue, "curve": transition.curve.rawValue,
+            "audio": transition.audio]
+}
+
+// ---- the section's WRITES: the Curve popup and the Crossfade Audio box ----
+if let writes = request["writes"] as? [String: Any] {
+    var runs: [[String: Any]] = []
+    // Once with a transition STORED and once with the clip's own cleared, so
+    // the both-keys rule — which only fires with nothing stored — is the
+    // only difference between the two.
+    for clear in [false, true] {
+        for row in ["Curve", "Crossfade Audio"] {
+            let document = opened(writes["package"] as! String)
+            select(document, writes["select"] as? [Int] ?? [])
+            let target = document.selection.first!
+            if clear { document.applyEdit("setup", .setTransition(clip: target, kind: nil)) }
+            NSDocumentController.shared.addDocument(document)
+            document.makeWindowControllers()
+            document.showWindows()
+            spin(1.2)
+            let controller =
+                document.windowControllers.first!.contentViewController as! EditorViewController
+            let shown = storedTransition(document, target)
+            guard let control = transitionControl(controller.view, row) else {
+                runs.append(["row": row, "cleared": clear, "found": false])
+                continue
+            }
+            if let popup = control as? OptionPopupControl {
+                // `itemPicked:` is what the popped-up menu sends; the tag is
+                // the index, and 2 is `ease_out`, which no minting writes.
+                let item = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+                item.tag = 2
+                popup.perform(NSSelectorFromString("itemPicked:"), with: item)
+            } else {
+                control.mouseDown(with: NSEvent.mouseEvent(
+                    with: .leftMouseDown, location: .zero, modifierFlags: [], timestamp: 0,
+                    windowNumber: 0, context: nil, eventNumber: 0, clickCount: 1,
+                    pressure: 1)!)
+            }
+            spin(0.6)
+            runs.append([
+                "row": row, "cleared": clear, "found": true,
+                "before": shown.isEmpty ? NSNull() : shown,
+                "after": storedTransition(document, target),
+                "undoName": document.undoManager?.undoActionName ?? "",
+            ])
+        }
+    }
+    answer["writes"] = runs
+    answer["curves"] = Curve.allCases.map(\.rawValue)
+}
+
 // ---- the menu command over a selection of two ----------------------------
 if let batch = request["batch"] as? [String: Any] {
     let document = opened(batch["package"] as! String)
@@ -725,6 +801,7 @@ def main():
         ],
         "rows": {"package": menu_fixture, "select": [3]},
         "batch": {"package": menu_fixture, "select": [1, 2], "tag": 0},
+        "writes": {"package": menu_fixture, "select": [3]},
     }
     answer, error = run_probe(binary, request)
     if error:
@@ -805,6 +882,46 @@ def main():
           f"C {before.get(4)} → {after.get(4)}")
     check("…with no sheet: a shape clip has material on both sides of the cut",
           batch.get("sheet") is False, f"sheet: {batch.get('sheet')}")
+
+    # ---- 3. the section's WRITES ----
+    # Added by the E1 reader review (road map 5 §12, R4·2): nothing here
+    # reached `styleOps`, the two style WRITES or their undo names, and the
+    # mutant that deletes the both-keys rule passed every instrument.
+    print("\n3 — the Curve and Crossfade Audio rows, written")
+    runs = {(run["row"], run["cleared"]): run for run in answer.get("writes", [])}
+    curves = answer.get("curves", [])
+    chosen = curves[2] if len(curves) > 2 else "?"
+    missing = [key for key, run in runs.items() if not run.get("found")]
+    check("both style rows are reachable, stored and cleared", len(runs) == 4 and not missing,
+          f"{len(runs)} runs, missing {missing}")
+    if len(runs) == 4 and not missing:
+        run = runs[("Curve", False)]
+        check("with a transition STORED, the Curve popup writes the curve alone",
+              run["after"].get("curve") == chosen
+              and run["after"].get("audio") == run["before"].get("audio")
+              and run["after"].get("kind") == run["before"].get("kind"),
+              f"{run['before']} → {run['after']}")
+        check("…as an undo step named Transition Curve",
+              run["undoName"] == "Transition Curve", run["undoName"])
+        run = runs[("Crossfade Audio", False)]
+        check("…and the checkbox writes the flag alone, keeping the curve",
+              run["after"].get("audio") != run["before"].get("audio")
+              and run["after"].get("curve") == run["before"].get("curve"),
+              f"{run['before']} → {run['after']}")
+        check("…as an undo step named Transition Audio",
+              run["undoName"] == "Transition Audio", run["undoName"])
+        run = runs[("Crossfade Audio", True)]
+        check("with NOTHING stored, the checkbox sends the CURVE it was showing too, "
+              "so the untouched row does not silently become ease_in_out",
+              run["before"] is None and run["after"].get("audio") is True
+              and run["after"].get("curve") == "linear",
+              f"{run['before']} → {run['after']}")
+        run = runs[("Curve", True)]
+        check("…and the Curve popup sends the crossfade flag it was showing, so that "
+              "row does not silently become on",
+              run["before"] is None and run["after"].get("curve") == chosen
+              and run["after"].get("audio") is False,
+              f"{run['before']} → {run['after']}")
 
     if WARNINGS:
         print("\nharness warnings (a render that never settled):")

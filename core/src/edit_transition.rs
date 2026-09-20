@@ -24,7 +24,6 @@
 use serde::{Deserialize, Serialize};
 
 use crate::edit_clip::clip_end;
-use crate::edit_time::{locked_track, shift_clips, unlocked_tracks};
 use crate::model::{Clip, Curve, Project, Source, Transition, TransitionKind};
 use crate::outcome::Outcome;
 use crate::source_window::source_advanced;
@@ -175,7 +174,10 @@ impl Project {
     /// 3. Convert to whole FRAMES, the request snapped down and each handle
     ///    floored inward. This happens BEFORE the split: snapping two half
     ///    extensions separately would lose the odd frame (1.5 + 1.5 frames
-    ///    snap to 1 + 1).
+    ///    snap to 1 + 1). The request is also held to
+    ///    `(A.duration + B.duration) / 3·frame`, the most the overlap rule
+    ///    could pass at ANY split, so that step 6 walks the clips and not
+    ///    the caller's number.
     /// 4. Split by `align`. Under `center` the odd frame goes to B, and a
     ///    side that cannot supply its share passes the shortfall to the
     ///    other side — up to that side's own handle — before the total
@@ -186,7 +188,10 @@ impl Project {
     ///    is half of the SHORTER clip and both durations are growing, so
     ///    the answer is not monotone in an obvious direction: a failure
     ///    steps the total down one frame, taken from the larger side, and
-    ///    retries. The loop is bounded by step 4's own frame count.
+    ///    retries. The loop is bounded by step 3's ceiling and so by the
+    ///    two clips. Each trial's two extensions are read off the frame
+    ///    GRID, not taken as a multiple of [`Project::frame`], which is a
+    ///    fallback at a rate that does not divide the timescale.
     /// 7. Nothing left to give — below one frame — is a refusal.
     /// 8. Write: A grows at the end, B grows at the front and its `in`
     ///    moves back by the same timeline time TIMES its speed, the
@@ -261,17 +266,45 @@ impl Project {
         let head_frames = self.head_handle_frames(&later, frame);
         let tail_frames = self.tail_handle_frames(&earlier, frame);
 
-        // 3. The request, snapped down to whole frames before it is split.
+        // 3. The request, snapped down to whole frames before it is split,
+        //    and held to the most the overlap rule could EVER pass. That
+        //    rule wants `2(a+b)·frame ≤ A.duration + a·frame` AND
+        //    `2(a+b)·frame ≤ B.duration + b·frame`; adding the two gives
+        //    `a + b ≤ (A.duration + B.duration) / 3·frame` whatever the
+        //    split, so a request above that fails at every length and step
+        //    6 would only walk it down ONE FRAME at a time — 4.5e11 passes,
+        //    36 hours extrapolated from a measured ladder, for the largest
+        //    `duration` the MCP argument gate lets through. The step-down
+        //    is bounded by the CLIPS, which is what step 6's own doc always
+        //    claimed. `requested` keeps the caller's own number, because
+        //    that is what the refusal sentence below has to name.
+        //
+        //    It is also what keeps B's new start at or after tick 0. A
+        //    handle says what the SOURCE holds, not what the timeline in
+        //    front of B has, so a bigger request used to run the start
+        //    negative; there the pair sorts the OTHER way round, the
+        //    overlap rule measures `A.duration + B.duration` against half
+        //    of the shorter GROWN clip, and passing that needs
+        //    `a + b ≥ 3(A.duration + B.duration) / frame` — nine times
+        //    this ceiling. So no trial the loop can now reach is one.
+        //    A swapped pair is not always that `Err`, either: on a SHORT
+        //    pair it passes the rule with BOTH starts non-negative and the
+        //    project is written with the two clips out of order, which
+        //    `validate` accepts. That is the worse half of what this
+        //    ceiling closes (108 of the 981 answers a differential sweep
+        //    of it moved; road map 5 §12).
         let requested = duration / frame;
+        let ceiling = earlier.duration.saturating_add(later.duration).max(0) / (3 * frame);
+        let split = requested.min(ceiling);
 
         // 4. The split, and `center`'s shortfall moving sides.
         let (want_b, want_a) = match align {
             TransitionAlign::Center => {
-                let b = requested.div_euclid(2) + requested.rem_euclid(2);
-                (b, requested - b)
+                let b = split.div_euclid(2) + split.rem_euclid(2);
+                (b, split - b)
             }
-            TransitionAlign::Before => (requested, 0),
-            TransitionAlign::After => (0, requested),
+            TransitionAlign::Before => (split, 0),
+            TransitionAlign::After => (0, split),
         };
         let capped = |want: Ticks, handle: Option<Ticks>| handle.map_or(want, |h| want.min(h));
         let mut b = capped(want_b, head_frames);
@@ -299,8 +332,29 @@ impl Project {
         }
 
         // 6 and 7. The overlap rule, stepping down from the larger side.
-        loop {
-            if a + b <= 0 {
+        //    The two extensions are read off the frame GRID rather than
+        //    taken as `count × frame`: [`Project::frame`] is a FALLBACK of
+        //    1/30 s at a canvas rate whose frame is not a whole number of
+        //    ticks (7 fps, or 5994/100 as a file sometimes spells 59.94),
+        //    and a multiple of it is not a grid position there, so the op
+        //    that MULTIPLIES would store the sub-frame start `time.rs` says
+        //    the model never holds. Both are snapped INWARD, and for a
+        //    position ON the grid at a rate that divides the timescale —
+        //    every position the model holds — they are exactly `a × frame`
+        //    and `b × frame`. For one that is not, the request's first
+        //    frame is partly spent landing the edge on the grid, which is
+        //    `time::snap_up_to_frame`'s own argument for a BOUND.
+        let a_end = clip_end(&earlier);
+        let (tail, head) = loop {
+            let tail = self
+                .snapped_down(a_end.saturating_add(a * frame))
+                .saturating_sub(a_end)
+                .max(0);
+            let head = later
+                .start
+                .saturating_sub(self.snapped_up(later.start.saturating_sub(b * frame)))
+                .max(0);
+            if tail + head <= 0 {
                 // Three clamps can land here — the two handles, the
                 // neighbours on the track, and the step-down below — so the
                 // sentence names all three rather than guessing which one
@@ -315,24 +369,24 @@ impl Project {
                      make the overlap by shifting the timeline left instead"
                 )));
             }
-            let (grown, moved) = extended(&earlier, &later, a * frame, b * frame);
+            let (grown, moved) = extended(&earlier, &later, tail, head);
             if self
                 .check_overlap_rule(&[grown, moved], later.track, &[])
                 .is_ok()
             {
-                break;
+                break (tail, head);
             }
             if b >= a {
                 b -= 1;
             } else {
                 a -= 1;
             }
-        }
+        };
 
         // 8, 9 and 10. Write.
-        let (grown, mut moved) = extended(&earlier, &later, a * frame, b * frame);
+        let (grown, mut moved) = extended(&earlier, &later, tail, head);
         for action in &mut moved.actions {
-            action.start = action.start.saturating_add(b * frame);
+            action.start = action.start.saturating_add(head);
         }
         moved.transition_in = Some(match (kind, later.transition_in) {
             (Some(kind), Some(stored)) => Transition { kind, ..stored },
@@ -349,101 +403,6 @@ impl Project {
             *slot = moved;
         }
         self.finish(next)
-    }
-
-    /// `add_transition` with `ripple` — the overlap made by SHIFTING the
-    /// incoming clip left over the end of the outgoing one, for the cut
-    /// where neither clip has a frame of unused material (two whole files
-    /// placed back to back, which the handle form can never join).
-    ///
-    /// No handle is read and `align` means nothing: the outgoing clip keeps
-    /// every frame and its place, the incoming clip keeps its source window
-    /// and its actions (they are clip time, and the clip moves whole), and
-    /// its first frames blend over the outgoing clip's last ones. What moves
-    /// is `close_gap`'s set — every clip at or after the cut on every
-    /// UNLOCKED track, through the same [`shift_clips`] — so the tracks stay
-    /// in sync and the timeline gets shorter by the overlap. Markers do not
-    /// move, as they do not for `ripple_delete` or `close_gap`.
-    ///
-    /// The duration is snapped down to whole frames, capped at half the
-    /// shorter of the two clips (the pair's own overlap rule, closed form),
-    /// and then stepped down a frame at a time until every track something
-    /// moved on passes the overlap rule — clamped rather than refused, the
-    /// handle form's posture. A clip on another track that the shift pushes
-    /// into its predecessor gains a minted `cross_dissolve`, which is
-    /// `close_gap`'s rule for the same shift.
-    ///
-    /// Three refusals, each in its own sentence: an incoming clip on a
-    /// LOCKED track cannot move ([`locked_track`]); a pair whose shorter
-    /// clip is under two frames has no half to give; and a shift every
-    /// length of which would break the overlap rule somewhere it moved
-    /// something.
-    pub(crate) fn add_transition_by_shift(
-        &self,
-        earlier: &Clip,
-        later: &Clip,
-        kind: Option<TransitionKind>,
-        duration: Ticks,
-    ) -> Result<Outcome, String> {
-        let unlocked = unlocked_tracks(self);
-        if !unlocked.contains(&later.track) {
-            return Ok(Outcome::Refused(locked_track(
-                later.track,
-                &format!(
-                    "clip {} cannot be shifted left to make the overlap",
-                    later.id
-                ),
-            )));
-        }
-        let frame = self.frame();
-        let cut = later.start;
-        let mut touched: Vec<u32> = Vec::new();
-        for clip in &self.clips {
-            if clip.start >= cut && unlocked.contains(&clip.track) && !touched.contains(&clip.track)
-            {
-                touched.push(clip.track);
-            }
-        }
-
-        let shorter = earlier.duration.min(later.duration);
-        let asked = duration / frame;
-        let allowed = shorter / 2 / frame;
-        // Asked first, so a request under a frame and a pair too short to
-        // halve are told apart by the two numbers rather than by a guess.
-        let mut frames = asked.min(allowed);
-        if frames <= 0 {
-            return Ok(Outcome::Refused(format!(
-                "clips {} and {} have no room to overlap by shifting: the overlap asked \
-                 for is {asked} frames and half of the shorter clip is {allowed} frames",
-                earlier.id, later.id
-            )));
-        }
-        let most = frames;
-        while frames > 0 {
-            let mut next = self.clone();
-            shift_clips(&mut next, cut, -(frames * frame));
-            if touched
-                .iter()
-                .all(|track| next.check_overlap_rule(&[], *track, &[]).is_ok())
-            {
-                if let Some(slot) = next.clip_mut(later.id) {
-                    slot.transition_in = Some(match (kind, later.transition_in) {
-                        (Some(kind), Some(stored)) => Transition { kind, ..stored },
-                        (Some(kind), None) => Transition::minted(kind),
-                        (None, Some(stored)) => stored,
-                        (None, None) => Transition::minted(TransitionKind::default()),
-                    });
-                }
-                set_gained_transitions(&mut next, &touched);
-                return self.finish(next);
-            }
-            frames -= 1;
-        }
-        Ok(Outcome::Refused(format!(
-            "clips {} and {} cannot overlap by shifting: no overlap from {most} frames down \
-             to one leaves every track the shift moves inside the overlap rule",
-            earlier.id, later.id
-        )))
     }
 
     /// How many whole frames the INCOMING clip could be extended backward

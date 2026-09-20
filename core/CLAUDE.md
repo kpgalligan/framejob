@@ -206,10 +206,16 @@ file is what governs a module now.
 - `edit_transition.rs` — the WRITE half of a transition: `set_transition`,
   `set_transition_duration`, `set_gained_transitions` (a clip that gains an
   overlap gains a transition), `add_transition` (an overlap built from the
-  two clips' handles at a hard cut, or with `ripple` by sliding the incoming
-  clip and everything after it left through `shift_clips`) and
-  `set_transition_style` (curve and audio crossfade). `transition.rs` is the
-  READ half and nothing here restates it.
+  two clips' handles at a hard cut) and `set_transition_style` (curve and
+  audio crossfade). `transition.rs` is the READ half and nothing here
+  restates it.
+- `edit_transition_shift.rs` — `add_transition_by_shift`, the `ripple` half
+  of `add_transition`: the same overlap made by sliding the incoming clip
+  and everything at or after the cut left through `shift_clips`. Cut out of
+  `edit_transition.rs` under the size rule (the E1 reader review's toll T),
+  a pure move: the handle form spends unused SOURCE and moves nothing,
+  this one spends the TIMELINE and moves `close_gap`'s set by
+  `close_gap`'s rules.
 - `edit_action.rs` · `edit_nest.rs` · `edit_paste.rs` — the action ops and
   their no-overlap rule, plus `check_end_patch`, the END patch's door: the
   three groups §5.4 allows (a `shape` is an unknown key), a `null` that

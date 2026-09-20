@@ -265,15 +265,56 @@ extension EditorViewController {
             + "The project gets shorter by the same amount."
         alert.addButton(withTitle: "Shift Clips Left")
         alert.addButton(withTitle: "Cancel")
-        alert.beginSheetModal(for: window) { [weak document] response in
-            guard response == .alertFirstButtonReturn, let document = document else { return }
+        alert.beginSheetModal(for: window) { [weak self, weak document] response in
+            guard response == .alertFirstButtonReturn, let self = self, let document = document
+            else { return }
             document.performGroupedEdit(
-                "Add Transition",
-                clips.map {
-                    .addTransition(
-                        clip: $0, kind: kind, duration: duration, align: .center, ripple: true)
-                })
+                "Add Transition", self.shiftingOps(clips, kind: kind, duration: duration))
         }
+    }
+
+    /// Shift Clips Left's ops, each decided against the project the EARLIER
+    /// ones leave behind rather than against the snapshot the sheet was
+    /// built from.
+    ///
+    /// One ripple slides every clip at or after its cut on every unlocked
+    /// track, and a clip whose PREDECESSOR began before that cut does not
+    /// slide with it — so a second chosen cut can already be an overlap by
+    /// the time its own op runs. `add_transition` answers that with an
+    /// `Err` ("not at a hard cut"), `ReelProject.applying` THROWS on an
+    /// `Err`, and the throw takes the whole batch with it: the first
+    /// shift — which had already made the second cut's overlap — is lost,
+    /// and the person is shown a sentence about a clip they did not point
+    /// at. Re-deciding sends `set_transition` for a cut that is now an
+    /// overlap, which is what Clip ▸ Transition ▸ sends for an overlap
+    /// anyway, so every cut chosen ends up carrying the kind.
+    ///
+    /// An op the running project declines is dropped rather than carried:
+    /// what `performGroupedEdit` is handed has already been shown to apply,
+    /// one op at a time, to the project it will be replayed against.
+    private func shiftingOps(
+        _ clips: [UInt32], kind: TransitionKind, duration: Ticks
+    ) -> [ReelOp] {
+        guard let document = document else { return [] }
+        var project = document.editedProject
+        var ops: [ReelOp] = []
+        for id in clips {
+            guard let clip = project.snapshot.clips.first(where: { $0.id == id }) else { continue }
+            let op: ReelOp
+            switch transitionPlacement(of: clip, in: project.snapshot) {
+            case .overlap:
+                op = .setTransition(clip: id, kind: kind)
+            case .hardCut:
+                op = .addTransition(
+                    clip: id, kind: kind, duration: duration, align: .center, ripple: true)
+            case .neither:
+                continue
+            }
+            guard let next = (try? project.applying(op))?.project else { continue }
+            ops.append(op)
+            project = next
+        }
+        return ops
     }
 
     /// Where a clip sits relative to the clip before it on its track, which

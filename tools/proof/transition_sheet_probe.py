@@ -37,7 +37,13 @@ Sections:
      shorter or whole), and choosing the kind a clip already has (a beep);
   6. a mixed selection — one clip already overlapping, one at a whole cut:
      the overlapping clip's kind changes AND the sheet explains the other;
-  7. a locked track: the sheet appears, and Shift Clips Left changes nothing.
+  7. a locked track: the sheet appears, and Shift Clips Left changes nothing;
+  8. two chosen cuts whose shifts COLLIDE — the first ripple slides the second
+     cut's incoming clip over a predecessor that does not slide with it, so
+     the second op's cut is an overlap before its own op runs. Added by the
+     E1 reader review (road map 5 §12, R3·1): the batch used to be built from
+     one snapshot, the second `add_transition` came back `Err`, and the throw
+     took the first shift with it.
 
 Mutation-tested on the working tree with the probe rebuilt; the scores are
 in `tools/proof/README.md`.
@@ -269,6 +275,37 @@ do {
     answer["locked"] = run
 }
 
+// 8. Two chosen cuts whose shifts COLLIDE: the first ripple pushes the
+//    second cut's incoming clip over a predecessor that does not move with
+//    it, so by the time the second op runs that cut is already an overlap.
+do {
+    let (document, controller, two) = editor(extra: 1)
+    let media = document.project.snapshot.media[0].id
+    let first = two[0].track
+    document.applyEdit("setup", .addTrack(index: 1, name: "Second"))
+    let second = document.project.snapshot.tracks.map { $0.id }.first { $0 != first }!
+    // P spans the first cut, so the first ripple cannot move it; Q sits at
+    // the second cut, so the first ripple does move it.
+    document.applyEdit("setup", .addClip(track: second, media: media, at: 1_800_000))
+    document.applyEdit("setup", .addClip(track: second, media: media, at: 5_400_000))
+    let onSecond = document.project.snapshot.clips.filter { $0.track == second }
+        .sorted { $0.start < $1.start }
+    let p = onSecond[0].id
+    let q = onSecond[1].id
+    var run = command(document, controller, [two[1].id, q], tag: chosen)
+    let before = run.removeValue(forKey: "before") as! String
+    run["ids"] = ["a": Int(two[0].id), "b": Int(two[1].id), "p": Int(p), "q": Int(q)]
+    press(controller, .alertFirstButtonReturn)
+    run["changedAfterButton"] = document.project.json != before
+    run["placementAfter"] = placement(document)
+    run["undoName"] = document.undoManager?.undoActionName ?? ""
+    run["sheetAfterButton"] = sheet(controller) ?? NSNull()
+    document.undoManager?.undo()
+    spin(0.3)
+    run["oneUndoRestores"] = document.project.json == before
+    answer["collide"] = run
+}
+
 let data = try! JSONSerialization.data(withJSONObject: answer, options: [.sortedKeys])
 FileHandle.standardOutput.write("ANSWER ".data(using: .utf8)! + data + "\n".data(using: .utf8)!)
 exit(0)
@@ -429,6 +466,30 @@ def main():
     run = answer["locked"]
     check("the sheet appears on a locked track too", bool(run["sheet"]), str(run["sheet"]))
     check("…and Shift Clips Left changes nothing there", run["unchangedAfterButton"] is True)
+
+    section("8 — two cuts whose shifts collide")
+    run = answer["collide"]
+    ids = run["ids"]
+    landed = {clip["id"]: clip for clip in run["placementAfter"]}
+    texts = (run["sheet"] or {}).get("texts", [])
+    check("both cuts reach the sheet",
+          "There\u2019s no extra footage at these cuts for a transition." in texts, str(texts))
+    check("Shift Clips Left changes the document", run["changedAfterButton"] is True,
+          "nothing landed: the second op's Err threw the batch away")
+    check("…and puts up no error sheet",
+          run["sheetAfterButton"] is None, str(run["sheetAfterButton"]))
+    check("the first cut overlaps by half a second",
+          landed[ids["a"]]["end"] - landed[ids["b"]]["start"] == HALF,
+          f"{landed[ids['a']]} {landed[ids['b']]}")
+    check("…and so does the second, which the FIRST ripple made",
+          landed[ids["p"]]["end"] - landed[ids["q"]]["start"] == HALF,
+          f"{landed[ids['p']]} {landed[ids['q']]}")
+    check("both incoming clips carry the chosen kind",
+          landed[ids["b"]]["kind"] == chosen and landed[ids["q"]]["kind"] == chosen,
+          f"{landed[ids['b']]} {landed[ids['q']]}")
+    check("…as ONE undo step named Add Transition that restores the document",
+          run["undoName"] == "Add Transition" and run["oneUndoRestores"] is True,
+          run["undoName"])
 
     print(f"\n{passed}/{passed + failed} checks passed")
     sys.exit(0 if failed == 0 else 1)

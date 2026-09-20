@@ -30,6 +30,7 @@ pub mod edit_split;
 pub mod edit_time;
 pub mod edit_track;
 pub mod edit_transition;
+pub mod edit_transition_shift;
 pub mod edit_zoom;
 pub mod evaluate;
 pub mod export;

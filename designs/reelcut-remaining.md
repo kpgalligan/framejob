@@ -299,6 +299,21 @@ is the dispatch that file holds. The new file is
 `app/Sources/MediaPeaks.swift` 236 → **228**, both well under. Nothing came
 off this list and nothing joined it.
 
+**What the E1 reader review did to it** (2026-09-20, road map 5 §12). **Toll
+T was paid**, a pure move landed and gated alone by `make test` and
+`make lint` before any fix touched the file: `add_transition_by_shift` and
+its doc comment left `core/src/edit_transition.rs` for a new
+`core/src/edit_transition_shift.rs` (**114** of the 400-line cap for a new
+file), taking the three `edit_time.rs` imports with them, and the file went
+571 → 477. The review's three `add_transition` fixes then took it to
+**530**, still 70 under. `app/Sources/EditorViewController+Inspector.swift`
+is 340 → **381**, under the cap: `shiftingOps` and its doc. Two new test
+files at or under the 400-line cap:
+`core/tests/add_transition_edges.rs` (**400**, AT the cap after the review's
+fix pass added the short-pair rows — it gives something up before it takes
+anything on) and `core/tests/crossfade_edges.rs` (**337**). Nothing came off this list and
+nothing joined it.
+
 Regenerate the list with
 `wc -l app/Sources/*.swift core/src/*.rs | awk '$1>600 && $2!="total"' | sort -rn`
 rather than trusting the numbers here; the standing exemptions are
@@ -452,8 +467,10 @@ and the closing above added the rest.
   band draw and the selection block count up.
 - **Transitions and motion, watched and heard** — road map 5 §4g's and
   §6g's checks, now that §4e's and §6e's instruments have landed
-  (`e1_proof.py` 95/95, `e2_proof.py` 61/61, `e1_chrome.py` 14/14,
-  `e2_chrome.py` 24/24, 2026-09-19). §4g: a crossfade across a Remove
+  (`e1_proof.py` 99/99, `e2_proof.py` 61/61, `e1_chrome.py` 21/21,
+  `e2_chrome.py` 24/24; E1's two are at their post-review counts of
+  2026-09-20, road map 5 §12, and `transition_sheet_probe.py` is 39/39).
+  §4g: a crossfade across a Remove
   Silences cut sounding even rather than dipped or bumped; an eased push
   FEELING better than the linear one; the Transition submenu at a hard cut
   doing what a person expects; and the three wipes reading as the direction
@@ -528,6 +545,25 @@ has been true since an identity has been possible and no caller reaches it:
 the agent refuses at its own trial first and the menu path does not use that
 entry point. `tools/proof/refusal_probe.py` prints it as a note rather than
 scoring it, so the day a caller does reach it the probe already says so.
+
+**A second op whose tick argument is bounded only by `i64`, filed and not
+fixed** — kpgalligan/reelcut#25, found by the E1 reader review
+(`designs/reelcut-roadmap-5.md` §12, R1·3 and R1·6; the limit is §3j's).
+`add_transition`'s step-down and `add_transition_by_shift`'s both remove ONE
+frame per pass. The handle form used to walk the caller's `duration` — 4.5e11
+passes and about 36 hours at the 9.0e15 the argument gate allows, from a
+measured ladder — and that is fixed: the request is held to
+`(A.duration + B.duration) / 3·frame`, the most the overlap rule can pass at
+any split. **What is left is that the CLIPS are the caller's too.** One
+ordinary `add_text_clip {duration: 9000000000000000}` makes a clip that long,
+and a lopsided split over two of them walks ~6.7 hours, extrapolated from
+0.181 / 1.607 / 16.134 s at d = 6e10 / 6e11 / 6e12; the run at the full value
+**expired at 120 s (pid 61383 killed)**, which is its measured answer. It is
+#24's family — a per-call bound with nothing cumulative behind it — and what
+would close it is either a bound on a clip's DURATION at the door or a closed
+form for the step-down, which needs a decision: the loop's own doc calls the
+predicate "not monotone in an obvious direction", so a binary search would be
+relying on the opposite. Labelled `bug`, not `ready-for-agent`.
 
 **One HOST limit with a cost at export**, measured by `e1_proof.py` §5 and
 recorded in `designs/reelcut-roadmap-5.md` §12 (2026-09-19): AVFoundation does

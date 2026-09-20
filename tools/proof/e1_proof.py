@@ -1281,6 +1281,52 @@ def silence_part(mcp):
           f"the crossfade's own dip is inside the wall, so nothing is proposed "
           f"({found['ranges']})")
 
+    # (c) the WIDENING itself, which §3f argues for and nothing measured:
+    #     with an EXACT wall the nearest legal cut destroys the transition.
+    #     The run has to be long enough that what an exact wall leaves of it
+    #     survives the length filter — the reason (a) above cannot see this.
+    d_session = Session(mcp, "e1-walls-widening")
+    dtrack = d_session.tracks()[0]
+    dmedia = d_session.media("silence.mov")
+    da = d_session.place(dtrack, dmedia, 0)
+    d_session.op("trim_end", clip=da, to=35 * SEC // 10)
+    # A ends inside the file's 2.0–3.5 s quiet, so the run ends AT the cut;
+    # B shows the file from 7 s, where it is a tone again.
+    db = d_session.place(dtrack, dmedia, 35 * SEC // 10)
+    d_session.op("trim_start", clip=db, to=7 * SEC)
+    d_session.op("move_clip", clips=[db], delta=-35 * SEC // 10)
+    d_session.op("add_transition", clip=db, duration=SEC // 2)
+    dclips = {clip["id"]: clip for clip in d_session.project()["clips"]}
+    d_a_end = dclips[da]["start"] + dclips[da]["duration"]
+    d_b_start = dclips[db]["start"]
+    d_width = d_a_end - d_b_start
+    proposed = [tuple(r) for r in detect(d_session, mode="level", threshold_db=-40.0,
+                                         min_length=SEC // 2, padding=0)["ranges"]]
+    check(d_width > 0 and any(r[1] > 0 for r in proposed),
+          f"a quiet run ends at the cut and something is still proposed "
+          f"(overlap {d_width}, {proposed})")
+    d_wall = (d_b_start - d_width, d_a_end + d_width)
+    check(not any(r[0] < d_wall[1] and r[1] > d_wall[0] for r in proposed),
+          f"no proposal reaches into the WIDENED wall {list(d_wall)} — an exact one "
+          f"leaves a proposal ending at the overlap's own first tick ({proposed})")
+    d_session.op("ripple_delete_ranges", ranges=[list(r) for r in proposed])
+    # The ids do not survive a split, so the pair is found by geometry: the
+    # overlaps left on the track, and the rule each of them has to obey.
+    ordered = sorted((c for c in d_session.project()["clips"] if c["track"] == dtrack),
+                     key=lambda c: c["start"])
+    pairs = [(a, b) for a, b in zip(ordered, ordered[1:])
+             if a["start"] + a["duration"] > b["start"]]
+    check(len(pairs) == 1,
+          f"the transition survives the cut: {len(pairs)} overlap(s) left on the track "
+          f"({[(c['start'], c['duration']) for c in ordered]})")
+    worst = max(
+        ((a["start"] + a["duration"] - b["start"], min(a["duration"], b["duration"]) // 2)
+         for a, b in pairs), default=(0, 0))
+    check(worst[0] <= worst[1],
+          f"…and it is still inside the overlap rule — {worst[0]} ticks against half of "
+          f"the shorter clip ({worst[1]}). An EXACT wall lets the cut leave A's tail "
+          f"wholly under B, which neither ripple_delete_ranges nor validate checks.")
+
     c_session = Session(mcp, "e1-walls-control")
     ctrack = c_session.tracks()[0]
     ca = c_session.place(ctrack, c_session.media("toneA.m4a"), 0)

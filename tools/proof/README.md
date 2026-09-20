@@ -2404,10 +2404,19 @@ running the sheet's own completion. Its fixture is one six-second `ffmpeg`
 movie in `work/transition-sheet/`, opened as a new project so every clip of it
 is whole.
 
-**32/32** at the landing. Mutants: the sheet never presented **14/32**; the
-button sending `ripple: false` **24/32**; the trial's apply guard reduced to
-"only an all-`set_transition` batch" **28/32** (the split pair and the mixed
-selection). **One survivor**: the button calling `applyEdit` instead of
+**32/32** at the landing, **39/39** since the E1 reader review (road map 5
+§12, R3·1) added §8, two chosen cuts whose shifts COLLIDE — one ripple slides
+the second cut's incoming clip over a predecessor that does not slide with
+it, so the second `add_transition` sees an overlap and answers `Err`.
+Mutants: the sheet never presented **14/32**; the button sending
+`ripple: false` **24/32**; the trial's apply guard reduced to "only an
+all-`set_transition` batch" **28/32** (the split pair and the mixed
+selection); §8's fix reverted — the button mapping the cuts straight to
+`ripple` ops from one snapshot instead of re-deciding each against the
+running project — **33/39**, five of §8's six rows, with the attached error
+sheet reading `clip 7 is not at a hard cut: it already overlaps clip 6 — use
+set_transition or set_transition_duration` and nothing landed at all.
+**One survivor**: the button calling `applyEdit` instead of
 `performGroupedEdit` scores 32/32. The grouped entry point is mandatory
 because an undo registration outside an AppKit event lands in an implicit
 group AppKit never closes, merging it with the next such edit — and the probe
@@ -3279,7 +3288,8 @@ instruments §4e and §6e owe them, landed 2026-09-19 against the tree as it
 stood.
 
 `python3 tools/proof/e1_proof.py [port] [reference_port]`, 4825 and 4826 by
-default, **95/95**, against TWO running instances: this build and the build
+default, **95/95** at the landing and **99/99** since the E1 reader review
+(road map 5 §12, R4·1) added §6(c), against TWO running instances: this build and the build
 at `1c3e92e` (the reference paragraph in "Running one" says how to make it).
 Fixtures are `media/`'s two tones, `AV.mov` and `silence.mov`, plus shape
 cards the app draws; **the tones are TRIMMED first**, because a file placed
@@ -3335,11 +3345,46 @@ padding rather than the op.
   overlap widened by its own length; the answer's KEY SET is the same either
   way, so a wall is never reported; and the crossfade's own dip is inside
   the wall, with a faded tail on its own as the control that says the
-  detector can see a dip at all.
+  detector can see a dip at all. **(c) the WIDENING itself**, which the
+  first three rows cannot see — the run they use is short enough that what
+  an exact wall leaves of it is dropped by the length filter. Here the quiet
+  ends AT the cut and is long enough to survive: the proposal is applied
+  with `ripple_delete_ranges`, the pair is found again by GEOMETRY (a split
+  does not keep the ids) and the overlap it leaves is measured against half
+  of the shorter clip. An exact wall leaves 1 660 000 ticks against a limit
+  of 150 000 — a project outside the rule that neither
+  `ripple_delete_ranges` nor `validate` checks, which is §3f's own
+  argument.
 
-`python3 tools/proof/e1_chrome.py [--reference DIR]`, no port, **14/14**.
-The harness on BOTH trees over one hand-written version-6 package, and a
-probe built from `app/Sources`.
+**Mutants, from the E1 reader review** (named patches of the tree in a copy,
+each asserted to replace its text exactly once). **X1, handles never clamp**
+(`|h| want.min(h)` → `|_| want`): **92/99**, all seven in §4. **X2, no
+crossfade** (the constant-power angle replaced by full gain both ways):
+**92/99**, all seven in §5. **X3, no easing in picture or sound**
+(`transition_of_later` forcing the default curve, so `get_project` still
+SAYS `ease_in_out`): **92/99** — two in §2 and §3, five in §5. **X4, walls
+exact rather than widened**: **97/99**, both in §6(c) — it scored 95/95, a
+clean pass, against the script as it stood, which is why §6(c) exists. **X5,
+the section's both-keys rule deleted**: **99/99** — this script reaches none
+of the section's writes, which is `e1_chrome.py`'s §3.
+
+`python3 tools/proof/e1_chrome.py [--reference DIR]`, no port, **14/14** at
+the landing and **21/21** since the E1 reader review (road map 5 §12, R4·2)
+added §3, the section's WRITES. The harness on BOTH trees over one
+hand-written version-6 package, and a probe built from `app/Sources`.
+
+* **§3, the Curve popup and the Crossfade Audio checkbox, DRIVEN.** The
+  popup is sent `itemPicked:` (what its own popped-up menu sends) and the
+  checkbox a synthesized `mouseDown`, on the same clip with its transition
+  stored and with it cleared. With one stored each row writes its ONE key
+  and the other is kept, under the undo names "Transition Curve" and
+  "Transition Audio"; with NOTHING stored each sends BOTH keys, so the
+  minted transition is what the section was showing and the untouched row
+  does not silently become `ease_in_out` / on. Mutant **X5**, the both-keys
+  rule deleted (`if stored() == nil` → `if false`): **19/21**, exactly those
+  last two rows — it had scored 14/14, 95/95 and 32/32 against all three
+  instruments before §3 existed. **X1**, **X2**, **X3** and **X4** all score
+  **21/21**: none of them touches what the section stores.
 
 * **The section's body is two rows taller than it was**: the vertical EXTENT
   of the pixels that opening `video.transition` changes, measured on each

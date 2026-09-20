@@ -3,8 +3,9 @@
 **Status: BUILT AND PROVED — E1 and E2's core in `e8028a2` (2026-09-16),
 `add_transition`'s `ripple` form in `5da056c` (2026-09-16), E2's chrome in
 `6dda2c7` (2026-09-17), and §4e's and §6e's four instruments on 2026-09-19.
-What is left is the reader review (§4f, §6f), the four `6dda2c7` nits and
-§4g's and §6g's checks by a person — §12 is the record.** Two phases, taken on
+What is left is E2's reader review (§6f), the four `6dda2c7` nits and
+§4g's and §6g's checks by a person — §12 is the record, and E1's reader
+review is in it (2026-09-20).** Two phases, taken on
 2026-09-15 from the
 survey of another editor's transitions, effects and filters
 (`designs/reelcut-effects-survey.md`): **E1**, transitions learn direction,
@@ -485,6 +486,17 @@ fade the layer's own RGB, so a picture-in-picture clip fades to a black box.
 A spinning or otherwise rotated partner disables the dissolve's weight
 correction (`Compositor.swift:1350`) and dips darker mid-dissolve — existing,
 and newly reachable through E2.
+
+Added by the E1 reader review (§12, R1·3 and R1·6): **`add_transition`'s two
+step-downs are bounded by the CLIPS, and a clip's duration is the caller's.**
+One `add_text_clip {duration: 9000000000000000}` — the MCP argument gate's own
+bound — makes a clip that leaves the handle form's loop
+`(A.duration + B.duration)/3·frame` passes long and the shift form's
+`shorter/2/frame`; on a lopsided split that is ~6.7 hours of walking,
+extrapolated from 0.181 s / 1.607 s / 16.134 s at d = 6e10 / 6e11 / 6e12, and
+the run at 9.0e15 expired at 120 s. It is one op's tick argument bounded only
+by `i64` — kpgalligan/reelcut#24's family — not transitions'. Filed as
+kpgalligan/reelcut#25.
 
 ---
 
@@ -1542,10 +1554,560 @@ instance by the end of `e1_proof.py`, one past the sixteen the plan
 budgeted: harmless against the deadlock past forty, written down so the
 number is true.
 
+### The E1 reader review (2026-09-20)
+
+The review §4f owes, run as four readers in sequence, each finished and
+written up before the next began. **The named deviation:** §4f asks for
+four parallel readers and earlier reviews put every finding to three
+sceptics; this is ONE context reading four questions in turn and ONE
+independent sceptic at the end, because litecode runs one agent at a time.
+Every finding below was reproduced by BUILDING the input and RUNNING it —
+a test through the FFI, an MCP call, or a compiled probe — before it was
+kept, and the fixes are gated by rows made to fail on purpose.
+
+The four questions, verbatim from §4f:
+
+1. the `add_transition` arithmetic against every source kind, speed,
+   reversal and track shape;
+2. the envelope — `Side`, containers, breakpoints, nests, mute/solo/duck
+   precedence — against the ramps it produces;
+3. the Swift UI — the menu's batch and validator, the section's writes,
+   undo names;
+4. the proof and the tests — which claims would pass against a build
+   without the feature.
+
+**Which STATE each reading came from.** E1 landed in `e8028a2` (E1 + E2
+core) and `5da056c` (`ripple` and the sheet), its instruments in `50a2e63`.
+Since then D2/D3 rewrote the refusal sentences and published the op table,
+and road map 7 §10's UNCOMMITTED phases A–B changed the handle arithmetic:
+`extended` now runs `source_advanced(.., head.saturating_neg(), speed)`,
+`head_handle_frames` reads `earliest_start_on_grid` and `tail_handle_frames`
+reads `source_length_on_timeline(..).or_empty()`. The review is of the
+WORKING TREE, and each line's bracket says where its reading came from —
+**[E1]** the text is already in `git show 5da056c:<path>`, **[D2-D3]** it
+arrived by `HEAD`, **[SW]** it exists only in the working tree.
+
+**The baseline, step 0, every command through rule H at a flat 1800 s.**
+`make test` green (`wall=2.5`), `e1_proof.py` 95/95 with both instances up
+and zero SKIP lines (`wall=7.3`), `e1_chrome.py` 14/14 (`wall=131.9`),
+`transition_sheet_probe.py` 32/32 (`wall=75.8`), `make lint` and
+`cargo fmt --check` clean, `make typecheck` 0 errors and exactly 4
+AVFoundation warnings. No R0·1: the baseline was what the plan said it was.
+
+**Toll T, paid first and alone.** Three of reader 1's fixes root in
+`core/src/edit_transition.rs`, which stood at 571 of the ~600-line cap.
+`add_transition_by_shift` and its doc comment moved out whole into a new
+`core/src/edit_transition_shift.rs` (114 lines) — a pure move, already
+`pub(crate)` with one caller, gated alone by `make test` and `make lint`
+before any fix touched the file, with the map entries in `core/CLAUDE.md`,
+spec §7.10 and `designs/reelcut-core-notes.md`. `edit_transition.rs` went
+571 → 477, and 530 after the three fixes and the sceptic's pass.
+
+#### Reader 1 — the arithmetic against every source kind, speed, reversal and track shape
+
+- **R1·1** [E1] (lead L2) `core/src/edit_transition.rs:318,333` — a canvas at fps
+  `[7, 1]` (valid; `time::frame_duration` answers `None` because
+  600 000 / 7 is not whole, so `Project::frame` falls back to 1/30 s =
+  20 000 ticks), two media clips at a hard cut at 3 600 000, `add_transition
+  {clip: 11, duration: 1220000}` → clip 11's start is **2 980 000, frame
+  34.7667** at 7 fps — a sub-frame time `time.rs:170` says the model never
+  holds, and which `trim_start` on the same document does not produce
+  (3 514 286, frame 41.0000 exactly). `add_transition` is the ONLY op in the
+  crate that multiplies by `frame()` to make a POSITION; every other use of
+  it is a minimum duration or a divisor. **FIXED** — each trial's two
+  extensions are now read off the grid itself, inward
+  (`snapped_down(A.end + a·frame) − A.end` and
+  `B.start − snapped_up(B.start − b·frame)`), which at a rate that divides
+  the timescale is exactly `a·frame` and `b·frame`. Rows
+  `at_a_rate_the_timescale_does_not_divide_both_clips_still_land_on_the_grid`
+  and `a_request_under_one_frame_of_the_real_grid_is_refused_rather_than_stored_flat`
+  in the new `core/tests/add_transition_edges.rs`; the mutant that is the fix
+  reverted (`tail = a * frame; head = b * frame`, one occurrence) scores
+  **7 passed, 2 failed** in a tree copy. What it costs, measured by the
+  sceptic on an OFF-GRID project at 30 fps (only hand-written JSON makes
+  one): the two inner edges now land on the grid where they used to stay off
+  it for ever, and a ONE-frame request against a start 3 ticks past a
+  boundary reveals 3 ticks rather than a frame, because the first frame is
+  spent on the landing.
+  - The same multiplication in `add_transition_by_shift`
+    (`shift_clips(.., -(frames * frame))`) is **REFUTED as this op's
+    defect**: `shift_clips` moves many clips by ONE delta, and at a rate
+    whose frame is not a whole tick count no single delta keeps them all on
+    the grid. `close_gap` shifts by `end − start`, a difference of two
+    on-grid positions, and is off the grid there for the same reason — it is
+    the ripple family's posture, not E1's.
+- **R1·2** [E1] `core/src/edit_transition.rs:283-300` — reader 1's own, not a
+  lead. On the SHIPPED test
+  fixture (`core/tests/add_transition.rs`'s `cuts()`, track 50),
+  `add_transition {clip: 11, duration: 14400000}` → **`Err("clip 11 has
+  negative start -3600000")`**, where `duration: 12000000` on the same pair
+  clamps and applies. Clip 11 carries twenty seconds of head and starts at
+  six, so the handle moved it to −3 600 000; there the trial pair sorts the
+  OTHER way round, `check_overlap_rule` measures that other pair, passes on
+  the FIRST trial, and `validate` complains about the crate's own state. The
+  op's own doc promises the duration is "clamped rather than refused". Not
+  monotone: 12 000 000 applies, 14 400 000 errors. **FIXED** by R1·3's
+  ceiling, which closes it completely — a swapped pair passes the rule only
+  at `a + b ≥ 3(A.duration + B.duration)/frame`, nine times the ceiling, so
+  no trial the loop can reach has a negative start. **The `Err` is not the
+  only form of that swapped pair, and the other one is worse**: on a SHORT
+  pair it passes the rule with BOTH starts non-negative and the project is
+  WRITTEN with the two clips out of order, which `validate` accepts — a
+  one-frame clip at 2 000 000 before a seven-frame one, `center`, 40 frames,
+  answers `78@2000000+420000 79@1620000+540000` with the ceiling reverted
+  (the ids are the committed row's, track 64), clip 79 beginning before
+  clip 78. That is 108 of the 981 answers the
+  sceptic's differential sweep moved (below), and the ceiling's own comment
+  now says it. Rows
+  `a_request_longer_than_the_timeline_in_front_of_the_clip_clamps_rather_than_erroring`
+  and `requests_either_side_of_the_timelines_edge_agree_and_never_swap_the_pair`,
+  the second of which carries that short pair (track 64 of the `kinds()`
+  fixture) because without it no row failed the revert for the out-of-order
+  form; the ceiling reverted scores **6 passed, 3 failed**, the first with
+  `this op was expected to apply, but: clip 11 has negative start -3600000`
+  and the short-pair row with `left: (2000000, 420000) right: (2000000,
+  40000)`.
+  A SECOND fix, an explicit clamp of `b` at tick 0, was written, run, found
+  to have no input left that reaches it once the ceiling is in — the revert
+  scored 9/9 — and DELETED under the deletion test. That measurement is
+  why R1·2 and R1·3 share one fix.
+- **R1·3** [E1] (lead L1) `core/src/edit_transition.rs:302-330` — the
+  step-down loop removes ONE frame per pass, and the pass count followed the
+  caller's `duration`, not the clips. Measured ladder, each rung under rule
+  H, on a TEXT clip (tail unbounded) before a MEDIA clip at `in` 0 (head
+  empty), where `center`'s shortfall moves the whole request to the
+  unbounded side — **one unbounded side is all it needs**: 3e4 frames in
+  0.010 s, 3e5 in 0.087 s, 3e6 in 0.880 s, 3e7 in 8.608 s. Linear, 287 ns a
+  pass; 9.0e15 ticks (the MCP argument gate's own bound) is 4.5e11 passes and
+  **~36 hours**, `i64::MAX` is 4.6e14 passes and ~4 years. The doc's "bounded
+  by step 4's own frame count" was true and was the problem. **FIXED** — the
+  request is held to `(A.duration + B.duration) / 3·frame` before the split.
+  That is the most the overlap rule can pass at ANY split (it wants
+  `2(a+b)·frame ≤ A.duration + a·frame` AND `2(a+b)·frame ≤ B.duration +
+  b·frame`; adding them gives the bound), so the clamp removes only trials
+  that were going to fail and no answer moves. **The row that pins the same
+  edit at and above the ceiling,
+  `a_huge_duration_lands_the_same_overlap_a_request_at_the_ceiling_does`, is
+  a CONTROL and is labelled one in its own comment**: `split` is
+  `requested.min(ceiling)`, so every request at or above the ceiling is one
+  `split` BY CONSTRUCTION, the row passes against the ceiling reverted too
+  (measured, among that build's 6 passes), and it can never fail for the
+  reason it is cited for. **The evidence that no answer MOVES is the
+  sceptic's 18 144-combination differential sweep below, not this row.**
+  Because fixed and unfixed AGREE on the answer, the regression row is the
+  clock: `a_huge_duration_is_answered_in_the_time_a_small_one_takes`, SIZED
+  from the ladder at 6e7 frames, with the three numbers it was chosen from —
+  **fixed under 0.001 s, bound B = 1.0 s, unfixed 17.844 s** — and it fails
+  by assertion, `add_transition took 17.844 s for a 1200000000000-tick
+  request (bound 1 s)`.
+  - Extremes, against the FIXED build only, each under rule H: `duration` 1
+    tick → the refusal (`the 0 frames asked for`), one frame → applied,
+    the ceiling and one frame either side → the same edit, **9.0e15 →
+    applied in under a millisecond with the same answer**, `i64::MAX` → the
+    same, `-1` and `i64::MIN` → `Err("duration must be positive, not …")`,
+    and `ripple` at `i64::MAX` → applied. 9.0e15 and `i64::MAX` are
+    deliberately NOT in the committed rows: against a build with the ceiling
+    reverted they ARE the loop, and a row that hangs `make test` on a revert
+    is worth less than the claim.
+  - **The residual, recorded as a limit (§3j).** The ceiling is the CLIPS,
+    and a clip's duration is the caller's: one ordinary
+    `add_text_clip {duration: 9000000000000000}` makes a clip 9.0e15 ticks
+    long. On a lopsided split (`align: "after"`, two such clips) the
+    step-down still walks `(A + B)/3f − min/2f` passes — measured 0.181 s at
+    d = 6e10, 1.607 s at 6e11, 16.134 s at 6e12, linear, so ~6.7 hours at
+    9.0e15. The extreme run **expired at 120 s (pid 61383 killed)**, which
+    is that row's measured answer. **FILED #25**
+    (kpgalligan/reelcut#25), a defect of #24's family — a single op's tick
+    argument bounded only by `i64` — not re-fixed here.
+- **R1·4** [E1/SW] (lead L3) — §3i asked for "a reversed clip's handle in
+  the reversed stream" and `grep -i revers core/tests/add_transition.rs
+  tools/proof/e1_proof.py` finds nothing; an image, a shape and any speed at
+  which the HANDLE is what clamps had no row either (`cuts()` has one
+  `still` and one `text`, and its ×2 track has a 6 000 000-tick head against
+  a ten-frame request). The ARITHMETIC is **REFUTED as a defect** — run, all
+  four are right: a reversed pair moves `in` 3 000 000 → 2 900 000 for five
+  frames at speed 1, which is correct because `in` is measured in the
+  direction the clip plays (`edit.rs`, `set_reversed`), so the handle
+  arithmetic is direction-agnostic by design; an image pair and a shape pair
+  are unbounded and split five and five; and at ×2 with a five-frame head
+  and an empty tail, five frames land, all on the incoming side, with `in`
+  200 000 → 0 (times the speed, not divided by it). The GAP was real and is
+  **FIXED** by four rows in `add_transition_edges.rs`. Two of the four are
+  failed by X1, "handles never clamp": the ×2 row, and the reversed row
+  after this pass sharpened it — clip 71 now sits at `in` 60 000, THREE
+  frames of head, so the handle is what binds and `center`'s shortfall
+  moves the other seven frames to the tail (X1 answers `(0, 1300000)` where
+  the fix answers `(0, 1340000)`). The image/shape row has no such mutant
+  and is named as a coverage row below.
+- **R1·5** [E1] (lead L4) — the handle form WRITES on a locked track where
+  the `ripple` form refuses. **REFUTED**: `core/src/edit_edge.rs` contains no
+  `locked` at all, and `trim_start` on a locked track applies here too
+  (clip 79 → start 1 400 000). An edge op that moves nothing but its own
+  clip's edges ignores the lock; the ripple form refuses because it MOVES
+  the timeline, which is `close_gap`'s and `ripple_delete`'s posture. The
+  repo's posture, not a defect.
+- **R1·6** [E1] (lead L5) `core/src/edit_transition_shift.rs` — the shift
+  form clones the whole project once per frame from `allowed` down.
+  **REFUTED as a defect**: `frames = asked.min(allowed)` already holds it to
+  `shorter/2/frame`, the CLIPS and never the request. Measured on a pair
+  whose shift breaks another track's overlap rule at every length, so the
+  walk runs to the bottom: 15 000 passes in 0.022 s, 150 000 in 0.090 s,
+  1 500 000 in 0.898 s. Same residual as R1·3's and recorded with it.
+- Noticed in passing, no verdict: a `duration` under one frame refuses with
+  "the **0** frames asked for", the request divided by the grid, which reads
+  oddly for a caller who asked for 1 tick.
+
+#### Reader 2 — the envelope against the ramps it produces
+
+Read whole: `audio_crossfade.rs`, `audio.rs`'s `Voice`/`Stage`/`silenced`
+walk, `breakpoints`, `gain_at`, `voice_gain`, `stage_gain`,
+`audio_duck.rs`'s `duck_gain`, and `transition.rs`'s read half
+(`overlap_of`, `progress_in`, `transition_of_later`, `overlap_before_of`,
+`overlap_after_of`, `transition_among`, `crossfade_among`). No defect was
+found; two promised shapes were measured for the first time.
+
+- **R2·1** [E1] `core/src/audio_crossfade.rs` (lead L6, first half) — §3e's
+  closing bullet promises "mute, solo, ducking and volume keep their
+  precedence: the term multiplies, as ducking does", and `crossfade.rs` has
+  a row for mute, one for solo and one for volume and none for a DUCKER —
+  the only one of the four computed OUTSIDE the voice (`gain_at` applies a
+  ducker after `voice_gain`, where the crossfade is inside `stage_gain`).
+  **REFUTED as a defect by the reader's own run**: a step duck at level 0.25
+  over `crossfade.rs`'s pair gives exactly `0.25 × cos(pπ/2)` and
+  `0.25 × sin(pπ/2)` at every breakpoint — 0.176777 at p = 0.5, which is
+  0.25/√2. The GAP was real and is **FIXED** by
+  `a_ducker_on_another_track_multiplies_the_crossfade_rather_than_replacing_it`
+  and `the_ducked_pair_still_sums_to_the_ducked_level` in the new
+  `core/tests/crossfade_edges.rs`. Mutant X2 (no crossfade) scores **0
+  passed, 6 failed** on that file.
+- **R2·2** [E1] (lead L6, second half) — no row anywhere for a MIDDLE clip
+  with an overlap at both ends whose two overlaps ABUT (each exactly half
+  of it, the most the rule allows), where `Side::Left` reads one overlap's
+  closed end and `Side::Right` reads the other's `p = 0` at the same tick.
+  **REFUTED as a defect**: run, the middle clip reads exactly 1.0 from both
+  sides at the seam, rises as `sin` over the first overlap and falls as
+  `cos` over the second, and its two neighbours tile the SAME composition
+  track (the A/B assignment puts 11 and 13 on one and 12 on the other)
+  without a gap. The GAP was real and is **FIXED** by three rows
+  (`a_middle_clips_two_overlaps_meet_at_full_gain`,
+  `a_middle_clip_fades_in_over_one_overlap_and_out_over_the_other`,
+  `the_middle_clips_neighbours_still_follow_the_law_around_it`).
+- **R2·3** [E1] — a FADE OUT as long as the overlap and the crossfade cover
+  the same second; `audio.rs` says both apply and nothing measured the
+  product. Added as `a_fade_out_as_long_as_the_overlap_multiplies_the_crossfade`,
+  which asserts `(1 − p)·cos(pπ/2)` and that the pair then does NOT hold
+  its power — the thing a person is choosing when they leave a fade on a
+  clip they put in a transition. **FIXED** (a gap), caught by X2.
+- **A fix's own sentence, corrected by measuring it.** The seam row was
+  first written claiming that only `crossfade_among`'s `Side::Left` closure
+  could answer there. A mutant that disables the closure
+  (`if side == Side::Left && …` → `if false && …`) leaves that row
+  **passing** — a `None` reads as gain 1 and 1 is the right answer at that
+  tick — while failing 8 of `crossfade.rs`'s 20. The comment and the file's
+  module doc now say which row guards the closure
+  (`the_outgoing_clips_last_breakpoint_is_zero`) and that this one does not.
+- Refuted while reading, each by the code itself rather than by a run, and
+  none re-reported: `Transition::default()` is `audio: false` and
+  `Curve::Linear`, so a version-6 bare overlap stays silent and linear
+  (R5-2); the two overlaps of a middle clip can abut but never cross, since
+  the rule bounds each at half the clip and the `i`/`i+2` pass blocks the
+  neighbours reaching each other; `crossfade_breaks` asking
+  `crossfade_among(.., overlap.start, Side::Right)` for BOTH overlaps is
+  right, because `progress_in` is half-open and the before-overlap has
+  already ended at the after-overlap's start. K1, K4, K5, K7 and K10 were
+  cited, not re-read.
+
+#### Reader 3 — the Swift UI: the menu's batch and validator, the section's writes, undo names
+
+Read whole: `EditorViewController+Inspector.swift`'s transition half
+(`setTransitionKindCommand`, `presentNoFootageForTransition`,
+`transitionPlacement`, `validateInspectorAction`), `VideoPane+Transition.swift`,
+`ReelEdit.swift`'s `applying([ReelOp])`, `ProjectDocument`'s `applyEdit` /
+`performGroupedEdit`, `AppDelegate+Menus.swift`'s Clip ▸ Transition ▸, and —
+because findings route by ROOT file and no question names them —
+`AgentServer+Transitions.swift`, `AgentCatalog+Transitions.swift` and §3f's
+`overlapWalls`.
+
+- **R3·1** [E1] `app/Sources/EditorViewController+Inspector.swift:268-276`
+  (lead L7) — **the sheet's Shift Clips Left loses everything when two
+  chosen cuts collide.** Input, reproduced in the core first and then in a
+  real window: track 1 holds two whole six-second files butted at 3 600 000;
+  track 2 holds one at 1 800 000 (so it SPANS that cut) and another at
+  5 400 000. Both cuts have no handle, so both reach the sheet with its
+  plural title, and the button maps them — in start order, which is
+  `selectedClips`' order — to one `ripple` op each, built from the snapshot
+  the sheet was made from. Op 1 slides every clip at or after 3 600 000 left
+  by half a second, which moves the second cut's INCOMING clip but not its
+  predecessor, which began earlier: that cut is now an overlap, with a
+  minted `cross_dissolve` on it (`close_gap`'s rule, by design). Op 2 is then
+  `Err("clip 7 is not at a hard cut: it already overlaps clip 6 — use
+  set_transition or set_transition_duration")`, `ReelProject.applying`
+  THROWS on an `Err`, and the throw discards `current` — so **op 1's shift is
+  lost, nothing lands, no undo step is made, and the person is shown an error
+  sheet naming a clip they never pointed at.** Op 1 had already given them
+  the second overlap. **FIXED**: the button's ops are now re-decided one at a
+  time against the project the earlier ones leave behind
+  (`shiftingOps`), a cut that has become an overlap taking the
+  `set_transition` Clip ▸ Transition ▸ sends for an overlap anyway, and an op
+  the running project declines being dropped rather than carried. Row:
+  `transition_sheet_probe.py` §8, **32/32 → 39/39**; the fix reverted scores
+  **33/39** with that error sheet's text printed and nothing landed.
+- **R3·2** [E1] `app/Sources/VideoPane+Transition.swift` (lead L8) — with an
+  overlap and NOTHING stored the section shows Linear / off, and the Kind
+  popup sends `set_transition` alone, which MINTS `ease_in_out` / `true`, so
+  two rows the person did not touch change. **REFUTED**, by spec §11 R5-2:
+  a clip that had no transition and gains one gets a MINTED one, and that is
+  the decision, not an accident. The section's own doc sentence was then
+  checked against every branch that could make it false and still reads
+  true: it is scoped to `set_transition_style`, whose one-key form is
+  exactly what the both-keys rule exists to stop, and it does not claim
+  anything about the Kind popup.
+- **R3·3** [E1] (lead L9) — undo names: the menu's batch says "Set
+  Transition" even when every op in it is `add_transition`; the MCP tool
+  says "Set Transition" with or without `ripple`; the sheet's button says
+  "Add Transition" for the op the tool mirrors. **REFUTED**: each name
+  describes the PATH it sits on rather than the op — the menu's batch can be
+  all `set_transition`, the tool's primary mirror is that menu and its doc
+  comment says so, and the sheet is its own gesture. Each is asserted by its
+  own instrument (`e1_chrome.py`, `e1_proof.py`, the sheet probe), so
+  changing one would move a row in another. Written down here because the
+  same op does answer to two names depending on the door it came through.
+- Refuted while reading: the validator is right to keep None enabled for any
+  selection and a KIND enabled only where `transitionPlacement != .neither`,
+  because the command SKIPS every other clip; `presentNoFootageForTransition`
+  is right to go through `performGroupedEdit`, since a sheet completion is
+  not an AppKit event (app/CLAUDE.md's undo pitfall); `overlapWalls` reads
+  adjacent pairs of `clips(onTrack:)` on every unlocked track and widens
+  each overlap by its own length, which is §3f's own argument. K11, K13 and
+  §3j's notes were cited, not re-read.
+
+#### Reader 4 — which claims would pass against a build without the feature
+
+**No old binary was scored as "the build without the feature."** Run as the
+BUILD port, the `1c3e92e` binary has 75 tools, `e1_proof.py`'s first
+`set_transition_style` call raises `ToolError`, `main()` has no handler for
+it, and the script aborts inside §1 with §2–§6 never run: it measures
+nothing. (The reference instance keeps its designed role on the SECOND
+port.) The builds are five NAMED MUTANTS of today's tree in a tree copy,
+each patch asserting its replaced text occurs exactly once — all five checked
+today, 1 each:
+
+- **X1, handles never clamp** — `edit_transition.rs`: `|h| want.min(h)` →
+  `|_| want`.
+- **X2, no crossfade** — `audio_crossfade.rs`: the constant-power angle
+  replaced by full gain both ways, breakpoints still emitted.
+- **X3, no easing in picture or sound** — `transition.rs`'s
+  `transition_of_later` forcing the default curve, so `get_project` still
+  SAYS `ease_in_out`.
+- **X4, walls exact, not widened** — `SilenceDetector+Walls.swift`: both
+  `± width` terms dropped.
+- **X5, the section's both-keys rule gone** — `VideoPane+Transition.swift`:
+  `if stored() == nil {` → `if false {`.
+
+None repeats §12's eleven E1 mutants (cited, not re-run) — **except that
+"the speed applied twice in `extended`" no longer has a patch site**: that
+multiplication is now `source_window.rs`'s `timeline_to_source`, shared by
+six ops, so a patch there would be mutating every placement op in the crate
+rather than this one.
+
+One row per CLAIM GROUP, one column per mutant. `fails` = the group catches
+it; `passes` = it does not; `control` = the group's own text claims something
+did NOT move, so passing is what it is for. Core-only mutants were scored by
+`cargo test` in the copy first, then the copy's app was built for MCP; every
+run went through rule H and none expired, so there is no `expired` or
+`unreached` cell in this table.
+
+| Claim group | X1 | X2 | X3 | X4 | X5 |
+|---|---|---|---|---|---|
+| `e1_proof.py` §0 the two instances | passes | passes | passes | passes | passes |
+| `e1_proof.py` §1 the schema | control | control | control | passes | passes |
+| `e1_proof.py` §2 the three wipes | passes | passes | **fails** | passes | passes |
+| `e1_proof.py` §3 the push, and version 6 unchanged | control | control | **fails** | control | control |
+| `e1_proof.py` §4 `add_transition`'s handles | **fails** | passes | passes | passes | passes |
+| `e1_proof.py` §5 the crossfade | passes | **fails** | **fails** | passes | passes |
+| `e1_proof.py` §6 Remove Silences | passes | passes | passes | **fails** | passes |
+| `e1_chrome.py` §1 the section as pixels | passes | passes | passes | passes | passes |
+| `e1_chrome.py` §2 the menu, validator, rows, batch | passes | passes | passes | passes | passes |
+| `e1_chrome.py` §3 the section's WRITES | passes | passes | passes | passes | **fails** |
+| `transition_sheet_probe.py` | **fails** | passes | passes | passes | passes |
+| `core/tests/add_transition.rs` | **fails** | passes | passes | passes | passes |
+| `core/tests/add_transition_edges.rs` | **fails** | passes | passes | passes | passes |
+| `core/tests/crossfade.rs` | passes | **fails** | **fails** | passes | passes |
+| `core/tests/crossfade_edges.rs` | passes | **fails** | passes | passes | passes |
+| `core/tests/ripple_transition.rs` | **fails** | passes | passes | passes | passes |
+| `core/tests/schema_v7.rs` | control | control | control | control | control |
+
+Totals, as run: X1 `e1_proof` **92/99**, `e1_chrome` 21/21, sheet **18/39**,
+`add_transition.rs` **29/34**, `add_transition_edges.rs` **7/9**
+(re-scored after this review's fix pass sharpened the reversed row; it was
+8/9 when the table was first written),
+`ripple_transition.rs` **12/13**. X2 `e1_proof` **92/99**, `crossfade.rs`
+**8/20**, `crossfade_edges.rs` **0/6**. X3 `e1_proof` **92/99**,
+`crossfade.rs` **16/20**. X4 `e1_proof` **97/99** (both in the new §6(c)),
+everything else clean. X5 `e1_chrome` **19/21** (both in the new §3),
+everything else clean.
+
+Two cells were findings, and both are now `fails`:
+
+- **R4·1** [E1] `tools/proof/e1_proof.py` §6 — **X4 scored 95/95: the walls
+  were EXACT and every row passed.** §3f's whole argument for WIDENING is
+  that an exact wall lets a legal cut destroy the transition, and no row
+  measured it. The reason the three shipped rows cannot see it is
+  arithmetical and worth recording: their quiet run is 2.0–3.0 s against an
+  overlap at [2.25, 2.75], so an exact wall leaves two 0.25 s pieces, both
+  BELOW the `min_length` of 0.5 s — the length filter hides the defect.
+  **FIXED** by a new §6(c) whose run ends AT the cut and is long enough to
+  survive the filter: it asserts no proposal reaches into the widened wall,
+  then APPLIES the proposal with `ripple_delete_ranges`, finds the pair
+  again by GEOMETRY (a split does not keep the ids) and measures the overlap
+  left against half the shorter clip. **95/95 → 99/99**; X4 now scores
+  **97/99**, the decisive row reading `1660000 ticks against half of the
+  shorter clip (150000)` — a project outside the overlap rule, which is
+  exactly §3f's sentence.
+- **R4·2** [E1] `tools/proof/e1_chrome.py` (lead L10) — **X5 scored 14/14,
+  95/95 and 32/32: nothing in any instrument reached `styleOps`, the Curve
+  or Crossfade Audio WRITES, or the undo names "Transition Curve" and
+  "Transition Audio".** `e1_chrome.py` measured the section's EXTENT and
+  COUNTED its controls; neither notices what a control writes. **FIXED** by
+  a new §3 that DRIVES them — the popup sent `itemPicked:`, which is what
+  its own popped-up menu sends, and the checkbox a synthesized `mouseDown` —
+  on the same clip with its transition stored and with it cleared.
+  **14/14 → 21/21**; X5 now scores **19/21**, failing exactly the two
+  cleared-clip rows, which read
+  `None → {'audio': True, 'curve': 'ease_in_out', …}` where the section was
+  showing Linear.
+- Everything else in the table is `passes` on a group whose text says
+  nothing about the mutated behaviour (a core test file says nothing about
+  Swift; `e1_chrome.py` §1 and §2 say nothing about a handle or a ramp), or
+  `control` on a group whose text claims something did NOT move — the
+  version-6 byte comparisons in §3, §1's version-6 open, and
+  `schema_v7.rs`, which is about the FILE and is meant to survive every one
+  of the five.
+
+#### The sceptic — every kept finding put back, every fix attacked
+
+The deviation §4f allows for: ONE independent sceptic pass over the four
+readers' work rather than three sceptics per finding, run in the same
+context. Nothing below was judged by reading alone; each attack was built
+and run.
+
+- **The ceiling's derivation, fuzzed.** The claim that
+  `(A.duration + B.duration) / 3·frame` can lose no answer rests on an
+  inequality, so it was attacked with a fixture sweep instead: **41 472**
+  combinations of A's start, both durations, six source-kind pairs
+  (media/media, text/media, media/text, text/text, shape/nest, nest/text),
+  three `in` points, three speeds, all three `align`s and four durations up
+  to 9.0e15 — every one asserted to answer a hard-cut `Err`, a refusal, an
+  identity or an APPLIED project whose every clip starts at or after tick 0.
+  **Zero unexpected `Err`s, zero negative starts, 1.53 s for the sweep**, so
+  no combination reached the loop either.
+- **The ceiling, attacked DIFFERENTIALLY — the evidence that no answer
+  moves.** One tree copy with `let split = requested.min(ceiling)` made
+  switchable by `RC_NO_CEILING`, one build, two runs, the answers diffed
+  over **18 144 combinations**: A's start × A.duration (1/5/60/301 frames)
+  × B.duration (1/7/60/500 frames) × {text, media, image}² × with and
+  without neighbours on the track × all three `align`s × requests of
+  1/3/40/121/200/1 000/20 000 frames. **17 163 answers identical, the rest
+  differing, and in every differing one the UNCLAMPED build is the wrong
+  one** — 540 `APPLIED → ERR("negative start")`, 333 `REFUSED → ERR`, 54
+  `REFUSED → APPLIED(swapped pair)` and 54 `APPLIED → APPLIED(swapped
+  pair)`. Those four sum to **981**, which is exactly 18 144 − 17 163. The
+  sceptic's own summary said "108 differ"; the second pass re-derived both
+  numbers from the sweep's surviving outputs (18 144 lines each, no
+  misaligned pair) and settled it: **981 differ, and 108 is the subtotal
+  54 + 54**, the answers where the unclamped build APPLIED a swapped pair.
+  **No input whose correct answer is larger than the clamp allows.**
+  `sweep-fixed` wall = 1.1 s, `sweep-unfixed` wall = 5.8 s, both under rule
+  H. It lived
+  in a scratch tree copy and **is not a committed instrument**: this
+  paragraph is the whole of it that survives, which is why the row R1·3
+  used to cite is called a control instead.
+- **The grid read, attacked with an OFF-GRID project at 30 fps.** Two clips
+  at 1 200 003 and 3 600 003 — which only hand-written JSON can make, and
+  `validate` accepts. The fix does what it says: A's new end and B's new
+  start both land ON the grid (3 700 000 and 3 520 000 for a ten-frame
+  request) where the old arithmetic kept them 3 ticks off it forever. **The
+  cost, measured and recorded here rather than argued away**: a ONE-frame
+  request against a start 3 ticks past a boundary reveals 3 ticks, not a
+  frame, because the request's first frame is spent landing the edge. That
+  is `snap_up_to_frame`'s own argument for a bound and the code comment now
+  says so; it cannot bite a project any op in the crate could produce.
+- **The `shiftingOps` fix, attacked on the paths its re-decision changes.**
+  A cut that has become an overlap now takes `set_transition`, so: choosing
+  the kind the shift already MINTED is an identity, the op is dropped, and
+  the cut still ends up carrying that kind (`cross_dissolve` is what
+  `set_gained_transitions` mints, which is what the person chose in that
+  case); a locked track's op is refused in the trial, dropped, and an empty
+  list is `applying([])` = identity = the beep the probe's §7 asserts
+  (39/39, unchanged); and the trial reads `document.editedProject` where the
+  replay reads `document.project` through `addressed`, which is the pattern
+  `setTransitionKindCommand`'s own trial has used since E1.
+- **The new rows put to their own mutants — and the control and the one
+  COVERAGE row no named mutant fails, said here by name.** Every score in a tree copy, every run
+  under rule H, each patch asserting its text occurs exactly once. Against
+  `add_transition_edges.rs`: the grid read reverted **7 passed, 2 failed**;
+  the ceiling reverted **6 passed, 3 failed** (17.6 s on the sized row,
+  limit 120 s); X1, handles never clamp, **7 passed, 2 failed**. Against
+  `crossfade_edges.rs`: X2 **0 passed, 6 failed**. Then the `shiftingOps`
+  fix reverted (**33/39**), X4 against `e1_proof.py` (**97/99**) and X5
+  against `e1_chrome.py` (**19/21**). Of
+  `add_transition_edges.rs`'s nine rows that leaves two that no named
+  mutant fails, and neither is a gap in the claim:
+  `a_huge_duration_lands_the_same_overlap_a_request_at_the_ceiling_does` is
+  a **CONTROL** (R1·3), and
+  `an_image_pair_and_a_shape_pair_are_bounded_by_nothing_but_the_overlap_rule`
+  is a **COVERAGE row** — what it pins is that an ABSENT handle imposes no
+  bound, so X1 (which removes a clamp that is already absent) and the grid
+  read (identity at a rate that divides the timescale) can only pass it.
+  **The first writing of this bullet said every one of the seventeen new
+  rows had a mutant that failed it; that was false for four of them, and
+  this is the corrected sentence** — two were sharpened until a mutant did
+  fail them (the either-side row now carries the short pair, the reversed
+  row a three-frame head), one is the control and one is the coverage row.
+- **A claim of the sceptic's own that DID break a row.** The seam row in
+  `crossfade_edges.rs` was written claiming only `crossfade_among`'s
+  `Side::Left` closure could answer at the abutting tick. The mutant that
+  disables the closure leaves that row passing (a `None` reads as gain 1,
+  and 1 is right there) while failing 8 of `crossfade.rs`'s 20. The row's
+  comment and the file's module doc were rewritten to say which row guards
+  the closure and that this one does not.
+- **A fix of the reader's own that the sceptic deleted.** R1·2 was first
+  fixed twice — by the ceiling and by an explicit clamp of `b` at tick 0.
+  The clamp reverted scored 9/9, so no input reaches it; it is gone, and the
+  arithmetic that makes it unreachable is in the ceiling's comment.
+- **What the sceptic did NOT reach, and is therefore UNJUDGED**: §4g's four
+  checks by a person (K17, `designs/reelcut-remaining.md` §4); whether
+  kpgalligan/reelcut#25's residual can be closed by a closed form rather
+  than a bound at the door, which needs a decision the loop's own doc argues
+  against (it calls the predicate "not monotone in an obvious direction");
+  and E2's files inside `e8028a2`, which are §6f's.
+
+**Final scores.** `make test` green with two new files;
+`core/tests/add_transition_edges.rs` **9/9** and
+`core/tests/crossfade_edges.rs` **6/6**; `e1_proof.py` **95/95 → 99/99**;
+`e1_chrome.py` **14/14 → 21/21**; `transition_sheet_probe.py`
+**32/32 → 39/39**; `make lint`, `cargo fmt --check` clean and
+`make typecheck` at 0 errors and exactly 4 AVFoundation warnings.
+
+**The count, against this section's own numbered lines.** **FOURTEEN**
+findings are recorded above — R1·1 to R1·6, R2·1 to R2·3, R3·1 to R3·3,
+R4·1 and R4·2. **TEN are FIXED or gap-filled**: R1·1, R1·2 and R1·3 (two
+lines, one fix), R1·4's missing rows, R2·1, R2·2 and R2·3 as gaps in the
+instruments, R3·1, R4·1 and R4·2. **FOUR are REFUTED** by the reader's own
+run: R1·5, R1·6, R3·2 and R3·3 — and R1·4 is refuted as an ARITHMETIC
+defect inside the line that is counted once, above, for the gap it fixed.
+Neither of the two remaining items is a numbered line: R1·3's residual is
+FILED as kpgalligan/reelcut#25 and the same residual is the limit recorded
+in §3j. (An earlier draft of this paragraph said "nine findings kept: five
+FIXED …, four REFUTED …" and listed seven and five; it was recounted here
+after the sceptic's review.) No command rule H covers was run outside it; one
+expiry is in the record (the residual at 9.0e15, `expired at 120 s (pid
+61383 killed)`) and nothing else expired.
+
 **Owed, as of this record:**
 
-- The reader review (§4f, §6f): four readers per phase, each with one
-  question and the diff.
+- E2's reader review (§6f): four readers, each with one question and the
+  diff. E1's (§4f) ran on 2026-09-20 and is recorded above.
 - Four review nits from `6dda2c7`: any negative menu tag reads as None; the
   glyph infers the label dot from `nameEnd`; the zoom hint's note is fixed at
   arm time; `phase6_chrome.py`'s comment still says 1600 measures
