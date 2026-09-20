@@ -225,15 +225,9 @@ impl Project {
                 let found = self.media(*media)?;
                 // Timeline duration times speed IS the source range: at 2x
                 // a 5 s clip consumes 10 s of source, and Swift scales the
-                // inserted range back down to 5 s.
-                let scaled = clip.duration as f64 * clip.speed;
-                let length = if scaled.is_finite() && scaled > 0.0 {
-                    // The cast saturates rather than wrapping, so an absurd
-                    // speed cannot produce a negative range.
-                    scaled.round() as Ticks
-                } else {
-                    clip.duration
-                };
+                // inserted range back down to 5 s. ONE function says how
+                // much that is (spec §11, D4-1).
+                let length = self.content_length_in_source(clip);
                 // The core's own ops no longer mint a window past the end
                 // of a file — a media clip's length is snapped DOWN at all
                 // three sites that write it (spec §11) — so this clamp is

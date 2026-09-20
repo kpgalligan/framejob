@@ -36,9 +36,23 @@ file is what governs a module now.
   there is no neutral kind to fall back to.
 - `model_query.rs` — reading a project: `Project::new`, id allocation, the
   `clip`/`track`/`media`/`marker`/`nest` lookups, `clips_on`, `duration`,
-  `validate` with its nesting walk, `source_size`, and the three
-  source-window measurements every placement op clamps against —
-  `source_head`, `content_length`, `source_length`.
+  `validate` with its nesting walk, and `source_size`. The three
+  source-window measurements moved out to `source_window.rs`.
+- `source_window.rs` — THE source window: how much material a clip shows,
+  how much lies either side of it, and the one way a source in point moves.
+  **Every name here carries its UNIT**, because the readers divide by a
+  clip's speed where the movers multiply by it: `content_length_in_source`,
+  `last_in_point` and `last_still_time` answer in SOURCE ticks;
+  `source_head_on_timeline`, `source_length_on_timeline` and
+  `longest_duration_on_grid` — the bound, snapped DOWN (spec §11, #22) — in
+  TIMELINE ticks. A measurement is a `SourceBound` and not an `Option`,
+  because `None` meant "unbounded, apply no clamp" to a trim and "no handle
+  at all" to a transition: the three arms are `Unbounded` (a source with no
+  window), `Unmeasured` (a media window that exists and cannot be measured)
+  and `Timeline`, and a caller picks what `Unmeasured` means to it BY NAME,
+  `or_unbounded` or `or_empty`. `in_advanced` / `source_advanced` is the one
+  `round(Δ × speed)` mover the six placement sites used to write out. Cut
+  out of `model_query.rs` by road map 7 §10's phase A.
 - `time.rs` — `Ticks`, `TIMESCALE`, `Fps`, frame snapping, timecode
   format/parse (non-drop `HH:MM:SS:FF` and `HH:MM:SS.mmm`).
 - `outcome.rs` — `Outcome`, the THREE arms every edit answers with

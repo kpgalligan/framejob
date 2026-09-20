@@ -30,7 +30,7 @@
 use serde_json::{json, Value};
 
 mod common;
-use common::{array, assert_contains, at, by_id, int, num, text, Handle};
+use common::{array, assert_contains, at, by_id, int, num, source_in, text, Handle};
 
 /// One frame at 30 fps, written out rather than imported so a change to
 /// `time::TIMESCALE` fails these tests instead of moving with them.
@@ -159,10 +159,6 @@ fn add_aligned(clip: u32, duration: i64, align: &str) -> Value {
 fn placement(project: &Value, id: u64) -> (i64, i64) {
     let clip = by_id(project, "/clips", id);
     (int(clip, "/start"), int(clip, "/duration"))
-}
-
-fn source_in(project: &Value, id: u64) -> i64 {
-    int(by_id(project, "/clips", id), "/source/in")
 }
 
 // ---- the overlap it makes -------------------------------------------------

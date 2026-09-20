@@ -28,6 +28,7 @@
 use crate::edit_clip::{clip_end, set_gained_transitions};
 use crate::model::{Clip, Enabled, Project, Source, VideoProps};
 use crate::outcome::Outcome;
+use crate::source_window::in_advanced;
 use crate::time::{Ticks, TIMESCALE};
 
 /// Default freeze length (spec §6). Two seconds is long enough for a hold
@@ -486,19 +487,13 @@ impl Project {
         };
 
         let clip_t = at.saturating_sub(target.start);
-        let elapsed = clip_t as f64 * target.speed;
-        let source_at = if elapsed.is_finite() {
-            r#in.saturating_add(elapsed.round() as Ticks)
-        } else {
-            r#in
-        };
+        let source_at = in_advanced(r#in, clip_t, target.speed);
         // The clamp only has to keep the still's source time inside the
-        // media; how long a still's source segment is (one frame at the
-        // MEDIA's rate) is `evaluate.rs`'s business, so the canvas frame is
-        // a good enough margin from the end here.
-        let limit = self.media(media).map_or(source_at.max(0), |m| {
-            m.duration.saturating_sub(frame).max(0)
-        });
+        // media, which is `source_window.rs`'s `last_still_time`; a media
+        // the project does not have cannot bound anything.
+        let limit = self
+            .media(media)
+            .map_or(source_at, |m| self.last_still_time(m));
         let source_at = source_at.clamp(0, limit);
 
         let video = self.evaluate_clip(&target, clip_t).video;

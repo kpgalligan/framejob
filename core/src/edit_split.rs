@@ -25,7 +25,8 @@ use serde_json::Value;
 
 use crate::actions::{self, Evaluated, MAX_PATCH_DEPTH};
 use crate::edit_clip::clip_end;
-use crate::model::{Action, Project, Source, VideoProps};
+use crate::model::{Action, Project, VideoProps};
+use crate::source_window::source_advanced;
 use crate::time::Ticks;
 
 /// The evaluated state as an action-style patch object, so `split` can hand
@@ -93,25 +94,9 @@ pub(crate) fn split_clip(project: &mut Project, clip_id: u32, at: Ticks) -> bool
     second.start = at;
     second.duration = clip_end(&original).saturating_sub(at);
     // The cut consumes `clip_t` of timeline, which is `clip_t * speed` of
-    // source; a still's frozen frame and the sourceless kinds do not move.
-    if let Source::Media {
-        media,
-        r#in,
-        reversed,
-    } = original.source
-    {
-        let advance = (clip_t as f64 * original.speed).round();
-        let advance = if advance.is_finite() {
-            advance as Ticks
-        } else {
-            0
-        };
-        second.source = Source::Media {
-            media,
-            r#in: r#in.saturating_add(advance).max(0),
-            reversed,
-        };
-    }
+    // source; a still's frozen frame and the sourceless kinds do not move,
+    // which is `source_advanced`'s own rule.
+    second.source = source_advanced(&original.source, clip_t, original.speed);
     // Presence of a group is a fact about the clip, so an audio-only clip
     // stays audio-only; only the values come from the evaluation.
     second.video = original.video.as_ref().map(|_| state.video.clone());

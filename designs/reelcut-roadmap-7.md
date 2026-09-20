@@ -6,7 +6,10 @@ of every caller-authored object, and 617 lines are out of the agent's
 handlers. **D2** — all five landed on `d2-refusal-reason` (§5.1 to §5.5), and
 §6 is what they add up to: an identity and a refusal are two different
 answers, eleven rules say why in their own words, and the app has no way to
-write a refusal sentence at all. §6 also says where a next candidate starts.**
+write a refusal sentence at all. §6 also says where a next candidate starts. **The source window** (§10) is a
+third candidate, grilled and split in three: phase A, the module as a pure
+move, is BUILT (§10.6 is what was decided, §10.7 the record); phases B and C
+are not started.**
 
 Road maps 2 to 6 each added something a person using the app can see. This
 one does not. A **deepening** takes knowledge that is spread across callers
@@ -4901,7 +4904,11 @@ deepenings.
 
 ## 10. The next candidate, scouted — the source window
 
-**Scouted on 2026-09-18, after D3 merged, and not started.** Nothing here is
+**Scouted on 2026-09-18, after D3 merged; grilled and split in three on
+2026-09-19, and PHASE A IS BUILT.** §10.1 to §10.5 are the scout's
+measurement, left exactly as it was written; §10.6 is what the grilling
+session decided and what it left for phases B and C; §10.7 is phase A's
+record. Nothing in §10.1–§10.5 is
 a plan: it is the measurement a grilling session would otherwise have to
 re-derive, written down because the claim it replaces was a single sentence
 in an architecture review and three of that sentence's four numbers turned
@@ -5081,6 +5088,175 @@ Not answered here, and each changes the size of the thing:
 the agent handlers forwarding a caller's whole op to the core unread was
 measured in §11 and retired, and the defect it existed to fix is tracked as
 kpgalligan/reelcut#21.
+
+### 10.6 Decided
+
+The grilling session of 2026-09-19 answered §10.5's four questions and split
+the work into three phases. This is the decision record; the spec's own entry
+is §11's **D4-1**, written before the code.
+
+**1. Both — the readers AND the movers, in one module.** §10.5's first
+question offered the movers alone as the small answer; it was declined,
+because the six copies of the mover exist to convert a TIMELINE delta into
+SOURCE ticks and the readers' unmarked units are what made the conversion
+something a caller had to know. Taking one without the other leaves the
+`None` ambiguity of §10.1's Form A against Form C in place. `source_window.rs`
+holds the one mover, the three readers, the on-grid bound and the two tail
+readers, and its `//!` doc states the two units and the three answers.
+
+**2. Functions with better names, NOT a tick newtype.** §10.5's second
+question is answered against the type: the unit goes in the NAME
+(`content_length_in_source`, `source_head_on_timeline`,
+`source_length_on_timeline`, `timeline_to_source`) and the `Option` whose
+`None` meant "unbounded" in one caller and "zero handle" in another becomes a
+three-way `SourceBound` — `Unbounded`, `Unmeasured`, `Timeline(Ticks)` —
+with the two readings spelled as the two methods that choose between them,
+`or_unbounded` and `or_empty`. A newtype per unit would touch every tick in
+the crate for a seam §0 calls hypothetical; a named answer for the one thing
+that was genuinely ambiguous is the whole of the win.
+
+**3. The commit tail is its own candidate, and does not come along.** §10.5's
+third question, answered as §10.1 recommends. Its counts are what decides it:
+5 byte-exact copies, 14 `check_overlap_rule` → `Refused` guards, 17
+`set_gained_transitions` + `finish` pairs, 12 functions carrying both, and 10
+where the guard is the pre-commit trial on `self` rather than on `next` — 11
+if `roll` is counted, which has the guard and the finish but deliberately no
+`set_gained_transitions`. It shares these functions with the source window
+and nothing else: it is about purity, the overlap rule and undo. Left as a
+candidate in its own right (§10.1's closing paragraph).
+
+**4. The reversed mirror stays APP arithmetic — phase C.** §10.5's fourth
+question. The core's refusal is on principle and `edit_clip.rs`'s
+`set_reversed` argues it; phase C makes the app's two spellings
+(`MediaPeaks.swift`, `ReverseRenderer.swift`) one, and probes
+`TimelineView.sourceTime`, which applies no mirror at all. Nothing in phase
+A changes Swift behaviour.
+
+**The three phases.**
+
+- **Phase A — the module, as a pure move.** Behaviour-preserving except the
+  one degenerate case D4-1 decides. Built; §10.7 is its record.
+- **Phase B — the invariant at the sites #22 did not cover.** `set_speed`,
+  `rate_stretch`, `paste`, `unnest` and `add_background` (spec §11, #22's
+  closing paragraph), plus routing `trim_end` and `whole_media_length`
+  through `longest_duration_on_grid`, plus whether `trim_end` on an
+  `Unmeasured` window should stay unbounded. Not started.
+- **Phase C — the reversed mirror**, above. Not started.
+
+**Left by name, because bringing it under the module would CHANGE an
+answer.** Each is phase B's to judge, not phase A's to move:
+
+- `evaluate.rs`'s `segment_of` keeps its own in-point clamp, `duration − 1`,
+  and its MEDIA-rate still margin. The CANVAS-rate still margin is
+  `last_still_time` and did move.
+- `trim_end` keeps `snapped_down(start + available)` rather than
+  `start + longest_duration_on_grid`: the two differ for an off-grid start,
+  which is why only `resnap`, of #22's three sites, routes through the bound
+  function in phase A. `whole_media_length` has no clip to ask about at all.
+
+**Unverified, for phase B to probe.** `trim_start`'s head clamp,
+`to.max(start − head)`, has no inward snap where `roll`'s pair does
+(`edit_edge.rs`, the directional snap of road map 2's second defect), so a
+floored `in / speed` that lands off the grid — a `rate_stretch` speed such as
+1.37 will produce one — may write an off-grid `start`. Phase A did not test
+it and did not change it.
+
+### 10.7 Phase A, the record
+
+**Landed 2026-09-19 as one commit, a PURE MOVE gated alone.** No `rc_*`
+export was added, so `core/include/reelcut_core.h` and
+`app/Sources/ReelCore.swift` were not touched; `RC_FORMAT_VERSION` stays 8;
+no Swift behaviour changed (two comments in `Transcriber.swift` name the new
+function and its module, and the file's line count is unchanged).
+
+**What the module holds.** `core/src/source_window.rs`, **251** lines of the
+400-line cap for a new module: `SourceBound` and its two readings
+(`or_unbounded`, `or_empty`); the mover trio `timeline_to_source` /
+`in_advanced` / `source_advanced`; the three readers renamed with their units
+(`content_length_in_source`, `source_head_on_timeline`,
+`source_length_on_timeline`); `longest_duration_on_grid`, the bound; and the
+two tail readers `last_in_point` and `last_still_time`. Its `//!` doc states
+the two units and the three answers, and nothing in the crate restates the
+arithmetic.
+
+**Every caller came down.** `wc -l` against `47db3ae`:
+
+| File | Before | After |
+|---|---|---|
+| `core/src/model_query.rs` | 503 | **440** |
+| `core/src/edit_clip.rs` | 1036 | **1021** |
+| `core/src/edit_edge.rs` | 220 | **197** |
+| `core/src/edit_split.rs` | 210 | **195** |
+| `core/src/edit_transition.rs` | 586 | **572** |
+| `core/src/evaluate.rs` | 594 | **588** |
+| `core/src/edit_time.rs` | 560 | **555** |
+| `core/src/edit_canvas.rs` | 241 | **241** |
+| `core/src/lib.rs` | 83 | **84** |
+| `core/src/source_window.rs` | — | **251** |
+
+`lib.rs` is the one file that grew, by the module declaration. No file
+crossed the cap in either direction and no toll came due; the ledger entry is
+`designs/reelcut-remaining.md` §3.
+
+**The ten reader call sites, and which reading each took.** `or_unbounded`
+(no clamp): `trim_end`'s tail, `roll`'s tail, and `resnap`, which is the one
+of spec §11 #22's three sites that could route through
+`longest_duration_on_grid` without changing an answer. `or_empty` (nothing
+available): `trim_start`'s head, `roll`'s head, and both of
+`add_transition`'s handle counts, which keep their `Source::Nest` arm because
+that is step 2's own rule and not the window's. `slip`'s two "last legal
+position" reads became `last_in_point` / `last_still_time`;
+`freeze_frame`'s limit became `last_still_time`; `rate_stretch`,
+`set_speed` and `evaluate.rs`'s `segment_of` read
+`content_length_in_source`.
+
+**The one behaviour change, decided before the code**: spec §11's **D4-1**.
+`segment_of` held a verbatim second copy of `content_length` with a looser
+threshold, and for a finite `0 < duration × speed < 1` the plan's
+`source_duration` was 1 where the reader answers the 1:1 fallback. The plan
+now reads the function. §10.3's first unverified reading is therefore
+CONFIRMED and closed.
+
+**The test surface.** `core/tests/source_window.rs`, **nine** tests through
+the FFI — the file §10.4 observed did not exist. Its vectors are chosen so
+`round` differs from `floor` (speed 1.00003 over one 20 000-tick frame:
+20 001, never 20 000) and `×` from `÷` (speed 2 wherever a reader is
+measured), and each row's arithmetic is written out in its comment. The six
+movers are proved to be ONE equation from one fixture, including
+`add_transition` with the sign flipped; the head and the length are proved to
+be TIMELINE ticks; the bound is proved to be on the grid at two frame rates;
+the content length is proved to be SOURCE ticks; D4-1 has its degenerate
+clip; and an `Unmeasured` window is read BOTH ways in one pair of tests.
+`core/tests/common/mod.rs` gained `source_in` and the four test files that
+had written it out lost their copies (§10.3's third finding); nothing else in
+any test file changed.
+
+**Four mutants, each patched into a tree copy, each killed by name**, and
+each patch asserting its text occurs exactly once:
+
+| Mutant | Tests that fail |
+|---|---|
+| `timeline_to_source` loses `* speed` | `every_mover_advances_the_in_point_by_the_same_rounded_product`, `a_freeze_mints_the_split_half_before_the_still`, `the_head_is_timeline_ticks_…` |
+| `source_head_on_timeline`'s `/` becomes `*` | `the_head_is_timeline_ticks_so_a_far_left_trim_lands_at_start_minus_in_over_speed` |
+| `or_empty`'s `Unmeasured` arm answers `None` | `an_unmeasured_window_gives_a_transition_no_tail`, `an_unmeasured_window_is_empty_to_a_head_clamp_and_unbounded_to_a_tail_one` |
+| `content_length_in_source`'s `>= 1.0` becomes `> 0.0` | `a_clip_whose_source_length_rounds_under_a_tick_falls_back_to_one_to_one` |
+
+**Gates and proofs.** `cargo fmt --check`, `make test` (every existing test
+unchanged and green, plus the nine new), `make lint`, `make typecheck` (0
+errors, the baseline 4 AVFoundation warnings), `make app`. Then five MCP
+scripts, each on its own freshly launched instance killed by PID, with
+`grep "Reelcut: "` printing nothing first: `phase1_proof.py` 66/66,
+`silence2_proof.py` 61/61 (which runs `phase3_proof.py` 123/123 and
+`phase3_silence_scope.py` 8/8 inside itself), `phase3_proof.py` 123/123,
+`phase6_proof.py` 168/168 and `e1_proof.py` 95/95 against the reference
+build on its second port. `silence2_proof.py`'s claim 1(d) still reads a
+ratio of 1.99795 at ×2, as it says it will until the `set_speed` overrun is
+closed — that is phase B's, not phase A's.
+
+**Two stale citations fixed on the way past** (§10.3's fourth finding):
+`designs/reelcut-roadmap-5.md` and `designs/reelcut-effects-survey.md` both
+cited `roll`'s snap-inward bounds by a line number that had already moved,
+and now name the file and the function instead.
 
 ---
 

@@ -226,8 +226,8 @@ precedent for an argument enum living with its op). The steps:
 3. **Work in whole frames.** `d` is snapped DOWN to whole frames first; each
    handle is floored to whole frames (A's tail with `snapped_down` of its
    end, B's head with `snapped_up` of its earliest start —
-   `edit_clip.rs:248, 252`, `roll`'s snap-inward bounds at
-   `edit_edge.rs:159-166`). Snapping two half-extensions separately would
+   `edit_clip.rs:248, 252`, `roll`'s snap-inward bounds in
+   `edit_edge.rs`). Snapping two half-extensions separately would
    LOSE the odd frame (1.5 + 1.5 frames snap to 1 + 1), which is why the
    split happens after the snap, in frames.
 4. **Split the request by `align`.** `center`: `b = ceil(d/2)` frames from

@@ -5,10 +5,10 @@
 //! a project *about*: build an empty one, find a clip / track / media /
 //! marker / nest by id, hand out the next id, measure a duration, and check
 //! that every invariant the editing modules assume actually holds. The
-//! source-window arithmetic lives here too — how much material a clip
-//! shows, and how much lies either side of it — because three placement
-//! modules measure against it and two spellings of it would let a trim and
-//! a slip disagree about where a media ends.
+//! source-window arithmetic — how much material a clip shows, and how much
+//! lies either side of it — was here and is `source_window.rs`, moved out
+//! whole by road map 7 §10's phase A: the readers' units were not in their
+//! names and six placement sites wrote the conversion back out.
 //!
 //! Split out of `model.rs` for room, under the "a new concern is a new
 //! module" rule: the schema grows a field with every phase and the file was
@@ -119,69 +119,6 @@ impl Project {
             .max()
             .unwrap_or(0)
             .max(0)
-    }
-
-    /// The source material one clip shows, in source ticks: its timeline
-    /// length times its speed. The same quantity `evaluate::segment_of`
-    /// inserts into the composition, so a speed edit here and the segment
-    /// there agree.
-    ///
-    /// A method rather than a free function only for company: it is the
-    /// middle of the three measurements — [`Project::source_head`] is what
-    /// lies before the window, this is the window, and
-    /// [`Project::source_length`] is what a window starting at `in` could
-    /// still grow to.
-    pub fn content_length(&self, clip: &Clip) -> Ticks {
-        let scaled = clip.duration as f64 * clip.speed;
-        // The cast saturates rather than wrapping, so an absurd speed
-        // cannot produce a negative length; a degenerate one falls back to
-        // 1:1.
-        if scaled.is_finite() && scaled >= 1.0 {
-            scaled.round() as Ticks
-        } else {
-            clip.duration.max(1)
-        }
-    }
-
-    /// How much TIMELINE time lies before a clip's first frame — how far
-    /// its front edge could be dragged left before the media runs out.
-    /// `in` ticks of source lie in front, which is `in / speed` ticks of
-    /// timeline at this clip's rate.
-    ///
-    /// `None` for a source with no window: a still, an image, text, a shape
-    /// and a nest may begin anywhere, so their front edge is unbounded and
-    /// the caller applies no clamp at all. A degenerate speed answers 0
-    /// rather than `None` — the window exists, it just cannot be measured.
-    pub fn source_head(&self, clip: &Clip) -> Option<Ticks> {
-        let Source::Media { r#in, .. } = clip.source else {
-            return None;
-        };
-        if !(clip.speed.is_finite() && clip.speed > 0.0) {
-            return Some(0);
-        }
-        let head = (r#in.max(0) as f64 / clip.speed).floor();
-        Some(if head.is_finite() { head as Ticks } else { 0 })
-    }
-
-    /// The longest timeline duration `clip` could have: the media's
-    /// remaining source length from its in point, divided by `speed` (at 2x
-    /// a 10 s remainder fills 5 s of timeline). Floored, so a clip can
-    /// never outrun its source by a partial frame.
-    ///
-    /// `None` for a source with no source bound — `still`, `image`, `text`,
-    /// `shape` and `nest` may have ANY duration — and for an unknown media
-    /// or a speed that is not a positive finite number.
-    pub fn source_length(&self, clip: &Clip) -> Option<Ticks> {
-        let (media_id, source_in) = match &clip.source {
-            Source::Media { media, r#in, .. } => (*media, *r#in),
-            _ => return None,
-        };
-        let media = self.media(media_id)?;
-        if !(clip.speed.is_finite() && clip.speed > 0.0) {
-            return None;
-        }
-        let remaining = media.duration.saturating_sub(source_in).max(0);
-        Some((remaining as f64 / clip.speed).floor() as Ticks)
     }
 
     /// The source's pixel size, when the model knows it. `None` for text

@@ -79,7 +79,7 @@ final class Transcriber {
         /// The clip's `in` point — where the extract begins in source time.
         let sourceIn: Ticks
         /// How much SOURCE time the clip plays: `duration × speed`, the
-        /// core's own `content_length` (`model_query.rs`).
+        /// core's own `content_length_in_source` (`source_window.rs`).
         let sourceLength: Ticks
         /// Project time of the clip's first frame.
         let start: Ticks
@@ -481,8 +481,8 @@ final class Transcriber {
         return (jobs, problems)
     }
 
-    /// How much SOURCE time a clip plays — `Project::content_length`
-    /// (`core/src/model_query.rs`) in Swift, saturating the same way, because
+    /// How much SOURCE time a clip plays — `Project::content_length_in_source`
+    /// (`core/src/source_window.rs`) in Swift, saturating the same way, because
     /// the extract's range is a source range and the core owns what that
     /// means.
     private static func contentLength(of clip: ClipSnapshot) -> Ticks {

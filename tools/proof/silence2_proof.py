@@ -468,8 +468,8 @@ class Session:
     def segment(self, clip, media):
         """The clip as `evaluate.rs` resolves it: `source_duration` is the
         clip's duration times its speed, CLAMPED to what the file has left
-        after the in point (`evaluate.rs:229-248`). The product is rounded
-        half AWAY from zero as `evaluate.rs` does it, not Python's
+        after the in point (`evaluate.rs`'s `segment_of`). The product is
+        rounded half AWAY from zero as `evaluate.rs` does it, not Python's
         half-to-even, so a speed whose product lands on `.5` cannot put the
         walk one tick off the app."""
         project = self.project()

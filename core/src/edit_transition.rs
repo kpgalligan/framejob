@@ -27,6 +27,7 @@ use crate::edit_clip::clip_end;
 use crate::edit_time::{locked_track, shift_clips, unlocked_tracks};
 use crate::model::{Clip, Curve, Project, Source, Transition, TransitionKind};
 use crate::outcome::Outcome;
+use crate::source_window::source_advanced;
 use crate::time::Ticks;
 
 /// Where the overlap [`Project::add_transition`] makes is taken FROM.
@@ -89,28 +90,11 @@ fn extended(earlier: &Clip, later: &Clip, tail: Ticks, head: Ticks) -> (Clip, Cl
     grown.duration = grown.duration.saturating_add(tail);
 
     let mut moved = later.clone();
-    if let Source::Media {
-        media,
-        r#in,
-        reversed,
-    } = later.source
-    {
-        // The source ticks that lie under `head` ticks of timeline at this
-        // clip's speed — `trim_start` and `roll`'s own arithmetic, and the
-        // reason the handle above is measured in TIMELINE time and never
-        // divided by the speed a second time.
-        let back = head as f64 * later.speed;
-        let back = if back.is_finite() {
-            back.round() as Ticks
-        } else {
-            0
-        };
-        moved.source = Source::Media {
-            media,
-            r#in: r#in.saturating_sub(back).max(0),
-            reversed,
-        };
-    }
+    // The source ticks that lie under `head` ticks of timeline at this
+    // clip's speed, subtracted — `source_window.rs`'s one mover run
+    // BACKWARD, and the reason the handle above is measured in TIMELINE
+    // time and never divided by the speed a second time.
+    moved.source = source_advanced(&later.source, head.saturating_neg(), later.speed);
     moved.start = later.start.saturating_sub(head);
     moved.duration = later.duration.saturating_add(head);
     (grown, moved)
@@ -177,13 +161,14 @@ impl Project {
     /// 1. Find A: the clip on B's track that ends EXACTLY where B begins —
     ///    `roll`'s own test (`edit_edge.rs`).
     /// 2. Measure the handles in TIMELINE ticks. B's head is
-    ///    `source_head` for a media clip, UNBOUNDED for a still, an image,
-    ///    text and a shape — none of which has a source window — and **0
-    ///    for a nest**, because trimming a nest clip's head moves its
-    ///    contents (`nest.rs`) rather than revealing anything, so a nest
-    ///    gives nothing on that side. A's tail is
-    ///    `source_length − duration` for a media clip (a `source_length` of
-    ///    `None` — unknown media, degenerate speed — means NO tail),
+    ///    `source_head_on_timeline` for a media clip, UNBOUNDED for a
+    ///    still, an image, text and a shape — none of which has a source
+    ///    window — and **0 for a nest**, because trimming a nest clip's
+    ///    head moves its contents (`nest.rs`) rather than revealing
+    ///    anything, so a nest gives nothing on that side. A's tail is
+    ///    `source_length_on_timeline − duration` for a media clip (an
+    ///    `Unmeasured` window — unknown media, degenerate speed — means NO
+    ///    tail: both handles read it as EMPTY),
     ///    unbounded for the sourceless kinds, and
     ///    `max(0, nest.duration() − A.duration)` for a nest, past which it
     ///    would draw nothing.
@@ -466,9 +451,10 @@ impl Project {
     /// [`Project::add_transition`] step 2 for why a nest answers `Some(0)`.
     fn head_handle_frames(&self, clip: &Clip, frame: Ticks) -> Option<Ticks> {
         let head = match clip.source {
-            Source::Media { .. } => self.source_head(clip).unwrap_or(0),
             Source::Nest { .. } => 0,
-            _ => return None,
+            // EMPTY, not unbounded: a window that cannot be measured
+            // supplies no handle.
+            _ => self.source_head_on_timeline(clip).or_empty()?,
         };
         // Snapped INWARD from the earliest start the handle allows, so the
         // count is whole frames of material that is really there even when
@@ -481,16 +467,16 @@ impl Project {
     /// by, or `None` for a source with no window at all.
     fn tail_handle_frames(&self, clip: &Clip, frame: Ticks) -> Option<Ticks> {
         let tail = match clip.source {
-            Source::Media { .. } => match self.source_length(clip) {
-                // No measurable window is no tail, not an unbounded one.
-                None => 0,
-                Some(available) => available.saturating_sub(clip.duration).max(0),
-            },
             Source::Nest { project, .. } => self
                 .nest(project)
                 .map_or(0, |nest| nest.duration().saturating_sub(clip.duration))
                 .max(0),
-            _ => return None,
+            // No measurable window is no tail, not an unbounded one.
+            _ => self
+                .source_length_on_timeline(clip)
+                .or_empty()?
+                .saturating_sub(clip.duration)
+                .max(0),
         };
         let end = clip_end(clip);
         let latest = self.snapped_down(end.saturating_add(tail));

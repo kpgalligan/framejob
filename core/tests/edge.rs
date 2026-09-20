@@ -12,7 +12,7 @@
 use serde_json::{json, Value};
 
 mod common;
-use common::{array, assert_contains, at, by_id, flag, int, text, Handle};
+use common::{array, assert_contains, at, by_id, flag, int, source_in, text, Handle};
 
 /// One frame at 30 fps, written out rather than imported so a change to
 /// `time::TIMESCALE` fails these tests instead of moving with them.
@@ -142,10 +142,6 @@ fn drop_frame_project() -> Handle {
 fn placement(project: &Value, clip: u64) -> (i64, i64) {
     let found = by_id(project, "/clips", clip);
     (int(found, "/start"), int(found, "/duration"))
-}
-
-fn source_in(project: &Value, clip: u64) -> i64 {
-    int(by_id(project, "/clips", clip), "/source/in")
 }
 
 fn source_at(project: &Value, clip: u64) -> i64 {

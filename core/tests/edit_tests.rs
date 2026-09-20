@@ -27,7 +27,7 @@ mod common;
 
 use serde_json::{json, Value};
 
-use common::{array, assert_contains, at, by_id, flag, int, num, text, Handle, Outcome};
+use common::{array, assert_contains, at, by_id, flag, int, num, source_in, text, Handle, Outcome};
 use reelcut_core::OP_NAMES;
 
 /// One frame of the 30 fps canvas every fixture but [`overlap_project`] uses.
@@ -500,11 +500,6 @@ fn lane(project: &Value, track: i64) -> Vec<(i64, i64)> {
         .collect();
     found.sort_unstable();
     found
-}
-
-/// The source in point of a media clip.
-fn source_in(project: &Value, clip: u64) -> i64 {
-    int(by_id(project, "/clips", clip), "/source/in")
 }
 
 /// Float comparison with a stated tolerance, naming what was being checked.

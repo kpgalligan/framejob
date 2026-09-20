@@ -116,8 +116,8 @@ fn resnap(project: &mut Project) {
     // while the clip itself is about to be mutated.
     for index in 0..project.clips.len() {
         let available = project
-            .source_length(&project.clips[index])
-            .map(|length| time::snap_down_to_frame(length, fps));
+            .longest_duration_on_grid(&project.clips[index])
+            .or_unbounded();
         let clip = &mut project.clips[index];
         clip.start = time::snap_to_frame(clip.start, fps).max(0);
         clip.duration = time::snap_to_frame(clip.duration, fps).max(frame);

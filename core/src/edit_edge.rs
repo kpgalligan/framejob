@@ -16,14 +16,15 @@
 //! or with an overlap (which IS a transition, whose length is
 //! `set_transition_duration`'s job), there is nothing here to roll.
 //!
-//! The arithmetic is `model_query.rs`'s — `content_length`, `source_head`
-//! and `source_length` are the three measurements of a source window, and
-//! this module only clamps against them, so a slip and a trim can never
-//! disagree about where a media ends.
+//! The arithmetic is `source_window.rs`'s — the three measurements of a
+//! source window, the conversion into source ticks and the two last legal
+//! positions all live there, and this module only clamps against them, so a
+//! slip and a trim can never disagree about where a media ends.
 
 use crate::edit_clip::clip_end;
 use crate::model::{Project, Source};
 use crate::outcome::Outcome;
+use crate::source_window::{source_advanced, timeline_to_source};
 use crate::time::Ticks;
 
 impl Project {
@@ -66,30 +67,19 @@ impl Project {
         // Timeline ticks to source ticks, at this clip's rate. A sub-tick
         // move at a very slow speed rounds to nothing, which is a refusal
         // and not an edit.
-        let scaled = delta as f64 * target.speed;
-        let moved_by = if scaled.is_finite() {
-            scaled.round() as Ticks
-        } else {
-            0
-        };
+        let moved_by = timeline_to_source(delta, target.speed);
         if moved_by == 0 {
             return Ok(Outcome::Identity);
         }
 
-        // The last legal position of what the clip shows. A window is
-        // `content_length` long wherever it sits, so the most its in point
-        // can be is what is left over when it is pushed against the tail; a
-        // still is one instant, and leaves a frame of margin for the reason
-        // `freeze_frame` leaves one — how long a still's source segment is
-        // belongs to `evaluate.rs`. A window longer than its own media,
-        // which a speed edit can leave behind, has no room at all rather
-        // than negative room.
-        let available = self.require_media(media)?.duration.max(0);
+        // The last legal position of what the clip shows: a window is
+        // pushed against the tail of the file, a still stops one frame
+        // short of it. Both are `source_window.rs`'s, which is also where
+        // the reasons for the two shapes are written down.
+        let media = self.require_media(media)?;
         let last = match target.source {
-            Source::Still { .. } => available.saturating_sub(self.frame()).max(0),
-            _ => available
-                .saturating_sub(self.content_length(&target))
-                .max(0),
+            Source::Still { .. } => self.last_still_time(media),
+            _ => self.last_in_point(&target, media),
         };
         let slipped = current.saturating_add(moved_by).clamp(0, last);
         if slipped == current {
@@ -151,10 +141,10 @@ impl Project {
         let frame = self.frame();
         let mut earliest = previous.start.saturating_add(frame);
         let mut latest = clip_end(&target).saturating_sub(frame);
-        if let Some(head) = self.source_head(&target) {
+        if let Some(head) = self.source_head_on_timeline(&target).or_empty() {
             earliest = earliest.max(target.start.saturating_sub(head).max(0));
         }
-        if let Some(available) = self.source_length(&previous) {
+        if let Some(available) = self.source_length_on_timeline(&previous).or_unbounded() {
             latest = latest.min(previous.start.saturating_add(available));
         }
         // The two source bounds are FLOORED divisions by a clip's speed, so
@@ -174,24 +164,11 @@ impl Project {
         }
 
         let mut moved = target.clone();
-        if let Source::Media {
-            media,
-            r#in,
-            reversed,
-        } = target.source
-        {
-            let advance = to.saturating_sub(target.start) as f64 * target.speed;
-            let advance = if advance.is_finite() {
-                advance.round() as Ticks
-            } else {
-                0
-            };
-            moved.source = Source::Media {
-                media,
-                r#in: r#in.saturating_add(advance).max(0),
-                reversed,
-            };
-        }
+        moved.source = source_advanced(
+            &target.source,
+            to.saturating_sub(target.start),
+            target.speed,
+        );
         moved.start = to;
         moved.duration = clip_end(&target).saturating_sub(to);
 

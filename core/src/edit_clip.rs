@@ -51,6 +51,7 @@ use crate::model::{
 use crate::outcome::Outcome;
 use crate::patch::{merge_group, Group};
 use crate::props_check::{check_shape, check_text, SCALE_MAX, SCALE_MIN};
+use crate::source_window::source_advanced;
 use crate::time::{self, Ticks, TIMESCALE};
 
 /// Re-exported from its new home so the nine call sites here and the three
@@ -628,7 +629,7 @@ impl Project {
         let latest = end.saturating_sub(self.frame());
         let mut to = self.snapped(to).min(latest).max(0);
 
-        if let Some(head) = self.source_head(&target) {
+        if let Some(head) = self.source_head_on_timeline(&target).or_empty() {
             to = to.max(target.start.saturating_sub(head).max(0));
         }
         // The two clamps can cross when the source has almost nothing left
@@ -639,24 +640,7 @@ impl Project {
 
         let delta = to.saturating_sub(target.start);
         let mut moved = target.clone();
-        if let Source::Media {
-            media,
-            r#in,
-            reversed,
-        } = target.source
-        {
-            let advance = (delta as f64 * target.speed).round();
-            let advance = if advance.is_finite() {
-                advance as Ticks
-            } else {
-                0
-            };
-            moved.source = Source::Media {
-                media,
-                r#in: r#in.saturating_add(advance).max(0),
-                reversed,
-            };
-        }
+        moved.source = source_advanced(&target.source, delta, target.speed);
         moved.start = to;
         moved.duration = end.saturating_sub(to);
         if let Err(why) = self.check_overlap_rule(&[moved.clone()], moved.track, &[]) {
@@ -680,7 +664,7 @@ impl Project {
         let target = self.require_clip(clip)?.clone();
         let earliest = target.start.saturating_add(self.frame());
         let mut to = self.snapped(to).max(earliest);
-        if let Some(available) = self.source_length(&target) {
+        if let Some(available) = self.source_length_on_timeline(&target).or_unbounded() {
             to = to.min(self.snapped_down(target.start.saturating_add(available)));
         }
         if to < earliest || to == clip_end(&target) {
@@ -718,7 +702,7 @@ impl Project {
         if duration < self.frame() {
             return Ok(Outcome::Identity);
         }
-        let rate = self.content_length(&target) as f64 / duration as f64;
+        let rate = self.content_length_in_source(&target) as f64 / duration as f64;
         if !rate.is_finite() || !(SPEED_MIN..=SPEED_MAX).contains(&rate) {
             return Ok(Outcome::Identity);
         }
@@ -863,7 +847,7 @@ impl Project {
         }
         let rate = rate.clamp(SPEED_MIN, SPEED_MAX);
 
-        let scaled = self.content_length(&target) as f64 / rate;
+        let scaled = self.content_length_in_source(&target) as f64 / rate;
         let duration = if scaled.is_finite() {
             self.snapped(scaled.round() as Ticks).max(self.frame())
         } else {
@@ -901,8 +885,9 @@ impl Project {
     /// (`model::Source::Media`), so reversing keeps the in point and
     /// therefore shows different frames — the tail of the file instead of
     /// its head. Advancing it to keep the same frames would be a second
-    /// convention, and every trim, split and `source_length` in the crate
-    /// would need to know which one was in force.
+    /// convention, and every trim, split and `source_window.rs`'s
+    /// `source_length_on_timeline` would need to know which one was in
+    /// force.
     ///
     /// A non-media source is an `Err` and not a refusal — the non-media
     /// rule (`edit.rs`, Results). An identity when the clip already plays

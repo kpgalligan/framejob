@@ -15,7 +15,7 @@
 use serde_json::{json, Value};
 
 mod common;
-use common::{array, assert_contains, by_id, int, text, Handle};
+use common::{array, assert_contains, by_id, int, source_in, text, Handle};
 
 // ---- fixtures ------------------------------------------------------------
 
@@ -108,10 +108,6 @@ fn drop_frame_project() -> Handle {
 fn placement(project: &Value, clip: u64) -> (i64, i64) {
     let found = by_id(project, "/clips", clip);
     (int(found, "/start"), int(found, "/duration"))
-}
-
-fn source_in(project: &Value, clip: u64) -> i64 {
-    int(by_id(project, "/clips", clip), "/source/in")
 }
 
 fn ids_on(project: &Value, track: i64) -> Vec<i64> {

@@ -628,6 +628,13 @@ pub fn by_id<'a>(value: &'a Value, pointer: &str, id: u64) -> &'a Value {
         .unwrap_or_else(|| panic!("no element with id {id} in {pointer}"))
 }
 
+/// A media clip's source in point — the number every mover in
+/// `core/src/source_window.rs` writes, and the one thing a test of one has
+/// to read back. Was written out in four test files.
+pub fn source_in(project: &Value, clip: u64) -> i64 {
+    int(by_id(project, "/clips", clip), "/source/in")
+}
+
 // ---- comparing clips across a re-minting op ------------------------------
 
 /// A clip with everything that names an id stripped out — what "the same

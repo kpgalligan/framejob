@@ -616,7 +616,7 @@ move to a new `core/src/edit_transition.rs` as a pure move, gated alone;
     `max(0, nest duration − clip duration)` — past that the nest draws
     nothing (`nest.rs:29-33`).
   - **The frame grid.** Each side is snapped separately with `roll`'s
-    snap-inward bounds (`edit_edge.rs:159-166`); an odd frame count gives the
+    snap-inward bounds in `edit_edge.rs`; an odd frame count gives the
     extra frame to the side with more handle, ties to the incoming head.
   - **The clamp.** The landed duration is the requested one clamped to the
     handles, to the overlap rule (at most half the shorter clip; the rule is

@@ -59,6 +59,7 @@ pub mod recipe;
 pub mod recipe_text;
 pub mod scope;
 pub mod snap;
+pub mod source_window;
 pub mod time;
 pub mod transition;
 

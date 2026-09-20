@@ -824,3 +824,84 @@ Not covered, and named in spec §11 as road map 7 §10's source-window
 candidate: `set_speed` / `rate_stretch` (a nearest-snapped duration times a
 rate can still outrun by a rounding), `paste` and `unnest`'s re-snaps, and
 `add_background`'s timeline-length plate.
+
+## 2026-09-19 — `source_window.rs`, the source window as one module (road map 7 §10, phase A)
+
+A PURE MOVE, landed and gated alone, and the only behaviour it changes is the
+one degenerate case spec §11's **D4-1** decided before the code. What moved,
+and from where:
+
+- **Out of `model_query.rs`** (**503 → 440**), the three readers, with their
+  units written into their names: `content_length` →
+  `content_length_in_source`, `source_head` → `source_head_on_timeline`,
+  `source_length` → `source_length_on_timeline`. Each new name begins with
+  the old one on purpose, so a grep for the old still lands — the test
+  comments, `model.rs:254` and `edit_paste.rs:494` were left to prove it.
+- **Out of six placement sites**, one equation: `trim_start`
+  (`edit_clip.rs`), `roll` and `slip` (`edit_edge.rs`), `split_clip`
+  (`edit_split.rs`), `freeze_frame` (`edit_time.rs`) and `add_transition`'s
+  `extended` (`edit_transition.rs`) each wrote out `round(Δ × speed)`, the
+  `is_finite` fallback to 0, the `saturating_add` and the `.max(0)`. They are
+  now `timeline_to_source` / `in_advanced` / `source_advanced`, the last of
+  which also states once that a still's frozen frame and the sourceless kinds
+  do not move when an edge does. `add_transition` is the one that subtracts,
+  and it passes a negated delta rather than a second function.
+- **Out of `evaluate.rs`'s `segment_of`** (**594 → 588**), the verbatim
+  second copy of `content_length` road map 7 §10.3 recorded as an unverified
+  reading. Confirmed, and D4-1 is the decision: one function, the plan reads
+  it. `segment_of`'s own `min(remaining).max(1)` clamp stays, with the
+  comment saying what it is for.
+- **Out of `slip` and `freeze_frame`**, the two "last legal position"
+  readers, `last_in_point` and `last_still_time`, which were the same two
+  expressions in two files.
+
+**The `Option` became `SourceBound`.** §10.1's sharpest finding was that one
+reader's `None` meant two opposite things to two callers — "unbounded, apply
+no clamp" to a trim, "no handle at all" to a transition — so the answer is
+now three-armed (`Unbounded`, `Unmeasured`, `Timeline`) and the caller names
+its reading: `or_unbounded` at the four trim and roll clamps and at
+`resnap`, `or_empty` at the two clamps that treat an unmeasurable window as
+empty and at both of `add_transition`'s handle counts. No call site changed
+its answer.
+
+`longest_duration_on_grid` is the bound of spec §11's #22 — the measurement
+snapped DOWN to the canvas grid — and of #22's three sites only
+`edit_canvas.rs`'s `resnap` routes through it in this phase.
+`trim_end`'s `snapped_down(start + available)` and `whole_media_length` were
+deliberately left: the first differs from `start + longest_duration_on_grid`
+for an off-grid start, and the second has no clip to ask about
+(`designs/reelcut-roadmap-7.md` §10.6).
+
+Line counts, `wc -l` against `47db3ae`: `source_window.rs` **251** (of the
+400-line cap for a new module); `model_query.rs` 503 → **440**;
+`edit_clip.rs` 1036 → **1021**; `edit_edge.rs` 220 → **197**;
+`edit_split.rs` 210 → **195**; `edit_transition.rs` 586 → **572**;
+`evaluate.rs` 594 → **588**; `edit_time.rs` 560 → **555**;
+`edit_canvas.rs` **241**, unchanged. The one file that grew is `lib.rs`,
+83 → **84**, the module declaration. No `rc_*` export was added, so the
+header and `ReelCore.swift` were not touched, and `RC_FORMAT_VERSION` stays
+8.
+
+`core/tests/source_window.rs` is the black-box test, nine tests through the
+FFI: the six movers proved to be one equation from one fixture, the head and
+the length proved to be TIMELINE ticks, the bound proved to be on the grid at
+two frame rates, the content length proved to be SOURCE ticks, D4-1's
+degenerate clip, and an `Unmeasured` window read both ways. Its vectors are
+chosen so `round` differs from `floor` (speed 1.00003 over one 20 000-tick
+frame: 20 001, not 20 000) and `×` from `÷` (speed 2 everywhere a reader is
+measured). Four mutants, each patched into a tree copy, each killed by name:
+`timeline_to_source` without its `* speed` (three tests),
+`source_head_on_timeline` multiplying instead of dividing (one),
+`or_empty`'s `Unmeasured` arm answering `None` (two), and
+`content_length_in_source`'s `>= 1.0` loosened to `> 0.0` (one).
+
+`core/tests/common/mod.rs` gained `source_in`, which four test files had
+written out (§10.3's third finding).
+
+Not covered, and left by name in `designs/reelcut-roadmap-7.md` §10.6: the
+window invariant at `set_speed`, `rate_stretch`, `paste`, `unnest` and
+`add_background` (phase B); `segment_of`'s `duration − 1` in-point clamp and
+its MEDIA-rate still margin; whether `trim_end` on an `Unmeasured` window
+should stay unbounded; `trim_start`'s head clamp, which has no inward snap
+where `roll`'s pair does and may therefore write an off-grid start
+(UNVERIFIED, for phase B to probe); and the app's reversed mirror (phase C).

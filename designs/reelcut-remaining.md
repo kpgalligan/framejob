@@ -242,6 +242,23 @@ two files now share.
 is over the cap, so only the part that had to be there went in, the function
 naming `rc_op_schemas`, and the value type it answers went to
 `ReelOpSchema.swift` instead.
+
+**What road map 7 §10's phase A did to it** (2026-09-19, measured with
+`wc -l` against `47db3ae`). The source-window module is a PURE MOVE, so the
+test is that every file it touched came down. `core/src/model_query.rs`
+**503 → 440** and the three readers, the mover, the bound and the two tail
+readers are `core/src/source_window.rs` (**251** of the 400-line cap for a
+new module). Every caller shrank because it stopped restating the
+arithmetic: `core/src/edit_clip.rs` **1036 → 1021** (the one row of the table
+below that moved, and still over the cap and still the largest Rust file),
+`core/src/edit_edge.rs` 220 → **197**, `core/src/edit_split.rs` 210 → **195**,
+`core/src/edit_transition.rs` 586 → **572**, `core/src/evaluate.rs`
+594 → **588**, `core/src/edit_time.rs` 560 → **555**, and
+`core/src/edit_canvas.rs` **241**, unchanged to the line. The one file that
+grew is `core/src/lib.rs`, 83 → **84**, which is the module declaration.
+`app/Sources/Transcriber.swift` stays **934**: phase A changed two of its
+comments and nothing else. Nothing came off this list and nothing joined it.
+
 Regenerate the list with
 `wc -l app/Sources/*.swift core/src/*.rs | awk '$1>600 && $2!="total"' | sort -rn`
 rather than trusting the numbers here; the standing exemptions are
@@ -264,7 +281,7 @@ row per op.
 | `app/Sources/PreviewCanvasView.swift` | 1104 |
 | `app/Sources/CanvasSessions.swift` | 1088 |
 | `app/Sources/OptionControls.swift` | 1081 |
-| `core/src/edit_clip.rs` | 1036 |
+| `core/src/edit_clip.rs` | 1021 |
 | `app/Sources/Transcriber.swift` | 934 |
 | `app/Sources/AudioDSP.swift` | 890 |
 | `app/Sources/AgentServer+Clips.swift` | 847 |
@@ -450,6 +467,19 @@ preview. Nothing is filed for it and no fix is attempted here: what a later
 road map could try is giving the first breakpoint a lead-in — a ramp that
 starts before the clip does — and re-measuring with `e1_proof.py`'s §5 rows,
 whose window 0 is printed and whose hard-cut row is what would move.
+
+**One deepening candidate, measured and waiting — the COMMIT TAIL**
+(`designs/reelcut-roadmap-7.md` §10.1, and §10.6 which decided it does not
+come along with the source window). Every op in the core ends the same way,
+and the honest count depends on where the block is cut: **5** byte-exact
+copies, **14** `check_overlap_rule` → `Ok(Outcome::Refused(why))` guards,
+**17** `set_gained_transitions` + `self.finish(next)` pairs, **12** functions
+carrying both, and **10** where the guard is the pre-commit trial on `self`
+rather than on `next` — **11** if `roll` is counted, which has the guard and
+the finish but deliberately no `set_gained_transitions`. It shares its
+functions with the source window and nothing else: it is about purity, the
+overlap rule and undo, and it should be judged on that. Phase A of the source
+window left every one of those tails exactly as it found them.
 
 Three small things the closing turned up that a third road map would pick up
 on its way past, none worth a phase: `relink_media` could re-probe the file
