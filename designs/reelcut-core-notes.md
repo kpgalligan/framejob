@@ -981,3 +981,47 @@ unused SOURCE and moves nothing, the shift form spends the TIMELINE and
 moves `close_gap`'s set by `close_gap`'s rules. That is also why the review
 routed `shift_clips`' off-grid shift at an inexact canvas rate to
 `close_gap`'s posture rather than to E1 (road map 5 §12, R1·1).
+
+## `motion.rs` and `edit_props.rs`, 2026-09-20 — the E2 reader review
+
+Two small additions, one to each, from road map 5 §12's R1·1 and R2·1.
+
+`motion.rs` (456 → 469, then **483** in the fix pass, then **491** in the
+residue run). The `rem_euclid(360)` reduction gained four lines and its
+module doc nine. `f64::rem_euclid` is `let r = self % rhs; if r < 0.0
+{ r + rhs.abs() } else { r }`, and the addition ROUNDS UP: for the
+`φ = −1.998e-14` an arrival `spin` produces one tick before it ends, `r +
+360.0` is exactly 360.0, which is the one value §5c says the reduction exists
+to prevent. So the reduction's own 360 maps back to 0. **That was not wide
+enough**, and the fix pass replaced the equality with a BAND: one tick
+earlier the same arrival publishes `359.99999999999994`, a different double
+that fails `partnerBox`'s exact f64 `rotation == 0` guard just as 360 does,
+so what is mapped back to 0 is every total that rounds to a whole turn as an
+f32 of DEGREES (`reduced as f32 >= 360.0`). **The reason first written here
+was false, and the second sceptic pass caught it**: nothing reads degrees
+into a `Float` — the uniform is `Float(rotation · π/180)`, radians, which
+conflates only 3.64e-6° under a turn, and the guard reads the `Double`. The
+band is a CHOSEN conservative width, 2⁻¹⁶ of a degree (1.5259e-5°), at most
+5.87e-4 px at the corner of a 4K frame (2202.9 px from its centre); what it
+actually moves is 1.998e-14° at R1·1's arrival and 1.0e-5° at the `during`
+the seventh test pins, and a threshold in the renderer's real precision
+FAILS that test, so the test pins the chosen band. The short-circuit above
+it is untouched, and the two byte-identity tests it protects
+(`a_clip_with_no_motion_renders_the_recipe_it_always_did`,
+`a_clip_past_its_arrival_renders_the_recipe_it_always_did`) were re-run.
+
+`edit_props.rs` (328 → 356, then **363** in the residue run) gained
+`normalise_and_check_group`, which is
+`check_group` with the one normalisation a COPIED group needs first: a
+payload clip's `{"motion": {}}` or three explicit nulls deserialises to a
+`Motion` with three `None`s, and `paste_attributes` used to store it that
+way, against §5a's one spelling of "no motion". The body is here rather than
+in `edit_paste.rs` because that file is AT the cap with one line of room —
+the paste side swapped one call line and stayed at 599, which is the shape
+the size rule asks for when a fix lands next to a full file.
+
+The review's third core change is a test file, `core/tests/motion_edges.rs`
+(285, then **370** when the fix pass widened the reduction to a chosen band
+under a whole turn, then **375** when the residue run restated the band's
+reason in its comments): the seven inputs those two fixes, R3·1 and that
+widening came from, each with a named mutant that fails it.

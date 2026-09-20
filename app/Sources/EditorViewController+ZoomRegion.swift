@@ -85,11 +85,8 @@ extension EditorViewController {
             NSSound.beep()
             return
         }
-        // A During motion moves the clip under a zoom solved without it, so
-        // the band says so in a second pill.
-        let during = document?.editedProject.snapshot.clip(target.id)?.videoProps.motion?.during
-        let note = purpose == .zoom && during != nil ? CanvasRegionView.duringNote : nil
-        let region = CanvasRegionView(purpose: purpose, clip: target.id, note: note)
+        let region = CanvasRegionView(
+            purpose: purpose, clip: target.id, note: regionNote(purpose, clip: target.id))
         // One-line forwards only (app/CLAUDE.md).
         region.canvasPoint = { [weak self] point in self?.regionCanvasPoint(point) }
         region.viewPoint = { [weak self] point in self?.regionViewPoint(point) ?? point }
@@ -130,8 +127,25 @@ extension EditorViewController {
     /// clip — it is aimed at nothing and closes itself.
     func syncRegionMode() {
         guard let region = canvasRegion else { return }
-        guard regionTarget()?.id != region.clip else { return }
+        guard regionTarget()?.id != region.clip else {
+            // Still aimed at the same clip — but the NOTE is about that
+            // clip's `during`, not about the moment the mode was armed, and
+            // Clip ▸ Motion ▸ During, an undo and an agent's `set_video` can
+            // all add or clear one while the band is up. So it is re-read
+            // here, where every `refreshCanvas` passes.
+            region.note = regionNote(region.purpose, clip: region.clip)
+            return
+        }
         endRegionMode()
+    }
+
+    /// The band's second pill for one clip, or nil: a During motion moves the
+    /// clip under a zoom solved without it (spec §11, R5-4), and only a zoom
+    /// is solved.
+    private func regionNote(_ purpose: CanvasRegionPurpose, clip: UInt32) -> String? {
+        guard purpose == .zoom else { return nil }
+        let during = document?.editedProject.snapshot.clip(clip)?.videoProps.motion?.during
+        return during != nil ? CanvasRegionView.duringNote : nil
     }
 
     /// `add_zoom_action` with no region, at the playhead: the clip goes back
@@ -293,8 +307,14 @@ final class CanvasRegionView: NSView, CanvasModalMode {
     let purpose: CanvasRegionPurpose
     /// The clip the mode was armed for.
     let clip: UInt32
-    /// A second hint pill under the first; nil draws none.
-    let note: String?
+    /// A second hint pill under the first; nil draws none. A `var` because
+    /// what it says is a fact about the CLIP, which can change while the mode
+    /// is armed — `syncRegionMode` re-reads it on every `refreshCanvas`.
+    var note: String? {
+        didSet {
+            if note != oldValue { needsDisplay = true }
+        }
+    }
     /// Live between mouse-down and mouse-up, and nil either side of it.
     private(set) var session: ZoomRegionSession?
 

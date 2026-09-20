@@ -3,9 +3,9 @@
 **Status: BUILT AND PROVED — E1 and E2's core in `e8028a2` (2026-09-16),
 `add_transition`'s `ripple` form in `5da056c` (2026-09-16), E2's chrome in
 `6dda2c7` (2026-09-17), and §4e's and §6e's four instruments on 2026-09-19.
-What is left is E2's reader review (§6f), the four `6dda2c7` nits and
-§4g's and §6g's checks by a person — §12 is the record, and E1's reader
-review is in it (2026-09-20).** Two phases, taken on
+What is left is §4g's and §6g's checks by a person — §12 is the record, and
+both reader reviews are in it (2026-09-20), E1's and E2's, the latter
+carrying the four `6dda2c7` nits.** Two phases, taken on
 2026-09-15 from the
 survey of another editor's transitions, effects and filters
 (`designs/reelcut-effects-survey.md`): **E1**, transitions learn direction,
@@ -2104,16 +2104,520 @@ after the sceptic's review.) No command rule H covers was run outside it; one
 expiry is in the record (the residual at 9.0e15, `expired at 120 s (pid
 61383 killed)`) and nothing else expired.
 
+### The E2 reader review (2026-09-20)
+
+Road map 5 §6f's four questions, verbatim, against the tree as it STANDS —
+not against `e8028a2` and `6dda2c7` as they landed. Every finding below was
+reproduced by RUNNING it, every fix has a test or a proof row made to fail on
+purpose, and the four `6dda2c7` nits each have a verdict.
+
+**The deviation, named.** §6f asks for four readers and earlier reviews put
+every finding to three sceptics. This ran as SEQUENTIAL single-context
+readers — one question finished and written up before the next started — and
+the reader was its own sceptic: it tried to refute each of its own findings
+by building the input and running it. Where it could not reach something it
+says so rather than calling it refuted. One verdict word is not in §6f's
+list: **UNFIXED — recorded as a limit of the instrument**, used twice for a
+gap in `e2_proof.py` that this run measured but did not close.
+
+**Which STATE each reading came from.** `[E2]` the text is already in
+`git show 6dda2c7:<path>`; `[D1-D3]` it arrived by `HEAD` (road map 7's
+deepening series); `[SW]` it exists only in the working tree.
+
+**The baseline, before anything was read** (every command through rule H at a
+flat 1800 s, on the untouched tree): `make test` green
+(`DONE test rc=0 wall=12.4`), `e2_proof.py` **61/61** with zero SKIP lines
+(`wall=6.2`), `e2_chrome.py` **24/24** (`wall=138.8`), `phase6_chrome.py`
+**70/70** (`wall=274.1`); `make lint` and `cargo fmt --check` clean,
+`make typecheck` 0 errors and exactly 4 AVFoundation warnings. There is no
+R0·1. Every later limit is 5 × those numbers, floored at 120 s.
+
+#### Reader 1 — "the preset arithmetic against the tables and the placement rule (rotation sign, y-down, crop centre, nests)"
+
+Every row of §5b's three tables was read against `core/src/motion.rs` — nine
+arrivals, nine departures, five continuous — and all twenty-three agree,
+including which edge each slide names and that `pop` is the one arrival on
+the RAW progress. The placement rule holds too: `nest::rotate` and
+`Compositor.metal`'s `rotate2` are the same sign, `bounce`'s `−0.08A·H` is UP
+on a y-down screen, the crop centre is `((l−r)/2, (t−b)/2)` and the
+half-extents are the §5b expressions. The one thing that does not hold is the
+REDUCTION.
+
+- **R1·1** [E2] `core/src/motion.rs:380` — an arrival `spin` with
+  `in.duration` 100,000,001 ticks, read at clip time 100,000,000 (frame 5000
+  at 30 fps, an ordinary frame of a three-minute recording) → the recipe
+  publishes `rotation: 360.0` (should be `0.0`). `f64::rem_euclid` is
+  `let r = self % rhs; if r < 0.0 { r + rhs.abs() } else { r }`, and the
+  smallest non-zero `1 − ease_out(u)` a double holds is `2⁻⁵³`, so
+  `φ = −180 × 1.110e-16 = −1.998e-14` and `r + 360.0` ROUNDS UP to exactly
+  360 (the spacing of doubles at 360 is 5.68e-14). 360 is the one value §5c
+  says the reduction exists to prevent, because `partnerBox`'s
+  `rotation == 0` guard cannot see it. Designer's lead L1, confirmed through
+  the FFI: the un-fixed recipe printed
+  `"rotation":360.0,"scale":0.4999999999999999`. **FIXED** — the reduction's
+  own 360 maps back to 0;
+  `core/tests/motion_edges.rs`'s
+  `an_arrival_spin_one_tick_from_its_end_reduces_to_zero_and_not_to_a_whole_turn`
+  and `no_arrival_spin_anywhere_near_the_window_publishes_a_whole_turn`, which
+  the fix REVERTED fails 2 of 5 (mutant `R1rev`, in the tree copy).
+  **The first fix was not enough, and the fix pass widened it** (the sceptic's
+  finding 1): mapping the exact double 360 back to 0 leaves the NEIGHBOURS,
+  and `t = in − 2` publishes `359.99999999999994`, which fails the guard's
+  exact f64 `rotation == 0` just as 360 does. The reduction now publishes a
+  BAND under a whole turn as 0 — every total that rounds to 360 as an f32 of
+  DEGREES, a CHOSEN width of 2⁻¹⁶ of a degree (1.5259e-5°, at most 5.87e-4
+  px at the corner of a 4K frame, 2202.9 px from its centre), which moves
+  1.998e-14° at this arrival and 1.0e-5° at the `during` the seventh test
+  pins (the reason first written here, "the precision the number is READ
+  in", was false; the closing block below says what is true) — and the
+  property test asserts `rotation as f32 < 360.0` plus an exact 0 on the
+  last two ticks, over arrivals, departures, a `during` 1.0e-5° short of a
+  turn and the reversed arm (a negative arrival φ added to two whole turns),
+  the last two in the new
+  `no_departure_no_during_and_no_reversed_sum_publishes_a_whole_turn`.
+  The FIRST fix reverted fails 2 of 7 by assertion (mutant `R1rev2`, in a
+  tree copy, 0.3 s under rule H at a 120 s limit). No recorded frame moved:
+  `make test` green and `e2_proof.py` **61/61** on a fresh instance after
+  `make app`, because every spin either instrument samples is a whole period
+  (φ exactly 360, reduced to 0 before and after) or an eighth of a turn.
+- **R1·2** [E2] `core/src/motion.rs:403-416` — a media descriptor with a zero
+  dimension makes `source_size` answer `None`, and the TEXT fallback
+  (`hx = W/2`) silently applies to a media clip: the reader built one and the
+  layer came out at `x = 1920.0` where a measured 1280 × 800 source would put
+  it at 1600. **REFUTED** by the reader's own run: the same layer carries
+  `"source_size":[0,0]`, so nothing is drawn at either offset. A source the
+  core cannot measure has no right answer, and the module doc already says
+  `None` is the fallback. (Designer's lead L3, first half.)
+- **R1·3** [E2] `core/src/recipe.rs:313`, `motion.rs:422-427` — a slide
+  INSIDE a nest and a slide on a CROPPED nest clip. **REFUTED** by two runs.
+  A `slide_left` on a clip inside a 640 × 360 nest starts at `x = 480.0`
+  — `640/2 + 160`, the NEST's canvas, not the project's 1920 — and lands on
+  `x = 0.0` at `in`. A `slide_left` on a nest clip cropped 200 px on the left
+  puts its `clip_rect` at `x 2140, w 440` on a 1920-wide canvas, so its left
+  edge is exactly on the canvas's right edge: the first frame IS the backdrop
+  alone, and the crop is not counted twice. (Lead L3, second half.)
+
+#### Reader 2 — "the model rules — every path an end patch, a paste or a split can bring motion through"
+
+Every site that mints a clip was read (`grep -n allocate_id core/src/*.rs`:
+`edit_clip.rs`, `edit_paste.rs`, `edit_nest.rs`, `edit_background.rs`,
+`edit_time.rs`, `edit_track.rs`). The three that make a NEW clip out of an
+old one say what §5e's table says they say — `edit_background.rs:473` and
+`edit_time.rs:538` write `motion: None`, `edit_split.rs:125-139,183` anchors
+each half to its own end and normalises — and the rest clone, which is K11.
+Two of the four paste and end-patch paths hold; two do not.
+
+- **R2·1** [E2] `core/src/edit_paste.rs:594` — `paste_attributes` with a
+  payload whose `video` carries `{"motion": {}}`, or three explicit nulls,
+  stores `{"in": null, "out": null, "during": null}` on the target, where the
+  patch path (`edit_props.rs:272-282`) and the split rule
+  (`edit_split.rs:133-134`) both store `null`. Two spellings of "no motion",
+  against §5a's "one clip has one spelling"; a save writes the long one out.
+  Designer's lead L4, first half, confirmed by running the op. **FIXED** —
+  `Project::normalise_and_check_group` in `edit_props.rs` beside
+  `check_group`, with the one call line at `edit_paste.rs:594` swapped, net
+  zero on a file with one line of room. `core/tests/motion_edges.rs`'s
+  `paste_attributes_stores_one_spelling_of_no_motion`, which the fix REVERTED
+  fails (mutant `R2rev`), and `paste_attributes_still_copies_a_real_motion`,
+  which a normalisation made too wide fails (mutant `R2wide`).
+- **R2·2** [pre-E2] `core/src/edit_paste.rs` — `paste`'s payload clips are
+  not range-checked, so a `motion` with `duration: -500`, `amount: 5.0` and
+  `period: 0` is stored whole, each a value `set_video` refuses by name
+  (`video.motion.in.duration must not be negative, not -500`). **REFUTED as
+  an E2 finding** by the reader's own CONTROL: the same payload carrying
+  `scale: 500.0`, `opacity: 9.0`, `corner_radius: -4.0` and
+  `audio.volume: 99.0` stores all four as readily. `paste` range-checks
+  NOTHING; motion is not special, and the hole predates E2 and belongs to
+  `paste`'s own door. Noticed in passing, and R3·1 below is where it bites.
+  (Lead L4, second half.)
+- **R2·3** [D1-D3] `core/src/edit_canvas.rs:102-130` — `set_canvas {"fps":
+  [24,1]}` on a 30 fps project re-snaps every clip, action and marker time
+  and leaves `video.motion`'s `{"in": {"duration": 20000}, "during":
+  {"period": 20000}}` exactly as they were, both now sub-frame on a 25,000
+  tick grid. `text.animation`'s two timings are in the same position, and
+  `paste`'s re-snap from another rate has the same hole
+  (`grep -n "motion\|animation" core/src/edit_canvas.rs core/src/edit_paste.rs`
+  prints nothing). It breaks `core/CLAUDE.md`'s Times rule, which road map
+  7's D1·2 applied to motion at the patch door. Reproduced through the FFI.
+  The root file is outside this review's list and the fix is not motion's
+  alone, so **FILED kpgalligan/reelcut#26**. (Lead L5.)
+- **R2·4** [SW] `core/src/edit_split.rs:166-169` — a split straddling an
+  action whose hand-written `end` names `video.motion` writes
+  `{"video": {"x": 150.0, "motion": {"in": {"kind": "fade", "duration":
+  600000}}}}` into the first half: `narrow_to` re-derives the named key from
+  the evaluated state, which the restore has already set to the BASE motion,
+  so the value written is the base's `in` and not the patch's `pop`.
+  **REFUTED** by the reader's own run on two counts: the `out` the lead
+  expected is NOT carried (only the key the patch named is narrowed), and the
+  fixture that produced it is a file no op can write — `set_action_end`
+  refuses a motion. The split propagates a hand-written oddity; it does not
+  invent one, and the restore keeps it inert. (Lead L6.)
+
+#### Reader 3 — "the Swift — the section's writes inside and outside actions, the menu's batch, the wedges"
+
+`MotionProps.dictionary`'s three keys and `VideoPatch.motion`'s
+`.some(nil)` / empty-`MotionProps` arm both reach the wire in the spelling the
+core's slot-by-slot merge expects (`ReelCore.swift:962,1056-1061`), and
+`ProjectSnapshot.swift:968`'s `c.lenient(.motion)` answers a default for a
+misspelt kind — K13's fixture already pins that. A finding rooted in either
+file would have been FILED; none was.
+
+- **R3·1** [E2] `app/Sources/EditorViewController+Motion.swift:85-87` — the
+  comment "An all-identity batch is the core's refusal and beeps; a mixed one
+  lands" is true of two of the three answers and silent about the third. A
+  clip already carrying an out-of-range value — which R2·2 shows `paste` will
+  give it — makes `set_video` an `Err`, because the op re-checks the WHOLE
+  stored group; `ReelProject.applying` THROWS on an `Err`, and
+  `ProjectDocument.applyEdit`'s `catch` presents the core's message, so the
+  batch lands NOTHING and the clips that would have applied do not. Reproduced
+  through the FFI: a pasted `scale: 500.0` makes a later motion patch answer
+  `video.scale must be between 0.01 and 10, not 500`. **FIXED** — the sentence
+  now names all three branches. `core/tests/motion_edges.rs`'s
+  `a_motion_patch_on_a_clip_already_out_of_range_is_an_error` pins the
+  mechanism the sentence describes, and the patch path's range check removed
+  fails it (mutant `R3chk`). (Lead L7.)
+- **R3·2** [E2] `app/Sources/TimelineClipDrawing.swift:245-247` — a stored
+  `duration: 0` is legal (`ticks_positive_or_zero`), INACTIVE in the core
+  (`motion.rs`'s `arrive > 0.0` filter) and LIVE in three places in the app:
+  the strip draws the 2 pt minimum wedge, the section shows the kind with In
+  Duration live, and Clip ▸ Motion checks it. A clip says in three places that
+  it has an entrance and has none. Which of the three answers is right — refuse
+  0, normalise it away, or stop claiming it — is a spec §11 decision, and
+  `text.animation`'s deliberately 0-legal timings argue both ways, so
+  **FILED kpgalligan/reelcut#27** with `bug` and `spec` rather than patched.
+  (Lead L8.)
+- **R3·3** [E2] `app/Sources/InspectorPane.swift:1364-1367`,
+  `VideoPane+Motion.swift:77` — the three undo names for one write ("Set
+  Motion" from the menu, "Motion In" … from the section's rows, "Video
+  Properties" from the MCP mirror at `AgentServer+Clips.swift:491`), and
+  whether Reset's ONE `set_video` over several ids still routes to base inside
+  an action. **REFUTED** by reading the branch: `structural(video:for:)` tests
+  `patch.motion != nil`, and `VideoPatch(motion: .some(nil))` is a non-nil
+  `MotionProps??`, so Reset lands on the base props inside an action like every
+  other motion write. Each of the three names describes its own path, which is
+  the house convention, and the section's row names are what an inspector row
+  is named after. (Lead L9.)
+
+#### The four `6dda2c7` nits
+
+- **N·1** [E2] `EditorViewController+Motion.swift:67,93,100,143-145` — any
+  NEGATIVE menu tag read as None. `guard tag < 0 || tag < count` let a tag
+  of −7 through, `edge(-7)` answered nil, and the write CLEARED a clip's
+  arrival; `kindAt` returned nil for it too, so the validator checked it as
+  None. The only builder is `motionSlotMenu`, which writes −1 and indices.
+  **FIXED** in that file alone: None is exactly `Self.motionNoneTag`, and
+  `slotAt` answers three-valued — `.some(kind)`, `.some(nil)` for None, nil
+  for a stranger, which checks nothing. Two rows in `e2_chrome.py`, on the
+  two fixtures where they can fail: the WRITE row on `one` (In set to
+  `slide_up`) is byte-identical, and the VALIDATOR row on `none` (In empty)
+  is `.off` where None is `.on`. The fix REVERTED fails both (mutant
+  `N1rev`, 31/33 in the tree copy). **The EXTREMES this fix's own rule asks
+  for now go through the BUILT binary** (the sceptic's Approach-7 gap,
+  closed by the residue run of 2026-09-20, below): two more rows in
+  `e2_chrome.py` put `Int.min`, `Int.max`, `count` (9) and `count + 1`
+  through both doors, with tag `0` and None (−1) beside them as the positive
+  controls — the tag VALUES live in the probe's own Swift source, since
+  `Int.min` is not trusted through `JSONSerialization` either way, and the
+  rows are keyed by name. The WRITE row, on `one` (In `slide_up`): the four
+  strangers each leave `project.json` byte-identical, and tag `0` moves the
+  arrival's kind to `fade` with `out` and `during` still null. The VALIDATOR
+  row, on `none` (In empty): all five check `.off` where None checks `.on`.
+  WHY they pass is still the inspection — `tag == -1 || (tag >= 0 && tag <
+  count)` does no arithmetic and cannot overflow, and `slotAt` uses
+  `Range.contains`, total for any `Int` — and the rows are what says it was
+  RUN: the gate widened back to "any negative tag is None" (N·1's own
+  defect, `guard tag < 0 || tag < count` and `if tag < 0 { return .some(nil)
+  }`) fails both new rows naming `Int.min` (In `slide_up` → `None` on the
+  write, `on` in the menu) and the two −7 rows with them (mutant `N1ext`,
+  31/35 in a tree copy, 159.9 s with its own probe built and 51.4 s on a
+  second run, under rule H at a 700 s limit). The UPPER extremes have no
+  non-trapping mutant to name: a gate widened to accept `count` indexes
+  `allCases[count]`, which TRAPS rather than answering, so `Int.min` is the
+  only one of the five a mutant can carry through.
+- **N·2** [E2] `TimelineClipDrawing.swift:219` — the glyph inferred the label
+  dot's place from `nameEnd`. Read today it is EXACT (the dot branch is the
+  only thing that moves `nameEnd` before it), so this is a fragility and not
+  a defect, and the record says so. **FIXED** anyway, by carrying what the
+  dot branch decided (`dotLeft`) rather than re-deriving it; the file keeps
+  exactly one line beginning `let right = ` (`grep -c` → 1). Two rows in
+  `e2_chrome.py` §1 measure a LABELLED card with a `during` against the same
+  labelled card without one: the glyph's right edge is x 285.0 against the
+  dot's left edge x 288, and 10.0 pt left of where it sits unlabelled
+  (x 295.0). **The fix moves no pixel, so the fix REVERTED passes both rows
+  by construction — measured, 33/33 (mutant `N2rev`).** The made-to-fail is
+  the PINNED mutant §12 names: the one `let right =` line replaced whole by
+  `let right = strip.maxX - padding`, which fails both rows (x 295.0 against
+  a dot at 288, and 0.0 pt of give; mutant `N2mut`, 31/33).
+- **N·3** [E2] `EditorViewController+ZoomRegion.swift:90-92,297` — the zoom
+  band's second pill was computed once at arm time into a `let`, and
+  `syncRegionMode` keeps the mode armed while the same clip stays the target,
+  so a `during` added or cleared while armed left the pill stale. **FIXED** —
+  `regionNote(_:clip:)` is re-read in `syncRegionMode`, which every
+  `refreshCanvas` passes, and `note` is a `var` that redraws on change. The
+  probe DID reach it (the lead doubted it could): armed with `zoomToRegion`,
+  the trail is `['', 'This clip has During motion — the zoom is solved
+  without it', '']` across a During ▸ Pulse and a During ▸ None. Two rows in
+  `e2_chrome.py`; the fix REVERTED fails both (mutant `N3rev`, 31/33).
+- **N·4** [E2] `tools/proof/phase6_chrome.py:185-188,1040-1041` — "1600
+  measures identically to 1400, which is what says the number is a threshold
+  and not a resonance", false since E2 (the same comment's next sentence says
+  1400 scores 68/70), and a stale "1440 x 1400 … 2880 x 2800". **FIXED** —
+  the size is corrected to 1440 × 1600 / 2880 × 3200, which the baseline
+  run's own PNG confirms (`grad-2-open.png` is 2880 × 3200), and the
+  threshold sentence GOES rather than stays: earning it back needs a render
+  of one fixture at `TALL + 200` scored against `TALL`'s solved body height,
+  no run in this review made that measurement, and the comment now says so by
+  name. `phase6_chrome.py` re-run at **70/70**, its baseline.
+
+#### Reader 4 — "the proof — which claims would pass against a build without the feature"
+
+No old binary is scored (§12 already records why: the `1c3e92e` tree cannot
+compile against the current header, and `e2_proof.py` has no handler for the
+`ToolError` that would follow). The builds are eight NAMED MUTANTS of today's
+tree in an `rsync` copy under a scratch directory, each patch asserting its
+replaced text occurs exactly once — all checked, 1 each. Core mutants were
+scored by the four core test binaries run ONE AT A TIME (`cargo test` stops
+at the first failing binary, and a claim group never started is not a claim
+group that answered), then by `e2_proof.py` against the copy's own build on
+port 4893, then by `e2_chrome.py` in the copy. Every run went through rule H
+and nothing expired.
+
+The claim groups are the two scripts' own printed sections and the four core
+test files. `e2_chrome.py` prints three numbered sections rather than the
+five bullets `tools/proof/README.md` describes them in; the sections are what
+was scored, because they are what a run counts.
+
+| Claim group | Y1 no motion | Y2 spins reversed | Y3 y up | Y4 no departures | Y5 nest motion dropped | Y6 container = canvas | Y7 one op over every id | Y8 strip gate + measure |
+|---|---|---|---|---|---|---|---|---|
+| `core/tests/motion.rs` | fails 15/19 | fails 3/19 | fails 3/19 | fails 2/19 | fails 2/19 | fails 1/19 | not run — a Swift-only patch; `cargo test` links no Swift | not run — same |
+| `core/tests/motion_edges.rs` (new; scored before R3·1's test was added — five tests then, seven now) | fails 1/5 | fails 2/5 | passes | passes | passes | passes | not run — same | not run — same |
+| `core/tests/motion_copy.rs` | passes | passes | passes | passes | passes | passes | not run — same | not run — same |
+| `core/tests/schema_v8.rs` | passes | passes | passes | passes | passes | passes | not run — same | not run — same |
+| `e2_proof.py` §0 the instance | control | control | control | control | control | control | control | control |
+| `e2_proof.py` §1 the schema | fails 2/13 | passes | passes | passes | passes | passes | passes | passes |
+| `e2_proof.py` §2 the slides | fails 4/6 | passes | fails 2/6 | passes | passes | passes | passes | passes |
+| `e2_proof.py` §3 fade, zoom_in, pop | fails 6/8 | passes | passes | passes | passes | passes | passes | passes |
+| `e2_proof.py` §4 spin, shake, drift, bounce | fails 4/8 | **passes** | fails 1/8 | passes | passes | passes | passes | passes |
+| `e2_proof.py` §5 tent, action, two slots, nest | fails 7/9 | passes | fails 1/9 | fails 1/9 | fails 3/9 | **passes** | passes | passes |
+| `e2_proof.py` §6 what the model says | fails 1/11 | passes | passes | passes | passes | passes | passes | passes |
+| `e2_proof.py` §7 the export path | fails 1/3 | passes | passes | passes | passes | passes | passes | passes |
+| `e2_chrome.py` §1 wedges and glyph | passes | passes | passes | passes | passes | passes | passes | **fails 2/8** |
+| `e2_chrome.py` §2 the section, open | passes | passes | passes | passes | passes | passes | passes | passes |
+| `e2_chrome.py` §3 menu, rows, commands | passes | passes | passes | passes | passes | passes | **fails 1/23** | passes |
+
+**How to read it.** A `control` is a row whose own text claims something did
+NOT move: `e2_proof.py` §0's three are about the instance and the tool count,
+and they are meant to pass in every column. The EIGHT `not run` cells are
+ONE pair — Y7–Y8 against the four core test files — and the reason is the
+only one there is: a Swift-only patch changes nothing `cargo test` links.
+The runner prints those eight as `the binary did not run`, which is what
+`not run` means here: nobody was told to run it, so it is a number no run
+printed. **Every
+other cell in the table was RUN.** In particular the Y1–Y6 × `e2_chrome.py`
+cells are `passes` from a run and not `not run`: the plan allowed them to be
+skipped on the grounds that the script reads no recipe and no render
+(`grep -n "recipe\|render_frame" tools/proof/e2_chrome.py` still prints
+nothing), but this review's own N·3 rows arm a canvas region whose target
+comes from a recipe-derived box, so they were measured instead of argued.
+They all pass, which is the answer that reason predicted. Nothing `unreached`
+and nothing `expired` appears in the table, and no `not run` cell is counted
+as caught.
+
+**The two bold `passes` are findings**, by the plan's own definition: a claim
+group whose text names the mutated behaviour and passes anyway.
+
+- **R4·1** `tools/proof/e2_proof.py` §4 — **Y2 scores 61/61**. §4's rows are
+  "an eighth of a turn as a 45° bounding box" and "one whole period of a
+  `spin` is byte-identical to no motion", and neither can see WHICH WAY the
+  clip turned: a rectangle's bounding box at +45° and −45° is the same
+  rectangle, and a whole turn reduces to 0 either way. The uncropped card
+  fixtures are symmetric about their own centre, so no render over MCP
+  distinguishes the sign. The direction IS pinned, in
+  `core/tests/motion.rs` (3 of 19 fail) and in this review's
+  `core/tests/motion_edges.rs` (2 of 5 fail) — the `rotation` numbers the
+  recipe publishes, read through the FFI. Designer's lead L2, confirmed.
+  **UNFIXED — recorded as a limit of the instrument** in
+  `tools/proof/README.md`: closing it needs a CROPPED fixture, where the
+  pivot compensation makes the drawn position depend on the sign of φ, and
+  the arithmetic for a 315°-rotated cropped card is a row this review did not
+  write.
+- **R4·2** `tools/proof/e2_proof.py` §5 — **Y6 scores 61/61**. §5's nest rows
+  measure a nest CLIP's own arrival scaling every inner layer about the nest
+  clip's placed centre; none measures a clip INSIDE a nest sliding against
+  the nest's frozen canvas, which is what `Project::container` answers and
+  what Y6 replaces with the project canvas. Caught by one test in
+  `core/tests/motion.rs` and by nothing over MCP. **UNFIXED — recorded as a
+  limit of the instrument** in `tools/proof/README.md`; R1·3 above is the
+  same property, measured through the FFI by hand during this review.
+- **R4·3** `tools/proof/e2_chrome.py` — **Y7 scored 30/30 before this
+  review's rows**, exactly as designer's lead L10 predicted: the probe
+  selected ONE clip for During ▸ None and reached no second clip, so a batch
+  that sent one op over every id passed everything. **FIXED** — a new probe
+  block selects BOTH cards of the `two` fixture (which disagree about their
+  arrival) and sends During ▸ Pulse: each keeps its own arrival
+  (`['slide_up', 'fade']`) while both gain the during. Y7 now fails that row
+  (`['fade', 'fade']`, 32/33). Beside it, and NOT a made-to-fail row, is a
+  CONTROL the same block reads: one undo puts `project.json` back byte for
+  byte, under the name "Set Motion". It is a control in the plan's own sense
+  — it claims something came BACK — and no mutant of E2's code can falsify
+  it: a batch split into one `applyEdit` per op is still one undo step,
+  because `NSUndoManager` groups by run-loop turn (measured: mutant `U1`,
+  33/33).
+- **R4·4** `tools/proof/e2_chrome.py` §1 — **Y8's first half was not
+  caught**. Y8 is two patches, and at 30 rows only the wedge MEASURE
+  (`MotionEdge().duration` for the stored one) failed; the strip's
+  `InspectorTab.hasPixels` GATE removed changed nothing, because every
+  fixture in the script is a shape clip and shape clips always have pixels.
+  **FIXED** — a fixture whose media declares `has_video: false` (the shape a
+  detached audio twin has, and the only one that exercises the gate), with a
+  full motion in its props, rendered against the same clip with none: the two
+  PNGs are byte-identical. Y8 now fails 2 of 8 in §1 rather than 1.
+
+**Final scores.** `make test` green, 721 tests over 39 binaries, with the new
+`core/tests/motion_edges.rs` at **7/7** (six from the review pass, the
+seventh from the fix pass's widened reduction); `e2_proof.py` **61/61** with zero
+SKIP lines; `e2_chrome.py` **24/24 → 33/33** (then **35/35** with the residue run's two
+rows, below); `phase6_chrome.py` **70/70**.
+The proofs the fixes feed, each re-run at full score on a fresh instance:
+`phase6_proof.py` **168/168** and `patch_door_proof.py` **261/261** (the
+renders for `motion.rs`, the patch door for `edit_props.rs`),
+`phase2_chrome.py` **26/26** and `phase4_chrome.py` **59/59** (the name
+strip). `make lint` and `cargo fmt --check` clean; `make typecheck` 0 errors
+and exactly 4 AVFoundation warnings; `make app` building; the parity log
+empty.
+
+**The mutants this review added**, all in a tree copy, all killing the row
+or test named beside them except the two said not to: `R1rev` (the
+reduction's 360 not mapped back), `R1rev2` (the fix pass's widening reverted
+to that first attempt — 2 of 7 in `motion_edges`), `R2rev` (the paste
+normalisation removed), `R2wide` (the same normalisation made too wide),
+`R3chk` (the patch path's range check removed), `N1rev` (both halves of the
+negative-tag fix), `N2mut` (the pinned `let right =` replacement), `N2rev`
+(N·2's fix REVERTED — 33/33, a mutant that kills nothing BY CONSTRUCTION,
+which is the record's own reason for calling that fix a fragility and not a
+defect), `N3rev` (the note not re-read) and `U1` (the batch split into
+one `applyEdit` per op — the other one that did NOT kill its row, which is
+why that row is called a control). TEN fix-REVERTED or pinned mutants in
+all — nine from the review pass, `R1rev2` from the fix pass — beside the
+eight NAMED mutants Y1–Y8 of the table above, eighteen together.
+
+**The count, against this section's own numbered lines.** **EIGHTEEN**
+findings are recorded above — R1·1 to R1·3, R2·1 to R2·4, R3·1 to R3·3, N·1
+to N·4, and R4·1 to R4·4. **NINE are FIXED**: R1·1, R2·1, R3·1, N·1, N·2,
+N·3, N·4, R4·3 and R4·4. **FIVE are REFUTED** by the reader's own run: R1·2,
+R1·3, R2·2, R2·4 and R3·3. **TWO are FILED**: R2·3 as kpgalligan/reelcut#26
+and R3·2 as #27. **TWO are UNFIXED and recorded as limits of `e2_proof.py`**
+in `tools/proof/README.md`: R4·1 and R4·2. Nothing is UNREPRODUCED and
+nothing is UNJUDGED. All ten of the designer's leads have a verdict: L1 is
+R1·1, L2 is R4·1, L3 is R1·2 and R1·3, L4 is R2·1 and R2·2, L5 is R2·3, L6 is
+R2·4, L7 is R3·1, L8 is R3·2, L9 is R3·3 and L10 is R4·3. No command rule H
+covers was run outside it and NOTHING expired, so there is no expiry line to
+write.
+
+**The second sceptic pass, and the run that closed it (2026-09-20).** The
+second sceptic pass over this review ended FIX-REQUIRED with one should-fix
+and one nit; two earlier nits about `edit_props.rs`'s comments had been left
+open by the fix pass's own choice, and N·1's extremes were recorded above as
+owing a probe row. A residue run closed all four and changed no behaviour:
+`make test` is still 721 tests over 39 binaries with none added or removed,
+no assertion CONDITION moved, and the threshold `reduced as f32 >= 360.0` is
+exactly what it was.
+
+**Finding 1, the should-fix: the reduction's stated REASON was false in
+seven places, and the threshold is right.** Every site said the recipe's
+rotation is read into a `Float` on the Swift side, so a double near 360
+"becomes exactly 360.0f over there". Nothing converts DEGREES to an f32: the
+only two are `Compositor.swift:1277` and `CompositorEffects.swift:144`, both
+`Float(deg * .pi / 180)` and therefore RADIANS, and `partnerBox`'s guard
+(`Compositor.swift:1357`) compares `rotation == 0` on the `Double`
+`RecipeLayer.rotation` (`ProjectSnapshot.swift:2271`). What is TRUE is that
+the guard needs an exact zero for a layer that is unrotated to the eye, that
+`rem_euclid` can hand back 360 or a hair under it, and that both fail the
+guard alike — so a BAND under a whole turn is published as no turn, and the
+band is a CHOSEN conservative width, "rounds to 360 as an f32 of DEGREES",
+2⁻¹⁶ of a degree. The sceptic MEASURED that a threshold decided in the
+renderer's real precision (radians: 3.64e-6° under a turn, a band 4.19×
+narrower) FAILS the seventh test's `during` row, which sits 1.0e-5° under a
+turn — so the wide band is what that test pins, and the threshold did not
+move. The seven sites restated: spec §7.10's `motion.rs` row (normative,
+done first), `motion.rs`'s module doc and its inline comment,
+`core/tests/motion_edges.rs`'s comments and ONE assertion message,
+`designs/reelcut-core-notes.md`, `designs/reelcut-remaining.md` §3, and R1·1
+above.
+
+**Finding 2, the nit: two figures.** "5e-4 px" is 5.87e-4 px, and "the 4e-14
+the arithmetic actually produces here" is contradicted by the fix pass's own
+fixture, where the rule moves 1.0e-5°. Both are now what a run printed:
+
+```
+band_deg=1.5259e-05 radius_px=2202.9 corner_px=5.867e-04 tie_is_360f=True
+radians_band_deg=3.642e-06 ratio=4.19
+during_P_t+1_deg=1.000e-05 during_P_t+100_deg=1.000e-03
+```
+
+2202.9 px is the CORNER's distance from a CENTRED pivot, and the pivot is
+the layer's own anchor (`Compositor.swift:1274-1275`, `canvas/2 + layer.x`),
+so no site states the bound of an unqualified pixel, or of every pixel:
+nothing printed covers an off-centre layer. 1.998e-14° is R1·1's own
+measured φ; "4e-14" was printed by nothing and is gone from the tree.
+
+**The two nits the fix pass left open, closed.** `edit_props.rs`'s "a
+payload is the third way a `Motion` enters a clip" told a reader the
+invariant was closed. `normalise_and_check_group`'s doc now says THIS op's
+payload is a third DOOR and names the two that are still open — `paste`'s
+payload clips, stored whole and neither normalised nor range-checked (R2·2
+above), and the FILE reader, deliberate until a patch touches it
+(`core/tests/schema_v8.rs`'s
+`a_motion_whose_slots_are_all_cleared_normalises_back_to_null`, road map 7
+§2.2) — and spec §6's `paste_attributes` row mirrors it. `check_group`'s doc
+no longer claims a range check SHARED with the patch path: its only caller
+is `normalise_and_check_group` (`edit_paste.rs:594` behind it) and the patch
+path calls `check_video` / `check_audio` / `check_text` / `check_shape`
+directly. `core/CLAUDE.md`'s `edit_props.rs` map entry carried both
+sentences and now says the same true thing; nothing else in that file was
+touched. One passage of the same shape was left standing by the residue
+run, outside its site list: `motion_edges.rs`'s
+`paste_attributes_stores_one_spelling_of_no_motion` called
+`paste_attributes` "the third way a `Motion` enters a clip". The residue
+run's own review judged it: the clause is about how a `Motion` ENTERS, where
+`paste`'s payload and the file reader are two more doors, so it now reads
+"a third door for a `Motion`" like the rest (a comment, changed by hand
+after the review; no test condition moved).
+
+**N·1's extremes, run.** The two rows and the mutant are recorded at N·1
+above. `N1ext` is the ELEVENTH fix-reverted or pinned mutant of this review
+— nineteen with Y1–Y8 — where the paragraph above counts the review and fix
+passes only; every mutant score quoted there out of 33 was scored on the
+33-row script and none was re-run.
+
+**Final scores, each as a run printed it.** `make test` green, 721 tests
+over 39 binaries, `motion_edges` **7/7**; `make lint` and `cargo fmt
+--check` clean; `make typecheck` 0 errors and exactly 4 AVFoundation
+warnings; `make app` building; `e2_chrome.py` **35/35** (157.7 s with the
+probe built, 65.2 s on a second run with it up to date), and the mutant
+`N1ext` **31/35** in a tree copy (159.9 s with its own probe built, 51.4 s
+on a second run). Both proof runs were under rule H — own process group, a
+700 s hard limit (5× the recorded 138.8 s), `os.killpg` on expiry — and
+NOTHING expired. `e2_proof.py`, `phase6_chrome.py` and the MCP proofs were
+not re-run and are quoted above at their own runs' scores: no product code
+changed, and the run's only edit under `app/` lives in the tree COPY the
+mutant was built from.
+
 **Owed, as of this record:**
 
-- E2's reader review (§6f): four readers, each with one question and the
-  diff. E1's (§4f) ran on 2026-09-20 and is recorded above.
-- Four review nits from `6dda2c7`: any negative menu tag reads as None; the
-  glyph infers the label dot from `nameEnd`; the zoom hint's note is fixed at
-  arm time; `phase6_chrome.py`'s comment still says 1600 measures
-  identically to 1400. No claim in the four instruments reaches any of them.
 - §4g's and §6g's checks by a person at the machine, now listed in
   `designs/reelcut-remaining.md` §4.
+- **Two findings of the E2 reader review, filed rather than fixed**:
+  kpgalligan/reelcut#26, an fps change leaving `video.motion`'s and
+  `text.animation`'s ticks off the new grid (the root is `edit_canvas.rs`,
+  outside that review's file list, and text's timings are in the same
+  position); and #27, a motion slot with `duration: 0` — inactive in the core
+  and live in the strip, the section and the menu — which needs a spec §11
+  decision before a patch. Both are in `designs/reelcut-remaining.md` §5.
+- **Two limits of `e2_proof.py`**, measured by that review's mutant table and
+  recorded in `tools/proof/README.md`: no MCP row sees a spin's DIRECTION,
+  and none measures a slide INSIDE a nest against the nest's own canvas.
+  Both properties are pinned in the core tests; what is owed is a row.
 - **The mix's first twelve milliseconds**, the limit measured above: it is
   bigger than §4e's own sentence expects and it is in the EXPORTED file, so
   it is owed a decision rather than only a paragraph. Entered in

@@ -203,6 +203,10 @@ extension TimelineContentView {
         // name gives up the dot's 6 pt plus the icon's 5 pt gap for it. Any
         // non-empty label draws — an unknown name in the neutral ink — so a
         // project from a newer build still shows WHERE its labels are.
+        // Where the dot's own left edge landed, or nil when no dot drew. The
+        // glyph below needs THAT, and `nameEnd` is not it: `nameEnd` is where
+        // the NAME stops, which three different branches move.
+        var dotLeft: CGFloat?
         if let label = clip.label, !label.isEmpty {
             let dot = CGRect(
                 x: strip.maxX - padding - 6, y: strip.midY - 3, width: 6, height: 6)
@@ -210,13 +214,13 @@ extension TimelineContentView {
                 ClipLabel.color(named: label).withAlphaComponent(0.92).setFill()
                 NSBezierPath(ovalIn: dot).fill()
                 nameEnd = dot.minX - 5
+                dotLeft = dot.minX
             }
         }
         // The during glyph: an 11 pt box (the kind icon's) at the right end,
-        // 4 pt left of the label dot when there is one (the dot moved
-        // `nameEnd` 5 pt left of itself), guarded like the dot.
+        // 4 pt left of the label dot when one drew, guarded like the dot.
         if motion?.during != nil {
-            let right = nameEnd < strip.maxX - padding ? nameEnd + 1 : nameEnd
+            let right = dotLeft.map { $0 - 4 } ?? (strip.maxX - padding)
             let glyph = CGRect(x: right - 11, y: strip.minY, width: 11, height: strip.height)
             if glyph.minX >= x {
                 TimelineDraw.symbol(

@@ -591,7 +591,7 @@ impl Project {
                     return Err(format!("clip {id} has no {} properties", group.name()));
                 }
                 copy_group(target, source, group);
-                self.check_group(target, group)?;
+                self.normalise_and_check_group(target, group)?;
             }
         }
         self.finish(next)

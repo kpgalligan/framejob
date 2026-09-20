@@ -145,9 +145,16 @@ file is what governs a module now.
   rule they all obey. A free function over `&mut Project` because it is
   called mid-edit on a clone the caller is still assembling.
 - `edit_props.rs` — the five patches (`set_video`, `set_audio`, `set_text`,
-  `set_shape`, `set_clip`), `Project::check_group` (how a patch and a
-  `paste_attributes` copy run the same range check), `check_blend`, the one
-  check about a CLIP rather than a value (a nest clip cannot blend), and
+  `set_shape`, `set_clip`), `Project::check_group` (the range check
+  `paste_attributes` runs on each group it has just replaced — the same
+  `check_video` / `check_audio` / `check_text` / `check_shape` the patch
+  path calls directly; its only caller is `normalise_and_check_group`) and
+  `normalise_and_check_group` beside it (the one NORMALISATION a copied
+  group needs first: `paste_attributes`' payload is a third door for a
+  `Motion`, and an empty one has two spellings; `paste`'s payload and the
+  file reader do not normalise; it lives here rather than on the paste side
+  because `edit_paste.rs` is at the size cap), `check_blend`, the one check
+  about a CLIP rather than a value (a nest clip cannot blend), and
   `snap_motion` / `snap_animation`, which put the ticks a patch carries on
   the frame grid AFTER the range check, so a refusal names what the caller
   sent. What a patch may CARRY is `patch.rs`'s and nothing here restates it.

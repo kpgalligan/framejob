@@ -140,25 +140,47 @@ def shape_props(fill):
 
 
 def clip(cid, start, fill, motion_value=None, actions=None, name=None,
-         duration=CLIP_SECONDS * TICKS):
+         duration=CLIP_SECONDS * TICKS, label=None):
     return {
         "id": cid, "track": 1, "start": start, "duration": duration,
         "source": {"kind": "shape"},
         "enabled": {"video": True, "audio": True}, "speed": 1.0,
         "video": video_props(motion_value), "audio": None, "text": None,
         "shape": shape_props(fill), "actions": actions or [], "transition_in": None,
+        "name": name, "label": label,
+    }
+
+
+def audio_only_clip(cid, start, motion_value=None, name=None,
+                    duration=CLIP_SECONDS * TICKS):
+    """A clip whose media has NO video — what `InspectorTab.hasPixels` says no
+    to, and the only fixture shape that exercises the strip's gate. The file
+    need not exist: the timeline paints from the snapshot."""
+    return {
+        "id": cid, "track": 1, "start": start, "duration": duration,
+        "source": {"kind": "media", "media": 90, "in": 0, "reversed": False},
+        "enabled": {"video": True, "audio": True}, "speed": 1.0,
+        "video": video_props(motion_value), "audio": {}, "text": None,
+        "shape": None, "actions": [], "transition_in": None,
         "name": name, "label": None,
     }
 
 
-def project(clips):
+AUDIO_MEDIA = [{
+    "id": 90, "path": "/fixtures/voice.m4a", "kind": "audio",
+    "duration": 60 * TICKS, "width": 0, "height": 0, "fps": [30, 1],
+    "has_video": False, "has_audio": True,
+}]
+
+
+def project(clips, media=None):
     return {
         "version": 8,
         "canvas": {
             "width": 1920, "height": 1080, "fps": [30, 1], "background": BLACK,
             "fit_new_clips": True, "timecode_frames": True,
         },
-        "media": [],
+        "media": media or [],
         "tracks": [{"id": 1, "name": "Track 1", "hidden": False, "muted": False,
                     "locked": False, "solo": False}],
         "clips": clips,
@@ -166,7 +188,8 @@ def project(clips):
         # Ids are unique across the WHOLE project — `next_id` is one counter —
         # so an ACTION's id counts too.
         "next_id": max([c["id"] for c in clips]
-                       + [a["id"] for c in clips for a in c["actions"]] + [1]) + 1,
+                       + [a["id"] for c in clips for a in c["actions"]]
+                       + [m["id"] for m in media or []] + [1]) + 1,
         "nests": [],
     }
 
@@ -179,6 +202,13 @@ def write_package(name, body):
         handle.write("\n")
     return path
 
+
+# A menu tag no builder in this app writes: `motionSlotMenu` writes −1 for
+# None and 0…n for the kinds (the E2 reader review's N·1). The EXTREMES of
+# the same rule — `Int.min`, `Int.max`, `count`, `count + 1` and `0` — are
+# carried in the probe's own source instead of here, because `Int.min` does not
+# survive `JSONSerialization` in either direction (block (f)).
+STRANGER_TAG = -7
 
 GREY = [0.6, 0.6, 0.6, 1.0]
 
@@ -209,6 +239,23 @@ def packages():
                 "id": 3, "start": 0, "duration": TICKS, "curve": "linear",
                 "end": {"video": {"x": 100.0}},
             }])])),
+        # The glyph against the LABEL dot (the E2 reader review's N·2): the
+        # same labelled card with and without a `during`, so the only pixels
+        # that differ are the glyph's.
+        "labelled": write_package("e2-labelled", project([
+            clip(2, 0, GREY, motion(during=slot("pulse")), name="Card",
+                 label="blue")])),
+        "labelled-none": write_package("e2-labelled-none", project([
+            clip(2, 0, GREY, None, name="Card", label="blue")])),
+        # The strip's GATE: a clip whose media has no video carries motion in
+        # its props (a detached audio twin clones them) and must draw none of
+        # it.
+        "silent": write_package("e2-silent", project([
+            audio_only_clip(2, 0, motion(edge("fade", 1.0), edge("fade", 0.5),
+                                         slot("pulse")), name="Voice")],
+            media=AUDIO_MEDIA)),
+        "silent-none": write_package("e2-silent-none", project([
+            audio_only_clip(2, 0, None, name="Voice")], media=AUDIO_MEDIA)),
     }
 
 
@@ -573,6 +620,127 @@ do {
     answer["insideAction"] = ["picked": picked, "project": document.project.json]
 }
 
+// ---- (c) a menu tag no builder writes -------------------------------------
+// The E2 reader review's N·1. `motionSlotMenu` writes −1 for None and an
+// index for every other item, so −7 came from nowhere this app knows. The
+// clip HAS an arrival, which is what makes the write visible: the unfixed
+// build read every negative tag as None and cleared it.
+do {
+    let (document, controller) = editor(request["strangerPackage"] as! String, select: [0])
+    let before = document.project.json
+    let item = NSMenuItem(
+        title: "", action: #selector(EditorViewController.setMotionIn(_:)),
+        keyEquivalent: "")
+    item.tag = request["strangerTag"] as! Int
+    controller.setMotionIn(item)
+    spin(0.8)
+    answer["stranger"] = ["before": before, "after": document.project.json]
+}
+
+// ---- (d) the zoom band's note follows the clip ----------------------------
+// The E2 reader review's N·3. Armed on a clip with no `during`, then a
+// `during` added and cleared through the ordinary command while the band
+// stays up. `armed` says whether the mode could be entered at all — a
+// harness window may have no canvas box to aim at, and a claim nothing
+// reached is not a claim.
+do {
+    let (_, controller) = editor(request["notePackage"] as! String, select: [0])
+    controller.zoomToRegion(nil)
+    spin(0.5)
+    var trail: [String] = []
+    let armed = controller.canvasRegion != nil
+    func noteNow() -> String { controller.canvasRegion?.note ?? "" }
+    if armed {
+        trail.append(noteNow())
+        let on = NSMenuItem(
+            title: "", action: #selector(EditorViewController.setMotionDuring(_:)),
+            keyEquivalent: "")
+        on.tag = 0
+        controller.setMotionDuring(on)
+        spin(0.8)
+        trail.append(noteNow())
+        let off = NSMenuItem(
+            title: "", action: #selector(EditorViewController.setMotionDuring(_:)),
+            keyEquivalent: "")
+        off.tag = -1
+        controller.setMotionDuring(off)
+        spin(0.8)
+        trail.append(noteNow())
+        controller.endRegionMode()
+    }
+    answer["note"] = ["armed": armed, "trail": trail,
+                      "expected": CanvasRegionView.duringNote]
+}
+
+// ---- (e) one op PER CLIP, and one undo step -------------------------------
+// The E2 reader review's reader 4. A `motion` patch replaces the whole
+// object, so a batch that sent ONE op over every id would give every clip
+// the last one's whole motion — the two fixtures disagree about their
+// arrival, which is what makes that visible. And the whole batch is one
+// undo step: one undo puts `project.json` back byte for byte.
+do {
+    let (document, controller) = editor(request["perClipPackage"] as! String,
+                                        select: [0, 1])
+    let before = document.project.json
+    let item = NSMenuItem(
+        title: "", action: #selector(EditorViewController.setMotionDuring(_:)),
+        keyEquivalent: "")
+    item.tag = 0
+    controller.setMotionDuring(item)
+    spin(0.8)
+    let after = document.project.json
+    document.undoManager?.undo()
+    spin(0.8)
+    answer["perClip"] = ["before": before, "after": after,
+                         "undone": document.project.json,
+                         "name": document.undoManager?.redoActionName ?? ""]
+}
+
+// ---- (f) N·1's EXTREMES, through the same two doors ----------------------
+// The E2 reader review recorded these five tags by INSPECTION and owed a row.
+// The tag VALUES live here and never in the request's JSON — `Int.min` is not
+// trusted through `JSONSerialization` either way — so the rows are keyed by
+// NAME. `0` writes LAST because it is the one tag that is MEANT to write: it
+// is the positive control, without which a gate that refused everything would
+// pass the four strangers for the wrong reason. The write fixture's In is SET
+// (`slide_up`), so a tag read as None would show as a cleared arrival.
+do {
+    let n = EdgeMotion.allCases.count
+    let extremes: [(String, Int)] = [
+        ("Int.min", Int.min), ("Int.max", Int.max), ("count", n),
+        ("count+1", n + 1), ("0", 0),
+    ]
+    let spec = request["extremes"] as! [String: Any]
+    let (document, controller) = editor(spec["writePackage"] as! String, select: [0])
+    var writes: [[String: Any]] = []
+    for (name, tag) in extremes {
+        let before = document.project.json
+        let item = NSMenuItem(
+            title: "", action: #selector(EditorViewController.setMotionIn(_:)),
+            keyEquivalent: "")
+        item.tag = tag
+        controller.setMotionIn(item)
+        spin(0.8)
+        writes.append(["name": name, "before": before, "after": document.project.json])
+    }
+    // The VALIDATOR half, on the card whose In is EMPTY — the only fixture
+    // where "checks nothing" and "reads as None" differ — with None itself as
+    // the control. Built exactly as the validate loop above builds its items.
+    let empty = opened(spec["validatePackage"] as! String)
+    select(empty, [0])
+    let inspector = EditorViewController(document: empty)
+    var validates: [[String: Any]] = []
+    for (name, tag) in extremes + [("-1", -1)] {
+        let item = NSMenuItem(
+            title: "", action: #selector(EditorViewController.setMotionIn(_:)),
+            keyEquivalent: "")
+        item.tag = tag
+        let enabled = inspector.validateUserInterfaceItem(item)
+        validates.append(["name": name, "state": state(item.state), "enabled": enabled])
+    }
+    answer["extremes"] = ["count": n, "writes": writes, "validates": validates]
+}
+
 try! JSONSerialization.data(withJSONObject: answer, options: [.prettyPrinted, .sortedKeys])
     .write(to: out)
 exit(0)
@@ -660,12 +828,16 @@ def main():
         for name in ["the harness builds", "the wedges are inside the name strip",
                      "the arrival's wedge is as long as the arrival",
                      "the departure's wedge is as long as the departure",
-                     "a `during` draws a glyph and no wedge"]:
+                     "a `during` draws a glyph and no wedge",
+                     "the glyph lies left of the label dot",
+                     "…and gives way by at least 8 pt",
+                     "a clip with no video draws no wedge and no glyph"]:
             failure(name, error)
         binary = None
     renders = {}
     if binary:
-        for tag in ("wedges", "none", "during"):
+        for tag in ("wedges", "none", "during", "labelled", "labelled-none",
+                    "silent", "silent-none"):
             out, error = render(binary, fixtures[tag], os.path.join(CHROME, f"{tag}.png"))
             if error:
                 failure(f"the {tag} fixture renders", error)
@@ -718,6 +890,50 @@ def main():
         else:
             check("…an 11 pt glyph at the strip's right end", False, "nothing changed")
 
+    # N·2: the glyph gives way to the LABEL dot, and it does so by carrying
+    # what the dot branch decided rather than re-deriving it from `nameEnd`.
+    # Measured as the same LABELLED card with and without a `during`, so the
+    # dot is in both renders and the only pixels that differ are the glyph's.
+    if {"labelled", "labelled-none", "during", "none"} <= set(renders):
+        scale = renders["none"].scale
+        plain_boxes = clusters(changed_pixels(renders["none"], renders["during"]))
+        boxes = clusters(changed_pixels(renders["labelled-none"], renders["labelled"]))
+        print(describe(boxes, scale))
+        # The dot is 6 pt wide at the strip's right inset
+        # (`TimelineClipDrawing.swift`: `strip.maxX - padding - 6`, padding 6).
+        dot_left = CLIP_X1 - 12
+        if len(boxes) == 1 and len(plain_boxes) == 1:
+            _, _, x1, _ = points(boxes[0], scale)
+            _, _, plain_x1, _ = points(plain_boxes[0], scale)
+            check("on a LABELLED card the `during` glyph lies wholly LEFT of the "
+                  "label dot's columns",
+                  x1 <= dot_left,
+                  f"the glyph's right edge is x {x1:.1f}, the dot's left edge "
+                  f"x {dot_left} (the glyph's antialiasing included)")
+            check("…and it gives way by at least 8 pt against where it sits with no "
+                  "label",
+                  plain_x1 - x1 >= 8,
+                  f"x {x1:.1f} labelled against x {plain_x1:.1f} unlabelled "
+                  f"({plain_x1 - x1:.1f} pt)")
+        else:
+            check("on a LABELLED card the `during` glyph lies wholly LEFT of the "
+                  "label dot's columns", False,
+                  f"{len(boxes)} labelled clusters, {len(plain_boxes)} plain")
+            check("…and it gives way by at least 8 pt against where it sits with no "
+                  "label", False, "no single cluster to measure")
+
+    # The GATE. `hasPixels` is what the section and Clip ▸ Motion gate on, and
+    # the strip has to gate on the same thing: a detached audio twin clones the
+    # video props, motion included, and must not claim a motion it never shows.
+    if {"silent", "silent-none"} <= set(renders):
+        diff = changed_pixels(renders["silent-none"], renders["silent"])
+        check("a clip whose media has NO video draws no wedge and no glyph, "
+              "whatever its props say — the strip gates on `hasPixels`",
+              not diff,
+              "byte-identical to the same clip with no motion" if not diff
+              else f"{len(diff)} changed pixels: "
+                   f"{describe(clusters(diff), renders['silent-none'].scale)}")
+
     print("\n2 — the Motion section, open")
     if binary:
         shut, error = render(binary, fixtures["wedges"], os.path.join(CHROME, "shut.png"),
@@ -763,7 +979,7 @@ def main():
         return
 
     slot_selectors = [
-        {"selector": "setMotionIn:", "tag": tag} for tag in (5, -1)
+        {"selector": "setMotionIn:", "tag": tag} for tag in (5, -1, STRANGER_TAG)
     ] + [
         {"selector": "setMotionOut:", "tag": -1},
         {"selector": "setMotionDuring:", "tag": -1},
@@ -777,6 +993,11 @@ def main():
              "selectors": slot_selectors},
             {"name": "two that disagree", "package": fixtures["two"], "select": [0, 1],
              "selectors": slot_selectors},
+            # A card whose In slot is EMPTY, which is the only fixture where
+            # the two readings of a stranger tag differ: None checks `on`
+            # here, so a tag read AS None would check `on` too.
+            {"name": "no arrival", "package": fixtures["none"], "select": [0],
+             "selectors": slot_selectors},
         ],
         "rows": [
             {"name": "pulse", "package": fixtures["pulse"], "select": [0]},
@@ -787,6 +1008,15 @@ def main():
         ],
         "clearPackage": fixtures["pulse"],
         "insideAction": {"package": fixtures["action"], "playhead": TICKS // 2, "tag": 2},
+        "strangerPackage": fixtures["one"],
+        "strangerTag": STRANGER_TAG,
+        "notePackage": fixtures["one"],
+        "perClipPackage": fixtures["two"],
+        # N·1's extremes: the write half on the card whose In is SET, the
+        # validator half on the card whose In is EMPTY. The tags themselves
+        # are in the probe's source.
+        "extremes": {"writePackage": fixtures["one"],
+                     "validatePackage": fixtures["none"]},
     }
     answer, error = run_probe(probe_binary, request)
     if error:
@@ -840,6 +1070,15 @@ def main():
           two[("setMotionOut:", -1)]["state"] == "on"
           and two[("setMotionDuring:", -1)]["state"] == "on",
           str({f"{k[0]}{k[1]}": v["state"] for k, v in two.items()}))
+    # N·1, the VALIDATOR half. On a card whose In is EMPTY, None checks
+    # `on`; a tag no builder writes must check NOTHING, where the unfixed
+    # build read every negative tag as None and checked it `on` too.
+    none = by_name["no arrival"]
+    check(f"a menu tag no builder writes ({STRANGER_TAG}) checks nothing, where None "
+          "checks on — an empty slot is the only fixture where the two differ",
+          none[("setMotionIn:", -1)]["state"] == "on"
+          and none[("setMotionIn:", STRANGER_TAG)]["state"] == "off",
+          str({f"{k[0]}{k[1]}": v["state"] for k, v in none.items()}))
 
     pulse = motion_section(answer["rows"]["pulse"])
     drift = motion_section(answer["rows"]["drift"])
@@ -883,6 +1122,99 @@ def main():
           all("motion" not in (a["end"].get("video") or {})
               for a in project_after["actions"]),
           str([a["end"] for a in project_after["actions"]]))
+
+    # N·1, the WRITE half. The fixture's In is SET (`slide_up`, 0.5 s): the
+    # unfixed build answered nil for tag −7 and CLEARED it. On a clip with no
+    # In the same call is nil over nil, which `applying` answers `.identity`
+    # for — the bytes would match either way, so that fixture is not the row.
+    stranger = answer["stranger"]
+    check(f"a menu tag no builder writes ({STRANGER_TAG}) writes NOTHING — the "
+          "project is byte-identical, where reading it as None would have cleared "
+          "the clip's arrival",
+          stranger["before"] == stranger["after"],
+          "byte-identical" if stranger["before"] == stranger["after"]
+          else f"motion went from "
+               f"{json.loads(stranger['before'])['clips'][0]['video']['motion']} to "
+               f"{json.loads(stranger['after'])['clips'][0]['video']['motion']}")
+
+    # N·1's EXTREMES, which §12 checked by INSPECTION and recorded as owing a
+    # row. `Int.min`, `Int.max`, `count` and `count + 1` are the four tags
+    # that break a gate written as "negative means None" or as "≤ count";
+    # tag 0 on the same clip is the positive control, without which a gate
+    # that refused everything would pass all four.
+    extremes = answer["extremes"]
+    writes = {w["name"]: w for w in extremes["writes"]}
+    strangers = ("Int.min", "Int.max", "count", "count+1")
+
+    def in_kind(blob):
+        motion = json.loads(blob)["clips"][0]["video"]["motion"] or {}
+        return ((motion.get("in") or {}).get("kind"), motion.get("out"),
+                motion.get("during"))
+
+    quiet = [n for n in strangers if writes[n]["before"] == writes[n]["after"]]
+    zero = writes["0"]
+    before_kind, _, _ = in_kind(zero["before"])
+    after_kind, after_out, after_during = in_kind(zero["after"])
+    control = (before_kind == "slide_up" and after_kind == "fade"
+               and after_out is None and after_during is None)
+    check(f"the four extreme tags (count is {extremes['count']}) write NOTHING, and "
+          "tag 0 on the same clip writes its kind — the control that says the gate "
+          "is not refusing everything",
+          len(quiet) == 4 and control,
+          "; ".join(
+              f"{w['name']}: " + ("no write" if w["before"] == w["after"]
+                                  else f"in {in_kind(w['before'])[0]} → "
+                                       f"{in_kind(w['after'])[0]}")
+              for w in extremes["writes"]))
+
+    # The same five through the VALIDATOR, on the card whose In is empty,
+    # with None as the control: a tag no builder writes checks NOTHING, where
+    # a gate that read it as None would check it `on` exactly as −1 is.
+    validates = {v["name"]: v for v in extremes["validates"]}
+    check("…and none of the five checks anything in the menu, where None (−1) "
+          "checks on",
+          validates["-1"]["state"] == "on"
+          and all(validates[n]["state"] == "off" for n in strangers + ("0",)),
+          "; ".join(f"{v['name']}: {v['state']}"
+                    + ("" if v["enabled"] else " (disabled)")
+                    for v in extremes["validates"]))
+
+    # N·3. The band's second pill is about the CLIP's `during`, not about
+    # the moment the mode was armed.
+    note = answer["note"]
+    if not note["armed"]:
+        print("  note: the zoom region mode could not be armed in the harness "
+              "(regionTarget needs previewCanvas.box(for:)), so the note's two "
+              "claims are UNREACHED here — road map 5 §12, N·3")
+    else:
+        trail = note["trail"]
+        check("the zoom band's note is nil on a clip with no `during`, and APPEARS "
+              "when one is added while the band is armed",
+              len(trail) >= 2 and trail[0] == "" and trail[1] == note["expected"],
+              f"{trail[:2]}")
+        check("…and goes again when the `during` is cleared, the band never "
+              "having been re-armed",
+              len(trail) >= 3 and trail[1] == note["expected"] and trail[2] == "",
+              f"{trail}")
+
+    # One op PER CLIP, and one undo step. The two cards disagree about their
+    # arrival, so a batch that sent one op over every id would leave them both
+    # carrying the LAST clip's whole motion object.
+    per = answer["perClip"]
+    after = json.loads(per["after"])["clips"]
+    arrivals = [(c["video"]["motion"] or {}).get("in", {}).get("kind") for c in after]
+    durings = [(c["video"]["motion"] or {}).get("during", {}).get("kind")
+               for c in after]
+    check("During ▸ * over TWO clips writes one op PER CLIP: each keeps its own "
+          "arrival while both gain the during",
+          arrivals == ["slide_up", "fade"] and durings == ["pulse", "pulse"],
+          f"arrivals {arrivals}, durings {durings}")
+    check("…and the whole batch is ONE undo step, which puts `project.json` back "
+          "byte for byte",
+          per["undone"] == per["before"] and per["after"] != per["before"],
+          f"undo name {per['name']!r}; restored "
+          f"{per['undone'] == per['before']}, and the write did change it "
+          f"{per['after'] != per['before']}")
 
     if WARNINGS:
         print("\nharness warnings (a render that never settled):")

@@ -370,6 +370,28 @@ when a fix took each over its line — and left two files AT the cap:
 | `ExporterWriter.swift` | 1114 | Over since phase 7; its seam — the settings/encoder half — is still unpaid |
 | `AgentServer+Clips.swift` | 1196 | Over since phase 6. Road map 7's D1·3, D1·4 and D1·5 took it to **847** by deleting what the agent door used to check by hand — the last of it `checkActionPatch`, `checkVideoEnums`, `checkTextEnums`, the three per-group key sets and the region reader. D1·6 took the shared launder out of `AgentServer+Arguments.swift` (562 → **445**, under the cap and not in the list above), so the whole `AgentServer*` family is **617 lines smaller than before D1**. The seam still unpaid here is the clip-placement handlers against the property doors |
 
+**What the E2 reader review did to it** (2026-09-20, `wc -l`; road map 5
+§12). Six product files were touched and NONE joined the list. In the core,
+`motion.rs` **456 → 483** (nine lines of module doc and four of arithmetic
+for the reduction's own 360, then fourteen more when the fix pass widened
+that reduction to a chosen band under a whole turn — chosen, NOT a
+consumer's precision; road map 5 §12's closing block — then **491** when the
+residue run restated the reason) and `edit_props.rs` **328 → 356** (the
+`normalise_and_check_group` the paste side has no room to hold), then
+**363** when the residue run restated its doc comments; the paste
+side itself paid nothing, because the fix was a one-line call swap and
+`edit_paste.rs` is **599, unchanged** — the "one line of room" file stayed
+at one line of room, which is the whole point of putting the body next to
+`check_group`. In the app, `EditorViewController+Motion.swift` **151 →
+176**, `EditorViewController+ZoomRegion.swift` **482 → 502** and
+`TimelineClipDrawing.swift` **450 → 454**, all well under. One new test
+file, `core/tests/motion_edges.rs` (**285**, then **370** for the fix pass's
+seventh test, then **375** when the residue run restated the reason, of the
+400-line cap a new file gets), and `tools/proof/e2_chrome.py` **901 →
+1138**, then **1233** when the residue run added N·1's two extremes rows,
+which is a proof script and not held to the cap
+(`designs/reelcut-roadmap-7.md` §2.4).
+
 **None of this is work on its own.** It is the list a feature phase consults
 so it pays the toll first and alone, the way `d69de99`, `b410125` and
 `3e5b598` did.
@@ -468,8 +490,12 @@ and the closing above added the rest.
 - **Transitions and motion, watched and heard** — road map 5 §4g's and
   §6g's checks, now that §4e's and §6e's instruments have landed
   (`e1_proof.py` 99/99, `e2_proof.py` 61/61, `e1_chrome.py` 21/21,
-  `e2_chrome.py` 24/24; E1's two are at their post-review counts of
-  2026-09-20, road map 5 §12, and `transition_sheet_probe.py` is 39/39).
+  `e2_chrome.py` 35/35; all four are at their post-review counts of
+  2026-09-20, road map 5 §12 — E1's review moved `e1_proof.py` and
+  `e1_chrome.py`, E2's took `e2_chrome.py` from 24/24 to 33/33 and its
+  residue run of 2026-09-20 to 35/35, with the four N·1 rows, the two N·2
+  rows, the two N·3 rows, the per-clip write and its undo control, and the
+  strip's `hasPixels` gate — and `transition_sheet_probe.py` is 39/39).
   §4g: a crossfade across a Remove
   Silences cut sounding even rather than dipped or bumped; an eased push
   FEELING better than the linear one; the Transition submenu at a hard cut
@@ -481,7 +507,12 @@ and the closing above added the rest.
   overshoot reads as a pop; that the Preview button loops the clip; whether
   a drag begun mid-motion is tolerable, since the inspector and the canvas
   see the clip UN-MOVED while the picture moves; and that the wedges read at
-  S, M and L track heights — `e2_chrome.py` measures them at M only.
+  S, M and L track heights — `e2_chrome.py` measures them at M only. Two more
+  since the E2 reader review measured what no row reaches (road map 5 §12,
+  R4·1 and R4·2): whether a `spin` turns the way the table says it does on
+  screen — no MCP row can see the DIRECTION, because a card's bounding box is
+  the same at +45° and −45° — and whether a slide on a clip INSIDE a nest
+  leaves by the nest's own edge rather than the project canvas's.
 - **The Keychain prompt road map 6's spike met and could not read**
   (`designs/reelcut-roadmap-6.md` §3 q7, run 2026-09-20). A login-keychain
   item added by one ad-hoc-signed build and read by the NEXT one — a
@@ -535,6 +566,28 @@ sceptic, 2026-09-20. It is labelled `bug` and deliberately NOT
 ceiling on `start` in the core's own op, refused in the rule's own sentence,
 or overflow-safe arithmetic in the app, which changes nothing a caller can
 see. A person picks one and records it before any code.
+
+**Two findings of the E2 reader review, filed and not fixed**
+(`designs/reelcut-roadmap-5.md` §12, R2·3 and R3·2; 2026-09-20).
+**kpgalligan/reelcut#26** — `set_canvas {"fps": [24,1]}` on a 30 fps project
+re-snaps every clip, action and marker time and leaves `video.motion`'s
+`duration` and `period`, and `text.animation`'s two timings, exactly where
+they were: on a 25,000-tick grid a stored 20,000 is sub-frame, against
+`core/CLAUDE.md`'s Times rule. `paste`'s re-snap from another rate has the
+same hole. Nothing renders wrong — `motion::apply` interpolates continuously
+and never reads the grid — so what is broken is the invariant and what an
+inspector shows. Not fixed here because the root, `core/src/edit_canvas.rs`,
+was outside that review's file list and because text's timings are in the
+same position; labelled `bug`.
+**kpgalligan/reelcut#27** — a motion slot with `duration: 0` is legal
+(`ticks_positive_or_zero`), INACTIVE in the core (`motion.rs`'s
+`arrive > 0.0` filter) and LIVE in three places in the app: the strip draws
+the 2 pt minimum wedge, the section shows the kind with In Duration live, and
+Clip ▸ Motion checks it. **Where the answer belongs is a spec §11 decision** —
+refuse 0 at the door, normalise the slot away like the all-`None` motion
+beside it, or stop claiming it in the UI — and `text.animation`'s
+deliberately 0-legal timings argue both ways. Labelled `bug` AND `spec`, and
+deliberately not `ready-for-agent`.
 
 **One pre-existing defect nothing can reach**, found by the probe deepening
 D2·2 built and named here because that ticket said it belonged in this

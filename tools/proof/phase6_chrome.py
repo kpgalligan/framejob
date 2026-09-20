@@ -182,10 +182,14 @@ HEIGHT = 862
 #         against a runner-up 120 rows worse. Section 4 SCORES that margin
 #         rather than trusting it.
 #
-# 1600 measures identically to 1400, which is what says the number is a
-# threshold and not a resonance. It is 1600 since road map 5's E2 put a shut
-# Motion header after Obscure: at 1400 the four-stop fixture's OPEN stack no
-# longer fitted the pane and relaid out the panel (grad-4 495/495, 68/70).
+# It is 1600 since road map 5's E2 put a shut Motion header after Obscure: at
+# 1400 the four-stop fixture's OPEN stack no longer fitted the pane and relaid
+# out the panel (grad-4 495/495, 68/70). This used to add that "1600 measures
+# identically to 1400, which is what says the number is a threshold and not a
+# resonance"; E2 made that false, and the E2 reader review (road map 5 §12,
+# N·4) took the sentence out rather than leave a claim no run backs. What
+# would earn it back is a render of one fixture at TALL + 200 whose solved
+# body height equals TALL's, scored as a row of its own.
 TALL = 1600
 # The band under the section starts this far below its header. It must clear
 # the tallest body any fixture here has (235 pt, four stops) or the
@@ -1037,8 +1041,8 @@ def main():
     print(f"rendered {len(renders)} PNGs in {time.time() - start:.1f} s")
 
     start = time.time()
-    # Decoded on first use, not up front: a 1440 x 1400 render is a
-    # 2880 x 2800 PNG and this file's decoder is pure Python, so the renders
+    # Decoded on first use, not up front: a 1440 x 1600 render is a
+    # 2880 x 3200 PNG and this file's decoder is pure Python, so the renders
     # that are only ever compared BYTE for byte (`identical`, which reaches
     # for pixels only when the bytes already differ) are never decoded at all.
     images = LazyImages(renders)

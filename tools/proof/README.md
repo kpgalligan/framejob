@@ -3456,13 +3456,24 @@ here are measured against.
   preset's 960 × 540: an image format is written with the picture fitted
   inside the size, aspect kept and never upscaled (`core/src/export_size.rs`).
 
-`python3 tools/proof/e2_chrome.py`, no port, **24/24**.
+`python3 tools/proof/e2_chrome.py`, no port, **35/35** (24/24 until the E2
+reader review of 2026-09-20 added nine rows, and its residue run two,
+`designs/reelcut-roadmap-5.md` §12).
 
 * **The wedges**, measured as the pixels that differ from the same card with
   no motion: an arrival's triangle over x 132–174 and a departure's over
   279–300 on a four-second card at the default 42 pt/s zoom, both inside the
   16 pt name strip. A `during` draws no wedge at all — it is continuous and
   has no length to show — and one 11 pt glyph at the strip's right end.
+  Beside them, from the E2 reader review: the glyph GIVES WAY to a label dot,
+  measured as the same LABELLED card with and without a `during`, so the dot
+  is in both renders and the only pixels that differ are the glyph's — its
+  right edge lands at x 285.0 against the dot's left edge at x 288, and 10.0
+  pt left of where it sits unlabelled (N·2); and the strip's GATE, a clip
+  whose media declares `has_video: false` carrying a full motion in its props
+  and rendering BYTE-IDENTICAL to the same clip with none, which is the only
+  fixture shape that exercises `InspectorTab.hasPixels` — every other clip
+  here is a shape clip, and shape clips always have pixels (R4·4).
 * **The section**, opened with `expandSections=video.motion`: the changed
   pixels are inside the inspector column and span a body at least seven rows
   deep. It is rendered at 1600 pt rather than 862: Motion is the tenth
@@ -3472,7 +3483,13 @@ here are measured against.
   Out and `DuringMotion.allCases` in During with None at −1, every one dead
   with nothing selected, the stored kind checked and the empty slots
   checking None — and two clips that DISAGREE checking nothing at all in
-  that slot while still checking None in the slots they agree on.
+  that slot while still checking None in the slots they agree on. And, from
+  the E2 reader review, a tag NO builder writes: −7 checks nothing on a card
+  whose In slot is empty, which is the one fixture where that differs from
+  None (None checks `on` there); anywhere else the two readings look alike,
+  and the EXTREMES of the same rule — `Int.min`, `Int.max`, `count`, `count
+  + 1` and `0` — all check `.off` on that card with None beside them as the
+  control, added by the review's residue run (N·1).
 * **The rows and their liveness**: the seven labels in order, and Period,
   In Duration and Amount live or dead according to what the clip carries —
   each read on a fixture that HAS the thing and on one that does not, so
@@ -3480,12 +3497,30 @@ here are measured against.
   arrival and no `during` at all.
   Liveness is read off `alphaValue` (1, or 0.42 when the row is off), since
   a control's own `isActive` is private.
-* **Two commands in a real window**: During ▸ None clearing the during and
+* **Commands in a real window**: During ▸ None clearing the during and
   KEEPING the arrival (a `motion` patch replaces the whole object, so the
   command has to carry the other two slots), and the section's In popup —
   driven by ObjC dispatch on `itemPicked:`, the message the menu itself
   sends — writing the clip's BASE motion with the playhead inside an action
-  and leaving that action's `end` with no `motion` in it.
+  and leaving that action's `end` with no `motion` in it. The E2 reader
+  review added three more, and its residue run a fourth. A tag no builder
+  writes (−7) sent to `setMotionIn:` on a card whose In IS set leaves
+  `project.json` byte-identical, where reading every negative tag as None
+  cleared it — the fixture matters, because on a card with no In the same
+  call is nil over nil and the bytes match either way (N·1). The residue run
+  put the four EXTREME tags through the same door on the same card —
+  `Int.min`, `Int.max`, `count` and `count + 1`, none of which writes a byte
+  — with tag `0` last as the positive control, since a gate that refused
+  everything would pass the other four (N·1). During ▸ * over TWO clips that
+  disagree about their arrival writes one op PER CLIP: each keeps its own
+  arrival while both gain the during (R4·3) — and beside it, as a CONTROL
+  rather than a made-to-fail row, one undo puts `project.json` back byte for
+  byte, which no mutant of the app's own code can falsify, because
+  `NSUndoManager` groups by run-loop turn (measured: a batch split into one
+  `applyEdit` per op is still one undo step). And the zoom band's second
+  pill FOLLOWS the clip: armed over a clip with no `during`, the trail
+  across a During ▸ Pulse and a During ▸ None is `['', '<the note>', '']`,
+  the band never re-armed (N·3).
 
 **Twenty-five mutants**, each in a copy of the tree under a scratch
 directory with the app rebuilt in the copy on its own port, every patch
@@ -3503,6 +3538,28 @@ tent removed, the pivot compensation removed, the split rule removed, the
 `structural` not widened, `drift` using the period. Every score is in
 `designs/reelcut-roadmap-5.md` §12, with the rows each one took.
 
+**The E2 reader review added nineteen more** (2026-09-20, same shape, same
+scratch copy, every patch asserting one occurrence): eight NAMED mutants of
+today's tree for reader 4's table — no motion at all, the spins reversed, y
+up, departures never running, a nest clip's own motion dropped, every
+container the project canvas, the menu writing one op over every id, and the
+strip's gate and its measure gone — and eleven more that are this review's
+own fixes REVERTED or bounded: the reduction's 360 not mapped back, that
+same reduction narrowed back to its FIRST attempt (an exact `== 360.0`,
+which the fix pass replaced with a band, tested as an f32 of degrees, and
+which fails `motion_edges` 2 of 7), the paste normalisation removed, the
+same normalisation made too wide, the patch path's range check removed, both
+halves of the negative-tag fix, the pinned `let right = strip.maxX -
+padding`, that glyph fix simply REVERTED, the zoom note not re-read, a batch
+split into one `applyEdit` per op, and — from the residue run — `N1ext`, the
+negative-tag gate widened back to N·1's own defect, which kills the two
+extremes rows and the two −7 rows with them (31/35). Two of those eleven
+kill nothing and say so: the batch split (its row is a control) and the
+plain glyph revert, which is pixel-identical BY CONSTRUCTION and is the
+reason that fix is recorded as a fragility rather than a defect. Two of the
+eight named mutants pass `e2_proof.py` entirely, and that is what the two
+limits below say.
+
 Three of those mutants SURVIVED their first fixture and the fixture was
 strengthened rather than the mutant excused, which is worth knowing before
 writing another row here: a whole `spin` reduces to a rotation the
@@ -3512,6 +3569,22 @@ a field DEFAULT, so the card had to be moved off the origin; and an action's
 end patch that differs only by a KIND leaves the same picture at every tick,
 because the action loop interpolates and a string it can only take whole, so
 the patch had to differ by a number.
+
+**Two things `e2_proof.py` cannot see, measured rather than guessed** (road
+map 5 §12, R4·1 and R4·2). A mutant that turns every spin the OTHER way
+scores **61/61**: §4's rows are an eighth-turn bounding box and a whole
+period byte-identical to no motion, and neither can see a DIRECTION — a
+card's bounding box at +45° and −45° is the same rectangle, a whole turn
+reduces to 0 either way, and the fixtures are rectangles symmetric about
+their own centre. A mutant that measures every container against the PROJECT
+canvas scores **61/61** too: §5's nest rows are about a nest CLIP's own
+arrival, and none is about a clip INSIDE a nest sliding against the nest's
+frozen canvas. Both properties are pinned through the FFI in
+`core/tests/motion.rs` and `core/tests/motion_edges.rs`, so they are proved
+— just not over MCP. Closing the first needs a CROPPED fixture, where the
+pivot compensation makes the drawn position depend on the sign of φ; closing
+the second needs a nest whose canvas differs from the project's and a render
+part-way through the slide. Neither row was written.
 
 What neither pair can see is in `designs/reelcut-remaining.md` §4: a
 crossfade across a Remove Silences cut HEARD, an eased push FELT, the three

@@ -1990,3 +1990,28 @@ other cross-thread value here is an `NSLock` or a main hop.
 Colors/fonts/metrics come from `DS` tokens; shared controls
 go in `Controls.swift`. Refusals beep (`NSSound.beep()`), errors never
 crash. 4-space indent, ~100 columns.
+
+## Three Motion files, 2026-09-20 — the E2 reader review's nits
+
+`EditorViewController+Motion.swift` (151 → 176). N·1: the tag gate was
+`guard tag < 0 || tag < count`, so ANY negative tag was read as None and a
+tag of −7 CLEARED a clip's arrival; the validator's `kindAt` said None for it
+too. None is now exactly `Self.motionNoneTag`, and `slotAt` answers
+three-valued — a kind, None, or nothing at all for a tag no builder writes.
+The commit's other change is a comment: the batch's "a mixed one lands" was
+true of two of `applying`'s three answers and silent about the `Err` that
+THROWS, which a clip already carrying an out-of-range value produces (R3·1).
+
+`TimelineClipDrawing.swift` (450 → 454). N·2: the `during` glyph inferred the
+label dot's place from `nameEnd`, which is exact today and only because the
+dot branch is the last thing to move `nameEnd` before it. It now carries what
+that branch decided, in a `dotLeft` of its own. **The fix moves no pixel**,
+so its proof rows pass with the fix reverted by construction; what fails them
+is the pinned mutant, the one `let right =` line replaced whole.
+
+`EditorViewController+ZoomRegion.swift` (482 → 502). N·3: the zoom band's
+second pill was computed once at arm time into a `let`, and `syncRegionMode`
+keeps the mode armed while the same clip stays the target — so a `during`
+added or cleared while armed left the pill stale. `regionNote(_:clip:)` is
+now re-read in `syncRegionMode`, where every `refreshCanvas` passes, and
+`note` is a `var` that redraws on change.

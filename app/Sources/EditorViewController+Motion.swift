@@ -12,6 +12,12 @@ import AppKit
 /// two slots; the ops go as one edit, so a selection is one undo step.
 extension EditorViewController {
 
+    /// The one tag that means None. `motionSlotMenu`
+    /// (`AppDelegate+Menus.swift`) writes it and nothing else negative, so a
+    /// tag that is neither this nor an index into the vocabulary came from
+    /// nowhere this app knows and is refused rather than read as None.
+    static let motionNoneTag = -1
+
     // MARK: - Commands
 
     /// The sender's tag indexes `EdgeMotion.allCases`; −1 is None.
@@ -64,7 +70,12 @@ extension EditorViewController {
             return
         }
         let count = slot == .during ? DuringMotion.allCases.count : EdgeMotion.allCases.count
-        guard tag < 0 || tag < count else {
+        // None is EXACTLY −1, the one negative tag `motionSlotMenu` writes
+        // (`AppDelegate+Menus.swift`). Any other tag out of range is a
+        // stranger — an item nothing in this app built — and clearing a
+        // person's arrival because a tag was −7 is a write they did not ask
+        // for. It beeps and writes nothing.
+        guard tag == Self.motionNoneTag || (tag >= 0 && tag < count) else {
             NSSound.beep()
             return
         }
@@ -82,13 +93,21 @@ extension EditorViewController {
             }
             ops.append(.setVideo(clips: [clip.id], patch: VideoPatch(motion: .some(next))))
         }
-        // An all-identity batch is the core's refusal and beeps; a mixed one
-        // lands (`ReelProject.applying` runs later ops past an identity).
+        // Three answers, not two. An all-identity batch is the core's refusal
+        // and beeps; a mixed one LANDS (`ReelProject.applying` runs later ops
+        // past an identity). But `set_video` re-checks the whole stored group,
+        // so a clip already carrying an out-of-range value — `paste` does not
+        // range-check its payload — makes the op an `Err`, `applying` THROWS,
+        // and the batch lands nothing and puts up the core's own message
+        // (`core/tests/motion_edges.rs`'s
+        // `a_motion_patch_on_a_clip_already_out_of_range_is_an_error`).
         document.applyEdit("Set Motion", ops)
     }
 
     /// A chosen kind keeps the slot's stored duration, else `MotionEdge()`'s
-    /// 0.5 s — the section's rule.
+    /// 0.5 s — the section's rule. The caller's gate has already refused
+    /// every tag but None and a real index, so `tag >= 0` is exactly "not
+    /// None" here.
     private func edge(_ tag: Int, keeping stored: MotionEdge?) -> MotionEdge? {
         guard tag >= 0 else { return nil }
         let kind = EdgeMotion.allCases[tag]
@@ -96,6 +115,7 @@ extension EditorViewController {
     }
 
     /// A chosen kind keeps the stored amount and period, else the defaults.
+    /// The caller's gate has already refused a stranger, as in [`edge`].
     private func during(_ tag: Int, keeping stored: MotionDuring?) -> MotionDuring? {
         guard tag >= 0 else { return nil }
         let base = stored ?? MotionDuring()
@@ -125,13 +145,13 @@ extension EditorViewController {
         switch action {
         case #selector(setMotionIn(_:)):
             let shared = sharedMotionKind { $0?.inEdge?.kind }
-            menuItem?.state = checked(shared, tagged: kindAt(EdgeMotion.allCases, tag))
+            menuItem?.state = checked(shared, tagged: slotAt(EdgeMotion.allCases, tag))
         case #selector(setMotionOut(_:)):
             let shared = sharedMotionKind { $0?.out?.kind }
-            menuItem?.state = checked(shared, tagged: kindAt(EdgeMotion.allCases, tag))
+            menuItem?.state = checked(shared, tagged: slotAt(EdgeMotion.allCases, tag))
         case #selector(setMotionDuring(_:)):
             let shared = sharedMotionKind { $0?.during?.kind }
-            menuItem?.state = checked(shared, tagged: kindAt(DuringMotion.allCases, tag))
+            menuItem?.state = checked(shared, tagged: slotAt(DuringMotion.allCases, tag))
         case #selector(previewClipMotion(_:)):
             break
         default:
@@ -140,12 +160,17 @@ extension EditorViewController {
         return !motionTargets.isEmpty
     }
 
-    private func kindAt<K>(_ kinds: [K], _ tag: Int) -> K? {
-        kinds.indices.contains(tag) ? kinds[tag] : nil
+    /// What a tag SAYS, in the same three-valued shape `sharedMotionKind`
+    /// answers in: `.some(kind)` for an index into the vocabulary,
+    /// `.some(nil)` for None, and nil for a tag no builder writes — which
+    /// checks nothing rather than reading as None.
+    private func slotAt<K>(_ kinds: [K], _ tag: Int) -> K?? {
+        if tag == Self.motionNoneTag { return .some(nil) }
+        return kinds.indices.contains(tag) ? .some(kinds[tag]) : nil
     }
 
-    private func checked<K: Equatable>(_ shared: K??, tagged: K?) -> NSControl.StateValue {
-        guard let shared = shared else { return .off }
+    private func checked<K: Equatable>(_ shared: K??, tagged: K??) -> NSControl.StateValue {
+        guard let shared = shared, let tagged = tagged else { return .off }
         return shared == tagged ? .on : .off
     }
 }

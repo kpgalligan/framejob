@@ -38,7 +38,15 @@
 //! added, so a whole turn is EXACTLY no turn. Without it a rotation of 360
 //! would reach Swift as `Float(360·π/180)`, whose `sin` is ~1.7e-7 rather
 //! than 0 (`Compositor.swift`), and `partnerBox`'s `rotation == 0` guard
-//! would read the layer as rotated.
+//! would read the layer as rotated. `rem_euclid` alone is not enough — it
+//! adds 360 to a negative remainder and a tiny negative one ROUNDS UP to
+//! exactly 360, or to a double a hair under it, and that guard compares the
+//! recipe's f64 to an EXACT 0, so either one reads as rotated. So a band under
+//! a whole turn is published as no turn. The band CHOSEN is "rounds to 360 as
+//! an f32 of degrees", 2⁻¹⁶ of a degree: no consumer reads degrees into an f32
+//! (the one f32 is the uniform above, in RADIANS), and what justifies it is
+//! that it moves the corner of a 4K frame, 2202.9 px from a centred pivot, by
+//! at most 5.87e-4 px (`core/tests/motion_edges.rs`).
 //!
 //! **The pivot is the VISIBLE centre.** The core's placement rule (★,
 //! `edit_zoom.rs`) pivots on the UNCROPPED anchor, so a zoom or a spin
@@ -378,7 +386,34 @@ pub(crate) fn apply(
         opacity_factor *= term.o;
     }
     let phi = if phi.is_finite() {
-        phi.rem_euclid(360.0)
+        // `rem_euclid` alone cannot keep the reduction's promise: it is
+        // `let r = self % rhs; if r < 0.0 { r + rhs.abs() } else { r }`, and
+        // for a φ of −2e-14 that addition ROUNDS UP to exactly 360.0 — the
+        // one value the reduction exists to prevent. An arrival `spin` one
+        // tick from its end produces exactly that φ.
+        let reduced = phi.rem_euclid(360.0);
+        // And a double merely NEAR 360 is no better than 360 itself, because
+        // `Compositor.swift`'s `partnerBox` guard tests `rotation == 0`
+        // EXACTLY, on the recipe's f64 (`RecipeLayer.rotation` is a `Double`):
+        // a layer that is unrotated to the eye has to publish an exact zero,
+        // and the same arrival one tick earlier reaches 359.99999999999994,
+        // which fails that guard exactly as 360.0 does. So a BAND under a
+        // whole turn is published as no turn. The band is CHOSEN, not read off
+        // a consumer: "rounds to 360 as an f32 of DEGREES", a convenient
+        // conservative width of 2⁻¹⁶ of a degree (1.5259e-5°). No f32 of
+        // degrees exists anywhere: the one f32 is the Metal uniform,
+        // `Float(rotation · π/180)`, RADIANS, which conflates only doubles
+        // within 3.64e-6° of a turn (a band 4.2× narrower) and which the guard
+        // never sees. What justifies the width is the PICTURE: 1.5259e-5°
+        // moves the corner of a 4K frame (√(1920² + 1080²) = 2202.9 px from
+        // its centre) by at most 5.87e-4 px. What the rule actually moves is
+        // 1.998e-14° one tick from an arrival's end and 1.0e-5° at the
+        // `during` `core/tests/motion_edges.rs` pins.
+        if reduced as f32 >= 360.0 {
+            0.0
+        } else {
+            reduced
+        }
     } else {
         0.0
     };
