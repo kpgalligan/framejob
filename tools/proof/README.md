@@ -2230,10 +2230,15 @@ section 3 reads the segment-sized `stopCeiling(segments:)` and the
 `filesClause` sentence off the tool's source, and the granted tier's
 detection call asserts the result's SHAPE — `pauses == 0`, one `segments`
 entry equal to the top level with its own `width`/`height`/`fps`, a
-`started_at` that parses as ISO-8601 UTC within a minute of the call. On this
-host it is **187/187** with the two tone rows skipped by name (the headless
-tier 121, the granted 66 — 9 detection, 44 landing, 13 microphone); expect
-121 plus a counted skip on an ungranted or locked machine. Its honest limit:
+`started_at` that parses as ISO-8601 UTC within a minute of the call. With a
+granted, unlocked console it is **187/187** with the two tone rows skipped by
+name (the headless tier 121, the granted 66 — 9 detection, 44 landing, 13
+microphone); on THIS host it is **186/187**, because the default INPUT is a
+Bluetooth headset whose capture session starts 150–200 ms late, so the
+microphone file arrives short at the head and the head-loss row FAILS —
+deliberately not skipped the way the Bluetooth OUTPUT's tone rows are, since
+that row is the one thing that catches a real head loss; expect 121 plus a
+counted skip on an ungranted or locked machine. Its honest limit:
 with ONE segment the "segment equals top level" rows cannot tell a build that
 copied the top level into the segment from one that did not — the two-segment
 shape is `recording_probe.py`'s, whose granted tier records for real. It
@@ -2874,7 +2879,7 @@ Road map 4's S1 — quiet judged by Silero VAD through Core ML — and the two
 instruments §4g owes it, landed 2026-09-19 against the unmodified tree.
 
 `python3 tools/proof/silence2_proof.py [port] [--remake]`, port 4823 by
-default, **60/60**, against a running instance. It makes its own fixtures
+default, **61/61**, against a running instance. It makes its own fixtures
 (above), and then measures claims 1–11:
 
 * **1, the clean fixture.** The default voice answer is compared three ways.
@@ -2888,8 +2893,16 @@ default, **60/60**, against a running instance. It makes its own fixtures
   `set_canvas fps=[100, 1]` canvas, where one frame IS one bucket so the snap
   absorbs nothing — the row the max→mean mutant is scored on. The walk
   carries the segment's own `source_duration` rather than assuming it equals
-  the clip's duration: a whole clip's duration is `snapped(media.duration)`,
-  so off the grid the two differ and `sourceTick` drifts.
+  the clip's duration; for a whole-file clip at rate 1 the two now AGREE —
+  its duration is the media's snapped DOWN (spec §11,
+  kpgalligan/reelcut#22) — and one row asserts exactly that, the rate being 1
+  the reason claim 11 can compare bytes. Which leaves the scale factor
+  `sourceTick` divides by an identity in every row above, so **1(d)** runs
+  the clean clip once more at **×2**, the one place in the suite where
+  `source_duration` (6 233 613) and `duration` (3 120 000) differ and their
+  ratio is not even a whole 2: the answer is still the walk over THAT segment
+  tick for tick. A build with the factor dropped from `MediaPeaks.sourceTick`
+  scores **60/61**, taking 1(d) and nothing else (measured 2026-09-19).
 * **2, `hum3.wav`** — the headline. A −32 dBFS hum the shipped rule is blind
   to: level at −40 answers NOTHING, voice answers both pauses, within 0.10 s
   of the bounds it found in the clean file.
@@ -2926,10 +2939,15 @@ default, **60/60**, against a running instance. It makes its own fixtures
   before the handler runs.
 * **11, the cut.** `ripple_delete_ranges` of the voice answer, exported as
   `audio_wav`: the decoded PCM is the uncut export with each span excised,
-  BYTE identical. The clip is trimmed to the last whole frame inside the file
-  first — otherwise its `snapped` duration outruns the source, the plan plays
-  it at 0.9990 and AVFoundation's resampler, not the cut, is what gets
-  measured (two exports of the same material drift about seventeen samples).
+  to the SAMPLE and then BYTE for byte. The clip needs no trim now — the core
+  snaps a media clip's length DOWN, so a whole-file clip lands on the last
+  whole frame inside the file and the plan plays it at rate 1 (spec §11,
+  kpgalligan/reelcut#22); the section's first row asserts that length, which
+  is what the trim used to buy. Against a build that kept the nearest snap
+  the clip outruns the source, the plan plays it at 0.9990 and AVFoundation's
+  resampler is what gets measured — that build scores **57/61**, taking this
+  row, the two beside it and claim 1's rate row (two exports of the same
+  material came out eight sample frames apart there on 2026-09-19).
 * **5, LAST**, because it opens eighteen more documents: `phase3_proof.py`
   and `phase3_silence_scope.py` run as subprocesses against the same binary
   and must score FULL. Their counts are printed rather than asserted.
@@ -2984,7 +3002,9 @@ modes and four processes:
 **Made to fail on purpose**, ten times, each mutant a copy of the tree with
 the app rebuilt in the copy on its own port and the probe compiled from the
 copy (the staticlib is copied in unchanged — every mutation is in
-`app/Sources`). Against the MCP half's 60: the level fallback removed
+`app/Sources`). Against the MCP half's N at the time, 60 — claim 1(d) took
+it to 61 later on 2026-09-19 and none of these three were re-run: the level
+fallback removed
 **52/60** (claim 4's tone rows and phase 3's re-run), the window test made
 whole-file **57/60** (claim 4's two-clip tone rows alone), and the fallback
 keyed per MEDIA — the pre-fix read — **59/60** (the two-clip variant's VOICE

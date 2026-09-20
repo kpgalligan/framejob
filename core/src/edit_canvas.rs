@@ -102,15 +102,28 @@ fn rescale(project: &mut Project, old_width: u32, old_height: u32) {
 /// clip start and duration, every action span and every marker time has to
 /// move to the nearest new boundary.
 ///
-/// Two clamps keep the result valid: a duration that would round to zero
-/// becomes one frame (a zero-length clip is what `validate` rejects), and
-/// an action is kept inside its clip.
+/// Three clamps keep the result valid: a media clip's duration is held to
+/// the source it still has, snapped DOWN to the new grid, so a coarser rate
+/// cannot round a whole-file clip past the end of its file (spec §11); a
+/// duration that would round to zero becomes one frame (a zero-length clip
+/// is what `validate` rejects), which is the ONE case the source bound
+/// cannot hold and `evaluate.rs`'s clamp covers; and an action is kept
+/// inside its clip.
 fn resnap(project: &mut Project) {
     let fps = project.canvas.fps;
     let frame = project.frame();
-    for clip in project.clips.iter_mut() {
+    // By index: the source bound is read off the PROJECT (the clip's media)
+    // while the clip itself is about to be mutated.
+    for index in 0..project.clips.len() {
+        let available = project
+            .source_length(&project.clips[index])
+            .map(|length| time::snap_down_to_frame(length, fps));
+        let clip = &mut project.clips[index];
         clip.start = time::snap_to_frame(clip.start, fps).max(0);
         clip.duration = time::snap_to_frame(clip.duration, fps).max(frame);
+        if let Some(available) = available {
+            clip.duration = clip.duration.min(available).max(frame);
+        }
         let last_start = clip.duration.saturating_sub(frame).max(0);
         for action in clip.actions.iter_mut() {
             action.start = time::snap_to_frame(action.start, fps).clamp(0, last_start);

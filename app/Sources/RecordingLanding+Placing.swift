@@ -4,7 +4,7 @@
 // (a sequence of clips, each at the previous END as read back), `placeClip`
 // (one `add_clip`, read back and stepped a frame up when the core snapped
 // it under its floor — the inexact-rate rule the base file's header
-// argues), `tooShortNote` (a file whose length snaps to no frame at all),
+// argues), `tooShortNote` (a file with no WHOLE frame inside it),
 // `mediaEntry` and `milliseconds`. Every "what will the core snap this to"
 // here is put to the core over the FFI — `ReelTime.snapToFrame` is
 // `rc_time_snap_to_frame` — or read off a purely-applied result; nothing
@@ -24,8 +24,8 @@ extension RecordingLanding {
     /// two clips meet at one tick or leave a sub-frame gap and never overlap
     /// (`core/src/transition.rs`: `overlap_of` answers none at zero length).
     /// A picture too short for a frame — the core's `whole_media_length`
-    /// would refuse it as "no duration" and its `Err` used to take the whole
-    /// list down — lands as media alone, with its sentence in `notes`, and
+    /// answers an `Err` for it, and that `Err` used to take the whole list
+    /// down — lands as media alone, with its sentence in `notes`, and
     /// the sequence carries on from the same point. nil when any `add_clip`
     /// refuses — the caller decides what a refusal means — and a throw is
     /// the core's own sentence. Answers one `Landed` per media, in order.
@@ -91,16 +91,19 @@ extension RecordingLanding {
     }
 
     /// The sentence for a media the core cannot make a clip of, or nil: a
-    /// timed media whose length snaps to no frame at all is "no duration"
-    /// to `whole_media_length` (`core/src/edit_clip.rs`), an `Err` and not
-    /// a refusal, and R0 q7 measured a real 2 ms microphone file. The test
-    /// IS the core's — `ReelTime.snapToFrame` is `rc_time_snap_to_frame`
-    /// over the FFI, the same rounding `add_clip` will apply to the same
-    /// stored duration — so it is exact at every rate and nothing here
-    /// re-derives a frame. An image has no such bound and gets the default
-    /// length instead, which is why it is exempt.
+    /// timed media with no WHOLE frame inside it is an `Err` to
+    /// `whole_media_length` (`core/src/edit_clip.rs`) — "no duration" at
+    /// zero, "shorter than a frame" above it — and not a refusal, and R0 q7
+    /// measured a real 2 ms microphone file. The test IS the core's: a clip
+    /// takes the media's length snapped DOWN (spec §11), so the threshold
+    /// here is `SilenceDetector.snapDownToFrame`, the one Swift spelling of
+    /// that snap and itself `rc_time_snap_to_frame` over the FFI — exact at
+    /// every rate, and nothing here re-derives a frame. An image has no such
+    /// bound and gets the default length instead, which is why it is exempt.
     static func tooShortNote(_ file: MediaSnapshot, at fps: Fps) -> String? {
-        guard file.kind != .image, ReelTime.snapToFrame(file.duration, fps: fps) <= 0 else {
+        guard file.kind != .image,
+            SilenceDetector.snapDownToFrame(file.duration, fps: fps) <= 0
+        else {
             return nil
         }
         return "\(file.path) is too short for a frame (\(milliseconds(file.duration)) ms) "

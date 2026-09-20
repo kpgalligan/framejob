@@ -264,7 +264,7 @@ row per op.
 | `app/Sources/PreviewCanvasView.swift` | 1104 |
 | `app/Sources/CanvasSessions.swift` | 1088 |
 | `app/Sources/OptionControls.swift` | 1081 |
-| `core/src/edit_clip.rs` | 1028 |
+| `core/src/edit_clip.rs` | 1036 |
 | `app/Sources/Transcriber.swift` | 934 |
 | `app/Sources/AudioDSP.swift` | 890 |
 | `app/Sources/AgentServer+Clips.swift` | 847 |
@@ -372,7 +372,7 @@ and the closing above added the rest.
   machine, which is why they are listed here: only a run at an unlocked screen
   asks them at all.
 - **Remove Silences judged by VOICE, listened to** — road map 4 §4h's three,
-  now that §4g's instruments have landed (`silence2_proof.py` 60/60,
+  now that §4g's instruments have landed (`silence2_proof.py` 61/61,
   `silence2_probe.py` 61/61, 2026-09-19): a narrated screencast recorded by
   the app's own recorder with the microphone on, run through Voice mode with
   the truth marked BY EAR and the spans compared, which q7 is the reason for
@@ -465,8 +465,9 @@ not ship a fix without one.
 Two more, found 2026-09-19 and worth a line each: `docs/agents/triage-labels.md`
 names a `needs-triage` label the repository does not have (`gh label list`
 shows `bug`, `spec`, `ready-for-agent` and GitHub's defaults), so a report
-that needs the maintainer's eye — kpgalligan/reelcut#22 is one — carries
-`bug` alone; either create the label or change the table's right-hand column.
+that needs the maintainer's eye — kpgalligan/reelcut#22 was one, closed
+2026-09-19 — carries `bug` alone; either create the label or change the
+table's right-hand column.
 And the two frame-rate pair readers in `AgentServer+Media.swift` and
 `AgentServer+Tracks.swift` still read `intValue` on each half after the
 argument gate (road map 7 §11's named residue), so a fractional numerator is

@@ -1421,7 +1421,7 @@ many clips`, `too many tracks`, `nests are more than 8 deep at nest N`.
 
 | Op | Semantics |
 |---|---|
-| `add_clip {track, media, at}` | Whole media as one clip at `at`; source in 0; Fit scale if `fit_new_clips` and the source exceeds the canvas. Refuses if the overlap rule fails. |
+| `add_clip {track, media, at}` | Whole media as one clip at `at`; source in 0; Fit scale if `fit_new_clips` and the source exceeds the canvas. The length is the media's, snapped DOWN to whole frames, so the window stays inside the file and the segment plays at rate 1 (§11); a timed media shorter than one canvas frame is an `Err` naming the frame. Refuses if the overlap rule fails. |
 | `add_text_clip {track, at, duration=5 s, text?}` / `add_shape_clip {…, shape?}` | Same placement rules; default text is the Title preset centered, default shape the rectangle — except that `shape.kind = "arrow"` is created with `arrow_end` on, since an arrow with no head is a diagonal line. `text` and `shape` are **patch objects** in the `set_text` / `set_shape` shape, merged over that default — not a bare string or kind — so an explicit `arrow_end: false` still wins. (The MCP tools additionally accept a bare string as shorthand: the words for `text`, a kind name for `shape`.) |
 | `add_background {media?, color?=white, duration?=the timeline's length}` | A backdrop on a NEW back-most track, starting at 0 and named "Background". With `media`, that file placed as `add_clip` would place it but for its SCALE — the right source kind, audio props when it has sound, and a FILL scale where `add_clip` takes a Fit one, because a plate that leaves the canvas showing down one side has failed at the one thing a background is for; with `color`, or with neither, a canvas-sized filled rectangle with no stroke at scale 1. The plate default is WHITE, not black: the canvas is already black, so a black plate is a command that appears to do nothing. `Err` for `media` and `color` together, an unknown media, a media with no pictures, a colour outside 0–1, or a duration under a frame. A full-canvas GRADIENT is this clip and a `set_shape {gradient}` after it — the canvas background stays one colour (§5.2). |
 | `add_blurred_background {clip}` | The screencast backdrop: `clip` copied onto a NEW back-most track at the same start, duration, speed and source window — so the two play the same frames — scaled to FILL the canvas, centred, uncropped, blended `normal` and blurred at full strength. The copy is muted (`enabled` becomes `{video: true, audio: false}`, `detach_audio`'s pair read the other way) and drops its `audio.duck` — the one field of that group that lowers OTHER material, so a copy keeping it would duck the mix including the clip it came from — along with its transition, its actions, its label and its `video.motion` (format version 8 — a backdrop that slid in or pulsed behind the clip it copies would be two pictures of one recording disagreeing about where they are, and a slide would leave the canvas showing down one side, which is the one thing a background exists to prevent); it is named "Blurred Background". `Err` for an unknown clip, a NEST (flattening drops a nest clip's own filters, so the copy would come out sharp), a source with no pixel size (text, audio-only), or a clip with no video properties. Both of these mint TWO objects — a track and the clip on it — and the TRACK takes the `next_id` the call was made with, the clip the one after. |
@@ -1429,7 +1429,7 @@ many clips`, `too many tracks`, `nests are more than 8 deep at nest N`.
 | `overwrite_clip {track, media, at}` | The OVERWRITE edit: `[at, at + media length)` is cleared on `track` ALONE — cut at both bounds, whatever is left inside removed — and the media lands there. Nothing shifts and no other track is touched; the named track is cleared whether or not it is locked, exactly as `ripple_delete` removes the clips it was given. |
 | `move_clip {clips, delta, track?}` | Shifts by `delta` ticks (may be negative; clamps at 0) and optionally to another track (all selected clips keep their relative track offsets). **Overlap rule** on the destination track: a clip may overlap at most one neighbour on each side, and each overlap must be ≤ half of the shorter of the two clips; anything else refuses. An overlap is a transition; a clip that gains a predecessor overlap gets `transition_in = cross_dissolve` if it had none. |
 | `trim_start {clip, to}` | New start `to`; source in advances by `(to − start) × speed`. Clamps: `to ≥ start − in/speed` (source bound), `to < end − one frame`. |
-| `trim_end {clip, to}` | New end `to`; clamps to the source's remaining length (`media` sources) and `> start`. |
+| `trim_end {clip, to}` | New end `to`; clamps to the source's remaining length (`media` sources), snapped DOWN to a whole frame so the clamp cannot put the end past the file (§11), and `> start`. |
 | `rate_stretch {clip, to_end}` | `speed = source_len / (to_end − start)`; duration follows. Media sources only — a non-media clip is an **error**, not a refusal, so an MCP caller gets a message it can correct from (the UI never offers it). |
 | `slip {clip, delta}` | Slides the source under a fixed clip: `in += delta × speed`, start and duration unchanged, so nothing downstream moves. `delta` is TIMELINE ticks; positive shows later material. Clamped so the window stays inside the media (`in ≥ 0`, `in + duration × speed ≤ media.duration`), and a slip the clamps reduce to nothing refuses. A `still` moves its `at` instead — it has a source time if not a window. Any other source is an **error**, as `rate_stretch` is. Actions are clip-relative and do not move. |
 | `roll {clip, to}` | Moves a hard cut: this clip's start and its predecessor's end both become `to`, and nothing else moves — the pair's outer edges and its total length are invariants. The predecessor is the clip on the same track ending EXACTLY at this one's start; with a gap or an overlap there instead it refuses (an overlap is a transition, and its length is `set_transition_duration`'s). Clamped four ways: one frame kept on each side, this clip's own source head, and the predecessor's remaining source. Front-trim semantics here (`in` follows), a plain end trim there. |
@@ -1475,7 +1475,7 @@ many clips`, `too many tracks`, `nests are more than 8 deep at nest N`.
 | `move_track {track, index}` · `set_track {track, name?, hidden?, muted?, locked?, solo?}` | Omitted fields keep their value. `solo` (format version 3) is §5.2's container rule — while any track in the set is soloed every other is treated as muted, mute wins, audio only, a nest's tracks judged among themselves — applied as a 0 envelope in `audio.rs` (§7.2) and never in the plan, so a solo toggle changes ramps and nothing else. |
 | `remove_empty_tracks` | |
 | `add_marker {at, name?, chapter?, color?}` · `set_marker {marker, time?, name?, chapter?, color?}` · `remove_marker {marker}` | Markers snap to frames; two markers may not share a time. Default color `red`. |
-| `set_canvas {width?, height?, fps?, background?, rescale_clips?, fit_new_clips?, timecode_frames?}` | `rescale_clips` multiplies every clip's `x`, `y`, `scale` by the size ratio. Changing fps re-snaps every clip start and duration. |
+| `set_canvas {width?, height?, fps?, background?, rescale_clips?, fit_new_clips?, timecode_frames?}` | `rescale_clips` multiplies every clip's `x`, `y`, `scale` by the size ratio. Changing fps re-snaps every clip start and duration; a media clip's re-snapped duration is then held to its remaining source snapped DOWN to the new grid (§11), never shorter than one frame. |
 | `add_media {descriptor}` → returns the id · `relink_media {media, path, bookmark?}` · `remove_media {media, with_clips=false}` | The descriptor is the `media[]` element minus `id`; the host probes the file. |
 
 **This table is the SEMANTICS half of the op table, and it has a second
@@ -3069,3 +3069,31 @@ assisted import.
   gate buys the same contract and gives up none of them. The same class one
   reader down went with it: a whole number is read exactly, so `3.7` where an
   id belongs is refused and never truncated to 3.
+
+- **#22 — A media clip's window stays INSIDE its file, on the grid.** A
+  clip's duration is written from its source at three sites —
+  `whole_media_length` (what `add_clip` gives a clip, and therefore how much
+  room `insert_clip` opens and how much span `overwrite_clip` clears),
+  `set_canvas`'s fps `resnap`, and `trim_end`'s tail clamp — and all three
+  snapped to the NEAREST frame, which rounds UP past the end of the file
+  whenever the last frame is more than half a frame short. The plan then
+  handed `evaluate.rs` a segment whose `source_duration` was the clamped
+  remainder rather than the clip's duration, so the rate came out just under
+  1 and AVFoundation RESAMPLED material nobody had asked to retime. All
+  three now snap DOWN: a media clip satisfies `in + duration × speed ≤
+  media.duration` by construction and its segment plays at rate exactly 1.
+  Three costs, taken: a whole-file clip may end up to one frame before its
+  file's last sample; a timed media shorter than one canvas frame cannot be
+  a clip at all and `add_clip` says so in a second `Err` sentence naming the
+  frame; and an fps change may shorten a whole-file clip by a frame. The
+  shape DECLINED was holding the last partial frame — carrying a sliver
+  through the plan and the compositor so the file's final sample always
+  plays — which buys a sub-frame of picture at the price of a sub-frame time
+  in the model, and nothing sub-frame lives in the model (§6). What the rule
+  does NOT cover: `set_speed` and `rate_stretch` (a nearest-snapped duration
+  times a rate can still outrun by a rounding), `paste` and `unnest`'s
+  re-snaps, and `add_background`'s timeline-length plate — the source-window
+  candidate of `designs/reelcut-roadmap-7.md` §10, where they are measured
+  together. `evaluate.rs`'s clamp stays: hand-written JSON, a version-8 file
+  minted before this, and the one-frame floor `resnap` cannot go below still
+  reach it. No persisted field changes, so `RC_FORMAT_VERSION` stays 8.

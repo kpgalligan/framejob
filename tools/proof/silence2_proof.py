@@ -21,10 +21,13 @@ STATE: nothing here hard-codes a second of the recording.
 wrote into `cache/speech/<id>.bin`. It is what makes claims 1(a), 1(c) and 9
 TICK-EXACT rather than tolerant: a tolerance of one bucket would hide every
 mutant the max-over-a-step rule and the reversed mirror have. The segment it
-walks is read back off `get_project` — a clip's `duration` is
-`snapped(media.duration)` and its `source_duration` is the media's remaining
-length, so the two DIFFER off the frame grid and `sourceTick` must be given
-both (`core/src/evaluate.rs`, `core/src/edit_clip.rs`).
+walks is read back off `get_project` — a clip's `source_duration` is what the
+plan resolved for it, which a clip at a SPEED other than 1 leaves different
+from its `duration`, so `sourceTick` is given both (`core/src/evaluate.rs`,
+`core/src/edit_clip.rs`). A whole-file clip at rate 1 is the case where the
+two now agree: its duration is the media's snapped DOWN, so the segment plays
+at rate exactly 1 (spec §11, kpgalligan/reelcut#22); claim 1(d) is the row
+where they differ, so the walk's scale factor is not an identity everywhere.
 
 Three of the four deviations from §4g recorded in
 `designs/reelcut-roadmap-4.md` §8 belong to this half, each asserted here as
@@ -42,15 +45,18 @@ the tree behaves (§8's (iii), claim 12's sha256 pin, is
         it is PRINTED with what it actually was — as is the lead-in span
         `quiet2.wav` produces (q6: the soft first word "The" missed at that
         SNR, §5's recorded limit), printed and not scored.
-  (iv)  claim 11 TRIMS the clip to the last whole frame inside the file
-        before exporting. A whole clip's duration is `snapped(media
-        .duration)`, which rounds UP past the end of this fixture, so the
-        plan plays the segment at 0.9990 and AVFoundation resamples it; two
-        exports of the same material then drift by about seventeen samples
-        and the claim would be measuring the resampler. At rate 1 the cut
-        export is BYTE-identical to the uncut one with the proposed spans
-        excised, which is stronger than the tolerance §4g asked for
-        (kpgalligan/reelcut#22).
+  (iv)  claim 11 used to TRIM the clip to the last whole frame inside the
+        file before exporting, because a whole clip's duration was
+        `snapped(media.duration)`, which rounds UP past the end of this
+        fixture: the plan played the segment at 0.9990, AVFoundation
+        resampled it, two exports of the same material drifted by about
+        seventeen samples, and the claim would have been measuring the
+        resampler. The core now snaps a media clip's length DOWN (spec §11,
+        kpgalligan/reelcut#22, closed 2026-09-19), so the trim is GONE, the
+        rate is exactly 1, and the cut export is BYTE-identical to the uncut
+        one with the proposed spans excised — stronger than the tolerance
+        §4g asked for. The first row of the section asserts the length the
+        core minted, which is what the trim used to buy.
 
 Fixtures: made by the script into `work/silence2/fixtures/` when absent or on
 `--remake`, never into `media/` (`media/speech.aiff` is phase 4's different
@@ -532,7 +538,9 @@ def clean_part(mcp):
     end than `OVERRUN` — §4g's "edges inward", with deviation (i);
     (c) the same at a 100 fps canvas, where one frame IS one bucket and the
     snap can absorb nothing, which is the row the max-over-a-step rule is
-    scored on.
+    scored on;
+    (d) and the clean clip once more at ×2, the one row in the suite where
+    the segment's `source_duration` and `duration` DIFFER.
     """
     print("\n1 — the clean fixture, voice against the truth and against the walk")
     s = Session(mcp, "silence2-clean")
@@ -563,11 +571,12 @@ def clean_part(mcp):
     p = s.probabilities(media)
     segment = s.segment(clip, media)
     check(
-        len(p) > 0 and segment.source_duration != segment.duration,
+        len(p) > 0 and segment.source_duration == segment.duration,
         f"{len(p)} probabilities on disk, over a clip whose duration "
-        f"({segment.duration}) is the SNAPPED media length and whose source "
-        f"range is {segment.source_duration} — the two differ, which is why the "
-        f"walk carries both")
+        f"({segment.duration}) is the media length snapped DOWN and whose "
+        f"source range is {segment.source_duration} — the two AGREE for a "
+        f"whole-file clip, so the plan plays it at rate 1 (spec §11); the walk "
+        f"is given both because a clip at another SPEED still differs — 1(d)")
 
     walked = expected_spans(
         p, segment, answer["voice_confidence"], answer["min_length"],
@@ -632,6 +641,33 @@ def clean_part(mcp):
         f"rule answers {walked100} — "
         + (f"{moved} edge(s) move at 100 fps" if mean100 != walked100
            else "IDENTICAL on this host's fixture"))
+
+    # (d) the scale factor `sourceTick` divides by, exercised. Every row above
+    # walks a whole-file clip at rate 1, where the plan resolves
+    # `source_duration == duration` and that factor is an IDENTITY a mutant
+    # could drop unseen. A trim cannot break the equality — at rate 1 the plan
+    # resolves `min(duration, media.duration − in)`, which a shorter window
+    # only makes smaller — so this row changes the clip's SPEED instead, which
+    # is what the factor is made of. At ×2 the plan's `duration × speed`
+    # (6 240 000) overruns the file, so `source_duration` is the clamp's
+    # `media.duration − in` (6 233 613) and the ratio is 1.99795, not 2: a
+    # walk that used `× speed` in place of the plan's own ratio misses these
+    # ticks too. That sharper half rests on the `set_speed` overrun spec §11
+    # leaves uncovered (road map 7 §10's candidate); when that lands the
+    # ratio is exactly 2 and only the `!=` half stays sharp. The session is
+    # left at ×2 and handed on to `refusal_part`, which asserts argument
+    # sentences only.
+    s.op("set_speed", clip=clip, rate=2)
+    sped = s.segment(clip, media)
+    twice = detect(s, padding=0)
+    walked_sped = expected_spans(
+        p, sped, twice["voice_confidence"], twice["min_length"], 0, s.frame())
+    check(
+        sped.source_duration != sped.duration and spans(twice) == walked_sped,
+        f"1d at ×2 the segment's source range ({sped.source_duration}) and its "
+        f"duration ({sped.duration}) DIFFER, and the voice answer is still the "
+        f"walk over that segment tick for tick: {spans(twice)} vs "
+        f"{walked_sped}")
     return s, truth, spans(answer), spans(bare)
 
 
@@ -1005,28 +1041,28 @@ def refusal_part(session):
 def export_part(mcp, clean_default):
     """Phase 3 proves `ripple_delete_ranges` cuts what it is given. This
     proves the voice answer was the right thing to send: the export of the cut
-    timeline is the uncut export with exactly those spans excised, sample for
-    sample.
+    timeline is the uncut export with exactly those spans excised, BYTE for
+    byte.
 
-    The clip is TRIMMED to the last whole frame inside the file first, and
-    that is the difference between a claim about the cut and a claim about
-    AVFoundation's resampler. A whole clip's duration is `snapped(media
-    .duration)`, which for this fixture rounds UP past the end of the file, so
-    the plan's `source_duration / duration` is 0.9990 rather than 1 and every
-    segment is played slightly slow; a ripple then splits it into three
-    segments, each resampled on its own, and two exports of the same material
-    drift by about seventeen samples (measured). At rate 1 they are BYTE
-    identical, which is what this section measures."""
+    Byte for byte rather than nearly so is what kpgalligan/reelcut#22 bought.
+    A whole clip's duration used to be `snapped(media.duration)`, which for
+    this fixture rounds UP past the end of the file, so the plan's
+    `source_duration / duration` was 0.9990 rather than 1 and every segment
+    was played slightly slow; a ripple then split it into three segments, each
+    resampled on its own, and two exports of the same material drifted by
+    about seventeen samples (measured). The core now snaps that length DOWN
+    (spec §11), so the clip lands on the last whole frame INSIDE the file, the
+    rate is exactly 1, nothing is resampled — and the trim this section used
+    to do first is gone, replaced by the row that asserts what the core
+    minted."""
     print("\n11 — the voice answer, cut and exported")
     s = Session(mcp, "silence2-export")
     media, clip = s.lay("clean.wav")
     frame = s.frame()
     inside_file = s.media_duration(media) // frame * frame
-    s.op("trim_end", clip=clip, to=inside_file)
     check(
-        s.clip(clip)["duration"] == inside_file
-        and inside_file <= s.media_duration(media),
-        f"the clip is trimmed to the last whole frame INSIDE the file "
+        s.clip(clip)["duration"] == inside_file,
+        f"a whole-file clip lands on the last whole frame inside the file "
         f"({inside_file} of {s.media_duration(media)} ticks), so the plan plays "
         f"it at rate 1 and nothing is resampled")
     answer = spans(detect(s))
@@ -1062,15 +1098,14 @@ def export_part(mcp, clean_default):
     expected += before[sample_of(edge) * 4:]
     expected = bytes(expected)
     check(
-        abs(len(after) - len(expected)) <= 1600 * 4,
-        f"the cut export is the uncut one minus the proposed spans, to within "
-        f"1600 samples: {len(after) // 4} against {len(expected) // 4} frames")
-    common = min(len(after), len(expected)) // 4 * 4
-    measured = wobble(after[:common], expected[:common])
+        len(after) == len(expected),
+        f"the cut export is the uncut one minus the proposed spans, to the "
+        f"SAMPLE: {len(after) // 4} against {len(expected) // 4} frames")
+    measured = wobble(after, expected)
     check(
-        measured is not None and measured[0] <= 2,
-        f"and sample for sample over the common length: "
-        f"{measured} (max |Δ| ≤ 2)")
+        after == expected,
+        f"and BYTE for byte, not to a tolerance: {measured} "
+        f"(max |Δ|, differing samples)")
 
 
 # ---- 5. Phase 3, re-run against this binary -----------------------------

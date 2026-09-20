@@ -760,3 +760,67 @@ notions of sameness. They were `nest.rs`'s private pair; that file's own
 test re-ran unchanged, which is what says the move was pure. Every new export
 gets at least one test plus inclusion in the null-safety sweep. Finish Rust
 work with `cargo fmt` and a clean `make lint`.
+
+## 2026-09-19 — a media clip's window stays inside its file (kpgalligan/reelcut#22)
+
+`edit_clip.rs`'s `whole_media_length` handed back `snapped(media.duration)`,
+the NEAREST frame boundary, which for any file whose last frame is more than
+half short rounds UP past the end of it. The clip that came out asked for more
+source than the file held, `evaluate.rs`'s `segment_of` clamped the range to
+what was there, and the plan's `source_duration / duration` came out just
+under 1 — so Swift followed the insert with a `scaleTimeRange` and
+AVFoundation RESAMPLED material nobody had asked to retime. Two exports of the
+same untrimmed audio then drifted — seventeen sample frames when road map 4
+measured it, eight against the 2026-09-19 fixture — which is how the defect
+was found: `tools/proof/silence2_proof.py` claim 11 had to TRIM the
+clip to the last whole frame inside the file before it could compare two
+exports at all (road map 4 §8's deviation (iv)).
+
+Three sites write a media clip's duration from its source, and all three now
+snap DOWN through `Project::snapped_down` (`time::snap_down_to_frame`, the
+crate's one down-snap, whose first caller was `roll`'s directional clamp):
+
+- **`whole_media_length`** — the length `add_clip` gives a clip, and with it
+  the room `insert_clip` opens and the span `overwrite_clip` clears, since
+  both take their length from the same call. Its `Err` arm split in two: a
+  media with no duration at all keeps the older sentence, `"media {id} has no
+  duration ({d} ticks)"` (verbatim, `core/tests/insert.rs` reads it), and a
+  media with a duration but no whole frame in it answers `"media {id} is
+  shorter than a frame ({d} ticks; a frame is {frame} ticks)"` — an `Err` and
+  not a one-frame clip of what is not there. The frame it names is
+  `snapped_up(1)`, the first boundary of the canvas's OWN grid, not
+  `frame()`: at a rate that does not divide the timescale (24981/1000, the
+  recorder's) `frame()` falls back to 1/30 s and the sentence would quote a
+  threshold that is not the one the media fell short of. `media_window.rs`
+  asserts the 24 018-tick sentence at that rate as well as the 20 000 at
+  30 fps, so putting `frame()` back fails in the tree (measured: that one
+  row, the other five green), not only in a scratch copy. The `Image` arms
+  are untouched: a still has no source bound, so it keeps the nearest snap
+  of its descriptor's length or of the default constant.
+- **`edit_canvas.rs`'s `resnap`** — a rate change re-snaps every duration to
+  the new grid, and a coarser grid rounds UP just as readily. The loop now
+  runs by INDEX, because the bound comes from `source_length`, which reads the
+  clip's media off the project while the clip is about to be mutated. The
+  `.max(frame)` floor is the one case the bound cannot hold — a media shorter
+  than a frame at the new rate — which is why `evaluate.rs`'s clamp stays.
+- **`trim_end`'s tail clamp** — the bound was `start + source_length`, a
+  floored source measurement that is not on the grid; a drag past the end of
+  the file therefore landed the end a few ticks past the last frame. It is
+  snapped down now, exactly as `roll`'s bounds are.
+
+`evaluate.rs` keeps its clamp and gained a sentence saying what it is FOR now:
+hand-written JSON, a version-8 document minted before this, and `resnap`'s
+one-frame floor. No persisted field changed, so `RC_FORMAT_VERSION` stayed 8 —
+a file whose whole-file clip outruns its media still opens and still plays.
+
+`core/tests/media_window.rs` is the black-box test, six tests through the FFI,
+every vector chosen so the nearest snap and the down snap DIFFER (the rows
+where they agree are marked as regression rows). Restoring `snapped` in
+`whole_media_length` fails four of them by name; removing the `resnap` clamp
+and `trim_end`'s down-snap fails the other two. `edit_clip.rs` went from 1028
+to 1036 lines, inside the 8 the phase was budgeted, so no toll came due.
+
+Not covered, and named in spec §11 as road map 7 §10's source-window
+candidate: `set_speed` / `rate_stretch` (a nearest-snapped duration times a
+rate can still outrun by a rounding), `paste` and `unnest`'s re-snaps, and
+`add_background`'s timeline-length plate.

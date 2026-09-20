@@ -162,31 +162,37 @@ impl Project {
     /// gives one, and therefore how much room `insert_clip` opens and how
     /// much span `overwrite_clip` clears.
     ///
-    /// A still image has no source bound, so it gets the default length
-    /// unless its descriptor carried one; a timed media with no duration is
-    /// an `Err`, because a zero-length clip is not a thing the timeline can
-    /// hold.
+    /// **A timed media's length snaps DOWN** (spec §11). The nearest snap
+    /// rounds UP past the end of the file when the last frame is more than
+    /// half short, and the segment then plays at a rate just under 1;
+    /// down-snapped, `in + duration × speed ≤ media.duration` holds and the
+    /// rate is exactly 1. The price is up to one frame of the tail, and a
+    /// media shorter than a frame, which is an `Err` naming the frame as a
+    /// media with no duration at all has always been an `Err`.
     ///
-    /// **The default is snapped like every other length.** It is a constant
-    /// number of ticks, and a constant is not on the frame grid of a rate
-    /// that does not divide the timescale — at 30000/1001 five seconds is
-    /// 3 003 000 ticks, not 3 000 000. Handing back the raw constant made
-    /// `insert_clip` open a hole a sliver wider than the clip it placed and
-    /// `overwrite_clip` clear a span that missed the fragment `split_clips`
-    /// had just made, which refused the whole op. One length, on the grid,
-    /// for all three callers.
+    /// An image has no source bound and keeps the NEAREST snap of its
+    /// descriptor's length or of the default — a constant is not on the
+    /// grid of a rate that does not divide the timescale (at 30000/1001
+    /// five seconds is 3 003 000 ticks, not 3 000 000), and the raw one
+    /// made `insert_clip` open a hole wider than the clip it placed.
     pub(crate) fn whole_media_length(&self, media: &Media) -> Result<Ticks, String> {
         match media.kind {
             MediaKind::Image if media.duration <= 0 => {
                 Ok(self.snapped(DEFAULT_CLIP_DURATION).max(self.frame()))
             }
             MediaKind::Image => Ok(self.snapped(media.duration)),
+            MediaKind::Video | MediaKind::Audio if media.duration <= 0 => Err(format!(
+                "media {} has no duration ({} ticks)",
+                media.id, media.duration
+            )),
             MediaKind::Video | MediaKind::Audio => {
-                let duration = self.snapped(media.duration);
+                let duration = self.snapped_down(media.duration);
                 if duration <= 0 {
                     return Err(format!(
-                        "media {} has no duration ({} ticks)",
-                        media.id, media.duration
+                        "media {} is shorter than a frame ({} ticks; a frame is {} ticks)",
+                        media.id,
+                        media.duration,
+                        self.snapped_up(1)
                     ));
                 }
                 Ok(duration)
@@ -667,13 +673,15 @@ impl Project {
 
     /// Moves the clip's end edge to `to`, clamped to the source's remaining
     /// length (media sources) and to at least one frame of clip (spec §6).
-    /// The source in point and the actions are untouched.
+    /// The source in point and the actions are untouched. The source bound
+    /// is a BOUND, so it is snapped DOWN like `roll`'s: the last frame at
+    /// or before the end of the file, never the one past it (spec §11).
     pub fn trim_end(&self, clip: u32, to: Ticks) -> Result<Outcome, String> {
         let target = self.require_clip(clip)?.clone();
         let earliest = target.start.saturating_add(self.frame());
         let mut to = self.snapped(to).max(earliest);
         if let Some(available) = self.source_length(&target) {
-            to = to.min(target.start.saturating_add(available));
+            to = to.min(self.snapped_down(target.start.saturating_add(available)));
         }
         if to < earliest || to == clip_end(&target) {
             return Ok(Outcome::Identity);

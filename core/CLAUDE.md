@@ -105,8 +105,11 @@ file is what governs a module now.
 - `edit_clip.rs` — clip placement: `add_clip`, move, trim, duplicate, delete,
   join, detach, `fit_scale` and `fill_scale` (Fit is a RESCUE for oversized
   footage and honours `canvas.fit_new_clips`; Fill is a REQUIREMENT, ignores
-  it, scales up as readily as down and clamps to `SCALE_MAX`). Over the cap,
-  known debt (below).
+  it, scales up as readily as down and clamps to `SCALE_MAX`). `whole_media_length`
+  and `trim_end` hold a media clip's window INSIDE its file — the length and
+  the tail clamp snap DOWN, so `in + duration × speed ≤ media.duration` and
+  the plan's rate is exactly 1 (spec §11); the third site is
+  `edit_canvas.rs`'s `resnap`. Over the cap, known debt (below).
 - `edit_split.rs` — `split_clip` and what the SECOND clip inherits: base
   props from the evaluation at the cut, unfinished actions rebased, a
   straddled one narrowed, presets and motion halves anchored to the two

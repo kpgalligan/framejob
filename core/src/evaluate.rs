@@ -234,11 +234,17 @@ impl Project {
                 } else {
                     clip.duration
                 };
-                // A clip may outrun its source, and hand-written JSON may
-                // put its `in` outside the file altogether (nothing in the
-                // schema forbids either; `validate` polices ids and spans,
-                // not source bounds). BOTH ends are clamped to what the
-                // file holds, because handing AVFoundation a range that
+                // The core's own ops no longer mint a window past the end
+                // of a file — a media clip's length is snapped DOWN at all
+                // three sites that write it (spec §11) — so this clamp is
+                // the LAST line of defence rather than the ordinary path:
+                // hand-written JSON may put `in` outside the file
+                // altogether, a document minted before that rule may carry
+                // an overrun, and `resnap`'s one-frame floor can still
+                // outrun a media shorter than a frame (nothing in the
+                // schema forbids any of it; `validate` polices ids and
+                // spans, not source bounds). BOTH ends are clamped to what
+                // the file holds, because handing AVFoundation a range that
                 // starts or ends past an asset makes the insert throw —
                 // clamped, it becomes a stretch of the last frame, which
                 // renders.

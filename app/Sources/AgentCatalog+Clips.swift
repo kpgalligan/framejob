@@ -247,7 +247,8 @@ extension AgentServer {
                 "add_clip",
                 "Places a whole media file as one clip at `at` on `track` — dragging a Media-tab "
                     + "row onto a track. The clip starts at source time 0 and runs the media's "
-                    + "whole length; trim it afterwards with trim_start / trim_end. It is given "
+                    + "whole length snapped DOWN to whole frames, so it never outruns the file; "
+                    + "trim it afterwards with trim_start / trim_end. It is given "
                     + "Fit scale when the project's fit_new_clips is on and the source is bigger "
                     + "than the canvas. Refused when it would break the overlap rule: a clip may "
                     + "overlap at most one neighbour on each side, and each overlap must be at "
@@ -387,7 +388,7 @@ extension AgentServer {
             opTool(
                 "trim_end",
                 "Moves a clip's END to `to`. Clamped by how much source is left after the "
-                    + "in-point and by the clip's start.",
+                    + "in-point, on the frame grid, and by the clip's start.",
                 ["clip": clipDescription, "to": "New end, \(ticks)"]),
             opTool(
                 "rate_stretch",

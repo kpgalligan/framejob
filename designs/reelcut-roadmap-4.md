@@ -566,7 +566,7 @@ the built binary, the three new argument refusals exact, and phase 3's
 fallback is what makes a tone fixture answer what it always did.
 
 **The proofs (2026-09-19).** §4g's two instruments landed against the
-UNMODIFIED tree at **59/59** and **61/61**, and score **60/60** over MCP
+UNMODIFIED tree at **59/59** and **61/61**, and score **61/61** over MCP
 (claims 1–11) and **61/61** over the probe (claims 12–17) against the tree
 the two fixes below left — `tools/proof/silence2_proof.py` and
 `tools/proof/silence2_probe.py`, the second compiled from the whole of
@@ -610,8 +610,10 @@ Five of those ten were not re-run after the two fixes below and are quoted
 against the N they had **at the time** (59 and 61): the probability forced to
 1, max → mean, `voice_confidence` accepted with `mode: "level"`, the LSTM
 state, and the 64-sample context. The five that were re-run are scored
-against today's 60 and 61, on a tree rebuilt in a copy with this run's own
-fixtures.
+against the 60 and 61 of that day, on a tree rebuilt in a copy with this
+run's own fixtures — and the MCP half's N is **61** since claim 1(d) landed
+with the #22 review's fixes later on 2026-09-19, so every `/60` above is the
+N it was measured at and none of those was re-run for the extra row.
 
 **The sensitivity line claim 1(c) prints** (not scored) says the mean rule IS
 visible on this host's fixture: at a 100 fps canvas it answers
@@ -650,6 +652,22 @@ resampler. At rate 1 the cut export is BYTE-identical to the uncut one with
 the proposed spans excised, which is stronger than the tolerance §4g asked
 for. The overrun itself is a core defect older than this phase, filed as
 kpgalligan/reelcut#22 with the two fix shapes it has to choose between.
+**Closed 2026-09-19**: the core now snaps a media clip's length DOWN at all
+three sites that write it (spec §11), so a whole-file clip lands on the last
+whole frame inside its file and the plan plays it at rate 1. The trim is gone
+from claim 11, which asserts that length in its first row instead, and the
+two rows that were tolerant are now a sample count and a BYTE comparison; a
+build that keeps the nearest snap scores **57/61** there. The review of that
+change asked for the coverage it cost: with every clip the script walks now a
+whole-file clip at rate 1, `MediaPeaks.sourceTick`'s
+`source_duration / duration` factor is an IDENTITY in every row, so claim
+1(d) was added — the clean clip at ×2, where the two differ (6 233 613
+against 3 120 000, not even a whole 2) and the answer is still the walk over
+that segment tick for tick. That row took the MCP half from 60 to **61/61**,
+and a build with the factor dropped from `sourceTick` scores **60/61**,
+taking 1(d) alone (both measured 2026-09-19). A trim cannot stand in for it:
+at rate 1 the plan resolves `min(duration, media.duration − in)`, which a
+shorter window only makes smaller.
 
 **Two defects the instruments measured, FIXED 2026-09-19** (not committed
 here), which is what took the MCP half from 59 rows to 60:

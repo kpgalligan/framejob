@@ -1299,8 +1299,9 @@ lockstep are in the root `CLAUDE.md`; the full design is
   list would name nothing a person can see; the three sentences say "in at
   least one clip … there" so the note is true of a mixed file. MCP claim 4's
   two-clip variant scores the voice half tick for tick against the walk now
-  (60/60), and the pre-fix read, put back as a mutant, takes that row alone
-  (59/60). See `designs/reelcut-roadmap-4.md` §8.
+  (61/61 since claim 1(d) landed; 60/60 when it was measured), and the
+  pre-fix read, put back as a mutant, takes that row alone (59/60, the N it
+  had). See `designs/reelcut-roadmap-4.md` §8.
   The detector is pure
   arithmetic over values: `Input.read` is the one seam that takes a
   snapshot, a plan, a selection and the peak files off a `ProjectDocument`,
@@ -1522,6 +1523,18 @@ lockstep are in the root `CLAUDE.md`; the full design is
   discarded and re-added a frame up), `tooShortNote` (the core's own "no
   duration" test asked over the FFI, `ReelTime.snapToFrame`, never a Swift
   replica) — cut out when the read-backs took the base file to 466.
+  **2026-09-19, kpgalligan/reelcut#22:** the core's threshold for that test
+  moved. A media clip's length is now the file's snapped DOWN (spec §11), so a
+  file with no WHOLE frame in it is an `Err` — "shorter than a frame" above
+  zero, "no duration" at it — where a nearest snap used to round a 12 ms file
+  up into a clip. `tooShortNote` follows it through
+  `SilenceDetector.snapDownToFrame` (`SilenceDetector+Walls.swift`), the one
+  Swift spelling of that snap and itself `rc_time_snap_to_frame` over the FFI
+  composed with `Fps.frameDuration`, so the predicate still agrees with the
+  core exactly at 24981/1000 as at 30 and the file's "nothing re-derives a
+  frame here" rule holds. Its sentence to the person is unchanged, and the
+  two Swift callers that READ a landed clip back rather than predict it
+  needed nothing.
   `RecordingLanding` is a value
   type, `AudioNormalize`'s shape: a `RecordingResult` and a document in, an
   UNSCOPED op list and the ids the core will mint out — `next_id` read off a

@@ -4234,9 +4234,11 @@ FRAME_30 = 20_000                      # one frame at the fresh project's 30 fps
 FRAME_60 = 10_000                      # one frame at the recorder's 60 fps
 PICTURE_LEN = 5 * SEC                  # the picture descriptor's 5 s
 MIC_LEN = 5 * SEC + 12_000             # the microphone file, 5.02 s
-# `add_clip` snaps a clip's length to the canvas frame grid — lane B's one
-# wrong first expectation, kept here as the rule rather than the number.
-MIC_LEN_SNAPPED = (MIC_LEN + FRAME_30 // 2) // FRAME_30 * FRAME_30   # 3 020 000
+# `add_clip` snaps a clip's length to the canvas frame grid, DOWNWARD — a
+# LENGTH is bounded by the file it came from (spec §11, kpgalligan/reelcut#22),
+# where a START is rounded to the nearest frame. Lane B's one wrong first
+# expectation, kept here as the rule rather than the number.
+MIC_LEN_SNAPPED = MIC_LEN // FRAME_30 * FRAME_30                     # 3 000 000
 RECORDING_STEM = "Screen Recording 2026-09-10 at 14.03.22"
 MIC_STEM = "Screen Recording 2026-09-10 at 15.00.00"
 PACKAGE_TYPE = "com.kgalligan.reelcut-project"
@@ -4751,7 +4753,9 @@ def section_segments(binary, sources):
           and (r.get("viewTracks") or [{}])[0].get("id") == tracks[0].get("id")
           and len(r.get("viewTracks") or []) == 2, f"{tracks}, view {r.get('viewTracks')}")
     m = clips_of(r, L.get("micClips") or [])
-    d1 = snap(3_012_000, frame)
+    # A LENGTH snaps DOWN, so the clip stops on the last whole frame inside
+    # the file (spec §11); `snap` above is still the rule for a START.
+    d1 = 3_012_000 // frame * frame
     head = snap(d1 - (3_000_000 - 11_000), frame)
     check(f"4b·E: voice 1 at 0, the snapped length {d1}, in 0",
           len(m) == 2 and m[0].get("start") == 0 and m[0].get("duration") == d1 and m[0].get("in") == 0,

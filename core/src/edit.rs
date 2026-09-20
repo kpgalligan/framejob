@@ -93,7 +93,7 @@
 //!
 //! | Op | Semantics |
 //! |---|---|
-//! | `add_clip` | Whole media as one clip at `at`; source in 0, Fit scale when `canvas.fit_new_clips` and the source exceeds the canvas. |
+//! | `add_clip` | Whole media as one clip at `at`; source in 0, Fit scale when `canvas.fit_new_clips` and the source exceeds the canvas. The length is the media's snapped DOWN to whole frames, so the window stays inside the file and the segment plays at rate 1 (spec §11); a timed media shorter than one canvas frame is an `Err` naming the frame. |
 //! | `add_text_clip` | The Title preset, centered, 5 s long when `duration` is absent; `text` patches it exactly as `set_text` would. |
 //! | `add_shape_clip` | The default rectangle, 5 s long when `duration` is absent — an `arrow` kind gets `arrow_end` on, since a headless arrow is a diagonal line; `shape` patches that preset exactly as `set_shape` would, so an explicit `arrow_end: false` still wins. |
 //! | `add_background` | A backdrop on a NEW back-most track, starting at 0, named "Background" and as long as the timeline unless `duration` says otherwise. With `media`, that file placed as `add_clip` would place it but for its SCALE — the right source kind, audio props when it has sound, and a FILL scale where `add_clip` takes a Fit one, because a plate that leaves the canvas showing down one side has failed at the one thing a background is for; with `color`, or with neither, a canvas-sized filled rectangle with no stroke at scale 1. The plate default is WHITE, not black: the canvas is already black, so a black plate is a command that appears to do nothing. `Err` for `media` and `color` together, an unknown media, a media with no pictures, a colour outside 0–1, or a duration under a frame. |
@@ -102,7 +102,7 @@
 //! | `overwrite_clip` | The overwrite edit: `[at, at + media length)` is cleared on `track` ALONE — cut at both bounds, the middles removed — and the media lands there. Nothing shifts and no other track is touched. |
 //! | `move_clip` | Shifts the selection by `delta`, clamped so the earliest clip stops at 0; `track` retargets by track-index delta, keeping relative offsets. |
 //! | `trim_start` | New start `to`; a media `in` advances by `(to − start) × speed`. Clamped to the source head and to one frame before the end. |
-//! | `trim_end` | New end `to`, clamped to `start + one frame` and to the source's remaining length. |
+//! | `trim_end` | New end `to`, clamped to `start + one frame` and to the source's remaining length, that bound snapped DOWN to a whole frame so a trim cannot put the end past the file (spec §11). |
 //! | `rate_stretch` | `speed = content length / (to_end − start)`; duration follows and actions rescale. A non-media source is an `Err`, not a refusal. |
 //! | `slip` | Slides the source under a fixed clip: `in += delta × speed`, start and duration unchanged, clamped so the window stays inside the media. A `still` moves its `at` instead. A slip the clamps reduce to nothing is an identity; a source with nothing to slip is an `Err`. |
 //! | `roll` | Moves a hard cut: this clip's start and its predecessor's end both become `to`. The predecessor is the clip on the track ending EXACTLY at this one's start; with none — a gap, or an overlap, whose length is `set_transition_duration`'s — it refuses. Clamped to one frame and to the source available on each side. |
@@ -163,7 +163,7 @@
 //! | `add_marker` | A marker at `at`, clamped to ≥ 0, named `Marker <n>` and red unless `name` and `color` say otherwise. Two markers may not share a tick. |
 //! | `set_marker` | Omitted fields keep their value; the same one-marker-per-tick rule. |
 //! | `remove_marker` | Removes the marker. |
-//! | `set_canvas` | `rescale_clips`, false when absent, multiplies every clip's `x`, `y` and `scale` by the size ratio; an fps change re-snaps every clip, action and marker time to the new grid, and DROPS a marker a coarser grid lands on a tick another marker already holds. |
+//! | `set_canvas` | `rescale_clips`, false when absent, multiplies every clip's `x`, `y` and `scale` by the size ratio; an fps change re-snaps every clip, action and marker time to the new grid — a media clip's duration then held to its remaining source snapped DOWN to that grid (spec §11), never under one frame — and DROPS a marker a coarser grid lands on a tick another marker already holds. |
 //! | `add_media` | Appends the `media[]` element of spec §5.2 minus its `id` (the host probes the file). A path already in the list changes nothing. |
 //! | `relink_media` | Points a media at another file; an absent or `null` bookmark clears the stale one. |
 //! | `remove_media` | Refuses while clips still reference it unless `with_clips`, which removes those clips too. |
