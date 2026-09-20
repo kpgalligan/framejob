@@ -110,8 +110,8 @@ enum SilenceDetector {
     /// cached Silero VAD probability (`cache/speech/<id>.bin`) and falls
     /// back to `level` per VOICE whose source window holds no voice, or for
     /// every media at once when the model cannot be used this process;
-    /// `level` is today's rule, byte for byte, and what a media with no
-    /// voice cache yet is judged by too.
+    /// `level` is today's rule, byte for byte. A media whose speech cache
+    /// has NOT landed is judged by neither — see `Outcome.voicePending`.
     enum Mode: String, CaseIterable {
         case voice
         case level
@@ -206,9 +206,18 @@ enum SilenceDetector {
         /// even in `voice` mode. Always `[]` in `level` mode.
         let judgedByLevel: [UInt32]
         /// Distinct media, in scope, whose `cache/speech/<id>.bin` has not
-        /// landed yet — never quiet by the model, judged by level until it
-        /// does. Always `[]` in `level` mode.
+        /// landed yet — never quiet by the model, and not judged by level
+        /// either: a missing cache must not read as silence. Always `[]` in
+        /// `level` mode.
         let voicePending: [UInt32]
+        /// Distinct media a span in `spans` actually lands inside, sorted.
+        /// It is what the sheet and the tool make their "nothing inside is
+        /// proposed" promise about while a cache is still landing: the gain
+        /// FLOOR is asked before either cache (`isQuiet`), so a clip the mix
+        /// has turned down, faded or ducked is quiet with nothing on disk at
+        /// all, and the promise used to deny the ranges printed beside it
+        /// (the reader review, road map 4 §8, R3·1).
+        let proposedMedia: [UInt32]
 
         var removed: Ticks { spans.reduce(0) { $0 + $1.length } }
         var isEmpty: Bool { spans.isEmpty }
@@ -395,7 +404,8 @@ enum SilenceDetector {
         guard !scoped.isEmpty else {
             return Outcome(
                 spans: [], scope: settings.scope, clips: [], pendingMedia: [],
-                protectedNests: [], mode: settings.mode, judgedByLevel: [], voicePending: [])
+                protectedNests: [], mode: settings.mode, judgedByLevel: [], voicePending: [],
+                proposedMedia: [])
         }
 
         // Road map 4's voice mode, judged PER VOICE: a window holding no
@@ -485,38 +495,19 @@ enum SilenceDetector {
                 outside, input.walls.map { NestExtent(clip: 0, span: $0) },
                 minLength: settings.minLength
             ).0
+        let spans = refine(clear, settings: settings, fps: input.snapshot.canvas.fps)
+        // Which media the answer proposes a span INSIDE — `Outcome.proposedMedia`
+        // says why the two notes need it.
+        let proposed = Set(
+            scoped.filter { voice in
+                spans.contains { $0.start < voice.end && voice.segment.start < $0.end }
+            }.map { $0.segment.media })
         return Outcome(
-            spans: refine(clear, settings: settings, fps: input.snapshot.canvas.fps),
+            spans: spans,
             scope: settings.scope, clips: clips, pendingMedia: pending,
             protectedNests: walled, mode: settings.mode,
-            judgedByLevel: judgedByLevelMedia.sorted(), voicePending: voicePendingMedia.sorted())
-    }
-
-    /// Length filter, then padding, then the frame grid — in that order,
-    /// because the minimum is about the RUN the ear heard and the padding is
-    /// about the CUT that replaces it.
-    ///
-    /// Both bounds snap INWARD: up for the start, down for the end. Inward is
-    /// the conservative direction for an edit that deletes material — it can
-    /// leave a frame of room tone, which is inaudible, where outward would
-    /// clip the attack of the next word, which is not. A frame at 30 fps is
-    /// 20 000 ticks against a bucket's 6 000, so nearest-snapping could move a
-    /// cut by more than the detection resolution, and in the wrong direction
-    /// half the time.
-    private static func refine(_ runs: [Span], settings: Settings, fps: Fps) -> [Span] {
-        var out: [Span] = []
-        for run in runs {
-            guard run.length >= settings.minLength else { continue }
-            let padded = Span(
-                start: run.start + settings.padding, end: run.end - settings.padding)
-            guard padded.end > padded.start else { continue }
-            let snapped = Span(
-                start: snapUpToFrame(padded.start, fps: fps),
-                end: snapDownToFrame(padded.end, fps: fps))
-            guard snapped.start >= 0, snapped.end > snapped.start else { continue }
-            out.append(snapped)
-        }
-        return out
+            judgedByLevel: judgedByLevelMedia.sorted(), voicePending: voicePendingMedia.sorted(),
+            proposedMedia: proposed.sorted())
     }
 
     // MARK: - The quiet test

@@ -67,10 +67,16 @@ normative: §5.2 is the project schema, §6 the op table, §7 the architecture.
   immutable project handle, so undo is a stack of handles and a refused
   edit costs nothing.
 - **The screencast trio.** **Remove Silences** (Clip ▸ Remove Silences…)
-  finds the dead air — threshold, minimum length and padding, over the
-  selected clips or everything audible — shades the candidate spans on the
-  ruler and the lanes while you tune it, and takes them all out in one undo
-  step, however many cuts that is. It measures what you HEAR, not what is
+  finds the dead air — Judge by Voice or Level, threshold, minimum length
+  and padding, over the selected clips or everything audible — shades the
+  candidate spans on the ruler and the lanes while you tune it, and takes
+  them all out in one undo step, however many cuts that is. **Voice is the
+  default**: quiet means "nobody is talking", judged by a Silero
+  voice-activity model that runs on your machine over each file once and is
+  cached beside the waveform — so a quiet microphone is not mistaken for
+  silence and a hum is not mistaken for speech. A clip whose sound holds no
+  voice at all (music, a tone) falls back to the level rule and the sheet
+  says which files those were. It measures what you HEAR, not what is
   in the file: the level it tests is the waveform peak times the mix
   envelope, so a muted or soloed-out clip is silent for free. **Zoom to
   Region** (Z, or the Actions section's button) is the screencast zoom:
@@ -241,7 +247,7 @@ Makefile              Build orchestration
 | `FrameWriter.swift` · `EditorViewController+SaveFrame.swift` | one composed frame to a PNG, JPEG or HEIC — a value type with no AppKit in it, called by File ▸ Save Frame… and by `render_frame` alike — and the panel that picks the URL |
 | `ExportPresetsStore.swift` · `ExportQueueController.swift` · `ExportQueueWindowController.swift` · `AppSupport.swift` | the last export choice and the named presets as a value, the queue (one job at a time, each holding the timeline as it was enqueued) and its window, and the one spelling of `~/Library/Application Support/Reelcut/` |
 | `AudioTap.swift` · `AudioDSP.swift` · `LevelMeter.swift` · `LevelMeterView.swift` | the sample-level audio the plan cannot carry (noise reduction, the compressor, the mono fold, the pan) and the level meter's model and its one view |
-| `MediaPeaks.swift` · `AudioNormalize.swift` · `SilenceDetector.swift` | the waveform cache and the two questions asked of it: a clip's own peak (Normalize) and peak × envelope (the quiet spans) |
+| `MediaPeaks.swift` · `AudioNormalize.swift` · `SilenceDetector.swift` (+`Walls`) · `SileroVAD.swift` · `MediaSpeech.swift` | the waveform cache and the questions asked of it: a clip's own peak (Normalize) and peak × envelope (the quiet spans in Level mode) — plus the Core ML voice model and its own per-media cache, which is what Voice mode asks |
 | `Loudness.swift` | BS.1770-4 integrated loudness and true peak, the export gain that follows, and the 16-bit scaler that applies it |
 | `TimelineLayout.swift` · `TimelineSessions.swift` · `TimelineView.swift` | all tick↔point arithmetic; the gesture session structs; the timeline view |
 | `CanvasSessions.swift` · `PreviewCanvasView.swift` · `EditorViewController+PreviewQuality.swift` · `PreviewWindowController.swift` | canvas geometry and gestures; the preview and its overlay; the preview's render size (View ▸ Preview Quality, applied to a copy of the player's composition so the export path cannot see it) and the second preview window, an `NSPanel` carrying a second layer on the same player |
@@ -351,7 +357,7 @@ hue rather than paints with it, is the one `[r, g, b]` in the model.
 | `record_screen {seconds, display?, window?, microphone?, system_audio?, show_clicks?, rate?, size?, place?, path?}` | records a display (index, 0 = main) or a window (a `CGWindowID`) for `seconds` and lands it as a clip at the target document's playhead — or as an untitled document rated at `rate` when nothing is open (File ▸ New Recording…). `microphone` records the default microphone to a second file on a Microphone track; `path` is a FOLDER override. It reads the two grants and never asks: the refusal names the System Settings pane, and a shell-launched instance runs under its TERMINAL's grants |
 | `transcribe {clips?, language?, place?}` | on-device speech recognition into caption clips (File ▸ Generate Captions…). Returns the cues in ticks whether or not it places them, and `place: false` changes nothing at all. macOS gates speech recognition and this tool never asks: without the grant it refuses with the status named, since the system prompt needs a frontmost app and an agent-driven one never is |
 | `export_captions {track?, path, format?}` | one text track out as `.srt` or `.vtt` (File ▸ Export Captions…). The track is never guessed — with no all-text track, or more than one, it refuses and lists the candidates |
-| `detect_silence {clips?, threshold_db?, min_length?, padding?}` | the quiet spans of the timeline, which `ripple_delete_ranges` then cuts — the same detector Clip ▸ Remove Silences… uses, so an agent and the sheet propose the same cuts. It changes nothing; loudness is the waveform peak times the mix envelope, so mute and solo are already in the answer |
+| `detect_silence {clips?, mode?, voice_confidence?, threshold_db?, min_length?, padding?}` | the quiet spans of the timeline, which `ripple_delete_ranges` then cuts — the same detector Clip ▸ Remove Silences… uses, so an agent and the sheet propose the same cuts. It changes nothing. `mode` is `voice` (the default, the cached Silero probability against `voice_confidence`) or `level`; either way a moment the mix envelope alone puts under `threshold_db` is quiet, so mute and solo are already in the answer, and the result names any file still being analysed and any judged by level |
 | `normalize_clip {clips, peak_db?}` | sets each clip's volume so its own loudest moment lands at `peak_db` (default −1 dBFS) — the Volume section's Normalize button and Clip ▸ Normalize. Measured from the waveform cache over the part that plays, so it knows nothing about the volume, fades, ducking, mute or solo already on the clip; it replaces the volume rather than multiplying it, writes the clip's base level even inside an action, and leaves `muted` alone. One gain per clip, one undo step, and what it could not measure comes back under `skipped` |
 | `set_playhead {t}` | moves the playhead and seeks the preview |
 | `set_range {start?, end?}` | the in/out range (I / O / ⌥X); no bounds clears it |

@@ -1307,7 +1307,10 @@ lockstep are in the root `CLAUDE.md`; the full design is
   `SileroVAD.isAvailable`. `SilenceDetector+Walls.swift` is the
   nest walls and the directional frame snap, a pure move out at road map
   4's toll 1 (`NestExtent` and the five functions widened to internal for
-  it).
+  it); **`refine` joined them on 2026-09-20** as the toll for the sceptic's
+  pass over the reader review (road map 4 §8), which needed room in the
+  detector for `Outcome.proposedMedia` — the sixth function widened to
+  internal, still answering to the snapshot alone, still calling both snaps.
   **2026-09-19, the fallback is keyed per VOICE.** It was computed per voice
   and READ per media: `detect` filled a `Set<UInt32>` of media holding no
   voice and asked `contains(segment.media)` inside the walk, so a file that

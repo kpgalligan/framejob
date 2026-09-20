@@ -22,6 +22,13 @@ import AppKit
 /// real bugs in this file's neighbours have been.
 extension AgentServer {
 
+    /// The longest a duration argument may be, `snappedTick`'s own ±9.0e15:
+    /// past it `refine`'s `run.start + padding` overflows. Finding 1 above.
+    /// Not private: `AgentCatalog+Audio` PUBLISHES it as both durations'
+    /// `maximum`, so the bound a caller reads and the bound the handler
+    /// enforces are one number (the second sceptic pass, road map 4 §8).
+    static let durationCeiling = 9_000_000_000_000_000
+
     /// `detect_silence` — Clip ▸ Remove Silences…
     /// (`SilenceSheetController`, whose four controls are these four
     /// arguments and whose live "N cuts · removes M:SS" line is this
@@ -52,7 +59,7 @@ extension AgentServer {
                     + "measure silence against.")
         }
         let (settings, modeNote) = try silenceSettings(
-            a, document, scope: clips == nil ? input.defaultScope : .selected,
+            a, scope: clips == nil ? input.defaultScope : .selected,
             voiceAvailable: input.voiceAvailable)
         let outcome = SilenceDetector.detect(input, settings: settings)
 
@@ -88,9 +95,75 @@ extension AgentServer {
             ? pendingPeaks.union(outcome.voicePending) : pendingPeaks
         if !pendingUnion.isEmpty {
             result["pending_peaks"] = pendingUnion.sorted().map { Int($0) }
-            notes.append(
-                "Analysis is still running for \(pendingUnion.count) media file(s). Nothing "
-                    + "inside them is proposed for removal; call again in a moment.")
+            // "Nothing inside them is proposed for removal" is a PROMISE about
+            // the ranges in this same reply, so it is made only about the
+            // media it holds for. A media with no peaks is never quiet in
+            // LEVEL mode, so there it holds for every waiter; in VOICE mode a
+            // media whose waveform is missing but whose speech has landed is
+            // judged by the model and spans inside it ARE proposed — and the
+            // sentence used to deny exactly the ranges it was printed beside
+            // (the reader review, road map 4 §8, R3·1).
+            let waiter = outcome.mode == .voice ? Set(outcome.voicePending) : pendingPeaks
+            // And the promise is made about what this ANSWER shows, not about
+            // the mode: the gain FLOOR is asked before either cache
+            // (`SilenceDetector.isQuiet`), so a clip the mix has turned down,
+            // faded, ducked or muted is quiet with nothing on disk at all and
+            // its spans are right here (the reader review, road map 4 §8,
+            // finding 2). Whatever the answer proposes inside is dropped from
+            // the promise and counted in its own clause.
+            let proposedInside = waiter.intersection(outcome.proposedMedia)
+            let blocked = waiter.subtracting(proposedInside)
+            let waveformOnly = pendingUnion.subtracting(waiter)
+            var waiting =
+                "Analysis is still running for \(pendingUnion.count) media file(s); call "
+                + "again in a moment."
+            if !blocked.isEmpty {
+                waiting += blocked.count == pendingUnion.count
+                    ? " Nothing inside them is proposed for removal."
+                    : " Nothing inside \(blocked.count) of them is proposed for removal."
+            }
+            if !proposedInside.isEmpty {
+                waiting +=
+                    " \(Self.subject(proposedInside.count, of: pendingUnion.count, verb: "hold")) "
+                    + "spans that ARE proposed here: the mix turns them down far enough to be "
+                    + "quiet before either cache is asked."
+            }
+            if !waveformOnly.isEmpty {
+                // The mirror image of the promise above, and it needs the
+                // same intersection (the reader review's second sceptic pass,
+                // road map 4 §8). "Spans inside them ARE proposed here" is a
+                // claim about ranges in this very reply, so a waveform waiter
+                // the answer proposes NOTHING inside — every clip of it holds
+                // no voice, so the missing waveform blocks the lot — must not
+                // be told it has them.
+                let proposedHere = waveformOnly.intersection(outcome.proposedMedia)
+                let silentHere = waveformOnly.subtracting(proposedHere)
+                let ending: String
+                if silentHere.isEmpty {
+                    ending = ", so spans inside them ARE proposed here."
+                } else if proposedHere.isEmpty {
+                    ending = ", and nothing inside them is proposed here."
+                } else {
+                    ending =
+                        ", so spans inside \(proposedHere.count) of them ARE proposed here "
+                        + "and nothing inside the other \(silentHere.count) is."
+                }
+                waiting +=
+                    " For \(Self.subject(waveformOnly.count, of: pendingUnion.count)) it is the "
+                    + "WAVEFORM that has not landed, which in voice mode decides only a clip "
+                    + "holding no voice" + ending
+                // And where those spans are the FLOOR's rather than the
+                // model's, say so: a clip of a by-level media is proposed
+                // without its waveform only because the mix already turned it
+                // down. No `voicePending` arm is needed here — a voice waiter
+                // is in `waiter` above and never in `waveformOnly`.
+                if !proposedHere.intersection(outcome.judgedByLevel).isEmpty {
+                    waiting +=
+                        " A clip there that holds no voice is proposed only where the mix "
+                        + "already turns it down far enough to be quiet."
+                }
+            }
+            notes.append(waiting)
         }
         if !outcome.voicePending.isEmpty {
             result["voice_pending"] = outcome.voicePending.map { Int($0) }
@@ -105,6 +178,16 @@ extension AgentServer {
         return try jsonResult(result)
     }
 
+    /// "that file" / "them" / "2 of them", so a clause about SOME of the
+    /// waiters never says "the rest" of a sentence that was not printed
+    /// (the reader review, road map 4 §8, finding 4). `verb` is the third
+    /// person the clause needs when the subject is what HOLDS something.
+    private static func subject(_ count: Int, of total: Int, verb: String? = nil) -> String {
+        let noun = count == total ? (count == 1 ? "that file" : "them") : "\(count) of them"
+        guard let verb else { return noun }
+        return noun == "that file" ? "That file \(verb)s" : "\(noun) \(verb)"
+    }
+
     /// The three numbers, read in the sheet's own units and refused by name.
     ///
     /// The sheet clamps its controls to `Settings`' published ranges because
@@ -114,8 +197,7 @@ extension AgentServer {
     /// all — everything else is passed through and named back in the result,
     /// so a caller reading `threshold_db` sees what actually ran.
     private func silenceSettings(
-        _ a: [String: Any], _ document: ProjectDocument, scope: SilenceDetector.Scope,
-        voiceAvailable: Bool
+        _ a: [String: Any], scope: SilenceDetector.Scope, voiceAvailable: Bool
     ) throws -> (SilenceDetector.Settings, String?) {
         var settings = SilenceDetector.Settings(scope: scope)
         var note: String?
@@ -161,23 +243,42 @@ extension AgentServer {
             }
             settings.thresholdDB = thresholdDB
         }
-        // Both lengths go through `optionalTimeArg`, so they land on the
-        // frame grid like every other tick that reaches this side. A
-        // duration does not have to be on the grid the way a position does,
-        // but the spans this produces are snapped to it anyway, and one
-        // reader for every time argument is what keeps the snapping rule from
-        // drifting into a second copy.
-        if let minLength = try optionalTimeArg(a, "min_length", document) {
-            guard minLength >= 0 else {
-                throw ToolError(message: "min_length must not be negative.")
+        // Both lengths are DURATIONS, and a duration is not a position: they
+        // are read as given, by the whole-number reader, and are NOT snapped
+        // to the frame grid. The sheet's own two fields are not snapped
+        // either (`SilenceSheetController.silenceSettings`'
+        // `ReelTime.ticks(seconds:)`) and this tool exists to mirror it; the
+        // frame rule stays where it belongs, on the span BOUNDS `refine`
+        // produces, so no sub-frame time reaches an op from here. Going
+        // through `optionalTimeArg` cost that mirror at the DEFAULT rate:
+        // at 30 fps it ran `padding: 30000` — the sheet's own 0.05 s — as
+        // 40000, ran `min_length: 45000` as 40000, and dropped
+        // `padding: 9999` to 0, cutting the material the caller asked to
+        // keep (the reader review, road map 4 §8, R1·1).
+        //
+        // What `optionalTimeArg` DID carry and a duration still needs is its
+        // CEILING: `refine` adds the padding to a run's start, and a padding
+        // at `Int64.max` overflowed and killed the app rather than answering
+        // (the reader review, road map 4 §8, finding 1). The bound is
+        // `snappedTick`'s own ±9.0e15, refused in a sentence naming the
+        // argument. The sheet's two fields cannot reach it — they clamp to
+        // `minLengthRange` and `paddingRange` — so the guard belongs here,
+        // on the one caller that is not a slider.
+        if let minLength = try intArg(a, "min_length") {
+            guard minLength >= 0, minLength <= Self.durationCeiling else {
+                throw ToolError(
+                    message: "min_length must be a length in ticks (600000 per second) from 0 "
+                        + "to \(Self.durationCeiling).")
             }
-            settings.minLength = minLength
+            settings.minLength = Ticks(minLength)
         }
-        if let padding = try optionalTimeArg(a, "padding", document) {
-            guard padding >= 0 else {
-                throw ToolError(message: "padding must not be negative.")
+        if let padding = try intArg(a, "padding") {
+            guard padding >= 0, padding <= Self.durationCeiling else {
+                throw ToolError(
+                    message: "padding must be a length in ticks (600000 per second) from 0 "
+                        + "to \(Self.durationCeiling).")
             }
-            settings.padding = padding
+            settings.padding = Ticks(padding)
         }
         return (settings, note)
     }

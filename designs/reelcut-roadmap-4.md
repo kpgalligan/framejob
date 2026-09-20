@@ -1,7 +1,9 @@
 # Reelcut — road map 4: Remove Silences, second pass
 
-**Status: BUILT and PROVED — S1 landed in `1c3e92e` (2026-09-15) and §4g's
-two instruments on 2026-09-19.** The spike (S0) was RUN on 2026-09-13 and
+**Status: BUILT, PROVED and REVIEWED — S1 landed in `1c3e92e` (2026-09-15),
+§4g's two instruments on 2026-09-19, and the reader review 2026-09-20,
+CLOSED on that date including its second sceptic pass and the residue that
+pass left (§8).** The spike (S0) was RUN on 2026-09-13 and
 its answers are pasted below before any plan leans on them; §8 is the record
 of what landed, what was verified and what is owed. The sections between
 are the plan as it was written.
@@ -471,6 +473,18 @@ binary and quoted "against the N it had at the time".
   The scope popup is the escape.
 - The cache is 16 kHz mono of AVFoundation's downmix; a voice panned hard
   to one channel of a stereo file is halved before the model sees it.
+- `speechIsCurrent` checks that `cache/speech/<id>.bin` EXISTS, not that it
+  is the right length, and past a short one's end `MediaPeaks.window` answers
+  nil, `speechMax` answers 0 and the moment reads quiet. No input but a hand
+  edit of the cache file makes one — the buffer is always sized by
+  `media.duration`, a relink does not re-probe that duration, and the pass
+  writes the whole buffer or (since the reader review) nothing at all — so
+  it is a limit and not a defect (§8, R2·3).
+- `detect_silence`'s `min_length` and `padding` are read as given and the
+  span BOUNDS are what land on the frame grid. That is the sheet's own
+  arithmetic (§8, R1·1) and it means a caller can ask for a padding finer
+  than a frame; what it gets is a cut whose ends are still on the grid, so
+  the padding it asked for is honoured only to within one frame.
 
 ---
 
@@ -729,5 +743,527 @@ feeding `probabilities(of:)`'s samples through `feed` in 1000-sample buffers
 with a `flush` answers it back float for float, which is the row the
 streaming rules are actually proved on.
 
-**Owed, as of this record:** the reader review, and §4h's checks by a person
-at the machine (listed in `designs/reelcut-remaining.md` §4).
+### The reader review (2026-09-20)
+
+Four readers, one question each, then one independent sceptic. **The named
+deviation:** road map 5 §4f asks for PARALLEL readers and earlier reviews put
+every finding to three sceptics; this run is /litecode, which runs one agent at
+a time, so the four readers were SEQUENTIAL single-context passes — each
+finished and written into this section before the next started — and there is
+ONE independent sceptic. Every reader tried to refute its own findings first,
+by building the input and running it; nothing here is a vote.
+
+**The four questions, verbatim** (road map 4 never wrote its readers' questions
+down, so these are shaped on road map 5's and recorded here as the ones asked):
+
+1. **The rule's arithmetic**: `SilenceDetector`'s spans against every clip
+   shape — speed, reversal, a trimmed window, a clip inside a nest, a clip
+   whose window #22 has now snapped down, frame rates off the 30 fps grid
+   (30000/1001 and the recorder's 24981/1000), the level fallback per voice,
+   min length and padding at the span edges.
+2. **The cache and its lifecycle**: `cache/speech/<id>.bin` — the marker,
+   withdrawal and arrival posts (`replaced`), relink and consolidate, a file
+   swapped under an open sheet, a reader that will not build or start, a usage
+   of the cache while it is being written, what a stale or truncated `.bin`
+   answers.
+3. **The Swift and the MCP mirror**: the sheet's state against the detector's
+   outcome (`judgedByLevel` names MEDIA), undo names and the single undo step,
+   `detect_silence`'s arguments against the sheet's controls, refusals in the
+   rule's own sentence, the agent parity rules in `app/CLAUDE.md`.
+4. **The proof and the tests**: which claims of `tools/proof/silence2_proof.py`
+   and `silence2_probe.py` would pass against a build WITHOUT the feature, or
+   with the level rule standing in for the voice rule; which of the recorded
+   mutants overlap; what no claim reaches.
+
+**The baseline, measured before anything was read:** `make test`, `make lint`,
+`cargo fmt --check` and `make typecheck` (0 errors, the same 4 AVFoundation
+warnings) clean, and the two instruments **61/61** and **61/61** against the
+untouched tree, no skip. There is no R0·1.
+
+**Reader 1 — the rule's arithmetic.** The walk was re-run against the app
+tick for tick in shapes the suite does not carry: 30000/1001 and the
+recorder's 24981/1000 (the one rate whose frame is NOT a whole number of
+ticks — `Fps.frameDuration` truncates 24018.25 to 24018, and
+`snapUpToFrame`/`snapDownToFrame` were brute-forced over 400 frames of it and
+land on a real boundary in the right direction every time), a clip trimmed to
+[1 s, 9 s) of its source, ×0.5 / ×1.5 / ×2, reversed × trimmed, reversed ×
+speed, reversed at 24981/1000, and five (min_length, padding) pairs at the
+span edges including padding that annihilates a run. **Every one matched the
+reference walk exactly**, so the arithmetic itself is sound and the two
+findings below are elsewhere.
+
+- **R1·1** `app/Sources/AgentServer+Silence.swift:170-181` — `detect_silence
+  {padding: 30000}` at the DEFAULT 30 fps ran with padding **40000**, and
+  `{padding: 9999}` ran with **0** (measured: the spans come back two frames
+  wider at each end than asked), because both DURATIONS went through
+  `optionalTimeArg`, which snaps every tick to the frame grid; `min_length:
+  45000` likewise ran as 40000. The sheet's own fields do not snap
+  (`SilenceSheetController.silenceSettings` → `ReelTime.ticks(seconds:)`), so
+  the tool that exists to mirror the sheet answered a different cut from the
+  same request — and on `padding` in the destructive direction, eating the
+  material the caller asked to keep. Both are read by `intArg` now and are
+  reported back unchanged; the frame rule stays on the span BOUNDS, which
+  `refine` still snaps. **FIXED** — `silence2_proof.py` §10b, six rows (the
+  value echoed, and the spans the walk says at that value, for
+  `padding: 30000`, `min_length: 45000` and `padding: 9999`); a copy with the
+  two `optionalTimeArg` reads restored scores **75/79**.
+- **R1·2** `app/Sources/SilenceDetector.swift:113,209` — two doc sentences
+  said a media whose speech cache has not landed "is judged by" level (`Mode`)
+  and is "judged by level until it does" (`Outcome.voicePending`). It is not:
+  `isQuiet` answers `false` — never quiet — and no level test is run, which
+  is what §4c decided and what claim 8 already measures (with the `.bin`
+  withheld voice mode proposes NOTHING inside that media while level mode
+  answers the two pauses). Prose only; both sentences now say what the code
+  does, line for line so `SilenceDetector.swift` stays at its 595 and pays no
+  toll. **FIXED** — the behaviour's row is claim 8, and a copy whose pending
+  arm falls back to level, making the old sentence true, scores **77/79**,
+  taking claim 8's "proposes NOTHING inside it" and §8b's with it.
+
+**Reader 2 — the cache and its lifecycle.**
+
+- **R2·1** `app/Sources/MediaImporter+Speech.swift:97` — `writeSpeech`'s
+  read loop ends on a nil sample buffer, which means EITHER the track ran out
+  OR the decode gave up part way, and `reader.status` was never asked. The
+  rest of the zero-filled buffer then stayed at zero, zero is "nobody is
+  talking", and the pass wrote the `.bin` and CERTIFIED it with a marker
+  nothing would rebuild until the file's stamp changed. Input:
+  `clean.wav` re-encoded as AAC with bytes 45 %–70 % of the container zeroed
+  and the `moov` left intact, so AVFoundation reports the full 10.389 s and
+  the reader gives up at 2.05 s — voice mode then proposed
+  `[[2.1667, 10.2333]]`, **8.1 s of a 10.4 s file**. (A truncated WAV does not
+  produce this: AVFoundation reads its duration off the bytes that are
+  actually there, which is what the reader tried first.) `reader.status` is
+  read BEFORE the cancel now — the cancel would make every status
+  `.cancelled` — and anything but `.completed` writes no `.bin`, no marker
+  and no post, which is §4a's own posture for a reader that will not build or
+  start: the media stays `voice_pending`, is never quiet, and is retried on
+  the next open. **FIXED** — `silence2_proof.py` §8b, four rows over a new
+  `corrupt.m4a` fixture; a copy without the guard scores **76/79**.
+  The LEVEL half of the same hole is in `MediaImporter.peaks`, whose file is
+  604 lines and over the cap, so it takes nothing on: **FILED as
+  kpgalligan/reelcut#23**, and §8b's last row asserts that level still
+  proposes that tail, so the day #23 closes the row says so rather than
+  passing in silence.
+- **R2·2** `app/Sources/SilenceSheetController.swift:389` — `cacheChanged`
+  returned early unless `pendingMedia` or `pendingSpeech` held something, so a
+  post that arrived with NOTHING pending was dropped and the sheet went on
+  showing spans measured from bytes that were no longer on disk. That is K13
+  of the already-known list (`designs/reelcut-remaining.md` §5), recorded as a
+  limit on the reason that **no proof could drive the sheet** — and
+  `silence2_probe.py`'s claim 17 drives it through a real document and posts
+  at it, so the reason was false and the guard was one line. Dropped.
+  **FIXED** — `silence2_probe.py` claim 17, two rows: with both caches landed
+  and nothing pending, the `.bin` under the open sheet is replaced by one that
+  says "talking" at every chunk and a `speech` post is made — the readout goes
+  to **No cuts** and the wash to 0 — then the original bytes are posted back
+  and the two cuts return. A copy with the pending guard restored scores
+  **64/65**, taking the first of the two.
+- **R2·3** `app/Sources/MediaImporter+Speech.swift:24` — L4 of the plan's
+  leads: `speechIsCurrent` checks that the `.bin` EXISTS and not that it is
+  the right LENGTH, and past a short `.bin`'s end `MediaPeaks.window` answers
+  nil, `speechMax` answers 0 and the moment reads quiet. No input but a hand
+  edit of the cache file produces one: the buffer is always sized by
+  `media.duration`, a relink does not re-probe that duration (K14) so the size
+  does not move under it, and the pass either writes the whole buffer or (now)
+  nothing at all. **REFUTED as a defect — recorded as a limit, §5.**
+
+**Reader 3 — the Swift and the MCP mirror.**
+
+- **R3·1** `app/Sources/AgentServer+Silence.swift:89` and
+  `app/Sources/SilenceSheetController.swift:329` — the pending note DENIED
+  the answer printed beside it. Input: `clean.wav` imported, both caches
+  landed, then `cache/peaks/<id>.bin` deleted and `detect_silence` called in
+  voice mode. It answers `[[2.9, 4.1667], [6.8667, 7.7333]]` — two spans
+  inside media 2 — with `pending_peaks: [2]` and the note "Analysis is still
+  running for 1 media file(s). **Nothing inside them is proposed for
+  removal**; call again in a moment." Both halves of the reply are in the same
+  JSON object and one of them is false: `pending_peaks` folds BOTH waiters
+  (K21) and in voice mode a missing waveform does not silence a file — the
+  model has landed and decides. The sheet's twin said the same thing on
+  screen, over a timeline washed with the spans it was denying. The promise is
+  now made about what the ANSWER shows: the waiters of the mode that ran,
+  minus any media the reply already proposes a span inside
+  (`Outcome.proposedMedia`), with a waveform-only waiter and a
+  proposed-inside waiter each named for what it is. **FIXED** —
+  `silence2_proof.py` §8c, seven rows, and `silence2_probe.py` claim 17, two
+  more over the sheet; a copy with both old sentences restored scores
+  **78/79** and **64/65**. The FIRST spelling of the fix promised "only about
+  the media it holds for", which was still false by a second route, the gain
+  FLOOR — measured and closed by the sceptic's pass, finding 2 below.
+- **R3·2** `app/Sources/AgentCatalog+Audio.swift:52` — `mode`'s description
+  still said voice falls "back to level per FILE that holds no voice
+  anywhere", which is the read the 2026-09-19 fix above replaced: the fallback
+  is per VOICE, over the clip's own source window, and the three result
+  sentences were changed then while the argument's was not. Now "over any clip
+  whose own source window holds no voice". **FIXED** (prose; the behaviour is
+  claim 4's two-clip rows, which is what caught the code defect in the first
+  place).
+- **R3·3** `app/CLAUDE.md:320` — the file map spelled the gain FLOOR as
+  "`peak × envelope`". It is not: the floor is the plan's ENVELOPE alone
+  against the threshold (`gain(of:) > limit`), which is what makes a muted,
+  faded or ducked clip quiet in either mode BEFORE the model is asked;
+  `peak × envelope` is the level test that comes after it, and reading the
+  rule the way that line wrote it would make the two steps one. **FIXED**
+  (prose).
+- **R3·4** `designs/reelcut-design.md` §7.4 — the normative row for
+  `detect_silence` still read `{clips?, threshold_db?, min_length?,
+  padding?}`. S1 added `mode` and `voice_confidence` and four result keys, and
+  §4e's lockstep pass named §7.4 but did not reach it: §5.6's cache lines and
+  §7.10's file table were updated, the tool's own signature was not. The row
+  now carries both arguments, the confidence range and its refusal,
+  `judged_by_level`, `voice_pending` and the fold into `pending_peaks`.
+  **FIXED** (prose; the arguments themselves are claim 10's four refusals and
+  §10b's six rows).
+
+*Noticed in passing, no verdict:* with a nest on the timeline,
+`detect_silence`'s `clips` names the INNER clip's id — 3 where the top level
+holds only nest clip 6 — because the plan flattens a nest into one segment
+per clip inside it and `segment.clip` is the inner id. It is consistent (the
+id is accepted back as a scope and the nest wall then answers `[]`) and it is
+the same flattening `Input.nests` and K11 are about, so it is recorded here
+rather than filed. And `README.md`'s file-map row for the catalog still lists
+`AgentCatalog.swift · AgentCatalog+Clips.swift · AgentCatalog+Files.swift`,
+where the tree also has `+Audio` (road map 4's toll 2), `+Transitions` (road
+map 5) and `+Declarations` (road map 7) — drift from three road maps rather
+than this one's, left alone here and written down so the next pass through
+that table has it.
+
+**Reader 4 — the proof and the tests.** Two builds, each a copy of TODAY's
+tree (the binary at `1c3e92e^` is not built and would measure nothing: it has
+75 tools, writes no `cache/speech/<id>.bin`, and the probe names the S1 types
+on 20 lines and cannot compile against it, so both instruments would ABORT and
+every claim would read as "caught"):
+
+- **W1, "without the feature"** — `MediaImporter+Speech.swift`,
+  `probabilities[index] = value` → `= 0`. The pass still writes a `.bin` of
+  the right length under a current marker, so both instruments run to the end;
+  every window then reads 0, every clip falls back to LEVEL and the answers
+  are the shipped rule's.
+- **W2, "level standing in"** — `SilenceDetector.swift`, `isQuiet`'s voice arm
+  replaced by `level(...) <= limit`, the model never consulted.
+
+Each patch asserted its replaced text occurs exactly once; both ran on port
+4872 in the copy. **No cell is `unreached`** — each instrument ran to its
+count under each build, so nothing here is UNJUDGED.
+
+| Claim | W1 | W2 |
+|---|---|---|
+| 1 the clean fixture (walk, truth, 100 fps, ×2) | fails (4) | fails (4) |
+| 1e the recorder's 24981/1000 | fails (1) | fails (1) |
+| 2 `hum3.wav`, the headline | fails (5) | fails (5) |
+| 3 `quiet2.wav` | fails (4) | fails (4) |
+| 4 a tone, both modes, the fallback | **passes** | **passes** |
+| 4 voice THEN tone, two clips | fails (1) | fails (1) |
+| 6 the scope rule in voice mode | **passes** | **passes** |
+| 7 the nest wall in voice mode | **passes** | **passes** |
+| 8 the speech cache withheld | **passes** | fails (1) |
+| 8b a decode that stops part way | **passes** | fails (1) |
+| 8c the waveform withheld | fails (1) | fails (1) |
+| 9 reversed, the mirrored walk | fails (1) | fails (1) |
+| 10 the refusals | **passes** | **passes** |
+| 10b `min_length` and `padding` as given | fails (3) | fails (3) |
+| 11 the cut and the export | fails (1) | fails (1) |
+| 5 phase 3's own proofs | **passes** | **passes** |
+| 12 the wrapper, four ways | fails (1) | passes |
+| 12d the pinned trace | fails (2) | passes |
+| 13 the `.bin` then the marker | passes | passes |
+| 14 the withdrawal's order and `replaced` | passes | passes |
+| 15 a file with no audio | passes | passes |
+| 17 the sheet, open | fails (1) | fails (2) |
+| 17 the cache withheld, `peaks` post | passes | fails (3) |
+| 17 the cache withheld, `speech` post | passes | fails (3) |
+| 16 a process with no model | passes | passes |
+
+**Scores: W1 58/79 and 61/65; W2 56/79 and 57/65.**
+
+- **R4·1** `tools/proof/silence2_proof.py` claim 11 — it PASSED under both
+  builds, and §4g's own sentence for it is "phase 3 proves the cut; this
+  proves the answer was the right one to send". It did not: it exported
+  whatever `detect_silence` answered and proved the cut matched it, which a
+  build with no voice rule at all satisfies. **FIXED** — the section now
+  walks the spans it is about to cut over the app's own `cache/speech/<id>.bin`
+  before exporting them, and the row is what W1 and W2 each take in the table
+  above.
+- **R4·2** neither instrument reached a canvas rate whose frame is not a
+  WHOLE number of ticks. 30 fps is 20 000, 100 fps is 6 000 and 30000/1001 is
+  20 020; the recorder's own **24981/1000** is 24018.25, which
+  `Fps.frameDuration` truncates to 24018, and `snapUpToFrame` /
+  `snapDownToFrame` compose the nearest snap with that truncated step —
+  arithmetic nothing scored. Reader 1 measured it by hand over 400 frames and
+  against the app and it holds, which is why this is a gap and not a defect.
+  **FIXED** — `silence2_proof.py` §1e, three rows (the truncated step, the
+  answer against a walk that computes the boundary from the RATE, and every
+  bound a real boundary of a grid whose frames are 24018 and 24019 ticks apart
+  by turns); a copy whose `refine` snaps to the NEAREST frame instead of
+  directionally scores **74/79** and takes 1e's walk row with it.
+- **R4·3** — an ANSWER to the question's first part, not a finding. The nine
+  claims that pass under both are not defects and are not sharpened: 4's tone half and 5 are about the FALLBACK, which is the level
+  rule by definition; 6 and 7 are about the scope rule and the nest wall,
+  which are mode-independent and assert an answer a level build gives too; 10
+  is about the ARGUMENTS; 13, 14 and 15 are about the cache pass's files,
+  marker and posts, which W1 still writes and W2 does not touch; 16 is about a
+  process with no model at all. Each is honest about its own subject, and a
+  row that fails for a reason outside its subject would be a worse row.
+  Recorded so the table above is not read as nine holes.
+- **R4·4** — an ANSWER to the question's second part, not a finding: the
+  overlap, read off §8's own table without re-running K22's five. The
+  **64-sample context not carried** (59/61) fails a
+  strict SUBSET of what the **LSTM state not fed back** (57/61) fails — 12(c)
+  and 12(d)'s amplitude, where the state mutant takes the decisions too — and
+  the **window test made whole-file** (57/60) fails a strict subset of the
+  **fallback removed** (52/60), which takes claim 5 as well. Two overlaps,
+  each with a strictly stronger partner, and neither needed a run to see. W1
+  is the complement of the recorded **probability forced to 1** (33/59) and is
+  the WEAKER of the two on the MCP half, because a probability of zero routes
+  every clip through the level fallback where a probability of one simply
+  makes nothing quiet.
+
+**Where the review left the instruments.** `silence2_proof.py` **79/79** (61
+rows when it landed; §8b four, §8c four, §10b six, §1e three and claim 11's
+walk row are this review's — the sceptic's pass below took it to **83/83**)
+and `silence2_probe.py` **65/65** (61 at the
+landing; claim 17 gained two rows for the sheet's re-read and two for its
+note). Both scored 61/61 on the UNTOUCHED tree before anything was read, so
+the baseline is the landing's and nothing below is a pre-existing failure.
+`make test`, `make lint`, `cargo fmt --check` and `make typecheck` (0 errors,
+the same 4 AVFoundation warnings) are clean; no `.rs` file was touched.
+
+**The mutants this review added**, each a copy of the tree under the scratch
+directory on port 4872, every patch asserting its replaced text occurs exactly
+once, the app rebuilt in the copy and the probe compiled from it:
+
+| Mutant | Score | What it took |
+|---|---|---|
+| the two durations read through `optionalTimeArg` again | **75/79** | §10b's three echo rows and one of its three walk rows |
+| a pending speech cache falling back to level | **77/79** | claim 8's "proposes NOTHING inside it" and §8b's |
+| `reader.status` not consulted after the read loop | **76/79** | the whole of §8b but its level row |
+| the old pending sentence, in the tool and the sheet | **78/79** and **64/65** | §8c's note row; the sheet's note row |
+| `cacheChanged`'s pending guard restored | **64/65** | claim 17's swap row |
+| `refine` snapping to the NEAREST frame, not directionally | **74/79** | claim 1's walk, §1e's walk, claim 9 and two of §10b |
+| **W1**, the model's answer never reaching the cache | **58/79** and **61/65** | the table above |
+| **W2**, the level rule standing in for the voice rule | **56/79** and **57/65** | the table above |
+
+**Dependents re-run** against the final binary, because the files this review
+touched feed them: `phase3_proof.py` **123/123** and
+`phase3_silence_scope.py` **8/8** (inside claim 5), `remaining_proof.py`
+**79/79**, `remaining_probe.py` **170/170** and `source_mirror_probe.py`
+**40/40** — every one full. `e1_proof.py`, whose E1 section drives
+`detect_silence` over a transition wall, scores **85/95 with 10 rows SKIPPED
+by name**: it wants a SECOND instance built from the frozen `1c3e92e` tree on
+a reference port and this run launched only one, so those ten are the
+counts-and-version-6 rows that need it. Every row of it that calls
+`detect_silence` PASSED, including the wall rows and the crossfade-dip row.
+
+**Not judged here.** The sceptic's pass is the next step of this pipeline and
+anything it did not reach stays UNJUDGED rather than refuted; §4h's three
+listening checks are still a person's (`designs/reelcut-remaining.md` §4).
+
+### The sceptic's pass over this review, 2026-09-20
+
+The review above was re-read by a sceptic who ran both instruments himself
+(79/79 and 65/65 on his own instances) and judged all eleven findings. Nine
+he confirmed as they stood, one he confirmed as correctly REFUTED (R2·3);
+**two of the review's own FIXES were broken and were fixed here**, with two
+prose nits beside them:
+
+- **Finding 1, a blocker — `app/Sources/AgentServer+Silence.swift`.** R1·1
+  rightly stopped snapping the two durations, but `optionalTimeArg` had also
+  CAPPED them at ±9.0e15 and `intArg` caps nothing, so
+  `detect_silence {padding: 9223372036854775807}` reached `refine`'s
+  `run.start + settings.padding` and KILLED the app (`EXC_BREAKPOINT`,
+  "Swift runtime failure: arithmetic overflow", crash reports
+  `Reelcut-2026-09-20-050302.ips` the sceptic's and `…-051240.ips` this
+  pass's own, both inside `SilenceDetector.refine`). The schema publishes no
+  `maximum` and the argument gate reads NAMES, so nothing else stood in the
+  way. **FIXED**: both durations are bounded by `snappedTick`'s own ceiling
+  and refused in a sentence naming the argument — `silence2_proof.py` claim
+  10 gained the row, made to fail on purpose against the pre-fix binary,
+  where it does not mis-answer but takes the socket down with the app.
+  **The SHEET cannot reach it**: `minimumSeconds` and `paddingSeconds` clamp
+  to `minLengthRange` (0.05–10 s) and `paddingRange` (0–2 s) and `clamp`
+  answers the lower bound for a non-finite field, so the guard belongs on
+  the tool and the arithmetic needs none at its root.
+- **Finding 2, a should-fix — the pending note, again.** R3·1's replacement
+  still denied ranges printed beside it, by a second route: the gain FLOOR is
+  asked BEFORE either cache (`isQuiet`), so a clip the mix has turned down,
+  faded or ducked is quiet with nothing on disk at all. Measured pre-fix, a
+  clip at `volume: 0.001` with its speech cache withheld answered
+  `ranges: [[60000, 6160000]]`, `voice_pending: [2]` and "… **Nothing inside
+  them is proposed for removal.**" **FIXED** at the root the two notes share:
+  `SilenceDetector.Outcome` now carries `proposedMedia`, the media a span in
+  this answer actually lands inside, and the promise is made only about a
+  waiter that is NOT one of them — the rest counted in a clause of its own.
+  That held for the tool and for the sheet's LEVEL branch when this was
+  written; the sheet's voice-mode WAVEFORM line was one branch short of it
+  until the residue pass below closed that too, and it is true of the code as
+  it now stands. Three rows landed at the foot of `silence2_proof.py` §8c,
+  and MEASURED against the pre-fix binary only ONE of them fails: the NOTE
+  row. The other two (`voice_pending == [media]` and `spans != []`) fix the
+  setup the note is read in and pass pre-fix — exactly what the pre-fix
+  measurement in this same bullet shows (`ranges: [[60000, 6160000]]`,
+  `voice_pending: [2]`).
+- **Finding 3, a nit — `SilenceDetector.swift:209`.** R1·2's replacement said
+  a pending media is "never quiet" without qualification, where the floor can
+  make it quiet with no model at all. Restored to "never quiet **by the
+  model**, and not judged by level either". **FIXED** (prose).
+- **Finding 4, a nit — the note's waveform clause.** With no blocked waiter
+  it read "For **the rest** it is the WAVEFORM …" after a sentence that was
+  not printed. Each clause now names its own count ("that file", "them",
+  "2 of them"), and §8c's two note rows assert the WHOLE sentence rather than
+  a substring, so the shape of the note is scored and not just a phrase in
+  it. **FIXED**.
+
+**The size toll it cost.** `SilenceDetector.swift` was at 595 of 600 and
+`Outcome.proposedMedia` needed room, so `refine` and its doc moved to
+`SilenceDetector+Walls.swift` — the pure move road map 4 §5 had already
+planned as Toll A, `private static` → `static`, the file's header sentence
+naming it. The detector is **586**, `+Walls` **178**, and no other file grew
+past its cap (`AgentServer+Silence.swift` 253, `SilenceSheetController.swift`
+528).
+
+**Verified after the fixes**, on this pass's own instance (port 4893, killed
+by PID; `grep "Reelcut: "` printed nothing): `make test`, `make lint`,
+`cargo fmt --check` clean, `make typecheck` 0 errors and the same 4
+AVFoundation warnings, `make app` BUILD SUCCEEDED, `silence2_proof.py`
+**83/83** and `silence2_probe.py` **65/65**. No `.rs` file was touched.
+
+### The second pass's residue, closed 2026-09-20
+
+The sceptic's pass above ended `fix-required` with one should-fix and four
+nits, and that pipeline runs no second fix pass. They were closed here, in
+the tree, on the same day. What each was and what closed it:
+
+- **Should-fix — the sheet's voice-mode WAVEFORM line
+  (`SilenceSheetController.swift`).** Finding 2's fix was one branch short:
+  that line said "Anything inside it that holds no voice is left alone until
+  it lands" without ever asking `proposedMedia`, so a ducked clip whose
+  window holds no voice had its whole span proposed by the gain FLOOR while
+  the sheet denied it. MEASURED on the pre-fix binary, `tone.wav` at
+  `volume: 0.001` with its waveform withheld: the sheet read "1 cut ·
+  removes 00:00:09:24" over "…is left alone until it lands". **FIXED** by a
+  new `waveformPromise()` beside `promise(about:)`, which HEDGES — "…, unless
+  the mix already turns it down far enough to be quiet." — when some media is
+  in `pendingMedia ∩ proposedMedia ∩ (judgedByLevel ∪ voicePending)`, and
+  answers the plain sentence otherwise.
+- **The DECISION, against the sceptic's suggested fix.** He proposed routing
+  that branch through `promise(about:)`, as the level branch does. It is not
+  routed there. That helper picks its arm by `proposedMedia` membership
+  (`SilenceSheetController.swift:383-387`), and in the `afterPeaksGone`
+  state — `clean.wav`, un-ducked, speech landed, waveform withdrawn — the
+  media IS in `proposedMedia`, because the MODEL proposes 2 cuts inside it.
+  The helper would therefore answer "What is proposed inside is quiet in the
+  MIX — turned down, faded or ducked", which is false: nothing there is
+  turned down. The MIX arm is the false one; the "Nothing inside is proposed
+  for removal yet." arm is not (it is reached only with nothing proposed
+  inside). **No existing row caught the rejected route**: claim 17's
+  `afterPeaksGone` row in `silence2_probe.py` forbids only the "Nothing"
+  substring and would
+  have PASSED under it — which is why a second `afterPeaksGone` row
+  forbidding `quiet in the MIX` was added, and mutant (e), the rejected route
+  itself, is what fails it. `promise(about:)` stays sound for its two
+  existing callers: a missing speech cache, or a missing waveform in level
+  mode, blocks EVERY clip of that media, so whatever is proposed inside one
+  IS the floor's.
+- **The gate's `voicePending` arm, and the state it exists for.**
+  `SilenceDetector.swift:419-421` returns `(voice, false)` for a voice whose
+  speech cache is missing BEFORE `judgedByLevelMedia.insert` at :428, so a
+  ducked clip with NEITHER cache on disk is proposed by the floor
+  (`isQuiet`, :559) and is in `pendingMedia`, `voicePending` and
+  `proposedMedia` but never in `judgedByLevel`. A hedge gated on
+  `judgedByLevel` alone would miss it. Probe mode `ducked` reads two states
+  for exactly this reason, and mutant (d) — the arm dropped — fails the
+  second and passes the first.
+- **Nit — `silence2_proof.py` claim 10.** Only `padding`'s ceiling was
+  scored, so a build that kept the guard on one duration and dropped it on
+  the other still scored full. Three rows added: `min_length` at the ceiling
+  plus one, and a NEGATIVE value of each, all by the rule's own sentence.
+- **Nit — `AgentCatalog+Audio.swift`.** Both durations published `"type":
+  "integer"` and no bounds while their neighbours published theirs, so the
+  ceiling lived only in a refusal sentence and the gate reads NAMES. Both now
+  publish `"minimum": 0` and `"maximum": AgentServer.durationCeiling` (the
+  one spelling: `durationCeiling` lost its `private`) and each description
+  names the range. A fourth claim-10 row asserts what `tools/list` publishes.
+- **Nit — `AgentServer+Silence.swift`'s `waveformOnly` clause.** The mirror
+  image of the defect just fixed: it claimed "spans inside them ARE proposed
+  here" without intersecting `proposedMedia`. It now splits that set and ends
+  one of three ways, and where the proposed half is judged by level it adds
+  " A clip there that holds no voice is proposed only where the mix already
+  turns it down far enough to be quiet." A fixture CAN reach it: a tone file
+  (no voice anywhere, so judged by level) with its waveform withheld proposes
+  nothing, and ducked to `volume: 0.001` with the same waveform still missing
+  proposes its span. Four rows at the foot of `silence2_proof.py`'s
+  `tone_part`, on its own session. The clause needs no `voicePending` arm — a
+  voice waiter is in `waiter` and never in `waveformOnly`.
+- **Nit — this document.** Finding 2's two sentences above are amended: what
+  the pre-fix binary actually failed was the NOTE row alone.
+
+**The limit this leaves.** Both notes are MEDIA-granular. `proposedMedia`,
+`judgedByLevel` and `voicePending` are sets of media ids, so neither the
+sheet nor the tool can say WHICH clip of a file the mix made quiet; the
+sheet's waveform line therefore HEDGES ("unless the mix already turns it
+down far enough…") instead of naming the clip, and the tool's clause counts
+files. A per-voice answer needs a new `Outcome` field and
+`SilenceDetector.swift` is at 586 of 600, so it would cost a size toll — it
+is not owed by anything here, and it is recorded so the next reader knows the
+sentence is a conditional on purpose.
+
+**Which rows failed PRE-FIX**, measured on the unmodified binary before any
+of the three Swift changes went in, not predicted:
+
+| Instrument | Score pre-fix | The rows that failed |
+|---|---|---|
+| `silence2_proof.py` | **88/91** | the two `tone_part` note rows, and the claim-10 row that reads the published schema |
+| `silence2_probe.py` | **74/76** | the `duckedNoPeaks` hedge row and the `duckedNoCaches` hedge row |
+
+The other six new rows PASS pre-fix on purpose: three fix the state a note is
+read in, two under `afterPeaksGone` are what the mutants below fail, and the
+three claim-10 refusals are guards against a guard being dropped.
+
+**The mutants**, all five in ONE copy of the tree under the scratch
+directory, each patch asserting its replaced text occurs exactly once, the
+app rebuilt in the copy on port 4911 and the probe compiled from it:
+
+| Mutant | Score | What it took |
+|---|---|---|
+| (a) `min_length`'s guard deleted | **89/91** | claim 10's two `min_length` rows |
+| (b) `padding`'s `>= 0` deleted | **90/91** | claim 10's `padding: -1` row |
+| (c) `waveformPromise()` hedging always | **75/76** | the `afterPeaksGone` "no hedge" row |
+| (d) the gate's `voicePending` arm dropped | **75/76** | the `duckedNoCaches` hedge row alone — `duckedNoPeaks` still passes |
+| (e) the waveform branch routed through `promise(about:)` — the rejected fix | **73/76** | the `afterPeaksGone` `quiet in the MIX` row and both hedge rows |
+
+**Verified after the fixes**, on this run's own instances (4907 and 4909,
+killed by PID, one instrument each; `grep "Reelcut: "` printed nothing on
+either): `make test`, `make lint` and `cargo fmt --check` clean,
+`make typecheck` 0 errors and the same 4 AVFoundation warnings, `make app`
+BUILD SUCCEEDED, `silence2_proof.py` **91/91** (with `phase3_proof.py`
+123/123 and `phase3_silence_scope.py` 8/8 inside claim 5),
+`silence2_probe.py` **76/76** and `op_argument_proof.py` **116/116** — the
+last re-run because item 4 changed a published schema, and unchanged as
+expected: `detect_silence` is an APP-STATE tool, so parity part 3 reads only
+object/properties/required, part 5 skips non-ops, the gate reads names, and
+that script's section 2 walks op tools only. No `.rs` file was touched.
+
+**Filed, not fixed:** kpgalligan/reelcut#24 — a clip's `start` is bounded at
+9.0e15 per CALL and not cumulatively, so about 1020 successive maximum-delta
+`move_clip`s walk it toward `Int64.max` and the app dies in
+`ClipSnapshot.end` (`app/Sources/ProjectSnapshot.swift:1700`) during
+`TimelineView.rebuildLayout`. The core saturates
+(`core/src/edit_clip.rs:557`, `clip_end` :95) and Swift does not. Reproduced
+once by the sceptic (PID 19353) and NOT re-run here. Labelled `bug` and not
+`ready-for-agent`: where the bound belongs — a ceiling on `start` in the
+core's op, or overflow-safe arithmetic in the app — is a spec §11 decision.
+
+**The residue pass's own review (2026-09-20) passed with three notes, closed
+by hand.** One of them is a limit and stays: the tool note's THIRD ending in
+`AgentServer+Silence.swift` ("spans inside N of them ARE proposed here and
+nothing inside the other M is") is UNSCORED. Both fixtures hold a single
+waveform-waiting media, so no row and no mutant reaches the mixed case; a
+row for it needs a document with two such media, one ducked. The other two
+were a line citation that this pass's own edit had moved (now cited by
+name) and `tone_part`'s last rows changing their session in place (now
+marked at the site so nothing is appended below them).
+
+**Owed, as of this record:** §4h's checks by a person at the machine
+(listed in `designs/reelcut-remaining.md` §4), kpgalligan/reelcut#23 — the
+LEVEL half of R2·1, which `MediaImporter.swift`'s size cap kept out of this
+review — and kpgalligan/reelcut#24, filed above and outside S1 entirely.

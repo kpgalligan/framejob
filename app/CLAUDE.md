@@ -317,8 +317,10 @@ free.
   Silences and `detect_silence`. The detector has a `Mode`, `voice` (default)
   or `level`, and is PURE and synchronous over `Input.read`'s snapshot so the
   sheet re-detects per control change. Per step, in this ORDER: the gain
-  FLOOR (`peak × envelope`, so mute and solo fall out of the plan's zero
-  envelope), then a voice whose source window holds no voice falls back to
+  FLOOR — the plan's ENVELOPE alone against the threshold, which is what makes
+  a muted, soloed-away, faded or ducked clip quiet in EITHER mode before the
+  model is asked, and is not `peak × envelope`, the level test after it — then
+  a voice whose source window holds no voice falls back to
   level (its media named), then a media whose speech cache has not landed is
   never quiet. A silenced clip is dropped from either scope rather than
   counted; a NEST is a wall. `SileroVAD` is the streaming Core ML wrapper over

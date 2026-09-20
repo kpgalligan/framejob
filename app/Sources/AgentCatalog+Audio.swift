@@ -50,11 +50,11 @@ extension AgentServer {
                     "mode": [
                         "type": "string", "enum": ["voice", "level"],
                         "description": "voice (the default) judges by the cached Silero VAD "
-                            + "probability, falling back to level per file that holds no "
-                            + "voice anywhere; level is today's rule alone. voice is refused "
-                            + "when the voice model could not be used this process — the "
-                            + "result names it and omitting mode falls back to level with a "
-                            + "note instead.",
+                            + "probability, falling back to level over any clip whose own "
+                            + "source window holds no voice; level is today's rule alone. "
+                            + "voice is refused when the voice model could not be used this "
+                            + "process — the result names it and omitting mode falls back to "
+                            + "level with a note instead.",
                     ],
                     "voice_confidence": [
                         "type": "number", "minimum": 0.1, "maximum": 0.9,
@@ -67,15 +67,24 @@ extension AgentServer {
                         "description": "Quieter than this counts as silence, in dBFS in the "
                             + "mix. Default -40.",
                     ],
+                    // Both durations publish the bound the handler enforces
+                    // (`AgentServer.durationCeiling`), which the argument
+                    // GATE cannot: it reads names, never values, so a caller
+                    // reading the schema saw no ceiling at all until the
+                    // second sceptic pass (road map 4 §8).
                     "min_length": [
-                        "type": "integer",
+                        "type": "integer", "minimum": 0,
+                        "maximum": AgentServer.durationCeiling,
                         "description": "The shortest quiet run worth cutting, \(ticks) "
-                            + "Default 0.5 s (300000).",
+                            + "Default 0.5 s (300000). From 0 to "
+                            + "\(AgentServer.durationCeiling).",
                     ],
                     "padding": [
-                        "type": "integer",
+                        "type": "integer", "minimum": 0,
+                        "maximum": AgentServer.durationCeiling,
                         "description": "Left at each end of every candidate, \(ticks) "
-                            + "Default 0.1 s (60000).",
+                            + "Default 0.1 s (60000). From 0 to "
+                            + "\(AgentServer.durationCeiling).",
                     ],
                 ]),
             tool(

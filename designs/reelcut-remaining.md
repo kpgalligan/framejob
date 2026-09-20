@@ -429,8 +429,11 @@ and the closing above added the rest.
   machine, which is why they are listed here: only a run at an unlocked screen
   asks them at all.
 - **Remove Silences judged by VOICE, listened to** — road map 4 §4h's three,
-  now that §4g's instruments have landed (`silence2_proof.py` 61/61,
-  `silence2_probe.py` 61/61, 2026-09-19): a narrated screencast recorded by
+  now that §4g's instruments have landed and the reader review has widened
+  them (`silence2_proof.py` 91/91, `silence2_probe.py` 76/76, 2026-09-20,
+  after the second sceptic pass's residue was closed; 83/83 and 65/65 after
+  the sceptic's pass over that review, 79/79 and 65/65 at the review's close,
+  and 61/61 and 61/61 when they landed on 2026-09-19): a narrated screencast recorded by
   the app's own recorder with the microphone on, run through Voice mode with
   the truth marked BY EAR and the spans compared, which q7 is the reason for
   — the one real mixed recording in hand defeats both VADs and nobody has
@@ -499,6 +502,23 @@ not an action target and the model, the plan and the audio envelopes would all
 have to learn); and the explicit non-goals — LUTs, motion blur, stabilisation,
 optical-flow retiming, auto-reframe, multicam, plugins, other platforms.
 
+**One pre-existing defect a caller CAN reach, filed and not fixed** —
+kpgalligan/reelcut#24, found by the sceptic's second pass over road map 4's
+reader review and outside that diff entirely
+(`designs/reelcut-roadmap-4.md` §8). A clip's `start` is bounded at ±9.0e15
+**per call** (`snappedTick`, `app/Sources/AgentServer+Arguments.swift:370`)
+and never cumulatively, so about 1020 successive maximum-delta `move_clip`s
+walk a clip's start toward `Int64.max`. The core SATURATES and says nothing
+(`core/src/edit_clip.rs:557`, `clip_end` :95); the app then TRAPS on the
+same sum, `ClipSnapshot.end` being `start + duration`
+(`app/Sources/ProjectSnapshot.swift:1700`), during
+`TimelineView.rebuildLayout`, and the process dies. Reproduced once, by the
+sceptic, 2026-09-20. It is labelled `bug` and deliberately NOT
+`ready-for-agent`: **where the bound belongs is a spec §11 decision** — a
+ceiling on `start` in the core's own op, refused in the rule's own sentence,
+or overflow-safe arithmetic in the app, which changes nothing a caller can
+see. A person picks one and records it before any code.
+
 **One pre-existing defect nothing can reach**, found by the probe deepening
 D2·2 built and named here because that ticket said it belonged in this
 document: `ProjectDocument.performGroupedEdit` opens an undo group and
@@ -539,12 +559,16 @@ Three small things the closing turned up that a third road map would pick up
 on its way past, none worth a phase: `relink_media` could re-probe the file
 it is pointed at (§2a's recorded limit); the panel and MCP spellings of a
 caption name carrying another of the app's containers could be made to agree
-by a decision in spec §11 (§2b's); and `SilenceSheetController.cacheChanged`
-re-reads on a peaks post only while something is pending, so spans an open
-sheet measured from a file that an MCP `relink_media` then swapped away (the
-sheet is modal, so nothing else can) stay until the sheet is reopened — a
-one-line guard, left because no proof can drive the sheet and the tree does
-not ship a fix without one.
+by a decision in spec §11 (§2b's); and `SilenceSheetController.cacheChanged` re-read on a
+peaks or speech post only while something was pending, so spans an open sheet
+measured from a file that an MCP `relink_media` then swapped away (the sheet
+is modal, so nothing else can) stayed until the sheet was reopened — left as
+a one-line guard on the belief that no proof could drive the sheet.
+**Closed 2026-09-20** by road map 4's reader review (§8, R2·2): the belief was
+wrong, `silence2_probe.py`'s claim 17 drives the sheet through a real document
+and posts at it, the guard is gone, and two rows there swap the `.bin` under
+an open sheet with nothing pending and watch the readout follow. A copy with
+the guard restored scores 64/65, taking the first of the two.
 
 Two more, found 2026-09-19 and worth a line each: `docs/agents/triage-labels.md`
 names a `needs-triage` label the repository does not have (`gh label list`

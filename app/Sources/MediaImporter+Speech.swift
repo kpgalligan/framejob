@@ -94,8 +94,22 @@ extension MediaImporter {
                 break
             }
         }
+        // BEFORE the cancel, which would make every status `.cancelled`: the
+        // loop above ends on a nil buffer, and a nil buffer means the track
+        // ran out OR the decode gave up part way. The second leaves the rest
+        // of `probabilities` at ZERO, and zero is "nobody is talking" — so a
+        // file whose middle will not decode would be certified by the marker
+        // below and its whole undecodable tail proposed for removal in voice
+        // mode (measured on a corrupt AAC: the reader stops at 2.05 s of a
+        // 10.4 s file and 8.1 s of it was proposed). `peaks` has the same
+        // shape and its own fix is filed (kpgalligan/reelcut#23).
+        // Refusing here is `writeSpeech`'s stated posture for a reader
+        // that will not build or start (§4a): no `.bin`, no marker, retried on
+        // the next open, and the media stays `voice_pending` — never quiet —
+        // until it decodes.
+        let status = reader.status
         reader.cancelReading()
-        guard !failed else { return }
+        guard !failed, status == .completed else { return }
         do {
             if let tail = try vad.flush() { absorb([tail]) }
         } catch {

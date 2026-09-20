@@ -325,9 +325,16 @@ final class SilenceSheetController: NSViewController, NSTextFieldDelegate {
                 ? (outcome.pendingMedia.count == 1
                     ? "one file" : "\(outcome.pendingMedia.count) files")
                 : names.joined(separator: ", ")
+            // The promise is the LEVEL rule's: a media with no peaks is never
+            // quiet there. In voice mode the model has landed and spans
+            // inside the file are proposed — only a clip it found no voice in
+            // waits for the waveform (the reader review, road map 4 §8, R3·1).
             notes.append(
-                "The waveform is still being analysed for \(listed). Nothing inside is "
-                    + "proposed for removal yet.")
+                outcome.mode == .level
+                    ? "The waveform is still being analysed for \(listed). "
+                        + promise(about: outcome.pendingMedia)
+                    : "The waveform is still being analysed for \(listed). "
+                        + waveformPromise())
         }
         if !input.voiceAvailable {
             notes.append(
@@ -340,8 +347,8 @@ final class SilenceSheetController: NSViewController, NSTextFieldDelegate {
                     ? "one file" : "\(outcome.voicePending.count) files")
                 : names.joined(separator: ", ")
             notes.append(
-                "Speech is still being analysed for \(listed). Nothing inside is proposed "
-                    + "for removal yet.")
+                "Speech is still being analysed for \(listed). "
+                    + promise(about: outcome.voicePending))
         }
         if !outcome.judgedByLevel.isEmpty {
             let names = outcome.judgedByLevel.compactMap { input.snapshot.media($0)?.name }
@@ -366,6 +373,46 @@ final class SilenceSheetController: NSViewController, NSTextFieldDelegate {
         return notes.joined(separator: " ")
     }
 
+    /// The "nothing inside is proposed" line, made about what the ANSWER
+    /// shows rather than about the mode: the gain FLOOR is asked before
+    /// either cache (`SilenceDetector.isQuiet`), so a clip the mix has turned
+    /// down, faded, ducked or muted is quiet with nothing on disk at all and
+    /// its spans are in the readout above this line (the reader review, road
+    /// map 4 §8, finding 2). The tool's twin says the same in
+    /// `AgentServer+Silence`.
+    private func promise(about pending: [UInt32]) -> String {
+        pending.contains { outcome.proposedMedia.contains($0) }
+            ? "What is proposed inside is quiet in the MIX — turned down, faded or ducked — "
+                + "which neither cache can change."
+            : "Nothing inside is proposed for removal yet."
+    }
+
+    /// The VOICE-mode waveform line's own promise, which is narrower than
+    /// `promise(about:)` above and cannot borrow it (the reader review's
+    /// second sceptic pass, road map 4 §8). In voice mode the model has
+    /// landed for most of what is on screen, so a media whose waveform is
+    /// late still has spans proposed inside it BY THE MODEL — `promise` would
+    /// then answer "quiet in the MIX", which is false about a clip nothing
+    /// has turned down. What is true is a CONDITIONAL, and it is added only
+    /// where a clip of that media could be proposed without its waveform: the
+    /// media is one this answer proposes a span inside AND a clip of it holds
+    /// no voice (`judgedByLevel`) or its speech cache has not landed either
+    /// (`voicePending` — `SilenceDetector.detect` returns on a missing speech
+    /// cache BEFORE the by-level test, so a clip with neither cache on disk
+    /// is never in `judgedByLevel`). Both sets are media-granular, which is
+    /// why the sentence hedges instead of naming the clip.
+    private func waveformPromise() -> String {
+        let plain = "Anything inside it that holds no voice is left alone until it lands"
+        let hedge = outcome.pendingMedia.contains { media in
+            outcome.proposedMedia.contains(media)
+                && (outcome.judgedByLevel.contains(media)
+                    || outcome.voicePending.contains(media))
+        }
+        return hedge
+            ? plain + ", unless the mix already turns it down far enough to be quiet."
+            : plain + "."
+    }
+
     // MARK: - Controls
 
     @objc private func controlChanged(_ sender: Any?) {
@@ -381,15 +428,24 @@ final class SilenceSheetController: NSViewController, NSTextFieldDelegate {
         refresh()
     }
 
-    /// A peaks file landed. Re-read the input — that is the only way to pick
-    /// the new floats up, since `Input` holds them by value — and recompute.
-    /// The media id is not checked against the scope: a file this project
-    /// does not use posts nothing, and a re-read costs one pass over caches
-    /// that are already in the page cache.
+    /// A peaks or speech file landed, or was WITHDRAWN. Re-read the input —
+    /// that is the only way to pick the new floats up, since `Input` holds
+    /// them by value — and recompute.
+    ///
+    /// It re-reads whether or not anything is PENDING. It used to stop unless
+    /// `pendingMedia` or `pendingSpeech` held something, and the post that
+    /// matters most arrives when neither does: a relink driven from the agent
+    /// while this sheet is up withdraws the old `.bin` FIRST, so the sheet
+    /// went on showing spans measured from a file the project no longer uses
+    /// until something else woke it (the reader review, road map 4 §8, R2·2 —
+    /// the limit `designs/reelcut-remaining.md` §5 recorded as unprovable, on
+    /// the belief that no proof could drive this sheet; `silence2_probe.py`'s
+    /// claim 17 does). The media id is not checked against the scope: a file
+    /// this project does not use posts nothing, and a re-read costs one pass
+    /// over caches that are already in the page cache.
     @objc private func cacheChanged(_ note: Notification) {
         let kind = note.userInfo?[MediaImporter.cacheKindKey] as? String
         guard kind == MediaImporter.peaksKind || kind == MediaImporter.speechKind,
-              !input.pendingMedia.isEmpty || !input.pendingSpeech.isEmpty,
               let document = document,
               let reread = SilenceDetector.read(from: document)
         else { return }

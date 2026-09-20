@@ -8,6 +8,11 @@ import Foundation
 /// nothing but visibility: `excludingNests`, `overlap`, `merged`,
 /// `snapUpToFrame` and `snapDownToFrame` widen `private` to internal, since
 /// an extension member in another file cannot see another file's `private`.
+///
+/// `refine` came the same way and for the same reason, as road map 4's toll
+/// for the reader review's fixes: it is the third thing here that answers to
+/// the SNAPSHOT alone (a run, the two lengths and the frame grid), it calls
+/// both snaps, and it widens to internal beside them.
 extension SilenceDetector {
 
     // MARK: - The walls
@@ -119,6 +124,33 @@ extension SilenceDetector {
                 continue
             }
             out[out.count - 1] = Span(start: last.start, end: max(last.end, span.end))
+        }
+        return out
+    }
+
+    /// Length filter, then padding, then the frame grid — in that order,
+    /// because the minimum is about the RUN the ear heard and the padding is
+    /// about the CUT that replaces it.
+    ///
+    /// Both bounds snap INWARD: up for the start, down for the end. Inward is
+    /// the conservative direction for an edit that deletes material — it can
+    /// leave a frame of room tone, which is inaudible, where outward would
+    /// clip the attack of the next word, which is not. A frame at 30 fps is
+    /// 20 000 ticks against a bucket's 6 000, so nearest-snapping could move a
+    /// cut by more than the detection resolution, and in the wrong direction
+    /// half the time.
+    static func refine(_ runs: [Span], settings: Settings, fps: Fps) -> [Span] {
+        var out: [Span] = []
+        for run in runs {
+            guard run.length >= settings.minLength else { continue }
+            let padded = Span(
+                start: run.start + settings.padding, end: run.end - settings.padding)
+            guard padded.end > padded.start else { continue }
+            let snapped = Span(
+                start: snapUpToFrame(padded.start, fps: fps),
+                end: snapDownToFrame(padded.end, fps: fps))
+            guard snapped.start >= 0, snapped.end > snapped.start else { continue }
+            out.append(snapped)
         }
         return out
     }

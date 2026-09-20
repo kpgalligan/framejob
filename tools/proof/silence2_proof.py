@@ -255,6 +255,22 @@ def make_fixtures():
         run(["ffmpeg", "-y", "-v", "error", "-i", padded, "-i", fixture("tone.wav"),
              "-filter_complex", "[0:a][1:a]concat=n=2:v=0:a=1[o]", "-map", "[o]",
              "-c:a", "pcm_s16le", "-ac", "2", fixture("voicetone.wav")])
+    if REMAKE or not os.path.exists(fixture("corrupt.m4a")):
+        # A file whose MIDDLE will not decode: the clean fixture as AAC with
+        # bytes 45%–70% of the way through the container zeroed, leaving the
+        # `moov` (and so the DURATION) intact. AVFoundation starts the read,
+        # yields about two seconds and then gives up — the input the reader
+        # review's R2·1 needed and could not get from a truncated WAV, whose
+        # duration AVFoundation reads off the bytes that are actually there.
+        aac = fixture("corrupt.m4a")
+        run(["ffmpeg", "-y", "-v", "error", "-i", fixture("clean.wav"),
+             "-c:a", "aac", "-b:a", "128k", aac])
+        with open(aac, "rb") as handle:
+            raw = bytearray(handle.read())
+        for index in range(int(len(raw) * 0.45), int(len(raw) * 0.70)):
+            raw[index] = 0
+        with open(aac, "wb") as handle:
+            handle.write(bytes(raw))
     if REMAKE or not os.path.exists(fixture("mute.mov")):
         run(["ffmpeg", "-y", "-v", "error", "-f", "lavfi", "-i",
              "testsrc=size=320x180:rate=30:duration=2", "-pix_fmt", "yuv420p",
@@ -321,24 +337,32 @@ def round_half_away(numer, denom):
     return sign * ((2 * n + d) // (2 * d))
 
 
-def nearest_frame(t, frame):
-    """`ReelTime.snapToFrame` for a rate that divides the timescale —
-    `frame_index` then `tick_at_frame`, each rounding half away from zero
-    (`core/src/time.rs:145-176`). At 30 fps `frame` is 20 000 and at 100 fps
-    6 000, and both divide 600 000 exactly, so the composition is this."""
+def nearest_frame(t, frame, fps=None):
+    """`ReelTime.snapToFrame` — `frame_index` then `tick_at_frame`, each
+    rounding half away from zero (`core/src/time.rs:145-176`).
+
+    At 30 fps `frame` is 20 000 and at 100 fps 6 000; at 30000/1001 it is
+    20 020. Every one of those is a WHOLE number of ticks, so the composition
+    collapses to one rounding and `fps` may be left out. The recorder's
+    24981/1000 is not: a frame there is 24018.25 ticks, the app's
+    `Fps.frameDuration` truncates it to 24018, and the boundary has to be
+    computed from the rate itself — which is what `fps` is for (§1e)."""
+    if fps is not None:
+        index = round_half_away(t * fps[0], SEC * fps[1])
+        return round_half_away(index * SEC * fps[1], fps[0])
     return round_half_away(t, frame) * frame
 
 
-def snap_up(t, frame):
+def snap_up(t, frame, fps=None):
     """`SilenceDetector+Walls.snapUpToFrame`."""
-    near = nearest_frame(t, frame)
-    return near if near >= t else nearest_frame(near + frame, frame)
+    near = nearest_frame(t, frame, fps)
+    return near if near >= t else nearest_frame(near + frame, frame, fps)
 
 
-def snap_down(t, frame):
+def snap_down(t, frame, fps=None):
     """`SilenceDetector+Walls.snapDownToFrame`."""
-    near = nearest_frame(t, frame)
-    return near if near <= t else nearest_frame(near - frame, frame)
+    near = nearest_frame(t, frame, fps)
+    return near if near <= t else nearest_frame(near - frame, frame, fps)
 
 
 def source_tick(seg, t):
@@ -350,7 +374,7 @@ def source_tick(seg, t):
 
 
 def expected_spans(p, seg, confidence, min_length, padding, frame,
-                   reversed_pivot=None, rule="max"):
+                   reversed_pivot=None, rule="max", fps=None):
     """The spans `detect` must answer for ONE segment over the probabilities
     `p`, in project ticks. `rule` is `max` — the shipped rule — or `mean`,
     which exists only for the sensitivity line claim 1(c) prints."""
@@ -400,7 +424,7 @@ def expected_spans(p, seg, confidence, min_length, padding, frame,
         low, high = begin + padding, finish - padding
         if high <= low:
             continue
-        snapped = (snap_up(low, frame), snap_down(high, frame))
+        snapped = (snap_up(low, frame, fps), snap_down(high, frame, fps))
         if snapped[0] >= 0 and snapped[1] > snapped[0]:
             out.append(snapped)
     return out
@@ -674,6 +698,43 @@ def clean_part(mcp):
     return s, truth, spans(answer), spans(bare)
 
 
+# ---- 1e. The recorder's own rate -----------------------------------------
+
+
+def offgrid_part(mcp):
+    """The reader review's R4·2 (`designs/reelcut-roadmap-4.md` §8).
+
+    Every other walked row in this file is at 30 or 100 fps, and 30000/1001
+    would be no different: all three put a frame on a WHOLE number of ticks.
+    `ScreenRecorder` mints **24981/1000**, where a frame is 24018.25 ticks —
+    `Fps.frameDuration` truncates it to 24018 and `snapUpToFrame` /
+    `snapDownToFrame` compose the nearest snap with that truncated step, which
+    nothing in the suite reached. The row walks the rate itself."""
+    print("\n1e — the clean fixture at the recorder's own 24981/1000")
+    rate = (24981, 1000)
+    s = Session(mcp, "silence2-offgrid", fps=rate)
+    media, clip = s.lay("clean.wav")
+    answer = detect(s)
+    frame = SEC * rate[1] // rate[0]
+    check(
+        s.frame() == frame == 24_018,
+        f"a frame at {rate[0]}/{rate[1]} is {SEC * rate[1] / rate[0]:.2f} ticks and the "
+        f"step the snaps take is the truncated {s.frame()}")
+    walked = expected_spans(
+        s.probabilities(media), s.segment(clip, media), answer["voice_confidence"],
+        answer["min_length"], answer["padding"], frame, fps=rate)
+    check(
+        spans(answer) == walked,
+        f"the voice answer is the walk over that RATIONAL grid tick for tick: "
+        f"{spans(answer)} vs {walked}")
+    check(
+        all(
+            nearest_frame(edge, frame, rate) == edge
+            for span in spans(answer) for edge in span),
+        f"and every bound it answers is a real boundary of a grid whose frames "
+        f"are 24018 and 24019 ticks apart by turns: {spans(answer)}")
+
+
 # ---- 2. hum3.wav, the headline ------------------------------------------
 
 
@@ -843,6 +904,56 @@ def tone_part(mcp, truth):
         f"the model's walk, which is the row's power on this host. "
         f"(default padding here would be {padding_default} ticks)")
 
+    # The second sceptic pass's item 5, on the TONE session above rather than
+    # a new document: the `waveformOnly` clause of the pending note said
+    # "spans inside them ARE proposed here" without ever intersecting
+    # `proposedMedia` — the mirror image of the defect the review's finding 2
+    # fixed. A media judged BY LEVEL is exactly the one that clause is about,
+    # and with its waveform gone NOTHING inside it is proposed; duck the clip
+    # and the FLOOR proposes its span with the same waveform still missing.
+    print("\n4 — the waveform withheld over a media that is judged by level")
+    os.remove(os.path.join(s.path, "cache", "peaks", f"{media}.bin"))
+    withheld = s.op("detect_silence")
+    check(
+        spans(withheld) == []
+        and withheld.get("pending_peaks") == [media]
+        and "voice_pending" not in withheld
+        and withheld.get("judged_by_level") == [media],
+        f"with its waveform gone the tone media is a WAVEFORM waiter judged by "
+        f"level, and nothing inside it is proposed: {show(spans(withheld))}, "
+        f"pending_peaks {withheld.get('pending_peaks')}, voice_pending "
+        f"{withheld.get('voice_pending')}, judged_by_level "
+        f"{withheld.get('judged_by_level')}")
+    check(
+        (withheld.get("note") or "") == (
+            "Analysis is still running for 1 media file(s); call again in a moment. "
+            "For that file it is the WAVEFORM that has not landed, which in voice mode "
+            "decides only a clip holding no voice, and nothing inside them is proposed "
+            "here. 1 media file(s) hold no voice in at least one clip and were judged "
+            "by level there."),
+        f"and the clause says so in the whole sentence, rather than claiming spans "
+        f"that are not there: {withheld.get('note')!r}")
+    s.op("set_audio", clips=[clip], patch={"volume": 0.001})
+    ducked = s.op("detect_silence")
+    check(
+        spans(ducked) != [],
+        f"ducked to 0.001 with the SAME waveform missing, the floor proposes its "
+        f"span: {show(spans(ducked))}")
+    check(
+        (ducked.get("note") or "") == (
+            "Analysis is still running for 1 media file(s); call again in a moment. "
+            "For that file it is the WAVEFORM that has not landed, which in voice mode "
+            "decides only a clip holding no voice, so spans inside them ARE proposed "
+            "here. A clip there that holds no voice is proposed only where the mix "
+            "already turns it down far enough to be quiet. 1 media file(s) hold no "
+            "voice in at least one clip and were judged by level there."),
+        f"and the clause turns over to the proposed wording, with the mix named as "
+        f"what made it quiet: {ducked.get('note')!r}")
+    # NOTHING BELOW THIS in `tone_part`: the two rows above changed the
+    # session in place (the peaks file removed, then the clip ducked), so a
+    # row appended here would inherit that state. A new row takes its own
+    # `Session`.
+
 
 # ---- 6. The scope rule, in voice mode ------------------------------------
 
@@ -1010,8 +1121,19 @@ def reversed_part(mcp):
 
 
 def refusal_part(session):
-    """Three rules of the tool's own and one of the argument GATE's, each by
-    its exact sentence."""
+    """Four rules of the tool's own and one of the argument GATE's, each by
+    its exact sentence.
+
+    The last of the four is the reader review's finding 1
+    (`designs/reelcut-roadmap-4.md` §8): the two durations stopped going
+    through `optionalTimeArg` — rightly, it snapped them — and went through
+    `intArg`, which has no CEILING, so `padding: Int64.max` reached
+    `refine`'s `run.start + settings.padding` and killed the app rather than
+    answering. Measured on the pre-fix binary before the fix went in:
+    `Remote end closed connection without response`, crash report
+    `Reelcut-2026-09-20-051240.ips`, `EXC_BREAKPOINT` / "Swift runtime
+    failure: arithmetic overflow" inside `SilenceDetector.refine`. This row
+    asks for a refusal and a live socket."""
     print("\n10 — the voice arguments' refusals, word for word")
     wanted = [
         (dict(voice_confidence=0.5, mode="level"),
@@ -1019,6 +1141,22 @@ def refusal_part(session):
         (dict(voice_confidence=0.95),
          "voice_confidence must be a number in 0.1…0.9."),
         (dict(mode="voise"), 'mode must be "voice" or "level".'),
+        (dict(padding=9223372036854775807),
+         "padding must be a length in ticks (600000 per second) from 0 to "
+         "9000000000000000."),
+        # The second sceptic pass's item 2: the ceiling was scored for
+        # `padding` alone, so a build that kept the guard on one duration and
+        # dropped it on the other still scored full. Both ends of both
+        # arguments now have a row.
+        (dict(min_length=9000000000000001),
+         "min_length must be a length in ticks (600000 per second) from 0 to "
+         "9000000000000000."),
+        (dict(min_length=-1),
+         "min_length must be a length in ticks (600000 per second) from 0 to "
+         "9000000000000000."),
+        (dict(padding=-1),
+         "padding must be a length in ticks (600000 per second) from 0 to "
+         "9000000000000000."),
     ]
     for arguments, sentence in wanted:
         try:
@@ -1036,6 +1174,192 @@ def refusal_part(session):
             "does not take voice_confidance" in str(error),
             f"and a STRANGER key is refused by name before the handler runs: "
             f"{str(error)!r}")
+    # And the bound is PUBLISHED, not only enforced: the gate reads names
+    # alone, so a caller that never sends a bad number learns the ceiling
+    # from `tools/list` or from nowhere (the second sceptic pass, item 4).
+    published = (session.mcp.schemas()["detect_silence"]["inputSchema"]
+                 .get("properties", {}))
+    check(
+        all(published.get(key, {}).get("minimum") == 0
+            and published.get(key, {}).get("maximum") == 9000000000000000
+            for key in ("min_length", "padding")),
+        f"and detect_silence PUBLISHES that ceiling on both durations: "
+        f"min_length {published.get('min_length', {}).get('minimum')}…"
+        f"{published.get('min_length', {}).get('maximum')}, "
+        f"padding {published.get('padding', {}).get('minimum')}…"
+        f"{published.get('padding', {}).get('maximum')}")
+
+
+# ---- 8b. A decode that stops part way ------------------------------------
+
+
+def partial_part(mcp):
+    """The reader review's R2·1 (`designs/reelcut-roadmap-4.md` §8).
+
+    `writeSpeech`'s loop ends on a nil sample buffer, and a nil buffer means
+    the track ran out OR the decode gave up. The second leaves the rest of the
+    zero-filled buffer at ZERO, and a zero probability is "nobody is talking",
+    so the pass used to write a `.bin` for a file it had only half read and
+    then CERTIFY it with a marker — and voice mode proposed cutting the whole
+    undecodable tail (measured: 8.3 s of this 10.4 s fixture, the reader
+    stopping at 2.05 s). `reader.status` is now read BEFORE the cancel and
+    anything but `.completed` writes nothing, which is §4a's own posture for a
+    reader that will not build or start: no `.bin`, no marker, the media
+    `voice_pending` and never quiet, retried on the next open.
+
+    The level rule has the same hole in `MediaImporter.peaks` — filed, not
+    fixed here, because `MediaImporter.swift` is over the size cap — and the
+    last row asserts that it is still there, so the day it is closed this row
+    says so rather than passing in silence."""
+    print("\n8b — a media whose decode stops part way is never certified")
+    s = Session(mcp, "silence2-partial")
+    media, _ = s.lay("corrupt.m4a")
+    speech = os.path.join(s.path, "cache", "speech", f"{media}.bin")
+    marker = os.path.join(s.path, "cache", "speech", f"{media}.complete.json")
+    peaks = os.path.join(s.path, "cache", "peaks", f"{media}.bin")
+    deadline = time.time() + 60
+    while time.time() < deadline and not os.path.exists(peaks):
+        time.sleep(0.5)
+    # The speech pass runs AFTER peaks, so the peaks `.bin` landing is not yet
+    # proof that the speech pass has had its turn; give it the same grace the
+    # sheet's poll would.
+    time.sleep(2.0)
+    note(f"the fixture is {duration_of(fixture('corrupt.m4a')):.3f} s and its "
+         f"peaks cache landed at {os.path.getsize(peaks)} bytes")
+    check(
+        not os.path.exists(speech) and not os.path.exists(marker),
+        f"no speech `.bin` and no marker are written for it "
+        f"(bin {os.path.exists(speech)}, marker {os.path.exists(marker)})")
+    answer = s.op("detect_silence")
+    check(
+        answer.get("voice_pending") == [media],
+        f"voice mode names it as pending rather than counting it silent: "
+        f"{answer.get('voice_pending')}")
+    check(
+        spans(answer) == [],
+        f"and proposes NOTHING inside it: {show(spans(answer))}")
+    level = spans(s.op("detect_silence", mode="level"))
+    check(
+        len(level) > 0,
+        f"while LEVEL still proposes the undecodable tail — `peaks` has the "
+        f"same hole and its fix is filed: {show(level)}")
+
+
+# ---- 8c. The waveform withheld, the voice cache in place ------------------
+
+
+def waveform_part(mcp, truth):
+    """The reader review's R3·1 (`designs/reelcut-roadmap-4.md` §8).
+
+    Claim 8 withholds the SPEECH cache. This withholds the WAVEFORM and keeps
+    the speech, which is the case the note got wrong: `pending_peaks` folds
+    both waiters (K21), and the sentence beside it said "Nothing inside them
+    is proposed for removal" — about media whose spans were in the very same
+    reply, because in voice mode the model has landed and the waveform decides
+    only a clip holding no voice. The promise is made now about what the
+    ANSWER shows: a waiter the reply already proposes a span inside is
+    dropped from it and counted in its own clause, whichever cache is late
+    and whichever mode ran (finding 2, the ducked rows at the foot)."""
+    print("\n8c — the waveform withheld with the voice cache in place")
+    s = Session(mcp, "silence2-nopeaks")
+    media, _ = s.lay("clean.wav")
+    before = spans(detect(s))
+    os.remove(os.path.join(s.path, "cache", "peaks", f"{media}.bin"))
+    answer = s.op("detect_silence")
+    check(
+        spans(answer) == before and before != [],
+        f"voice mode answers exactly what it did with the waveform on disk: "
+        f"{show(spans(answer))}")
+    check(
+        answer.get("pending_peaks") == [media] and "voice_pending" not in answer,
+        f"the media is a WAVEFORM waiter and not a voice one: "
+        f"{answer.get('pending_peaks')}, {answer.get('voice_pending')}")
+    check(
+        (answer.get("note") or "") == (
+            "Analysis is still running for 1 media file(s); call again in a moment. "
+            "For that file it is the WAVEFORM that has not landed, which in voice mode "
+            "decides only a clip holding no voice, so spans inside them ARE proposed here."),
+        f"and the note says those spans are proposed rather than denying them, in the "
+        f"whole sentence — no clause about \"the rest\" of one that was not printed: "
+        f"{answer.get('note')!r}")
+    level = s.op("detect_silence", mode="level")
+    check(
+        spans(level) == []
+        and (level.get("note") or "") == (
+            "Analysis is still running for 1 media file(s); call again in a moment. "
+            "Nothing inside them is proposed for removal."),
+        f"while LEVEL proposes nothing inside it and keeps the promise, which is "
+        f"where it holds: {show(spans(level))}, {level.get('note')!r}")
+    note(f"the truth for this fixture is {show(truth)}")
+
+    # The reader review's finding 2, the SECOND route to the same broken
+    # promise: the gain FLOOR is asked before either cache
+    # (`SilenceDetector.isQuiet`), so a clip the mix has ducked to 0.001 is
+    # quiet with no speech cache on disk at all — and the note used to deny
+    # the range printed beside it. Measured on the pre-fix binary: ranges
+    # [[60000, 6160000]], `voice_pending` [2], note "… Nothing inside them is
+    # proposed for removal."
+    d = Session(mcp, "silence2-ducked")
+    media, clip = d.lay("clean.wav")
+    detect(d)
+    d.op("set_audio", clips=[clip], patch={"volume": 0.001})
+    os.remove(os.path.join(d.path, "cache", "speech", f"{media}.bin"))
+    ducked = d.op("detect_silence")
+    check(
+        ducked.get("voice_pending") == [media],
+        f"a clip ducked under the threshold with its SPEECH cache withheld is a "
+        f"voice waiter: {ducked.get('voice_pending')}")
+    check(
+        spans(ducked) != [],
+        f"and the floor proposes its span anyway, before either cache is asked: "
+        f"{show(spans(ducked))}")
+    check(
+        (ducked.get("note") or "") == (
+            "Analysis is still running for 1 media file(s); call again in a moment. "
+            "That file holds spans that ARE proposed here: the mix turns them down far "
+            "enough to be quiet before either cache is asked."),
+        f"and the note counts it as proposed rather than promising nothing inside it "
+        f"is: {ducked.get('note')!r}")
+
+
+# ---- 10b. The two durations ---------------------------------------------
+
+
+def duration_part(mcp):
+    """The reader review's R1·1 (`designs/reelcut-roadmap-4.md` §8).
+
+    `min_length` and `padding` are DURATIONS, and the sheet puts neither on
+    the frame grid (`SilenceSheetController`'s unsnapped
+    `ReelTime.ticks(seconds:)`). The tool read both through
+    `optionalTimeArg`, which snaps every tick it is handed, so at the
+    DEFAULT 30 fps it ran the sheet's own 0.05 s — 30000 — as 40000, ran
+    `min_length: 45000` as 40000, and dropped `padding: 9999` to ZERO,
+    cutting the material the caller asked to keep. Both are read as given
+    now, and the frame rule stays where it belongs: on the span BOUNDS
+    `refine` produces, which the walk asserts here tick for tick."""
+    print("\n10b — min_length and padding run as given, not snapped to the grid")
+    s = Session(mcp, "silence2-durations")
+    media, clip = s.lay("clean.wav")
+    detect(s)
+    probabilities, segment = s.probabilities(media), s.segment(clip, media)
+    for key, value in (("padding", 30_000), ("min_length", 45_000), ("padding", 9_999)):
+        answer = detect(s, **{key: value})
+        check(
+            answer[key] == value,
+            f"{key}: {value} runs as {answer[key]} — a duration is not a "
+            f"position and is not rounded to the {s.frame()}-tick grid")
+        # The walk is given what the CALLER asked for, never what the answer
+        # echoed: a build that rounds the argument and then reports the
+        # rounded value would agree with itself on both rows.
+        asked = {"min_length": answer["min_length"], "padding": answer["padding"]}
+        asked[key] = value
+        walked = expected_spans(
+            probabilities, segment, answer["voice_confidence"],
+            asked["min_length"], asked["padding"], s.frame())
+        check(
+            spans(answer) == walked,
+            f"and its spans are the walk at the {key} ASKED FOR, tick for tick: "
+            f"{show(spans(answer))}")
 
 
 # ---- 11. The cut the answer asks for ------------------------------------
@@ -1068,7 +1392,20 @@ def export_part(mcp, clean_default):
         f"a whole-file clip lands on the last whole frame inside the file "
         f"({inside_file} of {s.media_duration(media)} ticks), so the plan plays "
         f"it at rate 1 and nothing is resampled")
-    answer = spans(detect(s))
+    found = detect(s)
+    answer = spans(found)
+    # The reader review's R4·1: this section used to take the answer on
+    # trust and prove only that the CUT matched it, which a build with no
+    # voice rule at all satisfies (W1 and W2 both passed every row here). The
+    # spans about to be exported are walked first, so what is proved is that
+    # the model's own answer is the one that was sent.
+    walked = expected_spans(
+        s.probabilities(media), s.segment(clip, media), found["voice_confidence"],
+        found["min_length"], found["padding"], frame)
+    check(
+        answer == walked,
+        f"the spans about to be cut are the MODEL's, walked over the app's own "
+        f"cache: {show(answer)} against {show(walked)}")
     check(
         answer == clean_default,
         f"the same one-clip project answers what section 1 measured: "
@@ -1165,14 +1502,18 @@ def main():
     check(len(names) >= 77, f"the catalog holds 77 tools or more (got {len(names)})")
 
     session, truth, default, bare = clean_part(mcp)
+    offgrid_part(mcp)
     hum3_part(mcp, truth, bare)
     quiet2_part(mcp, truth)
     tone_part(mcp, truth)
     scope_part(mcp, default)
     nest_part(mcp, default)
     withheld_part(mcp, truth)
+    partial_part(mcp)
+    waveform_part(mcp, truth)
     reversed_part(mcp)
     refusal_part(session)
+    duration_part(mcp)
     export_part(mcp, default)
     phase3_part()
     summary()

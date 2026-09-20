@@ -550,6 +550,32 @@ do {
             controller.removeSilencesCommand()
             spin(0.6)
             answer["open"] = sheetState(controller) ?? [:]
+            // The reader review's R2·2. NOTHING is pending here — both caches
+            // landed before the sheet opened — which is the state the sheet
+            // used to ignore a post in. The bytes under it are swapped for a
+            // file that says "talking" at every chunk, so a sheet that
+            // re-reads answers No cuts and one that does not keeps its two.
+            let ones = [Float](repeating: 1, count: kept.count / 4)
+            try ones.withUnsafeBufferPointer { Data(buffer: $0) }.write(to: speechBin)
+            MediaImporter.postCacheChange(media: mediaID, kind: MediaImporter.speechKind)
+            spin(0.5)
+            answer["afterSwap"] = sheetState(controller) ?? [:]
+            try kept.write(to: speechBin)
+            MediaImporter.postCacheChange(media: mediaID, kind: MediaImporter.speechKind)
+            spin(0.5)
+            answer["afterRestore"] = sheetState(controller) ?? [:]
+            // R3·1: the WAVEFORM withdrawn with the voice cache in place.
+            // Voice mode still answers, so the sheet must not go on promising
+            // that nothing inside that file is proposed — its spans are on
+            // the timeline underneath the sentence.
+            let keptPeaks = try Data(contentsOf: peaksBin)
+            try? manager.removeItem(at: peaksBin)
+            MediaImporter.postCacheChange(media: mediaID, kind: MediaImporter.peaksKind)
+            spin(0.5)
+            answer["afterPeaksGone"] = sheetState(controller) ?? [:]
+            try keptPeaks.write(to: peaksBin)
+            MediaImporter.postCacheChange(media: mediaID, kind: MediaImporter.peaksKind)
+            spin(0.5)
             dismiss(controller)
             answer["afterDismiss"] = controller.timeline?.candidateSpans.count ?? -1
 
@@ -595,6 +621,63 @@ do {
             answer["noModel"] = rows
         }
 
+    // ---- 17. a ducked clip whose caches are withheld ---------------------
+    // The second sceptic pass's finding 1. `tone.wav` holds no voice, so
+    // every clip of it is judged BY LEVEL; ducked to 0.001 the gain FLOOR
+    // makes it quiet before either cache is asked (`SilenceDetector.isQuiet`)
+    // and its span IS proposed — while the sheet's voice-mode waveform line
+    // said "Anything inside it that holds no voice is left alone until it
+    // lands" whatever the answer showed. Two states, in this order: the
+    // waveform withdrawn (the media is in `judgedByLevel`), then the speech
+    // cache withdrawn under it too (the media is in `voicePending` and NEVER
+    // in `judgedByLevel` — `SilenceDetector.swift`'s `voicePendingMedia.insert`
+    // returns before the by-level test — which is the state the hedge's
+    // second arm exists for).
+    case "ducked":
+        let tone = fixtures.appendingPathComponent("tone.wav")
+        let document = ProjectDocument()
+        try document.read(from: tone, ofType: "com.microsoft.waveform-audio")
+        NSDocumentController.shared.addDocument(document)
+        document.makeWindowControllers()
+        document.showWindows()
+        spin(1.0)
+        guard
+            let controller = document.windowControllers.first?.contentViewController
+                as? EditorViewController
+        else { throw ProbeError.noEditor }
+        let mediaID = document.project.snapshot.media.first?.id ?? 0
+        answer["media"] = Int(mediaID)
+        guard let cacheDir = document.cacheDirectory else { throw ProbeError.noCache }
+        let speechBin = MediaImporter.speechURL(for: mediaID, in: cacheDir)
+        let peaksBin = MediaImporter.peaksURL(for: mediaID, in: cacheDir)
+        let deadline = Date().addingTimeInterval(60)
+        while Date() < deadline,
+            !(manager.fileExists(atPath: speechBin.path)
+                && manager.fileExists(atPath: peaksBin.path)) {
+            spin(0.25)
+        }
+        answer["cachesLanded"] = manager.fileExists(atPath: speechBin.path)
+            && manager.fileExists(atPath: peaksBin.path)
+        guard let clip = document.project.snapshot.clips.first?.id else {
+            throw ProbeError.noClip
+        }
+        document.applyEdit(
+            "Volume", ReelOp.setAudioRaw(clips: [clip], patch: ["volume": 0.001]))
+        spin(0.4)
+
+        try? manager.removeItem(at: peaksBin)
+        MediaImporter.postCacheChange(media: mediaID, kind: MediaImporter.peaksKind)
+        controller.removeSilencesCommand()
+        spin(0.8)
+        answer["duckedNoPeaks"] = sheetState(controller) ?? [:]
+
+        // The sheet stays up: the same clip with NEITHER cache on disk.
+        _ = MediaImporter.clearSpeech(for: mediaID, in: cacheDir)
+        MediaImporter.postCacheChange(media: mediaID, kind: MediaImporter.speechKind)
+        spin(0.8)
+        answer["duckedNoCaches"] = sheetState(controller) ?? [:]
+        dismiss(controller)
+
     default:
         throw ProbeError.unknownMode
     }
@@ -603,13 +686,14 @@ do {
 }
 
 enum ProbeError: Error, CustomStringConvertible {
-    case noModel, noTrack, noEditor, noCache, unknownMode
+    case noModel, noTrack, noEditor, noCache, noClip, unknownMode
     var description: String {
         switch self {
         case .noModel: return "SileroVAD.bundled() answered nil"
         case .noTrack: return "the fixture has no audio track"
         case .noEditor: return "the document made no editor"
         case .noCache: return "the document has no cache directory"
+        case .noClip: return "the document laid no clip"
         case .unknownMode: return "unknown mode"
         }
     }
@@ -918,6 +1002,42 @@ def sheet_part(answer):
           opened.get("candidateSpans") == 2, f"{opened.get('candidateSpans')}")
     check("and Remove is enabled", opened.get("removeEnabled") is True,
           f"{opened.get('removeEnabled')}")
+    swapped = answer.get("afterSwap", {})
+    check("a `speech` post re-reads the input with NOTHING pending — the swapped "
+          "bytes say talking at every chunk and the sheet drops to No cuts",
+          any(text == "No cuts" for text in swapped.get("texts", []))
+          and swapped.get("candidateSpans") == 0,
+          f"{swapped.get('texts')}, wash {swapped.get('candidateSpans')}")
+    restored = answer.get("afterRestore", {})
+    check("and the original bytes, posted again, bring the two cuts back",
+          any(text.startswith("2 cuts") for text in restored.get("texts", []))
+          and restored.get("candidateSpans") == 2,
+          f"{restored.get('texts')}, wash {restored.get('candidateSpans')}")
+    nopeaks = answer.get("afterPeaksGone", {})
+    check("the WAVEFORM withdrawn with the voice cache in place: the sheet still "
+          "says 2 cuts, because the model is what answers in voice mode",
+          any(text.startswith("2 cuts") for text in nopeaks.get("texts", [])),
+          f"{nopeaks.get('texts')}")
+    check("and it does NOT promise that nothing inside that file is proposed",
+          not any("Nothing inside is proposed for removal yet" in text
+                  for text in nopeaks.get("texts", [])),
+          f"{nopeaks.get('texts')}")
+    # The second sceptic pass's finding 1, the other side of it: this clip is
+    # NOT ducked and it holds a voice, so the media is in neither
+    # `judgedByLevel` nor `voicePending` and the waveform line must stay
+    # PLAIN. A build that hedges unconditionally fails this row.
+    check("and the waveform line stays plain here — nothing in this file is judged "
+          "by the mix, so there is no hedge about it",
+          not any("unless the mix" in text for text in nopeaks.get("texts", [])),
+          f"{nopeaks.get('texts')}")
+    # And the row the rejected fix would have failed: routing the waveform
+    # branch through `promise(about:)` answers "quiet in the MIX" here,
+    # because this media IS in `proposedMedia` — the model proposes 2 cuts
+    # inside it — and nothing in it is turned down at all.
+    check("nor does it say what is proposed inside is quiet in the MIX: this media is "
+          "in `proposedMedia` by the MODEL, so `promise(about:)` would say it falsely",
+          not any("quiet in the MIX" in text for text in nopeaks.get("texts", [])),
+          f"{nopeaks.get('texts')}")
     check("dismissing clears the wash — nothing else does",
           answer.get("afterDismiss") == 0, f"{answer.get('afterDismiss')}")
 
@@ -944,6 +1064,51 @@ def sheet_part(answer):
               f"{after.get('texts')}")
         check("with the wash back on the timeline", after.get("candidateSpans") == 2,
               f"{after.get('candidateSpans')}")
+
+
+HEDGE = "unless the mix already turns it down far enough to be quiet"
+
+
+def ducked_part(answer):
+    """The second sceptic pass's finding 1, in its own process's own document.
+
+    `tone.wav` holds no voice anywhere, so every clip of it falls back to
+    LEVEL; ducked to `volume: 0.001` the gain FLOOR makes it quiet before
+    either cache is asked, and its span is proposed while the waveform is
+    still missing. The sheet's voice-mode waveform line used to say
+    "Anything inside it that holds no voice is left alone until it lands"
+    about exactly that span."""
+    section("17 — a ducked clip holding no voice, its waveform withheld")
+    check("both caches landed before anything was withheld",
+          answer.get("cachesLanded") is True, f"{answer.get('cachesLanded')}")
+    nopeaks = answer.get("duckedNoPeaks", {})
+    check("the floor proposes the ducked span with the waveform gone, and Remove is "
+          "enabled — the sheet is offering a cut",
+          nopeaks.get("candidateSpans", 0) >= 1 and nopeaks.get("removeEnabled") is True,
+          f"wash {nopeaks.get('candidateSpans')}, Remove {nopeaks.get('removeEnabled')}")
+    check("and the note names the waveform as what it is waiting for",
+          any("The waveform is still being analysed for" in text
+              for text in nopeaks.get("texts", [])), f"{nopeaks.get('texts')}")
+    check("and it HEDGES that promise rather than denying the span underneath it — "
+          "the media is in `proposedMedia` and in `judgedByLevel`",
+          any(HEDGE in text for text in nopeaks.get("texts", [])),
+          f"{nopeaks.get('texts')}")
+
+    nocaches = answer.get("duckedNoCaches", {})
+    section("17 — and its speech cache withheld too, so it is in NEITHER cache")
+    check("the floor still proposes it: a clip the mix has ducked is quiet with "
+          "nothing on disk at all",
+          nocaches.get("candidateSpans", 0) >= 1, f"{nocaches.get('candidateSpans')}")
+    check("the media is now a VOICE waiter with a span inside it — the speech line is "
+          "printed and its own promise says the mix is what made it quiet",
+          any("Speech is still being analysed for" in text
+              for text in nocaches.get("texts", []))
+          and any("quiet in the MIX" in text for text in nocaches.get("texts", [])),
+          f"{nocaches.get('texts')}")
+    check("and the waveform line hedges here TOO, where the media is in `voicePending` "
+          "and never in `judgedByLevel` — a gate on `judgedByLevel` alone misses it",
+          any(HEDGE in text for text in nocaches.get("texts", [])),
+          f"{nocaches.get('texts')}")
 
 
 def main():
@@ -986,6 +1151,13 @@ def main():
         check("and it had the model", sheet.get("voiceAvailable") is True,
               f"{sheet.get('voiceAvailable')}")
         sheet_part(sheet)
+
+    ducked, error = run_probe(binary, "ducked")
+    check("the ducked run answers, in its OWN process as the sheet run is",
+          ducked is not None, error or "")
+    if ducked is not None:
+        check("nothing threw inside it", "error" not in ducked, ducked.get("error", ""))
+        ducked_part(ducked)
 
     bare, error = run_probe(without, "sheet")
     check("the no-model run answers, in its OWN process — unavailability is "

@@ -2409,7 +2409,8 @@ be asked without them; pausable from the menu bar's item while it runs,
 the result then carrying `pauses` and `segments` — one entry per file,
 ALWAYS present — with `duration` the TOTAL recorded and the top-level keys
 the first segment's),
-`detect_silence {clips?, threshold_db?, min_length?, padding?}` → the
+`detect_silence {clips?, mode?, voice_confidence?, threshold_db?,
+min_length?, padding?}` → the
 quiet spans of the timeline and the scope they were taken over, which
 `ripple_delete_ranges` then cuts — the one tool that reads a CACHE rather
 than the model, and the only app-state tool that neither edits nor moves
@@ -2423,7 +2424,16 @@ bed would otherwise propose one cut across the whole song and take the
 voiceover under it — and a NEST, whose sound counts toward the test but
 which no candidate may intersect, because `Source::Nest` has no in point
 and splitting a nest clip strands its tail (§4.4's round trip is how the
-dead air inside one is reached),
+dead air inside one is reached). `mode` is road map 4's S1 — `voice`, the
+default, judges by the cached Silero VAD probability against
+`voice_confidence` (0.1–0.9, default 0.5, refused in `level` mode) and falls
+back to the level rule over any clip whose own source window holds no voice,
+naming those media in `judged_by_level`; a media whose speech cache has not
+landed is named in `voice_pending`, is never quiet BY THE MODEL and is not
+judged by level either — though the mix's own gain floor can still make it
+quiet, which is why the note beside `pending_peaks` promises nothing about a
+media this answer already proposes a span inside — and is folded with the
+waveform waiters into `pending_peaks`,
 `transcribe {clips?, language?, place?}` and
 `export_captions {track?, path, format?}` (road map 2's phase 4 — the
 mirrors of File ▸ Generate Captions… and File ▸ Export Captions…).
@@ -2953,9 +2963,12 @@ assisted import.
   coremltools is a documented option and not the only route. Core ML is the
   runtime; nothing else is added.
 - **Edges come from the model's own 32 ms grid, inward; the level rule is
-  the judge only for media that hold no voice.** No adaptive threshold, no
+  the judge only where no voice is found.** No adaptive threshold, no
   level-based edge refinement: the measured edge error is inside the
-  padding the feature already keeps.
+  padding the feature already keeps. (The unit of "where" is the CLIP's own
+  source window, not the media — a file that is speech then music is judged
+  by the model over one clip and by level over the other, and is named in
+  `judged_by_level` for the second; road map 4 §8, 2026-09-19.)
 - **The probabilities are a per-media CACHE, never computed at feature
   time.** `cache/speech/<media id>.bin` beside `peaks/`, stamped and marked
   on the same terms (§5.6), written by `MediaImporter`'s pass — so the
