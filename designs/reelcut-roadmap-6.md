@@ -1,12 +1,17 @@
 # Reelcut — road map 6: captions from the cloud (AssemblyAI Universal-3.5 Pro)
 
-**Status: DESIGNED, not built; the spike (C0) has NOT been run.** Nothing in
-this document is in the tree. Everything in §2 was read from AssemblyAI's
-own documentation on 2026-09-17 and is cited; everything in §3 is a question
-the plan leans on and has not measured, and two of its rows (q2, q4) can
-overturn the plan the way R0's did. The baseline this was written against:
-schema version 8, `OP_NAMES` 57, the catalog at 77 tools, road map 4's S1
-and road map 5's E1/E2 landed.
+**Status: DESIGNED, not built; the spike (C0) RAN on 2026-09-20 and §3 is
+its record.** No C1 code is in the tree; the spike's instruments are, in
+`tools/proof/cloud_spike/`. All eight of §3's rows were measured on that
+date, nothing is owed by a row, and the sections each row overturned — §2's
+two open questions, §5a's upload format, §5d's credential store, §5h's
+`project.yml` bullet and toll 1's sentence, three of 5i's claims and §8's
+constants — were REWRITTEN here rather than left standing beside the record
+(§3a lists every one). Everything in §2 was read from AssemblyAI's own
+documentation on 2026-09-17, is cited, and now carries what the service
+actually answered where the two differ. The baseline this was written
+against: schema version 8, `OP_NAMES` 57, the catalog at 77 tools, road map
+4's S1 and road map 5's E1/E2 landed.
 
 Road map 2's phase 4 shipped File ▸ Generate Captions… and `transcribe`
 over Apple's on-device recogniser (`app/Sources/Transcriber.swift`), and it
@@ -50,8 +55,8 @@ AssemblyAI* — and it is a product question, not an engineering one:
 - **The person brings their own key** (they open an AssemblyAI account,
   get $50 of credit and a key, paste it into Reelcut once). Then there is
   no server, no bucket and nothing to operate: the app talks to
-  `api.assemblyai.com` directly and the key lives in the person's own
-  Keychain. This is what this document builds as **C1**, and it is the
+  `api.assemblyai.com` directly and the key lives in a `0600` file of the
+  person's own (§5d, C0's q7). This is what this document builds as **C1**, and it is the
   only version a proof can run offline and for free, against a stand-in
   server.
 - **Reelcut pays** (the key is Reelcut's; the person is metered). Then a
@@ -97,15 +102,18 @@ cents at the published rate), and the sheet says so before the button.
 **Generate Captions gains an Engine — "On this Mac" (today's recogniser,
 unchanged, still the default) or "AssemblyAI" — and with the second the
 whole audio of each media in scope is extracted to a temporary 16 kHz mono
-WAV, uploaded to `POST /v2/upload`, transcribed by `POST /v2/transcript`
+FLAC (the WAV as the fallback when that write refuses — §5a, C0's q2),
+uploaded to `POST /v2/upload`, transcribed by `POST /v2/transcript`
 with `speech_models: ["universal-3-5-pro", "universal-2"]`, polled to
 completion, read back as words, written VERBATIM to
 `cache/transcripts/<media id>.json` under the package's stamp-and-marker
 discipline, and DELETED from AssemblyAI; the clips' cues are then built from
 the cached words through the existing `CaptionCues` and `CaptionLayout`,
 so a cloud caption is the same text clip an on-device one is.** The key is
-the person's own, in the Keychain, entered once in a new Reelcut ▸
-Settings… window; the base URL and the credential are the one seam a
+the person's own, in a `0600` file under `~/Library/Application
+Support/Reelcut/` (the Keychain is what q7 overturned; `KeychainStore` is
+deferred to a stable signing identity — §5d, R6-5), entered once in a new
+Reelcut ▸ Settings… window; the base URL and the credential are the one seam a
 relay (C2) would replace. No op, no schema change, no FFI change, no new
 tool: `transcribe` gains four arguments and the catalog stays at 77. No
 `async` exception: `URLSession`'s delegate and completion-handler API is
@@ -122,88 +130,386 @@ limits change; the constants that carry them into the tree are dated (§8).
 |---|---|---|
 | Model name in a request | `speech_models: ["universal-3-5-pro", "universal-2"]` — an array in priority order; the two are the only values, and that pair is the documented default | [POST /v2/transcript](https://www.assemblyai.com/docs/api-reference/transcripts/submit) |
 | Which model ran | the response carries `speech_model_used` | [GET /v2/transcript/{id}](https://www.assemblyai.com/docs/api-reference/transcripts/get) |
-| Direct upload | `POST /v2/upload`, raw bytes, `authorization: <key>`; answers `{"upload_url": …}`, a private URL only AssemblyAI's servers can read; max **2.2 GB** | [FAQ: upload URLs](https://www.assemblyai.com/docs/faq/why-cant-i-access-urls-from-the-upload-endpoint-directly), [FAQ: limits](https://www.assemblyai.com/docs/faq/are-there-any-limits-on-file-size-or-file-duration-for-files-submitted-to-the-api) |
+| Direct upload | `POST /v2/upload`, raw bytes, `authorization: <key>`, MEASURED to take `content-type: application/octet-stream`; answers `{"upload_url": …}`, a private URL only AssemblyAI's servers can read; max **2.2 GB** | [FAQ: upload URLs](https://www.assemblyai.com/docs/faq/why-cant-i-access-urls-from-the-upload-endpoint-directly), [FAQ: limits](https://www.assemblyai.com/docs/faq/are-there-any-limits-on-file-size-or-file-duration-for-files-submitted-to-the-api) |
 | Transcript limits | **5 GB** and **10 hours** per `audio_url` | same FAQ |
 | Upload retention | uploads deleted after transcription, within 24 h and at most 48 h, "regardless of configuration" | [Data retention](https://support.assemblyai.com/articles/2240096256-does-assemblyai-offer-zero-data-retention) |
 | Transcript retention | **indefinite** with no TTL and no BAA; a TTL can be set on the account (minimum 1 h) | same |
-| Deletion | `DELETE /v2/transcript/{id}` deletes the transcript and the upload "right away" | [DELETE](https://www.assemblyai.com/docs/api-reference/transcripts/delete) |
+| Deletion | `DELETE /v2/transcript/{id}` deletes the transcript and the upload "right away"; MEASURED (§3 q6): 200 in 0.35–1.70 s, and a GET afterwards answers **200, not 404**, with `audio_url: "http://deleted_by_user"`, `text: "Deleted by user."` and no words — a second DELETE answers 200 too | [DELETE](https://www.assemblyai.com/docs/api-reference/transcripts/delete), §3 q6 |
 | Status values | `queued`, `processing`, `completed`, `error` (+ `error` text) | GET reference |
 | Words | `words[]`: `text`, `start`, `end` in **milliseconds**, `confidence` 0–1, `speaker` (null unless `speaker_labels`) | GET reference |
-| Duration | `audio_duration` in **seconds**, integer | GET reference |
-| Language | `language_code` optional (omit → detection); `language_detection`; `language_confidence` in the response | POST/GET references |
+| Duration | `audio_duration` in **seconds**, integer, and MEASURED (§3 q1) to round UP — 10.389 s bills as 11 | GET reference, §3 q1 |
+| Language | `language_code` optional (omit → detection); `language_detection`; `language_confidence` in the response — MEASURED (§3 q1): detection answered `en` with confidence 0.9994, and an explicit `"en"` answered `language_code: "en_us"` with NO confidence | POST/GET references, §3 q1 |
 | Universal-3.5 Pro languages | 18 languages, 21 codes: `en en_au en_uk en_us es fr de it pt ar da nl fi he hi ja zh no sv tr vi`; dialects need no code; other languages fall back to Universal-2 when both models are named and detection is on | [Supported languages](https://www.assemblyai.com/docs/speech-to-text/pre-recorded-audio/supported-languages) |
 | Options used here | `speaker_labels` (needs `punctuate: true`, the default); `keyterms_prompt` up to 1000 terms on Universal-3.5 Pro; `prompt` up to 1500 words (not used, §7) | POST reference |
 | Options refused here | `webhook_url` (a desktop app has no public endpoint; polling is the design), `multichannel`, `disfluencies` (default false — "um" is not a caption) | POST reference |
 | Price | async Universal-3.5 Pro **$0.21 per hour** of audio; speaker labels **+$0.02/h**; $50 of free credit on a new account | [Pricing](https://www.assemblyai.com/pricing) |
-| Time to transcribe | "the vast majority of files … complete in under 45 seconds" | [FAQ: how long](https://www.assemblyai.com/docs/faq/how-long-does-it-take-to-transcribe-a-file) |
+| Time to transcribe | "the vast majority of files … complete in under 45 seconds"; MEASURED (§3 q1, q8): 2.8 s for 10 s of audio and 24.4 s for an hour, about **147× real time** | [FAQ: how long](https://www.assemblyai.com/docs/faq/how-long-does-it-take-to-transcribe-a-file), §3 q1/q8 |
 | Signed URLs | S3 presigned, Azure SAS and GCP signed URLs are accepted as `audio_url` and must be FRESH at submission | [Common errors](https://www.assemblyai.com/docs/pre-recorded-audio/guides/common_errors_and_solutions), [S3 guide](https://www.assemblyai.com/blog/transcribing-audio-files-in-an-s3-bucket-with-assemblyai) |
 | EU | `api.eu.assemblyai.com` in place of `api.assemblyai.com` | POST reference |
 | Retries | AssemblyAI's own guidance: retry after a 5xx or a failed upload | [Retrying requests](https://www.assemblyai.com/blog/customer-issues-retrying-requests) |
 
-Not read, and left to C0: the `content-type` the upload endpoint expects
-(the SDKs send `application/octet-stream`; the guide page answered 404 on
-the day), and whether a bad `language_code` is refused at submission or
-only after the download (q5).
+Both rows this table left to C0 are answered in §3. The upload endpoint
+takes `content-type: application/octet-stream` (q1), and a bad
+`language_code` is refused **at submission**, a 400 in a quarter of a second
+with the sentence "Language code xx is not supported." (q5) — the upload it
+was submitted against is spent, and nothing is transcribed or billed.
 
 ---
 
-## 3. C0 — the spike, to run before the plan leans on it
+## 3. C0 — the spike, run on 2026-09-20
 
-Instruments go in `tools/proof/cloud_spike/` and are tracked, as
-`silence_spike/` and `recording_spike.py` are. Rows q1, q2, q5 and q6 need
-a real key in `RC_ASSEMBLYAI_KEY` and cost cents; the rest cost nothing.
-The fixture is road map 4's: `say -o` with two `[[slnc]]` pauses, 10.39 s,
-whose level rule puts the pauses at **2.72–4.29 s and 6.68–7.81 s** on its
-digital silence — the truth every timing below is measured against.
+Instruments in `tools/proof/cloud_spike/`, tracked as `silence_spike/` and
+`recording_spike.py` are; that directory's README says how to run a row
+again, what costs money, and what each of `--selftest`'s seven checks scored
+when it was broken on purpose. Every number below is in
+`tools/proof/work/cloud_spike/answers.json` (untracked, rebuildable) and
+every paid call is in `ledger.json` beside it. **All eight rows RAN**; the
+runner exited 0 with every reservation closed.
 
-- **q1 — the round trip.** Upload the fixture's 16 kHz mono WAV, submit,
-  poll, fetch, delete. Record: upload seconds and MB/s from this host,
-  seconds from submit to `completed`, `speech_model_used`, the words, and
-  whether any word's `[start, end)` crosses a known pause (it must not).
-  Repeat with `speaker_labels: true`. Repeat with `language_code: "en"`.
-  A word that straddles a pause by more than a frame is a timing fact the
-  design would have to pad for.
-- **q2 — the upload format** (can overturn 5a). The same fixture as WAV
-  (32 kB/s), as AAC-LC 64 kbps mono in an `.m4a` (`AVAssetWriter`,
-  8 kB/s) and, if `ExtAudioFile` will write it, as FLAC. Sizes, and every
-  word's `start` delta against the WAV run. **The question is AAC's
-  priming delay**: an encoder prepends about 2112 samples, at 16 kHz
-  132 ms, that the container's edit list is supposed to hide; a decoder
-  that ignores the list puts every caption 132 ms late. WAV is the default
-  and needs no answer; a smaller format is taken only on a measured
-  delta under half a frame at 30 fps.
-- **q3 — App Transport Security.** Plain HTTP to `127.0.0.1` from the
-  signed app with `NSAllowsLocalNetworking` in `project.yml`, and from a
-  bare `swiftc` probe with no plist at all. The proof's stand-in server
-  (5i) speaks HTTP, not TLS, and ATS is enforced on macOS; if the probe is
-  blocked, the stand-in grows a self-signed certificate and the probe
-  pins it.
-- **q4 — a late audio track** (can overturn 5b's mapping). A fixture whose
-  audio begins 1.5 s after its picture (`ffmpeg -itsoffset 1.5` on the
-  audio input): does an extract of the WHOLE file, written from
-  `startSession(atSourceTime: .zero)`, keep the 1.5 s at its head, or
-  drop it? If it drops it, every word of such a file is 1.5 s early and
-  the mapping needs the audio track's own start time — read once, stored
-  in the cache file, and added on read.
-- **q5 — when a bad `language_code` is refused.** `"xx"` at
-  `POST /v2/transcript`: a 400 at submission (the upload is spent but
-  seconds, not minutes) or an `error` status after processing. Decides
-  whether the tool validates codes against a local table or relays the
-  server's sentence.
-- **q6 — what a deleted transcript answers.** `DELETE` then `GET`: the
-  status code and body, so the live proof row can assert it.
-- **q7 — the Keychain from an ad-hoc-signed bundle** (can overturn 5d).
-  `SecItemAdd` / `SecItemCopyMatching` from `make app`'s binary: does it
-  prompt, and does a REBUILT binary — a fresh ad-hoc signature, which every
-  `make app` produces — read the item without a prompt or at all? The
-  login keychain's ACL names the signing identity, and an ad-hoc identity
-  is per build. Try `kSecUseDataProtectionKeychain` too. If every rebuild
-  prompts, the fallback is a `0600` file under
-  `~/Library/Application Support/Reelcut/`, recorded as the weaker choice
-  it is.
-- **q8 — the ceilings.** A 1-hour file (a real recording, or the fixture
-  looped): upload time, `completed` time, and the `audio_duration`
-  billed, so §8's timeout constants are numbers and not guesses.
+**The host is an input to half of these answers.** macOS 26.5.1, Xcode 26.2
+(17C52), Apple Swift 6.2.3, Python 3.14.5, the default route over Wi-Fi.
+Upload throughput measured **0.549–0.606 MB/s** for the 337 kB fixture and
+**23.1 MB/s** for the 115 MB hour — the small number is per-request overhead,
+not the link, and it is the large one a progress estimate should lean on.
+Both probe bundles were ad-hoc signed with the hardened runtime,
+`flags=0x10002(adhoc,runtime)`, which is what `make app` produces.
+
+The fixture is road map 4's, remade by the runner: `say -o` with two
+`[[slnc]]` pauses, **10.389 s**, whose truth pauses this host measured on its
+digital silence at **2.72–4.29 s and 6.68–7.81 s** — road map 4's numbers to
+the hundredth, so no timing below rests on a fixture that drifted.
+
+### q1 — the round trip
+
+**Measured.** Upload 336 532 bytes in 0.565–0.578 s; `POST /v2/transcript`
+answered 200 in 0.264–0.279 s; `completed` after **2.8 s and three polls** at
+one second — so the true processing time is under three seconds and what was
+measured is the poll grid. `speech_model_used` was `universal-3-5-pro` in all
+three calls. `audio_duration` came back **11** for a 10.389 s file: an
+integer, rounded UP, and that is what bills. 23 words, confidence 0.87–1.00,
+and the text in order is "The quick brown fox jumps over the lazy dog. Pack
+my box with 5 dozen liquor jugs. How vexingly quick daft zebras jump!" — the
+three pangrams, with "five" normalised to "5" and terminal punctuation the
+recogniser chose. **No word overlapped either truth pause at all**; the
+overlap list is empty, so "crosses by more than 33 ms" never arose. `speaker`
+was null in the plain and `language_code` calls and `"A"` in the
+`speaker_labels` one. Detection answered `language_code: "en"` with
+`language_confidence` **0.9994**; asking for `"en"` explicitly answered
+`language_code: "en_us"` and NO `language_confidence`. Each DELETE answered
+200 in 0.48–0.52 s.
+
+Two things §2 left open were answered on the way. The upload endpoint takes
+`content-type: application/octet-stream` without complaint, and
+`speech_models: ["universal-3-5-pro", "universal-2"]` was never refused, so
+the runner's retry-without-the-field arm never fired.
+
+`list_match` is **proven**: `GET /v2/transcript?limit=200` returned the
+spike's own transcript, its `audio_url` equal to the upload URL byte for
+byte, with the fields `audio_url, completed, created, error, id, region,
+resource_url, status`. In the run this record is written from, the
+entry was present in the ONE look the row took, straight after the submit.
+The second look, five seconds on, runs only when the first finds nothing,
+so it did not run, and no latency was recorded for the look itself. An
+earlier, pre-fix reading of this row saw the entry absent at once and
+present five seconds later, and it is what the caution below about list lag
+was written from; `answers.json` no longer holds that reading, so it is an
+anecdote here and not a measurement.
+
+**Verdict.** §1's round trip is what the service does, at the timings §5a's
+progress plan assumed. No timing pad is needed anywhere: the words do not
+touch the pauses, so 5b's mapping needs no epsilon and 5i's live claim (20)
+can assert "no word crosses a known pause" outright rather than "by more than
+a frame". `audio_duration` rounding UP to the whole second is what the
+estimate in 5e should round with. A transcript whose submit reply is lost CAN
+be found again by its `audio_url`, and in this run it was there at once; a
+recovery look should still tolerate a few seconds of list lag, which is a
+caution carried from the earlier reading above and not something this run
+measured.
+
+### q2 — the upload format
+
+**Measured.** The control first: **the same WAV uploaded twice gave word
+starts identical to the millisecond**, every one of the 23, so the service
+has no run-to-run jitter on this fixture and any delta below is the format's.
+
+| Format | Bytes | Of the WAV | max │Δstart│ vs WAV run 1 |
+|---|---|---|---|
+| WAV 16 kHz mono 16-bit | 336 532 | 100% | — (0 against its own second run) |
+| FLAC 16 kHz mono 16-bit | 161 991 | 48.1% | **0 ms** |
+| AAC-LC 48 kbps mono `.m4a` | 64 396 | 19.1% | **38 ms** |
+
+AAC at **64 kbps was refused by the encoder** at 16 kHz mono
+("Cannot Encode Media"); 48 000 was the next bitrate tried and it wrote, and
+the probe stops at the first that writes, so nothing lower was attempted. Its
+38 ms is not the priming delay §3 suspected: the
+deltas grow monotonically 0 → 38 ms across ten seconds, and the container's
+2112-sample priming — visible as `source_start: 0.132` in the track's one
+segment — is hidden from BOTH decoders that were asked, AVFoundation
+(lag 0 samples) and `ffmpeg -ignore_editlist 1` (lag 0 samples). So the
+offset the design feared is not there, and what is there is a lossy codec
+moving word boundaries by up to a frame and a bit.
+
+FLAC needed a different writer. **`AVAssetWriter` on this host has no
+`org.xiph.flac` file type** — its list is `public.aiff-audio`,
+`com.apple.m4a-audio`, `com.microsoft.waveform-audio`,
+`com.apple.coreaudio-format`, `com.apple.quicktime-movie` and their kin — and
+it refuses with an Objective-C exception Swift cannot catch, so the probe
+writes FLAC through `AVAudioFile`, the `ExtAudioFile` path this row's
+question named as the alternative. Its output is padded to a block boundary
+(10.656 s of samples for a 10.389 s input); that decoded at lag 0, gave the
+same 23 words with the same starts, and billed the same `audio_duration` of
+11.
+
+**Verdict — 5a changes.** FLAC passes the rule §9 set (max │Δ│ under half a
+frame at 30 fps, with the control below that too) and halves the bytes, so
+**the extractor writes FLAC and falls back to the WAV when the FLAC write
+refuses**, and §8's format row says so. AAC is refused for C1: 38 ms is more
+than half a frame, and buying 29% more of a file for a caption that is a
+frame late is the wrong trade. The claim in 5i·2 about the upload's byte
+length becomes a claim about the container (a FLAC stream whose decode is
+sample-for-sample the WAV), which is the weaker claim §9 said it would
+become.
+
+### q3 — App Transport Security
+
+**Measured.** A loopback `http.server` on an ephemeral port, and one plain
+HTTP GET at it from three builds of the same probe, at `127.0.0.1` and at
+`localhost`:
+
+| Build | `http://127.0.0.1:<p>/` | `http://localhost:<p>/` |
+|---|---|---|
+| bare Mach-O, no plist at all | 200 `ok` | 200 `ok` |
+| `RCSpikeQ3.app`, ad-hoc signed, hardened runtime, **no ATS key** | 200 `ok` | 200 `ok` |
+| the same with `NSAllowsLocalNetworking: true` | 200 `ok` | 200 `ok` |
+
+The app itself has no outgoing HTTP code today (`git grep URLSession -- app`
+is empty), so an ad-hoc-signed bundle around the probe IS the "signed app"
+row of this question, and it is the row that matters: it is signed the way
+`make app` signs, with the hardened runtime on.
+
+**Verdict.** ATS does not block plain HTTP to loopback on macOS 26.5.1, with
+or without the key, bundled or not. **`project.yml` gains nothing** — the
+`NSAppTransportSecurity` bullet in 5h is struck, the stand-in server of 5i
+stays HTTP with no certificate to pin, and 5c's "not `https` is accepted only
+for a loopback host" line stands on a measurement instead of a hope.
+
+### q4 — a late audio track
+
+**Measured.** `ffmpeg -itsoffset 1.5` over a black picture, written twice
+(`late.mov`, PCM; `late.mp4`, AAC). The audio track's segments say what the
+container holds: an **EMPTY edit of 1.5 s** at the head of the `.mov` and of
+1.453 s at the head of the `.mp4` (its source start is
+`kCMTimeInvalid`), then the speech. An extract of the WHOLE file at the
+shipped settings, `reader.timeRange = (.zero, asset.duration)` and
+`startSession(atSourceTime: .zero)`, came out 11.89 s for a 10.389 s
+recording, and cross-correlated against `speech.wav` at
+**+24 019 samples (1.501 s)** for the `.mov` and **+24 010 (1.501 s)** for the
+`.mp4`, correlation 0.998 and 1.000.
+
+**Verdict — 5b stands.** The offset is **KEPT**: the extract begins where the
+picture begins and the silence is written out, so a word's time in the
+extract is its time in the media and nothing is 1.5 s early.
+`audio_track_start_ms` stays **0** and the mapping does not add it. The field
+stays in the cache file as the record of a question that was asked and
+answered, with a comment that it is 0 on this host's AVFoundation — a later
+macOS that trimmed the empty edit would be caught by a re-run of this row.
+
+### q5 — when a bad `language_code` is refused
+
+**Measured.** `language_code: "xx"` at `POST /v2/transcript` answered **400 in
+0.24 s**, body:
+
+```json
+{"error": "Language code xx is not supported. See https://www.assemblyai.com/docs/concepts/supported-languages."}
+```
+
+The upload it was submitted against is spent — nothing was transcribed and
+nothing was billed.
+
+**Verdict — 5g and 5k stand as written.** The refusal is at submission, in
+seconds, in a sentence a person can act on, so the tool RELAYS the server's
+sentence and does not carry a second dated table of language codes. §5k's
+"costs the upload if q5 answers at submission" is the answer: the upload
+(337 kB here, up to 55 MB for an hour) is spent and left to AssemblyAI's ≤ 48 h
+retention. The popup's 21 rows are still worth having, because they stop the
+mistake before the upload rather than after it.
+
+### q6 — what a deleted transcript answers
+
+**Measured.** `DELETE /v2/transcript/{id}` answered **200** in 0.35–1.70 s
+across the whole spike (the slowest was the FLAC call's), returning the
+transcript's own JSON. A `GET` afterwards answered **200, not 404**, with
+`status: "completed"`, `audio_url: "http://deleted_by_user"`,
+`text: "Deleted by user."` and the words gone. A second `DELETE` of the same
+id answered **200** again.
+
+**Verdict — 5i·20 changes.** The live proof row must assert the SENTINEL, not
+a 404: after the delete, a GET answers 200 with `audio_url` equal to
+`http://deleted_by_user`. The janitor of R6-4 gets a free property out of
+this — a repeated DELETE is idempotent and answers 200, so a retry of a
+recorded failure cannot make things worse.
+
+### q7 — the Keychain from an ad-hoc-signed bundle
+
+**Measured**, eight steps a sequence, every one in its own process under a
+20 s bound with `stdin` closed, three sequences. Builds A and B are the same
+source with one different generated nonce, so their cdhashes differ exactly
+as two `make app` runs differ — `5db12c2a…` and `ba7b3264…` in the run
+`answers.json` holds, and a fresh pair every re-run, which is the point.
+
+*Signed bundle, login (file) keychain.* A adds: `errSecSuccess`. A reads:
+success, the value matches. A reads with the interaction door shut
+(`kSecUseAuthenticationUIFail`): success. **Each of those three steps
+returned in about 90 ms of wall clock and blocked on nothing.** (The
+instrument's `security_agent_seen` is `true` for every step of the row,
+including the first one chronologically, so it only ever saw an agent
+already alive on this host and cannot tell a modal raised for THIS step
+from that: what distinguishes A's steps is that they returned at once.)
+Then B — the same bundle id, the same service, a
+new cdhash — reads: **BLOCKED for the whole 20 s with `SecurityAgent`
+running**, and blocked the same way with `kSecUseAuthenticationUIFail` set,
+which does not turn that ACL confirmation into a refusal. B's delete answered
+**−25244 `errSecInvalidOwnerEdit`**, "Invalid attempt to change the owner of
+this item", and the item was still there afterwards.
+
+*Bare Mach-O, login keychain.* A third identity: its `add` answered −25299
+(the item exists), its reads blocked the same 20 s, and its delete answered
+−25244.
+
+*Data-protection keychain (`kSecUseDataProtectionKeychain`).* `add` and
+`delete` answered **−34018 `errSecMissingEntitlement`** from the ad-hoc
+signed bundle, and every read answered −25300 (not found). It is not
+available to an unsandboxed app signed ad hoc with no keychain access group.
+
+Cleanup: the item's OWNER (build A) deleted it, status 0, and `attrs` answers
+"not found" on both keychains. `cleanup_blocked` is **false**, nothing is
+left behind, and `com.kgalligan.reelcut.assemblyai` — the service C1 would
+use — was never read, written or asked about.
+
+**Verdict — 5d changes.** A login-keychain item written by one ad-hoc
+signature cannot be read by the next one without a modal, and cannot be
+deleted by it at all. Every `make app` is a new ad-hoc signature, so on this
+tree's build the key would be unreachable after the first rebuild and an
+agent-driven instance could never answer the prompt. **C1 stores the key in a
+`0600` file** under `~/Library/Application Support/Reelcut/`, which §7's last
+bullet reserved for exactly this answer, and 5d says plainly that it is the
+weaker choice and why. `SecretStore` stays a protocol with `read`, `write`
+and `remove`, so a build signed with a stable Developer ID identity — where
+the ACL names one identity across builds and this whole problem does not
+arise — can carry a `KeychainStore` conformer later without touching anything
+above it. R6-5's sentence about "in their Keychain" is corrected to name the
+file, and 5i·17's probe claim is against the file store, still never the real
+item.
+
+### q8 — the ceilings
+
+**Measured.** `hour.wav`, the fixture looped to exactly 3600.0 s,
+115 200 044 bytes. Upload **4.98 s at 23.1 MB/s**. Submit 200 in 0.38 s.
+`completed` after **24.4 s and eight polls** at three seconds —
+**147× real time** — with `audio_duration` exactly **3600** and 7 967 words.
+DELETE 200 in 1.29 s.
+
+Drift: the loop period is 10.388 625 s, and each occurrence of the loop's
+first word was placed at its nearest loop index. 227 of the 347 loops were
+found that way (the recogniser does not always spell the first word the same)
+and the residual ran **+16.0 ms to +122.2 ms**, with none ambiguous and no
+trend across the hour. **Nothing accumulates**: the spread is the
+recogniser's own per-word placement, not a clock that slips.
+
+**Verdict — §8 gets numbers.** `pollCeiling`'s divisor is
+floor(3600 ÷ 24.4 ÷ 3) = **49**, clamped into [2, 60] and unchanged by it, so
+the ceiling is `max(300 s, audio seconds / 49)` — three times the measured
+rate, which is the margin a queue can eat. `deleteTimeout` of 5 s stands: the
+slowest DELETE the whole spike saw was 1.70 s. 5a's progress plan can advance
+its 0.65–0.95 band against **150× real time** and hold at 0.95, and an hour
+of audio is ~25 s of waiting, not minutes. The ten-hour ceiling implies about
+four minutes of processing and, at FLAC, 550 MB of upload.
+
+### 3a. What C0 changed in this document
+
+| Section | The claim before | The claim now | Why |
+|---|---|---|---|
+| §2, the two open rows | the upload's `content-type` and when a bad `language_code` is refused were "left to C0" | `application/octet-stream` is accepted; a bad code is a 400 at submission | q1, q5 |
+| §2, Deletion | "deletes the transcript and the upload right away" | it does, and a GET afterwards answers **200** with `audio_url: "http://deleted_by_user"` and `text: "Deleted by user."`; a second DELETE answers 200 | q6 |
+| §2, Duration | `audio_duration` in seconds, integer | and it rounds UP: 10.389 s billed as 11 | q1 |
+| §2, Time to transcribe | "under 45 seconds" for the vast majority | 2.8 s for 10 s of audio, 24.4 s for an hour — about 147× real time on this host | q1, q8 |
+| §1, the upload format | a temporary 16 kHz mono WAV | the FLAC with the WAV as fallback, as §5a | q2 |
+| §0 and §1, where the key lives | "the person's own Keychain", "in the Keychain, entered once" | a `0600` file of the person's own, as §5d and R6-5 | q7 |
+| §5a, the upload format | a temporary 16 kHz mono WAV | a 16 kHz mono **FLAC** through `AVAudioFile`, the WAV as the fallback when that write refuses | q2 |
+| §5b, `audio_track_start_ms` | "0 unless the spike says otherwise" | 0, measured: an empty edit at the head of a late track is KEPT by the extract | q4 |
+| §5d, the credential | `KeychainStore` over the login keychain | a `0600` file; `KeychainStore` deferred to a stable signing identity, `SecretStore` unchanged | q7 |
+| §5h, `project.yml` | `NSAppTransportSecurity` `NSAllowsLocalNetworking: true` | nothing: loopback HTTP is not blocked | q3 |
+| §5h, toll 1 | "`reelcut-remaining.md` §3 does not list it" | it does, at 934 | read back |
+| §5i·2 | the upload body is a RIFF WAV of `2 × 16000 × seconds` bytes | the upload body is a FLAC stream whose decode is sample-for-sample that WAV | q2 |
+| §5i·10, §5i·17, §5i·20 | the ATS row, `KeychainStore` through `MemoryStore`, "what q6 recorded" | loopback needs no key; the file store; the `deleted_by_user` sentinel | q3, q7, q6 |
+| §8 | `pollCeiling`'s divisor and the format row were guesses | divisor 49; FLAC; `deleteTimeout` checked against 1.70 s measured | q8, q2, q6 |
+
+Everything else in §1, §4, §5 and §6 stands as written. q1 and q5 confirmed
+their sections rather than changing them, and q4 confirmed 5b's mapping,
+which was the row most likely to overturn it.
+
+### 3b. Spend and deletion
+
+Twenty-six paid calls over the day, every one of them the synthetic `say`
+fixture or that fixture looped. No recording of this machine, no file of the
+user's, and no header, payload or record carrying a name, an email, a
+hostname or a path.
+
+| Row | Uploaded | Bytes | Calls | Billed `audio_duration` | Outcome |
+|---|---|---|---|---|---|
+| q1 | `speech.wav` | 336 532 | 12 | 11 s each | deleted |
+| q2 | `speech.wav` | 336 532 | 4 | 11 s each | deleted |
+| q2 | `speech_aac_48000.m4a` | 64 396 | 2 | 11 s each | deleted |
+| q2 | `speech.flac` | 161 991 | 2 | 11 s each | deleted |
+| q5 | `speech.wav` | 336 532 | 2 | — (refused at submission) | `no_transcript` |
+| q6 | `speech.wav` | 336 532 | 2 | 11 s each | deleted |
+| q8 | `hour.wav` | 115 200 044 | 2 | 3600 s each | deleted |
+
+**Totals: 7 462.8 s of audio — 2 h 04 m — and $0.4353 at §2's published
+$0.21 an hour, against a $2.00 budget the ledger enforced before every
+upload.** (q1 and q2 ran more than once: q1 to add the `list_match` look and
+the speaker and confidence readings, q2 once in its own run and once in the
+full one, q8 twice because the first reading of its drift was the
+instrument's fault, not the service's.)
+
+**Every transcript the spike created was deleted.** Twenty-six reservations,
+twenty-four transcripts created and twenty-four closed `deleted`; no
+reservation is open and none is `unresolved`. The two `no_transcript` rows are q5's refused submits:
+those two uploads were never transcribed, cannot be deleted by us (there is no
+transcript id to delete), and are left to the provider's own upload
+retention, which §2 records as within 24 h and at most 48 h "regardless of
+configuration". `find_own` was called only with upload URLs this spike's own
+ledger recorded, and nothing about any other transcript on the account was
+deleted, read, counted or written down. `--leakcheck` over the instruments,
+the work directory, this document, `tools/proof/README.md`, `CLAUDE.md` and
+the handoff directory answers `clean`: the key is in none of them, and each
+of the 26 upload URLs is in `ledger.json` and nowhere else.
+
+### 3c. The review pass
+
+The spike went through one litecode pipeline on 2026-09-20. The adversary
+read the plan before a line was written and turned up five gaps, all taken:
+a base-URL variable that could have paired the real key with any host
+(removed; the client refuses every pair but the real host with a real key
+and loopback with the selftest's dummy); `urllib` forwarding `authorization`
+across a redirect (the client follows none); a submit whose reply is lost
+leaving a transcript nobody knows to delete (`find_own`, and the ledger's
+`unresolved`); `--remake` sitting beside the ledger it could erase; and
+q7's cleanup running outside its timeout. The first review of the finished
+work re-added the ledger to the cent and found no path for the key, bar two
+`pgrep` children that inherited the environment (fixed), and caught five
+sentences in this document that `answers.json` did not support: §1 still
+saying WAV and Keychain, "no SecurityAgent process existed", two AAC
+bitrates never tried, q1's ranges, and a count of 23 reservations for 26.
+The second review found one more of the same kind, written by the fix
+itself ("present in BOTH looks" where the row takes a second look only
+when the first finds nothing), and five smaller ones; all six were closed
+by hand after it, since the pipeline runs no second fix pass, and
+`cloud_rows.py` now writes `own_entry_after_5s` only when that look ran.
+An independent scan for the key over the tree, the work directory, the
+handoff directory and every session transcript found it in no file.
+**The rule this record is held to: a number here is one `answers.json` or
+`ledger.json` holds, or the sentence says it is an anecdote.**
 
 ---
 
@@ -239,12 +545,17 @@ digital silence — the truth every timing below is measured against.
   retention (≤ 48 h) is the backstop, never the plan; its transcript
   retention (indefinite) is why the delete is not optional.
 - **R6-5 — The app never holds an AssemblyAI key of Reelcut's.** The
-  credential is the person's own, in their Keychain, or a relay's token
-  (C2). It is never an argument of `transcribe` — an argument is written
-  into every agent transcript and every log — and never a launch argument,
-  which `ps` shows to every user. `RC_ASSEMBLYAI_KEY` in the environment
-  is the one override, for proofs, and it is read only when the Keychain
-  has nothing.
+  credential is the person's own, in a `0600` file of their own under
+  `~/Library/Application Support/Reelcut/`, or a relay's token (C2). It is
+  never an argument of `transcribe` — an argument is written into every
+  agent transcript and every log — and never a launch argument, which `ps`
+  shows to every user. `RC_ASSEMBLYAI_KEY` in the environment is the one
+  override, for proofs, and it is read only when the store has nothing.
+  The file rather than the Keychain because C0's q7 measured what an ad-hoc
+  signature does to a login-keychain item: the next `make app` cannot read
+  it without a modal and cannot delete it at all (§3 q7, §5d). A build
+  signed with a stable identity could keep it in the Keychain, and
+  `SecretStore` is the protocol that lets that be a later conformer.
 - **R6-6 — The protocol boundary is the base URL and the credential.**
   The client speaks AssemblyAI's REST API to `AssemblyAIConfiguration`'s
   base URL; the stand-in server, the EU endpoint and a same-protocol relay
@@ -295,13 +606,18 @@ The run, on the `work` queue, synchronous:
    transcript marker (5b). Equal → the media is **cached**, no network.
    Otherwise, or with `refresh`, the media is **to upload**.
 3. For each media to upload: **extract** its whole audio track to a
-   temporary WAV (`Transcriber+Extract.swift`'s extractor, the shipped
-   settings, range = the whole asset, `NSTemporaryDirectory()`, deleted
-   in a `defer`); refuse by name a media over **10 hours** (AssemblyAI's
-   ceiling) before extracting; **upload** it; **submit**; **poll** every
-   3 s until `completed` or `error`, with the ceiling in §8; **fetch**;
-   **write** the cache file then its marker; **delete** remotely and
-   record the answer. One media's failure is reported under `problems`
+   temporary **FLAC** at the shipped settings' rate and width (16 kHz mono
+   16-bit, `Transcriber+Extract.swift`'s extractor, range = the whole asset,
+   `NSTemporaryDirectory()`, deleted in a `defer`) — half the bytes of the
+   WAV for a decode that is sample-for-sample the same, C0's q2; the WAV is
+   the fallback when the FLAC write refuses, and the cache file records
+   which was sent. FLAC is written through `AVAudioFile`, NOT
+   `AVAssetWriter`, which has no `org.xiph.flac` file type on macOS 26 and
+   refuses it as an Objective-C exception (q2). Then: refuse by name a media
+   over **10 hours** (AssemblyAI's ceiling) before extracting; **upload**
+   it; **submit**; **poll** every 3 s until `completed` or `error`, with the
+   ceiling in §8; **fetch**; **write** the cache file then its marker;
+   **delete** remotely and record the answer. One media's failure is reported under `problems`
    for every clip on it and the run carries on — phase 4's rule — except
    cancellation, which throws and places nothing, and an AUTH failure
    (401/403), which ends the run at once because every later media would
@@ -314,7 +630,8 @@ The run, on the `work` queue, synchronous:
 Progress is the bar's one number: extraction 0–0.25 of a media's share
 (frames written over frames expected), upload 0.25–0.65 (`URLSession`'s
 `didSendBodyData`), processing 0.65–0.95 advancing on the clock against
-q8's measured rate and holding at 0.95, fetch and cache to 1.0. The detail
+q8's measured rate — **147× real time**, so an hour of audio is about 25 s
+of waiting — and holding at 0.95, fetch and cache to 1.0. The detail
 line says the phase and the file — "Uploading intro.mov · 41 MB of 115" —
 and while waiting, the seconds waited, so a stuck queue is visible rather
 than silent.
@@ -344,6 +661,7 @@ The JSON, sorted keys, `.atomic`:
   "language_confidence": 0.99,
   "audio_duration": 3723,
   "extracted_seconds": 3723.41,
+  "uploaded_format": "flac",
   "audio_track_start_ms": 0,
   "fetched_at": "2026-09-17T14:02:11Z",
   "remote_deleted": true,
@@ -356,8 +674,14 @@ The JSON, sorted keys, `.atomic`:
 `words` is AssemblyAI's array as it arrived — milliseconds, not ticks —
 because a cache that stores the provider's answer unchanged can be
 compared byte for byte with what the stand-in served, re-derived under a
-future rule, and never argued with. `audio_track_start_ms` is q4's answer
-(0 unless the spike says otherwise). The marker is a `TranscriptStamp`:
+future rule, and never argued with. `audio_track_start_ms` is q4's answer, and it is **0**: C0 measured that an
+extract of a file whose audio starts 1.5 s after its picture KEEPS that
+1.5 s at its head, so a word's millisecond in the extract is its millisecond
+in the media and the mapping adds nothing (§3 q4). The field stays, written
+0 with a comment naming the row, because a later macOS that trimmed the
+empty edit would move every caption of such a file and a re-run of q4 is
+what would catch it. `uploaded_format` is `"flac"` or `"wav"`, q2's answer
+and its fallback, so a cache file says what was actually sent. The marker is a `TranscriptStamp`:
 `source: CacheStamp` (so a relink, an edited file or a changed duration
 invalidates it exactly as it invalidates the peaks) plus `provider`,
 `speech_models`, `language_code`, `speaker_labels` and `keyterms_prompt`
@@ -419,24 +743,47 @@ region key `ReelcutAssemblyAIRegion` (`us` → `https://api.assemblyai.com`,
 `eu` → `https://api.eu.assemblyai.com`); and the credential:
 `SecretStore` (5d) first, `RC_ASSEMBLYAI_KEY` in the environment when the
 store has nothing. A base URL that is not `https` is accepted only for a
-loopback host (q3's row is what makes that line honest).
+loopback host — and C0's q3 measured that plain HTTP to `127.0.0.1` and to
+`localhost` is NOT blocked by App Transport Security on macOS 26.5.1, from a
+bare binary or from an ad-hoc-signed hardened-runtime bundle, with or
+without an ATS key. The stand-in server of 5i speaks HTTP and has no
+certificate to pin.
 
 ### 5d. The credential, the region and the settings window
 
-`SecretStore` is a protocol with `read()`, `write(_:)`, `remove()`;
-`KeychainStore` implements it over `SecItemCopyMatching` / `SecItemAdd` /
-`SecItemUpdate` / `SecItemDelete` with service
-`com.kgalligan.reelcut.assemblyai`, account `api-key`, and whatever q7
-decides about the data-protection keychain; `MemoryStore` is the probe's,
-so no proof ever reads or writes a person's real item. The key is never in
-`UserDefaults`, never in the package, never in a log; the Settings window
-shows it masked and offers Remove.
+`SecretStore` is a protocol with `read()`, `write(_:)`, `remove()`, and
+**C0's q7 decided which conformer ships: a file, not the Keychain.**
+`FileStore` writes the key to `~/Library/Application Support/Reelcut/
+assemblyai-key` with `POSIXPermissions: 0o600`, created with those
+permissions and not chmod'ed after, in a directory it creates at `0o700`;
+`MemoryStore` is the probe's, so no proof ever reads or writes a person's
+real credential. The key is never in `UserDefaults`, never in the package,
+never in a log; the Settings window shows it masked and offers Remove.
+
+**Why not the Keychain**, which is the better place and was the plan. q7
+measured a login-keychain item written by one ad-hoc signature and read by
+the next: the second build blocks on a `SecurityAgent` modal — even with
+`kSecUseAuthenticationUIFail`, which does not turn that ACL confirmation
+into a refusal — and its DELETE answers `errSecInvalidOwnerEdit`, so the
+item cannot even be cleaned up by the build that finds it. Every `make app`
+is a new ad-hoc signature. An agent-driven instance has nobody to click the
+modal, and a person would meet one after every build. The
+data-protection keychain is not a way out either: `SecItemAdd` with
+`kSecUseDataProtectionKeychain` answers `errSecMissingEntitlement` (−34018)
+from an unsandboxed ad-hoc-signed app with no keychain access group. **The
+file is the weaker choice and this paragraph is the record of that**: it is
+readable by anything running as the person, where a Keychain item is
+readable only by one signed identity after one confirmation. A build signed
+with a stable Developer ID identity does not have q7's problem, and
+`KeychainStore` is then one more `SecretStore` conformer and a migration
+that reads the file once and removes it — a later phase, named here so it is
+not rediscovered.
 
 **Reelcut ▸ Settings… ⌘,** is new chrome — the app has had nothing to
 persist beyond view state — and it is a window, not a sheet:
 `SettingsWindowController.swift` (≤ 400), one pane for now,
 "Transcription": the key (an `NSSecureTextField` and Save / Remove; a
-`KeychainStore` write on Save), the region popup (United States /
+`FileStore` write on Save), the region popup (United States /
 European Union → `ReelcutAssemblyAIRegion`, pinned by the harness like
 every key the chrome reads), a **Verify** button (`client.verify()` on
 the `work` queue, "Key accepted" or the refusal sentence on main), and
@@ -498,8 +845,11 @@ refresh?}` — four new arguments, no new tool, the catalog at 77.
 - `engine`: `"apple"` (default, whatever the sheet last chose) or
   `"assemblyai"`; anything else refused by name with the two spellings.
 - `language` with the cloud engine: `"auto"` (default) or a code, passed
-  through; a code AssemblyAI refuses comes back as its own sentence (q5
-  says at what cost). The on-device engine's two-part language refusal is
+  through; a code AssemblyAI refuses comes back as its own sentence — C0's
+  q5 measured that as a **400 at submission in 0.24 s**, "Language code xx
+  is not supported.", so the cost of a wrong code is one wasted upload and a
+  quarter of a second, and the tool relays rather than carrying a second
+  dated table of codes. The on-device engine's two-part language refusal is
   untouched.
 - `speakers`, `vocabulary` (an array of strings), `refresh`: refused by
   name with `engine: "apple"`, `voice_confidence`-with-`mode: "level"`'s
@@ -530,7 +880,7 @@ code, so what changes afterwards is attributable:
 
 | Toll | File | Now | Cut |
 |---|---|---|---|
-| 1 | `Transcriber.swift` | 934 — over the cap since it landed, and `reelcut-remaining.md` §3 does not list it | the language block (`Language`, the two cached lists, `named`, `defaultLanguage`, `language(matching:)`, ~190) → `Transcriber+Languages.swift`; the extractor (`extractSettings`, `extractAudio`, ~130) → `Transcriber+Extract.swift`; `jobs`, `contentLength`, `hasTranscribableClip` (~110) → `Transcriber+Jobs.swift`. Widenings: `contentLength` and `extractAudio` internal, because the cloud run calls both |
+| 1 | `Transcriber.swift` | 934 — over the cap since it landed, and `reelcut-remaining.md` §3 lists it at that number (this table said it did not; read back 2026-09-20) | the language block (`Language`, the two cached lists, `named`, `defaultLanguage`, `language(matching:)`, ~190) → `Transcriber+Languages.swift`; the extractor (`extractSettings`, `extractAudio`, ~130) → `Transcriber+Extract.swift`; `jobs`, `contentLength`, `hasTranscribableClip` (~110) → `Transcriber+Jobs.swift`. Widenings: `contentLength` and `extractAudio` internal, because the cloud run calls both |
 | 2 | `AgentCatalog+Files.swift` | 609 | the three caption entries (`import_captions`, `transcribe`, `export_captions`) → `AgentCatalog+Captions.swift`, spliced where they were, `AgentCatalog+Audio.swift`'s precedent |
 | 3 | `TranscribeSheetController.swift` | 505, +≈150 to come | `finish`, `summary`, `truncationText`, `viewDidDisappear` and the menu-command extension → `TranscribeSheetController+Commit.swift` |
 
@@ -538,13 +888,17 @@ Then the feature, in ≤ 400-line files:
 
 - `Transcriber+Extract.swift` — the extractor generalised AFTER its move:
   `extractAudio(url:range:to:)`, the job form calling it (behaviour
-  byte-identical, the WAV a fixture can compare).
+  byte-identical, the WAV a fixture can compare), and beside it the FLAC
+  writer C0's q2 chose for the upload — `AVAudioFile` at the same 16 kHz
+  mono 16-bit, because `AVAssetWriter` has no FLAC file type on macOS 26 and
+  refuses it as an Objective-C exception. The on-device engine keeps the WAV
+  it hands the recogniser; only the upload changes.
 - `CloudTranscriber.swift` — 5a's run.
 - `MediaTranscript.swift` — 5b: paths, the file and marker types, the
   loader, the mapping, the janitor's list.
 - `AssemblyAIClient.swift`, `AssemblyAIConfiguration.swift`,
   `AssemblyAILanguages.swift` — 5c and the table.
-- `SecretStore.swift` (`KeychainStore`, `MemoryStore`), `CloudEstimate.swift`
+- `SecretStore.swift` (`FileStore`, `MemoryStore`), `CloudEstimate.swift`
   — 5d and 5e's pure parts.
 - `SettingsWindowController.swift`; `AppDelegate+Menus.swift` (544) takes
   the one item (Reelcut ▸ Settings… ⌘,) and no more.
@@ -554,9 +908,12 @@ Then the feature, in ≤ 400-line files:
 - `AgentServer+CloudCaptions.swift`; `AgentServer+Captions.swift` (409) —
   the dispatch; `AgentCatalog+Captions.swift` — the entry.
 - `MediaCacheFiles.swift` — ONE constant (`transcriptsKind`) and nothing else.
-- `project.yml` — the usage string's rewording; `NSAppTransportSecurity`
-  `NSAllowsLocalNetworking: true` (q3); no entitlement: the app is not
-  sandboxed and the hardened runtime does not gate outgoing connections.
+- `project.yml` — the usage string's rewording, and NOTHING else: C0's q3
+  measured that plain HTTP to loopback is not blocked from an
+  ad-hoc-signed hardened-runtime bundle with no ATS key at all, so the
+  `NSAppTransportSecurity` / `NSAllowsLocalNetworking` bullet this list
+  carried is struck. No entitlement either: the app is not sandboxed and the
+  hardened runtime does not gate outgoing connections.
 - `tools/proof/harness/main.swift` — pins `ReelcutCaptionEngine` and
   `ReelcutAssemblyAIRegion`; the `cues` mode reads `speaker`.
 
@@ -590,9 +947,10 @@ Over MCP: **(1)** `engine: "nope"`, `speakers` under `apple`, and the
 cloud engine with the key unset (the proof launches a second instance
 without the variable) are refused by name, and none touches the fake (its
 log is empty); **(2)** a two-clip project over ONE media uploads ONCE: the
-log holds one `POST /v2/upload` whose body is a RIFF WAV of
-`2 × 16000 × seconds` bytes within a frame and byte-identical across two
-runs, one `POST /v2/transcript` with `authorization: proof-key`,
+log holds one `POST /v2/upload` whose body is a FLAC stream that decodes,
+sample for sample, to the `2 × 16000 × seconds` bytes of the WAV the
+on-device engine would have written (C0's q2 took the format, so the byte
+length is now a claim about the container), byte-identical across two runs, one `POST /v2/transcript` with `authorization: proof-key`,
 `speech_models` `["universal-3-5-pro", "universal-2"]`, no `language_code`
 under `language: "auto"` and `"en"` under `"en"`, N polls, one `DELETE`
 with the served id; **(3)** the placed cues equal, tick for tick and word
@@ -617,8 +975,9 @@ the rule says; `vocabulary` arrives trimmed, de-duplicated and capped;
 **(8)** `transcribe` without `engine` runs the on-device path — the fake's
 log stays empty — and `phase4_proof.py` scores 84/84 against the new
 binary; **(9)** `truncated` is absent from every cloud result;
-**(10)** the `NSAppTransportSecurity` row: the built app reaches the
-loopback fake over plain HTTP (the whole script is this claim); **(11)** a
+**(10)** the built app reaches the loopback fake over plain HTTP with no
+ATS key in `project.yml` at all — C0's q3 measured that it needs none, and
+this claim is what guards that measurement against a later macOS; **(11)** a
 scenario with `remote_deleted` failing (the DELETE answers 500) leaves the
 flag false, and the next run's FIRST request is that DELETE.
 
@@ -632,8 +991,9 @@ retry and backoff over an injected `URLProtocol`: one retry on 5xx, none
 on 4xx, three tolerated polls, the poll ceiling ending the media with a
 DELETE issued; **(16)** the cancel token cancelling an upload task
 mid-body against the fake, and a cancel during polling issuing the
-DELETE; **(17)** `KeychainStore` through `MemoryStore` — never the real
-item; **(18)** the Settings pane's rows and the sheet's popup rows and
+DELETE; **(17)** `FileStore` over a temporary directory — its `0600` mode, its
+round trip and its removal — with `MemoryStore` everywhere else, so no
+proof ever touches the person's real credential; **(18)** the Settings pane's rows and the sheet's popup rows and
 hint texts as structural reads, and the Settings window photographed
 through `cacheDisplay` (a window, not a sheet, so it CAN be) with the key
 field empty; **(19)** the fifth rule at its boundaries through the `cues`
@@ -643,8 +1003,10 @@ mode.
 has no route to `api.assemblyai.com`, its rows counted: **(20)** the
 fixture's round trip against the real service — `speech_model_used` is
 `universal-3-5-pro`, the words contain the fixture's sentence in order,
-no word crosses a known pause by more than a frame, the DELETE answers
-2xx and a GET afterwards answers what q6 recorded; and **(21)** the second
+no word touches a known pause at all (§3 q1 measured none, so the row can
+be outright and needs no frame of tolerance), the DELETE answers
+200 and a GET afterwards answers **200** with `audio_url`
+`http://deleted_by_user` and `text` "Deleted by user." (q6); and **(21)** the second
 run is served from the cache in under a second with no upload.
 
 Mutants, each named in the record with its score: the stamp comparison
@@ -652,14 +1014,18 @@ deleted (5: uploads twice); the `in` term dropped (3, 5); the DELETE
 removed (2, 4); the retry removed (6); the fifth rule removed (7, 19);
 `speech_models` pinned to Universal-2 (2); the janitor removed (11); the
 env-var override reading BEFORE the store (17, with a store holding a
-value); the 401 arm not ending the run (6: two uploads where one is
+value); the store's file written 0644 (17); the 401 arm not ending the run (6: two uploads where one is
 right); the rate constant halved (14). Every earlier proof re-run against
 the final binary and quoted "against the N it had at the time".
 
 ### 5j. What only a person at the machine can check
 
-- The Keychain prompt, if q7 says there is one, from the signed bundle,
-  and again after a rebuild.
+- **What q7's prompt actually says**, and whether "Always Allow" survives
+  a rebuild. C0 measured that a rebuilt ad-hoc-signed binary BLOCKS on a
+  `SecurityAgent` modal for the whole twenty-second bound (§3 q7) — nobody
+  was at the machine to read it. That is why the key goes in a file (5d),
+  and it is the one q7 question a person can still answer. Also
+  `designs/reelcut-remaining.md` §4.
 - The Settings window's look in both appearances, and Verify's two
   answers.
 - A real recording of twenty minutes, home upstream: the phases' feel,
@@ -677,10 +1043,16 @@ the final binary and quoted "against the N it had at the time".
   stamp; the next run sees the mismatch and re-transcribes. The ledger
   that orders cache passes is not used here — a network run is minutes,
   and holding a relink behind it would be worse than one wasted upload.
-- **A code AssemblyAI refuses costs the upload** if q5 answers "at
-  submission" — seconds — and the whole transcription if it answers
-  "after". The popup's 21 rows cannot be wrong; the tool's pass-through
-  can.
+- **A code AssemblyAI refuses costs the upload**, measured: q5's 400 came
+  back in 0.24 s, so the cost is the upload (337 kB for the fixture, about
+  55 MB for an hour of FLAC) and no billing at all. That upload cannot be
+  deleted by us — there is no transcript id — and is left to AssemblyAI's
+  own ≤ 48 h upload retention. The popup's 21 rows cannot be wrong; the
+  tool's pass-through can.
+- **The key is in a `0600` file, not the Keychain** (5d, q7): readable by
+  anything running as the person. The Keychain is the better place and is
+  unreachable from a binary that is re-signed ad hoc on every build. A
+  Developer ID build can have it back.
 - **`transcribe` over MCP cannot be cancelled**, as it cannot today; a
   cloud run holds the connection for the whole round trip, and a client
   that gives up leaves a transcript AssemblyAI is still making, deleted
@@ -845,7 +1217,11 @@ proof's claims 2–11 run over both.
   ($0.45/h), for microphones, not files.
 - **Apple's `SpeechAnalyzer`** as a third engine — still `async`-only and
   still behind the deployment target (spec §11).
-- **A second key vault** (a `0600` file) unless q7 forces it.
+- ~~**A second key vault** (a `0600` file) unless q7 forces it.~~ **q7
+  forced it** (§3 q7): the `0600` file is what 5d ships, and it is the
+  KEYCHAIN that is deferred — to a build signed with a stable identity,
+  where the ACL names one signer across builds. `SecretStore` is the seam
+  that makes that a later conformer and a one-time migration.
 
 ---
 
@@ -853,16 +1229,16 @@ proof's claims 2–11 run over both.
 
 | Constant | Value | Where it comes from |
 |---|---|---|
-| `AssemblyAIRates.perHour` | $0.21, dated 2026-09-17 | §2; shown as "at AssemblyAI's published rate" so a stale number reads as one |
+| `AssemblyAIRates.perHour` | $0.21, dated 2026-09-17 | §2; shown as "at AssemblyAI's published rate" so a stale number reads as one. C0 spent $0.4353 over 26 calls and 2 h 04 m of audio at that rate, which is the rate arithmetic checked end to end |
 | `AssemblyAIRates.speakersPerHour` | +$0.02 | §2 |
 | `pollInterval` | 3 s | AssemblyAI's SDKs' default |
-| `pollCeiling` | `max(300 s, audio seconds / 2)` | a queue wait is bounded below; q8 sets the divisor |
+| `pollCeiling` | `max(300 s, audio seconds / 49)` | q8 MEASURED an hour of audio completing in 24.4 s — 147× real time — and the divisor is floor(147 ÷ 3), clamped into [2, 60]: three times the measured rate is the margin a queue can eat |
 | `uploadRetries` | 1 | AssemblyAI's own guidance is "retry"; one is enough to cover a dropped socket, and two uploads of a 100 MB file are the cost of a third |
 | `pollFailuresTolerated` | 3 | consecutive 5xx or transport errors |
-| `maxMediaSeconds` | 36 000 | AssemblyAI's 10-hour ceiling |
+| `maxMediaSeconds` | 36 000 | AssemblyAI's 10-hour ceiling — about four minutes of processing at q8's measured rate, and about 550 MB of FLAC |
 | `maxKeyterms` | 1000 | §2 |
-| `deleteTimeout` | 5 s | the janitor's budget per item |
-| upload format | WAV, 16 kHz mono 16-bit | q2 decides otherwise only on a measured timing delta under half a frame |
+| `deleteTimeout` | 5 s | the janitor's budget per item; the slowest DELETE C0 TIMED was **1.70 s**, q2's FLAC row, of the eleven `answers.json` holds a time for (24 were made), so 5 s is nearly three times the worst measured |
+| upload format | **FLAC**, 16 kHz mono 16-bit, the WAV as the fallback | q2 MEASURED zero word-timing delta against the WAV at 48.1% of its bytes, with the service's own run-to-run jitter at zero too; AAC-LC 48 kbps was refused at 38 ms, more than half a frame at 30 fps |
 
 ---
 
@@ -878,12 +1254,17 @@ the parity log empty, "commit only when asked" — and the seams of 5h
 written into the tree BEFORE the pipeline starts, so every lane compiles
 against one shape. C2 has no pipeline until 6b is answered.
 
-What C0 can overturn, and what the plan does then: q2 (a smaller upload
-format is offset-free → 5a's extractor writes it, and the claim about the
-WAV's byte length becomes a claim about the container); q4 (the extract
-drops a late track's offset → `audio_track_start_ms` becomes real and the
-mapping adds it); q7 (the Keychain prompts on every rebuild → the `0600`
-file, recorded as weaker); q3 (ATS blocks the probe → the stand-in speaks
-TLS with a pinned certificate); q5 (refused after download → the tool
-validates codes against the 21 plus Universal-2's list, read into a
-second dated table).
+What C0 overturned, and what the plan did about it — **C0 ran on
+2026-09-20 and §3 is the record; §3a is the table of every change**. q2: a
+smaller upload format IS offset-free, and it is FLAC and not AAC, so 5a's
+extractor writes it and 5i·2's claim about the WAV's byte length became a
+claim about the container. q4: the extract KEEPS a late track's offset, so
+`audio_track_start_ms` stays 0 and the mapping adds nothing — 5b stands.
+q7: a rebuilt ad-hoc-signed binary cannot read its own Keychain item without
+a modal and cannot delete it at all, so the `0600` file is what ships,
+recorded as weaker, and `KeychainStore` waits for a stable signing identity.
+q3: ATS did NOT block the probe, from a bare binary or a signed bundle, so
+the stand-in stays plain HTTP and `project.yml` gains nothing. q5: a bad
+code is refused AT SUBMISSION with the server's own sentence, so the tool
+relays it and carries no second dated table. What remains for C1 is the
+build itself.

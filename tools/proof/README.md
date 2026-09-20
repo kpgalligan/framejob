@@ -3327,3 +3327,82 @@ What neither pair can see is in `designs/reelcut-remaining.md` §4: a
 crossfade across a Remove Silences cut HEARD, an eased push FELT, the three
 wipes read as directions, and whether each preset's numbers look right at an
 ordinary clip length.
+
+## Road map 6 — the cloud spike (`cloud_spike/`)
+
+C0, run 2026-09-20: eight questions about AssemblyAI that
+`designs/reelcut-roadmap-6.md` §3 leaned on, MEASURED. Its own README
+(`tools/proof/cloud_spike/README.md`) is the full one — the instrument table,
+the fixtures, the key and spend rules, the ledger's outcomes — and the
+ANSWERS are in road map 6 §3, not here.
+
+```sh
+python3 tools/proof/cloud_spike/cloud_spike.py --selftest    # free, no key, loopback only
+python3 tools/proof/cloud_spike/cloud_spike.py               # all eight rows
+python3 tools/proof/cloud_spike/cloud_spike.py --only q3,q4  # a subset; the rest carry forward with their dates
+python3 tools/proof/cloud_spike/cloud_spike.py --leakcheck tools/proof/cloud_spike tools/proof/work/cloud_spike designs/reelcut-roadmap-6.md
+```
+
+**Nothing here is a pass.** Every row is a MEASUREMENT, and the two ways a
+run is wrong are a row that did not run and a reservation left open — the
+runner prints `SPIKE INCOMPLETE`, names each with its reason, and exits **2**.
+Exit **0** means every requested row ran and every reservation is closed; exit
+**1** is an instrument failure, and a probe that will not build is the ROW's
+recorded failure, never an exit.
+
+The instruments are `cloud_spike.py` (the runner), `aai.py` (a stdlib
+`urllib` client, the `Scrubber`, the `Ledger`), `fake.py` (the in-process
+stand-in), `selftest.py`, `fixtures.py`, `cloud_rows.py` (q1, q2, q5, q6, q8 —
+the paid ones), `local_rows.py` (q3, q4, q7, probe and bundle building,
+`run_bounded`) and three standalone Swift probes — `extract.swift` (the
+AVFoundation one, at `Transcriber.extractSettings`, taking NOTHING from
+`app/Sources`), `ats_probe.swift` and `keychain_probe.swift`.
+
+**What costs money.** q1, q2, q5, q6 and q8 make real calls at $0.21 an hour
+of audio; q3, q4 and q7 cost nothing. `Ledger.reserve` runs BEFORE every
+upload and refuses the call that would pass **$2.00**. Its events are
+`reserve → uploaded → created → billed → closed`, each written as a temp file
+in the same directory and an `os.replace`, and **nothing in the instruments
+deletes, truncates or moves `ledger.json`** — not `--remake`, which rebuilds
+`fixtures/`, `bin/` and `bundles/` and nothing else, and not `--selftest`,
+which works in a `mkdtemp` root of its own. A reservation closes `deleted`,
+`no_transcript`, `upload_only` or `unresolved`, and only the last owes a line
+in `designs/reelcut-remaining.md` §4. Every run with a key starts and ends by
+settling the ledger: DELETE everything created and not closed, and for an
+upload whose submit reply was lost, `find_own` — ONE page of the list, matched
+only against an upload URL this ledger recorded, the body parsed and dropped
+inside the method — then a DELETE of what it returns. The spike never deletes,
+reads, counts, prints or records anything about a transcript it did not
+create. The 2026-09-20 run spent **$0.4353** over 26 calls and closed all 26
+reservations; road map 6 §3b is the record.
+
+**The key.** `RC_ASSEMBLYAI_KEY` is read in one place, `aai.client_from_env`,
+and the only thing said about it anywhere is the word `present`. A row that
+needs it and does not find it is SKIPPED BY NAME with its reason and the run
+exits 2 — a skip is not a pass. Every child process gets an environment with
+it removed, every printed or written string goes through `Scrubber.clean`, and
+`answers.json` and `ledger.json` are `assert_clean`ed before the write. There
+is no base-URL variable: `Client.__init__` takes the live base with a real key
+or a loopback base with `selftest-dummy` and raises otherwise, no redirect is
+followed, and no URL out of a response body is ever requested.
+
+**`--selftest`** is twenty-five checks in seven groups against `fake.Fake` over
+loopback, and each group was broken on purpose once and seen to fail before it
+was trusted: the `authorization` header sent empty (1a, 24/25); the pair guard
+made `if False` (1b, 24/25); `build_opener(NoRedirect)` → `build_opener()`
+(1c, 23/25 — the stock opener FOLLOWED the redirect and the second port saw
+the request); `recover`'s `find_own` replaced by `200, []` (1d, 24/25);
+`remake()` given an `os.remove` of the ledger (1e, 23/25); `run_bounded`'s
+`child.kill()` deleted (1f, 24/25); the pause-crossing threshold moved from
+33 ms to 33 000 ms (1g, 24/25). Two of those first scored 25/25 and the CHECK
+was strengthened rather than the mutant excused — 1e watched a file called
+`remake-ledger.json` rather than the real name, and 1f looked for its own hung
+child with `pgrep -f "import time; time.sleep(60)"`, whose parentheses `pgrep`
+reads as a regular-expression group, so it matched nothing and passed against
+a `run_bounded` with the kill taken out.
+
+**`--leakcheck PATH…`** compares in process and prints file NAMES only — never
+the secret, never a URL, never a line. It looks for the key and for every
+upload URL in `ledger.json`, in every path given except `ledger.json` itself,
+which is the one place an upload URL is allowed to be. `clean` is the only
+good answer.

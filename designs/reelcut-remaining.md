@@ -462,6 +462,20 @@ and the closing above added the rest.
   a drag begun mid-motion is tolerable, since the inspector and the canvas
   see the clip UN-MOVED while the picture moves; and that the wedges read at
   S, M and L track heights — `e2_chrome.py` measures them at M only.
+- **The Keychain prompt road map 6's spike met and could not read**
+  (`designs/reelcut-roadmap-6.md` §3 q7, run 2026-09-20). A login-keychain
+  item added by one ad-hoc-signed build and read by the NEXT one — a
+  different cdhash, which is what every `make app` produces — blocked on a
+  `SecurityAgent` modal for the whole twenty-second bound, with
+  `kSecUseAuthenticationUIFail` set and not honoured, and its DELETE answered
+  `errSecInvalidOwnerEdit`. Nobody was at the machine to read the dialog. A
+  person can: what does it say, does "Always Allow" survive a rebuild, and
+  does a build signed with a stable Developer ID identity avoid it entirely?
+  The answer decides whether C1's `0600` file (§5d) can ever go back to being
+  a Keychain item. The spike left NOTHING in the Keychain —
+  `com.reelcut.spike.q7` was deleted and verified gone on both keychains, and
+  `com.kgalligan.reelcut.assemblyai` was never touched — so there is nothing
+  to clean up, only something to look at.
 
 ---
 
