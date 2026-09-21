@@ -639,11 +639,21 @@ than silent.
 
 ### 5b. The transcript cache
 
-`cache/transcripts/<media id>.json` and `<media id>.complete.json`, the
-peaks pair's shape (a sidecar, not a child, so either can be deleted alone).
-Paths and post kind (`"transcripts"`) live in a new `MediaTranscript.swift`,
-NOT in `MediaCacheFiles.swift` (550, at the cap for a file that must not
-grow).
+**Revised 2026-09-20 (c1-parts), replacing this paragraph's second
+sentence.** `cache/transcripts/<media id>.json` and
+`<media id>.complete.json`, the peaks pair's shape (a sidecar, not a child,
+so either can be deleted alone). The PATHS live in a new
+`MediaTranscript.swift`; the post KIND does not. `transcriptsKind` sits
+beside `speechKind` in `MediaCacheFiles.swift` (`:75`), as 5h `:911` already
+said it would, because a notification's `userInfo` is where the four kind
+constants are compared and a fifth spelling of one of them somewhere else is
+the drift this project warns about. That file measured **555** lines, not
+550, and 556 after the one constant.
+
+`TranscriptStamp`, this section's marker type, landed in
+`AssemblyAITranscript.swift` rather than `MediaTranscript.swift`: the cache
+file stood at 436 lines with it against the 400-line cap on a new file, and
+a stamp is a record of the REQUEST before it is anything about a file.
 
 The JSON, sorted keys, `.atomic`:
 
@@ -706,6 +716,22 @@ proof's claim (5i·5).
 
 ### 5c. The client — `AssemblyAIClient.swift`
 
+**Revised 2026-09-20 (c1-parts), adding to this section and replacing
+nothing in it.** Built, in TWO files rather than one: `AssemblyAIClient.swift`
+(338) holds the five calls, §8's numbers, the named errors and the two
+members that touch `credential`, `delegate` and `session`, and
+`AssemblyAIClient+Session.swift` (179) holds `Reply`, the status classifier,
+the two readers that cut a served body apart, the delete-then-throw helper,
+the cancellable wait and `SessionDelegate`. One file stood at 487 against the
+400-line cap; `request` and `send` stayed behind because `private` on a
+stored property does not cross a file and moving them would have widened the
+credential to pay a size toll. The wire VALUES went further out again, to
+`AssemblyAITranscript.swift` (374), which is the file this section's text
+never named. §8 gains two numbers the build needed and this section did not
+name: **`retryBackoff` 1 s** (what an upload retry waits first) and
+**`requestTimeout` 60 s** (every call's own ceiling, `deleteTimeout`'s 5 s
+apart). Both are `Tuning` fields a probe replaces wholesale.
+
 A final class over one `URLSession` with its own delegate
 `OperationQueue` (`Transcriber.delivery`'s twin, for the same reason: the
 default is the main queue and an off-main tool must not wait on it), a
@@ -751,6 +777,23 @@ without an ATS key. The stand-in server of 5i speaks HTTP and has no
 certificate to pin.
 
 ### 5d. The credential, the region and the settings window
+
+**Revised 2026-09-20 (c1-parts), adding R6-9 to this section and changing no
+sentence of it.** Spec §11's R6-9 settles a hole this section left: R6-5's
+"the store first, `RC_ASSEMBLYAI_KEY` when the store has nothing" is the
+right order for a person and the wrong one for a proof, because 5i's proofs
+launch the app with `RC_ASSEMBLYAI_KEY=proof-key` against a stand-in that
+writes every header to disk — so on a machine where the person had saved a
+real key, the STORE would win and the real key would go into that log, and
+5i·1's "key unset → refused by name" row could never pass. R6-9's four rules:
+`-RCSecretFolder <path>` overrides the store's folder; with
+`-RCAssemblyAIEndpoint` set and `-RCSecretFolder` absent NO `FileStore` is
+built at all and `store()` answers an empty `MemoryStore`; both arguments are
+read ONLY from the argument domain, so a persisted default can redirect
+neither; and the order is unchanged. Beside them the fake logs an
+`authorization` value only when it is `proof-key` or `wrong-key`. **C2's
+relay needs a configuration key of its own, not this launch argument** — a
+relay is a configuration a person sets, not a proof's override.
 
 `SecretStore` is a protocol with `read()`, `write(_:)`, `remove()`, and
 **C0's q7 decided which conformer ships: a file, not the Keychain.**
@@ -930,6 +973,23 @@ that before the lane relies on it. `TimelineView.swift` is frozen and has
 no reason to know.
 
 ### 5i. The proof
+
+**Revised 2026-09-20 (c1-parts), adding to this section and replacing
+nothing in it.** Two of the three instruments are built and their record is
+§10.9. The fake gained what the rows needed and this section did not name: a
+`POST /__control/scenario` that replaces the scenario whole and resets the
+counters, `slow_upload` (a body read in pieces, which is how an upload is
+cancelled mid-body), `fail: [{route, status, times}]`, `audio_seconds`,
+`unsupported_language_codes`, and `GET /__control/words`, which answers the
+exact bytes it served so "byte-equal to what was served" is a comparison
+rather than two encoders agreeing. R6-9 (e) is its redaction rule. The probe
+gained rows this section numbered none of: **W** the WAV against the baseline
+TREE, **F** the FLAC's STREAMINFO, decode and determinism, **FB** the WAV
+fallback, **Q** `wholeAsset` against an explicit range, **R** the redirect,
+**L** the loopback table, **C** R6-9 (a)–(c), **V** the served bytes to disk
+and back, **G** the fake's redaction, **N** the language table, **S**
+`CloudTranscriber`'s unreachability and **K** the credential in no child's
+output.
 
 Three instruments, on the tree's terms. **`tools/proof/assemblyai_fake.py`**
 is a stand-in server (`http.server`, no dependencies) speaking the five
@@ -1238,6 +1298,8 @@ proof's claims 2–11 run over both.
 | `pollFailuresTolerated` | 3 | consecutive 5xx or transport errors |
 | `maxMediaSeconds` | 36 000 | AssemblyAI's 10-hour ceiling — about four minutes of processing at q8's measured rate, and about 550 MB of FLAC |
 | `maxKeyterms` | 1000 | §2 |
+| `retryBackoff` | 1 s | added 2026-09-20 (c1-parts): what an upload retry waits before the second attempt. One second is longer than a dropped socket's own retry and shorter than anything a person would notice on a run that is minutes long |
+| `requestTimeout` | 60 s | added 2026-09-20 (c1-parts): every call's own ceiling, `deleteTimeout`'s 5 s apart. It bounds a request whose socket has gone quiet; the poll LOOP's bound is `pollCeiling`, which is a different thing |
 | `deleteTimeout` | 5 s | the janitor's budget per item; the slowest DELETE C0 TIMED was **1.70 s**, q2's FLAC row, of the eleven `answers.json` holds a time for (24 were made), so 5 s is nearly three times the worst measured |
 | upload format | **FLAC**, 16 kHz mono 16-bit, the WAV as the fallback | q2 MEASURED zero word-timing delta against the WAV at 48.1% of its bytes, with the service's own run-to-run jitter at zero too; AAC-LC 48 kbps was refused at 38 ms, more than half a frame at 30 fps |
 
@@ -1472,3 +1534,270 @@ evidence is the move check's A — each block present in its new file exactly
 once as one contiguous run, byte-identical and in order — plus the
 typecheck and the link. That is weaker than a picture and is recorded as
 what it is.
+
+### 10.9 c1-parts — the seams, the pure parts, the stand-in and the probe
+
+The second of §10.1's five pipelines. Its baseline is c1-tolls' final working
+tree `515e6a8032071626f8c2a77030db4b249495602b`; nothing was committed.
+
+| Tree | What it holds |
+|---|---|
+| `515e6a8032071626f8c2a77030db4b249495602b` | the baseline, c1-tolls' last |
+| **S1** `0d57f6b4bdc28a2c8343e1483666b0cfb8958253` | the whole Swift side, typechecking 0/4, before either instrument existed |
+| **S2** `f6598273c83b5468e7ee80a554af33392a615d6b` | S1 plus the fake, the probe, §5's dated revisions and the README, before this record |
+
+**A named deviation from the plan's step order.** The spec asked for the
+seams alone at S1, with the parts after. The seven files were written whole
+instead, so S1 is "the Swift side, typechecking, before either instrument
+existed" and not "the seams alone". What S1 was for — every later file
+compiled against ONE shape — holds trivially, because they all landed
+together; what is lost is the ability to read a seams-only diff. The same
+step's "run `phase4_chrome.py` for a cue BEFORE capture" was also missed:
+`CaptionLayout.swift` was already edited. The replacement is stronger and is
+in `work/cloudprobe/cues-before/` — the harness's own `main.swift` compiled
+against `git archive 515e6a80 app/Sources` under `-D HARNESS_REFERENCE_BUILD`,
+the tree as it stood with FOUR cue rules, run over the twenty `words-*.json`
+fixtures `phase4_chrome.py` writes. All twenty `cues-*.json` are `cmp`-silent
+against it, and an edited copy of `cues-exactly-42.json` makes `cmp` fail at
+char 36, line 4, which is the CONTROL.
+
+#### What landed
+
+Spec §11 gained **R6-9** before any code: a proof-launched app never opens
+the person's stored key, in four rules plus the fake's redaction. §5b, §5c,
+§5d, §5i and §8 carry dated 2026-09-20 revisions saying what each replaces.
+
+| File | Lines | What it is |
+|---|---|---|
+| `app/Sources/CloudTranscriber.swift` | 102 | NEW. `TranscriptionEngine`, and `CloudTranscriber` with `run` as final code and `transcribe` throwing "the AssemblyAI engine is not built yet". Nothing constructs it |
+| `app/Sources/AssemblyAITranscript.swift` | 374 | NEW, and not named by §5h. `TranscriptOptions`, `TranscriptRequest`, `TranscriptWord`, `TranscriptResponse`, `TranscriptStamp`, `JSONValueRange`, `encodeOrNull` |
+| `app/Sources/AssemblyAIClient.swift` | 338 | NEW. 5c's five calls, §8's numbers, the ten named errors, `request` and `send` |
+| `app/Sources/AssemblyAIClient+Session.swift` | 179 | NEW, and not named by §5h either — see below |
+| `app/Sources/AssemblyAIConfiguration.swift` | 179 | NEW. The two resolvers, `store()` (R6-9), the loopback rule |
+| `app/Sources/AssemblyAILanguages.swift` | 59 | NEW. The 21-code table, dated 2026-09-17, in §2's order |
+| `app/Sources/SecretStore.swift` | 212 | NEW. The protocol, `FileStore`, `MemoryStore` |
+| `app/Sources/MediaTranscript.swift` | 379 | NEW. 5b: the paths, `Header`, `File`, the read/write plumbing, the janitor's list, THE MAPPING, `Loader` |
+| `app/Sources/Transcriber+Extract.swift` | 143 → 305 | the static extractor, the job form calling it, `writeFLAC`, `extractUpload`, `UploadFormat`, `Upload`, `wholeAsset` |
+| `app/Sources/Transcriber.swift` | 553 → 584 | `Job.media`, and `CancelToken` holding a `URLSessionTask` beside the speech task |
+| `app/Sources/Transcriber+Jobs.swift` | 117 → 117 | one line: `media:` at the one `Job(` site |
+| `app/Sources/CaptionLayout.swift` | 444 → 473 | `Word.speaker`, the fifth rule, the header's "four rules" → five |
+| `app/Sources/MediaCacheFiles.swift` | 555 → 556 | ONE line: `transcriptsKind`, beside `speechKind` |
+| `tools/proof/harness/main.swift` | 881 → 901 | the `cues` mode reads an optional `speaker`, the call guarded by `#if !HARNESS_REFERENCE_BUILD` |
+| `tools/proof/assemblyai_fake.py` | 489 | NEW. 5i's stand-in, whole |
+| `tools/proof/cloud_captions_probe.py` | 2638 | NEW. Nine sections, seven mutants (the seventh is 05-review's finding 1) |
+
+**Two files the spec's list did not name, each a size toll paid where it
+fell.** `AssemblyAIClient.swift` stood at **487** lines with its transport in
+it, against the 400-line cap a new file has; `Reply`, the classifier, the two
+body readers, the wait, the log line and `SessionDelegate` went to
+`AssemblyAIClient+Session.swift`, and `request` and `send` stayed behind
+because `private` on a stored property does not cross a file and moving them
+would have widened `credential` to pay a size toll. `MediaTranscript.swift`
+stood at **436** with `TranscriptStamp` in it; the stamp went to
+`AssemblyAITranscript.swift`, which is where the request it records already
+lives. Both are recorded in the files' own headers and in §5b and §5c.
+
+#### The gate
+
+`make typecheck` **0 errors, 4 warnings** at S1 and again at S2 — the same
+four AVFoundation deprecations, no fifth. `make app` exit 0. `make test`
+**721 tests over 39 binaries, 0 failed, 0 ignored** — unmoved, as it must be
+with no Rust touched. `make lint` clean, `cargo fmt --check` clean.
+
+Against the binary, on port 4953, the parity grep empty both times:
+**`phase4_proof.py` 84/84**, and, on a freshly launched instance,
+**`op_catalog_proof.py` 23/23** ("the core declares 57 ops and every one of
+them is a tool"). With no instance running, **`source_mirror_probe.py`
+40/40** and **`phase4_chrome.py` 59/59**. Every instance was killed by the
+PID `pgrep -f "MacOS/Reelcut"` named, and it prints nothing now.
+
+**The four mirrors are unchanged, and it was read back rather than assumed**:
+`ReelCore.swift`, `ReelOps.swift`, all six `AgentCatalog*.swift` and
+`project.yml` are byte-identical to the baseline tree
+(`git show <tree>:<path> | diff -`), `git diff <tree> -- core` is empty, and
+`RC_FORMAT_VERSION` is 8 in both `core/src/format.rs` and the header. No
+`rc_*` export, no header line, no op, no tool.
+
+#### `cloud_captions_probe.py` — 186/186, three times; 196/196 after the fix
+
+Sections and what each measures are in `tools/proof/README.md`. No skips:
+`say`, `ffmpeg`, `git` and C0's `late.mov` were all present on this host.
+Numbers a run printed:
+
+- **12**, the mapping: six clip windows against expectations computed in
+  Python from §5b's sentence. A word straddling `in` is excluded, one
+  starting exactly AT `in` is included, one starting exactly at the window's
+  end is excluded, one ending past the window is clamped to the clip's end, a
+  split pair partitions with none lost or doubled, and the speaker is carried.
+  The spec's own wording for this row said a later `in` gets ONE word; the
+  fixture's window legitimately holds two, so the row was corrected to assert
+  both and "nothing from before its window" — the code was right and the
+  sentence was not. **05-review's finding 1 added a second request, run
+  2026-09-20:** the five degenerate speeds — `0`, `-2`, NaN, `+infinity` and
+  `greatestFiniteMagnitude` — each answer the three words the guard's rule
+  puts them at instead of trapping (the first four are degenerate and read as
+  1; the largest finite speed is finite and positive, so the guard passes it
+  through UNCHANGED and the oracle places its words with that speed), and each
+  is checked to have reached the mapping as itself (`0.0`, `-2.0`, `nan`,
+  `inf`, `1.7976931348623157e+308`). Ten rows, all ok.
+- **13**, the stamp: each of the four request fields and each of the ten
+  `CacheStamp` fields invalidates; the marker's bytes are the stamp's, keys
+  sorted at both levels, with `language_code` written as `null` rather than
+  dropped; the region changes the base URL (`https://api.assemblyai.com` /
+  `https://api.eu.assemblyai.com`) and appears in no stamp — the CONTROL.
+- **15**, the client over `URLProtocol`: `Tuning.shipped` equals §8 field for
+  field; `pollCeiling` is 300 s for 10 s and for an hour and 36000/49 for ten
+  hours; one retry on a 5xx and on a transport error, each measured waiting
+  **0.274 s** and **0.272 s** against a `retryBackoff` of 0.25 — the two
+  numbers that run printed; none on 400 or 401 (the 401 refused as
+  `keyRefused(401)`, which carries its status code — the spec's row said
+  plain `keyRefused`); three failed polls tolerated
+  and the fourth throwing `server` with a DELETE last; the ceiling ending as
+  `timedOut` with a DELETE last; every 5c status answering its own error with
+  the 400 and 402 sentences relayed verbatim; and the four `words` shapes —
+  absent, `null` and `{}` each `.malformed` with a DELETE last, while `[]` is
+  a `Fetched` whose `wordsJSON` is the two bytes `[]`, zero words, and no
+  delete (the CONTROL).
+- **16**, the cancel token against the fake: a 16 MB upload cancelled at its
+  first progress callback answers `cancelled`, the fake logs exactly one
+  upload and no submit, and it received **655 360 of 16 777 216** bytes with
+  `complete` false. A cancel during polling answers `cancelled` and issues a
+  DELETE of the id the fake served.
+- **17** and R6-9: the file is `0600` and the directory it creates is `0700`,
+  both read off the filesystem; the rename leaves no temporary sibling; the
+  store wins over the environment with both holding dummies; a
+  whitespace-only environment value is no key; `-RCSecretFolder` makes the
+  store a `FileStore` on that path, `-RCAssemblyAIEndpoint` alone makes it an
+  EMPTY `MemoryStore`, and the same two keys persisted in a defaults suite
+  move neither — all by TYPE and path string, with nothing read. The loopback
+  table and nine endpoint strings, one process each.
+- **19**, the fifth rule: three words that are ONE cue with no speaker key
+  are TWO with A,A,B; every speaker explicitly nil is BYTE-EQUAL to no
+  speaker key at all; A-then-nil breaks; a change coinciding with a length
+  break is ONE break; and the frame of gap survives, exactly 20 000 ticks in
+  the tight case. The spec's wording expected exactly one frame; `CaptionCues`'
+  rule is "a frame before the next cue OR where the last word ended, whichever
+  is earlier", so a quiet gap is larger — the row asserts `>= frame` and a
+  second fixture, words 10 000 ticks apart, measures the clamp making exactly
+  20 000. Again the code was right and the row's sentence was not.
+- **V**: a served `words` holding `0.98`, `"]` and non-ASCII comes back from
+  the client, out of the written file and out of a `remoteDeleted` rewrite
+  **byte-equal to the 354 bytes the fake served**; the document's keys are
+  sorted with `words` last; `undeleted` lists exactly the false ones by media
+  id; and a cache file with its `words` key removed, and one with
+  `"words":null`, each make `File.init(data:)` throw, `read` answer nil,
+  `isCurrent` answer false and the janitor's list empty.
+- **W/F/FB/Q**: the extractor and the FLAC — below.
+- **R/G/N/S/K**: a 302 is `redirected(302)` and the second fake's log stays
+  EMPTY; `not-on-the-list` is logged as the redaction marker, scored under
+  `failures`, and is in no file under the fake's folder; no logged header
+  holds the host's user name or home path; 21 codes in §2's order, unique,
+  dated 2026-09-17; `CloudTranscriber(` occurs in no `app/Sources` file but
+  its own and its placeholder throws its sentence; a child handed a
+  credential echoes it in neither stdout, stderr nor its answer; and every
+  `subprocess` call in the probe passes `env=` (11 of them).
+
+#### The FLAC, measured
+
+The fixture is road map 4's `say -o` speech: **166 218 frames, 10.389 s**, a
+336 532-byte WAV. The FLAC is **161 992 bytes, 48.1% of the WAV** — the same
+figure C0's q2 measured against the service — with STREAMINFO **16000 Hz, 1
+channel, 16 bits** and a total-sample count equal to the WAV's own 166 218.
+Two runs of `writeFLAC` over one WAV are byte-identical. It decodes, through
+`AVAudioFile` and again through `ffmpeg`, to the WAV's samples as a prefix
+with a tail of **0 frames** — no padding at all. The fallback, forced by a
+`flac:` closure calling the REAL `writeFLAC` at an unwritable path, answers
+`.wav` and the framework's own sentence is *"The operation couldn't be
+completed. (com.apple.coreaudio.avfaudio error 2003334207.)"*.
+
+#### A host fact that changed how two rows are written
+
+**This Mac's 16 kHz extract is not bit-deterministic.** Measured: over ten
+separate processes of one binary over one fixture, and over five trials of
+three decodes inside one process, decodes of the same audio land on one of
+exactly **two** byte strings that differ in **one byte** — one 16-bit
+sample's low bit, at offset 132 098 of 336 532 — in either direction, about
+**one decode in five**. It does not depend on the range asked for, on the
+binary, or on the order within a process, and a first attempt to explain it
+as a cold-decode effect was tested and disproved.
+
+The first shape of rows W and Q compared one decode against one decode and
+failed about a third of the time, in whichever row drew the short straw. That
+was not softened away: the rows now decode each side five to six times and
+assert the thing a real change breaks — one length, at most two distinct
+strings across the whole population, those two differing in a single sample —
+with a CONTROL row that measures ONE range form disagreeing with ITSELF at
+that same byte, which is what makes the comparison about this host rather
+than about the code. So:
+
+- **W**: five decodes by the BASELINE tree's `Transcriber().extractAudio(job:)`
+  and five by today's, over two windows. Today's tree is indistinguishable
+  from the baseline's: one length (336 532 and 132 072 bytes), one or two
+  distinct strings, and no baseline decode further than one sample from
+  every decode of today's.
+- **Q**: nine decodes over three processes — `wholeAsset`, the explicit
+  `[0, asset.duration)` range, `wholeAsset` again. All nine agree on the
+  frame count (166 218) and the length, and are drawn from one population of
+  at most two strings differing at 132 098; `wholeAsset` alone, six times,
+  disagrees with itself in exactly the same way. So the app never needs
+  `AVAsset.duration`, which is the deprecated getter it may not call.
+- **Q, q4's row**: C0's `late.mov` extracted whole keeps 1.5 s of silence at
+  its head, which is why `audio_track_start_ms` is written 0.
+
+#### Mutants, each a tree COPY with one text asserted to occur once
+
+| `--mutant` | Score | The named row among its failures |
+|---|---|---|
+| `mapping-no-in` | 180/186 before 05-review's fix; re-aimed after it, 14/24 (`--only mapping`) | all six of row 12's window rows |
+| `no-fifth-rule` | 179/186 | seven of row 19's |
+| `no-retry` | 182/186 | both retry rows and both backoff measurements |
+| `store-0644` | 184/186 | "the FILE is 0600 (got 0o644)" |
+| `env-first` | 185/186 | "with BOTH holding a dummy, the STORE wins" |
+| `stamp-drops-field` | 185/186 | "options.speaker_labels changing INVALIDATES" |
+| `no-speed-guard` | 14/15 (`--only mapping`) | "a degenerate `speed` is GUARDED, not trapped on" |
+
+None kept the full score. The last one is 05-review's finding 1 reverted in a
+tree COPY: with the guard gone the probe binary dies mid-row on *"Double value
+cannot be converted to Int64 because it is either infinite or NaN"*, which is
+the trap the guard exists to stop, and the row carries that sentence as its
+failure. `mapping-no-in` was re-aimed at the same line's new text (`/ speed`)
+and still takes row 12 down — 14/24 over `--only mapping`, every window row
+and four of the five degenerate rows among its failures.
+
+#### 05-review's findings, fixed (2026-09-20)
+
+- **Finding 1, should-fix.** `MediaTranscript.project` divided by `job.speed`
+  unguarded, so a `Job` carrying `0`, a negative, NaN or an infinity made
+  `Ticks(_:)` trap. It now takes the same local guard its twin
+  `Transcriber.project` has always had — `job.speed.isFinite && job.speed > 0
+  ? job.speed : 1` — three lines, no other change. Proved by the ten new rows
+  above and the `no-speed-guard` mutant.
+- **Finding 2, should-fix.** Row 15's record claimed the two retries were
+  "each measured waiting 0.271–0.278 s"; the run recorded in the handoff's
+  `04-checks.txt` printed 0.274 s and 0.272 s and "throws `server`". Both
+  sentences now quote that run.
+- **Findings 3–6 were nits.** The row-wording corrections (3) are now in the
+  row 12, 15 and 19 bullets above, where the deviation belongs; 4 (a
+  `progress` read outside the sink's lock), 5 (`EINTR` reported as
+  `unwritable`) and 6 (`make test`'s count said to be carried forward) were
+  left. `make test` was re-run after the fix all the same and printed 721
+  passed, 0 failed over 39 binaries with the core byte-identical to the
+  baseline tree.
+
+#### What this pipeline did NOT reach, said rather than papered over
+
+- **`CloudTranscriber.transcribe` has no body and no caller.** Its placeholder
+  is proved to throw its sentence and proved unreachable by a grep of
+  `app/Sources`; nothing about 5a's run — the janitor, the grouping, the
+  progress bands, the auth arm that ends a run — is built or measured. That
+  is c1-run's.
+- **No row drives the built APP at anything in this pipeline.** `phase4_proof`
+  and `op_catalog_proof` prove the app still does what it did; every new part
+  is reached by a probe compiled from `app/Sources`, never over MCP, because
+  no tool and no menu reaches any of it yet.
+- **`verify()`, `delete()` and `upload`'s progress are exercised only against
+  the stand-in.** No call to `api.assemblyai.com` was made by anything in
+  this pipeline, deliberately. 5i's live rows 20–21 remain c1-close's.
+- **The one-sample flip above is a HOST fact, not a fixed thing.** If a later
+  macOS makes the extract deterministic, W and Q will simply see one distinct
+  string and still pass.

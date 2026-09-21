@@ -430,6 +430,22 @@ These are not tasks so much as a list to run through at the machine once. The
 first two have been owed since M1 and spec §10 records them; phases 8 and 9
 and the closing above added the rest.
 
+- **The cloud captions parts, road map 6's c1-parts (2026-09-20)** — what no
+  instrument in that pipeline could reach. Every one of them needs a real
+  AssemblyAI key, which no proof may ever use:
+  - that `AssemblyAIClient.verify()` answers "Key accepted" against the real
+    `api.assemblyai.com` with a key that works, and the key sentence with one
+    that does not. The stand-in proves the STATUS mapping; only the service
+    proves the round trip.
+  - that a real 402 carries the balance sentence the `.account` arm relays.
+    The fake serves a sentence of the proof's own choosing; nobody has seen
+    AssemblyAI's.
+  - that the `eu` region's base URL reaches an account that has the EU
+    enabled. Road map 6 §5j already owed this; the client makes it testable.
+  - whether `FileStore`'s `0600` file is what the person expects to find in
+    `~/Library/Application Support/Reelcut/`, and whether Remove leaves them
+    confident it is gone. No probe may look in that folder.
+
 - **A clip plays with audio** (spec §10 step 4) and **the preview holds 60 fps**
   (step 5). No still frame can answer either.
 - **The recorder, road map 3** — what no headless proof can see: the
@@ -557,6 +573,59 @@ and the closing above added the rest.
 ---
 
 ## 5. Where a third road map would start
+
+**Residue from road map 6's c1-parts, 2026-09-20.** Five things that pipeline
+measured or left, none of them blocking anything (the last was added when its
+reader review's two nits were left unfixed):
+
+- **This Mac's 16 kHz audio extract is not bit-deterministic.** Measured over
+  ten processes of one binary over one fixture and five trials of three
+  decodes inside one process: a decode lands on one of exactly two byte
+  strings differing in ONE byte — one 16-bit sample's low bit, at offset
+  132 098 of a 336 532-byte WAV — about one decode in five, in either
+  direction, independent of the range asked for, the binary and the order
+  within a process. It is recorded here because it is the second
+  non-determinism this project has measured in AVFoundation's audio (the
+  first is the export's 8 ms duck-ramp window, app/CLAUDE.md) and because any
+  future row that wants byte-identity from an extract has to be written the
+  way `cloud_captions_probe.py`'s rows W and Q are: a population, not a
+  comparison. Nothing in the product depends on the flip — one sample's low
+  bit changes no word's timing — and it is not worth chasing.
+- **`AssemblyAIClient.swift` needed a second file and `MediaTranscript.swift`
+  a third home for its stamp**, both to stay under the 400-line cap on a new
+  file. Neither is on §3's ledger; both are recorded in road map 6 §10.9 and
+  in the files' own headers. A reader who thinks the client belongs in one
+  file has a size toll to pay first.
+- **`app/CLAUDE.md`'s Hygiene paragraph lists the permitted `DispatchQueue`
+  seams, and c1-parts left that list one short** — it added
+  `AssemblyAIClient`'s delegate `OperationQueue` and `CloudTranscriber`'s
+  serial queue, both R6-7's carried-over shape, wrote map entries only, and
+  left the RULE paragraph alone because no pipeline stage may amend a rule.
+  CLOSED the same day by the session's orchestrator, by hand and outside any
+  pipeline: the clause now sits beside `Transcriber`'s two and cites R6-7.
+  It is the one rule C1 changed; the user was told, and it is theirs to
+  reword or revert.
+- **`MediaTranscript.project`'s speed guard has a hole its twin
+  `Transcriber.project` shares, untried by any row** (c1-parts' second
+  review, a nit): a FINITE but tiny positive `speed` passes the guard and can
+  still overflow `Ticks(_:)`. Nothing reaches the cloud mapping until c1-run
+  wires a caller to it, so c1-run owns the answer: either the core's own
+  bounds on a clip's `speed` make it unreachable, shown by a row, or both
+  twins clamp.
+- **`tools/proof/cloud_captions_proof.py` does not exist yet.** Road map 6
+  §5i names three instruments; c1-parts built two. The MCP proof's rows 1–11
+  are c1-run's and rows 14, 18, 20 and 21 are later pipelines'.
+- **Two nits from c1-parts' reader review were left unfixed**, both read and
+  judged benign at the time, both cheap for whoever next opens those files:
+  `AssemblyAIClient+Session.swift`'s `sink(_:)?.progress?(…)` reads
+  `progress` outside the `NSLock` that `open(_:progress:)` writes it under
+  (benign only because it is set before `resume()`, and it is the one
+  unsynchronised field on a shared sink), and `SecretStore.swift`'s
+  `writeAll` turns an `EINTR`-interrupted `write(2)` into
+  `SecretStoreError.unwritable`, so a signal during a Save could report a
+  failure that did not happen. Neither has a row.
+
+
 
 `designs/reelcut-roadmap-2.md` §4 is the list of what was deliberately left
 out, and it stands. One of its conditions has now been met and the bullet

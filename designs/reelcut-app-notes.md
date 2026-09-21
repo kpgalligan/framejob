@@ -2130,3 +2130,75 @@ file it left. `summary` and `truncationText` are still `private`: only
 `finish` calls them and it moved with them. The FROZEN
 `EditorViewController.swift` is **1123, unchanged to the line** — two
 comments naming the file the command's body lives at the foot of.
+
+## Six caption files, 2026-09-20 — road map 6's C1 parts
+
+What road map 6's c1-parts pipeline did to files that already existed. Its
+own record — the seven new files, every measured number and the mutants — is
+`designs/reelcut-roadmap-6.md` §10.9.
+
+**`Transcriber.swift` 553 → 584.** Two changes and nothing else.
+`Job` gained `media: UInt32`, second after `clip`, because the on-device
+engine extracts each clip's own source window and the cloud engine uploads a
+MEDIA once and derives every clip on it from one transcript — so the grouping
+key and the cache file's name are the media id (R6-3). `CancelToken` gained a
+`URLSessionTask?` beside its `SFSpeechRecognitionTask?`, under the same lock,
+read out and cancelled OUTSIDE it, with `attach` as an OVERLOAD rather than a
+second name so a caller that holds a token cancels it the one way whatever is
+running underneath. `release()` clears both. The two slots are independent:
+only one engine runs at a time, and a token that had to be told which would
+be a token every caller had to tell. No widening: `Job`'s one construction
+site and `CancelToken`'s four callers are all internal already.
+
+**`Transcriber+Jobs.swift` 117 → 117.** One line: `media: media` at the one
+`Job(` site, taken from the `case .media` the function already bound.
+
+**`Transcriber+Extract.swift` 143 → 305, and its header rewritten.** It is no
+longer "a pure move out of `Transcriber.swift`" and the doc no longer says it
+is. The old body became `static func extractAudio(url:name:range:to:cancel:
+progress:)`, verbatim, with exactly two things lifted into arguments — the
+destination and the range — and `range.start` written where the old code
+wrote `CompositionBuilder.time(job.sourceIn)`; the instance
+`extractAudio(_:cancel:)` keeps its signature and its doc, computes the same
+destination and the same range as before, and calls it. That is a claim, and
+`cloud_captions_probe.py`'s row W is the instrument: the same job extracted
+by `git archive 515e6a80 app/Sources`'s own code and by today's, five decodes
+a side, indistinguishable. Beside it landed `UploadFormat`, `Upload`,
+`wholeAsset`, `writeFLAC(fromWAV:to:cancel:)` and `extractUpload`. Two things
+are worth knowing about them: `wholeAsset` is `CMTimeRange(start: .zero,
+duration: .positiveInfinity)` rather than a measured duration because
+`AVAsset.duration` is a deprecated getter whose replacement is `async` and
+`AVAssetReader` clamps a range that runs past the asset anyway (the probe's
+row Q measures the two as indistinguishable); and `writeFLAC` streams in
+16 384-frame buffers rather than decoding the file, because a cloud run's
+input is a whole media and ten hours of 16 kHz mono is 1.1 GB of PCM.
+
+**`CaptionLayout.swift` 444 → 473.** `CaptionCues.Word` gained
+`speaker: String?`, defaulting to nil in the initialiser, so every existing
+call site and the harness's `cues` mode are the code they were; and `build`
+gained the fifth rule, twelve lines in the loop it already had. The rule is
+tested BEFORE placement and not inside the placement test: a speaker change
+on a word that happened to fit the line and the six seconds would otherwise
+be placed and the rule would never fire, which is exactly the case row 19
+measures. It flushes and opens a new cue on the same word, so it is one
+break and never an empty cue. Three sentences of the file's header and the
+`CaptionCues` doc that said "the four cue rules" say five.
+
+**`MediaCacheFiles.swift` 555 → 556.** One line, `transcriptsKind`, beside
+`speechKind`. The file was measured at 555 rather than the 550 road map 6
+§5b quoted; it is not on `reelcut-remaining.md` §3's ledger. The kind
+constant sits here rather than in `MediaTranscript.swift` because a
+notification's `userInfo` is where the four are compared, and the paths sit
+in `MediaTranscript.swift` because that is where a reader looks for the
+mapping. §5b said the opposite about the kind and was revised, dated, to say
+what 5h had said all along.
+
+**`tools/proof/harness/main.swift` 881 → 901.** The `cues` mode's `Request`
+gained an optional `speaker` and the header's `words.json` description says
+so. The `CaptionCues.Word(` call is DUPLICATED under
+`#if !HARNESS_REFERENCE_BUILD`, with the three-argument form in the `#else`,
+because `phase5_chrome.py` and `recording_probe.py` compile this file against
+OLDER trees under that flag and a bare `speaker:` would break both. A fixture
+written before the rule existed produces byte-identical cues, which the probe
+proves by `cmp` and which twenty of `phase4_chrome.py`'s own cue files prove
+against a harness built from the baseline tree.

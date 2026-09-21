@@ -73,6 +73,7 @@ extension MediaImporter {
     static let thumbsKind = "thumbs"
     static let peaksKind = "peaks"
     static let speechKind = "speech"
+    static let transcriptsKind = "transcripts"
     /// Present (and `true`) only on the first post from a pass that replaced
     /// a file that was on disk — a `thumbs` rebuild, or the `speech`
     /// withdrawal at `MediaImporter.speech`'s head; absent otherwise, never

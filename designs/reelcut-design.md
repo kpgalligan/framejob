@@ -3314,3 +3314,25 @@ assisted import.
   and the tool's `note` say so when it was not the model the person
   chose. A silent downgrade would be a wrong answer presented as the
   right one; a refusal would be no answer at all.
+- **R6-9 — A proof-launched app never opens the person's stored key.**
+  The stored credential is opened only for AssemblyAI's own hosts, and a
+  proof never opens it. Four rules make that true. (a) `-RCSecretFolder
+  <path>` overrides the folder `FileStore` reads and writes, the
+  `-RCRecordingFolder` idiom — a PATH, never a key, because `ps` shows
+  every argument. (b) With `-RCAssemblyAIEndpoint` set and
+  `-RCSecretFolder` absent, NO `FileStore` is built at all:
+  `AssemblyAIConfiguration.store` answers an empty `MemoryStore`, so an
+  app pointed at a stand-in server has the environment as its only
+  credential and the person's own file is never read. (c) Both arguments
+  are read ONLY from `UserDefaults.standard.volatileDomain(forName:
+  UserDefaults.argumentDomain)`, so a persisted default can redirect
+  neither. (d) The resolution ORDER is unchanged — the store first, the
+  environment second — which amends R6-5's wording and not its order.
+  Beside them, the stand-in server of road map 6 §5i logs an
+  `authorization` value only when it is one of the dummies `proof-key`
+  and `wrong-key`; anything else is logged as a fixed redaction marker,
+  answered 401, scored as a failure of the run that sent it, and written
+  nowhere. Without (b) a machine where the person had saved a real key
+  would send that key to a stand-in server that writes every header to
+  disk, and road map 6 §5i·1's "key unset → refused by name" row could
+  not pass at all.

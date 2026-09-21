@@ -294,13 +294,63 @@ the key map behind it.
 free.
 - `CaptionLayout.swift` — placement ONLY (snap, abut, drop sub-frame cues, a
   new front-most track in the Caption preset), shared by every producer, and
-  `CaptionCues` at its foot — the four cue rules (≤ 2 lines, ≤ 42
-  characters, ≤ 6 s, a frame between cues), used only by a producer that must
-  INVENT line breaks. An SRT brings its own.
+  `CaptionCues` at its foot — the FIVE cue rules (≤ 2 lines, ≤ 42
+  characters, ≤ 6 s, a frame between cues, and never two speakers in one
+  cue), used only by a producer that must INVENT line breaks. An SRT brings
+  its own. `Word.speaker` defaults to nil, so every caller that knows nothing
+  about speakers is byte-identical to what it was.
 - `CaptionImporter.swift` (SubRip grammar) · `CaptionExporter.swift` (`.srt` /
   `.vtt` from one all-text track, never guessed; a popup built from
   `NSMenuItem`s carrying `representedObject`, because `addItem(withTitle:)`
   REMOVES a same-titled row).
+- `CloudTranscriber.swift` — `TranscriptionEngine` (`apple` | `assemblyai`,
+  persisted under `ReelcutCaptionEngine`) and the cloud engine's seam over the
+  SAME `Transcriber.Job` / `Outcome` / `CancelToken`. `run` is its serial
+  queue and the main-thread completion; `transcribe` is a placeholder that
+  throws, and nothing constructs the class.
+- `AssemblyAITranscript.swift` — the wire VALUES: `TranscriptOptions`,
+  `TranscriptRequest` (whose `encode` is the whole wire body — `language_code`
+  absent for auto, `keyterms_prompt` absent when empty), `TranscriptWord`,
+  `TranscriptResponse`, `TranscriptStamp` (the cache marker: a `CacheStamp`
+  plus the REQUEST) and `JSONValueRange`. Nothing here speaks HTTP or touches
+  disk. **Three encoders write every key with nil as `null`** through
+  `encodeOrNull`, because `encodeIfPresent` would drop a key a cache file and
+  its marker have to carry; `TranscriptResponse` reads `words` through a
+  `try?` so the CLIENT's rule about a missing words array is the sentence a
+  caller gets.
+- `AssemblyAIClient.swift` (+`Session`) — AssemblyAI's REST API as five
+  SYNCHRONOUS calls over one `.ephemeral` `URLSession` with its own one-wide
+  delegate queue (R6-7: no `async`). `willPerformHTTPRedirection` always
+  answers nil, so a 3xx is `.redirected` and the credential reaches no other
+  host; an upload retries once on a 5xx or a transport error and never on a
+  4xx or after a cancel; `poll` sleeps in ≤ 0.1 s slices that read the token
+  and EVERY throwing exit deletes the transcript first. A `completed` body
+  whose `words` is absent, null or not an array is `.malformed`, never an
+  empty transcript; `[]` is zero words. `request` and `send` stay in the
+  first file: they are the two members that touch `credential`.
+- `AssemblyAIConfiguration.swift` · `AssemblyAILanguages.swift` ·
+  `SecretStore.swift` — WHERE the client speaks and WHAT it says it is.
+  `AssemblyAIConfiguration` is the ONE reader of `-RCAssemblyAIEndpoint` and
+  `-RCSecretFolder`, both out of the ARGUMENT domain only, and the ONE line
+  in the feature that names `AppSupport.directory` (spec §11's R6-9: with an
+  endpoint set and no secret folder, `store()` answers an EMPTY `MemoryStore`
+  so a proof never opens the person's key). Non-`https` is accepted only for
+  `127.0.0.1`, `localhost` and `::1`. `FileStore` creates its file with
+  `O_CREAT|O_EXCL` at `0600` under a temporary name and `rename(2)`s it, in a
+  directory it `mkdir`s at `0700` — never `chmod`ed after; `MemoryStore` is
+  the probe's. The language table is a DATED static list, not an authority:
+  a code AssemblyAI refuses comes back as AssemblyAI's own sentence.
+- `MediaTranscript.swift` — `cache/transcripts/<id>.json` and its
+  `.complete.json` sidecar (`MediaImporter.transcriptsKind` is the post kind,
+  and lives beside the other three in `MediaCacheFiles.swift`). The provider's
+  `words` are stored VERBATIM as BYTES: `File.encoded()` splices `wordsJSON`
+  in after a `.sortedKeys` header, `init(data:)` cuts it back out with
+  `JSONValueRange`, and neither ever re-serialises — a `0.98` does not
+  survive that. Both `File` inits throw on a `words` that is not an array, so
+  `read` answers nil and `isCurrent` false rather than caching zero words.
+  THE MAPPING is here: a word is a clip's when `in ≤ start × 600 <
+  in + duration × speed`, landing at `start + (m − in) / speed`, clamped.
+  `Loader` is `MediaPeaks.Loader`'s shape; `undeleted(in:)` is the janitor's.
 - `Transcriber.swift` (+`Languages`, +`Extract`, +`Jobs`) ·
   `TranscribeSheetController.swift` (+`Commit`: the run's one exit, and the
   menu command with its validator arm) — on-device recognition through the
@@ -311,7 +361,16 @@ free.
   the run carries on. The SHEET is the only caller of `requestAuthorization`;
   the tool refuses by status. The tool's refusal ORDER is the caller's own
   mistakes first, the grant second, the model third, so a headless proof can
-  measure the first tier.
+  measure the first tier. `Job` carries `media` for the cloud engine, which
+  uploads a MEDIA once; `CancelToken` holds a `URLSessionTask` beside the
+  speech task, under the same lock and cancelled outside it. `+Extract` is no
+  longer only the on-device extractor: `extractAudio(url:name:range:to:)` is
+  the general form, `wholeAsset` is what a cloud run asks for,
+  `writeFLAC(fromWAV:to:)` is the 16 kHz mono 16-bit FLAC through
+  `AVAudioFile` (NEVER `AVAssetWriter`, which has no FLAC file type on macOS
+  26 and refuses as an uncatchable Objective-C exception), and
+  `extractUpload` is the pair with the WAV as the fallback when the FLAC
+  write refuses.
 
 **Silence and sound.**
 - `SilenceDetector.swift` (+`Walls`) · `SilenceSheetController.swift` ·
@@ -582,7 +641,9 @@ inversion and `main.async` allocates; every other cross-thread value is an
 `NSLock` or a main hop. `DispatchQueue` only at the documented seams: the
 compositor's render queue, the composition rebuild, import, the export
 progress timer, `Transcriber`'s serial queue and the recogniser's
-`OperationQueue`, `FFmpegRewrap`'s serial queue, the two one-frame render
+`OperationQueue`, `CloudTranscriber`'s serial queue and the AssemblyAI
+client's delegate `OperationQueue` (spec §11's R6-7: `Transcriber`'s
+two-queue shape, carried over), `FFmpegRewrap`'s serial queue, the two one-frame render
 queues (`eyedropperQueue`, `frameGrabQueue` — a third one-frame render joins
 this entry rather than growing the list), `ScreenRecorder.shareableContent`'s
 global hop, and the cache's main hop. The recorder adds NO queue of its own:

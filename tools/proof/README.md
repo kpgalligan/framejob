@@ -3701,3 +3701,116 @@ the secret, never a URL, never a line. It looks for the key and for every
 upload URL in `ledger.json`, in every path given except `ledger.json` itself,
 which is the one place an upload URL is allowed to be. `clean` is the only
 good answer.
+
+---
+
+## Road map 6 — the cloud parts, with no cloud (`assemblyai_fake.py`, `cloud_captions_probe.py`)
+
+C1's second pipeline (road map 6 §10.9) built every part that can be proved
+with no AssemblyAI job running, and these two instruments are what prove it.
+**Neither makes a call to any AssemblyAI host, and neither can be made to:**
+the probe removes `RC_ASSEMBLYAI_KEY` from every child it starts, the fake
+binds loopback, and the only credentials either ever sees are the dummies
+`proof-key` and `wrong-key`.
+
+### The stand-in server
+
+```sh
+python3 tools/proof/assemblyai_fake.py --dir <logdir>
+```
+
+Binds `127.0.0.1` on port 0 and prints `port <n>` as its FIRST stdout line,
+flushed, which is how a caller learns where it is. It speaks §5c's five calls
+— `POST /v2/upload`, `POST /v2/transcript`, `GET /v2/transcript/{id}`,
+`DELETE /v2/transcript/{id}`, `GET /v2/transcript?limit=1` — plus three
+control routes: `POST /__control/scenario` (replaces the scenario whole and
+resets the counters), `GET /__control/log` (`{requests, failures}`) and
+`GET /__control/words` (the exact bytes it serves as `words`, serialised
+once, so "byte-equal to what was served" is a comparison and not a hope).
+
+Reused from `cloud_spike/fake.py`: the handler skeleton and its three `do_*`
+forwards, `_json`, the lower-cased header log, `redirect_next`, and the
+transcript table with its poll count. NOT its 404-after-delete — q6 measured
+**200** with `audio_url: "http://deleted_by_user"` and
+`text: "Deleted by user."`. Its `words` after a delete is `null`, this fake's
+own choice: `work/cloud_spike/answers.json`'s recorded body is cut at 300
+bytes inside the `"wor…` KEY, so the key is measured present and its value
+was never recorded.
+
+**The redaction rule is R6-9 (e) and it is the reason a proof is safe to run
+on a machine where the person has a real key.** An `authorization` value
+reaches the log only when it is `proof-key` or `wrong-key`; anything else is
+logged as `<redacted: not an allow-listed dummy>`, answered 401, appended to
+`failures`, and written nowhere at all.
+
+Other measured answers it reproduces: `audio_duration` is the uploaded
+audio's seconds rounded UP, read from the WAV's `data` chunk or the FLAC's
+STREAMINFO (q1); an unsupported `language_code` is a **400 at submission**
+with q5's sentence verbatim.
+
+### The probe
+
+```sh
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_probe.py
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_probe.py --only mapping,stamp
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_probe.py --mutant no-retry
+```
+
+**186/186** on the tree, measured three times on 2026-09-20 with no skips,
+and **196/196** on 2026-09-20 after 05-review's finding 1 added row 12's
+second request — the five degenerate speeds (`0`, a negative, NaN,
+`+infinity`, `greatestFiniteMagnitude`), none of which traps: the first four
+read as 1, and the largest finite speed passes the guard unchanged.
+Nine sections: `mapping` (5i·12), `stamp` (13), `client` (15, over an injected
+`URLProtocol` with no socket), `cancel` (16, against the fake), `secrets`
+(17 and R6-9's three rules and the loopback table), `cues` (19, through the
+harness's `cues` mode), `extract` (the WAV against the BASELINE tree, the
+FLAC, the fallback and `wholeAsset`), `verbatim` (the served bytes all the
+way to disk and back) and `hygiene` (the redaction, the language table,
+`CloudTranscriber`'s unreachability, and the credential).
+
+It compiles two entries with `harness/build.sh`'s own `swiftc` line — never
+`build.sh` itself, which hard-codes the tree: the probe, and a four-argument
+`reference` entry (`<media> <inTicks> <lengthTicks> <out.wav>`) that is also
+compiled against `git archive 515e6a80 app/Sources` under
+`-D CLOUD_PROBE_BASELINE`, which is how "the moved extractor writes the same
+WAV" is a comparison of two TREES. `--wall` (default 1800 s) bounds the whole
+run and every child has a timeout whose expiry is that row's answer.
+
+**Mutant scores**, each a tree COPY with one text replaced, asserted to occur
+exactly once (2026-09-20, against 186):
+
+| `--mutant` | What it breaks | Score |
+|---|---|---|
+| `mapping-no-in` | the `in` term dropped from the projection | 180/186 |
+| `no-fifth-rule` | the speaker-change flush removed | 179/186 |
+| `no-retry` | the upload retry removed | 182/186 |
+| `store-0644` | the key file written `0644` | 184/186 |
+| `env-first` | the environment read before the store | 185/186 |
+| `stamp-drops-field` | `speaker_labels` dropped from the stamp | 185/186 |
+| `no-speed-guard` | the degenerate-speed guard removed from the mapping | 14/15 over `--only mapping` |
+
+**Host-state inputs.** `say` makes the speech fixture (road map 4's text) and
+its absence skips the whole `extract` section by name. `ffmpeg`, when it is
+on PATH, is the FLAC row's SECOND decoder; `AVAudioFile` is always the first
+and the row names which one answered. `git` unpacks the baseline tree, and a
+baseline that will not build is a SKIP printed by name with its row count,
+every other build failure still being the failure it was.
+`work/cloud_spike/fixtures/late.mov` is C0's late-audio fixture, untracked
+and rebuildable only by the spike's runner; without it the `audio_track_start_ms`
+row skips by name.
+
+**And one host fact the `extract` section had to be redesigned around.** This
+Mac's 16 kHz extract is NOT bit-deterministic. Measured: over ten separate
+processes of one binary over one fixture, and over five trials of three
+decodes inside one process, decodes of the same audio land on one of exactly
+**two** byte strings that differ in **one byte** — one 16-bit sample's low
+bit, at offset 132098 of a 336 532-byte WAV — in either direction, about one
+decode in five. It does not depend on the range asked for, on the binary, or
+on the order within a process. So rows W and Q do not compare one decode
+against one decode, which a coin would decide a third of the time. They
+decode each side five to six times and assert what a real change breaks: one
+length, at most two distinct strings in the whole population, and those two
+differing in a single sample — with a CONTROL row that measures one range
+form disagreeing with ITSELF at that same byte, which is what makes the
+comparison about this host rather than about the code.

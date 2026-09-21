@@ -7,14 +7,15 @@ import Foundation
 /// `CaptionImporter`'s header doc is still where the reasoning for THAT lives.
 ///
 /// **What is here is PLACEMENT, and only placement.** Road map 2 phase 4 says
-/// the four cue rules — at most two lines, at most 42 characters a line, at
-/// most six seconds a cue, at least a frame between cues — are "factored out
+/// the cue rules — at most two lines, at most 42 characters a line, at most
+/// six seconds a cue, at least a frame between cues, and (road map 6 §5f) no
+/// two speakers in one cue: five of them now — are "factored out
 /// of `CaptionImporter.swift`". None of them was ever in that file: SubRip
 /// supplies its own line breaks, the clip's `text.width` does the wrapping at
 /// render time (`LayerRenderers.measure`), and the importer bounds no cue's
 /// length. Moving those rules in here would silently re-wrap and re-time every
 /// caption file people already import, and would break the 4b round trip
-/// outright. So the four rules belong to the producer that has to invent line
+/// outright. So the five rules belong to the producer that has to invent line
 /// breaks — the transcriber's cue builder — and this file does what the
 /// importer actually did:
 ///
@@ -314,9 +315,10 @@ enum CaptionLayout {
 
 // MARK: - Words into cues
 
-/// The four cue rules, and the ONLY place they live: at most two lines, at
-/// most 42 characters a line, at most six seconds a cue, and at least a frame
-/// between cues. Recognised words in, `CaptionLayout.Cue`s out.
+/// The five cue rules, and the ONLY place they live: at most two lines, at
+/// most 42 characters a line, at most six seconds a cue, at least a frame
+/// between cues, and never two speakers in one cue. Recognised words in,
+/// `CaptionLayout.Cue`s out.
 ///
 /// **It is beside `CaptionLayout` and it is not part of it.** `CaptionImporter`
 /// must never reach this: a SubRip file supplies its own line breaks and its
@@ -345,18 +347,26 @@ enum CaptionCues {
         let text: String
         let start: Ticks
         let end: Ticks
+        /// Who said it, when the producer knows — AssemblyAI's `speaker`
+        /// with `speaker_labels` on (road map 6 §5f). Nil everywhere else,
+        /// which is what keeps every existing caller and the harness's
+        /// `cues` mode byte-identical to what they were: the fifth rule
+        /// compares nil to nil and never fires.
+        let speaker: String?
 
-        init(text: String, start: Ticks, end: Ticks) {
+        init(text: String, start: Ticks, end: Ticks, speaker: String? = nil) {
             self.text = text
             self.start = start
             self.end = max(start, end)
+            self.speaker = speaker
         }
     }
 
     /// Two lines is what a viewer reads without looking away from the
     /// picture, and 42 characters is the line length every broadcast caption
     /// guideline lands on; six seconds is about as long as one screenful of
-    /// words stays useful.
+    /// words stays useful. The fifth rule has no constant: a speaker change
+    /// is a change, and there is no threshold to tune.
     static let maxLines = 2
     static let maxCharacters = 42
     static let maxLength: Ticks = ReelTime.ticks(seconds: 6)
@@ -376,6 +386,7 @@ enum CaptionCues {
         var lines: [String] = []
         var start: Ticks = 0
         var end: Ticks = 0
+        var speaker: String?
 
         func flush() {
             guard !lines.isEmpty else { return }
@@ -390,6 +401,23 @@ enum CaptionCues {
                 lines = [text]
                 start = word.start
                 end = word.end
+                speaker = word.speaker
+                continue
+            }
+            // The fifth rule (road map 6 §5f): a word whose speaker differs
+            // from the open cue's flushes it, so no cue ever carries two
+            // voices. It is tested BEFORE placement rather than inside the
+            // placement test, because a speaker change that happened to fit
+            // the line and the six seconds would otherwise be placed and the
+            // rule would never fire. One break, never an empty cue: the flush
+            // is followed by opening a new cue on this word, exactly as the
+            // length and the line rules do.
+            if word.speaker != speaker {
+                flush()
+                lines = [text]
+                start = word.start
+                end = word.end
+                speaker = word.speaker
                 continue
             }
             var placed = false
@@ -412,6 +440,7 @@ enum CaptionCues {
                 lines = [text]
                 start = word.start
                 end = word.end
+                speaker = word.speaker
             }
         }
         flush()

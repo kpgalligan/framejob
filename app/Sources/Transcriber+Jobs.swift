@@ -76,7 +76,7 @@ extension Transcriber {
             }
             jobs.append(
                 Job(
-                    clip: clip.id, name: snapshot.name(of: clip), source: url,
+                    clip: clip.id, media: media, name: snapshot.name(of: clip), source: url,
                     sourceIn: max(0, sourceIn), sourceLength: contentLength(of: clip),
                     start: clip.start, duration: clip.duration, speed: clip.speed))
         }

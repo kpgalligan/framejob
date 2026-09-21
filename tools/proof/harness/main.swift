@@ -188,7 +188,10 @@
 // report — but that fallback is the apology, not the plan.)
 //
 // `words.json` is `{"fps": [30, 1], "words": [{"text": "…", "start": 0,
-// "end": 300000}, …]}`, in TICKS rather than seconds, because the rules are
+// "end": 300000, "speaker": null}, …]}`, in TICKS rather than seconds — with
+// `speaker` OPTIONAL, read when it is there and nil when it is not, which is
+// road map 6 §5f's fifth rule and is why a fixture written before it exists
+// still produces byte-identical cues. Ticks because the rules are
 // measured in ticks and a frame at 30 fps is 20 000 of them and 0.0333… of a
 // second: a fixture written in seconds could not say "exactly one frame"
 // exactly. `fps` defaults to 30/1 and is what the gap is one frame OF. The
@@ -463,6 +466,10 @@ enum Harness {
                 let text: String
                 let start: Ticks
                 let end: Ticks
+                /// Road map 6 §5f's fifth rule. Absent in every fixture
+                /// written before it existed, which is the point: with every
+                /// speaker nil the output is byte-identical to what it was.
+                let speaker: String?
             }
             /// `[num, den]`, the model's own spelling of a rate (§5.2).
             let fps: [Int]?
@@ -475,10 +482,23 @@ enum Harness {
         // degenerate rate, and the builder is handed the same number the
         // placement will use.
         let frame = max(fps.frameDuration, 1)
+        // `speaker:` is inside the guard because `phase5_chrome.py` and
+        // `recording_probe.py` compile THIS file against OLDER trees under
+        // `-D HARNESS_REFERENCE_BUILD`, and `CaptionCues.Word` had no such
+        // argument before road map 6's C1. The three-argument call below is
+        // what those builds take.
+        #if !HARNESS_REFERENCE_BUILD
+        let built = CaptionCues.build(
+            from: request.words.map {
+                CaptionCues.Word(
+                    text: $0.text, start: $0.start, end: $0.end, speaker: $0.speaker)
+            }, frame: frame)
+        #else
         let built = CaptionCues.build(
             from: request.words.map {
                 CaptionCues.Word(text: $0.text, start: $0.start, end: $0.end)
             }, frame: frame)
+        #endif
         let rows = built.map { cue -> [String: Any] in
             [
                 "start": cue.start,

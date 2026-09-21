@@ -72,6 +72,12 @@ final class Transcriber {
     /// value, so a run holds no document and nothing can change under it.
     struct Job: Equatable {
         let clip: UInt32
+        /// The media record behind the clip. The on-device engine never
+        /// needed it — it extracts each clip's own source window — but the
+        /// cloud engine uploads a MEDIA once and derives every clip on it
+        /// from one transcript (R6-3), so the grouping key and the cache
+        /// file's name are this (road map 6 §5a, §5b).
+        let media: UInt32
         /// What the timeline calls this clip, for the progress line.
         let name: String
         /// The file behind the clip's media.
@@ -157,10 +163,18 @@ final class Transcriber {
     /// any thread and safe to set twice — with the recognition task under the
     /// same lock, because speech cancellation is PUSH: there is no loop of
     /// ours to poll inside a recognition, only `SFSpeechRecognitionTask.cancel()`.
+    ///
+    /// **It holds a `URLSessionTask` beside it** (road map 6 §5a), under the
+    /// same lock and cancelled outside it, for the same reason: a cloud run
+    /// waiting on an upload has no loop of its own either, and one token has
+    /// to stop whichever engine is running. The two slots are independent —
+    /// only one engine runs at a time, and a token that had to know which
+    /// would be a token every caller had to tell.
     final class CancelToken {
         private let lock = NSLock()
         private var flag = false
         private var task: SFSpeechRecognitionTask?
+        private var request: URLSessionTask?
 
         var isCancelled: Bool {
             lock.lock()
@@ -172,11 +186,14 @@ final class Transcriber {
             lock.lock()
             flag = true
             let running = task
+            let sending = request
             lock.unlock()
             // Outside the lock: `cancel()` calls back into the delegate on
-            // the recogniser's own queue, and holding a lock across it would
-            // be a lock held across somebody else's code.
+            // the recogniser's own queue — and, for a `URLSessionTask`, on
+            // the session's — and holding a lock across it would be a lock
+            // held across somebody else's code.
             running?.cancel()
+            sending?.cancel()
         }
 
         /// Stops the task that is running WITHOUT marking the run cancelled —
@@ -187,8 +204,10 @@ final class Transcriber {
         func stopTask() {
             lock.lock()
             let running = task
+            let sending = request
             lock.unlock()
             running?.cancel()
+            sending?.cancel()
         }
 
         /// Hands the token the task it may stop. A cancel that arrived while
@@ -201,9 +220,21 @@ final class Transcriber {
             if already { task?.cancel() }
         }
 
+        /// The cloud run's half of the same contract, and an overload rather
+        /// than a second name so a caller that holds a token cancels it the
+        /// one way whatever is running underneath.
+        func attach(_ task: URLSessionTask?) {
+            lock.lock()
+            self.request = task
+            let already = flag
+            lock.unlock()
+            if already { task?.cancel() }
+        }
+
         func release() {
             lock.lock()
             task = nil
+            request = nil
             lock.unlock()
         }
     }
