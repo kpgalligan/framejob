@@ -56,9 +56,10 @@ extension AgentServer {
     /// spell their arguments out here: the ten of the Projects group below
     /// (`open_project` … `redo`), the two composites of
     /// `AgentCatalog+Audio.swift` (`detect_silence`, `normalize_clip`) and
-    /// the eight of `AgentCatalog+Files.swift` (`import_media`,
-    /// `import_captions`, `consolidate_media`, `transcribe`,
-    /// `export_captions`, `render_frame`, `export`, `record_screen`). Every
+    /// the eight `fileTools` returns (`import_media`, `import_captions`,
+    /// `consolidate_media`, `transcribe`, `export_captions`, `render_frame`,
+    /// `export`, `record_screen` — the three caption rows of them built in
+    /// `AgentCatalog+Captions.swift`). Every
     /// op tool is `opTool`'s since road map 7's D3·4, and `opTool` goes
     /// through here, so this is still where all seventy-seven get `project`
     /// and where all fifty-seven get `scope`.
