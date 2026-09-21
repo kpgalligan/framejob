@@ -154,9 +154,47 @@ extension AgentServer {
             // In band, message and all, exactly as the on-device arm does —
             // including "no speech was recognised", which is a true answer
             // about the audio rather than a transport problem.
-            throw ToolError(message: error.localizedDescription)
+            //
+            // **A throw that came AFTER a bill says so.** `cloudFields` is
+            // never reached on this path, so `uploaded` and `audio_seconds`
+            // are not in the answer at all: a run whose only media held no
+            // speech, or whose second media answered 401, told the caller
+            // nothing about the money already spent (the reader review,
+            // §10.13, R5·2). The facts go in the SENTENCE, which is the one
+            // channel a throw has; the result KEYS are unchanged.
+            throw ToolError(
+                message: error.localizedDescription
+                    + Self.billed(transcriber.report))
         }
         return (outcome, Self.cloudFields(transcriber.report, code: code, notes: notes))
+    }
+
+    /// What a FAILED run already cost, as a sentence to put after the
+    /// failure's own — or nothing at all when it cost nothing.
+    ///
+    /// Only the media AssemblyAI actually answered for are counted:
+    /// `report.uploaded` is written once per media that came back, so a media
+    /// the run refused or could not reach is not in it.
+    ///
+    /// **It promises nothing about the cache.** It used to close with "their
+    /// transcripts are cached in the project, so another run makes no request
+    /// for them", which is false on the branch R1·3's fix created and issue
+    /// #29 records: when `MediaTranscript.write` answers `false` the marker is
+    /// (correctly) not written and NOTHING is cached, while the media is in
+    /// `report.uploaded` all the same — so a caller who believed the sentence
+    /// paid for the same media twice. The bill is what this method knows;
+    /// what landed in the cache is not (the reader review's fix pass,
+    /// §10.13).
+    static func billed(_ report: CloudTranscriber.Report) -> String {
+        guard !report.uploaded.isEmpty else { return "" }
+        let seconds = report.uploaded.reduce(0) { sum, row in
+            let (total, overflowed) = sum.addingReportingOverflow(row.audioSeconds)
+            guard overflowed else { return total }
+            return row.audioSeconds > 0 ? Int.max : Int.min
+        }
+        let files = report.uploaded.count == 1 ? "1 media file" : "\(report.uploaded.count) media files"
+        return " AssemblyAI had already been billed for \(files) (\(seconds) audio seconds) "
+            + "before this failed."
     }
 
     /// `language` for the cloud engine: absent or `"auto"` is DETECTION,
@@ -217,7 +255,15 @@ extension AgentServer {
             "language": code ?? "auto",
             "uploaded": report.uploaded.map { Int($0.media) },
             "cached": report.cached.map { Int($0) },
-            "audio_seconds": report.uploaded.reduce(0) { $0 + $1.audioSeconds },
+            // SATURATING, because every term is the SERVER's own
+            // `audio_duration` and `+` traps: two media answered
+            // `9223372036854775807` killed the whole app after both had
+            // been uploaded and billed (the reader review, §10.13 R1·1).
+            "audio_seconds": report.uploaded.reduce(0) { sum, row in
+                let (total, overflowed) = sum.addingReportingOverflow(row.audioSeconds)
+                guard overflowed else { return total }
+                return row.audioSeconds > 0 ? Int.max : Int.min
+            },
         ]
         let models: [[String: Any]] = report.uploaded.compactMap { row in
             guard let model = row.speechModelUsed else { return nil }

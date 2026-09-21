@@ -58,6 +58,17 @@ the counters):
     language_code                default "en_us"
     language_confidence          default 0.99
     audio_seconds                overrides the measured duration
+    stall                        {route, seconds} — that route answers
+                                 NOTHING for `seconds`, then answers
+                                 normally: what an IDLE timeout is measured
+                                 against (the reader review, §10.13)
+    drop_reply                   [{route, times}] — the route's EFFECT
+                                 happens and the socket closes unanswered;
+                                 `times: -1` is always
+    echo_authorization           a FORCED failure's `error` sentence carries
+                                 the allow-listed dummy it received, so a
+                                 relay of the service's sentence can be
+                                 caught carrying a credential
 
 `GET /__control/log` answers `{"requests": [...], "failures": [...]}`;
 `GET /__control/words` answers the exact bytes this fake serves as `words`.
@@ -156,6 +167,31 @@ class Scenario:
         self.language_code = given.get("language_code", "en_us")
         self.language_confidence = given.get("language_confidence", 0.99)
         self.audio_seconds = given.get("audio_seconds")
+        # The reader review's three keys (road map 6 §10.13). `stall` answers
+        # NOTHING for its seconds and then answers normally, which is what an
+        # IDLE timeout is measured against; `drop_reply` lets the route's
+        # effect happen and then closes the socket unanswered, which is the
+        # reply a real network loses; `echo_authorization` puts the
+        # allow-listed dummy a forced failure received into its own `error`
+        # sentence, so a relay of the service's sentence can be caught
+        # carrying a credential.
+        self.stall = given.get("stall")
+        self.drop_reply = [dict(row) for row in given.get("drop_reply", [])]
+        self.echo_authorization = bool(given.get("echo_authorization", False))
+
+    def take_drop(self, route):
+        """Whether this route's reply is dropped this time. `times: -1` never
+        runs out — `take_failure`'s own rule, read across."""
+        for row in self.drop_reply:
+            if row.get("route") != route:
+                continue
+            times = int(row.get("times", 1))
+            if times == 0:
+                continue
+            if times > 0:
+                row["times"] = times - 1
+            return True
+        return False
 
     def take_failure(self, route):
         """The status this route must answer this time, or None. A row with
@@ -369,9 +405,32 @@ def make_handler(fake):
             route = self._route(method, path)
             if route is None:
                 return self._json(404, {"error": "no route"})
+
+            # `stall`: nothing at all is answered for its seconds, and then
+            # the route answers normally. What is being measured is the
+            # caller's IDLE timeout, so the socket must stay open and silent.
+            stall = fake.scenario.stall
+            if stall and stall.get("route") == route:
+                entry["stalled_seconds"] = float(stall.get("seconds", 1))
+                threading.Event().wait(entry["stalled_seconds"])
+
             forced = fake.scenario.take_failure(route)
             if forced is not None:
-                return self._json(forced, {"error": f"forced {forced} on {route}"})
+                sentence = f"forced {forced} on {route}"
+                if fake.scenario.echo_authorization:
+                    # The value is allow-listed by the time this runs: the
+                    # 401 above has already refused anything else and written
+                    # none of it. Only a dummy can reach this line.
+                    sentence += f" for {self.headers.get('authorization')}"
+                return self._json(forced, {"error": sentence})
+
+            # `drop_reply`: the route's EFFECT happens and the socket closes
+            # unanswered — the submit whose id the caller never learns.
+            if fake.scenario.take_drop(route):
+                entry["reply_dropped"] = True
+                self._effect_only(route, body, entry, path)
+                self.close_connection = True
+                return None
 
             if route == "upload":
                 return self._upload(body, entry)
@@ -388,6 +447,20 @@ def make_handler(fake):
                 return self._bytes(200, fake.deleted_bytes(tid))
             return self._poll(tid)
 
+        def _effect_only(self, route, body, entry, path):
+            """What a route DOES, with nothing written back. A submit mints
+            its transcript (so the fake holds an id the caller cannot know);
+            a delete marks it deleted; upload, poll and verify change nothing
+            the caller could learn from a second call."""
+            if route == "submit":
+                self._submit(entry.get("json") or {}, reply=False)
+            elif route == "delete":
+                tid = path.rsplit("/", 1)[1]
+                if tid in fake.transcripts:
+                    fake.deleted.add(tid)
+            elif route == "upload":
+                self._upload(body, entry, reply=False)
+
         def _route(self, method, path):
             if method == "POST" and path == "/v2/upload":
                 return "upload"
@@ -401,7 +474,7 @@ def make_handler(fake):
 
         # -- the five calls -------------------------------------------------
 
-        def _upload(self, body, entry):
+        def _upload(self, body, entry, reply=True):
             url = f"https://cdn.example.invalid/upload/{uuid.uuid4().hex}"
             seconds = fake.scenario.audio_seconds
             if seconds is None:
@@ -410,12 +483,16 @@ def make_handler(fake):
                 seconds = flac_seconds(body)
             fake.uploads[url] = seconds
             entry["measured_seconds"] = seconds
+            if not reply:
+                return None
             return self._json(200, {"upload_url": url})
 
-        def _submit(self, request):
+        def _submit(self, request, reply=True):
             code = request.get("language_code")
             if code is not None and code in fake.scenario.unsupported:
                 # q5: refused AT SUBMISSION, with the service's own sentence.
+                if not reply:
+                    return None
                 return self._json(400, {"error": LANGUAGE_REFUSAL.format(code=code)})
             seconds = fake.uploads.get(request.get("audio_url"))
             if seconds is None:
@@ -431,6 +508,8 @@ def make_handler(fake):
                 # q1: `audio_duration` rounds UP.
                 "audio_duration": int(math.ceil(seconds)),
             }
+            if not reply:
+                return None
             return self._json(200, fake.body(tid, "queued"))
 
         def _poll(self, tid):

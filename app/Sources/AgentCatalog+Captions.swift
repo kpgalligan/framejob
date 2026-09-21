@@ -74,12 +74,13 @@ extension AgentServer {
             // write captions rather than reading a file into the project.
 
             // It mirrors File ▸ Generate Captions… — the sheet's clip scope,
-            // its language popup and its progress bar are these arguments,
-            // this result and nothing else. The sheet's ENGINE popup and its
-            // three cloud rows are c1-chrome's work and are not there yet:
-            // until they land, `engine: "assemblyai"` is reachable from here
-            // and from nowhere in the UI, and the menu item behaves exactly
-            // as it always has.
+            // its language popup, its ENGINE popup, its three cloud rows and
+            // its progress bar are these arguments, this result and nothing
+            // else. The two the sheet has and this tool deliberately has not:
+            // the REGION, which is a person's setting and no tool's (R6-12),
+            // and the sheet's memory of the engine, which an agent call never
+            // reads (R6-2). c1-chrome landed them; the sentence that said
+            // they had not is gone (the reader review, §10.13, R5·1).
             tool(
                 "transcribe",
                 "Transcribes clips and lays the result out as TEXT CLIPS, one per cue, on a new "

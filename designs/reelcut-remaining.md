@@ -452,7 +452,43 @@ instruments are not held to a cap (`designs/reelcut-roadmap-7.md` §2.4):
 `tools/proof/cloud_captions_probe.py` 3280 → **4753** (4640 before c1-chrome's
 fix pass added six rows and three mutants),
 `tools/proof/harness/main.swift` 901 → **954**,
-`tools/proof/cloud_captions_proof.py` 1479 → **1494**.
+`tools/proof/cloud_captions_proof.py` 1479 → **1643** (revised 2026-09-21:
+**1494** is what `wc -l` gave at c1-chrome's own tree
+`5cc64c21215641e7a99cd3e7d95ace8c6f03a13d`, and c1-close then took the file
+to 1643, which is what the tree this sentence describes,
+`f03ebcc6e4769f7195812d51d562518a2e4d9b67`, holds — the C1 reader review's
+fix pass measured both).
+
+**What the C1 reader review did to it** (2026-09-21, road map 6 §10.13,
+`wc -l` against the tree it leaves). Nothing came ON to this list and nothing
+came off: the review's seven product fixes landed in files that all have room,
+and no file over the ~600 cap took anything on. The numbers, every one of them
+under its own 400-line cap:
+`app/Sources/AssemblyAIClient.swift` 338 → **395** — the biggest single
+growth, `withoutCredential(_:)`, `isPlainIdentifier(_:)` and `DeleteAnswer`
+with their arguments, and **five lines from its cap**, which is the one to
+watch;
+`app/Sources/CloudTranscriber.swift` 317 → **321**;
+`app/Sources/CloudTranscriber+Media.swift` 183 → **216**;
+`app/Sources/AgentServer+CloudCaptions.swift` 243 → **289**;
+`app/Sources/SecretStore.swift` 212 → **229**;
+`app/Sources/AssemblyAIClient+Session.swift` 179 → **187**;
+`app/Sources/AgentCatalog+Captions.swift` 215 → **216**;
+`app/Sources/MediaTranscript.swift` **399**, unchanged to the line, still one
+under its own cap; and `app/Sources/ProjectDocument.swift` **1352**, unchanged
+to the line — a file over the cap, whose one false comment was corrected five
+lines in and five out. On the instrument side `cloud_captions_live.py` is back
+at exactly **399** because `reachable` moved to `cloud_live_ledger.py`
+(312 → **327**), `cloud_live_selftest.py` is 219 → **272**,
+`assemblyai_fake.py` 501 → **580**, `cloud_captions_probe.py` 4753 → **5202**,
+`cloud_captions_proof.py` 1643 → **1982**, and the new
+`tools/proof/makefile_env_proof.py` is **203** — none of which the 400-line
+cap has ever covered, which is the correction §10.13 made to §10.10 and
+§10.11's twin sentences. (Revised 2026-09-21 by the review's own fix pass:
+the two "before" numbers read **288** and **1494**, neither of which is what
+the baseline tree `f03ebcc6…` holds — `wc -l` there gives 312 and 1643 — and
+the probe and the proof grew again in that pass, 5182 → 5202 and 1934 →
+1982.)
 
 **None of this is work on its own.** It is the list a feature phase consults
 so it pays the toll first and alone, the way `d69de99`, `b410125` and
@@ -703,8 +739,10 @@ and the closing above added the rest.
 
 **Where the next work starts, after C1 (2026-09-21).** C1 — captions from
 the cloud — is BUILT, over five pipelines whose record is road map 6 §10.
-Three things are owed by name and none of them is a phase that can simply be
-started:
+Two things are owed by name and neither is a phase that can simply be
+started (the THIRD, C1's reader review, was run on 2026-09-21 and its record
+is road map 6 §10.13 — including the independent sceptic pass over it and the
+fix pass that answered that pass's six findings, both the same day):
 
 - **C2, the relay, is blocked on a product decision the user has not made.**
   Road map 6 §6b: a relay that mints upload URLs needs to know WHO is
@@ -715,9 +753,6 @@ started:
   Keychain item without a modal and cannot delete it at all (road map 6 §3
   q7). A Developer ID build can have the Keychain back; nothing else has to
   change.
-- **C1's reader review is OWED.** Road map 2 §0's practice: c1-close was the
-  last build pipeline, and the review of the whole of C1 is its own run,
-  after it. Every residue bullet below is left standing for that reader.
 
 **Residue from road map 6's c1-chrome, 2026-09-20.** Two things that pipeline
 left, neither blocking anything. Its two INHERITED nits — c1-run's reader
@@ -748,9 +783,14 @@ millisecond, and a `no-ms-clamp` mutant that fails four of them by TRAP).
   A later phase that wants one spelling has to keep that row and make it
   compare the merged code against something else.
 
-**Residue from road map 6's c1-parts, 2026-09-20.** Five things that pipeline
-measured or left, none of them blocking anything (the last was added when its
-reader review's two nits were left unfixed):
+**Residue from road map 6's c1-parts, 2026-09-20.** **NINE** things, which is
+this block's own `- ` lines counted on 2026-09-21 by the reader review
+(H·9): it opened saying FIVE and had been added to four times since — by
+c1-parts' own reader review's two nits, by c1-chrome's order-dependent probe
+row, and by the `speed` bullet that opened the moment the one above it
+closed. Three of the nine are now struck through: the two nits are judged
+(H·1 refuted, H·3 fixed) and the probe row is fixed (H·5); the rest stand.
+None of them blocks anything.
 
 - **This Mac's 16 kHz audio extract is not bit-deterministic.** Measured over
   ten processes of one binary over one fixture and five trials of three
@@ -795,10 +835,16 @@ reader review's two nits were left unfixed):
   `no-length-clamp`) fail it on purpose. What is closed is
   `Transcriber.jobs`, `MediaTranscript.project` and `Transcriber.project`,
   and nothing else.
-- **The REST of the app against a hand-written `speed` is UNMEASURED.**
-  Residue, opened by the bullet above the moment it closed: nothing in this
-  tree has been driven with a `project.json` carrying a speed outside
-  0.1–10 except the three caption readers.
+- **The REST of the app against a hand-written `speed`: NARROWED
+  2026-09-21 by the reader review (road map 6 §10.13, H·4), not closed.**
+  What IS now driven, at `speed` **1e300** and **1e-300**, on its own
+  instance and with no trap and no expiry: `open_project`, `get_project`,
+  `render_frame` at `t: 0`, `transcribe engine: "assemblyai"`, and the
+  offscreen harness rendering the whole editor including the timeline. What
+  is still unasked is everything else, and the reader review also found that
+  the neighbouring input is WORSE than the speed: a hand-written clip
+  `"duration": 9223372036854775807` kills the app during `open_project`
+  (kpgalligan/reelcut#31, `spec`), where 2^62 and 1e18 open and draw.
   `app/Sources/CompositionBuilder.swift:386` sums
   `segment.sourceIn + segment.sourceDuration` off a core length that
   SATURATES at `i64::MAX`, which is a sum this pipeline chose 1e15 precisely
@@ -827,21 +873,41 @@ reader review's two nits were left unfixed):
   the difference is the AAC decode and not the resampler. Any future row
   wanting bytes out of an extract should use an uncompressed fixture; road
   map 6 §5i·2 was revised, dated, to say so and to say what it replaces.
-- **Two nits from c1-parts' reader review were left unfixed**, both read and
-  judged benign at the time, both cheap for whoever next opens those files:
-  `AssemblyAIClient+Session.swift`'s `sink(_:)?.progress?(…)` reads
-  `progress` outside the `NSLock` that `open(_:progress:)` writes it under
-  (benign only because it is set before `resume()`, and it is the one
-  unsynchronised field on a shared sink), and `SecretStore.swift`'s
-  `writeAll` turns an `EINTR`-interrupted `write(2)` into
-  `SecretStoreError.unwritable`, so a signal during a Save could report a
-  failure that did not happen. Neither has a row.
-- **One probe row of c1-chrome's leans on the ORDER of its section**
-  (c1-chrome's second review, a nit, left for the reader review): the row
-  that measures what Stop did to a sheet-started cloud run asserts the
-  `chrome` section's SHARED fake log is `[]`, which holds only because the
-  Verify rows run after it. A count captured before the click and compared
-  after would not depend on the order.
+- ~~**Two nits from c1-parts' reader review were left unfixed**~~ — both
+  JUDGED 2026-09-21 by the reader review (road map 6 §10.13, H·1 and H·3).
+  `AssemblyAIClient+Session.swift`'s `sink(_:)?.progress?(…)` is **REFUTED
+  as a race**: `progress` is written once, before the sink is published under
+  the lock, and every reader reaches it through the same lock, so there is a
+  happens-before edge and no row that could fail; the field is left a `var`.
+  `SecretStore.swift`'s `writeAll` is **FIXED**: it retries `EINTR` and
+  nothing else, through an injected-writer seam whose default IS `write(2)`,
+  with three rows in the probe's section 17 and an `eintr-unwritable` mutant
+  that fails the retry row and neither of the other two.
+- ~~**One probe row of c1-chrome's leans on the ORDER of its section**~~ —
+  **FIXED** 2026-09-21 by the reader review (road map 6 §10.13, H·5). The
+  row takes the fake's request count before the child runs and asserts that
+  nothing NEW arrived across the click. Made to fail in a COPY of the probe
+  outside the tree with one request sent into the shared fake above the
+  block: **76/77**, the old assertion failing and the new one holding.
+
+**Residue from road map 6's reader review, 2026-09-21.** Three nits from its
+second sceptic pass, none fixed (litecode runs no second fix pass, and none
+is a wrong answer a person would meet with AssemblyAI's real service):
+
+- **"The next run retries it" is false for an id that cannot be sent.** When
+  a server's body echoes a transcript id that is not a plain identifier,
+  `fetch` gets `notSent` and records `remote_deleted: false`, and the tool's
+  `note` (`AgentServer+CloudCaptions.swift`) and the report card
+  (`TranscribeSheetController+Commit.swift`) both promise a retry the janitor
+  will refuse in silence for ever. The true sentence would say the id could
+  not be sent.
+- **Two probe rows count five and assert six.** `cloud_captions_probe.py`'s
+  two new row-I checks say "none of the FIVE" and assert over all SIX planted
+  ids, the well-formed CONTROL included; they pass only because the fake
+  answers that one DELETE 404.
+- **A stale comment.** `cloud_captions_proof.py`'s comment beside its row-5
+  helper still says the split is at 2.5 s; the reader review moved it to
+  3.0 s.
 
 **Residue from road map 6's c1-close, 2026-09-21.** Three things the live rows
 measured and deliberately did not fix:
@@ -879,10 +945,20 @@ measured and deliberately did not fix:
   command that would have removed them was declined, and they were left for
   the user with their paths. A sweep of the repo, the handoff directories,
   the memory folder and `/tmp/reelcut-*.log` after the first deletion found
-  the key nowhere else. NOT done, and worth a decision: the `Makefile`'s
-  `app` target could remove the variable itself (`env -u RC_ASSEMBLYAI_KEY
-  xcodebuild …`), so that a person's ordinary `make app` cannot write it —
-  handed to C1's reader review as a finding for its credential reader.
+  the key nowhere else. ~~NOT done, and worth a decision: the `Makefile`'s
+  `app` target could remove the variable itself~~ — **DONE 2026-09-21** by
+  the reader review (road map 6 §10.13, H·2): one directive, `unexport
+  RC_ASSEMBLYAI_KEY`, above `.PHONY`, which covers every recipe in the file,
+  so a person's ordinary `make app` cannot write the key either. It is
+  measured by `tools/proof/makefile_env_proof.py`, which builds a tree COPY
+  with a recognisable dummy exported and searches every file under the copy's
+  `build/` and `Reelcut.xcodeproj/` IN PROCESS: **2/2**, no file of 448
+  holding the dummy, and **1/2** under `--mutant no-unexport`, where it lands
+  in that folder's `task-store.msgpack` and one attachment beside it — which
+  is this bullet's own measurement, reproduced and then closed. **It measures
+  the `app` recipe only**, which is the one that runs `xcodebuild`. The
+  person's own value is never read, printed or searched for; the dummy is
+  `RCDUMMY-makefile-env-proof-5d1c`.
 - **A submit whose transcript id never surfaces cannot be recovered by this
   tree.** `cloud_spike/aai.py`'s `find_own` matches a transcript by the
   UPLOAD URL the spike recorded, and the app never exposes its upload URL —

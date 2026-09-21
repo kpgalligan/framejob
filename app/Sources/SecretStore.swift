@@ -168,15 +168,32 @@ final class FileStore: SecretStore {
 /// function because `write(2)` and `SecretStore.write(_:)` are the same name
 /// and a method cannot call the system call without a module qualifier that
 /// changes with the SDK.
-private func writeAll(_ descriptor: Int32, _ bytes: [UInt8]) -> String? {
+///
+/// **`EINTR` is retried and NOTHING else is.** A signal that landed while the
+/// write was in progress is not a failure to write, and turning one into
+/// `unwritable` loses a key the person had just typed and told them the disk
+/// refused it (the reader review, road map 6 §10.13, H·3). Every other errno
+/// is still the sentence it was.
+///
+/// `using` is the probe's seam and nothing else: its default IS `write(2)`,
+/// so the shipped path has one spelling, and a row can hand it a writer that
+/// answers `EINTR` once before the real one runs.
+func writeAll(
+    _ descriptor: Int32, _ bytes: [UInt8],
+    using write: (Int32, UnsafeRawPointer?, Int) -> Int = { Darwin.write($0, $1, $2) }
+) -> String? {
     var offset = 0
     while offset < bytes.count {
         let written = bytes.withUnsafeBytes { buffer -> Int in
             guard let base = buffer.baseAddress else { return -1 }
             return write(descriptor, base + offset, buffer.count - offset)
         }
-        guard written > 0 else { return String(cString: strerror(errno)) }
-        offset += written
+        if written > 0 {
+            offset += written
+            continue
+        }
+        if written < 0, errno == EINTR { continue }
+        return String(cString: strerror(errno))
     }
     return nil
 }

@@ -719,8 +719,8 @@ final class ProjectDocument: NSDocument {
     /// Where `MediaImporter` writes thumbs and peaks: inside the package once
     /// the document has a file, a per-document temporary directory before
     /// that (`fileWrapper(ofType:)` copies it in on the first save). Caches
-    /// written to the temporary directory before a Save As are orphaned
-    /// there, which costs nothing — they regenerate on demand.
+    /// orphaned there regenerate on demand — except a transcript still owing
+    /// AssemblyAI a DELETE, whose only record goes with it (§10.13, R3·2).
     var cacheDirectory: URL? {
         let directory = intendedCacheDirectory
         guard let directory = directory else { return nil }

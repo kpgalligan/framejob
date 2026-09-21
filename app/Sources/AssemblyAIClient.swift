@@ -211,6 +211,9 @@ final class AssemblyAIClient {
         id: String, audioSeconds: Double, cancel: Transcriber.CancelToken? = nil,
         waited: ((TimeInterval) -> Void)? = nil
     ) throws -> Fetched {
+        guard Self.isPlainIdentifier(id) else {
+            throw ClientError.malformed("AssemblyAI answered an id that is not one")
+        }
         let ceiling = tuning.pollCeiling(audioSeconds: audioSeconds)
         let started = Date()
         var failures = 0
@@ -231,7 +234,9 @@ final class AssemblyAIClient {
                 else { throw refusing(.malformed("the transcript did not decode"), id: id) }
                 if response.status == "error" {
                     throw refusing(
-                        .transcript(response.error ?? "AssemblyAI could not transcribe it"),
+                        .transcript(
+                            withoutCredential(
+                                response.error ?? "AssemblyAI could not transcribe it")),
                         id: id)
                 }
                 if response.status == "completed" {
@@ -248,24 +253,58 @@ final class AssemblyAIClient {
         }
     }
 
+    /// What an AssemblyAI transcript id may be, and the ONE gate both calls
+    /// that interpolate one into a path go through.
+    ///
+    /// An id reaches this client from two places that are not this app: the
+    /// `transcript_id` of a cache file, which rides inside a `.reelcut`
+    /// package and can be hand-edited or authored by somebody else, and a
+    /// submission's own reply. `URL.appendingPathComponent` does not resolve
+    /// `..` and `URLSession` sends the path as written, so
+    /// `"transcript_id": "../../v1/anything"` in a package made a DELETE go
+    /// to a path of its author's choosing on the API host, carrying the
+    /// person's key (the reader review, road map 6 §10.13, R3·1). Letters,
+    /// digits, `-` and `_` are what the service's own ids are made of, and a
+    /// bounded length is what keeps a megabyte of them off the wire.
+    static func isPlainIdentifier(_ id: String) -> Bool {
+        guard !id.isEmpty, id.count <= 128 else { return false }
+        return id.allSatisfy { $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "-" || $0 == "_") }
+    }
+
+    /// What one DELETE answered. THREE states, because "never sent" is
+    /// neither "gone" nor "owed" (the reader review's fix pass, §10.13).
+    enum DeleteAnswer { case deleted, failed, notSent }
+
     /// `DELETE /v2/transcript/{id}` on `deleteTimeout`. Best effort by
-    /// design: a failed delete is RECORDED in the cache file and retried by
+    /// design: a `failed` delete is RECORDED in the cache file and retried by
     /// the next run's janitor, and a repeat answers 200 (q6), so a retry
     /// cannot make things worse.
+    ///
+    /// **An id that is not one is `notSent`, with no request at all.**
+    /// AssemblyAI cannot have minted it, so there is nothing to delete;
+    /// `failed` would put the media in `janitorFailed` and R6-11 would HOLD
+    /// it for ever over a string, and `deleted` would report — and write into
+    /// the cache file — a delete this app never asked for.
     @discardableResult
-    func delete(id: String) -> Bool {
+    func delete(id: String) -> DeleteAnswer {
+        guard Self.isPlainIdentifier(id) else {
+            note("refusing to DELETE an id that is not one")
+            return .notSent
+        }
         var request = self.request("DELETE", path: "/v2/transcript/\(id)")
         request.timeoutInterval = tuning.deleteTimeout
-        return classify(send(request)) == nil
+        return classify(send(request)) == nil ? .deleted : .failed
     }
 
     // MARK: - One request
 
     /// `request` and `send` stay in this file and not in `+Session.swift`
-    /// because they are the two members that touch `credential`, `delegate`
-    /// and `session`, which are `private` — and `private` on a stored
-    /// property does not cross a file. Keeping them here is what lets the
-    /// credential stay private rather than being widened for a size toll.
+    /// because they are two of the THREE members that touch `credential`,
+    /// `delegate` and `session`, which are `private` — and `private` on a
+    /// stored property does not cross a file. Keeping them here is what lets
+    /// the credential stay private rather than being widened for a size toll.
+    /// The third is `withoutCredential(_:)` above, which the reader review
+    /// added for the same reason and in the same place (§10.13, R2·1).
     func request(_ method: String, path: String, query: String? = nil) -> URLRequest {
         var components = URLComponents(
             url: base.appendingPathComponent(path), resolvingAgainstBaseURL: false)
@@ -296,6 +335,24 @@ final class AssemblyAIClient {
         note("\(request.httpMethod ?? "?") \(request.url?.path ?? "?") → "
             + "\(reply.response?.statusCode.description ?? reply.error.map { _ in "error" } ?? "?")")
         return reply
+    }
+
+    /// A sentence the SERVER wrote, with this client's own credential taken
+    /// out of it.
+    ///
+    /// Three sentences are relayed verbatim — a 402's, a 4xx's and a
+    /// transcript's `error` — because AssemblyAI says the useful thing and a
+    /// second-hand paraphrase would be worse (R6-6). But "verbatim" is a
+    /// promise about somebody ELSE's text, and a server that echoes the
+    /// `authorization` header it received puts the key in it: a stand-in
+    /// answering `400 … for <the key>` put the credential straight into an
+    /// MCP refusal, which `AgentServer+CloudCaptions.swift`'s header promises
+    /// never happens (the reader review, road map 6 §10.13, R2·1). This is
+    /// the one place that can know the string to look for, because
+    /// `credential` is `private` and does not cross a file.
+    func withoutCredential(_ text: String) -> String {
+        guard !credential.isEmpty, text.contains(credential) else { return text }
+        return text.replacingOccurrences(of: credential, with: "<redacted>")
     }
 
     /// `GET /v2/transcript?limit=1` — the cheapest authenticated call, for

@@ -178,8 +178,12 @@ final class CloudTranscriber {
         publish(0, "")
 
         // (1) The janitor, FIRST — before anything this run does can
-        // overwrite the file that holds an id we still owe a DELETE.
-        let janitor = retryDeletes()
+        // overwrite the file that holds an id we still owe a DELETE. A Stop
+        // the person has ALREADY pressed is answered above it, and one that
+        // arrives during it is heard between its items (the reader review,
+        // §10.13 R1·2).
+        if cancel.isCancelled { throw Transcriber.TranscribeError.cancelled }
+        let janitor = retryDeletes(cancel: cancel)
         report.janitorDeleted = janitor.deleted
         report.janitorFailed = janitor.failed
         if cancel.isCancelled { throw Transcriber.TranscribeError.cancelled }

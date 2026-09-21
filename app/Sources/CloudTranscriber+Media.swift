@@ -46,13 +46,35 @@ extension CloudTranscriber {
     ///
     /// A repeat DELETE of an already-deleted transcript answers 200 (C0's
     /// q6), so a retry can never make things worse.
-    func retryDeletes() -> (deleted: [UInt32], failed: [UInt32]) {
+    ///
+    /// **A Stop is heard BETWEEN items.** `cancel` is optional and defaulted
+    /// so `retryDeletes()` still means what it always did, but a run that has
+    /// one hands its token over: each DELETE has only `deleteTimeout` of its
+    /// own, and a cache owing three of them against a server that answers
+    /// nothing made a person wait out fifteen seconds of a Stop they had
+    /// already pressed (the reader review, §10.13 R1·2). What is left
+    /// unvisited is in NEITHER list — nothing was attempted for it — which is
+    /// safe because the one caller throws `cancelled` on the next line.
+    func retryDeletes(cancel: Transcriber.CancelToken? = nil) -> (
+        deleted: [UInt32], failed: [UInt32]
+    ) {
         var deleted: [UInt32] = []
         var failed: [UInt32] = []
         for row in MediaTranscript.undeleted(in: cacheDirectory) {
-            guard client.delete(id: row.transcriptID) else {
+            if cancel?.isCancelled == true { break }
+            switch client.delete(id: row.transcriptID) {
+            case .failed:
                 failed.append(row.media)
                 continue
+            // An id no request could be made from is in NEITHER list: saying
+            // `deleted` would report a delete nothing sent and would write
+            // `remote_deleted: true` over the one record that something is
+            // owed, and saying `failed` would HOLD the media for ever over a
+            // string (the reader review's fix pass, §10.13).
+            case .notSent:
+                continue
+            case .deleted:
+                break
             }
             if var file = MediaTranscript.read(for: row.media, in: cacheDirectory) {
                 file.header.remoteDeleted = true
@@ -81,10 +103,13 @@ extension CloudTranscriber {
     /// globs for `reelcut-upload-*` during and after a failed run rather than
     /// taking this comment's word for it.
     ///
-    /// **The cache file is written BEFORE its marker.** Either order can be
-    /// interrupted; this one fails safe. A file with no marker is re-fetched
-    /// next run (`isCurrent` needs both); a marker with no file would certify
-    /// a transcript that is not there.
+    /// **The cache file is written BEFORE its marker, and the marker only
+    /// when the file LANDED.** Either order can be interrupted; this one
+    /// fails safe. A file with no marker is re-fetched next run (`isCurrent`
+    /// needs both); a marker with no file would certify a transcript that is
+    /// not there, and a marker over an OLDER file — which is what discarding
+    /// `write`'s answer produced — certifies one that is there and is not the
+    /// one that was asked for (the reader review, §10.13 R1·3).
     ///
     /// **The DELETE is last and its answer is recorded**, not assumed
     /// (R6-4). `poll` already deletes on every throwing exit of its own, so
@@ -152,10 +177,18 @@ extension CloudTranscriber {
             // millisecond in the media (`MediaTranscript.Header`'s own doc).
             audioTrackStartMs: 0, fetchedAt: Self.timestamp(), remoteDeleted: false)
         var file = try MediaTranscript.File(header: header, wordsJSON: fetched.wordsJSON)
-        MediaTranscript.write(file, for: media.id, in: cacheDirectory)
-        MediaTranscript.writeStamp(stamp, for: media.id, in: cacheDirectory)
+        // ONLY when the file really landed. `write` answers `false` for every
+        // way it can fail, and discarding that answer stamped the marker over
+        // a cache file that still held an EARLIER request's words: `isCurrent`
+        // then read the new marker and the old file and served the stale
+        // transcript for ever, for a request it was never made from (the
+        // reader review, §10.13 R1·3). The comment above says the marker
+        // comes second so it fails safe; this is what makes that true.
+        if MediaTranscript.write(file, for: media.id, in: cacheDirectory) {
+            MediaTranscript.writeStamp(stamp, for: media.id, in: cacheDirectory)
+        }
 
-        let deleted = client.delete(id: fetched.response.id)
+        let deleted = client.delete(id: fetched.response.id) == .deleted
         if deleted {
             file.header.remoteDeleted = true
             MediaTranscript.write(file, for: media.id, in: cacheDirectory)

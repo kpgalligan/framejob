@@ -357,7 +357,12 @@ free.
   and EVERY throwing exit deletes the transcript first. A `completed` body
   whose `words` is absent, null or not an array is `.malformed`, never an
   empty transcript; `[]` is zero words. `request` and `send` stay in the
-  first file: they are the two members that touch `credential`.
+  first file, with `withoutCredential(_:)` beside them: those three are the
+  members that touch `credential`, and that helper keeps the three sentences
+  the client RELAYS verbatim — a 402's, a 4xx's and a transcript's `error` —
+  from carrying a key a server echoed back. `delete` answers THREE states
+  (`deleted`, `failed`, `notSent`): an id that is not a plain identifier is
+  never put on the wire.
 - `AssemblyAIConfiguration.swift` · `AssemblyAILanguages.swift` ·
   `SecretStore.swift` — WHERE the client speaks and WHAT it says it is.
   `AssemblyAIConfiguration` is the ONE reader of `-RCAssemblyAIEndpoint` and

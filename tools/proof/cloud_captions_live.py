@@ -32,7 +32,6 @@ import hashlib
 import json
 import math
 import os
-import socket
 import sys
 import threading
 import time
@@ -42,8 +41,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "clo
 from cloud_live_ledger import (                                            # noqa: E402,F401
     CEILING_DOLLARS, DELETED_TEXT, DELETED_URL, FOLDER, LEDGER, MAX_TRANSCRIPTIONS,
     PLANNED_SECONDS, Captured, Refused, account, cleanup, controls, erase, ids, leaks,
-    normalise, read_json, refusal, requests_in, reserve, scrubbed, subsequence, submits,
-    touches, uploads_ok, words_span)
+    normalise, read_json, reachable, refusal, requests_in, reserve, scrubbed, subsequence,
+    submits, touches, uploads_ok, words_span)
 from aai import KEY_ENV, Ledger, client_from_env                           # noqa: E402
 from fixtures import truth_pauses                                          # noqa: E402
 
@@ -52,14 +51,6 @@ from cloud_captions_probe import SPEECH_TEXT, make_fixture, run_probe      # noq
 # What a full run checks, and what a precondition SKIPS BY NAME. The run
 # prints what it actually made beside it, so a drift shows.
 LIVE_ROW_COUNT = 36
-
-
-def reachable(host, port, seconds):
-    try:
-        with socket.create_connection((host, port), timeout=seconds):
-            return True
-    except OSError:
-        return False
 
 
 # --------------------------------------------------------------------------
@@ -112,11 +103,18 @@ def dummy_arm(proof, client, binary, port, probe, ledger):
     held = submits(lines) == 0 and text is not None
     if held:
         ledger.closed(rid, "no_transcript")
+        wanted, branch = {"no_transcript"}, "no submit reached the wire, so the arm HELD"
     else:
+        # `cleanup` closes this reservation itself, `deleted` or `unresolved`
+        # — never `no_transcript`, which is what this check used to assert on
+        # both branches (the reader review, road map 6 §10.13, H·6).
         cleanup(client, ledger, [rid], Captured(lines), None, 0)
+        wanted = {"deleted", "unresolved"}
+        branch = "a submit DID reach the wire, so `cleanup` ran over the captured lines"
     row = ledger.reservations()[rid]
-    proof.check("20d: the ledger closes this arm `no_transcript`, billed nothing",
-                row.get("outcome") == "no_transcript" and "billed" not in row, f"got {row!r}")
+    proof.check(f"20d: {branch}, and the ledger closed it "
+                f"{' or '.join(sorted(wanted))}, billed nothing",
+                row.get("outcome") in wanted and "billed" not in row, f"got {row!r}")
     return held
 
 
@@ -384,8 +382,10 @@ def run(proof, binary, port_base, probe):
     state = {"since": 0, "returned": True, "session": None}
     try:
         if not dummy_arm(proof, client, binary, port_base + 3, probe, ledger):
-            proof.skip_rows(left(), "the dummy arm did not hold (R6-9), so the person's "
-                                    "own key was not used at all")
+            proof.skip_rows(left(), "the dummy arm did not hold (R6-9): a submit reached "
+                                    "the wire under the dummy folder, so `cleanup` ran and "
+                                    "the key WAS used \u2014 to delete what that submit made, "
+                                    "and for nothing else")
             return
         instance = proof.Instance("L1", port_base + 4, None, binary, key=proof.INHERIT,
                                   live=True)

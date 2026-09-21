@@ -19,6 +19,7 @@ app printed in this run or from the cache file this run wrote.
 import json
 import os
 import re
+import socket
 import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "cloud_spike"))
@@ -129,6 +130,20 @@ def account(ledger, rid, row, lines):
     for _ in range(max(0, submits(lines) - len(seen))):
         ledger.closed(ledger.reserve(row, "extra", PLANNED_SECONDS), "unresolved")
     return seen
+
+
+def reachable(host, port, seconds):
+    """A TCP connect, for the live module's precondition skip.
+
+    It is HERE and not beside its one caller because
+    `cloud_captions_live.py` sits one line under the 400-line cap on a new
+    file and the reader review's H·6 fix needed the room (road map 6
+    §10.13)."""
+    try:
+        with socket.create_connection((host, port), timeout=seconds):
+            return True
+    except OSError:
+        return False
 
 
 def erase(client, one):

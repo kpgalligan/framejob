@@ -15,10 +15,12 @@ import Foundation
 /// left first, then the wire MACHINERY, so what is left in the client file
 /// is the five calls a reader came for.
 ///
-/// `request` and `send` did NOT come here. They are the two members that
-/// touch `credential`, `delegate` and `session`, and `private` on a stored
-/// property does not cross a file: moving them would have widened the
-/// credential to pay a size toll, which is the wrong direction.
+/// `request` and `send` did NOT come here, and neither did
+/// `withoutCredential(_:)`. Those three are the members that touch
+/// `credential`, `delegate` and `session`, and `private` on a stored property
+/// does not cross a file: moving them would have widened the credential to
+/// pay a size toll, which is the wrong direction. `classify` below CALLS
+/// `withoutCredential` and does not name the credential itself.
 extension AssemblyAIClient {
 
     struct Reply {
@@ -46,13 +48,19 @@ extension AssemblyAIClient {
         case 200..<300: return nil
         case 300..<400: return .redirected(code)
         case 401, 403: return .keyRefused(code)
-        case 402: return .account(sentence(in: reply.data) ?? "AssemblyAI answered \(code)")
-        case 400..<500: return .request(sentence(in: reply.data) ?? "AssemblyAI answered \(code)")
+        case 402:
+            return .account(
+                withoutCredential(sentence(in: reply.data) ?? "AssemblyAI answered \(code)"))
+        case 400..<500:
+            return .request(
+                withoutCredential(sentence(in: reply.data) ?? "AssemblyAI answered \(code)"))
         default: return .server(code)
         }
     }
 
-    /// AssemblyAI's own `error` sentence out of a body, relayed verbatim.
+    /// AssemblyAI's own `error` sentence out of a body, relayed verbatim —
+    /// through `withoutCredential`, which is what makes "verbatim" a promise
+    /// about the SERVER's text and not about this client's key.
     private func sentence(in data: Data) -> String? {
         guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
             let text = object["error"] as? String, !text.isEmpty

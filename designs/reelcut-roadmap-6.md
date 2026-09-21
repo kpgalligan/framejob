@@ -1,9 +1,12 @@
 # Reelcut — road map 6: captions from the cloud (AssemblyAI Universal-3.5 Pro)
 
-**Status: C1 is BUILT** — captions from the cloud shipped over the five
-pipelines §10 records, the last of them (c1-close) on 2026-09-21, with 5i's
-LIVE rows run against `api.assemblyai.com` and every earlier proof re-run
-against the final binary (§10.12). **C2, the relay, is DESIGNED and not
+**Status: C1 is BUILT AND REVIEWED** — captions from the cloud shipped over
+the five pipelines §10 records, the last of them (c1-close) on 2026-09-21,
+with 5i's LIVE rows run against `api.assemblyai.com` and every earlier proof
+re-run against the final binary (§10.12); the READER REVIEW road map 2 §0's
+practice owes each phase ran on 2026-09-21 and its record is **§10.13**,
+whose closing subsections hold the independent SCEPTIC pass over that review
+and the fix pass that answered its six findings (same day). **C2, the relay, is DESIGNED and not
 built**, and §6b is what blocks it. The spike (C0) RAN on 2026-09-20 and §3
 is its record: all eight of its rows were measured on that date, nothing is
 owed by a row, and the sections each row overturned — §2's two open
@@ -1007,6 +1010,28 @@ gains `engine: "apple"` and nothing else. The handler is
 `engine` and `transcriptionScope` stays `private` — the cloud arm is handed
 `jobs` and `frame` by value.
 
+**Revised 2026-09-21 (the reader review, §10.13), correcting two sentences
+above and replacing nothing else in this section.**
+
+- The `engine` bullet reads `"apple"` **(default, whatever the sheet last
+  chose)**. The parenthesis is about the SHEET's own default and reads, over
+  the tool, as the opposite of R6-2: a tool call's default is `"apple"` FULL
+  STOP, and `TranscriptionEngine.defaultsKey` is read by nothing in
+  `AgentServer+CloudCaptions.swift`. Row 8 is what proves it — every proof
+  instance is launched with that key pinned to `assemblyai` and the fake's log
+  still comes back empty. The tool's own `engine` description already says
+  "The default is NEVER what the sheet last chose".
+- The refusal ORDER reads "… then the credential, **then a media over ten
+  hours, then the network**". A media over ten hours is not a position in a
+  run's refusal order: it is one MEDIA's problem, checked at the head of
+  `fetch` before that media's extract and upload and therefore AFTER every
+  earlier media's whole round trip. MEASURED — a two-media project whose
+  first media was rewritten to forty thousand seconds answered `uploaded:
+  [3]`, `audio_seconds: 11` and one `skipped` entry carrying the limit's own
+  sentence, with the other media's four routes in the fake's log. It becomes
+  a refusal of the RUN only when it is the only media there is, which is row
+  H's case and is what row H measures.
+
 ### 5h. Files, tolls, seams
 
 Tolls, each a pure move, its own commit, gated alone before any feature
@@ -1480,7 +1505,8 @@ code is refused AT SUBMISSION with the server's own sentence, so the tool
 relays it and carries no second dated table. What remained for C1 was the
 build itself. **Revised 2026-09-21 (c1-close):** it is built, over the five
 pipelines of §10.1; what remains is C1's reader review, a run of its own
-(§10.12), and C2, which §6b blocks.
+(§10.12), and C2, which §6b blocks. **Revised again 2026-09-21 (the reader
+review):** that review RAN, and its record is §10.13; what remains is C2.
 
 ---
 
@@ -2014,6 +2040,15 @@ Every new file is under the 400-line cap and `Transcriber.swift` came back
 one line under where it was. `AgentServer+Captions.swift` took 30 lines for
 the dispatch and is 161 under the ~600 cap.
 
+**Corrected 2026-09-21 (the reader review, §10.13, L15).** That sentence is
+about the new files under `app/Sources`, and it is FALSE of the table it
+stands under: `assemblyai_fake.py` is **501** there, the new
+`cloud_captions_probe.py` **3280** and the new `cloud_captions_proof.py`
+**1479**. The 400-line cap `app/CLAUDE.md` sets is a rule about app SOURCE
+files; `tools/proof/`'s instruments have never been held to it, and this
+paragraph and §10.11's twin should have said so. Nothing about the code
+changes; the claim does.
+
 The fake gained ONE scenario key, `transcript_error_first` — with
 `transcript_error` set, only the first N SUBMITTED transcripts end in
 `error`, so 5i·6's "the OTHER media's cues still land" is reachable. Absent
@@ -2194,7 +2229,9 @@ and exactly 4 warnings.
 | `tools/proof/cloud_captions_probe.py` | 3280 | **4753** |
 | `tools/proof/cloud_captions_proof.py` | 1479 | **1494** |
 
-Every new file is under the 400-line cap; `MediaTranscript.swift` and
+Every new file is under the 400-line cap — **of the app's own sources;
+corrected 2026-09-21 by the reader review, §10.13, L15, as §10.10's twin
+sentence is** — and `MediaTranscript.swift` and
 `AssemblyAITranscript.swift` are at **399** of their own 400 and
 `TranscribeSheetController.swift` at **540** of the ~600. (Every number in
 this table is the FIX-PASS tree's, measured after 05-review's findings were
@@ -2624,9 +2661,11 @@ score.** Each is quoted as it printed, against the N it had at the time:
 
 #### What is owed
 
-- **C1's reader review**, road map 2 §0's practice: a run of its own, after
-  this pipeline, over the whole of C1. Every residue bullet in
-  `designs/reelcut-remaining.md` §5 is left standing for that reader.
+- ~~**C1's reader review**~~ — RAN 2026-09-21, over the whole of C1, and its
+  record is **§10.13**. Of the residue bullets it was handed, three are
+  closed there (the two c1-parts nits and the order-dependent probe row), one
+  is narrowed (the hand-written `speed`) and the `Makefile` finding is fixed;
+  the rest stand with their reasons.
 - **§5j's five questions**, carried WHOLE into `designs/reelcut-remaining.md`
   §4 — the q7 prompt, the Settings window looked at, a real twenty-minute
   recording over a home upstream, the EU region, and the report card when the
@@ -2686,3 +2725,951 @@ cannot be written into that tree; re-run the recipe for the current one. The
 baseline is pipeline 4's `d22d0f4de4b031eed7a6377c697726aac8c16213`, and
 `git diff` of it over `core` is empty — as is every product file: this
 pipeline changed proofs and documents only.
+
+### 10.13 The reader review (2026-09-21)
+
+C1's owed reader review, run as one `/litecode` pipeline on the tree as it
+STANDS. **No live call was made and nothing was spent**: every process this
+run started had `RC_ASSEMBLYAI_KEY` removed or replaced by an allow-listed
+dummy, `cloud_captions_proof.py --live` was never passed, and no request left
+loopback. Ports 4990–4999, every instance killed by its own pid.
+
+**The named deviation.** The repo's practice is several readers in parallel
+and several sceptics per finding. litecode runs one agent at a time, so this
+was SEVEN SEQUENTIAL single-context readers, 1 → 7, each writing its lines
+here before the next started, with ONE independent sceptic at the end. A
+finding the sceptic did not reach is recorded UNJUDGED, never refuted.
+
+#### The baseline (step 0)
+
+`git diff --stat f03ebcc6e4769f7195812d51d562518a2e4d9b67` listed the 25
+untracked files as deletions and nothing else, so the tree is c1-close's.
+Every command ran under rule H's runner at a flat 1800 s. `built` says whether
+the instrument's own `built … in … s` line appeared — the two Python
+instruments' binaries were already current, so **neither baseline wall holds a
+build**, and Interfaces' `900 + 3 × wall` is the limit every later cell that
+BUILDS is held to.
+
+| Command | Score | `wall=` | built |
+|---|---|---|---|
+| `make test` | 721 passed, 0 failed, 39 binaries | 1.4 s | no |
+| `make lint` | clean | 0.2 s | no |
+| `cd core && cargo fmt --check` | clean | 0.4 s | — |
+| `make typecheck` | 0 errors, exactly 4 warnings (3 `CompositionBuilder`, 1 `Exporter`) | 38.7 s | — |
+| `make app` | BUILD SUCCEEDED | 4.7 s | nothing new |
+| `python3 -m py_compile` (six cloud scripts) | clean | 0.2 s | — |
+| `cloud_live_selftest.py` | 9/9 | 0.2 s | — |
+| `cloud_captions_probe.py` | 469/469 | 17.4 s | **no** |
+| `cloud_captions_proof.py --port-base 4990` | 115/115, no skip | 51.1 s | **no** |
+| `phase4_proof.py 4993` | 84/84 | 3.6 s | — |
+| `op_catalog_proof.py 4994` | 23/23 | 0.2 s | — |
+| `op_argument_proof.py 4995` | 133/133 | 1.6 s | — |
+| `phase4_chrome.py` | 59/59 | 72.7 s | — |
+| `source_mirror_probe.py` | 40/40 | 1.1 s | — |
+| `grep "Reelcut: " /tmp/reelcut-499?.log` | prints nothing | — | — |
+
+**The `wall=` column above is the step-0 capture's own, and
+`04-checks.txt` does not hold it** — that file holds the CLOSING runs. Where
+the two disagree for the same script (`op_catalog_proof.py` 0.2 s here
+against 61.0 s there, `op_argument_proof.py` 1.6 s against 68.4 s,
+`source_mirror_probe.py` 1.1 s against 60.1 s, `make app` 4.7 s against
+46.7 s) nothing in the evidence explains the difference, so read this table's
+SCORES as the baseline and not its walls (the reader review's fix pass, the
+sceptic pass's "did not reach" list).
+
+Every score is the recorded one, so **there is no finding R0·1**. The three
+MCP baselines each ran against a fresh instance launched with BOTH
+`-RCAssemblyAIEndpoint http://127.0.0.1:9` and `-RCSecretFolder` under
+`tools/proof/work/c1-review/`, killed by pid after its one script. The
+existing probe and harness launches ran AS THEY STAND and nothing in
+`run_probe`, `pinDefaults` or the 469 baseline was edited to satisfy the
+launch-argument rule (Objections 3).
+
+#### Reader 1 — the run and the client
+
+**The question, as refined and put:** for each exit the run has — the janitor,
+the upload's retries, the submit, the poll's four refusals, a body the client
+cannot read, a 401 anywhere, and a cancel at each phase — does a RUN against
+the fake show (a) at most one `POST /v2/transcript` per media per run, (b)
+every id the fake minted either DELETEd or in a cache file with
+`remote_deleted:false`, (c) no `reelcut-upload-*` left, (d) a marker only
+beside a readable file, and (e) a wall inside what `Tuning` promises?
+
+(a), (c) and (e) hold and the existing rows already say so (section 15's
+retries, tolerated poll failures, ceiling, 401 and three `words` shapes; row T's
+three failing paths with its CONTROL). **(b) and (d) do not**, and (d) was the
+worse of the two. Three findings, all reproduced by running, all three FIXED
+with a row that was then made to fail against the fix reverted in a tree copy.
+
+- **R1·1** `app/Sources/AgentServer+CloudCaptions.swift:220` — two media for
+  which AssemblyAI answered `audio_duration: 9223372036854775807` →
+  `report.uploaded.reduce(0) { $0 + $1.audioSeconds }` overflows and Swift's
+  `+` TRAPS → the whole app is killed after both media have been uploaded and
+  billed, and the MCP socket closes with no answer at all. The three trials
+  that pin it to the arithmetic: one media at `Int.max` answers
+  `9223372036854775807`; two at half of it answer `9223372036854775806`; two
+  at `Int.max` kill the process. **FIXED** — the sum saturates through
+  `addingReportingOverflow`. Row **O** in `cloud_captions_proof.py` (12
+  checks, the first two trials its controls); mutant **`audio-seconds-plus`**
+  reverts it and scores **123/124**, the one failure being "two media at
+  Int.max — the instance is still alive after the call".
+- **R1·2** `app/Sources/CloudTranscriber.swift:182` and
+  `+Media.swift:49` — `retryDeletes()` read no cancel token and `transcribe`
+  checked the token for the FIRST time after the janitor returned, so a Stop
+  the person had already pressed still paid the whole janitor bill. MEASURED
+  with the new `stall` fake key: three owed ids and a DELETE route that
+  answers nothing cost a pre-cancelled run **15.15 s** and three DELETEs, and
+  cleared none of them. **FIXED** — the check moved above the janitor and
+  `retryDeletes(cancel:)` gained a DEFAULTED token it reads between items, so
+  `retryDeletes()` still means what it meant. Row **J** in
+  `cloud_captions_probe.py` (6 checks, three of them CONTROLs: the cache
+  really did owe three, an un-cancelled run still sends all three, and that
+  still costs it the 15 s); mutant **`janitor-deaf`** reverts the check and
+  scores **41/43**. `cloud_captions_proof.py`'s `no-janitor` mutant was
+  RE-AIMED at the new line (its patch text occurs once, checked).
+- **R1·3** `app/Sources/CloudTranscriber+Media.swift`'s `fetch` —
+  `MediaTranscript.write`'s `Bool` was discarded and the marker written
+  regardless, so a write that failed left the NEW stamp over the OLD file and
+  `isCurrent` matched them: the next run served an earlier request's words as
+  the answer to a request it was never made from. MEASURED over MCP: run 1
+  caches `alpha`; run 2 asks with `speakers: true`, uploads, cannot write
+  (the file's `UF_IMMUTABLE` flag stops the atomic rename while the folder
+  stays writable), and rewrites the marker to `speaker_labels: true`; run 3
+  answers `cached: [2]` and serves `alpha`. **FIXED** — the marker is written
+  only when the file landed. Row **M** in `cloud_captions_proof.py` (5 checks,
+  one a CONTROL that the write really was stopped); mutant
+  **`marker-over-stale-file`** scores **130/132**, the two failures being the
+  marker row and the "uploads rather than serving the stale file" row.
+- **R1·4** (lead L2) `app/Sources/AssemblyAIClient.swift:184` — a `POST
+  /v2/transcript` whose REPLY is lost after the transcript was made orphans
+  it for ever: no id, no DELETE, no cache file, and no later run finds it.
+  Reproduced with the new `drop_reply` key — the fake still held
+  `t_b913de347e7e` after a second run that uploaded again. The only recovery
+  is to LIST the account's transcripts and match by `audio_url`, which is a
+  new interaction and a decision. **FILED #28.** (`remaining.md` §5's bullet
+  is about the LEDGER's side of this; the APP's side was recorded nowhere.)
+- **R1·5** (lead L3) with `cache/transcripts/` unwritable, the result's `note`
+  says "the next run retries it" and no run can: nothing holds the id.
+  Reproduced over MCP; run 2 minted a second transcript and cleared neither.
+  Saying the true thing needs a new field on `Report.Uploaded`, which
+  Interfaces pinned. **FILED #29.**
+- **H·1**, `AssemblyAIClient+Session.swift:165` reading `progress` outside the
+  lock: **REFUTED as a race**, by this reader's own reading of every writer.
+  `Sink.progress` is written once, in `open(_:progress:)`, BEFORE
+  `sinks[identifier] = sink` is published under the lock, and never again;
+  `close` removes the sink and nils nothing. A reader reaches the field only
+  through `sink(_:)`, which takes the SAME lock, so the write happens-before
+  the read through that lock's release/acquire pair — and, independently,
+  `didSendBodyData` cannot fire until `task.resume()`, which is after `open`
+  returned. There is no second writer and no window, so there is no row that
+  could fail and the field is left a `var`. Interfaces' `let`-plus-`init`
+  form was therefore NOT taken.
+
+Leads L1's second half — "a dripping server may never time out", since
+`timeoutIntervalForRequest` is an IDLE timer — is **UNREPRODUCED**: the new
+`stall` key answers nothing at all, which is exactly what the idle timer is
+for, and a fake that drips a byte under the timer would be a second timing
+instrument this review did not build. What WAS measured is the bounded half,
+R1·2. L4 became R1·1 and L3 became R1·5.
+
+#### Reader 2 — the credential
+
+**The question, as refined and put:** name every sink a credential string can
+reach — the app's stdout and stderr, every MCP result, refusal, `problems`
+entry and `note`, the cache file, the marker, the fake's upload files, every
+Settings view's readable text, the window title, the field editor and the undo
+manager — and every HOST a request carrying it can go to; then SHOW a run with
+`proof-key` whose bytes were searched. The person's own secret folder, login
+keychain and `~/Library/Logs/DiagnosticReports` were never opened, listed or
+searched, and no live call was made.
+
+The existing rows already answer the sinks the reader could enumerate by
+reading: section 17's store rows (0600, the rename, the siblings, the resolver
+order), section 18's `exposedText` sweep over every `stringValue`,
+`placeholderString`, `toolTip`, AX value, label, title and help, row G's
+redaction, and rows K and X over every app log and MCP answer. **One sink was
+not enumerated, and it is somebody else's text.**
+
+- **R2·1** `app/Sources/AssemblyAIClient+Session.swift:49-54` and
+  `AssemblyAIClient.swift`'s `poll` — three sentences are relayed from the
+  server VERBATIM (a 402's, a 4xx's and a transcript's `error`), and a server
+  that echoes the `authorization` header it received puts the key straight
+  into an MCP refusal. MEASURED with the new `echo_authorization` fake key:
+  `transcribe: The transcription failed: clip 3: forced 400 on submit for
+  proof-key` came back over MCP, with the app's own log clean. That makes
+  `AgentServer+CloudCaptions.swift`'s header sentence — "**No credential is
+  ever in an answer.** Not in a `ToolError`, not in a `Problem`, not in the
+  `note`" — false on that branch. **FIXED** — a new
+  `AssemblyAIClient.withoutCredential(_:)`, in the one file that can see the
+  `private` `credential`, replaces it with `<redacted>` in all three relayed
+  sentences. Row **E** in `cloud_captions_proof.py` (6 checks over the three
+  branches, three of them CONTROLs that the sentence really was relayed);
+  mutant **`key-relayed-verbatim`** scores **131/138** — the six E rows and,
+  **row K as well**, which before this review could not fail on that path
+  because nothing drove it.
+- **H·2**, the `Makefile`: **FIXED.** One directive, `unexport
+  RC_ASSEMBLYAI_KEY`, above `.PHONY`, which covers every recipe in the file.
+  GNU Make 3.81 is this host's and takes it (smoke-tested both ways on a
+  throwaway makefile: `ABSENT` with the directive, `PRESENT` without).
+  `tools/proof/makefile_env_proof.py` (**203** lines, new) builds a tree COPY
+  with `core` a symlink, runs `make app` in it with the person's variable
+  POPPED and `RCDUMMY-makefile-env-proof-5d1c` in its place, and searches
+  every file under the copy's `build/` and `Reelcut.xcodeproj/` IN PROCESS.
+  **2/2**: the build made the binary, and **no file of 448 holds the dummy**.
+  `--mutant no-unexport` removes the directive in the copy and scores
+  **1/2**, the dummy landing in
+  `build/Build/Intermediates.noindex/XCBuildData/<hash>.xcbuilddata/task-store.msgpack`
+  and one attachment beside it — which is `remaining.md` §5's measurement,
+  reproduced and then closed. **It measures the `app` recipe ONLY and says so
+  in its own header and in its first printed line**: `app` is the one recipe
+  that runs `xcodebuild`.
+- **H·3**, `writeAll`'s `EINTR`: **FIXED**, with the seam Interfaces named.
+  `writeAll(_:_:using:)` is internal, its default IS `write(2)`, and it now
+  retries on `EINTR` and on nothing else. Section 17 gains three rows driving
+  an injected writer that answers `-1`/`EINTR` once and the real call after:
+  the key lands, a CONTROL says the interruption really happened, and a
+  second writer answering `-1`/`EACCES` still earns `Permission denied` on
+  the first answer. Mutant **`eintr-unwritable`** removes the retry line and
+  scores **39/40**, the one failure being the retry row — the CONTROL and the
+  other-errno row still pass, which is what makes the mutant aimed.
+- **L10**, the harness's `pinDefaults` and an unshielded `store()`:
+  **REFUTED as a defect, by grep and reading, and then made checkable.**
+  There is exactly ONE place that builds a controller without a `store:`
+  argument — `chromeSettings`'s
+  `SettingsWindowController(defaults: defaults, environment: [:])`, which then
+  pushes Save and Remove through the default
+  `{ AssemblyAIConfiguration.store() }`. It is reached only through
+  `chrome_child`, which passes BOTH `-RCAssemblyAIEndpoint` and a disposable
+  `-RCSecretFolder`, so `store()` answers a `FileStore` on a folder under
+  `work/`. The harness's own `settings` mode passes
+  `store: { MemoryStore() }` explicitly, which is what makes `pinDefaults`'
+  argument-domain wipe harmless there. `modeHygiene`, the one mode launched
+  with NEITHER argument, reaches no store at all. **What shields the Save and
+  Remove buttons is the LAUNCHER and not the mode's code**, so three rows
+  were added to section 18's hygiene block: that the mode really does build
+  it with no `store:` (the CONTROL), that the one chrome launch passes both
+  arguments, and that `chrome_child` is the only way a chrome row is reached.
+  No scores in this review were taken before that reading.
+- **L11**, the store's modes and a hostile credential: **REFUTED as a leak,
+  and one nuance recorded.** A credential holding a CR/LF is not smuggled
+  into a second header: `URLRequest.setValue` DROPS such a header entirely,
+  measured against the fake — four requests went out with no `authorization`
+  name in the log at all and no `X-Reelcut-Smuggled` — so the failure mode is
+  a request with no credential, which any real server answers 401 and the
+  client reports as "AssemblyAI refused the API key". A non-ASCII credential
+  IS sent and is refused the same way. The nuance: `FileStore.makeDirectory`
+  `mkdir`s at `0700` only when it is the FIRST thing to make
+  `~/Library/Application Support/Reelcut/`, and `ExportPresetsStore.write`
+  and `FFmpegRewrap.convert` both create that folder with
+  `withIntermediateDirectories: true` and no attributes — so a person who
+  saved an export preset before their first key has that folder at the
+  umask's mode. The key FILE is still `0600`, so this changes who can LIST
+  the folder and not who can read the key; K4 already records the real
+  exposure. Both sentences in `SecretStore.swift` and `app/CLAUDE.md` are
+  true as written (they say the existing directory's mode is left alone on
+  purpose); this is a limit, not a false claim.
+
+#### Reader 3 — the cache and the stamp
+
+**The question, as refined and put:** for a relink and back, a file edited to
+the same size, each of the four request fields, the region, `refresh`, a held
+media, two media over one file, an untitled document, and a cache file that is
+truncated, empty, huge, doubly-keyed or hostile — what is uploaded, what is
+billed twice, what DELETE path leaves the machine, and are the served `words`
+bytes in the file verbatim?
+
+Rows 4, 5 and 11 and section 13 already answer the first list, and section V
+answers the verbatim claim over `TRICKY_WORDS` (an escaped `"]`, a non-ASCII
+run, a `1e-3`). **What no row asked is where the id in the cache file COMES
+FROM.**
+
+- **R3·1** `app/Sources/AssemblyAIClient.swift` — a cache file's
+  `transcript_id` is interpolated into `DELETE /v2/transcript/<id>` with no
+  validation, and that file rides inside a `.reelcut` package, so it is
+  somebody else's string. MEASURED against the fake: ids of `../upload`,
+  `a/b`, `?x=1`, a thousand `x`s and `../../../../etc/passwd` produced
+
+  ```
+    DELETE '/v2/transcript/../upload'
+    DELETE '/v2/transcript/a/b'
+    DELETE '/v2/transcript/%3Fx=1'
+    DELETE '/v2/transcript/xxxxxxxx…'
+    DELETE '/v2/transcript/../../../../etc/passwd'
+  ```
+
+  — `URL.appendingPathComponent` does not resolve `..` and `URLSession` sends
+  the path as written, so a package's author chooses the path a DELETE
+  carrying the person's key lands on at the API host. (`?` IS percent-encoded,
+  so no query is smuggled.) All five then failed, which put their media in
+  `janitorFailed`, which R6-11 turns into a HOLD **for ever**. **FIXED** —
+  `AssemblyAIClient.isPlainIdentifier(_:)` is the one gate both calls that
+  interpolate an id go through: `delete` sends NOTHING (there is nothing to
+  delete and nothing is owed, so no media is held over a string), and `poll`
+  throws `.malformed`. Row **I** in `cloud_captions_probe.py` (3 checks, one a
+  CONTROL that a well-formed id beside them still went out); mutant
+  **`any-id-on-the-wire`** scores **44/46**, the two hostile-id rows failing
+  and the CONTROL passing (that score is from the 3-check row and the 488-row
+  probe; the fix pass below added two checks to row I and re-aimed the
+  mutant's patch text at the gate's new line). **What the gate ANSWERS
+  changed in the fix pass**: it answered `true`, which made the janitor report
+  and RECORD a delete that was never sent — see below.
+- **R3·2** `app/Sources/ProjectDocument.swift:719-723` — the comment "Caches
+  written to the temporary directory before a Save As are orphaned there,
+  **which costs nothing** — they regenerate on demand" became false when
+  `cache/transcripts/` joined `thumbs/` and `peaks/` there: a transcript with
+  `remote_deleted:false` orphaned in `/tmp` is an id AssemblyAI is still
+  holding that no janitor will ever find. **FIXED as a false COMMENT,
+  corrected NET-ZERO** (five lines in, five out) — that file takes nothing on.
+- **L8's second half**, whether
+  `AgentServer+CloudCaptions.swift:134`'s "This document has nowhere to keep
+  its transcript cache, so it cannot be transcribed with AssemblyAI. Save it
+  first." is reachable: **REFUTED — it is not, by any input.**
+  `intendedCacheDirectory` returns nil on no path: with no `fileURL` it mints
+  `/tmp/Reelcut/<uuid>/`. MEASURED — `new_project` with no path, then
+  `transcribe engine: "assemblyai"`, answered a full result with cues and the
+  four expected routes. The refusal is defensive dead code, and the sheet's
+  twin at `TranscribeSheetController+Cloud.swift:238` is the same. It was left
+  standing: `cacheDirectory` is `URL?` by signature and a handler that ignored
+  the optional would be the worse shape. Reader 5 holds whether any PROSE
+  promises it.
+- **L5**, the stamp's width: **verified by reading and FILED #30 (`spec`).**
+  `TranscriptStamp.source` is the whole `CacheStamp`, `thumbnailHeight`,
+  `maxThumbnails` and `peakBucketsPerSecond` included, so a build that changes
+  the filmstrip's height re-bills every transcript everywhere. Section 13
+  already asserts exactly that, one row per field, as DESIRED behaviour —
+  which is what makes it a decision and not a patch, and any narrowing
+  re-bills once for everybody.
+- **L6**, a foreign account's id: the measurement above is the same shape —
+  five ids the service never minted, five failures, five permanent holds — and
+  R3·1's gate removes the case where the id is not even well formed. An id
+  that IS well formed and belongs to another account still answers 404 → K10 →
+  held, which is K9/K10 as recorded and is **LEFT LISTED**: what the real
+  service answers for another account's id stays UNMEASURED and no proof here
+  can learn it.
+
+#### Reader 4 — the mapping and the cue builder
+
+**The question, as refined and put:** against a Python oracle in integers,
+rounding half AWAY from zero, for speeds {0.1, 0.5, 1, 3.7, 10} and words on
+`in`, on `in + content_length`, on a split's tick and straddling it, does every
+word land in exactly one half tick for tick; do the five refusals fire in
+`Transcriber.jobs`'s own sentences; does the fifth rule fire on a speaker
+change and on nothing else; and **does `Transcriber.project` still equal the
+pre-C1 arithmetic** wherever `scaled = t / speed × 600 000` is below 2^63?
+
+Section 12's oracle, section `jobs`'s refusals and the `cues` section's fifth
+rule already answer the first three and passed unchanged, so this reader did
+not re-report them. The fourth had no row at all, and now has one.
+
+- **The pre-C1 equality: HOLDS.** A new `pre_c1_project` in
+  `cloud_captions_probe.py` is
+  `git show cfcd0959:app/Sources/Transcriber.swift:675-679` in Python —
+  `ReelTime.ticks(seconds:)`'s half-away rounding and its 0-out-of-range guard
+  (`ReelCore.swift:416-420`), then `min(start + max(0, offset),
+  start + duration)` — which rounds BEFORE the clamp where today's `placed`
+  clamps in `Double` first. Over **5 speeds × 9 seconds**, including
+  `1e-9`, the two ticks either side of the clip's own end
+  (`1.0000008333`, `1.9999991667`), the end exactly, and `1e6`, today's
+  `Transcriber.project` answers the pre-C1 tick every time. The reordering
+  moved nothing: the clamp is to an integer `duration`, so rounding before or
+  after it lands in the same place.
+- **The CONTROL beside it**, and it is called one: at `t = 1e14`, speed 1,
+  where `scaled` is past 2^63, the two differ BY DECISION — the old line's
+  `ReelTime.ticks` answered 0 out of range and so placed the word at the
+  clip's START, and today's `placed` clamps in `Double` and places it at the
+  clip's END. That is spec §11's R6-10 and this review's K28, recorded as a
+  control and not re-litigated.
+- **H·4 — the rest of the app against a hand-written `speed`: MEASURED, and
+  CLEAN.** A scratch package whose one clip's `speed` was rewritten in the
+  saved `project.json` to **1e300** and then to **1e-300**, driven on its own
+  instance through `open_project`, `get_project`, `render_frame` (at `t: 0`,
+  which wrote its PNG) and `transcribe engine: "assemblyai"`, and then through
+  the offscreen harness, which rendered the whole editor including the
+  timeline to a PNG for both. **No trap, no expiry, nothing to file.** The two
+  answers are R6-10's clamps working: at 1e300 the cue collapses to
+  `start: 0, end: 0` (the clip's start), and at 1e-300 the window
+  `in + duration × speed` holds no word at all and the run answers "No speech
+  was recognised". `remaining.md` §5's bullet narrows to exactly those five
+  callers at those two values.
+- **R4·1**, found while extending H·4's input past what H·4 named:
+  `"duration": 9223372036854775807` on a clip **kills the app during
+  `open_project`** — the socket closes with no answer and the process is
+  gone. 2^62 and 1e18 open, draw and transcribe normally. `Project::validate`
+  (`core/src/model_query.rs:320`) refuses a duration `<= 0` and puts **no
+  upper bound on one at all**, so every downstream `start + duration` in
+  Swift has to defend itself separately. C1 touched none of that code and
+  R6-10 already recorded that the core DECLINED such a bound once, so this is
+  a decision: **FILED #31 (`spec`).**
+
+#### Reader 5 — the MCP mirror
+
+**The question, as refined and put:** do the pinned refusals name the earlier
+one when two are present at once; does every argument reader hold at its
+extremes; does a stranger key die at the gate by name; is the result's key set
+exactly Interfaces' and `truncated` absent; and — the part with no row —
+**does every sentence of the catalog's `transcribe` entry and of §5g hold
+against EVERY branch of the handler?**
+
+Rows 1, 7, 8 and 9 already answer the first four and passed unchanged, and
+the four mirrors are untouched: `git diff cfcd0959 -- core app/Sources/ReelOps.swift
+app/Sources/ReelCore.swift app/Bridging` is empty, with `op_catalog_proof.py`
+**23/23** and `op_argument_proof.py` **133/133** at the baseline. The gate was
+seen refusing a stranger by name in passing, on a call this reader mistyped:
+`render_frame does not take at. It takes burn_in_timecode, format, max_width,
+path, t and project.` **The prose is where the findings were.**
+
+- **R5·1** `app/Sources/AgentCatalog+Captions.swift:76-82` — the comment that
+  names the UI path the tool mirrors, which the root `CLAUDE.md` requires,
+  said "The sheet's ENGINE popup and its three cloud rows are c1-chrome's
+  work and **are not there yet**: until they land, `engine: "assemblyai"` is
+  reachable from here and **from nowhere in the UI**". c1-chrome landed:
+  `TranscribeSheetController.swift:101` is the popup and
+  `+Cloud.swift` is the three rows. **FIXED** — the comment now names the
+  popup and the rows, and names the two things the sheet has that the tool
+  deliberately has not (the region, R6-12; the remembered engine, R6-2).
+- **R5·2** `app/Sources/AgentServer+CloudCaptions.swift`'s catch — a run that
+  throws after a bill said nothing about the bill. `cloudFields` is never
+  reached on a throwing path, so `uploaded` and `audio_seconds` are not in
+  the answer at all. MEASURED: a project whose one media the fake answered
+  `words: []` for — an array, so a real answer about audio nobody spoke in —
+  uploaded, was billed, and came back as the bare sentence `transcribe: No
+  speech was recognised in the audio that was transcribed.` with one upload
+  in the fake's log. **FIXED** — the facts go in the SENTENCE, which is the
+  one channel a throw has, and the result KEYS are unchanged: `AssemblyAI had
+  already been billed for 1 media file (6 audio seconds) before this
+  failed.` — the number is the one printed instance in the evidence, the fix
+  pass's `bill-promises-cache` capture of row B over `speech.mov`; this
+  record said 11 until the second sceptic pass found no run had printed it.
+  The sum saturates, R1·1's rule. Row **B** in `cloud_captions_proof.py` (8
+  checks after the fix pass, three of them CONTROLs, `tools/proof/README.md`'s
+  own count; it was 4 and two when first written — that there really was an
+  upload, and that a refusal costing nothing carries no such sentence);
+  mutant **`silent-about-the-bill`**. **The sentence ENDED there
+  only after the fix pass**: as first written it went on "…; their
+  transcripts are cached in the project, so another run makes no request for
+  them", which is false on the branch R1·3's own fix created (issue #29) —
+  see the fix pass below, where row B gained the case that shows it and the
+  mutant `bill-promises-cache` that reverts it.
+- **L12 — §5g's refusal ORDER: the sentence is imprecise, and it is
+  CORRECTED** as a dated revision on §5g rather than rewritten. "then a media
+  over ten hours, then the network" names a per-MEDIA problem as a position
+  in the run's order. MEASURED: a two-media project whose first media's
+  `duration` was rewritten to forty thousand seconds answered `uploaded: [3]`,
+  `audio_seconds: 11`, one `skipped` entry carrying the limit's own sentence,
+  and the other media's four routes in the log. It refuses the RUN only when
+  it is the only media, which is row H's case.
+- **L15's half that is §5g's**, the `engine` bullet's "(default, whatever the
+  sheet last chose)": it reads, over the tool, as the opposite of R6-2.
+  **CORRECTED in the same dated revision.** The tool's own `engine`
+  description was already right ("The default is NEVER what the sheet last
+  chose") and row 8 already proves it, so nothing in the product changed.
+- **L7**, the sheet's dead Generate button with no key and every media
+  cached, is Reader 6's and is judged there.
+- **What this reader did NOT drive**: the PAIRWISE refusal question — every
+  pair of the seven pinned refusals presented at once, with the fake's log in
+  the state §5g promises. Row 1 drives three of them one at a time and row 7
+  drives the readers' extremes; the 21 pairs have no row and this review did
+  not build one. **UNJUDGED**, and named here so the next reader does not
+  read the single-refusal rows as an answer to it.
+
+#### Reader 6 — the chrome
+
+**The question, as refined and put:** is there a sequence of clicks and keys
+after which Generate starts a run whose uploads, region or price differ from
+what the card showed at that instant; does Save / Remove / Verify hold against
+an answer arriving after the field, the store or the region changed; does Stop
+during EACH phase end inside a stated bound; and is every sentence the report
+card can show true of the branch that makes it?
+
+Section 18's rows already answer the card's arithmetic, the sheet's four
+states, the report card's lines, the Settings window's rows and both
+appearances through the harness, and they passed unchanged. This reader's work
+was the handed row and the two leads.
+
+- **H·5 — the order-dependent Stop row: FIXED.** The row read "it stopped
+  before anything was uploaded — the fake's request log **is still empty**",
+  which is a claim about the whole SECTION's shared fake rather than about
+  the click, and was true only because of where the block happens to sit. It
+  now takes the fake's request count BEFORE the child runs and asserts that
+  **nothing new** arrived across the click. Made to fail as the plan asked:
+  in a COPY of the probe (`tools/proof/work/c1-review/h5_probe.py`, outside
+  the tree) with one `GET /v2/transcript?limit=1` sent into the shared fake
+  just above the block — which is exactly what a later phase adding a
+  clicking row above it would do — and BOTH assertions present, the run
+  scores **76/77**: `FAIL 18 OLD: … the fake's request log is still empty`
+  and `ok 18: … the fake saw NOTHING NEW across this click`.
+- **L7 — no key, everything cached: the button is dead and the run would
+  send nothing. FILED #32 (`spec`).** `refresh`'s
+  `startButton?.isEnabled` gates on a credential above the cache, and
+  `AgentServer+CloudCaptions.swift:119` refuses the tool the same way, though
+  R6-3 makes a package's transcripts travel with it and
+  `CloudTranscriber.transcribe` classifies every media as cached before it
+  opens a socket. It is a decision rather than a patch because a keyless run
+  also cannot run the JANITOR, and a package can arrive carrying an id
+  somebody else owes AssemblyAI a DELETE for.
+- **L14 — Verify's answer announced as current: FILED #33 (`bug`), and NOT
+  DRIVEN.** `verifyClicked` reads the key and the region at click time and
+  its completion says "Key accepted" unconditionally, so an answer about key
+  A lands beside a field holding key B or a region it never spoke to; and the
+  completion's unconditional `verifying = nil` / `verifyButton.isEnabled =
+  true` lets the first of two verifies clobber the second. Found by reading,
+  LATE, while the named-mutant matrix was already running against
+  `app/Sources` as it then stood — and a product edit mid-matrix would have
+  built later cells from a different tree than earlier ones, which is the one
+  thing that table must not do. The issue names the row it needs and the
+  `stall {route: "verify"}` key that makes it possible.
+- **What this reader did NOT drive, and is UNJUDGED**: Stop during each of
+  the six phases. Today only EXTRACT has a row (section 18's cancel row, now
+  H·5's), and the plan asked for upload, submit, wait, save and the janitor
+  besides. Reader 1's row J measures the janitor's half of it from the
+  probe's side — a pre-cancelled token now costs nothing — but the SHEET's
+  Stop during an upload, a submit, a wait or a save has no row here and this
+  review built none.
+
+#### The twelve handed findings, each with one verdict
+
+| # | What was handed | Verdict |
+|---|---|---|
+| H·1 | `AssemblyAIClient+Session.swift` reads `progress` outside its lock | **REFUTED as a race** by Reader 1's own reading of every writer: written once before the sink is published under the lock, read only through the same lock, and `didSendBodyData` cannot fire before `resume()`. No row could fail, and it says so; the field stays a `var` and Interfaces' `let` form was not taken |
+| H·2 | a person's ordinary `make app` writes the key to disk | **FIXED** — `unexport RC_ASSEMBLYAI_KEY` above `.PHONY`, covering every recipe; `makefile_env_proof.py` **2/2**, `--mutant no-unexport` **1/2** with the dummy in `task-store.msgpack` |
+| H·3 | `SecretStore.swift`'s `writeAll` turns `EINTR` into `unwritable` | **FIXED** — retries `EINTR` and nothing else, through Interfaces' injected-writer seam; three rows in section 17, mutant `eintr-unwritable` **39/40** |
+| H·4 | the rest of the app is UNMEASURED against a hand-written `speed` | **MEASURED, CLEAN** at 1e300 and 1e-300 over five callers; nothing to file. The neighbouring input is worse and is **FILED #31** |
+| H·5 | one `chrome` probe row leans on the ORDER of its section's shared fake log | **FIXED** — a count before the click, compared after; demonstrated in a probe COPY outside the tree, **76/77**, old assertion failing and new one holding |
+| H·6 | `cloud_captions_live.py:118-119` asserts `no_transcript` on a branch that closes `deleted` | **FIXED** — each branch now names the outcomes IT can produce (`no_transcript`, or `deleted` or `unresolved`) and says which branch ran. It had been invisible because `StubProof.check` RECORDS without scoring, so the self-test gained the row that would have caught it: arm A asserts that exactly TWO of the arm's own checks failed and names them. **14/14** on the tree, **13/14** against the assertion reverted in a COPY of the live module |
+| H·7 | `:387-388`'s skip reason is false on the branch that ran `cleanup` | **FIXED** — the reason now names the branch: "a submit reached the wire under the dummy folder, so `cleanup` ran and the key WAS used — to delete what that submit made, and for nothing else" |
+| H·8 | the live self-test's stub always answers the q6 sentinel | **FIXED** — `StubClient(gone=False)` answers a transcript that is still THERE, and arm **D** asserts the reservation closes `unresolved`, that the DELETE and the sentinel GET were both made (so it is not unresolved for want of trying), and that `ledger.unresolved()` names it, with arm A as its control. **14/14** on the tree, **10/12** — the two D rows failing — against `cloud_live_ledger.py`'s `else "unresolved"` turned into `else "deleted"` in a COPY |
+| H·9 | `remaining.md` §5's "Five things" heading stands over nine bullets | **FIXED** — the heading says **NINE**, which is that block's own `- ` lines counted, and says when and why it grew |
+| H·10 | the app's client log lines are block-buffered | decided by Z5 — see the mutant table |
+| H·11 | the root `CLAUDE.md` row and `app/CLAUDE.md`'s queue-seam clause, hand-edited | **JUDGED, and NOT edited** (this run edits no `CLAUDE.md`). Both are correct as map and rule text: `CLAUDE.md:34` names what the document is and where to start and carries no status paragraph, and its "§10 its record per pipeline" still covers §10.13; `app/CLAUDE.md`'s queue clause names exactly the two queues C1 added and there is no third — `grep "DispatchQueue(\|OperationQueue("` over C1's ten files answers `CloudTranscriber.swift:101` and `AssemblyAIClient.swift:139` and nothing else. **One sentence elsewhere in `app/CLAUDE.md` is now false** and its exact replacement is written out for the orchestrator in the run's notes, unedited here |
+| H·12 | `cloud_captions_proof.py:1561` overrides `--port-base` under `--mutant` | **FIXED** before any mutant ran — `--port-base` defaults to `None` and resolves to 4955, or 4960 under `--mutant`, with an explicit flag winning either way. Verified by the first mutant cell, whose three instances bound 4990, 4991 and 4992 |
+
+#### Reader 7 — the proofs and the record
+
+**The question, as refined and put:** which claims would pass against a named
+mutant of TODAY's tree; which conjuncts are vacuous; is the fake faithful to
+what §3 MEASURED; and does every sentence of §10.1–§10.12 and the §5
+revisions that carries a number, a count or "every" hold to the run that
+printed it?
+
+**Vacuous conjuncts: one found, and it was this review's own.** Three sweeps
+over both cloud instruments and the self-test — a literal-truth assertion, a
+comparison of a thing with itself, and an empty-collection claim — found
+nothing in the tree. The four "the fake's log is EMPTY" rows in
+`cloud_captions_proof.py` (:493, :511, :1117, :1292) each call `scenario(…)`
+first, and `Fake.reset` clears `requests`, so each is a claim about its own
+row. **The one that was NOT reset is the `chrome` section's**, which is H·5
+and is fixed. The self-test had a worse shape and it was this review's to
+find: `StubProof.check` RECORDS a row without scoring it, so every check made
+INSIDE `dummy_arm` was invisible to the file's own count — which is how H·6's
+assertion stood on a branch it was false on. Two rows now score them. One
+vacuous row was written BY this reader in the course of the H·8 work — a
+`check(…, True, "")` control — and was removed before it landed.
+
+**The fake against §3's measured answers, row by row.** q1, `audio_duration`
+is the audio's seconds rounded UP: `int(math.ceil(seconds))`, taken from the
+uploaded body's own WAV `data` chunk or FLAC STREAMINFO. ✓ q5, an unsupported
+`language_code` is a **400 at SUBMISSION** with the service's sentence
+verbatim: `_submit` answers it before minting anything. ✓ q6, a deleted
+transcript answers **200** with `audio_url: "http://deleted_by_user"` and
+`text: "Deleted by user."`, and a second DELETE answers 200 too:
+`deleted_bytes`, and `fake.deleted` is a set. ✓ And the one value §3 did NOT
+measure — `words` after a delete, recorded cut at 300 bytes inside the KEY —
+the fake invents as `null`, **and says so in its own header**, with the
+reason (it is the value that exercises the client's "a completed body with no
+words ARRAY is `.malformed`" rule). That is the honest shape and this reader
+found nothing else invented.
+
+**L15, "Every new file is under the 400-line cap": FALSE of its own table,
+and CORRECTED** as dated revisions on §10.10 and §10.11. Both sentences stand
+directly under tables listing `assemblyai_fake.py` at 501, the new
+`cloud_captions_probe.py` at 3280 and 4753 and the new
+`cloud_captions_proof.py` at 1479 and 1494. The cap `app/CLAUDE.md` sets is
+about the app's own sources; `tools/proof/`'s instruments were never held to
+it and the paragraphs should have said so. Nothing about the code changed.
+**L15's other half**, §5g's `"apple"` "(default, whatever the sheet last
+chose)", is Reader 5's and is corrected in the same dated revision there.
+
+#### The mutant table — twelve named mutants of TODAY's tree
+
+Each is a COPY: `--mutant` for the ten under `app/Sources`, `--fake-mutant`
+for Z11, which is a mutant of the INSTRUMENT and cannot be one of `--mutant`'s
+rows (both instruments copy `app/` only and load the fake from the working
+tree). **No old binary was scored and `--live` was never passed.** Every patch
+text was asserted to occur exactly once before it was applied. Each cell is
+one CLAIM GROUP: a probe SECTION, or a proof ROW.
+
+Every cell below is RUN except Z8's and the four the plan names, and **no cell
+EXPIRED**: the longest was Z12's probe cell at 328 s against a 1173 s limit,
+where `run_probe`'s own 180 s per-row timeout is what answered the ceiling
+row rather than the outer wall.
+
+**The probe, thirteen sections × ten mutants** (Z8 not run, Z11 through
+`--fake-mutant`):
+
+| section | Z1 | Z2 | Z3 | Z4 | Z5 | Z6 | Z7 | Z9 | Z10 | Z12 | Z11 |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| 12 the mapping | passes | passes | passes | passes | passes | passes | passes | **fails** | passes | passes | not run |
+| R6-10 the hand-written speed | passes | passes | passes | passes | passes | passes | passes | passes | passes | passes | not run |
+| 13 the stamp | passes | passes | passes | passes | passes | passes | passes | passes | passes | passes | not run |
+| 15 the client | passes | **fails** | passes | passes | passes | passes | passes | passes | passes | **fails** | not run |
+| 16 the cancel token | passes | **fails** | passes | passes | passes | passes | passes | passes | passes | passes | not run |
+| 17 the secret store | passes | passes | passes | passes | passes | **fails** | **fails** | passes | passes | passes | not run |
+| 19 the fifth rule | passes | passes | passes | passes | passes | passes | passes | passes | passes | passes | not run |
+| W/F/FB/Q the extractor | passes | passes | passes | passes | passes | passes | passes | passes | passes | passes | not run |
+| V the served words | passes | passes | passes | **fails** | passes | passes | passes | passes | passes | passes | not run |
+| P/T/J/I the run | passes | passes | **fails** | passes | passes | passes | passes | passes | passes | passes | not run |
+| 14 the estimate | passes | passes | passes | passes | passes | passes | passes | passes | **fails** | passes | not run |
+| 18 the chrome | passes | passes | passes | passes | passes | passes | passes | passes | passes | passes | not run |
+| R/G/N/S/K redirect, redaction | **fails** | passes | passes | passes | passes | passes | passes | passes | passes | passes | **fails** |
+
+Scores: Z1 486/488, Z2 480/488, Z3 485/488, Z4 484/488, Z6 486/488, Z7
+487/488, Z9 479/488, Z10 484/488, Z12 487/489, Z11 (hygiene only) 29/30 and
+487/488 whole. **Z5 scored 488/488 — it was caught by NOTHING**, which is
+R7·3 below; against the sharper row it is **489/490**.
+
+**Every cell above is from the 488-row probe**, and the `P/T/J/I the run`
+cell under Z5 says so: at 488 rows Z5 `passes` there — that is what
+`probe-z5-key-in-note`'s **488/488** means — and it is the sharper row ADDED
+to that same section afterwards that catches it, **489/490, `fails`**
+(`probe-z5b`). The cell read `fails` until the reader review's fix pass,
+where it contradicted both this paragraph and the run (finding 2 of the
+sceptic pass).
+
+**The MCP proof, its rows × the seven it scores** (Z6, Z7 and Z10 are `not
+run` here — no tool reaches the resolver's argument table or the estimate):
+
+| row | Z1 | Z2 | Z3 | Z4 | Z5 | Z9 | Z12 | Z11 |
+|---|---|---|---|---|---|---|---|---|
+| 1 · 2 · 3 · 5 · 6 · 7 · 8 · 9 · 10 · 11 · H · O · M · E · B | passes | passes | passes | passes | passes | passes | passes | passes |
+| 4 the cache file's bytes | passes | passes | passes | **fails** | passes | passes | passes | passes |
+| T the temporary extract | control | control | **fails** | control | control | control | control | control |
+| K/X the key and the identity | passes | passes | passes | passes | **fails** | passes | passes | passes |
+
+Scores, all 142 rows: Z1 141/142, Z2 141/142, Z3 137/142, Z4 140/142,
+**Z5 140/142 (row K, and row T — R7·1's instrument failure)**, Z9 141/142,
+Z12 141/142, Z11 141/142. **The one failure in each of Z1, Z2, Z9, Z12 and
+Z11 was the SAME row and it was the instrument's, not the mutant's** — R7·1
+below — so those five cells are `passes` and the mutant survived the MCP
+proof. **Z5 failed TWO rows, not one**: row K, which is the catch, and that
+same instrument row, which is why its score is 140. This line read
+`Z5 141/142 (row K)` until the reader review's fix pass, where the count
+hid the second failure the run printed (finding 1 of the sceptic pass;
+`04-checks.txt`'s `proof-z5-key-in-note` is the line).
+
+**When each cell was measured, exactly.** The ten probe cells and the eight
+MCP cells above were scored against the instruments AS THEY STOOD when the
+matrix ran — a **488**-row probe and a **142**-row proof whose row T still
+carried R7·1's doubled glob. Two things changed afterwards, both because of
+what the matrix showed, and both re-scored rather than assumed: the probe
+gained Z5's sharper row (488 → **490**, and Z5's cell was run again:
+**489/490**), and the proof's row T was fixed (its control now passes, so the
+one failure that appeared in Z1, Z2, Z9, Z12 and Z11 — and the second of
+Z5's two — is gone; Z9 was run again after row 5's split moved, and **that
+re-run printed no line into `04-checks.txt`, so no score for it is claimed**,
+which is R7·2). The pre-fix scores are left above because they are what those
+runs printed; the paragraph under each table says what they mean.
+
+**Z8, `store-under-endpoint`: NOT RUN — it would open the person's store.**
+Removing `if argument(endpointArgument, …) != nil { return MemoryStore() }`
+makes a proof-launched app with an endpoint and no secret folder build a
+`FileStore` on `AppSupport.directory`, which is R6-9 (b)'s whole point.
+Its column is `not run — would open the person's store`, and the row that
+would have failed is named by READING: the probe's section 17,
+**`17 · R6-9 (b): with an endpoint and no secret folder the store is an EMPTY
+MemoryStore — the person's file is never opened`**, which asks
+`AssemblyAIConfiguration.store()` for its TYPE in a child launched with the
+endpoint alone (`run_probe(… extra=["-RCAssemblyAIEndpoint", …])`) and would
+read `FileStore` where it asserts `MemoryStore`.
+
+#### Reader 7's findings
+
+- **R7·1** `cloud_captions_proof.py`'s `temp_folders` / `temp_uploads` — on
+  this host `tempfile.gettempdir()` and `DARWIN_USER_TEMP_DIR` are the SAME
+  folder under two names, so every `reelcut-upload-*` was globbed TWICE,
+  while row T's CONTROL compared that doubled list's length against a
+  de-duplicated SET taken during the run. The row therefore failed whenever
+  the folder held one leftover from any earlier run — which is why it failed
+  in **every one of the eight** MCP mutant cells and passed on the tree, and
+  why each of those cells' 141/142 read as a catch it was not. **FIXED** —
+  the folders are de-duplicated by real path, `temp_uploads` answers a set,
+  and the control compares `set(during) - set(before)`.
+- **R7·2** the proof's row 5 split at **2.5 s**, where none of the fake's
+  five words starts — raised as a finding, **then REFUTED by this reader's
+  own re-run.** The split was moved to **3.0 s**, exactly where the fake's
+  fourth word starts, and the reader's notes say the proof was run again
+  against Z9 with row 5 on that boundary. **That re-run left no line in
+  `04-checks.txt`, so neither a score NOR THE RUN ITSELF is evidenced** (the
+  second sceptic pass: an event no evidence line shows is a reader's word) — this sentence said `142/142` until the reader
+  review's fix pass took the number out (the sceptic pass's "did not reach"
+  list). What stands is the READING, and it is what refutes the finding:
+  the reason is defence in depth and not a blunt row.
+  `CloudTranscriber.transcribe:293` filters every mapped word by
+  `$0.start < job.start + job.duration` before it builds a cue, so a word the
+  `<=` window doubled at the boundary is dropped a SECOND time by a SECOND
+  guard and never reaches a result. **No MCP row can catch Z9**, and the
+  probe's section 12 catches it only because it calls `MediaTranscript.words`
+  directly, below that filter. The split is LEFT on the boundary — a row
+  that exercises the tick is worth more than one that does not — and the
+  comment beside it now says why it cannot fail rather than claiming it can.
+- **R7·3** **Z5 survived the whole 488-row probe.** A mutant that puts the
+  credential into every `AssemblyAI: …` line the client prints was caught by
+  nothing there: the one row that reads a child's stdout drives the
+  `secrets` mode, which makes no request and so prints no client line at all.
+  **FIXED with a sharper row** — the `run` section's real round trip now
+  asserts the dummy is in NO line the child printed, with a CONTROL that it
+  printed at least four client lines to look in. 490/490 on the tree,
+  **489/490** against Z5, the new row the one failure.
+- **H·10, the block-buffered client lines: DECIDED, and the answer is to
+  change NOTHING.** The plan made it conditional on Z5: "if row K `passes`
+  against Z5, instances A-C become pty-backed". **Row K FAILS against Z5** —
+  measured, `FAIL K: the dummy key is in NO app log` — so a file-redirected
+  log's 4096 buffered bytes are more than enough for that row to see a key in
+  every line. K15's open question, "whether K can fail at all is NOT known",
+  is answered: it can. The instances stay as they are and the product is
+  unchanged.
+
+#### What this review did NOT reach — UNJUDGED, by name
+
+litecode runs one agent at a time and this review WAS the readers; the
+independent SCEPTIC pass the practice calls for is the part it could not do
+for itself. What follows is recorded UNJUDGED rather than refuted, so the next
+reader does not mistake a gap for an answer. **The sceptic pass HAS since run
+— "The sceptic pass, and the fix pass that answered it" below** — and it
+reached none of these five: they stay UNJUDGED, and the last one is answered
+only for the two fixes it attacked.
+
+- **The 21 PAIRS of pinned refusals.** Row 1 drives three one at a time and
+  row 7 drives every reader at its extremes; no row presents two at once and
+  asks which is named. Reader 5.
+- **Stop during the upload, the submit, the wait and the save**, from the
+  SHEET. Row J measures the janitor's half from the probe's side and section
+  18's cancel row measures the extract's; the other four phases have no row.
+  Reader 6.
+- **L14**, the Verify answer announced as current, found by reading and
+  **FILED #33 without being driven** — late, with the mutant matrix already
+  running against `app/Sources` as it then stood. The issue names the row it
+  needs and the `stall {route: "verify"}` key that makes it possible.
+- **L1's second half**, "a dripping server may never time out": UNREPRODUCED.
+  The new `stall` key answers nothing at all, which is what an idle timer is
+  FOR; a fake that drips a byte under the timer is a second timing instrument
+  this review did not build.
+- **Every fix's own sceptic.** Seven product fixes landed, each with a row
+  made to fail against the fix reverted in a tree copy. Nobody but their
+  author has tried to break them. **Partly answered**: the sceptic pass below
+  broke TWO of the seven — R5·2's sentence on the unwritable-cache branch and
+  R3·1's gate reporting a delete it never sent — and both are fixed there.
+  The other five have still had no reader but their author.
+
+#### The closing scores
+
+Every number below is from the run that printed it, on the tree as this
+review leaves it. No `EXPIRED` line anywhere: the longest cell was Z12's
+probe at **328 s** against its 1173 s limit.
+
+| Command | Score | `wall=` |
+|---|---|---|
+| `make test` | 721 passed, 0 failed, 39 binaries | 1.5 s |
+| `make lint` | clean | 0.2 s |
+| `cd core && cargo fmt --check` | clean | 0.4 s |
+| `make typecheck` | 0 errors, exactly 4 warnings | 38.9 s |
+| `make app` | BUILD SUCCEEDED | 46.7 s |
+| `python3 -m py_compile` (seven cloud scripts) | clean | 0.2 s |
+| `cloud_live_selftest.py` | **14/14** (was 9/9) | 0.2 s |
+| `cloud_captions_probe.py` | **490/490** (was 469) | 33.7 s |
+| `cloud_captions_proof.py --port-base 4990` | **142/142** (was 115), no skip | 50.8 s |
+| `makefile_env_proof.py` | **2/2** | 57.1 s |
+| `makefile_env_proof.py --mutant no-unexport` | **1/2**, the leak row failing | 55.2 s |
+| `cloud_captions_probe.py --fake-mutant fake-logs-any-key --only hygiene` | **29/30**, row G failing | 0.6 s |
+| `phase4_proof.py 4993` | 84/84 | 3.0 s |
+| `op_catalog_proof.py 4994` | 23/23 | 61.0 s |
+| `op_argument_proof.py 4995` | 133/133 | 68.4 s |
+| `phase4_chrome.py` | 59/59 | 132.2 s |
+| `source_mirror_probe.py` | 40/40 | 60.1 s |
+| `grep "Reelcut: " /tmp/reelcut-499?.log` | prints nothing | — |
+
+**No own instance is left alive** (`pgrep -f "MacOS/Reelcut"` is empty), and
+an in-process search over the scratch directory, `tools/proof/work/c1-review/`
+and all ten `/tmp/reelcut-499?.log` read **162 files**: `proof-key` and
+`wrong-key` appear only in the instruments' own captured console text, which
+is what those two allow-listed dummies are for, and
+**`RCDUMMY-makefile-env-proof-5d1c` appears in none of them**. The one place
+it DID land is the `--mutant no-unexport` cell's own tree copy — 2 files of
+661, both under `XCBuildData/`, which is the measurement — and that work
+folder, which this run made, was then removed.
+
+**Left behind on purpose, and named so nobody hunts it:** Z3
+(`extract-kept`) leaves `reelcut-upload-*.flac` files in the per-user
+temporary directory, which is what that mutant is. They are not this run's to
+delete — `/var/folders/…/T/` is the person's — and R7·1's fix is what keeps
+them from failing row T's control in a later run.
+
+#### The sceptic pass, and the fix pass that answered it (2026-09-21)
+
+The independent SCEPTIC the practice calls for — the part this review could
+not do for itself — was run afterwards against the tree above. It started
+nothing, bound no port and read no key; it read `03-spec-final.md`,
+`04-impl-notes.md`, `04-checks.txt` and the diff. Its verdict was
+**fix-required** on six findings: four where a sentence in the record is not
+what the run printed, one where a sentence a FIX wrote is false on a branch,
+and one nit where a refusal is reported as a success. All six are fixed, in
+one pass, below. **No live call was made in it either, and nothing was
+spent.**
+
+**The four record findings** — each corrected from `04-checks.txt`'s own
+printed lines and from `wc -l` on the day, never from memory:
+
+1. **The MCP mutant scores said `Z5 141/142 (row K)`**; the run printed
+   **140/142** (`04-checks.txt`, `proof-z5-key-in-note`). Z5 failed TWO rows:
+   row K, the catch, and row T, R7·1's instrument failure. The count hid the
+   second. **Corrected above**, with the second failure named.
+2. **The probe table's `P/T/J/I the run` × Z5 cell said `fails`** while the
+   same section's score line says Z5 was caught by NOTHING at 488 rows
+   (`probe-z5-key-in-note`, **488/488**). **Corrected to `passes`**, with the
+   488-row and 490-row runs named separately: the sharper row added to that
+   same section afterwards is what catches it, **489/490** (`probe-z5b`).
+3. **`designs/reelcut-remaining.md` §3's two "before" counts were not the
+   baseline tree's.** `git show f03ebcc6…` holds `cloud_live_ledger.py` at
+   **312** (§3 said 288) and `cloud_captions_proof.py` at **1643** (§3 said
+   1494, copied from the stale sentence higher up). **Both corrected**, and
+   the older sentence date-revised rather than rewritten: its 1494 is what
+   `wc -l` gives at c1-chrome's own tree `5cc64c21…`, and c1-close took the
+   file to 1643.
+4. **`tools/proof/README.md` said the probe has 488 rows**, the pre-R7·3
+   count, while the tree scored **490/490**. **Corrected**, and the sharper
+   Z5 row — "no line the child printed holds the dummy", with its CONTROL —
+   is now in the list of new rows beside J and I.
+
+**Finding 5, a sentence a fix wrote, false on one branch (`should-fix`).**
+R5·2's bill sentence ended "…their transcripts are cached in the project, so
+another run makes no request for them". On the branch R1·3's own fix created
+— `MediaTranscript.write` answers `false`, so the marker is correctly NOT
+written and nothing is cached — the media is in `report.uploaded` all the
+same, which is issue **#29**'s unwritable cache. A caller who believed the
+sentence paid for the same media twice. **FIXED** in
+`AgentServer+CloudCaptions.swift`: the sentence now ends `before this
+failed.` and promises nothing about a cache this method cannot see. Row **B**
+gained four checks, one of them the branch itself — run 1 caches, the cache
+file is made `UF_IMMUTABLE` the way row M does it, run 2 re-fetches under a
+different request, is billed, cannot write, and throws — plus two CONTROLs
+(that there was a file to make unwritable, and that the flag really stopped
+the write). Mutant **`bill-promises-cache`** puts the old clause back:
+**144/146**, the two failures being row B's "names the bill" and "promises
+NOTHING about a cache that was never written", both in row B and both for the
+reason the fix names.
+
+**Finding 6, the nit that was a false record (`nit`, fixed anyway).** R3·1's
+gate made `delete` answer **`true`** with no request, so
+`CloudTranscriber+Media.swift`'s janitor wrote `remote_deleted: true` into the
+cache file and put the media in `janitorDeleted`: the run reported deleting a
+transcript it never asked about, and erased the one record that something was
+owed. **What it answers now, and why.** `AssemblyAIClient.delete` answers
+**three** states — `deleted`, `failed`, `notSent` — because "never sent" is
+neither "gone" nor "owed", and the janitor puts a `notSent` media in
+**NEITHER list**: not `janitorDeleted`, so no delete is claimed and no cache
+file is rewritten, and not `janitorFailed`, so **R6-11's hold cannot trap the
+media for ever on an id that can never be sent** — which was the whole reason
+the gate answered `true` in the first place. The media is fetched again
+ONLY when its stamp is stale or `refresh` is asked (a current stamp serves
+the cache, as ever), and until then every run's janitor refuses the same
+string as cheaply — no request, and a log line that carries no id. `fetch`
+reads the same answer (`== .deleted`), so a server that echoes back an id
+that is not one cannot have a delete recorded for it either. Row **I** gained
+two checks: none of the five hostile ids is in `janitorDeleted`, and their
+cache files still say `remote_deleted: false`. Mutant
+**`refused-id-reported-as-deleted`** (`return .notSent` → `return .deleted`)
+fails exactly those two and no other: **490/492** whole, and **48/50** on the
+`run` section alone, where the R6-11 row beside them still passes — so the fix
+did not trade one answer for the other. `any-id-on-the-wire` was re-aimed at
+the gate's new line and `no-delete` at `fetch`'s.
+
+**What the fix pass did NOT do.** It did not re-run the twelve-mutant matrix
+(the cells above are what those runs printed, against the instruments as they
+then stood, and the paragraph under each table says so); it did not re-run
+`op_catalog_proof.py`, `op_argument_proof.py`, `phase4_chrome.py` or
+`source_mirror_probe.py`, none of which any of these six changes can reach —
+no op, no schema, no catalog entry, no chrome file and no Rust changed; and it
+did not touch the five things named UNJUDGED above, which stay UNJUDGED. Two
+numbers the sceptic could not find in the evidence are now REWORDED to claim
+only what was printed: R7·2's `142/142` re-run and the step-0 table's `wall=`
+column.
+
+**The fix pass's own scores**, each from the run that printed it, on the tree
+it leaves:
+
+| Command | Score |
+|---|---|
+| `make test` | 721 passed, 0 failed, 39 binaries |
+| `make lint` · `cargo fmt --check` | clean |
+| `make typecheck` | 0 errors, exactly 4 warnings (8 diagnostic lines) |
+| `make app` | BUILD SUCCEEDED |
+| `python3 -m py_compile` (seven cloud scripts) | clean |
+| `cloud_live_selftest.py` | 14/14 |
+| `cloud_captions_probe.py` | **492/492** in 207 s |
+| `cloud_captions_proof.py --port-base 4990` | **146/146** in 60 s, no skip |
+| `cloud_captions_proof.py --mutant bill-promises-cache` | **144/146** |
+| `cloud_captions_probe.py --mutant refused-id-reported-as-deleted` | **490/492** (48/50 on `--only run`) |
+| `phase4_proof.py 4993` | 84/84 |
+| `grep "Reelcut: " /tmp/reelcut-499?.log` | prints nothing |
+| `git diff f03ebcc6… -- core/` | empty |
+
+No own instance is left alive. Nothing was committed, added, stashed or
+checked out, no `CLAUDE.md` was edited, and the `app/CLAUDE.md` sentence
+`04-impl-notes.md` writes out is still owed to whoever may edit that file.
+
+#### The tree
+
+**`6056b1e9de52d64a0f00650517d3086edb34b0a7`** — every line this review wrote
+except this paragraph, by the request's temp-index recipe (never the real
+index; nothing was committed, added, stashed or checked out). It is measured
+before the paragraph rather than after it because a hash of a tree cannot be
+written into that tree; re-run the recipe for the current one. The baseline is
+c1-close's **`f03ebcc6e4769f7195812d51d562518a2e4d9b67`**, and `git diff` of it
+over `core/` is empty: this review changed no Rust at all.
+
+**The fix pass's tree: `def1209e45567cc7792661f3a9eb906a71d72b6d`** — the same recipe, measured with
+this hash line held at a placeholder and then written in, over the six fixes,
+the two new mutants, row B's four checks and row I's two, and every
+correction above. Its baseline is the review's own `6056b1e9…`; `git diff`
+of `f03ebcc6…` over `core/` is still empty.
+
+#### The second sceptic pass, and what was done by hand after it (2026-09-21)
+
+litecode's second review, still the sceptic, read the fix pass and ran
+nothing. All six findings of the first pass were RESOLVED. It attacked the two
+new code fixes and broke neither: `delete` has exactly two callers and the
+`refusing` helper, no `Bool` comparison survives, `notSent` is decided on the
+string before any socket so it cannot relabel a transport failure, `fetch`'s
+`== .deleted` changes no branch that was right before, and the shortened bill
+sentence is true on every branch that reaches it. Both new mutants' patch
+texts occur once and fail only the rows named. Its verdict was still
+`fix-required`, on ONE record number and five nits, and litecode runs no
+second fix pass, so the session's orchestrator closed the prose by hand and
+recorded the rest:
+
+- **The bill sentence's "(11 audio seconds)" had no printed line.** The only
+  printed instance is the fix pass's capture of row B, which says 6. R5·2's
+  bullet above now quotes 6 and says where it came from; its "4 checks, two
+  CONTROLs" is now 8 and three, the proof README's own count.
+- **R7·2's re-run is a reader's word**, and its bullet now says so: no
+  evidence line shows the run, let alone a score.
+- **"The media is simply fetched again"** was true only of a stale stamp; the
+  paragraph above now says when.
+- **Three nits were NOT fixed** and are listed in
+  `designs/reelcut-remaining.md` §5 under the reader review's own heading:
+  the "next run retries it" sentence that is false for an id that cannot be
+  sent, two probe rows that say five and assert six, and a stale 2.5 s
+  comment.
+- **`app/CLAUDE.md`'s one false map clause was corrected by the
+  orchestrator**, as factual text and with no record citation: the client's
+  entry now names `withoutCredential(_:)` as the third member that touches
+  the credential and says `delete` answers three states. No rule text
+  changed in either `CLAUDE.md`.
+
+**UNJUDGED still, never refuted:** the five things this section's opening
+names (the 21 refusal pairs, Stop during four of the six phases, #33, L1's
+dripping server, and a second pair of eyes on R1·1, R1·2, R1·3, R2·1 and
+H·3); every fix-pass score, which the second pass took on the fixer's notes
+and reproduced none of, including whether `UF_IMMUTABLE` really stops row B's
+second write on this host; and the re-aimed `any-id-on-the-wire` and
+`no-delete` mutants, whose patch texts were counted but which were not re-run
+after re-aiming.

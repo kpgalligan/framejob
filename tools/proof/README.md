@@ -4091,3 +4091,107 @@ every name is reachable on it: the ledger gate, the line parsing
 (`submits`, `uploads_ok`, `ids`, `account`), the deletions and the CONTROLs
 that make each of those fail on purpose in the same process. Two files
 because one would pass the 400-line cap on a new file.
+
+---
+
+## The C1 reader review's instruments (2026-09-21)
+
+Road map 6 §10.13 is the record. The review added ONE script, three scenario
+keys, one flag on both cloud instruments, and rows and mutants inside what was
+already there. **No live call was made and nothing was spent.**
+
+### `makefile_env_proof.py` — H·2, the key and `make app`
+
+```sh
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/makefile_env_proof.py
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/makefile_env_proof.py --mutant no-unexport
+```
+
+**2/2** on the tree, **1/2** under the mutant. It builds a tree COPY under
+`tools/proof/work/makefile-env/` — `app/`, `project.yml`, `Makefile`, with
+`core` a SYMLINK to the tree's already-built one, `cloud_captions_proof.py`'s
+`build_mutant` shape — runs `make app` inside it with the person's
+`RC_ASSEMBLYAI_KEY` POPPED and `RCDUMMY-makefile-env-proof-5d1c` in its place,
+and then searches every file under the copy's `build/` and
+`Reelcut.xcodeproj/` **in process** for the dummy's bytes. It prints paths and
+booleans and nothing else; the person's own value is never read, printed or
+searched for.
+
+Three rows: the copy's `make app` made `Reelcut.app`'s binary (a failed build
+holds nothing, and "no file holds the dummy" would be true of it for the wrong
+reason); **no file of 448 holds the dummy**; and, under `--mutant
+no-unexport`, which removes the `Makefile`'s one `unexport RC_ASSEMBLYAI_KEY`
+directive in the COPY, that second row FAILS with the dummy in
+`build/Build/Intermediates.noindex/XCBuildData/<hash>.xcbuilddata/task-store.msgpack`
+and one attachment beside it — the CONTROL that the instrument can see a leak
+at all. **It measures the `app` recipe ONLY** and says so in its header and in
+its first printed line: `app` is the one recipe that runs `xcodebuild`, which
+is the one tool measured to write its environment down.
+
+### Three new scenario keys on the fake
+
+| Key | What it does |
+|---|---|
+| `stall {route, seconds}` | that route answers NOTHING for `seconds` and then answers normally — what an IDLE timeout is measured against |
+| `drop_reply [{route, times}]` | the route's EFFECT happens and the socket closes unanswered; `times: -1` is always |
+| `echo_authorization` | a FORCED failure's `error` sentence carries the allow-listed dummy it received, so a relay of the service's sentence can be caught carrying a credential |
+
+`drop_reply` on `submit` is what mints a transcript the caller never learns
+the id of; `stall` on `delete` is what makes the janitor's bill measurable;
+`echo_authorization` is what made row E's branch reachable.
+
+### `--fake-mutant`, on both cloud instruments
+
+```sh
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_probe.py --fake-mutant fake-logs-any-key --only hygiene
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_proof.py --fake-mutant fake-logs-any-key --port-base 4990
+```
+
+`--mutant` copies `app/` only and loads the fake from the working tree, so a
+mutant of the INSTRUMENT cannot be one of its rows. `--fake-mutant` copies
+`assemblyai_fake.py` (stdlib only, so a copy runs from any folder) to
+`<WORK>/mutants/<name>/`, patches the COPY — the text asserted to occur
+exactly once — and rebinds the probe's one `FAKE` global, which is the name
+`Fake.__enter__` reads. The proof reaches it through the MODULE, so the
+rebinding is the one its own `Fake` sees. **The working tree's fake is never
+edited.** The two flags are refused together: a cell measures one thing.
+
+One row: `fake-logs-any-key`, the review's Z11, which makes the fake log any
+`authorization` value rather than only the two allow-listed dummies.
+
+### New rows and mutants inside the two cloud instruments
+
+`cloud_captions_probe.py` — **492 rows** on the tree (469 at the review's
+baseline; 488 when the mutant matrix ran, 490 with Z5's sharper row, 492 after
+the review's fix pass). New: a fourth `words` shape in section 15 (an array
+holding an element that is not a word); section `run`'s **J** block, six rows
+about the janitor and a Stop already pressed, three of them CONTROLs; section
+`run`'s **I** block, **five** rows about a cache file's `transcript_id` being
+somebody else's string — three about what reaches the wire and what R6-11
+holds, and two from the fix pass, that such an id is in neither
+`janitorDeleted` nor the cache file's `remote_deleted`; section `run`'s
+sharper Z5 row, that **no line the child printed holds the dummy**, with its
+CONTROL that the child printed client lines to look in; three `EINTR` rows in
+section 17; three hygiene rows about what shields `chromeSettings`' default
+store; two rows in section 12 holding `Transcriber.project` to the PRE-C1 line
+and naming the one place they differ by decision. Its `MUTANTS` table gained
+`janitor-deaf`, `eintr-unwritable`, `any-id-on-the-wire`,
+`refused-id-reported-as-deleted` and the review's ten named Z mutants.
+
+`cloud_captions_proof.py` — **146 rows** (115 at the baseline, 142 when the
+mutant matrix ran), and `--port-base` is now honoured under `--mutant` as
+well. New rows: **O** (a hostile `audio_duration` cannot kill the app, 12
+checks over three trials), **M** (a cache write that failed certifies nothing,
+5), **E** (a relayed server sentence carries no credential, 6) and **B** (a
+failed run names what it already cost, 8 — four of them from the fix pass, a
+run whose cache write is stopped the way row M stops it). Its
+`CLOUD_MUTANTS` table gained `audio-seconds-plus`, `marker-over-stale-file`,
+`key-relayed-verbatim`, `silent-about-the-bill`, `bill-promises-cache` and
+the seven Z mutants it scores; `no-janitor` was RE-AIMED at the janitor's new
+line and `no-delete` at `fetch`'s, which now reads the client's three-state
+answer.
+
+Row M's write is made to fail by setting the cache file's `UF_IMMUTABLE`
+flag: an `.atomic` write renames over the file, which the flag refuses, while
+the FOLDER stays writable so the marker's own write still succeeds — which is
+the whole point of that row.

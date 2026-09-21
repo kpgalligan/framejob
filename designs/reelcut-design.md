@@ -2461,8 +2461,13 @@ argument that cannot do anything is a mistake and not a no-op. The default
 is never what the sheet last chose (§11's R6-2). The refusal ORDER is the
 caller's own mistakes first — an unknown clip, an empty scope, a misspelt
 `engine` with both spellings named, a cloud-only argument under `apple` —
-then the credential, then a media over AssemblyAI's ten-hour limit, and only
-then the network. The cloud result gains `engine`, `uploaded` and `cached`
+then the credential, and only then the network. (**Corrected 2026-09-21** by
+road map 6 §10.13's reader review, which also corrected §5g's twin sentence:
+this used to name "a media over AssemblyAI's ten-hour limit" between the
+credential and the network. That limit is not a position in a RUN's order —
+it is one MEDIA's problem, checked at the head of its own fetch and therefore
+after every earlier media's whole round trip, and reported under `skipped`.
+It refuses the run only when it is the only media there is. MEASURED.) The cloud result gains `engine`, `uploaded` and `cached`
 (media ids), `audio_seconds` (what was billed), `speech_model_used`,
 `language_detected` with its confidence, and `note` when there is something
 to say — a vocabulary that was capped, R6-8's fallback, or a remote delete
@@ -3387,9 +3392,11 @@ assisted import.
   bounds to `Transcriber.maxSourceTicks` = 1e15 — deliberately NOT the
   core's `i64::MAX`, because Swift SUMS this number where the core does
   not: `MediaTranscript.swift:333` adds it to `sourceIn` for the window's
-  end and `TranscribeSheetController.swift:388` sums it over at most
+  end and `TranscribeSheetController.swift:395` sums it over at most
   `MAX_CLIPS` = 4096 jobs, and 4096 × 1e15 is comfortably under 2^63 (both
-  citations re-pointed by `grep -n` after c1-chrome's edits).
+  citations re-pointed by `grep -n` — after c1-chrome's edits, and the second
+  again on 2026-09-21 by §10.13's reader review, which found it seven lines
+  short at `:388`; the first was and is correct).
   `Transcriber.jobs` bounds every `Job.sourceIn` the same way so the window
   end cannot overflow either. **Extended 2026-09-20 (c1-chrome) to the one
   INTEGER multiply on that path**, which this rule did not cover and which

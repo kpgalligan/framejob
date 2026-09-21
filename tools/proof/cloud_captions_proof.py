@@ -73,6 +73,7 @@ import pty
 import re
 import shutil
 import signal
+import stat
 import subprocess
 import sys
 import tempfile
@@ -84,6 +85,11 @@ from mcp import MCP, ToolError
 # The probe's instruments, imported rather than copied (road map 6 §10.9
 # built them; a second spelling of any of them is the drift this tree warns
 # about).
+# The MODULE as well as the names: `--fake-mutant` rebinds the probe's one
+# `FAKE` global, and `Fake.__enter__` reads it off the module, so the
+# rebinding has to happen there and not on a copy of the name here.
+import cloud_captions_probe
+
 from cloud_captions_probe import (
     HARNESS_MAIN, PROBE_SOURCE, TREE_SOURCES, Fake, MUTANTS, build, child_env,
     differences_between, make_fixture, population, run_cues, run_probe, wav_samples, word)
@@ -921,7 +927,18 @@ def row_five(instance, fake):
 
     # A split pair, a later `in`, and the refusals.
     whole = session.op("transcribe", engine="assemblyai", clips=[clip], place=False)
-    session.op("split", clips=[clip], at=int(2.5 * SEC))
+    # At 3.0 s, which is EXACTLY where the fake's fourth word starts — 2.5 s
+    # put the split where no word was.
+    #
+    # It still does not catch a `<=` window test, and the reason is worth
+    # knowing: `CloudTranscriber.transcribe` filters every mapped word by
+    # `$0.start < job.start + job.duration` before it builds a cue, so a word
+    # the window doubled at the boundary is dropped a second time, by a
+    # second guard, before it can reach this row. Only the probe's section 12,
+    # which calls `MediaTranscript.words` directly, sees below that filter.
+    # The split is left on the boundary anyway, because a row that exercises
+    # the tick is worth more than one that does not (§10.13, R7·2).
+    session.op("split", clips=[clip], at=int(3.0 * SEC))
     halves = sorted(c["id"] for c in session.project()["clips"]
                     if c["source"]["kind"] == "media")
     parts = session.op("transcribe", engine="assemblyai", clips=halves, place=False)
@@ -1290,7 +1307,11 @@ def row_h(instance, fake):
 
 def temp_folders():
     """Both spellings of a temporary directory an app of ours could use: this
-    process's own, and the per-user Darwin one the launched app gets."""
+    process's own, and the per-user Darwin one the launched app gets.
+
+    De-duplicated by REAL path, because on this host they are the same folder
+    under two names and a caller that globbed both counted every file twice
+    (the reader review, road map 6 \u00a710.13, R7\u00b71)."""
     folders = {tempfile.gettempdir()}
     try:
         answer = subprocess.run(["getconf", "DARWIN_USER_TEMP_DIR"], capture_output=True,
@@ -1299,13 +1320,19 @@ def temp_folders():
             folders.add(answer)
     except (OSError, subprocess.SubprocessError):
         pass
-    return sorted(folders)
+    return sorted({os.path.realpath(one) for one in folders})
 
 
 def temp_uploads():
-    found = []
+    """Every `reelcut-upload-*` in either temporary folder, each named ONCE.
+
+    The set is what makes row T's CONTROL mean anything: it compares this
+    answer taken during a run with the same answer taken before it, and a
+    doubled `before` made the row fail whenever the folder held so much as one
+    leftover from an earlier run (R7\u00b71)."""
+    found = set()
     for folder in temp_folders():
-        found += glob.glob(os.path.join(folder, "reelcut-upload-*"))
+        found.update(glob.glob(os.path.join(folder, "reelcut-upload-*")))
     return sorted(found)
 
 
@@ -1349,7 +1376,7 @@ def row_t(instance, fake):
         during = watcher.stop()
     check("T: CONTROL — an extract IS on disk while the body is going out, so the rows "
           "below are claims about a file that existed",
-          len(during) > len(before), f"during {during!r}, before {before!r}")
+          set(during) - set(before), f"during {during!r}, before {before!r}")
     check("T: and it is gone once the run has ended",
           temp_uploads() == before, f"got {temp_uploads()!r}, before {before!r}")
 
@@ -1372,6 +1399,217 @@ def row_t(instance, fake):
 
 # --------------------------------------------------------------------------
 # K and X — the credential, and this host's own name
+
+
+def row_b(instance, fake):
+    """The reader review's R5\u00b72 — a run that throws AFTER a bill says so.
+
+    `cloudFields` is never reached on a throwing path, so `uploaded` and
+    `audio_seconds` are not in the answer at all. A project whose only media
+    held no speech billed AssemblyAI for the whole file and then answered a
+    bare "No speech was recognised", with nothing about the money."""
+    print("\nB. a failed run names what it already cost (the reader review, R5\u00b72)")
+    speech, _ = fixtures()
+    # `words: []` IS an array and means zero words, so the media is uploaded,
+    # answered and BILLED, and the run then throws `nothingRecognized`.
+    scenario(fake, words=[])
+    session = Session(instance, "rowB")
+    session.add(session.media_of(speech), at=0)
+    session.save()
+    answer = session.error("transcribe", engine="assemblyai", place=False)
+    check("B: the run still ends in its own sentence about the AUDIO",
+          answer is not None
+          and "No speech was recognised in the audio that was transcribed." in answer,
+          f"got {answer!r}")
+    check("B: and the refusal names the bill it already ran up",
+          answer is not None
+          and "AssemblyAI had already been billed for 1 media file" in answer
+          and "audio seconds) before this failed." in answer,
+          f"got {answer!r}")
+    check("B: CONTROL \u2014 there really was an upload behind that sentence",
+          len(uploads(fake.log())) == 1, f"got {routes(fake.log())!r}")
+    # And the CONTROL that says it is not printed when nothing was spent: a
+    # misspelt engine is refused above the network.
+    nothing = session.error("transcribe", engine="nope")
+    check("B: CONTROL \u2014 a refusal that cost nothing carries no bill sentence",
+          nothing is not None and "already been billed" not in nothing, f"got {nothing!r}")
+
+    # The branch the sentence must ALSO be true on (the reader review's fix
+    # pass, and issue #29): the cache write cannot land, so the media is
+    # billed and in `report.uploaded` while NOTHING is cached. The write is
+    # stopped exactly the way row M stops it \u2014 `UF_IMMUTABLE` on the cache
+    # file, the folder left writable.
+    alpha = [{"text": "alpha", "start": 600, "end": 900, "confidence": 0.9, "speaker": None}]
+    scenario(fake, words=alpha)
+    held = Session(instance, "rowB2")
+    media = held.media_of(speech)
+    held.add(media, at=0)
+    held.save()
+    held.op("transcribe", engine="assemblyai", place=False)
+    target = os.path.join(held.path, "cache", "transcripts", f"{media}.json")
+    check("B: CONTROL \u2014 run 1 cached that media, so there is a file to make unwritable",
+          os.path.exists(target), f"no {target!r}")
+    if not os.path.exists(target):
+        return
+    first = json.loads(read(target).decode())
+    os.chflags(target, stat.UF_IMMUTABLE)
+    try:
+        # A DIFFERENT request, so run 2 re-fetches rather than serving the
+        # cache, and `words: []` is what makes it throw after the bill.
+        scenario(fake, words=[])
+        second = held.error("transcribe", engine="assemblyai", place=False, speakers=True)
+        check("B: a run whose cache write could not land still names the bill",
+              second is not None
+              and "AssemblyAI had already been billed for 1 media file" in second,
+              f"got {second!r}")
+        check("B: and promises NOTHING about a cache that was never written \u2014 the "
+              "sentence is true on THIS branch too",
+              second is not None
+              and "cached in the project" not in second
+              and "makes no request for them" not in second,
+              f"got {second!r}")
+        check("B: CONTROL \u2014 the immutable flag really did stop the write: the cache "
+              "file still holds run 1's words",
+              json.loads(read(target).decode()).get("words") == first.get("words"),
+              f"got {json.loads(read(target).decode()).get('words')!r}")
+    finally:
+        os.chflags(target, 0)
+
+
+def row_e(instance, fake):
+    """The reader review's R2\u00b71 — a relayed sentence never carries the key.
+
+    `AgentServer+CloudCaptions.swift`'s header promises "No credential is ever
+    in an answer. Not in a `ToolError`, not in a `Problem`, not in the
+    `note`". Three sentences ARE relayed verbatim from the server — a 402's, a
+    4xx's and a transcript's `error` — and a server that echoes the
+    `authorization` header it received put the key straight into an MCP
+    refusal. The fake's `echo_authorization` key is what makes that branch
+    reachable, with the allow-listed dummy and nothing else."""
+    print("\nE. a relayed server sentence carries no credential (the reader review, R2\u00b71)")
+    speech, _ = fixtures()
+    session = Session(instance, "rowE")
+    session.add(session.media_of(speech), at=0)
+    session.save()
+    for tag, given in (
+            ("a 4xx at submission", {"fail": [{"route": "submit", "status": 400, "times": -1}]}),
+            ("a 402 at submission", {"fail": [{"route": "submit", "status": 402, "times": -1}]}),
+            ("a transcript that ended in `error`",
+             {"transcript_error": f"Transcoding failed for {DUMMY}"})):
+        scenario(fake, echo_authorization=True, **given)
+        answer = session.error("transcribe", engine="assemblyai", place=False)
+        check(f"E: {tag} is refused in band and the refusal does NOT hold the key",
+              answer is not None and DUMMY not in answer, f"got {answer!r}")
+        check(f"E: CONTROL \u2014 {tag} really did relay the SERVER's own sentence, with the "
+              f"key replaced rather than the whole sentence dropped",
+              answer is not None and "<redacted>" in answer, f"got {answer!r}")
+
+
+def row_m(instance, fake):
+    """The reader review's R1\u00b73 — the MARKER is written only when the cache
+    file LANDED.
+
+    `MediaTranscript.write` answers `false` for every way it can fail and
+    `fetch` discarded that answer, so a run whose write failed still stamped
+    the marker with the NEW request. `isCurrent` then matched the new marker
+    against the OLD file and served an earlier request's words for ever.
+
+    The write is made to fail by setting the cache file's IMMUTABLE flag: an
+    `.atomic` write renames over the file, which `UF_IMMUTABLE` refuses, while
+    the FOLDER stays writable so the marker's own write still succeeds — which
+    is the whole point of the row."""
+    print("\nM. a cache write that failed certifies nothing (the reader review, R1\u00b73)")
+    speech, _ = fixtures()
+    alpha = [{"text": "alpha", "start": 600, "end": 900, "confidence": 0.9, "speaker": None}]
+    bravo = [{"text": "bravo", "start": 600, "end": 900, "confidence": 0.9, "speaker": None}]
+    scenario(fake, words=alpha)
+    session = Session(instance, "rowM")
+    media = session.media_of(speech)
+    session.add(media, at=0)
+    session.save()
+    session.op("transcribe", engine="assemblyai", place=False)
+    folder = os.path.join(session.path, "cache", "transcripts")
+    target = os.path.join(folder, f"{media}.json")
+    marker = os.path.join(folder, f"{media}.complete.json")
+    check("M: run 1 wrote the cache file and its marker",
+          os.path.exists(target) and os.path.exists(marker),
+          f"got {sorted(os.listdir(folder)) if os.path.isdir(folder) else folder!r}")
+    if not (os.path.exists(target) and os.path.exists(marker)):
+        return
+    first = json.loads(read(target).decode())
+    before = read(marker)
+    os.chflags(target, stat.UF_IMMUTABLE)
+    try:
+        scenario(fake, words=bravo)
+        # A DIFFERENT request, so the stamp really does change and run 2 has
+        # to re-fetch rather than read the cache.
+        answer = session.op("transcribe", engine="assemblyai", place=False, speakers=True)
+        check("M: run 2 really did upload again — a different request is a different stamp",
+              answer.get("uploaded") == [int(media)], f"got {answer!r}")
+        after = json.loads(read(target).decode())
+        check("M: CONTROL — the immutable flag really did stop the write: the file still "
+              "holds run 1's words",
+              after.get("words") == first.get("words"),
+              f"got {after.get('words')!r}")
+        check("M: so the MARKER was not rewritten either — a stamp over a stale file would "
+              "certify an earlier request's transcript",
+              read(marker) == before,
+              f"marker changed: {read(marker)[:200]!r}")
+        third = session.op("transcribe", engine="assemblyai", place=False, speakers=True)
+        check("M: and the next run with that same request UPLOADS rather than serving the "
+              "stale file from the cache",
+              third.get("uploaded") == [int(media)] and third.get("cached") == [],
+              f"got uploaded={third.get('uploaded')!r} cached={third.get('cached')!r}")
+    finally:
+        os.chflags(target, 0)
+
+
+def row_o(instance, fake):
+    """The reader review's R1·1 — `audio_seconds` is the SERVER's own number
+    summed with `+`, which TRAPS.
+
+    Two media, each answered `9223372036854775807`, killed the whole app after
+    both had been uploaded and billed: the MCP socket closed with no answer and
+    the process was gone. The row is three trials so the arithmetic is pinned
+    rather than guessed — one media at the maximum and two at half of it both
+    have to come back, or a build that simply refused the key would pass."""
+    print("\nO. a hostile `audio_duration` cannot kill the app (the reader review, R1\u00b71)")
+    speech, second = fixtures()
+    big = 2 ** 63 - 1
+    for tag, seconds, two, expected in (
+            ("one media at Int.max", big, False, big),
+            ("two media at half of it", big // 2, True, 2 * (big // 2)),
+            ("two media at Int.max", big, True, big)):
+        scenario(fake, audio_seconds=seconds)
+        session = Session(instance, "rowO-" + tag.replace(" ", "-"))
+        session.add(session.media_of(speech), at=0)
+        if two:
+            session.add(session.media_of(second), at=10 * SEC)
+        session.save()
+        answer = None
+        failure = None
+        try:
+            answer = session.op("transcribe", engine="assemblyai", place=False)
+        except ToolError as problem:
+            failure = f"refused in band: {problem}"
+        except Exception as problem:  # noqa: BLE001 — a dead instance is the finding
+            failure = f"{type(problem).__name__}: {problem}"
+        alive = instance.process.poll() is None
+        check(f"O: {tag} \u2014 the instance is still alive after the call",
+              alive, "the app died mid-answer: the sum trapped")
+        if not alive:
+            return
+        check(f"O: {tag} \u2014 the call answered at all", answer is not None,
+              failure or "no answer")
+        if answer is None:
+            continue
+        check(f"O: {tag} \u2014 `audio_seconds` is {expected}",
+              answer.get("audio_seconds") == expected,
+              f"got {answer.get('audio_seconds')!r}")
+        check(f"O: {tag} \u2014 and every media really was uploaded, so the sum has as "
+              f"many terms as the tag says",
+              len(answer.get("uploaded") or []) == (2 if two else 1),
+              f"got {answer.get('uploaded')!r}")
 
 
 def row_k(fake_folders):
@@ -1431,12 +1669,12 @@ CLOUD_MUTANTS = {
         "the stamp comparison deleted — every run uploads (row 5)"),
     "no-delete": (
         "app/Sources/CloudTranscriber+Media.swift",
-        "        let deleted = client.delete(id: fetched.response.id)\n",
+        "        let deleted = client.delete(id: fetched.response.id) == .deleted\n",
         "        let deleted = false\n",
         "the remote DELETE removed (rows 2, 4)"),
     "no-janitor": (
         "app/Sources/CloudTranscriber.swift",
-        "        let janitor = retryDeletes()\n",
+        "        let janitor = retryDeletes(cancel: cancel)\n",
         "        let janitor: (deleted: [UInt32], failed: [UInt32]) = ([], [])\n",
         "the janitor removed (row 11)"),
     "auth-carries-on": (
@@ -1461,6 +1699,85 @@ CLOUD_MUTANTS = {
         "R6-2 broken — the tool falling back to the SHEET's remembered engine when the "
         "call named none (row 8, because every instance is launched with that key pinned "
         "to assemblyai)"),
+    # The reader review's named mutants that the MCP proof scores too
+    # (road map 6 §10.13, step 8). Z6, Z7 and Z10 are `not run` here:
+    # no tool reaches the resolver's argument table or the estimate.
+    "z1-follows-redirect": (
+        "app/Sources/AssemblyAIClient+Session.swift",
+        '            completionHandler(nil)\n',
+        '            completionHandler(request)\n',
+        'Z1 — the redirect FOLLOWED, so the authorization header goes to whatever host the Location named'),
+    "z2-throw-without-delete": (
+        "app/Sources/AssemblyAIClient+Session.swift",
+        '        delete(id: id)\n',
+        '',
+        'Z2 — `refusing` no longer DELETEs before it throws (R6-4)'),
+    "z3-extract-kept": (
+        "app/Sources/CloudTranscriber+Media.swift",
+        '        defer { try? FileManager.default.removeItem(at: upload.url) }\n',
+        '',
+        'Z3 — the temporary extract is never removed'),
+    "z4-words-reserialised": (
+        "app/Sources/AssemblyAIClient.swift",
+        'return Fetched(response: response, wordsJSON: words)',
+        'return Fetched(response: response, wordsJSON: (try? JSONEncoder().encode(response.words ?? [])) ?? words)',
+        'Z4 — the served `words` bytes re-serialised through Codable'),
+    "z5-key-in-note": (
+        "app/Sources/AssemblyAIClient.swift",
+        'note("\\(request.httpMethod ?? "?") \\(request.url?.path ?? "?") → "',
+        'note("\\(request.value(forHTTPHeaderField: "authorization") ?? "") \\(request.httpMethod ?? "?") \\(request.url?.path ?? "?") → "',
+        'Z5 — the credential in every client log line (dummy keys only)'),
+    "z9-boundary-doubled": (
+        "app/Sources/MediaTranscript.swift",
+        'startTicks < windowEnd else { continue }',
+        'startTicks <= windowEnd else { continue }',
+        "Z9 — the window's end made inclusive, so a split's halves double a word"),
+    "z12-no-ceiling": (
+        "app/Sources/AssemblyAIClient.swift",
+        '            if Date().timeIntervalSince(started) > ceiling { throw refusing(.timedOut, id: id) }\n',
+        '',
+        'Z12 — the poll ceiling removed'),
+    "silent-about-the-bill": (
+        "app/Sources/AgentServer+CloudCaptions.swift",
+        '                message: error.localizedDescription\n'
+        '                    + Self.billed(transcriber.report))\n',
+        '                message: error.localizedDescription)\n',
+        "the bill sentence dropped from a failed run \u2014 the reader review's R5\u00b72, "
+        "reverted (row B)"),
+    "bill-promises-cache": (
+        "app/Sources/AgentServer+CloudCaptions.swift",
+        '            + "before this failed."\n',
+        '            + "before this failed; their transcripts are cached in the project, so "\n'
+        '            + "another run makes no request for them."\n',
+        "the bill sentence promising a cache again — the reader review's fix pass, "
+        "reverted (row B: a run whose cache write could not land)"),
+    "key-relayed-verbatim": (
+        "app/Sources/AssemblyAIClient.swift",
+        '        guard !credential.isEmpty, text.contains(credential) else { return text }\n'
+        '        return text.replacingOccurrences(of: credential, with: "<redacted>")\n',
+        '        return text\n',
+        "the relayed sentence carrying the credential again \u2014 the reader review's R2\u00b71 "
+        "(row E: a server that echoes the authorization header puts the key in an MCP "
+        "refusal)"),
+    "marker-over-stale-file": (
+        "app/Sources/CloudTranscriber+Media.swift",
+        '        if MediaTranscript.write(file, for: media.id, in: cacheDirectory) {\n'
+        '            MediaTranscript.writeStamp(stamp, for: media.id, in: cacheDirectory)\n'
+        '        }\n',
+        '        MediaTranscript.write(file, for: media.id, in: cacheDirectory)\n'
+        '        MediaTranscript.writeStamp(stamp, for: media.id, in: cacheDirectory)\n',
+        "`write`'s answer discarded again \u2014 the reader review's R1\u00b73 (row M: a marker "
+        "stamped over a cache file the write never replaced)"),
+    "audio-seconds-plus": (
+        "app/Sources/AgentServer+CloudCaptions.swift",
+        '            "audio_seconds": report.uploaded.reduce(0) { sum, row in\n'
+        '                let (total, overflowed) = sum.addingReportingOverflow(row.audioSeconds)\n'
+        '                guard overflowed else { return total }\n'
+        '                return row.audioSeconds > 0 ? Int.max : Int.min\n'
+        '            },\n',
+        '            "audio_seconds": report.uploaded.reduce(0) { $0 + $1.audioSeconds },\n',
+        "the saturating sum reverted to `+` \u2014 the reader review's R1\u00b71 (row O: the "
+        "app dies on two media the server answered `9223372036854775807` for)"),
     "universal-2-only": (
         "app/Sources/AssemblyAITranscript.swift",
         '    static let shippedModels = ["universal-3-5-pro", "universal-2"]\n',
@@ -1534,10 +1851,19 @@ def main():
     parser.add_argument("--binary", default=os.path.join(
         ROOT, "build", "Build", "Products", "Release", "Reelcut.app", "Contents", "MacOS",
         "Reelcut"))
-    parser.add_argument("--port-base", type=int, default=4955)
+    parser.add_argument("--port-base", type=int, default=None,
+                        help="the first port an instance binds (default 4955, or 4960 "
+                             "under --mutant so a mutant run cannot collide with a tree "
+                             "run on the same host); an EXPLICIT flag is honoured under "
+                             "--mutant too")
     parser.add_argument("--mutant", choices=sorted(CLOUD_MUTANTS),
                         help="build a COPY of the tree with one text replaced and run every "
                              "row against it")
+    parser.add_argument("--fake-mutant",
+                        choices=sorted(cloud_captions_probe.FAKE_MUTANTS),
+                        help="patch a COPY of assemblyai_fake.py and run every row against "
+                             "the TREE's binary \u2014 a mutant of the INSTRUMENT, which builds "
+                             "nothing; refused together with --mutant")
     parser.add_argument("--wall", type=float, default=1800,
                         help="the whole run's wall-clock bound in seconds (rule H)")
     parser.add_argument("--live", action="store_true",
@@ -1550,15 +1876,24 @@ def main():
     os.makedirs(WORK, exist_ok=True)
     print("road map 6 C1 pipeline 3 — the cloud engine, over MCP, against the stand-in\n")
 
+    if args.mutant and args.fake_mutant:
+        print("--mutant and --fake-mutant are two different mutants and are refused "
+              "together: a cell measures one thing")
+        return 2
+    if args.fake_mutant:
+        cloud_captions_probe.prepare_fake_mutant(args.fake_mutant)
+
     binary = args.binary
-    port_base = args.port_base
+    # An explicit --port-base wins; absent, a mutant run moves off the
+    # tree run's ports of its own accord.
+    port_base = args.port_base if args.port_base is not None else (
+        4960 if args.mutant else 4955)
     if args.mutant:
         binary, error = build_mutant(args.mutant)
         if binary is None:
             check(f"the mutant {args.mutant} builds", False, error)
             print(f"\n{passed}/{passed + failed} checks passed in {time.time() - started:.0f} s")
             return 1
-        port_base = 4960
     if not os.path.exists(binary):
         check("the built binary is there — run `make app` first", False, binary)
         print(f"\n{passed}/{passed + failed} checks passed in {time.time() - started:.0f} s")
@@ -1625,6 +1960,10 @@ def main():
                     run_row(row_eleven, c, fake_c)
                     run_row(row_h, c, fake_c)
                     run_row(row_t, c, fake_c)
+                    run_row(row_o, c, fake_c)
+                    run_row(row_m, c, fake_c)
+                    run_row(row_e, c, fake_c)
+                    run_row(row_b, c, fake_c)
         run_row(row_k, fake_folders)
     finally:
         left = [one for one in temp_uploads()]

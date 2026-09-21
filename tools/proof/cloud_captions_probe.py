@@ -587,6 +587,11 @@ func modeRun(_ request: [String: Any]) -> [String: Any] {
     let jobs = (request["jobs"] as? [[String: Any]] ?? []).map(makeJob)
     let token = Transcriber.CancelToken()
     let cancelOnUpload = request["cancelOnUpload"] as? Bool ?? false
+    // The reader review's R1 janitor row: a token cancelled BEFORE the run
+    // starts. Everything after the janitor checks it; the question is what
+    // the janitor itself does with it.
+    if request["cancelBeforeRun"] as? Bool == true { token.cancel() }
+    let startedAt = Date()
 
     var published: [[Any]] = []
     var during: [String] = []
@@ -616,6 +621,7 @@ func modeRun(_ request: [String: Any]) -> [String: Any] {
         for (key, value) in describe(error) { answer[key] = value }
     }
     answer["progress"] = published
+    answer["seconds"] = Date().timeIntervalSince(startedAt)
     answer["tempDuring"] = during
     answer["tempAfter"] = uploadLeftovers()
     let report = transcriber.report
@@ -849,6 +855,58 @@ func modeSecrets(_ request: [String: Any]) -> [String: Any] {
     file["afterRemove"] = store.read() == nil
     file["removeTwiceSucceeds"] = (try? store.remove()) != nil
     answer["file"] = file
+
+    // H\u00b73: `writeAll`'s EINTR. The injected writer answers -1/EINTR on its
+    // first call and the real `write(2)` after, so the row measures the RETRY
+    // and not a mock of the whole call; the second row answers -1/EACCES,
+    // which must still be the sentence it always was.
+    var eintr: [String: Any] = [:]
+    let scratch = folder.appendingPathComponent("eintr-probe", isDirectory: false)
+    try? FileManager.default.removeItem(at: scratch)
+    let descriptor = scratch.withUnsafeFileSystemRepresentation { path -> Int32 in
+        guard let path = path else { return -1 }
+        return open(path, O_WRONLY | O_CREAT | O_EXCL, 0o600)
+    }
+    if descriptor >= 0 {
+        var interruptions = 0
+        let reason = writeAll(
+            descriptor, Array("interrupted-dummy".utf8),
+            using: { fd, base, count in
+                if interruptions == 0 {
+                    interruptions += 1
+                    errno = EINTR
+                    return -1
+                }
+                return Darwin.write(fd, base, count)
+            })
+        close(descriptor)
+        eintr["interruptions"] = interruptions
+        eintr["reason"] = reason ?? "<nil>"
+        eintr["wrote"] = (try? String(contentsOf: scratch, encoding: .utf8)) ?? "<nil>"
+    } else {
+        eintr["reason"] = "the scratch file would not open"
+    }
+    let refused = scratch.appendingPathExtension("second")
+    try? FileManager.default.removeItem(at: refused)
+    let second = refused.withUnsafeFileSystemRepresentation { path -> Int32 in
+        guard let path = path else { return -1 }
+        return open(path, O_WRONLY | O_CREAT | O_EXCL, 0o600)
+    }
+    if second >= 0 {
+        var calls = 0
+        eintr["otherErrno"] = writeAll(
+            second, Array("refused-dummy".utf8),
+            using: { _, _, _ in
+                calls += 1
+                errno = EACCES
+                return -1
+            }) ?? "<nil>"
+        eintr["otherCalls"] = calls
+        close(second)
+    }
+    try? FileManager.default.removeItem(at: scratch)
+    try? FileManager.default.removeItem(at: refused)
+    answer["eintr"] = eintr
 
     // MemoryStore, and the resolver's ORDER.
     let both = AssemblyAIConfiguration.credential(
@@ -2005,6 +2063,28 @@ def projected(job, t):
     return job["start"] + round_half_away(min(max(offset, 0.0), float(job["duration"])))
 
 
+def pre_c1_project(job, t):
+    """`Transcriber.project` as it stood BEFORE C1, in Python.
+
+    `git show cfcd09598e7ea7ec31ec229c943d1edfc51fc0d3:app/Sources/Transcriber.swift`
+    :675-679 — `ReelTime.ticks(seconds: max(0, t) / speed)`, which rounds half
+    AWAY from zero and answers 0 for anything out of `Ticks`' range
+    (`ReelCore.swift:416-420`), then `min(start + max(0, offset),
+    start + duration)`. The rounding comes BEFORE the clamp, where today's
+    `placed` clamps in `Double` first; this is the model that says whether
+    that reordering moved a tick."""
+    speed = speed_of(job)
+    if not (math.isfinite(speed) and speed > 0):
+        speed = 1.0
+    scaled = max(0.0, float(t)) / speed * 600000.0
+    if not math.isfinite(scaled):
+        offset = 0
+    else:
+        rounded = round_half_away(scaled)
+        offset = rounded if -(2 ** 63) <= rounded <= 2 ** 63 - 1 else 0
+    return min(job["start"] + max(0, offset), job["start"] + job["duration"])
+
+
 def oracle(job, words):
     """What the mapping must answer, computed here from road map 6 §5b's
     sentence and nothing else: `m = start × 600`; the clip's iff
@@ -2101,6 +2181,41 @@ def section_mapping(binary, sources):
               f"ticks Python computed",
               rows.get(job["clip"], {}).get("projected") == wanted,
               f"got {rows.get(job['clip'], {}).get('projected')!r}\n       want {wanted!r}")
+
+    # The reader review's R4 question: `Transcriber.project` today against the
+    # PRE-C1 line, on a sweep. Equal wherever `scaled = t / speed \u00d7 600 000` is
+    # below 2^63, and DIFFERENT above it by decision (K28 / R6-10).
+    sweep_job = {"clip": 30, "media": 5, "name": "pre-c1 sweep", "sourceIn": 0,
+                 "sourceLength": 2000 * TICKS_PER_MS, "start": 600_000,
+                 "duration": 2000 * TICKS_PER_MS, "speed": 1.0}
+    sweep_seconds = [0, 1e-9, 0.5, 1.0000008333, 1.9999991667, 2.0, 2.5, 3.0, 1e6]
+    differing = []
+    control = None
+    for speed in (0.1, 0.5, 1, 3.7, 10):
+        job = dict(sweep_job, speed=speed)
+        answer, error, _ = run_probe(binary, f"mapping-sweep-{speed}", {
+            "mode": "mapping", "words": [], "seconds": sweep_seconds + [1e14],
+            "jobs": [job]})
+        if answer is None:
+            check(f"12: the pre-C1 sweep at speed {speed} answers", False, error)
+            continue
+        today = (answer.get("jobs") or [{}])[0].get("projected") or []
+        for index, t in enumerate(sweep_seconds):
+            if index >= len(today):
+                continue
+            if today[index] != pre_c1_project(job, t):
+                differing.append((speed, t, today[index], pre_c1_project(job, t)))
+        if speed == 1 and len(today) > len(sweep_seconds):
+            control = (today[len(sweep_seconds)], pre_c1_project(job, 1e14))
+    check(f"12: `Transcriber.project` is the PRE-C1 line tick for tick wherever "
+          f"`t / speed \u00d7 600 000` is below 2^63 \u2014 5 speeds \u00d7 {len(sweep_seconds)} seconds",
+          not differing, f"differing: {differing!r}")
+    check("12: CONTROL \u2014 and at t = 1e14, speed 1, where `scaled` is PAST 2^63, the two "
+          "differ BY DECISION: the old line answered the clip's START and today's clamp "
+          "answers its END (spec \u00a711's R6-10, K28)",
+          control == (sweep_job["start"] + sweep_job["duration"], sweep_job["start"]),
+          f"got {control!r}, want "
+          f"{(sweep_job['start'] + sweep_job['duration'], sweep_job['start'])!r}")
 
     limit = edge["start"] + edge["duration"]
     check("12: the near-Int64.max clip answers at all — an unclamped `Ticks(_:)` would have "
@@ -2548,7 +2663,11 @@ def section_client(binary, sources):
 
     # The four `words` shapes.
     shapes = [("absent", None, "malformed"), ("null", '"words":null', "malformed"),
-              ("object", '"words":{}', "malformed")]
+              ("object", '"words":{}', "malformed"),
+              # The reader review's R1 question asks for the fourth shape: an
+              # array is not enough, its ELEMENTS have to decode as words.
+              ("an array holding one element that is not a word",
+               '"words":[{"text":1,"start":0,"end":1,"confidence":0.5}]', "malformed")]
     for label, literal, want_error in shapes:
         row = call(f"words-{label}", {
             "call": "poll", "tuning": FAST,
@@ -2688,6 +2807,19 @@ def section_secrets(binary, sources):
           f"got {file.get('afterRemove')!r} / {file.get('removeTwiceSucceeds')!r}")
     check("17: nothing but the key file was ever created in that folder",
           sorted(os.listdir(folder)) == [], f"got {sorted(os.listdir(folder))!r}")
+
+    # H\u00b73, the reader review: `writeAll` retries EINTR and nothing else.
+    eintr = answer.get("eintr", {})
+    check("17: a write interrupted by EINTR is RETRIED, not turned into "
+          "`unwritable` \u2014 the key the person typed still lands",
+          eintr.get("reason") == "<nil>" and eintr.get("wrote") == "interrupted-dummy",
+          f"got reason={eintr.get('reason')!r} wrote={eintr.get('wrote')!r}")
+    check("17: CONTROL \u2014 the injected writer really did answer EINTR once, so the "
+          "row above is about a retry and not about an uninterrupted write",
+          eintr.get("interruptions") == 1, f"got {eintr.get('interruptions')!r}")
+    check("17: and every OTHER errno is still the sentence it was, on the first answer",
+          eintr.get("otherErrno") == "Permission denied" and eintr.get("otherCalls") == 1,
+          f"got {eintr.get('otherErrno')!r} after {eintr.get('otherCalls')!r} calls")
 
     credential = answer.get("credential", {})
     check("17: with BOTH holding a dummy, the STORE wins (R6-5's order, R6-9 (d))",
@@ -3343,6 +3475,31 @@ def section_verbatim(binary, sources):
 RUN_TUNING = {"pollInterval": 0.2, "retryBackoff": 0.05, "requestTimeout": 20,
               "pollCeilingFloor": 60, "deleteTimeout": 5}
 
+# `MediaTranscript.File`'s document as section V writes it by hand, with the
+# transcript id left open: what the janitor's list is made of.
+UNDELETED_DOCUMENT = (
+    '{"audio_duration":11,"audio_track_start_ms":0,"extracted_seconds":10.389,'
+    '"fetched_at":"x","language_code":"en_us","language_confidence":0.99,'
+    '"provider":"assemblyai","remote_deleted":false,'
+    '"requested":{"keyterms_prompt":[],"language_code":null,'
+    '"speaker_labels":false,"speech_models":["universal-3-5-pro"]},'
+    '"speech_model_used":"universal-3-5-pro","transcript_id":"%s",'
+    '"uploaded_format":"flac","words":[]}')
+
+
+def plant_undeleted(cache, media_ids):
+    """One cache file per media with `remote_deleted` false, so
+    `MediaTranscript.undeleted` lists them. Answers the ids it wrote."""
+    folder = os.path.join(cache, "transcripts")
+    os.makedirs(folder, exist_ok=True)
+    ids = []
+    for media in media_ids:
+        tid = f"t_owed{media}"
+        ids.append(tid)
+        with open(os.path.join(folder, f"{media}.json"), "w") as handle:
+            handle.write(UNDELETED_DOCUMENT % tid)
+    return ids
+
 
 def run_media(path_a, path_b):
     """Two media over two files, ten and thirty seconds of DECLARED duration
@@ -3427,10 +3584,24 @@ def section_run(binary, sources):
     with Fake("run") as fake:
         fake.scenario(polls_before_complete=3, fail=[{"route": "upload", "status": 500,
                                                       "times": 1}])
-        answer, error, _ = run_probe(binary, "run-progress", {
+        answer, error, printed = run_probe(binary, "run-progress", {
             "mode": "run", "base": fake.base, "key": DUMMY_KEY, "tuning": RUN_TUNING,
             "cache": fresh("run-cache"), "media": media, "jobs": jobs}, timeout=300)
         log = fake.log()
+        # The reader review's Z5 cell: a mutant that puts the credential into
+        # every `note` line survived the whole 488-row probe, because the one
+        # row that read a child's stdout drove the `secrets` mode, which makes
+        # no request and so prints no client line at all. This row drives a
+        # real round trip and reads what the binary PRINTED.
+        client_lines = [one for one in printed.splitlines()
+                        if one.startswith("AssemblyAI: ")]
+        check("P: the credential is in NO line this child printed \u2014 `note` carries a "
+              "method, a path and a status, and never a header",
+              DUMMY_KEY not in printed,
+              f"printed: {[one for one in printed.splitlines() if DUMMY_KEY in one][:3]!r}")
+        check(f"P: CONTROL \u2014 it printed {len(client_lines)} client lines to look in, so "
+              f"the row above is about lines that exist",
+              len(client_lines) >= 4, f"got {client_lines[:6]!r}")
         if answer is None:
             check("P: the two-media run answers", False, error)
         else:
@@ -3497,8 +3668,124 @@ def section_run(binary, sources):
                   and any(d.startswith("Saving ") for d in details),
                   f"got {sorted(set(details))!r}")
 
-    # --- T: the temporary extract, on three failing paths and one control.
     one_media, one_job = media[:1], jobs[:1]
+
+    # --- J: the JANITOR against a Stop the person has already pressed
+    # (the reader review's R1\u00b72, FIXED). `CloudTranscriber.transcribe` used to
+    # check the token for the first time AFTER `retryDeletes()` had run, and
+    # `retryDeletes` read no token at all, so with three owed deletes and a
+    # server that answers nothing a run whose token was cancelled before it
+    # started paid three `deleteTimeout`s \u2014 fifteen seconds of a Stop the
+    # person had already pressed \u2014 and cleared none of them.
+    janitor_cache = fresh("run-janitor")
+    owed = plant_undeleted(janitor_cache, [11, 12, 13])
+    with Fake("run-janitor") as fake:
+        fake.scenario(stall={"route": "delete", "seconds": 30})
+        answer, error, _ = run_probe(binary, "run-janitor", {
+            "mode": "run", "base": fake.base, "key": DUMMY_KEY, "tuning": RUN_TUNING,
+            "cache": janitor_cache, "media": one_media, "jobs": one_job,
+            "cancelBeforeRun": True}, timeout=300)
+        log = fake.log()
+    if answer is None:
+        check("J: the pre-cancelled janitor run answers", False, error)
+    else:
+        check("J: a run whose token was cancelled BEFORE it started ends `cancelled`",
+              answer.get("ok") is False
+              and "cancelled" in str(answer.get("message", "")).lower(),
+              f"got ok={answer.get('ok')!r} {answer.get('message')!r}")
+        deletes = [row for row in log["requests"] if row["method"] == "DELETE"]
+        check("J: and it sent NO DELETE at all \u2014 the check is above the janitor, so a "
+              "Stop already pressed costs nothing",
+              not deletes, f"got {[r['path'] for r in deletes]!r}")
+        check("J: so it took under one `deleteTimeout`, where three owed ids used to cost "
+              "three of them",
+              (answer.get("seconds") or 99) < 5,
+              f"the run took {answer.get('seconds')!r} s")
+        check("J: CONTROL \u2014 the cache really did owe three DELETEs, so \"none sent\" is "
+              "a claim about work there was to do",
+              sorted(json.loads(open(os.path.join(
+                  janitor_cache, "transcripts", f"{media}.json")).read())["transcript_id"]
+                  for media in (11, 12, 13)) == sorted(owed)
+              and all(json.loads(open(os.path.join(
+                  janitor_cache, "transcripts", f"{media}.json")).read())["remote_deleted"]
+                  is False for media in (11, 12, 13)),
+              f"owed {owed!r}")
+
+    # --- J2: the CONTROL that the janitor still runs when nothing was
+    # cancelled, and that it is the STALL, not the check, that the row above
+    # measured.
+    janitor_ok = fresh("run-janitor-ok")
+    owed_ok = plant_undeleted(janitor_ok, [11, 12, 13])
+    with Fake("run-janitor-ok") as fake:
+        fake.scenario(stall={"route": "delete", "seconds": 30})
+        answer, error, _ = run_probe(binary, "run-janitor-ok", {
+            "mode": "run", "base": fake.base, "key": DUMMY_KEY, "tuning": RUN_TUNING,
+            "cache": janitor_ok, "media": one_media, "jobs": one_job,
+            "cancelOnUpload": True}, timeout=300)
+        log = fake.log()
+    if answer is None:
+        check("J: the un-cancelled janitor run answers", False, error)
+    else:
+        deletes = [row for row in log["requests"] if row["method"] == "DELETE"]
+        check("J: CONTROL \u2014 with NO cancel before the run the janitor still sends all "
+              "three, so the fix stopped a cancelled run and not the janitor",
+              sorted(row["path"].rsplit("/", 1)[1] for row in deletes) == sorted(owed_ok),
+              f"got {[r['path'] for r in deletes]!r}, owed {owed_ok!r}")
+        check("J: CONTROL \u2014 and that cost it the three `deleteTimeout`s the row above "
+              "no longer pays",
+              (answer.get("seconds") or 0) >= 3 * 5 - 1,
+              f"the run took {answer.get('seconds')!r} s")
+
+    # --- I: a cache file's `transcript_id` is somebody ELSE's string (the
+    # reader review's R3\u00b71). It rides inside a `.reelcut` package, so a
+    # hostile or hand-edited one used to put a DELETE on a path of its
+    # author's choosing on the API host, with the person's key.
+    hostile = {11: "../upload", 12: "a/b", 13: "?x=1", 14: "x" * 1000,
+               15: "../../../../etc/passwd", 16: "t_looks_fine"}
+    hostile_cache = fresh("run-hostile")
+    plant_undeleted(hostile_cache, [])
+    folder = os.path.join(hostile_cache, "transcripts")
+    os.makedirs(folder, exist_ok=True)
+    for media, tid in hostile.items():
+        with open(os.path.join(folder, f"{media}.json"), "w") as handle:
+            handle.write(UNDELETED_DOCUMENT % tid)
+    with Fake("run-hostile") as fake:
+        fake.scenario()
+        answer, error, _ = run_probe(binary, "run-hostile", {
+            "mode": "run", "base": fake.base, "key": DUMMY_KEY, "tuning": RUN_TUNING,
+            "cache": hostile_cache, "media": one_media, "jobs": one_job}, timeout=300)
+        log = fake.log()
+    if answer is None:
+        check("I: the hostile-id run answers", False, error)
+    else:
+        paths = [row["path"] for row in log["requests"] if row["method"] == "DELETE"]
+        janitor_paths = [p for p in paths if "t_" not in p.rsplit("/", 1)[1]]
+        check("I: NONE of the five hostile ids reached the wire \u2014 no `..`, no second "
+              "path segment, no query, no kilobyte",
+              not janitor_paths, f"got {janitor_paths!r}")
+        check("I: CONTROL \u2014 the ONE well-formed id beside them DID, so the janitor was "
+              "running and the row is not vacuous",
+              "/v2/transcript/t_looks_fine" in paths, f"got {paths!r}")
+        report = answer.get("report", {})
+        check("I: and none of the five is in `janitorFailed`, so R6-11 does not HOLD a "
+              "media for ever over a string somebody else wrote",
+              sorted(report.get("janitorFailed") or []) == [16],
+              f"got {report.get('janitorFailed')!r}")
+        # The reader review's fix pass: a refusal is not a delete either.
+        check("I: and none of the five is in `janitorDeleted` — a DELETE that was never "
+              "sent is not a delete the run may report",
+              not (set(report.get("janitorDeleted") or []) & set(hostile)),
+              f"got {report.get('janitorDeleted')!r}")
+        still_owed = sorted(
+            media for media in hostile
+            if json.loads(open(os.path.join(folder, f"{media}.json")).read())["remote_deleted"]
+            is False)
+        check("I: and their cache files still say `remote_deleted: false`, so the one "
+              "record that something was owed is not erased by a refusal",
+              still_owed == sorted(hostile),
+              f"got {still_owed!r}, planted {sorted(hostile)!r}")
+
+    # --- T: the temporary extract, on three failing paths and one control.
     for tag, scenario, cancel, expected in [
         ("cancel", {"slow_upload": {"chunk": 4096, "delay_ms": 20}}, True,
          "The transcription was cancelled."),
@@ -3743,6 +4030,30 @@ def section_hygiene(binary, sources):
     naked = [c for c in calls if "env=" not in c]
     check(f"K: every `subprocess` call in this file passes `env=` ({len(calls)} calls)",
           not naked, f"without env=: {[c[:60] for c in naked]!r}")
+
+    # The reader review's L10, made checkable rather than read: `chromeSettings`
+    # builds a `SettingsWindowController` with NO `store:` on purpose \u2014 that is
+    # the row that exercises R6-9's resolution \u2014 and then pushes Save and
+    # Remove through it. What keeps those two buttons off the person's own
+    # `~/Library/Application Support/Reelcut/assemblyai-key` is not the mode's
+    # code but its LAUNCHER, so the launcher is what is asserted here.
+    swift = PROBE_SOURCE
+    check("G: `chromeSettings` builds its controller with no `store:` \u2014 the CONTROL for "
+          "the two rows below, which are about what shields it",
+          swift.count("SettingsWindowController(defaults: defaults, environment: [:])") == 1,
+          "the mode has changed and L10's reading needs redoing")
+    chrome_calls = re.findall(r"run_probe\((?:[^()]|\([^()]*\))*\)", text, re.S)
+    chrome_calls = [c for c in chrome_calls if 'mode="chrome"' in c]
+    check(f"G: every chrome child in this file is launched by `chrome_child` "
+          f"({len(chrome_calls)} call)",
+          len(chrome_calls) == 1
+          and "-RCAssemblyAIEndpoint" in chrome_calls[0]
+          and "-RCSecretFolder" in chrome_calls[0],
+          f"got {[c[:80] for c in chrome_calls]!r}")
+    check("G: and `chrome_child` is the only way a chrome row is reached",
+          len(re.findall(r"chrome_child\(", text)) >= 2
+          and 'dict(body, mode="chrome")' in text,
+          "a chrome mode is reached by some other launcher")
 
 
 # --------------------------------------------------------------------------
@@ -4176,6 +4487,13 @@ def section_chrome(binary, sources):
                   row.get("noKeyNote") == NO_KEY_NOTE, f"got {row.get('noKeyNote')!r}")
 
         # --- A Mac with no on-device speech model at all.
+        # The fake's request count is taken BEFORE the child runs, because the
+        # row below is about what THIS click sent and the fake is the whole
+        # section's. It used to assert the log was "still empty", which was
+        # true only because of where the block happened to sit: moving the
+        # Verify block above it made the row fail for a reason that was
+        # nothing to do with Stop (the reader review, \u00a710.13, H\u00b75).
+        before_click = len(fake.log()["requests"])
         nomodel, error, _ = chrome_child(binary, fake, "nomodel", {
             "op": "sheet", "fixture": fixture, "key": DUMMY_KEY, "languages": "none",
             "click": True})
@@ -4206,10 +4524,12 @@ def section_chrome(binary, sources):
                   f"got {nomodel.get('cancelFinished')!r} / "
                   f"{nomodel.get('cancelStatus')!r} / {nomodel.get('cancelStopTitle')!r} / "
                   f"{nomodel.get('cancelClips')!r} clips")
-            check("18: and it stopped before anything was uploaded — the fake's request log "
-                  "is still empty",
-                  fake.log()["requests"] == [],
-                  f"got {[(r['method'], r['path']) for r in fake.log()['requests']]!r}")
+            after_click = fake.log()["requests"]
+            check("18: and it stopped before anything was uploaded — the fake saw NOTHING "
+                  "NEW across this click, whatever the section sent before it",
+                  len(after_click) == before_click,
+                  f"{before_click} before, {len(after_click)} after: "
+                  f"{[(r['method'], r['path']) for r in after_click[before_click:]]!r}")
 
         # --- The Settings window: its rows, and Save / Remove through the
         # --- DEFAULT store, so R6-9's folder is what is exercised.
@@ -4646,12 +4966,132 @@ MUTANTS = {
         "            store: store(), environment: environment)\n",
         "the store factory called twice per sync \u2014 05-review's nit 4, reverted "
         "(row 18's sync row)"),
+    # The reader review's NAMED MUTANTS of today's tree (road map 6
+    # §10.13, step 8). Z8 is NOT here: it would remove R6-9 (b)'s
+    # MemoryStore and open the person's own key file, so it is never
+    # built and never run, and its column is read rather than scored.
+    # Z11 is an INSTRUMENT mutant and goes through `--fake-mutant`.
+    "z1-follows-redirect": (
+        "AssemblyAIClient+Session.swift",
+        '            completionHandler(nil)\n',
+        '            completionHandler(request)\n',
+        'Z1 — the redirect FOLLOWED, so the authorization header goes to whatever host the Location named'),
+    "z2-throw-without-delete": (
+        "AssemblyAIClient+Session.swift",
+        '        delete(id: id)\n',
+        '',
+        'Z2 — `refusing` no longer DELETEs before it throws (R6-4)'),
+    "z3-extract-kept": (
+        "CloudTranscriber+Media.swift",
+        '        defer { try? FileManager.default.removeItem(at: upload.url) }\n',
+        '',
+        'Z3 — the temporary extract is never removed'),
+    "z4-words-reserialised": (
+        "AssemblyAIClient.swift",
+        'return Fetched(response: response, wordsJSON: words)',
+        'return Fetched(response: response, wordsJSON: (try? JSONEncoder().encode(response.words ?? [])) ?? words)',
+        'Z4 — the served `words` bytes re-serialised through Codable'),
+    "z5-key-in-note": (
+        "AssemblyAIClient.swift",
+        'note("\\(request.httpMethod ?? "?") \\(request.url?.path ?? "?") → "',
+        'note("\\(request.value(forHTTPHeaderField: "authorization") ?? "") \\(request.httpMethod ?? "?") \\(request.url?.path ?? "?") → "',
+        'Z5 — the credential in every client log line (dummy keys only)'),
+    "z6-plain-http-anywhere": (
+        "AssemblyAIConfiguration.swift",
+        'guard scheme == "https" || isLoopback(host) else {',
+        'guard scheme == "https" || !host.isEmpty else {',
+        'Z6 — plain HTTP accepted for any host, not just loopback'),
+    "z7-persisted-argument": (
+        "AssemblyAIConfiguration.swift",
+        'let domain = defaults.volatileDomain(forName: UserDefaults.argumentDomain)',
+        'let domain = defaults.dictionaryRepresentation()',
+        'Z7 — R6-9 (c) broken: a PERSISTED default can move the endpoint and the store'),
+    "z9-boundary-doubled": (
+        "MediaTranscript.swift",
+        'startTicks < windowEnd else { continue }',
+        'startTicks <= windowEnd else { continue }',
+        "Z9 — the window's end made inclusive, so a split's halves double a word"),
+    "z10-held-priced-as-upload": (
+        "CloudEstimate.swift",
+        'return facts.deleteOwed ? .awaitingDelete(reason) : .upload(reason)',
+        'return .upload(reason)',
+        'Z10 — R6-13 broken: a held media priced as an upload'),
+    "z12-no-ceiling": (
+        "AssemblyAIClient.swift",
+        '            if Date().timeIntervalSince(started) > ceiling { throw refusing(.timedOut, id: id) }\n',
+        '',
+        'Z12 — the poll ceiling removed'),
+    "any-id-on-the-wire": (
+        "AssemblyAIClient.swift",
+        "        guard Self.isPlainIdentifier(id) else {\n"
+        "            note(\"refusing to DELETE an id that is not one\")\n"
+        "            return .notSent\n"
+        "        }\n",
+        "",
+        "the transcript-id gate removed from `delete` \u2014 the reader review's R3\u00b71, "
+        "reverted (row I)"),
+    "refused-id-reported-as-deleted": (
+        "AssemblyAIClient.swift",
+        "            return .notSent\n",
+        "            return .deleted\n",
+        "the gate answering as if the DELETE had been SENT \u2014 the reader review's fix "
+        "pass, reverted (row I: a delete nothing asked for, reported and written into "
+        "the cache file)"),
+    "eintr-unwritable": (
+        "SecretStore.swift",
+        "        if written < 0, errno == EINTR { continue }\n",
+        "",
+        "the EINTR retry removed \u2014 the reader review's H\u00b73, reverted (section 17's "
+        "three EINTR rows)"),
+    "janitor-deaf": (
+        "CloudTranscriber.swift",
+        "        if cancel.isCancelled { throw Transcriber.TranscribeError.cancelled }\n"
+        "        let janitor = retryDeletes(cancel: cancel)\n",
+        "        let janitor = retryDeletes()\n",
+        "the janitor deaf to a Stop again \u2014 the reader review's R1\u00b72, reverted "
+        "(row J)"),
     "stamp-drops-field": (
         "AssemblyAITranscript.swift",
         "        self.speakerLabels = options.speakerLabels\n",
         "        self.speakerLabels = false\n",
         "one request field dropped from the stamp (row 13)"),
 }
+
+
+# An INSTRUMENT mutant: the fake is not under `app/`, and `--mutant` copies
+# `app/` only and loads the fake from the working tree (`FAKE`, and the proof
+# imports that same global), so Z11 cannot be a row of `MUTANTS`. The working
+# tree's fake is never edited.
+FAKE_MUTANTS: dict[str, tuple[str, str, str]] = {
+    "fake-logs-any-key": (
+        "                    if value in ALLOWED_KEYS:\n",
+        "                    if True:\n",
+        "Z11 \u2014 the fake logging ANY authorization value, not just the two "
+        "allow-listed dummies (row G)"),
+}
+
+
+def prepare_fake_mutant(name):
+    """A COPY of `assemblyai_fake.py` with one text replaced, and the module
+    global `FAKE` rebound to it \u2014 the one name `Fake.__enter__` reads.
+
+    The fake imports stdlib only, so a copy runs from any folder."""
+    global FAKE
+    before, after, what = FAKE_MUTANTS[name]
+    target = os.path.join(WORK, "mutants", name)
+    shutil.rmtree(target, ignore_errors=True)
+    os.makedirs(target)
+    path = os.path.join(target, "assemblyai_fake.py")
+    with open(FAKE, encoding="utf-8") as handle:
+        text = handle.read()
+    if text.count(before) != 1:
+        sys.exit(f"fake mutant {name}: the text to replace occurs {text.count(before)} times, "
+                 f"not once \u2014 the tree has moved and the mutant needs re-aiming")
+    with open(path, "w", encoding="utf-8") as handle:
+        handle.write(text.replace(before, after))
+    FAKE = path
+    print(f"  fake mutant {name}: {what}\n")
+    return path
 
 
 def prepare_mutant(name):
@@ -4692,6 +5132,10 @@ def main():
     parser.add_argument("--mutant", choices=sorted(MUTANTS),
                         help="prepare a named mutant COPY of the tree's app/Sources and "
                              "compile against it (overrides --sources)")
+    parser.add_argument("--fake-mutant", choices=sorted(FAKE_MUTANTS),
+                        help="patch a COPY of assemblyai_fake.py instead of app/Sources \u2014 "
+                             "for a mutant of the INSTRUMENT (the tree's fake is never "
+                             "edited); refused together with --mutant")
     parser.add_argument("--only",
                         help="a comma-separated subset of sections, by the name after "
                              "`section_` (mapping, jobs, stamp, client, cancel, secrets, "
@@ -4712,6 +5156,11 @@ def main():
 
     print("road map 6 C1 pipeline 2 — the mapping, the stamp, the client, the cancel "
           "token, the secret store, the fifth rule, the extractor and the served bytes\n")
+    if args.mutant and args.fake_mutant:
+        sys.exit("--mutant and --fake-mutant are two different mutants and are refused "
+                 "together: a cell measures one thing")
+    if args.fake_mutant:
+        prepare_fake_mutant(args.fake_mutant)
     if args.mutant:
         sources = prepare_mutant(args.mutant)
     if os.path.realpath(sources) != os.path.realpath(TREE_SOURCES):
