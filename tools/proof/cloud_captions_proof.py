@@ -190,7 +190,13 @@ class Instance:
             # taken `RC_ASSEMBLYAI_KEY` out.
             env["RC_ASSEMBLYAI_KEY"] = key
         self.process = subprocess.Popen(
+            # `-ReelcutCaptionEngine assemblyai` pins the SHEET's memory of
+            # what a person last chose to the wrong answer for a tool, which
+            # is what makes row 8 a real row: R6-2 says an agent call reads
+            # that key never, and an instance where it reads "apple" could
+            # not tell a build that obeys R6-2 from one that does not.
             [binary, "-ApplePersistenceIgnoreState", "YES", "-AgentServerEnabled", "YES",
+             "-ReelcutCaptionEngine", "assemblyai",
              "-RCAssemblyAIEndpoint", fake.base, "-RCSecretFolder", self.secrets],
             stdout=self.handle, stderr=subprocess.STDOUT, env=env,
             stdin=subprocess.DEVNULL)
@@ -1319,6 +1325,15 @@ CLOUD_MUTANTS = {
         "            } else {\n",
         "R6-11's hold removed — a media with an unconfirmed delete is fetched anyway "
         "(row 11's hold arm)"),
+    "agent-reads-remembered-engine": (
+        "app/Sources/AgentServer+CloudCaptions.swift",
+        '        guard let name = try stringArg(a, "engine") else { return .apple }\n',
+        '        guard let name = try stringArg(a, "engine")\n'
+        '            ?? UserDefaults.standard.string(forKey: TranscriptionEngine.defaultsKey)\n'
+        '        else { return .apple }\n',
+        "R6-2 broken — the tool falling back to the SHEET's remembered engine when the "
+        "call named none (row 8, because every instance is launched with that key pinned "
+        "to assemblyai)"),
     "universal-2-only": (
         "app/Sources/AssemblyAITranscript.swift",
         '    static let shippedModels = ["universal-3-5-pro", "universal-2"]\n',

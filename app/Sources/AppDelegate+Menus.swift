@@ -89,6 +89,11 @@ extension AppDelegate {
         let menu = NSMenu(title: "Reelcut")
         menu.addItem(item("About Reelcut", #selector(AppDelegate.showAboutPanel(_:))))
         menu.addItem(.separator())
+        // Road map 6 §5d: the app's first window for something PERSISTED,
+        // in the place macOS puts one. ⌘, is unclaimed by spec §9's table —
+        // the nudge pair is the BARE `,` and `.`.
+        menu.addItem(item("Settings…", #selector(AppDelegate.showSettings(_:)), ","))
+        menu.addItem(.separator())
         menu.addItem(item("Hide Reelcut", #selector(NSApplication.hide(_:)), "h"))
         menu.addItem(
             item(

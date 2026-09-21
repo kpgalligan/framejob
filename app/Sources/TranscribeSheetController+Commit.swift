@@ -16,6 +16,15 @@ import AppKit
 /// properties `finish` and `viewDidDisappear` read. `summary` and
 /// `truncationText` stay `private`: only `finish` calls them, and it
 /// moved with them.
+///
+/// **c1-chrome added the cloud engine's three lines** (road map 6 §5e), and
+/// it is no longer only a move. `cloudReportLines` turns the run's `Report`
+/// into what the card says beside today's counts — R6-8's fallback, the
+/// language that was DETECTED and how sure the service was, and any media
+/// whose remote delete is still owed. They are added in BOTH arms: a run
+/// that failed can still have uploaded one media and owe a delete for it,
+/// and a card that printed only the error would lose the one record a
+/// person has of that.
 extension TranscribeSheetController {
 
     // MARK: - Commit
@@ -39,10 +48,14 @@ extension TranscribeSheetController {
         stopButton.isEnabled = true
         detailLabel.stringValue = ""
 
+        let cloudLines = cloudReport.map {
+            Self.cloudReportLines($0, names: mediaNames, detected: cloudDetected)
+        } ?? []
         let result: Transcriber.Outcome
         switch outcome {
         case .failure(let error):
-            statusLabel.stringValue = error.localizedDescription
+            statusLabel.stringValue = ([error.localizedDescription] + cloudLines)
+                .joined(separator: "\n")
             statusLabel.textColor = DS.textStrong
             return
         case .success(let value):
@@ -65,13 +78,70 @@ extension TranscribeSheetController {
 
         // A clean run has nothing to say that the timeline does not already
         // show, so it leaves rather than making the user dismiss a receipt.
-        guard plan.report.isEmpty, result.truncations.isEmpty else {
-            statusLabel.stringValue = [summary(plan), truncationText(result), plan.report]
+        guard plan.report.isEmpty, result.truncations.isEmpty, cloudLines.isEmpty else {
+            statusLabel.stringValue =
+                ([summary(plan), truncationText(result), plan.report] + cloudLines)
                 .filter { !$0.isEmpty }.joined(separator: "\n")
             statusLabel.textColor = DS.textStrong
             return
         }
         dismiss(self)
+    }
+
+    /// The media names this sheet opened with, by id — the report card names
+    /// FILES, because a person chose files and an id is the tool's
+    /// vocabulary.
+    private var mediaNames: [UInt32: String] {
+        var out: [UInt32: String] = [:]
+        for entry in snapshot.media { out[entry.id] = entry.name }
+        return out
+    }
+
+    /// The cloud run's extra lines, in a fixed order: R6-8's fallback, the
+    /// detected language, then what is still owed a delete.
+    ///
+    /// The owed list is the TOOL's own rule (`cloudFields`): once per media
+    /// id, because a media can be in `janitorFailed` (an id owed from an
+    /// earlier run) AND in `uploaded` with `remoteDeleted` false (one owed
+    /// from this run), and saying it twice would read as two transcripts. A
+    /// media R6-11 HELD gets one more clause, because "it will be retried"
+    /// is only half of what happened to it.
+    static func cloudReportLines(
+        _ report: CloudTranscriber.Report, names: [UInt32: String], detected: Bool
+    ) -> [String] {
+        func name(_ id: UInt32) -> String { names[id] ?? "media \(id)" }
+        var lines: [String] = []
+        let preferred = TranscriptOptions.shippedModels.first ?? "universal-3-5-pro"
+        for row in report.uploaded {
+            guard let model = row.speechModelUsed, model != preferred else { continue }
+            lines.append(
+                "“\(name(row.media))” was transcribed with \(model), not \(preferred).")
+        }
+        if detected {
+            for row in report.uploaded {
+                guard let code = row.languageCode else { continue }
+                let spoken = AssemblyAILanguages.entry(code: code)?.displayName ?? code
+                guard let confidence = row.languageConfidence else {
+                    lines.append("“\(name(row.media))”: detected \(spoken).")
+                    continue
+                }
+                let percent = Int((min(max(confidence, 0), 1) * 100).rounded())
+                lines.append(
+                    "“\(name(row.media))”: detected \(spoken) (\(percent)% confidence).")
+            }
+        }
+        var owed: [UInt32] = []
+        for id in report.janitorFailed where !owed.contains(id) { owed.append(id) }
+        for row in report.uploaded where !row.remoteDeleted && !owed.contains(row.media) {
+            owed.append(row.media)
+        }
+        for id in owed {
+            var line = "AssemblyAI has not confirmed deleting the transcript of "
+                + "“\(name(id))”; it will be retried at the next run."
+            if report.held.contains(id) { line += " It was not uploaded again in this run." }
+            lines.append(line)
+        }
+        return lines
     }
 
     private func summary(_ plan: CaptionLayout.Plan) -> String {

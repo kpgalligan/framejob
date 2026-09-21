@@ -319,12 +319,26 @@ free.
   with its answer recorded. Spec §11's R6-11: a media in this run's
   `janitorFailed` is never fetched, since its cache file is the one record of
   the id still owed a delete.
+- `CloudEstimate.swift` — what a cloud run would COST and why, PURE: a
+  `Fate` per media (`upload(Reason)` / `cached` / `awaitingDelete(Reason)` /
+  `unreadable`), `describe` (the sheet's summary line), `reasons` (one line
+  per file that is not already transcribed, plus the DATED rate) and
+  `money`, over `AssemblyAIRates`' two dated constants. Spec §11's R6-13: a
+  media R6-11 will hold is its OWN clause and its line carries what it would
+  cost if the delete clears. `facts(jobs:media:cacheDirectory:)` is the ONE
+  member that opens a file, so a sheet can recompute the readout per
+  keystroke. Its classification is deliberately NOT shared with
+  `CloudTranscriber`'s — one says what a run WOULD do, the other what it DID
+  — and a probe row compares them.
 - `CloudProgress.swift` — the cloud run's one number and the words beside it,
   PURE: a share per media TO UPLOAD (cached and held media have none), the
   four phases at 0.25 / 0.65 / 0.95, the wait advancing on the clock against
   q8's 147× and holding, and the four detail lines. The run publishes
   `max(previous, computed)`.
-- `AssemblyAITranscript.swift` — the wire VALUES: `TranscriptOptions`,
+- `AssemblyAITranscript.swift` — the wire VALUES, and
+  `TranscriptOptions.keyterms`, the ONE spelling of the vocabulary's
+  trim/de-duplicate/cap that the sheet's field and the tool's argument share:
+  `TranscriptOptions`,
   `TranscriptRequest` (whose `encode` is the whole wire body — `language_code`
   absent for auto, `keyterms_prompt` absent when empty), `TranscriptWord`,
   `TranscriptResponse`, `TranscriptStamp` (the cache marker: a `CacheStamp`
@@ -366,11 +380,18 @@ free.
   `read` answers nil and `isCurrent` false rather than caching zero words.
   THE MAPPING is here: a word is a clip's when `in ≤ start × 600 <
   in + duration × speed`, landing at `start + (m − in) / speed`, clamped
-  through `Transcriber.placed` (R6-10).
+  through `Transcriber.placed` (R6-10). That `× 600` goes through
+  `sourceTicks(milliseconds:)`, the one integer multiply on the caption
+  path, clamped in `Int` to ±`Ticks.max / 600` first and deliberately NOT to
+  `maxSourceTicks` (R6-10's extension).
   `Loader` is `MediaPeaks.Loader`'s shape; `undeleted(in:)` is the janitor's.
 - `Transcriber.swift` (+`Languages`, +`Extract`, +`Jobs`) ·
-  `TranscribeSheetController.swift` (+`Commit`: the run's one exit, and the
-  menu command with its validator arm) — on-device recognition through the
+  `TranscribeSheetController.swift` (+`Cloud`: the AssemblyAI half — the
+  Language popup's second population, `RunRequest` (the ONE function from
+  the card's controls to what a run would receive), the estimate's readout,
+  §5e's two hint texts, the notes and `beginCloud`; +`Commit`: the run's one
+  exit, `cloudReportLines` and the menu command with its validator arm) —
+  on-device recognition through the
   CALLBACK API (spec §11: no second `async` exception) over each clip's source
   window EXTRACTED to a temporary mono 16 kHz WAV; the recogniser's queue is
   set explicitly because it defaults to MAIN. "Has sound" is `enabled.audio`,
@@ -393,7 +414,13 @@ free.
   `AVAudioFile` (NEVER `AVAssetWriter`, which has no FLAC file type on macOS
   26 and refuses as an uncatchable Objective-C exception), and
   `extractUpload` is the pair with the WAV as the fallback when the FLAC
-  write refuses.
+  write refuses. **The sheet's three readouts — `refresh`, `noteText` and
+  `startClicked` — dispatch on `engine` as their FIRST statement**, and
+  under `.assemblyai` none of them reads `language`, `languages`,
+  `isBlocked`, `authorizationStatus` or `requestAuthorization`: a Mac with
+  no on-device model can still transcribe in the cloud. `init` takes
+  `store`, `defaults`, `environment` and `languages` so a probe can build
+  every one of those states.
 
 **Silence and sound.**
 - `SilenceDetector.swift` (+`Walls`) · `SilenceSheetController.swift` ·
@@ -439,6 +466,22 @@ free.
   the MAIN thread with a fresh `Exporter` each (two concurrent ones deadlock);
   `mediaURLs()` captured at ENQUEUE. No MCP mirror: `export` called N times is
   the capability.
+- `SettingsWindowController.swift` — Reelcut ▸ Settings… ⌘,, the app's one
+  window for something PERSISTED beyond view state, with
+  `extension AppDelegate { showSettings }` at its foot
+  (`CaptionImporter.swift`'s command-at-the-foot precedent, which is why
+  `AppDelegate.swift` is untouched). `ExportQueueWindowController`'s mould.
+  One pane, the `Transcription` HEADING that is the content stack's first
+  arranged subview — which is what makes the `transcribe` tool's and the
+  catalog's "Settings ▸ Transcription" sentence true without either being
+  edited. The key goes in through an `NSSecureTextField` and NEVER comes
+  back out: `sync()` writes a FIXED-LENGTH mask into the field's
+  PLACEHOLDER, never its `stringValue`. Save and Remove go through
+  `AssemblyAIConfiguration.store()`, so R6-9's folder override holds; the
+  initialiser takes a store FACTORY so the offscreen harness can photograph
+  it with a `MemoryStore`. Verify runs on `CloudTranscriber`'s `work` queue
+  (`CloudTranscriber.verify(completion:)`, spec §11's R6-12 — no new queue).
+  **No key set is not an error** anywhere in it.
 - `PreviewWindowController.swift` — a second `AVPlayerLayer` on the same
   player (measured: two layers both display). It is an **`NSPanel`** (a titled
   window becomes main and every editor selector goes dead), the controller is

@@ -2270,7 +2270,8 @@ argument and ends in `Transcriber.placed`; `words` lost the `let limit` line
 that fed it. The two lines the probe's `mapping-no-in` and `no-speed-guard`
 mutants patch are byte-identical to what they were, deliberately.
 `:317`'s `job.sourceIn + job.sourceLength` is NOT edited: both terms are now
-bounded to 1e15, so the sum cannot overflow.
+bounded to 1e15, so the sum cannot overflow. (It is `:333` after c1-chrome
+added `sourceTicks(milliseconds:)` above it, and still not edited.)
 
 **`Transcriber.swift` 584 → 583.** `project(_:in:)` is three lines instead of
 four and ends in `placed` like its twin. Nothing else moved, and the file
@@ -2284,3 +2285,111 @@ section (one child process per speed, because an unclamped `Ticks(_:)` traps
 and a trap has to be that speed's own failure), the whole `run` section, two
 replaced S rows and two new mutants. **`tools/proof/cloud_captions_proof.py`
 — new, 1479**, 115 rows over three instances.
+
+## Thirteen caption files, 2026-09-20 — road map 6's C1 chrome
+
+Road map 6 §10.11 is the pipeline's record and has the scores; this is what
+happened to each FILE. Three are new, ten changed, and `AppDelegate.swift`
+was not touched at all.
+
+**`CloudEstimate.swift` — new, 328.** `AssemblyAIRates` (§8's two dated
+constants) and `CloudEstimate`, which is PURE except for one member. The
+shape worth remembering is the split: `Facts` is what the DISK knows about a
+media (its `CacheStamp` as it is now, its marker, whether the transcript
+reads back, whether a delete is owed), `facts(jobs:media:cacheDirectory:)` is
+the only thing that opens a file, and `fate`, `describe`, `reasons`, `money`
+and `dollars` are functions of those facts alone. That is what lets the sheet
+recompute its whole readout on every keystroke in the Vocabulary field
+without stat-ing two files per media, and it is why every arm of `fate` is
+reachable from a probe with no cache directory at all.
+
+**Its classification is deliberately a SECOND one.** `CloudTranscriber.transcribe`
+already sorts media into cached / held / to-upload, and merging the two would
+be the obvious tidy. It was not done: one answers what a run WOULD do and the
+other what it DID, they are read by different people at different times, and
+`cloud_captions_probe.py`'s `chrome` section drives an estimate and a real
+run over two rounds and compares them — so the day they drift is a scored
+failure rather than a refactor nobody checked.
+
+**`SettingsWindowController.swift` — new, 376**, with
+`extension AppDelegate { showSettings }` at its foot. `AppDelegate.swift` is
+untouched because of that foot, which is `CaptionImporter.swift`'s
+precedent. Two decisions in it are worth carrying: the store is injected as a
+FACTORY (`() -> any SecretStore`), not a value, because
+`AssemblyAIConfiguration.store()` is built from the argument domain and the
+offscreen harness has to be able to replace it wholesale — `Harness.pinDefaults`
+REPLACES that domain with `setVolatileDomain`, so after it `store()` is the
+person's real `FileStore` and this window's Save is exactly the code that
+would write into it; and `sync()` never writes `keyField.stringValue`, only
+`placeholderString`, so the key cannot be copied out of the field, read by
+accessibility or photographed, and the mask is FIXED length because one as
+long as the key leaks its length.
+
+**`TranscribeSheetController+Cloud.swift` — new, 313.** The AssemblyAI half
+of the card. `runRequest()` is the piece to know: ONE function from the
+controls to a `RunRequest`, and the estimate, the notes, the button rule and
+`beginCloud` all read it, so the summary can never describe a different
+request from the one Generate sends.
+
+**`TranscribeSheetController.swift` 380 → 540**, of the ~600 cap that toll 3
+bought. Eleven members widened from `private` to internal for the new file
+(`languages`, `mediaURLs`, `languagePopup`, `summaryLabel`, `noteLabel`,
+`hintLabel`, `scope`, `jobs(in:)`, `startButton`, `showProgress()`,
+`progressed(_:_:)`); `language` and `isBlocked` stayed private ON PURPOSE,
+because the cloud half must not be able to read either. **`refresh`,
+`noteText` and `startClicked` dispatch on `engine` as their FIRST
+statement**, and the `.apple` arms are the code they were, moved under the
+dispatch and not rewritten — `phase4_proof.py`'s exact-sentence rows read
+those strings. `makeSheetView` is called with `hint: nil` and the sheet owns
+its own `hintLabel`, first in the content, because the sentence changes with
+the popup and the builder's hint is a constructor argument.
+
+**`TranscribeSheetController+Commit.swift` 145 → 215.** `cloudReportLines`,
+and `finish` calls it in BOTH arms — a run that failed can still have
+uploaded one media and still owe a delete for it, and a card that printed
+only the error would lose the one record a person has of that. The owed list
+is the TOOL's own rule, read across: once per media id, because a media can
+be in `janitorFailed` and in `uploaded` with `remoteDeleted` false at the
+same time.
+
+**`MediaTranscript.swift` 383 → 399**, and it went to **411** on the way. The
+addition is `maxWordMilliseconds` and `sourceTicks(milliseconds:)` (R6-10's
+extension: the one INTEGER multiply on the caption path, clamped in `Int`
+before the `× 600`), and the doc comment was cut twice until the file fitted
+under its own 400-line cap. That is what the cap is for. `project(_:in:)` is
+byte-identical, because the `mapping-no-in` and `no-speed-guard` mutants aim
+at its two lines.
+
+**`AssemblyAITranscript.swift` 374 → 399** and
+**`AgentServer+CloudCaptions.swift` 247 → 243**: `keyterms` moved out of the
+tool and into `extension TranscriptOptions`, doc and body verbatim, so the
+sheet's Vocabulary field and the tool's `vocabulary` argument cap and
+de-duplicate through ONE function. A hygiene row asserts `func keyterms(`
+occurs once in `app/Sources`. The tool's file also gained R6-12's position in
+its header — that neither the key nor the REGION is a tool's to read or
+write, and why `transcribe`'s result names no region.
+
+**`CloudTranscriber.swift` 296 → 317.** `verify(completion:)` on the `work`
+queue, capturing the CLIENT and not `self`; and the per-media closing publish
+now carries `CloudProgress.detail(.saving, file:)` instead of an empty string
+(c1-run's review, nit 1 — it would have blanked the sheet's detail label
+between media).
+
+**`AppDelegate+Menus.swift` 544 → 549.** One item and one separator.
+
+**`tools/proof/harness/main.swift` 901 → 954** — two pinned defaults and a
+`settings` mode beside `welcome`, which builds its OWN controller with a
+`MemoryStore` and an EMPTY environment and never touches `.shared` or
+`store()`. A hygiene row reads the harness's CODE (not its comments) for
+both names. **`tools/proof/cloud_captions_probe.py` 3280 → 4753**, 283 → 469
+rows: the `estimate` section, the `chrome` section, mapping rows for R6-10's
+extension with one child process per millisecond, a run row, hygiene rows
+and, from the review pass, six more `chrome` rows — the summary tooltip on
+both sides of the Engine switch, a region changed under an open card, one
+store per `sync`, and what Stop actually DID to a started run. Eight
+mutants: five against the full 463 and three (`stale-tooltip`,
+`stale-region-hint`, `two-stores-per-sync`) at 75/76 over `--only chrome`.
+**`tools/proof/cloud_captions_proof.py` 1479 → 1494** — the same 115 rows,
+with every instance now launched `-ReelcutCaptionEngine assemblyai` and one
+more mutant (`agent-reads-remembered-engine`), which is what turns row 8
+from a row that could not fail into one that can.

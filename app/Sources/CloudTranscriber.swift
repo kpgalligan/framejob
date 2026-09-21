@@ -139,6 +139,25 @@ final class CloudTranscriber {
         }
     }
 
+    /// `GET /v2/transcript?limit=1` on the run's OWN queue, answered on
+    /// main — the Settings window's Verify button.
+    ///
+    /// Spec §11's R6-12: verify adds no queue. `work` is already one of the
+    /// seams `app/CLAUDE.md` lists, and a second one for a single cheap
+    /// authenticated GET would be a queue nobody could name a rule for.
+    ///
+    /// It captures the CLIENT and not `self`. A verify is a wait on a socket
+    /// and the window that asked may be gone before it answers; there is
+    /// nothing on this object for it to write, and a strong `self` would
+    /// keep a whole transcriber alive for the duration of a button press.
+    func verify(completion: @escaping (Result<Void, AssemblyAIClient.ClientError>) -> Void) {
+        let client = self.client
+        work.async {
+            let answer = client.verify()
+            DispatchQueue.main.async { completion(answer) }
+        }
+    }
+
     /// The synchronous body, road map 6 §5a. Call it off the main thread; a
     /// tool that already runs on the server thread calls it directly.
     ///
@@ -244,7 +263,9 @@ final class CloudTranscriber {
                         })
                     files[id] = answer.file
                     report.uploaded.append(answer.uploaded)
-                    publish(bar.fraction(media: index, phase: .saving, within: 1), "")
+                    publish(
+                        bar.fraction(media: index, phase: .saving, within: 1),
+                        CloudProgress.detail(.saving, file: entry.name))
                 } catch {
                     if cancel.isCancelled { throw Transcriber.TranscribeError.cancelled }
                     if let client = error as? AssemblyAIClient.ClientError {

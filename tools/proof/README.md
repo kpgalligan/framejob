@@ -1530,6 +1530,32 @@ every render argument keeps the position it had — added, not rearranged,
 because `phase2_chrome.py`, `phase3_chrome.py` and `phase4_chrome.py` all
 depend on that order.
 
+Road map 6's c1-chrome took a fourth RENDER target rather than a mode of its
+own kind:
+
+```
+harness settings <out.png> <light|dark>
+```
+
+renders the Settings window (road map 6 §5d) the way `welcome` renders the
+no-document window — a WINDOW, so `cacheDisplay` can have it, where a sheet
+cannot be put up offscreen at all. **It builds its own
+`SettingsWindowController` with a `MemoryStore` and an EMPTY environment and
+never touches `.shared` or `AssemblyAIConfiguration.store()`**, and that is a
+rule rather than a convenience: `Harness.pinDefaults` REPLACES the argument
+domain a few lines earlier (`setVolatileDomain`), which wipes
+`-RCSecretFolder` and `-RCAssemblyAIEndpoint`, so after it `store()` is the
+person's real `FileStore` on `~/Library/Application Support/Reelcut/` — and
+Save and Remove in that window are exactly the code that would write and
+delete that file. The empty environment is why the photograph says "No API
+key is set." on a machine whose shell has a real `RC_ASSEMBLYAI_KEY` in it.
+`pinDefaults` also gained `ReelcutCaptionEngine` and
+`ReelcutAssemblyAIRegion`, pinned to `apple` and `us` on
+`ReelcutExportChoice`'s terms — ordinary use of the app writes both. Measured
+on this host: 460 × 340 points at backing scale **1** for an offscreen
+window (the same as `welcome`'s), byte-identical across two processes in each
+appearance, light ≠ dark.
+
 Phase 5 took a THIRD mode, in the same shape and for the same reason:
 
 ```
@@ -3767,7 +3793,19 @@ job) and its clip whose `start` is within ten million ticks of `Int64.max`,
 the whole `jobs` section, the whole `run` section, and hygiene's two replaced
 S rows.
 
-Eleven sections: `mapping` (5i·12), `jobs` (spec §11's R6-10 — a clip `speed`
+Then **463/463** (2026-09-20, c1-chrome, in 228 s, no skips), and
+**469/469** (in 88 s) after that pipeline's review pass added six `chrome`
+rows. What c1-chrome added to pipeline 3's 283 is the whole `estimate`
+section, the whole `chrome` section, `mapping` rows for R6-10's EXTENSION to
+the one integer multiply (ONE CHILD PER MILLISECOND: 0, −1, `Int64.min`,
+`Int64.max`, `Int64.max / 600` and either side of it, and of its negative),
+one `run` row (every mid-run pair carries a detail) and `hygiene` rows — no
+run has ever printed that split, so it is named and not counted here. What a
+run DID print, on the fix-pass tree, is each section's own total:
+`--only estimate` **96/96**, `--only chrome` **76/76**, `--only hygiene`
+**27/27**.
+
+Thirteen sections: `mapping` (5i·12), `jobs` (spec §11's R6-10 — a clip `speed`
 the OPS cannot write and the CORE's reader accepts, spliced into a project's
 JSON text, read back through `ReelProject.from(json:)` and driven through
 `Transcriber.jobs` and both mappings, ONE CHILD PROCESS PER SPEED because an
@@ -3783,8 +3821,36 @@ back), `run` (`CloudProgress` over a table, then
 its media's share, holding at the 0.95 point, ending at 1.0; and the
 `reelcut-upload-*` a cancelled, an errored and a 401'd run leave behind,
 which is none, with a CONTROL that one was there while the body was going
-out) and `hygiene` (the redaction, the language table, the empty run and
-`CloudTranscriber`'s one caller, and the credential).
+out), `estimate` (row 14 — `CloudEstimate` with no disk in it: §8's two dated
+rates, every arm of `fate` one row each, and `describe`, `money` and
+`reasons` over a table of one file, many, cached and uploaded mixed, speakers
+on, nothing to upload, no rows at all, a held media, an unreadable one, a
+price under a cent and a duration no file has; the money recomputed IN
+PYTHON, the duration pinned once exactly as `rc_timecode_format` prints it
+and everywhere else by its shape), `chrome` (row 18 — the Engine popup and
+both hint texts, Language re-populated both ways, `runRequest()` per control
+state, the vocabulary through the TOOL's own `TranscriptOptions.keyterms`,
+the cap note's three readings, the button with and without a credential, a
+Mac with NO on-device model at all, the Settings window's rows and its Save /
+Verify / Remove through R6-9's disposable folder, the report card's lines,
+the bar as displayed, the estimate against a real RUN over two rounds, the
+Reelcut menu read off a real `AppDelegate`, `project.yml` diffed against
+pipeline 3's tree, and the Settings window PHOTOGRAPHED through the harness,
+two processes per appearance) and `hygiene` (the redaction, the language
+table, the empty run, the three files that construct a `CloudTranscriber`,
+the one declaration of `func keyterms(`, the harness's code naming neither
+`SettingsWindowController.shared` nor `AssemblyAIConfiguration.store`, the
+Settings sentence byte-identical to pipeline 3's in both files, and the
+credential).
+
+**Every `chrome` child is launched with BOTH launch arguments** —
+`-RCAssemblyAIEndpoint <the fake>` so nothing can leave the machine, and
+`-RCSecretFolder <a folder under work/cloudprobe/>` so the Settings window's
+Save and Remove, which are exactly the code that would write the person's
+own key file, write into a disposable directory instead. Every sheet and
+window it builds gets a `UserDefaults(suiteName:)` that is removed
+afterwards, and the `verify` op refuses to run at all unless the resolved
+base URL's host is loopback.
 
 It compiles two entries with `harness/build.sh`'s own `swiftc` line — never
 `build.sh` itself, which hard-codes the tree: the probe, and a four-argument
@@ -3793,6 +3859,23 @@ compiled against `git archive 515e6a80 app/Sources` under
 `-D CLOUD_PROBE_BASELINE`, which is how "the moved extractor writes the same
 WAV" is a comparison of two TREES. `--wall` (default 1800 s) bounds the whole
 run and every child has a timeout whose expiry is that row's answer.
+
+**Eight more mutants landed with c1-chrome** (2026-09-20). Five against the
+full 463 of the tree its review read:
+`rate-halved` (§8's `perHour` halved) **438/463**, caught by twenty-four
+`estimate` rows and the Settings paragraph's own dated rate;
+`no-credential-check` (the credential taken out of the cloud button's rule)
+**462/463**; `masked-shows-value` (`sync` putting the STORED key in the
+field's `stringValue`) **461/463**; `no-ms-clamp` (R6-10's extension
+removed) **459/463**, four of the nine ms rows failing by TRAP; and
+`empty-closing-detail` (the per-media closing publish sending an empty
+detail again) **462/463**. Three more came with that review's fixes and were
+scored over the `chrome` section alone (`--only chrome`, **76** rows):
+`stale-tooltip` (the cloud reasons left hovering over the on-device summary)
+**75/76**; `stale-region-hint` (the hint left naming the OLD region after a
+settings change) **75/76**; `two-stores-per-sync` (`sync` building a second
+store to read the same key file twice) **75/76** — each failing its own row
+and no other.
 
 **Mutant scores**, each a tree COPY with one text replaced, asserted to occur
 exactly once (2026-09-20, against 186):
@@ -3850,8 +3933,20 @@ env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_proof.py --mutant no
 ```
 
 **115/115** on the tree, no skips, in 45–50 s, measured three times on
-2026-09-20. `--binary` points at another build, `--port-base` (4955) moves
-the three instances, `--wall` (1800 s) bounds the run.
+2026-09-20, and again at **115/115 in 51 s** after c1-chrome (road map 6
+§10.11) — the row COUNT is unchanged on purpose, since that pipeline changed
+no tool, no schema and no op. `--binary` points at another build,
+`--port-base` (4955) moves the three instances, `--wall` (1800 s) bounds the
+run.
+
+**Every instance is now launched `-ReelcutCaptionEngine assemblyai`**, which
+pins the SHEET's memory of what a person last chose to the wrong answer for a
+tool. R6-2 says an agent call reads that key never, and before c1-chrome an
+instance where it read `apple` could not tell a build that obeys R6-2 from
+one that does not. The tenth mutant,
+**`agent-reads-remembered-engine`** — the tool falling back to
+`UserDefaults`'s `ReelcutCaptionEngine` when a call named no engine — scores
+**110/115**, failing row 8's "the fake's log is EMPTY" and four of row 1's.
 
 It launches and kills **three** instances, each on its own port with a fake
 of its own on port 0, each killed by its own `Popen` pid in a `finally`, each

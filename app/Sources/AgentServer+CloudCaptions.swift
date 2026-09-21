@@ -29,6 +29,20 @@ import AppKit
 /// `Problem`, not in the `note`: the only thing this file does with the
 /// credential is hand it to `AssemblyAIClient.init`, which puts it in one
 /// header and in no log line.
+///
+/// **R6-12, stated here because this is where it would be broken.** The KEY
+/// and the REGION are a person's settings and no tool reads or writes
+/// either: the key is R6-5's rule, and the region is a default a person sets
+/// in the Settings window's Transcription pane, and it decides only WHERE a
+/// transcript is made. So this file resolves both through
+/// `AssemblyAIConfiguration` and offers neither as an argument, and
+/// `cloudFields` names no region — every proof instance runs under
+/// `-RCAssemblyAIEndpoint`, where the region is not where the run spoke, so
+/// the key could be proved only where it is false. The honest shape, the
+/// base URL's HOST under a key named `endpoint`, is residue in
+/// `designs/reelcut-remaining.md` §5. The vocabulary's rules are
+/// `TranscriptOptions.keyterms`, the one spelling the sheet shares (c1-chrome
+/// moved them there verbatim).
 extension AgentServer {
 
     // MARK: - The engine argument
@@ -92,7 +106,7 @@ extension AgentServer {
         let asked = try stringsArg(a, "vocabulary") ?? []
         let refresh = try boolArg(a, "refresh") ?? false
         let code = try Self.cloudLanguage(language)
-        let vocabulary = Self.keyterms(asked)
+        let vocabulary = TranscriptOptions.keyterms(asked)
 
         var notes: [String] = []
         if asked.count > vocabulary.count, vocabulary.count == AssemblyAIClient.maxKeyterms {
@@ -165,24 +179,6 @@ extension AgentServer {
                     + "AssemblyAI detect it, or leave it out.")
         }
         return trimmed.lowercased() == "auto" ? nil : trimmed
-    }
-
-    /// `keyterms_prompt`: trimmed, empties dropped, de-duplicated KEEPING
-    /// THE FIRST spelling, capped at `AssemblyAIClient.maxKeyterms`.
-    ///
-    /// First rather than last because the order a caller wrote is the order
-    /// of importance it meant, and the cap cuts from the end — a list that
-    /// re-ordered itself and then cut would drop terms the caller put first.
-    private static func keyterms(_ given: [String]) -> [String] {
-        var out: [String] = []
-        var seen = Set<String>()
-        for term in given {
-            let trimmed = term.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !trimmed.isEmpty, seen.insert(trimmed).inserted else { continue }
-            out.append(trimmed)
-            if out.count == AssemblyAIClient.maxKeyterms { break }
-        }
-        return out
     }
 
     /// The result keys the cloud engine adds — §5g's list, built from the

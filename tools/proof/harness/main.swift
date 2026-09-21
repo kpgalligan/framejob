@@ -75,6 +75,25 @@
 //
 // TWO MORE MODES, which render nothing:
 //
+//   harness settings <out.png> <light|dark>
+//
+// renders the Settings window (road map 6 §5d) the way `welcome` renders the
+// no-document window: a WINDOW, so `cacheDisplay` can have it — a sheet
+// cannot be put up offscreen at all, which is why the Generate Captions card
+// is read structurally by `cloud_captions_probe.py` and photographed nowhere.
+//
+// **It builds its own controller with a `MemoryStore` and never touches
+// `SettingsWindowController.shared` or `AssemblyAIConfiguration.store()`**,
+// and that is a rule and not a convenience. `pinDefaults` REPLACES the
+// argument domain a few lines below (`setVolatileDomain`), which wipes
+// `-RCSecretFolder` and `-RCAssemblyAIEndpoint` — so after it `store()` is
+// the person's REAL `FileStore` on `~/Library/Application Support/Reelcut/`,
+// and the Save and Remove buttons in this window are exactly the code that
+// would write and delete that file. The controller is also handed an EMPTY
+// environment, so `RC_ASSEMBLYAI_KEY` in the shell that launched the harness
+// cannot change what the window says: the photograph is of a Mac with no key
+// set, whatever the machine taking it has.
+//
 //   harness cues <words.json> <out.json>
 //
 // reads a word list and writes the cues `CaptionCues.build` makes of it. It
@@ -312,6 +331,18 @@ enum Harness {
             "ReelcutRecordingShowClicks": false,
             "ReelcutRecordingRate": 60,
             "ReelcutRecordingSize": "nominal",
+            // The two keys road map 6's chrome reads (`TranscriptionEngine.defaultsKey`
+            // and `AssemblyAIConfiguration.regionKey` — spelled as LITERALS
+            // here for the recorder keys' reason above, the phase-5
+            // cross-build), pinned to their first-run values: the on-device
+            // engine, the United States region. The Generate Captions sheet
+            // is a SHEET and is in no render, but the Settings window's
+            // region popup is drawn straight from the second of them, and
+            // both are written by ORDINARY USE of the app on the machine
+            // that runs the proofs — every time a person changes an engine
+            // or a region — which is `ReelcutExportChoice`'s rule exactly.
+            "ReelcutCaptionEngine": "apple",
+            "ReelcutAssemblyAIRegion": "us",
             "AgentServerEnabled": false,
             // AppKit picks legacy (16 pt, always visible) or overlay scrollers
             // by whether a MOUSE is attached, and the inspector pane is 16 pt
@@ -751,7 +782,7 @@ enum Harness {
 let arguments = CommandLine.arguments
 guard arguments.count >= 4 else {
     FileHandle.standardError.write(
-        ("usage: harness <project.reelcut|welcome> <out.png> <light|dark> "
+        ("usage: harness <project.reelcut|welcome|settings> <out.png> <light|dark> "
             + "[w] [h] [selectIndex] [playheadSec] [sizeIndex 0-2] [clip|media|document] "
             + "[candidateSpans] [expandSections] [mediaFilter]\n"
             + "       harness cues <words.json> <out.json>\n"
@@ -818,6 +849,28 @@ app.setActivationPolicy(.prohibited)
 NSApp.appearance = NSAppearance(named: appearanceName)
 Harness.registerFonts(URL(fileURLWithPath: arguments[0]).deletingLastPathComponent()
     .appendingPathComponent("Fonts"))
+
+// "settings" renders road map 6 §5d's window — its own controller, an
+// in-memory store and an empty environment, so nothing on this machine is
+// read or written. See the header: `pinDefaults` has already wiped the two
+// launch arguments that would have made `store()` safe.
+#if !HARNESS_REFERENCE_BUILD
+if arguments[1] == "settings" {
+    let settings = SettingsWindowController(store: { MemoryStore() }, environment: [:])
+    settings.show()
+    for _ in 0..<10 { RunLoop.current.run(until: Date().addingTimeInterval(0.05)) }
+    guard let root = settings.window?.contentView else { exit(3) }
+    root.layoutSubtreeIfNeeded()
+    do {
+        try Harness.png(root, to: outURL)
+        print("wrote \(outURL.path)")
+        exit(0)
+    } catch {
+        FileHandle.standardError.write("render failed: \(error)\n".data(using: .utf8)!)
+        exit(2)
+    }
+}
+#endif
 
 // "welcome" renders the no-document window instead of an editor.
 if arguments[1] == "welcome" {

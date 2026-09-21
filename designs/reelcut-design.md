@@ -2675,6 +2675,7 @@ a clean `make lint` before finishing Rust work.
 | ⌘E | Export… |
 | ⌥⌘E | Save Frame… — the frame under the playhead as a PNG, JPEG or HEIC still (road map 2's phase 7a). Export…'s still-image sibling, under the same letter |
 | ⌥⌘N | New Recording… — the recorder panel (road map 3). The same item reads Stop Recording while one runs, paused included, and stops it; a nil-target action on `AppDelegate`, so it resolves with no document open, as New Project does. Pause Recording and Resume Recording have no menu item and no key — they are the status item's rows (R2) |
+| ⌘, | Settings… — Reelcut ▸ Settings…, the app's one window for something PERSISTED beyond view state (road map 6 §5d): one pane, "Transcription", holding the AssemblyAI key, the region and a Verify button. macOS's own place for the item and its own key; the nudge pair below is the BARE `,` and `.`, so nothing is displaced. A nil-target selector on `AppDelegate`, so it resolves with no document open, as New Project does |
 | ⌥⌘I | Toggle inspector |
 | ⇧⌘P | Preview Window — a second window showing the same picture as the canvas, with no overlay (road map 2's phase 8b). A TOGGLE: the item carries a checkmark and the key both opens the window and puts it away |
 | `,` / `.` (⇧ ×10) | Nudge the selection one frame |
@@ -2698,7 +2699,12 @@ a key, nothing more.
 |---|---|---|
 | — | Nothing. Phase 9 took the ⌘↓ / ⌘↑ this table claimed for it, for Clip ▸ Open Nest and Clip ▸ Close Nest, and the row has been promoted into the bound table above. Carrying a modifier does NOT keep either off the first responder — every main-menu key equivalent is offered the key-down before the window dispatches it, and what a modifier changes is only WHICH field-editor binding it displaces (here `moveToBeginningOfDocument:` / `moveToEndOfDocument:`). So the pair is validated DEAD while text is being edited, the Delete pair's precedent — otherwise ⌘↑ in an inline rename would leave the nest and discard the open field | — |
 
-Menus: File (New Project, New Recording… (road map 3 — directly under New
+Menus: Reelcut (About Reelcut, Settings… ⌘, — road map 6 §5d's window, in a
+separator group of its own between About and Hide, which is where macOS puts
+one; a WINDOW and not a sheet, because the key and the region belong to the
+person rather than to a document and the item has to work with no document
+open, Hide Reelcut, Hide Others, Show All, Quit Reelcut),
+File (New Project, New Recording… (road map 3 — directly under New
 Project with no separator, because both make a document out of nothing),
 Open…, Open Recent, Close, Save, Save As…,
 Add Media…, Import Captions… (M3), Generate Captions… and Export
@@ -3368,11 +3374,30 @@ assisted import.
   huge one blows up the SOURCE LENGTH, which `Transcriber.contentLength`
   bounds to `Transcriber.maxSourceTicks` = 1e15 — deliberately NOT the
   core's `i64::MAX`, because Swift SUMS this number where the core does
-  not: `MediaTranscript.swift:317` adds it to `sourceIn` for the window's
-  end and `TranscribeSheetController.swift:264` sums it over at most
-  `MAX_CLIPS` = 4096 jobs, and 4096 × 1e15 is comfortably under 2^63.
+  not: `MediaTranscript.swift:333` adds it to `sourceIn` for the window's
+  end and `TranscribeSheetController.swift:388` sums it over at most
+  `MAX_CLIPS` = 4096 jobs, and 4096 × 1e15 is comfortably under 2^63 (both
+  citations re-pointed by `grep -n` after c1-chrome's edits).
   `Transcriber.jobs` bounds every `Job.sourceIn` the same way so the window
-  end cannot overflow either. One consequence is SHARED with the on-device
+  end cannot overflow either. **Extended 2026-09-20 (c1-chrome) to the one
+  INTEGER multiply on that path**, which this rule did not cover and which
+  takes its input from the PROVIDER's JSON and from a hand-edited cache
+  file: `MediaTranscript.words` turns a word's milliseconds into source
+  ticks as `ms × 600`, and `Ticks` is `Int64`, so any `|ms| >
+  Ticks.max / 600` is an overflow trap in a build with checked arithmetic.
+  `MediaTranscript.sourceTicks(milliseconds:)` is now the one door that
+  conversion goes through and it clamps IN `Int` to
+  ±`maxWordMilliseconds` = `Ticks.max / 600` BEFORE multiplying. The bound
+  is deliberately NOT `maxSourceTicks`: this number is not summed with
+  anything — it is COMPARED with the window and has a non-negative
+  `sourceIn` subtracted from it — and a bound of 1e15 sits inside a
+  window end a hand-written file can legally reach (`sourceIn` +
+  `sourceLength` ≤ 2e15), so clamping there would move a word that is far
+  past the window INTO it and put a caption on somebody else's picture,
+  where `Ticks.max / 600` is outside every window there can be. A negative
+  millisecond stays negative for the same reason: it must keep failing the
+  `≥ sourceIn` test rather than being folded to zero. Every value that did
+  not trap before answers exactly what it always did. One consequence is SHARED with the on-device
   engine and MEASURED by no row: `contentLength` used to fall back to the
   clip's duration when `duration × speed` overflowed to `+infinity`, and now
   answers the 1e15 bound, so such a clip's on-device EXTRACT range is built
@@ -3384,7 +3409,7 @@ assisted import.
 - **R6-11 — A media whose remote delete this run could not confirm is not
   uploaded again in this run.** `cache/transcripts/<id>.json` is the ONLY
   record of a remote transcript's id — `MediaTranscript.undeleted`
-  (`:270`) reads it and nothing else holds it — and a fetch REPLACES that
+  (`:273`) reads it and nothing else holds it — and a fetch REPLACES that
   file. So if the janitor's retry failed for a media and the run then
   re-fetched it, the id it could not delete would be overwritten and the
   transcript orphaned at AssemblyAI for ever, with the run's own note
@@ -3398,3 +3423,35 @@ assisted import.
   `refresh` — a caller who asked for a re-upload is told it did not happen
   rather than handed a cached answer — and a second persisted file listing
   orphaned ids, which is a new persisted shape for one case.
+- **R6-12 — The key and the region are a PERSON's settings, and no tool
+  reads or writes either.** The key is R6-5's rule already: never an
+  argument, never in an answer, reachable only through Reelcut ▸ Settings…
+  and `RC_ASSEMBLYAI_KEY`. The REGION is the same kind of thing for a
+  different reason — it is a default a person sets once
+  (`ReelcutAssemblyAIRegion`, road map 6 §5d), it changes only WHERE a
+  transcript is made, and a tool argument for it would let one call put a
+  customer's audio in a jurisdiction the person did not choose. So the
+  Settings window is the one writer and `AssemblyAIConfiguration.region` the
+  one reader. DECLINED: a `region` key in `transcribe`'s result, which road
+  map 6 §5g's key list does not carry and pipeline 3 did not add. Every
+  proof instance runs under `-RCAssemblyAIEndpoint`, where the region is
+  NOT where the run spoke, so such a key could only ever be proved on the
+  one host where it is false; the honest shape — the base URL's HOST, under
+  a key named `endpoint` — is recorded as residue in
+  `designs/reelcut-remaining.md` §5 rather than guessed at here. The
+  Settings window's **Verify** runs on `CloudTranscriber`'s own `work`
+  queue, one of the seams `app/CLAUDE.md` lists, and adds no queue (R6-7).
+- **R6-13 — The estimate never counts a HELD media as "to upload", and
+  never hides its price.** R6-11 holds a media whose earlier remote delete
+  is unconfirmed: this run will not upload it, so counting it among the
+  files to upload would quote a person money for work that is not going to
+  happen, and R6-2's "a person is told what a run will cost before it runs"
+  would be false in the other direction if it were dropped in silence. So
+  it is its OWN clause of `CloudEstimate.describe` — "N file(s) waiting on
+  an earlier delete" — and its line in `CloudEstimate.reasons` names the
+  file and says what it would cost if the janitor clears it ("about $X more
+  if it does"). The estimate reads the cache's marker and the file's stamp
+  and NOTHING ELSE: whether the delete actually clears is the run's answer,
+  not the estimate's, and the report card is where that is reported.
+  DECLINED: hiding a held media from the card entirely, which would make a
+  file silently not transcribe.

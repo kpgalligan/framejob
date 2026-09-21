@@ -31,6 +31,31 @@ import Speech
 /// and undocumented for the on-device path (`Transcriber`'s doc argues it), so
 /// a run that stops early says where it stopped rather than pretending the
 /// clip held no more speech.
+///
+/// **Two engines, one card (road map 6 §5e).** An Engine popup under
+/// Language chooses between the recogniser on this Mac and AssemblyAI, and
+/// the choice re-populates Language, shows or hides the three cloud rows, and
+/// changes the hint. `TranscribeSheetController+Cloud.swift` holds everything
+/// that is only about the cloud engine; what is HERE is the card, and three
+/// methods — `refresh`, `noteText` and `startClicked` — whose FIRST statement
+/// dispatches on the engine. That order is load-bearing: under
+/// `.assemblyai` none of the three reads `language`, `languages`, `isBlocked`,
+/// `Transcriber.authorizationStatus` or `requestAuthorization`, so a Mac with
+/// no on-device model and no Speech grant can still transcribe in the cloud.
+/// The `.apple` arms are the code they were, moved under the dispatch.
+///
+/// **The widenings this split cost**, in toll 3's pattern: `languages`,
+/// `mediaURLs`, `languagePopup`, `summaryLabel`, `noteLabel`, `hintLabel`,
+/// `scope`, `jobs(in:)`, `startButton`, `showProgress()` and `progressed(_:_:)`
+/// are internal rather than private, because `+Cloud.swift` builds the same
+/// card out of them. `language` and `isBlocked` stay private: the cloud half
+/// must not be able to read either.
+///
+/// **Four injection points, for the probe and for nothing else.** `store`,
+/// `defaults`, `environment` and `languages` are initialiser arguments with
+/// the app's own values as defaults, so an instrument can build this sheet
+/// with an empty `MemoryStore`, a throwaway defaults suite, no environment
+/// and no on-device model at all, and measure what a person would see.
 final class TranscribeSheetController: NSViewController {
 
     /// Which clips a run is taken over.
@@ -55,18 +80,35 @@ final class TranscribeSheetController: NSViewController {
     /// Everything a run reads, taken off the document once. The document
     /// cannot change under an open sheet, which is what makes that safe.
     let snapshot: ProjectSnapshot
-    private let mediaURLs: [UInt32: URL]
+    let mediaURLs: [UInt32: URL]
     private let selection: Set<UInt32>
     private let inOutRange: (start: Ticks, end: Ticks)?
-    private let languages: [Transcriber.Language]
+    let languages: [Transcriber.Language]
+
+    /// Where the AssemblyAI key comes from, where the region and the
+    /// remembered engine are read and written, and what a `RC_ASSEMBLYAI_KEY`
+    /// would be read out of — injected so a probe can build this card with an
+    /// empty store and a throwaway suite. R6-9's folder override is already
+    /// inside `AssemblyAIConfiguration.store()`.
+    let store: any SecretStore
+    let defaults: UserDefaults
+    let environment: [String: String]
 
     private let transcriber = Transcriber()
     let token = Transcriber.CancelToken()
 
-    private let languagePopup = NSPopUpButton(frame: .zero, pullsDown: false)
+    let languagePopup = NSPopUpButton(frame: .zero, pullsDown: false)
+    let enginePopup = NSPopUpButton(frame: .zero, pullsDown: false)
+    let speakersCheckbox = NSButton(checkboxWithTitle: "", target: nil, action: nil)
+    let vocabularyField = NSTextField()
+    let refreshCheckbox = NSButton(checkboxWithTitle: "", target: nil, action: nil)
     private let scopePopup = NSPopUpButton(frame: .zero, pullsDown: false)
-    private let summaryLabel = NSTextField(labelWithString: "")
-    private let noteLabel = NSTextField(wrappingLabelWithString: "")
+    let summaryLabel = NSTextField(labelWithString: "")
+    let noteLabel = NSTextField(wrappingLabelWithString: "")
+    /// The engine's own hint. `makeSheetView` takes `hint: nil` and this
+    /// label goes first in the content instead, because the sentence changes
+    /// with the popup and the builder's hint is a constructor argument.
+    let hintLabel = NSTextField(wrappingLabelWithString: "")
     let bar = NSProgressIndicator()
     let statusLabel = NSTextField(wrappingLabelWithString: "")
     let detailLabel = NSTextField(labelWithString: "")
@@ -74,15 +116,38 @@ final class TranscribeSheetController: NSViewController {
     /// is what app/CLAUDE.md allows them for.
     private var settingsStack: NSStackView!
     private var progressStack: NSStackView!
+    private var grid: NSGridView!
     var stopButton: NSButton!
-    private var startButton: NSButton!
+    var startButton: NSButton!
+
+    /// The run, held for its life: `CloudTranscriber.run` hops onto its own
+    /// queue with `[weak self]`, so a transcriber nobody retains never
+    /// completes at all.
+    var cloud: CloudTranscriber?
+    /// What the cloud run said beside its `Outcome` — the report card's
+    /// extra lines, read by `finish`.
+    var cloudReport: CloudTranscriber.Report?
+    /// Whether the language was DETECTED rather than named, which is what
+    /// makes a confidence figure a true claim about how it was arrived at.
+    var cloudDetected = false
+    /// One `CloudEstimate.Facts` per media, read from disk once per sheet —
+    /// `refresh` runs on every keystroke in the Vocabulary field and a stat
+    /// per keystroke per media is not a readout, it is a spin.
+    var cloudFactsCache: [UInt32: CloudEstimate.Facts] = [:]
 
     var didStart = false
     var didFinish = false
 
     private static let scopes = Scope.allCases
+    /// The grid rows that belong to AssemblyAI alone.
+    static let cloudRows = [2, 3, 4]
 
-    init(document: ProjectDocument) {
+    init(
+        document: ProjectDocument, store: any SecretStore = AssemblyAIConfiguration.store(),
+        defaults: UserDefaults = .standard,
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        languages: [Transcriber.Language] = Transcriber.languages()
+    ) {
         self.document = document
         // The container the cues will LAND in, not the document — see
         // `CaptionImporter.plan`'s paragraph. A scope cannot change under
@@ -91,7 +156,10 @@ final class TranscribeSheetController: NSViewController {
         self.mediaURLs = document.mediaURLs()
         self.selection = document.selection
         self.inOutRange = document.inOutRange
-        self.languages = Transcriber.languages()
+        self.languages = languages
+        self.store = store
+        self.defaults = defaults
+        self.environment = environment
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -114,7 +182,7 @@ final class TranscribeSheetController: NSViewController {
         }
     }
 
-    private func jobs(in scope: Scope) -> [Transcriber.Job] {
+    func jobs(in scope: Scope) -> [Transcriber.Job] {
         Transcriber.jobs(for: clips(in: scope), in: snapshot, urls: mediaURLs).jobs
     }
 
@@ -126,7 +194,7 @@ final class TranscribeSheetController: NSViewController {
         return .all
     }
 
-    private var scope: Scope {
+    var scope: Scope {
         let index = scopePopup.indexOfSelectedItem
         guard Self.scopes.indices.contains(index) else { return .all }
         return Self.scopes[index]
@@ -148,26 +216,42 @@ final class TranscribeSheetController: NSViewController {
     // MARK: - View
 
     override func loadView() {
-        for language in languages {
-            languagePopup.addItem(withTitle: language.displayName)
-            // The identifier, not the row's position — see `language`.
-            languagePopup.lastItem?.representedObject = language.identifier
-        }
-        if languages.isEmpty {
-            languagePopup.addItem(withTitle: "No on-device language")
-            // A popup's menu validates its own rows, so this has to come
-            // BEFORE the row is disabled or AppKit puts it straight back on.
-            languagePopup.menu?.autoenablesItems = false
-            languagePopup.item(at: 0)?.isEnabled = false
-            languagePopup.isEnabled = false
-        } else if let preferred = Transcriber.defaultLanguage(in: languages),
-                  let index = languagePopup.itemArray.firstIndex(where: {
-                      $0.representedObject as? String == preferred.identifier
-                  }) {
-            languagePopup.selectItem(at: index)
-        }
         languagePopup.font = DS.sans(13)
         languagePopup.widthAnchor.constraint(equalToConstant: 200).isActive = true
+
+        // The remembered engine, and the ONLY place it is read (R6-2 keeps
+        // an agent call out of this key). An absent or unknown value is the
+        // on-device engine, which is what every build before this one did.
+        for engine in TranscriptionEngine.allCases {
+            enginePopup.addItem(withTitle: engine.displayName)
+            enginePopup.lastItem?.representedObject = engine.rawValue
+        }
+        let remembered = defaults.string(forKey: TranscriptionEngine.defaultsKey)
+        if let index = enginePopup.itemArray.firstIndex(where: {
+            $0.representedObject as? String == remembered
+        }) {
+            enginePopup.selectItem(at: index)
+        } else {
+            enginePopup.selectItem(at: 0)
+        }
+        enginePopup.font = DS.sans(13)
+        enginePopup.target = self
+        enginePopup.action = #selector(engineChanged(_:))
+        enginePopup.widthAnchor.constraint(equalToConstant: 200).isActive = true
+        populateLanguages()
+
+        speakersCheckbox.title = "start a new caption when the speaker changes"
+        speakersCheckbox.font = DS.sans(12)
+        speakersCheckbox.target = self
+        speakersCheckbox.action = #selector(controlChanged(_:))
+        DSField.style(vocabularyField)
+        vocabularyField.placeholderString = "names and jargon, separated by commas"
+        vocabularyField.delegate = self
+        vocabularyField.widthAnchor.constraint(equalToConstant: 240).isActive = true
+        refreshCheckbox.title = "ignore any cached transcript"
+        refreshCheckbox.font = DS.sans(12)
+        refreshCheckbox.target = self
+        refreshCheckbox.action = #selector(controlChanged(_:))
 
         for scope in Self.scopes {
             scopePopup.addItem(withTitle: scope.displayName)
@@ -190,9 +274,19 @@ final class TranscribeSheetController: NSViewController {
         noteLabel.font = DS.sans(11)
         noteLabel.textColor = DS.textFaint
         noteLabel.preferredMaxLayoutWidth = sheetWidth - sheetInset * 2
+        // `makeSheetView`'s own hint style, because this label is standing in
+        // for the one it would have built.
+        hintLabel.font = DS.sans(12)
+        hintLabel.textColor = DS.textMuted
+        hintLabel.isEditable = false
+        hintLabel.preferredMaxLayoutWidth = sheetWidth - sheetInset * 2
 
-        let grid = NSGridView(views: [
+        grid = NSGridView(views: [
             [fieldLabel("Language:"), languagePopup],
+            [fieldLabel("Engine:"), enginePopup],
+            [fieldLabel("Speakers:"), speakersCheckbox],
+            [fieldLabel("Vocabulary:"), vocabularyField],
+            [fieldLabel("Transcribe again:"), refreshCheckbox],
             [fieldLabel("From:"), scopePopup],
         ])
         grid.rowSpacing = 10
@@ -227,37 +321,76 @@ final class TranscribeSheetController: NSViewController {
         progressStack.spacing = 8
         progressStack.isHidden = true
 
-        let content = NSStackView(views: [settingsStack, progressStack])
+        let content = NSStackView(views: [hintLabel, settingsStack, progressStack])
         content.orientation = .vertical
         content.alignment = .leading
         content.spacing = 0
+        content.setCustomSpacing(16, after: hintLabel)
 
         stopButton = sheetCancelButton(target: self, action: #selector(stopClicked(_:)))
         startButton = StickerButton(
             title: "Generate", style: .primary, target: self,
             action: #selector(startClicked(_:)))
         view = makeSheetView(
-            title: "Generate Captions",
-            hint: "The words are recognised ON THIS MAC and land as ordinary text clips on a "
-                + "track of their own, so they show in the preview and burn into an export "
-                + "with no further step. Nothing is uploaded.",
-            content: content,
+            title: "Generate Captions", hint: nil, content: content,
             buttonRow: makeButtonRow(
                 cancel: stopButton, apply: startButton,
                 leading: [sheetFootnote("captions go on a new front track")]))
+        // A key saved or removed while this card is up must not leave a
+        // dead Generate button behind it.
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(settingsChanged(_:)),
+            name: SettingsWindowController.didChangeNotification, object: nil)
+        applyEngine()
         refresh()
     }
 
     // MARK: - Settings
 
-    @objc private func controlChanged(_ sender: Any?) {
+    @objc func controlChanged(_ sender: Any?) {
         refresh()
+    }
+
+    /// The Engine popup: remember the choice, re-populate Language, show or
+    /// hide the three cloud rows, change the hint, and recompute.
+    @objc private func engineChanged(_ sender: Any?) {
+        defaults.set(engine.rawValue, forKey: TranscriptionEngine.defaultsKey)
+        populateLanguages()
+        applyEngine()
+        refresh()
+    }
+
+    /// A key or a REGION changed in the Settings window while this card is
+    /// open. The hint names the jurisdiction and `beginCloud` resolves the
+    /// base URL from that same setting at click time, so the sentence is
+    /// rewritten here as well as the readout — `applyEngine` is idempotent
+    /// (05-review's finding 2).
+    @objc private func settingsChanged(_ note: Notification) {
+        applyEngine()
+        refresh()
+    }
+
+    /// The rows and the sentence that belong to the chosen engine. Called
+    /// from `loadView`, from `engineChanged` and from `settingsChanged`, and
+    /// from nowhere else: the grid's shape is not something a readout
+    /// recomputes.
+    func applyEngine() {
+        let cloud = engine == .assemblyai
+        for index in Self.cloudRows where grid.numberOfRows > index {
+            grid.row(at: index).isHidden = !cloud
+        }
+        hintLabel.stringValue = Self.hint(
+            for: engine, region: AssemblyAIConfiguration.region(defaults: defaults))
     }
 
     /// Everything the settings state shows, recomputed from the controls —
     /// there is no other way for the readout and the button to get out of
     /// step with each other.
     private func refresh() {
+        guard engine == .apple else {
+            refreshCloud()
+            return
+        }
         let jobs = jobs(in: scope)
         let seconds = jobs.reduce(0) { $0 + $1.sourceLength }
         summaryLabel.stringValue = jobs.isEmpty
@@ -265,6 +398,11 @@ final class TranscribeSheetController: NSViewController {
             : "\(jobs.count) clip\(jobs.count == 1 ? "" : "s") · "
                 + ReelTime.format(seconds, fps: snapshot.canvas.fps, frames: false)
                 + " of audio"
+        // The cloud arm hangs its reasons — file names, a price, AssemblyAI's
+        // dated rate — off this same label. They are not true of an on-device
+        // run, so going back to this engine takes them down (05-review's
+        // finding 1).
+        summaryLabel.toolTip = nil
         let note = noteText(jobs: jobs)
         noteLabel.stringValue = note
         noteLabel.isHidden = note.isEmpty
@@ -279,6 +417,7 @@ final class TranscribeSheetController: NSViewController {
     }
 
     private func noteText(jobs: [Transcriber.Job]) -> String {
+        guard engine == .apple else { return cloudNoteText(jobs: jobs) }
         var notes: [String] = []
         if languages.isEmpty {
             notes.append(
@@ -318,7 +457,17 @@ final class TranscribeSheetController: NSViewController {
 
     /// The grant, then the run. `requestAuthorization` only ever happens on
     /// this path, and only from `.notDetermined`.
-    @objc private func startClicked(_ sender: Any?) {
+    @objc func startClicked(_ sender: Any?) {
+        guard engine == .apple else {
+            // Nothing below this line is read for the cloud engine: no
+            // grant, no on-device model, no `language`.
+            guard !didStart, !jobs(in: scope).isEmpty, runRequest().options != nil else {
+                NSSound.beep()
+                return
+            }
+            beginCloud()
+            return
+        }
         guard !didStart, let language = language, !jobs(in: scope).isEmpty else {
             NSSound.beep()
             return
@@ -362,7 +511,7 @@ final class TranscribeSheetController: NSViewController {
     /// Swaps the card. The settings are gone rather than disabled: a run that
     /// has begun cannot take a different language, and a greyed grid invites
     /// a click that can do nothing.
-    private func showProgress() {
+    func showProgress() {
         settingsStack.isHidden = true
         progressStack.isHidden = false
         // Hidden AND disabled: AppKit skips both when it looks for the Return
@@ -372,9 +521,20 @@ final class TranscribeSheetController: NSViewController {
         startButton.isEnabled = false
     }
 
-    private func progressed(_ fraction: Double, _ name: String) {
+    func progressed(_ fraction: Double, _ name: String) {
         guard !didFinish else { return }
         bar.doubleValue = min(max(fraction, 0), 1)
         detailLabel.stringValue = name
+    }
+}
+
+// MARK: - The Vocabulary field
+
+/// The one thing on this card a person TYPES into, so the readout has to move
+/// with the keystroke rather than with the commit — `MediaPane`'s search
+/// field's rule. The facts are cached per media, so this costs no disk read.
+extension TranscribeSheetController: NSTextFieldDelegate {
+    func controlTextDidChange(_ note: Notification) {
+        refresh()
     }
 }

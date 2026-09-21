@@ -431,6 +431,29 @@ seventh test, then **375** when the residue run restated the reason, of the
 which is a proof script and not held to the cap
 (`designs/reelcut-roadmap-7.md` §2.4).
 
+**What road map 6's c1-chrome did to it** (2026-09-20, `wc -l`; road map 6
+§10.11). **Nothing joined this list**, and three files ended a line under a
+cap rather than over one. Three new files, all under the 400-line cap a new
+file gets: `app/Sources/CloudEstimate.swift` (**328**),
+`app/Sources/SettingsWindowController.swift` (**376**, with
+`extension AppDelegate { showSettings }` at its foot, so `AppDelegate.swift`
+was not touched at all) and
+`app/Sources/TranscribeSheetController+Cloud.swift` (**313**).
+`TranscribeSheetController.swift` is 380 → **540** against the ~600 cap —
+toll 3 paid for that room before the feature, which is what that toll was
+for — and `TranscribeSheetController+Commit.swift` 145 → **215**.
+`MediaTranscript.swift` 383 → **399** and `AssemblyAITranscript.swift`
+374 → **399**, each a line under its own 400: the first went to **411** mid-
+build and its doc comment was cut until it fitted, and the second took
+`keyterms` as a pure move from `AgentServer+CloudCaptions.swift`, which came
+DOWN 247 → **243**. `AppDelegate+Menus.swift` 544 → **549** for one item and
+one separator; `CloudTranscriber.swift` 296 → **317** for `verify`. The two
+instruments are not held to a cap (`designs/reelcut-roadmap-7.md` §2.4):
+`tools/proof/cloud_captions_probe.py` 3280 → **4753** (4640 before c1-chrome's
+fix pass added six rows and three mutants),
+`tools/proof/harness/main.swift` 901 → **954**,
+`tools/proof/cloud_captions_proof.py` 1479 → **1494**.
+
 **None of this is work on its own.** It is the list a feature phase consults
 so it pays the toll first and alone, the way `d69de99`, `b410125` and
 `3e5b598` did.
@@ -458,6 +481,32 @@ and the closing above added the rest.
   - whether `FileStore`'s `0600` file is what the person expects to find in
     `~/Library/Application Support/Reelcut/`, and whether Remove leaves them
     confident it is gone. No probe may look in that folder.
+
+- **The cloud captions chrome, road map 6's c1-chrome (2026-09-20)** — what
+  no instrument in that pipeline could reach:
+  - **the Settings window, LOOKED AT** in both appearances. It is
+    photographed (`cloud_captions_probe.py`'s `chrome` section, two processes
+    per appearance, byte-identical) and nobody has judged the picture: the
+    button row's balance, whether the explanation paragraph is too long at
+    460 points, whether `Verify` reads as a third affirmative button beside
+    Save and Remove.
+  - **the Generate Captions sheet, LOOKED AT.** A sheet cannot be put up
+    offscreen at all, so every claim about it is structural. Nobody has seen
+    the card with the three cloud rows showing, or watched them appear and
+    disappear as the Engine popup moves.
+  - **the reasons tooltip.** `CloudEstimate.reasons` is shown as the summary
+    label's `toolTip` (road map 6 §5e's dated revision); nobody has hovered
+    it, and a four-line tooltip may be the wrong home for it.
+  - **Verify against the REAL service**, both answers. The stand-in proves
+    the status mapping; c1-parts already owed this and the button now makes
+    it a thing a person can press.
+  - **the phases' feel on a real recording** — whether the bar's four bands
+    read as progress over minutes of somebody else's compute rather than as
+    four stalls, and whether the detail line's megabytes move often enough.
+  - **the fallback's report card**: R6-8's "transcribed with universal-2"
+    line has only ever been built from a `Report` a probe wrote.
+  - **⌘, in a document window**, and that it does not displace the bare `,`
+    nudge while a clip is selected or an inline rename is open.
 
 - **A clip plays with audio** (spec §10 step 4) and **the preview holds 60 fps**
   (step 5). No still frame can answer either.
@@ -607,6 +656,35 @@ and the closing above added the rest.
 
 ## 5. Where a third road map would start
 
+**Residue from road map 6's c1-chrome, 2026-09-20.** Two things that pipeline
+left, neither blocking anything. Its two INHERITED nits — c1-run's reader
+review's — are CLOSED: `CloudTranscriber`'s per-media closing publish now
+sends `CloudProgress.detail(.saving, file:)` instead of an empty string that
+would have blanked the sheet's detail label between media (the probe's `run`
+section gained a row and an `empty-closing-detail` mutant), and
+`MediaTranscript`'s `ms × 600` now goes through
+`sourceTicks(milliseconds:)`, clamped in `Int` first, which spec §11's
+R6-10 was extended to cover before the code (nine mapping rows, one child per
+millisecond, and a `no-ms-clamp` mutant that fails four of them by TRAP).
+
+- **`transcribe`'s result says WHERE it spoke, and nothing does.** Spec §11's
+  R6-12 declined a `region` key: every proof instance runs under
+  `-RCAssemblyAIEndpoint`, so the region is not where the run spoke and the
+  key could be proved only on the one host where it is false. The honest
+  shape, if a later phase wants one, is the base URL's **HOST** under a key
+  named `endpoint` — true under the override and under either region, and
+  measurable by every existing instrument. It is a new result key, so it is a
+  tool change with a catalog row and a parity consequence, and it belongs in
+  a phase that is changing the tool anyway.
+- **The estimate and the run classify a media in two places on purpose.**
+  `CloudEstimate.fate` answers what a run WOULD do and
+  `CloudTranscriber.transcribe` answers what it DID, and c1-chrome
+  deliberately did not merge them: one is a readout a person reads before
+  agreeing to spend money, the other is the run's own record. A `chrome` row
+  compares the two over two rounds so the day they drift is a scored failure.
+  A later phase that wants one spelling has to keep that row and make it
+  compare the merged code against something else.
+
 **Residue from road map 6's c1-parts, 2026-09-20.** Five things that pipeline
 measured or left, none of them blocking anything (the last was added when its
 reader review's two nits were left unfixed):
@@ -669,8 +747,9 @@ reader review's two nits were left unfixed):
 - **`tools/proof/cloud_captions_proof.py` EXISTS.** CLOSED 2026-09-20 by
   c1-run: 115 rows over three instances, 5i's rows 1–11 plus H, T, K and X,
   nine mutants each built in a tree copy and each named with its score (road
-  map 6 §10.10). Rows 14 and 18 are c1-chrome's and the live rows 20–21 are
-  c1-close's.
+  map 6 §10.10). Rows 14 and 18 landed 2026-09-20 in c1-chrome as the
+  probe's `estimate` and `chrome` sections (road map 6 §10.11); the live
+  rows 20–21 are c1-close's.
 - **`media/speech.mov`'s 16 kHz extract is not repeatable at all**, which is
   a SECOND and larger non-determinism than the one-sample flip above.
   Measured by c1-run: four extracts, four distinct byte strings of ONE length
@@ -688,6 +767,12 @@ reader review's two nits were left unfixed):
   `writeAll` turns an `EINTR`-interrupted `write(2)` into
   `SecretStoreError.unwritable`, so a signal during a Save could report a
   failure that did not happen. Neither has a row.
+- **One probe row of c1-chrome's leans on the ORDER of its section**
+  (c1-chrome's second review, a nit, left for the reader review): the row
+  that measures what Stop did to a sheet-started cloud run asserts the
+  `chrome` section's SHARED fake log is `[]`, which holds only because the
+  Verify rows run after it. A count captured before the click and compared
+  after would not depend on the order.
 
 
 

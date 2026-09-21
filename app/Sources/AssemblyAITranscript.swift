@@ -66,6 +66,31 @@ struct TranscriptOptions: Codable, Equatable {
     }
 }
 
+/// The vocabulary's rules, beside the field they fill. A pure move out of
+/// `AgentServer+CloudCaptions.swift` (c1-chrome): the tool and the sheet's
+/// Vocabulary field must cap and de-duplicate a person's list the same way,
+/// and two spellings of that would be two answers to one question.
+extension TranscriptOptions {
+
+    /// `keyterms_prompt`: trimmed, empties dropped, de-duplicated KEEPING
+    /// THE FIRST spelling, capped at `AssemblyAIClient.maxKeyterms`.
+    ///
+    /// First rather than last because the order a caller wrote is the order
+    /// of importance it meant, and the cap cuts from the end — a list that
+    /// re-ordered itself and then cut would drop terms the caller put first.
+    static func keyterms(_ given: [String]) -> [String] {
+        var out: [String] = []
+        var seen = Set<String>()
+        for term in given {
+            let trimmed = term.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty, seen.insert(trimmed).inserted else { continue }
+            out.append(trimmed)
+            if out.count == AssemblyAIClient.maxKeyterms { break }
+        }
+        return out
+    }
+}
+
 /// `POST /v2/transcript`'s body: the upload's URL and the options, flattened
 /// into ONE object, because that is the shape AssemblyAI's endpoint takes.
 ///

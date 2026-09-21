@@ -288,6 +288,22 @@ enum MediaTranscript {
 
     // MARK: - The mapping
 
+    /// The largest millisecond this file will multiply: the conversion below
+    /// multiplies by 600 into an `Int64` and TRAPS past this, not wraps.
+    static let maxWordMilliseconds = Int(Ticks.max / 600)
+
+    /// One of the provider's milliseconds as source ticks — the ONE door
+    /// that conversion goes through, and the only integer multiply on the
+    /// caption path (R6-10, extended by c1-chrome). The input is somebody
+    /// else's (AssemblyAI's JSON, or a hand-edited cache file), so it is
+    /// clamped IN `Int` first — to ±`maxWordMilliseconds` and NOT to
+    /// `Transcriber.maxSourceTicks`, which sits INSIDE a window end a
+    /// hand-written project can reach and would drag a far word INTO the
+    /// window. A negative stays negative: it must keep failing `>= sourceIn`.
+    static func sourceTicks(milliseconds: Int) -> Ticks {
+        Ticks(min(max(milliseconds, -maxWordMilliseconds), maxWordMilliseconds)) * 600
+    }
+
     /// THE MAPPING, and the one piece of arithmetic in this file: the words
     /// of a media's transcript that belong to ONE clip, in PROJECT ticks.
     ///
@@ -317,9 +333,9 @@ enum MediaTranscript {
         let windowEnd = job.sourceIn + job.sourceLength
         var out: [CaptionCues.Word] = []
         for word in file.words {
-            let startTicks = Ticks(word.start) * 600
+            let startTicks = sourceTicks(milliseconds: word.start)
             guard startTicks >= job.sourceIn, startTicks < windowEnd else { continue }
-            let endTicks = Ticks(max(word.start, word.end)) * 600
+            let endTicks = sourceTicks(milliseconds: max(word.start, word.end))
             out.append(
                 CaptionCues.Word(
                     text: word.text,

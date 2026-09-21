@@ -67,7 +67,8 @@ targets:
         # place it can live.
         NSSpeechRecognitionUsageDescription:
           Reelcut transcribes the audio of clips you choose, on this Mac, to write captions.
-          Nothing is sent anywhere.
+          Captions made with a cloud service are a separate choice, made in the Generate
+          Captions sheet.
         # File ▸ New Recording… (road map 3, R1c) — the microphone half of a
         # recording, which speech never needed (an SFSpeechURLRecognitionRequest
         # reads a file). The microphone takes TWO things, and this key is one:

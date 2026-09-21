@@ -849,6 +849,24 @@ with a stable Developer ID identity does not have q7's problem, and
 that reads the file once and removes it — a later phase, named here so it is
 not rediscovered.
 
+**Revised 2026-09-20 (c1-chrome), recording what "one pane" became and
+adding nothing to this section's rules.** The pane is a HEADING — the string
+`SettingsWindowController.paneTitle`, "Transcription", the first arranged
+subview of the window's content — inside a window titled Settings, and not a
+tab bar with one tab: a tab strip with a single tab is chrome that says
+nothing and has to be torn out when the second pane arrives. That is what
+makes the `transcribe` tool's and the catalog's sentence sending a caller to
+Settings and then to Transcription true without either sentence being edited,
+and a `hygiene` row pins both byte-identical to pipeline 3's tree. Verify
+runs on `CloudTranscriber`'s own `work` queue through a new
+`CloudTranscriber.verify(completion:)` that captures the CLIENT and not
+itself; no queue was added (spec §11's R6-12). Two things this section did
+not name and the build needed: the initialiser takes a store FACTORY, so the
+offscreen harness can hand it a `MemoryStore` — `Harness.pinDefaults`
+REPLACES the argument domain and would otherwise leave `store()` pointing at
+the person's real `FileStore` — and the masked placeholder is FIXED length,
+because a mask as long as the key leaks its length.
+
 **Reelcut ▸ Settings… ⌘,** is new chrome — the app has had nothing to
 persist beyond view state — and it is a window, not a sheet:
 `SettingsWindowController.swift` (≤ 400), one pane for now,
@@ -862,6 +880,20 @@ the rate, and a link to the account page. No key set is not an error
 anywhere in this window; it is a state the sheet names (5e).
 
 ### 5e. The sheet
+
+**Revised 2026-09-20 (c1-chrome), recording two deviations and adding no
+rule.** (1) The summary's DURATION is what `rc_timecode_format` prints —
+`02:00:00.000` for two hours, the on-device summary's own spelling with
+`frames: false` — so this section's "1:42:10" is an illustration of the
+SHAPE and not of the format; the probe pins the format once exactly and the
+rest by its shape. (2) A third clause joins the tail, spec §11's R6-13: a
+media R6-11 will HOLD is counted as "N file(s) waiting on an earlier
+delete" rather than as a file to upload, and its `reasons` line carries what
+it would cost if the janitor clears the delete, so its price is neither in
+the total nor hidden. The reasons themselves are the summary label's
+TOOLTIP, which this section did not say and the card has no room for; the
+note under the button is the three things about the CALL — no key, a
+vocabulary that was cut, a scope with nothing in it.
 
 `TranscribeSheetController` gains, under Language, an **Engine** popup
 whose choice re-populates the Language popup: On this Mac → today's
@@ -1029,6 +1061,19 @@ that before the lane relies on it. `TimelineView.swift` is frozen and has
 no reason to know.
 
 ### 5i. The proof
+
+**Revised 2026-09-20 (c1-chrome), adding to this section and replacing
+nothing in it.** Rows 14 and 18 landed as two named SECTIONS of
+`cloud_captions_probe.py`, `estimate` and `chrome`, so `--only` can reach
+either. Row 18 photographs the Settings WINDOW through `tools/proof/harness/`
+— the harness gained a `settings` mode beside `welcome` — and reads the
+SHEET structurally, because a sheet cannot be put up offscreen at all. The
+`mapping` section gained nine rows for R6-10's extension, ONE CHILD PER
+MILLISECOND, and the `run` section one row for the closing publish's detail.
+Three rows this section numbered none of: the sheet's controls against what
+a RUN would receive (`runRequest()`), the estimate against the run's own
+`Report` over two rounds, and `project.yml` diffed against pipeline 3's
+tree.
 
 **Revised 2026-09-20 (c1-parts), adding to this section and replacing
 nothing in it.** Two of the three instruments are built and their record is
@@ -1909,7 +1954,8 @@ warnings.
   through and clamps the offset into `[0, duration]` in `Double`;
   `Transcriber.contentLength` bounds the source length to
   `maxSourceTicks` = 1e15 — not `i64::MAX`, because Swift SUMS it
-  (`MediaTranscript.swift:317`, `TranscribeSheetController.swift:264` over at
+  (`MediaTranscript.swift:317`, `TranscribeSheetController.swift:264` as of
+  c1-run; `:333` and `:388` after c1-chrome, over at
   most `MAX_CLIPS` = 4096 jobs) — and `Transcriber.jobs` bounds `Job.sourceIn`
   the same way. Declined: bounding `speed` in `validate`.
 - **R6-11** — a media whose remote delete this run could not confirm is HELD:
@@ -2065,3 +2111,234 @@ and `project.yml` is empty.
   three cloud rows in the sheet, `CloudEstimate`, the Settings window, the
   report card, `project.yml`'s usage string, the harness pins, probe rows 14
   and 18, 5i's live rows 20–21, and every earlier proof re-run.
+
+### 10.11 c1-chrome — everything a person touches
+
+Built 2026-09-20. Reelcut ▸ Settings… ⌘, exists; the Generate Captions sheet
+has an Engine popup and AssemblyAI's three rows; `CloudEstimate` prices a run
+before it runs; the report card says what the cloud run said. **Nothing in
+this pipeline called `api.assemblyai.com`**, no live row ran, and `README.md`
+is untouched — both are c1-close's.
+
+**Nothing in the core, the FFI or the op table moved.**
+`git diff c9b80435 -- core app/Sources/ReelCore.swift app/Sources/ReelOps.swift`
+is EMPTY, and `AgentCatalog+Captions.swift` is byte-identical to pipeline 3's
+(`git show c9b80435:<path> | diff - <path>`, the recipe for an untracked
+file). `make test` printed **721 passed, 0 failed over 39 binaries**;
+`make lint` and `cargo fmt --check` are clean; `make typecheck` is 0 errors
+and exactly 4 warnings.
+
+#### Spec §11, before the code
+
+- **R6-10, EXTENDED** to the one INTEGER multiply on the caption path. The
+  rule covered every `Double → Ticks` conversion and not `ms × 600`, whose
+  input is the PROVIDER's JSON and a hand-edited
+  `cache/transcripts/<id>.json`. `MediaTranscript.sourceTicks(milliseconds:)`
+  is now the one door, clamping in `Int` to ±`Ticks.max / 600` BEFORE the
+  multiply — deliberately NOT to `maxSourceTicks`, because this number is
+  never summed (it is compared with the window, with a non-negative
+  `sourceIn` subtracted) and 1e15 sits INSIDE a window end a hand-written
+  project can reach, so a bound there would drag a far word INTO a window.
+  A negative stays negative so it keeps failing the `>= sourceIn` test.
+  Every value that did not trap answers what it always did.
+- **R6-12** — the key and the region are a PERSON's settings and no tool
+  reads or writes either. DECLINED: a `region` key in `transcribe`'s result.
+  Every proof instance runs under `-RCAssemblyAIEndpoint`, where the region
+  is not where the run spoke, so such a key could be proved only where it is
+  false; the honest shape (the base URL's HOST under `endpoint`) is residue
+  in `designs/reelcut-remaining.md` §5. Verify runs on `CloudTranscriber`'s
+  `work` queue and adds no queue (R6-7).
+- **R6-13** — the estimate never counts a HELD media as "to upload" and
+  never hides its price: its own clause in `describe`, its own line in
+  `reasons`, carrying what it would cost if the janitor clears the delete.
+
+#### What landed, with every file's `wc -l` before → after
+
+| File | Before | After |
+|---|---|---|
+| `app/Sources/CloudEstimate.swift` | — | **328** (new) |
+| `app/Sources/SettingsWindowController.swift` | — | **376** (new) |
+| `app/Sources/TranscribeSheetController+Cloud.swift` | — | **313** (new) |
+| `app/Sources/TranscribeSheetController.swift` | 380 | **540** |
+| `app/Sources/TranscribeSheetController+Commit.swift` | 145 | **215** |
+| `app/Sources/AppDelegate+Menus.swift` | 544 | **549** |
+| `app/Sources/CloudTranscriber.swift` | 296 | **317** |
+| `app/Sources/MediaTranscript.swift` | 383 | **399** |
+| `app/Sources/AssemblyAITranscript.swift` | 374 | **399** |
+| `app/Sources/AgentServer+CloudCaptions.swift` | 247 | **243** |
+| `tools/proof/harness/main.swift` | 901 | **954** |
+| `tools/proof/cloud_captions_probe.py` | 3280 | **4753** |
+| `tools/proof/cloud_captions_proof.py` | 1479 | **1494** |
+
+Every new file is under the 400-line cap; `MediaTranscript.swift` and
+`AssemblyAITranscript.swift` are at **399** of their own 400 and
+`TranscribeSheetController.swift` at **540** of the ~600. (Every number in
+this table is the FIX-PASS tree's, measured after 05-review's findings were
+fixed; the three files that grew there are named in "The fix pass" below.) `MediaTranscript`
+went over its cap once during the build at 411 and the doc comment was cut
+until it fitted, which is the whole of what that cap is for.
+`AgentServer+CloudCaptions.swift` came DOWN four lines: `keyterms` moved to
+`extension TranscriptOptions` in `AssemblyAITranscript.swift` verbatim, so
+the sheet's Vocabulary field and the tool's `vocabulary` argument cap and
+de-duplicate through ONE function. `AppDelegate.swift` was not touched at
+all — `showSettings` is an `extension AppDelegate` at the foot of
+`SettingsWindowController.swift`, `CaptionImporter.swift`'s
+command-at-the-foot precedent.
+
+#### The scores, each from the run that printed it
+
+- **`cloud_captions_probe.py` — 469/469, no skip**, in 88 s on the fix-pass
+  tree and again in 24 s on the final one with the fixture already made
+  (463/463 in 228 s on the tree the review read, before the fix pass added
+  six rows). The per-section counts, each printed by its OWN `--only`
+  run on the fix-pass tree: `--only estimate` **96/96**, `--only chrome`
+  **76/76**, `--only hygiene` **27/27**. Those are the sections' TOTALS, not
+  what this pipeline added to them: the `hygiene` section holds pipeline 2's
+  rows as well as this pipeline's, and no run has ever printed that split.
+  05-review's finding 3 was that the earlier "283 plus the 180 this pipeline
+  added … four hygiene rows" breakdown was arithmetic nobody ran; it is
+  withdrawn rather than patched.
+- **`cloud_captions_proof.py` — 115/115, no skip**, in 51 s against the new
+  binary, three instances on 4970–4972 each with its own fake on port 0,
+  each killed by its own PID, each with a row that `grep "Reelcut: "` on its
+  log is empty. **The row COUNT is unchanged and that is the point**: this
+  pipeline changed no tool, no schema and no op, and every instance now
+  launches with `-ReelcutCaptionEngine assemblyai`, which turns row 8 from a
+  row that could not fail into one that can.
+- Against the new binary, one FRESH instance per script on 4973 and 4974,
+  each with `-RCAssemblyAIEndpoint http://127.0.0.1:9` and a disposable
+  `-RCSecretFolder`: `phase4_proof.py` **84/84**, `op_catalog_proof.py`
+  **23/23**, `op_argument_proof.py` **133/133**, every parity grep empty.
+- With no instance running: `phase4_chrome.py` **59/59**,
+  `source_mirror_probe.py` **40/40**.
+
+#### Mutants, each a tree COPY with one text asserted to occur once
+
+Probe mutants, full score 463 — these five were measured on the tree the
+review read, before the fix pass added six rows (the full score is 469 now):
+
+| Mutant | Score | The rows that caught it |
+|---|---|---|
+| `rate-halved` | 438/463 | twenty-four `estimate` rows — every price, every `money`, both rate sentences and the `reasons` line — and the Settings paragraph's own dated rate |
+| `no-credential-check` | 462/463 | row 18's disabled-button row, with an empty store |
+| `masked-shows-value` | 461/463 | row 18's two Save rows: the field is not empty afterwards, and the key is in a view's `stringValue` |
+| `no-ms-clamp` | 459/463 | four of the nine ms rows, each by a TRAP — `Int64.min`, `Int64.max`, and either side of `Int64.max / 600` |
+| `empty-closing-detail` | 462/463 | the run section's new row: a pair published mid-run with no detail |
+
+Proof mutant, full score 115: **`agent-reads-remembered-engine`** —
+the tool falling back to `UserDefaults`'s `ReelcutCaptionEngine` when a call
+named no engine — scores **110/115**, failing row 8's "the fake's log is
+EMPTY" and four of row 1's, because every instance is launched with that key
+pinned to `assemblyai`. Before this pipeline that mutant was invisible: with
+the key absent the fallback answered `.apple` and every row passed.
+
+#### What this pipeline measured that nothing had
+
+- **The Settings window, photographed.** Two processes per appearance,
+  byte-identical each time, light ≠ dark, 460 × 340 points at the display's
+  backing scale (measured scale **1** on this host's offscreen window, the
+  same as `welcome`'s). No Auto Layout ambiguity to chase.
+- **A Mac with NO on-device speech model can still transcribe in the
+  cloud.** The sheet built with `languages: []` and a key: under On this Mac
+  the button is dead and the note names the missing model; under AssemblyAI
+  the same sheet is live, its note says nothing about an on-device model,
+  and a click sets `didStart` and holds a `CloudTranscriber`. That is what
+  the dispatch-on-`engine`-as-first-statement rule buys, and it is measured
+  rather than argued.
+- **The estimate and the RUN agree, twice.** Empty cache: the estimate says
+  upload, the run uploads, same id. Second round: the estimate says cached,
+  the run reads the cache, neither uploads. The two classifications are
+  DIFFERENT code (`CloudEstimate.fate` and `CloudTranscriber.transcribe`)
+  and were deliberately not merged; this row is what would catch them
+  drifting.
+- **The vocabulary is one function.** `func keyterms(` is declared once in
+  `app/Sources`, and a `chrome` row compares the sheet's own split-and-cap
+  against `TranscriptOptions.keyterms` on the same text. The cap NOTE reads
+  three ways and all three are rows: 1001 distinct terms names 1000 and
+  1001; 1001 pieces of which only 401 survive says nothing (a list that
+  shrank on duplicates lost nothing); exactly 1000 distinct says nothing.
+- **Save and Remove really went through R6-9's folder.** The `chrome` op
+  builds `SettingsWindowController` with its DEFAULT store factory under
+  `-RCSecretFolder <a folder under tools/proof/work/>`, writes, finds the
+  file at `0600` in that folder, scans every view's `stringValue`,
+  `placeholderString`, `toolTip`, `accessibilityValue()` and
+  `accessibilityLabel()` plus the window title for the dummy — none holds it
+  — then removes it and finds it gone.
+
+#### Limits and deviations, said rather than papered over
+
+- **The summary's duration is `rc_timecode_format`'s**, `02:00:00.000`, not
+  §5e's illustrative `1:42:10`. Recorded as a dated revision in §5e. The
+  probe pins the format exactly once and every other row by its shape,
+  because re-deriving a timecode in Python would be a second spelling of the
+  core's.
+- **The reasons are a TOOLTIP.** §5e names the summary line and the note but
+  gives the per-file "why" no home, and the card has no room for four lines
+  of it. It is `summaryLabel.toolTip`, and nobody has hovered it at the
+  machine — `designs/reelcut-remaining.md` §4 carries that.
+- **`Settings ▸ Transcription` is not a contiguous string in the TOOL's
+  file.** The sentence is split across two source lines there, so the
+  hygiene row greps for the contiguous string (exactly one file, the
+  catalog) and pins each file's sentence BYTE-IDENTICAL to pipeline 3's tree
+  separately. The spec for this pipeline assumed one grep would do both.
+- **The estimate's facts are cached per media for the life of the sheet**,
+  which is what keeps a keystroke in the Vocabulary field from stat-ing two
+  files per media. Nothing can change them under an open sheet; if a future
+  phase lets a document change under one, this cache is where it breaks.
+- **One row of the spec's chrome list is a text scan and not a call**:
+  "`openAccount` is never invoked" is checked by asserting the probe's own
+  chrome source does not name it, because invoking it would open a browser.
+- **No mutant was built for the Settings window's PHOTOGRAPH.** The four
+  chrome mutants aim at behaviour; a mutant that moved a control would be a
+  mutant of a picture nobody has looked at yet, which §4 owes a person.
+- **The root `CLAUDE.md`'s table still calls this road map "DESIGNED and not
+  built".** It has been wrong since c1-run and is not this pipeline's to
+  change — the row describes the whole of C1, and C1 is not finished until
+  c1-close. It is named here so it is not rediscovered.
+
+#### The fix pass (05-review, 2026-09-20)
+
+Findings 1 and 2 (both `should-fix`) and nits 4 and 5 were fixed; finding 3
+is the withdrawn breakdown above. Each code fix has a row that was made to
+FAIL on purpose, as a mutant over a tree COPY.
+
+| Finding | The fix | The row | The mutant, `--only chrome` |
+|---|---|---|---|
+| 1 | `refresh()`'s `.apple` arm sets `summaryLabel.toolTip = nil`, so the cloud reasons stop hovering over the on-device summary | "18: and going back to On this Mac TAKES THEM DOWN", with "18: under AssemblyAI the summary HANGS its reasons off the label's tooltip" as its CONTROL | `stale-tooltip` **75/76**, failing that row alone |
+| 2 | `settingsChanged` calls `applyEngine()` before `refresh()`, so a region changed in the Settings window under an open card rewrites the hint the way `beginCloud` reads it at click time | "18: a REGION changed in the Settings window under an open card rewrites the hint's jurisdiction" — the probe posts `didChangeNotification` with the suite's region moved to `eu` and back, and reads `hintLabel.stringValue` three times | `stale-region-hint` **75/76**, failing that row alone |
+| 4 (nit) | `sync()` builds ONE store and passes it to both reads | "18: ONE sync builds ONE store" — a counting factory over a `MemoryStore`, `sync()` called once, the count read back | `two-stores-per-sync` **75/76**, failing that row alone |
+| 5 (nit) | no code change: the row that clicks Generate now MEASURES its cancel | "18: and Stop ENDS it" (`didFinish` inside the row's bound, `The transcription was cancelled.` on the card, the button reading Close, the one clip still on the timeline) and "18: and it stopped before anything was uploaded — the fake's request log is still empty" | none — nothing was fixed to revert |
+
+`applyEngine`'s doc comment now names its third caller, which is the only
+other line the fixes moved. The three files that grew:
+`TranscribeSheetController.swift` 528 → **540**,
+`SettingsWindowController.swift` 372 → **376**,
+`cloud_captions_probe.py` 4640 → **4753**; every cap still holds.
+
+Re-run after the fixes, each score from the run that printed it:
+`make typecheck` **0 errors / 4 warnings** (the baseline four AVFoundation
+deprecations), `make app` **BUILD SUCCEEDED**, `make lint` clean and
+`cargo fmt --check` clean, `cloud_captions_probe.py` **469/469** with the
+three new mutants at **75/76** each, `cloud_captions_proof.py` **115/115**
+against the new binary (4970–4972, each fake on port 0, each instance killed
+by its own PID, `grep -c "Reelcut: "` **0** on all three logs, no instance
+left), and `phase4_chrome.py` **59/59**. `make test`, `phase4_proof.py`,
+`op_catalog_proof.py`, `op_argument_proof.py` and `source_mirror_probe.py`
+were NOT re-run: the fixes touched two app-side chrome files and the probe,
+`core` is byte-identical to the tree those scores were printed on, and no
+tool, schema or op moved.
+
+#### The tree
+
+**`5cc64c21215641e7a99cd3e7d95ace8c6f03a13d`** — every line this pipeline
+and its fix pass wrote except this paragraph, by the request's temp-index
+recipe (never the real index; nothing was committed, added, stashed or
+checked out). It is measured before the paragraph rather than after it
+because a hash of a tree cannot be written into that tree; re-run the recipe
+for the current one. The tree the review read was
+`2f82b87ed86c2ba39b40581fc215babc191acb5d`. The
+baseline is pipeline 3's
+`c9b8043522c5a91b6045102d182758fd5859d153`, and
+`git diff` of it over `core`, `ReelCore.swift` and `ReelOps.swift` is empty
+(`AgentCatalog+Captions.swift` is untracked, so it is compared with
+`git show <tree>:<path> | diff - <path>`, which is identical).
