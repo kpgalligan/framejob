@@ -36,9 +36,21 @@ Sections, by the name after `section_`:
 * `verbatim` (V) — a served `words` holding `0.98`, `\\"]` and non-ASCII
   coming back byte-equal from the client, the written file and a
   `remoteDeleted` rewrite; `undeleted`; and the two malformed cache files.
-* `hygiene` — the fake's redaction (G), the languages table (N),
-  `CloudTranscriber`'s unreachability (S), the credential never appearing in
-  a child's output (K), and this file's own `env=` discipline.
+* `hygiene` — the fake's redaction (G), the languages table (N), the empty
+  run and `CloudTranscriber`'s one caller (S), the credential never appearing
+  in a child's output (K), and this file's own `env=` discipline.
+* `jobs` (R6-10) — a clip `speed` the OPS cannot write and the CORE's reader
+  accepts, spliced into a project's JSON text and read back through
+  `ReelProject.from(json:)`, then driven through `Transcriber.jobs` and both
+  mappings. ONE CHILD PROCESS PER SPEED: an unclamped `Ticks(_:)` traps, and
+  a trap has to be that speed's own scored failure.
+* `run` (P, T) — `CloudProgress` as pure calls over a table, then
+  `CloudTranscriber.transcribe` itself against the fake: every
+  `(fraction, detail)` it published, non-decreasing, inside its phase's band
+  of its media's share, holding at the 0.95 point; and the temporary
+  `reelcut-upload-*` a cancelled, a failed and a 401'd run leave behind,
+  which is none, with a CONTROL that one was there while the body was in
+  flight.
 
 Host-state inputs: `say` for the fixture, `ffmpeg` for the FLAC decode row's
 second decoder (the row names which decoder answered and `AVAudioFile` always
@@ -134,10 +146,13 @@ def sleep(seconds):
 # The probe. One binary, one JSON request in, one JSON answer out, dispatched
 # on the request's `mode`. A mode the binary does not know is answered BY
 # NAME, so a stale binary is a scored failure with a reason rather than a
-# silent pass. No NSApplication anywhere: nothing here draws.
+# silent pass. Nothing here draws: the one mode that reaches
+# `NSApplication.shared` is `jobs`, which builds a `ProjectDocument` (an
+# `NSDocument`) out of ops and starts no event loop.
 
 PROBE_HEAD = r'''
 import AVFoundation
+import AppKit
 import Foundation
 
 // MARK: - The URLProtocol stub (row 15)
@@ -332,6 +347,7 @@ func modeMapping(_ request: [String: Any]) -> [String: Any] {
     guard let file = try? MediaTranscript.File(
         header: makeHeader(makeOptions(nil)), wordsJSON: bytes)
     else { return ["error": "the transcript file would not build"] }
+    let seconds = (request["seconds"] as? [NSNumber])?.map { $0.doubleValue } ?? []
     var rows: [[String: Any]] = []
     for row in request["jobs"] as? [[String: Any]] ?? [] {
         let job = makeJob(row)
@@ -344,6 +360,10 @@ func modeMapping(_ request: [String: Any]) -> [String: Any] {
                 if let speaker = word.speaker { out["speaker"] = speaker }
                 return out
             },
+            // The ON-DEVICE twin over the same job (R6-10). Both mappings
+            // end in `Transcriber.placed`, so a clamp that is missing from
+            // that one door shows up here as well as in `words`.
+            "projected": seconds.map { Transcriber.project($0, in: job) },
         ])
     }
     return ["jobs": rows]
@@ -404,6 +424,245 @@ func modeStamp(_ request: [String: Any]) -> [String: Any] {
     }
     try? FileManager.default.removeItem(at: folder)
     return ["stamps": answers, "regions": regions]
+}
+'''
+
+PROBE_JOBS = r'''
+// MARK: - R6-10: a speed only a hand-written file can carry
+
+/// One SPEED per process, and that is the whole design of this mode.
+///
+/// `Ticks(_:)` on an out-of-range `Double` TRAPS, and a trap is a crash with
+/// no answer file: run five speeds in one process and the first trap takes
+/// the other four down with it and leaves the caller a dead child instead of
+/// four measurements and one named failure. So the caller starts a child per
+/// speed and a crash is that speed's own scored row.
+///
+/// The project is built from OPS — one audio media, one clip at `in` = 1 s
+/// for 1 s (`source_mirror_probe.py`'s recipe) — and then its JSON TEXT has
+/// the clip's `speed` value replaced and is read back through
+/// `ReelProject.from(json:)`, which is the CORE's own reader. That is the
+/// point: the ops cannot write these speeds (`edit_clip.rs` clamps to
+/// 0.1–10) and the reader does not refuse them, so the file is exactly the
+/// one a person can hand the app, and "the reader accepts it" is a row
+/// rather than an assumption.
+func modeJobs(_ request: [String: Any]) -> [String: Any] {
+    // `ProjectDocument` is an `NSDocument`; it draws nothing and no event
+    // loop is started, but the class needs the shared application to exist.
+    _ = NSApplication.shared
+    let document = ProjectDocument()
+    guard let lane = document.project.snapshot.tracks.first?.id else {
+        return ["error": "the empty project has no track"]
+    }
+    document.performGroupedEdit(
+        "Media",
+        [
+            .addMedia(
+                descriptor: MediaDescriptor(
+                    path: "/nowhere/speech.wav", kind: .audio, duration: 60 * 600_000,
+                    width: 0, height: 0, fps: .thirty, hasVideo: false, hasAudio: true))
+        ])
+    guard let media = document.project.snapshot.media.first else {
+        return ["error": "add_media added nothing"]
+    }
+    document.performGroupedEdit("Clip", [.addClip(track: lane, media: media.id, at: 0)])
+    guard let added = document.project.snapshot.clips.first else {
+        return ["error": "add_clip added nothing"]
+    }
+    // `in` = 1000 ms, `start` = 0, `duration` = 1 s, all through ops.
+    document.performGroupedEdit("In", [.trimStart(clip: added.id, to: 600_000)])
+    document.performGroupedEdit("Start", [.moveClip(clips: [added.id], delta: -600_000)])
+    document.performGroupedEdit("Length", [.trimEnd(clip: added.id, to: 600_000)])
+
+    let json = document.project.json
+    let marker = "\"speed\":"
+    let hits = json.components(separatedBy: marker).count - 1
+    guard hits == 1, let found = json.range(of: marker) else {
+        return ["error": "`\(marker)` occurs \(hits) times in the document's JSON, not once"]
+    }
+    var end = found.upperBound
+    while end < json.endIndex, json[end] != ",", json[end] != "}" {
+        end = json.index(after: end)
+    }
+    let text = request["speedText"] as? String ?? "1.0"
+    let patched = json.replacingCharacters(in: found.upperBound..<end, with: text)
+
+    var answer: [String: Any] = [
+        "speedText": text, "maxSourceTicks": Transcriber.maxSourceTicks,
+        "writtenSpeed": String(json[found.upperBound..<end]),
+    ]
+    let reread: ReelProject
+    do {
+        reread = try ReelProject.from(json: patched)
+    } catch {
+        answer["readerAccepted"] = false
+        answer["readerMessage"] = error.localizedDescription
+        return answer
+    }
+    answer["readerAccepted"] = true
+    let snapshot = reread.snapshot
+    guard let clip = snapshot.clips.first else {
+        answer["error"] = "the re-read project has no clip"
+        return answer
+    }
+    answer["speed"] = String(clip.speed)
+
+    let words = request["words"] as? [[String: Any]] ?? []
+    let bytes = (try? JSONSerialization.data(withJSONObject: words, options: [.sortedKeys]))
+        ?? Data("[]".utf8)
+    let file = try? MediaTranscript.File(header: makeHeader(makeOptions(nil)), wordsJSON: bytes)
+    let seconds = (request["seconds"] as? [NSNumber])?.map { $0.doubleValue } ?? []
+
+    let made = Transcriber.jobs(
+        for: snapshot.clips, in: snapshot, urls: [media.id: URL(fileURLWithPath: media.path)])
+    answer["problems"] = made.problems.map { $0.description }
+    answer["jobs"] = made.jobs.map { job -> [String: Any] in
+        var row: [String: Any] = [
+            "clip": Int(job.clip), "sourceIn": job.sourceIn, "sourceLength": job.sourceLength,
+            "start": job.start, "duration": job.duration, "speed": String(job.speed),
+            "projected": seconds.map { Transcriber.project($0, in: job) },
+        ]
+        if let file = file {
+            row["words"] = MediaTranscript.words(for: job, in: file).map { word in
+                ["text": word.text, "start": word.start, "end": word.end] as [String: Any]
+            }
+        }
+        return row
+    }
+    return answer
+}
+'''
+
+PROBE_RUN = r'''
+// MARK: - The run: the progress arithmetic (P) and the temporary files (T)
+
+/// `CloudProgress` as PURE calls, and `CloudTranscriber.transcribe` driven
+/// against the fake with every `(fraction, detail)` it published recorded in
+/// order.
+///
+/// The extracts are the second half: this mode lists `reelcut-upload-*` in
+/// its OWN `NSTemporaryDirectory()` before the run, once from inside the
+/// progress callback while the body is still going out (the CONTROL — the
+/// file has to be there, or "none afterwards" would be true of a run that
+/// never wrote one), and again after the run has thrown.
+func modeRun(_ request: [String: Any]) -> [String: Any] {
+    if request["op"] as? String == "table" { return runTable(request) }
+
+    guard let client = makeClient(request, stub: false) else {
+        return ["error": "the base URL would not parse"]
+    }
+    let cache = URL(
+        fileURLWithPath: request["cache"] as? String ?? NSTemporaryDirectory(), isDirectory: true)
+    var media: [UInt32: MediaSnapshot] = [:]
+    for row in request["media"] as? [[String: Any]] ?? [] {
+        let id = UInt32((row["id"] as? NSNumber)?.uint32Value ?? 0)
+        media[id] = MediaSnapshot(
+            id: id, path: row["path"] as? String ?? "/dev/null", kind: .audio,
+            duration: ticks(row["duration"]), hasVideo: false, hasAudio: true)
+    }
+    let jobs = (request["jobs"] as? [[String: Any]] ?? []).map(makeJob)
+    let token = Transcriber.CancelToken()
+    let cancelOnUpload = request["cancelOnUpload"] as? Bool ?? false
+
+    var published: [[Any]] = []
+    var during: [String] = []
+    let before = uploadLeftovers()
+    let transcriber = CloudTranscriber(client: client, cacheDirectory: cache, media: media)
+    var answer: [String: Any] = ["tempBefore": before]
+    do {
+        let outcome = try transcriber.transcribe(
+            jobs, options: makeOptions(request["options"] as? [String: Any]),
+            refresh: request["refresh"] as? Bool ?? false, frame: 20000, cancel: token,
+            progress: { fraction, detail in
+                published.append([fraction, detail])
+                if detail.hasPrefix("Uploading") {
+                    if during.isEmpty { during = uploadLeftovers() }
+                    if cancelOnUpload { token.cancel() }
+                }
+            })
+        answer["ok"] = true
+        answer["cues"] = outcome.cues.map {
+            ["start": $0.start, "end": $0.end, "text": $0.text] as [String: Any]
+        }
+        answer["clips"] = outcome.clips.map { Int($0) }
+        answer["truncations"] = outcome.truncations.count
+        answer["problems"] = outcome.problems.map { $0.description }
+    } catch {
+        answer["ok"] = false
+        for (key, value) in describe(error) { answer[key] = value }
+    }
+    answer["progress"] = published
+    answer["tempDuring"] = during
+    answer["tempAfter"] = uploadLeftovers()
+    let report = transcriber.report
+    answer["report"] = [
+        "uploaded": report.uploaded.map { row -> [String: Any] in
+            [
+                "media": Int(row.media), "model": row.speechModelUsed ?? "<nil>",
+                "language": row.languageCode ?? "<nil>", "seconds": row.audioSeconds,
+                "format": row.format.rawValue, "remoteDeleted": row.remoteDeleted,
+            ]
+        },
+        "cached": report.cached.map { Int($0) },
+        "janitorDeleted": report.janitorDeleted.map { Int($0) },
+        "janitorFailed": report.janitorFailed.map { Int($0) },
+        "held": report.held.map { Int($0) },
+    ]
+    return answer
+}
+
+/// Every `reelcut-upload-*` this process's temporary directory holds. The
+/// stem is `Transcriber.extractUpload`'s own.
+func uploadLeftovers() -> [String] {
+    let folder = NSTemporaryDirectory()
+    let names = (try? FileManager.default.contentsOfDirectory(atPath: folder)) ?? []
+    return names.filter { $0.hasPrefix("reelcut-upload-") }.sorted()
+}
+
+/// `CloudProgress` with no run at all: the shares, the four phases, the
+/// clamp on `within`, the wait's clock and the four detail lines.
+func runTable(_ request: [String: Any]) -> [String: Any] {
+    var fractions: [[String: Any]] = []
+    for row in request["fractions"] as? [[String: Any]] ?? [] {
+        let seconds = (row["seconds"] as? [NSNumber])?.map { $0.doubleValue } ?? []
+        let bar = CloudProgress(seconds: seconds)
+        let phase: CloudProgress.Phase
+        switch row["phase"] as? String ?? "" {
+        case "extracting": phase = .extracting
+        case "uploading": phase = .uploading
+        case "waiting": phase = .waiting
+        default: phase = .saving
+        }
+        fractions.append([
+            "label": row["label"] as? String ?? "",
+            "value": bar.fraction(
+                media: (row["media"] as? NSNumber)?.intValue ?? 0, phase: phase,
+                within: (row["within"] as? NSNumber)?.doubleValue ?? 0),
+        ])
+    }
+    var waits: [[String: Any]] = []
+    for row in request["waits"] as? [[String: Any]] ?? [] {
+        waits.append([
+            "label": row["label"] as? String ?? "",
+            "value": CloudProgress.waiting(
+                waited: (row["waited"] as? NSNumber)?.doubleValue ?? 0,
+                audioSeconds: (row["audio"] as? NSNumber)?.doubleValue ?? 0),
+        ])
+    }
+    return [
+        "fractions": fractions, "waits": waits,
+        "bounds": [
+            CloudProgress.extractEnd, CloudProgress.uploadEnd, CloudProgress.waitEnd,
+            CloudProgress.processingRate,
+        ],
+        "details": [
+            CloudProgress.detail(.extracting, file: "intro.mov"),
+            CloudProgress.detail(.uploading, file: "intro.mov", sent: 41_000_000,
+                                 total: 115_000_000),
+            CloudProgress.detail(.waiting, file: "intro.mov", waited: 34.2),
+            CloudProgress.detail(.saving, file: "intro.mov"),
+        ],
+    ]
 }
 '''
 
@@ -749,19 +1008,24 @@ func modeHygiene(_ request: [String: Any]) -> [String: Any] {
             MediaImporter.transcriptsKind,
         ],
     ]
-    // Row S: the placeholder answers its sentence rather than an empty run.
+    // Row S: a run with NO jobs answers the on-device engine's own refusal
+    // and touches the network not at all — the janitor finds an empty cache
+    // directory, there is no media to group, and nothing is uploaded to
+    // discover that.
     let folder = temporaryDirectory("cloud")
     if let client = makeClient(["base": "https://stub.invalid", "key": "proof-key"], stub: true) {
+        StubProtocol.configure([], fallback: [:])
         let cloud = CloudTranscriber(client: client, cacheDirectory: folder, media: [:])
         do {
             _ = try cloud.transcribe(
                 [], options: makeOptions(nil), refresh: false, frame: 20000,
                 cancel: Transcriber.CancelToken())
-            answer["placeholderThrew"] = false
+            answer["emptyRunThrew"] = false
         } catch {
-            answer["placeholderThrew"] = true
-            answer["placeholderMessage"] = error.localizedDescription
+            answer["emptyRunThrew"] = true
+            answer["emptyRunMessage"] = error.localizedDescription
         }
+        answer["emptyRunRequests"] = StubProtocol.drain().count
     }
     // Row K: the credential this process was handed must not come back.
     answer["credentialAppears"] = false
@@ -950,6 +1214,8 @@ let mode = request["mode"] as? String ?? ""
 var answer: [String: Any]
 switch mode {
 case "mapping": answer = modeMapping(request)
+case "jobs": answer = modeJobs(request)
+case "run": answer = modeRun(request)
 case "stamp": answer = modeStamp(request)
 case "client": answer = modeClient(request)
 case "cancel": answer = modeCancel(request)
@@ -970,8 +1236,8 @@ let encoded = (try? JSONSerialization.data(
 FileManager.default.createFile(atPath: arguments[2], contents: encoded)
 '''
 
-PROBE_SOURCE = (PROBE_HEAD + PROBE_MAPPING + PROBE_CLIENT + PROBE_SECRETS
-                + PROBE_VERBATIM + PROBE_EXTRACT + PROBE_MAIN)
+PROBE_SOURCE = (PROBE_HEAD + PROBE_MAPPING + PROBE_JOBS + PROBE_RUN + PROBE_CLIENT
+                + PROBE_SECRETS + PROBE_VERBATIM + PROBE_EXTRACT + PROBE_MAIN)
 
 
 # --------------------------------------------------------------------------
@@ -1157,12 +1423,36 @@ SPEED_SPELLINGS = {"nan": float("nan"), "infinity": float("inf"),
                    "-infinity": float("-inf"),
                    "greatestFiniteMagnitude": sys.float_info.max}
 
+# The seconds every mapping row also asks the ON-DEVICE twin about.
+SECONDS = [0, 0.5, 1.5, 3.0]
+
 
 def speed_of(job):
     """A row's speed as a float. NaN and the infinities have no JSON spelling,
     so they travel to the probe binary as a NAME; this is the same table."""
     raw = job["speed"]
     return SPEED_SPELLINGS[raw] if isinstance(raw, str) else float(raw)
+
+
+def round_half_away(value):
+    """Swift's `.toNearestOrAwayFromZero`, in Python."""
+    return (int(math.floor(value + 0.5)) if value >= 0
+            else -int(math.floor(-value + 0.5)))
+
+
+def projected(job, t):
+    """`Transcriber.project`'s oracle — the ON-DEVICE twin, which since
+    R6-10 ends in the same `Transcriber.placed` the cloud mapping does: the
+    offset in ticks, clamped into `[0, duration]` BEFORE the conversion, then
+    added to the clip's start. A degenerate speed reads as 1, as it always
+    did."""
+    speed = speed_of(job)
+    if not (math.isfinite(speed) and speed > 0):
+        speed = 1.0
+    offset = max(0.0, float(t)) / speed * 600000.0
+    if math.isnan(offset):
+        return job["start"]
+    return job["start"] + round_half_away(min(max(offset, 0.0), float(job["duration"])))
 
 
 def oracle(job, words):
@@ -1182,8 +1472,12 @@ def oracle(job, words):
 
     def place(ms):
         offset = (ms * TICKS_PER_MS - job["sourceIn"]) / speed
-        placed = job["start"] + int(math.floor(offset + 0.5) if offset >= 0
-                                    else -math.floor(-offset + 0.5))
+        # R6-10: a speed small enough makes this INFINITE in Python exactly
+        # where it would trap `Ticks(_:)` in Swift, and the clamp's answer at
+        # either infinity is the end of the clip it ran past.
+        if math.isinf(offset):
+            return limit if offset > 0 else job["start"]
+        placed = job["start"] + round_half_away(offset)
         return min(max(placed, job["start"]), limit)
 
     for word in words:
@@ -1230,19 +1524,44 @@ def section_mapping(binary, sources):
     right = {"clip": 6, "media": 5, "name": "split right", "sourceIn": 2500 * TICKS_PER_MS,
              "sourceLength": 1500 * TICKS_PER_MS, "start": 1500 * TICKS_PER_MS,
              "duration": 1500 * TICKS_PER_MS, "speed": 1.0}
-    jobs = [base, fast, slow, late, left, right]
+    # R6-10. A clip whose `start` is within ten million ticks of Int64.max,
+    # played at a speed only a hand-written `project.json` can carry: every
+    # offset the mapping computes for it is larger than `Ticks` holds, and
+    # every answer must still land inside the clip. Asked of BOTH twins —
+    # `words` is the cloud mapping's, `projected` the on-device one's.
+    edge = {"clip": 12, "media": 5, "name": "start near Int64.max, speed 1e-300",
+            "sourceIn": 0, "sourceLength": 2000 * TICKS_PER_MS,
+            "start": 2**63 - 1 - 10_000_000, "duration": 1_000_000, "speed": 1e-300}
+    jobs = [base, fast, slow, late, left, right, edge]
 
     answer, error, _ = run_probe(binary, "mapping", {"mode": "mapping", "jobs": jobs,
-                                                     "words": words})
+                                                     "words": words, "seconds": SECONDS})
     if answer is None:
         check("12: the mapping mode answers", False, error)
         return
-    got = {row["clip"]: row["words"] for row in answer.get("jobs", [])}
+    rows = {row["clip"]: row for row in answer.get("jobs", [])}
+    got = {clip: row["words"] for clip, row in rows.items()}
     for job in jobs:
         want = oracle(job, words)
         mine = got.get(job["clip"], [])
         check(f"12: {job['name']} — {len(want)} words, each at the tick Python computed",
               mine == want, f"got {mine!r}\n       want {want!r}")
+        wanted = [projected(job, t) for t in SECONDS]
+        check(f"12: {job['name']} — the on-device twin places {len(SECONDS)} seconds at the "
+              f"ticks Python computed",
+              rows.get(job["clip"], {}).get("projected") == wanted,
+              f"got {rows.get(job['clip'], {}).get('projected')!r}\n       want {wanted!r}")
+
+    limit = edge["start"] + edge["duration"]
+    check("12: the near-Int64.max clip answers at all — an unclamped `Ticks(_:)` would have "
+          "TRAPPED on every one of its offsets",
+          len(got.get(12, [])) == 3, f"got {got.get(12)!r}")
+    check("12: and every tick it answered, cloud mapping and on-device twin alike, is "
+          f"inside [{edge['start']}, {limit}]",
+          all(edge["start"] <= w["start"] <= limit and edge["start"] <= w["end"] <= limit
+              for w in got.get(12, []))
+          and all(edge["start"] <= t <= limit for t in rows.get(12, {}).get("projected", [])),
+          f"got {got.get(12)!r} / {rows.get(12, {}).get('projected')!r}")
 
     texts = {job["clip"]: [w["text"] for w in got.get(job["clip"], [])] for job in jobs}
     check("12: a word STRADDLING `in` is excluded — the test is on its start",
@@ -1280,7 +1599,8 @@ def section_mapping(binary, sources):
              speed="greatestFiniteMagnitude", spelling="1.7976931348623157e+308"),
     ]
     answer, error, _ = run_probe(binary, "mapping-degenerate",
-                                 {"mode": "mapping", "jobs": degenerate, "words": words})
+                                 {"mode": "mapping", "jobs": degenerate, "words": words,
+                                  "seconds": SECONDS})
     if answer is None:
         check("12: a degenerate `speed` is GUARDED, not trapped on — 0, a negative, NaN, "
               "infinity and the largest finite speed all answer", False, error)
@@ -1295,6 +1615,98 @@ def section_mapping(binary, sources):
         check(f"12: {job['name']} reached the mapping as itself",
               row.get("speed") == job["spelling"],
               f"got {row.get('speed')!r}, want {job['spelling']!r}")
+        wanted = [projected(job, t) for t in SECONDS]
+        check(f"12: {job['name']} — the on-device twin answers the same ticks Python "
+              f"computed", row.get("projected") == wanted,
+              f"got {row.get('projected')!r}\n       want {wanted!r}")
+
+
+# --------------------------------------------------------------------------
+# Section `jobs` — R6-10, a speed the ops cannot write and the reader accepts
+
+# The four speeds, each with the text that goes into the project's JSON and
+# the Python float of it. `1e300` and `greatestFiniteMagnitude` overflow the
+# SOURCE LENGTH; `1e-300` and `leastNonzeroMagnitude` overflow the OFFSET.
+JOB_SPEEDS = [
+    ("1e300", "1e300", 1e300),
+    ("greatestFiniteMagnitude", "1.7976931348623157e308", sys.float_info.max),
+    ("1e-300", "1e-300", 1e-300),
+    ("leastNonzeroMagnitude", "5e-324", 5e-324),
+]
+
+JOB_WORDS = [
+    {"text": "straddle", "start": 900, "end": 1100, "confidence": 0.9, "speaker": None},
+    {"text": "atIn", "start": 1000, "end": 1200, "confidence": 0.9, "speaker": None},
+    {"text": "inside", "start": 1500, "end": 1700, "confidence": 0.9, "speaker": None},
+    {"text": "atEnd", "start": 3000, "end": 3200, "confidence": 0.9, "speaker": None},
+    {"text": "past", "start": 2900, "end": 4000, "confidence": 0.9, "speaker": None},
+    {"text": "later", "start": 3500, "end": 3700, "confidence": 0.9, "speaker": None},
+]
+
+
+def section_jobs(binary, sources):
+    print("\nR6-10. a hand-written `speed` the ops cannot write, through the CORE's reader, "
+          "`Transcriber.jobs` and both mappings")
+    check("R6-10: 4096 × maxSourceTicks is under 2^63 — the bound is chosen so the sheet's "
+          "sum over MAX_CLIPS jobs cannot overflow",
+          4096 * 1_000_000_000_000_000 < 2**63,
+          f"4096 × 1e15 = {4096 * 10**15}, 2^63 = {2**63}")
+
+    for name, text, value in JOB_SPEEDS:
+        # ONE CHILD PER SPEED: `Ticks(_:)` on an out-of-range `Double` traps,
+        # and a trap is a crash, so it has to be this speed's own failure.
+        answer, error, _ = run_probe(binary, "jobs-" + name,
+                                     {"mode": "jobs", "speedText": text, "words": JOB_WORDS,
+                                      "seconds": SECONDS}, timeout=120)
+        if answer is None:
+            check(f"jobs: speed {name} answers — a trap here is this speed's own failure",
+                  False, error)
+            continue
+        check(f"jobs: speed {name} answers", "error" not in answer, answer.get("error", ""))
+        check(f"jobs: the CORE's reader accepts a project whose clip speed is {text}",
+              answer.get("readerAccepted") is True,
+              f"got {answer.get('readerMessage')!r}")
+        check(f"jobs: and it arrived as itself ({text})",
+              answer.get("speed", "").replace("+", "") == repr(value).replace("+", "")
+              or float(answer.get("speed", "nan")) == value,
+              f"got {answer.get('speed')!r}")
+        rows = answer.get("jobs", [])
+        check(f"jobs: speed {name} makes exactly one job — none of `jobs`'s five refusals "
+              f"fires on a finite positive speed", len(rows) == 1,
+              f"got {len(rows)} jobs, problems {answer.get('problems')!r}")
+        if len(rows) != 1:
+            continue
+        job = rows[0]
+        if value > 1:
+            check(f"jobs: speed {name} bounds the source length to maxSourceTicks (1e15), "
+                  f"not to Ticks.max and not to the clip's duration",
+                  job.get("sourceLength") == 1_000_000_000_000_000,
+                  f"got {job.get('sourceLength')!r}")
+        else:
+            check(f"jobs: speed {name} falls back to the clip's own duration — the product "
+                  f"is below one tick", job.get("sourceLength") == job.get("duration"),
+                  f"got {job.get('sourceLength')!r}, duration {job.get('duration')!r}")
+        check(f"jobs: speed {name} leaves `sourceIn` inside 0…maxSourceTicks",
+              0 <= job.get("sourceIn", -1) <= 1_000_000_000_000_000,
+              f"got {job.get('sourceIn')!r}")
+
+        mine = dict(job, speed=value)
+        want = oracle(mine, JOB_WORDS)
+        check(f"jobs: speed {name} — the mapping answers the {len(want)} words Python "
+              f"computes from the sourceLength it was given",
+              job.get("words") == want,
+              f"got {job.get('words')!r}\n       want {want!r}")
+        limit = job["start"] + job["duration"]
+        check(f"jobs: speed {name} — every placed tick, both twins, is inside "
+              f"[{job['start']}, {limit}]",
+              all(job["start"] <= w["start"] <= limit and job["start"] <= w["end"] <= limit
+                  for w in job.get("words", []))
+              and all(job["start"] <= t <= limit for t in job.get("projected", [])),
+              f"got {job.get('words')!r} / {job.get('projected')!r}")
+        wanted = [projected(mine, t) for t in SECONDS]
+        check(f"jobs: speed {name} — the on-device twin answers the ticks Python computed",
+              job.get("projected") == wanted,
+              f"got {job.get('projected')!r}\n       want {wanted!r}")
 
 
 # --------------------------------------------------------------------------
@@ -2341,6 +2753,215 @@ def section_verbatim(binary, sources):
 
 
 # --------------------------------------------------------------------------
+# P and T — the run's progress arithmetic, and its temporary extracts
+
+RUN_TUNING = {"pollInterval": 0.2, "retryBackoff": 0.05, "requestTimeout": 20,
+              "pollCeilingFloor": 60, "deleteTimeout": 5}
+
+
+def run_media(path_a, path_b):
+    """Two media over two files, ten and thirty seconds of DECLARED duration
+    — which is what the progress shares are computed from — so the first
+    media's share is exactly a quarter and a value of the first that strayed
+    into the second's slice is visible."""
+    return (
+        [{"id": 1, "path": path_a, "duration": 6_000_000},
+         {"id": 2, "path": path_b, "duration": 18_000_000}],
+        [{"clip": 1, "media": 1, "name": "one", "source": path_a, "sourceIn": 0,
+          "sourceLength": 6_000_000, "start": 0, "duration": 6_000_000, "speed": 1.0},
+         {"clip": 2, "media": 2, "name": "two", "source": path_b, "sourceIn": 0,
+          "sourceLength": 18_000_000, "start": 6_000_000, "duration": 18_000_000,
+          "speed": 1.0}])
+
+
+def section_run(binary, sources):
+    print("\nP/T. the cloud run: the progress arithmetic, and the temporary extracts a "
+          "failed run leaves behind")
+
+    # --- P, first as PURE calls: `CloudProgress` with no run at all.
+    table = []
+    for label, seconds, index, phase, within in [
+        ("one media, extracting at 0", [10.0], 0, "extracting", 0),
+        ("one media, extracting done", [10.0], 0, "extracting", 1),
+        ("one media, half uploaded", [10.0], 0, "uploading", 0.5),
+        ("one media, the wait complete", [10.0], 0, "waiting", 1),
+        ("one media, saved", [10.0], 0, "saving", 1),
+        ("two media, the first's wait", [10.0, 30.0], 0, "waiting", 1),
+        ("two media, the second's wait", [10.0, 30.0], 1, "waiting", 1),
+        ("two media, the second saved", [10.0, 30.0], 1, "saving", 1),
+        ("within past 1 is clamped", [10.0], 0, "uploading", 5),
+        ("within below 0 is clamped", [10.0], 0, "uploading", -5),
+        ("nothing to upload has no share", [], 0, "saving", 1),
+        ("an index off the end has no share", [10.0], 7, "saving", 1),
+    ]:
+        table.append({"label": label, "seconds": seconds, "media": index, "phase": phase,
+                      "within": within})
+    waits = [{"label": "nothing waited", "waited": 0, "audio": 147.0},
+             {"label": "a second of a 147 s file", "waited": 1, "audio": 147.0},
+             {"label": "half of it", "waited": 0.5, "audio": 147.0},
+             {"label": "long past it", "waited": 10, "audio": 147.0},
+             {"label": "no audio at all", "waited": 1, "audio": 0}]
+    answer, error, _ = run_probe(binary, "progress-table",
+                                 {"mode": "run", "op": "table", "fractions": table,
+                                  "waits": waits}, timeout=120)
+    if answer is None:
+        check("P: the progress table answers", False, error)
+    else:
+        check("P: the four boundaries are §5a's 0.25 / 0.65 / 0.95 and q8's 147× rate",
+              answer.get("bounds") == [0.25, 0.65, 0.95, 147.0],
+              f"got {answer.get('bounds')!r}")
+        got = {row["label"]: row["value"] for row in answer.get("fractions", [])}
+        for row in table:
+            want = progress_oracle(row)
+            check(f"P: {row['label']} — {want}",
+                  got.get(row["label"]) == want, f"got {got.get(row['label'])!r}")
+        heard = {row["label"]: row["value"] for row in answer.get("waits", [])}
+        for row in waits:
+            want = (1.0 if row["audio"] <= 0
+                    else min(1.0, row["waited"] * 147.0 / row["audio"]))
+            want = 0.0 if row["waited"] <= 0 and row["audio"] > 0 else want
+            check(f"P: the wait's clock — {row['label']} — {want}",
+                  heard.get(row["label"]) == want, f"got {heard.get(row['label'])!r}")
+        check("P: the four detail lines are §5a's words",
+              answer.get("details") == ["Extracting intro.mov",
+                                        "Uploading intro.mov · 41 MB of 115",
+                                        "Waiting for AssemblyAI · 34 s",
+                                        "Saving intro.mov"],
+              f"got {answer.get('details')!r}")
+
+    speech = make_fixture()
+    if speech is None:
+        skip_rows(14, "`say` is not on this host, so the run rows have no audio to send")
+        return
+    second = os.path.join(os.path.dirname(speech), "speech-b.aiff")
+    if not os.path.exists(second):
+        shutil.copy2(speech, second)
+    media, jobs = run_media(speech, second)
+
+    # --- P, against a real run: two media, with one upload 500 in the way.
+    with Fake("run") as fake:
+        fake.scenario(polls_before_complete=3, fail=[{"route": "upload", "status": 500,
+                                                      "times": 1}])
+        answer, error, _ = run_probe(binary, "run-progress", {
+            "mode": "run", "base": fake.base, "key": DUMMY_KEY, "tuning": RUN_TUNING,
+            "cache": fresh("run-cache"), "media": media, "jobs": jobs}, timeout=300)
+        log = fake.log()
+        if answer is None:
+            check("P: the two-media run answers", False, error)
+        else:
+            check("P: the two-media run places cues from both media",
+                  answer.get("ok") is True and answer.get("clips") == [1, 2],
+                  f"got ok={answer.get('ok')!r} clips={answer.get('clips')!r} "
+                  f"{answer.get('message', '')!r}")
+            values = [row[0] for row in answer.get("progress", [])]
+            details = [row[1] for row in answer.get("progress", [])]
+            check(f"P: every value published is ≥ the one before it ({len(values)} of them) — "
+                  "an upload retried from zero never lowers the bar",
+                  all(b >= a for a, b in zip(values, values[1:])), f"got {values!r}")
+            check("P: the last value is exactly 1.0",
+                  values[-1:] == [1.0], f"got {values[-1:]!r}")
+            check("P: the retry really happened — three uploads in the fake's log, two media and one retry",
+                  len([r for r in log["requests"] if r["path"] == "/v2/upload"]) == 3,
+                  f"got {[r['path'] for r in log['requests']]!r}")
+            share = [0.25, 0.75]
+            base = [0.0, 0.25]
+            bands = [("Extracting", 0.0, 0.25), ("Uploading", 0.25, 0.65),
+                     ("Waiting for AssemblyAI", 0.65, 0.95), ("Saving", 0.95, 1.0)]
+            bad = []
+            for index, row in enumerate(answer.get("progress", [])):
+                value, detail = row
+                # The detail names the FILE, which is `MediaSnapshot.name`,
+                # and the two fixtures are named apart for this row.
+                which = 1 if "speech-b" in detail else (0 if "speech.aiff" in detail else None)
+                if which is None:
+                    continue
+                band = [b for b in bands if detail.startswith(b[0])]
+                if not band:
+                    bad.append((index, value, detail, "no phase in the detail"))
+                    continue
+                _, low, high = band[0]
+                if not (base[which] + share[which] * low - 1e-9 <= value
+                        <= base[which] + share[which] * high + 1e-9):
+                    bad.append((index, value, detail, "outside its band"))
+            check("P: every value is inside its own phase's band of its own media's share — "
+                  "extracting under 0.25, uploading 0.25–0.65, waiting 0.65–0.95",
+                  not bad, f"outside: {bad!r}")
+            first = [v for v, d in answer.get("progress", []) if "speech.aiff" in d]
+            check("P: every value published while the FIRST media was in flight is at most "
+                  f"its share, {base[1]}",
+                  all(v <= base[1] + 1e-9 for v in first), f"got {first!r}")
+            waiting = [v for v, d in answer.get("progress", []) if d.startswith("Waiting")]
+            check("P: the wait HOLDS at the 0.95 point of each media's share once "
+                  "waited × 147 has passed the audio's own seconds",
+                  base[0] + share[0] * 0.95 in waiting
+                  and base[1] + share[1] * 0.95 in waiting,
+                  f"got {sorted(set(waiting))!r}")
+            check("P: and never goes past it while it is still waiting",
+                  all(v <= base[1] + share[1] * 0.95 + 1e-9 for v in waiting),
+                  f"got {sorted(set(waiting))!r}")
+            check("P: the detail line names the phase and the file, §5a's words",
+                  any(d.startswith("Extracting ") for d in details)
+                  and any(d.startswith("Uploading ") and " MB of " in d for d in details)
+                  and any(d.startswith("Waiting for AssemblyAI · ") for d in details)
+                  and any(d.startswith("Saving ") for d in details),
+                  f"got {sorted(set(details))!r}")
+
+    # --- T: the temporary extract, on three failing paths and one control.
+    one_media, one_job = media[:1], jobs[:1]
+    for tag, scenario, cancel, expected in [
+        ("cancel", {"slow_upload": {"chunk": 4096, "delay_ms": 20}}, True,
+         "The transcription was cancelled."),
+        ("error", {"transcript_error": "AssemblyAI could not transcribe it"}, False,
+         "AssemblyAI could not transcribe it"),
+        ("401", {"fail": [{"route": "upload", "status": 401, "times": -1}]}, False,
+         "AssemblyAI refused the API key"),
+    ]:
+        with Fake("run-" + tag) as fake:
+            fake.scenario(**scenario)
+            answer, error, _ = run_probe(binary, "run-" + tag, {
+                "mode": "run", "base": fake.base, "key": DUMMY_KEY, "tuning": RUN_TUNING,
+                "cache": fresh("run-cache-" + tag), "media": one_media, "jobs": one_job,
+                "cancelOnUpload": cancel}, timeout=300)
+        if answer is None:
+            check(f"T: the {tag} run answers", False, error)
+            continue
+        check(f"T: the {tag} run fails, with its own sentence",
+              answer.get("ok") is False and expected in str(answer.get("message", "")),
+              f"got ok={answer.get('ok')!r} {answer.get('message')!r}")
+        check(f"T: the {tag} run left NO reelcut-upload-* behind — the `defer` covers the "
+              "throwing exits too",
+              answer.get("tempAfter") == answer.get("tempBefore"),
+              f"before {answer.get('tempBefore')!r}\n       after {answer.get('tempAfter')!r}")
+        if tag == "cancel":
+            check("T: CONTROL — one WAS there while the body was still going out, so "
+                  "\"none afterwards\" is a claim about a file that existed",
+                  len(answer.get("tempDuring", [])) > len(answer.get("tempBefore", [])),
+                  f"during {answer.get('tempDuring')!r}, "
+                  f"before {answer.get('tempBefore')!r}")
+
+
+def progress_oracle(row):
+    """`CloudProgress.fraction`, computed here from §5a's four boundaries."""
+    clean = [s if s > 0 else 0 for s in row["seconds"]]
+    total = sum(clean)
+    if not clean:
+        shares = []
+    elif total > 0:
+        shares = [s / total for s in clean]
+    else:
+        shares = [1 / len(clean) for _ in clean]
+    index = row["media"]
+    if not 0 <= index < len(shares):
+        return 0
+    base = sum(shares[:index])
+    low, high = {"extracting": (0.0, 0.25), "uploading": (0.25, 0.65),
+                 "waiting": (0.65, 0.95), "saving": (0.95, 1.0)}[row["phase"]]
+    part = min(max(row["within"], 0), 1)
+    value = high if part >= 1 else (low if part <= 0 else low + (high - low) * part)
+    return base + shares[index] * value
+
+
+# --------------------------------------------------------------------------
 # R — the redirect, and G/N/S/K — the rest
 
 
@@ -2428,17 +3049,21 @@ def section_hygiene(binary, sources):
           answer.get("engines") == [["apple", "On this Mac"], ["assemblyai", "AssemblyAI"]]
           and answer.get("engineKey") == "ReelcutCaptionEngine",
           f"got {answer.get('engines')!r} / {answer.get('engineKey')!r}")
-    check("S: CloudTranscriber's placeholder THROWS its sentence rather than answering "
-          "an empty run",
-          answer.get("placeholderThrew") is True
-          and answer.get("placeholderMessage")
-          == "The transcription failed: the AssemblyAI engine is not built yet",
-          f"got {answer.get('placeholderMessage')!r}")
-    others = [name for name in os.listdir(sources)
-              if name.endswith(".swift") and name != "CloudTranscriber.swift"
-              and "CloudTranscriber(" in open(os.path.join(sources, name)).read()]
-    check("S: `CloudTranscriber(` occurs in NO other file of app/Sources — nothing in the "
-          "app can reach it yet", not others, f"found in {others!r}")
+    check("S: a run with NO jobs throws `nothingRecognized` and makes not one request — "
+          "the janitor's empty list, no media to group, nothing uploaded to find out",
+          answer.get("emptyRunThrew") is True
+          and answer.get("emptyRunMessage")
+          == "No speech was recognised in the audio that was transcribed."
+          and answer.get("emptyRunRequests") == 0,
+          f"got {answer.get('emptyRunMessage')!r} / "
+          f"{answer.get('emptyRunRequests')!r} requests")
+    others = sorted(
+        name for name in os.listdir(sources)
+        if name.endswith(".swift") and not name.startswith("CloudTranscriber")
+        and "CloudTranscriber(" in open(os.path.join(sources, name)).read())
+    check("S: `CloudTranscriber(` occurs in exactly ONE other file of app/Sources — the "
+          "tool's cloud arm, and nothing in the UI",
+          others == ["AgentServer+CloudCaptions.swift"], f"found in {others!r}")
     check("S: the cache kind is `transcripts`, beside the other three",
           answer.get("transcriptsKind") == "transcripts"
           and answer.get("cacheKinds") == ["thumbs", "peaks", "speech", "transcripts"],
@@ -2495,6 +3120,22 @@ MUTANTS = {
         "        let offset = Double(source - job.sourceIn) / job.speed\n",
         "the degenerate-speed guard removed from the mapping — 05-review's finding 1, "
         "reverted (row 12)"),
+    "no-speed-clamp": (
+        "Transcriber+Jobs.swift",
+        "        guard !offset.isNaN else { return job.start }\n"
+        "        let bounded = min(max(offset, 0), Double(job.duration))\n"
+        "        return job.start + Ticks(bounded.rounded(.toNearestOrAwayFromZero))\n",
+        "        return job.start + Ticks(offset.rounded(.toNearestOrAwayFromZero))\n",
+        "R6-10's clamp removed from `Transcriber.placed` — the one door both mappings "
+        "convert through (the mapping and jobs sections)"),
+    "no-length-clamp": (
+        "Transcriber+Jobs.swift",
+        "        guard scaled >= 1 else { return min(max(clip.duration, 1), maxSourceTicks) }\n"
+        "        return Ticks(min(scaled, Double(maxSourceTicks)).rounded())\n",
+        "        guard scaled.isFinite, scaled >= 1 else { return max(clip.duration, 1) }\n"
+        "        return Ticks(scaled.rounded())\n",
+        "R6-10's bound removed from `Transcriber.contentLength` — the source length "
+        "reverted to what it was (the jobs section)"),
     "no-retry": (
         "AssemblyAIClient.swift",
         "                guard failure.isRetriable, attempt < tuning.uploadRetries,\n"
@@ -2563,8 +3204,9 @@ def prepare_mutant(name):
     return target
 
 
-SECTIONS = [section_mapping, section_stamp, section_client, section_cancel, section_secrets,
-            section_cues, section_extract, section_verbatim, section_hygiene]
+SECTIONS = [section_mapping, section_jobs, section_stamp, section_client, section_cancel,
+            section_secrets, section_cues, section_extract, section_verbatim, section_run,
+            section_hygiene]
 # The sections the HARNESS binary drives rather than the probe binary.
 HARNESS_SECTIONS = {"cues"}
 
@@ -2579,8 +3221,8 @@ def main():
                              "compile against it (overrides --sources)")
     parser.add_argument("--only",
                         help="a comma-separated subset of sections, by the name after "
-                             "`section_` (mapping, stamp, client, cancel, secrets, cues, "
-                             "extract, verbatim, hygiene)")
+                             "`section_` (mapping, jobs, stamp, client, cancel, secrets, "
+                             "cues, extract, verbatim, run, hygiene)")
     parser.add_argument("--wall", type=float, default=1800,
                         help="the whole run's wall-clock bound in seconds (rule H)")
     args = parser.parse_args()

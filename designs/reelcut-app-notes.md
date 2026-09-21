@@ -2202,3 +2202,85 @@ OLDER trees under that flag and a bare `speaker:` would break both. A fixture
 written before the rule existed produces byte-identical cues, which the probe
 proves by `cmp` and which twenty of `phase4_chrome.py`'s own cue files prove
 against a harness built from the baseline tree.
+
+## Nine caption files, 2026-09-20 — road map 6's C1 run
+
+The pipeline that gave `CloudTranscriber.transcribe` a body, put the cloud
+engine behind `transcribe {engine: "assemblyai"}`, and clamped the caption
+path's two `Double → Ticks` conversions (spec §11's R6-10 and R6-11). The
+record, every number and every mutant is `designs/reelcut-roadmap-6.md`
+§10.10.
+
+**`CloudTranscriber.swift` 102 → 296.** The placeholder that threw "the
+AssemblyAI engine is not built yet" became road map 6 §5a's run: `Report`
+(what the `Outcome` has no room for), the janitor first, the jobs grouped by
+MEDIA in first-clip order, each media classified cached / held / to upload
+before any work starts so the progress shares are known, then the per-job
+derivation through `MediaTranscript.words` and `CaptionCues.build`. `run` is
+untouched. The two closing throws are `Transcriber.transcribe`'s own, for its
+own reason. The file is 104 under the 400-line cap on a new file because the
+janitor and the round trip went next door.
+
+**`CloudTranscriber+Media.swift` — new, 183.** `retryDeletes` and `fetch`.
+It is a second file rather than more of the first because
+`CloudTranscriber.swift` holds the run's SHAPE and a reader following that
+shape does not need the cache header's twelve fields or the order of the five
+calls in front of them. `fetch`'s `progress` had to be `@escaping`: the two
+closures it hands to `extractUpload` and to `upload` outlive the call, and
+`make typecheck` does not say so — it stops before SILGen, and the probe's
+own build is what caught it.
+
+**`CloudProgress.swift` — new, 141.** The progress arithmetic as a value with
+no run in it, so `cloud_captions_probe.py`'s `run` section can drive it over
+a table and the sheet that shows it in c1-chrome inherits something measured.
+`fraction` takes the two ends of a phase EXACTLY rather than computing them —
+`0.65 + (0.95 − 0.65) × 1` is 0.9500000000000001 in binary floating point,
+and "holds at 0.95" is a claim a proof compares against the constant.
+
+**`AgentServer+CloudCaptions.swift` — new, 247.** `transcriptionEngine`,
+`refuseCloudOnlyArguments`, `cloudTranscription` and the two private helpers
+that normalise the language and the vocabulary. A file of its own because the
+on-device path's refusals are a story about a GRANT and a downloaded MODEL
+and the cloud path's are a story about a CREDENTIAL and somebody else's
+service; interleaved they read as one tangle.
+
+**`AgentServer+Captions.swift` 409 → 439.** Thirty lines: the `switch` on
+`transcriptionEngine(a)`, the Apple arm's existing body moved inside it
+unchanged, and `fields` built per arm instead of at the join.
+`transcriptionScope` and `TranscriptionScope` stayed `private` — the cloud
+arm is handed `jobs` and `frame` by value. 161 under the ~600 cap.
+
+**`AgentCatalog+Captions.swift` 165 → 215.** `transcribe`'s entry rewritten:
+one paragraph per engine with the consent sentence in the cloud one, four new
+properties, and a comment naming File ▸ Generate Captions… and saying that
+the sheet's Engine popup is c1-chrome's.
+
+**`Transcriber+Jobs.swift` 117 → 178, and it is no longer a pure move.**
+`maxSourceTicks` (1e15), `placed(offset:in:)` — the ONE door both caption
+mappings convert through — the bound on `Job.sourceIn`, and the clamp inside
+`contentLength`. Its header says so, and `contentLength`'s doc stops saying
+it saturates "the same way" as the core: the core's cast tops out at
+`i64::MAX` and this one at `maxSourceTicks`, because Swift SUMS this number
+where the core does not. A product that overflows to `+infinity` is the BOUND
+and not the fallback — "more source than there can be" is the honest answer
+where the clip's own duration would be a number pulled out of the air.
+
+**`MediaTranscript.swift` 379 → 383.** `project(_:in:)` lost its `limit`
+argument and ends in `Transcriber.placed`; `words` lost the `let limit` line
+that fed it. The two lines the probe's `mapping-no-in` and `no-speed-guard`
+mutants patch are byte-identical to what they were, deliberately.
+`:317`'s `job.sourceIn + job.sourceLength` is NOT edited: both terms are now
+bounded to 1e15, so the sum cannot overflow.
+
+**`Transcriber.swift` 584 → 583.** `project(_:in:)` is three lines instead of
+four and ends in `placed` like its twin. Nothing else moved, and the file
+came back one line UNDER where it was.
+
+**`tools/proof/assemblyai_fake.py` 489 → 501**, one scenario key
+(`transcript_error_first`) and the submission index it needs.
+**`tools/proof/cloud_captions_probe.py` 2638 → 3280**, 196 → 283 rows: the
+mapping mode's `projected` and its near-`Int64.max` job, the whole `jobs`
+section (one child process per speed, because an unclamped `Ticks(_:)` traps
+and a trap has to be that speed's own failure), the whole `run` section, two
+replaced S rows and two new mutants. **`tools/proof/cloud_captions_proof.py`
+— new, 1479**, 115 rows over three instances.

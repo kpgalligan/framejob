@@ -370,8 +370,11 @@ def catalog_part(mcp):
 
     transcribe = schema_of("transcribe")
     check(
-        set(transcribe["properties"]) == {"clips", "language", "place", "project"},
-        "transcribe declares clips, language and place (and project): "
+        set(transcribe["properties"])
+        == {"clips", "language", "place", "engine", "speakers", "vocabulary", "refresh",
+            "project"},
+        "transcribe declares clips, language and place, plus road map 6 C1's engine, "
+        "speakers, vocabulary and refresh (and project): "
         f"{sorted(transcribe['properties'])}",
     )
     check(

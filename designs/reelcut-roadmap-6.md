@@ -637,6 +637,32 @@ line says the phase and the file — "Uploading intro.mov · 41 MB of 115" —
 and while waiting, the seconds waited, so a stuck queue is visible rather
 than silent.
 
+**Revised 2026-09-20 (c1-run), adding to this section and replacing nothing
+in it.** Built. Three things this text left open, settled by the code that
+now exists:
+
+- **The shares.** "A media's share" is proportional to the SECONDS of audio
+  each media to upload carries (`CloudProgress.init(seconds:)`), and a media
+  served from the CACHE — or held by R6-11 — is not in the list at all:
+  neither costs a second of work and a slice for one would make the bar
+  stall. With nothing to upload the bar goes 0 → 1. `CloudProgress.waiting`
+  is the clock against q8's 147×, capped at 1, which is what "holds at 0.95"
+  means; the published number is `max(previous, computed)`, so an upload
+  retried from zero never lowers it.
+- **The detail strings**, pinned: `Extracting <file>` ·
+  `Uploading <file> · <a> MB of <b>` · `Waiting for AssemblyAI · <n> s` ·
+  `Saving <file>`, `<file>` being the media's own name. Megabytes are
+  1 000 000 bytes and whole numbers.
+- **Step 2 gains a third answer**, spec §11's R6-11: a media in THIS run's
+  `janitorFailed` is neither cached nor uploaded but HELD — no fetch, no
+  file write, one `Problem` per clip on it, counted as a failure for the
+  closing throw, and the hold releases in the first run whose janitor
+  confirms the delete. A current cache without `refresh` is still served.
+  The reason is that `cache/transcripts/<id>.json` is the one record of a
+  remote transcript's id and a fetch REPLACES it, so a re-fetch after a
+  failed janitor would orphan that transcript for ever and make the run's
+  own note ("the next run retries it") false.
+
 ### 5b. The transcript cache
 
 **Revised 2026-09-20 (c1-parts), replacing this paragraph's second
@@ -917,6 +943,36 @@ dispatches on `engine` and is otherwise the code it is. It stays in
 entry is rewritten to say both engines in one paragraph each, with the
 consent sentence in the cloud one.
 
+**Revised 2026-09-20 (c1-run), adding to this section and replacing nothing
+in it.** Built. The sentences, as they landed, each pinned by a row of
+`cloud_captions_proof.py`:
+
+- `engine must be "apple" or "assemblyai" (got "<x>").`
+- `<arg> only applies with engine "assemblyai". Pass engine: "assemblyai",
+  or leave it out.` — the FIRST of `speakers`, `vocabulary`, `refresh`
+  present is the one named, in that order.
+- `No AssemblyAI API key is set. Set one in Reelcut ▸ Settings ▸
+  Transcription, or RC_ASSEMBLYAI_KEY for a proof.`
+- `“<file>” is longer than AssemblyAI's 10-hour limit for one file.`
+- R6-11's, one per clip on a held media: `AssemblyAI has not confirmed
+  deleting its earlier transcript, so it was not uploaded again; the next
+  run retries the delete`
+- the `note`'s three parts, space-joined: `vocabulary was capped at 1000
+  terms (AssemblyAI's limit); <N> were given.` · `AssemblyAI transcribed
+  media <id> with <model>, not universal-3-5-pro.` · `AssemblyAI has not
+  confirmed deleting the transcript of media <id>; the next run retries
+  it.` (once per media id).
+
+`language` with the cloud engine: absent or `"auto"` is detection (the
+wire's absent `language_code`); anything else is trimmed and passed through,
+and an EMPTY string is refused by name rather than sent as a language called
+"". `vocabulary` is trimmed, empties dropped, de-duplicated KEEPING THE
+FIRST spelling and cut from the end at `maxKeyterms`. The Apple arm's result
+gains `engine: "apple"` and nothing else. The handler is
+`AgentServer+CloudCaptions.swift`; `AgentServer+Captions.swift` dispatches on
+`engine` and `transcriptionScope` stays `private` — the cloud arm is handed
+`jobs` and `frame` by value.
+
 ### 5h. Files, tolls, seams
 
 Tolls, each a pure move, its own commit, gated alone before any feature
@@ -1008,10 +1064,20 @@ Over MCP: **(1)** `engine: "nope"`, `speakers` under `apple`, and the
 cloud engine with the key unset (the proof launches a second instance
 without the variable) are refused by name, and none touches the fake (its
 log is empty); **(2)** a two-clip project over ONE media uploads ONCE: the
-log holds one `POST /v2/upload` whose body is a FLAC stream that decodes,
-sample for sample, to the `2 × 16000 × seconds` bytes of the WAV the
-on-device engine would have written (C0's q2 took the format, so the byte
-length is now a claim about the container), byte-identical across two runs, one `POST /v2/transcript` with `authorization: proof-key`,
+log holds one `POST /v2/upload` whose body is a FLAC stream that decodes to
+the audio the on-device engine's WAV holds — **revised 2026-09-20 (c1-run),
+replacing this clause's "sample for sample" and "byte-identical across two
+runs"**: this Mac's 16 kHz extract is not bit-deterministic
+(`designs/reelcut-remaining.md` §5), so the claim is a POPULATION, written
+the way `cloud_captions_probe.py`'s rows W and Q are — N uploads through
+`refresh`, each decoded by `AVAudioFile` and by `ffmpeg`, beside N on-device
+WAV extracts: ONE length, at most two distinct byte strings differing in a
+single 16-bit sample, with a CONTROL that an altered decode in the same
+population IS seen. **And the fixture for that half is the `say` AIFF, not
+`media/speech.mov`**, which c1-run measured at four distinct byte strings of
+one length out of four extracts, ~130 bytes apart: an AAC decode this host
+does not repeat, where the AIFF is the two-string population §5 recorded.
+One `POST /v2/transcript` with `authorization: proof-key`,
 `speech_models` `["universal-3-5-pro", "universal-2"]`, no `language_code`
 under `language: "auto"` and `"en"` under `"en"`, N polls, one `DELETE`
 with the served id; **(3)** the placed cues equal, tick for tick and word
@@ -1022,8 +1088,10 @@ oracle — through the harness's `cues` mode for the line-breaking;
 the marker decodes equal to the stamp the proof computes from the file's
 size and mtime, and `remote_deleted` is true; **(5)** a second run makes
 NO request and reports the media under `cached`; `refresh: true` uploads
-again; a `set_media` relink to a different file uploads, and a relink
-back uploads again (one transcript per media, not a history); a split
+again; a **`relink_media`** relink to a different file uploads, and a
+relink back uploads again (one transcript per media, not a history) —
+**revised 2026-09-20 (c1-run), replacing the op name `set_media`, which
+this tree does not have**; a split
 clip's two halves partition the words, a clip at a later `in` gets the
 later words only, a reversed clip and an `enabled.audio`-off clip are
 skipped by name; **(6)** a 401 fails the run with the key sentence and
@@ -1041,6 +1109,19 @@ ATS key in `project.yml` at all — C0's q3 measured that it needs none, and
 this claim is what guards that measurement against a later macOS; **(11)** a
 scenario with `remote_deleted` failing (the DELETE answers 500) leaves the
 flag false, and the next run's FIRST request is that DELETE.
+
+**Revised 2026-09-20 (c1-run), adding a second arm to row 11 and replacing
+nothing above it.** Row 11 also proves spec §11's **R6-11**, the HOLD: with
+the DELETE failing twice, run 1 uploads and leaves the flag false; run 2
+under `refresh: true` is REFUSED in R6-11's own sentence and makes EXACTLY
+one request — that DELETE, no upload and no submit — with the cache file's
+sha256 and its `transcript_id` unchanged; and run 3, once the failures are
+spent, issues the DELETE of run 1's id FIRST and only then an upload, after
+which the file holds a new id. The failures are spelled as a `times: 2`
+count rather than as a scenario cleared between runs, because the fake's
+`POST /__control/scenario` replaces the scenario WHOLE and forgets every
+transcript with it — including the id whose delete is the thing being
+retried.
 
 The probe: **(12)** the mapping at its boundaries — a word straddling
 `in`, one ending past the window, speed 2× and 0.5×, clamping — as pure
@@ -1801,3 +1882,186 @@ and four of the five degenerate rows among its failures.
 - **The one-sample flip above is a HOST fact, not a fixed thing.** If a later
   macOS makes the extract deterministic, W and Q will simply see one distinct
   string and still pass.
+
+### 10.10 c1-run — the run, the MCP mirror, and the proof
+
+Built 2026-09-20. `CloudTranscriber.transcribe` has 5a's body; the
+`transcribe` tool dispatches on `engine`; `tools/proof/cloud_captions_proof.py`
+exists and drives the BUILT binary over MCP against the stand-in. Nothing in
+this pipeline called `api.assemblyai.com`, and after it the cloud engine is
+reachable only through `transcribe {engine: "assemblyai"}` — File ▸ Generate
+Captions… behaves exactly as it did.
+
+**Nothing in the core, the FFI or the op table moved.**
+`git diff <pipeline 2's tree> -- core app/Sources/ReelCore.swift
+app/Sources/ReelOps.swift project.yml` is EMPTY. `OP_NAMES` is still 57, the
+catalog still 77 tools, `RC_FORMAT_VERSION` still 8. `make test` printed
+**721 passed, 0 failed over 39 binaries**; `make lint` and
+`cargo fmt --check` are clean; `make typecheck` is 0 errors and exactly 4
+warnings.
+
+#### Spec §11, before the code
+
+- **R6-10** — the caption path clamps a clip's `speed` at BOTH ends, because
+  the ops bound it (`edit_clip.rs`'s `SPEED_MIN`/`SPEED_MAX`) and the reader
+  does not (`model_query.rs:189`'s `validate` checks duration and start and
+  never speed). `Transcriber.placed` is the ONE door both mappings convert
+  through and clamps the offset into `[0, duration]` in `Double`;
+  `Transcriber.contentLength` bounds the source length to
+  `maxSourceTicks` = 1e15 — not `i64::MAX`, because Swift SUMS it
+  (`MediaTranscript.swift:317`, `TranscribeSheetController.swift:264` over at
+  most `MAX_CLIPS` = 4096 jobs) — and `Transcriber.jobs` bounds `Job.sourceIn`
+  the same way. Declined: bounding `speed` in `validate`.
+- **R6-11** — a media whose remote delete this run could not confirm is HELD:
+  not fetched, not under `refresh`, its cache file left byte for byte, one
+  `Problem` per clip, released by the first run whose janitor confirms the
+  delete. A current cache without `refresh` is still served. Declined: a
+  second file listing orphaned ids, and serving the old words under
+  `refresh`.
+
+This closes `designs/reelcut-remaining.md` §5's speed-guard bullet for the
+CAPTION path and for nothing else; the rest of the app against such a file is
+recorded there as unmeasured residue.
+
+#### What landed, with every file's `wc -l` before → after
+
+| File | Before | After |
+|---|---|---|
+| `app/Sources/CloudTranscriber.swift` | 102 | **296** |
+| `app/Sources/CloudTranscriber+Media.swift` | — | **183** (new) |
+| `app/Sources/CloudProgress.swift` | — | **141** (new) |
+| `app/Sources/AgentServer+CloudCaptions.swift` | — | **247** (new) |
+| `app/Sources/AgentServer+Captions.swift` | 409 | **439** |
+| `app/Sources/AgentCatalog+Captions.swift` | 165 | **215** |
+| `app/Sources/Transcriber+Jobs.swift` | 117 | **178** |
+| `app/Sources/MediaTranscript.swift` | 379 | **383** |
+| `app/Sources/Transcriber.swift` | 584 | **583** |
+| `tools/proof/assemblyai_fake.py` | 489 | **501** |
+| `tools/proof/cloud_captions_probe.py` | 2638 | **3280** |
+| `tools/proof/cloud_captions_proof.py` | — | **1479** (new) |
+
+Every new file is under the 400-line cap and `Transcriber.swift` came back
+one line under where it was. `AgentServer+Captions.swift` took 30 lines for
+the dispatch and is 161 under the ~600 cap.
+
+The fake gained ONE scenario key, `transcript_error_first` — with
+`transcript_error` set, only the first N SUBMITTED transcripts end in
+`error`, so 5i·6's "the OTHER media's cues still land" is reachable. Absent
+is every transcript, which is what it always meant.
+
+#### The scores, each from the run that printed it
+
+- **`cloud_captions_proof.py` — 115/115, no skip**, in 45–50 s, three times.
+  Three instances on 4955, 4956 and 4957, each with its own fake on port 0,
+  each killed by its own PID, each with a row that `grep "Reelcut: "` on its
+  log is empty. `ffmpeg` and `say` were both present, so row 2 ran both
+  decoders and row 5 both relinks.
+- **`cloud_captions_probe.py` — 283/283** (the run captured in the handoff's
+  `04-checks.txt` printed "in 12 s"; this line first said 133 s, which no
+  captured run printed): pipeline 2's 196 plus
+  the 87 this pipeline added (the mapping section's `projected` and its
+  near-`Int64.max` job, the whole `jobs` section, the whole `run` section,
+  and hygiene's two replaced S rows).
+- `source_mirror_probe.py` **40/40** — `contentLength`'s other reader, whose
+  6 200 000 row is untouched by the clamp.
+- Against the new binary on 4958: `phase4_proof.py` **84/84**,
+  `op_catalog_proof.py` **23/23**, `op_argument_proof.py` **133/133**, the
+  parity grep empty.
+
+#### Mutants, each built in a tree COPY and each named with its score
+
+Each is `app/`, `project.yml` and `Makefile` copied with `core` a SYMLINK to
+the tree's already-built one, one text asserted to occur exactly once,
+`xcodegen generate` plus the Makefile's `xcodebuild` line inside the copy
+under a 900 s wall, then every row on port base 4960. Full score is 115.
+
+| Mutant | Score | The rows that caught it |
+|---|---|---|
+| `stamp-always-stale` | 107/115 | row 5's six cache rows, and row 11's two |
+| `mapping-no-in` | 111/115 | row 3's two oracle rows, row 5's split pair and later `in` |
+| `no-delete` | 91/101 | row 2's DELETE, row 4's `remote_deleted`, row 5's cache — and rows 7, 11 and H then THROW, because R6-11 holds every media whose delete never lands (scored as three row failures, not a traceback) |
+| `no-retry` | 113/115 | row 6's two 5xx-once rows |
+| `no-fifth-rule` | 114/115 | row 7's speaker break |
+| `universal-2-only` | 112/115 | row 2's `speech_models`, row 4's two `requested` rows |
+| `no-janitor` | 109/115 | row 11's two retry rows and all four of its hold rows |
+| `auth-carries-on` | 114/115 | row 6's "one upload attempted, not one per media" |
+| `no-hold` | 111/115 | row 11's four hold rows |
+
+Three of the nine (`mapping-no-in`, `no-retry`, `no-fifth-rule`) are the
+probe's own `MUTANTS` texts, imported rather than spelled again. The probe
+gained two of its own for R6-10: **`no-speed-clamp`** (the clamp taken out of
+`Transcriber.placed`) fails the mapping section at its first request — a
+TRAP, which is the point — and **`no-length-clamp`** (the bound taken out of
+`contentLength`) scores 28/30 on the `jobs` section, failing `1e300` by trap
+and `greatestFiniteMagnitude` by answer.
+
+#### What this pipeline measured that nothing had
+
+- **`media/speech.mov`'s extract is not repeatable at all.** Four extracts,
+  four distinct byte strings of ONE length (167 930 bytes), spans 105–228
+  bytes — about 60–115 samples. The `say` AIFF over the same code is two
+  strings differing in one byte, which is what §5 recorded. So row 2's byte
+  population uses the AIFF and the .mov's own spread is printed as a row
+  beside it, named as the reason. This is a second, LARGER non-determinism
+  than the one `designs/reelcut-remaining.md` §5 holds, and it is about the
+  AAC decode rather than about the resampler.
+- **The progress bar, end to end.** 63 `(fraction, detail)` pairs over a
+  two-media run, non-decreasing, each inside its phase's band of its own
+  media's share, holding at exactly the 0.95 point of each share once
+  `waited × 147` passed the audio's own seconds, ending at exactly 1.0, with
+  an upload retried from zero never lowering it.
+- **No extract survives a failed run.** Measured at both ends: in the probe,
+  `reelcut-upload-*` in the probe binary's own temporary directory before,
+  during (the CONTROL — one IS there) and after a cancelled, an errored and a
+  401'd run; over MCP, the same glob over both spellings of the host's
+  temporary folder around the built app's runs.
+- **The credential is nowhere.** `proof-key` appears in no app log, in none
+  of the 158 MCP answers and refusals the run accumulated, and in no file the
+  run wrote — the fake keeps its request log in memory, so there is not even
+  that. No logged header or JSON body holds this host's user name or home
+  path.
+
+#### The tree
+
+**`870fa0ec4d017fa6c4b2f8a40d1a0bf7ef5cd222`** — every line this pipeline
+wrote except this paragraph, by the request's temp-index recipe (never the
+real index; nothing was committed, added, stashed or checked out). It is
+measured before the paragraph rather than after it because a hash of a tree
+cannot be written into that tree; re-run the recipe for the current one. The
+baseline is pipeline 2's `10bbbb05eb219319f84f7d5e6c13c775090ba31a`, and
+`git diff` of that baseline over `core`, `ReelCore.swift`, `ReelOps.swift`
+and `project.yml` is empty.
+
+#### Limits and deviations, said rather than papered over
+
+- **A service whose DELETE never succeeds stops re-transcription.** R6-11's
+  hold is per RUN and releases only when a janitor retry succeeds, so a
+  prolonged outage of `DELETE /v2/transcript/{id}` leaves every already-
+  transcribed media held: cached words are still served, `refresh` is
+  refused in R6-11's sentence, and a NEW media is unaffected. The
+  `no-delete` mutant is that state, and its score is what it looks like.
+  Accepted: the alternative is orphaning a transcript at the far end for
+  ever, which is what R6-11 was written for.
+- **A 404 from the janitor is a failure, not a delete.** C0's q6 measured
+  that a real deleted transcript answers 200, so a 404 means something else
+  and is not treated as "already gone". Recorded, not fixed.
+- **The fake's scenario cannot be half-replaced.** `POST /__control/scenario`
+  resets the transcript table with the scenario, so row 11's hold arm spells
+  "the failure stops" as `times: 2` rather than as a cleared `fail`. Same
+  observable sequence, one fewer control endpoint.
+- **Row 3's placed clips are checked by COUNT and by start**, within one
+  frame, not by duration: `CaptionLayout.place` snaps and abuts, which is its
+  own tested behaviour, and re-deriving it here would be a second spelling of
+  it. The cues themselves are compared tick for tick against the Python
+  oracle.
+- **Row 4 reads the three cache-sizing constants off whichever of the
+  import's markers has landed**, not off the peaks one by name: which pass
+  finishes first is the import's business, and pinning it made the row flaky
+  on a busy host (seen, then fixed).
+- **`make app`'s own `xcodebuild` is what a mutant runs**, so a mutant costs
+  about a minute of build and a minute of rows. Nine of them is twenty
+  minutes; they were run one at a time, never beside another build.
+- **Not reached, and c1-chrome's or c1-close's:** the Engine popup and the
+  three cloud rows in the sheet, `CloudEstimate`, the Settings window, the
+  report card, `project.yml`'s usage string, the harness pins, probe rows 14
+  and 18, 5i's live rows 20–21, and every earlier proof re-run.

@@ -3760,14 +3760,31 @@ env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_probe.py --mutant no
 and **196/196** on 2026-09-20 after 05-review's finding 1 added row 12's
 second request — the five degenerate speeds (`0`, a negative, NaN,
 `+infinity`, `greatestFiniteMagnitude`), none of which traps: the first four
-read as 1, and the largest finite speed passes the guard unchanged.
-Nine sections: `mapping` (5i·12), `stamp` (13), `client` (15, over an injected
-`URLProtocol` with no socket), `cancel` (16, against the fake), `secrets`
-(17 and R6-9's three rules and the loopback table), `cues` (19, through the
-harness's `cues` mode), `extract` (the WAV against the BASELINE tree, the
-FLAC, the fallback and `wholeAsset`), `verbatim` (the served bytes all the
-way to disk and back) and `hygiene` (the redaction, the language table,
-`CloudTranscriber`'s unreachability, and the credential).
+read as 1, and the largest finite speed passes the guard unchanged. Then
+**283/283** (2026-09-20, c1-run; the captured run printed "in 12 s"): 196 plus the 87 that pipeline
+added — the `mapping` section's `projected` (the on-device twin over the same
+job) and its clip whose `start` is within ten million ticks of `Int64.max`,
+the whole `jobs` section, the whole `run` section, and hygiene's two replaced
+S rows.
+
+Eleven sections: `mapping` (5i·12), `jobs` (spec §11's R6-10 — a clip `speed`
+the OPS cannot write and the CORE's reader accepts, spliced into a project's
+JSON text, read back through `ReelProject.from(json:)` and driven through
+`Transcriber.jobs` and both mappings, ONE CHILD PROCESS PER SPEED because an
+unclamped `Ticks(_:)` traps and a trap has to be that speed's own scored
+failure), `stamp` (13), `client` (15, over an injected `URLProtocol` with no
+socket), `cancel` (16, against the fake), `secrets` (17 and R6-9's three
+rules and the loopback table), `cues` (19, through the harness's `cues`
+mode), `extract` (the WAV against the BASELINE tree, the FLAC, the fallback
+and `wholeAsset`), `verbatim` (the served bytes all the way to disk and
+back), `run` (`CloudProgress` over a table, then
+`CloudTranscriber.transcribe` itself against the fake — every
+`(fraction, detail)` it published, non-decreasing, inside its phase's band of
+its media's share, holding at the 0.95 point, ending at 1.0; and the
+`reelcut-upload-*` a cancelled, an errored and a 401'd run leave behind,
+which is none, with a CONTROL that one was there while the body was going
+out) and `hygiene` (the redaction, the language table, the empty run and
+`CloudTranscriber`'s one caller, and the credential).
 
 It compiles two entries with `harness/build.sh`'s own `swiftc` line — never
 `build.sh` itself, which hard-codes the tree: the probe, and a four-argument
@@ -3789,6 +3806,8 @@ exactly once (2026-09-20, against 186):
 | `env-first` | the environment read before the store | 185/186 |
 | `stamp-drops-field` | `speaker_labels` dropped from the stamp | 185/186 |
 | `no-speed-guard` | the degenerate-speed guard removed from the mapping | 14/15 over `--only mapping` |
+| `no-speed-clamp` | R6-10's clamp removed from `Transcriber.placed` | 1/2 over `--only mapping` — it TRAPS at the first request, which is the point |
+| `no-length-clamp` | R6-10's bound removed from `Transcriber.contentLength` | 28/30 over `--only jobs` |
 
 **Host-state inputs.** `say` makes the speech fixture (road map 4's text) and
 its absence skips the whole `extract` section by name. `ffmpeg`, when it is
@@ -3814,3 +3833,87 @@ length, at most two distinct strings in the whole population, and those two
 differing in a single sample — with a CONTROL row that measures one range
 form disagreeing with ITSELF at that same byte, which is what makes the
 comparison about this host rather than about the code.
+
+## Road map 6 — the cloud engine through the built app (`cloud_captions_proof.py`)
+
+C1's third pipeline (road map 6 §10.10). It drives `make app`'s binary over
+MCP against `assemblyai_fake.py`, and, like the probe beside it, **makes no
+call to any AssemblyAI host and cannot be made to**: every instance is
+launched with `-RCAssemblyAIEndpoint http://127.0.0.1:<the fake's port>` and
+`-RCSecretFolder <a folder under work/cloudproof/>` (spec §11's R6-9), and
+the only credential any of them can have is the dummy `proof-key` — or, for
+row 1's no-key arm, nothing at all.
+
+```sh
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_proof.py
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_proof.py --mutant no-hold
+```
+
+**115/115** on the tree, no skips, in 45–50 s, measured three times on
+2026-09-20. `--binary` points at another build, `--port-base` (4955) moves
+the three instances, `--wall` (1800 s) bounds the run.
+
+It launches and kills **three** instances, each on its own port with a fake
+of its own on port 0, each killed by its own `Popen` pid in a `finally`, each
+with a row asserting `grep "Reelcut: "` finds nothing in its log — nothing in
+this file ever reads `pgrep`, so another session's instance is none of its
+business.
+
+* **A** (4955, `RC_ASSEMBLYAI_KEY=proof-key`) — rows 1's caller arms, 2, 3,
+  4, 5, 7, 8, 9, 10.
+* **B** (4956, the variable REMOVED) — row 1's no-key arm.
+* **C** (4957, `proof-key`) — rows 6, 11, H, T.
+
+The rows are 5i's 1–11 plus four of this pipeline's own: **H** a media over
+AssemblyAI's ten-hour limit (the duration rewritten in a SAVED package and
+the package reopened, since no op can make a media longer than its file);
+**T** no `reelcut-upload-*` surviving a cancelled, an errored or a refused
+run, with a CONTROL that one is there while the body is going out; **K** the
+dummy key in no app log, in none of the MCP answers and refusals the run
+accumulated, and in no file the run wrote; **X** no logged header or JSON
+body holding this host's user name or home path.
+
+It imports `build`, `run_probe`, `run_cues`, `Fake`, `child_env`,
+`population`, `wav_samples`, `make_fixture`, `word` and `MUTANTS` from
+`cloud_captions_probe.py` rather than copying any of them, so the probe
+binary and the harness it reuses are the ones that file builds.
+
+**Mutant scores**, each a COPY of the tree — `app/`, `project.yml` and
+`Makefile`, with `core` a SYMLINK to the tree's already-built one, so
+`project.yml`'s pre-build `cargo build --release` is a no-op — one text
+asserted to occur exactly once, `xcodegen generate` plus the Makefile's
+`xcodebuild` line inside the copy under a 900 s wall, then every row on port
+base 4960 (2026-09-20, against 115):
+
+| `--mutant` | What it breaks | Score |
+|---|---|---|
+| `stamp-always-stale` | the stamp comparison deleted | 107/115 |
+| `mapping-no-in` | the `in` term dropped from the projection | 111/115 |
+| `no-delete` | the remote DELETE removed | 91/101 |
+| `no-retry` | the upload retry removed | 113/115 |
+| `no-fifth-rule` | the speaker-change flush removed | 114/115 |
+| `universal-2-only` | `speech_models` pinned to Universal-2 | 112/115 |
+| `no-janitor` | the janitor removed | 109/115 |
+| `auth-carries-on` | the 401 arm not ending the run | 114/115 |
+| `no-hold` | R6-11's hold removed | 111/115 |
+
+`no-delete` is the one whose TOTAL moves: with no transcript ever deleted,
+R6-11 holds every media a later row touches, so rows 7, 11 and H throw where
+the tree's build answers — scored as three row failures each named for its
+row, never as a traceback, because a mutant's score is the measurement.
+
+**Host-state inputs.** `media/speech.mov` (road map 4's fixture; this file's
+own section says how to make it) and `say` for the second media, without
+which row 5's relink arms and row 6 skip BY NAME. `ffmpeg`, when it is on
+PATH, is row 2's second FLAC decoder; `AVAudioFile` always runs and the row
+names which answered. Three free loopback ports, and one free port per fake.
+
+**One thing row 2 had to be designed around, measured here.**
+`media/speech.mov`'s 16 kHz extract is not repeatable at ALL — four extracts,
+four distinct byte strings of one length (167 930 bytes), spans 105–228 bytes
+— where the `say` AIFF over the identical code is the TWO-string,
+one-sample population `designs/reelcut-remaining.md` §5 records. The
+difference is the AAC decode, not the resampler. So row 2's upload-count and
+request claims are made over `speech.mov` and its BYTE population over the
+AIFF, with the .mov's own spread printed as a row beside it, named as the
+reason. Road map 6 §5i·2 was revised, dated, to say the same.

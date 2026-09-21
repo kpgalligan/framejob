@@ -342,6 +342,19 @@ new file, and the FROZEN `app/Sources/EditorViewController.swift` **1123,
 unchanged to the line** — two comments, both naming a file that moved. It
 stays on the list, having taken nothing on.
 
+**What road map 6's C1 RUN did to it** (2026-09-20, `wc -l`; road map 6
+§10.10). Nothing: not one file on this list was touched, and no file it
+touched came near the ~600 cap. The nine Swift files it changed or made are
+`CloudTranscriber.swift` 102 → **296**, `CloudTranscriber+Media.swift`
+(**183**, new), `CloudProgress.swift` (**141**, new),
+`AgentServer+CloudCaptions.swift` (**247**, new),
+`AgentServer+Captions.swift` 409 → **439**, `AgentCatalog+Captions.swift`
+165 → **215**, `Transcriber+Jobs.swift` 117 → **178**,
+`MediaTranscript.swift` 379 → **383** and `Transcriber.swift` 584 → **583**,
+which came back one line UNDER where it was. Every new file is inside the
+400-line cap; `MediaTranscript.swift` at **383** is the closest to it and is
+the one to watch.
+
 Regenerate the list with
 `wc -l app/Sources/*.swift core/src/*.rs | awk '$1>600 && $2!="total"' | sort -rn`
 rather than trusting the numbers here; the standing exemptions are
@@ -555,6 +568,26 @@ and the closing above added the rest.
   screen — no MCP row can see the DIRECTION, because a card's bounding box is
   the same at +45° and −45° — and whether a slide on a clip INSIDE a nest
   leaves by the nest's own edge rather than the project canvas's.
+- **The cloud captions RUN, road map 6's c1-run (2026-09-20)** — what no
+  instrument in that pipeline could reach, and what nobody has looked at:
+  - **the progress bar as an experience.** Its arithmetic is measured (63
+    values over a two-media run, non-decreasing, holding at 0.95); whether
+    "Waiting for AssemblyAI · 34 s" reads as patience or as a hang on a real
+    twenty-minute recording, over a home upstream, is a question for a person
+    with a stopwatch and their own patience. Road map 6 §5j owed this and
+    still does.
+  - **a real media over ten hours.** The refusal is proved against a package
+    whose `duration` was rewritten by hand; nobody has pointed the app at a
+    ten-hour file, which would also be the first time the extractor was asked
+    for 550 MB of FLAC.
+  - **what a held media feels like** (R6-11). If AssemblyAI's DELETE is down,
+    every already-transcribed media is held: cached words still come back,
+    `refresh` is refused in R6-11's sentence, and only a person can say
+    whether that sentence is the right thing to read at that moment. The
+    `no-delete` mutant is what that state looks like.
+  - **the cue timings against the speech, by eye**, on a real recording with
+    the cloud engine. Row 3's oracle proves the mapping against the SERVED
+    words; nothing proves AssemblyAI's own word times feel right on screen.
 - **The Keychain prompt road map 6's spike met and could not read**
   (`designs/reelcut-roadmap-6.md` §3 q7, run 2026-09-20). A login-keychain
   item added by one ad-hoc-signed build and read by the NEXT one — a
@@ -605,16 +638,47 @@ reader review's two nits were left unfixed):
   pipeline: the clause now sits beside `Transcriber`'s two and cites R6-7.
   It is the one rule C1 changed; the user was told, and it is theirs to
   reword or revert.
-- **`MediaTranscript.project`'s speed guard has a hole its twin
-  `Transcriber.project` shares, untried by any row** (c1-parts' second
-  review, a nit): a FINITE but tiny positive `speed` passes the guard and can
-  still overflow `Ticks(_:)`. Nothing reaches the cloud mapping until c1-run
-  wires a caller to it, so c1-run owns the answer: either the core's own
-  bounds on a clip's `speed` make it unreachable, shown by a row, or both
-  twins clamp.
-- **`tools/proof/cloud_captions_proof.py` does not exist yet.** Road map 6
-  §5i names three instruments; c1-parts built two. The MCP proof's rows 1–11
-  are c1-run's and rows 14, 18, 20 and 21 are later pipelines'.
+- **`MediaTranscript.project`'s speed guard had a hole its twin
+  `Transcriber.project` shared** (c1-parts' second review, a nit): a FINITE
+  but tiny positive `speed` passed the guard and could still overflow
+  `Ticks(_:)`. **CLOSED 2026-09-20 by c1-run, for the CAPTION PATH and for
+  nothing else.** Spec §11's R6-10 records the answer: the ops bound a
+  clip's `speed` to 0.1–10 and the READER does not, so such a file reaches
+  the app and both twins clamp — in `Double`, before the conversion, through
+  the one door `Transcriber.placed`, with `Transcriber.contentLength` and
+  `Job.sourceIn` bounded to `maxSourceTicks` = 1e15 at the other end.
+  `cloud_captions_probe.py`'s `jobs` section drives `1e300`,
+  `greatestFiniteMagnitude`, `1e-300` and `leastNonzeroMagnitude` through the
+  CORE's own reader and then through `Transcriber.jobs` and both mappings,
+  one child process per speed, and two mutants (`no-speed-clamp`,
+  `no-length-clamp`) fail it on purpose. What is closed is
+  `Transcriber.jobs`, `MediaTranscript.project` and `Transcriber.project`,
+  and nothing else.
+- **The REST of the app against a hand-written `speed` is UNMEASURED.**
+  Residue, opened by the bullet above the moment it closed: nothing in this
+  tree has been driven with a `project.json` carrying a speed outside
+  0.1–10 except the three caption readers.
+  `app/Sources/CompositionBuilder.swift:386` sums
+  `segment.sourceIn + segment.sourceDuration` off a core length that
+  SATURATES at `i64::MAX`, which is a sum this pipeline chose 1e15 precisely
+  to avoid on its own path; the timeline, the peaks window, the reversed
+  mirror, the plan and the exporter have not been asked either. Whether any
+  of them traps, and whether the answer is a bound in each of them or one in
+  `Project::validate` (declined by R6-10 for the reader's own reason), is
+  nobody's yet.
+- **`tools/proof/cloud_captions_proof.py` EXISTS.** CLOSED 2026-09-20 by
+  c1-run: 115 rows over three instances, 5i's rows 1–11 plus H, T, K and X,
+  nine mutants each built in a tree copy and each named with its score (road
+  map 6 §10.10). Rows 14 and 18 are c1-chrome's and the live rows 20–21 are
+  c1-close's.
+- **`media/speech.mov`'s 16 kHz extract is not repeatable at all**, which is
+  a SECOND and larger non-determinism than the one-sample flip above.
+  Measured by c1-run: four extracts, four distinct byte strings of ONE length
+  (167 930 bytes), spans 105–228 bytes — about 60 to 115 samples. The `say`
+  AIFF over the identical code path is the two-string population above, so
+  the difference is the AAC decode and not the resampler. Any future row
+  wanting bytes out of an extract should use an uncompressed fixture; road
+  map 6 §5i·2 was revised, dated, to say so and to say what it replaces.
 - **Two nits from c1-parts' reader review were left unfixed**, both read and
   judged benign at the time, both cheap for whoever next opens those files:
   `AssemblyAIClient+Session.swift`'s `sink(_:)?.progress?(…)` reads

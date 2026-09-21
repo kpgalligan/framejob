@@ -71,6 +71,21 @@ extension AgentServer {
     /// this yet". That ordering is what makes the grant-less refusals checks
     /// a proof script can run, and they are the only part of this tool a
     /// headless run reaches.
+    ///
+    /// **Since road map 6's C1 it has TWO engines** (§5g), and this method
+    /// owns only the choice between them: `engine` is read after the
+    /// caller's own model mistakes and before anything either engine does,
+    /// and each arm is then the code it was or is
+    /// (`AgentServer+CloudCaptions.swift`). The order of the refusals, end to
+    /// end: the unknown clip and the empty scope (the scope), a misspelt
+    /// `engine` with both spellings named, then — under `apple` — a
+    /// cloud-only argument refused BY NAME, the language's spelling, the
+    /// grant and the on-device model; or — under `assemblyai` — the three
+    /// cloud arguments' own types, the credential, the endpoint, a media over
+    /// ten hours, and only then the network. `truncated` can appear for the
+    /// on-device engine alone: there is no one-minute ceiling on the other
+    /// side of a REST call, and `CloudTranscriber` answers no truncations at
+    /// all.
     func transcribe(_ a: [String: Any]) throws -> String {
         // `importMedia`'s guard, restated: everything below assumes the main
         // thread is free, which is only true while this handler is not
@@ -91,30 +106,48 @@ extension AgentServer {
         let scope = try onMain { try self.transcriptionScope(a, document) }
         guard !scope.jobs.isEmpty else { throw scope.emptyRefusal }
 
-        // A tag the framework has never heard of is a typo, and a typo is the
-        // caller's own mistake, so it is answered here with the rest of them
-        // and above the grant. See the two-part note in this method's doc.
-        try Self.checkSpelling(of: wanted)
-
-        guard Transcriber.isAuthorized else {
-            throw ToolError(message: Transcriber.authorizationRefusal.localizedDescription)
-        }
-        let language = try Self.transcriptionLanguage(wanted)
-
-        // Held on this stack for the whole call, as `export` holds its
-        // `Exporter`: the transcriber owns the task's delegate, which the task
-        // itself does not retain.
-        let transcriber = Transcriber()
         let outcome: Transcriber.Outcome
-        do {
-            outcome = try transcriber.transcribe(
-                scope.jobs, language: language, frame: scope.frame,
-                cancel: Transcriber.CancelToken())
-        } catch {
-            // Every failure comes back in band, message and all — including
-            // "no speech was recognised", which is a true answer about the
-            // audio rather than a transport problem.
-            throw ToolError(message: error.localizedDescription)
+        var fields: [String: Any]
+        switch try transcriptionEngine(a) {
+        case .apple:
+            // An argument that can only mean something to AssemblyAI is the
+            // caller's own mistake and is named before any work starts.
+            try refuseCloudOnlyArguments(a)
+
+            // A tag the framework has never heard of is a typo, and a typo is
+            // the caller's own mistake, so it is answered here with the rest
+            // of them and above the grant. See the two-part note in this
+            // method's doc.
+            try Self.checkSpelling(of: wanted)
+
+            guard Transcriber.isAuthorized else {
+                throw ToolError(message: Transcriber.authorizationRefusal.localizedDescription)
+            }
+            let language = try Self.transcriptionLanguage(wanted)
+
+            // Held on this stack for the whole call, as `export` holds its
+            // `Exporter`: the transcriber owns the task's delegate, which the
+            // task itself does not retain.
+            let transcriber = Transcriber()
+            do {
+                outcome = try transcriber.transcribe(
+                    scope.jobs, language: language, frame: scope.frame,
+                    cancel: Transcriber.CancelToken())
+            } catch {
+                // Every failure comes back in band, message and all —
+                // including "no speech was recognised", which is a true
+                // answer about the audio rather than a transport problem.
+                throw ToolError(message: error.localizedDescription)
+            }
+            fields = [
+                "engine": TranscriptionEngine.apple.rawValue,
+                "language": language.identifier,
+            ]
+        case .assemblyai:
+            let answer = try cloudTranscription(
+                a, document: document, jobs: scope.jobs, frame: scope.frame, language: wanted)
+            outcome = answer.outcome
+            fields = answer.fields
         }
 
         // Ticks, not seconds: every other tool speaks the model's own unit and
@@ -123,11 +156,8 @@ extension AgentServer {
             ["start": $0.start, "end": $0.end, "text": $0.text]
         }
         var problems = scope.problems + outcome.problems
-        var fields: [String: Any] = [
-            "cues": reported,
-            "clips_read": outcome.clips.map { Int($0) },
-            "language": language.identifier,
-        ]
+        fields["cues"] = reported
+        fields["clips_read"] = outcome.clips.map { Int($0) }
         if !outcome.truncations.isEmpty {
             fields["truncated"] = outcome.truncations.map {
                 ["clip": Int($0.clip), "at": $0.stoppedAt, "end": $0.end] as [String: Any]

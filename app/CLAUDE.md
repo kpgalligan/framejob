@@ -303,11 +303,27 @@ free.
   `.vtt` from one all-text track, never guessed; a popup built from
   `NSMenuItem`s carrying `representedObject`, because `addItem(withTitle:)`
   REMOVES a same-titled row).
-- `CloudTranscriber.swift` — `TranscriptionEngine` (`apple` | `assemblyai`,
-  persisted under `ReelcutCaptionEngine`) and the cloud engine's seam over the
-  SAME `Transcriber.Job` / `Outcome` / `CancelToken`. `run` is its serial
-  queue and the main-thread completion; `transcribe` is a placeholder that
-  throws, and nothing constructs the class.
+- `CloudTranscriber.swift` (+`Media`) — `TranscriptionEngine` (`apple` |
+  `assemblyai`, persisted under `ReelcutCaptionEngine`) and the cloud engine
+  over the SAME `Transcriber.Job` / `Outcome` / `CancelToken`. `run` is its
+  serial queue and the main-thread completion; `transcribe` is the
+  synchronous body — the janitor FIRST, the jobs grouped by MEDIA, each
+  media classified cached / HELD / to upload, then each job's words cut out
+  of its media's one transcript. `Report` is what the `Outcome` has no room
+  for (`uploaded`, `cached`, `janitorDeleted`, `janitorFailed`, `held`);
+  `truncations` is always empty. One media's failure is one media's problem
+  and the run carries on, with exactly two exceptions: a CANCEL and a
+  REFUSED KEY. `+Media` holds `retryDeletes` and `fetch` — the ten-hour
+  refusal BEFORE the extract, the `defer` that removes the temporary audio on
+  every exit, the cache file written before its marker, and the DELETE last
+  with its answer recorded. Spec §11's R6-11: a media in this run's
+  `janitorFailed` is never fetched, since its cache file is the one record of
+  the id still owed a delete.
+- `CloudProgress.swift` — the cloud run's one number and the words beside it,
+  PURE: a share per media TO UPLOAD (cached and held media have none), the
+  four phases at 0.25 / 0.65 / 0.95, the wait advancing on the clock against
+  q8's 147× and holding, and the four detail lines. The run publishes
+  `max(previous, computed)`.
 - `AssemblyAITranscript.swift` — the wire VALUES: `TranscriptOptions`,
   `TranscriptRequest` (whose `encode` is the whole wire body — `language_code`
   absent for auto, `keyterms_prompt` absent when empty), `TranscriptWord`,
@@ -349,7 +365,8 @@ free.
   survive that. Both `File` inits throw on a `words` that is not an array, so
   `read` answers nil and `isCurrent` false rather than caching zero words.
   THE MAPPING is here: a word is a clip's when `in ≤ start × 600 <
-  in + duration × speed`, landing at `start + (m − in) / speed`, clamped.
+  in + duration × speed`, landing at `start + (m − in) / speed`, clamped
+  through `Transcriber.placed` (R6-10).
   `Loader` is `MediaPeaks.Loader`'s shape; `undeleted(in:)` is the janitor's.
 - `Transcriber.swift` (+`Languages`, +`Extract`, +`Jobs`) ·
   `TranscribeSheetController.swift` (+`Commit`: the run's one exit, and the
@@ -360,10 +377,16 @@ free.
   not the media's track. One job's failure is reported under `problems` and
   the run carries on. The SHEET is the only caller of `requestAuthorization`;
   the tool refuses by status. The tool's refusal ORDER is the caller's own
-  mistakes first, the grant second, the model third, so a headless proof can
-  measure the first tier. `Job` carries `media` for the cloud engine, which
-  uploads a MEDIA once; `CancelToken` holds a `URLSessionTask` beside the
-  speech task, under the same lock and cancelled outside it. `+Extract` is no
+  mistakes first, then the ENGINE, then — under `apple` — the grant and the
+  model, so a headless proof can measure the first tier. `Job` carries
+  `media` for the cloud engine, which uploads a MEDIA once; `CancelToken`
+  holds a `URLSessionTask` beside the speech task, under the same lock and
+  cancelled outside it. `+Jobs` is no longer a pure move: it owns
+  `maxSourceTicks` (1e15) and `placed(offset:in:)`, the ONE door both caption
+  mappings convert through, because spec §11's R6-10 says a hand-written
+  `speed` the ops cannot write reaches the app and every `Double → Ticks`
+  there has to clamp IN `Double` first — the offset at one end, the source
+  length and `Job.sourceIn` at the other. `+Extract` is no
   longer only the on-device extractor: `extractAudio(url:name:range:to:)` is
   the general form, `wholeAsset` is what a cloud run asks for,
   `writeFLAC(fromWAV:to:)` is the 16 kHz mono 16-bit FLAC through
@@ -459,8 +482,13 @@ free.
 **The agent.**
 - `AgentServer.swift` (frozen) and `AgentServer+Project` / `Clips` / `Tracks`
   / `Media` / `Render` / `History` / `Silence` / `Captions` / `Audio` /
-  `Background` / `Scope` / `Transitions` / `Recording` (+`RecordingArguments`,
-  +`RecordingResult`) — the handlers, one file per group. `AgentCatalog.swift`
+  `Background` / `Scope` / `Transitions` / `CloudCaptions` / `Recording`
+  (+`RecordingArguments`, +`RecordingResult`) — the handlers, one file per
+  group. `+CloudCaptions` is `transcribe`'s CLOUD arm alone — the `engine`
+  reader, the three cloud-only arguments refused by name under `apple`, the
+  vocabulary's trim/de-dup/cap, the credential and the endpoint read ABOVE
+  the network, and the result keys; `+Captions` dispatches on `engine` and is
+  otherwise the code it was. `AgentCatalog.swift`
   (+`Clips`, +`Audio`, +`Transitions`, +`Files`, +`Captions`, +`Declarations`)
   — the catalog, spliced in ORDER (`recording_probe.py` reads the last eleven
   names). **A tool is built one of two ways**: `tool`, which declares its own

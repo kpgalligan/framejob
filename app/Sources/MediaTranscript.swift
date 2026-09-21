@@ -315,7 +315,6 @@ enum MediaTranscript {
     /// word's START, so half a word does not appear at a cut.
     static func words(for job: Transcriber.Job, in file: File) -> [CaptionCues.Word] {
         let windowEnd = job.sourceIn + job.sourceLength
-        let limit = job.start + job.duration
         var out: [CaptionCues.Word] = []
         for word in file.words {
             let startTicks = Ticks(word.start) * 600
@@ -324,8 +323,8 @@ enum MediaTranscript {
             out.append(
                 CaptionCues.Word(
                     text: word.text,
-                    start: project(startTicks, in: job, limit: limit),
-                    end: project(endTicks, in: job, limit: limit),
+                    start: project(startTicks, in: job),
+                    end: project(endTicks, in: job),
                     speaker: word.speaker))
         }
         return out
@@ -336,13 +335,18 @@ enum MediaTranscript {
     /// inside the clip, so the word is the clip's, but the rest is played by
     /// whatever comes next and a cue past its own clip would be a caption
     /// over somebody else's picture.
-    private static func project(_ source: Ticks, in job: Transcriber.Job, limit: Ticks) -> Ticks {
+    ///
+    /// The clamp itself is `Transcriber.placed`'s, which is the one door
+    /// both mappings convert through (R6-10): a FINITE but tiny `speed` —
+    /// which the ops cannot write and a hand-edited `project.json` can —
+    /// divides into an offset larger than `Ticks` holds, and the bound has
+    /// to be applied in `Double` before the conversion rather than after it.
+    private static func project(_ source: Ticks, in job: Transcriber.Job) -> Ticks {
         // A degenerate `speed` — 0, negative, NaN or infinite — would make
         // `Ticks(_:)` trap; `Transcriber.project` guards it the same way.
         let speed = job.speed.isFinite && job.speed > 0 ? job.speed : 1
         let offset = Double(source - job.sourceIn) / speed
-        let placed = job.start + Ticks(offset.rounded(.toNearestOrAwayFromZero))
-        return min(max(placed, job.start), limit)
+        return Transcriber.placed(offset: offset, in: job)
     }
 
     // MARK: - Reading one per media

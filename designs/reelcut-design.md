@@ -2434,20 +2434,37 @@ judged by level either — though the mix's own gain floor can still make it
 quiet, which is why the note beside `pending_peaks` promises nothing about a
 media this answer already proposes a span inside — and is folded with the
 waveform waiters into `pending_peaks`,
-`transcribe {clips?, language?, place?}` and
-`export_captions {track?, path, format?}` (road map 2's phase 4 — the
-mirrors of File ▸ Generate Captions… and File ▸ Export Captions…).
+`transcribe {clips?, language?, place?, engine?, speakers?, vocabulary?,
+refresh?}` and `export_captions {track?, path, format?}` (road map 2's
+phase 4 — the mirrors of File ▸ Generate Captions… and File ▸ Export
+Captions… — with `transcribe`'s four last arguments road map 6's C1).
 `transcribe` returns the cues in TICKS whether or not it placed them —
 `place: false` is a read, like `detect_silence`, and registers no undo
 step — and reports every named clip it could not read under `skipped`.
-Two refusals are unlike anything else in the catalog. macOS gates speech
-recognition, and this tool never asks: it REFUSES with the authorization
-status named, because the system prompt needs a frontmost app and an
-agent-driven one never is (`target`'s own fact, read across), so the grant
-has to have been given once from the sheet. And its work can stop short of
-the answer rather than fail: a run cut off by the framework's one-minute
+It has TWO engines. `engine: "apple"` is the default and is the on-device
+recogniser; `engine: "assemblyai"` uploads the WHOLE audio of every media
+file behind the named clips to AssemblyAI, and `speakers`, `vocabulary` and
+`refresh` apply only to it — each refused BY NAME under `apple`, because an
+argument that cannot do anything is a mistake and not a no-op. The default
+is never what the sheet last chose (§11's R6-2). The refusal ORDER is the
+caller's own mistakes first — an unknown clip, an empty scope, a misspelt
+`engine` with both spellings named, a cloud-only argument under `apple` —
+then the credential, then a media over AssemblyAI's ten-hour limit, and only
+then the network. The cloud result gains `engine`, `uploaded` and `cached`
+(media ids), `audio_seconds` (what was billed), `speech_model_used`,
+`language_detected` with its confidence, and `note` when there is something
+to say — a vocabulary that was capped, R6-8's fallback, or a remote delete
+still owed. Two refusals are unlike anything else in the catalog. macOS gates
+speech recognition, and the on-device engine never asks: it REFUSES with the
+authorization status named, because the system prompt needs a frontmost app
+and an agent-driven one never is (`target`'s own fact, read across), so the
+grant has to have been given once from the sheet. And its work can stop short
+of the answer rather than fail: a run cut off by the framework's one-minute
 ceiling reports `truncated` with the second it stopped at, instead of
-presenting a partial transcript as the whole of what was said. `export_captions` never guesses its track: with no all-text track,
+presenting a partial transcript as the whole of what was said. `truncated` is
+NEVER present for the cloud engine — there is no such ceiling on the other
+side of a REST call, and its absence is a claim
+`tools/proof/cloud_captions_proof.py` makes. `export_captions` never guesses its track: with no all-text track,
 or more than one, it refuses and lists the candidates by id and name — the
 posture `remove_media` and `export` already take when an answer is not
 unique — and it edits nothing, so it registers no undo step either.
@@ -3336,3 +3353,48 @@ assisted import.
   would send that key to a stand-in server that writes every header to
   disk, and road map 6 §5i·1's "key unset → refused by name" row could
   not pass at all.
+- **R6-10 — The caption path clamps a clip's `speed` at BOTH ends, because
+  the reader does not.** A clip's `speed` is bounded to 0.1–10 by the OPS
+  and by nothing else: `core/src/edit_clip.rs`'s `SPEED_MIN`/`SPEED_MAX`
+  make `set_speed` clamp and `rate_stretch` an identity outside the range,
+  while `Project::validate` (`core/src/model_query.rs:189`) checks a clip's
+  duration and its start and never its speed. So a hand-written
+  `project.json` reaches the app with any finite positive speed, TINY OR
+  HUGE, and both ends of the caption arithmetic have to survive it. Every
+  `Double → Ticks` conversion on that path therefore clamps IN `Double`
+  first: a tiny speed blows up the OFFSET, which `Transcriber.placed`
+  bounds into `[0, duration]` before converting (the two mappings,
+  `MediaTranscript.project` and `Transcriber.project`, both end there); a
+  huge one blows up the SOURCE LENGTH, which `Transcriber.contentLength`
+  bounds to `Transcriber.maxSourceTicks` = 1e15 — deliberately NOT the
+  core's `i64::MAX`, because Swift SUMS this number where the core does
+  not: `MediaTranscript.swift:317` adds it to `sourceIn` for the window's
+  end and `TranscribeSheetController.swift:264` sums it over at most
+  `MAX_CLIPS` = 4096 jobs, and 4096 × 1e15 is comfortably under 2^63.
+  `Transcriber.jobs` bounds every `Job.sourceIn` the same way so the window
+  end cannot overflow either. One consequence is SHARED with the on-device
+  engine and MEASURED by no row: `contentLength` used to fall back to the
+  clip's duration when `duration × speed` overflowed to `+infinity`, and now
+  answers the 1e15 bound, so such a clip's on-device EXTRACT range is built
+  from the bound rather than from the duration (c1-run's review, a nit; every
+  speed the ops can write is unchanged, `source_mirror_probe.py` 40/40).
+  DECLINED: bounding `speed` in `Project::validate`. The core stays untouched by this feature, and a
+  reader that began refusing files it has always accepted would be a
+  format change dressed as a fix.
+- **R6-11 — A media whose remote delete this run could not confirm is not
+  uploaded again in this run.** `cache/transcripts/<id>.json` is the ONLY
+  record of a remote transcript's id — `MediaTranscript.undeleted`
+  (`:270`) reads it and nothing else holds it — and a fetch REPLACES that
+  file. So if the janitor's retry failed for a media and the run then
+  re-fetched it, the id it could not delete would be overwritten and the
+  transcript orphaned at AssemblyAI for ever, with the run's own note
+  ("the next run retries it") made false by the same run that printed it.
+  The rule: a media in this run's `janitorFailed` is HELD — not fetched,
+  not under `refresh`, not with a stale stamp. Its clips are reported, one
+  `Problem` each, its cache file is left byte for byte, and the hold
+  releases in the first run whose janitor confirms the delete. A CURRENT
+  cache without `refresh` is still served, because that path reads the
+  file and never writes it. DECLINED: serving the old words under
+  `refresh` — a caller who asked for a re-upload is told it did not happen
+  rather than handed a cached answer — and a second persisted file listing
+  orphaned ids, which is a new persisted shape for one case.

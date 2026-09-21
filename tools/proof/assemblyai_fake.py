@@ -47,6 +47,9 @@ the counters):
     polls_before_complete        how many GETs answer `processing` first
     never_complete               every GET answers `processing`
     transcript_error             a string: the transcript ends in `error`
+    transcript_error_first       with `transcript_error` set, only the first
+                                 N SUBMITTED transcripts end in `error`;
+                                 absent is all of them
     fail                         [{route, status, times}] — times -1 is always
     slow_upload                  {chunk, delay_ms} — the body read in pieces
     redirect_next                a Location for the next request, once
@@ -140,6 +143,11 @@ class Scenario:
         self.polls_before_complete = int(given.get("polls_before_complete", 0))
         self.never_complete = bool(given.get("never_complete", False))
         self.transcript_error = given.get("transcript_error")
+        # How many of the SUBMITTED transcripts the error applies to, in
+        # submission order. None is all of them, which is what this scenario
+        # has always meant; a number is what lets ONE media of a run fail
+        # while the others succeed, which is 5i·6's claim.
+        self.transcript_error_first = given.get("transcript_error_first")
         self.fail = [dict(row) for row in given.get("fail", [])]
         self.slow_upload = given.get("slow_upload")
         self.redirect_next = given.get("redirect_next")
@@ -417,6 +425,8 @@ def make_handler(fake):
                 "id": tid,
                 "audio_url": request.get("audio_url"),
                 "request": request,
+                # Submission order, 0-based, for `transcript_error_first`.
+                "index": len(fake.transcripts),
                 "polls": 0,
                 # q1: `audio_duration` rounds UP.
                 "audio_duration": int(math.ceil(seconds)),
@@ -428,7 +438,9 @@ def make_handler(fake):
                 return self._bytes(200, fake.deleted_bytes(tid))
             fake.transcripts[tid]["polls"] += 1
             if fake.scenario.transcript_error:
-                return self._json(200, fake.body(tid, "error"))
+                first = fake.scenario.transcript_error_first
+                if first is None or fake.transcripts[tid]["index"] < int(first):
+                    return self._json(200, fake.body(tid, "error"))
             if fake.scenario.never_complete:
                 return self._json(200, fake.body(tid, "processing"))
             if fake.transcripts[tid]["polls"] <= fake.scenario.polls_before_complete:

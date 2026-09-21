@@ -73,24 +73,44 @@ extension AgentServer {
             // these two are the app-state tools of spec §7.9 that make and
             // write captions rather than reading a file into the project.
 
+            // It mirrors File ▸ Generate Captions… — the sheet's clip scope,
+            // its language popup and its progress bar are these arguments,
+            // this result and nothing else. The sheet's ENGINE popup and its
+            // three cloud rows are c1-chrome's work and are not there yet:
+            // until they land, `engine: "assemblyai"` is reachable from here
+            // and from nowhere in the UI, and the menu item behaves exactly
+            // as it always has.
             tool(
                 "transcribe",
-                "Transcribes clips with ON-DEVICE speech recognition and lays the result out as "
-                    + "TEXT CLIPS, one per cue, on a new track of its own — File ▸ Generate "
-                    + "Captions…. They are ordinary text clips in the Caption preset, exactly "
-                    + "what import_captions makes, so they render in the preview, in "
-                    + "render_frame and in an export (burn-in) and can be retimed with "
-                    + "move_clip or restyled with set_text. Cues are at most two lines of 42 "
-                    + "characters and at most 6 s, with a frame between them. THE GRANT: macOS "
-                    + "gates speech recognition, and this tool never asks for it — the system "
-                    + "prompt needs the app to be frontmost and an agent-driven app never is, "
-                    + "so without the grant the call is refused with the authorization status "
-                    + "named and nothing is changed; somebody has to run File ▸ Generate "
-                    + "Captions… once from the app. Recognition also stops after about a "
-                    + "minute per clip: when it does, the result says so under truncated with "
-                    + "the time it stopped at, rather than ending quietly. The result carries "
-                    + "the cues themselves in TICKS whether or not they were placed, and "
-                    + "reports under skipped every clip you named that cannot be transcribed.",
+                "Transcribes clips and lays the result out as TEXT CLIPS, one per cue, on a new "
+                    + "track of its own — File ▸ Generate Captions…. They are ordinary text "
+                    + "clips in the Caption preset, exactly what import_captions makes, so they "
+                    + "render in the preview, in render_frame and in an export (burn-in) and "
+                    + "can be retimed with move_clip or restyled with set_text. Cues are at "
+                    + "most two lines of 42 characters and at most 6 s, with a frame between "
+                    + "them. The result carries the cues themselves in TICKS whether or not "
+                    + "they were placed, names the engine that ran, and reports under skipped "
+                    + "every clip you named that cannot be transcribed. "
+                    + "ENGINE \"apple\" (the default) is ON-DEVICE speech recognition and "
+                    + "nothing leaves this Mac. THE GRANT: macOS gates it, and this tool never "
+                    + "asks — the system prompt needs the app to be frontmost and an "
+                    + "agent-driven app never is, so without the grant the call is refused with "
+                    + "the authorization status named and nothing is changed; somebody has to "
+                    + "run File ▸ Generate Captions… once from the app. Recognition also stops "
+                    + "after about a minute per clip: when it does, the result says so under "
+                    + "truncated with the time it stopped at, rather than ending quietly. "
+                    + "ENGINE \"assemblyai\" sends the audio of every media file behind the "
+                    + "clips you named — the WHOLE file, not just the parts in use — to "
+                    + "AssemblyAI, a cloud service that transcribes it and is billed for it, "
+                    + "and the transcript is deleted from AssemblyAI once the words have been "
+                    + "read back; do not choose it for somebody else's recording without their "
+                    + "say-so. It needs an API key (Reelcut ▸ Settings ▸ Transcription, or "
+                    + "RC_ASSEMBLYAI_KEY) and no grant at all, has no one-minute ceiling — "
+                    + "truncated is never present — and caches one transcript per media file "
+                    + "inside the project package, so a second run over the same files makes no "
+                    + "request and reports them under cached. It adds uploaded, cached, "
+                    + "audio_seconds (what was billed), speech_model_used, language_detected "
+                    + "and, when there is something to say, note.",
                 [
                     "clips": [
                         "type": "array", "items": ["type": "integer"], "minItems": 1,
@@ -100,11 +120,18 @@ extension AgentServer {
                             + "one played in REVERSE, whose words would come out backwards; a "
                             + "clip you name that cannot be is reported under skipped.",
                     ],
+                    "engine": [
+                        "type": "string", "enum": ["apple", "assemblyai"],
+                        "description": "Where the recognition happens: apple (default) on this "
+                            + "Mac, assemblyai in the cloud. Anything else is refused with both "
+                            + "spellings named. The default is NEVER what the sheet last chose "
+                            + "— an agent that wants the cloud says so every time.",
+                    ],
                     "language": [
                         "type": "string",
-                        "description": "A language tag, e.g. en-US. Default: this Mac's own "
-                            + "language. The two ways a tag can be wrong are two different "
-                            + "problems with two different fixes, so they are refused "
+                        "description": "A language tag, e.g. en-US. WITH apple: this Mac's own "
+                            + "language by default. The two ways a tag can be wrong are two "
+                            + "different problems with two different fixes, so they are refused "
                             + "SEPARATELY and the message says which you have. A tag speech "
                             + "recognition has never heard of is a misspelling: it is refused "
                             + "with the tags it does know, and answered before the grant is "
@@ -113,7 +140,11 @@ extension AgentServer {
                             + "MODEL for is a download instead: that refusal names System "
                             + "Settings ▸ Keyboard ▸ Dictation and lists the languages ready "
                             + "here, and it comes after the grant, because an ungranted Mac "
-                            + "cannot be asked which models it has.",
+                            + "cannot be asked which models it has. WITH assemblyai: \"auto\" "
+                            + "(the default) detects it and the result reports what was "
+                            + "detected and how sure it was; a code is passed through "
+                            + "unchecked, and one AssemblyAI does not support comes back as its "
+                            + "own sentence after the upload.",
                     ],
                     "place": [
                         "type": "boolean",
@@ -121,6 +152,25 @@ extension AgentServer {
                             + "undo step. false returns the cues and changes nothing at all — "
                             + "no edit, no undo step — which is the way to check a transcript "
                             + "before committing to it.",
+                    ],
+                    "refresh": [
+                        "type": "boolean",
+                        "description": "engine \"assemblyai\" only. Ignore the cached "
+                            + "transcript and upload again (default false). Refused by name "
+                            + "with engine \"apple\", which has no cache.",
+                    ],
+                    "speakers": [
+                        "type": "boolean",
+                        "description": "engine \"assemblyai\" only. Ask for speaker labels "
+                            + "(default false); a change of speaker then starts a new cue. "
+                            + "Refused by name with engine \"apple\".",
+                    ],
+                    "vocabulary": [
+                        "type": "array", "items": ["type": "string"],
+                        "description": "engine \"assemblyai\" only. Words and phrases to expect "
+                            + "— product names, people, identifiers. Trimmed, de-duplicated "
+                            + "keeping the first spelling, and capped at 1000 terms with the "
+                            + "cap named in note. Refused by name with engine \"apple\".",
                     ],
                 ]),
             tool(

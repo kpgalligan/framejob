@@ -8,12 +8,56 @@ import Foundation
 /// source window is measured for them, and `hasTranscribableClip(in:)`, the
 /// cheap question the menu's validator asks.
 ///
-/// A pure move out of `Transcriber.swift`, road map 6's C1 toll 1. The block
-/// came here whole and in its own order, with every line byte-identical.
-/// One widening: `contentLength(of:)` is internal rather than `private`
-/// (road map 6 §5h names it), which no compiler error demanded — its one
-/// caller, `jobs`, moved with it.
+/// It arrived as a pure move out of `Transcriber.swift` (road map 6's C1
+/// toll 1), and it is no longer one: c1-run added `maxSourceTicks`, the
+/// bound on `Job.sourceIn`, the clamp inside `contentLength(of:)` and
+/// `placed(offset:in:)`, the one door every `Double → Ticks` conversion on
+/// the caption path goes through. One widening survives from the move:
+/// `contentLength(of:)` is internal rather than `private` (road map 6 §5h
+/// names it), which no compiler error demanded — its one caller, `jobs`,
+/// moved with it.
+///
+/// **Why anything here is bounded at all — spec §11's R6-10.** A clip's
+/// `speed` is bounded to 0.1–10 by the OPS (`core/src/edit_clip.rs`'s
+/// `SPEED_MIN`/`SPEED_MAX`: `set_speed` clamps, `rate_stretch` is an
+/// identity outside) and NOT by the reader — `Project::validate`
+/// (`core/src/model_query.rs:189`) checks a clip's duration and its start
+/// and never its speed — so a hand-written `project.json` reaches this code
+/// with any finite positive speed, tiny or huge, and the two ends of the
+/// arithmetic fail in two different places: a huge speed overflows the
+/// SOURCE LENGTH here, and a tiny one overflows the OFFSET in the two
+/// mappings. Both clamp in `Double`, before the conversion, because a
+/// `Ticks(_:)` on an out-of-range `Double` traps.
 extension Transcriber {
+
+    /// The ceiling on any source time this file answers: 1e15 ticks, about
+    /// 1.9 billion seconds, some fifty years of media.
+    ///
+    /// Deliberately NOT `Ticks.max`, which is what the core's own
+    /// `content_length_in_source` saturates at (`core/src/source_window.rs`
+    /// casts an `f64` and an out-of-range cast saturates in Rust rather than
+    /// trapping). The core never ADDS that number to anything; Swift does.
+    /// `MediaTranscript.words` adds it to `sourceIn` for the window's end,
+    /// and `TranscribeSheetController.refresh` sums it over every job, at
+    /// most `MAX_CLIPS` = 4096 of them — and 4096 × 1e15 is under 2^63 with
+    /// three orders of magnitude to spare, where 4096 × `Ticks.max` is not.
+    static let maxSourceTicks: Ticks = 1_000_000_000_000_000
+
+    /// One offset in ticks, as a `Double`, landed in the clip — the ONE
+    /// door both caption mappings convert through.
+    ///
+    /// The clamp is into `[0, duration]` and it happens in `Double`: an
+    /// offset divided by a speed of 1e-300 is a finite `Double` far larger
+    /// than `Ticks.max`, and `Ticks(_:)` on it traps rather than saturating.
+    /// Rounded half away from zero, the rule both mappings had. NaN — which
+    /// is what `0 / 0` answers when a word sits exactly on a zero-speed
+    /// clip's `in` point — is 0, the clip's own start: the beginning of the
+    /// clip is the one answer that is always inside it.
+    static func placed(offset: Double, in job: Job) -> Ticks {
+        guard !offset.isNaN else { return job.start }
+        let bounded = min(max(offset, 0), Double(job.duration))
+        return job.start + Ticks(bounded.rounded(.toNearestOrAwayFromZero))
+    }
 
     // MARK: - What can be transcribed
 
@@ -77,20 +121,37 @@ extension Transcriber {
             jobs.append(
                 Job(
                     clip: clip.id, media: media, name: snapshot.name(of: clip), source: url,
-                    sourceIn: max(0, sourceIn), sourceLength: contentLength(of: clip),
+                    sourceIn: min(max(0, sourceIn), maxSourceTicks),
+                    sourceLength: contentLength(of: clip),
                     start: clip.start, duration: clip.duration, speed: clip.speed))
         }
         return (jobs, problems)
     }
 
     /// How much SOURCE time a clip plays — `Project::content_length_in_source`
-    /// (`core/src/source_window.rs`) in Swift, saturating the same way, because
-    /// the extract's range is a source range and the core owns what that
-    /// means.
+    /// (`core/src/source_window.rs`) in Swift, because the extract's range is
+    /// a source range and the core owns what that means.
+    ///
+    /// It does NOT saturate where the core saturates. The core's cast tops
+    /// out at `i64::MAX`; this one tops out at `maxSourceTicks`, for the
+    /// reason that constant's own doc gives — Swift sums this answer and the
+    /// core does not. Every speed the ops can write (0.1–10) is orders of
+    /// magnitude below the bound and answers exactly what it always did;
+    /// R6-10 is about the speeds only a hand-written file can carry. The
+    /// clamp is applied in `Double`: `Ticks(_:)` traps on an out-of-range
+    /// one. The degenerate fallback is unchanged and is bounded too, since a
+    /// hand-written `duration` can be as large as `Ticks` allows.
+    ///
+    /// A product that overflows to `+infinity` — which `duration × 1e308`
+    /// does — is the bound and not the fallback: the honest answer to "how
+    /// much source does this play" is "more than there can be", which is
+    /// `maxSourceTicks`, where the clip's own duration would be a number
+    /// pulled out of the air. `NaN`, a negative and `-infinity` all fail the
+    /// `>= 1` test and take the fallback, as they always did.
     static func contentLength(of clip: ClipSnapshot) -> Ticks {
         let scaled = Double(clip.duration) * clip.speed
-        guard scaled.isFinite, scaled >= 1 else { return max(clip.duration, 1) }
-        return Ticks(scaled.rounded())
+        guard scaled >= 1 else { return min(max(clip.duration, 1), maxSourceTicks) }
+        return Ticks(min(scaled, Double(maxSourceTicks)).rounded())
     }
 
     /// Whether anything in this project could be transcribed at all — the

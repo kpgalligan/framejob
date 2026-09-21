@@ -446,13 +446,12 @@ final class Transcriber {
     ///
     /// The whole of the mapping, and it is this short only because the
     /// extract begins at the clip's `in` point: `clip.start + ticks(t) / speed`,
-    /// with no source-window term left. Clamped into the clip, since a
-    /// recogniser may hand back a word whose duration runs past the audio it
-    /// was given.
+    /// with no source-window term left. Clamped into the clip through
+    /// `placed` — the one door both caption mappings convert through, and
+    /// the place R6-10's bound on a hand-written `speed` is applied.
     static func project(_ t: Double, in job: Job) -> Ticks {
         let speed = job.speed.isFinite && job.speed > 0 ? job.speed : 1
-        let offset = ReelTime.ticks(seconds: max(0, t) / speed)
-        return min(job.start + max(0, offset), job.start + job.duration)
+        return placed(offset: max(0, t) / speed * Double(ReelTime.perSecond), in: job)
     }
 
     // MARK: - Recognition
