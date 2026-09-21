@@ -3253,3 +3253,64 @@ assisted import.
   neighbour in the core (a speed change opens or leaves a gap, §6), and
   fixing the one-tick offset. No persisted field changes, no op-table change
   and no new export, so `RC_FORMAT_VERSION` stays 8.
+- **R6-1 — The cloud engine is a second engine behind the same command,
+  never a second command.** File ▸ Generate Captions… and `transcribe`
+  are the one way captions are made from speech; the engine is a popup
+  and an argument. A caption is an ordinary text clip whichever engine
+  made it, laid out by the same `CaptionLayout.place`.
+- **R6-2 — Audio leaves the machine only by name, with the price in
+  front of the person.** The on-device engine stays the default for the
+  sheet's first open and for every `transcribe` call that does not name
+  `engine`. With AssemblyAI chosen, the sheet states — before the button
+  is enabled — which files will be uploaded, their total duration, the
+  destination and its region, the published rate and the estimate, and
+  that the upload is deleted from AssemblyAI once read back. There is no
+  background transcription, no transcription at import, and
+  `MediaImporter.generateCaches` never touches the network: a cache pass
+  that costs money and needs consent is not a cache pass.
+- **R6-3 — The transcript is a per-media asset in the package.** One
+  upload per media file, the provider's words stored VERBATIM (their
+  milliseconds, confidence and speaker) with what was requested and what
+  ran, under `cache/transcripts/`, stamped and marked on §5.6's terms so
+  a relink or a changed file re-transcribes and nothing else does. Every
+  clip's cues are derived from it at run time. It is the reversed
+  render's kind of cache — regenerable at a cost — and it travels with the
+  package for the same reason.
+- **R6-4 — What was uploaded is deleted by us, immediately, and the fact
+  is recorded.** `DELETE /v2/transcript/{id}` follows the fetch in the
+  same run; the cache file records whether it succeeded, and a run's first
+  act is to retry every recorded failure. AssemblyAI's own upload
+  retention (≤ 48 h) is the backstop, never the plan; its transcript
+  retention (indefinite) is why the delete is not optional.
+- **R6-5 — The app never holds an AssemblyAI key of Reelcut's.** The
+  credential is the person's own, in a `0600` file of their own under
+  `~/Library/Application Support/Reelcut/`, or a relay's token (road map
+  6's C2). It is never an argument of `transcribe` — an argument is written
+  into every agent transcript and every log — and never a launch argument,
+  which `ps` shows to every user. `RC_ASSEMBLYAI_KEY` in the environment is
+  the one override, for proofs, and it is read only when the store has
+  nothing. The file rather than the Keychain because C0's q7 measured what
+  an ad-hoc signature does to a login-keychain item: the next `make app`
+  cannot read it without a modal and cannot delete it at all
+  (`designs/reelcut-roadmap-6.md` §3 q7, §5d). A build signed with a stable
+  identity could keep it in the Keychain, and `SecretStore` is the protocol
+  that lets that be a later conformer.
+- **R6-6 — The protocol boundary is the base URL and the credential.** The
+  client speaks AssemblyAI's REST API to `AssemblyAIConfiguration`'s base
+  URL; the stand-in server, the EU endpoint and a same-protocol relay are
+  configurations. A relay that must own the bytes (the bucket shape, road
+  map 6 §6d) is one more `TranscriptTransport` conformer and nothing above
+  it changes.
+- **R6-7 — No `async` exception.** `URLSession` has a completion-handler
+  and delegate form for every call this needs, `Transcriber`'s two-queue
+  shape (a serial `work` queue and a private delivery queue the framework
+  is told to call back on) carries over unchanged, and the run's body
+  stays synchronous so the sheet and the off-main tool both wait the way
+  they do today.
+- **R6-8 — A fallback to Universal-2 is allowed and REPORTED.** The
+  request names both models in AssemblyAI's documented order so a
+  language Universal-3.5 Pro does not speak still gets a transcript; the
+  cache and the result carry `speech_model_used`, and the sheet's report
+  and the tool's `note` say so when it was not the model the person
+  chose. A silent downgrade would be a wrong answer presented as the
+  right one; a refusal would be no answer at all.
