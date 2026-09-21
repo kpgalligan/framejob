@@ -549,7 +549,11 @@ handoff directory and every session transcript found it in no file.
   same run; the cache file records whether it succeeded, and a run's first
   act is to retry every recorded failure. AssemblyAI's own upload
   retention (≤ 48 h) is the backstop, never the plan; its transcript
-  retention (indefinite) is why the delete is not optional.
+  retention (indefinite) is why the delete is not optional. A next-run retry
+  is promised only when the transcript's deletion ID was saved in the
+  project. If that write and the remote delete both fail, the report says
+  automatic retry is unavailable and directs the person to delete the
+  transcript in their AssemblyAI dashboard.
 - **R6-5 — The app never holds an AssemblyAI key of Reelcut's.** The
   credential is the person's own, in a `0600` file of their own under
   `~/Library/Application Support/Reelcut/`, or a relay's token (C2). It is
@@ -776,6 +780,14 @@ each wait on a semaphore the delegate signals — `TaskSink.wait`'s shape:
 - `submit(_ params: TranscriptRequest) -> String` — `POST /v2/transcript`
   with `audio_url`, `speech_models`, `language_code` (absent for auto),
   `speaker_labels`, `keyterms_prompt` (absent when empty); answers the id.
+  R6-14 sends this POST once. If its reply is lost, times out, is 5xx or
+  lacks a decodable plain id, `AssemblyAIClient+Submission.swift` looks at
+  `GET /v2/transcript?limit=200` up to three times with a 5-second request
+  timeout and 2.5 seconds between looks. Only one distinct plain id whose
+  `audio_url` equals this upload's encoded URL byte for byte is accepted.
+  A 4xx or redirect on the POST retains its original error. A refused key
+  on recovery, an ambiguous match or exhaustion reports the explicit
+  dashboard warning; no second POST and no guessed DELETE follow.
 - `poll(id:) -> TranscriptResponse` — `GET /v2/transcript/{id}`; up to
   three consecutive 5xx or transport errors are tolerated and logged,
   the fourth fails the media.
@@ -883,6 +895,16 @@ the `work` queue, "Key accepted" or the refusal sentence on main), and
 one paragraph of plain words: what is uploaded, that it is deleted after,
 the rate, and a link to the account page. No key set is not an error
 anywhere in this window; it is a state the sheet names (5e).
+
+**#33's current-answer rule (2026-09-21).** Verify's answer belongs to the
+latest invocation and the effective credential, persisted region and resolved
+base URL captured for it. An older completion cannot change the latest
+request's status or controls. If the owning request's inputs changed while it
+was in flight, its answer is `Settings changed since this check began. Verify
+again.` in ordinary muted text, whether the server accepted or refused the
+old key. Verify is enabled only when an effective credential exists and no
+current request is checking those same inputs. Saving a typed key that equals
+the captured effective key leaves that input current.
 
 ### 5e. The sheet
 
@@ -999,6 +1021,14 @@ in it.** Built. The sentences, as they landed, each pinned by a row of
   media <id> with <model>, not universal-3-5-pro.` · `AssemblyAI has not
   confirmed deleting the transcript of media <id>; the next run retries
   it.` (once per media id).
+
+**Revised 2026-09-21 (#29).** A failed DELETE promises a next-run retry
+only when the fetched transcript JSON was saved and therefore retains its
+deletion ID. If the initial write failed too, the optional `note` (or the
+failure message when the run throws) names the media, says Reelcut cannot
+retry automatically, and directs dashboard deletion. A confirmed DELETE
+needs no cleanup note even when the cache write failed. The UI report card
+uses the same per-media rule and retains its held-media explanation.
 
 `language` with the cloud engine: absent or `"auto"` is detection (the
 wire's absent `language_code`); anything else is trimmed and passed through,
@@ -1474,6 +1504,9 @@ proof's claims 2–11 run over both.
 | `retryBackoff` | 1 s | added 2026-09-20 (c1-parts): what an upload retry waits before the second attempt. One second is longer than a dropped socket's own retry and shorter than anything a person would notice on a run that is minutes long |
 | `requestTimeout` | 60 s | added 2026-09-20 (c1-parts): every call's own ceiling, `deleteTimeout`'s 5 s apart. It bounds a request whose socket has gone quiet; the poll LOOP's bound is `pollCeiling`, which is a different thing |
 | `deleteTimeout` | 5 s | the janitor's budget per item; the slowest DELETE C0 TIMED was **1.70 s**, q2's FLAC row, of the eleven `answers.json` holds a time for (24 were made), so 5 s is nearly three times the worst measured |
+| `submitRecoveryAttempts` | 3 | R6-14: bounded looks at the newest account page after an ambiguous single submit; C0 §3 q1 found an exact URL match |
+| `submitRecoveryDelay` | 2.5 s | gap between the looks, allowing short list visibility lag |
+| `submitRecoveryTimeout` | 5 s | each recovery GET's own request ceiling; an outage remains bounded |
 | upload format | **FLAC**, 16 kHz mono 16-bit, the WAV as the fallback | q2 MEASURED zero word-timing delta against the WAV at 48.1% of its bytes, with the service's own run-to-run jitter at zero too; AAC-LC 48 kbps was refused at 38 ms, more than half a frame at 30 fps |
 
 ---
@@ -2629,6 +2662,9 @@ score.** Each is quoted as it printed, against the N it had at the time:
   transcript list is therefore never fetched, by anything, ever.** A submit
   whose id never surfaces closes `unresolved` in the ledger — named for a
   person — rather than being chased. No run has printed such a row.
+  **Superseded for the app by #28 (§10.14):** a run whose own submit reply
+  is ambiguous now makes at most three newest-page looks for its exact
+  uploaded URL. The live ledger described here is unchanged.
 - **The app's `submit` does not retry today** (`AssemblyAIClient.swift:183–
   193`, one `send`); only `upload` does, once, and an upload bills nothing.
   Row 20's submit-count rows therefore guard a REGRESSION and a second
@@ -3673,3 +3709,130 @@ and reproduced none of, including whether `UF_IMMUTABLE` really stops row B's
 second write on this host; and the re-aimed `any-id-on-the-wire` and
 `no-delete` mutants, whose patch texts were counted but which were not re-run
 after re-aiming.
+
+### 10.14 #28 — recover a lost submission reply (2026-09-21)
+
+R6-14 was recorded in spec §11 before the implementation. The decision uses
+C0 §3 q1's measured byte-equal `audio_url` list match and AssemblyAI's
+[list endpoint](https://www.assemblyai.com/docs/pre-recorded-audio/api-reference/transcripts/list),
+which returns newest rows with `id` and `audio_url` and caps a page at 200.
+`submit` moved by itself from `AssemblyAIClient.swift` to
+`AssemblyAIClient+Submission.swift`; that pure move passed `make typecheck`
+with only the existing four AVFoundation deprecation warnings. The client
+now sends one POST and, only when its answer may have been lost or cannot
+yield a plain ID, makes at most three authenticated newest-page GETs. It
+accepts one distinct plain ID at the exact encoded upload URL; refused
+authentication and unresolved ownership carry the dashboard warning.
+`CloudTranscriber` preserves that warning across a cancellation during
+recovery and aborts later media on a refused key. The fake distinguishes
+Verify's `limit=1` from recovery's `limit=200` and can hide transcripts for
+initial list looks. The permanent probe and built-app proof have the
+protocol, cancellation, placement, cache and delete cases; the
+`no-submit-recovery` source-copy mutant is the deletion test.
+
+Verification: `make test` and `make lint` passed; the post-change
+`make typecheck` passed with 0 errors and the four documented warnings.
+The focused normal probe passed **233/233** over `client,cancel,run,verbatim,
+hygiene,submission`; the mutant exited nonzero at **52/94**, with recovery
+assertions failing as intended. After the fake's list counter was made to
+count every request, the `submission` section passed **94/94** again.
+`make app` could not finish because this
+Xcode installation lacks `MetalToolchain` (`CompileMetalFile` could not
+execute `metal`). The required MCP proof command ran against the existing
+05:39 binary and scored **142/144**; its new recovery row failed because
+that binary predates this change, and an existing H fixture copy raced the
+importer's thumbnail write. Its score cannot validate the new app. All
+three owned instance logs had no `Reelcut: ` parity complaint. No live
+AssemblyAI request, commit or issue write was made. Final touched app sizes:
+`AssemblyAIClient.swift` **397**, `AssemblyAIClient+Submission.swift` **73**,
+`CloudTranscriber.swift` **327**, all within their 400-line caps. The
+unrecovered cases remain the explicit bounded limits in spec R6-14 and
+remaining §5; neither a future cleanup nor a deletion is promised for them.
+
+### 10.15 #29 — report an unrecorded deletion honestly (2026-09-21)
+
+`CloudTranscriber.Report.Uploaded` now records whether the fetched transcript's
+initial atomic JSON write succeeded, independently of its marker and remote
+DELETE. The report's pure `deletionWarnings` method gives the UI card and MCP
+success/failure answers one wording and order: a recorded failed DELETE is
+retried at the next run; an unsaved failed DELETE cannot be retried by Reelcut
+and asks for dashboard deletion. A confirmed DELETE produces no cleanup
+warning. The failed MCP answer retains the original error and unchanged
+billing sentence, followed by these warnings. No new request, format field,
+or result key was added.
+
+The source-compiled `cache_write` probe blocked `cache/transcripts` with a
+regular file and scored all four initial-write/DELETE outcomes, the next-run
+janitor with and without a saved ID, a marker-only failure, a zero-word
+throw after billing, and mixed per-media warning order and deduplication.
+The focused normal run, including `run`, `chrome` and #28's `submission`,
+passed **236/236**. The `cache-write-assumed` source-copy mutant compiled
+and scored **15/19**, failing four persistence/warning rows as intended.
+`make test`, `make lint`, and Swift typecheck passed; typecheck had only the
+four established AVFoundation warnings. `git diff --check` passed. Final
+touched app sizes: `CloudTranscriber.swift` **356**, `+Media.swift` **218**,
+`AgentServer+CloudCaptions.swift` **280**, and
+`TranscribeSheetController+Commit.swift` **205**, each under 400 lines.
+
+`make app` was attempted once and failed at `CompileMetalFile` because this
+Xcode lacks `MetalToolchain`. Thus the changed source is proved through the
+whole-source probe, while a fresh app build and built-app MCP proof remain
+owed when the toolchain is available. No old binary was used as proof; no
+live AssemblyAI request, commit or issue write was made.
+
+### 10.16 #33 — keep Verify's answer with its request and inputs (2026-09-21)
+
+The Settings window now captures the effective credential, persisted region
+and resolved base URL for each Verify invocation, and gives that invocation
+a UUID. An older completion cannot clear or answer for a newer request. The
+owning completion compares current inputs before announcing success or
+refusal; changed inputs yield §5d's stale sentence. Field edits, sync,
+reopening, Save, Remove and region changes update Verify availability while
+preserving a pending check when its inputs still match. Saving the same typed
+key remains eligible for the current result. The existing single store
+factory call per sync, fixed-length placeholder, notifications and transport
+interface remain in place. `SettingsWindowController.swift` is **453** lines,
+below its existing-file cap.
+
+The source-compiled `settings_verify` section drove nine scenarios over
+delayed loopback fakes and inspected both controller snapshots and exact
+wire requests. The final `settings_verify,chrome,hygiene` run passed
+**145/145**, with no skip. `verify-ignores-input` compiled and scored
+**38/41**, failing the typed-key, saved-key and region behavioral rows;
+`verify-ignores-owner` compiled and scored **37/41**, failing the same-input
+overlap and both reply-order rows. `make test`, `make lint`, and Swift
+typecheck passed; typecheck printed only the four established AVFoundation
+warnings. The probe's Python compile and `git diff --check` passed. The
+probe uses dummy credentials, isolated defaults suites and memory stores;
+no live AssemblyAI request was made.
+
+`make app` was attempted once and failed at `CompileMetalFile` because this
+Xcode installation lacks `MetalToolchain`. A fresh built app and MCP proof
+remain owed when that toolchain is available; the source-compiled probe is
+the measured verification for this Settings behavior. No old binary was
+substituted, and nothing was committed or written to GitHub.
+
+### 10.17 Final build and built-app verification for #28, #29 and #33 (2026-09-21)
+
+The earlier `make app` failures and #28's stale-binary **142/144** are the
+results those runs actually produced; they are superseded as current
+verification by this later run. `xcodebuild -downloadComponent MetalToolchain`
+completed on this host, then `make app` built the combined current sources
+and ended **BUILD SUCCEEDED**. The fresh app was driven over MCP by
+`cloud_captions_proof.py --port-base 5130` with `RC_ASSEMBLYAI_KEY` unset:
+**158/158** checks passed in 63 seconds. Each of its
+three owned instance logs (`/tmp/reelcut-5130.log` through `-5132.log`)
+existed and had zero `Reelcut: ` startup parity complaints.
+
+For **#28**, the built-app R6-14 immediate and delayed lost-reply rows each
+observed one paid submit, identified only its created transcript, confirmed
+its DELETE, placed captions through MCP, wrote the cache, and served the
+second run from that cache without another transcript request. For **#29**,
+the issue-specific unwritable-cache and deletion-warning matrix remains the
+source-compiled **236/236** proof in §10.15; the fresh built app also passed
+the cloud MCP proof's cache-write, failed-DELETE retry and report/billing
+rows. For **#33**, the issue-specific nine delayed Settings scenarios remain
+the source-compiled **145/145** proof in §10.16; personal Settings are
+intentionally outside MCP, and the fresh build now includes that changed
+controller. The prior owed fresh build and general built-app cloud proof
+are discharged by this run. No live AssemblyAI request was made.

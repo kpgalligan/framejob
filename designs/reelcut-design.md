@@ -1957,7 +1957,7 @@ pass nothing, because each wants the picture rather than a deliverable.
 | `Compositor.swift` | the `AVVideoCompositing` class and its Metal pipeline (§7.5) |
 | `LayerRenderers.swift` · `LayerRenderersText.swift` | text (Core Text) and shape (Core Graphics) descriptions → premultiplied BGRA `MTLTexture`s, LRU-cached by hash; reports measured text sizes to the overlay; draws a shape's `gradient` (format version 6) by CLIPPING to the path and running `CGGradient`, sorting the stops the core deliberately does not police (§5.2). The TEXT half — the layout caches, the attributed string and the three §5.2 reveals drawn over the recipe's `reveal`, so a reveal can never reflow the box — went out to `LayerRenderersText.swift` under the size rule when phase 6 came to add the gradient |
 | `CaptionImporter.swift` · `CaptionLayout.swift` · `Transcriber.swift` (+`Extract` `Jobs` `Languages`) · `CaptionExporter.swift` | captions in both directions: the SubRip grammar; the placement every producer shares (the frame grid, the overlap trim, the Caption preset, the new front-most track); on-device speech recognition and the cue builder over it; the extractor, the job list and the language table BOTH engines share; and the `.srt` / `.vtt` writer |
-| `CloudTranscriber.swift` (+`Media`) · `MediaTranscript.swift` · `CloudProgress.swift` · `CloudEstimate.swift` · `AssemblyAIClient.swift` (+`Session`) · `AssemblyAITranscript.swift` · `AssemblyAIConfiguration.swift` · `AssemblyAILanguages.swift` · `SecretStore.swift` | road map 6's C1, captions from the cloud: the run that groups a scope's clips by MEDIA, uploads each file once, maps the words back through every clip's own window and deletes the transcript at the far end; the per-media cache in the package and its stamp; the one progress number and the words beside it; what a run WOULD cost, before the button; AssemblyAI's five REST calls over one `URLSession` with its retry, its poll ceiling and its cancel token; the wire values; WHERE the client speaks and WHAT it says it is (spec §11's R6-6 and R6-9, the one reader of `-RCAssemblyAIEndpoint`, `-RCSecretFolder` and `RC_ASSEMBLYAI_KEY`); the twenty-one languages the popup offers; and the `0600` key file |
+| `CloudTranscriber.swift` (+`Media`) · `MediaTranscript.swift` · `CloudProgress.swift` · `CloudEstimate.swift` · `AssemblyAIClient.swift` (+`Session`, +`Submission`) · `AssemblyAITranscript.swift` · `AssemblyAIConfiguration.swift` · `AssemblyAILanguages.swift` · `SecretStore.swift` | road map 6's C1, captions from the cloud: the run that groups a scope's clips by MEDIA, uploads each file once, maps the words back through every clip's own window and deletes the transcript at the far end; the per-media cache in the package and its stamp; the one progress number and the words beside it; what a run WOULD cost, before the button; AssemblyAI's REST calls over one `URLSession` with its retry, its poll ceiling and its cancel token, plus R6-14's bounded lost-submit recovery; the wire values; WHERE the client speaks and WHAT it says it is (spec §11's R6-6 and R6-9, the one reader of `-RCAssemblyAIEndpoint`, `-RCSecretFolder` and `RC_ASSEMBLYAI_KEY`); the twenty-one languages the popup offers; and the `0600` key file |
 | `MediaImporter.swift` | `AVURLAsset` probing (the **one** place `async`/`await` is allowed — AVFoundation's loading API is async-only going forward), thumbnails via `AVAssetImageGenerator` — the seconds at or past the video track's end ask for its last frame once and hold it, the strip's half of the rule `CompositionBuilder` applies to the picture — peaks via `AVAssetReader` + vDSP, cache files in the package |
 | `Exporter.swift` | picks the pipeline for the core's settings — `ExportWriter` (`AVAssetReader`/`AVAssetWriter`: chapters, explicit bitrates, the loudness gain) or the ImageIO frame sequence for GIF/APNG — runs the loudness MEASUREMENT pass ahead of the write, reports progress, and renders one frame offline for `render_frame` |
 | `ExporterSettings.swift` | the resolved settings in AVFoundation's vocabulary — the time range, the fallback session preset, the file type, the UTI, the extension, `isAudioOnly` — cut out of `Exporter.swift` under the size rule when phase 7 gave `export` and `renderFrame` a `RecipeOptions` argument; `renderFrame` stayed behind because it is the app's only `copyCGImage` call and the build baseline names that warning by file |
@@ -3321,7 +3321,11 @@ assisted import.
   same run; the cache file records whether it succeeded, and a run's first
   act is to retry every recorded failure. AssemblyAI's own upload
   retention (≤ 48 h) is the backstop, never the plan; its transcript
-  retention (indefinite) is why the delete is not optional.
+  retention (indefinite) is why the delete is not optional. A next-run retry
+  is promised only when the transcript's deletion ID was saved in the
+  project. If that write and the remote delete both fail, the report says
+  automatic retry is unavailable and directs the person to delete the
+  transcript in their AssemblyAI dashboard.
 - **R6-5 — The app never holds an AssemblyAI key of Reelcut's.** The
   credential is the person's own, in a `0600` file of their own under
   `~/Library/Application Support/Reelcut/`, or a relay's token (road map
@@ -3474,3 +3478,18 @@ assisted import.
   not the estimate's, and the report card is where that is reported.
   DECLINED: hiding a held media from the card entirely, which would make a
   file silently not transcribe.
+- **R6-14 — A lost submit reply permits bounded recovery, never another
+  paid submit.** After one ambiguous `POST /v2/transcript`, the cloud run may
+  read the newest account transcript page (`GET /v2/transcript?limit=200`)
+  solely to find its own upload by byte-for-byte `audio_url` equality. Only a
+  unique plain transcript id may proceed to poll, cache and delete. Unrelated
+  rows are never polled, deleted, logged or saved. Three looks, 2.5 seconds
+  apart and each with a 5-second timeout, tolerate short visibility lag;
+  there is no POST retry. Failed or ambiguous recovery answers with an
+  explicit dashboard warning, even if the person cancelled while recovery
+  ran, and makes no claim of deletion or later cleanup. C0 measured an exact
+  list match (road map 6 §3 q1); AssemblyAI's [list endpoint](https://www.assemblyai.com/docs/pre-recorded-audio/api-reference/transcripts/list)
+  caps a page at 200 newest rows. An outage, longer lag, more than 200
+  intervening transcripts or multiple matches can require manual dashboard
+  cleanup. Crash recovery and a durable pending-submission journal are
+  outside this rule.

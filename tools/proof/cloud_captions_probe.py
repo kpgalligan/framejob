@@ -70,6 +70,11 @@ Sections, by the name after `section_`:
   `reelcut-upload-*` a cancelled, a failed and a 401'd run leave behind,
   which is none, with a CONTROL that one was there while the body was in
   flight.
+* `cache_write` (CW) — the fetched transcript's initial JSON write and
+  remote DELETE independently, including an unwritable cache, marker-only
+  failure, next-run janitor, zero-word throw, and production UI/MCP warnings.
+* `settings_verify` — delayed loopback Verify replies against actual Settings
+  actions: unchanged, changed input, removal, region, and overlapping owners.
 
 Host-state inputs: `say` for the fixture, `ffmpeg` for the FLAC decode row's
 second decoder (the row names which decoder answered and `AVAudioFile` always
@@ -81,6 +86,7 @@ this file's own text for a `subprocess` call without `env=`.
 
 import argparse
 import base64
+import contextlib
 import difflib
 import hashlib
 import json
@@ -190,6 +196,8 @@ final class StubProtocol: URLProtocol {
         let status: Int
         let body: Data?
         let transport: Bool
+        let timeout: Bool
+        let noResponse: Bool
     }
 
     static let lock = NSLock()
@@ -211,7 +219,9 @@ final class StubProtocol: URLProtocol {
         let text = row["body"] as? String
         return Step(route: route, status: row["status"] as? Int ?? 200,
                     body: text.map { Data($0.utf8) },
-                    transport: row["transport"] as? Bool ?? false)
+                    transport: row["transport"] as? Bool ?? false,
+                    timeout: row["timeout"] as? Bool ?? false,
+                    noResponse: row["noResponse"] as? Bool ?? false)
     }
 
     static func drain() -> [[String: Any]] {
@@ -226,7 +236,9 @@ final class StubProtocol: URLProtocol {
         if path.hasSuffix("/v2/upload") { return "upload" }
         if method == "DELETE" { return "delete" }
         if method == "POST" { return "submit" }
-        if path.hasSuffix("/v2/transcript") { return "verify" }
+        if path.hasSuffix("/v2/transcript") {
+            return request.url?.query == "limit=200" ? "list" : "verify"
+        }
         return "poll"
     }
 
@@ -238,6 +250,8 @@ final class StubProtocol: URLProtocol {
         StubProtocol.lock.lock()
         StubProtocol.log.append([
             "route": route,
+            "path": request.url?.path ?? "",
+            "query": request.url?.query ?? "",
             "at": Date().timeIntervalSince(StubProtocol.started),
         ])
         var taken: StubProtocol.Step?
@@ -248,13 +262,18 @@ final class StubProtocol: URLProtocol {
         }
         StubProtocol.lock.unlock()
         let step = taken ?? StubProtocol.Step(
-            route: route, status: 500, body: Data(#"{"error":"no step"}"#.utf8), transport: false)
+            route: route, status: 500, body: Data(#"{"error":"no step"}"#.utf8),
+            transport: false, timeout: false, noResponse: false)
         if step.transport {
             client?.urlProtocol(self, didFailWithError: URLError(.networkConnectionLost))
             return
         }
+        if step.timeout {
+            client?.urlProtocol(self, didFailWithError: URLError(.timedOut))
+            return
+        }
         let url = request.url ?? URL(fileURLWithPath: "/")
-        if let response = HTTPURLResponse(
+        if !step.noResponse, let response = HTTPURLResponse(
             url: url, statusCode: step.status, httpVersion: "HTTP/1.1",
             headerFields: step.status >= 300 && step.status < 400 ? ["location": "https://elsewhere.invalid/x"] : nil)
         {
@@ -340,6 +359,12 @@ func makeClient(_ request: [String: Any], stub: Bool) -> AssemblyAIClient? {
             (given["pollFailuresTolerated"] as? NSNumber)?.intValue ?? tuning.pollFailuresTolerated
         tuning.deleteTimeout = (given["deleteTimeout"] as? NSNumber)?.doubleValue ?? tuning.deleteTimeout
         tuning.requestTimeout = (given["requestTimeout"] as? NSNumber)?.doubleValue ?? tuning.requestTimeout
+        tuning.submitRecoveryAttempts =
+            (given["submitRecoveryAttempts"] as? NSNumber)?.intValue ?? tuning.submitRecoveryAttempts
+        tuning.submitRecoveryDelay =
+            (given["submitRecoveryDelay"] as? NSNumber)?.doubleValue ?? tuning.submitRecoveryDelay
+        tuning.submitRecoveryTimeout =
+            (given["submitRecoveryTimeout"] as? NSNumber)?.doubleValue ?? tuning.submitRecoveryTimeout
     }
     return AssemblyAIClient(
         base: url, credential: request["key"] as? String ?? "proof-key", tuning: tuning,
@@ -591,6 +616,24 @@ func modeRun(_ request: [String: Any]) -> [String: Any] {
     // starts. Everything after the janitor checks it; the question is what
     // the janitor itself does with it.
     if request["cancelBeforeRun"] as? Bool == true { token.cancel() }
+    if request["cancelAtRecovery"] as? Bool == true,
+        let base = request["base"] as? String,
+        let logURL = URL(string: base + "/__control/log")
+    {
+        Thread.detachNewThread {
+            for _ in 0..<3000 {
+                if let data = try? Data(contentsOf: logURL),
+                    let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                    let rows = object["requests"] as? [[String: Any]],
+                    rows.contains(where: { ($0["path"] as? String) == "/v2/transcript?limit=200" })
+                {
+                    token.cancel()
+                    return
+                }
+                Thread.sleep(forTimeInterval: 0.01)
+            }
+        }
+    }
     let startedAt = Date()
 
     var published: [[Any]] = []
@@ -619,9 +662,11 @@ func modeRun(_ request: [String: Any]) -> [String: Any] {
     } catch {
         answer["ok"] = false
         for (key, value) in describe(error) { answer[key] = value }
+        answer["cloudFailure"] = AgentServer.cloudFailure(error, report: transcriber.report)
     }
     answer["progress"] = published
     answer["seconds"] = Date().timeIntervalSince(startedAt)
+    answer["cancelled"] = token.isCancelled
     answer["tempDuring"] = during
     answer["tempAfter"] = uploadLeftovers()
     let report = transcriber.report
@@ -630,7 +675,8 @@ func modeRun(_ request: [String: Any]) -> [String: Any] {
             [
                 "media": Int(row.media), "model": row.speechModelUsed ?? "<nil>",
                 "language": row.languageCode ?? "<nil>", "seconds": row.audioSeconds,
-                "format": row.format.rawValue, "remoteDeleted": row.remoteDeleted,
+                "format": row.format.rawValue, "transcriptWritten": row.transcriptWritten,
+                "remoteDeleted": row.remoteDeleted,
             ]
         },
         "cached": report.cached.map { Int($0) },
@@ -638,6 +684,10 @@ func modeRun(_ request: [String: Any]) -> [String: Any] {
         "janitorFailed": report.janitorFailed.map { Int($0) },
         "held": report.held.map { Int($0) },
     ]
+    answer["cloudFields"] = AgentServer.cloudFields(report, code: nil, notes: [])
+    let names = media.mapValues { $0.name }
+    answer["cloudReportLines"] = TranscribeSheetController.cloudReportLines(
+        report, names: names, detected: true)
     return answer
 }
 
@@ -717,7 +767,7 @@ func modeClient(_ request: [String: Any]) -> [String: Any] {
         case "submit":
             let id = try client.submit(
                 TranscriptRequest(
-                    audioURL: URL(fileURLWithPath: "/tmp/x.flac"),
+                    audioURL: URL(string: request["audioURL"] as? String ?? "file:///tmp/x.flac")!,
                     options: makeOptions(request["options"] as? [String: Any])))
             answer["id"] = id
         case "verify":
@@ -749,6 +799,9 @@ func modeClient(_ request: [String: Any]) -> [String: Any] {
         "pollFailuresTolerated": shipped.pollFailuresTolerated,
         "deleteTimeout": shipped.deleteTimeout,
         "requestTimeout": shipped.requestTimeout,
+        "submitRecoveryAttempts": shipped.submitRecoveryAttempts,
+        "submitRecoveryDelay": shipped.submitRecoveryDelay,
+        "submitRecoveryTimeout": shipped.submitRecoveryTimeout,
         "ceilingShort": shipped.pollCeiling(audioSeconds: 10),
         "ceilingHour": shipped.pollCeiling(audioSeconds: 3600),
         "ceilingTenHours": shipped.pollCeiling(audioSeconds: 36000),
@@ -1393,6 +1446,7 @@ func modeChrome(_ request: [String: Any]) -> [String: Any] {
     case "sheet": return chromeSheet(request)
     case "settings": return chromeSettings(request)
     case "verify": return chromeVerify(request)
+    case "verify_state": return chromeVerifyState(request)
     case "report": return chromeReport(request)
     case "progress": return chromeProgress(request)
     case "agreement": return chromeAgreement(request)
@@ -1687,6 +1741,166 @@ func chromeVerify(_ request: [String: Any]) -> [String: Any] {
     ]
 }
 
+/// Delayed, real Verify requests. The only transport controls are the two
+/// argument-domain loopback endpoints; every action is the controller's own.
+func chromeVerifyState(_ request: [String: Any]) -> [String: Any] {
+    defer { dropSuite(request) }
+    let defaults = chromeSuite(request)
+    guard let scenario = request["scenario"] as? String,
+        let firstText = request["firstEndpoint"] as? String,
+        let first = URL(string: firstText),
+        AssemblyAIConfiguration.isLoopback(first.host ?? ""),
+        first.scheme == "http"
+    else { return ["error": "the first Verify endpoint is not loopback"] }
+    let second: URL?
+    if let text = request["secondEndpoint"] as? String {
+        guard let url = URL(string: text),
+            AssemblyAIConfiguration.isLoopback(url.host ?? ""), url.scheme == "http"
+        else { return ["error": "the second Verify endpoint is not loopback"] }
+        second = url
+    } else {
+        second = nil
+    }
+    func endpoint(_ url: URL) {
+        var arguments = defaults.volatileDomain(forName: UserDefaults.argumentDomain)
+        arguments[AssemblyAIConfiguration.endpointArgument] = url.absoluteString
+        defaults.setVolatileDomain(arguments, forName: UserDefaults.argumentDomain)
+    }
+    endpoint(first)
+    guard (try? AssemblyAIConfiguration.baseURL(defaults: defaults)) == first else {
+        return ["error": "the isolated defaults did not resolve the first loopback endpoint"]
+    }
+    let stored = scenario == "save-key" || scenario == "remove-key" || scenario == "region"
+    let initialKey = scenario == "region" || scenario == "newer-first"
+        || scenario == "unchanged-refusal"
+        ? "wrong-key" : "proof-key"
+    let memory = MemoryStore(stored ? initialKey : nil)
+    let controller = SettingsWindowController(
+        store: { memory }, defaults: defaults, environment: [:])
+    let deadline = Date().addingTimeInterval((request["wall"] as? NSNumber)?.doubleValue ?? 12)
+    var snapshots: [[String: Any]] = []
+    func snap(_ stage: String) {
+        snapshots.append([
+            "stage": stage, "status": controller.statusLabel.stringValue,
+            "verifyEnabled": controller.verifyButton.isEnabled,
+        ])
+    }
+    func requests(_ url: URL) -> Int? {
+        guard let data = try? Data(contentsOf: url.appendingPathComponent("__control/log")),
+            let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let rows = object["requests"] as? [[String: Any]]
+        else { return nil }
+        return rows.count
+    }
+    func wait(_ condition: () -> Bool) -> Bool {
+        while Date() < deadline {
+            if condition() { return true }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.025))
+        }
+        return condition()
+    }
+    func changedText(_ value: String) {
+        controller.keyField.stringValue = value
+        controller.controlTextDidChange(Notification(name: .init("probe-text-change"),
+                                                    object: controller.keyField))
+    }
+    snap("initial")
+    if scenario == "no-key" {
+        controller.verifyClicked(nil)
+        snap("no-key-invoked")
+        changedText("proof-key")
+        snap("typed")
+        changedText("   ")
+        snap("cleared")
+        return ["snapshots": snapshots]
+    }
+    if !stored { changedText(initialKey) }
+    controller.verifyClicked(nil)
+    snap("started")
+    guard wait({ requests(first) == 1 }) else {
+        return ["error": "first Verify request did not arrive before deadline"]
+    }
+    let firstArrivedAt = Date()
+    var finalRequestAt = firstArrivedAt
+    snap("first-arrived")
+    switch scenario {
+    case "unchanged-success", "unchanged-refusal":
+        controller.sync()
+        snap("synced")
+        controller.close()
+        controller.show()
+        snap("reopened")
+        if scenario == "unchanged-success" {
+            guard wait({ Date() >= firstArrivedAt.addingTimeInterval(0.7) }) else {
+                return ["error": "same-input overlap did not begin before deadline"]
+            }
+            controller.verifyClicked(nil)
+            snap("same-input-started")
+            guard wait({ requests(first) == 2 }) else {
+                return ["error": "same-input second Verify did not arrive"]
+            }
+            finalRequestAt = Date()
+            guard wait({ Date() >= firstArrivedAt.addingTimeInterval(1.8) }) else {
+                return ["error": "same-input older reply did not drain"]
+            }
+            snap("older-same-finished")
+            controller.saveClicked(nil)
+            snap("saved-same")
+        }
+    case "typed-key":
+        changedText("wrong-key")
+        snap("changed")
+    case "save-key":
+        changedText("wrong-key")
+        controller.saveClicked(nil)
+        snap("changed")
+    case "remove-key":
+        controller.removeClicked(nil)
+        snap("changed")
+    case "region":
+        controller.regionPopup.selectItem(withTitle: "European Union")
+        controller.regionChanged(nil)
+        snap("changed")
+    case "older-first", "newer-first":
+        guard let second else { return ["error": "overlap needs a second endpoint"] }
+        endpoint(second)
+        changedText(scenario == "older-first" ? "wrong-key" : "proof-key")
+        controller.verifyClicked(nil)
+        snap("second-started")
+        guard wait({ requests(second) == 1 }) else {
+            return ["error": "second Verify request did not arrive before deadline"]
+        }
+        snap("second-arrived")
+        let secondArrivedAt = Date()
+        finalRequestAt = secondArrivedAt
+        guard wait({ Date() >= secondArrivedAt.addingTimeInterval(1.0) }) else {
+            return ["error": "early Verify reply did not arrive before deadline"]
+        }
+        snap("early-finished")
+    default:
+        return ["error": "unknown Verify scenario"]
+    }
+    let answerDelay = scenario == "unchanged-success" ? 1.8 :
+        scenario == "older-first" ? 2.4 : 1.0
+    guard wait({ Date() >= finalRequestAt.addingTimeInterval(answerDelay) }) else {
+        return ["error": "owning Verify reply did not reach its bounded sample time",
+                "snapshots": snapshots]
+    }
+    snap("answer")
+    if scenario == "newer-first", let second {
+        // The first server still holds its response. Drain it and check that
+        // an old answer cannot overwrite the newer answer.
+        guard wait({ Date() >= firstArrivedAt.addingTimeInterval(2.5) }) else {
+            return ["error": "older Verify response did not drain before deadline"]
+        }
+        guard requests(first) == 1, requests(second) == 1 else {
+            return ["error": "overlap did not drain both wire requests"]
+        }
+        snap("old-drained")
+    }
+    return ["snapshots": snapshots]
+}
+
 /// The report card's new lines, from a `Report` the caller wrote.
 func chromeReport(_ request: [String: Any]) -> [String: Any] {
     var report = CloudTranscriber.Report()
@@ -1698,6 +1912,7 @@ func chromeReport(_ request: [String: Any]) -> [String: Any] {
                 languageCode: row["language"] as? String,
                 languageConfidence: (row["confidence"] as? NSNumber)?.doubleValue,
                 audioSeconds: (row["seconds"] as? NSNumber)?.intValue ?? 0, format: .flac,
+                transcriptWritten: row["transcriptWritten"] as? Bool ?? true,
                 remoteDeleted: row["remoteDeleted"] as? Bool ?? true))
     }
     report.cached = (request["cached"] as? [NSNumber] ?? []).map { $0.uint32Value }
@@ -1707,9 +1922,14 @@ func chromeReport(_ request: [String: Any]) -> [String: Any] {
     for (key, value) in request["names"] as? [String: String] ?? [:] {
         if let id = UInt32(key) { names[id] = value }
     }
+    let failure = NSError(
+        domain: "probe", code: 1,
+        userInfo: [NSLocalizedDescriptionKey: "synthetic failure"])
     return [
         "lines": TranscribeSheetController.cloudReportLines(
-            report, names: names, detected: request["detected"] as? Bool ?? false)
+            report, names: names, detected: request["detected"] as? Bool ?? false),
+        "fields": AgentServer.cloudFields(report, code: nil, notes: []),
+        "failure": AgentServer.cloudFailure(failure, report: report),
     ]
 }
 
@@ -2693,6 +2913,166 @@ def section_client(binary, sources):
 # Section 16 — the cancel token, against the fake
 
 
+def section_submission(binary, sources):
+    print("\nR6-14. one submit, bounded exact-URL recovery, and unresolved warnings")
+    url = "https://cdn.example.invalid/upload/own"
+    warning = ("AssemblyAI may have created a transcript, but Reelcut could not recover its ID. "
+               "Check your AssemblyAI dashboard before retrying; the transcript may still be "
+               "retained.")
+    fast = {"submitRecoveryAttempts": 3, "submitRecoveryDelay": 0.02,
+            "submitRecoveryTimeout": 0.5}
+
+    def body(rows):
+        return json.dumps({"transcripts": rows, "page_details": {"limit": 200}})
+
+    own = {"id": "t_own", "audio_url": url}
+    other = {"id": "../../hostile", "audio_url": url + "-different"}
+
+    def run(tag, steps, expected, count, tuning=fast, message=None):
+        answer, error, _ = run_probe(binary, "submission-" + tag, {
+            "mode": "client", "call": "submit", "audioURL": url,
+            "tuning": tuning, "steps": steps}, timeout=60)
+        if answer is None:
+            check("R6-14: " + tag + " instrument answers", False, error)
+            return {}
+        log = answer.get("log", [])
+        actual = routes(log)
+        good = (answer.get("id") == expected if expected != "unresolved"
+                else answer.get("error") == "submissionUnresolved")
+        check("R6-14: " + tag + " selects only the established id or warns",
+              good and actual == ["submit"] + ["list"] * count,
+              f"answer {answer!r}; routes {actual!r}")
+        if message is not None:
+            check("R6-14: " + tag + " keeps the warning sentence",
+                  answer.get("message") == message, f"got {answer.get('message')!r}")
+        check("R6-14: " + tag + " sends one POST and no unrelated ID request",
+              actual.count("submit") == 1 and all(r in ("submit", "list") for r in actual),
+              f"routes {actual!r}")
+        if count:
+            check("R6-14: " + tag + " uses only limit=200",
+                  all(r.get("query") == "limit=200" for r in log[1:]), f"log {log!r}")
+        return answer
+
+    shipped = run("plain reply", [{"route": "submit", "status": 200,
+                                   "body": '{"id":"t_plain","status":"queued"}'}],
+                  "t_plain", 0)
+    for key, value in (("submitRecoveryAttempts", 3), ("submitRecoveryDelay", 2.5),
+                       ("submitRecoveryTimeout", 5)):
+        check(f"R6-14: shipped {key} is {value}", shipped.get("shipped", {}).get(key) == value)
+
+    ambiguous = [
+        ("dropped", {"transport": True}),
+        ("timeout", {"timeout": True}),
+        ("server", {"status": 503}),
+        ("no HTTP reply", {"noResponse": True}),
+        ("malformed success", {"status": 200, "body": "{}"}),
+        ("invalid success id", {"status": 200,
+                                "body": '{"id":"../../bad","status":"queued"}'}),
+    ]
+    for tag, submit in ambiguous:
+        run(tag, [dict({"route": "submit"}, **submit),
+                  {"route": "list", "body": body([other, own])}], "t_own", 1)
+
+    for status in (400, 401, 403, 302):
+        answer, error, _ = run_probe(binary, f"submission-explicit-{status}", {
+            "mode": "client", "call": "submit", "audioURL": url, "tuning": fast,
+            "steps": [{"route": "submit", "status": status, "body": "{}"}]})
+        check(f"R6-14: explicit submit {status} retains its error and never lists",
+              answer is not None and routes(answer.get("log", [])) == ["submit"]
+              and answer.get("error") != "submissionUnresolved", f"{error}; {answer!r}")
+
+    lost = {"route": "submit", "transport": True}
+    run("first page lag", [lost, {"route": "list", "body": body([])},
+                           {"route": "list", "body": body([own])}], "t_own", 2)
+    run("duplicate identical rows", [lost, {"route": "list", "body": body([own, own])}],
+        "t_own", 1)
+    run("distinct matching ids", [lost, {"route": "list", "body": body([
+        own, {"id": "t_other", "audio_url": url}])}], "unresolved", 1, message=warning)
+    run("invalid matching id", [lost, {"route": "list", "body": body([
+        own, {"id": "../../bad", "audio_url": url}])}], "unresolved", 1, message=warning)
+    run("malformed page then match", [lost, {"route": "list", "body": "{"},
+                                      {"route": "list", "body": body([own])}], "t_own", 2)
+    run("missing row field then match", [lost, {"route": "list", "body": body([
+        {"id": "t_own"}])}, {"route": "list", "body": body([own])}], "t_own", 2)
+    run("transient list failure", [lost, {"route": "list", "status": 503},
+                                   {"route": "list", "body": body([own])}], "t_own", 2)
+    run("list never sees upload", [lost] + [{"route": "list", "body": body([other])}] * 3,
+        "unresolved", 3, message=warning)
+    run("list repeatedly fails", [lost] + [{"route": "list", "status": 503}] * 3,
+        "unresolved", 3, message=warning)
+    run("list redirect", [lost, {"route": "list", "status": 302}],
+        "unresolved", 1, message=warning)
+    for status in (401, 403):
+        run(f"list auth {status}", [lost, {"route": "list", "status": status}],
+            "unresolved", 1,
+            message="AssemblyAI refused the API key — check it in Reelcut ▸ Settings. "
+                    + warning)
+
+    speech = make_fixture()
+    if speech is None:
+        skip_rows(16, "`say` is unavailable, so the full-engine recovery-cancel rows have no audio")
+        return
+    second = os.path.join(os.path.dirname(speech), "recovery-second.aiff")
+    shutil.copy2(speech, second)
+    media, jobs = run_media(speech, second)
+    for tag, scenario, want_error, want_lists in [
+        ("cancel recovered", {"list_lag": 0}, "cancelled", 1),
+        ("cancel list failures", {"fail": [{"route": "list", "status": 503,
+                                            "times": -1}]}, "submissionUnresolved", 3),
+        ("cancel never visible", {"list_lag": 99}, "submissionUnresolved", 3),
+        ("cancel refused key", {"fail": [{"route": "list", "status": 401,
+                                         "times": 1}]}, "submissionUnresolved", 1),
+    ]:
+        with Fake("submission-" + tag.replace(" ", "-")) as fake:
+            fake.scenario(drop_reply=[{"route": "submit", "times": 1}],
+                          stall={"route": "list", "seconds": 0.3}, **scenario)
+            answer, error, _ = run_probe(binary, "submission-run-" + tag, {
+                "mode": "run", "base": fake.base, "key": DUMMY_KEY,
+                "cache": fresh("submission-cache-" + tag.replace(" ", "-")),
+                "media": media, "jobs": jobs, "cancelAtRecovery": True,
+                "tuning": dict(RUN_TUNING, submitRecoveryAttempts=3,
+                               submitRecoveryDelay=0.02, submitRecoveryTimeout=2),
+            }, timeout=180)
+            log = fake.log()
+        if answer is None:
+            check("R6-14: " + tag + " full-engine instrument answers", False, error)
+            continue
+        rows = log["requests"]
+        lists = [r for r in rows if r["path"] == "/v2/transcript?limit=200"]
+        posts = [r for r in rows if r["method"] == "POST"
+                 and r["path"] == "/v2/transcript"]
+        uploads = [r for r in rows if r["path"] == "/v2/upload"]
+        deletes = [r for r in rows if r["method"] == "DELETE"]
+        check("R6-14: " + tag + " synchronized cancellation during a list GET",
+              answer.get("cancelled") is True and len(lists) == want_lists,
+              f"answer {answer!r}; list count {len(lists)}")
+        check("R6-14: " + tag + " made one upload and one paid submit; later media did not start",
+              len(uploads) == len(posts) == 1 and len(log.get("transcripts", [])) == 1,
+              f"routes {[r['path'] for r in rows]!r}")
+        check("R6-14: " + tag + " returns no caption outcome",
+              answer.get("ok") is False
+              and answer.get("error") == ("other" if want_error == "cancelled" else want_error)
+              and (want_error != "cancelled"
+                   or answer.get("message") == "The transcription was cancelled.")
+              and not answer.get("cues"), f"answer {answer!r}")
+        if want_error == "cancelled":
+            tid = log["transcripts"][0]["id"] if log.get("transcripts") else ""
+            check("R6-14: recovered cancellation deletes exactly its recovered id",
+                  len(deletes) == 1 and deletes[0]["path"] == "/v2/transcript/" + tid
+                  and tid in log.get("deleted", []), f"deletes {deletes!r}; ids {log!r}")
+        else:
+            prefix = ("AssemblyAI refused the API key — check it in Reelcut ▸ Settings. "
+                      if tag == "cancel refused key" else "")
+            check("R6-14: " + tag + " preserves the exact dashboard warning",
+                  answer.get("message") == prefix + warning,
+                  f"got {answer.get('message')!r}")
+            check("R6-14: " + tag + " guesses no DELETE",
+                  not deletes and not log.get("deleted"), f"deletes {deletes!r}")
+        check("R6-14: " + tag + " removed its temporary audio",
+              answer.get("tempBefore") == answer.get("tempAfter"),
+              f"before {answer.get('tempBefore')!r}; after {answer.get('tempAfter')!r}")
+
+
 def section_cancel(binary, sources):
     print("\n16. the cancel token — an upload cut off mid-body, and a cancel during polling")
     big = os.path.join(fresh("cancel"), "big.bin")
@@ -3516,6 +3896,158 @@ def run_media(path_a, path_b):
           "speed": 1.0}])
 
 
+def section_cache_write(binary, sources):
+    print("\nCW. initial transcript persistence and remote deletion are independent")
+    speech = make_fixture()
+    if speech is None:
+        skip_rows(1, "`say` is not on this host, so cache-write rows have no audio to send")
+        return
+    media, jobs = run_media(speech, speech)
+    media, jobs = media[:1], jobs[:1]
+    dashboard = ("Its transcript could not be saved in the project, so Reelcut cannot "
+                 "retry deleting it automatically. Delete it in your AssemblyAI dashboard.")
+    retry = "it will be retried at the next run."
+
+    for written in (False, True):
+        for deleted in (False, True):
+            tag = f"cw-{int(written)}-{int(deleted)}"
+            cache = fresh(tag)
+            folder = os.path.join(cache, "transcripts")
+            if written:
+                os.makedirs(folder)
+            else:
+                with open(folder, "w") as handle:
+                    handle.write("blocked")
+            with Fake(tag) as fake:
+                fake.scenario(**({"fail": [{"route": "delete", "status": 500,
+                                               "times": 1}]} if not deleted else {}))
+                answer, error, _ = run_probe(binary, tag, {
+                    "mode": "run", "base": fake.base, "key": DUMMY_KEY,
+                    "tuning": RUN_TUNING, "cache": cache, "media": media, "jobs": jobs,
+                }, timeout=300)
+                log = fake.log()
+                if answer is None:
+                    check(f"CW: {tag} answers", False, error)
+                    continue
+                uploaded = answer.get("report", {}).get("uploaded", [])
+                check(f"CW: {tag} keeps usable in-memory cues and reports both facts",
+                      answer.get("ok") is True and bool(answer.get("cues"))
+                      and len(uploaded) == 1
+                      and uploaded[0].get("transcriptWritten") is written
+                      and uploaded[0].get("remoteDeleted") is deleted,
+                      f"got ok={answer.get('ok')!r}, uploaded={uploaded!r}")
+                transcript = os.path.join(folder, "1.json")
+                marker = os.path.join(folder, "1.complete.json")
+                check(f"CW: {tag} has a transcript and marker exactly when the first write lands",
+                      os.path.isfile(transcript) is written
+                      and os.path.isfile(marker) is written,
+                      f"file={os.path.isfile(transcript)}, marker={os.path.isfile(marker)}")
+                note = str(answer.get("cloudFields", {}).get("note", ""))
+                lines = " ".join(answer.get("cloudReportLines", []))
+                if deleted:
+                    check(f"CW: {tag} confirmed DELETE needs no cleanup warning",
+                          "not confirmed deleting" not in note
+                          and "not confirmed deleting" not in lines,
+                          f"note={note!r}, lines={lines!r}")
+                elif written:
+                    check(f"CW: {tag} saved ID promises a retry in both production reports",
+                          retry in note and retry in lines
+                          and dashboard not in note and dashboard not in lines,
+                          f"note={note!r}, lines={lines!r}")
+                    first = len(log["requests"])
+                    again, error, _ = run_probe(binary, tag + "-again", {
+                        "mode": "run", "base": fake.base, "key": DUMMY_KEY,
+                        "tuning": RUN_TUNING, "cache": cache, "media": [], "jobs": [],
+                    }, timeout=300)
+                    after = fake.log()["requests"][first:]
+                    check("CW: a saved failed DELETE is the next run's first request",
+                          again is not None and bool(after)
+                          and after[0]["method"] == "DELETE"
+                          and after[0]["path"].endswith("/" + log["transcripts"][0]["id"]),
+                          f"error={error!r}, after={after!r}")
+                else:
+                    check("CW: failed write and DELETE tell both callers to use the dashboard",
+                          dashboard in note and dashboard in lines
+                          and retry not in note and retry not in lines,
+                          f"note={note!r}, lines={lines!r}")
+                    first = len(log["requests"])
+                    again, error, _ = run_probe(binary, tag + "-again", {
+                        "mode": "run", "base": fake.base, "key": DUMMY_KEY,
+                        "tuning": RUN_TUNING, "cache": cache, "media": [], "jobs": [],
+                    }, timeout=300)
+                    after = fake.log()["requests"][first:]
+                    check("CW: an unrecorded ID causes no next-run janitor DELETE",
+                          again is not None and not any(r["method"] == "DELETE" for r in after),
+                          f"error={error!r}, after={after!r}")
+
+    cache = fresh("cw-marker-only")
+    folder = os.path.join(cache, "transcripts")
+    os.makedirs(os.path.join(folder, "1.complete.json"))
+    with Fake("cw-marker-only") as fake:
+        fake.scenario(fail=[{"route": "delete", "status": 500, "times": 1}])
+        answer, error, _ = run_probe(binary, "cw-marker-only", {
+            "mode": "run", "base": fake.base, "key": DUMMY_KEY, "tuning": RUN_TUNING,
+            "cache": cache, "media": media, "jobs": jobs,
+        }, timeout=300)
+        first = len(fake.log()["requests"])
+        again, again_error, _ = run_probe(binary, "cw-marker-only-again", {
+            "mode": "run", "base": fake.base, "key": DUMMY_KEY, "tuning": RUN_TUNING,
+            "cache": cache, "media": [], "jobs": [],
+        }, timeout=300)
+        after = fake.log()["requests"][first:]
+    row = (answer or {}).get("report", {}).get("uploaded", [{}])[0]
+    check("CW: a marker-only failure still saved the deletion ID",
+          answer is not None and row.get("transcriptWritten") is True
+          and os.path.isfile(os.path.join(folder, "1.json"))
+          and retry in str((answer or {}).get("cloudFields", {}).get("note", "")),
+          f"error={error!r}, row={row!r}")
+    check("CW: a marker-only failure permits the next-run janitor DELETE",
+          again is not None and bool(after) and after[0]["method"] == "DELETE",
+          f"error={again_error!r}, after={after!r}")
+
+    cache = fresh("cw-zero-words")
+    with open(os.path.join(cache, "transcripts"), "w") as handle:
+        handle.write("blocked")
+    with Fake("cw-zero-words") as fake:
+        fake.scenario(words=[], fail=[{"route": "delete", "status": 500, "times": -1}])
+        answer, error, _ = run_probe(binary, "cw-zero-words", {
+            "mode": "run", "base": fake.base, "key": DUMMY_KEY, "tuning": RUN_TUNING,
+            "cache": cache, "media": media, "jobs": jobs,
+        }, timeout=300)
+    failure = str((answer or {}).get("cloudFailure", ""))
+    lines = " ".join((answer or {}).get("cloudReportLines", []))
+    check("CW: zero words after an unrecorded failed DELETE names error, bill and dashboard",
+          answer is not None and answer.get("ok") is False
+          and "No speech was recognised" in failure
+          and "AssemblyAI had already been billed for 1 media file" in failure
+          and dashboard in failure and dashboard in lines and retry not in failure,
+          f"error={error!r}, failure={failure!r}, lines={lines!r}")
+
+    with Fake("cw-mixed") as fake:
+        fake.scenario()
+        mixed, error, _ = chrome_child(binary, fake, "cw-mixed", {
+            "op": "report", "detected": False,
+            "names": {"1": "lost.mov", "2": "saved.mov", "3": "gone.mov", "4": "held.mov"},
+            "uploaded": [
+                {"media": 1, "transcriptWritten": False, "remoteDeleted": False},
+                {"media": 2, "transcriptWritten": True, "remoteDeleted": False},
+                {"media": 3, "transcriptWritten": False, "remoteDeleted": True}],
+            "janitorFailed": [4, 4, 2], "held": [4],
+        })
+    lines = (mixed or {}).get("lines", [])
+    note = str((mixed or {}).get("fields", {}).get("note", ""))
+    check("CW: mixed warnings are ordered, deduplicated, and retain held text",
+          mixed is not None and len(lines) == 3
+          and "“held.mov”" in lines[0] and retry in lines[0]
+          and "It was not uploaded again in this run." in lines[0]
+          and "“saved.mov”" in lines[1] and retry in lines[1]
+          and "“lost.mov”" in lines[2] and dashboard in lines[2]
+          and note.count("media 4") == note.count("media 2") == note.count("media 1") == 1
+          and "media 3" not in note
+          and dashboard in str(mixed.get("failure", "")),
+          f"error={error!r}, lines={lines!r}, note={note!r}")
+
+
 def section_run(binary, sources):
     print("\nP/T. the cloud run: the progress arithmetic, and the temporary extracts a "
           "failed run leaves behind")
@@ -4335,6 +4867,115 @@ def chrome_child(binary, fake, tag, request, timeout=180):
     return answer, error, folder
 
 
+def section_settings_verify(binary, sources):
+    print("\nSV. Settings Verify owns its request and captured inputs")
+    stale = "Settings changed since this check began. Verify again."
+    refusal = "AssemblyAI refused the API key — check it in Reelcut ▸ Settings"
+    scenarios = ["unchanged-success", "unchanged-refusal", "typed-key", "save-key",
+                 "remove-key", "region", "older-first", "newer-first", "no-key"]
+    for scenario in scenarios:
+        try:
+            with contextlib.ExitStack() as stack:
+                first = stack.enter_context(Fake("settings-verify-" + scenario + "-a"))
+                overlap = scenario in ("older-first", "newer-first")
+                second = stack.enter_context(Fake("settings-verify-" + scenario + "-b")) \
+                    if overlap else None
+                first_stall = (2.1 if scenario == "newer-first" else
+                               1.5 if scenario == "unchanged-success" else 0.7)
+                first_refuses = scenario in ("unchanged-refusal", "region", "newer-first")
+                first.scenario(
+                    stall={"route": "verify", "seconds": first_stall},
+                    fail=[{"route": "verify", "status": 401, "times": -1}]
+                    if first_refuses else [])
+                if second:
+                    second.scenario(
+                        stall={"route": "verify", "seconds": 2.1 if scenario == "older-first"
+                               else 0.7},
+                        fail=[{"route": "verify", "status": 401, "times": -1}]
+                        if scenario == "older-first" else [])
+                body = {"op": "verify_state", "scenario": scenario,
+                        "firstEndpoint": first.base, "wall": 10}
+                if second:
+                    body["secondEndpoint"] = second.base
+                row, error, _ = chrome_child(binary, first, "settings-verify-" + scenario,
+                                             body, timeout=35)
+                first_log = first.log()
+                second_log = second.log() if second else {"requests": [], "failures": []}
+        except (OSError, RuntimeError, ValueError) as failure:
+            check(f"SV {scenario}: loopback setup and child answer", False, str(failure))
+            continue
+        if row is None or row.get("error"):
+            check(f"SV {scenario}: loopback child answer", False,
+                  error or str(row.get("error")))
+            continue
+        snapshots = {item["stage"]: item for item in row.get("snapshots", [])}
+        def state(stage, status, enabled):
+            item = snapshots.get(stage, {})
+            return item.get("status") == status and item.get("verifyEnabled") is enabled
+
+        if scenario == "no-key":
+            check("SV no-key: invocation sends nothing and Verify stays disabled",
+                  state("initial", "No API key is set.", False)
+                  and state("no-key-invoked", "No API key is set.", False),
+                  str(snapshots))
+            check("SV no-key: delegate enables typed key and disables cleared key",
+                  state("typed", "", True)
+                  and state("cleared", "No API key is set.", False), str(snapshots))
+        elif scenario.startswith("unchanged"):
+            check(f"SV {scenario}: sync and reopen retain pending ownership",
+                  state("started", "Checking…", False)
+                  and state("synced", "Checking…", False)
+                  and state("reopened", "Checking…", False), str(snapshots))
+            if scenario == "unchanged-success":
+                check("SV unchanged-success: older same-input request cannot clear the newer",
+                      state("same-input-started", "Checking…", False)
+                      and state("older-same-finished", "Checking…", False), str(snapshots))
+                check("SV unchanged-success: saving the same key keeps the result eligible",
+                      state("saved-same", "Key saved.", False)
+                      and state("answer", "Key accepted", True), str(snapshots))
+            else:
+                check("SV unchanged-refusal: refusal sentence and enabled state survive",
+                      state("answer", refusal, True), str(snapshots))
+        elif scenario in ("typed-key", "save-key", "remove-key", "region"):
+            immediate = "Key saved." if scenario == "save-key" else \
+                "Key removed." if scenario == "remove-key" else stale
+            check(f"SV {scenario}: changed input retires the old answer",
+                  state("changed", immediate, scenario != "remove-key")
+                  and state("answer", stale, scenario != "remove-key"), str(snapshots))
+        elif scenario == "older-first":
+            check("SV older-first: A cannot clear pending B; B's refusal owns the answer",
+                  state("second-started", "Checking…", False)
+                  and state("early-finished", "Checking…", False)
+                  and state("answer", refusal, True), str(snapshots))
+        else:
+            check("SV newer-first: B's acceptance survives A's later refusal",
+                  state("second-started", "Checking…", False)
+                  and state("early-finished", "Key accepted", True)
+                  and state("answer", "Key accepted", True)
+                  and state("old-drained", "Key accepted", True), str(snapshots))
+
+        expected_first = 0 if scenario == "no-key" else \
+            2 if scenario == "unchanged-success" else 1
+        first_rows = first_log["requests"]
+        second_rows = second_log["requests"]
+        first_key = "wrong-key" if scenario in ("unchanged-refusal", "region",
+                                               "newer-first") else "proof-key"
+        expected = [("GET", "/v2/transcript?limit=1", first_key)] * expected_first
+        check(f"SV {scenario}: first endpoint sees only its expected Verify GETs and dummy",
+              [(r["method"], r["path"], r["headers"].get("authorization"))
+               for r in first_rows] == expected and not first_log["failures"],
+              str(first_rows))
+        second_key = "wrong-key" if scenario == "older-first" else "proof-key"
+        expected_second = [("GET", "/v2/transcript?limit=1", second_key)] if overlap else []
+        check(f"SV {scenario}: second endpoint sees only its expected Verify GET and dummy",
+              [(r["method"], r["path"], r["headers"].get("authorization"))
+               for r in second_rows] == expected_second and not second_log["failures"],
+              str(second_rows))
+        check(f"SV {scenario}: no credential appears in probe output",
+              all(key not in json.dumps(row) for key in (DUMMY_KEY, WRONG_KEY)),
+              "a dummy credential reached a snapshot")
+
+
 def section_chrome(binary, sources):
     print("\n18. the chrome — the Settings window, the sheet's controls, the report card, "
           "the bar and the menu")
@@ -4836,6 +5477,30 @@ def png_size(data):
 # Mutants
 
 MUTANTS = {
+    "verify-ignores-input": (
+        "SettingsWindowController.swift",
+        "        guard let credential,\n"
+        "            (try? verificationInput(credential: credential)) == input\n"
+        "        else {\n",
+        "        guard credential != nil else {\n",
+        "the owning Verify completion announces an answer after its inputs changed "
+        "(settings_verify section)"),
+    "verify-ignores-owner": (
+        "SettingsWindowController.swift",
+        "        guard verifying?.id == id else { return }\n",
+        "        // Mutant: every completion may write the status and controls.\n",
+        "an older Verify completion can retire and answer for a newer request "
+        "(settings_verify section)"),
+    "cache-write-assumed": (
+        "CloudTranscriber+Media.swift",
+        "                transcriptWritten: transcriptWritten,\n",
+        "                transcriptWritten: true,\n",
+        "the report assumes an initial cache write succeeded (cache_write section)"),
+    "no-submit-recovery": (
+        "AssemblyAIClient+Submission.swift",
+        "                return try recoverSubmission(audioURL: request.audioURL)\n",
+        "                throw failure\n",
+        "R6-14's ambiguous-submit recovery removed (submission section)"),
     "mapping-no-in": (
         "MediaTranscript.swift",
         "        let offset = Double(source - job.sourceIn) / speed\n",
@@ -5117,9 +5782,11 @@ def prepare_mutant(name):
     return target
 
 
-SECTIONS = [section_mapping, section_jobs, section_stamp, section_client, section_cancel,
-            section_secrets, section_cues, section_extract, section_verbatim, section_run,
-            section_estimate, section_chrome, section_hygiene]
+SECTIONS = [section_mapping, section_jobs, section_stamp, section_client, section_submission,
+            section_cancel,
+            section_secrets, section_cues, section_extract, section_verbatim,
+            section_cache_write, section_run,
+            section_estimate, section_settings_verify, section_chrome, section_hygiene]
 # The sections the HARNESS binary drives rather than the probe binary.
 HARNESS_SECTIONS = {"cues"}
 
@@ -5138,8 +5805,9 @@ def main():
                              "edited); refused together with --mutant")
     parser.add_argument("--only",
                         help="a comma-separated subset of sections, by the name after "
-                             "`section_` (mapping, jobs, stamp, client, cancel, secrets, "
-                             "cues, extract, verbatim, run, estimate, chrome, hygiene)")
+                             "`section_` (mapping, jobs, stamp, client, submission, cancel, "
+                             "secrets, cues, extract, verbatim, cache_write, run, estimate, "
+                             "settings_verify, chrome, hygiene)")
     parser.add_argument("--wall", type=float, default=1800,
                         help="the whole run's wall-clock bound in seconds (rule H)")
     args = parser.parse_args()

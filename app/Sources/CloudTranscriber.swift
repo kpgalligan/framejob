@@ -75,6 +75,8 @@ final class CloudTranscriber {
             /// Seconds as AssemblyAI reported them — what was billed.
             let audioSeconds: Int
             let format: Transcriber.UploadFormat
+            /// Whether this fetched transcript's initial JSON write landed.
+            let transcriptWritten: Bool
             /// Whether the remote transcript is confirmed gone (R6-4).
             let remoteDeleted: Bool
         }
@@ -92,6 +94,33 @@ final class CloudTranscriber {
         /// record of an id we still have to delete, and a fetch would
         /// overwrite it.
         var held: [UInt32] = []
+
+        /// Cleanup still owed, in stable per-media order. An ID can be
+        /// retried only when its transcript JSON was saved in the project.
+        func deletionWarnings(name: (UInt32) -> String) -> [String] {
+            var seen: Set<UInt32> = []
+            var warnings: [String] = []
+            func append(_ id: UInt32, written: Bool) {
+                guard seen.insert(id).inserted else { return }
+                let target = name(id)
+                var warning: String
+                if written {
+                    warning = "AssemblyAI has not confirmed deleting the transcript of \(target); "
+                        + "it will be retried at the next run."
+                } else {
+                    warning = "AssemblyAI has not confirmed deleting the transcript of \(target). "
+                        + "Its transcript could not be saved in the project, so Reelcut cannot "
+                        + "retry deleting it automatically. Delete it in your AssemblyAI dashboard."
+                }
+                if held.contains(id) { warning += " It was not uploaded again in this run." }
+                warnings.append(warning)
+            }
+            for id in janitorFailed { append(id, written: true) }
+            for row in uploaded where !row.remoteDeleted {
+                append(row.media, written: row.transcriptWritten)
+            }
+            return warnings
+        }
     }
 
     /// The serial queue the whole run happens on — `Transcriber.work`'s
@@ -271,6 +300,12 @@ final class CloudTranscriber {
                         bar.fraction(media: index, phase: .saving, within: 1),
                         CloudProgress.detail(.saving, file: entry.name))
                 } catch {
+                    if let client = error as? AssemblyAIClient.ClientError,
+                        case .submissionUnresolved(let authenticationStatus) = client,
+                        cancel.isCancelled || authenticationStatus != nil
+                    {
+                        throw client
+                    }
                     if cancel.isCancelled { throw Transcriber.TranscribeError.cancelled }
                     if let client = error as? AssemblyAIClient.ClientError {
                         if client == .cancelled { throw Transcriber.TranscribeError.cancelled }

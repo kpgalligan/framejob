@@ -184,7 +184,8 @@ extension CloudTranscriber {
         // transcript for ever, for a request it was never made from (the
         // reader review, §10.13 R1·3). The comment above says the marker
         // comes second so it fails safe; this is what makes that true.
-        if MediaTranscript.write(file, for: media.id, in: cacheDirectory) {
+        let transcriptWritten = MediaTranscript.write(file, for: media.id, in: cacheDirectory)
+        if transcriptWritten {
             MediaTranscript.writeStamp(stamp, for: media.id, in: cacheDirectory)
         }
 
@@ -200,6 +201,7 @@ extension CloudTranscriber {
                 languageCode: fetched.response.languageCode,
                 languageConfidence: fetched.response.languageConfidence,
                 audioSeconds: header.audioDuration, format: upload.format,
+                transcriptWritten: transcriptWritten,
                 remoteDeleted: deleted)
         )
     }

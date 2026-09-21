@@ -100,7 +100,7 @@ extension TranscribeSheetController {
     /// The cloud run's extra lines, in a fixed order: R6-8's fallback, the
     /// detected language, then what is still owed a delete.
     ///
-    /// The owed list is the TOOL's own rule (`cloudFields`): once per media
+    /// The owed list is `Report.deletionWarnings`'s rule: once per media
     /// id, because a media can be in `janitorFailed` (an id owed from an
     /// earlier run) AND in `uploaded` with `remoteDeleted` false (one owed
     /// from this run), and saying it twice would read as two transcripts. A
@@ -130,17 +130,7 @@ extension TranscribeSheetController {
                     "“\(name(row.media))”: detected \(spoken) (\(percent)% confidence).")
             }
         }
-        var owed: [UInt32] = []
-        for id in report.janitorFailed where !owed.contains(id) { owed.append(id) }
-        for row in report.uploaded where !row.remoteDeleted && !owed.contains(row.media) {
-            owed.append(row.media)
-        }
-        for id in owed {
-            var line = "AssemblyAI has not confirmed deleting the transcript of "
-                + "“\(name(id))”; it will be retried at the next run."
-            if report.held.contains(id) { line += " It was not uploaded again in this run." }
-            lines.append(line)
-        }
+        lines.append(contentsOf: report.deletionWarnings { "“\(name($0))”" })
         return lines
     }
 

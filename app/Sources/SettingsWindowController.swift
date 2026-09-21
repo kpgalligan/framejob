@@ -45,7 +45,7 @@ import AppKit
 ///
 /// **R6-12** — the key and the region are settings a PERSON makes and no tool
 /// reads or writes either. This window is the one writer of both.
-final class SettingsWindowController: NSWindowController {
+final class SettingsWindowController: NSWindowController, NSTextFieldDelegate {
 
     /// The app's one Settings window. A probe never comes near it: every
     /// instrument builds its own controller with a store of its own.
@@ -77,10 +77,21 @@ final class SettingsWindowController: NSWindowController {
     private let defaults: UserDefaults
     private let environment: [String: String]
 
-    /// Held for the length of one Verify: `CloudTranscriber.verify` captures
-    /// its client and not itself, and this keeps the object alive for the
-    /// button's own state.
-    private var verifying: CloudTranscriber?
+    private struct VerificationInput: Equatable {
+        let credential: String
+        let region: AssemblyAIConfiguration.Region
+        let base: URL
+    }
+
+    private struct Verification {
+        let id: UUID
+        let input: VerificationInput
+        let transcriber: CloudTranscriber
+    }
+
+    /// The latest request owns the controls and answer. Its transcriber is
+    /// held until that request finishes or a newer invocation supersedes it.
+    private var verifying: Verification?
 
     let headingLabel = NSTextField(labelWithString: SettingsWindowController.paneTitle)
     let keyField = NSSecureTextField()
@@ -131,6 +142,7 @@ final class SettingsWindowController: NSWindowController {
         keyField.placeholderString = Self.emptyPlaceholder
         keyField.target = self
         keyField.action = #selector(saveClicked(_:))
+        keyField.delegate = self
         keyField.widthAnchor.constraint(equalToConstant: 240).isActive = true
 
         // A popup built from model objects carries the object, never an
@@ -228,20 +240,71 @@ final class SettingsWindowController: NSWindowController {
         // Remove and on a region change (05-review's nit 4).
         let store = self.store()
         let stored = store.read()
-        let credential = AssemblyAIConfiguration.credential(
-            store: store, environment: environment)
+        let credential = effectiveCredential(storedCredential: stored)
         keyField.placeholderString =
             stored != nil ? Self.maskedPlaceholder : Self.emptyPlaceholder
         removeButton?.isEnabled = stored != nil
-        verifyButton?.isEnabled = credential != nil || !keyField.stringValue.isEmpty
         let region = AssemblyAIConfiguration.region(defaults: defaults)
         if let index = regionPopup.itemArray.firstIndex(where: {
             $0.representedObject as? String == region.rawValue
         }) {
             regionPopup.selectItem(at: index)
         }
-        // Not an error, and not styled as one: it is where everybody starts.
-        say(credential == nil ? "No API key is set." : "", problem: false)
+        updateVerifyButton(credential: credential)
+        if let verifying {
+            if (try? verificationInput(credential: credential ?? "")) == verifying.input {
+                say("Checking…", problem: false)
+            } else {
+                say("Settings changed since this check began. Verify again.", problem: false)
+            }
+        } else {
+            // Not an error, and not styled as one: it is where everybody starts.
+            say(credential == nil ? "No API key is set." : "", problem: false)
+        }
+    }
+
+    private func effectiveCredential(storedCredential: String?) -> String? {
+        let typed = keyField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !typed.isEmpty { return typed }
+        if let storedCredential { return storedCredential }
+        guard let value = environment[AssemblyAIConfiguration.environmentKey] else { return nil }
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
+    private func verificationInput(credential: String) throws -> VerificationInput {
+        VerificationInput(
+            credential: credential,
+            region: AssemblyAIConfiguration.region(defaults: defaults),
+            base: try AssemblyAIConfiguration.baseURL(defaults: defaults))
+    }
+
+    private func updateVerifyButton(credential: String?) {
+        guard let credential else {
+            verifyButton?.isEnabled = false
+            return
+        }
+        if let verifying,
+            (try? verificationInput(credential: credential)) == verifying.input
+        {
+            verifyButton?.isEnabled = false
+        } else {
+            verifyButton?.isEnabled = true
+        }
+    }
+
+    func controlTextDidChange(_ notification: Notification) {
+        let credential = effectiveCredential(storedCredential: store().read())
+        updateVerifyButton(credential: credential)
+        if let verifying,
+            (try? verificationInput(credential: credential ?? "")) == verifying.input
+        {
+            say("Checking…", problem: false)
+        } else if verifying != nil {
+            say("Settings changed since this check began. Verify again.", problem: false)
+        } else {
+            say(credential == nil ? "No API key is set." : "", problem: false)
+        }
     }
 
     private func say(_ text: String, problem: Bool) {
@@ -292,18 +355,17 @@ final class SettingsWindowController: NSWindowController {
     /// be used for a real run: what is in the FIELD when somebody has typed
     /// one and not saved it yet, and the resolved credential otherwise.
     @objc func verifyClicked(_ sender: Any?) {
-        let typed = keyField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        let resolved = typed.isEmpty
-            ? AssemblyAIConfiguration.credential(store: store(), environment: environment)
-            : typed
-        guard let credential = resolved else {
+        verifying = nil
+        guard let credential = effectiveCredential(storedCredential: store().read()) else {
+            updateVerifyButton(credential: nil)
             say("No API key is set.", problem: false)
             return
         }
-        let base: URL
+        let input: VerificationInput
         do {
-            base = try AssemblyAIConfiguration.baseURL(defaults: defaults)
+            input = try verificationInput(credential: credential)
         } catch {
+            updateVerifyButton(credential: credential)
             say(error.localizedDescription, problem: true)
             return
         }
@@ -312,20 +374,35 @@ final class SettingsWindowController: NSWindowController {
         // The cache directory and the media list are what a RUN needs and a
         // verify never touches; the temporary folder is the honest "nowhere".
         let transcriber = CloudTranscriber(
-            client: AssemblyAIClient(base: base, credential: credential),
+            client: AssemblyAIClient(base: input.base, credential: input.credential),
             cacheDirectory: URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true),
             media: [:])
-        verifying = transcriber
+        let id = UUID()
+        verifying = Verification(id: id, input: input, transcriber: transcriber)
         transcriber.verify { [weak self] answer in
-            guard let self = self else { return }
-            self.verifying = nil
-            self.verifyButton.isEnabled = true
-            switch answer {
-            case .success:
-                self.say("Key accepted", problem: false)
-            case .failure(let error):
-                self.say(error.localizedDescription, problem: true)
-            }
+            self?.completeVerification(answer, id: id, input: input)
+        }
+    }
+
+    private func completeVerification(
+        _ answer: Result<Void, AssemblyAIClient.ClientError>,
+        id: UUID, input: VerificationInput
+    ) {
+        guard verifying?.id == id else { return }
+        verifying = nil
+        let credential = effectiveCredential(storedCredential: store().read())
+        updateVerifyButton(credential: credential)
+        guard let credential,
+            (try? verificationInput(credential: credential)) == input
+        else {
+            say("Settings changed since this check began. Verify again.", problem: false)
+            return
+        }
+        switch answer {
+        case .success:
+            say("Key accepted", problem: false)
+        case .failure(let error):
+            say(error.localizedDescription, problem: true)
         }
     }
 

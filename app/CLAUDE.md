@@ -310,7 +310,9 @@ free.
   synchronous body — the janitor FIRST, the jobs grouped by MEDIA, each
   media classified cached / HELD / to upload, then each job's words cut out
   of its media's one transcript. `Report` is what the `Outcome` has no room
-  for (`uploaded`, `cached`, `janitorDeleted`, `janitorFailed`, `held`);
+  for (`uploaded` with the initial transcript-write result, `cached`,
+  `janitorDeleted`, `janitorFailed`, `held`) and owns the shared cleanup
+  warning wording for the sheet and MCP result or failure;
   `truncations` is always empty. One media's failure is one media's problem
   and the run carries on, with exactly two exceptions: a CANCEL and a
   REFUSED KEY. `+Media` holds `retryDeletes` and `fetch` — the ten-hour
@@ -348,7 +350,7 @@ free.
   its marker have to carry; `TranscriptResponse` reads `words` through a
   `try?` so the CLIENT's rule about a missing words array is the sentence a
   caller gets.
-- `AssemblyAIClient.swift` (+`Session`) — AssemblyAI's REST API as five
+- `AssemblyAIClient.swift` (+`Session`, +`Submission`) — AssemblyAI's REST API as five
   SYNCHRONOUS calls over one `.ephemeral` `URLSession` with its own one-wide
   delegate queue (R6-7: no `async`). `willPerformHTTPRedirection` always
   answers nil, so a 3xx is `.redirected` and the credential reaches no other
@@ -362,7 +364,9 @@ free.
   the client RELAYS verbatim — a 402's, a 4xx's and a transcript's `error` —
   from carrying a key a server echoed back. `delete` answers THREE states
   (`deleted`, `failed`, `notSent`): an id that is not a plain identifier is
-  never put on the wire.
+  never put on the wire. `+Submission` owns the single paid submit and R6-14's
+  bounded recovery: three newest-page looks for an exact uploaded URL, with
+  no retry of the POST or requests by any unrelated id.
 - `AssemblyAIConfiguration.swift` · `AssemblyAILanguages.swift` ·
   `SecretStore.swift` — WHERE the client speaks and WHAT it says it is.
   `AssemblyAIConfiguration` is the ONE reader of `-RCAssemblyAIEndpoint` and
@@ -486,6 +490,11 @@ free.
   initialiser takes a store FACTORY so the offscreen harness can photograph
   it with a `MemoryStore`. Verify runs on `CloudTranscriber`'s `work` queue
   (`CloudTranscriber.verify(completion:)`, spec §11's R6-12 — no new queue).
+  Its latest request owns the answer and controls by UUID; completion also
+  matches the effective credential, persisted region and resolved base URL
+  captured at click time. Text edits, Save, Remove, sync and reopening keep
+  Verify enabled only when an effective credential exists and no current
+  request is checking those same inputs.
   **No key set is not an error** anywhere in it.
 - `PreviewWindowController.swift` — a second `AVPlayerLayer` on the same
   player (measured: two layers both display). It is an **`NSPanel`** (a titled

@@ -3748,9 +3748,11 @@ python3 tools/proof/assemblyai_fake.py --dir <logdir>
 Binds `127.0.0.1` on port 0 and prints `port <n>` as its FIRST stdout line,
 flushed, which is how a caller learns where it is. It speaks §5c's five calls
 — `POST /v2/upload`, `POST /v2/transcript`, `GET /v2/transcript/{id}`,
-`DELETE /v2/transcript/{id}`, `GET /v2/transcript?limit=1` — plus three
+`DELETE /v2/transcript/{id}`, `GET /v2/transcript?limit=1` — plus R6-14's
+`GET /v2/transcript?limit=200` recovery page and three
 control routes: `POST /__control/scenario` (replaces the scenario whole and
-resets the counters), `GET /__control/log` (`{requests, failures}`) and
+resets the counters), `GET /__control/log` (requests, failures, created
+transcript IDs and confirmed deletes) and
 `GET /__control/words` (the exact bytes it serves as `words`, serialised
 once, so "byte-equal to what was served" is a comparison and not a hope).
 
@@ -3780,7 +3782,18 @@ with q5's sentence verbatim.
 env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_probe.py
 env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_probe.py --only mapping,stamp
 env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_probe.py --mutant no-retry
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_probe.py --only submission
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_probe.py --only submission --mutant no-submit-recovery
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_probe.py --only cache_write
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_probe.py --only cache_write --mutant cache-write-assumed
 ```
+
+The `submission` section checks one POST and exact uploaded-URL selection
+through dropped, timed-out, server and unreadable replies; first-page lag,
+malformed or hostile rows, auth refusals and bounded exhaustion. Its
+full-engine rows cancel during a recovery-list request and check the recovered
+ID's DELETE or the exact dashboard warning, no later media, and temporary
+audio removal. The mutant must fail those recovery assertions.
 
 **186/186** on the tree, measured three times on 2026-09-20 with no skips,
 and **196/196** on 2026-09-20 after 05-review's finding 1 added row 12's
@@ -3821,7 +3834,12 @@ back), `run` (`CloudProgress` over a table, then
 its media's share, holding at the 0.95 point, ending at 1.0; and the
 `reelcut-upload-*` a cancelled, an errored and a 401'd run leave behind,
 which is none, with a CONTROL that one was there while the body was going
-out), `estimate` (row 14 — `CloudEstimate` with no disk in it: §8's two dated
+out), `cache_write` (all four initial-write/DELETE combinations against the
+loopback fake, a blocked cache folder, a marker-only failure, the next-run
+janitor, a zero-word failed run, and the production UI/MCP report formatters;
+`cache-write-assumed` changes the reported write result to `true` in a
+source COPY and must fail on the unwritten failed-DELETE case), `estimate`
+(row 14 — `CloudEstimate` with no disk in it: §8's two dated
 rates, every arm of `fate` one row each, and `describe`, `money` and
 `reasons` over a table of one file, many, cached and uploaded mixed, speakers
 on, nothing to upload, no rows at all, a held media, an unreadable one, a
@@ -3842,6 +3860,23 @@ the one declaration of `func keyterms(`, the harness's code naming neither
 `SettingsWindowController.shared` nor `AssemblyAIConfiguration.store`, the
 Settings sentence byte-identical to pipeline 3's in both files, and the
 credential).
+
+The `cache_write` section proves the changed Swift source and report
+formatters without building a Metal app. It cannot prove a fresh built-app
+MCP result; that requires `make app` and the loopback proof below.
+
+`cloud_captions_probe.py --only settings_verify` compiles all current Swift
+sources against the current staticlib and drives the Settings controller's
+actual Verify action against delayed loopback fakes. Its nine scenarios cover
+unchanged success/refusal through sync and reopen, typed and saved key changes,
+Remove, a region change with the same endpoint, both reply orders for two
+requests, and no key. The unchanged success case also overlaps two direct
+Verify actions with identical inputs and saves that same key. Each scenario
+checks the visible status/button snapshots and the fake's exact Verify GETs;
+the `verify-ignores-input` and `verify-ignores-owner` source-copy mutants must
+compile and fail the matching behavior rows. This section needs no audio
+fixture, screenshot, baseline tree or built app bundle. It does not prove a
+fresh app build when MetalToolchain is unavailable.
 
 **Every `chrome` child is launched with BOTH launch arguments** —
 `-RCAssemblyAIEndpoint <the fake>` so nothing can leave the machine, and
@@ -3930,7 +3965,13 @@ row 1's no-key arm, nothing at all.
 ```sh
 env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_proof.py
 env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_proof.py --mutant no-hold
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_proof.py --port-base 5030
 ```
+
+R6-14's built-app row drops a submit reply, then repeats with one hidden
+list page. It reads back placed captions, the package cache, the fake's
+created IDs and DELETE log; a second run must use the cache without another
+submission.
 
 **115/115** on the tree, no skips, in 45–50 s, measured three times on
 2026-09-20, and again at **115/115 in 51 s** after c1-chrome (road map 6

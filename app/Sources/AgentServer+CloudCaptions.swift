@@ -162,9 +162,7 @@ extension AgentServer {
             // nothing about the money already spent (the reader review,
             // §10.13, R5·2). The facts go in the SENTENCE, which is the one
             // channel a throw has; the result KEYS are unchanged.
-            throw ToolError(
-                message: error.localizedDescription
-                    + Self.billed(transcriber.report))
+            throw ToolError(message: Self.cloudFailure(error, report: transcriber.report))
         }
         return (outcome, Self.cloudFields(transcriber.report, code: code, notes: notes))
     }
@@ -197,6 +195,12 @@ extension AgentServer {
             + "before this failed."
     }
 
+    static func cloudFailure(_ error: any Error, report: CloudTranscriber.Report) -> String {
+        let warnings = report.deletionWarnings { "media \($0)" }
+        return ([error.localizedDescription + billed(report)] + warnings)
+            .joined(separator: "\n")
+    }
+
     /// `language` for the cloud engine: absent or `"auto"` is DETECTION,
     /// which is the wire's absent `language_code`; anything else is passed
     /// through trimmed.
@@ -225,7 +229,7 @@ extension AgentServer {
     /// `note` exists only when there is a part to put in it: R6-8's fallback
     /// ran, a vocabulary was cut, or a remote delete is still owed. An empty
     /// note would be a key a caller has to read to learn nothing.
-    private static func cloudFields(
+    static func cloudFields(
         _ report: CloudTranscriber.Report, code: String?, notes: [String]
     ) -> [String: Any] {
         var parts = notes
@@ -235,20 +239,7 @@ extension AgentServer {
             parts.append(
                 "AssemblyAI transcribed media \(row.media) with \(model), not \(preferred).")
         }
-        // Once per media id: a media can be in `janitorFailed` (an id owed
-        // from an earlier run) and in `uploaded` with `remoteDeleted` false
-        // (an id owed from this one), and saying it twice would read as two
-        // transcripts.
-        var owed: [UInt32] = []
-        for id in report.janitorFailed where !owed.contains(id) { owed.append(id) }
-        for row in report.uploaded where !row.remoteDeleted && !owed.contains(row.media) {
-            owed.append(row.media)
-        }
-        for id in owed {
-            parts.append(
-                "AssemblyAI has not confirmed deleting the transcript of media \(id); the next "
-                    + "run retries it.")
-        }
+        parts.append(contentsOf: report.deletionWarnings { "media \($0)" })
 
         var fields: [String: Any] = [
             "engine": TranscriptionEngine.assemblyai.rawValue,

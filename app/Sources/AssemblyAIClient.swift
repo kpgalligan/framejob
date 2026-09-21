@@ -45,6 +45,10 @@ final class AssemblyAIClient {
         var deleteTimeout: TimeInterval
         /// Every other request's ceiling.
         var requestTimeout: TimeInterval
+        /// Looks at the newest transcript page after an ambiguous submit.
+        var submitRecoveryAttempts: Int = 3
+        var submitRecoveryDelay: TimeInterval = 2.5
+        var submitRecoveryTimeout: TimeInterval = 5
 
         static let shipped = Tuning(
             pollInterval: 3, pollCeilingFloor: 300, pollCeilingDivisor: 49, uploadRetries: 1,
@@ -76,6 +80,7 @@ final class AssemblyAIClient {
         case timedOut
         case cancelled
         case malformed(String)
+        case submissionUnresolved(authenticationStatus: Int?)
 
         var errorDescription: String? {
             switch self {
@@ -100,6 +105,15 @@ final class AssemblyAIClient {
                 return "The transcription was cancelled."
             case .malformed(let what):
                 return "AssemblyAI's answer could not be read: \(what)"
+            case .submissionUnresolved(let authenticationStatus):
+                let warning = "AssemblyAI may have created a transcript, but Reelcut could not "
+                    + "recover its ID. Check your AssemblyAI dashboard before retrying; the "
+                    + "transcript may still be retained."
+                if authenticationStatus != nil {
+                    return "AssemblyAI refused the API key — check it in Reelcut ▸ Settings. "
+                        + warning
+                }
+                return warning
             }
         }
     }
@@ -178,19 +192,6 @@ final class AssemblyAIClient {
             else { throw ClientError.malformed("the upload answered no `upload_url`") }
             return url
         }
-    }
-
-    /// `POST /v2/transcript` — answers the transcript's id.
-    func submit(_ request: TranscriptRequest) throws -> String {
-        var post = self.request("POST", path: "/v2/transcript")
-        post.setValue("application/json", forHTTPHeaderField: "content-type")
-        post.httpBody = try JSONEncoder().encode(request)
-        let reply = send(post)
-        if let failure = classify(reply) { throw failure }
-        guard
-            let response = try? JSONDecoder().decode(TranscriptResponse.self, from: reply.data)
-        else { throw ClientError.malformed("the submission answered no transcript") }
-        return response.id
     }
 
     /// `GET /v2/transcript/{id}` every `pollInterval` until it is
@@ -390,6 +391,7 @@ extension AssemblyAIClient.ClientError {
         case .timedOut: return "timedOut"
         case .cancelled: return "cancelled"
         case .malformed: return "malformed"
+        case .submissionUnresolved: return "submissionUnresolved"
         }
     }
 }

@@ -69,6 +69,8 @@ the counters):
                                  the allow-listed dummy it received, so a
                                  relay of the service's sentence can be
                                  caught carrying a credential
+    list_lag                     initial recovery-list looks that omit newly
+                                 created transcripts (default 0)
 
 `GET /__control/log` answers `{"requests": [...], "failures": [...]}`;
 `GET /__control/words` answers the exact bytes this fake serves as `words`.
@@ -98,7 +100,7 @@ DEFAULT_WORDS = [
     {"text": "there", "start": 1180, "end": 1600, "confidence": 0.96, "speaker": None},
 ]
 
-ROUTES = ("upload", "submit", "poll", "delete", "verify")
+ROUTES = ("upload", "submit", "poll", "delete", "verify", "list")
 
 
 def wav_seconds(data):
@@ -178,6 +180,8 @@ class Scenario:
         self.stall = given.get("stall")
         self.drop_reply = [dict(row) for row in given.get("drop_reply", [])]
         self.echo_authorization = bool(given.get("echo_authorization", False))
+        self.list_lag = int(given.get("list_lag", 0))
+        self.list_looks = 0
 
     def take_drop(self, route):
         """Whether this route's reply is dropped this time. `times: -1` never
@@ -233,7 +237,11 @@ class Fake:
 
     def log_body(self):
         with self.lock:
-            return {"requests": list(self.requests), "failures": list(self.failures)}
+            return {"requests": list(self.requests), "failures": list(self.failures),
+                    "transcripts": [
+                        {"id": tid, "audio_url": row["audio_url"]}
+                        for tid, row in self.transcripts.items()],
+                    "deleted": sorted(self.deleted)}
 
     def reset(self, given):
         with self.lock:
@@ -405,6 +413,8 @@ def make_handler(fake):
             route = self._route(method, path)
             if route is None:
                 return self._json(404, {"error": "no route"})
+            if route == "list":
+                fake.scenario.list_looks += 1
 
             # `stall`: nothing at all is answered for its seconds, and then
             # the route answers normally. What is being measured is the
@@ -439,6 +449,18 @@ def make_handler(fake):
             if route == "verify":
                 return self._json(200, {"transcripts": [
                     {"id": tid} for tid in fake.transcripts if tid not in fake.deleted]})
+            if route == "list":
+                rows = []
+                if fake.scenario.list_looks > fake.scenario.list_lag:
+                    rows = [
+                        {"id": tid, "audio_url": row["audio_url"]}
+                        for tid, row in reversed(list(fake.transcripts.items()))
+                        if tid not in fake.deleted
+                    ][:200]
+                return self._json(200, {"transcripts": rows, "page_details": {
+                    "limit": 200, "result_count": len(rows), "current_url": self.path,
+                    "next_url": None, "prev_url": None,
+                }})
             tid = path.rsplit("/", 1)[1]
             if tid not in fake.transcripts:
                 return self._json(404, {"error": "not found"})
@@ -467,7 +489,11 @@ def make_handler(fake):
             if method == "POST" and path == "/v2/transcript":
                 return "submit"
             if method == "GET" and path == "/v2/transcript":
-                return "verify"
+                if self.path == "/v2/transcript?limit=1":
+                    return "verify"
+                if self.path == "/v2/transcript?limit=200":
+                    return "list"
+                return None
             if path.startswith("/v2/transcript/"):
                 return "delete" if method == "DELETE" else "poll"
             return None

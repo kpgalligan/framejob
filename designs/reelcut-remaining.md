@@ -496,6 +496,13 @@ so it pays the toll first and alone, the way `d69de99`, `b410125` and
 
 ---
 
+**R6-14, lost-submit recovery (#28, 2026-09-21).** The touched app files
+remain under their own 400-line caps: `AssemblyAIClient.swift` **397**,
+`AssemblyAIClient+Submission.swift` **73**, and `CloudTranscriber.swift`
+**327**. The client gained room by moving `submit` alone before behavior was
+added; the initial pure-move typecheck passed. The proof instruments are
+exempt from the app cap.
+
 ## 4. What only a person at the machine can check
 
 These are not tasks so much as a list to run through at the machine once. The
@@ -736,6 +743,15 @@ and the closing above added the rest.
 ---
 
 ## 5. Where a third road map would start
+
+**Bounded recovery after a lost AssemblyAI submit reply (#28).** R6-14 reads
+only the newest page of 200 transcripts at most three times. An outage,
+visibility lag beyond those looks, more than 200 intervening account
+transcripts, multiple exact URL matches or a crash can leave a remote
+transcript that Reelcut cannot identify or delete. The run tells the person
+to check their AssemblyAI dashboard before retrying and makes no later
+automatic cleanup claim. A durable pending-submission journal and an
+account-wide janitor remain outside this fix.
 
 **Where the next work starts, after C1 (2026-09-21).** C1 — captions from
 the cloud — is BUILT, over five pipelines whose record is road map 6 §10.

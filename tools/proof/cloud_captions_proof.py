@@ -883,6 +883,54 @@ def row_four(instance, fake):
           f"got {marker!r}")
 
 
+def row_recovery(instance, fake):
+    print("\nR6-14. lost submit reply recovered through the newest page, then cached")
+    speech, _ = fixtures()
+    for tag, lag, looks in (("immediate", 0, 1), ("delayed", 1, 2)):
+        scenario(fake, drop_reply=[{"route": "submit", "times": 1}], list_lag=lag)
+        session = Session(instance, "row-recovery-" + tag)
+        media = session.media_of(speech)
+        session.add(media, at=0, duration=5 * SEC)
+        before = session.project()
+        answer = session.op("transcribe", engine="assemblyai", place=True)
+        session.save()
+        after = session.project()
+        log = fake.log()
+        lists = [row for row in log["requests"]
+                 if row["method"] == "GET" and row["path"] == "/v2/transcript?limit=200"]
+        ids = [row["id"] for row in log.get("transcripts", [])]
+        check(f"R6-14 {tag}: one upload, exactly one paid submit and {looks} list looks",
+              len(uploads(log)) == len(submits(log)) == 1 and len(lists) == looks,
+              f"routes {routes(log)!r}")
+        check(f"R6-14 {tag}: the created ID alone was polled and DELETE confirmed",
+              len(ids) == 1 and [row["path"] for row in deletes(log)]
+              == ["/v2/transcript/" + ids[0]] and log.get("deleted") == ids
+              and all(row["path"] == "/v2/transcript/" + ids[0]
+                      for row in log["requests"] if row["method"] == "GET"
+                      and row["path"].startswith("/v2/transcript/")),
+              f"ids {ids!r}; routes {routes(log)!r}")
+        before_text = sum(c["source"]["kind"] == "text" for c in before["clips"])
+        after_text = sum(c["source"]["kind"] == "text" for c in after["clips"])
+        check(f"R6-14 {tag}: MCP placed captions into the project",
+              after_text > before_text and answer.get("engine") == "assemblyai",
+              f"text clips {before_text} -> {after_text}; answer {answer!r}")
+        header = json.loads(read(cache_path(session, media)) or b"{}")
+        check(f"R6-14 {tag}: the package cache records that ID and its DELETE",
+              bool(ids) and header.get("transcript_id") == ids[0]
+              and header.get("remote_deleted") is True,
+              f"cache {header!r}; ids {ids!r}")
+        saved = session.project()
+        cached = session.op("transcribe", engine="assemblyai", place=False)
+        after_cache = session.project()
+        after_log = fake.log()
+        check(f"R6-14 {tag}: a second run serves the cache without a transcript request",
+              cached.get("cached") == [media] and len(submits(after_log)) == 1
+              and len(uploads(after_log)) == 1 and len(deletes(after_log)) == 1,
+              f"cached {cached!r}; routes {routes(after_log)!r}")
+        check(f"R6-14 {tag}: the cache-only run leaves the placed project unchanged",
+              after_cache == saved, "project changed on a cache-only run")
+
+
 # --------------------------------------------------------------------------
 # Row 5 — the cache, refresh, a relink, a split, and the refusals
 
@@ -1182,8 +1230,8 @@ def row_eleven(instance, fake):
     check("11: a DELETE that answered 500 leaves `remote_deleted` FALSE in the cache file",
           header.get("remote_deleted") is False, f"got {header.get('remote_deleted')!r}")
     check("11: and the result says so in its note",
-          f"AssemblyAI has not confirmed deleting the transcript of media {media}; the next "
-          "run retries it." in str(answer.get("note", "")),
+          f"AssemblyAI has not confirmed deleting the transcript of media {media}; it will "
+          "be retried at the next run." in str(answer.get("note", "")),
           f"got {answer.get('note')!r}")
     owed = header.get("transcript_id")
 
@@ -1941,6 +1989,7 @@ def main():
                 run_row(row_two, a, fake_a, probe)
                 run_row(row_three, a, fake_a, harness)
                 run_row(row_four, a, fake_a)
+                run_row(row_recovery, a, fake_a)
                 run_row(row_five, a, fake_a)
                 run_row(row_seven, a, fake_a)
                 run_row(row_eight, a, fake_a)
