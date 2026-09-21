@@ -1,15 +1,19 @@
 # Reelcut — road map 7: deepening
 
-**Status: BOTH CANDIDATES BUILT AND CLOSED. D1** — all six tickets landed
-(§2.1 to §2.6), and §3 is what they add up to: the core is the one validator
-of every caller-authored object, and 617 lines are out of the agent's
-handlers. **D2** — all five landed on `d2-refusal-reason` (§5.1 to §5.5), and
-§6 is what they add up to: an identity and a refusal are two different
-answers, eleven rules say why in their own words, and the app has no way to
-write a refusal sentence at all. §6 also says where a next candidate starts. **The source window** (§10) is a
-third candidate, grilled and split in three: phase A, the module as a pure
-move, is BUILT (§10.6 is what was decided, §10.7 the record); phases B and C
-are not started.**
+**Status, reviewed 2026-09-21 at `49af3f4`: FOUR CANDIDATES BUILT AND CLOSED.**
+**D1** centralized caller-patch validation (§1–§3); **D2** separated applied,
+identity and refusal outcomes (§4–§6); **D3** published the core's operation
+arguments and made the tools read them (§7–§9). **The source window** is
+complete in all three phases, including the app's reversed mirror and the
+Speed sheet's core-derived duration (§10.7–§10.10). The proposed wholesale
+handler forward was measured and retired; its smaller **argument gate**
+landed as #21 (§11.8).
+
+**Start at §12 for work still needed.** The earlier sections retain their
+phase-time measurements and successor proposals; several were completed by
+later sections. §12 reconciles them with the current code, later changes and
+open issues. It proposes an order of work, not a new approved implementation
+spec. C2's deferral in road map 6 does not reopen any completed candidate here.
 
 Road maps 2 to 6 each added something a person using the app can see. This
 one does not. A **deepening** takes knowledge that is spread across callers
@@ -4902,7 +4906,7 @@ deepenings.
 
 ---
 
-## 10. The next candidate, scouted — the source window
+## 10. The source window — scout, decisions and completed phases
 
 **Scouted on 2026-09-18, after D3 merged; grilled and split in three on
 2026-09-19; ALL THREE PHASES ARE BUILT and the candidate is CLOSED on
@@ -5657,6 +5661,9 @@ inside nests (remaining §5, a document-wide rate change with its own overlap
 question), and the Speed sheet's hint, which says nothing of either arm
 (§10.9).
 
+**Current review:** §12 re-measures this inventory, corrects the byte-exact
+count, and separates this refactor from the outstanding timing defects.
+
 **What this candidate is worth to the next one.** The order that held was
 DECISION, then PROBE, then code: D4-1 to D4-6 were written into spec §11
 before the phase they govern, and phase C's §2 was run against the unchanged
@@ -5672,6 +5679,9 @@ caught it.
 ---
 
 ## 11. The candidate §9 recommended, measured — the handler forward
+
+**Current disposition:** the broad forward is retired; the argument gate in
+§11.8 is built. The opening measurement below describes the earlier scout.
 
 **Measured on 2026-09-19, before any grilling round was answered, and not
 started.** §9 closed D3 by naming the next candidate: *"the agent handlers
@@ -5994,3 +6004,201 @@ which is now the gate's refusal by name.
   was not run — it records the screen for real — and its calls were
   audited: none carries a key its tool does not declare. The proof README's
   214 for phase 9 and 23 for the clip catalog predate this change.
+
+---
+
+## 12. Current review and remaining work (2026-09-21)
+
+### 12.1 What was reviewed, and what stays closed
+
+Reviewed the code at `49af3f4`, the changes since the gate's `a9103b1`,
+the later source-window commits, the records above, and the open GitHub
+issues. The working tree also contains the user's documentation-only C2
+deferral; that is a separate product decision. This review changes documents,
+not product behavior. Source observations below are distinguished from
+tests run in this review; earlier proof scores remain earlier evidence.
+
+| Area | Current evidence and disposition |
+|---|---|
+| D1, patch validation | `AgentServer+Clips.swift` still passes caller patches through `rawPatchArg`; `patch.rs` owns their validation and merge. Closed; do not rebuild Swift validators. |
+| D2, outcomes | `outcome.rs`, the FFI and `ProjectDocument.applyEdit` retain the three answers. `finish` compares projects, validates a changed one and returns `Applied`; it deliberately does not invent a refusal. Closed. |
+| D3, published arguments | `op_table.rs` / `op_schema.rs`, `AgentCatalog.opTool`, declarations and parity checks remain the contract. C1 moved caption declarations to `AgentCatalog+Captions.swift`; these are app-state tools, not new core ops. Closed. |
+| Source window | `source_window.rs` is 396 lines; phases B and C landed in `2bbceed` and `1f03132`. `ReverseMirror.swift` is shared, and `SpeedSheetController.lengths` asks the core using the same ops as Apply. The old un-held readout and unmirrored timeline are closed. |
+| Handler forward | `AgentServer.dispatch` calls `checkArgumentNames` before handler dispatch. The gate is built; the broader forwarding rewrite remains retired for §11's reasons. |
+| Fractional frame-rate terms | `rateTerm` / `fpsPair` in `AgentServer+Arguments.swift` replaced both truncating readers in `7f04e59`. This is no longer an open residue of #21. |
+| Size debt | Old phase deltas are historical, not current toll estimates. Current examples: `edit_clip.rs` 1021, `edit.rs` 838, `edit_paste.rs` 599, `AgentCatalog+Clips.swift` 792 and `ReelCore.swift` 1542 lines. Consult remaining §3 and measure again before touching one. |
+
+### 12.2 Work still needed, in proposed order
+
+Each row is a separate work item. A decision goes into spec §11 before the
+behavior it governs changes; a structural move lands and passes its gate
+alone. This list does not authorize combining a correctness change with an
+unrelated refactor, or treat a proposed policy as already decided.
+
+1. **Decide a shared policy for extreme timeline values — existing #24,
+   #25 and #31.** These are related correctness issues, not a benefit that
+   extracting the commit tail would provide. `Project::validate` currently
+   checks positive duration and nonnegative start, without an upper time
+   bound; Swift still has unchecked `start + duration` in
+   `ProjectSnapshot.swift` and `sourceIn + sourceDuration` in
+   `CompositionBuilder.swift`. Both transition builders still have
+   frame-by-frame reduction loops over clip-dependent lengths. The prior
+   issues record crashes or impractical runtimes; this review re-read those
+   paths but did not repeat a destructive or hours-long experiment.
+   Decide reader/writer bounds versus safe arithmetic and a bounded
+   transition algorithm, including compatibility for old projects. Respect
+   R6-10's existing speed decision rather than silently extending or
+   reversing it. **Done means:** boundary vectors through file load and
+   every relevant edit, an app that survives the saved-project cases, and
+   a measured upper bound for the pathological transition cases. Use the
+   existing issues rather than filing duplicates.
+
+2. **Finish frame-grid normalization — #26 plus the nested-clip gap.**
+   `edit_canvas.rs::resnap` walks only `project.clips` and top-level
+   markers. Scoped views use the parent's fps (`scope.rs::scoped_view`),
+   so stored nested clips can remain on the old grid while being viewed on
+   the new one. The same function never visits `video.motion` or
+   `text.animation`; `edit_paste.rs::resnap_actions` also only visits
+   actions, including when called from `absorb_nests`. The property setters
+   have `snap_motion` / `snap_animation`, but these paths do not use them.
+   `unnest_clip` re-snaps start and duration while merely reallocating the
+   copied actions' IDs, another path the timing inventory must cover.
+   **First decide:** rounding/clamping and overlap handling when an entire
+   document, including nested contents, changes rate. Nests have no marker
+   list; marker collision policy is a top-level concern. Keep audio-envelope
+   timings at sample precision, as the Times rule already requires.
+   **Done means:** FFI vectors for top-level and nested clips, actions,
+   motion/animation fields, paste/unnest, source-tail bounds and marker
+   collisions, at ordinary and fractional frame rates. Retain the existing
+   source-window bound instead of writing another one. This is a proposed
+   normalization concern of its own, not unfinished source-window phase B.
+
+3. **Design the commit-tail deepening, then prove a behavior-preserving
+   extraction.** The duplication remains; §12.3 gives the current measured
+   inventory and the differences a design must preserve. Its first stage
+   must define which caller knowledge disappears and measure the deletion.
+   `edit_clip.rs` is over the cap: any required move comes first, separately.
+   **Done means:** unchanged applied/identity/refused/error arms, refusal
+   sentences, ID allocation, affected tracks, transition style and undo,
+   including composed and scoped ops. Use FFI tests and the existing
+   refusal/source-window/MCP proofs, plus mutants that bypass the proposed
+   guard or transition minting. Do not change clamped-edge semantics as
+   part of this extraction.
+
+4. **Restore the two historical cross-build proof comparisons.**
+   `phase5_chrome.py` still archives old Swift sources but links the current
+   staticlib/header; its named FFI-drift skip accounts for 45 rows.
+   `recording_probe.py` has the corresponding two-row skip for the old
+   welcome window. These are proof gaps, not failures in the current app.
+   Build the reference app against its matching core/header, with isolated
+   outputs and a cache key that includes both trees and the instrument.
+   **Done means:** those 47 reference-dependent rows run again; a broken
+   current instrument still fails, and host-state skips remain separate.
+   Neither reference build was rerun in this review.
+
+5. **Correct the Speed sheet's explanation.** Its duration preview is
+   already correct, but `loadView` still says a speed change “opens or leaves
+   a gap.” A slower clip can instead gain an overlap and a minted dissolve,
+   or be refused. Update the hint to match the established D4-6 behavior.
+   Any richer per-clip preview is a separate UI decision. **Done means:**
+   the sheet's explanation agrees with `source_mirror_probe.py`'s existing
+   applied, refused and mixed-selection cases; no duplicate Swift duration
+   calculation is introduced.
+
+6. **Close the remaining argument-contract coverage gaps.** §11.8 closed
+   the required-list and running-app gaps; do not carry those forward from
+   §11.7. The blanket tick-argument audit and explicit null cases still need
+   a deliberate matrix. `op_table.rs`'s optional-argument comment says
+   absence and null are equivalent, while `edit.rs` has four defaulted plain
+   booleans (`ripple`, both `with_clips`, `rescale_clips`), which are not
+   `Option<bool>`. The current generic Boolean wrong-kind vector tests a
+   string, not null. **Done means:** FFI tests distinguish absent/null/valid
+   values for those fields and nullable controls, correct the contract
+   prose, and cover every tick-taking op against an independent grid
+   expectation. Preserve the existing decoder semantics unless a separate
+   spec decision changes them. Moving nullability into the published table
+   is optional future design, not a prerequisite for these tests.
+
+### 12.3 The commit tail, counted again
+
+The inventory is over current `core/src/edit*.rs`, grouping call sites by
+their enclosing function and reading the branches; an import, comment or
+helper definition is not a call. Counts are not added together: they
+describe overlapping sets.
+
+| Shape | Current count |
+|---|---:|
+| Byte-identical ten-line guard/clone/replace/mint/finish block | **4**: `trim_start`, `trim_end`, `rate_stretch`, `set_speed` |
+| Same ten-line shape in `set_transition_duration` | **1**, but it assigns `slot.start = start`, not `*slot = moved`; the earlier “5 byte-exact” claim is inaccurate |
+| `if let Err(why) = …check_overlap_rule` returning `Outcome::Refused(why)` | **14**, including `roll` |
+| `set_gained_transitions` immediately followed by `self.finish(next)` (including a `return`) | **17** |
+| Functions containing both one of those direct refusal guards and a mint/finish pair | **12** |
+| Of those twelve, functions whose guard tries candidates on `self` | **10**; `roll` is an eleventh pre-trial function but deliberately has no minting call |
+
+The seventeen pairs are nine in `edit_clip.rs`, two in `edit_nest.rs`, one
+in `edit_paste.rs`, three in `edit_time.rs`, one in `edit_transition.rs`
+and one in the later-extracted `edit_transition_shift.rs`. The two remaining
+direct-guard functions, `roll` and `freeze_frame`, are not the same tail.
+`paste` and `unnest` use overlap failures to select a fallback track;
+transition construction uses them to reduce its trial overlap. Turning all
+of those checks into immediate refusals would change the operations.
+
+`finish` is already shared, at `edit_clip.rs:154`: identity detection and
+validation are not duplicated work to claim as this candidate's saving.
+`scope.rs::apply_scoped` also finishes the merged parent after the inner
+operation, where document-wide caps and nesting rules actually apply.
+`set_gained_transitions` creates a minted transition only for newly
+overlapping clips without one. An extraction must preserve all three facts
+and prove its value in the callers, not just move seventeen call pairs.
+
+### 12.4 Deliberate behavior and separate decisions
+
+- **Clamped-edge identities and empty selections:** still documented in
+  `Outcome::Identity`. D2 explicitly left these semantics alone. A more
+  explanatory refusal may be proposed, but is not owed by the completed D2.
+- **Refusal UI:** `ProjectDocument.applyEdit` still beeps for identity and
+  refusal. Showing the core's sentence requires a presentation decision;
+  do not silently turn this into an alert as part of a core refactor.
+- **Grouped no-op undo:** `performGroupedEdit` still opens a group before
+  calling `applyEdit`. The existing `refusal_probe.py` prints the no-op
+  observation as a note. Reproduce it with undo-stack assertions and audit
+  current callers before promoting the old “unreachable” claim into either
+  a guarantee or a new fix. No new runtime conclusion is claimed here.
+- **App-state schemas and nullability:** app-state tools have no core op,
+  and the declared schema differences have reasons. Their hand-written
+  fields are not evidence to revive the retired whole-handler forward.
+- **Other road maps:** #23 (peaks), #27 (zero-duration motion), and #30/#32
+  (transcript caching and keyless reuse) remain in their own work streams.
+  C2 is deferred by the user, not a dependency of this series. Existing
+  human-only checks stay in remaining §4.
+
+### 12.5 Verification of this review
+
+The focused current-core command passed **108/108 tests**:
+
+```sh
+cd core
+cargo test --release --test patch_door --test refusal --test op_table \
+  --test op_schemas --test source_window --test source_invariant \
+  --test source_edges --test scope
+```
+
+The command's eight suite counts are 9, 21, 8, 10, 9, 9, 4 and 38.
+These establish that the selected existing contracts still pass; they do
+not prove the missing normalization and boundary cases above. The source
+and branch review, including the re-count in §12.3, is the basis for those
+remaining work items. This review implements none of them.
+
+`python3 tools/proof/op_argument_proof.py 5340` also passed **133/133**
+against an owned instance of the current Release app, built from the same
+product sources as `49af3f4` during road map 6's final verification. Its
+startup log contained no `Reelcut: ` parity complaint before or after the
+proof. The proof compiled its current-source probe, checked the 57 core ops
+and 77 tools, exercised their required/unknown arguments and the exact
+frame-rate readers, and included C1's current `transcribe` arguments. Only
+this review's app process was terminated afterward.
+
+`git diff --check` passed. No full build, whole proof-tree rerun, source-mirror
+probe, old reference build or destructive extreme-time reproduction was
+claimed for this documentation review. Those checks belong to the future
+work items where they discriminate the behavior being changed.

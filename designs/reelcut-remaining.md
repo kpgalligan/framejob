@@ -755,15 +755,16 @@ account-wide janitor remain outside this fix.
 
 **Where the next work starts, after C1 (2026-09-21).** C1 — captions from
 the cloud — is BUILT, over five pipelines whose record is road map 6 §10.
-Two things are owed by name and neither is a phase that can simply be
-started (the THIRD, C1's reader review, was run on 2026-09-21 and its record
+Two things are deferred, neither a next phase to start
+(C1's reader review was run on 2026-09-21 and its record
 is road map 6 §10.13 — including the independent sceptic pass over it and the
 fix pass that answered that pass's six findings, both the same day):
 
-- **C2, the relay, is blocked on a product decision the user has not made.**
-  Road map 6 §6b: a relay that mints upload URLs needs to know WHO is
-  calling, and nothing in the app has an identity to offer. §6 is designed as
-  far as it can be and has no pipeline until that is answered.
+- **C2, the relay, is deferred by the user (2026-09-21).** The current plan
+  is C1's user-supplied AssemblyAI key; an integrated AI offering for Reelcut
+  users has not been designed. Road map 6 §6 remains a future design
+  reference, and §10.18 records the decision. If C2 is resumed, §6b's
+  identity prerequisite still needs an answer.
 - **`KeychainStore` waits for a stable signing identity.** The key is a
   `0600` file because a rebuilt ad-hoc-signed binary cannot read its own
   Keychain item without a modal and cannot delete it at all (road map 6 §3
@@ -1088,18 +1089,20 @@ road map could try is giving the first breakpoint a lead-in — a ramp that
 starts before the clip does — and re-measuring with `e1_proof.py`'s §5 rows,
 whose window 0 is printed and whose hard-cut row is what would move.
 
-**One deepening candidate, measured and waiting — the COMMIT TAIL**
-(`designs/reelcut-roadmap-7.md` §10.1, and §10.6 which decided it does not
-come along with the source window). Every op in the core ends the same way,
-and the honest count depends on where the block is cut: **5** byte-exact
-copies, **14** `check_overlap_rule` → `Ok(Outcome::Refused(why))` guards,
-**17** `set_gained_transitions` + `self.finish(next)` pairs, **12** functions
-carrying both, and **10** where the guard is the pre-commit trial on `self`
-rather than on `next` — **11** if `roll` is counted, which has the guard and
-the finish but deliberately no `set_gained_transitions`. It shares its
-functions with the source window and nothing else: it is about purity, the
-overlap rule and undo, and it should be judged on that. Phase A of the source
-window left every one of those tails exactly as it found them.
+**One deepening candidate, measured and waiting — the COMMIT TAIL.**
+The current review is `designs/reelcut-roadmap-7.md` §12; §12.3 re-counts the
+code at `49af3f4`, superseding §10.1's inventory for new work: **4** byte-exact
+ten-line blocks and **1** similar block with a different assignment, **14**
+direct overlap-refusal guards, **17** transition-mint/finish pairs, **12**
+functions carrying both and **10** of those trying candidates on `self`.
+`roll` is an eleventh pre-trial function and deliberately does not mint a
+transition. `finish` is already shared; paste/unnest's fallback-track checks
+and transition builders' trial loops are not immediate-refusal tails. The
+candidate needs its own design and a measured deletion, preserving those
+differences. Road map 7 §12.2 puts the outstanding extreme-time and
+frame-grid correctness decisions ahead of that optional refactor, and lists
+the remaining proof gaps separately. None is reopened work on the completed
+source-window phases.
 
 Three small things the closing turned up that a third road map would pick up
 on its way past, none worth a phase: `relink_media` could re-probe the file

@@ -6,8 +6,10 @@ with 5i's LIVE rows run against `api.assemblyai.com` and every earlier proof
 re-run against the final binary (§10.12); the READER REVIEW road map 2 §0's
 practice owes each phase ran on 2026-09-21 and its record is **§10.13**,
 whose closing subsections hold the independent SCEPTIC pass over that review
-and the fix pass that answered its six findings (same day). **C2, the relay, is DESIGNED and not
-built**, and §6b is what blocks it. The spike (C0) RAN on 2026-09-20 and §3
+and the fix pass that answered its six findings (same day). **C2, the relay, is
+DEFERRED by the user (2026-09-21)**: users supply their own AssemblyAI key;
+an integrated AI offering has not been designed. §6 is retained as a future
+design, not the next scheduled phase (§10.18). The spike (C0) RAN on 2026-09-20 and §3
 is its record: all eight of its rows were measured on that date, nothing is
 owed by a row, and the sections each row overturned — §2's two open
 questions, §5a's upload format, §5d's credential store, §5h's `project.yml`
@@ -1334,6 +1336,12 @@ the final binary and quoted "against the N it had at the time".
 
 ## 6. C2 — the relay: the ask's design, specified as far as it can be
 
+**Deferred by the user, 2026-09-21.** The current product uses each person's
+own AssemblyAI key, as C1 already implements. Reelcut has no integrated AI
+plan yet. The options below are retained for that future design; choosing
+an identity system or building a relay is not current road map work. If C2
+is resumed, §6b's identity prerequisite still applies.
+
 ### 6a. What it is for
 
 C2 exists for one reason: Reelcut pays AssemblyAI and the key is
@@ -1540,6 +1548,10 @@ build itself. **Revised 2026-09-21 (c1-close):** it is built, over the five
 pipelines of §10.1; what remains is C1's reader review, a run of its own
 (§10.12), and C2, which §6b blocks. **Revised again 2026-09-21 (the reader
 review):** that review RAN, and its record is §10.13; what remains is C2.
+**Current scope, 2026-09-21 (§10.18):** the user deferred C2 and kept
+user-supplied AssemblyAI keys. C1 is the delivered cloud-caption feature;
+C2 has no scheduled pipeline. The separately filed follow-ups and manual
+checks remain recorded on their own terms.
 
 ---
 
@@ -3836,3 +3848,13 @@ the source-compiled **145/145** proof in §10.16; personal Settings are
 intentionally outside MCP, and the fresh build now includes that changed
 controller. The prior owed fresh build and general built-app cloud proof
 are discharged by this run. No live AssemblyAI request was made.
+
+### 10.18 Product scope — user-supplied keys, C2 deferred (2026-09-21)
+
+The user chose to keep AssemblyAI available through each person's own API
+key for now, because an integrated AI plan for Reelcut users has not been
+designed. C1 already provides that behavior through Reelcut ▸ Settings…;
+this decision requires no app change. C2 is deferred, and §6's relay and
+identity options remain a future design reference. R6-5 records the current
+scope. The open follow-up issues and manual checks are not closed by this
+decision.

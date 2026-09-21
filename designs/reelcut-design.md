@@ -3339,6 +3339,10 @@ assisted import.
   (`designs/reelcut-roadmap-6.md` §3 q7, §5d). A build signed with a stable
   identity could keep it in the Keychain, and `SecretStore` is the protocol
   that lets that be a later conformer.
+  **Current product scope (2026-09-21):** users supply their own AssemblyAI
+  key. The user deferred C2 until an integrated AI offering is designed;
+  the relay-token alternative above remains future scope (road map 6
+  §10.18).
 - **R6-6 — The protocol boundary is the base URL and the credential.** The
   client speaks AssemblyAI's REST API to `AssemblyAIConfiguration`'s base
   URL; the stand-in server, the EU endpoint and a same-protocol relay are
