@@ -1,7 +1,8 @@
 # Reelcut — road map 6: captions from the cloud (AssemblyAI Universal-3.5 Pro)
 
 **Status: DESIGNED, not built; the spike (C0) RAN on 2026-09-20 and §3 is
-its record.** No C1 code is in the tree; the spike's instruments are, in
+its record.** No C1 FEATURE code is in the tree; spec §11's R6 decisions
+and §5h's three tolls are (§10), and the spike's instruments are, in
 `tools/proof/cloud_spike/`. All eight of §3's rows were measured on that
 date, nothing is owed by a row, and the sections each row overturned — §2's
 two open questions, §5a's upload format, §5d's credential store, §5h's
@@ -881,7 +882,7 @@ code, so what changes afterwards is attributable:
 | Toll | File | Now | Cut |
 |---|---|---|---|
 | 1 | `Transcriber.swift` | 934 — over the cap since it landed, and `reelcut-remaining.md` §3 lists it at that number (this table said it did not; read back 2026-09-20) | the language block (`Language`, the two cached lists, `named`, `defaultLanguage`, `language(matching:)`, ~190) → `Transcriber+Languages.swift`; the extractor (`extractSettings`, `extractAudio`, ~130) → `Transcriber+Extract.swift`; `jobs`, `contentLength`, `hasTranscribableClip` (~110) → `Transcriber+Jobs.swift`. Widenings: `contentLength` and `extractAudio` internal, because the cloud run calls both |
-| 2 | `AgentCatalog+Files.swift` | 609 | the three caption entries (`import_captions`, `transcribe`, `export_captions`) → `AgentCatalog+Captions.swift`, spliced where they were, `AgentCatalog+Audio.swift`'s precedent |
+| 2 | `AgentCatalog+Files.swift` | 601 (this table said 609; read back 2026-09-20) | the three caption entries (`import_captions`, `transcribe`, `export_captions`) → `AgentCatalog+Captions.swift`, spliced where they were, `AgentCatalog+Audio.swift`'s precedent |
 | 3 | `TranscribeSheetController.swift` | 505, +≈150 to come | `finish`, `summary`, `truncationText`, `viewDidDisappear` and the menu-command extension → `TranscribeSheetController+Commit.swift` |
 
 Then the feature, in ≤ 400-line files:
@@ -1268,3 +1269,206 @@ the stand-in stays plain HTTP and `project.yml` gains nothing. q5: a bad
 code is refused AT SUBMISSION with the server's own sentence, so the tool
 relays it and carries no second dated table. What remains for C1 is the
 build itself.
+
+---
+
+## 10. C1 — the record
+
+### 10.1 The split, a named deviation from §9
+
+§9 says C1 is one `/litecode` pipeline. It is being run as FIVE sequential
+pipelines instead, because one implementer and one reviewer cannot hold the
+whole of §5h, and because the tolls must be gated alone:
+
+1. **c1-tolls** — spec §11 gains R6-1..R6-8, then §5h's three tolls, each a
+   pure move gated alone. No feature code. **This section is its record.**
+2. c1-parts — the seams of §5h and the pure parts: the extractor
+   generalised plus the FLAC writer, `MediaTranscript`, `SecretStore`, the
+   configuration, the languages table, the client, the cue builder's fifth
+   rule; the probe.
+3. c1-run — `CloudTranscriber`, the MCP mirror, the stand-in server, the
+   MCP proof.
+4. c1-chrome — the Settings window, the sheet, the estimate, the report card.
+5. c1-close — the live rows, the mutants not yet run, every earlier proof
+   re-run, the record, the README.
+
+**"Its own commit" per toll becomes "its own TREE OBJECT."** Nothing is
+committed between pipelines, so each toll's gate is followed by a snapshot
+of the working tree into a temporary index, and the hash is written here so
+a toll can later be turned into a commit of its own. A toll's diff reads
+`git diff <Tn-1> <Tn>`; the whole pipeline's CODE is `git diff cfcd0959 <T5>`
+(T3 plus the review's one header fix, below).
+An untracked file shows in a diff against the BASELINE as wholly deleted,
+which is noise — for one of those, `git show <tree>:<path> | diff - <path>`.
+
+| Tree | What it holds |
+|---|---|
+| `cfcd09598e7ea7ec31ec229c943d1edfc51fc0d3` | the baseline, `HEAD^{tree}` at `7f04e59` |
+| **T0** `44f77338cdcb1cd2cfdb537c8322f77027fe0986` | spec §11's R6-1..R6-8, and nothing else |
+| **T1** `55beb03dcd0c20118e56f0931dbbcfdf9aff0fe5` | toll 1 |
+| **T2** `634ea96b7123b34e02ec0809fca3cccb0d4548f4` | toll 2 |
+| **T3** `2eaa126c54d6a1e41f91948150885f0b944537dc` | toll 3 |
+| **T5** `8f1bfc9edf3a9c5c5a5ea7a32ee87173c9d1860e` | T3 plus the records and the review's one fix — the last CODE tree |
+
+T0 holds the decisions and T1–T3 hold code: every record — this section,
+`reelcut-remaining.md` §3, `reelcut-app-notes.md` and `app/CLAUDE.md` — was
+written after T3, so that every number in them is one a run printed.
+
+The pipeline's reader review found one wrong sentence and it was fixed after
+T3: the file header of `Transcriber+Languages.swift` had the two lists the
+wrong way round (`languages()` is the locales this Mac has an ON-DEVICE
+model for; `supportedLanguages()` is every locale the framework names), and
+five header lines were rewritten to say what the code and the two function
+doc comments below them already said. No code line moved, no line count
+changed — the file is still 172 lines, so every number in these records is
+still the one a run printed — and `make typecheck` (0 errors, 4 warnings),
+`make app` (exit 0), the parity grep (empty), `phase4_proof.py` (84/84) and
+`source_mirror_probe.py` (40/40) were run again on the fixed tree and answer
+as they did at toll 1. T5 is the working tree after that fix (T4 is a
+convenience row in the pipeline's own `04-impl-notes.md`, not here); the tree
+including this paragraph is named in the pipeline's `06-fix-notes.md`, which
+is the only thing that changed after it.
+
+### 10.2 Spec §11, before the code
+
+R6-1..R6-8 are §4's text word for word, appended after D4-6, with exactly
+three reference fixes, because a bare `§` in the spec means the spec's own:
+R6-5's `(§3 q7, §5d)` names this file, R6-5's `(C2)` reads "road map 6's
+C2", and R6-6's `§6d` reads "road map 6 §6d". R6-3's `§5.6` IS the spec's
+and stands. The two bullets those fixes lengthened were re-wrapped at the
+section's own width; no word changed. T0 is that edit alone.
+
+### 10.3 The CONTROL run, R0
+
+Before any toll, at T0: `make app` exit 0, a fresh instance on port 4951
+with the parity log empty, **`phase4_proof.py` 84/84** and, with no
+instance running, **`source_mirror_probe.py` 40/40**. Those two are the
+scores tolls 1 and 3 had to equal on this host, and they are called a
+CONTROL for that reason. phase4's exact-sentence rows read the host's own
+grant word back: **`notDetermined`** — this Mac has never granted Speech
+Recognition to a proof instance, which is a property of the host, not of
+the tolls (TCC attributes a shell-launched binary to the terminal, and the
+prompt needs a frontmost app).
+
+### 10.4 Toll 1 — `Transcriber.swift`
+
+| File | Before → after |
+|---|---|
+| `app/Sources/Transcriber.swift` | 934 → 553 |
+| `app/Sources/Transcriber+Languages.swift` | new, 172 (lines 210–363) |
+| `app/Sources/Transcriber+Jobs.swift` | new, 117 (lines 415–514) |
+| `app/Sources/Transcriber+Extract.swift` | new, 143 (lines 680–806) |
+| `tools/proof/cloud_spike/extract.swift` | 320 → 320 (one comment names the file the settings were copied from) |
+
+Two widenings, both named in §5h:
+
+- **W1 `contentLength(of:)`**, `private static func` → `static func`. **No
+  compiler error demanded it** — its one caller, `jobs`, moved with it —
+  and it is made because §5h names it for the cloud run. It is the one
+  widening in this pipeline the compiler did not arbitrate.
+- **W2 `extractAudio(_:cancel:)`**, `private func` → `func`, same
+  signature. Compiler-forced: with no widening, `make typecheck` printed
+  exactly one error, `app/Sources/Transcriber.swift:356:35: error:
+  'extractAudio' is inaccessible due to 'private' protection level`
+  (`transcribe`, its one caller, stayed behind).
+
+Nothing else widened: `languageLock`, `cachedLanguages`, `cachedSupported`,
+`extractSampleRate` and `extractSettings` are still `private`, every reader
+of them having moved with them. Stored instance properties (`work`,
+`delivery`, `sink`, `recognizer`) cannot live in an extension and stayed,
+with `Job`, `Truncation`, `Outcome`, `TranscribeError`, `CancelToken`,
+Authorization, all of Running and Recognition, and `TaskSink`.
+
+Gate: `make typecheck` 0 errors and the 4 AVFoundation warnings; the move
+check PASS on A, B, C and D with its `--control` FAIL; `make app` exit 0;
+the parity grep empty; **`phase4_proof.py` 84/84, byte-identical to R0's
+output**, and **`source_mirror_probe.py` 40/40**, whose output differs from
+R0's in one line, the probe's own build time.
+
+### 10.5 Toll 2 — `AgentCatalog+Files.swift`
+
+| File | Before → after |
+|---|---|
+| `app/Sources/AgentCatalog+Files.swift` | 601 → 487 |
+| `app/Sources/AgentCatalog+Captions.swift` | new, 165 (lines 51–61, 213–234, 274–367) |
+| `app/Sources/AgentCatalog.swift` | 524 → 525 (one pointer comment, +1 line) |
+
+No widening at all: `fileTools` and the two new functions are members of
+the same internal extension of `AgentServer`. `captionImportTools()`
+returns `import_captions`' row; `captionTools()` returns `transcribe`'s and
+`export_captions`' with their `// MARK: Captions` note and
+`captionFormatNames` / `captionFormatProperty`, the hoisted local only they
+read, which moved with them.
+
+The catalog's ORDER is a contract (`recording_probe.py` reads the last
+eleven names), so the rows are SPLICED back at the two points they left
+rather than appended: `fileTools`'s `return [` became `var rows:
+[[String: Any]] = [` (`AgentCatalog+Clips.swift:242`'s precedent), the array
+is closed and reopened after `import_media` and after `remove_media` with
+`rows += captionImportTools()` and `rows += captionTools()` between, and
+`return rows` closes the function. Each splice carries a three-line comment
+saying it is a splice and why.
+
+Gate: `make typecheck` 0/4; the move check PASS with its `--control` FAIL;
+`make app` exit 0; the parity grep empty; **`op_catalog_proof.py` 23/23**
+(the core declares 57 ops, every one a tool, beside 20 app-state tools);
+and the published answer itself — `tools/list` captured from the app built
+BEFORE the toll (T1) and from the app built after it, the array order kept
+and each object's keys sorted, **`cmp` silent over 77 tools**, with
+`import_captions` at index 67 and `transcribe` and `export_captions` at 72
+and 73 in both. CONTROL: the same before-capture with `transcribe` and
+`export_captions` swapped makes `cmp` fail (char 200178, line 2418), so the
+comparison can see an order change.
+
+### 10.6 Toll 3 — `TranscribeSheetController.swift`
+
+| File | Before → after |
+|---|---|
+| `app/Sources/TranscribeSheetController.swift` | 505 → 380 |
+| `app/Sources/TranscribeSheetController+Commit.swift` | new, 145 (lines 380–463 and 465–505) |
+| `app/Sources/EditorViewController.swift` (FROZEN) | 1123 → 1123 (two comments name the new file; zero net lines) |
+
+Ten widenings, **every one of them compiler-forced**, and the compiler was
+asked twice. With the move made and nothing widened, `make typecheck`
+named nine stored properties, each "inaccessible due to 'private'
+protection level" from `TranscribeSheetController+Commit.swift`: **W3**
+`document`, **W4** `snapshot`, **W5** `token`, **W6** `bar`, **W7**
+`statusLabel`, **W8** `detailLabel`, **W9** `stopButton`, **W10**
+`didStart`, **W11** `didFinish` — `private` dropped in place, nothing else
+on the line. With those nine made it named the tenth, **W12** `finish`,
+at `TranscribeSheetController.swift:343:13` and `:359:56`, `begin` having
+stayed behind. `summary`, `truncationText` and every other private member
+of the class are still `private`. `override func viewDidDisappear()` is
+legal in an extension because it is an Objective-C method
+(`MediaRowView.swift`'s `extension TimelineView` is the precedent).
+
+Gate: `make typecheck` 0/4; the move check PASS with its `--control` FAIL;
+`make app` exit 0; the parity grep empty; **`phase4_proof.py` 84/84,
+byte-identical to R0's output**.
+
+### 10.7 The final tree, and the mirrors
+
+On T3: `make test` **721 tests over 39 binaries, 0 failed, 0 ignored** —
+the last recorded count, unmoved, as it must be with no Rust touched —
+`make lint` clean, `cargo fmt --check` clean, `make typecheck` 0 errors and
+4 warnings, `make app` exit 0. Every instance this pipeline launched was
+killed by the PID `lsof -t -iTCP:4951 -sTCP:LISTEN` named, and `pgrep -f
+"MacOS/Reelcut"` prints nothing.
+
+**The op table's four mirrors are unchanged**: `OP_NAMES` 57 (printed by
+`op_catalog_proof.py`), the catalog 77 tools (printed by the `tools/list`
+capture), `RC_FORMAT_VERSION` 8, and no FFI change — no Rust, header,
+`ReelCore.swift`, op-table or catalog-CONTENT line was touched at all.
+
+### 10.8 What no script reaches, said rather than papered over
+
+`extractAudio`, `languages()` and `defaultLanguage` sit below the Speech
+Recognition grant, which no agent-driven instance can obtain (§10.3), and
+toll 3's `finish`, `summary`, `truncationText`, `viewDidDisappear` and the
+menu command have no MCP or harness caller at all. `phase4_chrome.py` was
+NOT run: `tools/proof/README.md` says it photographs the TextPane Animation
+section and runs the cue builder, never this sheet. For those bodies the
+evidence is the move check's A — each block present in its new file exactly
+once as one contiguous run, byte-identical and in order — plus the
+typecheck and the link. That is weaker than a picture and is recorded as
+what it is.

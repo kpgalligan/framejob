@@ -301,15 +301,17 @@ free.
   `.vtt` from one all-text track, never guessed; a popup built from
   `NSMenuItem`s carrying `representedObject`, because `addItem(withTitle:)`
   REMOVES a same-titled row).
-- `Transcriber.swift` · `TranscribeSheetController.swift` — on-device
-  recognition through the CALLBACK API (spec §11: no second `async`
-  exception) over each clip's source window EXTRACTED to a temporary mono
-  16 kHz WAV; the recogniser's queue is set explicitly because it defaults to
-  MAIN. "Has sound" is `enabled.audio`, not the media's track. One job's
-  failure is reported under `problems` and the run carries on. The SHEET is
-  the only caller of `requestAuthorization`; the tool refuses by status. The
-  tool's refusal ORDER is the caller's own mistakes first, the grant second,
-  the model third, so a headless proof can measure the first tier.
+- `Transcriber.swift` (+`Languages`, +`Extract`, +`Jobs`) ·
+  `TranscribeSheetController.swift` (+`Commit`: the run's one exit, and the
+  menu command with its validator arm) — on-device recognition through the
+  CALLBACK API (spec §11: no second `async` exception) over each clip's source
+  window EXTRACTED to a temporary mono 16 kHz WAV; the recogniser's queue is
+  set explicitly because it defaults to MAIN. "Has sound" is `enabled.audio`,
+  not the media's track. One job's failure is reported under `problems` and
+  the run carries on. The SHEET is the only caller of `requestAuthorization`;
+  the tool refuses by status. The tool's refusal ORDER is the caller's own
+  mistakes first, the grant second, the model third, so a headless proof can
+  measure the first tier.
 
 **Silence and sound.**
 - `SilenceDetector.swift` (+`Walls`) · `SilenceSheetController.swift` ·
@@ -396,55 +398,54 @@ free.
   `untitled(around:)`'s order is a contract, documented there.
 
 **The agent.**
-- `AgentServer.swift` (frozen) and `AgentServer+Project` / `Clips` /
-  `Tracks` / `Media` / `Render` / `History` / `Silence` / `Captions` / `Audio`
-  / `Background` / `Scope` / `Transitions` / `Recording`
-  (+`RecordingArguments`, +`RecordingResult`) — the handlers, one file per
-  group. `AgentCatalog.swift` (+`Clips`, +`Audio`, +`Transitions`, +`Files`,
-  +`Declarations`) — the catalog, spliced in ORDER (`recording_probe.py`
-  reads the last eleven names). **A tool is built one of two ways**: `tool`,
-  which declares its own schema, or `opTool`, which declares PROSE and prints
-  the argument STRUCTURE from the core's published table (`Self.opSchemas`
-  over `rc_op_schemas`). **Every one of the fifty-seven op tools is
-  `opTool`'s** and carries no `"type"`, no `"enum"` and no hand-written
-  required list; `tool`'s remaining callers are the twenty APP-STATE tools,
-  which have no op behind them and so nothing to read from the table — the
-  ten of the Projects group, `AgentCatalog+Audio.swift`'s two composites and
-  the eight file tools, `record_screen` among them. `opTool` goes THROUGH
-  `tool`, so `project` and `scope` are injected by one piece of code either
-  way. `AgentCatalog+Declarations.swift` is the one list of places a tool
-  deliberately takes more or less than its op does — a bare-string body, a
-  boolean's string spellings, a null that MEANS something, a range the core
-  clamps to rather than refusing, a default taken from app state, a list the
-  tool will not take empty — each row carrying the op, the argument, what
+- `AgentServer.swift` (frozen) and `AgentServer+Project` / `Clips` / `Tracks`
+  / `Media` / `Render` / `History` / `Silence` / `Captions` / `Audio` /
+  `Background` / `Scope` / `Transitions` / `Recording` (+`RecordingArguments`,
+  +`RecordingResult`) — the handlers, one file per group. `AgentCatalog.swift`
+  (+`Clips`, +`Audio`, +`Transitions`, +`Files`, +`Captions`, +`Declarations`)
+  — the catalog, spliced in ORDER (`recording_probe.py` reads the last eleven
+  names). **A tool is built one of two ways**: `tool`, which declares its own
+  schema, or `opTool`, which declares PROSE and prints the argument STRUCTURE
+  from the core's published table (`Self.opSchemas` over `rc_op_schemas`).
+  **Every one of the fifty-seven op tools is `opTool`'s** and carries no
+  `"type"`, no `"enum"` and no hand-written required list; `tool`'s remaining
+  callers are the twenty APP-STATE tools, which have no op behind them and so
+  nothing to read from the table — the ten of the Projects group,
+  `AgentCatalog+Audio.swift`'s two composites and
+  `AgentCatalog+Captions.swift`'s three, spliced back at the two points they
+  left, and the five other file tools, `record_screen` among them. `opTool`
+  goes THROUGH `tool`, so `project` and `scope` are injected by one piece of
+  code either way. `AgentCatalog+Declarations.swift` is the one list of places
+  a tool deliberately takes more or less than its op does — a bare-string
+  body, a boolean's string spellings, a null that MEANS something, a range the
+  core clamps to rather than refusing, a default taken from app state, a list
+  the tool will not take empty — each row carrying the op, the argument, what
   the app adds and why, and the schema DECLARES it. A new row is a decision
-  with a reason, like an entry in `opsWithoutTools`; a leniency the tools
-  have never declared is not a row until someone decides to OFFER it,
-  because a schema narrower than what is accepted costs a caller nothing
-  where a wider one is a promise the app breaks.
-  `AgentServer+Parity.swift` is the FIFTH part of the startup parity check —
-  the one part that looks INSIDE an op tool's schema: its arguments must be
-  the core's own (both directions, the envelope's two keys and the
-  declarations list apart), each one must carry a description, and a
-  description whose key is no argument is a complaint rather than a sentence
-  `opTool` drops in silence. Parts 1 to 3 stay in the frozen file with the
-  private dispatch table they read and part 4 in `AgentServer+Scope.swift`
-  with the feature it is about; all five assert in debug, log `Reelcut: ` in
-  release and start the server either way.
+  with a reason, like an entry in `opsWithoutTools`; a leniency the tools have
+  never declared is not a row until someone decides to OFFER it, because a
+  schema narrower than what is accepted costs a caller nothing where a wider
+  one is a promise the app breaks. `AgentServer+Parity.swift` is the FIFTH
+  part of the startup parity check — the one part that looks INSIDE an op
+  tool's schema: its arguments must be the core's own (both directions, the
+  envelope's two keys and the declarations list apart), each one must carry a
+  description, and a description whose key is no argument is a complaint
+  rather than a sentence `opTool` drops in silence. Parts 1 to 3 stay in the
+  frozen file with the private dispatch table they read and part 4 in
+  `AgentServer+Scope.swift` with the feature it is about; all five assert in
+  debug, log `Reelcut: ` in release and start the server either way.
   `AgentServer+Gate.swift` is the CALL-time half of the same contract
-  (kpgalligan/reelcut#21): one comparison in `dispatch`, for all
-  seventy-seven tools, of a caller's keys against the schema the tool
-  published, every stranger refused by name — the tool, the strangers and
-  the whole of what it takes — before the scope or any handler reads a
-  thing. Its map is read once from the catalog string `start()` registered.
-  What it cannot see is a declared argument no handler reads, which is the
-  optional half of `op_argument_proof.py`'s section 3.
-  `target(_:)` resolves the implicit document through
-  `NSApp.orderedDocuments`, never `documents.first`, and an explicit path
-  through `AgentServer.canonical`. `offMainTools` names the handlers that
-  wait for something the main thread must deliver (`import_media`,
-  `transcribe`, `record_screen`, `export`, …); the criterion is "waits on
-  main", not "touches the disk".
+  (kpgalligan/reelcut#21): one comparison in `dispatch`, for all seventy-seven
+  tools, of a caller's keys against the schema the tool published, every
+  stranger refused by name — the tool, the strangers and the whole of what it
+  takes — before the scope or any handler reads a thing. Its map is read once
+  from the catalog string `start()` registered. What it cannot see is a
+  declared argument no handler reads, which is the optional half of
+  `op_argument_proof.py`'s section 3. `target(_:)` resolves the implicit
+  document through `NSApp.orderedDocuments`, never `documents.first`, and an
+  explicit path through `AgentServer.canonical`. `offMainTools` names the
+  handlers that wait for something the main thread must deliver
+  (`import_media`, `transcribe`, `record_screen`, `export`, …); the criterion
+  is "waits on main", not "touches the disk".
 - `AgentServer+Arguments.swift` — the shared argument vocabulary
   (`intArg`, `timeArg`, `rangesArg`, `rawPatchArg`, …), each refusing a
   value it cannot read BY NAME, and ONLY what the core cannot know: target

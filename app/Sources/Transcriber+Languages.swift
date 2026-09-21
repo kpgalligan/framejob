@@ -4,11 +4,11 @@ import Speech
 // MARK: - Transcriber: languages
 
 /// The sheet's language popup and the tool's `language` argument: the
-/// `Language` row, the two cached lists (`languages()`, every locale the
-/// framework knows; `supportedLanguages()`, the ones this Mac has a model
-/// for), the display-name builder behind both, and the two lookups the
-/// callers use — `defaultLanguage(in:)` for the popup's first selection and
-/// `language(matching:in:)` for a tag a person or an agent typed.
+/// `Language` row, the two cached lists (`languages()`, the locales this Mac
+/// has an on-device model for; `supportedLanguages()`, every locale the
+/// framework names), the display-name builder behind both, and the two lookups
+/// the callers use — `defaultLanguage(in:)` for the popup's first selection
+/// and `language(matching:in:)` for a tag a person or an agent typed.
 ///
 /// A pure move out of `Transcriber.swift`, road map 6's C1 toll 1. The block
 /// came here whole and in its own order, with every line byte-identical, and

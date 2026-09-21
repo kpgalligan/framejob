@@ -203,10 +203,12 @@ would be the bare strip with a longer list.
 
 ## 3. The size debt
 
-Every file over the ~600-line cap as of 2026-09-18 — 29 of them, the
+Every file over the ~600-line cap as of 2026-09-20 — 27 of them, the
 list regenerated row by row against `wc -l` at road map 7's D3·6, which
-closed deepening D3. `core/src/edit_track.rs` came off it at D2·3
-(674 → 522, `edit_canvas.rs` cut out of it) and nothing has joined since.
+closed deepening D3, and regenerated again by the command below when road
+map 6's C1 tolls took two files off it. `core/src/edit_track.rs` came off
+it at D2·3 (674 → 522, `edit_canvas.rs` cut out of it) and nothing has
+joined since.
 
 **What deepening D3 did to this list**, measured against `main` rather than
 summed from the tickets (road map 7 §7–§9). `core/src/edit.rs` lost its
@@ -318,6 +320,28 @@ fix pass added the short-pair rows — it gives something up before it takes
 anything on) and `core/tests/crossfade_edges.rs` (**337**). Nothing came off this list and
 nothing joined it.
 
+**What road map 6's C1 tolls did to it** (2026-09-20, `wc -l` against the
+tree as C1's first pipeline found it, `cfcd0959`; road map 6 §10). Three
+pure moves, each gated and tree-snapshotted alone, and **two files came OFF
+this list** — the first time two have in one pipeline.
+`app/Sources/Transcriber.swift` **934 → 553** (the language block, the
+extractor and the job builder out to `app/Sources/Transcriber+Languages.swift`
+(**172**), `app/Sources/Transcriber+Extract.swift` (**143**) and
+`app/Sources/Transcriber+Jobs.swift` (**117**), all well under the 400-line
+cap a new file gets) and `app/Sources/AgentCatalog+Files.swift`, over by one
+line at **601 → 487** (the three caption rows out to
+`app/Sources/AgentCatalog+Captions.swift`, **165**, and spliced back where
+they were). Both rows are struck from the table below, which is what the
+regenerate command now prints. Under the cap already and still under it:
+`app/Sources/TranscribeSheetController.swift` **505 → 380** (the run's one
+exit and the menu command to `app/Sources/TranscribeSheetController+Commit.swift`,
+**145**), which was the toll §5h asked for against the ~150 lines C1's later
+pipelines will add. Two files grew by a pointer and nothing else:
+`app/Sources/AgentCatalog.swift` 524 → **525**, one line of doc naming the
+new file, and the FROZEN `app/Sources/EditorViewController.swift` **1123,
+unchanged to the line** — two comments, both naming a file that moved. It
+stays on the list, having taken nothing on.
+
 Regenerate the list with
 `wc -l app/Sources/*.swift core/src/*.rs | awk '$1>600 && $2!="total"' | sort -rn`
 rather than trusting the numbers here; the standing exemptions are
@@ -341,7 +365,6 @@ row per op.
 | `app/Sources/CanvasSessions.swift` | 1088 |
 | `app/Sources/OptionControls.swift` | 1081 |
 | `core/src/edit_clip.rs` | 1021 |
-| `app/Sources/Transcriber.swift` | 934 |
 | `app/Sources/AudioDSP.swift` | 890 |
 | `app/Sources/AgentServer+Clips.swift` | 847 |
 | `core/src/edit.rs` | 838 |
@@ -354,7 +377,6 @@ row per op.
 | `app/Sources/ClipPane.swift` | 609 |
 | `app/Sources/MediaImporter.swift` | 604 |
 | `app/Sources/CompositionBuilder.swift` | 601 |
-| `app/Sources/AgentCatalog+Files.swift` | 601 |
 
 The notes below are from road map 3's close and name each file's SEAM, which
 is what a phase needs before it pays; the counts in them are as of that day.

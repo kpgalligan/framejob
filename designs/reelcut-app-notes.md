@@ -2076,3 +2076,57 @@ them, the two controls that apply and read back, and the same through
 put back to `intValue` with only `> 0`: **126/133, exit 1**, seven rows red
 and all of them in the new group. `op_catalog_proof.py` is 23/23 either way;
 one row's sentence there moved from `fps must be` to `fps[0] must be`.
+
+## Three caption files, 2026-09-20 — road map 6's C1 tolls
+
+Road map 6 §5h's three size tolls, paid before any cloud-captions code, each
+a pure move landed and gated alone (`designs/reelcut-roadmap-6.md` §10 has
+the trees, the gates and the printed scores). What moved, and where:
+
+**`Transcriber.swift` 934 → 553.** Three blocks left, whole and in their own
+order, each to an `extension Transcriber` of its own:
+`Transcriber+Languages.swift` (**172**) took the `Language` row, the two
+caches and the lock behind them, `languages()`, `supportedLanguages()`,
+`named`, `defaultLanguage(in:)` and `language(matching:in:)`;
+`Transcriber+Jobs.swift` (**117**) took `jobs(for:in:urls:)`,
+`contentLength(of:)` and `hasTranscribableClip(in:)`;
+`Transcriber+Extract.swift` (**143**) took `extractSampleRate`,
+`extractSettings` and `extractAudio(_:cancel:)`. Two members came out of
+`private`: `contentLength`, which no compiler error demanded and §5h asks for
+by name, and `extractAudio`, which one did, `transcribe` having stayed
+behind. Everything else stayed, the instance stored properties (`work`,
+`delivery`, `sink`, `recognizer`) because an extension cannot hold one, and
+`Job`, `Outcome`, `CancelToken`, `TranscribeError`, Authorization, Running,
+Recognition and `TaskSink` because nothing asked them to move.
+`tools/proof/cloud_spike/extract.swift`'s comment now names
+`Transcriber+Extract.swift` as the file its settings were copied from.
+
+**`AgentCatalog+Files.swift` 601 → 487.** The three caption rows —
+`import_captions` from the Media group, `transcribe` and `export_captions`
+with their own `// MARK: Captions` note and the hoisted
+`captionFormatNames` / `captionFormatProperty` only they read — are
+`AgentCatalog+Captions.swift`'s (**165**), in two functions,
+`captionImportTools()` and `captionTools()`. They are SPLICED back at the
+two points they left rather than appended, because the catalog's order is a
+contract: `fileTools` builds `var rows` and reopens the array around
+`rows += captionImportTools()` after `import_media` and
+`rows += captionTools()` after `remove_media`, which is
+`AgentCatalog+Audio.swift`'s shape exactly. Nothing widened — they are
+members of the same internal extension. `AgentCatalog.swift` 524 → **525**:
+one line of doc, since the eight app-state file tools it lists are still
+`fileTools`'s but three of them are now built next door.
+
+**`TranscribeSheetController.swift` 505 → 380.** `finish`, `summary`,
+`truncationText`, `viewDidDisappear` and the menu-command
+`extension EditorViewController` are `TranscribeSheetController+Commit.swift`'s
+(**145**). `override func viewDidDisappear()` is legal in an extension
+because it is an Objective-C method, the way `extension TimelineView`
+overrides `NSView`'s in `MediaRowView.swift`. Ten members came out of
+`private`, every one of them because the compiler said so, asked twice: the
+nine stored properties the two moved methods read (`document`, `snapshot`,
+`token`, `bar`, `statusLabel`, `detailLabel`, `stopButton`, `didStart`,
+`didFinish`) and then `finish` itself, which `begin` still calls from the
+file it left. `summary` and `truncationText` are still `private`: only
+`finish` calls them and it moved with them. The FROZEN
+`EditorViewController.swift` is **1123, unchanged to the line** — two
+comments naming the file the command's body lives at the foot of.
