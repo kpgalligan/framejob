@@ -878,7 +878,7 @@ final class EditorViewController: NSViewController {
     /// forward.
     @objc func removeSilences(_ sender: Any?) { removeSilencesCommand() }
     /// File ▸ Generate Captions… — the body and its validator are at the foot
-    /// of TranscribeSheetController.swift, and File ▸ Export Captions…' are at
+    /// of TranscribeSheetController+Commit.swift, and File ▸ Export Captions…' are at
     /// the foot of CaptionExporter.swift: the same rule as Import Captions'
     /// and Remove Silences', a command living beside the feature it opens.
     @objc func generateCaptions(_ sender: Any?) { generateCaptionsCommand() }
@@ -1105,7 +1105,7 @@ extension EditorViewController: NSUserInterfaceValidations {
             // Silences' body and validator live at the foot of
             // SilenceSheetController.swift, beside the sheet, and phase 4's
             // two caption commands follow the same rule from the feet of
-            // TranscribeSheetController.swift and CaptionExporter.swift.
+            // TranscribeSheetController+Commit.swift and CaptionExporter.swift.
             //
             // Both caption arms are load-bearing, not decoration. Without
             // them the two items fall through to `return true` and are
