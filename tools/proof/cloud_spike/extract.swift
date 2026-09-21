@@ -35,7 +35,7 @@ func fail(_ message: String) -> Never { emit(["ok": false, "error": message]) }
 
 let extractSampleRate = 16000
 
-/// `app/Sources/Transcriber.swift`'s `extractSettings`, copied by hand.
+/// `app/Sources/Transcriber+Extract.swift`'s `extractSettings`, copied by hand.
 let extractSettings: [String: Any] = [
     AVFormatIDKey: Int(kAudioFormatLinearPCM),
     AVSampleRateKey: extractSampleRate,
