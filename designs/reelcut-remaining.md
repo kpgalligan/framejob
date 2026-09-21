@@ -652,9 +652,72 @@ and the closing above added the rest.
   `com.kgalligan.reelcut.assemblyai` was never touched — so there is nothing
   to clean up, only something to look at.
 
+- **`recording_proof.py`'s microphone rows want a WIRED or BUILT-IN input**,
+  found by c1-close's re-run on 2026-09-21. With this Mac's default INPUT
+  device set to a Bluetooth headset (`system_profiler SPAudioDataType` names
+  "Kevin's AirPods Max" as both the default output and the default input),
+  the capture session's first sample lands AFTER the screen stream's, so
+  `mic_offset` is negative where R0 measured +66 and +70 ms, and the
+  microphone file comes out SHORTER than the movie — measured twice, −81.9
+  and −213.3 ms, against a two-frame (67 ms) bound. The script already skips
+  its TONE rows by name for a Bluetooth OUTPUT and has no such arm for a
+  Bluetooth INPUT, so the row FAILS rather than skipping. Nothing in the
+  recorder changed (road map 6's C1 touched no recording file), and what a
+  person can do is re-run it with a wired or built-in input selected and say
+  whether the row passes — and, if it does, whether the script should skip
+  that row by name the way it skips the tone rows.
+
+- **Road map 6 §5j's list, WHOLE, carried here by c1-close (2026-09-21)** —
+  the five things C1 always knew only a person could answer. Three of them
+  are also owed by a bullet above, from the pipeline that met them; they are
+  repeated rather than cross-referenced only, so this list is 5j's list and
+  not a summary of it:
+  - **What q7's prompt actually says**, and whether "Always Allow" survives a
+    rebuild. C0 measured that a rebuilt ad-hoc-signed binary BLOCKS on a
+    `SecurityAgent` modal for the whole twenty-second bound (road map 6 §3
+    q7); nobody was at the machine to read it. That is why the key is a file
+    (§5d), and it is the one q7 question a person can still answer. Also the
+    Keychain bullet above.
+  - **The Settings window's look in both appearances, and Verify's two
+    answers.** The window is photographed and the STATUS mapping is proved
+    against the stand-in; c1-close's live rows never open it. Also the
+    c1-chrome and c1-parts bullets above.
+  - **A real recording of twenty minutes, home upstream**: the phases' feel,
+    whether "Waiting for AssemblyAI · 34 s" reads as patience or as a hang,
+    and the captions' timing by eye against the speech. The live rows upload
+    eleven synthetic seconds over a fast link and nothing else, ever. Also
+    the c1-run bullet above.
+  - **The EU region with an account that has it enabled.** The live rows pin
+    `-ReelcutAssemblyAIRegion us`, which is the only region this account is
+    known to answer in.
+  - **The report card when the FALLBACK ran**, on a Korean or Polish
+    recording. `speech_model_used` is read from the service's own answer and
+    was `universal-3-5-pro` on every live call C1 made; no run in this tree
+    has ever seen Universal-2 answer for a language the newer model declines,
+    so the sentence the card would print has been proved only against the
+    stand-in.
+
 ---
 
 ## 5. Where a third road map would start
+
+**Where the next work starts, after C1 (2026-09-21).** C1 — captions from
+the cloud — is BUILT, over five pipelines whose record is road map 6 §10.
+Three things are owed by name and none of them is a phase that can simply be
+started:
+
+- **C2, the relay, is blocked on a product decision the user has not made.**
+  Road map 6 §6b: a relay that mints upload URLs needs to know WHO is
+  calling, and nothing in the app has an identity to offer. §6 is designed as
+  far as it can be and has no pipeline until that is answered.
+- **`KeychainStore` waits for a stable signing identity.** The key is a
+  `0600` file because a rebuilt ad-hoc-signed binary cannot read its own
+  Keychain item without a modal and cannot delete it at all (road map 6 §3
+  q7). A Developer ID build can have the Keychain back; nothing else has to
+  change.
+- **C1's reader review is OWED.** Road map 2 §0's practice: c1-close was the
+  last build pipeline, and the review of the whole of C1 is its own run,
+  after it. Every residue bullet below is left standing for that reader.
 
 **Residue from road map 6's c1-chrome, 2026-09-20.** Two things that pipeline
 left, neither blocking anything. Its two INHERITED nits — c1-run's reader
@@ -749,7 +812,13 @@ reader review's two nits were left unfixed):
   nine mutants each built in a tree copy and each named with its score (road
   map 6 §10.10). Rows 14 and 18 landed 2026-09-20 in c1-chrome as the
   probe's `estimate` and `chrome` sections (road map 6 §10.11); the live
-  rows 20–21 are c1-close's.
+  rows 20–21 are CLOSED 2026-09-21 by c1-close — `--live` (off by default)
+  runs them through `cloud_captions_live.py` against `api.assemblyai.com`
+  under a ledger with a $0.25 ceiling, and the whole of C1's live spend is
+  TWO transcriptions of the eleven-second `say` fixture — one per live run,
+  22 billed seconds at $0.21 an hour, **$0.00128** — each deleted and proved
+  gone by C0's q6 sentinel (road map 6 §10.12, and
+  `work/cloudlive/ledger.json`'s own six reservations).
 - **`media/speech.mov`'s 16 kHz extract is not repeatable at all**, which is
   a SECOND and larger non-determinism than the one-sample flip above.
   Measured by c1-run: four extracts, four distinct byte strings of ONE length
@@ -773,6 +842,58 @@ reader review's two nits were left unfixed):
   `chrome` section's SHARED fake log is `[]`, which holds only because the
   Verify rows run after it. A count captured before the click and compared
   after would not depend on the order.
+
+**Residue from road map 6's c1-close, 2026-09-21.** Three things the live rows
+measured and deliberately did not fix:
+
+- **`print` is BLOCK-buffered under a file redirect, so every instance log
+  under-reports the client's lines.** `AssemblyAIClient+Session.swift:98`'s
+  `note` prints one line per request; with stdout redirected to a file (which
+  is how every proof instance is launched) Darwin buffers it 4096 bytes at a
+  time and the last line in the buffer is cut in half. MEASURED by c1-close:
+  `/tmp/reelcut-4960.log` holds exactly 4096 bytes of client lines and
+  4970–4972 hold NONE, and road map 6 §10.10's row K read such a log. The
+  live rows answer it in the INSTRUMENT — a `pty` per live instance, drained
+  by a thread that never raises — rather than in the app, because a
+  `setvbuf` or a `FileHandle` in the product would be a change no product
+  behaviour needs. Anything that wants to COUNT an instance's client lines
+  has to use the pty; a log is a lower bound.
+- **`xcodebuild` writes every task's ENVIRONMENT into its build database**,
+  so `make app` run from a shell that exports `RC_ASSEMBLYAI_KEY` leaves the
+  key in `build/Build/Intermediates.noindex/XCBuildData/<hash>.xcbuilddata/`
+  — measured by c1-close's own sweep on 2026-09-21, which found it in two of
+  that folder's four databases (both from builds made before this pipeline)
+  and in six Xcode build trees under a scratch directory. `/build/` is
+  gitignored and nothing under it is tracked, so none of it can reach a
+  commit, and every mutant build the proofs make goes through
+  `cloud_captions_probe.child_env()`, which is why `tools/proof/work/` holds
+  none. The rule this asks for is the one the proofs already follow and a
+  person at a terminal does not: **build with the variable removed** —
+  `env -u RC_ASSEMBLYAI_KEY make app` — and delete those databases (they are
+  a cache; the next build remakes them) on a machine where the key has ever
+  been exported. **What was done about it on 2026-09-21:** the session's
+  orchestrator located the tainted `.xcbuilddata` directories with an
+  in-process comparison that printed paths only, and deleted EIGHT — the
+  repo's two and six under the session's scratch directory; a second pass
+  found TWO more under that scratch directory's `e2rev/copy/build/`, the
+  command that would have removed them was declined, and they were left for
+  the user with their paths. A sweep of the repo, the handoff directories,
+  the memory folder and `/tmp/reelcut-*.log` after the first deletion found
+  the key nowhere else. NOT done, and worth a decision: the `Makefile`'s
+  `app` target could remove the variable itself (`env -u RC_ASSEMBLYAI_KEY
+  xcodebuild …`), so that a person's ordinary `make app` cannot write it —
+  handed to C1's reader review as a finding for its credential reader.
+- **A submit whose transcript id never surfaces cannot be recovered by this
+  tree.** `cloud_spike/aai.py`'s `find_own` matches a transcript by the
+  UPLOAD URL the spike recorded, and the app never exposes its upload URL —
+  `AssemblyAIClient+Session.swift`'s `note` prints a method, a path and a
+  status and deliberately no URL — so `find_own` has no caller in the live
+  rows and one page of the account's transcript list is never fetched. A
+  `POST /v2/transcript` with no id in the lines that followed it therefore
+  closes `unresolved` in the ledger, named for a person, rather than being
+  chased. Nothing has ever printed such a row: C1's live spend is two
+  submits and two ids, one of each per live run, and the ledger wrote no
+  `extra` reservation at all.
 
 
 

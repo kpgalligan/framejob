@@ -1,18 +1,20 @@
 # Reelcut — road map 6: captions from the cloud (AssemblyAI Universal-3.5 Pro)
 
-**Status: DESIGNED, not built; the spike (C0) RAN on 2026-09-20 and §3 is
-its record.** No C1 FEATURE code is in the tree; spec §11's R6 decisions
-and §5h's three tolls are (§10), and the spike's instruments are, in
-`tools/proof/cloud_spike/`. All eight of §3's rows were measured on that
-date, nothing is owed by a row, and the sections each row overturned — §2's
-two open questions, §5a's upload format, §5d's credential store, §5h's
-`project.yml` bullet and toll 1's sentence, three of 5i's claims and §8's
-constants — were REWRITTEN here rather than left standing beside the record
-(§3a lists every one). Everything in §2 was read from AssemblyAI's own
-documentation on 2026-09-17, is cited, and now carries what the service
-actually answered where the two differ. The baseline this was written
-against: schema version 8, `OP_NAMES` 57, the catalog at 77 tools, road map
-4's S1 and road map 5's E1/E2 landed.
+**Status: C1 is BUILT** — captions from the cloud shipped over the five
+pipelines §10 records, the last of them (c1-close) on 2026-09-21, with 5i's
+LIVE rows run against `api.assemblyai.com` and every earlier proof re-run
+against the final binary (§10.12). **C2, the relay, is DESIGNED and not
+built**, and §6b is what blocks it. The spike (C0) RAN on 2026-09-20 and §3
+is its record: all eight of its rows were measured on that date, nothing is
+owed by a row, and the sections each row overturned — §2's two open
+questions, §5a's upload format, §5d's credential store, §5h's `project.yml`
+bullet and toll 1's sentence, three of 5i's claims and §8's constants — were
+REWRITTEN here rather than left standing beside the record (§3a lists every
+one). Everything in §2 was read from AssemblyAI's own documentation on
+2026-09-17, is cited, and now carries what the service actually answered
+where the two differ. The baseline the design was written against, kept as
+written: schema version 8, `OP_NAMES` 57, the catalog at 77 tools, road map
+4's S1 and road map 5's E1/E2 landed — and C1 changed none of them.
 
 Road map 2's phase 4 shipped File ▸ Generate Captions… and `transcribe`
 over Apple's on-device recogniser (`app/Sources/Transcriber.swift`), and it
@@ -1196,6 +1198,26 @@ be outright and needs no frame of tolerance), the DELETE answers
 `http://deleted_by_user` and `text` "Deleted by user." (q6); and **(21)** the second
 run is served from the cache in under a second with no upload.
 
+**Revised 2026-09-21 (c1-close), saying how rows 20 and 21 are MEASURED and
+replacing nothing above it.** There is no fake to read a request log from, so
+what the app's client did is counted from the app's OWN lines: every live
+instance is launched under a `pty` (a redirected `print` is block-buffered on
+Darwin and loses the tail of the buffer — see `reelcut-remaining.md` §5),
+drained by a thread that never raises, and `<method> <path> → <status>` is
+parsed out of those lines. Row 20 is reserved in
+`work/cloudlive/ledger.json` BEFORE the call and then made to say what the
+app did rather than what the row expected: exactly one upload answering 200,
+exactly one `POST /v2/transcript` line of any status and exactly one
+transcript id, and every FURTHER id or unaccounted submit writes an `extra`
+reservation — a fact, not an authorisation — which the $0.25 and
+six-transcription gate then counts against, so an unaccounted submit stops
+the money instead of hiding. Row 21's "no upload" is the strongest form the
+lines can carry: the client says NOTHING AT ALL since the mark — zero lines,
+hence zero `POST /v2/upload` and zero `POST /v2/transcript` — beside the
+result's `cached`/`uploaded` keys and a cache file unchanged byte for byte.
+The numbers these produced on this host, and the spend to the cent, are
+§10.12.
+
 Mutants, each named in the record with its score: the stamp comparison
 deleted (5: uploads twice); the `in` term dropped (3, 5); the DELETE
 removed (2, 4); the retry removed (6); the fifth rule removed (7, 19);
@@ -1455,8 +1477,10 @@ recorded as weaker, and `KeychainStore` waits for a stable signing identity.
 q3: ATS did NOT block the probe, from a bare binary or a signed bundle, so
 the stand-in stays plain HTTP and `project.yml` gains nothing. q5: a bad
 code is refused AT SUBMISSION with the server's own sentence, so the tool
-relays it and carries no second dated table. What remains for C1 is the
-build itself.
+relays it and carries no second dated table. What remained for C1 was the
+build itself. **Revised 2026-09-21 (c1-close):** it is built, over the five
+pipelines of §10.1; what remains is C1's reader review, a run of its own
+(§10.12), and C2, which §6b blocks.
 
 ---
 
@@ -2342,3 +2366,323 @@ baseline is pipeline 3's
 `git diff` of it over `core`, `ReelCore.swift` and `ReelOps.swift` is empty
 (`AgentCatalog+Captions.swift` is untracked, so it is compared with
 `git show <tree>:<path> | diff - <path>`, which is identical).
+
+### 10.12 c1-close — the live rows, the re-runs, and what C1 is
+
+The fifth and last of §10.1's five pipelines, 2026-09-21. Its baseline is
+c1-chrome's final working tree `d22d0f4de4b031eed7a6377c697726aac8c16213`.
+**It changed no product file at all** — `git status` over `app/Sources` is
+byte for byte what pipeline 4 left — and `git diff d22d0f4d -- core` is
+empty. What it added is `tools/proof/cloud_captions_live.py` and
+`tools/proof/cloud_live_ledger.py`, a `--live` flag and a pty-backed
+`Instance` in `cloud_captions_proof.py`, the section-C runner under the
+gitignored `tools/proof/work/c1-close/`, and the documents below.
+
+#### The five pipelines, as trees
+
+Nothing was committed between them; each pipeline snapshotted its working
+tree into a TEMPORARY index (never the real one) and wrote the hash into its
+own record. A record's paragraph cannot hold a hash of the tree that holds
+it, so each pipeline's own number is the tree BEFORE its closing paragraph
+and the next pipeline's baseline is the tree after it; both are given.
+
+| Pipeline | The tree its own record names | What the NEXT pipeline took as its baseline |
+|---|---|---|
+| 1 · c1-tolls (§10.1–§10.8) | **T5** `8f1bfc9edf3a9c5c5a5ea7a32ee87173c9d1860e`, the last CODE tree; T0–T3 are §10.1's table | `515e6a8032071626f8c2a77030db4b249495602b` |
+| 2 · c1-parts (§10.9) | **S2** `f6598273c83b5468e7ee80a554af33392a615d6b` | `10bbbb05eb219319f84f7d5e6c13c775090ba31a` |
+| 3 · c1-run (§10.10) | `870fa0ec4d017fa6c4b2f8a40d1a0bf7ef5cd222` | `c9b8043522c5a91b6045102d182758fd5859d153` |
+| 4 · c1-chrome (§10.11) | `5cc64c21215641e7a99cd3e7d95ace8c6f03a13d` (the review read `2f82b87ed86c2ba39b40581fc215babc191acb5d`) | `d22d0f4de4b031eed7a6377c697726aac8c16213` |
+| 5 · c1-close (this section) | at the end of this section | — |
+
+#### The gate, before a line was written
+
+`make typecheck` **0 errors, exactly 4 warnings** (the baseline four
+AVFoundation deprecations — three in `CompositionBuilder.swift`, one in
+`Exporter.swift`), `make app` **BUILD SUCCEEDED**, `make test` **721 passed,
+0 failed over 39 binaries**, `make lint` clean, `cargo fmt --check` clean,
+`git diff d22d0f4d -- core` empty. Re-run on the final tree after the live
+module landed: `cloud_captions_probe.py` **469/469 in 17 s**,
+`cloud_captions_proof.py` **115/115 in 52 s** — the row count unchanged,
+which is the point, since `--live` runs rows 20–21 INSTEAD of rows 1–11 and
+the flag is off by default.
+
+#### The mutants — twelve already scored, one gap run here
+
+5i's list was read against §10.9–§10.11 and every mutant it names already
+has a score from the pipeline that aimed it. They are NOT re-run; this is the
+table, with the section that measured each:
+
+| Mutant | Score | Against | Recorded in |
+|---|---|---|---|
+| `mapping-no-in` | 180/186, re-aimed 14/24 (`--only mapping`) · 111/115 | probe · proof | §10.9 · §10.10 |
+| `no-fifth-rule` | 179/186 · 114/115 | probe · proof | §10.9 · §10.10 |
+| `no-retry` | 182/186 · 113/115 | probe · proof | §10.9 · §10.10 |
+| `store-0644` | 184/186 | probe | §10.9 |
+| `env-first` | 185/186 | probe | §10.9 |
+| `stamp-drops-field` | 185/186 | probe | §10.9 |
+| `no-speed-guard` | 14/15 (`--only mapping`) | probe | §10.9 |
+| `stamp-always-stale` | 107/115 | proof | §10.10 |
+| `no-delete` | 91/101 | proof | §10.10 |
+| `universal-2-only` | 112/115 | proof | §10.10 |
+| `no-janitor` | 109/115 | proof | §10.10 |
+| `auth-carries-on` | 114/115 | proof | §10.10 |
+| `no-hold` | 111/115 | proof | §10.10 |
+| `no-length-clamp` | 28/30 (`--only jobs`) | probe | §10.10 |
+| `rate-halved` | 438/463 | probe | §10.11 |
+| `no-credential-check` · `masked-shows-value` · `no-ms-clamp` · `empty-closing-detail` | 462 · 461 · 459 · 462 of 463 | probe | §10.11 |
+| `agent-reads-remembered-engine` | 110/115 | proof | §10.11 |
+| `stale-tooltip` · `stale-region-hint` · `two-stores-per-sync` | 75/76 each (`--only chrome`) | probe | §10.11 |
+
+**The one gap, run here.** §10.10 described `no-speed-clamp` — R6-10's clamp
+taken out of `Transcriber.placed` — in a sentence and recorded no N/M for it.
+Run on 2026-09-21 in a tree COPY, `--mutant no-speed-clamp --only mapping`:
+**1/2**, the probe built in 63.7 s and the mapping mode then DIED at its
+first request with *"Fatal error: Double value cannot be converted to Int64
+because the result would be greater than Int64.max"* — the trap the clamp
+exists to stop, carried as that row's failure sentence rather than as a
+traceback. No mutant in this table kept a full score.
+
+#### The LIVE rows — RUN on this host, not skipped
+
+`python3 tools/proof/cloud_captions_proof.py --live --port-base 4980`:
+**37/37 checks, no skip**, twice (8 s and 11 s), the second time on the final
+files. Thirty-six of the thirty-seven are the live module's own, which is
+exactly `LIVE_ROW_COUNT`, printed beside the number the run actually made;
+the thirty-seventh is the probe-build row. The preconditions all held —
+`RC_ASSEMBLYAI_KEY` present (the word, never the value), a TCP connect to
+`api.assemblyai.com:443` inside 5 s, `say` on the host, the ledger clean and
+the gate open — so **nothing here is a skip standing in for a pass**.
+
+What the rows measured, each from the run that printed it:
+
+- **The dummy arm (L0), free.** An instance with NO endpoint override, a
+  DUMMY key in the environment and `-RCSecretFolder` on an EMPTY directory:
+  the real service answered `POST /v2/upload → 401` and the run was refused
+  with *"AssemblyAI refused the API key — check it in Reelcut ▸ Settings"*.
+  The captured client lines were EXACTLY that one line — zero `POST
+  /v2/transcript` of any status, no id — no cache file and no marker were
+  written, and the secrets folder was `[]` before and after. That is R6-9's
+  arm proved against nothing billable, and it is the gate the real key is
+  only used behind.
+- **Row 20 (L1), the round trip.** One `POST /v2/upload → 200`, exactly one
+  `POST /v2/transcript` line of any status and it a `200`, exactly one
+  transcript id. `speech_model_used` is **`universal-3-5-pro`** in the result
+  and in the cache header. `audio_seconds` is **11** — `math.ceil(166218
+  frames / 16000)` from the app's own extractor — and equals the header's
+  `audio_duration`, which is §3 q1's rounding-up, measured again. The
+  provider's **23 words** hold all 23 of the fixture's spoken tokens in
+  order; this host's WAV holds two pauses (**2.72–4.29 and 6.68–7.81 s**, road
+  map 4's own numbers) and **no word overlaps one by a single millisecond**,
+  outright and with no tolerance. `remote_deleted` is true, there is exactly
+  one `DELETE /v2/transcript/<id> → 200` of that one id, and a GET afterwards
+  answers **200** with `audio_url` `http://deleted_by_user` and text *"Deleted
+  by user."* (q6's sentinel).
+- **The provider's bytes, won in a race.** A reader thread GETs the app's own
+  transcript id every 0.25 s and keeps the first `completed` body in memory;
+  it **won with 12 GETs of its own** on the final run, and the cache file's
+  `words` span (row 4's cut) occurs CONTIGUOUSLY in that body and decodes
+  equal to its `words`. The row is a SKIP BY NAME when the app's DELETE wins;
+  it did not, on either run.
+- **Row 21, the cache.** `cached` holds the media and `uploaded` is empty,
+  the answer came back in **0.00 and 0.01 s**, the cues are run 1's cue for
+  cue, the cache file's sha256 is unchanged, and "no upload" is measured as
+  the client saying NOTHING AT ALL: the captured lines since the mark are
+  `[]`, so zero uploads and zero submits.
+- **The key is nowhere.** One in-process comparison over the captured lines,
+  every MCP answer and refusal, the package, the secret folder,
+  `work/cloudlive/` and BOTH instances' `/tmp/reelcut-<port>.log` files:
+  `leaked False, found False`, and only that boolean is printed. Both
+  instances' parity greps are empty and `reader_failed` is false on both.
+
+#### The spend, to the cent, from `work/cloudlive/ledger.json`
+
+Two live runs, **six reservations**, and this is the whole of C1's spend on
+AssemblyAI:
+
+- **2 transcriptions**, one per run, of the eleven-second `say` fixture.
+  Both `created`, both `billed` **11 s** (AssemblyAI's own `audio_duration`),
+  both closed **`deleted`** with the q6 sentinel passing for each.
+- **22 billed seconds at $0.21 an hour = $0.00128.** The ledger's own
+  conservative total — planned seconds for every reservation that was never
+  billed — is `total_seconds()` **66.0** and `dollars()` **$0.0038**, which
+  is what the $0.25 gate counts against. Two of the six transcription slots
+  are used: the four `no_transcript` (the dummy arms) and `no_upload` (row
+  21) rows do not count.
+- **No `extra` reservation was ever written**, which is the interesting
+  number: `account` writes one per submit or id the ledger had not accounted
+  for, and the submit-line count seen (1 per run) equalled the created count
+  (1 per run) every time.
+- **No open and no `unresolved` row**, at the start of each run and at the
+  end of both.
+
+#### Section C — every earlier proof, once, against the final binary
+
+`tools/proof/work/c1-close/rerun.py` (gitignored, beside its
+`results.json`): one script per FRESHLY launched instance on 4985, each
+instance in its own process group with `-RCAssemblyAIEndpoint
+http://127.0.0.1:9` and a disposable `-RCSecretFolder`, each killed by its
+own pid, each parity grep empty; the no-port scripts with NO instance alive;
+every child started from an environment the runner popped
+`RC_ASSEMBLYAI_KEY` out of at its second statement. **41 scripts, 40 at their
+score.** Each is quoted as it printed, against the N it had at the time:
+
+- **MCP:** phase1 66/66, phase2 **86/86** (the request's table said 85; road
+  map 7's D3 pipeline added the row — "its measurement of the defect became a
+  check of the fix" — and 86 is the newest recorded total), phase3 123/123,
+  phase3_silence_scope 8/8, phase4 84/84, phase5 88/88, phase6 168/168,
+  phase7 92/92, phase8 79/79, phase9 216/216, patch_door 261/261, refusal
+  116/116, remaining 79/79, clip_catalog 24/24, op_catalog 23/23,
+  op_argument 133/133, silence2 91/91, e1 99/99 (with the reference build on
+  4986), e2 61/61.
+- **No port:** op_schema_probe 28/28, phase9_probe 48/48, refusal_probe
+  15/15, remaining_probe 170/170, preview_validity_probe 19/19 (5 skipped by
+  name), preview_refresh_probe 0/0 (58 skipped by name), transition_sheet
+  39/39, recording_probe **858/858** (43 skipped by name: 2 the reference
+  tree, 41 "no shareable display — the console is locked or every display is
+  asleep"; 899 is the unlocked total and 858 + 43 is the locked one, which
+  this host is), marquee 28/28, source_mirror 40/40, silence2_probe 76/76,
+  phase2–phase9 chrome 26/26 · 33/33 · 59/59 · 36/36 (45 skipped, the
+  reference tree) · 70/70 · 78/78 · **144/144** (6 skipped by name, the
+  probe could not become key — the documented alternative to 150) · 62/62,
+  e1_chrome 21/21, e2_chrome 35/35.
+- **The one FAIL: `recording_proof.py`, and it is HOST STATE, named.** The
+  row "the microphone file is not SHORTER than the movie by more than two
+  frames" failed twice, with different numbers each time — microphone
+  1227200 vs movie 1276325 ticks (−81.9 ms, `mic_offset` −106.6 ms) and
+  1176000 vs 1304000 (−213.3 ms, `mic_offset` −171.9 ms). `system_profiler
+  SPAudioDataType` names *Kevin's AirPods Max* as this Mac's default INPUT
+  device as well as its default output: a Bluetooth capture session's first
+  sample lands AFTER the screen stream's, so `mic_offset` is NEGATIVE where
+  R0 measured +66 and +70 ms with the microphone LEADING. The script already
+  skips its TONE rows by name for a Bluetooth OUTPUT and has no such arm for
+  a Bluetooth INPUT, so the row fails rather than skipping. **It is not a
+  regression**: C1 touched no recording file at all (`git diff 7f04e59 --
+  app/Sources` names none), and nothing else in the 41 moved. It is in
+  `designs/reelcut-remaining.md` §4 for a person with a wired input, and the
+  re-run was carried on past it by name rather than stopped for good.
+- **The leak sweep**, in process, over every file under `work/c1-close/`
+  (including `results.json`) and every instance log this runner wrote:
+  **False**, printed as the boolean and nothing else.
+
+#### Limits and deviations, said rather than papered over
+
+- **The live module is TWO files, not one.** `cloud_captions_live.py` came
+  out at 692 lines written whole, and the standing rule caps a NEW file at
+  400. The money half — the ledger gate, the line parsing, the deletions and
+  the CONTROLs — went to `cloud_live_ledger.py` (288 lines) and is imported
+  by `cloud_captions_live.py` (389 lines), so every name the spec pins is
+  still reachable on that module. Two files under the cap rather than one
+  over it.
+- **`print` is BLOCK-buffered under a file redirect, and it is not fixed.**
+  `AssemblyAIClient+Session.swift:98` prints one line per request; with
+  stdout redirected to a file, Darwin buffers it 4096 bytes at a time and
+  cuts the last line in half. MEASURED: `/tmp/reelcut-4960.log` holds exactly
+  4096 bytes of client lines and 4970–4972 hold NONE, and §10.10's row K read
+  such a log. The live rows COUNT those lines, so a live instance gets a
+  `pty` and a draining reader instead; instances A, B and C are unchanged,
+  because their rows do not count lines. Any future row that wants a count
+  has to use the pty — an instance log is a LOWER BOUND. Also
+  `designs/reelcut-remaining.md` §5.
+- **`find_own` has no caller, by measurement** — a deviation from this
+  pipeline's request, which expected one. `cloud_spike/aai.py`'s `find_own`
+  matches a transcript by the UPLOAD URL, and the app never exposes its
+  upload URL (`AssemblyAIClient+Session.swift`'s `note` prints a method, a
+  path and a status, deliberately no URL), so the live rows hold one only
+  after a GET by an id they already know. **One page of the account's
+  transcript list is therefore never fetched, by anything, ever.** A submit
+  whose id never surfaces closes `unresolved` in the ledger — named for a
+  person — rather than being chased. No run has printed such a row.
+- **The app's `submit` does not retry today** (`AssemblyAIClient.swift:183–
+  193`, one `send`); only `upload` does, once, and an upload bills nothing.
+  Row 20's submit-count rows therefore guard a REGRESSION and a second
+  media, not a present behaviour. They are still what makes the ledger count
+  what the app did rather than what the row expected.
+- **The root `CLAUDE.md`'s road-map-6 row is still wrong, and this pipeline
+  did not change it.** It has said "DESIGNED and not built" since c1-run
+  (§10.11 named it). The implementer's own operating rules forbid an
+  agent-authored instruction to edit a `CLAUDE.md`, so the one-line
+  replacement is written out verbatim in this pipeline's
+  `04-impl-notes.md` for a person to apply, and the row is named here so it
+  is not rediscovered a third time. `app/CLAUDE.md` was read against the tree
+  and holds no false map entry. **APPLIED 2026-09-21**, after this
+  pipeline's second review, by the session's orchestrator and by hand: that
+  one table row, the replacement text verbatim, on the root file's own
+  standing rule that a phase updates a map entry. No rule text changed.
+- **Two live runs, not one.** The second was made to add the racing reader's
+  own GET count, which §10.12 was asked to hold and the first run did not
+  print. It cost one more transcription inside the six and $0.00064, and it
+  is also the run that proves the rows against the FINAL files.
+- **`recording_proof.py` launches its own second instance on its hardcoded
+  4896**, outside this pipeline's 4980–4989 range. It was not edited; it is
+  named here because a reader counting ports will find it.
+- **`results.json` was rewritten mid-way.** The section-C runner's first
+  session recorded 17 scripts; a later `--only` run without `--resume`
+  replaced the file, and the 17 were re-run to fill it back in (which is why
+  their second timings are shorter — the fixtures were already made). The
+  console output of every session is what the numbers above are quoted from,
+  and the final `results.json` holds all 41.
+
+#### What is owed
+
+- **C1's reader review**, road map 2 §0's practice: a run of its own, after
+  this pipeline, over the whole of C1. Every residue bullet in
+  `designs/reelcut-remaining.md` §5 is left standing for that reader.
+- **§5j's five questions**, carried WHOLE into `designs/reelcut-remaining.md`
+  §4 — the q7 prompt, the Settings window looked at, a real twenty-minute
+  recording over a home upstream, the EU region, and the report card when the
+  FALLBACK ran. Nothing in this tree has ever seen Universal-2 answer for a
+  language the newer model declines.
+- ~~The root `CLAUDE.md` row~~ — applied 2026-09-21, above.
+- **`recording_proof.py` with a wired or built-in input**, above.
+- **C2** waits on §6b, and `KeychainStore` on a stable signing identity.
+
+#### The fix pass (05-review, 2026-09-21)
+
+All four `should-fix` findings and the one nit were fixed. **No live call was
+made and nothing was spent**: the fix pass ran with `RC_ASSEMBLYAI_KEY`
+removed from every process it started, and finding 4 — the only one on the
+money path — was proved with stubs instead of the network.
+
+| Finding | The fix | How it was proved |
+|---|---|---|
+| 1 (`remaining.md`) | the live-spend sentences say **two** transcriptions (one per live run), **22 billed seconds**, **$0.00128**, and that no `extra` reservation was ever written | read back against `work/cloudlive/ledger.json` and the spend section above, which are where those three numbers were printed |
+| 2 (§5i) | a **Revised 2026-09-21 (c1-close)** paragraph on §5i saying how rows 20 and 21 are MEASURED — the pty-counted client lines, the ledger's reservation and its `extra` rows, and "no upload" as ZERO lines of any kind — pointing here for the numbers | the form the section's other revisions take; it adds and replaces nothing above it |
+| 3 (`remaining.md` §5) | the c1-close residue block is blank-lined off and MOVED below the list it had been inserted into, so the order-dependent probe bullet belongs to that list again, and its heading says **Three things** over its three bullets | the counts are the section's own `- **` lines: three under the c1-close heading |
+| 4 (`cloud_captions_live.py`) | `dummy_arm` takes the `Client`, closes its reservation on its MEASURED outcome and, when the arm does NOT hold, runs `cleanup` over its own captured lines before returning — so a submit that got through is deleted and proved gone even though `run` returns before the real instance exists. `Captured` (in `cloud_live_ledger.py`) stands in for the stopped instance's pty | `tools/proof/cloud_live_selftest.py`, a new stub-only self-test: **9/9** on the tree, **6/9** on a tree COPY with the fix's branch reverted (its text asserted to occur exactly once), the three failures being the missing DELETE, the missing q6 sentinel GET and a reservation closed `no_transcript` while holding a `transcript_id` |
+| 5 (nit) | the dummy arm's refusal detail and the exception text `run_row` prints both pass the run's own `Scrubber` (`scrubbed` in `cloud_live_ledger.py`; `live_scrubber` in the proof module) | row C of the self-test: a refusal carrying a registered secret leaves `<scrubbed>` in the details and the secret in none of them |
+
+The spec's Files list also asked for the root `CLAUDE.md`'s road-map-6 row;
+no fix here touched it, and the orchestrator applied it by hand after the
+second review (above).
+
+Files: `cloud_captions_live.py` 389 → **399**, `cloud_live_ledger.py`
+288 → **312**, `cloud_captions_proof.py` 1640 → **1643**, and the new
+`cloud_live_selftest.py` **219** — every cap holds, the live module by one
+line.
+
+Re-run after the fixes, each score from the run that printed it:
+`cloud_live_selftest.py` **9/9** (and **6/9** reverted, above),
+`python3 -m py_compile` clean on the four scripts, and
+`cloud_captions_proof.py` WITHOUT `--live` **115/115 in 52 s** against the
+final binary on ports 4980–4982 — three "the startup parity check said
+nothing" rows, no instance left running. The LIVE rows were NOT re-run: that
+would spend money the ceiling is there to stop, and the fix's own branch has
+a row that fails on purpose without the network. `make typecheck`, `make
+app`, `make test`, `make lint` and `cargo fmt --check` were not re-run
+either: the fix pass touched three proof scripts and two documents and no
+product file at all.
+
+The fix pass's own tree is **`d246836f063f2c1fe44f16e435ae54c7e2fe505f`**, by
+the same temp-index recipe and measured before this sentence, which is the
+only line it does not contain; it supersedes the pipeline hash below.
+
+#### The tree
+
+**`e29b2e4cd9c8f9370511cc782b422156dd37d2f2`** — every line this pipeline
+wrote except this paragraph, by the request's temp-index recipe (never the
+real index; nothing was committed, added, stashed or checked out). It is
+measured before the paragraph rather than after it because a hash of a tree
+cannot be written into that tree; re-run the recipe for the current one. The
+baseline is pipeline 4's `d22d0f4de4b031eed7a6377c697726aac8c16213`, and
+`git diff` of it over `core` is empty — as is every product file: this
+pipeline changed proofs and documents only.

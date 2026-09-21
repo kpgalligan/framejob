@@ -69,6 +69,7 @@ import glob
 import hashlib
 import json
 import os
+import pty
 import re
 import shutil
 import signal
@@ -94,6 +95,19 @@ WORK = os.path.join(HERE, "work", "cloudproof")
 
 DUMMY = "proof-key"
 SEC = 600_000
+
+# The `key=` sentinel for a LIVE instance: the variable is copied by
+# INHERITANCE, out of `os.environ` into the child's environment, and is never
+# bound to a name in this process. `None` is "no credential at all" (row 1's
+# second instance) and a string is a dummy; this is neither.
+INHERIT = object()
+
+# Set by `cloud_captions_live.run` before the first live instance: the
+# `Scrubber` `client_from_env` filled (`cloud_spike/aai.py:207`, the key's one
+# reader), so the pty reader below can TEST a line for the key and clean it
+# before anything is kept. `None` everywhere else, and the fake's dummy needs
+# no scrubbing.
+live_scrubber = None
 BOUND_PORT = re.compile(r"listening on http://127\.0\.0\.1:(\d+)/mcp")
 
 # The words the fake serves for every row that needs a transcript. Five of
@@ -137,7 +151,10 @@ def run_row(row, *arguments):
     try:
         row(*arguments)
     except Exception as problem:  # noqa: BLE001 — a row's throw is its answer
-        check(f"{row.__name__} ran to its end", False, f"{type(problem).__name__}: {problem}")
+        detail = f"{type(problem).__name__}: {problem}"
+        if live_scrubber is not None:
+            detail = live_scrubber.clean(detail)
+        check(f"{row.__name__} ran to its end", False, detail)
 
 
 def skip_rows(count, reason):
@@ -174,34 +191,131 @@ class Instance:
     of this script's business.
     """
 
-    def __init__(self, tag, port, fake, binary, key=DUMMY):
+    def __init__(self, tag, port, fake, binary, key=DUMMY, live=False):
         self.tag = tag
         self.fake = fake
+        self.live = live
         self.secrets = fresh("secrets-" + tag)
         self.log = f"/tmp/reelcut-{port}.log"
         logs[tag] = self.log
         if os.path.exists(self.log):
             os.remove(self.log)
         self.handle = open(self.log, "wb")
-        env = child_env()
+        # The pty reader's state. Empty and unused for a fake-backed instance.
+        self.captured = []
+        self.lock = threading.Lock()
+        self.leaked = False
+        self.reader_failed = False
+        self.master = None
+        self.reader = None
+        if key is INHERIT:
+            # Copied, never read: `dict(os.environ)` carries
+            # `RC_ASSEMBLYAI_KEY` into the child without this process ever
+            # naming its value.
+            env = dict(os.environ)
+        else:
+            env = child_env()
+            if key is not None:
+                # The dummy, never the person's own: `child_env()` has already
+                # taken `RC_ASSEMBLYAI_KEY` out.
+                env["RC_ASSEMBLYAI_KEY"] = key
         env["RC_AGENT_PORT"] = str(port)
-        if key is not None:
-            # The dummy, never the person's own: `child_env()` has already
-            # taken `RC_ASSEMBLYAI_KEY` out.
-            env["RC_ASSEMBLYAI_KEY"] = key
-        self.process = subprocess.Popen(
-            # `-ReelcutCaptionEngine assemblyai` pins the SHEET's memory of
-            # what a person last chose to the wrong answer for a tool, which
-            # is what makes row 8 a real row: R6-2 says an agent call reads
-            # that key never, and an instance where it reads "apple" could
-            # not tell a build that obeys R6-2 from one that does not.
-            [binary, "-ApplePersistenceIgnoreState", "YES", "-AgentServerEnabled", "YES",
-             "-ReelcutCaptionEngine", "assemblyai",
-             "-RCAssemblyAIEndpoint", fake.base, "-RCSecretFolder", self.secrets],
-            stdout=self.handle, stderr=subprocess.STDOUT, env=env,
-            stdin=subprocess.DEVNULL)
+        # `-ReelcutCaptionEngine assemblyai` pins the SHEET's memory of
+        # what a person last chose to the wrong answer for a tool, which
+        # is what makes row 8 a real row: R6-2 says an agent call reads
+        # that key never, and an instance where it reads "apple" could
+        # not tell a build that obeys R6-2 from one that does not.
+        argv = [binary, "-ApplePersistenceIgnoreState", "YES", "-AgentServerEnabled", "YES",
+                "-ReelcutCaptionEngine", "assemblyai", "-RCSecretFolder", self.secrets]
+        if live:
+            # NO endpoint override, so the client speaks to the region's own
+            # host — and the secret folder above is an EMPTY directory, which
+            # is what keeps the person's real store closed (R6-9) and leaves
+            # the environment as the only credential.
+            argv += ["-ReelcutAssemblyAIRegion", "us"]
+        else:
+            argv += ["-RCAssemblyAIEndpoint", fake.base]
+        if live:
+            # A pty, because `note`'s `print` is BLOCK-buffered under a file
+            # redirect: an instance whose stdout is a file writes its client
+            # lines 4096 bytes at a time and cuts the last one in half, and
+            # the live rows COUNT those lines.
+            self.master, slave = pty.openpty()
+            self.process = subprocess.Popen(
+                argv, stdout=slave, stderr=subprocess.STDOUT, env=env,
+                stdin=subprocess.DEVNULL)
+            # The parent's own copy of the slave, closed here: without this
+            # the reader never sees EOF and `stop()` hangs on the join.
+            os.close(slave)
+            self.reader = threading.Thread(target=self._read_pty, daemon=True)
+            self.reader.start()
+        else:
+            self.process = subprocess.Popen(
+                argv, stdout=self.handle, stderr=subprocess.STDOUT, env=env,
+                stdin=subprocess.DEVNULL)
         self.port = self._await_port()
         self.mcp = MCP(self.port, timeout=300)
+
+    def _read_pty(self):
+        """The live instance's stdout, line by line, in BYTES.
+
+        It never raises. `OSError` and an empty read are both EOF (macOS
+        answers `EIO` on the master once the child is gone); any other
+        exception sets `reader_failed` and the thread KEEPS DRAINING and
+        discarding, so the app can never block in `print` with a transcript
+        half made.
+        """
+        tail = b""
+        while True:
+            try:
+                block = os.read(self.master, 65536)
+            except OSError:
+                block = b""
+            if not block:
+                if tail and not self.reader_failed:
+                    self._line(tail)
+                return
+            if self.reader_failed:
+                continue
+            try:
+                pieces = (tail + block).split(b"\n")
+                tail = pieces.pop()
+                for piece in pieces:
+                    self._line(piece)
+            except Exception:  # noqa: BLE001 — the thread's whole failure rule
+                self.reader_failed = True
+                tail = b""
+
+    def _line(self, raw):
+        """One whole line: tested RAW for the key, then cleaned, then kept.
+
+        The log handle is flushed per line because `_await_port` polls that
+        file for the port.
+        """
+        text = raw.decode("utf-8", errors="replace").replace("\r", "")
+        if live_scrubber is not None:
+            for secret in live_scrubber.secrets:
+                if secret in text:
+                    self.leaked = True
+            text = live_scrubber.clean(text)
+        with self.lock:
+            self.captured.append(text)
+        self.handle.write((text + "\n").encode("utf-8", errors="replace"))
+        self.handle.flush()
+
+    def mark(self):
+        """How many lines have been captured — the `since` a row brackets a
+        call with."""
+        with self.lock:
+            return len(self.captured)
+
+    def client_lines(self, since=0):
+        """The `AssemblyAI: ` lines captured since a mark, with that prefix
+        taken off: `POST /v2/upload → 200` and the like."""
+        with self.lock:
+            rows = list(self.captured[since:])
+        prefix = "AssemblyAI: "
+        return [line[len(prefix):] for line in rows if line.startswith(prefix)]
 
     def _await_port(self, seconds=60):
         deadline = time.time() + seconds
@@ -231,6 +345,19 @@ class Instance:
             if self.process.poll() is None:
                 self.process.send_signal(signal.SIGKILL)
                 self.process.wait(timeout=10)
+        if self.live:
+            # The process is dead, so the master is at EOF: the reader ends
+            # of its own accord. The 10 s wall is rule H — an expiry is the
+            # row's measured answer, not a hang.
+            if self.reader is not None:
+                self.reader.join(timeout=10)
+                if self.reader.is_alive():
+                    self.reader_failed = True
+            if self.master is not None:
+                try:
+                    os.close(self.master)
+                except OSError:
+                    pass
         self.handle.close()
 
     def __enter__(self):
@@ -1413,6 +1540,10 @@ def main():
                              "row against it")
     parser.add_argument("--wall", type=float, default=1800,
                         help="the whole run's wall-clock bound in seconds (rule H)")
+    parser.add_argument("--live", action="store_true",
+                        help="road map 6 §5i's rows 20 and 21 against the REAL service "
+                             "INSTEAD of rows 1-11 — this SPENDS money, under "
+                             "cloud_captions_live.py's ledger and its $0.25 ceiling")
     args = parser.parse_args()
 
     started = time.time()
@@ -1443,10 +1574,28 @@ def main():
     probe, error = build(TREE_SOURCES, PROBE_SOURCE, "probe", "cloudprobe")
     check("the probe binary is available for row 2's decoders — an instrument that will not "
           "compile is a FAILURE here, not an exit", probe is not None, error or "")
-    harness, harness_error = build(TREE_SOURCES, open(HARNESS_MAIN).read(), "harness",
-                                   "harness")
-    check("the harness is available for row 3's line-breaking",
-          harness is not None, harness_error or "")
+    harness = None
+    if not args.live:
+        harness, harness_error = build(TREE_SOURCES, open(HARNESS_MAIN).read(), "harness",
+                                       "harness")
+        check("the harness is available for row 3's line-breaking",
+              harness is not None, harness_error or "")
+
+    if args.live:
+        # Rows 20 and 21, and nothing else: the live module opens its own
+        # instances on `port_base + 3` and `+ 4`, against api.assemblyai.com.
+        import cloud_captions_live
+
+        run_row(cloud_captions_live.run, sys.modules[__name__], binary, port_base, probe)
+        tail = ""
+        if skips:
+            tail = (" (" + str(skipped) + " skipped by name — "
+                    + "; ".join(f"{n}: {why}" for n, why in skips) + ")")
+        print(f"\n{passed}/{passed + failed} checks passed{tail} in "
+              f"{time.time() - started:.0f} s")
+        return 0 if failed == 0 else 1
+    print("  (rows 20 and 21 are LIVE and did not run: `--live` is their flag, and it "
+          "SPENDS money)")
 
     fake_folders = []
     try:

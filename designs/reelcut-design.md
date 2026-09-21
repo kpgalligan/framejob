@@ -502,11 +502,22 @@ Consolidate… and a line saying what it does.
   makes burn-in on export free: a caption is an ordinary text clip, so it
   retimes, restyles and renders like one. Malformed entries are reported
   with their line numbers rather than skipped in silence.
-- File ▸ Generate Captions… (road map 2's phase 4)
-  makes the same clips out of SPEECH, on this Mac: a sheet picks the
-  language and the scope (the selection, the in/out range, or everything
-  with sound), and the same card becomes its own progress bar while it
-  runs. It transcribes each clip's own source window, extracted to a
+- File ▸ Generate Captions… (road map 2's phase 4, a second engine in road
+  map 6's C1) makes the same clips out of SPEECH: a sheet picks the ENGINE
+  — **On this Mac**, Apple's own recogniser, or **AssemblyAI**, in the
+  cloud — the language and the scope (the selection, the in/out range, or
+  everything with sound), and the same card becomes its own progress bar
+  while it runs. The cloud engine sends audio off the machine, so the sheet
+  says which files it would upload, how long they are and what they would
+  cost at the published rate BEFORE the button does anything; the key is a
+  `0600` file behind Reelcut ▸ Settings… (⌘,), the words come back into
+  `cache/transcripts/<media>.json` in the package and are re-used by the
+  next run, and the copy at the far end is deleted as soon as it has been
+  read. Road map 6 §5 is its specification and §11's R6 rows are its
+  decisions.
+
+  The rest of this bullet is the ON THIS MAC engine's, unchanged. It
+  transcribes each clip's own source window, extracted to a
   temporary audio file — never the media file as it sits, and never the
   whole of a long recording for the sake of a short clip. macOS gates
   speech recognition behind a grant, and this sheet is the one place the
@@ -1945,7 +1956,8 @@ pass nothing, because each wants the picture rather than a deliverable.
 | `CompositionBuilder.swift` | plan JSON → `AVMutableComposition` + `AVMutableAudioMix` + `AVMutableVideoComposition` (+ `CompositionInstruction`). Since road map 3, `fill` HOLDS a video track's last frame over any part of a segment's source range the track does not cover (§7.2): a screen recording's video track ends at the last screen change while its sound runs on, and AVFoundation inserts the uncovered range without clamping and renders it black |
 | `Compositor.swift` | the `AVVideoCompositing` class and its Metal pipeline (§7.5) |
 | `LayerRenderers.swift` · `LayerRenderersText.swift` | text (Core Text) and shape (Core Graphics) descriptions → premultiplied BGRA `MTLTexture`s, LRU-cached by hash; reports measured text sizes to the overlay; draws a shape's `gradient` (format version 6) by CLIPPING to the path and running `CGGradient`, sorting the stops the core deliberately does not police (§5.2). The TEXT half — the layout caches, the attributed string and the three §5.2 reveals drawn over the recipe's `reveal`, so a reveal can never reflow the box — went out to `LayerRenderersText.swift` under the size rule when phase 6 came to add the gradient |
-| `CaptionImporter.swift` · `CaptionLayout.swift` · `Transcriber.swift` · `CaptionExporter.swift` | captions in both directions: the SubRip grammar; the placement every producer shares (the frame grid, the overlap trim, the Caption preset, the new front-most track); on-device speech recognition and the cue builder over it; and the `.srt` / `.vtt` writer |
+| `CaptionImporter.swift` · `CaptionLayout.swift` · `Transcriber.swift` (+`Extract` `Jobs` `Languages`) · `CaptionExporter.swift` | captions in both directions: the SubRip grammar; the placement every producer shares (the frame grid, the overlap trim, the Caption preset, the new front-most track); on-device speech recognition and the cue builder over it; the extractor, the job list and the language table BOTH engines share; and the `.srt` / `.vtt` writer |
+| `CloudTranscriber.swift` (+`Media`) · `MediaTranscript.swift` · `CloudProgress.swift` · `CloudEstimate.swift` · `AssemblyAIClient.swift` (+`Session`) · `AssemblyAITranscript.swift` · `AssemblyAIConfiguration.swift` · `AssemblyAILanguages.swift` · `SecretStore.swift` | road map 6's C1, captions from the cloud: the run that groups a scope's clips by MEDIA, uploads each file once, maps the words back through every clip's own window and deletes the transcript at the far end; the per-media cache in the package and its stamp; the one progress number and the words beside it; what a run WOULD cost, before the button; AssemblyAI's five REST calls over one `URLSession` with its retry, its poll ceiling and its cancel token; the wire values; WHERE the client speaks and WHAT it says it is (spec §11's R6-6 and R6-9, the one reader of `-RCAssemblyAIEndpoint`, `-RCSecretFolder` and `RC_ASSEMBLYAI_KEY`); the twenty-one languages the popup offers; and the `0600` key file |
 | `MediaImporter.swift` | `AVURLAsset` probing (the **one** place `async`/`await` is allowed — AVFoundation's loading API is async-only going forward), thumbnails via `AVAssetImageGenerator` — the seconds at or past the video track's end ask for its last frame once and hold it, the strip's half of the rule `CompositionBuilder` applies to the picture — peaks via `AVAssetReader` + vDSP, cache files in the package |
 | `Exporter.swift` | picks the pipeline for the core's settings — `ExportWriter` (`AVAssetReader`/`AVAssetWriter`: chapters, explicit bitrates, the loudness gain) or the ImageIO frame sequence for GIF/APNG — runs the loudness MEASUREMENT pass ahead of the write, reports progress, and renders one frame offline for `render_frame` |
 | `ExporterSettings.swift` | the resolved settings in AVFoundation's vocabulary — the time range, the fallback session preset, the file type, the UTI, the extension, `isAudioOnly` — cut out of `Exporter.swift` under the size rule when phase 7 gave `export` and `renderFrame` a `RecipeOptions` argument; `renderFrame` stayed behind because it is the app's only `copyCGImage` call and the build baseline names that warning by file |

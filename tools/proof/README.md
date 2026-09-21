@@ -4012,3 +4012,82 @@ difference is the AAC decode, not the resampler. So row 2's upload-count and
 request claims are made over `speech.mov` and its BYTE population over the
 AIFF, with the .mov's own spread printed as a row beside it, named as the
 reason. Road map 6 §5i·2 was revised, dated, to say the same.
+
+### `cloud_captions_live.py` — the LIVE rows, 20 and 21, which SPEND money
+
+Road map 6 §5i's last two rows, against `api.assemblyai.com` itself. They
+are reached only through `cloud_captions_proof.py --live`, which runs them
+INSTEAD of rows 1–11, and the flag is off by default, so a routine proof run
+cannot spend a cent:
+
+```sh
+python3 tools/proof/cloud_captions_proof.py --live --port-base 4980
+```
+
+**What it spends.** One transcription of the eleven-second `say` fixture —
+about $0.00064 at AssemblyAI's published $0.21 an hour — and nothing else.
+`tools/proof/work/cloudlive/ledger.json` is the spike's own append-only
+ledger (`cloud_spike/aai.py`'s `Ledger`, shared rather than respelled): a
+reservation is written BEFORE every billable call, the gate refuses at
+**$0.25** or at **six transcriptions**, and it counts an `extra` reservation
+for every `POST /v2/transcript` line and every transcript id the APP made
+that the ledger had not already accounted for — so the ceiling counts what
+the app DID, not what the rows expected. Nothing deletes or truncates the
+ledger; an open or `unresolved` row from an earlier run is a FAIL and stops
+the next one before it calls.
+
+**What it uploads.** Only `work/cloudprobe/fixtures/speech.aiff`, the
+synthetic `say` fixture. Never a real recording, never a file from outside
+`work/`.
+
+**What it deletes.** The app deletes its own transcript (R6-4) and the row
+proves it with C0's q6 sentinel — a GET that answers 200 with `audio_url`
+`http://deleted_by_user` and text "Deleted by user." — and `cleanup` runs in
+a `finally` over the set of every id this run's own lines named plus the one
+in the cache file, closing a reservation `deleted` only when the sentinel
+passes for each. Nothing here ever LISTS the account: an id the run did not
+see is an id these files do not know exists.
+
+**The key.** `cloud_spike/aai.py`'s `client_from_env` is its one reader and
+never returns the string. Exactly two processes have it: the app under test,
+which INHERITS it (`key=INHERIT` — never a launch argument, which `ps` would
+show), and the proof's own `Client`, for the read-backs the app cannot do.
+Every other child is `child_env()`'s environment, with the variable removed.
+The leak row compares IN PROCESS over the captured lines, every MCP answer
+and refusal, the package, the secret folder, `work/cloudlive/` and both
+instances' `/tmp/reelcut-<port>.log` files, and prints only a boolean.
+
+**Two instances, both with no endpoint override** and with `-RCSecretFolder`
+pointed at an EMPTY directory, which is the arm of R6-9 that keeps the
+person's real store closed and leaves the environment as the only
+credential. **L0** carries the DUMMY key and is the free control: the real
+service answers `POST /v2/upload → 401`, the run is refused in the key's own
+sentence, and ZERO `POST /v2/transcript` lines are printed — if that arm
+submits anything, the real key is never used at all. **L1** carries the
+person's own, and is row 20 and row 21.
+
+**A pty, not a log file.** `AssemblyAIClient+Session.swift`'s `note` is a
+`print`, and `print` is BLOCK-buffered under a file redirect: an instance
+whose stdout is a file writes its client lines 4096 bytes at a time and cuts
+the last one in half (measured — `/tmp/reelcut-4960.log` holds exactly 4096
+bytes of them and 4970–4972 hold none). The live rows COUNT those lines, so a
+live instance gets a `pty` and a reader thread that splits on `b"\n"` in
+bytes, decodes with `errors="replace"`, treats `OSError` and an empty read
+alike as EOF, and never raises — an unexpected exception sets
+`reader_failed` (a FAIL row) and the thread keeps DRAINING, so the app can
+never block in `print` with a transcript half made. Instances A, B and C of
+the stand-in proof are NOT changed: their rows do not count lines.
+
+**Skips, by name, each counted.** `RC_ASSEMBLYAI_KEY` absent (printed as the
+word `absent`, never the value); no TCP connect to `api.assemblyai.com:443`
+in 5 s; no `say`; the ledger gate refusing; and, inside row 20, the race for
+the provider's own bytes — a GET of the app's own transcript id every 0.25 s
+for at most 30 s, which the app's DELETE can win. `LIVE_ROW_COUNT` (36) is
+what a precondition skip reports, and the run prints the number of checks it
+actually made beside it.
+
+**The money half is `cloud_live_ledger.py`**, imported by the live module so
+every name is reachable on it: the ledger gate, the line parsing
+(`submits`, `uploads_ok`, `ids`, `account`), the deletions and the CONTROLs
+that make each of those fail on purpose in the same process. Two files
+because one would pass the 400-line cap on a new file.
