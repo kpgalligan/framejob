@@ -115,17 +115,16 @@ extension AgentServer {
                     + "limit); \(asked.count) were given.")
         }
 
-        let store = AssemblyAIConfiguration.store()
-        guard let credential = AssemblyAIConfiguration.credential(store: store) else {
-            throw ToolError(
-                message: "No AssemblyAI API key is set. Set one in Reelcut ▸ Settings ▸ "
-                    + "Transcription, or RC_ASSEMBLYAI_KEY for a proof.")
-        }
-        let base: URL
-        do {
-            base = try AssemblyAIConfiguration.baseURL()
-        } catch {
-            throw ToolError(message: error.localizedDescription)
+        let credential = AssemblyAIConfiguration.credential(
+            store: AssemblyAIConfiguration.store())
+        var client: AssemblyAIClient?
+        if let credential {
+            do {
+                let base = try AssemblyAIConfiguration.baseURL()
+                client = AssemblyAIClient(base: base, credential: credential)
+            } catch {
+                throw ToolError(message: error.localizedDescription)
+            }
         }
 
         let context = try onMain { () -> (cache: URL, media: [UInt32: MediaSnapshot]) in
@@ -143,7 +142,7 @@ extension AgentServer {
             speechModels: TranscriptOptions.shippedModels, languageCode: code,
             speakerLabels: speakers, keytermsPrompt: vocabulary)
         let transcriber = CloudTranscriber(
-            client: AssemblyAIClient(base: base, credential: credential),
+            client: client,
             cacheDirectory: context.cache, media: context.media)
         let outcome: Transcriber.Outcome
         do {

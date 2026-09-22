@@ -4,13 +4,13 @@ import Foundation
 /// the package, what is in it, what marks it current, the loader that reads
 /// one per media, THE MAPPING from AssemblyAI's milliseconds to project
 /// ticks, and the janitor's list. `TranscriptStamp`, the marker's own type,
-/// is in `AssemblyAITranscript.swift` with the request it records; this file
+/// is in `TranscriptStamp.swift` with the request it records; this file
 /// stood at 436 lines with it, against the 400-line cap.
 ///
 /// **R6-3: it is a per-media asset of the package.** One upload per media
 /// file, the provider's words stored VERBATIM — their milliseconds, their
 /// confidence, their speaker — beside what was requested and what ran, under
-/// `cache/transcripts/`, stamped on spec §5.6's terms so a relink or a
+/// `cache/transcripts/`, stamped on R6-15's audio-source terms so a relink or a
 /// changed file re-transcribes and nothing else does. Every clip's cues are
 /// derived from it at run time; it is the reversed render's kind of cache,
 /// regenerable at a cost, which is why it travels with the package.

@@ -101,8 +101,8 @@ extension MediaImporter {
         // file whose middle will not decode would be certified by the marker
         // below and its whole undecodable tail proposed for removal in voice
         // mode (measured on a corrupt AAC: the reader stops at 2.05 s of a
-        // 10.4 s file and 8.1 s of it was proposed). `peaks` has the same
-        // shape and its own fix is filed (kpgalligan/reelcut#23).
+        // 10.4 s file and 8.1 s of it was proposed). `peaks` now also
+        // requires a completed reader and full accepted PCM coverage (#23).
         // Refusing here is `writeSpeech`'s stated posture for a reader
         // that will not build or start (§4a): no `.bin`, no marker, retried on
         // the next open, and the media stays `voice_pending` — never quiet —

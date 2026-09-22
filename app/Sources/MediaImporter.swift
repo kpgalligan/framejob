@@ -512,62 +512,34 @@ enum MediaImporter {
 
     /// Writes the waveform for `media` to `cache/peaks/<id>.bin`: the
     /// reader's every sample buffer through `PeakBuckets`
-    /// (`MediaCacheFiles.swift`, which holds the arithmetic and the argument
-    /// for max over RMS), then one atomic write of its floats.
+    /// (`MediaPeakBuckets.swift`), then one atomic write of its floats after
+    /// successful whole-track coverage.
     ///
-    /// Skipped when `peaks/<id>.complete.json` holds `stamp` AND the `.bin`
-    /// is there — the marker is a sibling, not a child, so either can be
+    /// Skipped when `peaks/<id>.complete.json` holds `PeaksStamp(stamp)` AND
+    /// its `.bin` is valid — the marker is a sibling, not a child, so either can be
     /// deleted without the other. Otherwise BOTH go, before anything below
     /// can fail, and a removed `.bin` is posted at once (`clearPeaks` says
-    /// why: nothing that reads a `.bin` asks for its marker first, so an old
-    /// file's waveform left through the rebuild would be drawn and measured,
-    /// and kept for ever by an early return). The three silent returns
-    /// below (no audio track, a reader that will not be built or started)
-    /// write NO marker and no `.bin`, so the next pass retries them, and
-    /// they cost what they cost the first time: an asset load, no samples
-    /// read.
+    /// why: readers may memoize a waveform, so a withdrawal must invalidate
+    /// it). No track, unusable extent, reader failure or incomplete decode
+    /// writes no marker or `.bin`; the next normal pass retries it.
     static func peaks(
         for media: MediaSnapshot, url: URL, stamp: CacheStamp?, into cacheDir: URL
     ) async {
         guard media.hasAudio, media.duration > 0 else { return }
-        let file = peaksURL(for: media.id, in: cacheDir)
-        let marker = peaksMarkerURL(for: media.id, in: cacheDir)
-        if let stamp, readStamp(at: marker) == stamp,
-            FileManager.default.fileExists(atPath: file.path) {
-            return
-        }
+        if peaksAreCurrent(for: media, stamp: stamp, in: cacheDir) { return }
         if clearPeaks(for: media.id, in: cacheDir) {
             postCacheChange(media: media.id, kind: peaksKind)
         }
         let asset = AVURLAsset(url: url)
-        guard let track = (try? await asset.loadTracks(withMediaType: .audio))?.first,
-            let reader = try? AVAssetReader(asset: asset)
+        guard let track = (try? await asset.loadTracks(withMediaType: .audio))?.first else {
+            return
+        }
+        guard let trackRange = try? await track.load(.timeRange),
+            let segments = try? await track.load(.segments),
+            let expected = expectedPeaksRanges(trackRange: trackRange, segments: segments)
         else { return }
-
-        let output = AVAssetReaderTrackOutput(
-            track: track,
-            outputSettings: [
-                AVFormatIDKey: kAudioFormatLinearPCM,
-                AVLinearPCMBitDepthKey: 32,
-                AVLinearPCMIsFloatKey: true,
-                AVLinearPCMIsBigEndianKey: false,
-                AVLinearPCMIsNonInterleaved: false,
-            ])
-        output.alwaysCopiesSampleData = false
-        guard reader.canAdd(output) else { return }
-        reader.add(output)
-        guard reader.startReading() else { return }
-
-        var peaks = PeakBuckets(duration: media.duration)
-        while let sample = output.copyNextSampleBuffer() { peaks.add(sample) }
-        reader.cancelReading()
-
-        guard ensureDirectory(file.deletingLastPathComponent()) else { return }
-        guard (try? peaks.data.write(to: file, options: .atomic)) != nil else { return }
-        // After the `.bin`'s atomic write, so a marker never vouches for a
-        // file that is not there yet.
-        if let stamp { writeStamp(stamp, to: marker) }
-        postCacheChange(media: media.id, kind: peaksKind)
+        writePeaks(for: media, asset: asset, track: track, expectedRanges: expected,
+                   stamp: stamp, into: cacheDir)
     }
 
     // MARK: - Speech

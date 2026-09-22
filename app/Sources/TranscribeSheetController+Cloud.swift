@@ -206,6 +206,13 @@ extension TranscribeSheetController {
     func refreshCloud() {
         let jobs = self.jobs(in: scope)
         let estimate = cloudEstimate()
+        let reusable = estimate?.canReuseWithoutCredential == true
+        let hasCredential = AssemblyAIConfiguration.credential(
+            store: store, environment: environment) != nil
+        hintLabel.stringValue = !hasCredential && reusable
+            ? "Current cached transcripts will be used without an API key or network request."
+            : Self.hint(
+                for: .assemblyai, region: AssemblyAIConfiguration.region(defaults: defaults))
         summaryLabel.stringValue = estimate
             .map { CloudEstimate.describe($0, fps: snapshot.canvas.fps) } ?? "Nothing to transcribe"
         // The WHY, where a person can reach it without it pushing the card
@@ -221,8 +228,7 @@ extension TranscribeSheetController {
         } ?? false
         startButton?.isEnabled =
             !jobs.isEmpty
-            && AssemblyAIConfiguration.credential(store: store, environment: environment) != nil
-            && document?.cacheDirectory != nil && hasWork
+            && document?.cacheDirectory != nil && (hasCredential ? hasWork : reusable)
     }
 
     /// `noteText`'s cloud arm — the three things that are about the CALL and
@@ -230,7 +236,9 @@ extension TranscribeSheetController {
     /// scope holding nothing that can be transcribed.
     func cloudNoteText(jobs: [Transcriber.Job]) -> String {
         var notes: [String] = []
-        if AssemblyAIConfiguration.credential(store: store, environment: environment) == nil {
+        if AssemblyAIConfiguration.credential(store: store, environment: environment) == nil,
+            cloudEstimate()?.canReuseWithoutCredential != true
+        {
             notes.append(Self.noKeyNote)
         }
         if document?.cacheDirectory == nil {
@@ -265,23 +273,25 @@ extension TranscribeSheetController {
     func beginCloud() {
         guard !didStart else { return }
         let request = runRequest()
-        guard let options = request.options, let cache = document?.cacheDirectory,
-            let credential = AssemblyAIConfiguration.credential(
-                store: store, environment: environment)
+        guard let options = request.options, let cache = document?.cacheDirectory
         else {
             NSSound.beep()
             return
         }
-        let base: URL
-        do {
-            base = try AssemblyAIConfiguration.baseURL(defaults: defaults)
-        } catch {
-            // A misconfigured endpoint is a result card, not a beep: the
-            // sentence names what is wrong with it.
-            didStart = true
-            showProgress()
-            finish(.failure(error))
-            return
+        let credential = AssemblyAIConfiguration.credential(
+            store: store, environment: environment)
+        var client: AssemblyAIClient?
+        if let credential {
+            do {
+                let base = try AssemblyAIConfiguration.baseURL(defaults: defaults)
+                client = AssemblyAIClient(base: base, credential: credential)
+            } catch {
+                // A misconfigured keyed endpoint is a result card.
+                didStart = true
+                showProgress()
+                finish(.failure(error))
+                return
+            }
         }
         didStart = true
         let jobs = self.jobs(in: scope)
@@ -291,7 +301,7 @@ extension TranscribeSheetController {
         var records: [UInt32: MediaSnapshot] = [:]
         for entry in snapshot.media { records[entry.id] = entry }
         let run = CloudTranscriber(
-            client: AssemblyAIClient(base: base, credential: credential),
+            client: client,
             cacheDirectory: cache, media: records)
         cloud = run
         // A code the person NAMED comes back as itself; only an absent one
@@ -305,9 +315,20 @@ extension TranscribeSheetController {
             },
             completion: { [weak self] outcome in
                 guard let self = self else { return }
-                // Before `finish`, which is what reads them.
-                self.cloudReport = run.report
-                self.finish(outcome)
+                self.finishCloud(outcome, report: run.report)
             })
+    }
+
+    /// A Stop between worker success and main delivery still prevents placement.
+    func finishCloud(
+        _ outcome: Result<Transcriber.Outcome, any Error>, report: CloudTranscriber.Report
+    ) {
+        precondition(Thread.isMainThread)
+        cloudReport = report
+        if case .success = outcome, token.isCancelled {
+            finish(.failure(Transcriber.TranscribeError.cancelled))
+        } else {
+            finish(outcome)
+        }
     }
 }

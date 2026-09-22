@@ -73,7 +73,8 @@ detail there.
   `MotionProps.dictionary` always writes all three keys, `NSNull` for a nil
   slot, because a core patch of `motion` deep-merges — it is the
   APP's writer saying all three slots, not a replace rule, and it is the only
-  edge that writes a whole motion.
+  edge that writes a whole motion. `MotionEdge` also supplies nonpersisted
+  zero-duration activity and inactive display/menu titles (E2-27).
 
 **The document.**
 - `ProjectDocument.swift` (+`DisplayStem`, +`Recording`) — NSDocument,
@@ -87,15 +88,20 @@ detail there.
   handle, and `project` still means the parent for save, export and
   consolidate. A range is cleared on every scope change: a pair of ticks
   means one thing inside a nest and another to an export.
-- `MediaImporter.swift` (+`Probe`, +`Speech`) · `MediaCacheFiles.swift` ·
+- `MediaImporter.swift` (+`Probe`, +`Speech`, +`Peaks`) ·
+  `MediaPeakBuckets.swift` · `MediaCacheFiles.swift` ·
   `FFmpegRewrap.swift` · `AppSupport.swift` — the import funnel and the
   three per-media caches (`thumbs/`, `peaks/`, `speech/`) inside the package.
   `async`/`await` is confined to `MediaImporter.swift`; the await-free halves
-  are the `+` files and `MediaCacheFiles`. A cache is CURRENT when its
+  are the `+` files, `MediaPeakBuckets` and `MediaCacheFiles`. A cache is CURRENT when its
   `complete.json` marker matches `CacheStamp` (the source's size and
   modification second plus the constants that size the cache — no path, so a
   moved or consolidated package keeps its caches); the marker is written
-  LAST and only for a strip the pass can vouch for; a stale cache is deleted
+  LAST and only for a strip the pass can vouch for. Peaks alone wrap the
+  unchanged source stamp in `PeaksStamp` version 1 and require a complete
+  selected-track decode, valid PCM coverage and a usable record-sized
+  Float32 payload; legacy or malformed peaks are unavailable until rebuilt.
+  A stale cache is deleted
   first and a withdrawn peaks `.bin` is POSTED at once; passes for one media
   run one at a time in call order through `CacheLedger` (an `NSLock`, not an
   actor). The cache order is thumbnails → peaks → speech. `thumbnails` holds a
@@ -146,7 +152,8 @@ the key map behind it.
   `+Nest` (⌘G / ⇧⌘G), `+NestScope` (⌘↓ / ⌘↑ and the double-click that enters
   a nest; the three marker commands validate OFF inside one, because a
   nest-local tick sent unscoped would land at the wrong project time),
-  `+Motion` (Clip ▸ Motion ▸, one `set_video` PER CLIP), `+Export` (the
+  `+Motion` (Clip ▸ Motion ▸, one `set_video` PER CLIP; inactive stored edge
+  titles refreshed at validation), `+Export` (the
   dialogs), `+SaveFrame` (⌥⌘E; renders off-main on `frameGrabQueue`; passes
   no burn-in), `+PreviewQuality`, `+Eyedropper` and `+ZoomRegion`.
 - The two modal canvas modes (`+Eyedropper`, `+ZoomRegion`) install a bare
@@ -165,7 +172,7 @@ the key map behind it.
   points ↔ lanes conversion; `rowTop` is a prefix sum because S/M/L drives
   real heights per track KIND) · `TimelineBar.swift` · `TimelineClipDrawing.swift`
   (a clip is ONE object: body, name strip with the kind symbol, label dot,
-  motion wedges, filmstrip under a tint wash, waveform, grips on the
+  motion wedges for active edges only, filmstrip under a tint wash, waveform, grips on the
   selected clip, hatched transition zone) · `TimelineSessions.swift` (drag,
   trim, slip, roll sessions) · `TimelineView+Rename` (the one inline editor
   for clips, tracks and markers; it drops an unchanged and an empty commit,
@@ -197,7 +204,9 @@ the key map behind it.
   +`Motion`) · `AudioPane.swift` · `TextPane.swift` · `ShapePane.swift` ·
   `DocumentPane.swift` (reads `documentSnapshot`, never the scoped one: its
   ops are document-level) · `OptionControls.swift` (the descriptor-driven
-  row controls).
+  row controls). `VideoPane+Motion.swift` owns the local wrapping
+  `MotionInactiveNote` for selected zero-duration edges; it refreshes with
+  the section and leaves stored kind and Duration editable.
 - Pitfalls, each measured: **a section factory is not a section until
   `makeSections()` calls it** — nothing type-checks the omission, and two
   phases shipped a section invisible in the app; `editedList` — a write of a
@@ -303,17 +312,19 @@ free.
   `.vtt` from one all-text track, never guessed; a popup built from
   `NSMenuItem`s carrying `representedObject`, because `addItem(withTitle:)`
   REMOVES a same-titled row).
-- `CloudTranscriber.swift` (+`Media`) — `TranscriptionEngine` (`apple` |
+- `CloudTranscriber.swift` (+`Report`, +`Media`) — `TranscriptionEngine` (`apple` |
   `assemblyai`, persisted under `ReelcutCaptionEngine`) and the cloud engine
   over the SAME `Transcriber.Job` / `Outcome` / `CancelToken`. `run` is its
   serial queue and the main-thread completion; `transcribe` is the
   synchronous body — the janitor FIRST, the jobs grouped by MEDIA, each
   media classified cached / HELD / to upload, then each job's words cut out
-  of its media's one transcript. `Report` is what the `Outcome` has no room
+  of its media's one transcript. `+Report` holds what the `Outcome` has no room
   for (`uploaded` with the initial transcript-write result, `cached`,
-  `janitorDeleted`, `janitorFailed`, `held`) and owns the shared cleanup
-  warning wording for the sheet and MCP result or failure;
-  `truncations` is always empty. One media's failure is one media's problem
+  `janitorDeleted`, `janitorFailed`, `janitorDeferred`, `held`) and owns the
+  shared cleanup warning wording for the sheet and MCP result or failure;
+  `truncations` is always empty. A nil client admits only a nonempty, entirely
+  current batch and skips janitor/network, retaining pending IDs as deferred.
+  One media's failure is one media's problem
   and the run carries on, with exactly two exceptions: a CANCEL and a
   REFUSED KEY. `+Media` holds `retryDeletes` and `fetch` — the ten-hour
   refusal BEFORE the extract, the `defer` that removes the temporary audio on
@@ -329,7 +340,8 @@ free.
   media R6-11 will hold is its OWN clause and its line carries what it would
   cost if the delete clears. `facts(jobs:media:cacheDirectory:)` is the ONE
   member that opens a file, so a sheet can recompute the readout per
-  keystroke. Its classification is deliberately NOT shared with
+  keystroke. `canReuseWithoutCredential` is true only for nonempty all-cached
+  rows and gates the keyless sheet. Its classification is deliberately NOT shared with
   `CloudTranscriber`'s — one says what a run WOULD do, the other what it DID
   — and a probe row compares them.
 - `CloudProgress.swift` — the cloud run's one number and the words beside it,
@@ -343,9 +355,12 @@ free.
   `TranscriptOptions`,
   `TranscriptRequest` (whose `encode` is the whole wire body — `language_code`
   absent for auto, `keyterms_prompt` absent when empty), `TranscriptWord`,
-  `TranscriptResponse`, `TranscriptStamp` (the cache marker: a `CacheStamp`
-  plus the REQUEST) and `JSONValueRange`. Nothing here speaks HTTP or touches
-  disk. **Three encoders write every key with nil as `null`** through
+  `TranscriptResponse` and `JSONValueRange`. `TranscriptStamp.swift` owns the
+  cache marker: `TranscriptSourceStamp` projects `CacheStamp` to size,
+  modification second, duration and audio presence, then pairs those with
+  the provider and REQUEST (R6-15); old wide markers decode by projection.
+  Nothing here speaks HTTP or touches disk. **Three encoders write every key
+  with nil as `null`** through
   `encodeOrNull`, because `encodeIfPresent` would drop a key a cache file and
   its marker have to carry; `TranscriptResponse` reads `words` through a
   `try?` so the CLIENT's rule about a missing words array is the sentence a

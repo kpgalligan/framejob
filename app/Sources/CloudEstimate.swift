@@ -167,7 +167,7 @@ struct CloudEstimate: Equatable {
             reason = .refresh
         } else if facts.marker == nil || !facts.cacheReads {
             reason = .notCached
-        } else if let marker = facts.marker, marker.source != source {
+        } else if let marker = facts.marker, marker.source != wanted.source {
             reason = .fileChanged
         } else {
             reason = .requestChanged(changed(facts.marker, wanted))
@@ -195,6 +195,11 @@ struct CloudEstimate: Equatable {
         rows.filter { if case .awaitingDelete = $0.fate { return true } else { return false } }
     }
     var unreadable: [Row] { rows.filter { $0.fate == .unreadable } }
+
+    /// A keyless run is admitted only when every distinct media is current.
+    var canReuseWithoutCredential: Bool {
+        !rows.isEmpty && rows.allSatisfy { $0.fate == .cached }
+    }
 
     /// The audio this run would upload, in ticks.
     ///

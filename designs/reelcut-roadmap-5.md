@@ -2285,7 +2285,8 @@ file would have been FILED; none was.
   0, normalise it away, or stop claiming it — is a spec §11 decision, and
   `text.animation`'s deliberately 0-legal timings argue both ways, so
   **FILED kpgalligan/reelcut#27** with `bug` and `spec` rather than patched.
-  (Lead L8.)
+  (Lead L8.) **RESOLVED by E2-27 (§11 and §13 below):** zero stays stored and
+  editable, while the timeline, inspector and menu disclose inactivity.
 - **R3·3** [E2] `app/Sources/InspectorPane.swift:1364-1367`,
   `VideoPane+Motion.swift:77` — the three undo names for one write ("Set
   Motion" from the menu, "Motion In" … from the section's rows, "Video
@@ -2625,3 +2626,53 @@ mutant was built from.
   pick up — a lead-in on the first breakpoint, re-measured against
   `e1_proof.py` §5's hard-cut row. Nothing is filed on the tracker for it
   and no fix is attempted here: AVFoundation is what does it.
+
+---
+
+## 13. Issue #27 — zero-duration motion presentation (2026-09-22)
+
+**Decision.** Spec §11's E2-27 keeps zero-duration In/Out legal, stored and
+inactive, preserving D7-3 and the core's render-time contract. The UI names
+the configured kind and its inactivity rather than treating the slot as
+absent. A positive Duration reactivates it; None/Reset clears it. R3·2 above
+is resolved on this basis.
+
+**Implementation.** `MotionEdge.isActive` supplies the single presentation
+test; its display and menu helpers attach `inactive` or `some inactive` to
+stored kinds without changing Codable or defaults. The timeline gates both
+wedges before the 2 pt positive-edge minimum. The Motion section shows the
+first clip's inactive kind in its summary, keeps its popup and actual zero
+Duration editable, and adds a selection-aware wrapping note before the rows.
+Menu validation regenerates kind titles on every call and retains the
+existing checkmark rules. Core motion, FFI, schema and format are unchanged.
+The focused FFI test covers the write boundary, snapped sub-frame values,
+first/middle/last recipe equality, one-frame In, exclusive-end one-frame Out,
+two-frame Out at 0.75 × base opacity, persistence and final-slot clearing.
+
+**Verification.** `cargo fmt --check`, `make test`, `make lint`, `make
+typecheck` (zero errors, four existing AVFoundation warnings), `make app`
+(`BUILD SUCCEEDED`) and `git diff --check` passed. The final offscreen
+`e2_chrome.py` scored **52/52**: zero In/Out/both match the no-motion name
+strip pixel for pixel; one-frame positive edges draw their minimum wedge;
+the actual-source probe checks titles, notes, controls, per-clip preservation,
+Reset and undo. The note measured 41 pt actual and intrinsic height at 271 pt
+width, with 7 pt to the In row; the expanded `zero-open.png` was inspected
+and shows two full lines without overlap. The owned Release app on port 5427
+had no `Reelcut: ` startup complaint and `e2_proof.py` scored **69/69**,
+including save/reopen, first/last PNG equality, reactivation and undo.
+
+**Discrimination.** A complete copy of the current dirty author tree with
+`MotionEdge.isActive` forced to `true` built successfully in isolation.
+Its `e2_chrome.py` scored **41/52**, failing the zero-wedge, inactive title,
+note and mixed-selection assertions while positive controls still ran.
+The pristine tree reran **52/52** after that mutant. The litecode issue #27
+handoff carries the full logs, mutant diff and issue-only diff against the
+captured pre-edit working tree, including its pre-existing dirty documents.
+The first focused Rust test attempt used the wrong fixture variant (`rect`),
+fixed to `rectangle`; the first chrome probe attempted a Python constant in
+generated Swift, and the second expected unsnapped 0.25 s rather than the
+core's 160,000 ticks. All three mistakes were in instruments and were
+corrected before the final scores above.
+
+**Owed.** §6g's hands-on motion judgment remains for a person at the machine.
+Final reader review passed with no findings (`02-issue-27/05-review.md`).

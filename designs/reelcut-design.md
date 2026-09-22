@@ -358,7 +358,9 @@ Chroma key — or to a media source, which is Speed.
   so each clip keeps its own other slots, and it lands on the base props
   even inside an action, since motion is not an animation target. Also
   Clip ▸ Motion ▸; the timeline's name strip draws the in/out wedges and a
-  During glyph.
+  During glyph. A stored zero-duration In or Out stays selected and editable
+  but is explicitly marked inactive in the summary, selection note and menu;
+  it draws no wedge (E2-27, §11).
 
 **Audio sections** — clips whose media has an audio track and whose audio
 is enabled.
@@ -1270,9 +1272,11 @@ Talk.reelcut/
     thumbs/<media id>/<index>.jpg
     thumbs/<media id>/complete.json    # completion marker, written LAST (below)
     peaks/<media id>.bin        # f32 max-magnitude per bucket, 100 buckets/s
-    peaks/<media id>.complete.json     # its marker, a sidecar; the .bin keeps its name
+    peaks/<media id>.complete.json     # {"source": CacheStamp, "version": 1}, written last
     speech/<media id>.bin       # f32 Silero VAD probability per 32 ms chunk (road map 4)
     speech/<media id>.complete.json    # its marker, a sidecar carrying the model and chunk size
+    transcripts/<media id>.json         # provider words and request, regenerable at a cost
+    transcripts/<media id>.complete.json # four-field source and request marker, written last
     reversed/<media id>-<digest>.mov   # pre-rendered reverse (M3)
   media/                # only after Consolidate (M3)
 ```
@@ -1368,6 +1372,20 @@ a content hash, for the reason the digest gives. Passes for one media run
 one at a time and in the order they were asked for, so two sources can never
 interleave under one marker; a queued pass re-reads the marker when its turn
 comes and usually finds nothing to do.
+
+**Transcript markers** use R6-15's separate source identity: byte size,
+rounded modification second, recorded duration and audio presence, followed
+by provider and request. Their `source` object carries exactly those four
+keys. Older ten-field markers decode by reading those same four keys and
+ignoring the six display-cache fields, even when those values differ; a
+current marker and readable transcript are reused without rewriting either
+file. A fresh fetch writes the narrow marker only after the transcript file
+is written. Missing or malformed required source fields are cache misses.
+The transcript remains a per-media cache that travels with the package.
+R6-16 allows a nonempty entirely current batch to be reused without an API
+key or network; such a run skips the janitor and reports every pending deletion
+ID as deferred. Explicit refresh requires a key, and keyed runs retain the
+remote-delete janitor.
 
 **Transcription extracts are not a cache entry at all.** Generating
 captions (§4.3, §7.9) writes each clip's own source window to a temporary
@@ -1981,7 +1999,7 @@ pass nothing, because each wants the picture rather than a deliverable.
 | File | Owns |
 |---|---|
 | `ReelCore.swift` · `ReelOps.swift` · `ReelEdit.swift` · `ReelOpSchema.swift` | the core's edge. `ReelCore.swift` is the **only** `rc_*` caller: `ReelProject` (handle + lazy `ProjectSnapshot`), `RecipeSource`, the typed patches, and the op table read BACK — `ReelOp.coreNames()` over `rc_op_names` and `ReelOp.coreSchemas()` over `rc_op_schemas`, which `AgentCatalog.opTool` prints (§7.9). `ReelOps.swift` is the typed op builders, cut out of it under the size rule — one factory per row of the op table, plus the eleven RAW factories that forward a caller's own object; `ReelEdit.swift` is the three arms an edit answers (§5.5) and `ReelOpSchema.swift` the value `coreSchemas()` answers, both their own files because neither names an `rc_*` symbol |
-| `MotionProps.swift` | `video.motion`'s Swift vocabulary (format version 8): `EdgeMotion` and `DuringMotion` with their display names, `MotionEdge`, `MotionDuring` and `MotionProps`, all decoded leniently and all with the core's own defaults mirrored rather than derived. Its `dictionary`s live here rather than beside every other property type's in `ReelCore.swift`, which is far over the ~600-line cap — and `MotionProps.dictionary` ALWAYS writes three keys, `NSNull` for a nil slot, because a core patch deep-merges a motion (§6) and a slot left out would leave the old one in place. Since D1·3 it is the ONLY writer of a whole motion: an agent's patch is the caller's object, forwarded unread, and merges slot by slot |
+| `MotionProps.swift` | `video.motion`'s Swift vocabulary (format version 8): `EdgeMotion` and `DuringMotion` with their display names, `MotionEdge`, `MotionDuring` and `MotionProps`, all decoded leniently and all with the core's own defaults mirrored rather than derived. `MotionEdge` also supplies nonpersisted activity and inactive display/menu titles (E2-27). Its `dictionary`s live here rather than beside every other property type's in `ReelCore.swift`, which is far over the ~600-line cap — and `MotionProps.dictionary` ALWAYS writes three keys, `NSNull` for a nil slot, because a core patch deep-merges a motion (§6) and a slot left out would leave the old one in place. Since D1·3 it is the ONLY writer of a whole motion: an agent's patch is the caller's object, forwarded unread, and merges slot by slot |
 | `ProjectDocument.swift` | NSDocument, `.reelcut` package read/write, the single mutation point (`applyEdit`, live-edit trio), undo as a handle stack, dirty counting, and the FIVE pieces of view state (playhead, selection, in/out range, `selectedMedia`, `nestPath`). `nestPath` is §4.4's nest scope as the PATH it was entered by — one step per level, each naming the nest and the nest CLIP that showed it, because a nest can be shown by two clips at two different starts. `scope` is its last step's nest and is what every op is stamped with (`ReelOp.scoped(_:)`), except the seven the core refuses inside a nest, which are sent unscoped; `editedProject` is the memoised `rc_project_scoped` handle every view of the TIMELINE draws from, where `project` stays the document for save, export, captions, consolidate and the Document and Media tabs |
 | `EditorViewController+NestScope.swift` · `TimelineView+NestScope.swift` | going inside a nest and coming back out (§4.4): Open / Close Nest, the double-click, the playhead mapping, and the breadcrumb the ruler draws in the corner over the track headers — one stored property, one closure, one draw call, one hit token and one gesture case in the frozen `TimelineView.swift`, `TimelineView+Candidates.swift`'s split exactly |
 | `Playback.swift` · `EditorViewController+PreviewQuality.swift` · `PreviewWindowController.swift` | `AVPlayer` + `AVPlayerItem` over the plan; the rebuild-vs-refresh decision (§7.6); coalesced exact seeks; JKL rates; loop range; `preferredMaximumResolution` = canvas size. **Preview Quality** (View ▸ Preview Quality ▸ Full / Half / Quarter) scales the PLAYER's render size on a `mutableCopy()` of the built video composition, so `CompositionBuilder.build` is untouched and the export and `render_frame` paths are UNREACHABLE from the setting rather than merely unchanged by it; the size always carries the canvas's EXACT aspect (`m · (w/g, h/g)`, `g = gcd(w,h)`, `m = ceil(g/divisor)`), falling back to the next coarser exact size and finally to Full for a coprime canvas, because the overlay maps every drag handle through `AVPlayerLayer.videoRect`. **Preview Window** (⇧⌘P) is a second `AVPlayerLayer` on the SAME player in an `NSPanel` — a panel because a titled window becomes MAIN and every ⌘-item whose action is on `EditorViewController` then resolves to nothing |
@@ -1989,7 +2007,7 @@ pass nothing, because each wants the picture rather than a deliverable.
 | `Compositor.swift` | the `AVVideoCompositing` class and its Metal pipeline (§7.5) |
 | `LayerRenderers.swift` · `LayerRenderersText.swift` | text (Core Text) and shape (Core Graphics) descriptions → premultiplied BGRA `MTLTexture`s, LRU-cached by hash; reports measured text sizes to the overlay; draws a shape's `gradient` (format version 6) by CLIPPING to the path and running `CGGradient`, sorting the stops the core deliberately does not police (§5.2). The TEXT half — the layout caches, the attributed string and the three §5.2 reveals drawn over the recipe's `reveal`, so a reveal can never reflow the box — went out to `LayerRenderersText.swift` under the size rule when phase 6 came to add the gradient |
 | `CaptionImporter.swift` · `CaptionLayout.swift` · `Transcriber.swift` (+`Extract` `Jobs` `Languages`) · `CaptionExporter.swift` | captions in both directions: the SubRip grammar; the placement every producer shares (the frame grid, the overlap trim, the Caption preset, the new front-most track); on-device speech recognition and the cue builder over it; the extractor, the job list and the language table BOTH engines share; and the `.srt` / `.vtt` writer |
-| `CloudTranscriber.swift` (+`Media`) · `MediaTranscript.swift` · `CloudProgress.swift` · `CloudEstimate.swift` · `AssemblyAIClient.swift` (+`Session`, +`Submission`) · `AssemblyAITranscript.swift` · `AssemblyAIConfiguration.swift` · `AssemblyAILanguages.swift` · `SecretStore.swift` | road map 6's C1, captions from the cloud: the run that groups a scope's clips by MEDIA, uploads each file once, maps the words back through every clip's own window and deletes the transcript at the far end; the per-media cache in the package and its stamp; the one progress number and the words beside it; what a run WOULD cost, before the button; AssemblyAI's REST calls over one `URLSession` with its retry, its poll ceiling and its cancel token, plus R6-14's bounded lost-submit recovery; the wire values; WHERE the client speaks and WHAT it says it is (spec §11's R6-6 and R6-9, the one reader of `-RCAssemblyAIEndpoint`, `-RCSecretFolder` and `RC_ASSEMBLYAI_KEY`); the twenty-one languages the popup offers; and the `0600` key file |
+| `CloudTranscriber.swift` (+`Report`, +`Media`) · `MediaTranscript.swift` · `TranscriptStamp.swift` · `CloudProgress.swift` · `CloudEstimate.swift` · `AssemblyAIClient.swift` (+`Session`, +`Submission`) · `AssemblyAITranscript.swift` · `AssemblyAIConfiguration.swift` · `AssemblyAILanguages.swift` · `SecretStore.swift` | road map 6's C1, captions from the cloud: the run that groups a scope's clips by MEDIA, uploads each file once, maps the words back through every clip's own window and deletes the transcript at the far end; the per-media cache in the package and R6-15's four-field source marker; R6-16's all-cached keyless admission and deferred cleanup report; the one progress number and the words beside it; what a run WOULD cost, before the button; AssemblyAI's REST calls over one `URLSession` with its retry, its poll ceiling and its cancel token, plus R6-14's bounded lost-submit recovery; the wire values; WHERE the client speaks and WHAT it says it is (spec §11's R6-6 and R6-9, the one reader of `-RCAssemblyAIEndpoint`, `-RCSecretFolder` and `RC_ASSEMBLYAI_KEY`); the twenty-one languages the popup offers; and the `0600` key file |
 | `MediaImporter.swift` | `AVURLAsset` probing (the **one** place `async`/`await` is allowed — AVFoundation's loading API is async-only going forward), thumbnails via `AVAssetImageGenerator` — the seconds at or past the video track's end ask for its last frame once and hold it, the strip's half of the rule `CompositionBuilder` applies to the picture — peaks via `AVAssetReader` + vDSP, cache files in the package |
 | `Exporter.swift` | picks the pipeline for the core's settings — `ExportWriter` (`AVAssetReader`/`AVAssetWriter`: chapters, explicit bitrates, the loudness gain) or the ImageIO frame sequence for GIF/APNG — runs the loudness MEASUREMENT pass ahead of the write, reports progress, and renders one frame offline for `render_frame` |
 | `ExporterSettings.swift` | the resolved settings in AVFoundation's vocabulary — the time range, the fallback session preset, the file type, the UTI, the extension, `isAudioOnly` — cut out of `Exporter.swift` under the size rule when phase 7 gave `export` and `renderFrame` a `RecipeOptions` argument; `renderFrame` stayed behind because it is the app's only `copyCGImage` call and the build baseline names that warning by file |
@@ -2442,6 +2460,13 @@ edit is one undo step" and "the in/out range scopes the export" properties
 cannot be checked by driving the built app),
 `import_captions {path, track?}` and `consolidate_media {}` (M3's two
 §5.6 file features),
+For `transcribe(engine: "assemblyai")`, the handler validates typed arguments
+and the target before the coordinator decides whether a keyless run can reuse
+every packaged transcript. Keyless calls resolve no endpoint; a mixed or stale
+batch is refused as a whole with no request or edit. Successful placement is
+one grouped undo step, and `place: false` only returns cues. Deferred remote
+deletions are named in `note` on success and in the error on failure.
+
 `record_screen {seconds, display? | window?, microphone?, system_audio?,
 show_clicks?, rate?, size?, place?, path?}` (road map 3 — File ▸ New
 Recording…'s mirror: the file lands as ordinary media at the playhead of
@@ -3104,6 +3129,16 @@ assisted import.
   clock, no previous frame: `render_frame` at a tick is byte-identical run
   after run, preview and export agree, and two clips with the same preset
   at the same clip time are displaced identically.
+- **E2-27 — A zero-duration edge is configured but inactive.** Zero stays
+  legal and stored for In and Out, as D7-3 requires. The timeline draws no
+  wedge for it. The inspector keeps its kind selected and its actual zero
+  duration editable, while its summary and a selection-aware note disclose
+  inactivity. Clip ▸ Motion keeps the stored kind checked and annotates its
+  title when all or some matching selected edges are inactive. Increasing
+  Duration reactivates that same preset; None or Reset removes it. Choosing
+  another kind preserves the stored duration, including zero; an absent slot
+  still starts at the existing 0.5 s default. This is presentation only:
+  the core's render-time motion contract and R5-4/R5-5 do not change.
 - **D2-1 — A refused op says why in the CORE's words; a tool still names an
   argument the caller left out.** Deepening D2 gave every rule that refuses
   a sentence of its own and deleted the app's copies
@@ -3534,6 +3569,39 @@ assisted import.
   intervening transcripts or multiple matches can require manual dashboard
   cleanup. Crash recovery and a durable pending-submission journal are
   outside this rule.
+- **R6-15 — A transcript marker identifies audio and the request, not display
+  caches.** The source identity is exactly the file's byte size, rounded
+  modification second, media duration and audio presence, together with the
+  unchanged provider and requested speech models, language, speaker labels
+  and vocabulary. Width, height, video presence, thumbnail height, maximum
+  thumbnails, peak buckets per second, path, region and credential do not
+  identify the transcript. The reader projects existing wide source stamps
+  onto those four fields, including markers whose irrelevant fields differ;
+  a cache hit rewrites neither the marker nor the transcript. A real later
+  fetch writes the narrow marker only after its transcript write succeeds.
+  Explicit refresh and remote deletion retain their existing rules. A missing
+  or malformed relevant source field is a cache miss; no project format or
+  marker version changes. This identity still uses modification seconds and
+  recorded duration, without a content hash or path.
+- **R6-16 — A current transcript batch may be reused without credentials.**
+  A keyless cloud run is admitted only when the request is nonempty, refresh is
+  false, and EVERY distinct job media has a readable source identity, a
+  matching R6-15 marker and request, and a decodable transcript. Admission
+  re-reads all files at run time and retains them before deriving any cue;
+  one missing, stale, malformed or unreadable entry refuses the whole batch
+  without extraction, network or partial captions. An empty words array is a
+  current transcript and answers with the existing no-speech outcome. A
+  keyless run skips the entire janitor, including unrelated package media,
+  retains all pending deletion IDs without rewriting their files, and reports
+  each as deferred: no deletion was attempted or confirmed. A later keyed
+  run retries IDs only when safe to send, with the originating account and
+  region's key. Keyed janitor-first ordering, failed-delete holds and
+  per-media partial-success behavior remain. Generate Captions and the MCP
+  `transcribe` tool share this coordinator admission, while the sheet shows
+  keyless eligibility only for nonempty all-cached rows. Stop before the
+  sheet's main-thread completion prevents placement of a success already
+  queued, retaining its cleanup report. No endpoint is resolved for a
+  keyless run and no credential is added to a tool call or project file.
 - **D7-1 — Structural times have one admission envelope.** Every stored media
   duration, marker time, top-level or nested clip start, duration and source
   position, and action start and duration must lie in the inclusive interval
@@ -3568,3 +3636,20 @@ assisted import.
   nests have no markers. Paste and unnest retain their placement, fallback
   and transition rules while normalizing returned clips to the target grid.
   No load-time migration is performed.
+- **S1-23 — A peaks marker certifies a complete selected audio-track decode.**
+  The waveform is trusted only when the reader completes, every decoded PCM
+  buffer is usable, and consumed frames cover every nonempty presentation
+  interval of the selected audio track. Genuine zero-amplitude frames count
+  as decoded audio. Gaps in the track's edit list remain silent; the media
+  record's duration may differ from the track's duration after a relink or
+  when video outlasts sound, so it is a storage bound, not a coverage oracle.
+  Exact decoded coverage is valid on any track timebase. A shortfall at an
+  outer edge may use only that edge's PCM-frame and fractional CMTime rounding
+  precision, strictly less than one 10 ms waveform bucket; internal gaps
+  receive no allowance.
+  The peaks marker alone changes to a versioned wrapper around the existing
+  `CacheStamp`; a missing, legacy, unknown or malformed peaks marker is
+  unavailable immediately and rebuilt on the next normal cache pass. This
+  does not change thumbnail, speech or transcript cache identities, project
+  format or the provider upload decision. A failed decode writes no usable
+  waveform and remains retriable.

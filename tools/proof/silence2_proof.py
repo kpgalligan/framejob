@@ -1207,25 +1207,16 @@ def partial_part(mcp):
     reader that will not build or start: no `.bin`, no marker, the media
     `voice_pending` and never quiet, retried on the next open.
 
-    The level rule has the same hole in `MediaImporter.peaks` — filed, not
-    fixed here, because `MediaImporter.swift` is over the size cap — and the
-    last row asserts that it is still there, so the day it is closed this row
-    says so rather than passing in silence."""
+    The peaks pass now makes the same completion decision for level mode.
+    This app check observes pending status; `peaks_probe.py` awaits the
+    actual importer pass before asserting that neither file was published."""
     print("\n8b — a media whose decode stops part way is never certified")
     s = Session(mcp, "silence2-partial")
     media, _ = s.lay("corrupt.m4a")
     speech = os.path.join(s.path, "cache", "speech", f"{media}.bin")
     marker = os.path.join(s.path, "cache", "speech", f"{media}.complete.json")
     peaks = os.path.join(s.path, "cache", "peaks", f"{media}.bin")
-    deadline = time.time() + 60
-    while time.time() < deadline and not os.path.exists(peaks):
-        time.sleep(0.5)
-    # The speech pass runs AFTER peaks, so the peaks `.bin` landing is not yet
-    # proof that the speech pass has had its turn; give it the same grace the
-    # sheet's poll would.
-    time.sleep(2.0)
-    note(f"the fixture is {duration_of(fixture('corrupt.m4a')):.3f} s and its "
-         f"peaks cache landed at {os.path.getsize(peaks)} bytes")
+    note(f"the fixture is {duration_of(fixture('corrupt.m4a')):.3f} s")
     check(
         not os.path.exists(speech) and not os.path.exists(marker),
         f"no speech `.bin` and no marker are written for it "
@@ -1238,11 +1229,14 @@ def partial_part(mcp):
     check(
         spans(answer) == [],
         f"and proposes NOTHING inside it: {show(spans(answer))}")
-    level = spans(s.op("detect_silence", mode="level"))
+    level_answer = s.op("detect_silence", mode="level")
+    level = spans(level_answer)
     check(
-        len(level) > 0,
-        f"while LEVEL still proposes the undecodable tail — `peaks` has the "
-        f"same hole and its fix is filed: {show(level)}")
+        level_answer.get("pending_peaks") == [media] and level == []
+        and not os.path.exists(peaks)
+        and not os.path.exists(os.path.join(s.path, "cache", "peaks", f"{media}.complete.json")),
+        f"level names undecoded audio as pending and proposes no tail: "
+        f"{level_answer.get('pending_peaks')}, {show(level)}")
 
 
 # ---- 8c. The waveform withheld, the voice cache in place ------------------

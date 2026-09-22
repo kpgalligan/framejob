@@ -49,10 +49,20 @@ extension VideoPane {
         func summary() -> String {
             let m = motion()
             var parts: [String] = []
-            if let e = m.inEdge { parts.append("in " + e.kind.displayName.lowercased()) }
-            if let e = m.out { parts.append("out " + e.kind.displayName.lowercased()) }
+            if let e = m.inEdge { parts.append("in " + e.displayName.lowercased()) }
+            if let e = m.out { parts.append("out " + e.displayName.lowercased()) }
             if let d = m.during { parts.append(d.kind.displayName.lowercased()) }
             return parts.isEmpty ? "off" : parts.joined(separator: " · ")
+        }
+        func inactiveNote() -> String? {
+            let selected = binding.videoClips.map { $0.videoProps.motion }
+            let inactiveIn = selected.contains { $0?.inEdge.map { !$0.isActive } ?? false }
+            let inactiveOut = selected.contains { $0?.out.map { !$0.isActive } ?? false }
+            guard inactiveIn || inactiveOut else { return nil }
+            let slots = [inactiveIn ? "In" : nil, inactiveOut ? "Out" : nil]
+                .compactMap { $0 }.joined(separator: " and ")
+            return "Selection includes inactive \(slots) motion (zero duration). "
+                + "Increase Duration to reactivate; choose None to clear."
         }
 
         let preview = OptionButtonControl(
@@ -77,6 +87,7 @@ extension VideoPane {
             reset: { binding.apply("Motion", video: VideoPatch(motion: .some(nil))) },
             defaultExpanded: false,
             rows: [
+                MotionInactiveNote(note: inactiveNote),
                 inspectorPopupRow(
                     "In", binding, name: "Motion In", items: ["None"] + edges.map(\.displayName),
                     read: { motion().inEdge.map { (edges.firstIndex(of: $0.kind) ?? 0) + 1 } ?? 0 },
@@ -177,5 +188,56 @@ extension VideoPane {
                     }),
                 inspectorButtonRow([preview]),
             ])
+    }
+}
+
+/// The Motion section's selection note may need several lines at 304 pt.
+final class MotionInactiveNote: NSTextField, OptionControl {
+    private let note: () -> String?
+    private var measuredWidth: CGFloat = 0
+
+    init(note: @escaping () -> String?) {
+        self.note = note
+        super.init(frame: .zero)
+        isEditable = false
+        isBordered = false
+        isBezeled = false
+        drawsBackground = false
+        font = DS.sans(11)
+        textColor = DS.accent
+        usesSingleLineMode = false
+        lineBreakMode = .byWordWrapping
+        cell?.wraps = true
+        refresh()
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("MotionInactiveNote does not support NSCoder")
+    }
+
+    override var intrinsicContentSize: NSSize {
+        guard !isHidden else { return NSSize(width: NSView.noIntrinsicMetric, height: 0) }
+        let width = bounds.width > 0 ? bounds.width : 264
+        let text = NSAttributedString(string: stringValue, attributes: [.font: font ?? DS.sans(11)])
+        let height = text.boundingRect(
+            with: NSSize(width: width, height: .greatestFiniteMagnitude),
+            options: [.usesLineFragmentOrigin, .usesFontLeading]).height
+        return NSSize(width: NSView.noIntrinsicMetric, height: ceil(height) + 2)
+    }
+
+    override func layout() {
+        super.layout()
+        if bounds.width != measuredWidth {
+            measuredWidth = bounds.width
+            invalidateIntrinsicContentSize()
+        }
+    }
+
+    func refresh() {
+        let text = note()
+        stringValue = text ?? ""
+        isHidden = text == nil
+        invalidateIntrinsicContentSize()
     }
 }

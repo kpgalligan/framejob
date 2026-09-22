@@ -1267,3 +1267,112 @@ marked at the site so nothing is appended below them).
 (listed in `designs/reelcut-remaining.md` §4), kpgalligan/reelcut#23 — the
 LEVEL half of R2·1, which `MediaImporter.swift`'s size cap kept out of this
 review — and kpgalligan/reelcut#24, filed above and outside S1 entirely.
+
+## 9. Issue #23 — peaks publication after a complete decode (2026-09-21)
+
+**Decision:** spec §11 S1-23. A waveform marker now certifies a completed
+selected-audio-track reader, valid Float32 PCM ingestion and coverage of every
+nonempty target edit. Genuine zero samples count as audio, and a record whose
+duration differs from the selected sound track uses the record only to size the
+100 Hz payload. The shared `CacheStamp` and its fields are unchanged. Only the
+peaks sidecar is versioned: `{ "source": CacheStamp, "version": 1 }`. Missing,
+legacy, future and malformed peaks markers, and malformed payloads, are
+unavailable immediately; a normal cache pass withdraws them before awaited
+track loads and rebuilds them. Thumbnail, speech and paid transcript stamps are
+not migrated or rewritten by this change.
+
+**Separate size gate.** At baseline `e1411be701442878e12becd85a4cbe8424f6a909`
+the tree was clean, `MediaImporter.swift` was 604 lines and
+`MediaCacheFiles.swift` 556. The synchronous reader/writer moved to
+`MediaImporter+Peaks.swift` and the bucket accumulator moved verbatim to
+`MediaPeakBuckets.swift` before any behavior changed. The exact stage diff is
+in the litecode handoff's `04-pure-move.patch`; no commit was made. At that
+stage the four files were 580, 478, 39 and 82 lines. The separate gate passed:
+`make typecheck` (zero errors, four baseline AVFoundation warnings), `make app`
+(BUILD SUCCEEDED), `remaining_probe.py` 170/170, `remaining_proof.py` 79/79
+and `phase3_proof.py` 123/123, each MCP script on a fresh owned Release app
+with no `Reelcut: ` parity complaints.
+
+**Coverage boundary.** `PeakBuckets` places maxima at each accepted buffer's
+presentation timestamp and coalesces consumed intervals. Its two outer-edge
+allowances are local to each decoded outer edge: one PCM frame or a genuinely
+fractional timestamp unit, and one fractional target-boundary unit, whichever
+is larger. Exact integer boundaries (for example 0/1 or 1/1) add no timebase
+slack. Exact full coverage needs no allowance, even on a coarse fractional
+target grid. An edge shortfall is accepted only when its own allowance is
+smaller than one 10 ms bucket. Internal gaps get no boundary allowance.
+This distinction was measured: a complete 48 kHz WAV with its final buffer
+omitted was wrongly certified when `0/1` gave a one-second slack; the corrected
+source probe rejects both a missing final buffer and a missing middle buffer.
+A valid ffmpeg AAC with a 228 ms empty edit and a 1022 ms nonempty target
+has a 1.250 s track extent at a 1 ms target timebase, while AVAssetReader
+returns 59,968 frames through 1.249333 s. Its 32-frame/0.667 ms end
+shortfall fits one target timebase unit and is accepted. A delayed PCM MOV with
+an actual 250 ms empty edit and an exact 1.250 s decode also passes. A
+truncated WAV whose header claims a longer file is qualified from
+AVFoundation's physically shortened selected-track extent (0.600 s here),
+not treated as proof that its header was authoritative.
+
+**Verification record.** The focused source probe compiles actual app sources,
+awaits the real importer pass, reads back the marker and payload, and compares
+all 100 buckets of each authored 44.1/48 kHz mono/stereo PCM fixture against
+an independent Python frame count. It also covers AAC, genuine zeros,
+record/track duration mismatch, legacy migration and inode reuse, nil stamp,
+malformed and missing markers/payloads, corrupt middle AAC, a declared short
+PCM block, nonfinite samples, and completed-but-uncovered sample streams.
+The built-app proof checks corrupt media through level and Normalize,
+unchanged project JSON, real silence, healthy normalization and legacy cache
+withdrawal/migration. Its normal-pass trigger is a second imported media;
+`relink_media` to the already-linked path correctly answered identity and was
+not used as a fake trigger.
+
+**Initial implementation gate:** `make test` and `make lint` passed; `make typecheck` had zero
+errors and the four baseline AVFoundation warnings; `make app` printed BUILD
+SUCCEEDED. The final pristine `peaks_probe.py` scored **77/77** (no skips).
+`remaining_probe.py` scored **170/170** and `source_mirror_probe.py` **40/40**.
+Four fresh owned Release apps, ports 5410–5413 with `RC_ASSEMBLYAI_KEY`
+unset and zero `Reelcut: ` parity complaints, scored `peaks_proof.py`
+**21/21**, `remaining_proof.py` **79/79**, `phase3_proof.py` **123/123** and
+`silence2_proof.py` **91/91**, respectively. No paid request ran. These checks
+read the current binary after the final product edit. `git diff --check`
+passed at handoff.
+
+**Made to fail.** Four source-copy mutants were run sequentially against the
+71-row probe version, all with successful Swift builds and named behavioral
+failures. Removing the reader-status guard scored **70/71** (published after
+`.failed`); removing coverage and ingestion guards **67/71** (missing final,
+missing middle, nonfinite and short PCM buffers published); accepting a bare
+legacy marker **70/71** (false-silent cache available immediately); requiring
+a positive bucket **68/69** (genuine silence not published, with its two
+dependent value rows inapplicable). The later 77-row pristine probe only added
+positive controls for an actual nil-stamp pass, a valid-source future marker,
+marker-write rollback and >1.0 magnitude; the four assertions killed by the
+mutants were unchanged. Exact mutant logs and the final pristine output are
+named in the litecode handoff's `04-checks.txt`.
+
+**Owed:** §4's human listen and visual waveform check on real footage. The
+instruments do not claim waveform quality on every codec or fix source
+changes that preserve both file size and modification second. An edge
+shortfall of a 10 ms bucket or more cannot be certified; the waveform stays
+pending instead of publishing speculative silence. Exact full coverage is
+certifiable on coarse metadata grids.
+
+**Review fix (2026-09-22):** The first implementation still let one decoded
+`0/1` timestamp enlarge every edge's allowance, and rejected exact coverage
+on a coarse fractional target grid. Coverage now retains the PCM-frame and
+genuinely fractional timestamp precision at each outer edge, checks exact
+coverage first, and caps any edge-shortfall allowance below one bucket. The
+source probe's completed-stream 0/1 missing-tail and exact coarse-target
+publication/readback controls score **80/80**. Two sequential source-copy
+mutants each compiled and failed its named control (**79/80**); a final
+pristine rerun scored **80/80**. `make typecheck` retained zero errors and
+four baseline warnings, `make app` succeeded, and the fresh owned Release
+app's peaks MCP proof scored **21/21** with zero startup parity complaints.
+The earlier Rust and unrelated proof gates above remain valid for unchanged
+paths; §4's hands-on waveform check remains owed.
+
+**Final #23 review (2026-09-22):** The litecode handoff's
+`01-issue-23/07-review-2.md` records `verdict: pass` with no findings after
+the review fix. The completed-reader probe scored 80/80, both focused mutants
+built and failed at 79/80, and the fresh Release app peaks proof scored 21/21
+with no parity complaints. The human waveform check above remains owed.

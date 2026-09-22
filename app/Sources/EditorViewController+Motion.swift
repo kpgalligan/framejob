@@ -144,9 +144,17 @@ extension EditorViewController {
         let tag = menuItem?.tag ?? -1
         switch action {
         case #selector(setMotionIn(_:)):
+            if let kind = slotAt(EdgeMotion.allCases, tag) ?? nil {
+                menuItem?.title = MotionEdge.menuTitle(
+                    for: kind, among: motionTargets.map { $0.videoProps.motion?.inEdge })
+            }
             let shared = sharedMotionKind { $0?.inEdge?.kind }
             menuItem?.state = checked(shared, tagged: slotAt(EdgeMotion.allCases, tag))
         case #selector(setMotionOut(_:)):
+            if let kind = slotAt(EdgeMotion.allCases, tag) ?? nil {
+                menuItem?.title = MotionEdge.menuTitle(
+                    for: kind, among: motionTargets.map { $0.videoProps.motion?.out })
+            }
             let shared = sharedMotionKind { $0?.out?.kind }
             menuItem?.state = checked(shared, tagged: slotAt(EdgeMotion.allCases, tag))
         case #selector(setMotionDuring(_:)):

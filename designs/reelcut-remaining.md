@@ -388,7 +388,7 @@ row per op.
 | `app/Sources/ExportSheetController.swift` | 639 |
 | `app/Sources/Exporter.swift` | 609 |
 | `app/Sources/ClipPane.swift` | 609 |
-| `app/Sources/MediaImporter.swift` | 604 |
+| `app/Sources/MediaImporter.swift` | 604 at the pre-#23 baseline; 580 after its separately gated move |
 | `app/Sources/CompositionBuilder.swift` | 601 |
 
 Road map 7 part 1 did not pay a size toll on those capped files. At this
@@ -406,7 +406,7 @@ when a fix took each over its line — and left two files AT the cap:
 | File | Now | Note |
 |---|---|---|
 | `AgentServer+Scope.swift` | 592 | ON the cap. Seam: the envelope rule (`checkCallScope`, `effectiveScope`, `idScope`, `addressed`, `checkDocumentLevelTicks`, `scopeLanding`, `scopeFailure`) against `set_scope` THE TOOL and its path arithmetic (`setScope`, `nestScopePath`, `pathToClip`, `applyNestScope`, `commonPrefix`, `scopeReport`) |
-| `MediaImporter.swift` | 571 | Went to 619 when road map 3's held tail landed in it, and paid mid-wave: the await-free half — `ImportError`, `isImage`/`probeImage`, the rate table — to `MediaImporter+Probe.swift` (121), a pure move (619 → 518, 571 with the tail). The next cut is the peaks reader, which awaits and stays |
+| `MediaImporter.swift` | 580 after #23's pure move | Went to 619 when road map 3's held tail landed in it, and paid mid-wave: the await-free half — `ImportError`, `isImage`/`probeImage`, the rate table — to `MediaImporter+Probe.swift` (121), a pure move. #23's separate move takes the synchronous reader and writer to `MediaImporter+Peaks.swift` (39) and the buckets from `MediaCacheFiles.swift` (556 → 478) to `MediaPeakBuckets.swift` (82); the asset and track awaits stay here. |
 | `AgentCatalog.swift` | 454 | Was cut to 665 in `b410125`, phase 9 put it back over at 807, and road map 3's R1·toll paid the cut the file's own header had named, first and alone: the FILE groups — Media, Captions, Rendering and export — are `AgentCatalog+Files.swift` (**609** with `record_screen`'s entry — over the cap since R2 hoisted the entry's pause and result paragraphs into two locals for the type checker's budget; the cut it owes is that entry's sentences, whose description is the longest in the catalog; the cut it will owe is that entry's sentences), spliced after the Canvas group as the clip rows are. The header's "sharing no hoisted local" was false by ONE, `ticks`, which `fileTools(ticks:)` takes as an argument |
 | `CompositionBuilder.swift` | 601 | AT the cap since road map 3's held tail (+83); the next addition pays first — the audio-parameter half (`audioParameters` and the `AudioTap.make` call) is the natural cut |
 | `ReelOps.swift` | 925 | Created by `b410125` at 853. It is a TABLE — one factory per row of `edit.rs`'s op table — so it has the same standing exemption `edit.rs` has on the Rust side |
@@ -518,6 +518,18 @@ move cut `edit_paste.rs` from 599 to 580 before behavior was added; it is
 **53**, and the owned-app MCP proof **203**, all under their 400-line caps.
 The exempt `edit.rs` semantics table was **838** lines at this gate. These
 are historical gate readings; measure current sizes before another edit.
+
+**R6-15, transcript identity (#30, 2026-09-22).** The separately gated pure
+move took `AssemblyAITranscript.swift` from 399 to 344 lines and put the old
+53-line marker block in `TranscriptStamp.swift`; typecheck and the existing
+131-row stamp/estimate/verbatim probe passed before behavior changed. After
+the four-field source projection, touched product files measure:
+`AssemblyAITranscript.swift` **344**, `TranscriptStamp.swift` **68**,
+`MediaTranscript.swift` **399** and `CloudEstimate.swift` **328** (`wc -l`).
+`MediaTranscript.swift` grew no lines. The proof scripts are exempt from the
+product cap.
+
+**R6-16 size toll (#32, 2026-09-22).** Before behavior, the complete `Report` declaration moved from `CloudTranscriber.swift` (356 lines) into `CloudTranscriber+Report.swift` as a pure move. Typecheck passed with the four established warnings; the existing `run,cache_write,chrome` probe passed 143/143. The isolated move patch is in the issue handoff. Final product sizes are coordinator **325**, +Report **85**, +Media **220**, estimate **333**, sheet +Cloud **334**, agent +Cloud **279**, and catalog +Captions **221** lines, all under 400; proof scripts remain exempt. Road map 6 §10.20 records the final checks. Existing modification-second/recorded-duration identity limits, unreadable malformed files whose deletion IDs cannot be recovered by the reader, and the need for the originating account/region key to retry a safe ID remain.
 
 ## 4. What only a person at the machine can check
 
@@ -767,6 +779,23 @@ and passed independent review: structural-time and bounded-transition work
 (§12.10) and argument-contract coverage (§12.11). The capped
 `edit_clip.rs` still has 751 lines after part 3's separately gated pure move
 and caller deletion; no other size debt was paid here.
+
+**Review closeout (2026-09-22).** The four-issue set (#23, #27, #30 and #32)
+passed its latest independent reviews with
+no unresolved implementation review findings. Their records are road map 4
+§9, road map 5 §13, and road map 6 §§10.19–10.20. This review status does
+not discharge the live-provider, source-identity or hands-on acceptance
+limits below.
+
+**Waveform peaks #23:** the level half of road map 4's partial-decode bug is
+implemented in road map 4 §9. Its peaks-only versioned marker and strict
+reader/PCM coverage keep a failed decode pending and distinguish real silence.
+The shared `CacheStamp` remains byte-for-byte the same type for thumbnails,
+speech and transcripts. The separately gated pure move paid both Swift size
+tolls; the final files are `MediaImporter.swift` **576**,
+`MediaCacheFiles.swift` **486**, `MediaImporter+Peaks.swift` **116** and
+`MediaPeakBuckets.swift` **161** lines. A real-user listen and visual waveform
+judgment are still part of §4's acceptance rather than an automated claim.
 
 **Bounded recovery after a lost AssemblyAI submit reply (#28).** R6-14 reads
 only the newest page of 200 transcripts at most three times. An outage,
@@ -1061,15 +1090,24 @@ and never reads the grid — so what is broken is the invariant and what an
 inspector shows. Not fixed here because the root, `core/src/edit_canvas.rs`,
 was outside that review's file list and because text's timings are in the
 same position; labelled `bug`.
-**kpgalligan/reelcut#27** — a motion slot with `duration: 0` is legal
-(`ticks_positive_or_zero`), INACTIVE in the core (`motion.rs`'s
-`arrive > 0.0` filter) and LIVE in three places in the app: the strip draws
-the 2 pt minimum wedge, the section shows the kind with In Duration live, and
-Clip ▸ Motion checks it. **Where the answer belongs is a spec §11 decision** —
-refuse 0 at the door, normalise the slot away like the all-`None` motion
-beside it, or stop claiming it in the UI — and `text.animation`'s
-deliberately 0-legal timings argue both ways. Labelled `bug` AND `spec`, and
-deliberately not `ready-for-agent`.
+**kpgalligan/reelcut#27 — resolved in spec §11's E2-27 and road map 5 §13.**
+Zero-duration In/Out remains legal, stored, editable and inactive. The
+timeline omits its wedge; the Motion inspector and Clip ▸ Motion menu name
+the inactive configured edge, with Duration available to reactivate it and
+None/Reset available to clear it. The core contract and format stay unchanged.
+Current author-file sizes after #27 (`wc -l`): `MotionProps.swift` 230,
+`TimelineClipDrawing.swift` 454, `VideoPane+Motion.swift` 243,
+`EditorViewController+Motion.swift` 184; the new `motion_zero.rs` is 89.
+
+**kpgalligan/reelcut#30 — resolved by R6-15 and road map 6's #30 record.**
+Transcript identity now ignores display-cache metadata and reads legacy wide
+markers without rewriting them. The remaining limits are the existing
+modification-second/recorded-duration identity without a content hash or
+path, and that an older build requiring ten source keys cannot read a new
+four-key marker. #32/R6-16 admits an unrefreshed, all-current-cache batch
+without a key; cloud work and deletion retry still require a key. Live
+AssemblyAI verification remains a separate
+person-authorized check; the #30 proof uses only dummy loopback credentials.
 
 **One pre-existing defect nothing can reach**, found by the probe deepening
 D2·2 built and named here because that ticket said it belonged in this

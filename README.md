@@ -100,7 +100,11 @@ normative: §5.2 is the project schema, §6 the op table, §7 the architecture.
   Reelcut ▸ Settings… (⌘,) — a file only you can read, never a launch
   argument — and what comes back is cached in the project package, one
   transcript per media file, re-used by the next run, with the copy at
-  AssemblyAI deleted as soon as it has been read. A caption is an ordinary text clip
+  AssemblyAI deleted as soon as it has been read. If every requested media
+  already has a current readable transcript in the package, Generate Captions
+  can reuse the whole batch without an API key or network request. Pending
+  remote deletion remains recorded and is reported as deferred; a later run
+  with the originating account and region's key retries safe deletion IDs. A caption is an ordinary text clip
   either way, which is what makes burn-in on export free and lets you drag
   one to retime it. Text clips also arrive and leave under their own power:
   a **typewriter**, a **word fade** or a **line rise**, with separate in

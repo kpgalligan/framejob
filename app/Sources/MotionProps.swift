@@ -96,6 +96,21 @@ struct MotionEdge: Codable, Equatable {
     let kind: EdgeMotion
     let duration: Ticks
 
+    /// A zero duration keeps its stored kind but has no render-time effect.
+    var isActive: Bool { duration > 0 }
+
+    var displayName: String {
+        kind.displayName + (isActive ? "" : " (inactive)")
+    }
+
+    /// The title of one kind across the selected edges of one slot.
+    static func menuTitle(for kind: EdgeMotion, among edges: [MotionEdge?]) -> String {
+        let matching = edges.compactMap { $0 }.filter { $0.kind == kind }
+        guard matching.contains(where: { !$0.isActive }) else { return kind.displayName }
+        let suffix = matching.contains(where: \.isActive) ? " (some inactive)" : " (inactive)"
+        return kind.displayName + suffix
+    }
+
     /// The core's own default (`MotionEdge::default`): half a second of
     /// fade. Mirrored rather than derived, so switching a slot on writes
     /// exactly what the core would have defaulted to had the key simply

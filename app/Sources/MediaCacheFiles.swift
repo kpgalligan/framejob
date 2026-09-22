@@ -1,5 +1,3 @@
-import Accelerate
-import CoreMedia
 import Foundation
 import ImageIO
 import UniformTypeIdentifiers
@@ -7,7 +5,7 @@ import UniformTypeIdentifiers
 /// The await-free half of the media cache: where the two files the timeline
 /// draws from live inside the package (`cache/thumbs/<id>/<n>.jpg`,
 /// `cache/peaks/<id>.bin`), the three constants that size them, how they are
-/// read back (`loadThumbnail`, `thumbnailCount`, `loadPeaks` — synchronous,
+    /// read back (`loadThumbnail`, `thumbnailCount`, `loadPeaks` — synchronous,
 /// because the timeline calls them from `draw(_:)`), the plumbing the two
 /// writers stand on, and the notification that says a cache has landed.
 ///
@@ -43,9 +41,9 @@ import UniformTypeIdentifiers
 /// can now draw it, or, for peaks, has been WITHDRAWN: a rebuild removes
 /// the old `.bin` at its head and posts at once, so a `peaks` post means
 /// "re-read", and the re-read may find nothing until the pass lands. That
-/// is the point — no reader of `<id>.bin` consults its marker, so an old
-/// file's waveform left on disk through a rebuild would be drawn and
-/// measured until the new one replaced it. `userInfo` carries
+/// is the point — readers consult the marker now, and withdrawing the old
+/// file also invalidates any memoized waveform until the pass publishes a
+/// complete new one. `userInfo` carries
 /// `MediaImporter.mediaIDKey` (the media id as `UInt32`) and
 /// `MediaImporter.cacheKindKey` (`MediaImporter.thumbsKind` or
 /// `MediaImporter.peaksKind`), and, on the FIRST post of a pass that
@@ -224,12 +222,12 @@ extension MediaImporter {
         return try? JSONDecoder().decode(CacheStamp.self, from: data)
     }
 
-    /// Sorted keys, so two markers of one stamp are byte-identical and a
-    /// proof can compare them as text; `.atomic`, so a marker is whole or
+    /// Sorted keys make repeat markers of the same kind byte-identical;
+    /// `.atomic`, so a marker is whole or
     /// absent and never a truncated file that decodes to nothing. Generic
     /// since `SpeechStamp` wraps a `CacheStamp` rather than sharing its
-    /// type — `CacheStamp` itself is UNCHANGED, so thumbs and peaks markers
-    /// stay valid, and only a model or chunk-size change invalidates speech.
+    /// type. `CacheStamp` itself is unchanged; peaks use their own versioned
+    /// wrapper, while thumbnail and speech identities remain independent.
     @discardableResult
     static func writeStamp<S: Encodable>(_ stamp: S, to url: URL) -> Bool {
         let encoder = JSONEncoder()
@@ -283,16 +281,15 @@ extension MediaImporter {
 
     /// Clears a waveform a pass is about to rebuild — `clearThumbnails`'
     /// posture for the other half. The marker goes FIRST, for the same
-    /// reason; then the `.bin`, because it is the old file's, and because no
-    /// reader asks for the marker before reading it: `loadPeaks` is the ONE
-    /// reader, the timeline, `MediaPeaks.Loader` (Remove Silences and
+    /// reason; then the `.bin`, because it is the old file's. `loadPeaks` is
+    /// the ONE reader; the timeline, `MediaPeaks.Loader` (Remove Silences and
     /// Normalize) and the Media row all read through it, and each memoises
-    /// what it read as a hit. Left in place, the old file's peaks would be
-    /// drawn and measured for the whole rebuild, and for ever after a pass
+    /// what it read as a hit. The old file must be withdrawn rather than
+    /// left for a later marker to recertify after a pass
     /// that returned early (a relink to a file with no audio track leaves
     /// `hasAudio` true on the record and returns at the track load). Returns
-    /// whether a `.bin` was REMOVED — the one fact a reader cares about,
-    /// since a marker alone is nothing anybody reads — and the pass posts at
+    /// whether a `.bin` was REMOVED — the fact that requires a reader
+    /// notification — and the pass posts at
     /// once when it was, so every memo drops the withdrawn floats and the
     /// detector reports the media as pending rather than measuring them.
     static func clearPeaks(for media: UInt32, in cacheDir: URL) -> Bool {
@@ -357,13 +354,22 @@ extension MediaImporter {
 
     // MARK: - Peaks
 
-    /// The cached waveform, or nil when it has not been generated. One float
-    /// per 1/100 s, magnitudes 0…1 (louder than full scale is possible and
-    /// is not clamped — the lane clamps when it draws).
+    /// The cached waveform, or nil until a complete decode is certified by
+    /// the versioned marker. Legacy and malformed cache files are never
+    /// treated as silence. Magnitudes above one remain unclamped.
     static func loadPeaks(for media: UInt32, in cacheDir: URL) -> [Float]? {
+        guard let marker = readPeaksStamp(at: peaksMarkerURL(for: media, in: cacheDir)) else {
+            return nil
+        }
+        let duration = Double(marker.source.duration) / Double(ReelTime.perSecond)
+        let count = (duration * Double(peakBucketsPerSecond)).rounded(.up)
+        guard count.isFinite, count >= 1, count < Double(Int.max / 4) else { return nil }
+        let expectedBytes = max(1, Int(count)) * MemoryLayout<Float>.size
         let url = peaksURL(for: media, in: cacheDir)
-        guard let data = try? Data(contentsOf: url), data.count >= 4 else { return nil }
-        return data.withUnsafeBytes { raw in Array(raw.bindMemory(to: Float.self)) }
+        guard let data = try? Data(contentsOf: url), data.count == expectedBytes else { return nil }
+        let values = data.withUnsafeBytes { raw in Array(raw.bindMemory(to: Float.self)) }
+        guard values.allSatisfy({ $0.isFinite && $0 >= 0 }) else { return nil }
+        return values
     }
 
     /// The cached Silero VAD probabilities, or nil when they have not been
@@ -383,82 +389,6 @@ extension MediaImporter {
         let file = speechURL(for: media, in: cacheDir)
         guard manager.fileExists(atPath: file.path) else { return false }
         return (try? manager.removeItem(at: file)) != nil
-    }
-
-    /// The `.bin`'s content as `peaks` accumulates it: one Float32 per
-    /// bucket, `peakBucketsPerSecond` a second over the record's duration,
-    /// each the MAX MAGNITUDE over the bucket across every channel — a mono
-    /// envelope, which is what a waveform lane draws. Max, not RMS: a
-    /// waveform's job is to show where the transients are, and an RMS
-    /// envelope hides a clipped peak. `peaks` feeds it every sample buffer
-    /// the reader yields and writes `data` — raw little-endian floats, so
-    /// `loadPeaks` is one `Data` read and a rebind — when the reader runs
-    /// dry. It is here and not beside its caller because none of it awaits
-    /// (`copyNextSampleBuffer` is synchronous) and the file that holds the
-    /// exception was at its cap; the arithmetic moved verbatim.
-    struct PeakBuckets {
-        private var buckets: [Float]
-        /// Frames consumed so far, so a bucket that spans two sample buffers
-        /// still lands in one place.
-        private var frameCursor = 0.0
-        private var sampleRate = 48000.0
-        private var channels = 1
-
-        init(duration: Ticks) {
-            let count = max(
-                1,
-                Int(
-                    (Double(duration) / Double(ReelTime.perSecond)
-                        * Double(MediaImporter.peakBucketsPerSecond)).rounded(.up)))
-            buckets = [Float](repeating: 0, count: count)
-        }
-
-        var data: Data { buckets.withUnsafeBufferPointer { Data(buffer: $0) } }
-
-        mutating func add(_ sample: CMSampleBuffer) {
-            if let description = CMSampleBufferGetFormatDescription(sample),
-                let asbd = CMAudioFormatDescriptionGetStreamBasicDescription(description) {
-                sampleRate = asbd.pointee.mSampleRate > 0 ? asbd.pointee.mSampleRate : sampleRate
-                channels = max(1, Int(asbd.pointee.mChannelsPerFrame))
-            }
-            guard let block = CMSampleBufferGetDataBuffer(sample) else { return }
-            let byteCount = CMBlockBufferGetDataLength(block)
-            guard byteCount >= 4 else { return }
-            var samples = [Float](repeating: 0, count: byteCount / 4)
-            let copied = samples.withUnsafeMutableBytes { raw -> OSStatus in
-                guard let base = raw.baseAddress else { return -1 }
-                // Copy rather than point into the block: a block buffer may be
-                // several non-contiguous chunks, and pointing at the first one
-                // silently truncates the buffer.
-                return CMBlockBufferCopyDataBytes(
-                    block, atOffset: 0, dataLength: byteCount, destination: base)
-            }
-            guard copied == noErr else { return }
-
-            let framesPerBucket = max(
-                1.0, sampleRate / Double(MediaImporter.peakBucketsPerSecond))
-            let frames = samples.count / channels
-            var frame = 0
-            while frame < frames {
-                let bucket = Int(frameCursor / framesPerBucket)
-                guard bucket >= 0 else { break }
-                if bucket >= buckets.count {
-                    frame = frames
-                    break
-                }
-                let bucketEnd = Double(bucket + 1) * framesPerBucket
-                let take = max(1, min(frames - frame, Int(bucketEnd - frameCursor)))
-                var magnitude: Float = 0
-                samples.withUnsafeBufferPointer { buffer in
-                    guard let base = buffer.baseAddress else { return }
-                    vDSP_maxmgv(
-                        base + frame * channels, 1, &magnitude, vDSP_Length(take * channels))
-                }
-                buckets[bucket] = max(buckets[bucket], magnitude)
-                frame += take
-                frameCursor += Double(take)
-            }
-        }
     }
 
     // MARK: - One pass per media

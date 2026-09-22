@@ -19,9 +19,10 @@ Sections, by the name after `section_`:
   `start`, so the row is an oracle and not a second reading of the code. A
   second request tries the five degenerate speeds (0, a negative, NaN,
   infinity, the largest finite value), which read as 1 rather than trapping.
-* `stamp` (5i·13) — each of the five request fields and each `CacheStamp`
-  field invalidates; the REGION does not (the control); the marker's bytes
-  are sorted and stable.
+* `stamp` (5i·13, R6-15) — four audio-source and five provider/request
+  fields invalidate; six display-cache fields do not. Raw legacy and narrow
+  markers decode without rewrite, and new-process loopback runs count every
+  HTTP request to prove reuse has no extra upload or paid submission.
 * `client` (5i·15) — the retry, the backoff, the tolerated polls, the
   ceiling, every §5c status, and the four `words` shapes, over `URLProtocol`.
 * `cancel` (5i·16) — a 16 MB upload cancelled at its first progress callback,
@@ -462,6 +463,21 @@ func modeStamp(_ request: [String: Any]) -> [String: Any] {
             "readsBackEqual": MediaTranscript.readStamp(for: UInt32(index), in: folder) == one,
         ])
     }
+    var legacy: [[String: Any]] = []
+    for (index, row) in (request["legacy"] as? [[String: Any]] ?? []).enumerated() {
+        let raw = Data((row["marker"] as? String ?? "").utf8)
+        let media = UInt32(rows.count + index)
+        let url = MediaTranscript.markerURL(for: media, in: folder)
+        let wrote = (try? raw.write(to: url, options: .atomic)) != nil
+        let decoded = wrote ? MediaTranscript.readStamp(for: media, in: folder) : nil
+        let after = try? Data(contentsOf: url)
+        legacy.append([
+            "label": row["label"] as? String ?? "\(index)",
+            "decodes": decoded != nil,
+            "equal": decoded == stamp(row),
+            "unchanged": wrote && after == raw,
+        ])
+    }
     // The CONTROL: the region changes the base URL and NOT the stamp.
     var regions: [String: String] = [:]
     for region in AssemblyAIConfiguration.Region.allCases {
@@ -472,7 +488,7 @@ func modeStamp(_ request: [String: Any]) -> [String: Any] {
         regions["\(region.rawValue).display"] = region.displayName
     }
     try? FileManager.default.removeItem(at: folder)
-    return ["stamps": answers, "regions": regions]
+    return ["stamps": answers, "legacy": legacy, "regions": regions]
 }
 '''
 
@@ -597,7 +613,9 @@ PROBE_RUN = r'''
 func modeRun(_ request: [String: Any]) -> [String: Any] {
     if request["op"] as? String == "table" { return runTable(request) }
 
-    guard let client = makeClient(request, stub: false) else {
+    let keyless = request["keyless"] as? Bool ?? false
+    let client = keyless ? nil : makeClient(request, stub: false)
+    if !keyless && client == nil {
         return ["error": "the base URL would not parse"]
     }
     let cache = URL(
@@ -610,8 +628,14 @@ func modeRun(_ request: [String: Any]) -> [String: Any] {
             duration: ticks(row["duration"]), hasVideo: false, hasAudio: true)
     }
     let jobs = (request["jobs"] as? [[String: Any]] ?? []).map(makeJob)
+    let options = makeOptions(request["options"] as? [String: Any])
+    let refresh = request["refresh"] as? Bool ?? false
+    let estimate = CloudEstimate(
+        facts: CloudEstimate.facts(jobs: jobs, media: media, cacheDirectory: cache),
+        options: options, refresh: refresh)
     let token = Transcriber.CancelToken()
     let cancelOnUpload = request["cancelOnUpload"] as? Bool ?? false
+    let cancelAtFirstProgress = request["cancelAtFirstProgress"] as? Bool ?? false
     // The reader review's R1 janitor row: a token cancelled BEFORE the run
     // starts. Everything after the janitor checks it; the question is what
     // the janitor itself does with it.
@@ -640,13 +664,19 @@ func modeRun(_ request: [String: Any]) -> [String: Any] {
     var during: [String] = []
     let before = uploadLeftovers()
     let transcriber = CloudTranscriber(client: client, cacheDirectory: cache, media: media)
-    var answer: [String: Any] = ["tempBefore": before]
+    var answer: [String: Any] = [
+        "tempBefore": before,
+        "estimateFates": estimate.rows.map { fateName($0.fate) },
+        "estimateUploadTicks": estimate.uploadTicks,
+        "estimateCanReuse": estimate.canReuseWithoutCredential,
+    ]
     do {
         let outcome = try transcriber.transcribe(
-            jobs, options: makeOptions(request["options"] as? [String: Any]),
-            refresh: request["refresh"] as? Bool ?? false, frame: 20000, cancel: token,
+            jobs, options: options,
+            refresh: refresh, frame: 20000, cancel: token,
             progress: { fraction, detail in
                 published.append([fraction, detail])
+                if cancelAtFirstProgress { token.cancel() }
                 if detail.hasPrefix("Uploading") {
                     if during.isEmpty { during = uploadLeftovers() }
                     if cancelOnUpload { token.cancel() }
@@ -682,6 +712,7 @@ func modeRun(_ request: [String: Any]) -> [String: Any] {
         "cached": report.cached.map { Int($0) },
         "janitorDeleted": report.janitorDeleted.map { Int($0) },
         "janitorFailed": report.janitorFailed.map { Int($0) },
+        "janitorDeferred": report.janitorDeferred.map { Int($0) },
         "held": report.held.map { Int($0) },
     ]
     answer["cloudFields"] = AgentServer.cloudFields(report, code: nil, notes: [])
@@ -1450,6 +1481,7 @@ func modeChrome(_ request: [String: Any]) -> [String: Any] {
     case "report": return chromeReport(request)
     case "progress": return chromeProgress(request)
     case "agreement": return chromeAgreement(request)
+    case "keyless": return chromeKeyless(request)
     case "menu": return chromeMenu(request)
     default: return ["error": "this probe does not know the chrome op \(request["op"] ?? "")"]
     }
@@ -1626,6 +1658,107 @@ func chromeSheet(_ request: [String: Any]) -> [String: Any] {
         answer["cancelStatus"] = sheet.statusLabel.stringValue
         answer["cancelStopTitle"] = sheet.stopButton.title
         answer["cancelClips"] = built.document.project.snapshot.clips.count
+    }
+    return answer
+}
+
+/// R6-16. A real sheet over the same package files the keyed fake wrote.
+/// The queued variants hold main until worker success has been enqueued;
+/// Stop is then delivered through the actual button before main drains.
+func chromeKeyless(_ request: [String: Any]) -> [String: Any] {
+    defer { dropSuite(request) }
+    guard let built = chromeDocument(request),
+        let cache = built.document.cacheDirectory,
+        let seed = request["cache"] as? String
+    else { return ["error": "the keyless sheet fixture would not build"] }
+    let source = URL(fileURLWithPath: seed).appendingPathComponent("transcripts")
+    let target = cache.appendingPathComponent("transcripts")
+    try? FileManager.default.copyItem(at: source, to: target)
+    let sheet = TranscribeSheetController(
+        document: built.document, store: MemoryStore(), defaults: chromeSuite(request),
+        environment: [:], languages: probeLanguages)
+    _ = sheet.view
+    if let index = sheet.enginePopup.itemArray.firstIndex(where: {
+        $0.representedObject as? String == TranscriptionEngine.assemblyai.rawValue
+    }) { sheet.enginePopup.selectItem(at: index) }
+    sheet.perform(NSSelectorFromString("engineChanged:"), with: nil)
+    sheet.controlChanged(nil)
+    let before = built.document.project.json
+    var answer: [String: Any] = [
+        "enabled": sheet.startButton?.isEnabled ?? false,
+        "note": sheet.noteLabel.stringValue,
+        "hint": sheet.hintLabel.stringValue,
+        "estimateReusable": sheet.cloudEstimate()?.canReuseWithoutCredential ?? false,
+    ]
+    let action = request["action"] as? String ?? "click"
+    if action == "refresh" {
+        sheet.refreshCheckbox.state = .on
+        sheet.controlChanged(nil)
+        answer["refreshEnabled"] = sheet.startButton?.isEnabled ?? false
+        answer["refreshNote"] = sheet.noteLabel.stringValue
+        answer["refreshHint"] = sheet.hintLabel.stringValue
+        return answer
+    }
+    if action == "mutate" {
+        try? FileManager.default.removeItem(
+            at: MediaTranscript.markerURL(for: built.media, in: cache))
+    }
+    if action.hasPrefix("queued") {
+        sheet.didStart = true
+        sheet.showProgress()
+        let jobs = sheet.jobs(in: sheet.scope)
+        let options = sheet.runRequest().options ?? TranscriptOptions(
+            speechModels: TranscriptOptions.shippedModels, languageCode: nil,
+            speakerLabels: false, keytermsPrompt: [])
+        var records: [UInt32: MediaSnapshot] = [:]
+        for entry in built.document.project.snapshot.media { records[entry.id] = entry }
+        let worker = CloudTranscriber(cacheDirectory: cache, media: records)
+        let queued = DispatchSemaphore(value: 0)
+        DispatchQueue.global().async {
+            let genuine = Result {
+                try worker.transcribe(
+                    jobs, options: options, refresh: false, frame: 20000,
+                    cancel: Transcriber.CancelToken())
+            }
+            let delivered: Result<Transcriber.Outcome, any Error> =
+                action == "queued-failure"
+                ? .failure(Transcriber.TranscribeError.failed("queued failure")) : genuine
+            DispatchQueue.main.async {
+                sheet.finishCloud(delivered, report: worker.report)
+            }
+            queued.signal()
+        }
+        answer["queued"] = queued.wait(timeout: .now() + 10) == .success
+        answer["beforeDelivery"] = built.document.project.json == before
+        if action != "queued-success" {
+            sheet.stopButton.performClick(nil)
+        }
+    } else {
+        sheet.startClicked(nil)
+        answer["didStart"] = sheet.didStart
+    }
+    let deadline = Date().addingTimeInterval(20)
+    while Date() < deadline && !sheet.didFinish {
+        RunLoop.current.run(until: Date().addingTimeInterval(0.02))
+    }
+    answer["didFinish"] = sheet.didFinish
+    answer["status"] = sheet.statusLabel.stringValue
+    answer["reportDeferred"] = sheet.cloudReport?.janitorDeferred.map(Int.init) ?? []
+    answer["warnings"] = sheet.cloudReport.map {
+        TranscribeSheetController.cloudReportLines(
+            $0, names: [built.media: "fixture"], detected: true)
+    } ?? []
+    let after = built.document.project.json
+    answer["sameProject"] = after == before
+    answer["textClips"] = built.document.project.snapshot.clips.filter {
+        if case .text = $0.source { return true }
+        return false
+    }.count
+    if action == "queued-success" && after != before {
+        built.document.undoManager?.undo()
+        answer["oneUndoRestores"] = built.document.project.json == before
+        built.document.undoManager?.redo()
+        answer["redoRestores"] = built.document.project.json == after
     }
     return answer
 }
@@ -2637,6 +2770,33 @@ BASE_SOURCE = {"size": 1000, "modified": 2000, "duration": 6_000_000, "width": 1
                "maxThumbnails": 600, "peakBucketsPerSecond": 100}
 BASE_OPTIONS = {"speech_models": ["universal-3-5-pro", "universal-2"], "language_code": None,
                 "speaker_labels": False, "keyterms_prompt": []}
+SOURCE_KEYS = {"size", "modified", "duration", "hasAudio"}
+OUTER_KEYS = {"source", "provider", "speech_models", "language_code", "speaker_labels",
+              "keyterms_prompt"}
+IRRELEVANT_SOURCE = {"width": 1921, "height": 1081, "hasVideo": False,
+                     "thumbnailHeight": 200.0, "maxThumbnails": 601,
+                     "peakBucketsPerSecond": 101}
+# Literal old writer shape. The Swift probe receives these raw bytes, not a
+# marker obtained from the current writer. Python only changes named fields.
+LEGACY_MARKER = ('{"source":{"size":1000,"modified":2000,"duration":6000000,'
+                 '"width":1920,"height":1080,"hasVideo":true,"hasAudio":true,'
+                 '"thumbnailHeight":160,"maxThumbnails":600,"peakBucketsPerSecond":100},'
+                 '"provider":"assemblyai","speech_models":["universal-3-5-pro",'
+                 '"universal-2"],"language_code":null,"speaker_labels":false,'
+                 '"keyterms_prompt":[]}')
+NARROW_MARKER = ('{"source":{"size":1000,"modified":2000,"duration":6000000,'
+                 '"hasAudio":true},"provider":"assemblyai","speech_models":'
+                 '["universal-3-5-pro","universal-2"],"language_code":null,'
+                 '"speaker_labels":false,"keyterms_prompt":[]}')
+
+
+def raw_marker(source=None, outer=None, narrow=False, absent=()):
+    body = json.loads(NARROW_MARKER if narrow else LEGACY_MARKER)
+    body["source"].update(source or {})
+    body.update(outer or {})
+    for key in absent:
+        body["source"].pop(key, None)
+    return json.dumps(body, separators=(",", ":"))
 
 
 def section_stamp(binary, sources):
@@ -2663,7 +2823,38 @@ def section_stamp(binary, sources):
         source[key] = value
         rows.append({"label": f"source.{key}", "source": source, "options": dict(BASE_OPTIONS)})
 
-    answer, error, _ = run_probe(binary, "stamp", {"mode": "stamp", "stamps": rows})
+    legacy_cases = [("matching legacy", LEGACY_MARKER, dict(BASE_SOURCE),
+                     dict(BASE_OPTIONS), True, True)]
+    for key, value in IRRELEVANT_SOURCE.items():
+        legacy_cases.append((f"legacy irrelevant {key}", raw_marker(source={key: value}),
+                             dict(BASE_SOURCE), dict(BASE_OPTIONS), True, True))
+    legacy_cases.append(("legacy all six irrelevant", raw_marker(source=IRRELEVANT_SOURCE),
+                         dict(BASE_SOURCE), dict(BASE_OPTIONS), True, True))
+    legacy_cases.append(("narrow marker", NARROW_MARKER, dict(BASE_SOURCE),
+                         dict(BASE_OPTIONS), True, True))
+    for key, value in {"size": 1001, "modified": 2001, "duration": 6_000_001,
+                       "hasAudio": False}.items():
+        legacy_cases.append((f"legacy relevant {key}", raw_marker(source={key: value}),
+                             dict(BASE_SOURCE), dict(BASE_OPTIONS), True, False))
+    for key in sorted(SOURCE_KEYS):
+        legacy_cases.append((f"legacy absent {key}", raw_marker(absent=(key,)),
+                             dict(BASE_SOURCE), dict(BASE_OPTIONS), False, False))
+        legacy_cases.append((f"legacy null {key}", raw_marker(source={key: None}),
+                             dict(BASE_SOURCE), dict(BASE_OPTIONS), False, False))
+        legacy_cases.append((f"legacy wrong type {key}", raw_marker(source={key: "wrong"}),
+                             dict(BASE_SOURCE), dict(BASE_OPTIONS), False, False))
+    legacy_cases.append(("truncated JSON", LEGACY_MARKER[:-1], dict(BASE_SOURCE),
+                         dict(BASE_OPTIONS), False, False))
+    legacy_cases.append(("provider mismatch", raw_marker(outer={"provider": "other"}),
+                         dict(BASE_SOURCE), dict(BASE_OPTIONS), True, False))
+    for key, value in request_changes.items():
+        legacy_cases.append((f"legacy request {key}", raw_marker(outer={key: value}),
+                             dict(BASE_SOURCE), dict(BASE_OPTIONS), True, False))
+    legacy = [{"label": label, "marker": marker, "source": source, "options": options}
+              for label, marker, source, options, _, _ in legacy_cases]
+
+    answer, error, _ = run_probe(binary, "stamp", {"mode": "stamp", "stamps": rows,
+                                                  "legacy": legacy})
     if answer is None:
         check("13: the stamp mode answers", False, error)
         return
@@ -2680,10 +2871,11 @@ def section_stamp(binary, sources):
         inner = list(json.loads(marker).get("source", {}))
     except ValueError:
         keys, inner = [], []
-    check("13: the marker's bytes ARE the stamp's, every key sorted at both levels, "
-          "with `language_code` written as null rather than dropped",
+    check("13: writer emits exact four source and six outer keys in stable sorted bytes, "
+          "with `language_code` null",
           marker == by.get("base", {}).get("json") and '"language_code":null' in marker
-          and keys == sorted(keys) and inner == sorted(inner) and len(keys) == 6,
+          and keys == sorted(keys) and inner == sorted(inner)
+          and set(keys) == OUTER_KEYS and set(inner) == SOURCE_KEYS,
           f"got {marker!r}")
     check("13: the marker reads back EQUAL to what was written",
           all(row.get("readsBackEqual") is True for row in answer.get("stamps", [])),
@@ -2692,8 +2884,16 @@ def section_stamp(binary, sources):
         key = f"options.{label}" if label in request_changes else f"source.{label}"
         if key not in by:
             continue
-        check(f"13: {key} changing INVALIDATES", by[key].get("equalToFirst") is False,
+        invalidates = key.startswith("options.") or label in SOURCE_KEYS
+        check(f"13: {key} changing {'INVALIDATES' if invalidates else 'does not invalidate'}",
+              by[key].get("equalToFirst") is (not invalidates),
               f"got {by[key]!r}")
+    legacy_by = {row["label"]: row for row in answer.get("legacy", [])}
+    for label, _, _, _, decodes, equal in legacy_cases:
+        row = legacy_by.get(label, {})
+        check(f"13: raw {label} decodes={decodes}, equal={equal}, read leaves bytes unchanged",
+              row.get("decodes") is decodes and row.get("equal") is equal
+              and row.get("unchanged") is True, f"got {row!r}")
     regions = answer.get("regions", {})
     check("13: the region `us` resolves to api.assemblyai.com",
           regions.get("us") == "https://api.assemblyai.com", f"got {regions.get('us')!r}")
@@ -2708,6 +2908,178 @@ def section_stamp(binary, sources):
           [regions.get("us.display"), regions.get("eu.display")]
           == ["United States", "European Union"],
           f"got {regions.get('us.display')!r} / {regions.get('eu.display')!r}")
+    section_stamp_runs(binary)
+
+
+def section_stamp_runs(binary):
+    print("\n13R. raw legacy markers through new-process fake runs")
+    speech = make_fixture()
+    if speech is None or not os.path.isfile(speech):
+        check("13R: speech fixture exists for paid-submission discrimination", False,
+              f"fixture {speech!r}")
+        return
+    media, jobs = run_media(speech, speech)
+    media, jobs = media[:1], jobs[:1]
+
+    def brief(answer):
+        return {key: answer.get(key) for key in
+                ("ok", "estimateFates", "estimateUploadTicks", "report", "cues")}
+
+    def request(fake, cache, **options):
+        return {"mode": "run", "base": fake.base, "key": DUMMY_KEY,
+                "tuning": RUN_TUNING, "cache": cache, "media": media, "jobs": jobs,
+                **options}
+
+    def clone(seed, tag, marker):
+        cache = fresh("stamp-run-" + tag)
+        shutil.copytree(seed, cache, dirs_exist_ok=True)
+        path = os.path.join(cache, "transcripts", "1.complete.json")
+        with open(path, "wb") as handle:
+            handle.write(marker)
+        return cache, path
+
+    def facts(seed):
+        path = os.path.join(seed, "transcripts", "1.json")
+        marker = os.path.join(seed, "transcripts", "1.complete.json")
+        if not os.path.isfile(path) or not os.path.isfile(marker):
+            return None
+        payload = open(path, "rb").read()
+        stamp = json.loads(open(marker, "rb").read())
+        return payload, json.loads(payload)["transcript_id"], stamp
+
+    with Fake("stamp-runs") as fake:
+        fake.scenario()
+        seed = fresh("stamp-run-seed")
+        first, error, _ = run_probe(binary, "stamp-seed", request(fake, seed), timeout=300)
+        seed_facts = facts(seed)
+        check("13R: loopback seed wrote a real transcript and marker",
+              first is not None and first.get("ok") is True and seed_facts is not None
+              and len([r for r in fake.log()["requests"] if r["path"] == "/v2/upload"]) == 1,
+              f"error={error!r}, answer={brief(first or {})!r}")
+        if seed_facts is None or first is None or first.get("ok") is not True:
+            return
+        payload, original_id, written = seed_facts
+        source4 = {key: written["source"][key] for key in SOURCE_KEYS}
+        wide = {"width": 0, "height": 0, "hasVideo": False,
+                "thumbnailHeight": 160, "maxThumbnails": 600,
+                "peakBucketsPerSecond": 100}
+        legacy_source = dict(source4, **wide)
+        changed = {"width": 1, "height": 1, "hasVideo": True,
+                   "thumbnailHeight": 161, "maxThumbnails": 601,
+                   "peakBucketsPerSecond": 101}
+        variants = [("matching", raw_marker(source=legacy_source))]
+        variants += [(key, raw_marker(source=dict(legacy_source, **{key: value})))
+                     for key, value in changed.items()]
+        variants += [("all six", raw_marker(source=dict(legacy_source, **changed)))]
+        variants += [("narrow", raw_marker(source=source4, narrow=True))]
+        for tag, raw in variants:
+            marker_bytes = raw.encode()
+            cache, path = clone(seed, "positive-" + tag.replace(" ", "-"), marker_bytes)
+            before = len(fake.log()["requests"])
+            result, error, _ = run_probe(binary, "stamp-positive-" + tag,
+                                         request(fake, cache), timeout=300)
+            after = fake.log()["requests"][before:]
+            saved = open(os.path.join(cache, "transcripts", "1.json"), "rb").read()
+            check(f"13R: raw {tag} reuses the transcript and estimate without rebilling",
+                  result is not None and result.get("ok") is True
+                  and result.get("report", {}).get("cached") == [1]
+                  and result.get("cues") == first.get("cues")
+                  and result.get("estimateFates") == ["cached"]
+                  and result.get("estimateUploadTicks") == 0
+                  and json.loads(saved)["transcript_id"] == original_id
+                  and saved == payload and open(path, "rb").read() == marker_bytes
+                  and not after and not [r for r in after if r["path"] == "/v2/upload"
+                                     or r["path"] == "/v2/transcript"],
+                  f"error={error!r}, answer={brief(result or {})!r}, requests={after!r}")
+
+        raw = raw_marker(source=dict(legacy_source, **changed)).encode()
+        old_times = os.stat(speech)
+        try:
+            cache, _ = clone(seed, "negative-source", raw)
+            os.utime(speech, (old_times.st_atime, old_times.st_mtime + 2))
+            before = len(fake.log()["requests"])
+            result, error, _ = run_probe(binary, "stamp-source-change",
+                                         request(fake, cache), timeout=300)
+            after = fake.log()["requests"][before:]
+            new_id = json.loads(open(os.path.join(cache, "transcripts", "1.json"), "rb").read())[
+                "transcript_id"]
+            check("13R: real modified second uploads as fileChanged after irrelevant drift",
+                  result is not None and result.get("estimateFates") == ["upload:fileChanged"]
+                  and len([r for r in after if r["path"] == "/v2/upload"]) == 1
+                  and len([r for r in after if r["path"] == "/v2/transcript"]) == 1
+                  and new_id != original_id,
+                  f"error={error!r}, answer={brief(result or {})!r}, after={after!r}")
+        finally:
+            os.utime(speech, ns=(old_times.st_atime_ns, old_times.st_mtime_ns))
+
+        for tag, extra, fate in (("language", {"options": dict(BASE_OPTIONS, language_code="de")},
+                                 "upload:requestChanged(language)"),
+                                ("refresh", {"refresh": True}, "upload:refresh")):
+            cache, _ = clone(seed, "negative-" + tag, raw)
+            before = len(fake.log()["requests"])
+            result, error, _ = run_probe(binary, "stamp-" + tag,
+                                         request(fake, cache, **extra), timeout=300)
+            after = fake.log()["requests"][before:]
+            new_id = json.loads(open(os.path.join(cache, "transcripts", "1.json"), "rb").read())[
+                "transcript_id"]
+            check(f"13R: {tag} still uploads once with {fate}",
+                  result is not None and result.get("estimateFates") == [fate]
+                  and len([r for r in after if r["path"] == "/v2/upload"]) == 1
+                  and len([r for r in after if r["path"] == "/v2/transcript"]) == 1
+                  and new_id != original_id,
+                  f"error={error!r}, answer={brief(result or {})!r}, after={after!r}")
+
+    # Keep the fake's transcript table alive across seed and retry. Its
+    # scenario is chosen before seeding because resetting it clears IDs.
+    for tag, fail_times in (("retry", 1), ("hold", -1)):
+        with Fake("stamp-" + tag) as fake:
+            fake.scenario(fail=[{"route": "delete", "status": 500, "times": fail_times}])
+            seed = fresh("stamp-" + tag + "-seed")
+            first, error, _ = run_probe(binary, "stamp-" + tag + "-seed",
+                                         request(fake, seed), timeout=300)
+            seeded = facts(seed)
+            check(f"13R: {tag} seed retains a pending remote ID",
+                  first is not None and first.get("ok") is True and seeded is not None
+                  and json.loads(seeded[0])["remote_deleted"] is False,
+                  f"error={error!r}, answer={brief(first or {})!r}")
+            if seeded is None or first is None or first.get("ok") is not True:
+                continue
+            old_payload, old_id, old_marker = seeded
+            source = {key: old_marker["source"][key] for key in SOURCE_KEYS}
+            raw = raw_marker(source=dict(source, **changed)).encode()
+            variants = ([("current", {})] if tag == "retry" else [
+                ("source", {"sourceChange": True}),
+                ("request", {"options": dict(BASE_OPTIONS, language_code="de")}),
+            ])
+            for variant in variants:
+                name, extra = variant
+                cache, path = clone(seed, tag + "-" + name, raw)
+                before = len(fake.log()["requests"])
+                prior = os.stat(speech)
+                try:
+                    if extra.get("sourceChange"):
+                        os.utime(speech, (prior.st_atime, prior.st_mtime + 2))
+                    result, error, _ = run_probe(binary, "stamp-" + tag + "-" + name,
+                                                 request(fake, cache, **{
+                                                     k: v for k, v in extra.items()
+                                                     if k != "sourceChange"}), timeout=300)
+                finally:
+                    os.utime(speech, ns=(prior.st_atime_ns, prior.st_mtime_ns))
+                after = fake.log()["requests"][before:]
+                saved = open(os.path.join(cache, "transcripts", "1.json"), "rb").read()
+                fate = ("cached" if tag == "retry" else
+                        "awaiting:fileChanged" if name == "source" else
+                        "awaiting:requestChanged(language)")
+                check(f"13R: pending DELETE {tag}/{name} retries without upload",
+                      result is not None and result.get("estimateFates") == [fate]
+                      and len([r for r in after if r["method"] == "DELETE"]) == 1
+                      and not [r for r in after if r["path"] in ("/v2/upload", "/v2/transcript")]
+                      and json.loads(saved)["transcript_id"] == old_id
+                      and open(path, "rb").read() == raw
+                      and (result.get("report", {}).get("cached") == [1] if tag == "retry"
+                           else result.get("report", {}).get("held") == [1]
+                           and saved == old_payload),
+                      f"error={error!r}, answer={brief(result or {})!r}, after={after!r}")
 
 
 # --------------------------------------------------------------------------
@@ -3906,7 +4278,7 @@ def section_cache_write(binary, sources):
     media, jobs = media[:1], jobs[:1]
     dashboard = ("Its transcript could not be saved in the project, so Reelcut cannot "
                  "retry deleting it automatically. Delete it in your AssemblyAI dashboard.")
-    retry = "it will be retried at the next run."
+    retry = "it will be retried at the next run with an API key."
 
     for written in (False, True):
         for deleted in (False, True):
@@ -4501,29 +4873,19 @@ def section_hygiene(binary, sources):
         name for name in os.listdir(sources)
         if name.endswith(".swift") and "Settings ▸ Transcription" in open(
             os.path.join(sources, name)).read())
-    check("S: the string `Settings ▸ Transcription` occurs in exactly ONE file — the "
-          "catalog's tool description. The tool's own copy is split across two source "
-          "lines, so it is pinned by its SENTENCE below rather than by this grep",
-          sentences == ["AgentCatalog+Captions.swift"], f"found in {sentences!r}")
-    for name, sentence in [
-        ("AgentCatalog+Captions.swift",
-         '                    + "say-so. It needs an API key (Reelcut ▸ Settings ▸ '
-         'Transcription, or "\n'),
-        ("AgentServer+CloudCaptions.swift",
-         '                message: "No AssemblyAI API key is set. Set one in Reelcut ▸ '
-         'Settings ▸ "\n'
-         '                    + "Transcription, or RC_ASSEMBLYAI_KEY for a proof.")\n'),
-    ]:
-        before = subprocess.run(
-            ["git", "show", f"{BASELINE_TREE_C1CHROME}:app/Sources/{name}"], cwd=ROOT,
-            capture_output=True, text=True, env=child_env(), timeout=60)
-        after = open(os.path.join(sources, name)).read()
-        check(f"S: {name}'s Settings sentence is BYTE-IDENTICAL to the baseline's — the "
-              f"heading was added to make it true, not edited to match the window",
-              before.returncode == 0 and before.stdout.count(sentence) == 1
-              and after.count(sentence) == 1,
-              f"baseline {before.stdout.count(sentence) if before.returncode == 0 else '?'}, "
-              f"now {after.count(sentence)}")
+    check("S: the credential refusal sentence has one source in the coordinator",
+          sentences == ["CloudTranscriber.swift"], f"found in {sentences!r}")
+    catalog_text = open(os.path.join(sources, "AgentCatalog+Captions.swift")).read()
+    check("S: the catalog describes both keyed upload and all-cached keyless reuse",
+          "New transcription needs an API key" in catalog_text
+          and "can be reused without a key" in catalog_text,
+          "the catalog does not describe both admissions")
+    agent_text = open(os.path.join(sources, "AgentServer+CloudCaptions.swift")).read()
+    check("S: the MCP handler resolves an optional credential and forwards it",
+          "var client: AssemblyAIClient?" in agent_text
+          and "client: client," in agent_text
+          and "guard let credential" not in agent_text,
+          "the MCP handler restored a credential gate")
     check("S: the cache kind is `transcripts`, beside the other three",
           answer.get("transcriptsKind") == "transcripts"
           and answer.get("cacheKinds") == ["thumbs", "peaks", "speech", "transcripts"],
@@ -5301,9 +5663,9 @@ def section_chrome(binary, sources):
                       "“intro.mov”: detected German (98% confidence).",
                       "“outro.mov”: detected English (United States) (99% confidence).",
                       "AssemblyAI has not confirmed deleting the transcript of “held.mov”; it "
-                      "will be retried at the next run. It was not uploaded again in this run.",
+                      "will be retried at the next run with an API key. It was not uploaded again in this run.",
                       "AssemblyAI has not confirmed deleting the transcript of “outro.mov”; it "
-                      "will be retried at the next run."],
+                      "will be retried at the next run with an API key."],
                   f"got {report.get('lines')!r}")
         quiet, error, _ = chrome_child(binary, fake, "report-quiet", {
             "op": "report", "detected": False, "names": {"1": "intro.mov"},
@@ -5474,9 +5836,293 @@ def png_size(data):
 
 
 # --------------------------------------------------------------------------
+# R6-16 — disk-backed keyless admission, independent of the sheet estimate
+
+def section_keyless(binary, sources):
+    print("\nKL. nonempty whole-batch keyless reuse and deferred cleanup")
+    speech = make_fixture()
+    check("KL: the audio fixture exists", speech is not None and os.path.isfile(speech))
+    if speech is None or not os.path.isfile(speech):
+        return
+    second = os.path.join(os.path.dirname(speech), "keyless-second.aiff")
+    shutil.copy2(speech, second)
+    media, jobs = run_media(speech, second)
+
+    def request(cache, **extra):
+        return {"mode": "run", "keyless": True, "cache": cache, "media": media,
+                "jobs": jobs, **extra}
+
+    def cache_bytes(cache):
+        folder = os.path.join(cache, "transcripts")
+        return {name: open(os.path.join(folder, name), "rb").read()
+                for name in os.listdir(folder)}
+
+    with Fake("keyless-seed") as fake:
+        fake.scenario()
+        seed = fresh("keyless-seed")
+        planted, error, _ = run_probe(binary, "keyless-seed", {
+            "mode": "run", "base": fake.base, "key": DUMMY_KEY,
+            "tuning": RUN_TUNING, "cache": seed, "media": media, "jobs": jobs,
+        }, timeout=300)
+        check("KL: dummy-key fake seeded two decodable transcripts and markers",
+              planted is not None and planted.get("ok") is True
+              and len(planted.get("cues", [])) > 0
+              and all(os.path.isfile(os.path.join(seed, "transcripts", f"{i}.json"))
+                      and os.path.isfile(os.path.join(seed, "transcripts", f"{i}.complete.json"))
+                      for i in (1, 2)),
+              f"error={error!r}, answer={planted!r}")
+        if planted is None or planted.get("ok") is not True:
+            return
+        # The fake has already confirmed deletion. Restore pending flags as a
+        # package fixture; this changes only the header, never the words.
+        for ident in (1, 2):
+            path = os.path.join(seed, "transcripts", f"{ident}.json")
+            data = json.loads(open(path, "rb").read())
+            data["remote_deleted"] = False
+            with open(path, "wb") as handle:
+                handle.write(json.dumps(data, ensure_ascii=False, separators=(",", ":")).encode())
+        plant_undeleted(seed, [9])
+        unsafe = os.path.join(seed, "transcripts", "10.json")
+        with open(unsafe, "w") as handle:
+            handle.write(UNDELETED_DOCUMENT % "unsafe/id")
+        before_bytes = cache_bytes(seed)
+        before_http = len(fake.log()["requests"])
+        reused, error, _ = run_probe(binary, "keyless-reuse", request(seed), timeout=120)
+        after_http = len(fake.log()["requests"])
+        report = (reused or {}).get("report", {})
+        check("KL: fresh nil-client process reuses both distinct media and original cues",
+              reused is not None and reused.get("ok") is True
+              and reused.get("cues") == planted.get("cues")
+              and report.get("cached") == [1, 2] and report.get("uploaded") == []
+              and reused.get("estimateCanReuse") is True,
+              f"error={error!r}, answer={reused!r}")
+        check("KL: no additional HTTP request of any method and no changed package byte",
+              after_http == before_http and cache_bytes(seed) == before_bytes,
+              f"HTTP {before_http}->{after_http}")
+        check("KL: all pending IDs, including unrelated and unsafe, are deferred in media order",
+              report.get("janitorDeferred") == [1, 2, 9, 10]
+              and all(report.get(k) == [] for k in ("janitorDeleted", "janitorFailed", "held")),
+              f"report={report!r}")
+        qualified = ("cleanup was deferred because no API key is set. Its deletion ID is "
+                     "retained in the project; a later run with a key for the originating "
+                     "account and region will retry deletion only if that ID is safe to send.")
+        note = (reused or {}).get("cloudFields", {}).get("note", "")
+        lines = " ".join((reused or {}).get("cloudReportLines", []))
+        check("KL: shared UI/MCP warning qualifies every deferred retry including unsafe ID",
+              all(f"media {i}; {qualified}" in note for i in (1, 2, 9, 10))
+              and qualified in lines and "media 10" in lines,
+              f"note={note!r}, lines={lines!r}")
+        check("KL: successful keyless result reports zero billed seconds",
+              (reused or {}).get("cloudFields", {}).get("audio_seconds") == 0,
+              f"fields={(reused or {}).get('cloudFields')!r}")
+
+        # A legacy wide marker remains current and byte-identical too.
+        legacy = fresh("keyless-legacy")
+        shutil.copytree(seed, legacy, dirs_exist_ok=True)
+        marker = os.path.join(legacy, "transcripts", "1.complete.json")
+        wide = json.loads(open(marker, "rb").read())
+        wide["source"].update({"width": 777, "height": 888, "hasVideo": True,
+                               "thumbnailHeight": 42, "maxThumbnails": 99,
+                               "peakBucketsPerSecond": 13})
+        with open(marker, "wb") as handle:
+            handle.write(json.dumps(wide).encode())
+        prior = cache_bytes(legacy)
+        legacy_result, error, _ = run_probe(binary, "keyless-legacy", request(legacy))
+        check("KL: wide marker projects to source identity without writing bytes",
+              legacy_result is not None and legacy_result.get("ok") is True
+              and legacy_result.get("cues") == planted.get("cues")
+              and cache_bytes(legacy) == prior and len(fake.log()["requests"]) == before_http,
+              f"error={error!r}, answer={legacy_result!r}")
+
+        def negative(tag, mutate=None, expected_deferred=(1, 2, 9, 10), **extra):
+            cache = fresh("keyless-negative-" + tag)
+            shutil.copytree(seed, cache, dirs_exist_ok=True)
+            if mutate:
+                mutate(cache)
+            old = cache_bytes(cache)
+            count = len(fake.log()["requests"])
+            response, issue, _ = run_probe(binary, "keyless-negative-" + tag,
+                                            request(cache, **extra), timeout=120)
+            check("KL: " + tag + " refuses the entire keyless batch without effects",
+                  response is not None and response.get("ok") is False
+                  and "No AssemblyAI API key is set" in response.get("message", "")
+                  and not response.get("cues")
+                  and response.get("report", {}).get("cached") == []
+                  and response.get("report", {}).get("janitorDeferred")
+                      == list(expected_deferred)
+                  and cache_bytes(cache) == old
+                  and len(fake.log()["requests"]) == count
+                  and response.get("tempBefore") == response.get("tempAfter"),
+                  f"error={issue!r}, answer={response!r}")
+
+        negative("mixed uncached third media", media=media + [{"id": 3, "path": second,
+                  "duration": 18_000_000}], jobs=jobs + [dict(jobs[1], clip=3, media=3)])
+        negative("missing marker", lambda cache: os.remove(
+            os.path.join(cache, "transcripts", "2.complete.json")))
+        negative("missing transcript", lambda cache: os.remove(
+            os.path.join(cache, "transcripts", "2.json")), expected_deferred=(1, 9, 10))
+        negative("malformed marker", lambda cache: open(
+            os.path.join(cache, "transcripts", "2.complete.json"), "wb").write(b"{"))
+        def bad_words(cache):
+            path = os.path.join(cache, "transcripts", "2.json")
+            data = json.loads(open(path, "rb").read())
+            data["words"] = None
+            with open(path, "w") as handle: json.dump(data, handle)
+        negative("malformed words", bad_words, expected_deferred=(1, 9, 10))
+        changed = os.path.join(fresh("keyless-changed-source"), "changed.aiff")
+        shutil.copy2(second, changed)
+        with open(changed, "ab") as handle: handle.write(b"changed")
+        negative("changed source", media=[media[0], dict(media[1], path=changed)],
+                 jobs=[jobs[0], dict(jobs[1], source=changed)])
+        for field, value in (("speech_models", ["universal-2"]),
+                             ("language_code", "de"), ("speaker_labels", True),
+                             ("keyterms_prompt", ["changed"])):
+            negative("changed " + field, options=dict(BASE_OPTIONS, **{field: value}))
+        negative("refresh", refresh=True)
+        missing = "/no-such-keyless-source.aiff"
+        negative("unreadable source", media=[media[0], dict(media[1], path=missing)],
+                 jobs=[jobs[0], dict(jobs[1], source=missing)])
+
+        # A readable empty words array is a true no-speech answer, with the
+        # same retained cleanup report even though no cues can be placed.
+        empty = fresh("keyless-empty-words")
+        shutil.copytree(seed, empty, dirs_exist_ok=True)
+        path = os.path.join(empty, "transcripts", "1.json")
+        data = json.loads(open(path, "rb").read()); data["words"] = []
+        with open(path, "w") as handle: json.dump(data, handle)
+        one = request(empty, media=media[:1], jobs=jobs[:1])
+        silent, error, _ = run_probe(binary, "keyless-empty-words", one)
+        check("KL: valid empty words reaches no-speech with deferred cleanup warning",
+              silent is not None and silent.get("ok") is False
+              and "No speech" in silent.get("message", "")
+              and qualified in silent.get("cloudFailure", "")
+              and silent.get("report", {}).get("janitorDeferred") == [1, 2, 9, 10],
+              f"error={error!r}, answer={silent!r}")
+        cancelled, error, _ = run_probe(binary, "keyless-cancel-first", request(
+            seed, cancelAtFirstProgress=True))
+        check("KL: first progress callback cancellation yields no cues or request",
+              cancelled is not None and cancelled.get("ok") is False
+              and cancelled.get("cancelled") is True and not cancelled.get("cues")
+              and len(fake.log()["requests"]) == before_http,
+              f"error={error!r}, answer={cancelled!r}")
+
+        ui_seed = fresh("keyless-ui-seed")
+        shutil.copytree(seed, ui_seed, dirs_exist_ok=True)
+        keyed, error, _ = run_probe(binary, "keyless-later-keyed", {
+            "mode": "run", "base": fake.base, "key": DUMMY_KEY, "tuning": RUN_TUNING,
+            "cache": seed, "media": media, "jobs": jobs}, timeout=300)
+        fresh_requests = fake.log()["requests"][before_http:]
+        unsafe_after = open(unsafe, "rb").read()
+        keyed_report = (keyed or {}).get("report", {})
+        expected_deletes = [
+            f"DELETE /v2/transcript/{json.loads(before_bytes[f'{ident}.json'])['transcript_id']}"
+            for ident in (1, 2, 9)
+        ]
+        requests = [f"{row['method']} {row['path']}" for row in fresh_requests]
+        check("KL: later keyed janitor retries safe IDs first and never sends unsafe ID",
+              keyed is not None and keyed.get("ok") is True
+              and requests[:len(expected_deletes)] == expected_deletes
+              and [row for row in requests if row.startswith("DELETE ")] == expected_deletes
+              and "unsafe" not in " ".join(row["path"] for row in fresh_requests)
+              and unsafe_after == before_bytes["10.json"]
+              and 10 not in keyed_report.get("janitorDeleted", [])
+              and 10 not in keyed_report.get("janitorFailed", []),
+              f"error={error!r}, requests={requests!r}, expected={expected_deletes!r}, "
+              f"report={keyed_report!r}")
+
+        # The sheet uses actual controls, project edits and the coordinator's
+        # disk reread. Its copied cache is separate from the coordinator rows.
+        for action in ("click", "mutate", "refresh", "queued-cancel",
+                       "queued-success", "queued-failure"):
+            before_ui_http = len(fake.log()["requests"])
+            before_ui_bytes = cache_bytes(ui_seed)
+            ui, issue, _ = run_probe(binary, "keyless-ui-" + action, {
+                "mode": "chrome", "op": "keyless", "action": action,
+                "cache": ui_seed, "fixture": second, "duration": 18_000_000,
+            }, timeout=120, extra=("-RCAssemblyAIEndpoint", "http://remote.invalid"))
+            check(f"KL UI {action}: current package enables Generate without a key",
+                  ui is not None and ui.get("enabled") is True
+                  and ui.get("estimateReusable") is True
+                  and "No AssemblyAI API key" not in ui.get("note", "")
+                  and "without an API key or network request" in ui.get("hint", ""),
+                  f"issue={issue!r}, ui={ui!r}")
+            if ui is None:
+                continue
+            if action == "refresh":
+                check("KL UI refresh: keyless gate and hint return to cloud-work state",
+                      ui.get("refreshEnabled") is False
+                      and "No AssemblyAI API key" in ui.get("refreshNote", "")
+                      and "uploaded to AssemblyAI" in ui.get("refreshHint", ""),
+                      f"ui={ui!r}")
+            elif action == "click":
+                check("KL UI click: real Generate places cues with deferred warning",
+                      ui.get("didStart") is True and ui.get("didFinish") is True
+                      and ui.get("textClips", 0) > 0
+                      and ui.get("sameProject") is False
+                      and qualified in " ".join(ui.get("warnings", [])),
+                      f"ui={ui!r}")
+            elif action == "mutate":
+                check("KL UI mutate: stale sheet facts cannot bypass runtime refusal",
+                      ui.get("didStart") is True and ui.get("didFinish") is True
+                      and ui.get("sameProject") is True
+                      and ui.get("textClips") == 0
+                      and "No AssemblyAI API key is set" in ui.get("status", "")
+                      and qualified in " ".join(ui.get("warnings", [])),
+                      f"ui={ui!r}")
+            elif action == "queued-cancel":
+                check("KL UI queued-cancel: worker succeeded before Stop, no edit lands",
+                      ui.get("queued") is True and ui.get("beforeDelivery") is True
+                      and ui.get("didFinish") is True and ui.get("sameProject") is True
+                      and ui.get("textClips") == 0
+                      and "cancelled" in ui.get("status", "")
+                      and ui.get("reportDeferred") == [1, 2, 9, 10]
+                      and qualified in " ".join(ui.get("warnings", [])),
+                      f"ui={ui!r}")
+            elif action == "queued-success":
+                check("KL UI queued-success: unchanged token places cues as one undo step",
+                      ui.get("queued") is True and ui.get("didFinish") is True
+                      and ui.get("textClips", 0) > 0
+                      and ui.get("oneUndoRestores") is True
+                      and ui.get("redoRestores") is True,
+                      f"ui={ui!r}")
+            elif action == "queued-failure":
+                check("KL UI queued-failure: Stop preserves original error and report",
+                      ui.get("queued") is True and ui.get("didFinish") is True
+                      and ui.get("sameProject") is True
+                      and "queued failure" in ui.get("status", "")
+                      and "cancelled" not in ui.get("status", "")
+                      and qualified in " ".join(ui.get("warnings", [])),
+                      f"ui={ui!r}")
+            check(f"KL UI {action}: no loopback fake request or package change",
+                  len(fake.log()["requests"]) == before_ui_http
+                  and cache_bytes(ui_seed) == before_ui_bytes,
+                  "fixture was unexpectedly changed")
+
+
+# --------------------------------------------------------------------------
 # Mutants
 
 MUTANTS = {
+    "keyless-ui-requires-key": (
+        "TranscribeSheetController+Cloud.swift",
+        "            && document?.cacheDirectory != nil && (hasCredential ? hasWork : reusable)\n",
+        "            && document?.cacheDirectory != nil && hasCredential && hasWork\n",
+        "the real Generate button again requires a key on cached-only scope"),
+    "keyless-any-cache": (
+        "CloudTranscriber.swift",
+        "        if client == nil {\n            for id in order {\n",
+        "        if client == nil {\n            for id in order.prefix(1) {\n",
+        "only the first cached media is admitted; a mixed batch partially succeeds"),
+    "keyless-omits-deferred": (
+        "CloudTranscriber.swift",
+        "            report.janitorDeferred = MediaTranscript.undeleted(in: cacheDirectory).map(\\.media)\n",
+        "            report.janitorDeferred = []\n",
+        "pending remote IDs disappear from keyless success and failure reports"),
+    "keyless-late-cancel": (
+        "TranscribeSheetController+Cloud.swift",
+        "        if case .success = outcome, token.isCancelled {\n",
+        "        if false {\n",
+        "queued successful completion places captions despite a later Stop"),
     "verify-ignores-input": (
         "SettingsWindowController.swift",
         "        guard let credential,\n"
@@ -5573,10 +6219,9 @@ MUTANTS = {
         "AssemblyAI's published rate halved (row 14)"),
     "no-credential-check": (
         "TranscribeSheetController+Cloud.swift",
-        "            && AssemblyAIConfiguration.credential(store: store, environment: "
-        "environment) != nil\n",
-        "",
-        "the credential taken out of the cloud button's rule (row 18's disabled row)"),
+        "            && document?.cacheDirectory != nil && (hasCredential ? hasWork : reusable)\n",
+        "            && document?.cacheDirectory != nil && hasWork\n",
+        "the credential and all-cache condition taken out of the cloud button's rule"),
     "masked-shows-value": (
         "SettingsWindowController.swift",
         "        keyField.placeholderString =\n",
@@ -5710,13 +6355,12 @@ MUTANTS = {
         "three EINTR rows)"),
     "janitor-deaf": (
         "CloudTranscriber.swift",
-        "        if cancel.isCancelled { throw Transcriber.TranscribeError.cancelled }\n"
-        "        let janitor = retryDeletes(cancel: cancel)\n",
-        "        let janitor = retryDeletes()\n",
+        "            let janitor = retryDeletes(cancel: cancel)\n",
+        "            let janitor = retryDeletes()\n",
         "the janitor deaf to a Stop again \u2014 the reader review's R1\u00b72, reverted "
         "(row J)"),
     "stamp-drops-field": (
-        "AssemblyAITranscript.swift",
+        "TranscriptStamp.swift",
         "        self.speakerLabels = options.speakerLabels\n",
         "        self.speakerLabels = false\n",
         "one request field dropped from the stamp (row 13)"),
@@ -5782,7 +6426,8 @@ def prepare_mutant(name):
     return target
 
 
-SECTIONS = [section_mapping, section_jobs, section_stamp, section_client, section_submission,
+SECTIONS = [section_mapping, section_jobs, section_stamp, section_keyless,
+            section_client, section_submission,
             section_cancel,
             section_secrets, section_cues, section_extract, section_verbatim,
             section_cache_write, section_run,

@@ -251,7 +251,7 @@ extension TimelineContentView {
         }
         // 0.55 white: a strip literal, a shade under the icon's 0.62.
         NSColor.white.withAlphaComponent(0.55).setFill()
-        if let edge = motion.inEdge {
+        if let edge = motion.inEdge, edge.isActive {
             let w = width(edge)
             let path = NSBezierPath()
             path.move(to: CGPoint(x: strip.minX, y: strip.maxY))
@@ -260,7 +260,7 @@ extension TimelineContentView {
             path.close()
             path.fill()
         }
-        if let edge = motion.out {
+        if let edge = motion.out, edge.isActive {
             let w = width(edge)
             let path = NSBezierPath()
             path.move(to: CGPoint(x: strip.maxX, y: strip.maxY))

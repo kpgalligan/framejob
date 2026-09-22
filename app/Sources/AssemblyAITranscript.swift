@@ -2,8 +2,7 @@ import Foundation
 
 /// AssemblyAI's wire vocabulary: what a transcript is ASKED for
 /// (`TranscriptOptions`, `TranscriptRequest`), what comes back
-/// (`TranscriptResponse`, `TranscriptWord`), what a cache file's marker
-/// records about the request (`TranscriptStamp`), and `JSONValueRange`, the
+/// (`TranscriptResponse`, `TranscriptWord`), and `JSONValueRange`, the
 /// one tool that lets a served `words` array be carried through this app byte
 /// for byte.
 ///
@@ -12,9 +11,8 @@ import Foundation
 /// has (app/CLAUDE.md, road map 6 §5h). What gathers here is the VALUES —
 /// nothing here speaks HTTP and nothing here touches disk, so a probe reads
 /// every one of them with no socket and no cache directory at all.
-/// `TranscriptStamp` is here rather than beside the cache it marks for the
-/// same reason, and because it is a record of the REQUEST above before it is
-/// anything about a file.
+/// The marker's type moved to `TranscriptStamp.swift`; this file keeps the
+/// wire values and the shared optional-key encoder.
 ///
 /// **Snake case is spelled out, never derived.** `JSONEncoder`'s
 /// `.convertToSnakeCase` would turn `audioURL` into `audio_url` and
@@ -329,59 +327,6 @@ enum JSONValueRange {
             }
             return index > start ? index : nil
         }
-    }
-}
-
-// MARK: - The marker
-
-/// What `cache/transcripts/<id>.complete.json` holds: the source file's own
-/// stamp — so a relink, an edited file or a changed duration invalidates a
-/// transcript exactly as it invalidates the peaks — plus the REQUEST, so a
-/// run with a different language, with speakers on or with a new vocabulary
-/// is a new transcript. `MediaImporter.SpeechStamp`'s shape, and for its
-/// reason: `CacheStamp` is UNCHANGED, so thumbs and peaks stay valid.
-///
-/// The region is deliberately NOT in it. A transcript of a file is the same
-/// whichever of AssemblyAI's two regions made it, and putting the region here
-/// would re-upload every media of every project the first time somebody
-/// looked at the popup.
-struct TranscriptStamp: Codable, Equatable {
-    let source: MediaImporter.CacheStamp
-    let provider: String
-    let speechModels: [String]
-    let languageCode: String?
-    let speakerLabels: Bool
-    let keytermsPrompt: [String]
-
-    init(source: MediaImporter.CacheStamp, options: TranscriptOptions) {
-        self.source = source
-        self.provider = MediaTranscript.provider
-        self.speechModels = options.speechModels
-        self.languageCode = options.languageCode
-        self.speakerLabels = options.speakerLabels
-        self.keytermsPrompt = options.keytermsPrompt
-    }
-
-    enum CodingKeys: String, CodingKey {
-        case source
-        case provider
-        case speechModels = "speech_models"
-        case languageCode = "language_code"
-        case speakerLabels = "speaker_labels"
-        case keytermsPrompt = "keyterms_prompt"
-    }
-
-    /// Every key, always, nil as `null` — `TranscriptOptions.encode`'s
-    /// reason. A marker that dropped `language_code` when the language was
-    /// auto would compare unequal to one written by a build that kept it.
-    func encode(to encoder: any Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(source, forKey: .source)
-        try container.encode(provider, forKey: .provider)
-        try container.encode(speechModels, forKey: .speechModels)
-        try encodeOrNull(languageCode, into: &container, forKey: .languageCode)
-        try container.encode(speakerLabels, forKey: .speakerLabels)
-        try container.encode(keytermsPrompt, forKey: .keytermsPrompt)
     }
 }
 

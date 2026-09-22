@@ -53,73 +53,12 @@ enum TranscriptionEngine: String, CaseIterable {
 /// tell which engine ran.
 final class CloudTranscriber {
 
-    /// Everything a caller may want to SAY about a run that the `Outcome`
-    /// has no room for — which media were uploaded and what AssemblyAI said
-    /// about each, which were served from the cache, and what the janitor
-    /// managed.
-    ///
-    /// It is beside the outcome rather than inside it because `Outcome` is
-    /// the shape BOTH engines answer and the on-device one has nothing to
-    /// put in any of these fields. The tool reads it for its result keys and
-    /// c1-chrome's report card reads it for its lines.
-    struct Report: Equatable {
+    enum AccessError: LocalizedError, Equatable {
+        case credentialRequired
 
-        /// One media this run sent to AssemblyAI, and what came back.
-        struct Uploaded: Equatable {
-            let media: UInt32
-            /// R6-8: which model actually ran, so a fallback is reported.
-            let speechModelUsed: String?
-            let languageCode: String?
-            /// Set when the language was DETECTED, not when it was named.
-            let languageConfidence: Double?
-            /// Seconds as AssemblyAI reported them — what was billed.
-            let audioSeconds: Int
-            let format: Transcriber.UploadFormat
-            /// Whether this fetched transcript's initial JSON write landed.
-            let transcriptWritten: Bool
-            /// Whether the remote transcript is confirmed gone (R6-4).
-            let remoteDeleted: Bool
-        }
-
-        var uploaded: [Uploaded] = []
-        /// Media served from `cache/transcripts/` with no request at all.
-        var cached: [UInt32] = []
-        /// Media whose earlier transcript the janitor deleted this run.
-        var janitorDeleted: [UInt32] = []
-        /// Media whose earlier transcript the janitor could NOT delete.
-        var janitorFailed: [UInt32] = []
-        /// R6-11: in `janitorFailed` AND this run would otherwise have
-        /// fetched them. A held media is in neither `uploaded` nor `cached`
-        /// and its clips are reported as problems: its cache file is the one
-        /// record of an id we still have to delete, and a fetch would
-        /// overwrite it.
-        var held: [UInt32] = []
-
-        /// Cleanup still owed, in stable per-media order. An ID can be
-        /// retried only when its transcript JSON was saved in the project.
-        func deletionWarnings(name: (UInt32) -> String) -> [String] {
-            var seen: Set<UInt32> = []
-            var warnings: [String] = []
-            func append(_ id: UInt32, written: Bool) {
-                guard seen.insert(id).inserted else { return }
-                let target = name(id)
-                var warning: String
-                if written {
-                    warning = "AssemblyAI has not confirmed deleting the transcript of \(target); "
-                        + "it will be retried at the next run."
-                } else {
-                    warning = "AssemblyAI has not confirmed deleting the transcript of \(target). "
-                        + "Its transcript could not be saved in the project, so Reelcut cannot "
-                        + "retry deleting it automatically. Delete it in your AssemblyAI dashboard."
-                }
-                if held.contains(id) { warning += " It was not uploaded again in this run." }
-                warnings.append(warning)
-            }
-            for id in janitorFailed { append(id, written: true) }
-            for row in uploaded where !row.remoteDeleted {
-                append(row.media, written: row.transcriptWritten)
-            }
-            return warnings
+        var errorDescription: String? {
+            "No AssemblyAI API key is set. Set one in Reelcut ▸ Settings ▸ Transcription, "
+                + "or RC_ASSEMBLYAI_KEY for a proof."
         }
     }
 
@@ -129,7 +68,7 @@ final class CloudTranscriber {
     /// main.
     private let work = DispatchQueue(label: "com.kgalligan.reelcut.cloud-transcribe")
 
-    let client: AssemblyAIClient
+    let client: AssemblyAIClient?
     /// Where `cache/transcripts/` lives for this run — the document's cache
     /// directory, passed by value so the run holds no document.
     let cacheDirectory: URL
@@ -142,7 +81,7 @@ final class CloudTranscriber {
     /// caller that reads it is the caller that waited for it.
     private(set) var report = Report()
 
-    init(client: AssemblyAIClient, cacheDirectory: URL, media: [UInt32: MediaSnapshot]) {
+    init(client: AssemblyAIClient? = nil, cacheDirectory: URL, media: [UInt32: MediaSnapshot]) {
         self.client = client
         self.cacheDirectory = cacheDirectory
         self.media = media
@@ -180,7 +119,12 @@ final class CloudTranscriber {
     /// nothing on this object for it to write, and a strong `self` would
     /// keep a whole transcriber alive for the duration of a button press.
     func verify(completion: @escaping (Result<Void, AssemblyAIClient.ClientError>) -> Void) {
-        let client = self.client
+        guard let client = self.client else {
+            DispatchQueue.main.async {
+                completion(.failure(.request(AccessError.credentialRequired.localizedDescription)))
+            }
+            return
+        }
         work.async {
             let answer = client.verify()
             DispatchQueue.main.async { completion(answer) }
@@ -206,16 +150,21 @@ final class CloudTranscriber {
         }
         publish(0, "")
 
-        // (1) The janitor, FIRST — before anything this run does can
+        // (1) The janitor, FIRST on keyed runs — before anything this run does can
         // overwrite the file that holds an id we still owe a DELETE. A Stop
         // the person has ALREADY pressed is answered above it, and one that
         // arrives during it is heard between its items (the reader review,
         // §10.13 R1·2).
         if cancel.isCancelled { throw Transcriber.TranscribeError.cancelled }
-        let janitor = retryDeletes(cancel: cancel)
-        report.janitorDeleted = janitor.deleted
-        report.janitorFailed = janitor.failed
+        if client == nil {
+            report.janitorDeferred = MediaTranscript.undeleted(in: cacheDirectory).map(\.media)
+        } else {
+            let janitor = retryDeletes(cancel: cancel)
+            report.janitorDeleted = janitor.deleted
+            report.janitorFailed = janitor.failed
+        }
         if cancel.isCancelled { throw Transcriber.TranscribeError.cancelled }
+        if client == nil, jobs.isEmpty || refresh { throw AccessError.credentialRequired }
 
         // (2) Grouped by media, in the order of each media's FIRST clip, and
         // classified before any work starts so the progress shares are known.
@@ -225,12 +174,30 @@ final class CloudTranscriber {
             if grouped[job.media] == nil { order.append(job.media) }
             grouped[job.media, default: []].append(job)
         }
+        // Admit the entire keyless batch from disk before deriving a cue.
+        // Holding these decoded files also closes the gap between admission
+        // and use if a package file disappears while the worker is running.
+        var keylessFiles: [UInt32: MediaTranscript.File] = [:]
+        if client == nil {
+            for id in order {
+                if cancel.isCancelled { throw Transcriber.TranscribeError.cancelled }
+                guard let entry = media[id], let url = grouped[id]?.first?.source,
+                    let source = MediaImporter.CacheStamp.stamp(for: entry, url: url),
+                    MediaTranscript.readStamp(for: id, in: cacheDirectory)
+                        == TranscriptStamp(source: source, options: options),
+                    let file = MediaTranscript.read(for: id, in: cacheDirectory)
+                else { throw AccessError.credentialRequired }
+                keylessFiles[id] = file
+            }
+            report.cached = order
+        }
         var stamps: [UInt32: TranscriptStamp] = [:]
         var unreadable: [UInt32] = []
         var toUpload: [UInt32] = []
         var held: [UInt32] = []
         var cached: [UInt32] = []
         for id in order {
+            if client == nil { continue }
             guard let entry = media[id], let url = grouped[id]?.first?.source,
                 let source = MediaImporter.CacheStamp.stamp(for: entry, url: url)
             else {
@@ -269,7 +236,9 @@ final class CloudTranscriber {
 
         for id in order {
             if cancel.isCancelled { throw Transcriber.TranscribeError.cancelled }
-            if unreadable.contains(id) {
+            if let file = keylessFiles[id] {
+                files[id] = file
+            } else if unreadable.contains(id) {
                 refuse(id, "its media file could not be read")
             } else if cached.contains(id) {
                 if let file = MediaTranscript.read(for: id, in: cacheDirectory) {
@@ -284,7 +253,7 @@ final class CloudTranscriber {
                 refuse(
                     id,
                     "AssemblyAI has not confirmed deleting its earlier transcript, so it was "
-                        + "not uploaded again; the next run retries the delete")
+                        + "not uploaded again; the next run with an API key retries the delete")
             } else if let index = toUpload.firstIndex(of: id), let entry = media[id],
                 let url = grouped[id]?.first?.source, let stamp = stamps[id]
             {

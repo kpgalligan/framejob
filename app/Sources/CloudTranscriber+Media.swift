@@ -58,6 +58,7 @@ extension CloudTranscriber {
     func retryDeletes(cancel: Transcriber.CancelToken? = nil) -> (
         deleted: [UInt32], failed: [UInt32]
     ) {
+        guard let client else { return ([], []) }
         var deleted: [UInt32] = []
         var failed: [UInt32] = []
         for row in MediaTranscript.undeleted(in: cacheDirectory) {
@@ -121,6 +122,7 @@ extension CloudTranscriber {
         cancel: Transcriber.CancelToken,
         progress: @escaping (CloudProgress.Phase, Double, String) -> Void
     ) throws -> (file: MediaTranscript.File, uploaded: Report.Uploaded) {
+        guard let client else { throw AccessError.credentialRequired }
         let name = media.name
         let seconds = ReelTime.seconds(media.duration)
         guard seconds <= Double(AssemblyAIClient.maxMediaSeconds) else {

@@ -197,7 +197,7 @@ class Instance:
     of this script's business.
     """
 
-    def __init__(self, tag, port, fake, binary, key=DUMMY, live=False):
+    def __init__(self, tag, port, fake, binary, key=DUMMY, live=False, endpoint=None):
         self.tag = tag
         self.fake = fake
         self.live = live
@@ -240,7 +240,7 @@ class Instance:
             # the environment as the only credential.
             argv += ["-ReelcutAssemblyAIRegion", "us"]
         else:
-            argv += ["-RCAssemblyAIEndpoint", fake.base]
+            argv += ["-RCAssemblyAIEndpoint", endpoint or fake.base]
         if live:
             # A pty, because `note`'s `print` is BLOCK-buffered under a file
             # redirect: an instance whose stdout is a file writes its client
@@ -511,6 +511,109 @@ def row_one_no_key(instance, fake):
           "network", fake.log()["requests"] == [], f"got {routes(fake.log())!r}")
 
 
+def seed_keyless_package(instance, fake):
+    """Seed with the dummy key in the owned keyed instance, then save a
+    package the later keyless instance can open with no account state."""
+    print("\nKL seed. keyed fake writes the package for the independent keyless app")
+    speech, _ = fixtures()
+    scenario(fake, fail=[{"route": "delete", "status": 500, "times": 1}])
+    session = Session(instance, "keyless-package")
+    media = session.media_of(speech)
+    session.add(media, at=0, duration=3 * SEC)
+    seeded = session.op("transcribe", engine="assemblyai", place=False)
+    session.save()
+    transcript = cache_path(session, media)
+    marker = cache_path(session, media, marker=True)
+    header = json.loads(read(transcript) or b"{}")
+    check("KL seed: saved package has a readable transcript, marker and pending ID",
+          bool(seeded.get("cues")) and os.path.isfile(transcript)
+          and os.path.isfile(marker) and header.get("remote_deleted") is False,
+          f"answer={seeded!r}, header={header!r}")
+    if not os.path.isfile(transcript) or not os.path.isfile(marker):
+        return None
+    # Unrelated and unsafe IDs must be reported although this scope names
+    # only one media. They are package files, not a second client account.
+    folder = os.path.dirname(transcript)
+    for extra, ident in ((90, "t_unrelated"), (91, "unsafe/id")):
+        with open(os.path.join(folder, f"{extra}.json"), "w") as handle:
+            handle.write(cloud_captions_probe.UNDELETED_DOCUMENT % ident)
+    return {"path": session.path, "media": media, "cues": seeded["cues"],
+        "bytes": {name: read(os.path.join(folder, name)) for name in os.listdir(folder)}}
+
+
+def row_keyless_mcp(instance, fake, seed):
+    print("\nKL MCP. saved package reopened without credential or usable endpoint")
+    if seed is None:
+        check("KL MCP: seeded package is available", False)
+        return
+    path = seed["path"]
+    instance.mcp.call("open_project", path=path)
+    def op(tool, **kwargs):
+        return instance.mcp.call_with(tool, dict(kwargs, project=path))
+    def project():
+        return op("get_project")["project"]
+    before = project()
+    count = len(fake.log()["requests"])
+    folder = os.path.join(path, "cache", "transcripts")
+    package_before = {name: read(os.path.join(folder, name)) for name in os.listdir(folder)}
+    try:
+        preview = op("transcribe", engine="assemblyai", place=False)
+    except ToolError as problem:
+        check("KL MCP: place:false returns the seeded cue text/times with zero bill",
+              False, str(problem))
+        return
+    check("KL MCP: place:false returns the seeded cue text/times with zero bill",
+          preview.get("cues") == seed["cues"]
+          and preview.get("cached") == [seed["media"]]
+          and preview.get("uploaded") == [] and preview.get("audio_seconds") == 0,
+          f"preview={preview!r}, seeded={seed['cues']!r}")
+    check("KL MCP: place:false leaves project and package unchanged",
+          project() == before and package_before == {
+              name: read(os.path.join(folder, name)) for name in os.listdir(folder)},
+          "project or bytes changed")
+    qualified = ("cleanup was deferred because no API key is set. Its deletion ID is "
+                 "retained in the project; a later run with a key for the originating "
+                 "account and region will retry deletion only if that ID is safe to send.")
+    note = preview.get("note", "")
+    check("KL MCP: success note names all deferred IDs with the safe-ID qualification",
+          all(f"media {i}; {qualified}" in note for i in (seed["media"], 90, 91)),
+          f"note={note!r}")
+    placed = op("transcribe", engine="assemblyai", place=True)
+    after = project()
+    texts = [clip for clip in after["clips"] if clip["source"]["kind"] == "text"]
+    check("KL MCP: place:true lays out the cached cues into text clips",
+          placed.get("cues") == seed["cues"] and len(texts) > 0,
+          f"placed={placed!r}, clips={texts!r}")
+    op("undo")
+    check("KL MCP: one undo removes the whole caption placement", project() == before)
+    op("redo")
+    check("KL MCP: redo restores the exact caption placement", project() == after)
+    check("KL MCP: neither operation made any HTTP request of any method",
+          len(fake.log()["requests"]) == count and package_before == {
+              name: read(os.path.join(folder, name)) for name in os.listdir(folder)},
+          f"routes={routes(fake.log())[count:]!r}")
+
+    # A mixed request is refused as a whole after normal target/jobs checks.
+    speech, second = fixtures()
+    extra = op("import_media", path=second)["media"]
+    track = project()["tracks"][0]["id"]
+    op("add_clip", track=track, media=extra, at=8 * SEC)
+    mixed_before = project()
+    try:
+        op("transcribe", engine="assemblyai", place=False)
+        failure = None
+    except ToolError as problem:
+        failure = str(problem)
+    check("KL MCP: mixed cached/uncached batch refuses without partial result",
+          failure is not None and "No AssemblyAI API key is set" in failure
+          and project() == mixed_before and len(fake.log()["requests"]) == count,
+          f"failure={failure!r}, routes={routes(fake.log())[count:]!r}")
+    check("KL MCP: failure also discloses unrelated and unsafe deferred IDs",
+          failure is not None and all(f"media {i}; {qualified}" in failure
+                                      for i in (seed["media"], 90, 91)),
+          f"failure={failure!r}")
+
+
 # --------------------------------------------------------------------------
 # Row 2 — ONE upload per media, and what is in it
 
@@ -767,26 +870,6 @@ def row_three(instance, fake, harness):
 # Row 4 — the cache file and its marker
 
 
-def any_cache_stamp(session):
-    """The `CacheStamp` any of the import's markers carries — thumbs, peaks
-    or speech, whichever has landed. `transcripts/` is skipped: its marker is
-    a `TranscriptStamp`, which is the thing being CHECKED."""
-    base = os.path.join(session.path, "cache")
-    for folder, _, names in os.walk(base):
-        if os.path.basename(folder) == "transcripts":
-            continue
-        for name in sorted(names):
-            if not name.endswith(".json"):
-                continue
-            try:
-                body = json.loads(read(os.path.join(folder, name)) or b"{}")
-            except ValueError:
-                continue
-            if isinstance(body, dict) and "peakBucketsPerSecond" in body:
-                return body
-    return {}
-
-
 def cache_path(session, media, marker=False):
     name = f"{media}.complete.json" if marker else f"{media}.json"
     return os.path.join(session.path, "cache", "transcripts", name)
@@ -832,46 +915,15 @@ def row_four(instance, fake):
           f"got {header.get('requested')!r}")
 
     marker = json.loads(read(cache_path(session, media, marker=True)) or b"{}")
-    # The peaks marker is written by the import's own cache pass, which is
-    # not this tool's work and has its own clock. Waited for, bounded (rule
-    # H), because the three cache-sizing constants are READ off it rather
-    # than restated here.
-    # ANY of the import's own cache markers — thumbs, peaks or speech — will
-    # do: all three are the same `CacheStamp`, and which of them has landed
-    # is the import's business and not this row's. Waited for and re-saved
-    # once a second, bounded (rule H), because a pass that finished AFTER
-    # the save wrote into the document's temporary cache directory and only
-    # the next `save_project` carries it in
-    # (`ProjectDocument.fileWrapper(ofType:)` copies `cache/` whole).
-    peaks = {}
-    deadline = time.time() + 60
-    while not peaks and time.time() < deadline:
-        peaks = any_cache_stamp(session)
-        if peaks:
-            break
-        time.sleep(1)
-        session.save()
-    check("4: one of the import's own cache markers is in the package, to read the three "
-          "cache-sizing constants off rather than restate them",
-          bool(peaks), f"no CacheStamp marker under {session.path}/cache after 60 s")
     entry = {m["id"]: m for m in session.project()["media"]}[media]
     stat = os.stat(speech)
     want = {
         "size": stat.st_size,
         "modified": round(stat.st_mtime),
         "duration": entry["duration"],
-        "width": entry["width"],
-        "height": entry["height"],
-        "hasVideo": entry["has_video"],
         "hasAudio": entry["has_audio"],
-        # The three cache-sizing constants, read off the PEAKS marker rather
-        # than restated here: they are the same `CacheStamp` fields.
-        "thumbnailHeight": peaks.get("thumbnailHeight"),
-        "maxThumbnails": peaks.get("maxThumbnails"),
-        "peakBucketsPerSecond": peaks.get("peakBucketsPerSecond"),
     }
-    check("4: the marker's `source` is the stamp this script computes from os.stat, "
-          "get_project and the peaks marker's own three constants",
+    check("4: the whole four-field marker source equals independent os.stat and get_project facts",
           marker.get("source") == want,
           f"got {marker.get('source')!r}\n       want {want!r}")
     check("4: and the marker records the REQUEST beside it",
@@ -1231,7 +1283,7 @@ def row_eleven(instance, fake):
           header.get("remote_deleted") is False, f"got {header.get('remote_deleted')!r}")
     check("11: and the result says so in its note",
           f"AssemblyAI has not confirmed deleting the transcript of media {media}; it will "
-          "be retried at the next run." in str(answer.get("note", "")),
+          "be retried at the next run with an API key." in str(answer.get("note", "")),
           f"got {answer.get('note')!r}")
     owed = header.get("transcript_id")
 
@@ -1277,7 +1329,7 @@ def row_eleven(instance, fake):
     check("11 (hold): run 2 under `refresh` is REFUSED with R6-11's own sentence",
           text is not None
           and "AssemblyAI has not confirmed deleting its earlier transcript, so it was not "
-              "uploaded again; the next run retries the delete" in text,
+              "uploaded again; the next run with an API key retries the delete" in text,
           f"got {text!r}")
     check("11 (hold): and it made EXACTLY one request — that DELETE. No upload, no submit.",
           [f"{r['method']} {r['path']}" for r in after] == [f"DELETE /v2/transcript/{owed}"],
@@ -1709,6 +1761,16 @@ def row_k(fake_folders):
 
 
 CLOUD_MUTANTS = {
+    "keyless-agent-requires-key": (
+        "app/Sources/AgentServer+CloudCaptions.swift",
+        "        let credential = AssemblyAIConfiguration.credential(\n",
+        "        guard AssemblyAIConfiguration.credential(\n"
+        "            store: AssemblyAIConfiguration.store()) != nil else {\n"
+        "            throw ToolError(message: CloudTranscriber.AccessError.credentialRequired"
+        ".localizedDescription)\n"
+        "        }\n"
+        "        let credential = AssemblyAIConfiguration.credential(\n",
+        "the MCP cloud arm restores unconditional credential refusal"),
     "stamp-always-stale": (
         "app/Sources/CloudTranscriber.swift",
         "            if MediaTranscript.isCurrent(stamp, for: id, in: cacheDirectory), "
@@ -1981,6 +2043,7 @@ def main():
           "SPENDS money)")
 
     fake_folders = []
+    keyless_seed = None
     try:
         with Fake("proof-a") as fake_a:
             fake_folders.append(fake_a.folder)
@@ -1995,13 +2058,19 @@ def main():
                 run_row(row_eight, a, fake_a)
                 run_row(row_nine, a, fake_a)
                 run_row(row_ten, a)
+                try:
+                    keyless_seed = seed_keyless_package(a, fake_a)
+                except Exception as problem:
+                    check("KL seed: package fixture builds", False, str(problem))
         if time.time() - started > args.wall:
             skip_rows(1, f"the run passed its --wall bound of {args.wall:.0f} s")
         else:
             with Fake("proof-b") as fake_b:
                 fake_folders.append(fake_b.folder)
-                with Instance("B", port_base + 1, fake_b, binary, key=None) as b:
+                with Instance("B", port_base + 1, fake_b, binary, key=None,
+                              endpoint="http://remote.invalid") as b:
                     run_row(row_one_no_key, b, fake_b)
+                    run_row(row_keyless_mcp, b, fake_b, keyless_seed)
             with Fake("proof-c") as fake_c:
                 fake_folders.append(fake_c.folder)
                 with Instance("C", port_base + 2, fake_c, binary) as c:

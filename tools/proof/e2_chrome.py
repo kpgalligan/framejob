@@ -222,6 +222,22 @@ def packages():
         "wedges": write_package("e2-wedges", project([
             clip(2, 0, GREY, motion(edge("fade", 1.0), edge("fade", 0.5)), name="Card")])),
         "none": write_package("e2-none", project([clip(2, 0, GREY, None, name="Card")])),
+        "zero-in": write_package("e2-zero-in", project([
+            clip(2, 0, GREY, motion(edge("fade", 0)), name="Card")])),
+        "zero-out": write_package("e2-zero-out", project([
+            clip(2, 0, GREY, motion(leave=edge("fade", 0)), name="Card")])),
+        "zero-both": write_package("e2-zero-both", project([
+            clip(2, 0, GREY, motion(edge("fade", 0), edge("fade", 0)), name="Card")])),
+        "frame-in": write_package("e2-frame-in", project([
+            clip(2, 0, GREY, motion(edge("fade", 1 / 30)), name="Card")])),
+        "frame-out": write_package("e2-frame-out", project([
+            clip(2, 0, GREY, motion(leave=edge("fade", 1 / 30)), name="Card")])),
+        "zero-mixed": write_package("e2-zero-mixed", project([
+            clip(2, 0, GREY, motion(edge("fade", 0))),
+            clip(3, CLIP_SECONDS * TICKS, GREY, motion(edge("fade", 0.5)))])),
+        "zero-different": write_package("e2-zero-different", project([
+            clip(2, 0, GREY, motion(edge("fade", 0))),
+            clip(3, CLIP_SECONDS * TICKS, GREY, motion(edge("slide_up", 0.5)))])),
         "during": write_package("e2-during", project([
             clip(2, 0, GREY, motion(during=slot("pulse")), name="Card")])),
         # The probe's.
@@ -236,6 +252,11 @@ def packages():
             clip(2, 0, GREY, motion(during=slot("drift")))])),
         "action": write_package("e2-action", project([
             clip(2, 0, GREY, None, actions=[{
+                "id": 3, "start": 0, "duration": TICKS, "curve": "linear",
+                "end": {"video": {"x": 100.0}},
+            }])])),
+        "zero-action": write_package("e2-zero-action", project([
+            clip(2, 0, GREY, motion(edge("fade", 0)), actions=[{
                 "id": 3, "start": 0, "duration": TICKS, "curve": "linear",
                 "end": {"video": {"x": 100.0}},
             }])])),
@@ -738,7 +759,137 @@ do {
         let enabled = inspector.validateUserInterfaceItem(item)
         validates.append(["name": name, "state": state(item.state), "enabled": enabled])
     }
-    answer["extremes"] = ["count": n, "writes": writes, "validates": validates]
+answer["extremes"] = ["count": n, "writes": writes, "validates": validates]
+}
+
+// ---- E2-27: the real menu items and inspector controls -------------------
+UserDefaults.standard.set(false, forKey: InspectorSection.collapsedKeyPrefix + "video.motion")
+func rowControl(_ root: NSView, _ name: String) -> NSView? {
+    for view in walk(root) {
+        guard let label = view as? InspectorRowLabel, label.stringValue == name else { continue }
+        return controlAfter(label).0
+    }
+    return nil
+}
+
+func noteState(_ root: NSView) -> [String: Any] {
+    guard let note = walk(root).compactMap({ $0 as? MotionInactiveNote }).first else {
+        return ["found": false]
+    }
+    let next = rowControl(root, "In")
+    let noteBox = note.convert(note.bounds, to: nil)
+    let nextBox = next.map { $0.convert($0.bounds, to: nil) }
+    let field = rowControl(root, "In Duration") as? OptionFieldControl
+    return [
+        "found": true, "text": note.stringValue, "hidden": note.isHidden,
+        "height": note.bounds.height, "intrinsic": note.intrinsicContentSize.height,
+        "width": note.bounds.width,
+        "clearance": nextBox.map { noteBox.minY - $0.maxY } ?? -1000,
+        "duration": field?.subviews.compactMap { $0 as? NSTextField }.first?.stringValue ?? "",
+        "durationAlpha": field?.alphaValue ?? 0,
+    ]
+}
+
+func validateEdge(_ controller: EditorViewController, _ item: NSMenuItem) -> [String: Any] {
+    let enabled = controller.validateUserInterfaceItem(item)
+    return ["title": item.title, "state": state(item.state), "enabled": enabled]
+}
+
+do {
+    let (document, controller) = editor(request["zeroPackage"] as! String, select: [0])
+    let fade = NSMenuItem(title: "Fade", action: #selector(EditorViewController.setMotionIn(_:)),
+                          keyEquivalent: "")
+    fade.tag = 0
+    let none = NSMenuItem(title: "None", action: #selector(EditorViewController.setMotionIn(_:)),
+                          keyEquivalent: "")
+    none.tag = -1
+    let out = NSMenuItem(title: "Fade", action: #selector(EditorViewController.setMotionOut(_:)),
+                         keyEquivalent: "")
+    out.tag = 0
+    var trail: [[String: Any]] = []
+    trail.append(["fade": validateEdge(controller, fade), "out": validateEdge(controller, out),
+                  "none": validateEdge(controller, none),
+                  "note": noteState(controller.view)])
+    let before = document.project.json
+    if let field = rowControl(controller.view, "In Duration") as? OptionFieldControl {
+        let pick = NSMenuItem(title: "0.25 s", action: nil, keyEquivalent: "")
+        pick.tag = 0
+        field.perform(NSSelectorFromString("quickPicked:"), with: pick)
+    }
+    spin(0.8)
+    trail.append(["fade": validateEdge(controller, fade), "out": validateEdge(controller, out),
+                  "none": validateEdge(controller, none),
+                  "note": noteState(controller.view), "project": document.project.json])
+    document.undoManager?.undo()
+    spin(0.8)
+    trail.append(["fade": validateEdge(controller, fade), "out": validateEdge(controller, out),
+                  "none": validateEdge(controller, none),
+                  "note": noteState(controller.view), "project": document.project.json])
+    // The actual inspector popup's None command removes the stored edge.
+    if let popup = rowControl(controller.view, "In") as? OptionPopupControl {
+        let pick = NSMenuItem(title: "None", action: nil, keyEquivalent: "")
+        pick.tag = 0
+        popup.perform(NSSelectorFromString("itemPicked:"), with: pick)
+    }
+    spin(0.8)
+    trail.append(["fade": validateEdge(controller, fade), "out": validateEdge(controller, out),
+                  "none": validateEdge(controller, none),
+                  "note": noteState(controller.view), "project": document.project.json])
+    select(document, [])
+    trail.append(["fade": validateEdge(controller, fade), "none": validateEdge(controller, none)])
+    answer["zeroTrail"] = ["before": before, "steps": trail]
+}
+
+var selectionStates: [String: Any] = [:]
+for name in ["zeroMixed", "zeroDifferent"] {
+    let (_, controller) = editor(request[name] as! String, select: [0, 1])
+    let item = NSMenuItem(title: "Fade", action: #selector(EditorViewController.setMotionIn(_:)),
+                          keyEquivalent: "")
+    item.tag = 0
+    selectionStates[name] = ["menu": validateEdge(controller, item),
+                              "note": noteState(controller.view)]
+}
+answer["zeroSelections"] = selectionStates
+
+do {
+    let (document, controller) = editor(request["zeroAction"] as! String,
+                                        select: [0], playhead: Ticks(300_000))
+    let notes = walk(controller.view).compactMap { $0 as? InspectorNoteLabel }
+        .map { $0.stringValue }.filter { !$0.isEmpty }
+    let inactive = noteState(controller.view)
+    if let field = rowControl(controller.view, "In Duration") as? OptionFieldControl {
+        let pick = NSMenuItem(title: "0.25 s", action: nil, keyEquivalent: "")
+        pick.tag = 0
+        field.perform(NSSelectorFromString("quickPicked:"), with: pick)
+    }
+    spin(0.8)
+    answer["zeroAction"] = ["notes": notes, "inactive": inactive,
+                             "project": document.project.json]
+}
+
+do {
+    let (document, controller) = editor(request["zeroPackage"] as! String, select: [0])
+    let none = NSMenuItem(title: "None", action: #selector(EditorViewController.setMotionOut(_:)),
+                          keyEquivalent: "")
+    none.tag = -1
+    controller.setMotionOut(none)
+    spin(0.8)
+    let afterMenu = document.project.json
+    // Reset is the real header control, reached through the public view tree.
+    let section = walk(controller.view).compactMap { $0 as? InspectorSection }.first {
+        let names = walk($0).compactMap { ($0 as? InspectorRowLabel)?.stringValue }
+        return names.contains("In Duration") && names.contains("Out Duration")
+    }
+    let reset = section.flatMap { walk($0).compactMap { $0 as? OptionButtonControl }
+        .first { $0.toolTip == "Reset this section to its defaults" } }
+    if let reset, let event = NSEvent.mouseEvent(
+        with: .leftMouseDown, location: .zero, modifierFlags: [], timestamp: 0,
+        windowNumber: 0, context: nil, eventNumber: 0, clickCount: 1, pressure: 1) {
+        reset.mouseDown(with: event)
+    }
+    spin(0.8)
+    answer["zeroRemove"] = ["afterMenu": afterMenu, "afterReset": document.project.json,
+                             "resetFound": reset != nil, "note": noteState(controller.view)]
 }
 
 try! JSONSerialization.data(withJSONObject: answer, options: [.prettyPrinted, .sortedKeys])
@@ -837,7 +988,8 @@ def main():
     renders = {}
     if binary:
         for tag in ("wedges", "none", "during", "labelled", "labelled-none",
-                    "silent", "silent-none"):
+                    "silent", "silent-none", "zero-in", "zero-out", "zero-both",
+                    "frame-in", "frame-out"):
             out, error = render(binary, fixtures[tag], os.path.join(CHROME, f"{tag}.png"))
             if error:
                 failure(f"the {tag} fixture renders", error)
@@ -868,6 +1020,21 @@ def main():
               f"{right} (wanted x {wanted_out:.0f}–{CLIP_X1} ± 1: 0.5 s × 168 pt ÷ 4 s)")
     else:
         check("the wedges are measured", False, "a render is missing")
+
+    if {"none", "zero-in", "zero-out", "zero-both", "frame-in", "frame-out"} <= set(renders):
+        for tag in ("zero-in", "zero-out", "zero-both"):
+            changed = changed_pixels(renders["none"], renders[tag])
+            check(f"{tag} draws no timeline wedge against the same plain card",
+                  not changed, f"{len(changed)} changed pixels")
+        strip = Rect("name strip", CLIP_X0, STRIP_Y, CLIP_X1 - CLIP_X0, STRIP_H)
+        midpoint = (CLIP_X0 + CLIP_X1) / 2
+        for tag, side in (("frame-in", "left"), ("frame-out", "right")):
+            changed = changed_pixels(renders["none"], renders[tag])
+            scale = renders[tag].scale
+            ok = bool(changed) and all(strip.contains(x, y, scale) for x, y in changed)
+            ok = ok and all((x / scale < midpoint) == (side == "left") for x, _ in changed)
+            check(f"one-frame positive {side} edge draws its 2 pt minimum wedge",
+                  ok, f"{len(changed)} changed pixels")
 
     if {"during", "none"} <= set(renders):
         scale = renders["none"].scale
@@ -959,6 +1126,16 @@ def main():
                   height >= 7 * ROW_PITCH,
                   f"the changed pixels span {height:.1f} pt, from y {min(ys):.1f} "
                   f"(≥ 7 × {ROW_PITCH} = {7 * ROW_PITCH})")
+        zero_shut, zero_error = render(
+            binary, fixtures["zero-both"], os.path.join(CHROME, "zero-shut.png"),
+            select=0, height=SECTION_HEIGHT)
+        zero_open, zero_error2 = render(
+            binary, fixtures["zero-both"], os.path.join(CHROME, "zero-open.png"),
+            expand="video.motion", select=0, height=SECTION_HEIGHT)
+        check("zero Motion section captures both collapsed summary and expanded recovery note",
+              zero_error is None and zero_error2 is None
+              and bool(changed_pixels(Image(zero_shut), Image(zero_open))) if zero_shut and zero_open else False,
+              zero_error or zero_error2 or "both inspector renders captured")
 
     print("\n3 — the menu, the rows and two commands")
     probe_binary, error = build_probe()
@@ -1017,6 +1194,10 @@ def main():
         # are in the probe's source.
         "extremes": {"writePackage": fixtures["one"],
                      "validatePackage": fixtures["none"]},
+        "zeroPackage": fixtures["zero-both"],
+        "zeroMixed": fixtures["zero-mixed"],
+        "zeroDifferent": fixtures["zero-different"],
+        "zeroAction": fixtures["zero-action"],
     }
     answer, error = run_probe(probe_binary, request)
     if error:
@@ -1176,8 +1357,75 @@ def main():
           validates["-1"]["state"] == "on"
           and all(validates[n]["state"] == "off" for n in strangers + ("0",)),
           "; ".join(f"{v['name']}: {v['state']}"
-                    + ("" if v["enabled"] else " (disabled)")
-                    for v in extremes["validates"]))
+                  + ("" if v["enabled"] else " (disabled)")
+                  for v in extremes["validates"]))
+
+    trail = answer["zeroTrail"]
+    zero, positive, undone, removed, disabled = trail["steps"]
+    check("zero In and Out keep checked Fade kinds with explicit inactive menu titles",
+          zero["fade"]["title"] == "Fade (inactive)"
+          and zero["fade"]["state"] == "on"
+          and zero["out"]["title"] == "Fade (inactive)"
+          and zero["out"]["state"] == "on"
+          and zero["none"]["state"] == "off")
+    note = zero["note"]
+    check("the selected zero edges show a visible wrapping recovery note and editable 0 s",
+          note["found"] and not note["hidden"]
+          and "In and Out" in note["text"]
+          and "Increase Duration" in note["text"]
+          and "None" in note["text"]
+          and note["duration"].startswith("0.00")
+          and note["durationAlpha"] == 1,
+          str(note))
+    check("the wrapping inactive note fits its height and clears the In row",
+          note["height"] >= note["intrinsic"] - 1
+          and note["height"] > 20 and note["width"] <= INSPECTOR_W
+          and note["clearance"] >= 0,
+          str(note))
+    first_motion = json.loads(trail["before"])["clips"][0]["video"]["motion"]
+    positive_motion = json.loads(positive["project"])["clips"][0]["video"]["motion"]
+    check("the actual quick-duration pick reactivates In and preserves zero Out",
+          positive_motion["in"]["kind"] == "fade"
+          and positive_motion["in"]["duration"] == 160_000
+          and positive_motion["out"] == first_motion["out"]
+          and positive["fade"]["title"] == "Fade"
+          and positive["out"]["title"] == "Fade (inactive)"
+          and positive["note"]["text"].find("Out") >= 0)
+    check("one undo restores zero In and its note and menu title",
+          json.loads(undone["project"])["clips"][0]["video"]["motion"] == first_motion
+          and undone["fade"]["title"] == "Fade (inactive)"
+          and not undone["note"]["hidden"])
+    removed_motion = json.loads(removed["project"])["clips"][0]["video"]["motion"]
+    check("the actual In popup None clears only In; reused menu item loses stale suffix",
+          removed_motion["in"] is None and removed_motion["out"] == first_motion["out"]
+          and removed["fade"]["title"] == "Fade"
+          and removed["none"]["state"] == "on")
+    check("no selection disables the reused menu item and keeps its plain title",
+          disabled["fade"]["title"] == "Fade" and not disabled["fade"]["enabled"])
+    mixed = answer["zeroSelections"]["zeroMixed"]
+    different = answer["zeroSelections"]["zeroDifferent"]
+    check("same-kind mixed activity checks Fade and says some inactive",
+          mixed["menu"]["title"] == "Fade (some inactive)"
+          and mixed["menu"]["state"] == "on"
+          and "In" in mixed["note"]["text"])
+    check("different-kind selection checks nothing but discloses its inactive In",
+          different["menu"]["state"] == "off"
+          and different["menu"]["title"] == "Fade (inactive)"
+          and "In" in different["note"]["text"])
+    action = answer["zeroAction"]
+    action_clip = json.loads(action["project"])["clips"][0]
+    check("zero In inside an action keeps the base-props note and writes base Duration",
+          any("Motion belongs to the clip" in text for text in action["notes"])
+          and not action["inactive"]["hidden"]
+          and action_clip["video"]["motion"]["in"]["duration"] == 160_000
+          and all("motion" not in a["end"].get("video", {}) for a in action_clip["actions"]))
+    remove = answer["zeroRemove"]
+    menu_motion = json.loads(remove["afterMenu"])["clips"][0]["video"]["motion"]
+    reset_motion = json.loads(remove["afterReset"])["clips"][0]["video"]["motion"]
+    check("menu None clears only Out; Reset removes the last configured edge",
+          menu_motion["out"] is None and menu_motion["in"] == first_motion["in"]
+          and remove["resetFound"] and reset_motion is None
+          and remove["note"]["hidden"])
 
     # N·3. The band's second pill is about the CLIP's `during`, not about
     # the moment the mode was armed.

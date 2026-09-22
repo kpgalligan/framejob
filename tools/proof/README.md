@@ -3192,10 +3192,10 @@ its own fixtures (above), and then measures claims 1–11:
   cancel now and anything but `.completed` writes no `.bin`, no marker and no
   post, so the media stays `voice_pending` and NOTHING inside it is proposed;
   the zero-filled tail used to be certified by a marker and voice mode
-  proposed cutting 8.1 s of the 10.4 s file. The last row asserts that LEVEL
-  still proposes that tail — `MediaImporter.peaks` has the same hole and its
-  fix is kpgalligan/reelcut#23 — so closing that issue makes the row fail and
-  say so. A build without the status guard scores **76/79**.
+  proposed cutting 8.1 s of the 10.4 s file. Level now reports that media
+  as `pending_peaks` and proposes no undecodable tail (#23). The source
+  probe below awaits the actual peaks pass before checking that no waveform
+  was published. The historical speech-status mutant scored **76/79**.
 * **8c, the waveform withheld with the voice cache in place** (reader review,
   R3·1). Claim 8 withholds the SPEECH cache; this withholds the WAVEFORM. In
   voice mode the answer is unchanged — the model decides — yet
@@ -3521,7 +3521,8 @@ hand-written version-6 package, and a probe built from `app/Sources`.
   the other clip exactly where it was rather than aborting the selection, and
   puts up no sheet.
 
-`python3 tools/proof/e2_proof.py [port]`, 4825 by default, **61/61**, one
+`python3 tools/proof/e2_proof.py [port]`, 4825 by default, **69/69** after
+E2-27 (61/61 before it), one
 instance. Cards on a black backdrop; `NONE` is the same session with the
 motion cleared, re-rendered and put back, which is the control half the rows
 here are measured against.
@@ -3566,10 +3567,28 @@ here are measured against.
   `ease_out` puts it. The APNG comes out at the CANVAS's size and not the
   preset's 960 × 540: an image format is written with the picture fitted
   inside the size, aspect kept and never upscaled (`core/src/export_size.rs`).
+* **8, zero-duration edges (E2-27)**: explicit zero In and Out retain their
+  kind through `get_project`, save and reopen, with first/last PNG bytes equal
+  to the no-motion card. A one-frame Fade In changes the first frame; a
+  two-frame Fade Out changes the last drawn frame; undo restores the stored
+  zeros and the matching PNGs. Run against an owned Release app on its bound
+  port, with an empty `rg 'Reelcut: ' /tmp/reelcut-<port>.log` parity scan.
 
-`python3 tools/proof/e2_chrome.py`, no port, **35/35** (24/24 until the E2
-reader review of 2026-09-20 added nine rows, and its residue run two,
-`designs/reelcut-roadmap-5.md` §12).
+`env RC_ASSEMBLYAI_KEY=proof-key python3 tools/proof/e2_chrome.py`, no port,
+**52/52** after E2-27 (35/35 before it; 24/24 until the E2
+  reader review of 2026-09-20 added nine rows, and its residue run two,
+  `designs/reelcut-roadmap-5.md` §12).
+
+E2-27 extends that same script with no-motion versus zero In, zero Out and
+both-zero name-strip pixel equality; a one-frame positive wedge on each
+side; the expanded and collapsed zero Motion inspector; and an actual-source
+probe of the selection-aware wrapping note, editable zero Duration, quick
+pick, popup/menu None, Reset, one-step undo, and menu title refresh through
+same-kind mixed activity, different kinds and no selection. The note probe
+measures its intrinsic height, actual height and clearance to the In row;
+the opened PNG is `tools/proof/work/chrome-e2/zero-open.png` for visual
+inspection. A focused FFI regression is
+`cd core && cargo test --release --test motion_zero`.
 
 * **The wedges**, measured as the pixels that differ from the same card with
   no motion: an arrival's triangle over x 132–174 and a departure's over
@@ -3839,6 +3858,13 @@ env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_probe.py --only subm
 env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_probe.py --only submission --mutant no-submit-recovery
 env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_probe.py --only cache_write
 env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_probe.py --only cache_write --mutant cache-write-assumed
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_probe.py --only stamp
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_probe.py --only keyless
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_probe.py --only keyless --mutant keyless-ui-requires-key
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_probe.py --only keyless --mutant keyless-any-cache
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_probe.py --only keyless --mutant keyless-omits-deferred
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_probe.py --only keyless --mutant keyless-late-cancel
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_probe.py --sources /Users/kevingalligan/.codex/litecode/reelcut/fix-remaining-bugs-series/03-issue-30/baseline/app/Sources --only stamp
 ```
 
 The `submission` section checks one POST and exact uploaded-URL selection
@@ -3847,6 +3873,33 @@ malformed or hostile rows, auth refusals and bounded exhaustion. Its
 full-engine rows cancel during a recovery-list request and check the recovered
 ID's DELETE or the exact dashboard warning, no later media, and temporary
 audio removal. The mutant must fail those recovery assertions.
+
+**R6-16 / #32:** `--only keyless` seeds real cache files and markers through
+the dummy-key loopback fake, then runs fresh nil-client processes over
+narrow and legacy markers. It compares exact cues, request counts of every
+method and package bytes; rejects mixed, malformed, missing, stale, changed
+request/source and refresh batches without partial cues or extraction; and
+checks valid empty words and pending safe/unsafe deletion IDs. The real sheet
+rows measure Generate, notes/hints, click placement, stale facts, first
+progress cancellation and a semaphore-synchronized worker success queued
+before Stop, with uncancelled/failed controls. The four named copy mutants
+must compile and fail semantic KL rows.
+
+**R6-15 / #30:** `--only stamp` now checks the four-field writer and its
+sorted six-key outer object, all nine independent identity fields and six
+irrelevant source fields, raw ten-field legacy and narrow markers, strict
+rejection of each missing/null/wrong-typed relevant field, and byte-identical
+readback. New-process loopback runs seed one real transcript, replace only
+its marker with each raw legacy variant, and require the same cues, ID and
+cache bytes, `cached` estimate, zero upload ticks and zero additional HTTP
+requests. Source modification, language and explicit refresh still upload
+once each; pending DELETE is retried on a current cache and a failed DELETE
+holds a stale cache without replacing it. Fixture/setup failures are scored.
+The captured pre-fix sources compiled and scored **45/72**, with 27 named
+semantic failures including irrelevant-field rebilling. Current sources
+scored **72/72** with no skips in the focused run.
+The specified `stamp,estimate,verbatim,cache_write,run,chrome,hygiene`
+run passed **351/351** with no skips after the fresh Release build.
 
 **186/186** on the tree, measured three times on 2026-09-20 with no skips,
 and **196/196** on 2026-09-20 after 05-review's finding 1 added row 12's
@@ -4019,12 +4072,21 @@ row 1's no-key arm, nothing at all.
 env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_proof.py
 env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_proof.py --mutant no-hold
 env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_proof.py --port-base 5030
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_proof.py --port-base 5470
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/cloud_captions_proof.py --mutant keyless-agent-requires-key --port-base 5480
 ```
 
 R6-14's built-app row drops a submit reply, then repeats with one hidden
 list page. It reads back placed captions, the package cache, the fake's
 created IDs and DELETE log; a second run must use the cache without another
 submission.
+
+For R6-15, row 4 compares the marker's entire four-field `source` object
+with independent `os.stat` size/rounded modification second and `get_project`
+duration/audio presence. It no longer waits for a thumbnail, peaks or speech
+marker or reads display-cache constants from one.
+The fresh built-app proof on ports 5430–5432 passed **157/157**, with no
+skips and no startup parity complaints in any owned app log.
 
 **115/115** on the tree, no skips, in 45–50 s, measured three times on
 2026-09-20, and again at **115/115 in 51 s** after c1-chrome (road map 6
@@ -4066,6 +4128,13 @@ It imports `build`, `run_probe`, `run_cues`, `Fake`, `child_env`,
 `population`, `wav_samples`, `make_fixture`, `word` and `MUTANTS` from
 `cloud_captions_probe.py` rather than copying any of them, so the probe
 binary and the harness it reuses are the ones that file builds.
+
+The R6-16 MCP rows seed a package on an owned keyed instance and reopen it
+on a separate owned keyless instance with an invalid endpoint setting. They
+check `place:false`, placement, exact cues, one-step undo/redo, whole-batch
+mixed refusal, deferred cleanup notes and unchanged package bytes/request
+count. `keyless-agent-requires-key` must build and fail the named keyless
+result row.
 
 **Mutant scores**, each a COPY of the tree — `app/`, `project.yml` and
 `Makefile`, with `core` a SYMLINK to the tree's already-built one, so
@@ -4307,3 +4376,63 @@ target and mutates only that copy. A successful negative control **exits 1**
 after compiling and observing its named behavioral assertion fail; anchor,
 compile or attribution failures exit 2. The nearest-transition control runs
 both handle and ripple assertions. No built app or cloud account is needed.
+
+### Peaks decode completion — issue #23
+
+`python3 tools/proof/peaks_probe.py` authors 44.1/48 kHz mono/stereo WAV,
+all-zero PCM, normal and corrupt AAC, a delayed PCM MOV with a real empty edit,
+a delayed AAC with a millisecond target edit list, and a physically truncated
+WAV under `tools/proof/work/peaks-probe/`. It compiles the actual
+`app/Sources/*.swift` with `peaks_probe.swift` using the offscreen harness's
+Swift compiler line; `--sources PATH` selects a copied app-source tree for a
+mutant. A compile/setup failure is scored as a failure. The Swift probe awaits
+each actual `MediaImporter.peaks` pass, reads its marker and payload, and
+compares every WAV bucket against an independent Python count of authored
+frames, including the positive tail and stereo channel maximum. It also
+feeds real decoded `CMSampleBuffer`s through the same accumulator and final
+publication path to test completed streams missing final/middle buffers,
+nonfinite and short blocks, genuine silence, legacy cache migration and reuse,
+and nil/unknown/corrupt cache states. The valid delayed AAC is a deliberate
+boundary control: its edit target ends at 1.250 s on a 1 ms grid, while the
+reader returns PCM through 1.249333 s. A whole-second WAV boundary does not
+receive a whole-second allowance. A source with a decoded 0/1 timestamp and
+missing tail is rejected through publication and readback, while a fully
+covered coarse fractional target is published and read back. Coarse metadata
+only limits edge-shortfall tolerance, not exact coverage. The truncated WAV is
+qualified against AVFoundation's physical track extent, not its original header.
+
+After `make app`, start a fresh owned Release app on port 5410 with
+`RC_ASSEMBLYAI_KEY` unset, `-ApplePersistenceIgnoreState YES` and
+`-AgentServerEnabled YES`; verify its log names that port and contains no
+`Reelcut: ` parity complaint. Then run
+`python3 tools/proof/peaks_proof.py 5410`. The built-app checks use
+`detect_silence` and `normalize_clip` to distinguish pending corrupt audio,
+real silence and an audible clip, verify unchanged project JSON on refusal,
+and reject an old false-silent cache before the next normal pass migrates it.
+The existing `remaining_proof.py` checks surviving inodes across repeat opens
+and consolidation; its peaks assertions now compare the versioned wrapper's
+`source` to the unchanged thumbnail stamp. `source_mirror_probe.py` writes a
+versioned marker beside its independently authored waveform.
+
+For negative controls, copy `app/Sources` into a temporary directory and run
+`python3 tools/proof/peaks_probe.py --sources PATH` after exactly one change:
+remove the `status == .completed` guard in `finishPeaks`; remove its
+`!peaks.failed`/`acceptedFrames`/`covers` guards; let `loadPeaks` accept a
+bare `CacheStamp`; or require a positive bucket in `PeakBuckets.covers`.
+Each mutant must compile and fail a named assertion tied to that behavior;
+setup errors are not evidence. Re-run the pristine probe afterward. Road map
+4 §9 records the actual scores and limitations.
+
+The review-fixed pristine source probe scored **80/80**; the built-app proof
+**21/21**, with zero parity complaints. The existing cache/source-mirror,
+phase 3 and silence 2 gates scored **170/170**, **40/40**, **79/79**,
+**123/123** and **91/91** in their respective source and MCP runs. Four
+sequential compiled source-copy mutants against the 71-row probe before four
+additional positive controls scored **70/71** (status), **67/71** (coverage
+and ingestion), **70/71** (legacy) and **68/69** (zero amplitude). Their
+named killed assertions did not change when the final positive controls were
+added. Two further compiled source-copy mutants scored **79/80** each:
+restoring unbounded 0/1 timestamp tolerance published a missing tail, and
+restoring the coarse-grid pre-rejection withheld fully covered PCM. The
+pristine **80/80** run was repeated after those mutants; road map 4 §9 and
+the litecode checks and fix-notes files hold the evidence.

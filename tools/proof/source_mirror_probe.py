@@ -245,6 +245,15 @@ let peaksURL = cache.appendingPathComponent("peaks", isDirectory: true)
 try? FileManager.default.createDirectory(
     at: peaksURL.deletingLastPathComponent(), withIntermediateDirectories: true)
 peaks.withUnsafeBufferPointer { raw in try? Data(buffer: raw).write(to: peaksURL) }
+let source = MediaImporter.CacheStamp(
+    size: 0, modified: 0, duration: tone.duration, width: tone.width,
+    height: tone.height, hasVideo: tone.hasVideo, hasAudio: tone.hasAudio,
+    thumbnailHeight: MediaImporter.thumbnailHeight,
+    maxThumbnails: MediaImporter.maxThumbnails,
+    peakBucketsPerSecond: MediaImporter.peakBucketsPerSecond)
+_ = MediaImporter.writeStamp(
+    MediaImporter.PeaksStamp(source),
+    to: MediaImporter.peaksMarkerURL(for: tone.id, in: cache))
 guard MediaImporter.loadPeaks(for: tone.id, in: cache)?.count == BUCKETS else {
     fail("the hand-written peaks file did not read back")
 }

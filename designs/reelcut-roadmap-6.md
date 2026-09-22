@@ -611,7 +611,7 @@ the tool's placement code do not know which engine ran.
 
 The run, on the `work` queue, synchronous:
 
-1. **Janitor** (R6-4): for every `cache/transcripts/*.json` whose
+1. **Janitor** (R6-4, keyed runs): for every `cache/transcripts/*.json` whose
    `remote_deleted` is false, `DELETE` again, 5 s each, best effort.
 2. **Group** the jobs by media id. For each media, in the order of its
    first clip: read `CacheStamp.stamp(for:url:)` NOW and compare with the
@@ -638,6 +638,15 @@ The run, on the `work` queue, synchronous:
    build cues with `CaptionCues.build(from:frame:clip:)`, and append. A
    clip whose window holds no words is "no speech was recognised in it",
    as today.
+
+**R6-16 / #32:** Without a key, this run has a disk-only capability. It
+first discovers all pending IDs as deferred, skips every janitor DELETE, then
+admits only a nonempty unrefreshed batch whose every distinct media has a
+readable source, matching R6-15 marker/request and decodable transcript. It
+retains the whole batch before deriving cues. Any miss refuses the whole
+request without extraction, network or partial captions. An empty words
+array remains a valid no-speech answer. Keyed ordering and partial success
+remain as above.
 
 Progress is the bar's one number: extraction 0–0.25 of a media's share
 (frames written over frames expected), upload 0.25–0.65 (`URLSession`'s
@@ -687,10 +696,11 @@ constants are compared and a fifth spelling of one of them somewhere else is
 the drift this project warns about. That file measured **555** lines, not
 550, and 556 after the one constant.
 
-`TranscriptStamp`, this section's marker type, landed in
+`TranscriptStamp`, this section's marker type, first landed in
 `AssemblyAITranscript.swift` rather than `MediaTranscript.swift`: the cache
-file stood at 436 lines with it against the 400-line cap on a new file, and
-a stamp is a record of the REQUEST before it is anything about a file.
+file stood at 436 lines with it against the 400-line cap on a new file.
+Issue #30 moved it alone to `TranscriptStamp.swift` before changing its
+source policy; `AssemblyAITranscript.swift` retains the wire values.
 
 The JSON, sorted keys, `.atomic`:
 
@@ -730,12 +740,14 @@ in the media and the mapping adds nothing (§3 q4). The field stays, written
 empty edit would move every caption of such a file and a re-run of q4 is
 what would catch it. `uploaded_format` is `"flac"` or `"wav"`, q2's answer
 and its fallback, so a cache file says what was actually sent. The marker is a `TranscriptStamp`:
-`source: CacheStamp` (so a relink, an edited file or a changed duration
-invalidates it exactly as it invalidates the peaks) plus `provider`,
+`source: TranscriptSourceStamp` (size, rounded modification second, duration
+and audio presence; old ten-field source objects decode by projection) plus `provider`,
 `speech_models`, `language_code`, `speaker_labels` and `keyterms_prompt`
 — the REQUEST, so a run with a different language, with speakers turned
 on or with a new vocabulary is a new transcript, and the sheet says which
-files it will upload for that reason. `MediaTranscript.Loader` is
+files it will upload for that reason. Width, height, video presence and the
+three display-cache constants never invalidate this marker; a current cache
+hit rewrites neither file. `MediaTranscript.Loader` is
 `MediaPeaks.Loader`'s shape: one read per media, a `pending` set.
 
 **The mapping**, the one piece of arithmetic in the file, and the place
@@ -949,6 +961,14 @@ Settings…", when the credential resolves to nothing; the grant machinery
 is untouched and simply not consulted for the cloud engine, which needs
 no grant.
 
+**R6-16 / #32:** Generate is enabled with no key only for a nonempty
+all-cached estimate and a cache directory. The no-key note is replaced by a
+no-network reuse hint; changing scope, options, refresh or credentials
+recomputes it. Generate constructs no endpoint/client without a credential,
+and the coordinator rechecks the package at click time. The main-thread
+cloud completion resolves a Stop arriving after worker success to cancelled
+before the common placement path, while retaining cleanup warnings.
+
 The report card at the end lists, beside today's counts: the model that
 ran when it was not Universal-3.5 Pro (R6-8), the detected language and
 its confidence when detection was used, and any media whose remote delete
@@ -987,6 +1007,14 @@ refresh?}` — four new arguments, no new tool, the catalog at 77.
   precedent — an argument that cannot do anything is a mistake, not a
   no-op.
 
+**R6-16 / #32:** After argument/language and target/jobs validation, the
+handler resolves an optional credential. It resolves an endpoint and creates
+a client only when a key exists. A keyless call uses the coordinator's
+whole-batch disk admission; a malformed endpoint setting cannot block it.
+The existing result keys and placement/undo path remain. Deferred deletions
+are named in `note` or the failure text, with retry qualified to safe IDs
+and the originating account and region.
+
 The refusal ORDER, phase 4's rule extended: the caller's own mistakes
 first (unknown clip, empty scope, misspelt engine, cloud-only arguments
 under the wrong engine), then the credential ("No AssemblyAI API key is
@@ -1017,7 +1045,7 @@ in it.** Built. The sentences, as they landed, each pinned by a row of
 - `“<file>” is longer than AssemblyAI's 10-hour limit for one file.`
 - R6-11's, one per clip on a held media: `AssemblyAI has not confirmed
   deleting its earlier transcript, so it was not uploaded again; the next
-  run retries the delete`
+  run with an API key retries the delete`
 - the `note`'s three parts, space-joined: `vocabulary was capped at 1000
   terms (AssemblyAI's limit); <N> were given.` · `AssemblyAI transcribed
   media <id> with <model>, not universal-3-5-pro.` · `AssemblyAI has not
@@ -3858,3 +3886,107 @@ this decision requires no app change. C2 is deferred, and §6's relay and
 identity options remain a future design reference. R6-5 records the current
 scope. The open follow-up issues and manual checks are not closed by this
 decision.
+
+### 10.19 Issue #30 — transcript identity apart from display caches (2026-09-22)
+
+R6-15 was recorded in spec §11 before implementation. A separate pure-move
+gate relocated the existing wide `TranscriptStamp` from
+`AssemblyAITranscript.swift` to `TranscriptStamp.swift`, with behavior
+unchanged: `make typecheck` passed with four established AVFoundation
+warnings and the existing `stamp,estimate,verbatim` probe passed **131/131**.
+The saved move-only patch is in the issue handoff. The new
+`TranscriptSourceStamp` then projected the shared `CacheStamp` to size,
+rounded modification second, duration and audio presence. Keyed decoding
+accepts old wide markers while requiring those four fields; the writer emits
+only them. `CloudEstimate` compares the same projected source as the run,
+without changing its precedence. The cache writer, janitor, extraction and
+credential code did not change. No marker or project format version changed.
+
+The extended section 13 compiles against the captured pre-fix sources and
+scored **45/72**: its 27 named semantic failures include all six irrelevant
+metadata fields, raw legacy and narrow markers, and extra requests on cache
+reuse. The fixed sources scored **72/72**, with every fake-run cache hit
+making zero additional HTTP requests and leaving transcript and marker bytes
+unchanged. Independent negative copies still upload once for a real source
+modification, a language change and refresh; pending DELETE retries on a
+current cache, while failed DELETE holds stale source/request cases without
+replacing the old payload or ID. Missing fixture/setup is a scored failure,
+and none was skipped. Built-app row 4 now compares the entire four-field
+marker source to independent `os.stat` and `get_project` facts; it no longer
+depends on another cache's completion marker.
+
+Final gates: `make test`, `make lint`, `make typecheck` (zero errors and four
+baseline warnings), and fresh `make app` (**BUILD SUCCEEDED**) passed. The
+specified full source probe passed **351/351** and built-app MCP proof
+**157/157**, both without skips; all three owned app logs on ports 5430–5432
+had no `Reelcut: ` startup parity complaint. `git diff --check` passed. The
+issue-only patch has exactly the twelve listed repository paths; the audit
+found all 19 incoming dirty paths outside that list byte-identical, including
+the #23/#27 source and proof work. No live API call, real credential read,
+commit or issue write was made. Final independent reader review passed with
+no findings (`05-review.md`); the modification-second/duration identity
+limits remain separate work.
+
+### 10.20 Issue #32 — keyless reuse of current packaged transcripts (2026-09-22)
+
+R6-16 was recorded in spec §11 before behavior. A separately gated pure move
+placed `CloudTranscriber.Report` in `CloudTranscriber+Report.swift`: typecheck
+passed with the four established AVFoundation warnings and the existing
+`run,cache_write,chrome` probe passed **143/143**. The isolated move patch and
+incoming dirty baseline are in the issue handoff. The coordinator now takes
+an optional client. With none, it discovers every readable pending deletion
+ID, admits only a nonempty, unrefreshed batch whose every distinct media has
+current source/request markers and decodable transcript files, retains those
+files before deriving cues, and performs no janitor, extraction or request.
+A failed admission refuses the entire request. Keyed janitor-first ordering,
+failed-delete holds and per-media partial success remain. The shared report
+calls pending deletes deferred, promises a later retry only with the
+originating account and region's key and only for IDs safe to send, and keeps
+#29's separate dashboard warning for an ID never saved to the package.
+
+The sheet's pure estimate enables keyless Generate only for nonempty
+all-cached rows. Its note/hint reflect no-network reuse and revert when cloud
+work is required; its main-thread cloud completion turns a success queued
+before Stop into cancellation before placement while retaining the report.
+The MCP handler keeps argument/target validation and grouped placement,
+resolves an endpoint only with a credential, and forwards the nil-client
+coordinator's result or refusal. No persisted schema, Rust/FFI, credential
+surface or live account call changed.
+
+The permanent `keyless` source/UI section seeded disk files through a dummy
+key fake and passed **42/42** focused and **432/432** in the specified full
+probe, with no skips. It checked narrow/legacy markers, multiple clips/media,
+all-cache admission negatives, exact cues, zero additional requests of any
+method, unchanged transcript/marker bytes, pending safe/unsafe IDs, deferred
+warnings, later keyed retry, valid empty words, first-progress cancellation,
+real Generate click, stale sheet facts, and a semaphore-synchronized queued
+success/Stop with success and existing-failure controls. The built-app MCP
+proof passed **167/167** without skips on owned ports **5470–5472**; all three
+owned logs had no `Reelcut: ` startup parity complaint. A saved package
+created by the keyed fake reopened in a separate keyless app with an invalid
+endpoint; `place:false`, exact cues, place/undo/redo, mixed refusal, deferred
+success/failure notes, zero HTTP and package byte identity passed.
+
+Five guarded copy mutants each compiled and failed named semantic rows:
+`keyless-ui-requires-key` **36/42**, `keyless-any-cache` **33/42**,
+`keyless-omits-deferred` **18/38**, `keyless-late-cancel` **41/42**, and
+`keyless-agent-requires-key` **158/159** on owned ports **5480–5482**. The
+last mutant's owned logs likewise had no startup parity complaint. Final
+`make test`, `make lint`, `make typecheck` (zero errors/four baseline warnings),
+and `make app` (**BUILD SUCCEEDED**) passed. The issue-only allowlist and
+incoming baseline preservation audit are in the handoff, with `git diff
+--check`. No commit, issue write, real credential read or live paid request
+was made. Final independent reader review passed with no findings
+(`04-issue-32/07-review-2.md`); the follow-up record is below.
+
+Follow-up (2026-09-22): the held-media refusal now qualifies deletion retry
+as requiring an API key. The later-keyed proof requires the complete ordered
+DELETE set for safe media 1, 2 and 9 before other requests, excludes the
+unsafe ID, and checks its bytes and report categories. The proof README's
+interrupted-import sentence was repaired. Python compilation passed;
+`make typecheck` passed with zero errors and four established warnings; the
+affected source sections passed **109/109**; `make app` rebuilt successfully;
+and fresh MCP proof passed **167/167** on ports **5490–5492**, with no startup
+parity complaints. `git diff --check` passed. Earlier `make test`, `make lint`,
+full source/UI probe **432/432**, and five compiled mutants remain the
+verification evidence for unchanged paths.

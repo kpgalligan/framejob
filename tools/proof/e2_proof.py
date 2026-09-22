@@ -1111,6 +1111,46 @@ def export_part(mcp):
           f"{found[0] if found else None} (wanted {wanted:.1f} ± 2)")
 
 
+def zero_edges_part(mcp):
+    print("\n8 — zero In/Out stay stored and inactive until Duration increases")
+    session, clip = card_session(mcp, "e2-zero")
+    first, last = 0, 4 * SEC - FRAME
+    control = (session.frame(first), session.frame(last))
+    zero = motion(arrive=edge("fade", 0), leave=edge("fade", 0))
+    set_motion(session, clip, zero)
+    stored = session.clip(clip)["video"]["motion"]
+    check(stored["in"] == zero["in"] and stored["out"] == zero["out"],
+          "explicit zero In/Out retain both Fade kinds and durations")
+    check((session.frame(first), session.frame(last)) == control,
+          "zero In/Out render byte-identically to no motion at first and last frames")
+    saved = session.save()
+    copy = os.path.join(WORK, f"e2-zero-reopen-{os.getpid()}.reelcut")
+    if os.path.exists(copy):
+        shutil.rmtree(copy)
+    shutil.copytree(session.path, copy)
+    reopened = Session.opened(mcp, copy)
+    check(reopened.clip(clip)["video"]["motion"] == stored
+          and json.loads(saved)["clips"][0]["video"]["motion"] == stored,
+          "save and reopen keep configured zero edges unchanged")
+    check((reopened.frame(first), reopened.frame(last)) == control,
+          "reopened zero edges still render as no motion")
+
+    set_motion(session, clip, motion(arrive=edge("fade", FRAME / SEC)))
+    check(session.frame(first) != control[0],
+          "one-frame positive Fade In reactivates the first frame")
+    session.undo()
+    check(session.clip(clip)["video"]["motion"] == stored
+          and (session.frame(first), session.frame(last)) == control,
+          "one undo restores both stored zeros and inactive rendering")
+    set_motion(session, clip, motion(leave=edge("fade", 2 * FRAME / SEC)))
+    check(session.frame(last) != control[1],
+          "two-frame positive Fade Out changes the last drawn frame")
+    session.undo()
+    check(session.clip(clip)["video"]["motion"] == stored
+          and session.frame(last) == control[1],
+          "undo restores zero Out and its unchanged last frame")
+
+
 # ---- main ----------------------------------------------------------------
 
 
@@ -1127,6 +1167,7 @@ def main():
     compose_part(mcp)
     model_part(mcp)
     export_part(mcp)
+    zero_edges_part(mcp)
 
     print()
     if skipped:

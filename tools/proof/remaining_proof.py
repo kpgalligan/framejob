@@ -255,6 +255,13 @@ def read_json(path):
         return None
 
 
+def peaks_source(path):
+    marker = read_json(path)
+    if not isinstance(marker, dict) or marker.get("version") != 1:
+        return None
+    return marker.get("source")
+
+
 def read_bytes(path):
     try:
         with open(path, "rb") as handle:
@@ -495,7 +502,8 @@ def part_1a(mcp, s):
     check(os.path.exists(session.peaks_bin(av)), "AV's `peaks/<id>.bin` is there")
     for label, path in (("thumbs", session.thumbs_marker(av)),
                         ("peaks", session.peaks_marker(av))):
-        marker = read_json(path)
+        outer = read_json(path)
+        marker = outer if label == "thumbs" else peaks_source(path)
         check(isinstance(marker, dict), f"the {label} marker is a JSON object")
         if not isinstance(marker, dict):
             continue
@@ -513,9 +521,10 @@ def part_1a(mcp, s):
               f"({marker.get('modified')})")
         check(marker.get("duration") == imported["duration"],
               f"the {label} marker's `duration` is the record's ({marker.get('duration')})")
-    check(read_bytes(session.thumbs_marker(av)) == read_bytes(session.peaks_marker(av)),
-          "the two markers of one media are byte-identical (one stamp, sorted keys)")
+    check(peaks_source(session.peaks_marker(av)) == read_json(session.thumbs_marker(av)),
+          "peaks version 1 wraps the unchanged thumbnail source stamp")
     s.marker_bytes = read_bytes(session.thumbs_marker(av))
+    s.peaks_marker_bytes = read_bytes(session.peaks_marker(av))
     s.baseline = session.stats(av)
     check(all(v is not None for v in s.baseline.values()),
           "all four of AV's files stat (the baseline for every 'unmoved' claim)")
@@ -582,7 +591,7 @@ def part_1d(s):
         and stat_of(session.peaks_marker(av)) != s.baseline["peaks marker"],
         REBUILD_SECONDS) is not None,
         "and the peaks marker was rewritten (new inode or mtime)")
-    check(read_bytes(session.peaks_marker(av)) == s.marker_bytes,
+    check(read_bytes(session.peaks_marker(av)) == s.peaks_marker_bytes,
           "rewritten byte-identical: the same file was measured")
     check(read_bytes(session.peaks_bin(av)) == bin_bytes,
           "the rebuilt `.bin` is byte-identical to the first — same samples, same buckets")
@@ -700,7 +709,7 @@ def part_1g(mcp, s):
           f"the saved project.json lists AV and A ({sorted(saved_ids)}) — the copies below "
           "open with media in them")
     check(read_bytes(session.thumbs_marker(av)) == s.marker_bytes
-          and read_json(session.peaks_marker(av)) == read_json(session.thumbs_marker(av)),
+          and peaks_source(session.peaks_marker(av)) == read_json(session.thumbs_marker(av)),
           "AV's markers survived the save's package swap byte-identical")
     # `save_project` answers only once NSDocument's completion has fired,
     # so nothing should be writing into the package now — and that is
@@ -776,7 +785,8 @@ def part_1h(s):
           f"mtime_ns: {os.stat(s.av_copy).st_mtime_ns} → {os.stat(av_file).st_mtime_ns})")
 
     def matches(marker_path, file_path):
-        marker = read_json(marker_path) or {}
+        marker = (peaks_source(marker_path) if "/peaks/" in marker_path
+                  else read_json(marker_path)) or {}
         return (marker.get("size") == os.stat(file_path).st_size
                 and marker.get("modified") == mtime_second(file_path))
 
@@ -800,7 +810,7 @@ def part_1h(s):
               "the mtime changed, so the strip and the peaks were rebuilt and both markers "
               "rewritten to the new stamp")
         print("       consolidate outcome: mtime NOT preserved → rebuilt, markers rewritten")
-    check(read_json(session.thumbs_marker(av)) == read_json(session.peaks_marker(av)),
+    check(read_json(session.thumbs_marker(av)) == peaks_source(session.peaks_marker(av)),
           "AV's two markers still agree with each other")
 
 
@@ -854,7 +864,7 @@ def part_1i(s):
     session.op("relink_media", media=av, path=av_file)
     returned = wait_until(
         lambda: read_bytes(session.peaks_bin(av)) == bin_bytes
-        and read_json(session.peaks_marker(av)) == read_json(session.thumbs_marker(av))
+        and peaks_source(session.peaks_marker(av)) == read_json(session.thumbs_marker(av))
         and read_json(session.peaks_marker(av)) is not None, REBUILD_SECONDS)
     check(returned is not None,
           "relinked back, the `.bin` returns byte-identical to the first and both markers "
