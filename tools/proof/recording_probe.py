@@ -384,10 +384,9 @@ machine's menu bar — so the menu's rebuild is a structural read and the
 
 Section 6 (`welcome`) is the welcome window's CROSS-BUILD — `phase5_chrome.py`'s
 pattern: the tree one commit before the button existed, `git archive`d into
-`work/recordingprobe/before/` and compiled with the same swiftc line, the
-same staticlib and (first) THIS tree's `harness/main.swift` under
-`-D HARNESS_REFERENCE_BUILD`, falling back to the reference commit's own
-harness and SAYING so. The reference is found by a pickaxe on the button's
+`work/recordingprobe/before/` and compiled with its own Rust core and header,
+using THIS tree's `harness/main.swift` under `-D HARNESS_REFERENCE_BUILD`.
+The reference is found by a pickaxe on the button's
 title (`git log -S"New Recording" -- app/Sources/WelcomeWindowController.swift`,
 the LAST hash + `^`; HEAD while the change is uncommitted), because the
 file's adding commit is the initial commit and `--diff-filter=A` would name
@@ -406,8 +405,8 @@ diff's bottom edge and compared with the laid-out frame. Nothing outside
 the row may change (a third button moves the other two, and the old row is
 inside the new one), the changed-pixel clusters are PRINTED and never
 counted as one, and a scored row asks that the reference was compiled with
-this tree's own harness — the fallback would mean the harness names a type
-the older tree lacks outside the reference guard. Section 6 always renders
+this tree's own harness. A new mode that names a type absent from the old
+tree must respect the reference guard or the build fails by name. Section 6 renders
 through the TREE's harness (`build.sh` hard-codes `app/Sources`), whatever
 `--sources` says; the mutant that turns the button's action is caught by
 section 5's structural read, which is what a pixel cannot see.
@@ -651,6 +650,8 @@ import subprocess
 import sys
 import time
 import zlib
+
+from reference_build import build_reference as build_matching_reference
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 WORK = os.path.join(ROOT, "tools", "proof", "work")
@@ -5683,115 +5684,10 @@ def reference_commit():
 
 
 def build_reference(commit):
-    """`git archive` the reference tree into `work/`, then compile it with the
-    SAME swiftc line, staticlib and bridging header the current build uses —
-    so the two binaries differ by the phase's own `app/Sources` changes and by
-    nothing else.
-
-    Returns `(binary, sha, note)`, with `binary` None when it could not be
-    built at all; `note` says which `main.swift` the reference was compiled
-    with, and section 6 prints it and scores the failure. It is a returned
-    failure rather than a `sys.exit` for one reason: this build is the only
-    thing in the script that reaches BACKWARDS in the history, so it is the
-    only thing that can rot on its own, and a rotted instrument must not take
-    the sections that need no reference at all down with it.
-
-    **The instrument, and what happens when it will not fit.** The reference
-    is compiled with the CURRENT `harness/main.swift` under
-    `-D HARNESS_REFERENCE_BUILD`, which compiles out every mode naming a type
-    an older tree lacks (that file's header states the convention). Both
-    renders then come out of one program, which is the whole value of the
-    comparison. When the current instrument will not compile against the older
-    tree anyway — a mode a later phase forgot to guard, or an `app/Sources`
-    change the reference tree cannot satisfy — it falls back to the reference
-    commit's OWN `harness/main.swift` and says so, because a comparison made
-    with two builds of the instrument is worth more than no comparison, and
-    far more than a script that exits before its first check. The fallback is
-    the apology, not the plan: the fix is the guard — and section 6 SCORES
-    which one was used.
-
-    Skipped when the stamp beside the binary still names the same commit and
-    the same instrument. `harness/build.sh` is not reused because it hard-codes
-    `app/Sources`; everything else about the two builds is deliberately equal,
-    down to the `-module-name`.
-    """
-    sha = git("rev-parse", commit).strip()
-    binary = os.path.join(BEFORE, "harness")
-    stamp = os.path.join(BEFORE, "stamp.json")
-    instrument = [
-        sha,
-        os.path.getmtime(HARNESS_MAIN), os.path.getsize(HARNESS_MAIN),
-        os.path.getmtime(STATICLIB), os.path.getsize(STATICLIB),
-    ]
-    if os.path.exists(binary) and os.path.exists(stamp):
-        with open(stamp) as f:
-            kept = json.load(f)
-        if isinstance(kept, dict) and kept.get("instrument") == instrument:
-            return binary, sha, kept.get("note", "")
-
-    for path in (binary, stamp):
-        if os.path.exists(path):
-            os.remove(path)
-    tree = os.path.join(BEFORE, "tree")
-    subprocess.run(["rm", "-rf", tree], check=True)
-    os.makedirs(tree, exist_ok=True)
-    # The reference commit's own copy of the harness comes out of the archive
-    # beside its `app/Sources`, unused unless the current one will not build.
-    archive = subprocess.run(
-        ["git", "-C", ROOT, "archive", sha, "app/Sources", "tools/proof/harness/main.swift"],
-        capture_output=True, check=True)
-    subprocess.run(["tar", "-x", "-C", tree], input=archive.stdout, check=True)
-    sources = sorted(
-        os.path.join(tree, "app", "Sources", name)
-        for name in os.listdir(os.path.join(tree, "app", "Sources"))
-        if name.endswith(".swift") and name != "main.swift")
-    sdk = subprocess.run(
-        ["xcrun", "--show-sdk-path", "--sdk", "macosx"],
-        capture_output=True, text=True, check=True).stdout.strip()
-
-    def compile_with(main):
-        return subprocess.run(
-            ["swiftc", "-sdk", sdk, "-target", "arm64-apple-macos15.0",
-             "-module-name", "Reelcut", "-import-objc-header", BRIDGING,
-             "-D", "HARNESS_REFERENCE_BUILD",
-             "-L", os.path.dirname(STATICLIB), "-lreelcut_core"]
-            + sources + [main, "-o", binary],
-            capture_output=True, text=True)
-
-    theirs = os.path.join(tree, "tools", "proof", "harness", "main.swift")
-    attempts = [(HARNESS_MAIN, "this tree's own harness/main.swift, so both renders "
-                               "come out of one program")]
-    if os.path.exists(theirs):
-        attempts.append((theirs, f"{sha[:8]}'s OWN harness/main.swift — the current one "
-                                 "does not compile against that tree, so the two renders "
-                                 "are two builds of the instrument as well as two builds "
-                                 "of the app; see build_reference"))
-    start, note, used, failures = time.time(), None, None, []
-    for candidate, description in attempts:
-        result = compile_with(candidate)
-        if result.returncode == 0 and os.path.exists(binary):
-            note, used = description, candidate
-            break
-        failures.append(
-            f"with {os.path.relpath(candidate, ROOT)}:\n"
-            + "\n".join((result.stdout + result.stderr).strip().splitlines()[:6]))
-    if note is None:
-        return None, sha, (f"the reference harness ({sha[:8]}) did not build.\n"
-                           + "\n".join(failures))
-    if used != HARNESS_MAIN:
-        print(f"reference: WARNING — fell back to {sha[:8]}'s own harness/main.swift")
-        for failure in failures:
-            print("      " + failure.replace("\n", "\n      "))
-    # The harness registers the fonts sitting BESIDE its own binary, and
-    # without them every label in the reference render falls back to the
-    # system face — which shows up as a full-window diff and looks exactly
-    # like a layout change (phase 5 measured it).
-    subprocess.run(["rm", "-rf", os.path.join(BEFORE, "Fonts")], check=True)
-    subprocess.run(["cp", "-R", FONTS, os.path.join(BEFORE, "Fonts")], check=True)
-    with open(stamp, "w") as f:
-        json.dump({"instrument": instrument, "note": note}, f)
-    print(f"reference: built {sha[:8]} in {time.time() - start:.0f} s")
-    return binary, sha, note
+    """Build archived Swift with its matching archived core and header."""
+    return build_matching_reference(root=ROOT, before=BEFORE, commit=commit,
+                                    harness_main=HARNESS_MAIN, fonts=FONTS,
+                                    proof_script=__file__)
 
 
 def build_harness():
@@ -5880,27 +5776,12 @@ def section_welcome(binary, sources):
     reference, sha, note = build_reference(commit)
     print(f"      reference: {commit} = {sha[:12]}")
     print(f"      compiled with {note.splitlines()[0] if note else '?'}")
-    # **A reference the instrument cannot reach is a SKIP, not a failure**,
-    # for phase 5's reason and gated the same way (`phase5_chrome.py`, which
-    # states it in full): one core and two app trees means a reference whose
-    # own `ReelCore.swift` predates an FFI change cannot compile at all, and
-    # D2·1's fourth parameter put this reference (pre-R1) out of reach for
-    # good. Anything else that will not build is still the failure it was.
-    ffi_drift = reference is None and "rc_project_apply" in (note or "") \
-        and "app/Sources/ReelCore.swift" in (note or "")
-    if ffi_drift:
-        skip_rows(2, "the reference tree's own ReelCore.swift predates an FFI change and cannot "
-                     "call the current header (road map 7's D2·1 fourth parameter)")
-        print("      " + (note or "").replace("\n", "\n      "))
-    else:
-        check("6b: the reference tree built, so there is a 'before' to compare the welcome window "
-              "against — see build_reference for the two instruments it tries",
-              reference is not None, "      " + (note or "").replace("\n", "\n      "))
-        check("6b: … compiled with THIS tree's own harness/main.swift (one program, two app trees) — "
-              "the fallback means the harness names a type the older tree lacks outside the "
-              "HARNESS_REFERENCE_BUILD guard",
-              reference is not None and note.startswith("this tree's own"),
-              (note or "").splitlines()[0] if note else "")
+    check("6b: the reference tree built, so there is a 'before' to compare the welcome window "
+          "against", reference is not None,
+          "      " + (note or "").replace("\n", "\n      "))
+    check("6b: … compiled with THIS tree's own harness/main.swift (one program, two app trees)",
+          reference is not None and note.startswith("this tree's own"),
+          (note or "").splitlines()[0] if note else "")
     tree = os.path.join(BEFORE, "tree", "app", "Sources")
     panel_present = os.path.exists(os.path.join(tree, "RecorderPanelController.swift"))
     welcome_path = os.path.join(tree, "WelcomeWindowController.swift")

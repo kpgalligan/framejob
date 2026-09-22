@@ -377,7 +377,7 @@ row per op.
 | `app/Sources/PreviewCanvasView.swift` | 1104 |
 | `app/Sources/CanvasSessions.swift` | 1088 |
 | `app/Sources/OptionControls.swift` | 1081 |
-| `core/src/edit_clip.rs` | 1021 |
+| `core/src/edit_clip.rs` | 751 after road map 7 part 3; 1021 before its pure move |
 | `app/Sources/AudioDSP.swift` | 890 |
 | `app/Sources/AgentServer+Clips.swift` | 847 |
 | `core/src/edit.rs` | 838 |
@@ -390,6 +390,12 @@ row per op.
 | `app/Sources/ClipPane.swift` | 609 |
 | `app/Sources/MediaImporter.swift` | 604 |
 | `app/Sources/CompositionBuilder.swift` | 601 |
+
+Road map 7 part 1 did not pay a size toll on those capped files. At this
+gate `edit_transition.rs` is 537 lines, `edit_transition_shift.rs` 119,
+and the new `transition_search.rs` and `time_bounds.rs` are 108 and 71;
+`edit_clip.rs` remains 1021, `edit.rs` 838 under its semantics-table
+exemption, and `edit_paste.rs` 599. Recount before a later part edits one.
 
 The notes below are from road map 3's close and name each file's SEAM, which
 is what a phase needs before it pays; the counts in them are as of that day.
@@ -502,6 +508,16 @@ remain under their own 400-line caps: `AssemblyAIClient.swift` **397**,
 **327**. The client gained room by moving `submit` alone before behavior was
 added; the initial pure-move typecheck passed. The proof instruments are
 exempt from the app cap.
+
+**Part-2 frame-grid ledger (2026-09-21; final review passed).** The pure
+move cut `edit_paste.rs` from 599 to 580 before behavior was added; it is
+**574** after implementation. New `frame_grid.rs` is **40** of 400 lines.
+`edit_canvas.rs` is **232**, `edit_nest.rs` **320**, and `edit_props.rs`
+**376**. The new FFI suites were **190** and **245** at implementation and
+**192** and **247** after review; their shared fixture is
+**53**, and the owned-app MCP proof **203**, all under their 400-line caps.
+The exempt `edit.rs` semantics table was **838** lines at this gate. These
+are historical gate readings; measure current sizes before another edit.
 
 ## 4. What only a person at the machine can check
 
@@ -743,6 +759,14 @@ and the closing above added the rest.
 ---
 
 ## 5. Where a third road map would start
+
+**Road map 7 continuation:** all six §12.2 items were implemented in sequence
+and passed independent review: structural-time and bounded-transition work
+(§12.6), frame-grid normalization (§12.7), placement commit extraction
+(§12.8), historical proof comparisons (§12.9), the Speed sheet explanation
+(§12.10) and argument-contract coverage (§12.11). The capped
+`edit_clip.rs` still has 751 lines after part 3's separately gated pure move
+and caller deletion; no other size debt was paid here.
 
 **Bounded recovery after a lost AssemblyAI submit reply (#28).** R6-14 reads
 only the newest page of 200 transcripts at most three times. An outage,
@@ -1089,20 +1113,14 @@ road map could try is giving the first breakpoint a lead-in — a ramp that
 starts before the clip does — and re-measuring with `e1_proof.py`'s §5 rows,
 whose window 0 is printed and whose hard-cut row is what would move.
 
-**One deepening candidate, measured and waiting — the COMMIT TAIL.**
-The current review is `designs/reelcut-roadmap-7.md` §12; §12.3 re-counts the
-code at `49af3f4`, superseding §10.1's inventory for new work: **4** byte-exact
-ten-line blocks and **1** similar block with a different assignment, **14**
-direct overlap-refusal guards, **17** transition-mint/finish pairs, **12**
-functions carrying both and **10** of those trying candidates on `self`.
-`roll` is an eleventh pre-trial function and deliberately does not mint a
-transition. `finish` is already shared; paste/unnest's fallback-track checks
-and transition builders' trial loops are not immediate-refusal tails. The
-candidate needs its own design and a measured deletion, preserving those
-differences. Road map 7 §12.2 puts the outstanding extreme-time and
-frame-grid correctness decisions ahead of that optional refactor, and lists
-the remaining proof gaps separately. None is reopened work on the completed
-source-window phases.
+**The commit tail is implemented, not waiting.** Road map 7 §12.3's counts
+are the dated inventory before part 3. Part 3 separately gated the pure move
+and then moved candidate placement checks, storage and transition finalization
+into `edit_commit.rs`; §12.8 holds the measured deletion, exact behavior
+proof and independent review. The extreme-time and frame-grid work in parts
+1–2, historical comparison repair in part 4, Speed sheet explanation in
+part 5 and argument-contract coverage in part 6 are recorded in §12.6–§12.11.
+The separate product choices in §12.4 and human checks in §4 remain open.
 
 Three small things the closing turned up that a third road map would pick up
 on its way past, none worth a phase: `relink_media` could re-probe the file
@@ -1166,16 +1184,23 @@ left there**, both recorded in §10.8 as well:
   overlap question, and because the markers rule (`resnap` drops the second
   of two markers a coarser grid lands on one tick) would need an answer per
   nest. Found by phase B's scout and recorded nowhere before this.
+
+  Road map 7 §12.7 now records the frame-grid implementation, including
+  stored nests, property timings, paste, attributes and unnest. This bullet
+  remains the historical discovery; disposition and issue closure await
+  review of the part-2 gate.
 - ~~**`SpeedSheetController.syncReadout`'s "→ duration" is the UN-HELD
   number.**~~ **CLOSED by §10's phase C** (2026-09-20, spec §11's D4-6).
   The readout is now the CORE's answer: `SpeedSheetController.lengths`
   applies the sheet's own `set_speed` ops to the immutable handle and reads
   the durations back, so it says the held number, the overlap rule's
   refusals and a mixed selection's sum without a second copy of the
-  arithmetic in Swift and without a new `rc_*` export. What phase C
-  deliberately did NOT fix is recorded in §10.9: the sheet's HINT still
-  says only that a speed change opens or leaves a gap, and the readout shows
-  a length rather than the cross dissolve a neighbour gains.
+  arithmetic in Swift and without a new `rc_*` export. Phase C left the
+  sheet's hint describing only gaps; road map 7 part 5 (§12.10) corrected it
+  to describe gaps, allowed overlap with a possible cross dissolve, and a
+  refused clip staying unchanged while other selected clips can change.
+  The readout still shows a length rather than the dissolve a neighbour
+  gains; richer transition or per-clip presentation remains separate.
 
 ---
 

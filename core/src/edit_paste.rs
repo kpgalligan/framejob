@@ -81,7 +81,6 @@ use std::collections::HashMap;
 use serde::Deserialize;
 use serde_json::Value;
 
-use crate::edit_clip::set_gained_transitions;
 use crate::export::describe;
 use crate::format::MAX_TRACKS;
 use crate::model::{Clip, Media, Nest, Project, ShapeProps, Source, TextProps, Track};
@@ -224,13 +223,11 @@ fn absorb_nests(
             }
             clip.track = tracks.get(&clip.track).copied().unwrap_or(clip.track);
             clip.source = remap_source(&clip.source, media, &map);
-            clip.start = project.snapped(clip.start).max(0);
             // The speed BEFORE the duration: the bound is measured at it.
             if !(clip.speed.is_finite() && clip.speed > 0.0) {
                 clip.speed = 1.0;
             }
-            clip.duration = project.duration_resnapped(clip);
-            resnap_actions(project, clip);
+            project.resnap_clip_times(clip);
         }
         project.nests.push(copy);
     }
@@ -311,26 +308,6 @@ fn new_track(project: &mut Project) -> Track {
         muted: false,
         locked: false,
         solo: false,
-    }
-}
-
-/// Re-snaps a pasted clip's actions onto this project's frame grid and
-/// clamps them inside its (already re-snapped) duration.
-///
-/// The same two clamps `set_canvas`'s `resnap` applies when the document's
-/// rate changes, and for the same reason: yesterday's grid is not today's, a
-/// duration that rounds to zero is what `validate` rejects, and an action
-/// must still fit the clip it is on.
-fn resnap_actions(project: &Project, clip: &mut Clip) {
-    let frame = project.frame();
-    let last_start = clip.duration.saturating_sub(frame).max(0);
-    for action in clip.actions.iter_mut() {
-        action.start = project.snapped(action.start).clamp(0, last_start);
-        action.duration = project
-            .snapped(action.duration)
-            .max(frame)
-            .min(clip.duration.saturating_sub(action.start))
-            .max(1);
     }
 }
 
@@ -490,14 +467,11 @@ impl Project {
             if !(clip.speed.is_finite() && clip.speed > 0.0) {
                 clip.speed = 1.0;
             }
-            clip.start = self
-                .snapped(at.saturating_add(source.start.saturating_sub(earliest)))
-                .max(0);
+            clip.start = at.saturating_add(source.start.saturating_sub(earliest));
             // `next` and not `self`: the media this clip names was absorbed
             // into it above, and only a project that HOLDS the media can
             // measure how much window is left (spec §11, D4-4).
-            clip.duration = next.duration_resnapped(&clip);
-            resnap_actions(self, &mut clip);
+            next.resnap_clip_times(&mut clip);
 
             // The target track, then the fallbacks already added, then a new
             // one. A brand-new track holds nothing, so the last arm always
@@ -534,8 +508,7 @@ impl Project {
             next.clips.push(clip);
         }
 
-        set_gained_transitions(&mut next, &touched);
-        self.finish(next)
+        self.finish_placement(next, &touched)
     }
 
     /// Copies one payload clip's property groups onto every named clip (spec

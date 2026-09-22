@@ -21,6 +21,8 @@ pub mod edit_action;
 pub mod edit_background;
 pub mod edit_canvas;
 pub mod edit_clip;
+mod edit_clip_timing;
+mod edit_commit;
 pub mod edit_edge;
 pub mod edit_insert;
 pub mod edit_nest;
@@ -42,6 +44,7 @@ pub mod ffi_agent;
 pub mod ffi_edit;
 pub mod ffi_query;
 pub mod format;
+pub mod frame_grid;
 pub mod model;
 pub mod model_motion;
 pub mod model_props;
@@ -62,7 +65,9 @@ pub mod scope;
 pub mod snap;
 pub mod source_window;
 pub mod time;
+mod time_bounds;
 pub mod transition;
+mod transition_search;
 
 mod ffi_util;
 

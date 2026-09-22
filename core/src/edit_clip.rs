@@ -1,7 +1,8 @@
 //! The clip and action ops — spec §6, tables "Clips" and "Actions".
 //!
-//! One `impl Project` block holding every edit that adds, places, trims,
-//! splits, copies or re-describes a clip. The five property patches are the
+//! One `impl Project` block holding clip construction, moves, copies and
+//! deletes. Timing edits are in `edit_clip_timing.rs`; their placement commit
+//! is in `edit_commit.rs`. The five property patches are the
 //! OTHER half of the clip surface, `edit_props.rs`'s, policed by the range
 //! checks of `props_check.rs`: this file decides where a clip sits, that one
 //! what it looks like. The action ops, which were here, are `edit_action.rs`;
@@ -30,11 +31,9 @@
 //!    `Err`.
 //!
 //! The pieces those three rules are made of — `snapped`, `frame`, the
-//! `require_*` lookups, `finish`, `selected_clips` and `clip_end` — are
-//! `pub(crate)` so `edit_track.rs` and `edit_time.rs` obey the same rules by
-//! calling them rather than by restating them. `set_gained_transitions` is
-//! the sixth and now lives in `edit_transition.rs`, re-exported from here so
-//! every caller's path is unchanged.
+//! `require_*` lookups, `selected_clips` and `clip_end` — are `pub(crate)`
+//! so other edit modules obey the same rules by calling them. Placement
+//! finalization and `finish` live in `edit_commit.rs`.
 //!
 //! The two ops here that DO take a patch — `add_text_clip` and
 //! `add_shape_clip` — build their preset and then hand it to `edit_props`'s
@@ -45,30 +44,18 @@ use serde_json::Value;
 
 use crate::edit_split::split_clip;
 use crate::model::{
-    Action, AudioProps, Clip, Enabled, Media, MediaKind, Project, ShapeKind, ShapeProps, Source,
-    TextProps, Track, VideoProps,
+    AudioProps, Clip, Enabled, Media, MediaKind, Project, ShapeKind, ShapeProps, Source, TextProps,
+    Track, VideoProps,
 };
 use crate::outcome::Outcome;
 use crate::patch::{merge_group, Group};
 use crate::props_check::{check_shape, check_text, SCALE_MAX, SCALE_MIN};
-use crate::source_window::source_advanced;
 use crate::time::{self, Ticks, TIMESCALE};
-
-/// Re-exported from its new home so the nine call sites here and the three
-/// in `edit_time.rs`, `edit_nest.rs` and `edit_paste.rs` keep naming it at
-/// the path they always did.
-pub(crate) use crate::edit_transition::set_gained_transitions;
 
 /// Default duration for a source with no source bound — text, shape, and an
 /// image whose descriptor carries no duration. Five seconds is a screencast editor's
 /// title default and long enough to read.
 const DEFAULT_CLIP_DURATION: Ticks = 5 * TIMESCALE;
-
-/// Speed range, matching the inspector's ×0.1 – ×10 (spec §4.3). Outside
-/// it, `scaleTimeRange` and the time-pitch unit stop producing anything
-/// anyone wants to watch.
-const SPEED_MIN: f64 = 0.1;
-const SPEED_MAX: f64 = 10.0;
 
 /// The font of the Title text preset (spec §4.3). A concrete face, not a
 /// family: the renderer asks for exactly this name, and a bold weight is
@@ -141,22 +128,6 @@ impl Project {
     pub(crate) fn require_track_index(&self, id: u32) -> Result<usize, String> {
         self.track_index(id)
             .ok_or_else(|| format!("no track with id {id}"))
-    }
-
-    /// The single exit of every op: a result equal to the input is
-    /// [`Outcome::Identity`] (never a copy, which would register a phantom
-    /// undo step), and a result that broke an invariant is an `Err` rather
-    /// than a project the rest of the crate cannot reason about.
-    ///
-    /// It never answers [`Outcome::Refused`]: a rule that says no does so
-    /// where it is asked, with its own sentence, before anything is built
-    /// for this to judge.
-    pub(crate) fn finish(&self, next: Project) -> Result<Outcome, String> {
-        if next == *self {
-            return Ok(Outcome::Identity);
-        }
-        next.validate()?;
-        Ok(Outcome::Applied(next))
     }
 
     /// How long a clip showing the WHOLE of `media` is — what `add_clip`
@@ -252,42 +223,6 @@ impl Project {
         }
     }
 
-    /// Scales every action's span with the clip, so an action keeps the
-    /// same clip-relative FRACTION when the clip's length changes (spec §6,
-    /// `set_speed`).
-    ///
-    /// Rounding can leave two adjacent actions touching by a tick; that is
-    /// harmless, because evaluation orders actions by `(start, id)` and is
-    /// defined for overlaps — only `add_action` refuses to create one.
-    fn rescale_actions(&self, actions: &mut [Action], old: Ticks, new: Ticks) {
-        if old <= 0 || new <= 0 || old == new {
-            return;
-        }
-        let frame = self.frame();
-        let factor = new as f64 / old as f64;
-        for action in actions.iter_mut() {
-            let scaled_start = (action.start as f64 * factor).round();
-            let scaled_duration = (action.duration as f64 * factor).round();
-            let start = if scaled_start.is_finite() {
-                self.snapped(scaled_start as Ticks)
-            } else {
-                action.start
-            };
-            let duration = if scaled_duration.is_finite() {
-                self.snapped(scaled_duration as Ticks)
-            } else {
-                action.duration
-            };
-            // Clamped so the action still fits the clip and still has a
-            // positive duration, which `validate` requires.
-            action.start = start.clamp(0, new.saturating_sub(frame).max(0));
-            action.duration = duration
-                .max(frame)
-                .min(new.saturating_sub(action.start))
-                .max(1);
-        }
-    }
-
     // ---- adding clips ----------------------------------------------------
 
     /// Places the whole of `media` as one clip at `at` on `track`, source
@@ -340,12 +275,7 @@ impl Project {
             name: None,
             label: None,
         };
-        if let Err(why) = self.check_overlap_rule(std::slice::from_ref(&clip), track, &[]) {
-            return Ok(Outcome::Refused(why));
-        }
-        next.clips.push(clip);
-        set_gained_transitions(&mut next, &[track]);
-        self.finish(next)
+        self.commit_additions(next, vec![clip])
     }
 
     /// A text clip at `at` on `track`: the Title preset, centered, five
@@ -493,15 +423,10 @@ impl Project {
             name: None,
             label: None,
         };
-        if let Err(why) = self.check_overlap_rule(std::slice::from_ref(&clip), track, &[]) {
-            return Ok(Outcome::Refused(why));
-        }
-        next.clips.push(clip);
-        set_gained_transitions(&mut next, &[track]);
-        self.finish(next)
+        self.commit_additions(next, vec![clip])
     }
 
-    // ---- moving and trimming ---------------------------------------------
+    // ---- moving -----------------------------------------------------------
 
     /// Shifts `clips` by `delta` ticks and, when `track` is given, moves
     /// them to that track keeping their relative track offsets (spec §6).
@@ -577,31 +502,7 @@ impl Project {
             candidates.push(moved);
         }
 
-        let mut affected: Vec<u32> = Vec::new();
-        for clip in selection
-            .iter()
-            .map(|c| c.track)
-            .chain(candidates.iter().map(|c| c.track))
-        {
-            if !affected.contains(&clip) {
-                affected.push(clip);
-            }
-        }
-        for track in &affected {
-            if let Err(why) = self.check_overlap_rule(&candidates, *track, &[]) {
-                return Ok(Outcome::Refused(why));
-            }
-        }
-
-        let mut next = self.clone();
-        for moved in &candidates {
-            if let Some(clip) = next.clip_mut(moved.id) {
-                clip.start = moved.start;
-                clip.track = moved.track;
-            }
-        }
-        set_gained_transitions(&mut next, &affected);
-        self.finish(next)
+        self.commit_replacements(candidates)
     }
 
     /// The named clips, deduplicated, in the order given. `Err` on an
@@ -616,117 +517,6 @@ impl Project {
             }
         }
         Ok(out)
-    }
-
-    /// Moves the clip's start edge to `to`, advancing the source in point
-    /// by `(to - start) × speed` so the frame under the edge does not move
-    /// (spec §6).
-    ///
-    /// Clamped to the source bound — `to ≥ start - in/speed` snapped UP to
-    /// a frame, `source_window.rs`'s `earliest_start_on_grid` (spec §11,
-    /// D4-5) — and to leaving at least one frame of clip. Actions are
-    /// deliberately left alone: clip-relative, rebasing would drop or bake
-    /// whatever fell off the front, which is lossy and makes trimming back
-    /// out not an identity.
-    pub fn trim_start(&self, clip: u32, to: Ticks) -> Result<Outcome, String> {
-        let target = self.require_clip(clip)?.clone();
-        let end = clip_end(&target);
-        let latest = end.saturating_sub(self.frame());
-        let mut to = self.snapped(to).min(latest).max(0);
-
-        if let Some(earliest) = self.earliest_start_on_grid(&target) {
-            to = to.max(earliest.max(0));
-        }
-        // The two clamps can cross when the source has almost nothing left
-        // in front: then there is no legal new start, so nothing happens.
-        if to > latest || to == target.start {
-            return Ok(Outcome::Identity);
-        }
-
-        let delta = to.saturating_sub(target.start);
-        let mut moved = target.clone();
-        moved.source = source_advanced(&target.source, delta, target.speed);
-        moved.start = to;
-        moved.duration = end.saturating_sub(to);
-        if let Err(why) = self.check_overlap_rule(&[moved.clone()], moved.track, &[]) {
-            return Ok(Outcome::Refused(why));
-        }
-
-        let mut next = self.clone();
-        if let Some(slot) = next.clip_mut(clip) {
-            *slot = moved;
-        }
-        set_gained_transitions(&mut next, &[target.track]);
-        self.finish(next)
-    }
-
-    /// Moves the clip's end edge to `to`, clamped to the source's remaining
-    /// length (media sources) and to at least one frame of clip (spec §6).
-    /// The source in point and the actions are untouched. The bound is
-    /// `source_window.rs`'s `latest_end_on_grid`, measured at this clip's
-    /// OWN start: the last frame at or before the end of the file, and
-    /// never the one past it (spec §11, #22 and D4-2).
-    pub fn trim_end(&self, clip: u32, to: Ticks) -> Result<Outcome, String> {
-        let target = self.require_clip(clip)?.clone();
-        let earliest = target.start.saturating_add(self.frame());
-        let mut to = self.snapped(to).max(earliest);
-        if let Some(latest) = self.latest_end_on_grid(&target) {
-            to = to.min(latest);
-        }
-        if to < earliest || to == clip_end(&target) {
-            return Ok(Outcome::Identity);
-        }
-
-        let mut moved = target.clone();
-        moved.duration = to.saturating_sub(target.start);
-        if let Err(why) = self.check_overlap_rule(&[moved.clone()], moved.track, &[]) {
-            return Ok(Outcome::Refused(why));
-        }
-
-        let mut next = self.clone();
-        if let Some(slot) = next.clip_mut(clip) {
-            *slot = moved;
-        }
-        set_gained_transitions(&mut next, &[target.track]);
-        self.finish(next)
-    }
-
-    /// Drags the clip's end edge to `to_end` by changing its SPEED, not the
-    /// source range it shows: `speed = source_len / (to_end - start)`
-    /// (spec §6). Media sources only.
-    ///
-    /// Refuses when the resulting rate falls outside ×0.1 – ×10, when the
-    /// new length is under a frame, or when the placement breaks the
-    /// overlap rule. Actions keep their clip-relative fraction.
-    pub fn rate_stretch(&self, clip: u32, to_end: Ticks) -> Result<Outcome, String> {
-        let target = self.require_clip(clip)?.clone();
-        if !matches!(target.source, Source::Media { .. }) {
-            return Err(format!("clip {clip} is not a media clip"));
-        }
-        let to_end = self.snapped(to_end);
-        let duration = to_end.saturating_sub(target.start);
-        if duration < self.frame() {
-            return Ok(Outcome::Identity);
-        }
-        let rate = self.content_length_in_source(&target) as f64 / duration as f64;
-        if !rate.is_finite() || !(SPEED_MIN..=SPEED_MAX).contains(&rate) {
-            return Ok(Outcome::Identity);
-        }
-
-        let mut moved = target.clone();
-        moved.speed = rate;
-        moved.duration = duration;
-        self.rescale_actions(&mut moved.actions, target.duration, duration);
-        if let Err(why) = self.check_overlap_rule(&[moved.clone()], moved.track, &[]) {
-            return Ok(Outcome::Refused(why));
-        }
-
-        let mut next = self.clone();
-        if let Some(slot) = next.clip_mut(clip) {
-            *slot = moved;
-        }
-        set_gained_transitions(&mut next, &[target.track]);
-        self.finish(next)
     }
 
     // ---- splitting, deleting, duplicating --------------------------------
@@ -804,7 +594,6 @@ impl Project {
 
         let mut next = self.clone();
         let mut copies: Vec<Clip> = Vec::new();
-        let mut affected: Vec<u32> = Vec::new();
         for clip in &selection {
             let mut copy = clip.clone();
             copy.id = next.allocate_id();
@@ -812,66 +601,12 @@ impl Project {
             for action in copy.actions.iter_mut() {
                 action.id = next.allocate_id();
             }
-            if !affected.contains(&copy.track) {
-                affected.push(copy.track);
-            }
             copies.push(copy);
         }
-        for track in &affected {
-            if let Err(why) = self.check_overlap_rule(&copies, *track, &[]) {
-                return Ok(Outcome::Refused(why));
-            }
-        }
-        next.clips.extend(copies);
-        set_gained_transitions(&mut next, &affected);
-        self.finish(next)
+        self.commit_additions(next, copies)
     }
 
-    // ---- speed and audio detach ------------------------------------------
-
-    /// Sets the clip's playback rate: `duration = source_len / rate` held
-    /// to what the file holds AT THAT RATE (`duration_at_speed`, spec §11
-    /// D4-3), actions keeping their clip-relative fraction (spec §6). Media
-    /// sources only; `keep_pitch`, when given, sets the time-pitch flag.
-    ///
-    /// The rate is clamped to the inspector's ×0.1 – ×10 rather than
-    /// refused, because a slider or an MCP call that asks for ×20 wants the
-    /// fastest thing available. `Err` for a non-media clip or a rate that
-    /// is not a positive finite number; refuses on an overlap-rule
-    /// violation.
-    pub fn set_speed(
-        &self,
-        clip: u32,
-        rate: f64,
-        keep_pitch: Option<bool>,
-    ) -> Result<Outcome, String> {
-        let target = self.require_clip(clip)?.clone();
-        if !matches!(target.source, Source::Media { .. }) {
-            return Err(format!("clip {clip} is not a media clip"));
-        }
-        if !(rate.is_finite() && rate > 0.0) {
-            return Err(format!("speed must be a positive number, not {rate}"));
-        }
-        let rate = rate.clamp(SPEED_MIN, SPEED_MAX);
-
-        let mut moved = target.clone();
-        moved.speed = rate;
-        moved.duration = self.duration_at_speed(&target, rate);
-        self.rescale_actions(&mut moved.actions, target.duration, moved.duration);
-        if let (Some(keep), Some(audio)) = (keep_pitch, moved.audio.as_mut()) {
-            audio.keep_pitch = keep;
-        }
-        if let Err(why) = self.check_overlap_rule(&[moved.clone()], moved.track, &[]) {
-            return Ok(Outcome::Refused(why));
-        }
-
-        let mut next = self.clone();
-        if let Some(slot) = next.clip_mut(clip) {
-            *slot = moved;
-        }
-        set_gained_transitions(&mut next, &[target.track]);
-        self.finish(next)
-    }
+    // ---- audio detach -----------------------------------------------------
 
     /// Plays a media clip back to front, or forward again (spec §6).
     ///
@@ -984,15 +719,10 @@ impl Project {
         // The transition describes an overlap on the ORIGINAL track.
         audio_clip.transition_in = None;
 
-        if let Err(why) = self.check_overlap_rule(&[audio_clip.clone()], below, &[]) {
-            return Ok(Outcome::Refused(why));
-        }
         if let Some(slot) = next.clip_mut(clip) {
             slot.enabled.audio = false;
         }
-        next.clips.push(audio_clip);
-        set_gained_transitions(&mut next, &[below]);
-        self.finish(next)
+        self.commit_additions(next, vec![audio_clip])
     }
 
     // ---- enablement ------------------------------------------------------

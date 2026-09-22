@@ -38,6 +38,11 @@ file is what governs a module now.
   `clip`/`track`/`media`/`marker`/`nest` lookups, `clips_on`, `duration`,
   `validate` with its nesting walk, and `source_size`. The three
   source-window measurements moved out to `source_window.rs`.
+- `frame_grid.rs` — clip-time normalization shared by canvas rate changes,
+  both full-paste paths and unnest. It snaps placement start, delegates the
+  source-bounded duration to `source_window.rs`, clamps action spans and snaps
+  present base motion/text timing through the patch snappers. It does not
+  change source positions, action-end payloads or audio envelopes.
 - `source_window.rs` — THE source window: how much material a clip shows,
   how much lies either side of it, and the one way a source in point moves.
   **Every name here carries its UNIT**, because the readers divide by a
@@ -65,7 +70,14 @@ file is what governs a module now.
   `round(Δ × speed)` mover the six placement sites used to write out. Cut
   out of `model_query.rs` by road map 7 §10's phase A.
 - `time.rs` — `Ticks`, `TIMESCALE`, `Fps`, frame snapping, timecode
-  format/parse (non-drop `HH:MM:SS:FF` and `HH:MM:SS.mmm`).
+  format/parse (non-drop `HH:MM:SS:FF` and `HH:MM:SS.mmm`). Snapping keeps
+  frame indices wide through directional adjustment and saturates only at
+  the public tick/index result.
+- `time_bounds.rs` — the single structural-time admission checker and
+  `MAX_STORED_TICKS`: ±9,000,000,000,000,000 for stored media, markers,
+  clips, source positions and actions, including clip/action endpoints in
+  i128. `Project::validate` and `format::write` both call it; vocabulary
+  property timings and finite positive speeds are outside this envelope.
 - `outcome.rs` — `Outcome`, the THREE arms every edit answers with
   (spec §5.5): applied with the new project, an identity, or refused with
   the rule's own sentence. An enum and its doc, nothing else. It is an enum
@@ -127,17 +139,25 @@ file is what governs a module now.
   can still return `Err`. `refused_inside` is an EXHAUSTIVE match over every
   op, so a new op does not compile until it is classified. The READ half is
   `rc_project_scoped` in `ffi.rs`, which calls the same `scoped_view`.
-- `edit_clip.rs` — clip placement: `add_clip`, move, trim, duplicate, delete,
-  join, detach, `fit_scale` and `fill_scale` (Fit is a RESCUE for oversized
+- `edit_clip.rs` — clip construction and placement callers: `add_clip`, move,
+  duplicate, delete, join, detach, `fit_scale` and `fill_scale` (Fit is a RESCUE for oversized
   footage and honours `canvas.fit_new_clips`; Fill is a REQUIREMENT, ignores
   it, scales up as readily as down and clamps to `SCALE_MAX`). `whole_media_length`,
-  `trim_end` and `set_speed` hold a media clip's window INSIDE its file, each
+  `edit_clip_timing.rs`'s `trim_end` and `set_speed` hold a media clip's window INSIDE its file, each
   through `source_window.rs`'s one bound, so
   `in + duration × speed ≤ media.duration` and the plan's segment rate is
   exactly the clip's speed (spec §11, #22 and D4-2 to D4-5); the other
   writers are `edit_canvas.rs`'s `resnap`, `edit_paste.rs`'s two loops,
   `edit_nest.rs`'s `unnest` and `edit_background.rs`'s timed plate. Over
   the cap, known debt (below).
+- `edit_clip_timing.rs` — `trim_start`, `trim_end`, `rate_stretch`, `set_speed`,
+  their speed bounds and clip-relative action rescaling.
+- `edit_commit.rs` — the placement commit protocol: replacements preserve
+  caller order and check old tracks before destination tracks; additions
+  check caller-allocated candidates against the input project; both write
+  one draft and call `finish_placement`, which mints gained transitions on
+  exactly the chosen tracks before `finish`. `finish` remains equality first,
+  validation second, and does not itself refuse.
 - `edit_split.rs` — `split_clip` and what the SECOND clip inherits: base
   props from the evaluation at the cut, unfinished actions rebased, a
   straddled one narrowed, presets and motion halves anchored to the two
@@ -152,12 +172,13 @@ file is what governs a module now.
   `normalise_and_check_group` beside it (the one NORMALISATION a copied
   group needs first: `paste_attributes`' payload is a third door for a
   `Motion`, and an empty one has two spellings; `paste`'s payload and the
-  file reader do not normalise; it lives here rather than on the paste side
-  because `edit_paste.rs` is at the size cap), `check_blend`, the one check
+  file reader do not normalise; the copied group is checked before its
+  present video/text timing is snapped), `check_blend`, the one check
   about a CLIP rather than a value (a nest clip cannot blend), and
-  `snap_motion` / `snap_animation`, which put the ticks a patch carries on
-  the frame grid AFTER the range check, so a refusal names what the caller
-  sent. What a patch may CARRY is `patch.rs`'s and nothing here restates it.
+  `snap_motion` / `snap_animation`, which put the ticks a patch or checked
+  copied group carries on the frame grid AFTER the range check, so a refusal
+  names what the caller sent. What a patch may CARRY is `patch.rs`'s and
+  nothing here restates it.
 - `patch.rs` — reading a caller-authored patch, cut out of `edit_props.rs`
   under the size rule: `Group` and its per-group template, `check_keys` (the
   walk of keys and JSON kinds, array indices in the path) and `merge_group`
@@ -193,8 +214,8 @@ file is what governs a module now.
   dimension is even, because H.264 encodes in macroblocks), `rescale` (a
   size change moves every clip's `x`, `y` and `scale`, each axis by its own
   ratio and `scale` by the smaller of the two) and `resnap` (a rate change
-  moves every stored time to the new grid, and drops the second of two
-  markers a coarser grid lands on one tick).
+  normalizes top-level and each stored nest's clip times through `frame_grid.rs`
+  and drops the second of two top-level markers a coarser grid lands on one tick).
 - `edit_time.rs` — ripple, insert time, `ripple_delete_ranges` (the pairs are
   ordered, MERGED — touching as well as overlapping — then cut and closed
   right to left as ONE edit; the singular delegates to it), `lift_range`
@@ -264,6 +285,11 @@ file is what governs a module now.
   (`unwrap_or_default`), and `add_clip` onto an overlap mints a
   `cross_dissolve`, so a no-transition baseline is built by moving clips
   apart, not by clearing the kind.
+- `transition_search.rs` — the bounded fitting arithmetic for both hard-cut
+  transition forms: the old handle decrement path by total, and exact
+  forbidden shift intervals across fixed/moved clips for ripple. It does
+  not enumerate timeline frames; final placements still pass
+  `check_overlap_rule`.
 - `evaluate.rs` — `composition_plan()` (A/B assignment, instruction tiling)
   and the `assign()` the recipe shares with it.
 - `recipe.rs` · `recipe_text.rs` — `frame_recipe(t)`: the layer list at one

@@ -298,6 +298,7 @@ impl Project {
                 self.next_id, max_id
             ));
         }
+        crate::time_bounds::check_stored_times(self)?;
         Ok(())
     }
 

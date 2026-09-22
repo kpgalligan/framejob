@@ -135,8 +135,9 @@ final class SpeedSheetController: NSViewController, NSTextFieldDelegate {
         let applyButton = sheetApplyButton(target: self, action: #selector(applyClicked(_:)))
         view = makeSheetView(
             title: "Speed",
-            hint: "Faster clips get shorter and slower ones longer; the clips after them stay "
-                + "where they are, so a speed change opens or leaves a gap.",
+            hint: "Faster clips can leave gaps; slower clips can overlap. Later clips stay in "
+                + "place. Allowed overlaps may add a cross dissolve. If an overlap is not "
+                + "allowed, that clip stays unchanged; other selected clips can still change.",
             content: content,
             buttonRow: makeButtonRow(
                 cancel: cancelButton, apply: applyButton,

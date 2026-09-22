@@ -39,7 +39,7 @@
 //! because the timeline's tracks stay on the timeline, holding whatever was
 //! not selected.
 
-use crate::edit_clip::{clip_end, set_gained_transitions};
+use crate::edit_clip::clip_end;
 use crate::model::{AudioProps, Clip, Enabled, Nest, Project, Source, Track, VideoProps};
 use crate::outcome::Outcome;
 
@@ -203,8 +203,7 @@ impl Project {
         if let Err(why) = next.check_overlap_rule(&[], front_track, &[]) {
             return Ok(Outcome::Refused(why));
         }
-        set_gained_transitions(&mut next, &[front_track]);
-        self.finish(next)
+        self.finish_placement(next, &[front_track])
     }
 
     /// Puts a nest clip's contents back on the timeline and removes the clip
@@ -272,16 +271,10 @@ impl Project {
             for action in moved.actions.iter_mut() {
                 action.id = next.allocate_id();
             }
-            // Already on this document's frame grid — the nest was made from
-            // clips that were — and snapped anyway, because a hand-written
-            // nest need not have been.
-            moved.start = next
-                .snapped(target.start.saturating_add(source.start))
-                .max(0);
-            // And held to what the media still holds: a nest made before an
-            // fps change carries clips on the OLD grid, since `resnap`
-            // walks the timeline's clips only (spec §11, D4-4).
-            moved.duration = next.duration_resnapped(&moved);
+            // Translate first; the shared normalization then handles a
+            // hand-written or legacy off-grid nest on the parent grid.
+            moved.start = target.start.saturating_add(source.start);
+            next.resnap_clip_times(&mut moved);
 
             let wanted = next
                 .tracks
@@ -320,7 +313,6 @@ impl Project {
         if !next.nest_is_shown(project) {
             next.nests.retain(|n| n.id != project);
         }
-        set_gained_transitions(&mut next, &touched);
-        self.finish(next)
+        self.finish_placement(next, &touched)
     }
 }

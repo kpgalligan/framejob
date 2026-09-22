@@ -89,8 +89,11 @@ pub struct OpRow {
 }
 
 /// One named value an op takes. `required` is the absence of a serde
-/// default on the enum's field: an optional argument absent and an explicit
-/// `null` mean the same thing, which is the envelope's rule.
+/// default on the enum's field. Optional means omission is accepted; it does
+/// not imply that `null` is accepted. The four defaulted plain booleans
+/// (`add_transition.ripple`, both `with_clips` fields, and
+/// `set_canvas.rescale_clips`) default to false when absent and reject null.
+/// Other optional fields are `Option<T>` and decode absence and null alike.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Argument {
     pub name: &'static str,

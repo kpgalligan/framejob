@@ -46,6 +46,11 @@ pub struct Overlap {
     pub duration: Ticks,
 }
 
+/// The maximum overlap permitted for this pair by the half-shorter rule.
+pub(crate) fn overlap_limit(a: &Clip, b: &Clip) -> Ticks {
+    a.duration.min(b.duration) / 2
+}
+
 /// The overlap between two clips, `earlier` being the one that starts
 /// first. `None` when they merely touch: a zero-length overlap is not a
 /// transition, it is a cut, and treating it as one would put a degenerate
@@ -296,7 +301,7 @@ impl Project {
                     // Half of the SHORTER clip. Integer halving truncates,
                     // which errs toward refusing — the safe side, since an
                     // over-long overlap is what breaks the A/B assignment.
-                    let limit = a.duration.min(b.duration) / 2;
+                    let limit = overlap_limit(a, b);
                     if overlap.duration > limit {
                         return Err(format!(
                             "clips {} and {} would overlap by {} ticks, more than half of the \

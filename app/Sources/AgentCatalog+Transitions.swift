@@ -35,7 +35,8 @@ extension AgentServer {
                     + "frames and CLAMPED — to each side's available material, to the "
                     + "neighbours on the track, and to the overlap rule — so a request too "
                     + "long for the media lands shorter rather than failing; a request that "
-                    + "clamps below one frame changes nothing. align center takes half from "
+                    + "clamps below one frame is refused. An affected track already outside "
+                    + "the overlap rule is refused by that rule before fitting. align center takes half from "
                     + "each side (an odd frame goes to the incoming clip, and a side with "
                     + "nothing to give passes its share to the other), before takes it all "
                     + "from the incoming clip's head, after all from the outgoing clip's tail. "
@@ -53,7 +54,8 @@ extension AgentServer {
                     + "every clip at or after the cut on every unlocked track slides left by "
                     + "duration, so the timeline gets that much shorter and no clip's source "
                     + "window changes. It is capped at half the shorter of the two clips and "
-                    + "stepped down until every moved track passes the overlap rule; a clip "
+                    + "limited to the greatest whole-frame shift that leaves every moved "
+                    + "track inside the overlap rule, including after clips cross; a clip "
                     + "on another track pushed into its neighbour gets a cross_dissolve; "
                     + "markers do not move.",
                 [

@@ -241,12 +241,13 @@ no caller a script can reach** (a menu, a validator, a cue builder, a queue),
 the answer is a probe compiled from `app/Sources` over `harness/build.sh`'s
 own `swiftc` line, not a photograph. A probe that will not build is a scored
 FAILURE, never an exit, so a rotted instrument cannot take a score down with
-it. **That rule is about the INSTRUMENT, not about a reference tree it
-compares against.** Two scripts build an OLD `app/Sources` against the
-current core to photograph a "before"; a reference commit the current header
-has left behind cannot be made to compile by anything in this repo, so that
-one cause is a SKIP printed by name with its row count, and every other
-build failure is still the failure it was.
+it. **That rule applies to historical instruments too.** The meter and welcome
+comparisons build old `app/Sources` with the matching old core and header in
+isolated output directories, using the current guarded `harness/main.swift`
+for both paints. A failed current or reference build is a scored failure,
+including an FFI diagnostic; it is never a historical skip or a reason to
+fall back to the old harness. Only the recording proof's granted tier can
+skip rows for a named host condition such as a locked console.
 
 ## Agent skills
 

@@ -202,9 +202,8 @@
 // that names a type newer than the tree" — put every future non-render mode
 // inside the same `#if !HARNESS_REFERENCE_BUILD` rather than pinning that
 // tree's copy of this file, which would let the instrument drift a phase at a
-// time. (`build_reference` will fall back to the reference commit's own
-// `main.swift` if this one refuses to compile against it, and says so in its
-// report — but that fallback is the apology, not the plan.)
+// time. A reference compile failure is scored by its proof script, so a new
+// mode must use this guard whenever it names types absent from older trees.
 //
 // `words.json` is `{"fps": [30, 1], "words": [{"text": "…", "start": 0,
 // "end": 300000, "speaker": null}, …]}`, in TICKS rather than seconds — with

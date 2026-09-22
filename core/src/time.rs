@@ -143,23 +143,31 @@ pub fn frame_duration(fps: Fps) -> Option<Ticks> {
 /// The index of the frame nearest `t` (0 = the frame starting at tick 0).
 /// Negative for negative times. `None` for a degenerate rate.
 pub fn frame_index(t: Ticks, fps: Fps) -> Option<i64> {
+    frame_index_wide(t, fps).map(clamp_ticks)
+}
+
+fn frame_index_wide(t: Ticks, fps: Fps) -> Option<i128> {
     if !fps.is_valid() {
         return None;
     }
     // t seconds = t / TIMESCALE; frames = seconds * num/den.
     let numer = i128::from(t) * i128::from(fps.num);
     let denom = TIMESCALE as i128 * i128::from(fps.den);
-    Some(clamp_ticks(div_round_half_away(numer, denom)))
+    Some(div_round_half_away(numer, denom))
 }
 
 /// The tick at which frame `index` begins. Inverse of [`frame_index`] up to
 /// a tick of rounding for rates that do not divide the timescale exactly.
 /// `None` for a degenerate rate.
 pub fn tick_at_frame(index: i64, fps: Fps) -> Option<Ticks> {
+    tick_at_frame_wide(i128::from(index), fps)
+}
+
+fn tick_at_frame_wide(index: i128, fps: Fps) -> Option<Ticks> {
     if !fps.is_valid() {
         return None;
     }
-    let numer = i128::from(index) * TIMESCALE as i128 * i128::from(fps.den);
+    let numer = index * TIMESCALE as i128 * i128::from(fps.den);
     let denom = i128::from(fps.num);
     Some(clamp_ticks(div_round_half_away(numer, denom)))
 }
@@ -169,7 +177,7 @@ pub fn tick_at_frame(index: i64, fps: Fps) -> Option<Ticks> {
 /// the model goes through here first: the model never stores a sub-frame
 /// time.
 pub fn snap_to_frame(t: Ticks, fps: Fps) -> Ticks {
-    match frame_index(t, fps).and_then(|index| tick_at_frame(index, fps)) {
+    match frame_index_wide(t, fps).and_then(|index| tick_at_frame_wide(index, fps)) {
         Some(snapped) => snapped,
         None => t,
     }
@@ -188,7 +196,7 @@ pub fn snap_up_to_frame(t: Ticks, fps: Fps) -> Ticks {
     if nearest >= t {
         return nearest;
     }
-    match frame_index(nearest, fps).and_then(|index| tick_at_frame(index + 1, fps)) {
+    match frame_index_wide(t, fps).and_then(|index| tick_at_frame_wide(index + 1, fps)) {
         Some(next) => next,
         None => t,
     }
@@ -201,7 +209,7 @@ pub fn snap_down_to_frame(t: Ticks, fps: Fps) -> Ticks {
     if nearest <= t {
         return nearest;
     }
-    match frame_index(nearest, fps).and_then(|index| tick_at_frame(index - 1, fps)) {
+    match frame_index_wide(t, fps).and_then(|index| tick_at_frame_wide(index - 1, fps)) {
         Some(previous) => previous,
         None => t,
     }

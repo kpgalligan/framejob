@@ -11,10 +11,10 @@
 //! amendment of 2026-09-16); nothing else calls it.
 
 use crate::edit_time::{locked_track, shift_clips, unlocked_tracks};
-use crate::edit_transition::set_gained_transitions;
 use crate::model::{Clip, Project, Transition, TransitionKind};
 use crate::outcome::Outcome;
 use crate::time::Ticks;
+use crate::transition_search::shift_frame_limit;
 
 impl Project {
     /// `add_transition` with `ripple` — the overlap made by SHIFTING the
@@ -33,7 +33,7 @@ impl Project {
     ///
     /// The duration is snapped down to whole frames, capped at half the
     /// shorter of the two clips (the pair's own overlap rule, closed form),
-    /// and then stepped down a frame at a time until every track something
+    /// and then searched for the greatest length at which every track something
     /// moved on passes the overlap rule — clamped rather than refused, the
     /// handle form's posture. A clip on another track that the shift pushes
     /// into its predecessor gains a minted `cross_dissolve`, which is
@@ -76,7 +76,7 @@ impl Project {
         let allowed = shorter / 2 / frame;
         // Asked first, so a request under a frame and a pair too short to
         // halve are told apart by the two numbers rather than by a guess.
-        let mut frames = asked.min(allowed);
+        let frames = asked.min(allowed);
         if frames <= 0 {
             return Ok(Outcome::Refused(format!(
                 "clips {} and {} have no room to overlap by shifting: the overlap asked \
@@ -85,25 +85,28 @@ impl Project {
             )));
         }
         let most = frames;
-        while frames > 0 {
+        for track in &touched {
+            if let Err(why) = self.check_overlap_rule(&[], *track, &[]) {
+                return Ok(Outcome::Refused(why));
+            }
+        }
+        if let Some(frames) = shift_frame_limit(self, cut, frame, most, &touched) {
             let mut next = self.clone();
             shift_clips(&mut next, cut, -(frames * frame));
-            if touched
-                .iter()
-                .all(|track| next.check_overlap_rule(&[], *track, &[]).is_ok())
-            {
-                if let Some(slot) = next.clip_mut(later.id) {
-                    slot.transition_in = Some(match (kind, later.transition_in) {
-                        (Some(kind), Some(stored)) => Transition { kind, ..stored },
-                        (Some(kind), None) => Transition::minted(kind),
-                        (None, Some(stored)) => stored,
-                        (None, None) => Transition::minted(TransitionKind::default()),
-                    });
+            for track in &touched {
+                if let Err(why) = next.check_overlap_rule(&[], *track, &[]) {
+                    return Ok(Outcome::Refused(why));
                 }
-                set_gained_transitions(&mut next, &touched);
-                return self.finish(next);
             }
-            frames -= 1;
+            if let Some(slot) = next.clip_mut(later.id) {
+                slot.transition_in = Some(match (kind, later.transition_in) {
+                    (Some(kind), Some(stored)) => Transition { kind, ..stored },
+                    (Some(kind), None) => Transition::minted(kind),
+                    (None, Some(stored)) => stored,
+                    (None, None) => Transition::minted(TransitionKind::default()),
+                });
+            }
+            return self.finish_placement(next, &touched);
         }
         Ok(Outcome::Refused(format!(
             "clips {} and {} cannot overlap by shifting: no overlap from {most} frames down \

@@ -25,7 +25,7 @@
 //! restating them, so a split made by a range delete is the same split ⌘T
 //! makes.
 
-use crate::edit_clip::{clip_end, set_gained_transitions};
+use crate::edit_clip::clip_end;
 use crate::model::{Clip, Enabled, Project, Source, VideoProps};
 use crate::outcome::Outcome;
 use crate::source_window::in_advanced;
@@ -204,8 +204,7 @@ impl Project {
         // track; an overlap IS a transition, so give the newcomer the
         // default rather than leaving two stacked layers.
         let unlocked = unlocked_tracks(&next);
-        set_gained_transitions(&mut next, &unlocked);
-        self.finish(next)
+        self.finish_placement(next, &unlocked)
     }
 
     /// Removes everything between `from` and `to` on unlocked tracks and
@@ -294,8 +293,7 @@ impl Project {
             shift_clips(&mut next, span.end, span.start.saturating_sub(span.end));
         }
         let unlocked = unlocked_tracks(&next);
-        set_gained_transitions(&mut next, &unlocked);
-        self.finish(next)
+        self.finish_placement(next, &unlocked)
     }
 
     /// Removes everything between `from` and `to` on unlocked tracks and
@@ -393,8 +391,7 @@ impl Project {
                 return Ok(Outcome::Refused(why));
             }
         }
-        set_gained_transitions(&mut next, &touched);
-        self.finish(next)
+        self.finish_placement(next, &touched)
     }
 
     /// Opens `length` of empty time at `at`: every clip on an unlocked

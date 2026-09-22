@@ -26,6 +26,34 @@ nothing here compares sizes or timestamps.
 
 ## Running one
 
+Road map 7 part 2's frame-grid proof owns a fresh Release app process. After
+`make app`, run `python3 tools/proof/frame_grid_proof.py --port 5514`;
+`--app PATH` selects a matching alternate `.app`. It opens a generated package,
+changes fps, pastes a nested payload, copies attributes and unnests, reading
+exact stored clip/property ticks after each edit. Each edit's complete
+before/after project is checked through one undo and redo, followed by a
+save/reopen check. It verifies the actual bound port and an empty startup
+parity log before and after, times out failed calls, and terminates only the
+process it launched. This is a stored-timing proof; it makes no pixel or
+audio claim. The FFI companion vectors are `frame_grid_canvas.rs` and
+`frame_grid_transfer.rs`.
+
+Road map 7 part 1's extreme-time proof launches its own Release app and owns
+only that process. After `make app`, run
+`python3 tools/proof/extreme_time_proof.py --port 5350`; `--app PATH` selects a
+matching alternate `.app` for an isolated mutation build. It writes temporary
+`.reelcut` packages, checks named refusal of oversized saved values and the
+next valid open in the same process, renders an admitted control, then checks
+edit rejection, undo/redo and save/reopen. It refuses a fallback MCP port,
+checks the startup parity log before and after, and exits nonzero for a crash,
+timeout, build mismatch or failed row. The Rust companion
+`core/tests/transition_bounded.rs` runs long searches in child processes with
+hard 5-second and 30-second watchdogs; the parent kills only its own child.
+For mutation verification, remove the `check_stored_times` call in a temporary
+copy to make the endpoint and saved-file rows fail, or restore an enumerating
+transition loop there to make the child watchdog fail. Restore the source and
+rerun green before recording a proof claim.
+
 Make the test media once (ffmpeg is not a product dependency — see spec §11
 — but it is the obvious way to get a frame-numbered test card):
 
@@ -818,19 +846,42 @@ its window height by arithmetic over the section stack — so a failure there
 is the row landing, not the row being wrong, and finding that out after
 everything else has been written costs a day.
 
-**Its cross-build sections cannot run on this tree any more, and say so by
-name.** Road map 7's D2·1 gave `rc_project_apply` a fourth parameter, and the
-reference commit's own `ReelCore.swift` calls the three-argument export — so
-an app tree that old cannot compile against the CURRENT header, which is what
-the one-core-two-app-trees design requires. No guard in `harness/main.swift`
-fixes that, and nothing in this repo can. `phase5_chrome.py` is therefore
-**36/36 with 45 rows SKIPPED by name** — sections 3 to 7, which scored 81/81
-while the reference still built — and `recording_probe.py`'s §6b the same,
-which is why that script is **858/858 with 43 skipped** (2 here, 41 the
-locked console) where it was 917/917. A skip is not a pass: both print the
-reason AND the count, and both gate on the one cause — the error must name
-`rc_project_apply` and the reference tree's own `ReelCore.swift` — so every
-other build failure is still the scored failure it was (root `CLAUDE.md`).
+**The historical cross-build sections run again (2026-09-21).**
+`phase5_chrome.py` builds commit `3187c5d7` (before the meter) with that
+commit's own Rust library and bridging header. `recording_probe.py` does the
+same for `c1dce5f0` (before the welcome button). Both compile the CURRENT
+`harness/main.swift` under `HARNESS_REFERENCE_BUILD`, so the paint path is
+one instrument. The former FFI-drift skips are retired: a failed current or
+historical compile is a scored failure, even if the error names
+`rc_project_apply` in `ReelCore.swift`. There is no fallback to a historical
+harness. Host-state skips in recording's granted tier remain separate.
+
+`reference_build.py` keeps each caller's archived `app/Sources`, `app/Bridging`
+and `core`, Rust target, Swift/Clang modules, binary, Fonts, compiler logs and
+atomic stamp under its own `before/` directory. Its content key includes the
+resolved historical commit; current sources, core files and staticlib;
+current harness, builder, caller and Fonts; compiler/Rust/Cargo/SDK identity,
+targets, flags and effective build overrides, including `CARGO_TARGET_*` and
+`CARGO_PROFILE_*`. A hit also rechecks extracted source, binary and Fonts
+digests. Deleting or changing an output, or changing
+same-size/same-mtime input bytes, rebuilds it. The current `core/target`
+staticlib is neither linked into nor written by a historical build.
+Run `python3 tools/proof/reference_build_selftest.py [--integration]` for a
+tiny Git fixture, failure scoring, and optional real compiler mutation.
+
+Cold and warm runs on 2026-09-21 each scored **81/81** for phase 5 and
+**29/29** for recording's `--only welcome`, without historical skips. Both
+warm runs reported cache hits and kept binary/stamp mtimes unchanged. The
+real compiler mutation (`#error` in a temporary guarded harness) failed
+both reference builds by name, scored **36/37** in phase 5 while its
+independent meter/gain rows ran, and failed recording's two §6b rows without
+a historical skip. The full recording probe scored **876/876**, with
+**41 skipped by name** because Screen Recording was granted but the console
+was locked and `SCShareableContent` listed zero displays. A later unlocked
+rerun of `--only host,granted` passed **44/44 with no skips**, including all
+41 previously skipped rows; two displays were shareable. These comparisons
+claim AppKit chrome geometry and pixels only; they say nothing about the
+Metal preview image or live audio.
 
 `phase5_chrome.py` is the other half, and phase 5 splits between the two more
 sharply than any phase so far: four of its five features are AUDIO, which a
@@ -841,8 +892,8 @@ phase draws — the output level meter in the timeline bar. Its sections 1 to 7
 `TimelineBar`'s own layout constants, and its new instrument is WHAT it
 compares against: the second PNG is built from the tree BEFORE the meter
 existed — the parent of the commit that added `LevelMeterView.swift`,
-extracted with `git archive` and compiled by the same swiftc line, so the two
-binaries differ by the phase's `app/Sources` changes and nothing else. At
+extracted with `git archive` and compiled against its matching archived
+core and header with the same guarded paint instrument. At
 1440 in both appearances, and at 1080 and 1600, the TIMELINE BAR differs in
 exactly one 120 × 12 rectangle and nowhere else in the row; at the 900 pt
 minimum it does not differ at all, because the meter VANISHES rather than
@@ -865,10 +916,9 @@ comparison, and section 3's rectangle measurements are what will say so. The
 reference build is guarded the same way: it is compiled with the current
 `harness/main.swift` under the GENERAL `-D HARNESS_REFERENCE_BUILD` flag —
 every future non-render mode goes behind the same `#if`, which is why the
-flag is not named after the meter — falls back to the reference commit's own
-`main.swift` when the current one will not compile against that tree, and
-reports a build it cannot make at all as a scored FAILURE rather than
-exiting, so a rotted instrument cannot take the model checks down with it.
+flag is not named after the meter. A build it cannot make is a scored
+FAILURE rather than an exit, so a rotted reference instrument cannot take
+the independent model checks down with it.
 
 Its section 8 (twenty-three checks) is the METER'S READING and
 is not a picture at all: the contract's −20 dBFS claim is about the model,
@@ -2280,12 +2330,15 @@ fix wave built (a placement throw unwrapped, the `path` trim removed, a
 named project falling through to a new document, the Goertzel share on the
 wrong scale) are in its docstring with the rows that kill them.
 
-`python3 tools/proof/recording_probe.py`, **858/858 with 43 rows skipped by
-name** — 41 the locked console's granted tier, 2 section 6b's reference build,
-which no longer compiles against the current header (see phase 5's chrome
-above for why, and it is the same cause); 876/876 and 917/917 are its earlier
-scores, when that reference still built (662 before R2; `--only
-<sections>` for iteration), over a probe compiled
+`python3 tools/proof/recording_probe.py`, **876/876 with 41 rows skipped by
+name** on 2026-09-21: the locked console's granted tier had zero shareable
+displays. Its historical welcome comparison ran and passed; no §6b row was
+skipped. A later `--only host,granted` rerun on the unlocked desktop passed
+**44/44 with no skips**, covering all 41 previously omitted granted-tier
+rows. This was a focused rerun, not a new full-suite score. The earlier
+858/858 with 43 skipped and 917/917 are dated scores
+from before this matching-core repair (662 before R2; `--only <sections>`
+for iteration), over a probe compiled
 from the whole of `app/Sources` (`remaining_probe.py`'s shape): section 1 the
 file naming, 2 `RecordingConfiguration.make` read back field by field over
 sixteen configurations (`excludesCurrentProcessAudio` TRUE in every row — the
@@ -4236,3 +4289,21 @@ Row M's write is made to fail by setting the cache file's `UF_IMMUTABLE`
 flag: an `.atomic` write renames over the file, which the flag refuses, while
 the FOLDER stays writable so the marker's own write still succeeds — which is
 the whole point of that row.
+
+### Road map 7 part 6 — core argument contract
+
+Run `python3 tools/proof/op_contract_proof.py` from the repository root. It
+runs four FFI suites in sequence: `op_nullability` (all 54 optional fields,
+required Boolean and scope), `op_default_booleans` (four defaulted plain
+booleans and nullable semantic controls), `op_ticks` (the exact 27-op / 36-pair
+published tick inventory at 30/1 and 30000/1001), and `op_tick_payloads`
+(picture timing versus source/audio precision). The Rust commands are also
+available directly with `cd core && cargo test --release --test NAME`.
+
+Three negative controls use `--mutant null-as-absent`,
+`--mutant unsnapped-marker`, or `--mutant nearest-transition`. Each copies
+the current core and tests into its own temporary tree, uses a private Cargo
+target and mutates only that copy. A successful negative control **exits 1**
+after compiling and observing its named behavioral assertion fail; anchor,
+compile or attribution failures exit 2. The nearest-transition control runs
+both handle and ripple assertions. No built app or cloud account is needed.

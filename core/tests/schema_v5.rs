@@ -355,7 +355,12 @@ fn paste_attributes_carries_the_animation_and_re_checks_it() {
             "op": "paste_attributes", "clips": [11], "payload": payload_with(word_fade())
         }))
         .value();
-    assert_eq!(at(&landed, "/clips/0/text/animation"), &word_fade());
+    // A copied group now uses the same check-then-snap rule as a patch:
+    // 450 000 is halfway between 440 000 and 460 000 at 30 fps.
+    assert_eq!(
+        at(&landed, "/clips/0/text/animation"),
+        &json!({ "kind": "word_fade", "in": 300_000, "out": 460_000 })
+    );
     assert_eq!(at(&landed, "/clips/0/text/size"), &json!(48.0));
     // ...and `content` is the one thing that stays behind, so pasting a
     // look does not paste the words.

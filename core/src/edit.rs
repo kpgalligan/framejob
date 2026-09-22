@@ -17,8 +17,9 @@
 //!
 //! - **Times are ticks**: `i64` at 600 000 per second ([`crate::TIMESCALE`]),
 //!   the timescale that divides every common frame duration exactly.
-//! - **Every time argument is snapped to the canvas frame grid first**
-//!   (round to nearest), durations included, so a caller may pass a value
+//! - **Caller-supplied timeline time arguments are snapped to the canvas frame
+//!   grid** (usually round to nearest; `add_transition` floors its requested
+//!   overlap), durations included, so a caller may pass a value
 //!   computed from a pixel position without rounding it itself. A negative
 //!   PROJECT time is clamped to 0 — a drag can start left of the timeline
 //!   and there is no negative time there — while a negative LENGTH is an
@@ -28,8 +29,9 @@
 //!   not a gesture to round off.
 //! - **What an absent optional argument MEANS is said here**, in the
 //!   Semantics column, and which arguments are optional at all is
-//!   [`crate::op_table`]. An absent optional and an explicit `null` mean
-//!   the same thing.
+//!   [`crate::op_table`]. An optional argument may be omitted. Most are
+//!   `Option<T>` and decode an explicit `null` like absence; the four
+//!   defaulted plain booleans reject null and default to false when omitted.
 //! - **A new id is the project's `next_id` from BEFORE the call.** An op
 //!   returns a project, not a value, so a caller that needs the id of the
 //!   clip, track, marker or media it just added reads `next_id` first. An
@@ -119,10 +121,10 @@
 //! | `freeze_frame` | `split` at `at`, `insert_time(at, duration)` (2 s when absent), then a `still` of that source frame with the clip's video props evaluated at `at`. |
 //! | `detach_audio` | Clears the clip's `enabled.audio` and puts an audio-only twin on the track below, inserting a track when there is none. |
 //! | `duplicate` | Copies each clip one selection-span later on its own track, with fresh ids. |
-//! | `paste` | Inserts the clips of a clipboard payload — `{"clips": […], "media": […]}`, what Copy wrote — with fresh ids, the earliest landing at `at` and the rest keeping their offsets. A payload clip's `track` is a DEPTH from the front (0 = front-most), so `track` says where depth 0 lands (default: the front) and the rest follow by the same index delta; tracks missing behind it are added. Media is matched to `media[]` by path and appended when absent. A clip the overlap rule refuses goes on a new track in front; an empty clip list changes nothing. Every landed duration — the payload's own and those inside the nests it brings — is re-snapped to this document's grid and then held to what its media holds (spec §11, D4-4). |
-//! | `paste_attributes` | Copies the payload's EARLIEST clip's property groups (at one start the front-most, then the lower id — never the array's first, which is creation order) onto each clip: video and audio whole, text but content, shape but kind, width, height, from and to. Default: every group both sides have; a named group either side lacks is an Err. Speed, enabled, actions, transition and identity stay. An identity when nothing changes. |
+//! | `paste` | Inserts the clips of a clipboard payload — `{"clips": […], "media": […]}`, what Copy wrote — with fresh ids, the earliest landing at `at` and the rest keeping their offsets. A payload clip's `track` is a DEPTH from the front (0 = front-most), so `track` says where depth 0 lands (default: the front) and the rest follow by the same index delta; tracks missing behind it are added. Media is matched to `media[]` by path and appended when absent. A clip the overlap rule refuses goes on a new track in front; an empty clip list changes nothing. Every landed clip — the payload's own and those inside the nests it brings — has its start, source-bounded duration, action spans and present base motion/text timings re-snapped to this document's grid (spec §11, D7-3). |
+//! | `paste_attributes` | Copies the payload's EARLIEST clip's property groups (at one start the front-most, then the lower id — never the array's first, which is creation order) onto each clip: video and audio whole, text but content, shape but kind, width, height, from and to. Default: every group both sides have; a named group either side lacks is an Err. Copied video motion and text animation pass their original-value range checks, then snap to the target grid; audio envelopes keep sample precision. Speed, enabled, actions, transition and identity stay. An identity when nothing changes. |
 //! | `nest` | Collapses the selection into ONE clip showing a nest named `Nest <n>` unless `name` says otherwise, on the front-most track the selection occupied, running from the earliest start to the latest end. The clips move whole — ids, props, actions, transitions — keeping their relative times (earliest → 0) and their track order; the nest's canvas is frozen at the project's current size. Refuses on an empty selection, on a lone nest clip, and when the nest clip would break the overlap rule. |
-//! | `unnest` | The inverse: the nest's clips return at `clip.start + their own start`, with fresh ids, on tracks counted back from the nest clip's own (front-most nest track first), and the nest clip goes. `nest` then `unnest` is the identity on clip content, ids aside. A clip the overlap rule refuses lands on a new track in front, as `paste` does; a nest clip trimmed shorter than its contents gives ALL of them back (a nest has no in point); the nest is dropped when nothing else shows it; each returning duration is re-snapped and held to what its media holds (spec §11, D4-4), which a nest made before an fps change needs. `Err` when `clip` is not a nest clip. |
+//! | `unnest` | The inverse: the nest's clips return at `clip.start + their own start`, with fresh ids, on tracks counted back from the nest clip's own (front-most nest track first), and the nest clip goes. `nest` then `unnest` is the identity on clip content, ids aside. A clip the overlap rule refuses lands on a new track in front, as `paste` does; a nest clip trimmed shorter than its contents gives ALL of them back (a nest has no in point); the nest is dropped when nothing else shows it. Returning clips have translated start, source-bounded duration, action spans and present base motion/text timings normalized on the document grid (spec §11, D7-3). `Err` when `clip` is not a nest clip. |
 //! | `set_video` | Merges the patch into each clip's video props (spec §5.2). |
 //! | `set_audio` | Merges the patch into each clip's audio props. |
 //! | `set_text` | Merges the patch into each clip's text props. |
@@ -131,7 +133,7 @@
 //! | `set_enabled` | The per-clip hide and mute switches; omitted fields keep their value. |
 //! | `set_transition` | Sets `transition_in`; absent or `null` clears it. The overlap with the predecessor IS the duration. |
 //! | `set_transition_duration` | Moves the clip so its overlap with its predecessor is exactly `duration`. |
-//! | `add_transition` | Makes an overlap at the HARD CUT before `clip` out of the two clips' unused handles and puts a transition on it — nothing else on the timeline moves. `align` is `center` when absent: half from each side (the odd frame to the incoming clip) and passes a side's shortfall to the other; `before` takes it all from the incoming clip's head, `after` all from the outgoing clip's tail. The duration is snapped down to whole frames and CLAMPED — to each handle, to the neighbours on the track, and to the overlap rule — so a request too long for the material lands shorter rather than refusing; below one frame refuses. A nest gives no head, and a nest tail ends at the nest's own length. The incoming clip's actions move with its new first frame. `kind` absent uses the clip's stored kind if it has one, else cross_dissolve; a stored transition keeps its curve and crossfade, a new one is minted (eased, crossfading). Err for a non-positive duration, an unknown clip, and for not being at a hard cut — naming which of no predecessor, a gap, an existing overlap. `ripple` (false when absent): when true no handle is read and `align` is ignored — the overlap is made by SHIFTING the incoming clip and every clip at or after it on every unlocked track left by the snapped duration, so the timeline gets shorter and no source window changes; the duration is capped at half the shorter of the two clips and stepped down a frame at a time until every track something moved on passes the overlap rule, another track's clip that gains an overlap gets a minted cross_dissolve (`close_gap`'s rule), markers do not move, and an incoming clip on a locked track refuses. |
+//! | `add_transition` | Makes an overlap at the HARD CUT before `clip` out of the two clips' unused handles and puts a transition on it — nothing else on the timeline moves. `align` is `center` when absent: half from each side (the odd frame to the incoming clip) and passes a side's shortfall to the other; `before` takes it all from the incoming clip's head, `after` all from the outgoing clip's tail. The duration is snapped down to whole frames and CLAMPED — to each handle, to the neighbours on the track, and to the overlap rule — so a request too long for the material lands shorter rather than refusing; below one frame refuses. A nest gives no head, and a nest tail ends at the nest's own length. The incoming clip's actions move with its new first frame. `kind` absent uses the clip's stored kind if it has one, else cross_dissolve; a stored transition keeps its curve and crossfade, a new one is minted (eased, crossfading). Err for a non-positive duration, an unknown clip, and for not being at a hard cut — naming which of no predecessor, a gap, an existing overlap. `ripple` (false when absent): when true no handle is read and `align` is ignored — the overlap is made by SHIFTING the incoming clip and every clip at or after it on every unlocked track left by the snapped duration, so the timeline gets shorter and no source window changes; the duration is capped at half the shorter of the two clips and the greatest passing whole-frame shift is selected without enumerating frames, even when a crossing makes a larger shift valid again, another track's clip that gains an overlap gets a minted cross_dissolve (`close_gap`'s rule), markers do not move, and an incoming clip on a locked track refuses. An already-invalid affected track refuses by the overlap rule before fitting; an unrelated track is ignored. |
 //! | `set_transition_style` | Sets the transition's easing and whether it crossfades the two clips' sound; an absent key keeps. A clip with no stored transition and at least one key given gets a minted `cross_dissolve` with the style applied; NEITHER key given is an identity and never mints. A separate op from `set_transition` because that one reads an absent `kind` as a clear and so cannot spell "keep". |
 //!
 //! The closed vocabularies an argument may take — a transition kind, a
@@ -163,7 +165,7 @@
 //! | `add_marker` | A marker at `at`, clamped to ≥ 0, named `Marker <n>` and red unless `name` and `color` say otherwise. Two markers may not share a tick. |
 //! | `set_marker` | Omitted fields keep their value; the same one-marker-per-tick rule. |
 //! | `remove_marker` | Removes the marker. |
-//! | `set_canvas` | `rescale_clips`, false when absent, multiplies every clip's `x`, `y` and `scale` by the size ratio; an fps change re-snaps every clip, action and marker time to the new grid — a media clip's duration then held to its remaining source snapped DOWN to that grid (spec §11), never under one frame — and DROPS a marker a coarser grid lands on a tick another marker already holds. |
+//! | `set_canvas` | `rescale_clips`, false when absent, multiplies every clip's `x`, `y` and `scale` by the size ratio; an fps change re-snaps top-level and stored-nest clip starts, source-bounded durations, action spans and present base motion/text timings, plus top-level markers, to the new grid (spec §11, D7-3). A marker a coarser grid lands on a tick an earlier stored marker already holds is dropped; size-only and same-fps edits do not resnap. |
 //! | `add_media` | Appends the `media[]` element of spec §5.2 minus its `id` (the host probes the file). A path already in the list changes nothing. |
 //! | `relink_media` | Points a media at another file; an absent or `null` bookmark clears the stale one. |
 //! | `remove_media` | Refuses while clips still reference it unless `with_clips`, which removes those clips too. |
@@ -255,8 +257,8 @@ pub enum Op {
     /// `media` and `color` are alternatives, not a pair: a plate is either
     /// a picture or a colour, and naming both is an `Err` rather than a
     /// precedence rule nobody would remember. Both carry a serde default so
-    /// that an absent key and an explicit `null` mean the same thing (the
-    /// envelope's rule), which is what makes the no-argument call — the
+    /// that an absent key and an explicit `null` mean the same thing for
+    /// these `Option<T>` fields, which makes the no-argument call — the
     /// "Solid Color" command — legal and white.
     AddBackground {
         #[serde(default)]
@@ -405,8 +407,8 @@ pub enum Op {
     },
     /// The fifth patch op: `patch` is `{name?, label?}`, each a string or
     /// `null`, read by `edit_props.rs`. A patch rather than two envelope
-    /// arguments because an envelope's absent and null mean the same thing
-    /// and this op needs them to differ.
+    /// arguments because optional `Option<T>` envelope fields decode absent
+    /// and null alike, while this patch needs them to differ.
     SetClip {
         clips: Vec<u32>,
         patch: Value,
@@ -430,8 +432,8 @@ pub enum Op {
     },
     /// An absent `kind` means the clip's own stored kind if it has one, and
     /// `cross_dissolve` otherwise — never a clear, unlike `set_transition`,
-    /// which is why this variant's `kind` is not nullable in the schema
-    /// even though serde would accept a null into the `Option`.
+    /// The core decodes null like absence for this `Option`; the app's tool
+    /// schema deliberately requires a non-null value when the key is present.
     AddTransition {
         clip: u32,
         #[serde(default)]
@@ -442,8 +444,8 @@ pub enum Op {
         #[serde(default)]
         ripple: bool,
     },
-    /// Both arguments are "absent means keep", so neither is nullable and
-    /// an op carrying neither changes nothing.
+    /// Both arguments mean "keep" when absent or null at the core decoder;
+    /// the app's tool schema requires non-null values when keys are present.
     SetTransitionStyle {
         clip: u32,
         #[serde(default)]
@@ -461,7 +463,7 @@ pub enum Op {
     },
     /// The zoom's arguments are `add_action`'s plus the region it lands
     /// on. `region` is `Option` with a serde default so that an absent key
-    /// and an explicit `null` mean the same thing — the envelope's rule —
+    /// and an explicit `null` mean the same thing for these `Option<T>` fields —
     /// and here they mean a zoom BACK; a caller that wants an absent region
     /// REFUSED (the MCP tool does) says so in its own schema.
     AddZoomAction {

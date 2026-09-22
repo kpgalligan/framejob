@@ -327,6 +327,7 @@ pub fn read(json: &str) -> Result<Project, String> {
 /// of the extra whitespace is nothing next to the media it references.
 pub fn write(p: &Project) -> Result<String, String> {
     check_caps(p)?;
+    crate::time_bounds::check_stored_times(p)?;
     // The common case is already current, so serialize in place; only a
     // project carried over from an older file needs the clone to stamp the
     // version. `write` runs after every edit (Swift rebuilds its snapshot

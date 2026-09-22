@@ -11,10 +11,8 @@
 //! placement and transitions are different questions: every op in
 //! `edit_clip.rs` decides where a clip SITS, while these decide what happens
 //! where two of them meet. `set_gained_transitions` comes with them — it is
-//! the rule that a clip which gains an overlap gains a transition, which is
-//! about the meeting and not about the move, and it is re-exported from
-//! `edit_clip.rs` so the nine call sites there and the three in
-//! `edit_time.rs`, `edit_nest.rs` and `edit_paste.rs` are unchanged.
+//! the rule that a clip which gains an overlap gains a transition, called
+//! by `edit_commit.rs` when a placement is finalized.
 //!
 //! The three rules of `edit_clip.rs`'s module doc hold here too: every tick
 //! argument is snapped to the frame grid first, a placement that would break
@@ -28,6 +26,7 @@ use crate::model::{Clip, Curve, Project, Source, Transition, TransitionKind};
 use crate::outcome::Outcome;
 use crate::source_window::source_advanced;
 use crate::time::Ticks;
+use crate::transition_search::{largest_passing, reduced_split};
 
 /// Where the overlap [`Project::add_transition`] makes is taken FROM.
 ///
@@ -176,8 +175,7 @@ impl Project {
     ///    extensions separately would lose the odd frame (1.5 + 1.5 frames
     ///    snap to 1 + 1). The request is also held to
     ///    `(A.duration + B.duration) / 3·frame`, the most the overlap rule
-    ///    could pass at ANY split, so that step 6 walks the clips and not
-    ///    the caller's number.
+    ///    could pass at ANY split, so the search stays within the clips.
     /// 4. Split by `align`. Under `center` the odd frame goes to B, and a
     ///    side that cannot supply its share passes the shortfall to the
     ///    other side — up to that side's own handle — before the total
@@ -185,11 +183,11 @@ impl Project {
     /// 5. Clamp against the neighbours, closed form.
     /// 6. Check the overlap rule (`transition.rs`, which is not part of
     ///    `validate`, so it is called here as `roll` calls it). Its bound
-    ///    is half of the SHORTER clip and both durations are growing, so
-    ///    the answer is not monotone in an obvious direction: a failure
-    ///    steps the total down one frame, taken from the larger side, and
-    ///    retries. The loop is bounded by step 3's ceiling and so by the
-    ///    two clips. Each trial's two extensions are read off the frame
+    ///    is half of the SHORTER clip and both durations are growing. The
+    ///    old larger-side decrement path has a single passing boundary
+    ///    once this affected track is valid, so `transition_search` finds
+    ///    its greatest passing total in at most 64 trials. Each trial's
+    ///    two extensions are read off the frame
     ///    GRID, not taken as a multiple of [`Project::frame`], which is a
     ///    fallback at a rate that does not divide the timescale.
     /// 7. Nothing left to give — below one frame — is a refusal.
@@ -260,6 +258,10 @@ impl Project {
             return self.add_transition_by_shift(&earlier, &later, kind, duration);
         }
 
+        if let Err(why) = self.check_overlap_rule(&[], later.track, &[]) {
+            return Ok(Outcome::Refused(why));
+        }
+
         let frame = self.frame();
         // 2 and 3. The handles, floored to whole frames. `None` is
         //    UNBOUNDED, which is not the same as a handle of zero.
@@ -271,12 +273,11 @@ impl Project {
         //    rule wants `2(a+b)·frame ≤ A.duration + a·frame` AND
         //    `2(a+b)·frame ≤ B.duration + b·frame`; adding the two gives
         //    `a + b ≤ (A.duration + B.duration) / 3·frame` whatever the
-        //    split, so a request above that fails at every length and step
-        //    6 would only walk it down ONE FRAME at a time — 4.5e11 passes,
-        //    36 hours extrapolated from a measured ladder, for the largest
-        //    `duration` the MCP argument gate lets through. The step-down
-        //    is bounded by the CLIPS, which is what step 6's own doc always
-        //    claimed. `requested` keeps the caller's own number, because
+        //    split. Before D7-2, a request above that could take 4.5e11
+        //    one-frame trials, 36 hours extrapolated from a measured
+        //    ladder. The bounded search still keeps this ceiling because
+        //    it prevents a reordered pair from passing the wrong rule.
+        //    `requested` keeps the caller's own number, because
         //    that is what the refusal sentence below has to name.
         //
         //    It is also what keeps B's new start at or after tick 0. A
@@ -286,7 +287,7 @@ impl Project {
         //    overlap rule measures `A.duration + B.duration` against half
         //    of the shorter GROWN clip, and passing that needs
         //    `a + b ≥ 3(A.duration + B.duration) / frame` — nine times
-        //    this ceiling. So no trial the loop can now reach is one.
+        //    this ceiling. So no trial the search can now reach is one.
         //    A swapped pair is not always that `Err`, either: on a SHORT
         //    pair it passes the rule with BOTH starts non-negative and the
         //    project is written with the two clips out of order, which
@@ -331,7 +332,7 @@ impl Project {
             b = b.min(room);
         }
 
-        // 6 and 7. The overlap rule, stepping down from the larger side.
+        // 6 and 7. The same larger-side reduction path, searched by total.
         //    The two extensions are read off the frame GRID rather than
         //    taken as `count × frame`: [`Project::frame`] is a FALLBACK of
         //    1/30 s at a canvas rate whose frame is not a whole number of
@@ -345,7 +346,7 @@ impl Project {
         //    frame is partly spent landing the edge on the grid, which is
         //    `time::snap_up_to_frame`'s own argument for a BOUND.
         let a_end = clip_end(&earlier);
-        let (tail, head) = loop {
+        let extension = |a: Ticks, b: Ticks| {
             let tail = self
                 .snapped_down(a_end.saturating_add(a * frame))
                 .saturating_sub(a_end)
@@ -354,34 +355,36 @@ impl Project {
                 .start
                 .saturating_sub(self.snapped_up(later.start.saturating_sub(b * frame)))
                 .max(0);
+            (tail, head)
+        };
+        let total = a + b;
+        let winner = largest_passing(total, |remaining| {
+            let (a, b) = reduced_split(a, b, remaining);
+            let (tail, head) = extension(a, b);
             if tail + head <= 0 {
-                // Three clamps can land here — the two handles, the
-                // neighbours on the track, and the step-down below — so the
-                // sentence names all three rather than guessing which one
-                // it was. The number in it is the request in whole FRAMES
-                // (`requested`, the caller's ticks divided by the grid),
-                // which is the unit every clamp above is measured in and
-                // the one a caller has to change.
-                return Ok(Outcome::Refused(format!(
-                    "the cut before clip {clip} has no room for an overlap: the {requested} \
+                return true;
+            }
+            let (grown, moved) = extended(&earlier, &later, tail, head);
+            self.check_overlap_rule(&[grown, moved], later.track, &[])
+                .is_ok()
+        });
+        let (a, b) = reduced_split(a, b, winner);
+        let (tail, head) = extension(a, b);
+        if tail + head <= 0 {
+            // Three clamps can land here — the two handles, the
+            // neighbours on the track, and the search above — so the
+            // sentence names all three rather than guessing which one
+            // it was. The number in it is the request in whole FRAMES
+            // (`requested`, the caller's ticks divided by the grid),
+            // which is the unit every clamp above is measured in and
+            // the one a caller has to change.
+            return Ok(Outcome::Refused(format!(
+                "the cut before clip {clip} has no room for an overlap: the {requested} \
                      frames asked for clamp to nothing against the two clips' unused \
                      material, their neighbours and the overlap rule; pass ripple: true to \
                      make the overlap by shifting the timeline left instead"
-                )));
-            }
-            let (grown, moved) = extended(&earlier, &later, tail, head);
-            if self
-                .check_overlap_rule(&[grown, moved], later.track, &[])
-                .is_ok()
-            {
-                break (tail, head);
-            }
-            if b >= a {
-                b -= 1;
-            } else {
-                a -= 1;
-            }
-        };
+            )));
+        }
 
         // 8, 9 and 10. Write.
         let (grown, mut moved) = extended(&earlier, &later, tail, head);
@@ -516,15 +519,6 @@ impl Project {
 
         let mut moved = target.clone();
         moved.start = start;
-        if let Err(why) = self.check_overlap_rule(&[moved.clone()], moved.track, &[]) {
-            return Ok(Outcome::Refused(why));
-        }
-
-        let mut next = self.clone();
-        if let Some(slot) = next.clip_mut(clip) {
-            slot.start = start;
-        }
-        set_gained_transitions(&mut next, &[target.track]);
-        self.finish(next)
+        self.commit_replacements(vec![moved])
     }
 }

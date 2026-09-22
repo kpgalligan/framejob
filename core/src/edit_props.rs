@@ -113,8 +113,8 @@ impl Project {
     /// Sets or clears every named clip's own name and label (spec §6) — the
     /// fifth patch op, shaped like `set_video` so that "absent keeps, null
     /// clears" lives where it already does in this crate: inside a patch
-    /// object, never as an envelope argument, whose absent and null mean the
-    /// same thing. The keys are `name` and `label`, each a string or `null`.
+    /// object, never as an `Option<T>` envelope argument, where absent and
+    /// null decode alike. The keys are `name` and `label`, each a string or `null`.
     /// A string is stored trimmed, and an EMPTY one — after trimming — clears
     /// too: `set_track`'s rule for a name, except that "unnamed" is `None`
     /// here, so the app's fallback name returns. `Err` for an unknown clip,
@@ -181,7 +181,7 @@ impl Project {
     /// formula, so a period under half a frame would snap to 0 and stop the
     /// motion the caller asked for. On the grid the smallest period there
     /// is is one frame, so that is where it lands.
-    fn snap_motion(&self, props: &mut VideoProps) {
+    pub(crate) fn snap_motion(&self, props: &mut VideoProps) {
         let Some(motion) = props.motion.as_mut() else {
             return;
         };
@@ -212,9 +212,9 @@ impl Project {
         animation.out = self.snapped(animation.out);
     }
 
-    /// [`Self::check_group`] with the one NORMALISATION a copied group needs
-    /// first — what `paste_attributes` runs on each group it has just
-    /// replaced.
+    /// What `paste_attributes` runs on each copied group: canonicalize an
+    /// empty motion, check the original values, then snap present video or
+    /// text timing to the destination grid.
     ///
     /// "One clip has one spelling of no motion" (road map 5 §5a) is kept by
     /// the patch path and by the split rule, and THIS op's payload is a third
@@ -227,9 +227,8 @@ impl Project {
     /// (`core/tests/schema_v8.rs`'s
     /// `a_motion_whose_slots_are_all_cleared_normalises_back_to_null`; road
     /// map 7 §2.2). Normalising is not a range check, so it happens here
-    /// rather than inside one, and it is written beside `check_group` because
-    /// the paste side has no room to hold it (`edit_paste.rs` is at the size
-    /// cap).
+    /// rather than inside one, beside `check_group` and the snappers whose
+    /// check-before-snap order the copied group must follow.
     pub(crate) fn normalise_and_check_group(
         &self,
         clip: &mut Clip,
@@ -242,7 +241,21 @@ impl Project {
                 }
             }
         }
-        self.check_group(clip, group)
+        self.check_group(clip, group)?;
+        match group {
+            Group::Video => {
+                if let Some(video) = clip.video.as_mut() {
+                    self.snap_motion(video);
+                }
+            }
+            Group::Text => {
+                if let Some(text) = clip.text.as_mut() {
+                    self.snap_animation(text);
+                }
+            }
+            Group::Audio | Group::Shape => {}
+        }
+        Ok(())
     }
 
     /// The range check for ONE of a clip's groups — the second half of

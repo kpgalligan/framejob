@@ -9,11 +9,15 @@ Speed sheet's core-derived duration (§10.7–§10.10). The proposed wholesale
 handler forward was measured and retired; its smaller **argument gate**
 landed as #21 (§11.8).
 
-**Start at §12 for work still needed.** The earlier sections retain their
-phase-time measurements and successor proposals; several were completed by
-later sections. §12 reconciles them with the current code, later changes and
-open issues. It proposes an order of work, not a new approved implementation
-spec. C2's deferral in road map 6 does not reopen any completed candidate here.
+**All six §12.2 continuation items are implemented and independently
+reviewed:** extreme timeline values (§12.6), frame-grid normalization
+(§12.7), placement commit ownership (§12.8), historical chrome comparisons
+(§12.9), the Speed sheet explanation (§12.10), and argument-contract
+coverage (§12.11). The earlier sections retain their phase-time measurements
+and proposals. §12.2 preserves the dated review inventory; §12.6–§12.11
+record the implementations and gates. Separate product decisions in §12.4,
+human checks in `designs/reelcut-remaining.md` §4, other-roadmap issues and
+road map 6's deferred C2 remain outside this completion claim.
 
 Road maps 2 to 6 each added something a person using the app can see. This
 one does not. A **deepening** takes knowledge that is spread across callers
@@ -5581,7 +5585,8 @@ uncommitted):
    nothing of the overlap the applied arm can leave, nothing of the refusal
    the other arm answers, and the readout shows a LENGTH rather than the
    cross dissolve the neighbour gains. Rewording it was out of scope; this
-   is where it is written down.
+   is where it is written down. Part 5 (§12.10) later corrected the hint;
+   the readout remains a length.
 
 **What was NOT touched, deliberately**: `core/` at all, `ReelCore.swift`,
 `ProjectDocument.swift`, `CompositionBuilder.swift` (601, at the cap, and its
@@ -6007,7 +6012,7 @@ which is now the gate's refusal by name.
 
 ---
 
-## 12. Current review and remaining work (2026-09-21)
+## 12. Review, six-part continuation and separate work (2026-09-21)
 
 ### 12.1 What was reviewed, and what stays closed
 
@@ -6026,34 +6031,29 @@ tests run in this review; earlier proof scores remain earlier evidence.
 | Source window | `source_window.rs` is 396 lines; phases B and C landed in `2bbceed` and `1f03132`. `ReverseMirror.swift` is shared, and `SpeedSheetController.lengths` asks the core using the same ops as Apply. The old un-held readout and unmirrored timeline are closed. |
 | Handler forward | `AgentServer.dispatch` calls `checkArgumentNames` before handler dispatch. The gate is built; the broader forwarding rewrite remains retired for §11's reasons. |
 | Fractional frame-rate terms | `rateTerm` / `fpsPair` in `AgentServer+Arguments.swift` replaced both truncating readers in `7f04e59`. This is no longer an open residue of #21. |
-| Size debt | Old phase deltas are historical, not current toll estimates. Current examples: `edit_clip.rs` 1021, `edit.rs` 838, `edit_paste.rs` 599, `AgentCatalog+Clips.swift` 792 and `ReelCore.swift` 1542 lines. Consult remaining §3 and measure again before touching one. |
+| Size debt | Old phase deltas are historical, not current toll estimates. At this review the examples were `edit_clip.rs` 1021, `edit.rs` 838, `edit_paste.rs` 599, `AgentCatalog+Clips.swift` 792 and `ReelCore.swift` 1542 lines. Consult remaining §3 and measure again before touching one. |
 
-### 12.2 Work still needed, in proposed order
+### 12.2 Six proposed work items, completed in order
 
-Each row is a separate work item. A decision goes into spec §11 before the
-behavior it governs changes; a structural move lands and passes its gate
-alone. This list does not authorize combining a correctness change with an
-unrelated refactor, or treat a proposed policy as already decided.
+This is the dated pre-implementation inventory; the part records in
+§12.6–§12.11 supersede its proposed work and all six final independent
+reviews passed without findings. Each item was implemented in order. A
+decision went into spec §11 before the behavior it governed changed; the
+structural moves passed their own gates.
 
-1. **Decide a shared policy for extreme timeline values — existing #24,
-   #25 and #31.** These are related correctness issues, not a benefit that
-   extracting the commit tail would provide. `Project::validate` currently
-   checks positive duration and nonnegative start, without an upper time
-   bound; Swift still has unchecked `start + duration` in
-   `ProjectSnapshot.swift` and `sourceIn + sourceDuration` in
-   `CompositionBuilder.swift`. Both transition builders still have
-   frame-by-frame reduction loops over clip-dependent lengths. The prior
-   issues record crashes or impractical runtimes; this review re-read those
-   paths but did not repeat a destructive or hours-long experiment.
-   Decide reader/writer bounds versus safe arithmetic and a bounded
-   transition algorithm, including compatibility for old projects. Respect
-   R6-10's existing speed decision rather than silently extending or
-   reversing it. **Done means:** boundary vectors through file load and
-   every relevant edit, an app that survives the saved-project cases, and
-   a measured upper bound for the pathological transition cases. Use the
-   existing issues rather than filing duplicates.
+1. **Extreme timeline values — #24, #25 and #31: implemented in part 1;
+   record in §12.6.** D7-1 admits structural times and endpoints only within
+   ±9e15 ticks through one read/edit/write checker. D7-2 replaces both
+   frame-enumerating transition reductions with bounded searches. The old
+   format versions and extreme finite speeds remain accepted when their
+   structural times fit. The saved-package and edit proof, measured bounds,
+   and any owed coverage are recorded in §12.6. GitHub issue disposition is
+   separate from this implementation and review record.
 
-2. **Finish frame-grid normalization — #26 plus the nested-clip gap.**
+2. **Frame-grid normalization — implemented and reviewed (§12.7).** The
+   following is the dated rationale that led to part 2; its final gate and
+   review supersede this proposed work description. #26 remains open until
+   issue disposition is separately authorized.
    `edit_canvas.rs::resnap` walks only `project.clips` and top-level
    markers. Scoped views use the parent's fps (`scope.rs::scoped_view`),
    so stored nested clips can remain on the old grid while being viewed on
@@ -6073,42 +6073,34 @@ unrelated refactor, or treat a proposed policy as already decided.
    source-window bound instead of writing another one. This is a proposed
    normalization concern of its own, not unfinished source-window phase B.
 
-3. **Design the commit-tail deepening, then prove a behavior-preserving
-   extraction.** The duplication remains; §12.3 gives the current measured
-   inventory and the differences a design must preserve. Its first stage
-   must define which caller knowledge disappears and measure the deletion.
-   `edit_clip.rs` is over the cap: any required move comes first, separately.
-   **Done means:** unchanged applied/identity/refused/error arms, refusal
-   sentences, ID allocation, affected tracks, transition style and undo,
-   including composed and scoped ops. Use FFI tests and the existing
-   refusal/source-window/MCP proofs, plus mutants that bypass the proposed
-   guard or transition minting. Do not change clamped-edge semantics as
-   part of this extraction.
+3. **Placement commit ownership — implemented and independently reviewed (§12.8).**
+   The approved design first moved timing and `finish` code unchanged, then
+   put candidate checks, storage and transition finalization behind
+   `edit_commit.rs`. The detailed proof and measured deletion are in §12.8.
+   §12.3 remains the dated inventory from before parts 1–3, not a claim
+   about the present source. Clamped-edge semantics remain unchanged.
 
-4. **Restore the two historical cross-build proof comparisons.**
-   `phase5_chrome.py` still archives old Swift sources but links the current
-   staticlib/header; its named FFI-drift skip accounts for 45 rows.
-   `recording_probe.py` has the corresponding two-row skip for the old
-   welcome window. These are proof gaps, not failures in the current app.
-   Build the reference app against its matching core/header, with isolated
-   outputs and a cache key that includes both trees and the instrument.
-   **Done means:** those 47 reference-dependent rows run again; a broken
-   current instrument still fails, and host-state skips remain separate.
-   Neither reference build was rerun in this review.
+4. **Restore the two historical cross-build proof comparisons — implemented
+   and independently reviewed in part 4 (§12.9).** `phase5_chrome.py` and
+   `recording_probe.py` now build old Swift against each commit's matching
+   core/header in isolated output directories. The 45 meter comparison rows
+   and two welcome §6b build rows run again. Broken instruments score
+   failures; host-state skips remain separate. The preceding description
+   was the dated review finding.
 
-5. **Correct the Speed sheet's explanation.** Its duration preview is
-   already correct, but `loadView` still says a speed change “opens or leaves
-   a gap.” A slower clip can instead gain an overlap and a minted dissolve,
-   or be refused. Update the hint to match the established D4-6 behavior.
-   Any richer per-clip preview is a separate UI decision. **Done means:**
-   the sheet's explanation agrees with `source_mirror_probe.py`'s existing
-   applied, refused and mixed-selection cases; no duplicate Swift duration
-   calculation is introduced.
+5. **Correct the Speed sheet's explanation — implemented and independently
+   reviewed in part 5 (§12.10).** The hint now describes a faster
+   clip's gap, a slower clip's allowed overlap and possible cross dissolve,
+   and a refused clip staying unchanged while other selected clips can
+   change. The core-derived readout and Apply path are unchanged. Any richer
+   per-clip preview is a separate UI decision.
 
-6. **Close the remaining argument-contract coverage gaps.** §11.8 closed
+6. **Close the remaining argument-contract coverage gaps — implemented and
+   independently reviewed in part 6 (§12.11).** The following is the dated
+   rationale for that part. §11.8 closed
    the required-list and running-app gaps; do not carry those forward from
-   §11.7. The blanket tick-argument audit and explicit null cases still need
-   a deliberate matrix. `op_table.rs`'s optional-argument comment says
+   §11.7. The blanket tick-argument audit and explicit null cases needed
+   a deliberate matrix. `op_table.rs`'s optional-argument comment said
    absence and null are equivalent, while `edit.rs` has four defaulted plain
    booleans (`ripple`, both `with_clips`, `rescale_clips`), which are not
    `Option<bool>`. The current generic Boolean wrong-kind vector tests a
@@ -6119,14 +6111,15 @@ unrelated refactor, or treat a proposed policy as already decided.
    spec decision changes them. Moving nullability into the published table
    is optional future design, not a prerequisite for these tests.
 
-### 12.3 The commit tail, counted again
+### 12.3 The commit tail, counted before parts 1–3
 
-The inventory is over current `core/src/edit*.rs`, grouping call sites by
-their enclosing function and reading the branches; an import, comment or
-helper definition is not a call. Counts are not added together: they
-describe overlapping sets.
+This is the inventory measured on 2026-09-21 before roadmap 7 parts 1–3,
+over the then-current `core/src/edit*.rs`. It groups call sites by their
+enclosing function and reads the branches; an import, comment or helper
+definition is not a call. Counts are not added together because they
+describe overlapping sets. §12.8 records the later commit-tail measurements.
 
-| Shape | Current count |
+| Shape | Count before parts 1–3 |
 |---|---:|
 | Byte-identical ten-line guard/clone/replace/mint/finish block | **4**: `trim_start`, `trim_end`, `rate_stretch`, `set_speed` |
 | Same ten-line shape in `set_transition_duration` | **1**, but it assigns `slot.start = start`, not `*slot = moved`; the earlier “5 byte-exact” claim is inaccurate |
@@ -6202,3 +6195,383 @@ this review's app process was terminated afterward.
 probe, old reference build or destructive extreme-time reproduction was
 claimed for this documentation review. Those checks belong to the future
 work items where they discriminate the behavior being changed.
+
+### 12.6 Part 1 — structural time and bounded transitions (#24, #25, #31)
+
+**Decision and shape.** Spec §11's D7-1 and D7-2 were written before the
+behavior change. `time_bounds.rs` is the one checker for structural fields
+and i128 clip/action endpoints, called after the old positive/start checks
+in `Project::validate` and after `check_caps` in `format::write`. The rule is
+the inclusive ±9e15 envelope; all older format versions remain supported
+when their values fit, and format version stays 8. R6-10's arbitrary finite
+positive speed survives. Property vocabulary timings retain their old
+handling. `time.rs` keeps snap indices wide through directional adjustment
+and saturates only at the public result. The admitted media and source
+positions, and `segment_of`'s source clamp, keep
+`CompositionBuilder.heldTail`'s `sourceIn + sourceDuration` inside Int64;
+even a full-u32 rational still frame is `600000 × u32::MAX` ticks.
+
+**Pure extraction gate.** `transition::overlap_limit` is exactly the former
+`a.duration.min(b.duration) / 2`; `check_overlap_rule` calls it. Before any
+other core behavior edit, the three focused transition suites passed 56/56
+and `cargo clippy --all-targets -- -D warnings` was clean. The later
+`transition_search.rs` owns the handle path's reduced split and binary
+boundary search (at most 64 predicate calls) and ripple's exact forbidden
+fixed/moved intervals. The latter considers at most the sum of
+`fixed_count × moved_count` across affected tracks, bounded by
+`MAX_CLIPS²/4 = 4,194,304` pairs, plus interval sorting. It never walks
+timeline frames. The final shifted project still passes the original
+overlap rule. An initially invalid affected track now gets that rule's
+named refusal before fitting; unrelated tracks stay irrelevant.
+
+**Verification.** `make fmt`, `make test` (**742 passed, 0 failed**),
+`make lint`, `make typecheck` and `make app` passed. Typecheck had zero errors and the four baseline
+AVFoundation deprecations. `time_bounds.rs`, `time_bounds_edits.rs` and
+`transition_bounded.rs` add boundary, writer, rational-snap, independent
+small-oracle, affected-track and child-watchdog vectors. Review follow-up
+made every writer crossing assert its named error or existing refusal and
+directly checks every structural field and endpoint on applied results;
+snap vectors assert directional bounds and repeated stability where the
+result is representable. Independent old-path enumeration now also covers
+limited media, reversed and nested handles, neighbours, all alignments,
+7 fps rational grid, stored transition style and action rebasing. The
+ripple oracle includes multiple tracks, a locked track, a straddling clip,
+half-limit equality and one tick beyond. The 5-second
+extreme case exercises both an obstructed ripple and an unbalanced handle
+request; the cap-sized project has 4,096 clips under a 30-second watchdog.
+The child runs measured **0.013 s** for the extreme pair and **0.334 s**
+for the cap-sized track on this host.
+The saved-package MCP proof opened Int64.max, 2^62, 1e18, endpoint-overflow
+and nested invalid packages with named errors, then successfully opened and
+rendered admitted media/generated/nested controls in the same owned app.
+It also checked cumulative move rejection, undo/redo, save/reopen and an
+empty `Reelcut: ` parity log. The cloud source probe passed 643/643, which
+preserves R6-10's speed coverage. Full command output and measured child
+runtimes are in the litecode part-1 handoff's `04-checks.txt`; the review
+follow-up and its focused gate are in `06-fix-notes.md`.
+
+**Mutants.** In isolated temporary core copies, removing both admission
+calls failed the endpoint and structural-field reader/writer vectors (2
+failed rows). The strengthened writer matrix in a fresh isolated mutant
+target also failed all 5 test groups with those calls removed. Restoring a
+frame-enumerating handle search and, separately,
+a frame-enumerating ripple search each failed the 5-second child watchdog.
+The copies and generated artifacts were not added to the repository; the
+original source was rechecked green.
+
+**Size and next work.** `edit_transition.rs` is below 600 lines; the new
+modules are below 400. The capped `edit_clip.rs`, `ProjectSnapshot.swift`
+and `CompositionBuilder.swift` were not enlarged. This closes §12.2 item 1
+in implementation; items 2–6 remain separate, in the order above. Existing
+human acceptance checks remain in `designs/reelcut-remaining.md` §4, and
+issue closure waits for review of this gate.
+
+### 12.7 Part 2 — frame-grid normalization (#26 and stored nests)
+
+**Decision and shape.** D7-3 was entered in spec §11 before behavior changed.
+`frame_grid.rs` owns one clip-time path: snap placement start; ask
+`source_window.rs::duration_resnapped` for the duration; clamp action spans;
+then snap present base video motion and text animation through the existing
+patch snappers. The old `resnap_actions` body was moved unchanged from
+`edit_paste.rs` before any behavior edit. Its isolated gate passed the paste,
+scope, patch-door and source-invariant suites and Clippy. The paste file fell
+from 599 to 580 lines at that gate; the isolated diff, line counts and command
+outputs are in the part-2 litecode handoff. Canvas now walks top-level clips
+and each stored nest exactly once, including orphans and shared references;
+its top-level marker collision rule is unchanged. Full paste and unnest call
+the helper after ID/source remapping and translated placement. Copied Video
+and Text attributes still check original values first, then snap the copied
+timing. Source positions, metadata, audio envelopes, action-end JSON,
+placement fallback and transition minting keep their existing owners.
+
+**Verification.** The final Rust suite passed **753 tests**. `make fmt`,
+`make lint`, `make typecheck` and `make app` passed; Swift typecheck reported
+zero errors and the four baseline AVFoundation deprecations. The first
+typecheck run could not write the sandboxed Clang cache and passed with
+`CLANG_MODULE_CACHE_PATH` under `/tmp`. Xcode's Metal toolchain was downloaded
+and `make app` passed outside the sandbox, which otherwise hid that toolchain.
+New FFI suites passed **11/11**: ordinary, fractional and non-dividing
+rational grids; top-level, two-level, orphan and shared nests; source bounds
+(100100 and 100000 stored ticks would each stay unchanged after grid
+snapping but clamp to the 50050 and 50000 source tails),
+actions, marker order and overlap tolerance; full/scoped paste, nested media
+remapping, unnest fallback, copied attribute errors and identity, audio
+precision and empty-motion spelling. One pre-existing schema-v5 expectation
+was updated from 450000 to 460000 because a copied animation now snaps like
+the patch path. The fresh Release app passed the owned-process MCP proof:
+exact stored timing for canvas, nested paste, attributes and unnest; complete
+undo/redo for each; save/reopen; actual requested port and no startup parity
+complaints. The proof claims stored state only, not a picture or sound.
+
+**Mutants and limits.** Omitting the canvas nest loop failed the intended
+nested start assertion, 20000 versus 25000. Bypassing base motion/text
+snapping failed the intended FFI motion assertion, 10000 versus 0, and a
+rebuilt mutant app failed the permanent MCP proof on the same stored field.
+Both sources were restored, then the clean app was rebuilt and the MCP proof
+passed again. Final sizes: `frame_grid.rs` 40, `edit_paste.rs` 574,
+`edit_canvas.rs` 232, `edit_nest.rs` 320, `edit_props.rs` 376; new FFI files
+192 and 247, shared fixture 53, MCP proof 203. The first full Rust run found
+the old schema-v5 expectation; two Clippy invocations found and then
+confirmed removal of needless test lifetimes. Final checks are green.
+This is the implementation record for §12.2 item 2. The independent
+`07-review-2.md` returned **pass, no findings**, after a 753-test gate and an
+11/11 focused follow-up that strengthened the source-tail vectors. Issue
+closure is separate; human playback and UI checks in remaining §4 remain
+owed.
+
+### 12.8 Part 3 — placement commit ownership
+
+**Design and isolated move.** The approved litecode part-3 spec keeps
+`transition.rs::check_overlap_rule` as the algorithm and sentence owner and
+`edit_transition.rs::set_gained_transitions` as the sole minting algorithm.
+Before rewriting a caller, `Project::finish` moved unchanged to
+`edit_commit.rs`; the four timing ops, their speed constants and action
+rescaling moved unchanged to `edit_clip_timing.rs`. The separately gated move
+changed `edit_clip.rs` from **1021 to 807** lines; the new files were 22 and
+207 lines. The preservation suites, refusal/source/scope suites, Clippy and
+format check all passed at that gate. The isolated diff, sizes and command
+output are in the litecode part-3 handoff. Moving `finish` is not a deletion
+saving.
+
+**Commit interface.** `commit_replacements` accepts already resolved clips
+in caller order, checks distinct old tracks first and destination tracks
+second against `self`, replaces those IDs in one clone, then finalizes.
+`commit_additions` accepts a caller-owned draft whose IDs and incidental
+track/audio changes are already prepared; it checks the new clips against
+`self`, appends them in order and finalizes. `finish_placement` mints on
+exactly the supplied tracks before calling `finish`; it does not check
+overlap or short-circuit identity. `finish` remains equality before
+validation and never creates a refusal. No public op, FFI, schema, format,
+source-window or frame-grid semantics changed.
+
+The six replacement callers are the four timing ops, `move_clips` and
+`set_transition_duration`. The four addition paths are `add_clip`, the
+shared text/shape builder, `duplicate_clips` and `detach_audio`. Seven
+composed paths call `finish_placement`: nest, unnest, paste, the two ripple
+deletes, close gap and ripple transition. Their trial checks, fallback
+track search, explicit style assignments and ID allocation remain at the
+callers. Roll and freeze still have no automatic minting. The transition
+minting helper has one production caller and its old `edit_clip.rs`
+re-export is gone.
+
+**Deletion measured independently of the move.** Across the seven
+caller-bearing modules (`edit_clip.rs`, `edit_clip_timing.rs`,
+`edit_transition.rs`, `edit_nest.rs`, `edit_paste.rs`, `edit_time.rs`,
+`edit_transition_shift.rs`), the comparison to the pure-move snapshot and
+part-2 baseline counts **147 removed lines and 34 added lines, net 113 fewer**.
+That gross count includes import and documentation adjustments; it is a
+source diff count, not a claim that all 147 were repeated guard statements.
+The new placement interface added 69 lines and changed 2 lines of the
+22-line pure-move `edit_commit.rs`, leaving it **89** lines. The final
+`edit_clip_timing.rs` is **170**, while `edit_clip.rs` is **751** and remains
+over the soft cap. Ten candidate callers now have no direct overlap call,
+mint call, affected-track construction or storage tail. Seven composed
+callers shed the mint/finish pair; the direct guards for roll, freeze, nest,
+close gap, handle-transition admission and both ripple-transition preflight
+checks remain outside the new module. §12.3 is the dated pre-part-1 inventory,
+not a current count.
+
+**Preservation proof.** Sixteen new FFI tests pass both against an isolated
+copy restored to the pre-refactor production sources and against the new
+code. They cover all ten candidate paths, old-before-destination refusal
+wording and untouched IDs, affected/unrelated tracks and stored transition
+style, a zero-delta mint, action/clip/track allocation order, paste and
+unnest fallback, composed insert/overwrite and ripple transition, scoped
+applied/refused/merged-parent-cap answers, and roll/freeze no-mint controls.
+The full core gate, Release app and current-source probes passed; the
+handoff holds exact commands and outputs. The source mirror probe scored
+**40/40**, the owned-app refusal MCP proof **116/116** with clean parity on
+port 5453, and the separate frame-grid MCP proof passed with clean parity on
+port 5454. Sandboxed Xcode could not see its installed Metal Toolchain, and
+sandboxed AVFoundation could not decode the source probe fixture; the
+required build and probe passed outside that sandbox. There were no host
+skips in the final proof logs. In separate temporary core copies, bypassing
+both candidate guards made the intended scoped and old-track/addition
+refusals fail; omitting minting made the intended zero-delta, overlap and
+transition-duration expectations fail. The unchanged counterparts passed.
+
+This implements §12.2 item 3 and passed independent review (`07-review-2.md`,
+verdict: pass, no findings). Items 4–6 followed in sequence; §12.9 records
+item 4. No GitHub issue was closed, no commit was made, and the manual
+playback and UI acceptance in remaining §4 remains owed.
+
+### 12.9 Part 4 — historical chrome comparisons
+
+**The gap is closed (2026-09-21).** `reference_build.py` archives the selected
+commit's `app/Sources`, `app/Bridging` and `core` together. It builds that
+core under the caller's private `before/target`, then compiles the archived
+Swift and header with the current guarded `harness/main.swift`; it never
+links the current staticlib or calls the historical harness. Phase 5 selected
+`3187c5d7d0595b3ecde6310732bf453edfcbd2b8`; recording selected
+`c1dce5f01840a500b6093d70fa7d5beed2feaa4b`, both through their
+existing dynamic history queries. Each caller keeps its own archived tree,
+module caches, Fonts, binary, cargo/swiftc logs and atomic stamp. Its key
+hashes current source/core/staticlib, instrument/builder/caller/Fonts bytes,
+the resolved old commit, toolchain/SDK identities and build overrides,
+including effective `CARGO_TARGET_*` and `CARGO_PROFILE_*` settings. A hit
+also rechecks archived tree, binary and Fonts bytes; an invalid output or
+failed compile cannot leave a reusable success stamp.
+
+**Restored rows.** The cold and warm phase-5 runs each passed **81/81**,
+including all 45 formerly omitted rows: section 1 determinism (1), §2
+reference build/source identity (3), §3 meter-only bar difference in dark and
+light (7), §3b changed playhead outside the bar (2), §4 resting ink and
+geometry (16), §5 1080/1440/1600 widths (10), §6 900-point minimum (2),
+and §7 quiet/diagnostic renders (4). The independent meter and gain sections
+passed 23 and 13 rows. Recording `--only welcome` passed **29/29** cold and
+warm; the restored §6b labels are “the reference tree built, so there is a
+'before' to compare the welcome window against” and “compiled with THIS
+tree's own harness/main.swift (one program, two app trees).” Its welcome
+source-absence, determinism, geometry, pixel and constraint rows also ran.
+No historical row was skipped. Warm logs name cache hits for both commits;
+the historical binaries and stamps retained their mtimes.
+
+**Failure controls.** The tiny Git fixture exercised matching archived
+header/library paths, isolated outputs, cold/hit behavior, same-size and
+same-mtime content changes in the harness and current source, header,
+staticlib, Fonts, caller and builder, source membership, changed old commit,
+corrupt stamp, missing binary, altered extracted tree/Fonts and failed build
+followed by successful retry.
+The independent review found that target and profile Cargo overrides were
+missing from the cache identity. The follow-up added both environment
+families and proved a warm hit becomes a rebuild when either value changes,
+then a hit again when that value is held. Injecting the former `ReelCore.swift` /
+`rc_project_apply` diagnostic into failed current and reference builds made
+both consumers score failures without historical skips; phase 5 still ran
+independent gain/meter checks where possible. In the real-compiler
+integration, a temporary copy of the current harness carried
+`#if HARNESS_REFERENCE_BUILD` / `#error("reference instrument mutation")`.
+The reference compiler rejected both copies; phase 5 scored **36/37**, with
+its independent meter/gain rows passing; recording scored failures on both
+§6b build rows. Neither failure published a success stamp. The working
+harness and app/core sources were untouched by this mutation.
+
+**Full host result and limits.** The full recording probe passed **876/876**.
+It skipped **41 granted-tier rows by name**: `CGPreflightScreenCaptureAccess()`
+was true and microphone access authorized, but the console was locked and
+`SCShareableContent` exposed zero displays. That host skip is separate from
+the welcome comparison, which passed. The current
+`core/target/release/libreelcut_core.a` SHA-256 and mtime were identical before
+and after both historical builds. A first sandboxed current-harness compile
+could not write Clang's default cache; `/tmp` module cache made its forced
+build pass. A first sandboxed render could not read the generated package;
+the host-access rerun passed. The handoff preserves the successful complete
+logs and notes those initial host failures. These are AppKit chrome comparisons: no
+Metal preview image, live audio or manual recording acceptance is claimed.
+The independent part-4 review (`07-review-2.md`) passed with no findings.
+The reviewer reran the cache-key self-test and its negative control after
+the Cargo target/profile environment-key fix. The 81/81 phase-5, 29/29
+welcome and 876/876 recording scores, including 41 named locked-console
+skips, are the preceding implementation runs, not reruns for part 5.
+Item 6 and the manual checks in remaining §4 remain owed after part 5.
+
+### 12.10 Part 5 — Speed sheet explanation
+
+**Implemented (2026-09-21); the independent review later passed.** The Speed sheet's
+hint now tells the user that faster clips can leave gaps, slower clips can
+overlap, allowed overlaps may add a cross dissolve, and a refused clip stays
+unchanged while other selected clips can still change. This changes only the
+`loadView` hint literal. The wrapping label and sheet layout, rate and pitch
+controls, `ops`, `lengths`, `syncReadout` and Apply remain unchanged. The
+`set_speed` MCP mirror and the core's overlap policy did not change.
+
+The existing source mirror probe §5 is the behavioral reference: A slowed to
+×0.5 applies at 2,000,000 ticks and B gains a cross dissolve; C slowed to
+×0.5 is refused and stays at 1,000,000; selecting [A, C] yields 3,000,000
+ticks after only A changes. The hint explains these outcomes without a
+second duration calculation. The sequential gate passed: `make typecheck`
+had zero errors and only the four baseline AVFoundation warnings, `make app`
+built a fresh Release app, and the unchanged `source_mirror_probe.py` passed
+**40/40**, including all §5 vectors, with no host skips. The part-only diff
+shows the hint as the sole product change; the probe instrument and product
+logic are unchanged. The probe verifies behavior, not the displayed text:
+it does not photograph the Speed sheet or establish rendered wrapping.
+Layout and manual acceptance remain unclaimed. The independent part-5
+review (`05-review.md`) passed without findings. Part 6 is recorded below.
+
+### 12.11 Part 6 — argument contract coverage
+
+**Implemented (2026-09-21); the final independent review passed with no
+findings (`05-review.md`).** The product
+decoder, editing algorithms, op table rows, schemas, FFI and app callers are
+unchanged. Only the contract comments in `op_table.rs`, `edit.rs` and
+`edit_props.rs` were corrected: `required: false` promises omission, while
+the four defaulted plain booleans reject null; `Option<T>` fields and the
+separate scope key accept it. Spec §6 states this distinction and qualifies
+the ordinary nearest-frame rule with `add_transition`'s floor policy and the
+source/audio exceptions. The app's stricter present-value transition schema
+remains separate.
+
+`op_nullability.rs` derives all **54 optional fields** from `OP_TABLE`:
+the four plain Boolean exceptions and 50 nullable fields. Each gets an
+omitted baseline, null and a valid value; booleans get both values. Required
+`set_reversed.reversed` and absent/null/valid/wrong-kind `scope` are separate
+controls. A decoder failure must carry the named op's parse prefix, and a
+later domain error is not mistaken for one. `op_default_booleans.rs` pins
+false/omission equality and the true branch for ripple placement,
+occupied-track removal, used-media removal and canvas transform scaling;
+nullable Boolean, duration and transition-kind controls pin the different
+semantics of explicit values.
+
+`op_ticks.rs` compares the case set with the published `Kind::Ticks` and
+`Kind::Ranges` inventory in both directions: **27 ops / 36 distinct
+argument pairs**. All 36 pairs execute at **30/1 (20,000 ticks/frame)**
+and **30000/1001 (20,020 ticks/frame)**; 41 vectors per rate include the
+extra selected/omitted split, speed-two/still slip, plural-range and second
+transition-mode branches. Expected fields and outcome arms are literal
+frame-index or source-time calculations in the tests, not calls to the
+production snap/window helpers. The tests check the input handle byte for
+byte after each call. Edge-sensitive insert and gap selections, lower/upper
+half-frame and signed ties, zero/negative duration, a slightly negative
+clip-relative start that snaps to zero, and scoped parent-grid placement
+have independent controls. Both `add_transition` modes floor a request above
+half a frame, unlike `set_transition_duration`'s nearest rounding.
+
+Opaque timing has its own direct FFI controls in `op_tick_payloads.rs`:
+`add_text_clip.text.animation`, `set_video.patch.motion` and
+`set_text.patch.animation` snap; `set_audio` fade lengths and
+`add_media.descriptor.duration` keep their precision. `set_action_end` keeps
+permitted off-grid audio/text timing payloads and refuses motion. The
+complementary loaded-state and copy paths remain covered by `schema_v8`,
+`patch_door`, `frame_grid_canvas` and `frame_grid_transfer`: paste and
+paste-attributes normalize picture times in payload clips/nests; their
+source positions and audio envelopes stay precise. Derived-time writers
+`set_canvas`, `set_speed` and `unnest` do not declare `Ticks` arguments;
+parts 1–2 and their tests own their bounds and normalization. This audit
+does not assert that legacy loaded contents are all on a frame grid.
+
+The new `op_contract_proof.py` runs the four FFI suites sequentially and
+builds each negative control in a separate temporary core and private Cargo
+target. The focused suites passed **15/15 tests**; `make test` passed
+**784/784**. Null-as-absent, unsnapped-marker and nearest-transition mutants
+compiled and failed their named assertions with exit 1; the last failed both
+handle and ripple controls. `make fmt`, `make lint`, `make typecheck` (zero
+errors, four baseline warnings) and a fresh `make app` passed. The current
+Release app's argument proof passed **133/133** on owned port 5466, with an
+empty `Reelcut: ` parity log before and after; `git diff --check` passed.
+The first proof launch scored 132/133 solely because its temporary launcher
+wrote the parity log under a filename the existing script did not read; the
+corrected fresh owned launch passed 133/133. The full command outputs are in
+the implementation handoff. No paid cloud call or historical proof-tree
+rerun belongs to this coverage-only part. The 41 named locked-console
+recording skips from part 4 remained unmeasured at this stage; the later
+unlocked rerun in §12.12 closes that gap. §12.4's
+separate product choices and remaining §4's human playback/layout checks
+remain open. No GitHub issue is closed by this record.
+
+### 12.12 Unlocked recording verification (2026-09-21)
+
+After the user confirmed the desktop was unlocked,
+`CLANG_MODULE_CACHE_PATH=/tmp/reelcut-unlocked-clang python3 -u
+tools/proof/recording_probe.py --only host,granted` passed **44/44 with no
+skips**. The probe compiled the current app sources and reported Screen
+Recording preflight true, microphone access authorized, console locked
+false, and two active/shareable displays. All **41 previously skipped
+granted-tier rows** ran and passed: real start/pause/resume/stop recordings,
+stop while paused, and the panel's recording, hiding and document-landing
+path. The probe deleted its generated recordings afterward.
+
+The log is `/tmp/reelcut-recording-unlocked.log`. This focused result
+supplements the earlier full **876/876 with 41 skipped** run; it is not a
+fresh full-suite score. No source or proof code changed. Manual playback,
+audio-quality and layout acceptance in remaining §4 remain separate.

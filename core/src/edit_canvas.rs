@@ -13,8 +13,8 @@
 //! 1. **A canvas dimension is even**, because H.264 and HEVC encode in
 //!    macroblocks over a chroma-subsampled plane. Catching it here makes
 //!    it a message about the field the user just typed.
-//! 2. **Nothing sub-frame may live in the model**, so a rate change
-//!    re-snaps every clip, action and marker time to the new grid — and a
+//! 2. **A rate change normalizes stored picture times**, so it re-snaps
+//!    top-level and nested clips and top-level markers to the new grid — and a
 //!    coarser grid can land two markers on one tick, which markers may
 //!    never share.
 
@@ -94,13 +94,12 @@ fn rescale(project: &mut Project, old_width: u32, old_height: u32) {
     }
 }
 
-/// Re-snaps every stored time to the canvas's CURRENT frame grid, after
+/// Re-snaps stored picture times to the canvas's CURRENT frame grid, after
 /// that grid has changed.
 ///
-/// Nothing sub-frame may live in the model (spec §6), and yesterday's grid
-/// is not today's: a 24 fps boundary is not a 30 fps boundary, so every
-/// clip start and duration, every action span and every marker time has to
-/// move to the nearest new boundary.
+/// Yesterday's grid is not today's: a 24 fps boundary is not a 30 fps
+/// boundary, so top-level and stored-nest clips, their action and present
+/// base motion/text times, and top-level markers move to the new grid.
 ///
 /// Three clamps keep the result valid: a media clip's duration is held to
 /// the source it still has, snapped DOWN to the new grid, so a coarser rate
@@ -111,22 +110,20 @@ fn rescale(project: &mut Project, old_width: u32, old_height: u32) {
 /// inside its clip.
 fn resnap(project: &mut Project) {
     let fps = project.canvas.fps;
-    let frame = project.frame();
-    // By index: the new duration is read off the PROJECT (the clip's media
-    // is what bounds it) while the clip itself is about to be mutated.
-    for index in 0..project.clips.len() {
-        let duration = project.duration_resnapped(&project.clips[index]);
-        let clip = &mut project.clips[index];
-        clip.start = time::snap_to_frame(clip.start, fps).max(0);
-        clip.duration = duration;
-        let last_start = clip.duration.saturating_sub(frame).max(0);
-        for action in clip.actions.iter_mut() {
-            action.start = time::snap_to_frame(action.start, fps).clamp(0, last_start);
-            action.duration = time::snap_to_frame(action.duration, fps)
-                .max(frame)
-                .min(clip.duration.saturating_sub(action.start))
-                .max(1);
+    // Temporarily own each list so source/media lookup can borrow the whole
+    // project while a clip is normalized. Visit each stored nest exactly
+    // once, including orphans and nests shown by more than one clip.
+    let mut clips = std::mem::take(&mut project.clips);
+    for clip in &mut clips {
+        project.resnap_clip_times(clip);
+    }
+    project.clips = clips;
+    for index in 0..project.nests.len() {
+        let mut clips = std::mem::take(&mut project.nests[index].clips);
+        for clip in &mut clips {
+            project.resnap_clip_times(clip);
         }
+        project.nests[index].clips = clips;
     }
     for marker in project.markers.iter_mut() {
         marker.time = time::snap_to_frame(marker.time, fps).max(0);
@@ -157,9 +154,8 @@ impl Project {
     ///
     /// `rescale_clips` multiplies every clip's `x`, `y` and `scale` by the
     /// size ratio (see [`rescale`]) so a finished layout survives a resize.
-    /// Changing `fps` re-snaps EVERY stored time to the new grid — clip
-    /// starts and durations, action spans, marker times (see [`resnap`]) —
-    /// because nothing sub-frame may live in the model.
+    /// Changing `fps` re-snaps top-level and stored-nest clip times, present
+    /// base motion/text timing, action spans and top-level markers.
     ///
     /// `Err` for a dimension outside 16..16384 or odd (H.264 needs even
     /// dimensions), a frame rate with a zero term, or a background channel

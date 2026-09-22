@@ -57,9 +57,9 @@ it" is against the chrome as it was. `reference_commit()` finds that tree
 without a checkout: the parent of the commit that ADDED
 `app/Sources/LevelMeterView.swift`, or HEAD while the phase is still
 uncommitted, extracted with `git archive` into `work/chrome5/before/` and
-compiled by the same swiftc line `harness/build.sh` runs, against the same
-staticlib and the SAME `harness/main.swift`. So the two binaries differ by
-the phase's `app/Sources` changes and by nothing else, and the answer is
+compiled with its matching Rust core and bridging header, and the SAME
+current `harness/main.swift` under `HARNESS_REFERENCE_BUILD`. This preserves
+the historical source/FFI contract while using one paint instrument. The answer is
 worth the 35 s it costs: at 1440 in both appearances, and at 1080 and 1600,
 the TIMELINE BAR differs in exactly one 120 × 12 rectangle — 4 704 pixels of
 it, and not one anywhere else in the row — and at the 900 pt minimum it does
@@ -89,16 +89,12 @@ measurements are what will tell it so.
 The instrument itself is guarded the same way. The reference is compiled with
 the CURRENT `harness/main.swift` under `-D HARNESS_REFERENCE_BUILD` — one
 general flag, not a per-phase one, so a later phase's mode goes behind the
-same `#if` — and when the current instrument will not compile against the
-older tree anyway, `build_reference` falls back to the reference commit's own
-`main.swift` and says so in section 2 rather than exiting. A reference build
+same `#if`. A reference build
 that cannot be made at all is a scored FAILURE and not a `sys.exit`: it is
 the only thing here that reaches backwards in the history, so it is the only
 thing that can rot on its own, and it must not take the model checks — which
-need no reference at all — down with it. (Measured, by staging a mode naming
-`LevelMeterSink` outside the guard: with the fallback the script still runs
-81/81 and names the instrument it used; with the fallback disabled it reports
-36/37 instead of dying at zero.)
+need no reference at all — down with it. A failed current harness build also
+leaves the independent gain checks running; meter requests and renders cannot.
 
 **One harness change, and the phase's plan said there would not be one.**
 Wave 2B measured the meter's rect and reported the model reachable without
@@ -215,6 +211,8 @@ import subprocess
 import sys
 import time
 import zlib
+
+from reference_build import build_reference as build_matching_reference
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
@@ -410,127 +408,28 @@ def reference_commit():
 
 
 def build_reference(commit):
-    """`git archive` the reference tree into `work/`, then compile it with the
-    SAME swiftc line, staticlib and bridging header the current build uses —
-    so the two binaries differ by the phase's own `app/Sources` changes and by
-    nothing else.
-
-    Returns `(binary, sha, note)`, with `binary` None when it could not be
-    built at all; `note` says which `main.swift` the reference was compiled
-    with, and section 2 prints it and scores the failure. It is a returned
-    failure rather than a `sys.exit` for one reason: this build is the only
-    thing in the script that reaches BACKWARDS in the history, so it is the
-    only thing that can rot on its own, and a rotted instrument must not take
-    the twenty-three model checks — which need no reference at all — down with
-    it.
-
-    **The instrument, and what happens when it will not fit.** The reference
-    is compiled with the CURRENT `harness/main.swift` under
-    `-D HARNESS_REFERENCE_BUILD`, which compiles out every mode naming a type
-    an older tree lacks (that file's header states the convention). Both
-    renders then come out of one program, which is the whole value of the
-    comparison. When the current instrument will not compile against the older
-    tree anyway — a mode a later phase forgot to guard, or an `app/Sources`
-    change the reference tree cannot satisfy — it falls back to the reference
-    commit's OWN `harness/main.swift` and says so, because a comparison made
-    with two builds of the instrument is worth more than no comparison, and
-    far more than a script that exits before its first check. The fallback is
-    the apology, not the plan: the fix is the guard.
-
-    Skipped when the stamp beside the binary still names the same commit and
-    the same instrument. `harness/build.sh` is not reused because it hard-codes
-    `app/Sources`; everything else about the two builds is deliberately equal,
-    down to the `-module-name`.
-    """
-    sha = git("rev-parse", commit).strip()
-    binary = os.path.join(BEFORE, "harness")
-    stamp = os.path.join(BEFORE, "stamp.json")
-    instrument = [
-        sha,
-        os.path.getmtime(HARNESS_MAIN), os.path.getsize(HARNESS_MAIN),
-        os.path.getmtime(STATICLIB), os.path.getsize(STATICLIB),
-    ]
-    if os.path.exists(binary) and os.path.exists(stamp):
-        with open(stamp) as f:
-            kept = json.load(f)
-        if isinstance(kept, dict) and kept.get("instrument") == instrument:
-            return binary, sha, kept.get("note", "")
-
-    for path in (binary, stamp):
-        if os.path.exists(path):
-            os.remove(path)
-    tree = os.path.join(BEFORE, "tree")
-    subprocess.run(["rm", "-rf", tree], check=True)
-    os.makedirs(tree, exist_ok=True)
-    # The reference commit's own copy of the harness comes out of the archive
-    # beside its `app/Sources`, unused unless the current one will not build.
-    archive = subprocess.run(
-        ["git", "-C", ROOT, "archive", sha, "app/Sources", "tools/proof/harness/main.swift"],
-        capture_output=True, check=True)
-    subprocess.run(["tar", "-x", "-C", tree], input=archive.stdout, check=True)
-    sources = sorted(
-        os.path.join(tree, "app", "Sources", name)
-        for name in os.listdir(os.path.join(tree, "app", "Sources"))
-        if name.endswith(".swift") and name != "main.swift")
-    sdk = subprocess.run(
-        ["xcrun", "--show-sdk-path", "--sdk", "macosx"],
-        capture_output=True, text=True, check=True).stdout.strip()
-
-    def compile_with(main):
-        return subprocess.run(
-            ["swiftc", "-sdk", sdk, "-target", "arm64-apple-macos15.0",
-             "-module-name", "Reelcut", "-import-objc-header", BRIDGING,
-             "-D", "HARNESS_REFERENCE_BUILD",
-             "-L", os.path.dirname(STATICLIB), "-lreelcut_core"]
-            + sources + [main, "-o", binary],
-            capture_output=True, text=True)
-
-    theirs = os.path.join(tree, "tools", "proof", "harness", "main.swift")
-    attempts = [(HARNESS_MAIN, "this tree's own harness/main.swift, so both renders "
-                               "come out of one program")]
-    if os.path.exists(theirs):
-        attempts.append((theirs, f"{sha[:8]}'s OWN harness/main.swift — the current one "
-                                 "does not compile against that tree, so the two renders "
-                                 "are two builds of the instrument as well as two builds "
-                                 "of the app; see build_reference"))
-    start, note, used, failures = time.time(), None, None, []
-    for candidate, description in attempts:
-        result = compile_with(candidate)
-        if result.returncode == 0 and os.path.exists(binary):
-            note, used = description, candidate
-            break
-        failures.append(
-            f"with {os.path.relpath(candidate, ROOT)}:\n"
-            + "\n".join((result.stdout + result.stderr).strip().splitlines()[:6]))
-    if note is None:
-        return None, sha, (f"the reference harness ({sha[:8]}) did not build.\n"
-                           + "\n".join(failures))
-    if used != HARNESS_MAIN:
-        print(f"reference: WARNING — fell back to {sha[:8]}'s own harness/main.swift")
-    # The harness registers the fonts sitting BESIDE its own binary, and
-    # without them every label in the reference render falls back to the
-    # system face — which shows up as a full-window diff and looks exactly
-    # like a layout change. Measured, before this line existed: 39 253 changed
-    # pixels in 38 clusters, none of them the meter's.
-    subprocess.run(["rm", "-rf", os.path.join(BEFORE, "Fonts")], check=True)
-    subprocess.run(["cp", "-R", FONTS, os.path.join(BEFORE, "Fonts")], check=True)
-    with open(stamp, "w") as f:
-        json.dump({"instrument": instrument, "note": note}, f)
-    print(f"reference: built {sha[:8]} in {time.time() - start:.0f} s")
-    return binary, sha, note
+    """Build archived Swift with its matching archived core and header."""
+    return build_matching_reference(root=ROOT, before=BEFORE, commit=commit,
+                                    harness_main=HARNESS_MAIN, fonts=FONTS,
+                                    proof_script=__file__)
 
 
 def build_harness():
+    """Return the current binary and a diagnostic for the scored build row."""
     start = time.time()
-    result = subprocess.run([BUILD], capture_output=True, text=True)
-    elapsed = time.time() - start
+    try:
+        result = subprocess.run([BUILD], capture_output=True, text=True)
+    except OSError as error:
+        return None, str(error)
     if result.returncode != 0:
-        sys.stderr.write(result.stdout + result.stderr)
-        sys.exit("harness build failed")
-    binary = result.stdout.strip().splitlines()[-1]
+        return None, (result.stdout + result.stderr).strip()
+    lines = result.stdout.strip().splitlines()
+    if not lines or not os.path.isfile(lines[-1]):
+        return None, "build.sh succeeded without a harness binary"
+    binary = lines[-1]
     built = "built" in result.stderr
-    print(f"harness: {binary} ({'built in %.0f s' % elapsed if built else 'up to date'})")
-    return binary
+    print(f"harness: {binary} ({'built in %.0f s' % (time.time() - start) if built else 'up to date'})")
+    return binary, None
 
 
 def render(binary, package, out, width=WIDTH, height=HEIGHT, appearance="dark",
@@ -771,15 +670,6 @@ def runs(values):
 # The checks.
 
 RESULTS = []
-# Checks that could not run, and why. A skip is not a pass: `report` names
-# every reason AND the count, so a reader sees what was measured and what
-# could not be.
-SKIPS = []
-# What sections 2 to 7 scored the last time the reference build worked:
-# 81/81 against the 36 sections 8 and 9 score alone. Hard-coded because the
-# rows cannot be counted without running them, and a skip that prints no
-# number is the thing `tools/proof/README.md` forbids.
-CROSS_BUILD_ROWS = 45
 
 
 def check(name, ok, detail=""):
@@ -787,11 +677,6 @@ def check(name, ok, detail=""):
     print(f"  {'PASS' if ok else 'FAIL'}: {name}")
     if detail:
         print(detail if detail.startswith("      ") else "      " + detail)
-
-
-def skip(count, reason):
-    SKIPS.append((count, reason))
-    print(f"  SKIPPED by name: {reason} — {count} rows did not run")
 
 
 def same_file(a, b):
@@ -1229,11 +1114,7 @@ def reading_checks(binary):
 
 def report():
     passed = sum(RESULTS)
-    tail = ""
-    if SKIPS:
-        total = sum(n for n, _ in SKIPS)
-        tail = f" ({total} skipped by name — " + "; ".join(why for _, why in SKIPS) + ")"
-    print(f"\n{passed}/{len(RESULTS)} checks passed{tail}")
+    print(f"\n{passed}/{len(RESULTS)} checks passed")
     sys.exit(0 if passed == len(RESULTS) else 1)
 
 
@@ -1472,7 +1353,12 @@ def gain_checks():
 
 def main():
     os.makedirs(CHROME, exist_ok=True)
-    binary = build_harness()
+    binary, build_note = build_harness()
+    if binary is None:
+        check("the current harness builds, so meter renders and readings can run", False,
+              build_note or "unknown build failure")
+        gain_checks()
+        report()
     reference, sha, note = build_reference(reference_commit())
     package = write_package()
     print(f"package: {os.path.relpath(package, ROOT)}")
@@ -1488,33 +1374,9 @@ def main():
         return os.path.join(CHROME, tag + ".png")
 
     if reference is None:
-        # Sections 3–7 are all cross-build comparisons and there is nothing to
-        # compare against; sections 8 and 9 need no reference at all, so they
-        # still run and are still scored. It is a CHECK or a SKIP rather than
-        # an exit so that this reads as "the instrument rotted" and not as
-        # "the proof was never run".
-        #
-        # **A reference the instrument cannot reach is a SKIP, not a
-        # failure.** The two builds are deliberately one core and two app
-        # trees, so a reference commit whose `ReelCore.swift` predates a
-        # change to the FFI cannot compile against the CURRENT header at all
-        # — nothing in this repo can make it, and no guard in
-        # `harness/main.swift` is the fix. Road map 7's D2·1 added
-        # `rc_project_apply`'s fourth parameter, which put this reference
-        # (pre-meter) permanently out of reach. Anything else that will not
-        # build is still the failure it was.
         print("\n2. the reference build — the tree one commit before the meter existed")
-        ffi_drift = "rc_project_apply" in note and "app/Sources/ReelCore.swift" in note
-        if ffi_drift:
-            skip(CROSS_BUILD_ROWS,
-                 "the reference tree's own ReelCore.swift predates an FFI change and cannot "
-                 "call the current header (road map 7's D2·1 fourth parameter); sections 3 "
-                 "to 7 (every cross-build comparison) did not run")
-            print("      " + note.replace("\n", "\n      "))
-        else:
-            check("the reference tree built, so there is a 'before' to compare the chrome "
-                  "against — see build_reference for the two instruments it tries",
-                  False, "      " + note.replace("\n", "\n      "))
+        check("the reference tree built, so there is a 'before' to compare the chrome against",
+              False, "      " + note.replace("\n", "\n      "))
         print("   sections 3–7 are cross-build comparisons and cannot run without it.")
         reading_checks(binary)
         gain_checks()
