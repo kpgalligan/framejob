@@ -572,11 +572,47 @@ them. The frozen files took wiring only: `TimelineView.swift` 1651 →
 **395**, `tools/proof/clip_inspector_proof.py` **384**,
 `tools/proof/harness/main.swift` 1116 → **1132**.
 
+**Road map 9's phase 2, the sub-tabs and the pinned block (2026-09-23,
+`wc -l`; road map 9 §4).** `app/Sources/ClipPane.swift`, over the cap at
+608, gave up first: `ClipSelectionHeaderView` moved verbatim to the new
+`ClipSelectionHeader.swift` (**235**) and `ClipHeaderBlock` out of
+`ActionLaneView.swift` to the new `ClipPinnedBlock.swift` (**190**, with
+`ClipSubTab` and `ClipSubTabsView`), the two moves typechecked at the
+baseline alone before anything else landed. Then `ClipPane.swift`
+608 → **400** (the sub-tab state and the per-tab `makeSections()`, which
+came out shorter than the list it replaced); `ActionLaneView.swift`
+378 → **330**; `InspectorPane.swift` 1679 → **1679**, net 0 of the +8
+allowed (`pinnedBlock`, the protocol member, `InspectorSection.title`, the
+header no longer stacked, the knob's draw shorter by one line);
+`InspectorViewController.swift` (frozen) 296 → **332**, 36 of the 40
+wiring lines allowed; `OptionControls.swift` untouched at 1082, the typed
+popup init going to the new `OptionControls+Choices.swift` (**24**).
+`VideoPane+Motion.swift` 242, `TextPane.swift` 528 and
+`EditorViewController+Actions.swift` 87 changed in place. The instruments,
+exempt: `tools/proof/clip_inspector2_proof.py` **393** and
+`clip_inspector2_probe.swift` **263** (new), `tools/proof/harness/main.swift`
+1132 → **1154**, `e2_chrome.py` 1481 → **1493**, `phase3_chrome.py`
+768 → **768**, `clip_inspector_proof.py` 385 → **393**.
+
 ## 4. What only a person at the machine can check
 
 These are not tasks so much as a list to run through at the machine once. The
 first two have been owed since M1 and spec §10 records them; phases 8 and 9
 and the closing above added the rest.
+
+- **The Clip tab's sub-tabs and pinned block, LOOKED AT (road map 9's
+  phase 2, 2026-09-23)** — in both appearances, in the running app. The
+  harness photographs the strip, the `◆1` badge and the inspector sliders'
+  block knob at rest (`clip_inspector2_proof.py`); it cannot scroll, click
+  or drag. Worth judging: that the block stays put while the sections
+  scroll under it; that a click on a sub-tab switches at once and the
+  panel comes back to the top; that the choice survives picking an action
+  and resets on picking another clip; whether the active cell's selection
+  fill reads in light; whether the mint `◆N` reads beside a muted label;
+  and dragging a slider's block knob, whose fill should meet it on a pixel
+  edge at every value. Phase 1's own checks (the lane and bands in both
+  appearances, a real band click and esc) are road map 9 §2's and still
+  stand.
 
 - **The sharp chrome, LOOKED AT (2026-09-23)** — in both appearances, in the
   running app. `sharp_chrome.py` photographs the resting chrome offscreen and
@@ -935,16 +971,17 @@ and the closing above added the rest.
 
 ## 5. Where a third road map would start
 
-**Road map 9, the clip inspector redesign, has its phase 1 BUILT
-(2026-09-23; road map 9 §2).** The selected action is the sixth piece of
-view state (spec §11 CI-1 to CI-4): the timeline and the Clip tab's new
-action lane highlight it, the inspector's fields show and write its END
-state, esc and the Clip chip leave it, ⌫ removes it. **Next work starts at
-road map 9 §0's phases 2 to 5** — sub-tabs and the lane pinned above the
-scroll view (2), row marks, Reset/Clear and the refusal strip (3), band
-drags on the lane and the timeline (4), canvas drags following the mode and
-keyed-off switches (5) — and at §2's deviations, each of which one of those
-phases retires.
+**Road map 9, the clip inspector redesign, has its phases 1 and 2 BUILT
+(2026-09-23; road map 9 §2 and §4).** The selected action is the sixth
+piece of view state (spec §11 CI-1 to CI-4): the timeline and the Clip
+tab's action lane highlight it, the inspector's fields show and write its
+END state, esc and the Clip chip leave it, ⌫ removes it. The Clip tab is
+sub-tabs by kind under a block pinned above the scroll view (CI-5), with
+`◆N` key counts and the block knob (CI-6). **Next work starts at road map
+9 §0's phases 3 to 5** — row marks, Reset/Clear and the refusal strip (3,
+which may re-count `◆N` to rows and must say so), band drags on the lane
+and the timeline (4), canvas drags following the mode and keyed-off
+switches (5) — and at §2's and §4's deviations.
 
 **Road map 8, word captions, is BUILT (2026-09-23; road map 8 §10, W0 to
 W4b).** Both engines page a run's words into width-measured, word-timed

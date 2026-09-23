@@ -350,7 +350,7 @@ final class TextPane: InspectorPaneView {
             binding.ops(text: TextPatch(animation: .some(next)))
         }
         return InspectorSection(
-            id: "text.animation", title: "Animation",
+            id: "text.animation", title: "Reveal",
             summary: {
                 guard let animation = binding.textProps.animation else { return "off" }
                 return animation.kind.displayName.lowercased()

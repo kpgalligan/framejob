@@ -1,7 +1,7 @@
 # Reelcut — road map 9: the clip inspector redesign
 
-**Status: phase 1 BUILT, 2026-09-23 (§2). Phases 2–5 are designed by the
-handoff and not built (§0).**
+**Status: phases 1 and 2 BUILT, 2026-09-23 (§2, §4). Phases 3–5 are
+designed by the handoff and not built (§0).**
 
 The handoff is `designs/design_handoff_clip_inspector/` — its README is the
 normative text for the redesign's metrics, inks and behaviour, with this
@@ -23,11 +23,11 @@ the view state everything else hangs on lands first.
    a lane in the Clip tab SELECTS; the lane replaces the Actions section;
    pan, compressor, noise reduction, duck, mono and keep-pitch routed to the
    clip; the per-section "Editing action N's end state" note removed.
-2. **Sub-tabs and the pinned block** (P1, P2) — Picture · Sound · Clip
-   (Text · Picture · Clip, Shape · Picture · Clip, Sound · Clip), the
-   section regrouping and the two renames (Motion presets, Reveal), the
-   selection header and lane PINNED above the scroll view, the 7 × 11 block
-   knob on the inspector's sliders, sub-tab badges.
+2. **Sub-tabs and the pinned block** (P1, P2) — BUILT, §3 and §4.
+   Picture · Sound · Clip (Text · Picture · Clip, Shape · Picture · Clip,
+   Sound · Clip), the section regrouping and the two renames (Motion
+   presets, Reveal), the selection header and lane PINNED above the scroll
+   view, the 7 × 11 block knob on the inspector's sliders, sub-tab badges.
 3. **Marks and Reset/Clear** (P5, P11) — the row marks ◆ ◇ ○ ⊘ and "at
    end", the coral playhead tick, header badges, auto-opening the sections
    an action keys, summary colours, the Reset/Clear model with per-row ×,
@@ -152,15 +152,146 @@ does.
 
 **Owed.** Three earlier chrome proofs were re-run on the phase's tree
 (2026-09-23): `sharp_chrome.py` **29/29** and `e2_chrome.py` **52/52** hold,
-and `phase3_chrome.py` is **32/33**. Its failing row is "the content below is
-the one-region render pushed DOWN by six rows" (the best shift is still
-174 pt, but at 157 mismatched rows of 400): that proof holds `video.actions`
-open (`INSPECTOR_BELOW`) so the section stack has no slack when Obscure
-opens, and the Actions section no longer exists, so the stack now has slack
-and the rows below Obscure redistribute. The instrument needs a new
-section to hold open below Obscure (or a taller window), re-measured —
-not done here, because the phase's spec does not name the file. Every
-other Clip-tab photograph now carries the lane block under its header and
-was not re-run in this phase. A person still checks the lane and the bands
-in both appearances (the light ink `#1E8F6E` is the handoff's placeholder),
-and a real click on a band and esc in the running app.
+and `phase3_chrome.py` was **32/33**. Its failing row was "the content below
+is the one-region render pushed DOWN by six rows" (the best shift was still
+174 pt, but at 157 mismatched rows of 400): that proof held `video.actions`
+open so the section stack had no slack when Obscure opened, and the Actions
+section no longer exists. **Corrected by phase 2 (§4):** Obscure is now the
+last section of the Picture sub-tab, `INSPECTOR_BELOW` is deleted, and the
+row, re-measured on the section's own tail, scores **33/33**. The lane is
+no longer inside the scroll view either: phase 2 pins the whole block above
+it (§3), retiring the deviation above. Every other Clip-tab photograph now
+carries the lane block under its header and was not re-run in this phase. A
+person still checks the lane and the bands in both appearances (the light
+ink `#1E8F6E` is the handoff's placeholder), and a real click on a band and
+esc in the running app.
+
+## 3. Phase 2's design
+
+**The block, pinned** (spec §11 CI-5). `InspectorPane.pinnedBlock` is the
+header `makeHeader()` builds on every `rebuild()` — no longer stacked into
+the scroll view. The frozen `InspectorViewController` hosts it in a
+`pinnedContainer`, a vertical `NSStackView` between the tab strip and the
+scroll view (0 pt when empty, a priority-1 zero height), filled by
+`installPinned(_:)` right after `pane.rebuild()`; a swap to Media or
+Document rebuilds, so the container empties there. The outgoing block is
+held one generation in `retiredPinned`, `buildTabs()`'s reason: a sub-tab
+click lands inside the block's own `mouseDown`. For the Clip tab the block
+is `ClipHeaderBlock` (`ClipPinnedBlock.swift`), stacked header → lane →
+sub-tabs.
+
+**The sub-tabs.** `ClipPane.subTabs` is Text for an all-text selection,
+Shape for an all-shape one, Picture when a selected clip has pixels, Sound
+when one has audio, and Clip always, last. `activeSubTab` is the hand-picked
+`chosen` while the selection still has that tab, else the first.
+`choose(_:)` and `forgetSubTab()` set and clear `chosen` and trigger
+nothing; `InspectorViewController.selectClipSubTab(_:)` is the one refresh
+(and scrolls to the top), and `refresh(isLive:)`'s existing
+`ids != lastSelection` block calls `forgetSubTab()` — whatever tab is
+showing — so A → B → A comes back on the default and a detour through the
+Media tab keeps nothing stale. `structureSignature` carries the active tab
+and the tab list. `makeSections()` switches on the active tab: **Text**
+Content, Font, Style, Outline, Backdrop, Box, Reveal, Presets; **Shape**
+Shape, Stroke, Fill, Gradient, Arrows; **Picture** Transform, then Crop,
+Corner radius, Colour and Chroma key when `allSourcePixels`, then Shadow,
+Filters, Reflection, Spotlight, Obscure; **Sound** Volume, Fades, Duck,
+Noise reduction, Compressor, Mix; **Clip** Timing (single) or its Reverse
+half (several media clips), Speed (media), Transition (single, with an
+overlap), Motion presets (pixels). The open rule lost its `!hasPixels`
+guard: on any tab with nothing expanded, the first section with no stored
+preference opens. Ids are unchanged; `video.motion` is titled *Motion
+presets* and `text.animation` *Reveal*.
+
+**The strip** (`ClipSubTabsView`): 40 pt — 8 above, 24 pt cells, 8 below —
+with 10 pt sides; equal cells whose 1 pt borders collapse, with
+`PanelTabsView.tabRect`'s rounding; the active cell `DS.selectionFill` with
+a `DS.accent` border and `DS.textStrong`, inactive ones
+`controlBackgroundColor`, `DS.border` and `DS.textMuted`; labels
+`DS.sans(11, .semibold)`; a 1 pt `DS.border` line at the foot. No hover.
+The badge (spec §11 CI-6) is "◆N" in `DS.mono(9, .medium)` and `DS.action`
+after the label, only for N > 0, where N counts the KEYS of the selected
+action's end patch the tab's sections write — Picture the video keys but
+`motion`, Clip `motion`, Sound the audio keys, Text the text keys, Shape
+none. `refresh()` redraws only when a count changed.
+
+**The block knob.** `InspectorSliderControl` draws `BlockSliderCell.drawKnob`'s
+7 × 11 pt block in `DS.textStrong` at full alpha, its rect snapped to device
+pixels (`backingAlignedRect`, `.alignAllEdgesNearest`); the rail's inset
+and the value mapping use the 7 pt width, and the accent fill runs to the
+SNAPPED knob's `midX`, so the two meet on a pixel edge. Dimming stays the
+view's `alphaValue`.
+
+**Two owed items from phase 1.** The park clamp is
+`min(action.endTime, max(snapshot.duration - frame, 0))`: a clip shorter
+than a frame (which `Project::validate` lets through on read) parked the
+playhead BEFORE its own start. The Curve popup goes through the new typed
+`OptionPopupControl` init (`OptionControls+Choices.swift`), values in and
+out, no index array beside it.
+
+## 4. Phase 2's record
+
+**What landed.** Three new files — `ClipSelectionHeader.swift` (a pure move
+of `ClipSelectionHeaderView` out of `ClipPane.swift`), `ClipPinnedBlock.swift`
+(`ClipSubTab`, `ClipSubTabsView`, and `ClipHeaderBlock` moved out of
+`ActionLaneView.swift`) and `OptionControls+Choices.swift` — and changes in
+`ClipPane`, `ActionLaneView` (the Curve popup), `InspectorPane`
+(`pinnedBlock`, `sections` readable, `InspectorSection.id`/`title`
+readable, the knob), `InspectorViewController` (frozen; wiring only),
+`VideoPane+Motion` and `TextPane` (one title each) and
+`EditorViewController+Actions` (the clamp). No core, FFI, op or tool change.
+The sizes are `designs/reelcut-remaining.md` §3's phase-2 paragraph.
+
+**What was measured.** The two pure moves alone, before anything else:
+`make typecheck` at its baseline, 0 errors and 7 warnings. At the end:
+`make typecheck` 0 errors and 7 warnings; `make test` (816 passed, 0
+failed) and `make lint` clean, the core untouched; `make app` rc 0; the
+built app's log carries no `Reelcut: ` line. `clip_inspector2_proof.py`
+**32/32** — the probe's 21 rows (T1 ×5, T2 ×6, T3 ×4, T4 ×2, T5, T6 ×2, T7)
+plus its build and presence rows, and nine harness rows (H1, H2 ×3, H3 ×2,
+H4 ×3). `--mutant tabs` exits 0: the six T2 rows fail and nothing else
+does. T7 was run once over a copy of `app/Sources` with l.29 put back to
+`min(action.endTime, snapshot.duration - frame)`: it FAILED, the playhead
+parked at **1 180 000** (the clip starts at 1 200 000), 20/21 probe rows.
+Re-run: `phase3_chrome.py` **33/33**, `e2_chrome.py` **52/52**,
+`sharp_chrome.py` **29/29**, `clip_inspector_proof.py` **39/39**.
+
+**Deviations, each for a reason.**
+
+- **"8/10 padding" is 8 pt top and bottom, 10 pt sides**, and a text clip
+  opens on Text (its first tab) — both recorded in CI-5.
+- **The knob is `DS.textStrong` at full alpha**
+  (`withAlphaComponent(1)`), which is `BlockSliderCell.drawKnob`'s own ink
+  when enabled. `labelColor` is translucent, so a knob in it composited
+  over the two-colour rail split in two on its centreline (measured
+  (221, 221, 221) and (224, 224, 224) at scale 2); opaque, it is one run of
+  (255, 255, 255), 14 px, between the accent and the rail.
+- **`clip_inspector_proof.py` scores 39/39, not 38/38.** It scored 39 on the
+  phase-1 tree before this phase touched it: S3 has five rows, which phase
+  1's record counted as four. Its row 4 now takes the FIRST run of mint
+  rows down the column, a gap of up to 4 pt staying inside the run: the
+  selected band's curve crosses the column (mint at 156–164.5 and
+  167–175.5 pt), so a run of strictly adjacent rows stops at the curve and
+  measured a 9 pt band. The strip's `◆1` is 40 pt and more below.
+- **`e2_chrome.py`'s embedded probe changed too**, not only its four
+  renders: its `editor()` helper selects the Clip sub-tab (Motion presets
+  lives there), and `rowControl` looks inside the `video.motion` section
+  first, because on the Clip tab Timing's own "In" row comes before
+  Motion's. Before the two edits the file scored 32/36 and then 50/52.
+- **`phase3_chrome.py`'s shift band** starts at 955 pt, just above the
+  two-region render's tail (the Add Region · Place on Canvas row, 963–985
+  pt) and runs 200 pt; at the winning shift it is compared with the
+  one-region render's 781–981 pt, which holds that render's tail (789–811
+  pt). A band holding both tails in the SAME rows also passes, but thinly
+  (50 mismatched rows against a runner-up of 235), because it compares
+  Region 2's rows with Region 1's. TALL stays 1500: the two-region section
+  ends at 993 pt against a visible area ending at 1200, so neither render
+  has a scroller.
+- **The detail row's widths are decided**: Start stays 104 pt
+  (`InspectorTimecodeField`'s `hh:mm:ss:ff`) and Curve 70 pt, closing phase
+  1's note.
+
+**Owed.** A person checks the strip, the badge and the block knob in both
+appearances, the block staying put while the sections scroll, and a real
+click on a sub-tab (remaining §4). The other Clip-tab photographs
+(`phase2`, `phase4`, `phase6`–`phase9`, `e1`, the word-caption chrome) were
+not re-run in this phase; each now opens on its selection's first sub-tab.

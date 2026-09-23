@@ -57,9 +57,10 @@ PROBE = os.path.join(WORK, "e2probe")
 
 WIDTH, HEIGHT = 1440, 862
 # The timeline renders are at 862, the window every earlier chrome script
-# photographs. The INSPECTOR renders are taller: Motion is the tenth section
-# in a shape clip's stack and its header is below the fold at 862, so opening
-# it would change no visible pixel at all (measured). Recorded as a deviation.
+# photographs. The INSPECTOR renders are taller, and ask for the Clip sub-tab
+# (road map 9 §3), where Motion presets now lives: they were first made taller
+# when Motion was the tenth section of one long stack, below the fold at 862,
+# and the height is kept. Recorded as a deviation.
 SECTION_HEIGHT = 1600
 TOOLBAR = 44             # DS.toolbarHeight
 INSPECTOR_W = 304        # DS.panelWidth
@@ -442,9 +443,11 @@ def build_harness():
     return binary, None
 
 
-def render(binary, package, out, expand="-", select=-1, height=HEIGHT):
+def render(binary, package, out, expand="-", select=-1, height=HEIGHT, sub_tab=None):
     args = [binary, package, out, "light", str(WIDTH), str(height), str(select),
             "0", "1", "clip", "-", expand]
+    if sub_tab:
+        args += ["-", "-", sub_tab]
     result = subprocess.run(args, capture_output=True, text=True)
     if result.returncode != 0 or not os.path.exists(out):
         return None, (result.stdout + result.stderr).strip()[-400:]
@@ -562,8 +565,13 @@ func editor(_ path: String, select indices: [Int], playhead: Ticks? = nil)
     document.makeWindowControllers()
     document.showWindows()
     spin(1.2)
-    return (document,
-            document.windowControllers.first!.contentViewController as! EditorViewController)
+    let controller =
+        document.windowControllers.first!.contentViewController as! EditorViewController
+    // Motion presets is on the Clip sub-tab (road map 9 §3), where the rows
+    // below look for it.
+    controller.inspector?.selectClipSubTab(.clip)
+    spin(0.3)
+    return (document, controller)
 }
 
 var answer: [String: Any] = [
@@ -764,8 +772,11 @@ answer["extremes"] = ["count": n, "writes": writes, "validates": validates]
 
 // ---- E2-27: the real menu items and inspector controls -------------------
 UserDefaults.standard.set(false, forKey: InspectorSection.collapsedKeyPrefix + "video.motion")
+/// Looked up inside the Motion presets section when there is one: on the
+/// Clip sub-tab Timing's own "In" row comes first (road map 9 §3).
 func rowControl(_ root: NSView, _ name: String) -> NSView? {
-    for view in walk(root) {
+    let motion = walk(root).first { ($0 as? InspectorSection)?.id == "video.motion" }
+    for view in walk(motion ?? root) {
         guard let label = view as? InspectorRowLabel, label.stringValue == name else { continue }
         return controlAfter(label).0
     }
@@ -1104,10 +1115,11 @@ def main():
     print("\n2 — the Motion section, open")
     if binary:
         shut, error = render(binary, fixtures["wedges"], os.path.join(CHROME, "shut.png"),
-                             select=0, height=SECTION_HEIGHT)
+                             select=0, height=SECTION_HEIGHT, sub_tab="clip")
         opened, error2 = render(binary, fixtures["wedges"],
                                 os.path.join(CHROME, "open.png"),
-                                expand="video.motion", select=0, height=SECTION_HEIGHT)
+                                expand="video.motion", select=0, height=SECTION_HEIGHT,
+                                sub_tab="clip")
         if error or error2:
             failure("the Motion section opens", error or error2)
         else:
@@ -1128,10 +1140,10 @@ def main():
                   f"(≥ 7 × {ROW_PITCH} = {7 * ROW_PITCH})")
         zero_shut, zero_error = render(
             binary, fixtures["zero-both"], os.path.join(CHROME, "zero-shut.png"),
-            select=0, height=SECTION_HEIGHT)
+            select=0, height=SECTION_HEIGHT, sub_tab="clip")
         zero_open, zero_error2 = render(
             binary, fixtures["zero-both"], os.path.join(CHROME, "zero-open.png"),
-            expand="video.motion", select=0, height=SECTION_HEIGHT)
+            expand="video.motion", select=0, height=SECTION_HEIGHT, sub_tab="clip")
         check("zero Motion section captures both collapsed summary and expanded recovery note",
               zero_error is None and zero_error2 is None
               and bool(changed_pixels(Image(zero_shut), Image(zero_open))) if zero_shut and zero_open else False,

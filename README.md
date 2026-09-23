@@ -53,9 +53,11 @@ normative: §5.2 is the project schema, §6 the op table, §7 the architecture.
   the one place a name can be cleared back to what the clip shows, with its
   label dot — and the clip's **action lane**: its actions as numbered bands
   you click to select, with Zoom to Region, Zoom Back and Add Action, and
-  the selected action's start, length, curve and Remove — over the sections
-  that selection's kind earns (transform, crop, filters, text, shape,
-  audio…), each collapsible. Every field shows and writes the clip's base
+  the selected action's start, length, curve and Remove — pinned above the
+  scroll view with a row of sub-tabs the selection's kind earns (Text or
+  Shape, Picture, Sound, and Clip for timing, speed, transitions and motion
+  presets; a mint `◆N` marks a tab the selected action keys), over that
+  tab's sections, each collapsible. Every field shows and writes the clip's base
   props — or, while an action is selected, that action's END state, read
   at its end tick. Playing or scrubbing INTO an action selects it; esc or
   the lane's Clip chip leaves it, and ⌫ removes it. The timeline draws each

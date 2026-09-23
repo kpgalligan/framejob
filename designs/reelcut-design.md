@@ -227,6 +227,32 @@ sections appear is a function of the selection's kind (`ClipPane.makeSections`)
 — the piece of logic that replaces the whole tab-visibility apparatus. With
 that, a pin protects nothing and is gone.
 
+**Sub-tabs and the pinned block** (§11 CI-5; road map 9 §3). The Clip tab
+is itself split into SUB-TABS, and above them, outside the scroll view, sits
+one pinned block: the selection header, the action lane and a strip of the
+sub-tabs, which stays put while the sections scroll. The tabs follow the
+selection's kinds — **Text** for an all-text selection, **Shape** for an
+all-shape one, **Picture** when a selected clip draws pixels, **Sound** when
+one has audio, and **Clip** always, last — so a video with sound shows
+Picture · Sound · Clip, a text clip Text · Picture · Clip, a shape Shape ·
+Picture · Clip and an audio file Sound · Clip. The first is the default,
+so a text clip opens on Text. A tab picked by hand is kept while the same
+clips stay selected (selecting or changing an action keeps it) and is
+forgotten whenever the selection's ids change. Each tab lists its own
+sections: Text — Content, Font, Style, Outline, Backdrop, Box, Reveal,
+Presets; Shape — Shape, Stroke, Fill, Gradient, Arrows; Picture —
+Transform, then Crop, Corner radius, Colour and Chroma key for a source
+with pixels of its own, then Shadow, Filters, Reflection, Spotlight,
+Obscure; Sound — Volume, Fades, Duck, Noise reduction, Compressor, Mix;
+Clip — Timing (or, for several media clips, its Reverse half), Speed for
+media, Transition when the clip overlaps its predecessor, and Motion
+presets for a clip that draws. The strip's cells are equal, square, 24 pt
+tall with 8 pt above and below and 10 pt at the sides (the handoff's "8/10
+padding", read that way); the active cell wears the selection fill and an
+accent border, and a mono `◆N` in the action ink follows a label whose tab
+the selected action keys — N counts the KEYS of the action's end patch
+those sections write (§11 CI-6).
+
 The Clip tab opens with a 44 pt selection header: an 8 × 26 pt tint chip in
 the clip's kind colour, the name at 12 pt semibold, and a mono 10 pt line
 giving the kind word, the duration in the DOCUMENT's timecode, and the
@@ -250,10 +276,10 @@ line sits at y 27 under the 20 pt field.
 Sections are disclosure groups with a reset-to-default in the header, a
 right-aligned mono 10 pt summary of the group's current state (`100%`,
 `neutral`, `+0.0 dB`, `off`) so a collapsed group still tells you something,
-and per-section open/closed state in `UserDefaults`. Transform opens by
-default and the rest are closed; a selection that gets no Transform — an
-audio-only clip — opens its first section instead, so the panel is never a
-wall of shut headers.
+and per-section open/closed state in `UserDefaults`, keyed by the section's id.
+Transform opens by default and the rest are closed; on any sub-tab where
+nothing is open, the first section with no stored preference opens
+instead, so a tab is never a wall of shut headers.
 
 **Note on the section list.** The design handoff's table sketches five groups
 (Transform, Video, Audio, Effects, Timing). What shipped keeps the panes'
@@ -266,7 +292,8 @@ Controls are Rasterize's `OptionControls` family: slider + field pairs
 with quick-value chevrons, color wells, steppers.
 
 The section groups below are named as they were when each was a tab; they
-are now sections of the Clip tab, offered when the selection has that aspect.
+are now sections of the Clip tab, offered when the selection has that aspect
+and grouped into the sub-tabs above.
 
 **Video sections** — any clip with a video property group, which is every
 clip that draws. A text or shape clip therefore gets Transform and the
@@ -315,7 +342,7 @@ Chroma key — or to a media source, which is Speed.
   behind. Nothing retries on its own: a render the user stopped must not
   restart itself on the next keystroke.
 - *Actions* is not a section: the **action lane** under the selection
-  header replaces it (§11 CI-1 to CI-4; road map 9 §1). A header row —
+  header, pinned above the scroll view with it, replaces it (§11 CI-1 to CI-4; road map 9 §1). A header row —
   ACTIONS, the count or `none`, "· editing N" in the action ink, and Zoom
   to Region, Zoom Back and Add Action (⌥⌘K); a lane row — the Clip chip,
   active when no action is selected, then the whole clip with its actions
@@ -363,14 +390,16 @@ Chroma key — or to a media source, which is Speed.
   blurred region is self-evident on the picture, unlike a spotlight's
   geometry, and drag handles for one are a hit-test family the frozen
   canvas file has no room for yet.
-- Format version 8: *Motion* — In and Out (a kind from the nine
+- Format version 8: *Motion presets* (id `video.motion`; titled *Motion*
+  until road map 9's phase 2, on the Clip sub-tab) — In and Out (a kind from the nine
   entrances/exits, or None, each with a duration in seconds), During (a
   kind from the five continuous motions, or None, with Amount % and
   Period — Period disabled for Drift, which ignores it) and a Preview
   button that sets the in/out range to the clip, turns Loop on and plays.
-  Shut by default, after Obscure. Every write is one `set_video` per clip,
-  so each clip keeps its own other slots, and it lands on the base props
-  even inside an action, since motion is not an animation target. Also
+  Shut by default, last on the Clip sub-tab. Every write is one
+  `set_video` per clip, so each clip keeps its own other slots, and it
+  lands on the base props even inside an action, since motion is not an
+  animation target. Also
   Clip ▸ Motion ▸; the timeline's name strip draws the in/out wedges and a
   During glyph. A stored zero-duration In or Out stays selected and editable
   but is explicitly marked inactive in the summary, selection note and menu;
@@ -452,7 +481,8 @@ is enabled.
 - Box: auto-size, or fixed width with wrapping.
 - Animation on position / opacity / scale is Actions, like every other
   property. The built-in REVEALS are their own thing and are
-  `text.animation` (format version 5): an *Animation* section of three
+  `text.animation` (format version 5): a *Reveal* section (titled
+  *Animation* until road map 9's phase 2; the id is unchanged) of three
   controls — a kind popup (None, Typewriter, Word Fade, Line Rise), In and
   Out — written through `set_text` as one whole object, which is the SECTION
   saying all three controls and not a rule about patches: a patch of a nested
@@ -3958,3 +3988,33 @@ assisted import.
   the Actions section, and actions are numbered by TIME order (start, then
   id), not by creation — the timeline's bands, the lane and "editing N"
   all count the same way (`ActionBands.ordered`).
+- **CI-5 — The Clip tab is sub-tabs over a pinned block** (road map 9 §3,
+  the clip inspector redesign's phase 2). Above the scroll view, and not in
+  it, sits one block — the selection header, the action lane and a strip of
+  sub-tabs — OWNED by the pane (`InspectorPane.pinnedBlock`, built by
+  `makeHeader()` on every rebuild and never stacked) and HOSTED by the
+  controller in a container between the tab strip and the scroll view. The
+  tabs follow the selection's kinds: Text for an all-text selection, Shape
+  for an all-shape one, Picture when a selected clip draws pixels, Sound
+  when one has audio, and Clip ALWAYS, last; Text and Shape come first. The
+  default is the first tab, so a text clip opens on Text. A tab picked by
+  hand is KEPT while an action is selected or changed and is FORGOTTEN by
+  the controller whenever the selection's ids change, whatever tab is
+  showing (`refresh(isLive:)`'s `ids != lastSelection` block calls
+  `ClipPane.forgetSubTab()`), so A → B → A comes back on the default. Each
+  tab lists its own sections (spec §4.3), and the open rule applies per
+  tab: on a tab with no expanded section the first one with no stored
+  preference opens. Section ids — the `UserDefaults` keys — are unchanged;
+  two titles are renamed, `video.motion` to *Motion presets* and
+  `text.animation` to *Reveal*. The handoff's "8/10 padding" is read as 8 pt
+  top and bottom and 10 pt sides (`InspectorMetrics.inset`).
+- **CI-6 — `◆N` counts KEYS, and the slider knob is the block.** In this
+  phase a sub-tab's `◆N` badge counts the KEYS of the selected action's end
+  patch that the tab's sections write (Picture: `video` minus `motion`;
+  Clip: `motion`; Sound: `audio`; Text: `text`; Shape: none), drawn only for
+  N > 0 in `DS.action`. Phase 3's row marks may re-count to ROWS and must say
+  so where they do. The inspector slider's knob is the 7 × 11 pt block of
+  `BlockSliderCell.drawKnob` in `DS.textStrong` at full alpha, its rect snapped to device
+  pixels (`backingAlignedRect`, nearest) with the accent fill running to the
+  snapped knob's centre; the accent fill is kept until phase 3's keyed
+  segment replaces it.

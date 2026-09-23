@@ -76,7 +76,7 @@ extension VideoPane {
             + " — both stay until you clear them"
 
         return InspectorSection(
-            id: "video.motion", title: "Motion",
+            id: "video.motion", title: "Motion presets",
             summary: summary,
             note: {
                 binding.editsAction

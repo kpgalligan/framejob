@@ -359,7 +359,7 @@ final class InspectorSliderControl: NSView, OptionControl {
     private var isActive = true
     private var dragging = false
 
-    private static let knob: CGFloat = 11
+    private static let knobSize = NSSize(width: 7, height: 11)
     private static let track: CGFloat = 3
 
     init(
@@ -406,8 +406,8 @@ final class InspectorSliderControl: NSView, OptionControl {
     }
 
     private func value(atX x: CGFloat) -> Double {
-        let inset = Self.knob / 2
-        let span = Swift.max(bounds.width - Self.knob, 1)
+        let inset = Self.knobSize.width / 2
+        let span = Swift.max(bounds.width - Self.knobSize.width, 1)
         let t = Swift.min(Swift.max((x - inset) / span, 0), 1)
         return lower + Double(t) * (upper - lower)
     }
@@ -440,28 +440,27 @@ final class InspectorSliderControl: NSView, OptionControl {
     // MARK: Drawing
 
     override func draw(_ dirtyRect: NSRect) {
-        let inset = Self.knob / 2
+        let knobSize = Self.knobSize
         let mid = bounds.midY
         let rail = NSRect(
-            x: inset, y: mid - Self.track / 2, width: max(bounds.width - Self.knob, 1),
-            height: Self.track)
+            x: knobSize.width / 2, y: mid - Self.track / 2,
+            width: max(bounds.width - knobSize.width, 1), height: Self.track)
         DS.border.setFill()
         rail.fill()
 
-        let filled = NSRect(
-            x: rail.minX, y: rail.minY, width: rail.width * fraction, height: rail.height)
-        DS.accent.setFill()
-        filled.fill()
-
+        // The block knob (`BlockSliderCell.drawKnob`'s shape), snapped to
+        // device pixels; the fill runs to the SNAPPED centre so the two meet
+        // on a pixel edge.
         let center = rail.minX + rail.width * fraction
-        let knob = NSRect(
-            x: center - Self.knob / 2, y: mid - Self.knob / 2,
-            width: Self.knob, height: Self.knob)
-        let knobPath = NSBezierPath(ovalIn: knob.insetBy(dx: 0.5, dy: 0.5))
-        NSColor.controlBackgroundColor.setFill()
-        knobPath.fill()
-        (dragging ? DS.accent : DS.borderStrong).setStroke()
-        knobPath.stroke()
+        let knob = backingAlignedRect(
+            NSRect(x: center - knobSize.width / 2, y: mid - knobSize.height / 2,
+                   width: knobSize.width, height: knobSize.height),
+            options: .alignAllEdgesNearest)
+        DS.accent.setFill()
+        NSRect(x: rail.minX, y: rail.minY, width: max(knob.midX - rail.minX, 0),
+               height: rail.height).fill()
+        DS.textStrong.withAlphaComponent(1).setFill()
+        knob.fill()
     }
 }
 
@@ -572,7 +571,8 @@ final class InspectorSection: NSView {
     /// `UserDefaults` key prefix; the suffix is the section's stable id.
     static let collapsedKeyPrefix = "ReelcutInspectorSection."
 
-    private let id: String
+    let id: String
+    let title: String
     private let header = InspectorSectionHeader()
     private let content = NSStackView()
     private(set) var isExpanded = true
@@ -588,6 +588,7 @@ final class InspectorSection: NSView {
         defaultExpanded: Bool = true, rows: [NSView]
     ) {
         self.id = id
+        self.title = title
         super.init(frame: .zero)
         let key = Self.collapsedKeyPrefix + id
         if let collapsed = UserDefaults.standard.object(forKey: key) as? Bool {
@@ -1508,6 +1509,7 @@ protocol InspectorPane: NSView {
     var structureSignature: String { get }
     func rebuild()
     func refresh()
+    var pinnedBlock: NSView? { get }
 }
 
 /// The base every pane subclasses: a vertical stack of `InspectorSection`s
@@ -1518,9 +1520,11 @@ class InspectorPaneView: NSView, InspectorPane {
     let binding: InspectorBinding
     weak var inspector: InspectorViewController?
     private let stack = NSStackView()
-    private var sections: [InspectorSection] = []
+    private(set) var sections: [InspectorSection] = []
     /// The current build's header, when the pane makes one.
     private var headerControl: (any OptionControl)?
+    /// The header, hosted ABOVE the scroll view by the controller.
+    var pinnedBlock: NSView? { headerControl }
     /// The previous build's views, held one generation past their removal —
     /// see the pitfall in `rebuild()`.
     private var retired: [NSView] = []
@@ -1636,14 +1640,10 @@ class InspectorPaneView: NSView, InspectorPane {
             placeholder.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
             return
         }
-        // Above the sections, and only with something selected: with nothing
-        // selected the empty row above has already said so, and a header
-        // reading "No selection" beside it would say it twice.
-        if let header = makeHeader() {
-            headerControl = header
-            stack.addArrangedSubview(header)
-            header.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
-        }
+        // Pinned above the scroll view, and only with something selected: with
+        // nothing selected the empty row above has already said so, and a
+        // header reading "No selection" beside it would say it twice.
+        headerControl = makeHeader()
         for section in makeSections() {
             sections.append(section)
             stack.addArrangedSubview(section)

@@ -1,51 +1,5 @@
 import AppKit
 
-/// The Clip tab's header: the selection header over the pinned action lane
-/// (the clip inspector handoff's "Pinned action lane block", road map 9 §1).
-/// One `OptionControl`, because the pane has one header slot
-/// (`InspectorPaneView.makeHeader()`), and refreshed with it.
-///
-/// It scrolls with the pane until phase 2 moves it above the scroll view
-/// (road map 9 §2's deviation).
-final class ClipHeaderBlock: NSView, OptionControl {
-    private let header: ClipSelectionHeaderView
-    private let lane: ActionLaneView
-
-    init(binding: InspectorBinding, inspector: InspectorViewController?) {
-        header = ClipSelectionHeaderView(binding: binding)
-        lane = ActionLaneView(binding: binding, inspector: inspector)
-        super.init(frame: .zero)
-        for view in [header, lane] as [NSView] {
-            view.translatesAutoresizingMaskIntoConstraints = false
-            addSubview(view)
-        }
-        NSLayoutConstraint.activate([
-            header.topAnchor.constraint(equalTo: topAnchor),
-            header.leadingAnchor.constraint(equalTo: leadingAnchor),
-            header.trailingAnchor.constraint(equalTo: trailingAnchor),
-            lane.topAnchor.constraint(equalTo: header.bottomAnchor),
-            lane.leadingAnchor.constraint(equalTo: leadingAnchor),
-            lane.trailingAnchor.constraint(equalTo: trailingAnchor),
-            lane.bottomAnchor.constraint(equalTo: bottomAnchor),
-        ])
-    }
-
-    @available(*, unavailable)
-    required init?(coder: NSCoder) {
-        fatalError("ClipHeaderBlock does not support NSCoder")
-    }
-
-    override var isFlipped: Bool { true }
-
-    /// The lane, for a probe.
-    var actionLane: ActionLaneView { lane }
-
-    func refresh() {
-        header.refresh()
-        lane.refresh()
-    }
-}
-
 /// The selected clip's actions as a mini timeline (spec §11 CI-1, CI-4):
 /// a header row (ACTIONS, the count, "· editing N", and Zoom to Region, Zoom
 /// Back and Add Action), a lane row (the Clip chip, then the whole clip with
@@ -227,14 +181,12 @@ final class ActionLaneView: NSView, OptionControl {
             },
             enabled: { true }, onEdit: { binding.edited() })
         duration.toolTip = "How long the action takes"
-        let curves = Curve.allCases
         let curve = OptionPopupControl(
-            width: 70, items: curves.map { $0.displayName },
-            read: { curves.firstIndex(of: current()?.curve ?? .linear) ?? 0 },
-            write: { index in
-                guard curves.indices.contains(index) else { return }
-                let op = ReelOp.setAction(clip: clipID, action: actionID, curve: curves[index])
-                binding.apply("Action Curve", [op])
+            width: 70, choices: Curve.allCases.map { ($0.displayName, $0) },
+            read: { current()?.curve ?? .linear },
+            write: { value in
+                binding.apply(
+                    "Action Curve", [.setAction(clip: clipID, action: actionID, curve: value)])
             },
             enabled: { true }, onEdit: { binding.edited() })
         curve.toolTip = "How the action eases from its start to its end state"

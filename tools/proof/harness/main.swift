@@ -17,7 +17,7 @@
 //
 //   harness <project.reelcut|welcome> <out.png> <light|dark>
 //           [w] [h] [selectIndex] [playheadSec] [sizeIndex 0-2] [clip|media|document]
-//           [candidateSpans] [expandSections] [mediaFilter] [selectAction]
+//           [candidateSpans] [expandSections] [mediaFilter] [selectAction] [subTab]
 //
 // `selectIndex` picks the clip at that index in START order (-1 for none).
 // The PNG is written at the main screen's backing scale (2x on a Retina
@@ -65,6 +65,13 @@
 //                      playhead's entry selected. APPENDED, for
 //                      `tools/proof/clip_inspector_proof.py`; compiled out of
 //                      a `-D HARNESS_REFERENCE_BUILD` harness.
+//   `subTab`           the Clip tab's sub-tab (road map 9 §3, spec §11 CI-5):
+//                      text|shape|picture|sound|clip, or "-"/absent for the
+//                      selection kind's default (its first tab). Applied after
+//                      the tab switch through `selectClipSubTab`, the strip's
+//                      own path, then four runloop turns. APPENDED, for
+//                      `tools/proof/clip_inspector2_proof.py`; compiled out
+//                      of a `-D HARNESS_REFERENCE_BUILD` harness.
 //
 //                      **It drives the app's own controls and sets nothing
 //                      itself**: `MediaPane.filter` is private and stays that
@@ -947,7 +954,7 @@ guard arguments.count >= 4 else {
     FileHandle.standardError.write(
         ("usage: harness <project.reelcut|welcome|settings> <out.png> <light|dark> "
             + "[w] [h] [selectIndex] [playheadSec] [sizeIndex 0-2] [clip|media|document] "
-            + "[candidateSpans] [expandSections] [mediaFilter]\n"
+            + "[candidateSpans] [expandSections] [mediaFilter] [selectAction] [subTab]\n"
             + "       harness transcribe <project.reelcut> <out.png> <light|dark> <style> "
             + "[replace 0|1]\n"
             + "       harness cues <words.json> <out.json>\n"
@@ -1009,6 +1016,8 @@ let expandSections = Harness.list(arguments.count > 11 ? arguments[11] : "-")
 let mediaFilterSpec = arguments.count > 12 && arguments[12] != "-" ? arguments[12] : ""
 /// The selected action — the thirteenth argument (see the header).
 let selectActionSpec = arguments.count > 13 ? arguments[13] : ""
+/// The Clip tab's sub-tab — the fourteenth argument (see the header).
+let subTabSpec = arguments.count > 14 && arguments[14] != "-" ? arguments[14] : ""
 
 Harness.pinDefaults(sizeIndex: sizeIndex, expand: expandSections)
 let app = NSApplication.shared
@@ -1113,6 +1122,19 @@ for _ in 0..<4 {
     RunLoop.current.run(until: Date().addingTimeInterval(0.05))
     controller.view.layoutSubtreeIfNeeded()
 }
+#if !HARNESS_REFERENCE_BUILD
+if !subTabSpec.isEmpty {
+    guard let subTab = ClipSubTab(rawValue: subTabSpec) else {
+        FileHandle.standardError.write("subTab: unknown tab \(subTabSpec)\n".data(using: .utf8)!)
+        exit(64)
+    }
+    controller.inspector?.selectClipSubTab(subTab)
+    for _ in 0..<4 {
+        RunLoop.current.run(until: Date().addingTimeInterval(0.05))
+        controller.view.layoutSubtreeIfNeeded()
+    }
+}
+#endif
 // The find band, after the pane it lives in exists — a control cannot be
 // driven before it has been built, and `select(.media)` is what builds it.
 if !mediaFilterSpec.isEmpty {

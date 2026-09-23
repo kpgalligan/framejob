@@ -1,7 +1,7 @@
 import AppKit
 
-/// The Clip tab: a selection header, then every section the SELECTION has, in
-/// one list (the chrome cleanup's Part 2 §5).
+/// The Clip tab: a pinned block — the selection header, the action lane and
+/// the sub-tabs (spec §11 CI-5) — over the sections of the ACTIVE sub-tab.
 ///
 /// **It owns almost no controls.** The rows are the ones the Video, Audio,
 /// Text and Shape panes have always built, so this pane holds one instance of
@@ -10,8 +10,8 @@ import AppKit
 /// and writes through the shared `InspectorBinding` this inspector handed it,
 /// and the sections it makes are plain `NSView`s that keep working wherever
 /// they are added. What this file adds is the header, the Timing section, and
-/// `makeSections()` — the function from the selection's kind to the ordered
-/// list of sections, which is what replaced the old tab-visibility juggling.
+/// `makeSections()` — the function from the selection's kind and the active
+/// sub-tab to the ordered list of sections.
 ///
 /// **Why the sections are the ones that already existed.** The handoff's table
 /// draws five groups (TRANSFORM · VIDEO · AUDIO · EFFECTS · TIMING) of four or
@@ -34,6 +34,9 @@ final class ClipPane: InspectorPaneView {
     private let audioPane: AudioPane
     private let textPane: TextPane
     private let shapePane: ShapePane
+    /// The sub-tab picked by hand, if any. Forgotten by the CONTROLLER when
+    /// the selection's ids change (`forgetSubTab()`), never here.
+    private var chosen: ClipSubTab?
 
     override init(inspector: InspectorViewController) {
         videoPane = VideoPane(inspector: inspector)
@@ -74,101 +77,124 @@ final class ClipPane: InspectorPaneView {
             shapePane.structureSignature,
             audioPane.structureSignature,
             (binding.videoClips.isEmpty ? "-" : "px") + (binding.audioClips.isEmpty ? "-" : "au"),
+            activeSubTab.rawValue, subTabs.map(\.rawValue).joined(separator: ","),
         ].joined(separator: "|")
     }
 
     override func makeHeader() -> (any OptionControl)? {
-        ClipHeaderBlock(binding: binding, inspector: inspector)
+        let binding = self.binding
+        let strip = ClipSubTabsView(
+            tabs: subTabs, active: activeSubTab,
+            badge: { tab in binding.selectedAction.map { tab.keyedCount(in: $0.end) } ?? 0 },
+            onSelect: { [weak inspector] in inspector?.selectClipSubTab($0) })
+        return ClipHeaderBlock(binding: binding, inspector: inspector, subTabs: strip)
     }
+
+    // MARK: - Sub-tabs
+
+    /// The selection's tabs, in display order: Text or Shape first for those
+    /// kinds, Picture for clips that draw, Sound for clips with audio, and
+    /// Clip always, last.
+    var subTabs: [ClipSubTab] {
+        var tabs: [ClipSubTab] = []
+        if textPane.allText { tabs.append(.text) }
+        if shapePane.allShape { tabs.append(.shape) }
+        if !binding.videoClips.isEmpty { tabs.append(.picture) }
+        if !binding.audioClips.isEmpty { tabs.append(.sound) }
+        tabs.append(.clip)
+        return tabs
+    }
+
+    /// The tab picked by hand while the selection has it, else the first.
+    var activeSubTab: ClipSubTab {
+        let tabs = subTabs
+        if let chosen, tabs.contains(chosen) { return chosen }
+        return tabs.first ?? .clip
+    }
+
+    /// Records a pick; triggers nothing (`selectClipSubTab` refreshes).
+    func choose(_ tab: ClipSubTab) { chosen = tab }
+
+    /// Back to the default tab; triggers nothing. The controller calls it
+    /// when the selection's ids change.
+    func forgetSubTab() { chosen = nil }
 
     // MARK: - Kind → sections
 
-    /// The order the design asks for: what the layer IS, then what it is made
-    /// of, then the effects over it, then when it plays, then how it sounds.
-    /// A section that does not apply is absent rather than disabled — the pane
-    /// is rebuilt when the selection's kinds change, so there is nothing stale
-    /// to grey out.
+    /// The active sub-tab's sections, in the handoff's order. A section that
+    /// does not apply is absent rather than disabled — the pane is rebuilt
+    /// when the selection's kinds or the tab change, so there is nothing
+    /// stale to grey out.
     ///
-    /// **Transform is "always" only for a clip that draws.** The design lists
-    /// it unconditionally, but every control in it and in the effects group
+    /// Picture exists only for a selection with PIXELS: every control in it
     /// writes a `set_video` patch, and `InspectorBinding` addresses those to
-    /// the clips with PIXELS: on a detached audio clip the patch would name no
-    /// clip, so the whole group would be controls that answer a drag with a
-    /// beep. `hasPixels` is the Video tab's old enabled-test, which is the
-    /// same question asked once instead of six times.
+    /// the clips that draw.
     override func makeSections() -> [InspectorSection] {
         let hasPixels = !binding.videoClips.isEmpty
         var sections: [InspectorSection] = []
-        if hasPixels {
-            sections.append(videoPane.transformSection())
-        }
-        if textPane.allText {
-            sections.append(contentsOf: [
+        switch activeSubTab {
+        case .text:
+            sections = [
                 textPane.contentSection(), textPane.fontSection(), textPane.styleSection(),
                 textPane.outlineSection(), textPane.backdropSection(), textPane.boxSection(),
                 textPane.animationSection(), textPane.presetSection(),
-            ])
-        }
-        if shapePane.allShape {
-            sections.append(contentsOf: [
+            ]
+        case .shape:
+            sections = [
                 shapePane.shapeSection(), shapePane.strokeSection(), shapePane.fillSection(),
                 // Immediately after Fill, because a gradient REPLACES a fill
                 // when it is set and the two rows are read together.
                 shapePane.gradientSection(), shapePane.arrowSection(),
-            ])
-        }
-        // `allSourcePixels` asks about the SOURCE KIND, so it says yes to an
-        // audio-only file's clip too; `hasPixels` is what keeps a crop off a
-        // clip that draws nothing.
-        if hasPixels, videoPane.allSourcePixels {
-            sections.append(contentsOf: [
-                videoPane.cropSection(), videoPane.cornerSection(), videoPane.colorSection(),
-                videoPane.chromaSection(),
-            ])
-        }
-        // The effects group. Shadow is shared by all three drawing kinds, so
-        // it appears once, here, rather than in the text and shape lists.
-        if hasPixels {
-            sections.append(contentsOf: [
+            ]
+        case .picture:
+            sections = [videoPane.transformSection()]
+            // `allSourcePixels` asks about the SOURCE KIND, so it says yes to
+            // an audio-only file's clip too; the tab itself is what keeps a
+            // crop off a clip that draws nothing.
+            if videoPane.allSourcePixels {
+                sections += [
+                    videoPane.cropSection(), videoPane.cornerSection(), videoPane.colorSection(),
+                    videoPane.chromaSection(),
+                ]
+            }
+            // Shadow is shared by all three drawing kinds, so it is here once.
+            sections += [
                 inspectorShadowSection(binding), videoPane.filtersSection(),
                 videoPane.reflectionSection(), videoPane.spotlightSection(),
-                videoPane.obscureSection(), videoPane.motionSection(),
-            ])
-        }
-        if videoPane.allMedia {
-            sections.append(videoPane.speedSection())
-        }
-        if binding.isSingle, let clip = binding.primary {
-            sections.append(timingSection(clip.id))
-        } else if videoPane.allMedia {
-            // The half of Timing a MULTI-clip selection can still answer for.
-            // In, Out and Duration genuinely need one clip — two clips have
-            // two In points — but Reverse is a per-clip op that fans out
-            // happily, and it used to live in Speed, which is built for any
-            // all-media selection. Dropping the whole section for two clips
-            // took Reverse out of reach with it.
-            sections.append(reverseTimingSection())
-        }
-        if binding.isSingle, let clip = binding.primary, videoPane.overlap(before: clip) != nil {
-            sections.append(videoPane.transitionSection(clip.id))
-        }
-        if !binding.audioClips.isEmpty {
-            sections.append(contentsOf: [
+                videoPane.obscureSection(),
+            ]
+        case .sound:
+            sections = [
                 audioPane.volumeSection(), audioPane.fadeSection(), audioPane.duckSection(),
                 audioPane.noiseSection(), audioPane.compressorSection(), audioPane.mixSection(),
-            ])
+            ]
+        case .clip:
+            if binding.isSingle, let clip = binding.primary {
+                sections.append(timingSection(clip.id))
+            } else if videoPane.allMedia {
+                // The half of Timing a MULTI-clip selection can still answer
+                // for: Reverse is a per-clip op that fans out happily, where
+                // In, Out and Duration genuinely need one clip.
+                sections.append(reverseTimingSection())
+            }
+            if videoPane.allMedia {
+                sections.append(videoPane.speedSection())
+            }
+            if binding.isSingle, let clip = binding.primary,
+               videoPane.overlap(before: clip) != nil {
+                sections.append(videoPane.transitionSection(clip.id))
+            }
+            if hasPixels {
+                sections.append(videoPane.motionSection())
+            }
         }
-        // Transform is the only section built open, so a selection that does
-        // not get one — an audio-only clip, whose media has no video track —
-        // would open the panel as nine shut headers and nothing to read. The
-        // first section takes Transform's place there. `expandByDefault` still
-        // defers to a section the user has closed themselves, so this is a
-        // default and not an override — and it is offered to each section in
-        // TURN for exactly that reason: the first one an audio-only clip gets
-        // is `video.speed`, an id the Speed group shares, so a user who once
-        // closed Speed on a video clip would otherwise be back to a panel of
-        // nine shut headers. The first section with no stored preference opens.
-        if !hasPixels, !sections.contains(where: { $0.isExpanded }) {
+        // A tab that would open as a column of shut headers opens its first
+        // section with no stored preference instead. `expandByDefault` defers
+        // to a section the user has closed themselves, so this is a default
+        // and not an override — and it is offered to each section in TURN
+        // because an id can be shared (`video.speed`, `clip.timing`), and a
+        // group closed once elsewhere would otherwise leave the tab shut.
+        if !sections.contains(where: { $0.isExpanded }) {
             for section in sections {
                 if section.expandByDefault() { break }
             }
@@ -370,239 +396,5 @@ final class ClipPane: InspectorPaneView {
             inspectorRow("Reversed frames", [inspectorReadout { status().summary }]),
             inspectorButtonRow([render]),
         ]
-    }
-}
-
-// MARK: - Selection header
-
-/// The 44 pt block above the sections: the kind chip, the clip's name, and one
-/// mono line of the facts a machine produced — how long it is, and where those
-/// pixels came from.
-///
-/// It is the third view of the one selection model, the other two being the
-/// timeline bar's block and the canvas's handles, so the chip and the kind word
-/// come from `ClipKindStyle` and agree with them by construction. Drawn rather
-/// than composed from controls — with ONE exception since format version 3:
-/// for a single clip the name line is an `InspectorNameField`, because this
-/// header is where the clip's OWN name is set and the only place it is cleared
-/// (the strip's inline editor drops an empty commit — `TimelineView+Rename.swift`
-/// says why). A multi-selection keeps the drawn "N clips selected". A label is
-/// a 6 pt dot at the line's right end, the strip's dot, so the two views agree.
-/// The field binds by clip ID and reads fresh through it (`timingSection`'s rule).
-final class ClipSelectionHeaderView: NSView, OptionControl {
-    static let height: CGFloat = 44
-    /// The name line: 16 pt at y 8 drawn, a 20 pt field at y 6 typed into —
-    /// both centred on y 16 — with the meta line under it. `DSField.style`
-    /// pins a field at the panel's 26 pt, more than a 44 pt band with a meta
-    /// line can give, so the field's is re-pinned (`installNameField`).
-    private static let nameTop: CGFloat = 8
-    private static let nameHeight: CGFloat = 16
-    private static let fieldTop: CGFloat = 6
-    private static let fieldHeight: CGFloat = 20
-    private static let metaTop: CGFloat = 27
-    private static let dotSize: CGFloat = 6
-    private static let dotGap: CGFloat = 6
-
-    private let binding: InspectorBinding
-    private var nameField: InspectorNameField?
-    /// The field's right edge, pulled in by the dot's room while a label is set.
-    private var nameTrailing: NSLayoutConstraint?
-
-    init(binding: InspectorBinding) {
-        self.binding = binding
-        super.init(frame: .zero)
-        wantsLayer = true
-        // Decided once: the pane, header included, is rebuilt whenever the
-        // selected ids change (`structureSignature`).
-        if binding.isSingle, let clip = binding.primary {
-            installNameField(for: clip.id)
-        }
-    }
-
-    @available(*, unavailable)
-    required init?(coder: NSCoder) {
-        fatalError("ClipSelectionHeaderView does not support NSCoder")
-    }
-
-    override var isFlipped: Bool { true }
-
-    override var intrinsicContentSize: NSSize {
-        NSSize(width: NSView.noIntrinsicMetric, height: Self.height)
-    }
-
-    /// Redraws only when what it SAYS changed. The panel refreshes on every
-    /// playhead tick when the selected clip has actions
-    /// (`EditorViewController+Inspector.swift`), and re-laying two truncating
-    /// strings across a 44 pt band thirty times a second for a value that moves
-    /// once per click is work for nothing. The field's own `refresh` is as
-    /// cheap, and skips itself while it is typed into.
-    func refresh() {
-        nameField?.refresh()
-        let label = self.label
-        let trailing = -(InspectorMetrics.inset + (label == nil ? 0 : Self.dotSize + Self.dotGap))
-        if let constraint = nameTrailing, constraint.constant != trailing {
-            constraint.constant = trailing
-        }
-        let next = [name, meta, label ?? ""]
-        guard next != lastDrawn else { return }
-        lastDrawn = next
-        needsDisplay = true
-    }
-
-    private var lastDrawn: [String] = []
-
-    // MARK: The name field
-
-    /// The single-clip name line, typed into. It shows what the strip shows
-    /// (`name(of:)` — own name or fallback), so what you read is what you
-    /// edit, and commits the clip's OWN name: the trimmed text, or `null` for
-    /// an emptied field, which is how a name goes back to the fallback.
-    /// Emptying a field that already showed the fallback has nothing to
-    /// clear: no op is sent (the core's refusal would only beep). Either way
-    /// the field re-reads the model as the commit ends — `InspectorNameField`
-    /// sets itself directly there, because its `refresh` is skipped while
-    /// the field editor is attached, which it still is at that point.
-    private func installNameField(for id: UInt32) {
-        let binding = self.binding
-        /// Read fresh through the captured id, never captured itself: a
-        /// rename REPLACES the clip snapshot, and the header is refreshed.
-        func clip() -> ClipSnapshot? { binding.snapshot.clip(id) }
-        let field = InspectorNameField(
-            read: { clip().map { binding.snapshot.name(of: $0) } ?? "" },
-            write: { value in
-                let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-                if trimmed.isEmpty, clip()?.name == nil { return }
-                let patch = ClipPatch(name: .some(trimmed.isEmpty ? nil : trimmed))
-                binding.apply("Rename Clip", [.setClip(clips: [id], patch: patch)])
-            },
-            enabled: { clip() != nil },
-            onEdit: { binding.edited() })
-        field.font = DS.sans(12, weight: .semibold)
-        field.toolTip = "The clip's own name — empty it to go back to what the clip shows"
-        // `DSField.style` installed a 26 pt height on the field itself; the
-        // one constraint is re-pinned rather than fought with a second.
-        for constraint in field.constraints
-        where constraint.firstItem === field && constraint.firstAttribute == .height {
-            constraint.constant = Self.fieldHeight
-        }
-        field.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(field)
-        let trailing = field.trailingAnchor.constraint(
-            equalTo: trailingAnchor, constant: -InspectorMetrics.inset)
-        NSLayoutConstraint.activate([
-            field.leadingAnchor.constraint(equalTo: leadingAnchor, constant: Self.nameLeft),
-            field.topAnchor.constraint(equalTo: topAnchor, constant: Self.fieldTop),
-            trailing,
-        ])
-        nameTrailing = trailing
-        nameField = field
-    }
-
-    // MARK: What it says
-
-    /// The chip's ink: the kind's tint, or the neutral one when the selection
-    /// holds more than one kind and no single tint would be true.
-    private var chipColor: NSColor {
-        let clips = binding.clips
-        guard let first = clips.first else { return DS.borderStrong }
-        let tint = ClipKindStyle.tint(for: first, in: binding.snapshot)
-        let mixed = clips.dropFirst().contains {
-            ClipKindStyle.tint(for: $0, in: binding.snapshot) != tint
-        }
-        return mixed ? DS.borderStrong : tint
-    }
-
-    private var name: String {
-        let clips = binding.clips
-        guard let first = clips.first else { return "No selection" }
-        guard clips.count == 1 else { return "\(clips.count) clips selected" }
-        return binding.snapshot.name(of: first)
-    }
-
-    /// The label the selection agrees on — nil when the clips disagree or
-    /// none has one, so the dot never claims a colour for a clip that has
-    /// another. An unknown name draws in the neutral ink, as on the strip.
-    private var label: String? {
-        let clips = binding.clips
-        guard let first = clips.first?.label, !first.isEmpty,
-              clips.allSatisfy({ $0.label?.lowercased() == first.lowercased() })
-        else { return nil }
-        return first
-    }
-
-    /// The meta line: the kind word, the duration in the DOCUMENT's timecode
-    /// (never the source's), and the source's own facts where there are any.
-    private var meta: String {
-        let clips = binding.clips
-        let canvas = binding.canvas
-        guard let first = clips.first else { return "" }
-        guard clips.count == 1 else {
-            let total = clips.reduce(Ticks(0)) { $0 + $1.duration }
-            return ReelTime.format(total, fps: canvas.fps, frames: canvas.timecodeFrames)
-                + " total"
-        }
-        var parts = [ClipKindStyle.name(for: first, in: binding.snapshot)]
-        parts.append(
-            ReelTime.format(first.duration, fps: canvas.fps, frames: canvas.timecodeFrames))
-        if let size = binding.snapshot.sourceSize(of: first), size.width > 0, size.height > 0 {
-            parts.append("\(Int(size.width))×\(Int(size.height))")
-        }
-        // The source's own rate, not the canvas's: it is the one fact here
-        // that says whether this clip is being conformed.
-        if let media = binding.snapshot.media(for: first), media.hasVideo, media.fps.double > 0 {
-            parts.append("\(media.fps.displayName) fps")
-        }
-        return parts.joined(separator: " · ")
-    }
-
-    // MARK: Drawing
-
-    /// Where the name line starts: after the chip and its gap.
-    private static var nameLeft: CGFloat { InspectorMetrics.inset + 8 + 8 }
-
-    override func draw(_ dirtyRect: NSRect) {
-        DS.border.setFill()
-        NSRect(x: 0, y: bounds.height - 1, width: bounds.width, height: 1).fill()
-
-        let chip = NSRect(x: InspectorMetrics.inset, y: bounds.midY - 13, width: 8, height: 26)
-        chipColor.setFill()
-        chip.fill()
-
-        let left = Self.nameLeft
-        var nameRight = bounds.width - InspectorMetrics.inset
-        if let label = label {
-            // At the line's right end, centred on it, like the strip's.
-            let dot = NSRect(
-                x: nameRight - Self.dotSize,
-                y: Self.nameTop + Self.nameHeight / 2 - Self.dotSize / 2,
-                width: Self.dotSize, height: Self.dotSize)
-            ClipLabel.color(named: label).setFill()
-            NSBezierPath(ovalIn: dot).fill()
-            nameRight = dot.minX - Self.dotGap
-        }
-        // The field paints its own line when there is one.
-        if nameField == nil {
-            let line = NSRect(
-                x: left, y: Self.nameTop, width: max(nameRight - left, 10),
-                height: Self.nameHeight)
-            draw(name, in: line, font: DS.sans(12, weight: .semibold), color: DS.textStrong)
-        }
-        let width = max(bounds.width - left - InspectorMetrics.inset, 10)
-        draw(meta, in: NSRect(x: left, y: Self.metaTop, width: width, height: 13),
-             font: DS.mono(10), color: DS.textFaint)
-    }
-
-    /// One truncating line. `TimelineDraw.label` clips instead, which is right
-    /// on a clip bar (the bar's edge says where it stopped) and wrong here,
-    /// where a cut-off file name has nothing to say it was cut off.
-    private func draw(_ text: String, in rect: NSRect, font: NSFont, color: NSColor) {
-        guard !text.isEmpty, rect.width > 8 else { return }
-        let paragraph = NSMutableParagraphStyle()
-        paragraph.lineBreakMode = .byTruncatingTail
-        text.draw(
-            in: rect,
-            withAttributes: [
-                .font: font, .foregroundColor: color, .paragraphStyle: paragraph,
-            ])
     }
 }

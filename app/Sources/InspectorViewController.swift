@@ -65,6 +65,10 @@ final class InspectorViewController: NSViewController {
     /// The previous strip, held one generation past its removal — the pitfall
     /// is named in `buildTabs()`.
     private var retiredTabs: PanelTabsView?
+    /// The pane's pinned block, above the scroll view (spec §11 CI-5).
+    private let pinnedContainer = NSStackView()
+    /// The previous block, held one generation — `buildTabs()`'s pitfall.
+    private var retiredPinned: NSView?
     private var scroll: NSScrollView!
     private var panes: [InspectorTab: InspectorPaneView] = [:]
     private var currentPane: InspectorPaneView?
@@ -94,6 +98,14 @@ final class InspectorViewController: NSViewController {
         tabsContainer.translatesAutoresizingMaskIntoConstraints = false
         root.addSubview(tabsContainer)
 
+        pinnedContainer.orientation = .vertical
+        pinnedContainer.spacing = 0
+        pinnedContainer.translatesAutoresizingMaskIntoConstraints = false
+        root.addSubview(pinnedContainer)
+        // Empty is 0 pt; a block's own rows say how tall it is.
+        let collapse = pinnedContainer.heightAnchor.constraint(equalToConstant: 0)
+        collapse.priority = NSLayoutConstraint.Priority(1)
+
         scroll = NSScrollView()
         scroll.translatesAutoresizingMaskIntoConstraints = false
         scroll.hasVerticalScroller = true
@@ -107,7 +119,11 @@ final class InspectorViewController: NSViewController {
             tabsContainer.leadingAnchor.constraint(equalTo: root.leadingAnchor),
             tabsContainer.trailingAnchor.constraint(equalTo: root.trailingAnchor),
             tabsContainer.heightAnchor.constraint(equalToConstant: DS.tabHeight),
-            scroll.topAnchor.constraint(equalTo: tabsContainer.bottomAnchor),
+            pinnedContainer.topAnchor.constraint(equalTo: tabsContainer.bottomAnchor),
+            pinnedContainer.leadingAnchor.constraint(equalTo: root.leadingAnchor),
+            pinnedContainer.trailingAnchor.constraint(equalTo: root.trailingAnchor),
+            collapse,
+            scroll.topAnchor.constraint(equalTo: pinnedContainer.bottomAnchor),
             scroll.leadingAnchor.constraint(equalTo: root.leadingAnchor),
             scroll.trailingAnchor.constraint(equalTo: root.trailingAnchor),
             scroll.bottomAnchor.constraint(equalTo: root.bottomAnchor),
@@ -196,6 +212,24 @@ final class InspectorViewController: NSViewController {
         select(.clip)
     }
 
+    /// A Clip sub-tab was picked (`ClipSubTabsView`): the one refresh for it.
+    func selectClipSubTab(_ tab: ClipSubTab) {
+        (pane(for: .clip) as? ClipPane)?.choose(tab)
+        refresh(isLive: false)
+        scrollToTop()
+    }
+
+    /// Hosts the pane's pinned block. The outgoing one is held a generation:
+    /// a sub-tab click lands inside the block's own `mouseDown`.
+    private func installPinned(_ block: NSView?) {
+        guard pinnedContainer.arrangedSubviews.first !== block else { return }
+        retiredPinned = pinnedContainer.arrangedSubviews.first
+        retiredPinned?.removeFromSuperview()
+        guard let block else { return }
+        pinnedContainer.addArrangedSubview(block)
+        block.widthAnchor.constraint(equalTo: pinnedContainer.widthAnchor).isActive = true
+    }
+
     private func pane(for tab: InspectorTab) -> InspectorPaneView {
         if let existing = panes[tab] { return existing }
         let made: InspectorPaneView
@@ -275,6 +309,7 @@ final class InspectorViewController: NSViewController {
         if ids != lastSelection {
             lastSelection = ids
             toTop = true
+            (pane(for: .clip) as? ClipPane)?.forgetSubTab()
             if !clips.isEmpty, tab != .clip {
                 tab = .clip
                 buildTabs()
@@ -289,6 +324,7 @@ final class InspectorViewController: NSViewController {
         if signature != lastSignature, !isLive, document?.isLiveEditing != true {
             lastSignature = signature
             pane.rebuild()
+            installPinned(pane.pinnedBlock)
         }
         pane.refresh()
         if toTop { scrollToTop() }

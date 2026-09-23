@@ -77,16 +77,17 @@ BUILD = os.path.join(HERE, "harness", "build.sh")
 # Swift constant it mirrors; the PNG's width / WIDTH is the backing scale
 # (2 on a Retina Mac).
 #
-# Two window heights are used, and the second one needs a word. The Clip tab
-# of a text clip carries fourteen sections and the Obscure section is the
-# thirteenth, so at the 862 pt window phase 2 uses it is BELOW THE FOLD and
-# nothing about it can be measured — the inspector's scroll view starts at
-# the top and the harness cannot scroll it. TALL is the height at which the
-# whole section is on screen AND the content still overflows: with Timing and
-# Motion held open (`INSPECTOR_BELOW`) the stack has no slack to redistribute,
-# so opening Obscure moves nothing above it and the arithmetic below is a
-# pure downward shift. Measured, not guessed: at 1400 and above the empty-list
-# package regains slack and the sections above Obscure start to move.
+# Two window heights are used, and the second one needs a word. Since road
+# map 9's phase 2 the Clip tab is sub-tabs, and Obscure is the LAST section
+# of a text clip's Picture tab (`subTab=picture`), under the pinned block
+# (header, action lane, sub-tabs: 153 pt). At the 862 pt window phase 2 uses
+# the open section runs below the fold, and the harness cannot scroll. TALL
+# is a height at which the one- and two-region renders are on the SAME side
+# of the scroller threshold — both short of it — because a scroller that
+# appears in one render narrows that pane and every row under it mismatches.
+# Measured at 1500: the two-region section ends at 993 pt against a visible
+# area ending at 1200, so neither render has a scroller; with nothing below
+# Obscure, opening a second region moves only the section's own tail.
 
 WIDTH = 1440
 HEIGHT = 862             # phase 2's window: the timeline claims
@@ -127,11 +128,6 @@ SPAN_A = (1.0, 2.0)
 SPAN_B = (6.0, 7.0)
 CANDIDATES = f"{SPAN_A[0]:g}-{SPAN_A[1]:g},{SPAN_B[0]:g}-{SPAN_B[1]:g}"
 
-# The two `InspectorSection` ids BELOW Obscure in the Clip tab, held open in
-# every inspector render so the section stack has no spare height to give
-# back when Obscure opens (see the note on TALL). Changed 2026-09-23: road
-# map 9's phase 1 deleted `video.actions`, so Motion is held open in its place.
-INSPECTOR_BELOW = "clip.timing,video.motion"
 OBSCURE_ID = "video.obscure"
 
 # `DS.timelineCandidateShade` is `coral.withAlphaComponent(0.24)` and
@@ -190,11 +186,13 @@ RECTS = {
 INSPECTOR = Rect(
     "inspector", INSPECTOR_X, TOOLBAR + TAB, INSPECTOR_W,
     (TALL - TIMELINE_H) - (TOOLBAR + TAB))
-# The band the shift is solved over: the bottom 200 pt of the inspector, clear
-# of the scroller (whose knob length changes with the content height).
-SHIFT_BAND = Rect(
-    "shift band", INSPECTOR_X, TALL - TIMELINE_H - 200,
-    INSPECTOR_W - SCROLLER_W, 200)
+# The band the shift is solved over, in the two-region render: from just
+# above its tail (the Add Region · Place on Canvas row, measured at 963–985
+# pt, under Region 2's Size row, which ends at 956) for 200 pt, clear of the
+# scroller column. At the winning shift it is compared with the one-region
+# render's 781–981 pt, which holds THAT render's tail (789–811 pt), so the
+# tail lies inside the band in both.
+SHIFT_BAND = Rect("shift band", INSPECTOR_X, 955, INSPECTOR_W - SCROLLER_W, 200)
 # Six rows is what one more region adds: `Region N`, Shape, Amount, Feather,
 # Center, Size (VideoPane.obscureSection), each DS.controlHeight tall with
 # InspectorMetrics.rowSpacing under it.
@@ -311,10 +309,13 @@ def build_harness():
     return binary
 
 
-def render(binary, package, out, height=HEIGHT, candidates="-", expand="-", select=0):
+def render(binary, package, out, height=HEIGHT, candidates="-", expand="-", select=0,
+           sub_tab="picture"):
+    # The fixture is a TEXT clip, whose default sub-tab is Text; Obscure is on
+    # Picture (road map 9 §3), so every render asks for it by name.
     args = [
         binary, package, out, "light", str(WIDTH), str(height), str(select), "0", "1",
-        "clip", candidates, expand,
+        "clip", candidates, expand, "-", "-", sub_tab,
     ]
     result = subprocess.run(args, capture_output=True, text=True)
     if result.returncode != 0 or not os.path.exists(out):
@@ -517,9 +518,9 @@ def uniform(values):
 def shift_match(top, bottom, band, limit=260):
     """How far DOWN `bottom` is `top`, measured over `band`.
 
-    With the section stack overflowing its scroll view there is no spare
-    height to redistribute, so opening a second region can only push what is
-    under it down. This walks every whole-point shift and counts the rows of
+    With nothing below Obscure on the Picture tab and neither render past the
+    scroller threshold, opening a second region can only push the section's
+    tail down. This walks every whole-point shift and counts the rows of
     `band` that do not match; the winner is the growth, in points.
     """
     scale = bottom.scale
@@ -578,7 +579,7 @@ def main():
         return os.path.join(CHROME, tag + ".png")
 
     start = time.time()
-    opened = INSPECTOR_BELOW + "," + OBSCURE_ID
+    opened = OBSCURE_ID
     renders = {
         # The timeline, at phase 2's window.
         "plain-a": render(binary, packages["obscure-one"], png("plain-a")),
@@ -587,16 +588,15 @@ def main():
         # The inspector, at the tall window. "closed" is the Obscure section
         # as the design ships it (`defaultExpanded: false`); "open" has it open.
         "closed-v3": render(
-            binary, packages["obscure-v3"], png("closed-v3"), TALL, expand=INSPECTOR_BELOW),
+            binary, packages["obscure-v3"], png("closed-v3"), TALL),
         "closed-none": render(
-            binary, packages["obscure-none"], png("closed-none"), TALL, expand=INSPECTOR_BELOW),
+            binary, packages["obscure-none"], png("closed-none"), TALL),
         "closed-one": render(
-            binary, packages["obscure-one"], png("closed-one"), TALL, expand=INSPECTOR_BELOW),
+            binary, packages["obscure-one"], png("closed-one"), TALL),
         "closed-blur": render(
-            binary, packages["obscure-one-blur"], png("closed-blur"), TALL,
-            expand=INSPECTOR_BELOW),
+            binary, packages["obscure-one-blur"], png("closed-blur"), TALL),
         "closed-two": render(
-            binary, packages["obscure-two"], png("closed-two"), TALL, expand=INSPECTOR_BELOW),
+            binary, packages["obscure-two"], png("closed-two"), TALL),
         "open-one": render(
             binary, packages["obscure-one"], png("open-one"), TALL, expand=opened),
         "open-two": render(
@@ -741,7 +741,7 @@ def main():
     scores = shift_match(images["open-one"], images["open-two"], SHIFT_BAND)
     best, runner = scores[0], scores[1]
     print(f"      best shifts (mismatched rows, points): {scores[:4]}")
-    check("the content below is the one-region render pushed DOWN by six rows",
+    check("the section's tail is the one-region render pushed DOWN by six rows",
           best[1] == REGION_HEIGHT and best[0] * 4 < runner[0],
           f"{best[1]} pt at {best[0]} mismatched rows of {int(200 * scale)}; next best "
           f"{runner[1]} pt at {runner[0]}. Six rows = {REGION_ROWS} × "

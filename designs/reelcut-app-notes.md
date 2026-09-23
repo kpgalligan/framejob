@@ -2644,3 +2644,31 @@ from the search field by the field's ROUNDED corners (564 of 568 pixels
 inked); the square field inked all 568 and the two rows read four rules
 (147/150). Updated in place, dated: `band_rules` excludes the field's own
 24 pt box by position.
+
+## The Clip tab's sub-tabs and pinned block, 2026-09-23 — road map 9's phase 2
+
+Two pure moves first, typechecked alone at the baseline (0 errors, 7
+warnings) before anything else landed: `ClipSelectionHeaderView` from
+`ClipPane.swift` (608, over the cap) to `ClipSelectionHeader.swift`, verbatim,
+and `ClipHeaderBlock` from `ActionLaneView.swift` to `ClipPinnedBlock.swift`.
+The record is `designs/reelcut-roadmap-9.md` §3–§4; the decisions are spec
+§11 CI-5 and CI-6; the sizes are remaining §3's phase-2 paragraph.
+
+**Roles that changed.** `InspectorPaneView` no longer stacks its header:
+`makeHeader()`'s control is `pinnedBlock`, and `InspectorViewController`
+(frozen) hosts it in a container between the tab strip and the scroll view,
+holding the outgoing block one generation (`retiredPinned`, `buildTabs()`'s
+pitfall, since a sub-tab click lands inside the block's `mouseDown`).
+`ClipPane` is sub-tabs: `subTabs` by kind, `activeSubTab`, `choose` and
+`forgetSubTab` (which never refresh — `selectClipSubTab` is the one refresh,
+and `refresh(isLive:)`'s selection-change block is the one forgetter), and a
+`makeSections()` per tab. `ClipHeaderBlock` is three children — header,
+lane, `ClipSubTabsView` — and carries `subTabsView` for a probe.
+`InspectorSection.id` and `title` and `InspectorPaneView.sections` are
+readable, for the probe. `InspectorSliderControl`'s knob is the 7 × 11
+block, snapped to device pixels, in `DS.textStrong` at FULL alpha:
+`labelColor` is translucent, and a translucent knob over the two-colour
+rail split into two colours on its centreline. The typed popup init lives in
+`OptionControls+Choices.swift` so `OptionControls.swift` (Rasterize's)
+stays unforked; the Curve popup is its first caller and the Popups rule
+names it.

@@ -237,8 +237,16 @@ the key map behind it.
   Preview Quality must keep the canvas's exact aspect.
 
 **Inspector.**
-- `InspectorViewController.swift` (frozen: the tab strip) · `InspectorPane.swift`
-  (the pane base, `InspectorSection`, the row builders, and `InspectorBinding`
+- `InspectorViewController.swift` (frozen: the tab strip, and the PINNED
+  container between it and the scroll view that hosts a pane's
+  `pinnedBlock`, one generation retired like the strip; `selectClipSubTab`
+  is a sub-tab pick's one refresh, and `refresh(isLive:)` calls
+  `ClipPane.forgetSubTab()` whenever the selection's ids change, spec §11
+  CI-5) · `InspectorPane.swift`
+  (the pane base — `pinnedBlock` is the header `makeHeader()` built, never
+  stacked — `InspectorSection` with its `id` and `title` readable, the row
+  builders, `InspectorSliderControl` with the 7 × 11 block knob snapped to
+  device pixels (CI-6), and `InspectorBinding`
   — the one place that knows the fields read the SELECTED action's END state
   (`action(_:)` answers the selected action and never consults the playhead;
   `evaluated(_:)` asks `clip_state` at `clip.start + action.endTime`, spec
@@ -247,15 +255,21 @@ the key map behind it.
   LENGTH, or `motion`, to the BASE props, and `structural(audio:for:)` the
   one that sends pan, mono, compressor, noise reduction, duck and
   keep-pitch there (CI-3)) ·
-  `ClipPane.swift` (`makeSections()`, the function from a selection's kind
-  to its sections, and the selection header, which `makeHeader()` wraps in
-  `ActionLaneView.swift`'s `ClipHeaderBlock` over the action lane — the
-  Actions section's replacement, built once per pane build with the clip
-  and action ids it shows captured) · `VideoPane.swift` (+`Transition`,
+  `ClipPane.swift` (the sub-tabs — `subTabs` by kind, `activeSubTab`, and
+  `choose` / `forgetSubTab`, which never refresh — and `makeSections()`, the
+  function from the selection's kind and the active sub-tab to its
+  sections, with the open rule per tab) · `ClipSelectionHeader.swift`
+  (`ClipSelectionHeaderView`, a pure move out of `ClipPane.swift`) ·
+  `ClipPinnedBlock.swift` (`ClipSubTab` with its `◆N` key count,
+  `ClipSubTabsView`, and `ClipHeaderBlock` — header, lane, sub-tabs — which
+  `makeHeader()` builds once per pane build) · `ActionLaneView.swift` (the
+  action lane, the Actions section's replacement, with the clip and action
+  ids it shows captured) · `VideoPane.swift` (+`Transition`,
   +`Motion`) · `AudioPane.swift` · `TextPane.swift` · `ShapePane.swift` ·
   `DocumentPane.swift` (reads `documentSnapshot`, never the scoped one: its
   ops are document-level) · `OptionControls.swift` (the descriptor-driven
-  row controls). `VideoPane+Motion.swift` owns the local wrapping
+  row controls) · `OptionControls+Choices.swift` (the typed, value-carrying
+  `OptionPopupControl` init over the index one). `VideoPane+Motion.swift` owns the local wrapping
   `MotionInactiveNote` for selected zero-duration edges; it refreshes with
   the section and leaves stored kind and Duration editable.
   `TextPane.swift`'s Style section carries UPPERCASE (`case`, through
@@ -894,7 +908,10 @@ by `NSToolTipManager`, and nothing reinstalls one that is removed.
 **Popups.** A popup built from model objects carries the object in
 `representedObject` and is read from `selectedItem`, never by index, and its
 rows are `NSMenuItem`s: `addItem(withTitle:)` REMOVES an existing row with the
-same title. `menu.autoenablesItems = false` comes before disabling a row.
+same title. `menu.autoenablesItems = false` comes before disabling a row. An
+`OptionPopupControl` over model values takes them through the typed init
+(`OptionControls+Choices.swift`: `choices:` of title and value, `read` and
+`write` in values), not the index init with a hand-kept array beside it.
 
 **Hygiene.** No storyboards/xibs. No `!` force-unwraps, `as!`, or `try!`;
 implicitly-unwrapped optionals only for post-`loadView` view refs. Every

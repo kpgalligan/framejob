@@ -26,7 +26,7 @@ extension EditorViewController {
         // keeps the selection, so collapse it here or nothing is selected.
         if document.singleSelectedClip?.id != clip { document.selection = [clip] }
         let frame = max(document.editedProject.snapshot.canvas.fps.frameDuration, 1)
-        setPlayhead(snapshot.start + min(action.endTime, snapshot.duration - frame))
+        setPlayhead(snapshot.start + min(action.endTime, max(snapshot.duration - frame, 0)))
         document.selectAction(id)
         viewStateDidChange()
     }
