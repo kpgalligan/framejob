@@ -619,6 +619,11 @@ fallback, as H, M and L are the other three's, drawn only when the SF
 Symbol is missing). Top track is front-most. Drag a header to
 reorder. Dragging a clip above the top track or below the bottom one
 creates a track; Track > Remove Empty Tracks cleans up. New Track is ⇧⌘N.
+Right-click (or ⌃-click) a header, or the empty part of a lane, for that
+track's menu: Hide Video, Mute Audio, Lock Track and Solo, each checked when
+on, then Remove Track — disabled on the last track, and asking first when
+the track still holds clips, as Track > Remove Track does. A right-click on
+a clip opens nothing.
 
 **Clips are objects, not bands.** A clip is a 4 pt-rounded body inset 3 pt
 from the lane's top and bottom, clipped to that shape, with a 1 pt

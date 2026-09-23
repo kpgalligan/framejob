@@ -768,6 +768,15 @@ and the closing above added the rest.
     so the sentence the card would print has been proved only against the
     stand-in.
 
+- **The track context menu (2026-09-23)** — `track_menu_probe.py` sends
+  synthetic right-mouse-downs through the content view's `menu(for:)` and
+  performs the items; what it cannot reach:
+  - **⌃-click.** AppKit routes a control-click to `menu(for:)` before any
+    `mouseDown`, the same path `MediaRowView`'s menu relies on; nobody has
+    pressed one on a header or a lane and seen the menu rather than a drag.
+  - **The menu, LOOKED AT**: that it pops up at the pointer over a header
+    and over an empty lane, and that the checkmarks read at a glance.
+
 ---
 
 ## 5. Where a third road map would start

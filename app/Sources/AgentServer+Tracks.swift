@@ -29,7 +29,9 @@ extension AgentServer {
             document, "New Track", [.addTrack(index: index, name: try stringArg(a, "name"))])
     }
 
-    /// `remove_track` — Track ▸ Remove Track (`removeTrackCommand`). A
+    /// `remove_track` — Track ▸ Remove Track (`removeTrackCommand`), and the
+    /// track context menu's Remove Track (`TimelineView+TrackMenu.swift`),
+    /// which reaches the same command with the clicked track. A
     /// non-empty track refuses without `with_clips`, which is the question
     /// the UI puts in an alert; over MCP it is the core's own sentence,
     /// naming the clips and the argument that would let the op through.
@@ -63,7 +65,9 @@ extension AgentServer {
 
     /// `set_track` — the header's four toggles (`toggleTrack`, mirrored by
     /// Track ▸ Hide Video / Mute Audio / Lock Track / Solo; the header's S is
-    /// `TimelineView.toggleHeader`'s `.solo` case) and its inline rename.
+    /// `TimelineView.toggleHeader`'s `.solo` case; the track context menu,
+    /// `TimelineView+TrackMenu.swift`, makes the same four edits) and its
+    /// inline rename.
     /// Solo is an audio rule on the track's CONTAINER — the timeline, or a
     /// nest's own tracks: while any track there is soloed, every track that
     /// is not is silent, mute wins on a track that is both, and pictures are

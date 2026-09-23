@@ -2954,6 +2954,28 @@ The two `payload` doors are named rather than skipped: the app checks a
 payload's shape before forwarding, so the core cannot be reached through them
 without a whole Copy payload, and what is true of them is asserted instead.
 
+## The track context menu (`track_menu_probe.py`)
+
+`python3 tools/proof/track_menu_probe.py`, no port and no running app,
+**22/22**. A right-click on a track's header or empty lane opens that
+track's menu — Hide Video, Mute Audio, Lock Track, Solo (checked from the
+track's own flags) and Remove Track (`TimelineView+TrackMenu.swift`,
+2026-09-23). A click is not an op, so no MCP call can reach WHICH track it
+names; the instrument is `marquee_probe.py`'s builder, one probe along. It
+puts a real `EditorViewController` in an offscreen `NSWindow` over three
+tracks — front (a clip at 20 s) and middle empty where it is clicked, back
+holding a text clip — sends synthetic right-mouse-down events through the
+content view's own `menu(for:)`, performs items inside one undo group as an
+event would, and reads the document back. Five sections: where a menu
+opens (header, header button and empty lane do, for their row; clip, ruler
+and the room below do not); a toggle and its checkmark and undo; Remove
+Track on the empty middle track with a clip on the FRONT track selected —
+the case Track ▸ Remove Track gets wrong — and its undo; a clip-holding
+track's sheet, answered by pressing its Remove button; and the last track's
+disabled item. Made to fail twice: `removeTrackCommand` ignoring its id
+takes 3 rows (19/22), `menu(for:)` answering nil takes 14 (8/22). ~75 s
+with a rebuild. ⌃-click is a person's check (remaining §4).
+
 ## The marquee, from anywhere empty (`marquee_probe.py`)
 
 `python3 tools/proof/marquee_probe.py`, no port and no running app,

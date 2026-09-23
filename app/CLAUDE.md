@@ -177,7 +177,10 @@ the key map behind it.
   trim, slip, roll sessions) · `TimelineView+Rename` (the one inline editor
   for clips, tracks and markers; it drops an unchanged and an empty commit,
   follows its target through relayout, and ends with its commit DROPPED when
-  the target is gone) · `+Candidates` (Remove Silences' wash, drawn not
+  the target is gone) · `+TrackMenu` (the right-click menu on a header or an
+  empty lane: the four toggles, checked, and Remove Track through
+  `onRemoveTrack` to `removeTrackCommand`, which asks when clips would go;
+  a clip hit answers no menu) · `+Candidates` (Remove Silences' wash, drawn not
   overlaid) · `+NestScope` (the breadcrumb, painted LAST in the ruler's
   corner so it stays above the header column when scrolled).
 - `ClipLabel.swift` — the ONE home of the label and marker colour

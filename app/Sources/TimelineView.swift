@@ -105,6 +105,9 @@ final class TimelineView: NSView, NSTextFieldDelegate {
     var onSnapCandidates: (([UInt32]) -> [Ticks])?
     var onSnappingToggled: (() -> Void)?
     var onTrackHeightChanged: ((Int) -> Void)?
+    /// The track context menu's Remove Track (`TimelineView+TrackMenu.swift`):
+    /// the controller asks first when the track still holds clips.
+    var onRemoveTrack: ((UInt32) -> Void)?
 
     // MARK: - Views
 
@@ -902,16 +905,7 @@ final class TimelineView: NSView, NSTextFieldDelegate {
 
     private func toggleHeader(_ button: TimelineHeaderButton, row: Int) {
         guard let track = track(atRow: row) else { return }
-        switch button {
-        case .hidden:
-            onEdit?("Hide Track", [.setTrack(track: track.id, hidden: !track.hidden)])
-        case .muted:
-            onEdit?("Mute Track", [.setTrack(track: track.id, muted: !track.muted)])
-        case .locked:
-            onEdit?("Lock Track", [.setTrack(track: track.id, locked: !track.locked)])
-        case .solo:
-            onEdit?("Solo Track", [.setTrack(track: track.id, solo: !track.solo)])
-        }
+        toggle(button, on: track)
     }
 
     private func renameTrack(_ track: TrackSnapshot, row: Int) {
@@ -1254,6 +1248,11 @@ final class TimelineContentView: NSView {
 
     private func flags(_ event: NSEvent) -> NSEvent.ModifierFlags {
         event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+    }
+
+    /// A track's header or empty lane (`TimelineView+TrackMenu.swift`).
+    override func menu(for event: NSEvent) -> NSMenu? {
+        timeline?.trackMenu(for: hit(at: convert(event.locationInWindow, from: nil)))
     }
 
     override func mouseDown(with event: NSEvent) {

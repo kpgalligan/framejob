@@ -41,6 +41,7 @@ extension EditorViewController {
         timeline.onLiveUpdate = { [weak self] ops in self?.document?.updateLiveEdit(ops) }
         timeline.onLiveEnd = { [weak self] name in self?.document?.endLiveEdit(name) }
         timeline.onEdit = { [weak self] name, ops in self?.document?.applyEdit(name, ops) }
+        timeline.onRemoveTrack = { [weak self] id in self?.removeTrackCommand(id) }
         timeline.onProbe = { [weak self] ops in self?.timelineProbe(ops) }
         timeline.onSnapCandidates = { [weak self] clips in self?.timelineCandidates(clips) ?? [] }
         timeline.onSnappingToggled = { [weak self] in self?.toggleSnapping(nil) }
@@ -275,9 +276,17 @@ extension EditorViewController {
     }
 
     /// A non-empty track refuses to go without `with_clips`, so the clips it
-    /// would take go in the question rather than in a beep.
-    func removeTrackCommand() {
-        guard let document = document, let track = currentTrack else {
+    /// would take go in the question rather than in a beep. `id` is the
+    /// track context menu's clicked track; Track ▸ Remove Track passes none
+    /// and acts on `currentTrack`.
+    func removeTrackCommand(_ id: UInt32? = nil) {
+        let track: TrackSnapshot?
+        if let id = id {
+            track = document?.editedProject.snapshot.track(id)
+        } else {
+            track = currentTrack
+        }
+        guard let document = document, let track = track else {
             NSSound.beep()
             return
         }

@@ -40,7 +40,9 @@ normative: §5.2 is the project schema, §6 the op table, §7 the architecture.
   dropped with ⌥ inserts and with ⇧⌥ overwrites. Double-clicking a clip
   renames it in place, a labelled clip wears a 6 pt dot in its label's
   colour on its name strip (the tint still says the kind), and a track
-  header has eye, speaker, lock and headphones — solo.
+  header has eye, speaker, lock and headphones — solo. Right-clicking a
+  header or an empty lane opens that track's menu: the four toggles and
+  Remove Track.
 - **Canvas** with an `AVPlayerLayer` under a transparent overlay: move, scale,
   rotate and crop handles, line/arrow endpoint handles, safe-area guides,
   snapping to the canvas centre and edges, inline text editing, a region
