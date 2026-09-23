@@ -33,7 +33,7 @@ python3 tools/proof/cloud_spike/cloud_spike.py --leakcheck tools/proof/cloud_spi
 | `keychain_probe.swift` | q7: `add` / `read` / `read-noui` / `attrs` / `delete`, one step per process |
 
 Each Swift file is built by the runner with
-`xcrun swiftc -O -target arm64-apple-macos15.0 <file> -o work/cloud_spike/bin/<name>`
+`xcrun swiftc -O -target arm64-apple-macos26.0 <file> -o work/cloud_spike/bin/<name>`
 and prints ONE JSON object on stdout. `keychain_probe.swift` is copied to
 `main.swift` first, because it is compiled with a generated `nonce.swift` and
 top-level code needs that name once a second file joins it — the nonce is what

@@ -3,8 +3,8 @@ import AppKit
 // MARK: - Sheet: the commit and the command
 
 /// The run's one exit and the menu command that opens the sheet: `finish`,
-/// the single place all four outcomes land (`summary` and `truncationText`
-/// are the two sentences it writes), `viewDidDisappear`, which cancels a
+/// the single place all four outcomes land (`summary` is the sentence it
+/// writes), `viewDidDisappear`, which cancels a
 /// run the sheet is dismissed out from under, and File ▸ Generate
 /// Captions… itself with the validator arm that greys it.
 ///
@@ -13,9 +13,9 @@ import AppKit
 /// line byte-identical. One widening in the move — `finish` is internal
 /// rather than `private`, which the compiler forces, since `begin` stayed
 /// behind and calls it — and nine in the file it left, the stored
-/// properties `finish` and `viewDidDisappear` read. `summary` and
-/// `truncationText` stay `private`: only `finish` calls them, and it
-/// moved with them.
+/// properties `finish` and `viewDidDisappear` read. `summary` stays
+/// `private`: only `finish` calls it, and it moved with it. W2 deleted
+/// `truncationText` with the ceiling it reported (spec §11 W-8).
 ///
 /// **c1-chrome added the cloud engine's three lines** (road map 6 §5e), and
 /// it is no longer only a move. `cloudReportLines` turns the run's `Report`
@@ -67,8 +67,13 @@ extension TranscribeSheetController {
         }
         let plan: CaptionLayout.Plan
         do {
+            let replacing = replaceExisting
+                ? CaptionLayout.replaceableTracks(
+                    in: document.editedProject.snapshot, jobs: jobs(in: scope))
+                : []
             plan = try CaptionLayout.place(
-                result.cues, problems: result.problems, in: document.editedProject)
+                result.cues, problems: result.problems, in: document.editedProject,
+                style: style, replacing: replacing)
         } catch {
             statusLabel.stringValue = error.localizedDescription
             statusLabel.textColor = DS.textStrong
@@ -78,9 +83,9 @@ extension TranscribeSheetController {
 
         // A clean run has nothing to say that the timeline does not already
         // show, so it leaves rather than making the user dismiss a receipt.
-        guard plan.report.isEmpty, result.truncations.isEmpty, cloudLines.isEmpty else {
+        guard plan.report.isEmpty, cloudLines.isEmpty else {
             statusLabel.stringValue =
-                ([summary(plan), truncationText(result), plan.report] + cloudLines)
+                ([summary(plan), plan.report] + cloudLines)
                 .filter { !$0.isEmpty }.joined(separator: "\n")
             statusLabel.textColor = DS.textStrong
             return
@@ -137,22 +142,6 @@ extension TranscribeSheetController {
     private func summary(_ plan: CaptionLayout.Plan) -> String {
         "\(plan.clips) caption\(plan.clips == 1 ? "" : "s") added"
             + (plan.trackName.map { " on “\($0)”." } ?? ".")
-    }
-
-    /// The one-minute ceiling, in words. Never left unsaid: a caption run that
-    /// stopped at sixty seconds and reported success is the failure this
-    /// sentence exists to prevent.
-    private func truncationText(_ outcome: Transcriber.Outcome) -> String {
-        guard !outcome.truncations.isEmpty else { return "" }
-        let fps = snapshot.canvas.fps
-        let listed = outcome.truncations.prefix(3).map { entry in
-            "clip \(entry.clip) stopped at "
-                + ReelTime.format(entry.stoppedAt, fps: fps, frames: false)
-        }.joined(separator: ", ")
-        let count = outcome.truncations.count
-        return "Recognition stopped early on \(count) clip\(count == 1 ? "" : "s") — \(listed). "
-            + "macOS stops a speech task after about a minute; split the clip and run it again "
-            + "to caption the rest."
     }
 
     override func viewDidDisappear() {

@@ -35,7 +35,9 @@ use crate::model::{
     AudioProps, Color, ShapeProps, TextProps, VideoProps, MAX_FILTERS, MAX_GRADIENT_STOPS,
     MAX_OBSCURE,
 };
+use crate::model_words::token_count;
 use crate::time::Ticks;
+use crate::time_bounds::MAX_STORED_TICKS;
 
 // ---- bounds --------------------------------------------------------------
 
@@ -58,6 +60,12 @@ pub(crate) const SPOT_ZOOM_MAX: f64 = 2.0;
 pub(crate) const COMPRESSOR_THRESHOLD_MIN_DB: f64 = -60.0;
 pub(crate) const COMPRESSOR_RATIO_MAX: f64 = 20.0;
 pub(crate) const COMPRESSOR_MAKEUP_MAX_DB: f64 = 24.0;
+
+/// Where a word-caption page's active word may settle (format version 9,
+/// road map 8 §5a). 1 is "no pop"; past 1.5 the active word crowds its
+/// neighbours on a page the pager filled to a measured width.
+pub(crate) const WORD_SCALE_MIN: f64 = 1.0;
+pub(crate) const WORD_SCALE_MAX: f64 = 1.5;
 
 // ---- range checks --------------------------------------------------------
 
@@ -103,6 +111,18 @@ pub(crate) fn color_ok(key: &str, color: &Color) -> Result<(), String> {
         in_range(key, *channel, 0.0, 1.0)?;
     }
     Ok(())
+}
+
+/// A clip-time position inside D7-1's envelope, in `time_bounds.rs`'s own
+/// words — a word time is a position, so it may be negative.
+fn ticks_in_envelope(key: &str, value: Ticks) -> Result<(), String> {
+    if (-MAX_STORED_TICKS..=MAX_STORED_TICKS).contains(&value) {
+        Ok(())
+    } else {
+        Err(format!(
+            "{key} must be between -{MAX_STORED_TICKS} and {MAX_STORED_TICKS} ticks, not {value}"
+        ))
+    }
 }
 
 fn ticks_positive_or_zero(key: &str, value: Ticks) -> Result<(), String> {
@@ -323,6 +343,64 @@ pub(crate) fn check_text(props: &TextProps) -> Result<(), String> {
         // bought (`model_props.rs`).
         ticks_positive_or_zero("text.animation.in", animation.r#in)?;
         ticks_positive_or_zero("text.animation.out", animation.out)?;
+    }
+    // Word timings (format version 9, spec §11 W-2 and W-3). The core is
+    // the one counter: a non-empty list must hold one timing per
+    // whitespace token, and it is never padded or trimmed to fit. Each
+    // time is a clip-time POSITION, so a negative one is legal ("already
+    // said", what `split` leaves on a second half) and only D7-1's envelope
+    // bounds it. Equal starts are legal too — two engine words snapped to
+    // one frame — so the order rule is non-decreasing, and a word may be
+    // zero-length. These run on what the caller sent; `edit_props.rs`'s
+    // `snap_animation` snaps them after, so a refusal names that number.
+    if !props.words.is_empty() {
+        let tokens = token_count(&props.content);
+        if props.words.len() != tokens {
+            return Err(format!(
+                "this text is timed word by word: {} timings for {tokens} words",
+                props.words.len()
+            ));
+        }
+    }
+    for (i, word) in props.words.iter().enumerate() {
+        ticks_in_envelope(&format!("text.words[{i}].start"), word.start)?;
+        ticks_in_envelope(&format!("text.words[{i}].end"), word.end)?;
+        if word.end < word.start {
+            return Err(format!(
+                "text.words[{i}].end must be at least its start {}, not {}",
+                word.start, word.end
+            ));
+        }
+        if i > 0 && word.start < props.words[i - 1].start {
+            return Err(format!(
+                "text.words[{i}].start must not precede text.words[{}].start {}, not {}",
+                i - 1,
+                props.words[i - 1].start,
+                word.start
+            ));
+        }
+    }
+    if let Some(style) = &props.word_style {
+        in_range(
+            "text.word_style.active_scale",
+            style.active_scale,
+            WORD_SCALE_MIN,
+            WORD_SCALE_MAX,
+        )?;
+        if let Some(color) = &style.active_color {
+            color_ok("text.word_style.active_color", color)?;
+        }
+        if let Some(color) = &style.spoken_color {
+            color_ok("text.word_style.spoken_color", color)?;
+        }
+        if let Some(color) = &style.upcoming_color {
+            color_ok("text.word_style.upcoming_color", color)?;
+        }
+        if let Some(pill) = &style.active_pill {
+            color_ok("text.word_style.active_pill.color", &pill.color)?;
+            at_least("text.word_style.active_pill.padding", pill.padding, 0.0)?;
+            at_least("text.word_style.active_pill.radius", pill.radius, 0.0)?;
+        }
     }
     Ok(())
 }

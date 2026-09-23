@@ -5,7 +5,7 @@
 // by raising an Objective-C exception, which Swift cannot catch — a crash in
 // one test must be a scored line, not the end of the run.
 //
-// Build: xcrun swiftc -O -parse-as-library -target arm64-apple-macos15.0 \
+// Build: xcrun swiftc -O -parse-as-library -target arm64-apple-macos26.0 \
 //          fx_common.swift fx_constraints.swift -o ../work/effects_spike/fx_constraints
 // Run:   ../work/effects_spike/fx_constraints            (all tests)
 //        ../work/effects_spike/fx_constraints --test NAME (one, in-process)

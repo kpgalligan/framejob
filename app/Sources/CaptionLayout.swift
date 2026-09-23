@@ -49,17 +49,31 @@ enum CaptionLayout {
     /// it is whatever names this cue in a message, and it is the producer's to
     /// spell, so a parser says `"line 12"` and a transcript says `"clip 7 at
     /// 0:04.2"`. Nothing here parses it.
+    ///
+    /// The last three are a word caption's page (road map 8's W4a) and nil
+    /// from every other producer: `words`, one per whitespace token of
+    /// `text` in TIMELINE ticks; `size`, a lone word's shrunk font size;
+    /// `width`, the box a lone word too wide even at the floor wraps in.
     struct Cue: Equatable {
         let start: Ticks
         let end: Ticks
         let text: String
         let tag: String
+        let words: [CaptionCues.Word]?
+        let size: Double?
+        let width: Double?
 
-        init(start: Ticks, end: Ticks, text: String, tag: String) {
+        init(
+            start: Ticks, end: Ticks, text: String, tag: String,
+            words: [CaptionCues.Word]? = nil, size: Double? = nil, width: Double? = nil
+        ) {
             self.start = start
             self.end = end
             self.text = text
             self.tag = tag
+            self.words = words
+            self.size = size
+            self.width = width
         }
     }
 
@@ -89,6 +103,10 @@ enum CaptionLayout {
         /// The name of the track created for these captions; nil when the
         /// caller named a track to place them on instead.
         let trackName: String?
+        /// The caption tracks this plan removes, with their clips, before
+        /// it adds its own — the restyle step (road map 8 §5e). Empty
+        /// unless the caller asked for it.
+        let replaced: [UInt32]
 
         /// The human report: what was adjusted and what was skipped. Empty
         /// when everything landed cleanly, which is the signal to say nothing
@@ -181,6 +199,9 @@ enum CaptionLayout {
         let start: Ticks
         var end: Ticks
         let text: String
+        let words: [CaptionCues.Word]?
+        let size: Double?
+        let width: Double?
     }
 
     /// Everything a caption run will do, computed against `project` and
@@ -194,9 +215,18 @@ enum CaptionLayout {
     /// `track` places on an existing track; absent, the captions get a new
     /// front-most track of their own, which is the only placement that can
     /// never be refused by the overlap rule.
+    ///
+    /// `style` is the caption style (road map 8's W4a). `.subtitles` is the
+    /// Caption preset and the code path this function always had; a word
+    /// style writes `style.pagePatch` per page — the props the pager measured,
+    /// at the page's own size (a shrunk one or the style's), with its wrap
+    /// width and its `words` in CLIP time — and puts the batch at the style's `y`. `replacing` names caption tracks to remove
+    /// WITH their clips in the same ops, first — `replaceableTracks` says
+    /// which qualify — and the new track takes their place at the front.
     static func place(
         _ cues: [Cue], problems existing: [Problem] = [], in project: ReelProject,
-        track: UInt32? = nil, trackBase: String = "Captions"
+        track: UInt32? = nil, trackBase: String = "Captions", style: CaptionStyle = .subtitles,
+        replacing: [UInt32] = []
     ) throws -> Plan {
         let snapshot = project.snapshot
         let canvas = snapshot.canvas
@@ -211,7 +241,7 @@ enum CaptionLayout {
             let end = ReelTime.snapToFrame(cue.end, fps: canvas.fps)
             return Placed(
                 tag: cue.tag, order: index, start: start, end: max(end, start + frame),
-                text: cue.text)
+                text: cue.text, words: cue.words, size: cue.size, width: cue.width)
         }
         placed.sort { $0.start == $1.start ? $0.order < $1.order : $0.start < $1.start }
 
@@ -236,14 +266,18 @@ enum CaptionLayout {
         // transcript one clip too long would throw about clips, halfway
         // through, with the earlier ones already applied purely and thrown
         // away. The count is known here.
-        let room = Int(RC_MAX_CLIPS) - snapshot.clips.count
+        let removed = Set(replacing)
+        let room = Int(RC_MAX_CLIPS) - snapshot.clips.filter { !removed.contains($0.track) }.count
         guard kept.count <= room else {
             throw LayoutError.tooMany(cues: kept.count, room: max(0, room))
         }
 
-        var ops: [ReelOp] = []
+        // The replaced tracks go FIRST, clips and all: a removal mints no
+        // id, so `next_id` below is still the new track's, and the new
+        // track's index counts the stack as it will be once they are gone.
+        var ops: [ReelOp] = replacing.map { .removeTrack(track: $0, withClips: true) }
         let destination: UInt32
-        let name = trackName(in: snapshot, base: trackBase)
+        let name = trackName(in: snapshot, base: trackBase, excluding: replacing)
         if let track = track {
             destination = track
         } else {
@@ -252,20 +286,36 @@ enum CaptionLayout {
             // a project rather than an id. Index `tracks.count` is the front
             // of the stack, so captions draw over everything.
             destination = snapshot.nextId
-            ops.append(.addTrack(index: snapshot.tracks.count, name: name))
+            ops.append(.addTrack(index: snapshot.tracks.count - replacing.count, name: name))
         }
 
         let preset = captionPreset
         let height = Double(canvas.height)
-        var base = TextPatch(
-            font: preset.font, size: (height * preset.sizeFraction).rounded(),
-            align: preset.align, valign: "middle", backdrop: .some(preset.backdrop),
-            width: .some(Double(canvas.width) * wrapFraction))
-        for cue in kept {
-            base.content = cue.text
-            ops.append(
-                .addTextClip(
-                    track: destination, at: cue.start, duration: cue.end - cue.start, text: base))
+        if style.isWordStyle {
+            let base = style.size(for: CGSize(width: canvas.width, height: canvas.height))
+            for cue in kept {
+                let words = cue.words.map { words in
+                    words.map { TextWord(start: $0.start - cue.start, end: $0.end - cue.start) }
+                }
+                ops.append(
+                    .addTextClip(
+                        track: destination, at: cue.start, duration: cue.end - cue.start,
+                        text: style.pagePatch(
+                            content: cue.text, size: cue.size ?? base, width: cue.width,
+                            words: words)))
+            }
+        } else {
+            var base = TextPatch(
+                font: preset.font, size: (height * preset.sizeFraction).rounded(),
+                align: preset.align, valign: "middle", backdrop: .some(preset.backdrop),
+                width: .some(Double(canvas.width) * wrapFraction))
+            for cue in kept {
+                base.content = cue.text
+                ops.append(
+                    .addTextClip(
+                        track: destination, at: cue.start, duration: cue.end - cue.start,
+                        text: base))
+            }
         }
 
         // The preset's position is a `set_video` patch, and a patch needs
@@ -287,13 +337,42 @@ enum CaptionLayout {
         ops.append(
             .setVideo(
                 clips: created,
-                patch: VideoPatch(
-                    x: preset.xFraction * Double(canvas.width), y: preset.yFraction * height,
-                    opacity: 1)))
+                patch: style.isWordStyle
+                    ? VideoPatch(x: 0, y: style.yFraction * height)
+                    : VideoPatch(
+                        x: preset.xFraction * Double(canvas.width), y: preset.yFraction * height,
+                        opacity: 1)))
 
         return Plan(
             ops: ops, clips: created.count, cues: kept.count, trimmed: trimmed,
-            problems: problems, trackName: track == nil ? name : nil)
+            problems: problems, trackName: track == nil ? name : nil, replaced: replacing)
+    }
+
+    /// The tracks a restyle may replace (road map 8 §5e's three rules): a
+    /// track named as this file names caption tracks ("Captions",
+    /// "Captions N"), holding at least one clip and only text clips, each overlapping
+    /// some job's `span` — so nothing outside the run's scope is removed.
+    static func replaceableTracks(
+        in snapshot: ProjectSnapshot, jobs: [Transcriber.Job]
+    ) -> [UInt32] {
+        func captionName(_ name: String) -> Bool {
+            if name == "Captions" { return true }
+            guard name.hasPrefix("Captions ") else { return false }
+            let suffix = name.dropFirst("Captions ".count)
+            return !suffix.isEmpty && suffix.allSatisfy { $0.isASCII && $0.isNumber }
+        }
+        return snapshot.tracks.compactMap { track -> UInt32? in
+            guard captionName(track.name) else { return nil }
+            guard snapshot.clips.contains(where: { $0.track == track.id }) else { return nil }
+            for clip in snapshot.clips where clip.track == track.id {
+                guard case .text = clip.source else { return nil }
+                let end = clip.start + clip.duration
+                guard jobs.contains(where: { $0.span.overlaps(clip.start ..< end) }) else {
+                    return nil
+                }
+            }
+            return track.id
+        }
     }
 
     /// "Captions", then "Captions 2" — so two runs are tellable apart in the
@@ -301,8 +380,11 @@ enum CaptionLayout {
     /// producers say "Captions": a transcript and an imported file are the
     /// same thing on the timeline, and a second name would only make the
     /// numbering restart.
-    static func trackName(in snapshot: ProjectSnapshot, base: String = "Captions") -> String {
-        let taken = Set(snapshot.tracks.map { $0.name })
+    /// A track in `excluding` is one this plan removes, so its name is free.
+    static func trackName(
+        in snapshot: ProjectSnapshot, base: String = "Captions", excluding: [UInt32] = []
+    ) -> String {
+        let taken = Set(snapshot.tracks.filter { !excluding.contains($0.id) }.map { $0.name })
         var name = base
         var suffix = 2
         while taken.contains(name) {

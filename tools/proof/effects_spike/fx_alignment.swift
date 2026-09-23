@@ -2,7 +2,7 @@
 // the same length, where do tails go, what latency does each unit report) and
 // q5 (TimePitch at ±12 semitones and beyond, and what `overlap` changes).
 //
-// Build: xcrun swiftc -O -parse-as-library -target arm64-apple-macos15.0 \
+// Build: xcrun swiftc -O -parse-as-library -target arm64-apple-macos26.0 \
 //          fx_common.swift fx_alignment.swift -o ../work/effects_spike/fx_alignment
 
 import AVFoundation

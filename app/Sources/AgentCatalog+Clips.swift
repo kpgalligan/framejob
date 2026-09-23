@@ -179,12 +179,19 @@ extension AgentServer {
             + "both are snapped to the document's frame grid. Like shadow and backdrop it "
             + "MERGES: a key you leave out keeps what is stored, and {animation: null} clears "
             + "the whole thing)"
+        let wordsClause: String =
+            ", case (as_written|upper — applied before layout; it never changes the word count), "
+            + "words (one {start, end} per whitespace token of content, in clip ticks, or [] for "
+            + "an untimed page — a content change that alters the count must send words: [] in "
+            + "the same patch), word_style (null or {mode: highlight|build, active_color, "
+            + "active_scale 1–1.5, active_pill {color, padding, radius}, spoken_color, "
+            + "upcoming_color} — how the word being said is drawn; it replaces animation)"
         let textPatchDescription: String =
             "Text properties to merge. Keys: content, font (a PostScript name), size (px), "
             + "color, align (left|center|right), valign (top|middle|bottom), line_spacing, "
             + "tracking, outline (null or {width, color}), backdrop (null or {color, padding, "
             + "radius}), width (null for auto-sizing, or a wrap width in px)"
-            + animationClause
+            + animationClause + wordsClause
             + ". A colour is FOUR numbers, [r, g, b, a], each 0–1: three is refused by "
             + "length and a component outside the range is refused by name, neither "
             + "filled in nor clamped."

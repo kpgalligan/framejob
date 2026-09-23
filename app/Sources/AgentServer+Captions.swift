@@ -13,11 +13,11 @@ import AppKit
 ///
 /// **`transcribe` runs on the SERVER thread** (`AgentServer.offMainTools`).
 /// The set's criterion is "waits for something the main thread has to deliver
-/// or must not be doing", and a recognition task is both halves of it: the
-/// Speech framework delivers its callbacks on an `OperationQueue` that
-/// defaults to the app's main one, so a main-thread wait would deadlock
-/// exactly as `import_media`'s probe would, and a transcription is seconds to
-/// minutes of work that must not freeze the UI. `detect_silence` was kept OUT
+/// or must not be doing", and a transcription is the second half of it:
+/// `SpeechEngine.transcribe` blocks its caller on a semaphore while a
+/// detached analysis runs (it refuses the main thread outright), and a
+/// transcription is seconds to minutes of work that must not freeze the UI.
+/// `detect_silence` was kept OUT
 /// of the set on the same criterion read the other way — it reads a few
 /// hundred KB and returns — and that is the distinction, not "touches the
 /// disk".
@@ -41,36 +41,23 @@ extension AgentServer {
     /// `Transcriber.transcribe` — the SYNCHRONOUS body its own doc offers "a
     /// tool that already runs on the server thread" — rather than `run`,
     /// whose completion is posted to main for a sheet's benefit. There is
-    /// therefore no semaphore here at all: the wait is the call, and the main
-    /// thread stays free to deliver the recogniser's callbacks, which is the
-    /// whole reason this tool is off main.
+    /// therefore no semaphore here at all: the wait is the call.
     ///
-    /// **It never asks for the Speech Recognition grant.**
-    /// `SFSpeechRecognizer.authorizationStatus()` is a synchronous read, so
-    /// the refusal is instant and its message can carry the fix;
-    /// `requestAuthorization` puts up a system prompt that needs the app to be
-    /// FRONTMOST, and an agent-driven app is never the active app (the fact
-    /// `AgentServer.target`'s doc already turns on). A prompt nobody can see
-    /// would hold this handler open to its ceiling. Asking is the sheet's job,
-    /// because a person opened it — `Transcriber.canAsk` is the same question
-    /// `FFmpegRewrap.canAsk` asks about the same launch flag.
+    /// **It needs no grant and never downloads** (spec §11 W-8).
+    /// `SpeechTranscriber` asks for no Speech Recognition grant (W0 q1), so
+    /// there is no grant tier. A language whose model is not INSTALLED is
+    /// refused by name — "a person has to install it" — because a download
+    /// is a person's act, done from the sheet's Download row, never a tool's
+    /// (R6-12's argument read across).
     ///
     /// **The order of the refusals is deliberate**, and the LANGUAGE question
     /// is split across it, because its two halves are not the same kind of
     /// question. The caller's own mistakes — a clip id that names nothing, a
-    /// scope with nothing audible in it, and a language tag speech
-    /// recognition has never heard of — are model questions and are answered
-    /// FIRST, so they stay reachable on a machine with no grant;
-    /// `Transcriber.supportedLanguages()` reads the same at every
-    /// authorization status, so a misspelling can be named there honestly.
-    /// The grant is checked next, and only then whether this Mac has a MODEL
-    /// for the language that was named, because `Transcriber.languages()` is
-    /// a framework question about downloaded assets and a machine nobody has
-    /// granted yet would otherwise be told to download what it may already
-    /// have — "no languages" where the true answer is "you have not granted
-    /// this yet". That ordering is what makes the grant-less refusals checks
-    /// a proof script can run, and they are the only part of this tool a
-    /// headless run reaches.
+    /// scope with nothing audible in it, and a language tag the engine has
+    /// never heard of — are answered FIRST. Only then is it asked whether
+    /// this Mac has the MODEL for the language that was named
+    /// (`Transcriber.languages()`, the installed list), and only then does
+    /// the run start.
     ///
     /// **Since road map 6's C1 it has TWO engines** (§5g), and this method
     /// owns only the choice between them: `engine` is read after the
@@ -79,13 +66,18 @@ extension AgentServer {
     /// (`AgentServer+CloudCaptions.swift`). The order of the refusals, end to
     /// end: the unknown clip and the empty scope (the scope), a misspelt
     /// `engine` with both spellings named, then — under `apple` — a
-    /// cloud-only argument refused BY NAME, the language's spelling, the
-    /// grant and the on-device model; or — under `assemblyai` — the three
-    /// cloud arguments' own types, the credential, the endpoint, a media over
-    /// ten hours, and only then the network. `truncated` can appear for the
-    /// on-device engine alone: there is no one-minute ceiling on the other
-    /// side of a REST call, and `CloudTranscriber` answers no truncations at
-    /// all.
+    /// cloud-only argument refused BY NAME, the language's spelling and the
+    /// installed model; or — under `assemblyai` — the three cloud arguments'
+    /// own types, the credential, the endpoint, a media over ten hours, and
+    /// only then the network. Neither engine reports `truncated`: W2 deleted
+    /// the key with the ceiling it reported.
+    ///
+    /// **`style` and `replace` (road map 8 §5i, W4a)** are the caller's own
+    /// mistakes too, so they are read with `place` and `language`, before
+    /// the scope: a misspelt style is refused with the six named, and
+    /// `replace` is refused by name with `subtitles` or with `place: false`,
+    /// where it could do nothing. The tracks it replaces are found at
+    /// COMMIT time, against the handle the plan is built on.
     func transcribe(_ a: [String: Any]) throws -> String {
         // `importMedia`'s guard, restated: everything below assumes the main
         // thread is free, which is only true while this handler is not
@@ -97,6 +89,22 @@ extension AgentServer {
         }
         let place = try boolArg(a, "place") ?? true
         let wanted = try stringArg(a, "language")
+        let style = try captionStyle(a)
+        let replace = try boolArg(a, "replace")
+        if replace != nil {
+            guard style.isWordStyle else {
+                throw ToolError(
+                    message: "replace only applies with a word caption style — one of "
+                        + CaptionStyle.allCases.filter(\.isWordStyle).map(\.rawValue)
+                            .joined(separator: ", ")
+                        + " — not subtitles.")
+            }
+            guard place else {
+                throw ToolError(
+                    message: "replace only applies when place is true: with place false "
+                        + "nothing is placed, so nothing is replaced.")
+            }
+        }
 
         let document = try onMain { try self.target(a) }
         // The scope, the jobs and the frame in ONE main-thread hop, so every
@@ -105,6 +113,7 @@ extension AgentServer {
         // everything by value for the same reason.
         let scope = try onMain { try self.transcriptionScope(a, document) }
         guard !scope.jobs.isEmpty else { throw scope.emptyRefusal }
+        let pages = CaptionPages.Request(style: style, canvas: scope.canvas)
 
         let outcome: Transcriber.Outcome
         var fields: [String: Any]
@@ -116,22 +125,16 @@ extension AgentServer {
 
             // A tag the framework has never heard of is a typo, and a typo is
             // the caller's own mistake, so it is answered here with the rest
-            // of them and above the grant. See the two-part note in this
-            // method's doc.
+            // of them. See the two-part note in this method's doc.
             try Self.checkSpelling(of: wanted)
-
-            guard Transcriber.isAuthorized else {
-                throw ToolError(message: Transcriber.authorizationRefusal.localizedDescription)
-            }
             let language = try Self.transcriptionLanguage(wanted)
 
             // Held on this stack for the whole call, as `export` holds its
-            // `Exporter`: the transcriber owns the task's delegate, which the
-            // task itself does not retain.
+            // `Exporter`.
             let transcriber = Transcriber()
             do {
                 outcome = try transcriber.transcribe(
-                    scope.jobs, language: language, frame: scope.frame,
+                    scope.jobs, language: language, frame: scope.frame, pages: pages,
                     cancel: Transcriber.CancelToken())
             } catch {
                 // Every failure comes back in band, message and all —
@@ -145,33 +148,27 @@ extension AgentServer {
             ]
         case .assemblyai:
             let answer = try cloudTranscription(
-                a, document: document, jobs: scope.jobs, frame: scope.frame, language: wanted)
+                a, document: document, jobs: scope.jobs, frame: scope.frame, pages: pages,
+                language: wanted)
             outcome = answer.outcome
             fields = answer.fields
         }
 
         // Ticks, not seconds: every other tool speaks the model's own unit and
         // the catalog has one sentence for it.
-        let reported: [[String: Any]] = outcome.cues.map {
-            ["start": $0.start, "end": $0.end, "text": $0.text]
+        // A word style's cue adds its `words`, in the same timeline ticks,
+        // and `size` only where a lone word shrank.
+        let reported: [[String: Any]] = outcome.cues.map { cue in
+            var row: [String: Any] = ["start": cue.start, "end": cue.end, "text": cue.text]
+            if let words = cue.words {
+                row["words"] = words.map { ["start": $0.start, "end": $0.end, "text": $0.text] }
+            }
+            if let size = cue.size { row["size"] = size }
+            return row
         }
         var problems = scope.problems + outcome.problems
         fields["cues"] = reported
         fields["clips_read"] = outcome.clips.map { Int($0) }
-        if !outcome.truncations.isEmpty {
-            fields["truncated"] = outcome.truncations.map {
-                ["clip": Int($0.clip), "at": $0.stoppedAt, "end": $0.end] as [String: Any]
-            }
-            // Reported rather than worked around: the framework stops a
-            // recognition task after about a minute, and a caption run that
-            // quietly ended at 60 s and said nothing is the failure this key
-            // exists to prevent.
-            let count = outcome.truncations.count
-            fields["note"] =
-                "Recognition stopped early on \(count) clip" + (count == 1 ? "" : "s")
-                + ". Speech recognition ends a task after about a minute, so nothing between "
-                + "at and end was heard. Split the clip and transcribe the halves."
-        }
 
         // `place: false` is a read, like `detect_silence`: no ops, no undo
         // step, and the caller places the cues itself or does not.
@@ -192,8 +189,13 @@ extension AgentServer {
             // could patch ids that no longer mean what it thought.
             let plan: CaptionLayout.Plan
             do {
+                let replacing = replace == true
+                    ? CaptionLayout.replaceableTracks(
+                        in: document.editedProject.snapshot, jobs: scope.jobs)
+                    : []
                 plan = try CaptionLayout.place(
-                    outcome.cues, problems: problems, in: document.editedProject)
+                    outcome.cues, problems: problems, in: document.editedProject,
+                    style: style, replacing: replacing)
             } catch {
                 throw ToolError(message: error.localizedDescription)
             }
@@ -202,6 +204,7 @@ extension AgentServer {
             fields["captions"] = plan.clips
             if let name = plan.trackName { fields["track_name"] = name }
             if plan.trimmed > 0 { fields["trimmed"] = plan.trimmed }
+            if replace != nil { fields["replaced"] = plan.replaced.map { Int($0) } }
             if !problems.isEmpty { fields["skipped"] = problems.map { $0.description } }
             return try self.editResult(document, "Generate Captions", plan.ops, fields)
         }
@@ -233,7 +236,22 @@ extension AgentServer {
         let problems = named == nil ? [] : outcome.problems
         return TranscriptionScope(
             jobs: outcome.jobs, problems: problems, named: named != nil,
-            frame: max(snapshot.canvas.fps.frameDuration, 1))
+            frame: max(snapshot.canvas.fps.frameDuration, 1),
+            canvas: CGSize(width: snapshot.canvas.width, height: snapshot.canvas.height))
+    }
+
+    /// The `style` argument, refused BY NAME with all six spellings when it
+    /// is not one of them; Subtitles when absent, so today's calls are
+    /// unchanged.
+    private func captionStyle(_ a: [String: Any]) throws -> CaptionStyle {
+        guard let name = try stringArg(a, "style") else { return .subtitles }
+        guard let style = CaptionStyle(rawValue: name) else {
+            throw ToolError(
+                message: "style must be one of "
+                    + CaptionStyle.allCases.map(\.rawValue).joined(separator: ", ")
+                    + " (got \"\(name)\").")
+        }
+        return style
     }
 
     /// The jobs a run will do, and how to refuse when there are none.
@@ -244,6 +262,8 @@ extension AgentServer {
         /// is the honest one: "none of THOSE" or "nothing here at all".
         let named: Bool
         let frame: Ticks
+        /// What the pager measures pages against.
+        let canvas: CGSize
 
         var emptyRefusal: AgentServer.ToolError {
             guard named else {
@@ -263,23 +283,19 @@ extension AgentServer {
     /// ALL? Everything the framework names passes, model or no model.
     ///
     /// It is a separate function because it is a separate PROBLEM with a
-    /// separate fix. A tag speech recognition has never heard of is a
-    /// misspelling and is retyped; a tag it knows that this Mac has no model
-    /// for is a download, and `transcriptionLanguage` below refuses that one
-    /// in those words. One refusal for both would send somebody whose only
-    /// problem was an undownloaded model back to check a tag that was right
-    /// all along — which is what `transcribe`'s catalog entry promises does
-    /// not happen, and the promise is the reason this half exists.
-    ///
-    /// Being asked above the grant is the other reason. The framework's list
-    /// is static and reads the same at every authorization status, so this
-    /// answer is honest on a machine nobody has granted, where the on-device
-    /// question is not.
+    /// separate fix. A tag the engine has never heard of is a misspelling and
+    /// is retyped; a tag it knows that this Mac has no model for is a
+    /// download a person makes, and `transcriptionLanguage` below refuses
+    /// that one in those words. One refusal for both would send somebody
+    /// whose only problem was an uninstalled model back to check a tag that
+    /// was right all along — which is what `transcribe`'s catalog entry
+    /// promises does not happen, and the promise is the reason this half
+    /// exists.
     ///
     /// It refuses only where that list is NON-EMPTY. An empty one is not
     /// evidence that a tag is wrong — it is evidence that the question could
-    /// not be asked at all — and "no such language" off it would be the very
-    /// mistake the grant-first ordering exists to avoid, one list further out.
+    /// not be asked at all (`SpeechEngine.askBound`) — and "no such language"
+    /// off it would be a false answer.
     private static func checkSpelling(of wanted: String?) throws {
         guard let wanted = wanted else { return }
         let known = Transcriber.supportedLanguages()
@@ -304,9 +320,9 @@ extension AgentServer {
         let languages = Transcriber.languages()
         guard !languages.isEmpty else {
             throw ToolError(
-                message: "This Mac has no ON-DEVICE speech model for any language. macOS "
-                    + "downloads one the first time a language is used for dictation: open "
-                    + "System Settings ▸ Keyboard ▸ Dictation, add a language, and try again.")
+                message: "This Mac has no ON-DEVICE speech model installed for any language. "
+                    + "A person has to install one: open File ▸ Generate Captions…, choose a "
+                    + "language under Language, and press Download.")
         }
         guard let wanted = wanted else {
             guard let fallback = Transcriber.defaultLanguage(in: languages) else {
@@ -317,36 +333,37 @@ extension AgentServer {
             return fallback
         }
         guard let match = Transcriber.language(matching: wanted, in: languages) else {
-            throw noModelRefusal(for: wanted, ready: languages)
+            throw notInstalledRefusal(for: wanted, ready: languages)
         }
         return match
     }
 
     /// "This Mac has no model for a language it otherwise understands" — the
-    /// download refusal, and the only way past `checkSpelling` that is still
-    /// about the language.
+    /// not-installed refusal, and the only way past `checkSpelling` that is
+    /// still about the language. It never downloads: a person does, from the
+    /// sheet (spec §11 W-8).
     ///
-    /// The display NAME comes back out of the framework's list rather than
-    /// being echoed as the caller typed it, because "French (France) has no
-    /// on-device speech model" reads as a fact about a language where "fr has
-    /// no on-device speech model" reads as a fact about a string. A tag that
+    /// The display NAME comes back out of the engine's list rather than
+    /// being echoed as the caller typed it, because "French (France) is not
+    /// installed" reads as a fact about a language where "fr is not
+    /// installed" reads as a fact about a string. A tag that
     /// arrives here with no name to be found can only mean the framework's
     /// list was empty when `checkSpelling` asked it, and then the tag is the
     /// best name there is — one message with a fallback, rather than a third
     /// arm that nothing can reach, which is the shape this whole refusal was
     /// found in.
-    private static func noModelRefusal(
+    private static func notInstalledRefusal(
         for wanted: String, ready: [Transcriber.Language]
     ) -> ToolError {
         let known = Transcriber.supportedLanguages()
         let name = Transcriber.language(matching: wanted, in: known)?.displayName ?? wanted
         return ToolError(
-            message: Transcriber.TranscribeError.noOnDeviceModel(name).localizedDescription
+            message: Transcriber.TranscribeError.notInstalled(name).localizedDescription
                 + " Ready to use here: " + list(ready) + ".")
     }
 
-    /// The identifiers of either list, capped: the framework names sixty-odd
-    /// and an error message that prints all sixty is not read at all.
+    /// The identifiers of either list, capped: the engine names thirty here
+    /// and an error message that prints them all is not read at all.
     private static func list(_ languages: [Transcriber.Language]) -> String {
         let names = languages.map { $0.identifier }.sorted()
         guard names.count > 24 else { return names.joined(separator: ", ") }

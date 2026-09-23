@@ -307,7 +307,10 @@ impl Project {
     /// there is nothing to interpolate — half a slide into half a spin is
     /// not a picture anybody asked for — and the evaluator would put the
     /// base value back anyway, leaving a control that reported success and
-    /// did nothing.
+    /// did nothing. A `text` object naming `words` is an `Err` too (format
+    /// version 9, spec §11 W-6): a word's times are anchored to speech, not
+    /// a state a clip ramps toward, and interpolating two lists of ticks
+    /// would move every word off what it times.
     pub fn set_action_end(&self, clip: u32, action: u32, patch: &Value) -> Result<Outcome, String> {
         let target = self.require_clip(clip)?;
         let existing = target
@@ -329,6 +332,13 @@ impl Project {
             .is_some()
         {
             return Err("video.motion is not an animation target".to_string());
+        }
+        if patch
+            .get("text")
+            .and_then(|text| text.get("words"))
+            .is_some()
+        {
+            return Err("text.words is not an animation target".to_string());
         }
         check_end_patch(patch)?;
         let mut merged = actions::merge(&existing.end, patch);

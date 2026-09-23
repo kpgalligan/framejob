@@ -1,7 +1,9 @@
 //! The text vocabulary — [`TextProps`], the [`TextAlign`] and
 //! [`TextVAlign`] it is placed by, the optional [`Outline`] and
 //! [`Backdrop`] drawn with it, and the [`TextAnimation`] (with its
-//! [`TextAnimationKind`]) that reveals it (spec §5.2, §5.3).
+//! [`TextAnimationKind`]) that reveals it (spec §5.2, §5.3). Version 9's
+//! three word-caption fields — `case`, `words` and `word_style` — close
+//! [`TextProps`]; their TYPES are `model_words.rs`'s.
 //!
 //! Split out of `model_props.rs` under the size rule (core/CLAUDE.md: a
 //! module over ~600 lines gives something up BEFORE it takes anything on)
@@ -60,6 +62,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::model::Color;
+use crate::model_words::{TextCase, Word, WordStyle};
 use crate::time::{Ticks, TIMESCALE};
 
 /// A text layer's description. The model never stores a measured size —
@@ -85,6 +88,15 @@ pub struct TextProps {
     /// How the words arrive and how they leave, or `None` for text that is
     /// simply there for the length of its clip (format version 5).
     pub animation: Option<TextAnimation>,
+    /// A transform applied before layout (format version 9); never
+    /// changes the token count.
+    pub case: TextCase,
+    /// One `{start, end}` per whitespace token of `content`, in clip time,
+    /// or empty for an untimed text (format version 9, spec §11 W-2).
+    pub words: Vec<Word>,
+    /// How a timed page shows the word being said, or `None` for a text
+    /// that draws its words all alike (format version 9).
+    pub word_style: Option<WordStyle>,
 }
 
 impl Default for TextProps {
@@ -103,6 +115,9 @@ impl Default for TextProps {
             backdrop: None,
             width: None,
             animation: None,
+            case: TextCase::AsWritten,
+            words: Vec::new(),
+            word_style: None,
         }
     }
 }

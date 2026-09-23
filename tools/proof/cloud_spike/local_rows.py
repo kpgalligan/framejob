@@ -20,7 +20,7 @@ import http.server
 
 import aai
 
-TARGET = ["-O", "-target", "arm64-apple-macos15.0"]
+TARGET = ["-O", "-target", "arm64-apple-macos26.0"]
 Q7_SERVICE = "com.reelcut.spike.q7"
 Q7_ACCOUNT = "spike"
 

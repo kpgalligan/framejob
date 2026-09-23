@@ -17,10 +17,12 @@
 //!   loss back over the original on the next save — with the project still
 //!   opening and the text still on screen, which is what makes it quiet.
 //!   That gate itself is `schema_v3.rs`'s claim and is not restated here.
-//! - **`animation` is the LAST key of the `text` object**, read off the
-//!   written TEXT, because a parsed `Value` sorts its keys and cannot tell.
-//!   Declaration order is key order, so a version-4 file diffed against a
-//!   version-5 one differs by a trailing key rather than by a re-ordering.
+//! - **`animation` follows `width` and precedes version 9's `case`**, read
+//!   off the written TEXT, because a parsed `Value` sorts its keys and
+//!   cannot tell. Declaration order is key order, so a version-4 file
+//!   diffed against a version-5 one differed by a trailing key rather than
+//!   by a re-ordering; which key CLOSES the object is `schema_v9.rs`'s
+//!   claim now.
 //! - **An animation added with nothing said takes the documented
 //!   defaults** — a one-second typewriter that does not un-reveal. That is
 //!   the schema's one opinion here, and `TextAnimation::default` argues it:
@@ -119,7 +121,7 @@ fn set_text(patch: Value) -> Value {
 // ---- reading older files -------------------------------------------------
 
 fn assert_no_animation(project: &Value) {
-    assert_eq!(at(project, "/version"), &json!(8));
+    assert_eq!(at(project, "/version"), &json!(9));
     assert_eq!(at(project, "/clips/0/text/animation"), &Value::Null);
     // The neighbours a version-5 reader adds nothing to, so a file that
     // gained an absent animation gained ONLY that.
@@ -151,7 +153,7 @@ fn every_older_version_reads_the_same_way() {
 #[test]
 fn the_animation_round_trips_exactly() {
     let written = Handle::from_value(&animated()).value();
-    assert_eq!(at(&written, "/version"), &json!(8));
+    assert_eq!(at(&written, "/version"), &json!(9));
 
     let animation = at(&written, "/clips/0/text/animation");
     assert_eq!(text(animation, "/kind"), "word_fade");
@@ -175,11 +177,14 @@ fn every_kind_survives_a_write_and_a_read() {
 }
 
 #[test]
-fn animation_is_the_last_key_of_the_text_object() {
-    // Declaration order IS key order, and `animation` is the last field of
-    // `TextProps`, so a version-4 file diffed against a version-5 one
-    // differs by a trailing key rather than by a re-ordering. Read off the
-    // written TEXT, because a `Value` sorts its keys and cannot tell.
+fn animation_follows_width_and_precedes_the_version_nine_keys() {
+    // Declaration order IS key order. `animation` was the last field of
+    // `TextProps` at version 5, so a version-4 file diffed against a
+    // version-5 one differed by a trailing key rather than by a
+    // re-ordering; version 9 appended `case`, `words` and `word_style`
+    // after it, and the claim about which key CLOSES the text object moved
+    // to `schema_v9.rs` with them. Read off the written TEXT, because a
+    // `Value` sorts its keys and cannot tell.
     let first = Handle::from_value(&animated()).to_json();
     // Scoped to the text object, because `width` is also a key of the
     // canvas and of every media entry, and the first match in the whole
@@ -194,13 +199,7 @@ fn animation_is_the_last_key_of_the_text_object() {
     };
     assert!(position("\"backdrop\"") < position("\"width\""));
     assert!(position("\"width\"") < position("\"animation\""));
-    // ...and it CLOSES the object: the animation's own last key, its
-    // closing brace and the text object's closing brace, with nothing
-    // between them.
-    assert!(
-        first.contains("\"out\": 450000\n        }\n      }"),
-        "animation does not close the text object:\n{first}"
-    );
+    assert!(position("\"animation\"") < position("\"case\""));
 
     // A second trip through the text is byte-identical to the first, which
     // is what lets Swift compare project strings at all.

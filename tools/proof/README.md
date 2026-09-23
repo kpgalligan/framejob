@@ -461,34 +461,22 @@ is exported — and runs against the same instance as the rest.
 `phase4_proof.py` covers the catalog COUNT (70, the exact one) and phase 4's
 three parts. It needs no ffmpeg: nothing in it is exported to a movie.
 
-**Auto captions, honestly.** Speech recognition is gated by a TCC grant an
-agent-driven app can never obtain — the system prompt needs the app to be
-frontmost — so the recogniser is out of reach of every script, and the proof
-says so rather than pretending otherwise. What it DOES assert is the whole
-path around it: the three ineligible sources of the contract's D-A7 are each
-refused by name with the reason that belongs to them (a text clip, a
-REVERSED clip, a clip of a silent movie), a timeline with nothing audible in
-it is refused as that rather than as a scope, and then the grant itself —
-`transcribe` refuses with the exact sentence, NAMES the framework's status
-word inside it (`notDetermined` here), leaves the project JSON unchanged and
-pushes no undo step. That the scope refusals are reachable at all is the
-claim: the handler answers the caller's own mistakes BEFORE it reads the
-grant, and a build with those two guards swapped answers all four with the
-authorization sentence. What is NOT reachable HERE is the cue builder — the
-≤ 2 lines, ≤ 42 characters, ≤ 6 s and one-frame-gap rules of `CaptionCues` —
-because nothing in a running app calls it until a recogniser has produced
-words, and no MCP call can make one. Those four rules are proved in
-`phase4_chrome.py`'s section 8 instead, over the offscreen harness, which is
-the one binary that can call `CaptionCues.build` directly; the paragraph on
-that script says how.
-
-**With the grant**, which means opening the app yourself once and running
-File ▸ Generate Captions… so macOS can ask: import `media/speech.mov`, run
-`transcribe` over it, and the two pangrams should come back as text clips on
-a new "Captions" track, in order, none longer than 6 s or wider than two
-42-character lines, each starting at least a frame after the one before, and
-`render_frame` inside a cue should show its words burnt into the picture.
-`transcribe {place: false}` returns the same cues and changes nothing.
+**Auto captions, end to end** (rewritten by road map 8's W2). The on-device
+engine is `SpeechTranscriber` since W2 (spec §11 W-8), which asks for no TCC
+grant, so the recogniser is in reach of a script. Section 4a asserts the
+three ineligible sources of the contract's D-A7, each refused by name with
+the reason that belongs to it (a text clip, a REVERSED clip, a clip of a
+silent movie), and a timeline with nothing audible in it refused as that
+rather than as a scope. It then runs `transcribe` over `media/speech.mov`:
+the pangrams' words come back, `place: false` changes nothing and carries no
+`truncated` key, and placed, the cues land as ONE undo step. Last come the two
+LANGUAGE tiers: `zz-ZZ` is refused as a misspelling listing the tags that do
+exist, and a tag the engine knows whose model is NOT INSTALLED here (fr-FR,
+de-DE, ja-JP or ko-KR, the first refused) is refused by name — "a person has
+to install it" — placing nothing and pushing no undo step. A host with all
+four installed prints a SKIP for that row. The cue builder's four rules are
+still proved at their boundaries in `phase4_chrome.py`'s section 8, and on
+real speech by `speech_engine_proof.py`.
 
 **Caption export** is where the measurement is. The `.srt` fixture is
 written by the script at **25 fps**, where a frame is 40 ms exactly, so
@@ -1573,8 +1561,10 @@ puts on the frame grid next. It belongs to the harness because the harness
 is the only binary in the tree that links `app/Sources` outside the app, and
 that is the ONLY way the four cue rules can be reached without a person at
 the machine: in the app nothing calls `CaptionCues` until a recogniser has
-produced words, and `SFSpeechRecognizer` produces none without a Speech
-Recognition grant only a frontmost app can be given. The mode is answered
+produced words, and until road map 8's W2 the recogniser produced none
+without a Speech Recognition grant only a frontmost app could be given
+(since W2 `phase4_proof.py` and `speech_engine_proof.py` reach them over MCP
+as well). The mode is answered
 before a package is opened or a default is pinned, the way `welcome` is, and
 every render argument keeps the position it had — added, not rearranged,
 because `phase2_chrome.py`, `phase3_chrome.py` and `phase4_chrome.py` all
@@ -1605,6 +1595,33 @@ key is set." on a machine whose shell has a real `RC_ASSEMBLYAI_KEY` in it.
 on this host: 460 × 340 points at backing scale **1** for an offscreen
 window (the same as `welcome`'s), byte-identical across two processes in each
 appearance, light ≠ dark.
+
+Road map 8's W4b took a fifth render target, in `settings`' shape:
+
+```
+harness transcribe <project.reelcut> <out.png> <light|dark> <style> [replace 0|1]
+```
+
+renders the Generate Captions card (road map 8 §5e) over a package, hosted
+as a WINDOW's content view controller for `settings`' reason — a sheet
+cannot be put up offscreen. It builds its own `TranscribeSheetController`
+with a `MemoryStore`, an EMPTY environment, one synthetic installed
+language (en-US) and `MemoryDefaults`, a `UserDefaults` subclass that
+answers every keyed call from memory, the argument domain empty, and traps
+every domain write (a crash, so a scored failure) — it writes nothing, and
+`word_captions_sheet_support.swift` holds the same text: a named suite removed with
+`removePersistentDomain(forName:)` was MEASURED to leave its
+`~/Library/Preferences` plist behind, because cfprefsd writes the emptied
+domain seconds after the process exits (road map 8 §10.10). `<style>` is a
+`CaptionStyle` raw value chosen the way AppKit chooses it — the row
+selected, then `styleChanged:` — and `replace` sets the checkbox and sends
+`controlChanged:`. The preview is drawn off-Metal by
+`LayerRenderers.textBitmap`, so it is NOT black here the way the editor's
+preview well is. `pinDefaults` gained `ReelcutCaptionStyle`, pinned to
+`subtitles` on `ReelcutExportChoice`'s terms, and DEFENSIVE: no render reads
+it, since `transcribe` hands the card `MemoryDefaults` and no other mode
+builds the card. The arguments come after the
+render form's own count and every earlier caller's positions hold.
 
 Phase 5 took a THIRD mode, in the same shape and for the same reason:
 
@@ -1682,9 +1699,9 @@ for the reason the note on `SHAPE_HEIGHT` gives.
 **Section 8 is not a picture**, and it is in this script because the harness
 is: over the `cues` mode above it runs 4a's **cue builder** — the ≤ 2 lines,
 ≤ 42 characters, ≤ 6 s and one-frame-gap rules of `CaptionCues` — over
-twenty word lists, which is the only way those rules can be reached without
-the Speech Recognition grant (`phase4_proof.py` says so from the other
-side). Each rule is asserted at its BOUNDARY rather than in the middle,
+twenty word lists, which was the only way those rules could be reached
+before road map 8's W2 removed the Speech Recognition grant (since then
+`speech_engine_proof.py` checks them over MCP too, on real speech). Each rule is asserted at its BOUNDARY rather than in the middle,
 because a rule tested in the middle passes against `<` where the code says
 `<=`: a word of 60 characters comes back whole rather than hyphenated, a
 list of one word keeps its own times, two words at the same instant both
@@ -4458,3 +4475,430 @@ restoring unbounded 0/1 timestamp tolerance published a missing tail, and
 restoring the coarse-grid pre-rejection withheld fully covered PCM. The
 pristine **80/80** run was repeated after those mutants; road map 4 §9 and
 the litecode checks and fix-notes files hold the evidence.
+
+## Road map 8 — the word captions spike (`words_spike/`)
+
+W0, run complete on 2026-09-22: the seven questions
+`designs/reelcut-roadmap-8.md` §3 asks before any word-caption code is
+written. **The answers are in that document's §10.1, and §3a lists every
+design section a row overturned.** `tools/proof/words_spike/README.md` is how
+to run it again; this paragraph is the entry in this table.
+
+```sh
+python3 tools/proof/words_spike/words_spike.py                  # all seven rows
+python3 tools/proof/words_spike/words_spike.py --only q4,q5     # a subset; the rest carry forward
+python3 tools/proof/words_spike/words_spike.py --leakcheck tools/proof/words_spike \
+    tools/proof/work/words_spike designs/reelcut-roadmap-8.md tools/proof/README.md \
+    designs/reelcut-remaining.md
+```
+
+Five instruments. `speech_probe.swift` is a standalone `@main async` probe
+built at `-target arm64-apple-macos26.0` (the line
+`tools/proof/silence_spike/level_apple.swift:7` already proved here) that
+takes nothing from `app/Sources`; it answers `words`, `sf`, `assets` and
+`cancel`, and it never calls `requestAuthorization` or `downloadAndInstall`.
+`text_probe.swift` is compiled AS `main.swift` over every file in
+`app/Sources` but the app's own, module `Reelcut`, at
+`-target arm64-apple-macos15.0` — `peaks_probe.py:101-117`'s line — and
+answers `tokens`, `raster`, `stress` and `fonts`; it registers
+`app/Resources/Fonts` and the spike's own `fonts/` at `.process` scope with
+the harness's own loop before anything asks for a face, because a bare Mach-O
+has no `ATSApplicationFontsPath` and `CTFontCreateWithName` never answers nil.
+`tokens.rs` is `str::split_whitespace` alone, `rustc -O`, no dependencies.
+`scratch_rows.py` rsyncs a copy of the tree, moves the five deployment-target
+pins IN THE COPY, builds it, and drives the app it built on port 4831 by PID:
+the tree's `project.yml`, `Makefile` and `tools/proof/harness/build.sh` are
+never written, which `git status --short -- app core project.yml Makefile
+tools/proof/harness` proves afterwards.
+
+Two rules the spike learned the hard way, worth carrying into the next one.
+**A bounded child whose answer does not fit a 64 KiB pipe deadlocks
+`local_rows.run_bounded`**, which reads only after the child exits — the
+ten-minute probe prints 1 755 words and hung twice, which read exactly like a
+length ceiling in the Speech framework and was not one;
+`speech_rows.run_drained` is the version that drains while it waits. And **a
+bound enforced by an `await` is not a bound**: when a `SpeechAnalyzer` stops
+answering, nothing on the cooperative pool gets scheduled either, so
+`speech_probe`'s watchdog is an ordinary `Thread` that prints what arrived and
+exits.
+
+Only q2 spends money — three synthetic `say` fixtures, about 75 s of audio,
+each uploaded once and DELETEd, with `Ledger.reserve` before every upload and
+a $2.00 ceiling. `ten.wav` is never uploaded. `--leakcheck` carries its OWN
+secret list (the key plus this ledger's upload URLs) and exempts only
+`work/words_spike/ledger.json`; it is not `cloud_spike.leakcheck`, which is
+pinned to the other spike's ledger, and nothing under `cloud_spike/` was
+edited.
+
+The full run scored **exit 0 with all seven rows `run`** and every reservation
+closed. One SUB-row did not run and is named in road map 8 §10.3 and in
+`designs/reelcut-remaining.md` §4: q3's no-network case, which would change
+host network state.
+
+## The deployment target, rendered (`target_bump_proof.py`)
+
+W1a, road map 8 §10.4: the macOS 26 bump recompiles `Compositor.metal`
+(`project.yml`'s `MTL_LANGUAGE_REVISION: UseDeploymentTarget`), and the
+harness compiles only `.swift` and paints a black preview well, so nothing
+else here draws through the new `default.metallib`. This script writes one
+hand-made package — `A.mov`, a text clip and a shape clip on three tracks,
+all live at ticks 0, 900 000 and 1 500 000 — renders those three ticks with
+`render_frame` and keeps the PNGs; `compare` renders the same package on
+another build and checks each PNG byte for byte, `3/3`. It launches nothing
+and kills nothing: `capture` on the CONTROL build's own instance, `compare`
+on a fresh instance of the build under test.
+
+```sh
+python3 tools/proof/target_bump_proof.py <port> capture tools/proof/work/target-bump   # the control build
+python3 tools/proof/target_bump_proof.py <port> compare tools/proof/work/target-bump   # the build under test → 3/3
+```
+
+## Word captions, the core (`words_core_proof.py`)
+
+W1b, road map 8 §10.5: format version 9 adds `text.case`, `text.words` and
+`text.word_style`, and the core is the one counter, rebaser, snapper and
+recipe of them (spec §11 W-1 to W-6). The script is the core's half, so its
+rows are placements read back through `get_project`, refusal sentences, a
+saved `project.json`'s text, and ONE byte comparison — a CONTROL until W3
+(two `render_frame` PNGs a word apart were identical while no renderer read
+`word`), INVERTED since W3 (road map 8 §10.7): the same two frames must now
+DIFFER, because the active word is drawn. A version-10 package refused "(version 9)";
+a page added through `add_text_clip` read back on the 30 fps grid; six calls
+the door turns away (W-2's count sentence, a `words[0]` with no `end`,
+`active_scale` 2, a reversed word, `set_action_end` naming `text.words`,
+`case: "shouting"`) between an undo marker and ONE `undo` that takes the
+marker back; a content edit keeping or clearing the words; `split` mid-page
+and after a content-switching action; `trim_start`, `trim_end`, `roll`,
+`add_transition {align: "before"}`; `paste_attributes` keeping content and
+words; `set_canvas fps [24, 1]`; and the save and re-open. The recipe's
+`word` / `word_pop` are not reachable over MCP (no tool returns a recipe), so
+those rows are `core/tests/words.rs`'s, through the FFI. It launches nothing
+and kills nothing: run it on a fresh instance of the build under test.
+
+`--mutant` copies `core/` to a temporary tree (`op_contract_proof.py`'s
+pattern), replaces an anchor that must occur exactly once, and runs the one
+test that should catch it with a 900 s ceiling; exit 0 means that test
+FAILED in the copy. `hash-arm` drops the `word` / `word_pop` inserts from
+`text_hash` (`words::a_styled_page_hashes_a_word_apart_differently`);
+`trim-rebase` drops `trim_start`'s `rebase_words` call
+(`words::trim_start_rebases_the_words_by_its_delta`); `count-check` disables
+the count comparison
+(`schema_v9::a_count_mismatch_is_an_error_in_the_rules_own_words`).
+
+```sh
+python3 tools/proof/words_core_proof.py <port>                       # the build under test → 27/27
+python3 tools/proof/words_core_proof.py --mutant hash-arm            # exit 0 = the named test FAILED
+python3 tools/proof/words_core_proof.py --mutant trim-rebase
+python3 tools/proof/words_core_proof.py --mutant count-check
+```
+
+## The on-device engine (`speech_engine_proof.py`, `speech_engine_probe.swift`)
+
+W2, road map 8 §10.6: the on-device engine is `SpeechAnalyzer` +
+`SpeechTranscriber` behind the unchanged `Transcriber` path (spec §11 W-8).
+The script makes its own fixtures under `work/speech_engine/` —
+`pangram.wav` (`say --data-format=LEI16@16000` of `silence2_proof.SPEECH_TEXT`,
+23 words), `ten.wav` (the pangram repeated with 0.8 s of zeros until past
+600 s) and `silence.wav` (3 s of zeros) — and scores three parts in one run:
+
+- **MCP rows** against the build on the port given (launch a fresh instance
+  first; the script launches and kills nothing). `transcribe {engine: apple,
+  place: false}` over the pangram holds at least 20 of its 23 words, no cue
+  text has a leading, trailing or double space, the result carries no
+  `truncated` and no `note`, the project is unchanged and no undo step is
+  pushed. `ten.wav` comes back WHOLE: at least 100 cues, the first within
+  5 s of the start and the last ending within 5 s of the end, every cue
+  ≤ 2 lines × ≤ 42 characters, ≤ 6 s, sorted and a frame apart. `silence.wav`
+  answers the exact nothingRecognized sentence; `zz-ZZ` is a misspelling
+  listing at least ten tags; and the first of fr-FR, de-DE, ja-JP, ko-KR
+  refused as not installed is refused with "not installed" and "a person has
+  to install it" in under 5 s, identically twice. No model is downloaded; a
+  host with all four installed is a named SKIP.
+- **Probe rows**: `speech_engine_probe.swift`, compiled from `app/Sources`
+  minus `main.swift` at `-target arm64-apple-macos26.0` with the probe as
+  `main.swift` (a probe that will not build is a scored FAILURE). P1 cancels
+  a ten-minute run at 300 ms, and again once the analysis has reported
+  progress, and expects `.cancelled` within 5 s; P2 reads the two language
+  lists (installed ⊆ supported, all BCP-47), `en-US` and `en_US` agreeing in
+  `identifier(.bcp47)`, and `AssetInventory.reservedLocales` empty after the
+  runs; P3 `defaultLanguage` answering this Mac's own tag over both lists;
+  P4 `Transcriber().transcribe` with the first uninstalled supported
+  language throwing `.notInstalled` in under 5 s; P5 the sheet's Download
+  row, driven by hand — offered for fr-FR, Cancel shown but disabled while
+  the download waits for its request's `Progress`, both popups locked and
+  the label naming French mid-download with en-US selected, and after
+  `downloadFinished(.success(()))` the popups back and fr-FR still selected
+  (nothing is ever downloaded); P6 `SpeechEngine.transcribe` over the pangram,
+  every run trimmed; P7 over `ten.wav`, at least 1 000 runs and the last
+  ending within 5 s of the end. P8, run last because every row above goes
+  through `SpeechEngine.gate`, holds that gate for 90 s from a detached task
+  and expects `SpeechEngine.transcribe` over the pangram to answer at least
+  20 of its words in under 30 s regardless (a SKIP where en-US is not
+  installed).
+- **Mutants**: six tree copies under `work/speech_engine/mutants/`, one
+  once-only anchor each, the probe rebuilt from each; a mutant scores when
+  its NAMED row fails. `keep-last-result-only` (P7), `drop-the-trim` (P6),
+  `skip-installed-check` (P4), `raw-compare-default` (P3),
+  `cancel-live-before-progress` (P5 awaiting progress) and
+  `release-before-signal` (P8, which waits out its 60 s bound).
+
+```sh
+python3 tools/proof/speech_engine_proof.py <port>                # MCP + probe + mutants
+python3 tools/proof/speech_engine_proof.py <port> --no-mutants   # MCP + probe
+```
+
+## Road map 8's W3 — the word-caption picture
+
+W3 (road map 8 §10.7) taught the app to decode format version 9's `case`,
+`words` and `word_style` and the recipe's `word` / `word_pop`, and to draw a
+timed page. Four instruments; each launches nothing and kills nothing, and
+the two MCP ones run on a FRESH instance each, with
+`grep "Reelcut: " /tmp/reelcut-<port>.log` printing nothing first.
+
+### The reveal toll, rendered (`reveal_toll_proof.py`)
+
+The three reveal routines moved out of `LayerRenderersText.swift` as a pure
+move before the fourth routine landed, and `TextProps` / `TextPatch` moved
+out of their ledger files. `target_bump_proof.py`'s shape over a
+hand-written version-9 640×360 package: a static title, a typewriter, a
+word_fade, an OUTLINED word_fade (the partial-alpha transparency layer) and
+a two-line line_rise over a backdrop, each 5 s with `in` and `out` of 1 s,
+rendered at 0, 0.4, 0.8, 2.0, 4.6 and 4.9 s. `capture` (on the UNCHANGED
+build) keeps the six PNGs and exits 0 only if all six differ — a fixture
+whose frames were equal would prove nothing was animated; `compare` checks
+each byte for byte, `6/6`.
+
+```sh
+python3 tools/proof/reveal_toll_proof.py <port> capture tools/proof/work/reveal-toll   # the control build
+python3 tools/proof/reveal_toll_proof.py <port> compare tools/proof/work/reveal-toll   # → 6/6
+```
+
+### The picture over MCP (`words_picture_proof.py`)
+
+Seven rows, each a byte comparison of two `render_frame` PNGs of a
+hand-written version-9 package in `work/words-picture/` (the PNGs are kept
+there under stable names), or a sentence off `tools/list`: R1 two frames
++0.20 s and +0.30 s after a word start (after the 0.12 s pop) identical; R2
+the frame a frame before a word start differs from the frame at it; R3 a
+build page a frame before its first word equals a frame before the clip
+(and the page does draw at the word); R4 `case: upper` on "straße ist"
+differs from `as_written` and equals "STRASSE IST" typed; R5 the four
+bundled faces and `NoSuchFont-Black` give five distinct PNGs; R6 `set_text`'s
+patch description names `case (as_written|upper`, `words (one {start, end}`
+and `word_style (null or {mode: highlight|build`; R7 an UNTIMED page with a
+colour-only `word_style` equals its unstyled twin.
+
+```sh
+python3 tools/proof/words_picture_proof.py <port>     # → 7/7
+```
+
+### The arithmetic, in a probe (`words_picture_probe.py`, `words_picture_probe.swift`)
+
+The box, the headroom, the ink and the Content write have no caller a
+script can reach, so the probe is compiled from `app/Sources` over
+`harness/build.sh`'s swiftc line (a probe that will not build is a scored
+FAILURE) and registers `app/Resources/Fonts` at `.process` scope. The Swift
+side measures and prints one JSON object (kept as
+`work/words-picture-probe/answer.json`); the Python side scores P1–P9: P1 the
+bitmap is `measuredSize` at every word and pop {0, .3, .58, 1}, four faces ×
+1080×1920 and 1920×1080, one line and wrapped, `valign` middle, top and
+bottom, at `active_scale` 1.15 and 1.5 with the default pill and — since
+W4a — 1.5 with NO pill, plus each of §5h's five word styles in its own
+face, case, outline, scale and pill through `CaptionStyle` (204 pages); P2 no ink outside that box, drawn by the
+renderer's own `drawWords` into a bitmap two em larger each side; P3 word 1
+≠ word 2, a build page inkless at word 0; P4 `laidContent` and the red
+active word's extents against the LAID midpoint of "STRASSE IST"; P5 each
+face round-trips its PostScript name, is not the fallback, and the file at
+`kCTFontURLAttribute` has the pinned sha256; P6 `contentEdit`'s three cases
+and `contentOps` (a) (b) (c); P7 the headroom rule; P8 `measuredSize` with
+and without `words`; P9 the popped word's red ink is at least 0.95 × 1.5 its
+unpopped width. About 575 s, most of it P1/P2's 204 pages, so its bound is
+1500 s.
+
+`--mutant` builds from a COPY of `app/Sources` with one anchor asserted to
+occur exactly once and exits 0 when at least one row FAILED within 1500 s:
+`ignore-word` (drawText's words arm never taken), `drop-headroom` (the
+insets without `wordHeadroom`), `skip-case` (`laidContent` is `content`),
+`keep-words` (`contentEdit` never clears `words`), `clip-then-scale` (the
+active token's midpoint clip set before the pop's CTM, P9) and
+`flat-vertical` (the vertical headroom pinned to 0.30 em, P2 at 1.5).
+
+```sh
+python3 tools/proof/words_picture_probe.py                        # → 11/11
+python3 tools/proof/words_picture_probe.py --mutant ignore-word   # exit 0 = a row FAILED
+```
+
+### The inspector's two items, offscreen (`words_picture_chrome.py`)
+
+Through `tools/proof/harness/` at 1440×1600 with `text.content`,
+`text.style` and `text.animation` opened: four packages of one text clip,
+"TITLE 2026" — already capitals, so switching `case` cannot move a glyph or
+the canvas overlay's handles — as written, `case: upper`, with a
+colour-only `word_style` and two timed words, and the same with
+`words: []`. The CONTROL renders the title twice, identical; then title vs
+UPPERCASE, title vs styled (the Reveal rows greyed and the word-style
+note) and styled vs untimed (the Content footnote) each differ, with every
+changed pixel inside the inspector column (x ≥ 1440 − 304 pt). Run it AFTER
+anything that builds the harness, never beside it.
+
+```sh
+python3 tools/proof/words_picture_chrome.py           # → 5/5
+```
+
+## Road map 8's W4a — generation
+
+W4a (road map 8 §10.9) pages a run's words into width-measured, word-timed
+pages in five styles and places them. Two instruments: a probe for the
+pager's arithmetic, which no script can reach, and an MCP proof that
+launches its OWN instance and its own `assemblyai_fake.py`.
+
+### The pager, in a probe (`word_captions_probe.py`, `word_captions_probe.swift`, `word_captions_support.swift`)
+
+Compiled from `app/Sources` over `harness/build.sh`'s swiftc line with the
+two Swift files beside it (a probe that will not build is a scored FAILURE),
+the fonts registered at `.process` scope. The fixed list is
+`work/words_spike/fixtures/fixtures.json`'s `talk_text` (W0's; present on a
+host that ran the spike), one token every 0.3 s from 1.0 s, each spoken for
+0.18 s, with one 40-letter compound after the first sentence and every token
+from the sixth unpunctuated mid-sentence one on 0.3 s later ("editing |
+video", a 0.42 s gap — W4b's fix for W4a's review nit 2) — 117 words —
+paged in every word style on 1080×1920 and 1920×1080. The WIDTH checks
+measure `LayerRenderers.measuredSize` of `CaptionStyle.textProps` directly,
+never `CaptionPages.fits`. P0 every page's shape (one timing per token,
+starts non-decreasing, inside the span); P1 every multi-word page within
+0.86 of the width; P2 every page closed by width alone would not take its
+next word, or is one balance move from such a page, and a page ending `,;:`
+is exempt only where `clauseMark`'s own conditions held (at least
+`clauseMinimum` of the budget, the page plus m ≤ `clauseWindow` next words
+laying where one more did not, and no balance move explaining it), with at
+least one such page; P3 no lone word unless
+its break was forced, no balance move improves it, or it is at least half
+the budget; P4 a lone over-wide word shrinks in 5 % steps to the floor
+before it wraps; P5 no two-line page but Karaoke or a wrapped lone word
+(`layout(for:).lines.count`); P6 abutment where the gap is under
+`breakGap`, under the standard rules AND a hold of 0.1 s (under §8's own
+numbers `hold` outlasts `breakGap`, so only the short hold sees the no-blink
+rule do anything); P7 the canvases page differently; P8 the first page at
+raw start + `lead` per engine; P9 `cues(.subtitles)` equals
+`CaptionCues.build`; P11 two abutting spans per engine and style; P12 the
+0.42 s gap closes a page in every style and canvas; and P10,
+`SpeechEngine` over `speech_engine_proof.make_fixtures()`'s `say` pangram,
+paged by gap and punctuation and again with road map 4's two detector
+pauses as forced breaks — the row asserts the first breaks at both, and
+whether the second changes any page is PRINTED (a host without en-US
+installed is a named SKIP). About 70 s.
+
+`--mutant` builds from a COPY of `app/Sources`, each anchor asserted to
+occur exactly once, and exits 0 when its NAMED row failed: `width-count`
+(`fits` → at most 3 tokens, P2), `drop-balance` (P3), `drop-no-blink` (P6),
+`drop-lead` (both leads 0, P8), `drop-span` (the clamp and the last
+page's bound removed, P11), W4b's two: `drop-gap` (the `breakGap`
+disjunct removed, P12) and `drop-clause` (`clauseMark` never fires, P2), and
+the W4b residue's `loosen-clause` (`clauseMark`'s two limits loosened — any
+mark, any head — so a short comma head closes a page early; P2, with the
+slack printed).
+
+```sh
+python3 tools/proof/word_captions_probe.py                          # → 15/15
+python3 tools/proof/word_captions_probe.py --mutant drop-span       # exit 0 = P11 FAILED
+```
+
+### Generation over MCP (`word_captions_proof.py`)
+
+Launches its own instance on the port given, with `-RCSecretFolder` under
+`work/word_captions/`, `-RCAssemblyAIEndpoint` at its own fake and the dummy
+key, and kills both by PID. G1 `apple` + `highlight` over `media/speech.mov`
+on 1080×1920 — every placed clip Montserrat-Black, `case` upper,
+`word_style` highlight, one timing per token; G2 Width off pixels — each
+page rendered at `start + frame` with and without the captions (`undo`),
+every differing column inside `[0.07 W, 0.93 W]`; G3 the cloud engine over
+the fake's five words — `subtitles` with `place: false` gives the pinned
+cue, `highlight` answers from the cache with `words`; G4 `pill` with
+`replace: true` replaces exactly the old track and NOT an empty "Captions 2"
+track added beside it (W4a's review nit 1), one `undo` restores it whole
+and `redo` swaps back; G5 three refusals by name, the `place` one matched
+on "when place is true" (nit 4: "place" is a substring of "replace"); G6 `apple` +
+`one_word` over the `say` pangram; G7 `tools/list`; G8 `speech.mov` split
+at its midpoint, then `highlight` — no `trimmed`, no `skipped`, every page
+inside one clip — and `pill` with `replace: true`. Then `grep "Reelcut: "`
+on its log.
+
+```sh
+env -u RC_ASSEMBLYAI_KEY python3 tools/proof/word_captions_proof.py 4891   # → 19/19
+```
+
+
+## Road map 8's W4b — the sheet (`word_captions_chrome.py`, `word_captions_sheet_probe.swift`)
+
+W4b (road map 8 §10.10) gave File ▸ Generate Captions… its Style popup, the
+preview and the Replace checkbox. A sheet cannot be put up offscreen, so the
+card is proved two ways by ONE script, run AFTER anything that builds the
+harness, never beside it.
+
+**Photographs**, through the harness's `transcribe` target (above), over
+three v9 packages the script writes under `work/chrome-words-sheet/` — one
+audio media on `media/speech.aiff` (the file must exist: `mediaURL(for:)`
+drops a missing one) and one clip on it: `tall` 1080×1920, `wide`
+1920×1080, and `track`, `tall` plus a "Captions" track holding one text clip
+over the clip. Rows: the harness builds; every render wrote a PNG; CONTROL —
+`tall`, Subtitles, light, twice, byte-identical; the six styles six distinct
+PNGs in each appearance; each style light ≠ dark; Highlight 9:16 ≠ 16:9;
+`track` with Replace checked ≠ `tall` with Replace asked for (disabled, so
+off).
+
+**Structure**, through `word_captions_sheet_probe.swift` compiled over
+`app/Sources` with `harness/build.sh`'s swiftc line and
+`word_captions_sheet_support.swift` beside it (the fixture, the builders,
+S8's readers and `MemoryDefaults`, moved out so the probe stays under 400
+lines; a probe that will not build is a scored FAILURE), every sheet over its
+own `MemoryDefaults`: S1
+the popup's six rows in `CaptionStyle.allCases` order, opening on Subtitles;
+S2 six byte-distinct previews on 1080×1920, Highlight's differing between
+the two canvases, the sample page's token counts (the width closes
+Highlight at 4 on 1080 wide, §5h, and the balance step leaves 3; all 5 on
+1920 wide), Karaoke previewed as written (its `textBitmap` differs from the
+same props in capitals) and Highlight upper; S3 Replace disabled with no
+caption track, with an EMPTY "Captions" track, with Subtitles, and over a
+"Captions" track holding a media clip — enabled over one text clip, the
+label reading `Replaces “Captions” (1 caption).`; S4 the remembered style
+(Pill written, a second sheet opens on Pill, "bold" opens on Subtitles); S5
+`finish` with Pill and Replace — one caption track of Montserrat-ExtraBold,
+upper, `active_pill` pages, the old track gone, one undo restores it
+(the sheet presented from a host with a no-op animator, so `finish`'s
+`dismiss` has something to dismiss); S6 the preview's words — the fixed
+sample with no transcript (the miss cached), a transcript's own words when
+one is written before the sheet (a different preview), the fixed sample and
+the no-file preview byte for byte when the transcript has no word in the
+clip; S7 `replaceExisting` false whenever the checkbox is disabled; S8 a
+shrunk page is ONE page — a lone Highlight word from a ladder that shrinks
+without wrapping ("Straightforward", 68.85 of 81) has its preview props,
+its committed props (less `words`) and `CaptionStyle.textProps` at its own
+size all equal, its committed outline 0.08 × its own size, and it measures
+and draws (`textBitmap`) inside the 928.8 px budget where the same text at
+the base size does not; the same three-way equality for a word wrapped at
+the floor (64.8, `width` the budget); and Subtitles' preview props equal to
+its committed props whole; S9 the preview is drawn 0 times across five
+`refresh()`es and a Vocabulary keystroke (the image object is the same —
+`preview()` mints a new one per call), and anew on each style change, with
+`previewKey` the style, the first job's clip and the canvas.
+
+`--mutant` copies `app/Sources`, asserts each anchor once, runs only the
+probe, and exits 0 when its NAMED row failed: `preview-ignores-style` (the
+preview drawn from fixed Highlight props, S2), `replace-without-track`
+(Replace live for any word style, S3's no-track row), `style-not-remembered`
+(`styleChanged` writes nothing, S4) and `replace-empty-track`
+(`replaceableTracks` without its at-least-one-clip guard, S3's empty-track
+row), and the W4b residue's three: `commit-wider-outline` (`pagePatch`'s
+outline 1.25 × the pager's, S8's shrunk row), `preview-base-size` (the
+preview measured at the style's size, not the page's, S8's shrunk row) and
+`preview-redraws` (the key guard always true, S9). 80 s for the whole script
+with the harness already built (its rebuild, when `build.sh` finds it stale,
+is about 65 s more), 66 s a mutant. Afterwards `ls ~/Library/Preferences | grep -c
+"reelcut.harness.transcribe\|wordsheet-"` prints 0: neither half writes a
+defaults suite.
+
+```sh
+tools/proof/harness/build.sh --force
+python3 tools/proof/word_captions_chrome.py                                 # → 31/31
+python3 tools/proof/word_captions_chrome.py --mutant replace-empty-track    # exit 0 = S3 FAILED
+```

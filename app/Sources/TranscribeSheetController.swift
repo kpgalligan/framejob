@@ -1,5 +1,4 @@
 import AppKit
-import Speech
 
 /// File ▸ Generate Captions… — road map 2 phase 4a's dialog: a language, a
 /// scope, and then the same card turned into a progress bar while
@@ -17,20 +16,13 @@ import Speech
 /// action validates false while a sheet is attached, so the clips it counted
 /// in `init` are the clips that will be transcribed.
 ///
-/// **The grant is asked for HERE and nowhere else.**
-/// `SFSpeechRecognizer.requestAuthorization` puts up a system prompt that
-/// needs a person, and this sheet is the one place in the app where one is
-/// known to be present by construction. The `transcribe` tool reads
-/// `authorizationStatus()` and refuses instead (`Transcriber.canAsk` carries
-/// the argument, which is `FFmpegRewrap.canAsk`'s). Denied and restricted are
-/// answered before the button is ever enabled; `notDetermined` is answered by
-/// asking, on the click, and the answer either starts the run or turns this
-/// into a result card explaining what happened.
-///
-/// **What it cannot promise.** The recogniser's one-minute ceiling is real
-/// and undocumented for the on-device path (`Transcriber`'s doc argues it), so
-/// a run that stops early says where it stopped rather than pretending the
-/// clip held no more speech.
+/// **A model is installed HERE and nowhere else** (spec §11 W-8). The
+/// Language popup lists every locale the engine supports, a row whose model
+/// is missing marked "— not installed", and choosing one shows the Download
+/// row (`TranscribeSheetController+Download.swift`): a download is a
+/// person's act, so the `transcribe` tool refuses such a locale by name and
+/// never downloads. Generate is live only for an installed language. No grant
+/// is asked for and no ceiling is reported: W0 q1 measured neither.
 ///
 /// **Two engines, one card (road map 6 §5e).** An Engine popup under
 /// Language chooses between the recogniser on this Mac and AssemblyAI, and
@@ -39,17 +31,15 @@ import Speech
 /// that is only about the cloud engine; what is HERE is the card, and three
 /// methods — `refresh`, `noteText` and `startClicked` — whose FIRST statement
 /// dispatches on the engine. That order is load-bearing: under
-/// `.assemblyai` none of the three reads `language`, `languages`, `isBlocked`,
-/// `Transcriber.authorizationStatus` or `requestAuthorization`, so a Mac with
-/// no on-device model and no Speech grant can still transcribe in the cloud.
-/// The `.apple` arms are the code they were, moved under the dispatch.
+/// `.assemblyai` none of the three reads `language` or `languages`, so a Mac
+/// with no on-device model can still transcribe in the cloud.
 ///
 /// **The widenings this split cost**, in toll 3's pattern: `languages`,
 /// `mediaURLs`, `languagePopup`, `summaryLabel`, `noteLabel`, `hintLabel`,
 /// `scope`, `jobs(in:)`, `startButton`, `showProgress()` and `progressed(_:_:)`
 /// are internal rather than private, because `+Cloud.swift` builds the same
-/// card out of them. `language` and `isBlocked` stay private: the cloud half
-/// must not be able to read either.
+/// card out of them. W2 widened `language`, `grid` and `refresh()` for the
+/// Download row's file; the cloud half still reads none of them.
 ///
 /// **Four injection points, for the probe and for nothing else.** `store`,
 /// `defaults`, `environment` and `languages` are initialiser arguments with
@@ -83,7 +73,7 @@ final class TranscribeSheetController: NSViewController {
     let mediaURLs: [UInt32: URL]
     private let selection: Set<UInt32>
     private let inOutRange: (start: Ticks, end: Ticks)?
-    let languages: [Transcriber.Language]
+    var languages: [Transcriber.Language]
 
     /// Where the AssemblyAI key comes from, where the region and the
     /// remembered engine are read and written, and what a `RC_ASSEMBLYAI_KEY`
@@ -112,13 +102,26 @@ final class TranscribeSheetController: NSViewController {
     let bar = NSProgressIndicator()
     let statusLabel = NSTextField(wrappingLabelWithString: "")
     let detailLabel = NSTextField(labelWithString: "")
+    let stylePopup = NSPopUpButton(frame: .zero, pullsDown: false)
+    let previewView = NSImageView()
+    let replaceCheckbox = NSButton(checkboxWithTitle: "existing captions", target: nil, action: nil)
+    let replaceLabel = NSTextField(wrappingLabelWithString: "")
     /// Set in `loadView`; the only implicitly-unwrapped optionals here, which
     /// is what app/CLAUDE.md allows them for.
     private var settingsStack: NSStackView!
     private var progressStack: NSStackView!
-    private var grid: NSGridView!
+    var grid: NSGridView!
     var stopButton: NSButton!
     var startButton: NSButton!
+    /// The Download row's three views, built by `makeDownloadRow()`.
+    var downloadButton: NSButton!
+    var downloadBar: NSProgressIndicator!
+    var downloadLabel: NSTextField!
+    /// The running download's own `Progress`, observed while it runs.
+    var downloadProgress: Progress?
+    var downloadObservation: NSKeyValueObservation?
+    /// The locale the RUNNING download is for; nil when none runs.
+    var downloading: Transcriber.Language?
 
     /// The run, held for its life: `CloudTranscriber.run` hops onto its own
     /// queue with `[weak self]`, so a transcriber nobody retains never
@@ -134,19 +137,27 @@ final class TranscribeSheetController: NSViewController {
     /// `refresh` runs on every keystroke in the Vocabulary field and a stat
     /// per keystroke per media is not a readout, it is a spin.
     var cloudFactsCache: [UInt32: CloudEstimate.Facts] = [:]
+    /// The answer `sampleWords()` gave for a job's clip — the fixed sample when the
+    /// transcript is absent or has no words for it — so a MISS is read once too
+    /// (`cloudFactsCache`'s rule: `refresh` runs per keystroke).
+    var sampleWordsCache: [UInt32: [CaptionCues.Word]] = [:]
+    /// What the preview was last drawn for (`+Style.swift`); nil until the
+    /// first `refreshStyleRow`, which therefore always draws.
+    var previewKey: PreviewKey?
 
     var didStart = false
     var didFinish = false
 
+
     private static let scopes = Scope.allCases
     /// The grid rows that belong to AssemblyAI alone.
-    static let cloudRows = [2, 3, 4]
+    static let cloudRows = [3, 4, 5]
 
     init(
         document: ProjectDocument, store: any SecretStore = AssemblyAIConfiguration.store(),
         defaults: UserDefaults = .standard,
         environment: [String: String] = ProcessInfo.processInfo.environment,
-        languages: [Transcriber.Language] = Transcriber.languages()
+        languages: [Transcriber.Language] = Transcriber.supportedLanguages()
     ) {
         self.document = document
         // The container the cues will LAND in, not the document — see
@@ -206,7 +217,7 @@ final class TranscribeSheetController: NSViewController {
     /// to one display name, so an index into `languages` can name a different
     /// language than the row the person clicked. `CaptionExporter`'s track
     /// popup carries the same guard for the same reason.
-    private var language: Transcriber.Language? {
+    var language: Transcriber.Language? {
         guard let identifier = languagePopup.selectedItem?.representedObject as? String else {
             return languages.first
         }
@@ -283,11 +294,15 @@ final class TranscribeSheetController: NSViewController {
 
         grid = NSGridView(views: [
             [fieldLabel("Language:"), languagePopup],
+            makeDownloadRow(),
             [fieldLabel("Engine:"), enginePopup],
             [fieldLabel("Speakers:"), speakersCheckbox],
             [fieldLabel("Vocabulary:"), vocabularyField],
             [fieldLabel("Transcribe again:"), refreshCheckbox],
             [fieldLabel("From:"), scopePopup],
+            makeStyleRow(),
+            makePreviewRow(),
+            makeReplaceRow(),
         ])
         grid.rowSpacing = 10
         grid.columnSpacing = 12
@@ -386,7 +401,8 @@ final class TranscribeSheetController: NSViewController {
     /// Everything the settings state shows, recomputed from the controls —
     /// there is no other way for the readout and the button to get out of
     /// step with each other.
-    private func refresh() {
+    func refresh() {
+        defer { refreshStyleRow(); refreshDownloadRow() }
         guard engine == .apple else {
             refreshCloud()
             return
@@ -406,14 +422,7 @@ final class TranscribeSheetController: NSViewController {
         let note = noteText(jobs: jobs)
         noteLabel.stringValue = note
         noteLabel.isHidden = note.isEmpty
-        startButton?.isEnabled = !jobs.isEmpty && !languages.isEmpty && !isBlocked
-    }
-
-    /// True when no click could ever succeed: the grant was refused for good.
-    /// `notDetermined` is not blocked — that is the state a click FIXES.
-    private var isBlocked: Bool {
-        let status = Transcriber.authorizationStatus
-        return status == .denied || status == .restricted
+        startButton?.isEnabled = !jobs.isEmpty && language?.installed == true
     }
 
     private func noteText(jobs: [Transcriber.Job]) -> String {
@@ -421,14 +430,8 @@ final class TranscribeSheetController: NSViewController {
         var notes: [String] = []
         if languages.isEmpty {
             notes.append(
-                "No language on this Mac has an on-device speech model. Download one in "
-                    + "System Settings ▸ Keyboard ▸ Dictation and reopen this sheet.")
-        }
-        if isBlocked {
-            notes.append(
-                "Speech Recognition is turned off for Reelcut (status: "
-                    + "\(Transcriber.name(of: Transcriber.authorizationStatus))). Turn it on in "
-                    + "System Settings ▸ Privacy & Security ▸ Speech Recognition.")
+                "This Mac's speech engine named no language with an on-device speech model. "
+                    + "Reopen this sheet to ask it again.")
         }
         if jobs.isEmpty {
             notes.append(
@@ -455,12 +458,11 @@ final class TranscribeSheetController: NSViewController {
         token.cancel()
     }
 
-    /// The grant, then the run. `requestAuthorization` only ever happens on
-    /// this path, and only from `.notDetermined`.
+    /// The run, for an installed language only.
     @objc func startClicked(_ sender: Any?) {
         guard engine == .apple else {
             // Nothing below this line is read for the cloud engine: no
-            // grant, no on-device model, no `language`.
+            // on-device model, no `language`.
             guard !didStart, !jobs(in: scope).isEmpty, runRequest().options != nil else {
                 NSSound.beep()
                 return
@@ -468,30 +470,17 @@ final class TranscribeSheetController: NSViewController {
             beginCloud()
             return
         }
-        guard !didStart, let language = language, !jobs(in: scope).isEmpty else {
+        guard !didStart, downloading == nil, let language = language, language.installed,
+            !jobs(in: scope).isEmpty
+        else {
             NSSound.beep()
             return
         }
-        guard Transcriber.authorizationStatus == .notDetermined else {
-            begin(language: language)
-            return
-        }
-        startButton.isEnabled = false
-        Transcriber.requestAuthorization { [weak self] _ in
-            guard let self = self else { return }
-            self.startButton.isEnabled = true
-            self.begin(language: language)
-        }
+        begin(language: language)
     }
 
     private func begin(language: Transcriber.Language) {
         guard !didStart else { return }
-        guard Transcriber.isAuthorized else {
-            didStart = true
-            showProgress()
-            finish(.failure(Transcriber.authorizationRefusal))
-            return
-        }
         didStart = true
         let jobs = self.jobs(in: scope)
         showProgress()
@@ -499,7 +488,7 @@ final class TranscribeSheetController: NSViewController {
             "Transcribing \(jobs.count) clip\(jobs.count == 1 ? "" : "s")…"
         transcriber.run(
             jobs: jobs, language: language,
-            frame: max(snapshot.canvas.fps.frameDuration, 1), cancel: token,
+            frame: max(snapshot.canvas.fps.frameDuration, 1), pages: pagesRequest, cancel: token,
             progress: { [weak self] fraction, name in
                 // The run's own queue: every UI touch hops, the way
                 // `ConsolidateProgressSheetController` bounces its.

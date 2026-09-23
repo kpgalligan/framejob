@@ -222,8 +222,9 @@ enum RecordingConfiguration {
 // MARK: - The grants
 
 /// Decision 4 (road map 3 §0): the PANEL asks for the grants, the tool never
-/// does — `Transcriber.canAsk`'s rule for two grants. What lives here is the
-/// synchronous READ of each and the sentence a refusal names the fix in;
+/// does — the rule the speech grant's `canAsk` carried, for two grants.
+/// What lives here is the synchronous READ of each and the sentence a
+/// refusal names the fix in;
 /// `CGRequestScreenCaptureAccess()` and `AVCaptureDevice.requestAccess` are
 /// called by the recorder panel alone, because a system prompt needs a
 /// person in front of it.

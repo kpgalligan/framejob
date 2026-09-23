@@ -8,7 +8,7 @@
 // The model is NOT in the tree. Fetch it beside this file (the README has the
 // five files and their ETags), or point SILERO_MLMODELC at a .mlmodelc:
 //
-//   xcrun swiftc -O -target arm64-apple-macos15.0 silero_coreml.swift -o silero_coreml
+//   xcrun swiftc -O -target arm64-apple-macos26.0 silero_coreml.swift -o silero_coreml
 //   SILERO_MLMODELC=./silero_vad.mlmodelc ./silero_coreml <media>...
 //
 // designs/reelcut-roadmap-4.md §2 quotes its output (q6, q7).

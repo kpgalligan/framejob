@@ -6,7 +6,7 @@
 // M4A AAC), written twice. Every digest is printed so a SECOND RUN of the
 // program can be diffed against the first — the cross-process half.
 //
-// Build: xcrun swiftc -O -parse-as-library -target arm64-apple-macos15.0 \
+// Build: xcrun swiftc -O -parse-as-library -target arm64-apple-macos26.0 \
 //          fx_common.swift fx_determinism.swift -o ../work/effects_spike/fx_determinism
 
 import AVFoundation

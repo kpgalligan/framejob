@@ -50,7 +50,7 @@ import ScreenCaptureKit
 /// the microphone's did-start on one labelled "File ou", the recording
 /// output's on ScreenCaptureKit's), and each is stamped with `Date()` where
 /// it arrives and hopped to main through `DispatchQueue.main.async` —
-/// `Transcriber.requestAuthorization`'s and `MediaImporter.probe`'s shape —
+/// `MediaImporter.probe`'s shape —
 /// so every transition runs on the main thread and needs no lock. The
 /// microphone's did-finish arrived ON main in every measured run and is
 /// hopped anyway.

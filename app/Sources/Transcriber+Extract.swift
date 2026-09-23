@@ -60,10 +60,10 @@ extension Transcriber {
     /// written asset: `AVAsset.duration` is deprecated in favour of an
     /// `async` accessor this file may not use (app/CLAUDE.md), and frames
     /// divided by a known sample rate is the more exact number anyway. It is
-    /// what the truncation test compares against, so it has to be the audio
-    /// the recogniser was actually given, not the range that was asked for —
-    /// a clip whose source window runs past the end of its file gets a
-    /// shorter extract and must not be called truncated for it.
+    /// what the engine's wait is bounded by, so it has to be the audio the
+    /// engine was actually given, not the range that was asked for — a clip
+    /// whose source window runs past the end of its file gets a shorter
+    /// extract.
     ///
     /// The file goes in `NSTemporaryDirectory()`, never inside the package:
     /// it is an input to one recognition and is deleted the moment that

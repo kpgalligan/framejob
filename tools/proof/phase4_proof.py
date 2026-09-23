@@ -9,21 +9,18 @@ the feature did nothing.
 
 The three parts, and what each is measured with:
 
-* **4a auto captions** — honesty first. Speech recognition is gated by a TCC
-  grant that an agent-driven app can never obtain (the system prompt needs the
-  app to be frontmost), so the recogniser itself is out of reach of any script.
-  What IS reachable, and is checked here, is everything around it: the SCOPE
-  refusals, which `AgentServer+Captions.swift` deliberately answers BEFORE the
-  grant so they stay reachable on a machine with no grant; the MISSPELLED-tag
-  refusal, which is above the grant for the same reason and is one of the two
-  language refusals the catalog promises separately (the other one, a tag the
-  framework knows that this Mac has no MODEL for, is a download and is refused
-  BELOW the grant, where no script can reach it — an ungranted Mac cannot be
-  asked which models it has); and then the authorization refusal itself — the
-  exact sentence, the status word inside it, and the fact that a refused run
-  places nothing and registers no undo step.
-  `media/speech.mov` is here for the person who runs this WITH the grant;
-  README.md says what they should see.
+* **4a auto captions** — the whole path, since road map 8's W2. The
+  on-device engine is `SpeechTranscriber` (spec §11 W-8), which asks for no
+  TCC grant, so a headless run reaches the recogniser itself. Checked here:
+  the SCOPE refusals, each by name with its own reason; a real run over
+  `media/speech.mov` whose cues hold the pangrams' words, as a read
+  (`place: false`, nothing changed) and then placed as ONE undo step; and
+  the two LANGUAGE tiers the catalog promises separately — a misspelt tag
+  refused as a misspelling with the tags that do exist, and a tag the engine
+  knows whose model is NOT INSTALLED here refused by name ("a person has to
+  install it"), placing nothing and pushing no undo step. The not-installed
+  row picks fr-FR, de-DE, ja-JP and ko-KR in order; a host with all four
+  installed prints a SKIP, never a pass.
 
 * **4b caption export** — `CaptionExporter`'s round trip, measured on the
   bytes. The fixture is written by this script at **25 fps**, where a frame is
@@ -372,9 +369,9 @@ def catalog_part(mcp):
     check(
         set(transcribe["properties"])
         == {"clips", "language", "place", "engine", "speakers", "vocabulary", "refresh",
-            "project"},
+            "style", "replace", "project"},
         "transcribe declares clips, language and place, plus road map 6 C1's engine, "
-        "speakers, vocabulary and refresh (and project): "
+        "speakers, vocabulary and refresh, road map 8 W4a's style and replace (and project): "
         f"{sorted(transcribe['properties'])}",
     )
     check(
@@ -432,15 +429,14 @@ def catalog_part(mcp):
 
 
 def transcribe_part(mcp):
-    """What a headless run can reach of the recogniser path: the scope, the
-    grant, and the fact that a refusal is a refusal all the way down.
+    """The recogniser path end to end: the scope, a real run over
+    `speech.mov`, and the two language tiers, each refusal a refusal all the
+    way down.
 
-    The order these are asserted in is the order the handler answers in, and
-    that ordering is itself the claim: `AgentServer+Captions.swift` answers
-    the CALLER's mistakes first so they stay reachable on a machine with no
-    grant. A build that checked the grant first would fail every scope check
-    below with the authorization sentence."""
-    print("\n4a — transcribe: the scope, and the grant")
+    The order these are asserted in is the order the handler answers in: the
+    CALLER's mistakes first (the scope, then the tag's spelling), then the
+    installed model, then the run."""
+    print("\n4a — transcribe: the scope, a real run, and the two language tiers")
     s = Session(mcp, "transcribe")
 
     tracks = s.tracks()
@@ -492,8 +488,8 @@ def transcribe_part(mcp):
     # where it bites — it leaves the picture clip switched off and puts a twin
     # with the SAME media, in point, start and speed on the track below, so a
     # run that asked only the media would recognise one recording TWICE and
-    # place two identical cues at one time. Both checks below come back with
-    # the authorization sentence on a build that does not ask.
+    # place two identical cues at one time. Both checks below would reach the
+    # engine on a build that does not ask.
     detached = Session(mcp, "transcribe-detached")
     picture = detached.clip_of("AV.mov")
     detached.op("detach_audio", clip=picture)
@@ -511,77 +507,72 @@ def transcribe_part(mcp):
         f"transcribe, rather than two runs over one recording: {message[:110]!r}",
     )
 
-    # Now the grant, which is everything a headless run can say about the
-    # recogniser itself. The scope here is non-empty — the AV clip has a tone
-    # under it — so the call gets past the scope pass and stops at
-    # `Transcriber.isAuthorized`.
-    before = s.text()
-    message = s.error("transcribe") or ""
+    # Now a REAL run. Since W2 the on-device engine asks for no grant
+    # (spec §11 W-8), so the recogniser is in reach of a script: the fixture
+    # is `say`'s two pangrams, and their words are the claim.
+    spoken = Session(mcp, "transcribe-speech")
+    speech = spoken.clip_of("speech.mov")
+    before = spoken.text()
+    answer = spoken.op("transcribe", clips=[speech], language="en-US", place=False)
+    heard = " ".join(c["text"] for c in answer.get("cues", [])).replace("\n", " ").lower()
     check(
-        message.endswith(
-            "speech recognition is not authorized for Reelcut (status: notDetermined) — "
-            "run File ▸ Generate Captions… once from the app to grant it"),
-        f"an unauthorized transcribe refuses with the exact sentence: {message[:130]!r}",
+        "quick brown fox" in heard and "liquor jugs" in heard,
+        f"speech.mov transcribes: the pangrams' words come back ({heard[:90]!r})",
     )
-    status = re.search(r"\(status: (\w+)\)", message)
     check(
-        status is not None and status.group(1) in {"notDetermined", "denied", "restricted"},
-        "and NAMES the framework's own status word, which is the only observable of the "
-        f"grant a script has: {status.group(1) if status else 'none'}",
+        spoken.text() == before and answer.get("placed") is False
+        and "truncated" not in answer,
+        "place: false changed nothing, and no result carries `truncated` any more",
     )
-    check(s.text() == before, "the refused run placed nothing — the project JSON is unchanged")
-    # And registered no undo step: the top of the stack is still the edit
-    # before it. A "Generate Captions" step here would mean a plan had been
-    # committed and then reported as a failure.
-    undone = s.undo()
+    answer = spoken.op("transcribe", clips=[speech], language="en-US")
+    undone = spoken.undo()
     check(
-        "Caption" not in undone,
-        f"and pushed no undo step — the top of the stack is still “{undone}”",
+        answer.get("placed") is True and answer.get("captions", 0) >= 1
+        and "Caption" in undone,
+        f"placed, it lands {answer.get('captions')} caption clip(s) as ONE undo step "
+        f"(“{undone}”)",
     )
 
     # THE TWO LANGUAGE REFUSALS, which are two because they have two fixes.
-    # A tag speech recognition has never heard of is a misspelling and is the
-    # CALLER's own mistake, so the handler answers it above the grant with the
-    # scope refusals: `SFSpeechRecognizer.supportedLocales()` is a list out of
-    # the framework's own bundle and reads the same at every authorization
-    # status, which is the only reason this half is reachable here at all. The
-    # other half — a tag the framework knows that this Mac has no MODEL for —
-    # is a download and sits BELOW the grant on purpose, because an ungranted
-    # Mac cannot be asked which models it has and must not be sent to
-    # System Settings for one it may already have. So a headless run sees the
-    # authorization sentence exactly where a granted one sees the download
-    # refusal, and both checks below are read off that fact.
-    #
-    # The four are a set and none of them stands alone: the first two would
-    # pass a build that refused EVERY tag as a misspelling, and the last two
-    # would pass the build this phase shipped with, where the misspelling
-    # refusal did not exist and every tag alike reached the grant.
+    # A tag speech recognition has never heard of is a misspelling and is
+    # retyped; a tag it knows whose model is not INSTALLED on this Mac is a
+    # download, which a person makes from the sheet's Download row and this
+    # tool never does. Each must name its own fix and never the other's.
     message = s.error("transcribe", language="zz-ZZ") or ""
     check(
-        "zz-ZZ" in message and "spelling" in message and "not authorized" not in message,
-        "a misspelled language tag is refused AS a misspelling, above the grant: "
-        f"{message[:120]!r}",
+        "zz-ZZ" in message and "spelling" in message and "not installed" not in message,
+        f"a misspelled language tag is refused AS a misspelling: {message[:120]!r}",
     )
     tags = re.findall(r"\b[a-z]{2}-[A-Z0-9]{2,3}\b", message)
     check(
         len(tags) >= 10 and "System Settings" not in message,
         f"and it lists the tags speech recognition does know ({len(tags)} of them) without "
-        "sending anybody to System Settings — a tag that does not exist is not a missing "
-        "download, and the fix for it is to retype it",
+        "sending anybody to a download — a tag that does not exist is not a missing model, "
+        "and the fix for it is to retype it",
     )
-    for tag in ["en-US", "fr-FR"]:
-        message = s.error("transcribe", language=tag) or ""
+    for tag in ["fr-FR", "de-DE", "ja-JP", "ko-KR"]:
+        before = spoken.text()
+        message = spoken.error("transcribe", clips=[speech], language=tag) or ""
+        if "not installed" not in message:
+            print(f"  note {tag} was not refused as not installed: {message[:80]!r}")
+            continue
         check(
-            "not authorized" in message and "spelling" not in message,
-            f"while {tag}, which the framework DOES know, is past that gate and stopped by "
-            f"the grant — where a Mac with the grant answers about the MODEL "
-            f"instead: {message[:90]!r}",
+            "a person has to install it" in message.lower() and "spelling" not in message
+            and "System Settings" not in message,
+            f"while {tag}, which the engine DOES know, is refused as NOT INSTALLED, with the "
+            f"person's fix named: {message[:120]!r}",
         )
-
-    print(
-        "  note the recogniser itself is out of reach here and always will be: the TCC "
-        "prompt needs a frontmost app. media/speech.mov is the fixture for a person who "
-        "has granted it; README.md says what they should see.")
+        after = spoken.text()
+        undone = spoken.undo()
+        check(
+            after == before and "Caption" not in undone,
+            "and it placed nothing and pushed no undo step — the top of the stack is still "
+            f"“{undone}”",
+        )
+        break
+    else:
+        print("  SKIP the not-installed tier: fr-FR, de-DE, ja-JP and ko-KR are all "
+              "installed on this host")
 
 
 # ---- 4b: caption export ---------------------------------------------------
@@ -1067,10 +1058,12 @@ def schema_part(mcp, session):
     with open(os.path.join(session.path, "project.json"), encoding="utf-8") as handle:
         text = handle.read()
     root = json.loads(text)
-    check(root["version"] == 8, f"the saved project.json is version 8 (got {root['version']})")
+    check(root["version"] == 9, f"the saved project.json is version 9 (got {root['version']})")
     check(
-        all(list(c["text"].keys())[-1] == "animation" for c in root["clips"] if c["text"]),
-        "and animation is the LAST key of every text object",
+        all(list(c["text"].keys())[-4:] == ["animation", "case", "words", "word_style"]
+            for c in root["clips"] if c["text"]),
+        "and animation is followed by exactly version 9's case, words and word_style in "
+        "every text object",
     )
     check(
         root["clips"][0]["text"]["animation"] == animation,
@@ -1095,7 +1088,7 @@ def schema_part(mcp, session):
     )
     v4 = Session(mcp, "textanim-v4", open_from=fixture)
     project = v4.project()
-    check(project["version"] == 8, "a version-4 file opens and reports version 8")
+    check(project["version"] == 9, "a version-4 file opens and reports version 9")
     check(
         all(c["text"]["animation"] is None for c in project["clips"] if c["text"]),
         "and every text clip reads a NULL animation",

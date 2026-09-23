@@ -37,7 +37,7 @@ app: rust project
 typecheck:
 	swiftc -typecheck \
 		-sdk "$$(xcrun --show-sdk-path --sdk macosx)" \
-		-target arm64-apple-macos15.0 \
+		-target arm64-apple-macos26.0 \
 		-import-objc-header app/Bridging/Reelcut-Bridging-Header.h \
 		app/Sources/*.swift
 

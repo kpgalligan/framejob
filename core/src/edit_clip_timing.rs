@@ -2,6 +2,7 @@
 
 use crate::edit_clip::clip_end;
 use crate::model::{Action, Project, Source};
+use crate::model_words::rebase_words;
 use crate::outcome::Outcome;
 use crate::source_window::source_advanced;
 use crate::time::Ticks;
@@ -58,7 +59,10 @@ impl Project {
     /// D4-5) — and to leaving at least one frame of clip. Actions are
     /// deliberately left alone: clip-relative, rebasing would drop or bake
     /// whatever fell off the front, which is lossy and makes trimming back
-    /// out not an identity.
+    /// out not an identity. `text.words` are the opposite, on purpose
+    /// (spec §11, W-3): a word is anchored to speech that stays where it is
+    /// on the timeline, so every word is rebased by the trim's delta and a
+    /// word trimmed off the front keeps its (negative) time.
     pub fn trim_start(&self, clip: u32, to: Ticks) -> Result<Outcome, String> {
         let target = self.require_clip(clip)?.clone();
         let end = clip_end(&target);
@@ -79,6 +83,9 @@ impl Project {
         moved.source = source_advanced(&target.source, delta, target.speed);
         moved.start = to;
         moved.duration = end.saturating_sub(to);
+        if let Some(text) = moved.text.as_mut() {
+            rebase_words(text, delta);
+        }
         self.commit_replacements(vec![moved])
     }
 

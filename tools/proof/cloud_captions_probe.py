@@ -673,7 +673,8 @@ func modeRun(_ request: [String: Any]) -> [String: Any] {
     do {
         let outcome = try transcriber.transcribe(
             jobs, options: options,
-            refresh: refresh, frame: 20000, cancel: token,
+            refresh: refresh, frame: 20000,
+            pages: CaptionPages.Request(style: .subtitles, canvas: CGSize(width: 1920, height: 1080)), cancel: token,
             progress: { fraction, detail in
                 published.append([fraction, detail])
                 if cancelAtFirstProgress { token.cancel() }
@@ -687,7 +688,6 @@ func modeRun(_ request: [String: Any]) -> [String: Any] {
             ["start": $0.start, "end": $0.end, "text": $0.text] as [String: Any]
         }
         answer["clips"] = outcome.clips.map { Int($0) }
-        answer["truncations"] = outcome.truncations.count
         answer["problems"] = outcome.problems.map { $0.description }
     } catch {
         answer["ok"] = false
@@ -1185,7 +1185,7 @@ func modeHygiene(_ request: [String: Any]) -> [String: Any] {
         do {
             _ = try cloud.transcribe(
                 [], options: makeOptions(nil), refresh: false, frame: 20000,
-                cancel: Transcriber.CancelToken())
+                pages: CaptionPages.Request(style: .subtitles, canvas: CGSize(width: 1920, height: 1080)), cancel: Transcriber.CancelToken())
             answer["emptyRunThrew"] = false
         } catch {
             answer["emptyRunThrew"] = true
@@ -1718,7 +1718,7 @@ func chromeKeyless(_ request: [String: Any]) -> [String: Any] {
             let genuine = Result {
                 try worker.transcribe(
                     jobs, options: options, refresh: false, frame: 20000,
-                    cancel: Transcriber.CancelToken())
+                    pages: CaptionPages.Request(style: .subtitles, canvas: CGSize(width: 1920, height: 1080)), cancel: Transcriber.CancelToken())
             }
             let delivered: Result<Transcriber.Outcome, any Error> =
                 action == "queued-failure"
@@ -2124,7 +2124,7 @@ func chromeAgreement(_ request: [String: Any]) -> [String: Any] {
         do {
             _ = try transcriber.transcribe(
                 jobs, options: options, refresh: false, frame: 20000,
-                cancel: Transcriber.CancelToken())
+                pages: CaptionPages.Request(style: .subtitles, canvas: CGSize(width: 1920, height: 1080)), cancel: Transcriber.CancelToken())
             round["ok"] = true
         } catch {
             round["ok"] = false
@@ -2287,7 +2287,7 @@ def build(sources, entry_source, stem, binary_name, defines=()):
     sdk = subprocess.run(["xcrun", "--show-sdk-path", "--sdk", "macosx"],
                          capture_output=True, text=True, env=child_env()).stdout.strip()
     started = time.time()
-    line = ["swiftc", "-sdk", sdk, "-target", "arm64-apple-macos15.0", "-module-name", "Reelcut",
+    line = ["swiftc", "-sdk", sdk, "-target", "arm64-apple-macos26.0", "-module-name", "Reelcut",
             "-import-objc-header", BRIDGING,
             "-L", os.path.dirname(STATICLIB), "-lreelcut_core"]
     for name in defines:
@@ -5513,8 +5513,8 @@ def section_chrome(binary, sources):
                   nomodel.get("buttonEnabled") is True
                   and "on-device speech model" not in nomodel.get("note", ""),
                   f"got {nomodel.get('buttonEnabled')!r} / {nomodel.get('note')!r}")
-            check("18: and clicking Generate there STARTS a cloud run — the grant machinery "
-                  "is never consulted",
+            check("18: and clicking Generate there STARTS a cloud run — the on-device model "
+                  "list is never consulted",
                   nomodel.get("didStart") is True and nomodel.get("cloudNotNil") is True,
                   f"got {nomodel.get('didStart')!r} / {nomodel.get('cloudNotNil')!r}")
             check("18: and Stop ENDS it: the cancelled run came back inside the row's bound, "
@@ -5776,11 +5776,34 @@ def section_chrome(binary, sources):
         diff = [line for line in difflib.unified_diff(
             baseline.stdout.splitlines(), current.splitlines(), lineterm="", n=0)
             if line and line[0] in "+-" and not line.startswith(("---", "+++"))]
-        check("18: `project.yml` changed in the Speech usage string and NOWHERE else",
-              diff == ["-          Nothing is sent anywhere.",
-                       "+          Captions made with a cloud service are a separate choice, "
-                       "made in the Generate",
-                       "+          Captions sheet."],
+        # Since this baseline: W1a's three macOS 26 lines, and road map 8's
+        # W2, which DELETED the Speech usage string with its comment (no code
+        # path asks for the grant any more, spec §11 W-8) and reworded the
+        # microphone comment's aside about how speech reads a file.
+        check("18: `project.yml` changed in the three macOS 26 lines, the deleted Speech "
+              "usage string and the microphone comment's aside, and NOWHERE else",
+              diff == ['-    macOS: "15.0"',
+                       '+    macOS: "26.0"',
+                       '-        MACOSX_DEPLOYMENT_TARGET: "15.0"',
+                       '+        MACOSX_DEPLOYMENT_TARGET: "26.0"',
+                       '-        LSMinimumSystemVersion: "15.0"',
+                       '+        LSMinimumSystemVersion: "26.0"',
+                       "-        # File ▸ Generate Captions… (Transcriber.swift). NOT optional and not",
+                       "-        # a nicety: SFSpeechRecognizer.h says an app whose Info.plist lacks",
+                       "-        # this key CRASHES the moment it calls requestAuthorization. app/",
+                       "-        # Info.plist is generated and git-ignored, so this block is the only",
+                       "-        # place it can live.",
+                       "-        NSSpeechRecognitionUsageDescription:",
+                       "-          Reelcut transcribes the audio of clips you choose, on this Mac, "
+                       "to write captions.",
+                       "-          Nothing is sent anywhere.",
+                       "-        # recording, which speech never needed (an "
+                       "SFSpeechURLRecognitionRequest",
+                       "-        # reads a file). The microphone takes TWO things, and this key "
+                       "is one:",
+                       "+        # recording, which speech never needed (the speech engine reads an",
+                       "+        # extracted file). The microphone takes TWO things, and this key "
+                       "is one:"],
               f"got {diff!r}")
     check("18: and it still carries no NSAppTransportSecurity key — C0's q3 measured that it "
           "needs none",

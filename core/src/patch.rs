@@ -72,9 +72,10 @@ impl Group {
     /// A fully-populated instance of the group, serialized: every optional
     /// sub-object present, so the key check can see inside `shadow`,
     /// `chroma`, `reflection`, `spotlight`, `duck`, `compressor`, `outline`,
-    /// `backdrop`, `animation`, `stroke` and `gradient` even when the clip
-    /// currently has `null` there — and one `filters` entry and one
-    /// `obscure` region, so it can see inside the two arrays of objects too.
+    /// `backdrop`, `animation`, `word_style`, `stroke` and `gradient` even
+    /// when the clip currently has `null` there — and one `filters` entry,
+    /// one `obscure` region and one `text.words` entry, so it can see inside
+    /// the three arrays of objects too.
     /// Both entries are load-bearing: `check_keys` reads the FIRST element
     /// of the template's array as the reference for every element it is
     /// given, so a list left at its empty default would hand it no reference
@@ -106,6 +107,8 @@ impl Group {
                 backdrop: Some(crate::model::Backdrop::default()),
                 width: Some(0.0),
                 animation: Some(crate::model::TextAnimation::default()),
+                words: vec![crate::model::Word::default()],
+                word_style: Some(crate::model::WordStyle::template()),
                 ..TextProps::default()
             }),
             Group::Shape => actions::to_json(&ShapeProps {
@@ -219,7 +222,17 @@ fn check_keys(
 /// landed and refuse every patch every agent had already learnt to write —
 /// where a new field's serde default is, by construction, the value every
 /// older project already has.
-const COMPLETE_ENTRIES: [(&str, &[&str]); 1] = [("filters", &["kind", "amount"])];
+///
+/// `text.words` (format version 9) is the second entry, for the filter's
+/// reason read on a clock: a word IS its two times, and a `{"start": …}`
+/// whose `end` came from the type's default would be a word that ends at
+/// clip time 0 — before it starts, which `check_text` would then refuse in
+/// a sentence about an `end` the caller never sent. Naming the missing key
+/// is the refusal that tells the caller what to fix.
+const COMPLETE_ENTRIES: [(&str, &[&str]); 2] = [
+    ("filters", &["kind", "amount"]),
+    ("words", &["start", "end"]),
+];
 
 /// The last dotted segment of `path` — the key an array is held under,
 /// which is what [`COMPLETE_ENTRIES`] is matched against.

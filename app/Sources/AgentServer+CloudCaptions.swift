@@ -5,7 +5,7 @@ import AppKit
 ///
 /// It is a file of its own, and `AgentServer+Captions.swift` is otherwise the
 /// code it was, for the reason §5g gives: the on-device path's refusals are a
-/// story about a GRANT and a downloaded MODEL, the cloud path's are a story
+/// story about an installed MODEL, the cloud path's are a story
 /// about a CREDENTIAL and somebody else's service, and the two read as one
 /// tangle when they are interleaved. What the two share — the scope, the
 /// jobs, the frame, the cues, `CaptionLayout.place` and the result's shape —
@@ -100,7 +100,7 @@ extension AgentServer {
     /// off main with no document held.
     func cloudTranscription(
         _ a: [String: Any], document: ProjectDocument, jobs: [Transcriber.Job], frame: Ticks,
-        language: String?
+        pages: CaptionPages.Request, language: String?
     ) throws -> (outcome: Transcriber.Outcome, fields: [String: Any]) {
         let speakers = try boolArg(a, "speakers") ?? false
         let asked = try stringsArg(a, "vocabulary") ?? []
@@ -147,7 +147,7 @@ extension AgentServer {
         let outcome: Transcriber.Outcome
         do {
             outcome = try transcriber.transcribe(
-                jobs, options: options, refresh: refresh, frame: frame,
+                jobs, options: options, refresh: refresh, frame: frame, pages: pages,
                 cancel: Transcriber.CancelToken())
         } catch {
             // In band, message and all, exactly as the on-device arm does —

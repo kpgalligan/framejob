@@ -6,7 +6,7 @@
 // point of the spike is to show that is the whole story.
 //
 // Compiled beside each program: `xcrun swiftc -O -parse-as-library
-// -target arm64-apple-macos15.0 fx_common.swift <program>.swift -o <program>`.
+// -target arm64-apple-macos26.0 fx_common.swift <program>.swift -o <program>`.
 
 import AVFoundation
 import Accelerate

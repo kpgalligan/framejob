@@ -4,7 +4,7 @@
 // loaded for it to take effect, which fx_determinism's identical reverb
 // digests put in question.
 //
-// Build: xcrun swiftc -O -parse-as-library -target arm64-apple-macos15.0 \
+// Build: xcrun swiftc -O -parse-as-library -target arm64-apple-macos26.0 \
 //          fx_common.swift fx_presets.swift -o ../work/effects_spike/fx_presets
 
 import AVFoundation

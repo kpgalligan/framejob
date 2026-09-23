@@ -69,8 +69,9 @@
 //! know. A group is REPLACED whole, never merged — "make this look like
 //! that" is the gesture, and a merge would leave the target's shadow under
 //! a source that had none. What a target keeps is what makes it the clip it
-//! is rather than how it looks: a text clip's `content`; a shape's `kind`,
-//! `width`, `height`, `from` and `to`. Video and audio travel whole,
+//! is rather than how it looks: a text clip's `content` and the `words`
+//! that time it (spec §11 W-6 — a timing belongs to its words); a shape's
+//! `kind`, `width`, `height`, `from` and `to`. Video and audio travel whole,
 //! transform included — `audio.muted` and `keep_pitch` are properties like
 //! opacity, and `keep_pitch` only acts when the speed is not 1, which does
 //! not travel: `speed`, `enabled`, the actions, the transition, the name,
@@ -345,8 +346,10 @@ fn copy_group(target: &mut Clip, source: &Clip, group: Group) {
         Group::Text => {
             if let (Some(into), Some(from)) = (target.text.as_mut(), &source.text) {
                 let content = std::mem::take(&mut into.content);
+                let words = std::mem::take(&mut into.words);
                 *into = TextProps {
                     content,
+                    words,
                     ..from.clone()
                 };
             }

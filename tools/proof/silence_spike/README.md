@@ -9,7 +9,7 @@ document can be reproduced rather than believed.
 |---|---|---|
 | `level_apple.swift` | q1 the shipped rule on a real file, q2 an adaptive threshold, q3 `SpeechDetector` (file mode), q4 the transcriber's word ranges, q5 SoundAnalysis at 0.5 s | `xcrun swiftc -O -parse-as-library -target arm64-apple-macos26.0 level_apple.swift -o level_apple` |
 | `separation_streaming.swift` | q5 SoundAnalysis at 0.5 s and 1.0 s (gaps and separation), q3 `SpeechDetector` (streaming) | same line, its own name |
-| `silero_coreml.swift` | q6 Silero v6.2.1 through Core ML, q7 the real mixed recording | `xcrun swiftc -O -target arm64-apple-macos15.0 silero_coreml.swift -o silero_coreml` |
+| `silero_coreml.swift` | q6 Silero v6.2.1 through Core ML, q7 the real mixed recording | `xcrun swiftc -O -target arm64-apple-macos26.0 silero_coreml.swift -o silero_coreml` |
 
 ## Fixtures
 

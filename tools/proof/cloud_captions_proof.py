@@ -1221,9 +1221,12 @@ def row_eight(instance, fake):
     media = session.media_of(speech)
     session.add(media, at=0, duration=3 * SEC)
     text = session.error("transcribe", place=False)
-    check("8: the default engine is the ON-DEVICE one — the call is answered by the grant "
-          "or by the model, never by AssemblyAI",
-          text is None or "authoriz" in text or "on-device" in text or "ON-DEVICE" in text,
+    # Since road map 8's W2 the on-device engine asks for no grant, so it
+    # RUNS here: success, or its own model or no-speech sentence.
+    check("8: the default engine is the ON-DEVICE one — the call is answered by the "
+          "on-device engine or its model, never by AssemblyAI",
+          text is None or "not installed" in text or "ON-DEVICE" in text
+          or "No speech was recognised" in text,
           f"got {text!r}")
     check("8: and the fake's log is EMPTY", fake.log()["requests"] == [],
           f"got {routes(fake.log())!r}")

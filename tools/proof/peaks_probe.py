@@ -108,7 +108,7 @@ def build(sources):
         return None, "app source set incomplete"
     sdk = run(["xcrun", "--show-sdk-path", "--sdk", "macosx"]).stdout.strip()
     lib = ROOT / "core/target/release/libreelcut_core.a"
-    result = run(["swiftc", "-sdk", sdk, "-target", "arm64-apple-macos15.0",
+    result = run(["swiftc", "-sdk", sdk, "-target", "arm64-apple-macos26.0",
                   "-module-name", "Reelcut", "-import-objc-header",
                   str(ROOT / "app/Bridging/Reelcut-Bridging-Header.h"),
                   "-L", str(lib.parent), "-lreelcut_core", *swift, str(entry),

@@ -26,6 +26,7 @@ use serde_json::Value;
 use crate::actions::{self, Evaluated, MAX_PATCH_DEPTH};
 use crate::edit_clip::clip_end;
 use crate::model::{Action, Project, VideoProps};
+use crate::model_words::{rebase_words, token_count};
 use crate::source_window::source_advanced;
 use crate::time::Ticks;
 
@@ -137,6 +138,28 @@ pub(crate) fn split_clip(project: &mut Project, clip_id: u32, at: Ticks) -> bool
         }
     };
     motion_of(&mut second.video, false);
+    // The second half's word timings (format version 9, spec §11 W-3). A
+    // word is anchored to its speech, so the second half keeps ALL of them,
+    // rebased by the cut: a negative start means "already said" and the
+    // split is invisible. The first half is untouched — its clip time did
+    // not move.
+    //
+    // Except in one case, and only on this half: the text stored here is
+    // the EVALUATED text, so a finished action whose end patch switched
+    // `content` (which `set_action_end` lets through, where it refuses
+    // `words`) lays a new content over the base `words`. A half stored with
+    // that mismatch would be a clip the patch door refuses on every later
+    // `set_text` or `paste_attributes` — even one that only changes the
+    // colour — until the caller sent `words: []`. A half is a clip the door
+    // must accept again, so a count that no longer matches stores `[]`: the
+    // page draws static, which is what the recipe already drew for it.
+    if let Some(text) = second.text.as_mut() {
+        if !text.words.is_empty() && token_count(&text.content) != text.words.len() {
+            text.words = Vec::new();
+        } else {
+            rebase_words(text, clip_t);
+        }
+    }
     if let Some(animation) = second.text.as_mut().and_then(|t| t.animation.as_mut()) {
         animation.r#in = 0;
         if animation.out == 0 {

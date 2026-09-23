@@ -75,7 +75,8 @@ pub fn text_props(font: &str, content: &str) -> Value {
         "color":[1.0,1.0,1.0,1.0], "content":content,
         "font":font, "line_spacing":1.0,
         "outline":null, "size":72.0, "tracking":0.0,
-        "valign":"middle", "width":null
+        "valign":"middle", "width":null,
+        "case":"as_written", "words":[], "word_style":null
     })
 }
 

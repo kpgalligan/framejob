@@ -9,11 +9,11 @@ import AppKit
 ///
 /// **It is a file of its own for `AgentServer+CloudCaptions.swift`'s reason,
 /// read across to the chrome.** The on-device half of this sheet is a story
-/// about a GRANT and a downloaded MODEL; this half is a story about a
+/// about an installed MODEL and its Download row; this half is a story about a
 /// CREDENTIAL, somebody else's money and a cache. Interleaved they read as one
 /// tangle, and the main file would be over its cap besides.
 ///
-/// **Nothing here reads the grant, the on-device model list or `language`.**
+/// **Nothing here reads the on-device model list, the Download row or `language`.**
 /// That is the whole point of the dispatch in the three methods next door: a
 /// Mac with no on-device speech model can still transcribe in the cloud, and
 /// this file is where that has to stay true.
@@ -42,7 +42,8 @@ extension TranscribeSheetController {
         return chosen
     }
 
-    /// The Language popup for the chosen engine: today's on-device list, or
+    /// The Language popup for the chosen engine: every locale the on-device
+    /// engine supports, a row with no model titled "— not installed", or
     /// "Detect automatically" and then §2's 21 codes by display name.
     ///
     /// The on-device arm is the code `loadView` carried before the Engine
@@ -69,7 +70,9 @@ extension TranscribeSheetController {
             return
         }
         for language in languages {
-            languagePopup.addItem(withTitle: language.displayName)
+            languagePopup.addItem(
+                withTitle: language.installed
+                    ? language.displayName : "\(language.displayName) — not installed")
             // The identifier, not the row's position — see `language`.
             languagePopup.lastItem?.representedObject = language.identifier
         }
@@ -309,7 +312,7 @@ extension TranscribeSheetController {
         cloudDetected = options.languageCode == nil
         run.run(
             jobs: jobs, options: options, refresh: request.refresh,
-            frame: max(snapshot.canvas.fps.frameDuration, 1), cancel: token,
+            frame: max(snapshot.canvas.fps.frameDuration, 1), pages: pagesRequest, cancel: token,
             progress: { [weak self] fraction, name in
                 DispatchQueue.main.async { self?.progressed(fraction, name) }
             },

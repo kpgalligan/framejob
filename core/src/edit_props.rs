@@ -201,10 +201,22 @@ impl Project {
     /// legal and a reveal shorter than half a frame lands there: it is a
     /// reveal no frame could show.
     ///
+    /// It snaps every `text.words[i].start` and `end` too (format version
+    /// 9, spec §11's W-3): a word time is a clip time like any other a patch
+    /// carries, so it lands on the grid AFTER `check_text` has named what
+    /// the caller sent. Nearest, never clamped — a negative start is legal
+    /// ("already said") and stays negative. Two words may land on one
+    /// frame, which the check allows and the recipe resolves (the later
+    /// one wins that frame).
+    ///
     /// `pub(crate)` for the one text patch that is not `set_text`:
     /// `add_text_clip`'s, which runs the same merge and the same check in
     /// `edit_clip.rs` and must land on the same grid.
     pub(crate) fn snap_animation(&self, props: &mut TextProps) {
+        for word in &mut props.words {
+            word.start = self.snapped(word.start);
+            word.end = self.snapped(word.end);
+        }
         let Some(animation) = props.animation.as_mut() else {
             return;
         };

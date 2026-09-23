@@ -34,6 +34,19 @@ file is what governs a module now.
   declaration order in these four is load-bearing; the JSON spelling of every
   variant is, so a rename needs a migration step. The enums are closed:
   there is no neutral kind to fall back to.
+- `model_words.rs` — the word-caption vocabulary (format version 9, road
+  map 8's W1b): `TextCase`, `Word`, `WordMode`, `ActivePill` and
+  `WordStyle` (whose `template()` is what `patch.rs`'s text template walks
+  against), re-exported through `model_props.rs`; the FIELDS (`case`,
+  `words`, `word_style`) close `TextProps`. It also holds the two facts
+  every writer of `text.words` shares, both `pub(crate)` and so named
+  directly by their callers (a glob re-export cannot widen them):
+  `token_count`, THE token rule (`split_whitespace` — the core is the one
+  counter, spec §11 W-2), and `rebase_words`, the one saturating
+  subtraction `trim_start`, `roll`, `add_transition`'s handle form and
+  `split`'s second half make (W-3). Word times are clip-time POSITIONS: a
+  negative start is legal, equal starts are legal, and `snap_animation`
+  puts them on the grid after `check_text` has named what the caller sent.
 - `model_query.rs` — reading a project: `Project::new`, id allocation, the
   `clip`/`track`/`media`/`marker`/`nest` lookups, `clips_on`, `duration`,
   `validate` with its nesting walk, and `source_size`. The three
@@ -309,6 +322,18 @@ file is what governs a module now.
   hash so an animating layer is never served a stale texture — and
   `burn_in_layer`. `serde_json`'s `Map` is a `BTreeMap` here: keys come out
   sorted, which `content_hash` leans on.
+- `recipe_words.rs` — what a timed text PAGE shows at one instant:
+  `Words::of` answers `word` (how many of `text.words` have started, 0 to
+  n) and `word_pop` (0..1 through the active word's pop over `WORD_POP`,
+  0.12 s), both null unless the text has a `word_style`, non-empty `words`
+  and a matching token count, and `word_pop` null at `active_scale` 1.0.
+  Total and order-blind — a count, a saturating subtraction and a clamp —
+  because `paste`'s payload and the file reader store `words` unchecked.
+  `recipe_text.rs` emits both keys on every text layer, gives a styled
+  page a WHOLE reveal (W-5), strips `words` from the description (and
+  `word_style` when unset, `case` when `as_written`, so an unstyled title
+  hashes as before version 9), and folds the two keys into the hash only
+  for a styled page.
 - `motion.rs` — `video.motion` turned into PLACEMENT: presets to `scale`,
   `rotation`, `opacity`, `x`, `y` from the clip time, its duration, the
   source size and the container's canvas. **Its only callers are
@@ -416,7 +441,7 @@ Export names mirror the Rust method exactly.
 `RC_FORMAT_VERSION` in `format.rs` **and** the `#define` in
 `core/include/reelcut_core.h`; the reader must keep accepting every prior
 version; the writer enforces the reader's caps. A bump whose new fields all
-carry a serde default needs no migrate step (versions 3 through 8 have none)
+carry a serde default needs no migrate step (versions 3 through 9 have none)
 but still bumps, because unknown keys are ignored at every level by design
 and an older build would otherwise open the file, drop the new fields on read
 and write the loss back on the next save; a bump that changes a field's

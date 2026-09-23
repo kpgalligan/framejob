@@ -1319,8 +1319,8 @@ def schema_part(mcp):
         text = handle.read()
     root = json.loads(text)
     check(
-        root["version"] == 8,
-        f"the saved project.json is version 8 (got {root['version']})",
+        root["version"] == 9,
+        f"the saved project.json is version 9 (got {root['version']})",
     )
     # Version 4 put `obscure` last and this check pinned it there. Version 6
     # appended `blend` after it and version 8 `motion` after that, each
@@ -1362,7 +1362,7 @@ def schema_part(mcp):
     )
     v3 = Session(mcp, "obscure-v3", open_from=fixture)
     project = v3.project()
-    check(project["version"] == 8, "a version-3 file opens and reports version 8")
+    check(project["version"] == 9, "a version-3 file opens and reports version 9")
     check(
         all(c["video"]["obscure"] == [] for c in project["clips"] if c["video"]),
         "and every clip reads an EMPTY region list",

@@ -31,11 +31,19 @@ final class TextPane: InspectorPaneView {
 
     // MARK: Content
 
+    /// The footnote on a word-styled page whose timings a content edit
+    /// dropped (road map 8 §5e), and the Animation section's on a styled
+    /// page, whose reveal the word style replaces (spec §11 W-5).
+    static let untimedNote = "Not timed — regenerate to time it again"
+    static let wordStyleNote = "Word style and animation do not compose; the word style wins."
+
     func contentSection() -> InspectorSection {
         let binding = self.binding
         let area = InspectorTextArea(
             read: { binding.textProps.content },
-            write: { value in binding.apply("Edit Text", text: TextPatch(content: value)) },
+            // Per clip: a timed page keeps its words while the count holds
+            // and sends `words: []` beside the content when it does not.
+            write: { value in binding.apply("Edit Text", binding.ops(textContent: value)) },
             enabled: { !binding.textClips.isEmpty },
             onEdit: { binding.edited() })
         return InspectorSection(
@@ -45,7 +53,9 @@ final class TextPane: InspectorPaneView {
                     .split(whereSeparator: \.isNewline).first.map(String.init) ?? ""
                 return line.isEmpty ? "empty" : line
             },
-            note: { binding.actionNote },
+            note: {
+                binding.actionNote ?? (binding.textProps.isUntimedPage ? Self.untimedNote : nil)
+            },
             rows: [area])
     }
 
@@ -144,7 +154,8 @@ final class TextPane: InspectorPaneView {
                     "Text Style",
                     text: TextPatch(
                         color: defaults.color, align: defaults.align, valign: defaults.valign,
-                        lineSpacing: defaults.lineSpacing, tracking: defaults.tracking))
+                        lineSpacing: defaults.lineSpacing, tracking: defaults.tracking,
+                        textCase: defaults.textCase))
             },
             defaultExpanded: false,
             rows: [
@@ -154,6 +165,11 @@ final class TextPane: InspectorPaneView {
                     mixed: { binding.mixedText { $0.color } }),
                 inspectorRow("Align", [align], mixed: { binding.mixedText { $0.align } }),
                 inspectorRow("Vertical", [valign], mixed: { binding.mixedText { $0.valign } }),
+                inspectorCheckRow(
+                    "UPPERCASE", binding, name: "Case",
+                    read: { binding.textProps.textCase == .upper },
+                    ops: { binding.ops(text: TextPatch(textCase: $0 ? .upper : .asWritten)) },
+                    mixed: { binding.mixedText { $0.textCase } }),
                 inspectorValueRow(
                     "Line spacing", binding, name: "Line Spacing", unit: "×", decimals: 2,
                     min: 0.5, max: 4,
@@ -328,6 +344,7 @@ final class TextPane: InspectorPaneView {
         let items = ["None"] + kinds.map { $0.displayName }
         func current() -> TextAnimation { binding.textProps.animation ?? TextAnimation() }
         func on() -> Bool { binding.textProps.animation != nil }
+        func free() -> Bool { binding.textProps.wordStyle == nil }
         func ticks(_ seconds: Double) -> Ticks {
             ReelTime.snapToFrame(ReelTime.ticks(seconds: max(seconds, 0)), fps: binding.canvas.fps)
         }
@@ -341,7 +358,7 @@ final class TextPane: InspectorPaneView {
                 return animation.kind.displayName.lowercased()
                     + String(format: " · %.2f s", ReelTime.seconds(animation.inDuration))
             },
-            note: { binding.actionNote },
+            note: { binding.actionNote ?? (free() ? nil : Self.wordStyleNote) },
             reset: { binding.apply("Animation", text: TextPatch(animation: .some(nil))) },
             defaultExpanded: false,
             rows: [
@@ -363,7 +380,7 @@ final class TextPane: InspectorPaneView {
                                 kind: kinds[index - 1], inDuration: animation.inDuration,
                                 outDuration: animation.outDuration))
                     },
-                    mixed: { binding.mixedText { $0.animation?.kind } }),
+                    mixed: { binding.mixedText { $0.animation?.kind } }, enabled: free),
                 inspectorValueRow(
                     "In", binding, name: "Animation In", unit: " s", decimals: 2, min: 0, max: 10,
                     quick: [0, 0.25, 0.5, 1, 2],
@@ -375,7 +392,7 @@ final class TextPane: InspectorPaneView {
                                 outDuration: current().outDuration))
                     },
                     mixed: { binding.mixedText { $0.animation?.inDuration } },
-                    enabled: on),
+                    enabled: { on() && free() }),
                 inspectorValueRow(
                     "Out", binding, name: "Animation Out", unit: " s", decimals: 2, min: 0,
                     max: 10, quick: [0, 0.25, 0.5, 1, 2],
@@ -387,7 +404,7 @@ final class TextPane: InspectorPaneView {
                                 outDuration: ticks(value)))
                     },
                     mixed: { binding.mixedText { $0.animation?.outDuration } },
-                    enabled: on),
+                    enabled: { on() && free() }),
             ])
     }
 

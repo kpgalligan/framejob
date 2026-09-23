@@ -1506,7 +1506,7 @@ def build_probe():
     ).stdout.strip()
     start = time.time()
     result = subprocess.run(
-        ["swiftc", "-sdk", sdk, "-target", "arm64-apple-macos15.0", entry,
+        ["swiftc", "-sdk", sdk, "-target", "arm64-apple-macos26.0", entry,
          "-Xlinker", "-sectcreate", "-Xlinker", "__TEXT", "-Xlinker", "__info_plist", "-Xlinker", plist,
          "-o", binary],
         capture_output=True, text=True, timeout=600)

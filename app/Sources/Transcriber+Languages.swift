@@ -1,19 +1,23 @@
 import Foundation
-import Speech
 
 // MARK: - Transcriber: languages
 
 /// The sheet's language popup and the tool's `language` argument: the
-/// `Language` row, the two cached lists (`languages()`, the locales this Mac
-/// has an on-device model for; `supportedLanguages()`, every locale the
-/// framework names), the display-name builder behind both, and the two lookups
-/// the callers use — `defaultLanguage(in:)` for the popup's first selection
-/// and `language(matching:in:)` for a tag a person or an agent typed.
+/// `Language` row, the two cached lists (`languages()`, the locales whose
+/// model is INSTALLED on this Mac; `supportedLanguages()`, every locale the
+/// engine names, each marked installed or not), the display-name builder
+/// behind both, and the two lookups the callers use —
+/// `defaultLanguage(in:)` for the popup's first selection and
+/// `language(matching:in:)` for a tag a person or an agent typed.
 ///
-/// A pure move out of `Transcriber.swift`, road map 6's C1 toll 1. The block
-/// came here whole and in its own order, with every line byte-identical, and
-/// nothing arrived widened: the lock and the two caches stay `private`
-/// because every reader of them moved with them.
+/// Since W2 (spec §11 W-8) both lists are ASKED of `SpeechEngine`
+/// (`supportedLocales()`, `installedLocales()`), never written down, and
+/// every identifier is BCP-47 (`en-US`) — the engine answers `en_US`, and a
+/// raw compare between the two spellings never matches. No transcriber is
+/// constructed per locale here: constructing one reserves its locale against
+/// a cap of 5 (W0 q3), so the installed SET comes from `installedLocales()`
+/// and the one model question, `SpeechEngine.isInstalled`, is asked only for
+/// the locale a run chose.
 extension Transcriber {
 
     // MARK: - Languages
@@ -21,9 +25,18 @@ extension Transcriber {
     /// One row of the sheet's language popup, and the vocabulary the tool's
     /// `language` argument speaks.
     struct Language: Equatable {
-        /// A BCP-47 identifier, `en-US`.
+        /// A BCP-47 identifier, `en-US` — never `en_US`.
         let identifier: String
         let displayName: String
+        /// Whether this Mac has the model. The sheet marks a row that has not
+        /// and offers its Download row; a run refuses it.
+        let installed: Bool
+
+        init(identifier: String, displayName: String, installed: Bool = true) {
+            self.identifier = identifier
+            self.displayName = displayName
+            self.installed = installed
+        }
 
         var locale: Locale { Locale(identifier: identifier) }
     }
@@ -32,22 +45,12 @@ extension Transcriber {
     private static var cachedLanguages: [Language]?
     private static var cachedSupported: [Language]?
 
-    /// Every dictation locale this Mac can recognise WITHOUT a network,
-    /// sorted by display name.
+    /// Every locale whose model is INSTALLED on this Mac, sorted by display
+    /// name — the rows a run can use without a download. All `installed`.
     ///
-    /// The filter is not cosmetic: an `SFSpeechRecognitionRequest` can only
-    /// honour `requiresOnDeviceRecognition` where the recogniser answers
-    /// `supportsOnDeviceRecognition`, so an unfiltered popup would offer rows
-    /// whose every run fails. Measured on this machine: **4 of 63** supported
-    /// locales have on-device assets, and the whole pass — one recogniser per
-    /// locale — takes **0.33 s**, which is why it is cached and why it is not
-    /// asked for again on every control change.
-    ///
-    /// The result is cached only when it is NON-empty, because the property
-    /// is known to answer false on the first read after a recogniser is
-    /// constructed and true a moment later — caching an empty first answer
-    /// would make the feature refuse for the rest of the session on a machine
-    /// where it works.
+    /// Cached only when NON-empty: an empty answer is what `askBound`
+    /// expiring looks like, and remembering it would make the feature refuse
+    /// for the rest of the session on a Mac where it works.
     static func languages() -> [Language] {
         languageLock.lock()
         if let cached = cachedLanguages {
@@ -56,11 +59,7 @@ extension Transcriber {
         }
         languageLock.unlock()
 
-        let found = named(
-            SFSpeechRecognizer.supportedLocales().filter { locale in
-                SFSpeechRecognizer(locale: locale)?.supportsOnDeviceRecognition ?? false
-            })
-
+        let found = named(SpeechEngine.installedLocales(), installed: nil)
         if !found.isEmpty {
             languageLock.lock()
             cachedLanguages = found
@@ -69,32 +68,22 @@ extension Transcriber {
         return found
     }
 
-    /// Every locale the FRAMEWORK names, model downloaded or not — the
-    /// unfiltered twin of `languages()`.
+    /// Every locale the ENGINE names, model installed or not — the
+    /// unfiltered twin of `languages()`, each row's `installed` read off the
+    /// installed SET by BCP-47 tag.
     ///
     /// There are two lists because a caller who named a language this Mac
-    /// could not use has one of TWO problems and they have two different
-    /// fixes. `en-XX` is a tag speech recognition has never heard of, and the
-    /// fix is to spell it right; `fr-FR` is a tag it knows perfectly well
-    /// that this Mac has no model for, and the fix is a download in System
-    /// Settings. Told only "this Mac cannot recognise it", somebody with the
-    /// second problem retypes a tag that was right all along, which is what
-    /// `transcribe`'s catalog entry promises does not happen.
+    /// could not use has one of TWO problems with two different fixes.
+    /// `en-XX` is a tag the engine has never heard of, and the fix is to
+    /// spell it right; `fr-FR` is a tag it knows that this Mac has no model
+    /// for, and the fix is a person pressing Download in the sheet. Told only
+    /// "this Mac cannot recognise it", somebody with the second problem
+    /// retypes a tag that was right all along.
     ///
-    /// It costs no recogniser — `supportedLocales()` is a list the framework
-    /// answers out of its own bundle — so this is sixty-odd display-name
-    /// lookups where `languages()` is sixty-odd recogniser constructions.
-    /// And it is INDEPENDENT OF THE GRANT, which is the property the tool
-    /// leans on: measured at status `notDetermined`, 63 locales here, the
-    /// same 4 of them on device. That is why a misspelled tag can be refused
-    /// ABOVE the authorization check, among the caller's other mistakes,
-    /// while the download question stays BELOW it, where a machine nobody has
-    /// granted yet cannot be mistaken for one with no models installed.
-    ///
-    /// Cached like its twin, and an empty answer is not cached, for its
-    /// twin's reason turned around: the list is static, so the cache is only
-    /// about not rebuilding the display names, and an empty framework list is
-    /// not an answer this file is willing to remember.
+    /// Cached like its twin, and an empty answer is not cached — nor is a
+    /// list read against an EMPTY installed set, which is what the installed
+    /// ask expiring looks like: cached, every row would read "not installed"
+    /// for the rest of the session.
     static func supportedLanguages() -> [Language] {
         languageLock.lock()
         if let cached = cachedSupported {
@@ -103,8 +92,9 @@ extension Transcriber {
         }
         languageLock.unlock()
 
-        let found = named(SFSpeechRecognizer.supportedLocales())
-        if !found.isEmpty {
+        let installed = Set(SpeechEngine.installedLocales().map { $0.identifier(.bcp47) })
+        let found = named(SpeechEngine.supportedLocales(), installed: installed)
+        if !found.isEmpty, !installed.isEmpty {
             languageLock.lock()
             cachedSupported = found
             languageLock.unlock()
@@ -112,38 +102,55 @@ extension Transcriber {
         return found
     }
 
-    /// Locales as rows: named in this Mac's own language and sorted by that
-    /// NAME rather than by tag, because a person reads the name — and both
-    /// lists are built here so the popup and the two refusals cannot spell
-    /// one locale two ways.
-    private static func named(_ locales: Set<Locale>) -> [Language] {
+    /// Drops both caches, so the next ask reads the engine again — what the
+    /// sheet's Download row does once a model has been installed.
+    static func forgetLanguages() {
+        languageLock.lock()
+        cachedLanguages = nil
+        cachedSupported = nil
+        languageLock.unlock()
+    }
+
+    /// Locales as rows: tagged in BCP-47, named in this Mac's own language
+    /// and sorted by that NAME rather than by tag, because a person reads the
+    /// name — and both lists are built here so the popup and the two
+    /// refusals cannot spell one locale two ways. `installed` nil means every
+    /// row is installed; otherwise a row is installed when its tag is in it.
+    /// A locale listed twice under one tag is one row.
+    private static func named(_ locales: [Locale], installed: Set<String>?) -> [Language] {
         let names = Locale.current
-        return locales.map { locale -> Language in
-            let identifier = locale.identifier
+        var seen = Set<String>()
+        return locales.compactMap { locale -> Language? in
+            let identifier = locale.identifier(.bcp47)
+            guard seen.insert(identifier).inserted else { return nil }
             return Language(
                 identifier: identifier,
-                displayName: names.localizedString(forIdentifier: identifier) ?? identifier)
+                displayName: names.localizedString(forIdentifier: identifier) ?? identifier,
+                installed: installed.map { $0.contains(identifier) } ?? true)
         }.sorted {
             $0.displayName.localizedStandardCompare($1.displayName) == .orderedAscending
         }
     }
 
-    /// The language a run defaults to: this Mac's own, when it survives the
-    /// on-device filter, then anything sharing its language code, then the
-    /// first row there is.
+    /// The language a run defaults to: this Mac's own, then anything sharing
+    /// its language code, then the first row — an INSTALLED row preferred at
+    /// each step. Compared in BCP-47 (`Locale.current.identifier` is `en_US`
+    /// and the rows are `en-US`). Over `languages()`, where every row is
+    /// installed, this is exact → prefix → first.
     static func defaultLanguage(in list: [Language]) -> Language? {
-        let current = Locale.current.identifier
-        if let exact = list.first(where: {
-            $0.identifier.caseInsensitiveCompare(current) == .orderedSame
-        }) {
-            return exact
+        let current = Locale.current.identifier(.bcp47)
+        func exact(_ row: Language) -> Bool {
+            row.identifier.caseInsensitiveCompare(current) == .orderedSame
         }
+        if let hit = list.first(where: { exact($0) && $0.installed }) { return hit }
+        if let hit = list.first(where: exact) { return hit }
         let code = Locale.current.language.languageCode?.identifier ?? ""
-        if !code.isEmpty,
-           let near = list.first(where: { $0.identifier.hasPrefix(code) }) {
-            return near
+        if !code.isEmpty {
+            func near(_ row: Language) -> Bool { row.identifier.hasPrefix(code + "-") }
+            if let hit = list.first(where: { near($0) && $0.installed }) { return hit }
+            if let hit = list.first(where: near) { return hit }
         }
-        return list.first
+        return list.first(where: { $0.installed }) ?? list.first
     }
 
     /// The language a caller named — `en-US`, `en`, or a display name — or nil

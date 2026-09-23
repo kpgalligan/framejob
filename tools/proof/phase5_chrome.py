@@ -1204,7 +1204,7 @@ def build_probe():
         ["xcrun", "--show-sdk-path", "--sdk", "macosx"],
         capture_output=True, text=True, check=True).stdout.strip()
     result = subprocess.run(
-        ["swiftc", "-sdk", sdk, "-target", "arm64-apple-macos15.0",
+        ["swiftc", "-sdk", sdk, "-target", "arm64-apple-macos26.0",
          LOUDNESS_SOURCE, main, "-o", binary],
         capture_output=True, text=True)
     if result.returncode != 0 or not os.path.exists(binary):

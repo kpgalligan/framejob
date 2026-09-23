@@ -80,7 +80,8 @@
 // renders the Settings window (road map 6 §5d) the way `welcome` renders the
 // no-document window: a WINDOW, so `cacheDisplay` can have it — a sheet
 // cannot be put up offscreen at all, which is why the Generate Captions card
-// is read structurally by `cloud_captions_probe.py` and photographed nowhere.
+// is photographed as a window's content by the `transcribe` mode below and
+// never as a sheet.
 //
 // **It builds its own controller with a `MemoryStore` and never touches
 // `SettingsWindowController.shared` or `AssemblyAIConfiguration.store()`**,
@@ -93,6 +94,20 @@
 // environment, so `RC_ASSEMBLYAI_KEY` in the shell that launched the harness
 // cannot change what the window says: the photograph is of a Mac with no key
 // set, whatever the machine taking it has.
+//
+//   harness transcribe <project.reelcut> <out.png> <light|dark> <style> [replace 0|1]
+//
+// renders the Generate Captions card (road map 8 §5e, W4b) over a package,
+// hosted as a WINDOW's content view controller for `settings`' reason. It is
+// built with a `MemoryStore`, an EMPTY environment, one synthetic installed
+// language and `MemoryDefaults` — values in memory, no suite on disk — so it
+// reads nothing on the machine and leaves no `~/Library/Preferences` plist
+// behind (the class says why a removed suite still does). `<style>` is a
+// `CaptionStyle` raw value, chosen the way AppKit chooses it — the row
+// selected, then `styleChanged:` — and `replace` is the checkbox, set and
+// then `controlChanged:`. The preview is drawn off-Metal, so unlike the
+// editor's preview well it is not black here. `MemoryDefaults` is what the
+// popup reads and writes; `ReelcutCaptionStyle`'s pin below is defensive.
 //
 //   harness cues <words.json> <out.json>
 //
@@ -334,14 +349,21 @@ enum Harness {
             // and `AssemblyAIConfiguration.regionKey` — spelled as LITERALS
             // here for the recorder keys' reason above, the phase-5
             // cross-build), pinned to their first-run values: the on-device
-            // engine, the United States region. The Generate Captions sheet
-            // is a SHEET and is in no render, but the Settings window's
+            // engine, the United States region. The Generate Captions card
+            // reads both in the `transcribe` mode, and the Settings window's
             // region popup is drawn straight from the second of them, and
             // both are written by ORDINARY USE of the app on the machine
             // that runs the proofs — every time a person changes an engine
             // or a region — which is `ReelcutExportChoice`'s rule exactly.
             "ReelcutCaptionEngine": "apple",
             "ReelcutAssemblyAIRegion": "us",
+            // The Generate Captions card's remembered style
+            // (`CaptionStyle.defaultsKey`, road map 8's W4b), kept under
+            // `pinDefaults`' own rule — a key ordinary use writes, every time
+            // a person picks a style — and DEFENSIVE: no render reads it, since
+            // `transcribe` hands the card `MemoryDefaults` and no other mode
+            // builds the card.
+            "ReelcutCaptionStyle": "subtitles",
             "AgentServerEnabled": false,
             // AppKit picks legacy (16 pt, always visible) or overlay scrollers
             // by whether a MOUSE is attached, and the inspector pane is 16 pt
@@ -778,12 +800,149 @@ enum Harness {
     }
 }
 
+#if !HARNESS_REFERENCE_BUILD
+/// The `transcribe` mode's defaults: values in memory, NOTHING written. A
+/// named suite removed with `removePersistentDomain(forName:)` was MEASURED
+/// (road map 8 §10.10) to leave `~/Library/Preferences/<suite>.plist`
+/// behind — cfprefsd writes the emptied domain seconds after the process
+/// has exited, so no removal inside the process can win that race. The
+/// sheet reaches three calls: `string(forKey:)`, `set(_:forKey:)` and, on a
+/// keyed cloud start, `volatileDomain(forName: UserDefaults.argumentDomain)`
+/// (`AssemblyAIConfiguration`'s endpoint read). This class answers every
+/// keyed call from memory, the argument domain empty, and every domain write
+/// traps. `tools/proof/word_captions_sheet_support.swift` holds the same text.
+final class MemoryDefaults: UserDefaults {
+    private var values: [String: Any] = [:]
+
+    // Keyed reads, off `values`.
+    override func object(forKey defaultName: String) -> Any? { values[defaultName] }
+    override func string(forKey defaultName: String) -> String? { values[defaultName] as? String }
+    override func array(forKey defaultName: String) -> [Any]? { values[defaultName] as? [Any] }
+    override func dictionary(forKey defaultName: String) -> [String: Any]? {
+        values[defaultName] as? [String: Any]
+    }
+    override func data(forKey defaultName: String) -> Data? { values[defaultName] as? Data }
+    override func stringArray(forKey defaultName: String) -> [String]? {
+        values[defaultName] as? [String]
+    }
+    override func url(forKey defaultName: String) -> URL? { values[defaultName] as? URL }
+    override func integer(forKey defaultName: String) -> Int {
+        (values[defaultName] as? NSNumber)?.intValue ?? 0
+    }
+    override func float(forKey defaultName: String) -> Float {
+        (values[defaultName] as? NSNumber)?.floatValue ?? 0
+    }
+    override func double(forKey defaultName: String) -> Double {
+        (values[defaultName] as? NSNumber)?.doubleValue ?? 0
+    }
+    override func bool(forKey defaultName: String) -> Bool {
+        (values[defaultName] as? NSNumber)?.boolValue ?? false
+    }
+
+    // Keyed writes, into `values`; a nil removes.
+    override func set(_ value: Any?, forKey defaultName: String) { values[defaultName] = value }
+    override func set(_ value: Int, forKey defaultName: String) { values[defaultName] = value }
+    override func set(_ value: Float, forKey defaultName: String) { values[defaultName] = value }
+    override func set(_ value: Double, forKey defaultName: String) { values[defaultName] = value }
+    override func set(_ value: Bool, forKey defaultName: String) { values[defaultName] = value }
+    override func set(_ url: URL?, forKey defaultName: String) { values[defaultName] = url }
+    override func removeObject(forKey defaultName: String) { values[defaultName] = nil }
+
+    // Domain reads. The volatile domains are EMPTY: an in-memory argument
+    // domain holds no `-RCAssemblyAIEndpoint`, which is what the sheet's keyed
+    // cloud start reads through `AssemblyAIConfiguration`.
+    override func dictionaryRepresentation() -> [String: Any] { values }
+    override func volatileDomain(forName domainName: String) -> [String: Any] { [:] }
+    override func objectIsForced(forKey key: String) -> Bool { false }
+    override func objectIsForced(forKey key: String, inDomain domain: String) -> Bool { false }
+
+    // Everything else would reach the real defaults domain: a trap, which is
+    // a crash and so a scored FAILURE, never a silent write to disk.
+    override func register(defaults registrationDictionary: [String: Any]) { trap() }
+    override func addSuite(named suiteName: String) { trap() }
+    override func removeSuite(named suiteName: String) { trap() }
+    override func persistentDomain(forName domainName: String) -> [String: Any]? { trap() }
+    override func setPersistentDomain(_ domain: [String: Any], forName domainName: String) {
+        trap()
+    }
+    override func removePersistentDomain(forName domainName: String) { trap() }
+    override func setVolatileDomain(_ domain: [String: Any], forName domainName: String) {
+        trap()
+    }
+    override func removeVolatileDomain(forName domainName: String) { trap() }
+    override func synchronize() -> Bool { trap() }
+    private func trap(_ function: String = #function) -> Never {
+        fatalError("MemoryDefaults: \(function) would reach the real defaults domain")
+    }
+}
+
+extension Harness {
+    /// The `transcribe` mode.
+    static func transcribe(_ arguments: [String]) -> Int32 {
+        guard arguments.count >= 6 else {
+            FileHandle.standardError.write("transcribe: too few arguments\n".data(using: .utf8)!)
+            return 64
+        }
+        let appearance = NSAppearance(named: arguments[4] == "dark" ? .darkAqua : .aqua)
+        NSApp.appearance = appearance
+        let package = URL(fileURLWithPath: arguments[2])
+        let document = ProjectDocument()
+        do {
+            try document.read(from: package, ofType: "com.kgalligan.reelcut-project")
+            document.fileURL = package
+        } catch {
+            FileHandle.standardError.write("read failed: \(error)\n".data(using: .utf8)!)
+            return 1
+        }
+        guard let suite = MemoryDefaults(suiteName: nil) else { return 3 }
+        let sheet = TranscribeSheetController(
+            document: document, store: MemoryStore(), defaults: suite, environment: [:],
+            languages: [
+                Transcriber.Language(
+                    identifier: "en-US", displayName: "English (United States)", installed: true)
+            ])
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 420, height: 400), styleMask: [.titled],
+            backing: .buffered, defer: false)
+        window.appearance = appearance
+        window.contentViewController = sheet
+        guard let index = sheet.stylePopup.itemArray.firstIndex(where: {
+            $0.representedObject as? String == arguments[5]
+        }) else {
+            FileHandle.standardError.write(
+                "transcribe: no style row \(arguments[5])\n".data(using: .utf8)!)
+            return 64
+        }
+        sheet.stylePopup.selectItem(at: index)
+        sheet.perform(#selector(TranscribeSheetController.styleChanged(_:)), with: nil)
+        sheet.replaceCheckbox.state = arguments.count > 6 && arguments[6] == "1" ? .on : .off
+        sheet.controlChanged(nil)
+        for _ in 0..<10 {
+            RunLoop.current.run(until: Date().addingTimeInterval(0.05))
+            sheet.view.layoutSubtreeIfNeeded()
+        }
+        window.setContentSize(sheet.view.fittingSize)
+        sheet.view.layoutSubtreeIfNeeded()
+        do {
+            try Harness.png(sheet.view, to: URL(fileURLWithPath: arguments[3]))
+            print("wrote \(arguments[3])")
+            return 0
+        } catch {
+            FileHandle.standardError.write("render failed: \(error)\n".data(using: .utf8)!)
+            return 2
+        }
+    }
+}
+#endif
+
 let arguments = CommandLine.arguments
 guard arguments.count >= 4 else {
     FileHandle.standardError.write(
         ("usage: harness <project.reelcut|welcome|settings> <out.png> <light|dark> "
             + "[w] [h] [selectIndex] [playheadSec] [sizeIndex 0-2] [clip|media|document] "
             + "[candidateSpans] [expandSections] [mediaFilter]\n"
+            + "       harness transcribe <project.reelcut> <out.png> <light|dark> <style> "
+            + "[replace 0|1]\n"
             + "       harness cues <words.json> <out.json>\n"
             + "       harness meter <request.json> <out.json>\n")
             .data(using: .utf8)!)
@@ -868,6 +1027,10 @@ if arguments[1] == "settings" {
         FileHandle.standardError.write("render failed: \(error)\n".data(using: .utf8)!)
         exit(2)
     }
+}
+// "transcribe" renders road map 8 §5e's card — see the header.
+if arguments[1] == "transcribe" {
+    exit(Harness.transcribe(arguments))
 }
 #endif
 

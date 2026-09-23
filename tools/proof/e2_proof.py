@@ -71,6 +71,10 @@ SEC = 600_000
 FRAME = 20_000
 CANVAS = (640, 360)
 VERSION = 8
+# What a save writes: the CURRENT format version, which moved past E2's own
+# when road map 8's W1b bumped it to 9. `VERSION` stays E2's, because the
+# hand-written fixtures below are version-8 files on purpose.
+CURRENT_VERSION = 9
 
 # Floors, not exact counts: since road map 7's D3 the exact numbers belong to
 # `op_argument_proof.py` (tools/proof/README.md's handover rule).
@@ -640,8 +644,8 @@ def schema_part(mcp):
     set_motion(session, clip, motion(arrive=edge("slide_up", 0.5)))
     text = session.save()
     found = re.search(r'"version"\s*:\s*(\d+)', text)
-    check(f'"version": {VERSION}' in text,
-          f"a motion makes it a version-{VERSION} file "
+    check(f'"version": {CURRENT_VERSION}' in text,
+          f"a motion saves as a version-{CURRENT_VERSION} file "
           f"({found.group(1) if found else 'no version key'})")
     written = json.loads(text)
     keys = list(written["clips"][0]["video"].keys())

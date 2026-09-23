@@ -23,10 +23,11 @@ import ScreenCaptureKit
 /// `.notDetermined`, and the countdown starts from the answer; `.denied` and
 /// `.restricted` name the pane and stop there. Both readings happen BEFORE
 /// the countdown, so a countdown never ends in a prompt. An earlier draft
-/// gated both asks on `Transcriber.canAsk` — false under `-AgentServerEnabled
-/// YES` — and the R1 review measured what that cost: under that flag the
-/// refusal note told the person to press the button they had just pressed,
-/// and a `notDetermined` microphone could never be granted from anywhere.
+/// gated both asks on a `canAsk` (since deleted with the speech grant) —
+/// false under `-AgentServerEnabled YES` — and the R1 review measured what
+/// that cost: under that flag the refusal note told the person to press the
+/// button they had just pressed, and a `notDetermined` microphone could never
+/// be granted from anywhere.
 /// `canAsk` is the tool's rule about a prompt nobody would see; it does not
 /// apply to a button somebody clicked.
 ///
@@ -144,8 +145,8 @@ extension RecorderPanelController {
                 break
             case .notDetermined:
                 recordButton.isEnabled = false
-                // The framework does not say which queue it answers on; the
-                // hop is `Transcriber.requestAuthorization`'s.
+                // The framework does not say which queue it answers on, so
+                // the answer hops to main.
                 AVCaptureDevice.requestAccess(for: .audio) { [weak self] _ in
                     DispatchQueue.main.async { self?.microphoneAnswered() }
                 }

@@ -63,10 +63,11 @@ use serde_json::{Map, Value};
 
 use crate::evaluate::{json, number};
 use crate::model::{
-    Backdrop, BlendMode, Canvas, TextAnimation, TextAnimationKind, TextProps, VideoProps,
+    Backdrop, BlendMode, Canvas, TextAnimation, TextAnimationKind, TextCase, TextProps, VideoProps,
 };
 use crate::nest::Frame;
 use crate::recipe::{content_hash, RecipeLayer};
+use crate::recipe_words::Words;
 use crate::time::{format_timecode, Ticks};
 
 /// How much of a text layer is showing at one instant, and which half of
@@ -231,18 +232,30 @@ fn ramp(elapsed: Ticks, over: Ticks) -> f64 {
 /// key even at amount 1: whether a full reveal draws exactly what no
 /// animation draws is the renderer's promise, and a cache key must not lean
 /// on one.
-fn text_hash(description: &Value, reveal: &Reveal) -> String {
-    match reveal.phase {
-        None => content_hash(description),
-        Some(phase) => {
-            let mut keyed = Map::new();
-            keyed.insert("text".to_string(), description.clone());
-            keyed.insert("reveal".to_string(), number(reveal.amount));
-            keyed.insert("reveal_phase".to_string(), Value::from(phase));
-            keyed.insert("reveal_kind".to_string(), reveal_kind(reveal));
-            content_hash(&Value::Object(keyed))
-        }
+///
+/// `words` is `Some` only when the text has a `word_style` (spec §11, W-4),
+/// and then `word` and `word_pop` go in too: a page is a different picture
+/// at every word. Otherwise the hash is exactly what it was before format
+/// version 9, `words` or not.
+fn text_hash(description: &Value, reveal: &Reveal, words: Option<&Words>) -> String {
+    if reveal.phase.is_none() && words.is_none() {
+        return content_hash(description);
     }
+    let mut keyed = Map::new();
+    keyed.insert("text".to_string(), description.clone());
+    if let Some(phase) = reveal.phase {
+        keyed.insert("reveal".to_string(), number(reveal.amount));
+        keyed.insert("reveal_phase".to_string(), Value::from(phase));
+        keyed.insert("reveal_kind".to_string(), reveal_kind(reveal));
+    }
+    if let Some(words) = words {
+        keyed.insert("word".to_string(), Value::from(words.word));
+        keyed.insert(
+            "word_pop".to_string(),
+            words.pop.map_or(Value::Null, number),
+        );
+    }
+    content_hash(&Value::Object(keyed))
 }
 
 /// The reveal's kind as the recipe carries it: the schema's own spelling of
@@ -266,7 +279,13 @@ fn reveal_kind(reveal: &Reveal) -> Value {
 /// digs the description out of an evaluated clip; everything after that is
 /// here.
 pub(crate) fn text_source(text: &TextProps, clip_t: Ticks, duration: Ticks) -> Value {
-    let reveal = Reveal::of(text.animation.as_ref(), clip_t, duration);
+    // A styled page is a WHOLE reveal: `word_style` and `animation` do not
+    // compose, and `word_style` wins (spec §11, W-5).
+    let reveal = match text.word_style {
+        Some(_) => Reveal::WHOLE,
+        None => Reveal::of(text.animation.as_ref(), clip_t, duration),
+    };
+    let words = Words::of(text, clip_t);
     let mut description = json(text);
     // The animation is STRIPPED from the description carried here: the
     // computed reveal below is the only account of it a renderer gets.
@@ -276,14 +295,28 @@ pub(crate) fn text_source(text: &TextProps, clip_t: Ticks, duration: Ticks) -> V
     // what it was before format version 5. The inspector reads the
     // animation FIELD through `clip_state`; this description is what
     // draws.
+    //
+    // Version 9's keys ride in the description only when they change the
+    // picture, so an unstyled, as-written title hashes byte for byte as it
+    // did before them: `words` never (the computed `word` below is the
+    // renderer's only account of them, W-4), `word_style` only when set,
+    // `case` only when it is not `as_written`.
     if let Some(map) = description.as_object_mut() {
         map.remove("animation");
+        map.remove("words");
+        if text.word_style.is_none() {
+            map.remove("word_style");
+        }
+        if text.case == TextCase::AsWritten {
+            map.remove("case");
+        }
     }
+    let styled = text.word_style.is_some().then_some(&words);
     let mut source = Map::new();
     source.insert("kind".to_string(), Value::from("text"));
     source.insert(
         "hash".to_string(),
-        Value::from(text_hash(&description, &reveal)),
+        Value::from(text_hash(&description, &reveal, styled)),
     );
     source.insert("text".to_string(), description);
     // The three computed keys ride INSIDE the source object, where the
@@ -307,6 +340,15 @@ pub(crate) fn text_source(text: &TextProps, clip_t: Ticks, duration: Ticks) -> V
         },
     );
     source.insert("reveal_kind".to_string(), reveal_kind(&reveal));
+    // The two computed word keys (format version 9, `recipe_words.rs`),
+    // emitted on every text layer for the reveal keys' reason: `word` is
+    // how many words have started, `word_pop` how far the newest one's pop
+    // has got, and both are null on a page that is not word-timed.
+    source.insert("word".to_string(), Value::from(words.word));
+    source.insert(
+        "word_pop".to_string(),
+        words.pop.map_or(Value::Null, number),
+    );
     Value::Object(source)
 }
 

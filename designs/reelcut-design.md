@@ -17,7 +17,7 @@ already made so they are not re-litigated.
 a screencast editor's editor without a screencast editor's recorder — and, since road map 3,
 a recorder of the SCREEN alone, whose output is ordinary media. Open one or
 more video files from disk, arrange them on layered tracks over a fixed canvas, trim,
-split, annotate, animate, and export. Mac only, Apple Silicon, macOS 15+.
+split, annotate, animate, and export. Mac only, Apple Silicon, macOS 26+.
 
 The bar is a screencast editor's balance: enough to make a real cut with text,
 shapes, transitions and simple animation, without Final Cut's magnetic
@@ -421,7 +421,18 @@ is enabled.
 
 - Content (multi-line), font family / style / size, color, alignment
   (left / center / right and top / middle / bottom within the box), line
-  spacing, letter spacing.
+  spacing, letter spacing, and an UPPERCASE checkbox in the Style section
+  that writes `text.case` (format version 9) — a rendering transform applied
+  before layout, so it changes the measured box but never the word count.
+- On a word-caption page (a text clip with `word_style`, road map 8), the
+  Content field keeps the page's `words` while an edit keeps the word count
+  and sends `words: []` in the same `set_text` when it changes it — decided
+  PER CLIP, and never `words` inside an action's end patch (§11 W-2, W-6).
+  A styled page left untimed that way carries the Content section's
+  footnote "Not timed — regenerate to time it again", and the Animation
+  section's three rows are greyed with "Word style and animation do not
+  compose; the word style wins." (§11 W-5). Nothing in the inspector writes
+  `word_style`: restyling is regenerating (§11 W-10).
 - Outline (width, color); Backdrop (fill, opacity, padding, corner
   radius); Shadow (shared section).
 - Box: auto-size, or fixed width with wrapping.
@@ -521,13 +532,35 @@ Consolidate… and a line saying what it does.
   The rest of this bullet is the ON THIS MAC engine's, unchanged. It
   transcribes each clip's own source window, extracted to a
   temporary audio file — never the media file as it sits, and never the
-  whole of a long recording for the sake of a short clip. macOS gates
-  speech recognition behind a grant, and this sheet is the one place the
-  app asks for it. Recognition stops after about a minute per clip, which
-  is the framework's own ceiling: when it does, the run SAYS where it
-  stopped rather than presenting a truncated transcript as the whole of
-  what was said. Cues are at most two lines of 42 characters, at most six
-  seconds, with at least a frame between them.
+  whole of a long recording for the sake of a short clip. Since road map
+  8's W2 (§11 W-8) the engine is `SpeechTranscriber`: no grant is asked
+  and there is no length ceiling. The Language popup lists every supported
+  locale, one whose model is not on this Mac marked "— not installed", and
+  choosing one shows a Download row — the one place a model is installed;
+  Generate runs only for an installed language. Cues are at most two lines
+  of 42 characters, at most six seconds, with at least a frame between
+  them.
+
+  Since road map 8's W4a a run can make WORD CAPTIONS instead, in one of
+  five styles — Highlight, Pill, Karaoke, Build and One Word (road map 8
+  §5h, `CaptionStyle.swift`) — besides Subtitles, which is the cue path
+  above, unchanged. A word caption is a PAGE: an ordinary text clip filled
+  to the width it MEASURES in its style on this canvas (at most 0.86 of the
+  canvas width), never to a word count, on one line (Karaoke: two), each
+  word's timing carried in `text.words` so the word being said is drawn as
+  the style says (§11 W-1, W-7). A lone word too wide for the budget
+  shrinks, then wraps. A run may REPLACE the caption tracks it would have
+  made over the same clips in the same undo step, which is how a track is
+  restyled (§11 W-10). The sheet's **Style** popup (road map 8's W4b)
+  lists Subtitles and then the five, opens on the style last chosen, and
+  shows a preview under it: the first page generation would make — of the
+  first clip's cached transcript when there is one, else "This is how it
+  looks" — drawn by the renderer itself at this canvas's size, two frames
+  for a word style (the first word active, then the second). A **Replace
+  existing captions** checkbox is live only for a word style over a track
+  the command itself would replace, and lists those tracks by name with
+  their caption counts before Generate; the sheet commits exactly what
+  `transcribe`'s `style` and `replace` (§7.9) commit.
 - File ▸ Export Captions… writes one track of text clips back out as
   SubRip (`.srt`) or WebVTT (`.vtt`) — the clips' own times and words, so
   a caption retimed by dragging exports where it was dragged to. The track
@@ -758,7 +791,7 @@ source position before `CompositionBuilder` reads them; a still's full-u32
 rational frame is at most `600000 × u32::MAX` ticks. Those bounds keep
 `sourceIn + sourceDuration` within Int64 without a duplicate Swift policy.
 
-### 5.2 Project — the JSON schema (format version 8)
+### 5.2 Project — the JSON schema (format version 9)
 
 The Rust value, serialized by serde. Small, no pixels. All times are
 ticks, all positions canvas pixels, colors `[r, g, b, a]` floats 0–1 — FOUR
@@ -957,7 +990,14 @@ it opens what a newer build wrote (§5.6).
   "outline": null | { "width": 2, "color": [...] },
   "backdrop": null | { "color": [...], "padding": 12, "radius": 8 },
   "width": null | 800,
-  "animation": null | { "kind": "typewriter", "in": 600000, "out": 0 } }`.
+  "animation": null | { "kind": "typewriter", "in": 600000, "out": 0 },
+  "case": "as_written" | "upper",
+  "words": [] | [{ "start": 0, "end": 108000 }, …],
+  "word_style": null | { "mode": "highlight" | "build",
+    "active_color": null | [...], "active_scale": 1.0,
+    "active_pill": null | { "color": [...], "padding": 0.2, "radius": 0.25 },
+    "spoken_color": null | [...], "upcoming_color": null | [...] } }` —
+  `word_style` closes the object.
 - `text.animation` (format version 5): how the words ARRIVE and how they
   LEAVE, or `null` — the common case — for text that is simply there for
   the length of its clip. `kind` ∈ `typewriter`, `word_fade`, `line_rise`,
@@ -980,6 +1020,24 @@ it opens what a newer build wrote (§5.6).
   values is what actions are for (§5.4) — and no per-frame number: the
   core computes that into the recipe (§7.3), so the model says what the
   animation IS and nothing about where it has got to.
+- `text.case`, `text.words` and `text.word_style` (format version 9, road
+  map 8's word captions; §11 W-1 to W-6): a word caption is an ordinary
+  text clip holding one PAGE. `case` is a transform applied before layout
+  (`as_written`, the default, or `upper`); it changes the measured width
+  and never the token count. `words` is `[]` for an untimed text, or ONE
+  `{start, end}` per whitespace token of `content` (`str::split_whitespace`
+  — the core is the one counter), in CLIP ticks: a negative start is legal
+  and means "already said", two words may share a start (the later one
+  wins that frame), starts never decrease and an `end` is never before its
+  `start`. Every word time is snapped to the frame grid like any tick a
+  patch carries, and stays inside D7-1's envelope. `word_style` is `null`
+  or how the word being said is drawn: `mode` `highlight` (the whole page,
+  the active word picked out) or `build` (words appear as they are said);
+  the three colours are `null` for "the text's own colour"; `active_scale`
+  (1.0–1.5) is where the active word's pop settles; `active_pill`'s
+  `padding` and `radius` are FRACTIONS of `size`. All three keys default,
+  so a version-8 file reads unchanged; the per-frame answer is computed
+  into the recipe (§7.3), never stored.
 - `shape`: `{ "kind": "arrow", "width": 320, "height": 120,
   "stroke": { "width": 6, "color": [...] }, "fill": null | [...],
   "arrow_start": false, "arrow_end": true, "radius": 0,
@@ -1494,12 +1552,12 @@ many clips`, `too many tracks`, `nests are more than 8 deep at nest N`.
 | `insert_clip {track, media, at}` | The INSERT edit: the clip `at` is strictly inside on `track` is split, every unlocked track opens by the media's whole length (`insert_time`), then the media lands at `at`. Only the destination track is cut — a straddler on another track rides the shift whole, which is what keeps a bed unbroken. One op, so one undo step and one tool. Refuses when the clip could not be placed after the room was made, which is what a locked destination track gives. |
 | `overwrite_clip {track, media, at}` | The OVERWRITE edit: `[at, at + media length)` is cleared on `track` ALONE — cut at both bounds, whatever is left inside removed — and the media lands there. Nothing shifts and no other track is touched; the named track is cleared whether or not it is locked, exactly as `ripple_delete` removes the clips it was given. |
 | `move_clip {clips, delta, track?}` | Shifts by `delta` ticks (may be negative; clamps at 0) and optionally to another track (all selected clips keep their relative track offsets). **Overlap rule** on the destination track: a clip may overlap at most one neighbour on each side, and each overlap must be ≤ half of the shorter of the two clips; anything else refuses. An overlap is a transition; a clip that gains a predecessor overlap gets `transition_in = cross_dissolve` if it had none. |
-| `trim_start {clip, to}` | New start `to`; source in advances by `(to − start) × speed`. Clamps: `to ≥ start − in/speed` snapped UP to a whole frame (source bound — `in/speed` is a floored division and is not on the grid, so an un-snapped clamp could write a sub-frame start, §11 D4-5), `to < end − one frame`. |
+| `trim_start {clip, to}` | New start `to`; source in advances by `(to − start) × speed`. Clamps: `to ≥ start − in/speed` snapped UP to a whole frame (source bound — `in/speed` is a floored division and is not on the grid, so an un-snapped clamp could write a sub-frame start, §11 D4-5), `to < end − one frame`. A text clip's `text.words` are rebased by `to − start` — unlike its actions, because a word is anchored to speech that stays where it is on the timeline (§11 W-3). |
 | `trim_end {clip, to}` | New end `to`; clamps to the source's remaining length (`media` sources), snapped DOWN to a whole frame so the clamp cannot put the end past the file (§11), and `> start`. |
 | `rate_stretch {clip, to_end}` | `speed = source_len / (to_end − start)`; duration follows. Media sources only — a non-media clip is an **error**, not a refusal, so an MCP caller gets a message it can correct from (the UI never offers it). |
 | `slip {clip, delta}` | Slides the source under a fixed clip: `in += delta × speed`, start and duration unchanged, so nothing downstream moves. `delta` is TIMELINE ticks; positive shows later material. Clamped so the window stays inside the media (`in ≥ 0`, `in + duration × speed ≤ media.duration`), and a slip the clamps reduce to nothing refuses. A `still` moves its `at` instead — it has a source time if not a window. Any other source is an **error**, as `rate_stretch` is. Actions are clip-relative and do not move. |
-| `roll {clip, to}` | Moves a hard cut: this clip's start and its predecessor's end both become `to`, and nothing else moves — the pair's outer edges and its total length are invariants. The predecessor is the clip on the same track ending EXACTLY at this one's start; with a gap or an overlap there instead it refuses (an overlap is a transition, and its length is `set_transition_duration`'s). Clamped four ways: one frame kept on each side, this clip's own source head, and the predecessor's remaining source. Front-trim semantics here (`in` follows), a plain end trim there. |
-| `split {clips?, at}` | Two clips. Second: `start = at`, `in += (at − start) × speed`, base props = the evaluated state at `at`. Actions before `at` stay with the first; after go to the second (start rebased); a straddling action becomes two — the first half's end patch is the evaluated state at `at`. `transition_in` stays with the first. A PRESET anchored to the clip's two ends is divided rather than copied (format version 8): the first half keeps `video.motion.in` and loses `out`, the second keeps `out` and loses `in`, each normalised to `null` when nothing is left, and `text.animation` is split the same way — `out` zeroed on the first half, `in` on the second, the pair becoming `null` when both are 0. Carrying both to both halves, which is what a clone does and what version 5 did, makes the first half leave at the cut and the second arrive again there. A `during` slot survives on both, since it is anchored to neither end, and restarts at each cut. Every splitter in the crate routes through this — `split`, `delete` and the two range cuts, `lift_range`, `insert_clip`, `overwrite_clip` and `freeze_frame` — so the rule is stated once (`edit_split.rs`, §7.10). Refuses when `at` is not strictly inside. **Omitting** `clips` — not passing a flag — means every unlocked clip `at` is strictly inside, the ⌘T-with-no-selection case. |
+| `roll {clip, to}` | Moves a hard cut: this clip's start and its predecessor's end both become `to`, and nothing else moves — the pair's outer edges and its total length are invariants. The predecessor is the clip on the same track ending EXACTLY at this one's start; with a gap or an overlap there instead it refuses (an overlap is a transition, and its length is `set_transition_duration`'s). Clamped four ways: one frame kept on each side, this clip's own source head, and the predecessor's remaining source. Front-trim semantics here (`in` follows), a plain end trim there. This clip's `text.words` are rebased by the move, as `trim_start` rebases them (§11 W-3). |
+| `split {clips?, at}` | Two clips. Second: `start = at`, `in += (at − start) × speed`, base props = the evaluated state at `at`. Actions before `at` stay with the first; after go to the second (start rebased); a straddling action becomes two — the first half's end patch is the evaluated state at `at`. `transition_in` stays with the first. The second keeps every `text.words` entry rebased by the cut — a negative start is legal and means "already said", so the split is invisible — and the first half's words are untouched; a second half whose EVALUATED content (a finished action may have switched it) has a different token count stores `words: []` instead, because a half is a clip the door must accept again (format version 9, §11 W-3). A PRESET anchored to the clip's two ends is divided rather than copied (format version 8): the first half keeps `video.motion.in` and loses `out`, the second keeps `out` and loses `in`, each normalised to `null` when nothing is left, and `text.animation` is split the same way — `out` zeroed on the first half, `in` on the second, the pair becoming `null` when both are 0. Carrying both to both halves, which is what a clone does and what version 5 did, makes the first half leave at the cut and the second arrive again there. A `during` slot survives on both, since it is anchored to neither end, and restarts at each cut. Every splitter in the crate routes through this — `split`, `delete` and the two range cuts, `lift_range`, `insert_clip`, `overwrite_clip` and `freeze_frame` — so the rule is stated once (`edit_split.rs`, §7.10). Refuses when `at` is not strictly inside. **Omitting** `clips` — not passing a flag — means every unlocked clip `at` is strictly inside, the ⌘T-with-no-selection case. |
 | `delete {clips}` | Removes; gaps stay. |
 | `ripple_delete {clips}` / `ripple_delete_range {from, to}` | Removes; then for each removed span (union of the removed clips' spans, processed right-to-left) shifts every clip on **unlocked** tracks whose start ≥ span end left by the span length. Clips on other tracks that straddle a span are left in place. Range form: every unlocked clip is split at both bounds first, the middle pieces removed, then the shift. |
 | `ripple_delete_ranges {ranges: [[from, to], …]}` | Several ranges as ONE edit — the silence cut. Each pair is snapped, clamped and ordered exactly as `ripple_delete_range`'s one is (a reversed pair is the same range), the pairs are then MERGED — touching as well as overlapping — and the survivors cut and closed right to left. So the op is **merge-then-cut and not N `ripple_delete_range`s**, and the difference is visible in the document: a cut at a boundary that no longer exists would mint a fragment and burn an id. `set_gained_transitions` runs once at the end, over the unlocked tracks. Markers do not move, as they do not for the singular. An empty list, and a list that merges to nothing, change nothing. Written by Clip ▸ Remove Silences… as one undo step, whatever the number of cuts. |
@@ -1512,14 +1570,14 @@ many clips`, `too many tracks`, `nests are more than 8 deep at nest N`.
 | `detach_audio {clip}` | `enabled.audio = false` on the clip; a new clip with `enabled = {video: false, audio: true}`, same source/in/duration/speed and the audio props, on the track below (a track is inserted at index 0 if needed). Refuses if the media has no audio or audio is already detached. |
 | `duplicate {clips}` | Copies placed after the originals' span on the same tracks (⌥-drag then moves them). |
 | `paste {at, track?, payload}` | Inserts the clips of a clipboard payload — `{"clips": [...], "media": [...]}`, what ⌘C wrote to `com.kgalligan.reelcut.clips` — with fresh ids for the clips, their actions and any media row added. The EARLIEST clip lands exactly at `at` and the rest keep their offsets from it. A payload clip's `track` is a **depth from the front** (0 = front-most), not an id, since the ids belong to the document copied from: `track` names where depth 0 lands (default: the front-most track), the rest follow by the same index delta, and tracks missing behind it are added. Media is matched to `media[]` **by path** — reused when it is there, appended when it is not — so a paste between documents brings the entry with it. A clip the overlap rule refuses on its target track goes on a new track in front (as Add Text does, §4.1), so the only refusal is an empty clip list; a malformed payload is an **error**. Every landed clip — the payload's own and those inside the nests it brings — has its start, source-bounded duration, action spans and present base motion/text timings normalized to this document's grid, since the payload may come from another frame rate (§11, D7-3). |
-| `paste_attributes {clips, payload, groups?}` | Copies the payload's EARLIEST clip's property groups onto each clip (at one start the front-most, then the lower id — never the array's first, which is Copy's creation order) — `payload` is the same Copy payload `paste` takes, and only that clip's `video`, `audio`, `text` and `shape` are read; its ids, times, media rows and nests do not matter and nothing is minted. A group is REPLACED whole, never merged: video and audio whole, transform included (`audio.muted` and `keep_pitch` travel — they are properties like opacity); text but its `content`; a shape but its `kind`, `width`, `height`, `from` and `to`. `groups` ∈ `video`, `audio`, `text`, `shape`: absent, it means every group BOTH sides have, silently skipping the rest; a NAMED group the payload clip lacks, or a target lacks, is an **error**, all-or-nothing, and so is a copied value the inspector would refuse — each copied group passes the patches' range checks. Copied video motion and text animation pass the same original-value range checks as a patch, then snap to the target grid; audio envelopes retain sample precision. Speed, enabled, actions, the transition, the source and the clip's own name and label stay. One value is NORMALISED on the way in, not merely checked: a copied `video.motion` whose three slots are all null lands as `null`, the same one spelling of "no motion" `set_video` and `split` keep — this op's payload is a third door for a `Motion`, and `{"motion": {}}` means the same thing; `paste`'s payload and the file reader do NOT normalise (road map 5 §12 R2·2; `core/tests/schema_v8.rs`). Refuses when nothing changes, and on an empty `groups` list. |
+| `paste_attributes {clips, payload, groups?}` | Copies the payload's EARLIEST clip's property groups onto each clip (at one start the front-most, then the lower id — never the array's first, which is Copy's creation order) — `payload` is the same Copy payload `paste` takes, and only that clip's `video`, `audio`, `text` and `shape` are read; its ids, times, media rows and nests do not matter and nothing is minted. A group is REPLACED whole, never merged: video and audio whole, transform included (`audio.muted` and `keep_pitch` travel — they are properties like opacity); text but its `content` and the `words` that time it (§11 W-6); a shape but its `kind`, `width`, `height`, `from` and `to`. `groups` ∈ `video`, `audio`, `text`, `shape`: absent, it means every group BOTH sides have, silently skipping the rest; a NAMED group the payload clip lacks, or a target lacks, is an **error**, all-or-nothing, and so is a copied value the inspector would refuse — each copied group passes the patches' range checks. Copied video motion and text animation pass the same original-value range checks as a patch, then snap to the target grid; audio envelopes retain sample precision. Speed, enabled, actions, the transition, the source and the clip's own name and label stay. One value is NORMALISED on the way in, not merely checked: a copied `video.motion` whose three slots are all null lands as `null`, the same one spelling of "no motion" `set_video` and `split` keep — this op's payload is a third door for a `Motion`, and `{"motion": {}}` means the same thing; `paste`'s payload and the file reader do NOT normalise (road map 5 §12 R2·2; `core/tests/schema_v8.rs`). Refuses when nothing changes, and on an empty `groups` list. |
 | `nest {clips, name?}` | Collapses the selection into ONE clip showing a nest (§5.2), on the front-most track the selection occupied, running from the earliest start to the latest end. The clips move whole — ids, props, actions, transitions — keeping their relative times (the earliest starts at 0 inside) and their track order, onto fresh tracks of the nest's own that copy the source tracks' names and their hidden/muted/locked/solo state (a copied solo is then judged among the nest's own tracks, §5.2). The nest's canvas is frozen at the project's current size, so a later `set_canvas` cannot re-lay-out what is inside it. Media is untouched: a nest references the project's `media[]` in the same one id space. Refuses on an empty selection, on a selection of one nest clip, and when the nest clip would break the overlap rule against what was left behind. |
 | `unnest {clip}` | The inverse: the nest's clips return at `clip.start + their own start` with fresh ids (as `split` then a re-join mints fresh ones), on tracks counted back from the nest clip's own — the nest's front-most track lands where the nest clip was — with tracks missing behind added, and the nest clip goes. A clip the overlap rule refuses lands on a new track in front, as `paste` does, so a group can always be opened. A nest clip trimmed shorter than its contents gives **all** of them back: there is no in point on a nest, so this is the inverse of `nest`, not of the trim. The nest is dropped from `nests[]` when no clip anywhere still shows it. Each returning clip has its translated start, source-bounded duration, action spans and present base motion/text timings normalized to the document's grid (§11, D7-3), including a legacy off-grid nest. An **error** when `clip` is not a nest clip. |
-| `set_video {clips, patch}` / `set_audio` / `set_text` / `set_shape` | Merge the patch into the base props. Refuses if nothing changes. An unknown key, a value of the wrong JSON kind or a misspelt variant anywhere in the patch is an **error** that names the dotted path to it, array indices included, and the value sent — `unknown key "filters[1].kindd" in a video patch`, `bad value at "shadow" in a video patch: expected an object, not 5`, ``bad value at "filters[1].kind" in a video patch: unknown variant `glw`, expected one of `blur`, …`` — so a number where a shadow belongs is refused rather than read as a clear, and a list where an object belongs (or an object where a string belongs) is refused rather than read field by field; `add_text_clip`'s `text` and `add_shape_clip`'s `shape` answer in the same words. One value is refused by the CLIP rather than by the vocabulary: `video.blend` on a nest clip is an **error** naming it (format version 6), because a nest is flattened rather than composited offscreen and there is no group picture for a blend to combine with. It fires on the MERGED value only, so `{"blend": "normal"}` on a nest clip is the identity and refuses instead — otherwise an all-or-nothing `paste_attributes` of an ordinary look onto a nest clip would fail over a value that changes nothing. `set_action_end` does not range-check, so the same rule is enforced again in the evaluator (§5.4's `clamp_video`), which closes the recipe, `clip_state` and both export writers at once. A `video.filters` entry must name BOTH `kind` and `amount` — `missing key "filters[0].kind" in a video patch` — because a list replaces whole, so an entry is merged over nothing and the keys it leaves out would be completed from the type's defaults into a half-strength blur nobody asked for; the file reader keeps that completion, so an older file still opens with the defaults it always had. `video.obscure` and `shape.gradient.stops` entries are NOT held to it: their omitted keys leave the entry recognisably the thing the caller named. `video.motion` (format version 8) deep-merges like every other nested object — `{"motion": {"in": …}}` keeps a stored `out`, and `{"motion": {"in": null}}` clears that slot alone. The APP's two writers still send the WHOLE object with nil slots as `null` (the inspector's Motion section and Clip ▸ Motion ▸ know all three slots), which is the same rule spelled out rather than a second one; an AGENT's patch is the caller's own object, forwarded unread (§7.9). `{"motion": null}` clears the field, and a motion whose three slots are all null is normalised to `null` before the range checks run, so one clip has one spelling of "no motion". |
+| `set_video {clips, patch}` / `set_audio` / `set_text` / `set_shape` | Merge the patch into the base props. Refuses if nothing changes. An unknown key, a value of the wrong JSON kind or a misspelt variant anywhere in the patch is an **error** that names the dotted path to it, array indices included, and the value sent — `unknown key "filters[1].kindd" in a video patch`, `bad value at "shadow" in a video patch: expected an object, not 5`, ``bad value at "filters[1].kind" in a video patch: unknown variant `glw`, expected one of `blur`, …`` — so a number where a shadow belongs is refused rather than read as a clear, and a list where an object belongs (or an object where a string belongs) is refused rather than read field by field; `add_text_clip`'s `text` and `add_shape_clip`'s `shape` answer in the same words. One value is refused by the CLIP rather than by the vocabulary: `video.blend` on a nest clip is an **error** naming it (format version 6), because a nest is flattened rather than composited offscreen and there is no group picture for a blend to combine with. It fires on the MERGED value only, so `{"blend": "normal"}` on a nest clip is the identity and refuses instead — otherwise an all-or-nothing `paste_attributes` of an ordinary look onto a nest clip would fail over a value that changes nothing. `set_action_end` does not range-check, so the same rule is enforced again in the evaluator (§5.4's `clamp_video`), which closes the recipe, `clip_state` and both export writers at once. A `video.filters` entry must name BOTH `kind` and `amount` — `missing key "filters[0].kind" in a video patch` — because a list replaces whole, so an entry is merged over nothing and the keys it leaves out would be completed from the type's defaults into a half-strength blur nobody asked for; the file reader keeps that completion, so an older file still opens with the defaults it always had. `video.obscure` and `shape.gradient.stops` entries are NOT held to it: their omitted keys leave the entry recognisably the thing the caller named. `video.motion` (format version 8) deep-merges like every other nested object — `{"motion": {"in": …}}` keeps a stored `out`, and `{"motion": {"in": null}}` clears that slot alone. The APP's two writers still send the WHOLE object with nil slots as `null` (the inspector's Motion section and Clip ▸ Motion ▸ know all three slots), which is the same rule spelled out rather than a second one; an AGENT's patch is the caller's own object, forwarded unread (§7.9). `{"motion": null}` clears the field, and a motion whose three slots are all null is normalised to `null` before the range checks run, so one clip has one spelling of "no motion". `set_text` can patch `case`, `words` and `word_style` like any declared key (format version 9, §11 W-10); a `words` entry must name both `start` and `end`, and a non-empty `words` whose length is not the content's token count is an **error** in the rule's own words — `this text is timed word by word: 4 timings for 5 words` — as are a word time outside D7-1's envelope, an `end` before its `start`, a `start` before the previous word's, and a `word_style` value out of range (`active_scale` 1.0–1.5, colours 0–1, a negative pill padding or radius). The check runs on what the caller sent; the word times are then snapped to the grid, nearest, a negative one staying negative. A content edit that changes the count sends `words: []` in the same patch. |
 | `set_clip {clips, patch: {name?: string \| null, label?: string \| null}}` | The fifth patch op: sets or clears the clip's own name and label (§5.2). Inside the patch an absent key keeps, `null` clears, and so does an empty string — after the trim a name gets on its way in — because an unnamed clip is `null`, not `""`. Any other key is an **error**, checked before the clip ids. A patch rather than two optional `Option<T>` envelope arguments lets "keep" and "clear" differ. A `split`, `duplicate`, `detach_audio` or `paste` carries both along (they clone the clip); `paste_attributes` never does. Refuses if nothing changes. |
 | `set_enabled {clip, video?, audio?}` | Visibility/mute per clip. |
 | `set_transition {clip, kind\|null}` | Sets `transition_in`. With a kind on a clip that already HAS a transition only the `kind` moves — its `curve` and `audio` stay where the person put them (format version 7), because a kind chosen from the popup, the menu or MCP must not reset a curve; a clip that had none gets a minted one (§11, R5-2). `set_transition_duration {clip, duration}` moves the clip so the overlap equals `duration` (subject to the overlap rule). |
-| `add_transition {clip, kind?, duration, align="center", ripple=false}` | Makes an overlap at the HARD CUT before `clip` out of the two clips' unused handles and puts a transition on it — **nothing else on the timeline moves** and the pair's outer edges stay (§11, R5-3). `align` `center` takes half from each side (the odd frame to the incoming clip, and a side that cannot supply its share passes it to the other before the total shrinks), `before` takes it all from the incoming clip's head, `after` all from the outgoing clip's tail. The duration is snapped DOWN to whole frames before the split — snapping two halves separately would lose the odd frame — and then clamped: to each side's handle (a media clip's source window; UNBOUNDED for a still, an image, text or a shape; **0 for a nest's head**, since trimming a nest clip's head moves its contents, and the nest's own remaining length for its tail), to the neighbours on the track, and to the overlap rule, which is held FIRST to `(A.duration + B.duration) / 3 frames` — the most that rule can pass at any split, so the step-down walks the CLIPS and not the caller's number — and then searched on that same larger-side reduction path without enumerating frames (D7-2). An already-invalid affected track refuses with the overlap rule before fitting. Each trial's two extensions are read off the frame GRID rather than taken as a multiple of one frame, because the canvas frame is a FALLBACK of 1/30 s at a rate that does not divide the timescale (7 fps) and a multiple of it is not a grid position there. A request that clamps below one frame of the real grid is REFUSED, in a sentence naming the cut, the frames asked for and `ripple: true` as the way past it. The incoming clip's `in` moves back by the extension times its speed, and its ACTIONS move with it — where `trim_start` deliberately leaves actions alone, because a transition reveals material in front of a first frame nobody asked to move. `kind` absent uses the clip's own stored kind if it has one, else `cross_dissolve`; a stored transition keeps its style and a new one is minted. **Error** for a non-positive duration, an unknown clip, and for not being at a hard cut — naming which of: no predecessor, a gap, an overlap that already exists. **`ripple: true` makes the overlap by MOVING instead** (§11, R5-3's amendment): no handle is read and `align` is ignored; the incoming clip and every clip at or after the cut on every UNLOCKED track slide left by the snapped duration — `close_gap`'s set, through the same shift — so the timeline gets shorter, the outgoing clip keeps every frame and its place, and no source window or action moves. The duration is capped at half the shorter of the two clips and limited to the greatest whole-frame shift outside exact forbidden overlap intervals, including a feasible shift after clips cross; an already-invalid affected track refuses with the overlap rule before fitting; a clip on another track pushed into its neighbour gains a minted `cross_dissolve` (`close_gap`'s rule); markers do not move; an incoming clip on a locked track, or nothing left above one frame, is REFUSED, each in its own sentence. The same hard-cut `Err`s apply. |
+| `add_transition {clip, kind?, duration, align="center", ripple=false}` | Makes an overlap at the HARD CUT before `clip` out of the two clips' unused handles and puts a transition on it — **nothing else on the timeline moves** and the pair's outer edges stay (§11, R5-3). `align` `center` takes half from each side (the odd frame to the incoming clip, and a side that cannot supply its share passes it to the other before the total shrinks), `before` takes it all from the incoming clip's head, `after` all from the outgoing clip's tail. The duration is snapped DOWN to whole frames before the split — snapping two halves separately would lose the odd frame — and then clamped: to each side's handle (a media clip's source window; UNBOUNDED for a still, an image, text or a shape; **0 for a nest's head**, since trimming a nest clip's head moves its contents, and the nest's own remaining length for its tail), to the neighbours on the track, and to the overlap rule, which is held FIRST to `(A.duration + B.duration) / 3 frames` — the most that rule can pass at any split, so the step-down walks the CLIPS and not the caller's number — and then searched on that same larger-side reduction path without enumerating frames (D7-2). An already-invalid affected track refuses with the overlap rule before fitting. Each trial's two extensions are read off the frame GRID rather than taken as a multiple of one frame, because the canvas frame is a FALLBACK of 1/30 s at a rate that does not divide the timescale (7 fps) and a multiple of it is not a grid position there. A request that clamps below one frame of the real grid is REFUSED, in a sentence naming the cut, the frames asked for and `ripple: true` as the way past it. The incoming clip's `in` moves back by the extension times its speed, and its ACTIONS move with it, as do its `text.words` (§11 W-3) — where `trim_start` deliberately leaves actions alone, because a transition reveals material in front of a first frame nobody asked to move. `kind` absent uses the clip's own stored kind if it has one, else `cross_dissolve`; a stored transition keeps its style and a new one is minted. **Error** for a non-positive duration, an unknown clip, and for not being at a hard cut — naming which of: no predecessor, a gap, an overlap that already exists. **`ripple: true` makes the overlap by MOVING instead** (§11, R5-3's amendment): no handle is read and `align` is ignored; the incoming clip and every clip at or after the cut on every UNLOCKED track slide left by the snapped duration — `close_gap`'s set, through the same shift — so the timeline gets shorter, the outgoing clip keeps every frame and its place, and no source window or action moves. The duration is capped at half the shorter of the two clips and limited to the greatest whole-frame shift outside exact forbidden overlap intervals, including a feasible shift after clips cross; an already-invalid affected track refuses with the overlap rule before fitting; a clip on another track pushed into its neighbour gains a minted `cross_dissolve` (`close_gap`'s rule); markers do not move; an incoming clip on a locked track, or nothing left above one frame, is REFUSED, each in its own sentence. The same hard-cut `Err`s apply. |
 | `set_transition_style {clip, curve?, audio?}` | Sets the transition's easing and whether it crossfades the sound; an absent key KEEPS. A separate op rather than two more arguments on `set_transition`, because that one reads an absent `kind` and an explicit `null` as the same thing and so cannot spell "keep". It stores on the same terms — any clip, with or without an overlap — and a clip with no stored transition and at least one key given gets a minted `cross_dissolve` with the style applied. NEITHER key given is an IDENTITY whatever the clip holds, and never mints — nothing was asked for, so there is nothing to explain. **Error** for an unknown clip. |
 
 **Actions**
@@ -1529,7 +1587,7 @@ many clips`, `too many tracks`, `nests are more than 8 deep at nest N`.
 | `add_action {clip, at, duration=1 s}` | Refuses if it would overlap another action or run past the clip end. End patch starts empty (= no change until edited). |
 | `add_zoom_action {clip, at, duration=1 s, region: {x, y, width, height} \| null, fit="fit", curve="ease_in_out"}` | An `add_action` whose end patch is the `scale`, `x` and `y` that bring `region` to the canvas — the screencast zoom. **`region`'s `x` and `y` are its CENTRE** and `width`/`height` its size, both source pixels from the centre of the cropped rect (§5.3's one region frame); the field names say neither, so the tool description and the core's doc say it too. `fit` shows the whole region, `fill` covers the whole canvas, both measured THROUGH the clip's rotation — a rectangle contains a rotated rectangle exactly when it contains its four corners, and the test collapses to the naive form at 0°. Rotation and crop — and nothing else — are read from the clip evaluated at `at`, the frame the rectangle was drawn on: the `scale`, `x` and `y` it writes are absolute, so the placement never reads a transform, base or evaluated. A rotation animated between `at` and `at + duration` is not tracked. The scale clamps to the layer maximum and the offsets are derived from the CLAMPED value, so a region too small to reach it still lands centred and only the magnification degrades. `region` absent or `null` is a zoom BACK: the end patch is the clip's STORED base `scale`, `x`, `y` — the one thing here that is NOT read evaluated, because "back" means where the clip sits when nothing is animating it, which is also what a later zoom on the same clip measures from. It composes `add_action` + `set_action` + `set_action_end`, so it is one undo step and inherits every `add_action` refusal rather than restating it; a clip with no video properties is an **error**. The region is read the way a patch is: it must BE an object (a four-number LIST is refused rather than read member by member), an unknown member and a missing member are **errors** naming the member beside the four it takes, and a wrong-typed one names its path (`bad value at "region.width"`). A non-finite or non-positive number is an **error** too — `region.width must be greater than 0` — because a zero-width region asks for an infinite scale. |
 | `set_action {clip, action, start?, duration?, curve?}` | Same overlap checks. |
-| `set_action_end {clip, action, patch}` | Merges into the end patch; a key set to `null` removes it, at any depth. The patch is walked like every other one (§5.4): the three groups it may name are `video`, `audio` and `text`, and an unknown key, a value of the wrong JSON kind or a misspelt variant anywhere in it is an **error** naming the dotted path with the group in it — `unknown key "video.filters[1].kindd" in an action end patch` — and a `shape` object is an unknown key, because a shape is not animatable and the key would be stored, reported as success and animate nothing. VALUES are not range-checked, so an end state may name what no stored group could hold and the evaluator clamps it (§5.4's `clamp_video`). One refusal is about the op rather than the vocabulary: a `video` object naming `motion` is an **error** (format version 8, §5.4), because a preset is anchored to the clip's two ends rather than being a value to ramp between two states, and the evaluator would restore the base value anyway. |
+| `set_action_end {clip, action, patch}` | Merges into the end patch; a key set to `null` removes it, at any depth. The patch is walked like every other one (§5.4): the three groups it may name are `video`, `audio` and `text`, and an unknown key, a value of the wrong JSON kind or a misspelt variant anywhere in it is an **error** naming the dotted path with the group in it — `unknown key "video.filters[1].kindd" in an action end patch` — and a `shape` object is an unknown key, because a shape is not animatable and the key would be stored, reported as success and animate nothing. VALUES are not range-checked, so an end state may name what no stored group could hold and the evaluator clamps it (§5.4's `clamp_video`). One refusal is about the op rather than the vocabulary: a `video` object naming `motion` is an **error** (format version 8, §5.4), because a preset is anchored to the clip's two ends rather than being a value to ramp between two states, and the evaluator would restore the base value anyway. A `text` object naming `words` — a `null` included — is an **error** too (format version 9, §11 W-6): a word's times are anchored to speech, not a state to ramp toward. |
 | `remove_action {clip, action}` | |
 
 **Tracks, markers, canvas, media**
@@ -1811,7 +1869,8 @@ Asked once per frame by the compositor, and by the overlay for hit-testing.
       "transition": null },
     { "clip": 23,
       "source": { "kind": "text", "hash": "9f3c…", "text": { …resolved text props… },
-                  "reveal": 0.4, "reveal_phase": "in", "reveal_kind": "typewriter" },
+                  "reveal": 0.4, "reveal_phase": "in", "reveal_kind": "typewriter",
+                  "word": null, "word_pop": null },
       "source_size": null,
       "x": -560, "y": -380, "scale": 1.0, "rotation": 0, "opacity": 0.72, … },
     { "clip": 31, "source": { "kind": "track", "track_id": 2 }, …,
@@ -1850,6 +1909,30 @@ Asked once per frame by the compositor, and by the overlay for hit-testing.
   served the whole text's cached texture — and a layer with NO animation
   hashes exactly what it hashed before version 5, so no shipped project's
   texture cache behaves differently.
+- And TWO more (format version 9, road map 8's word captions; §11 W-4 and
+  W-5), emitted on every text layer for the same reason:
+  `"word": 3, "word_pop": 0.4`. `word` is how many of `text.words` have
+  started (`start ≤` the clip time), 0 to n — the renderer derives the rest,
+  the active word being token `word − 1`, the spoken ones before it and the
+  upcoming ones from `word` on — and is `null` with no `word_style`, with
+  empty `words`, or when the count does not match `content`'s tokens (only
+  an action switching `content`, a paste or a hand-written file can store
+  that, and the page then draws static). `word_pop` is how far the active
+  word's pop into `active_scale` has got, `(clip time − its start) /
+  WORD_POP` (0.12 s) clamped to 0..1, and `null` when `word` is null or 0
+  or `active_scale` is 1.0. Both are computed by `recipe_words.rs`, which
+  assumes nothing about order: the door refuses decreasing starts, but a
+  paste payload and the file reader store `words` whole, so an unsorted list
+  or an extreme start still comes out in 0..1. The description beside them
+  STRIPS `words`, as it strips `animation`, and carries `word_style` only
+  when it is set and `case` only when it is not `as_written` — so an
+  unstyled, as-written title hashes byte for byte as it did before version
+  9, `words` or not. **The hash folds `word` and `word_pop` in only when
+  `word_style` is set**; a styled page therefore re-rasterizes for one
+  `WORD_POP` after each word start and then hits the cache. **W-5**: a
+  layer with a `word_style` is a WHOLE reveal — `reveal` 1.0 and both reveal
+  keys `null` whatever its `animation` says — because the two do not
+  compose and the style wins; the combination is not refused.
 - **`reveal_phase` is the ORDER the renderer draws in, not a label on the
   amount**, and where those two readings part the order wins. `word_fade`
   and `line_rise` stagger their words and lines from the OTHER end while a
@@ -2010,10 +2093,11 @@ pass nothing, because each wants the picture rather than a deliverable.
 | `Playback.swift` · `EditorViewController+PreviewQuality.swift` · `PreviewWindowController.swift` | `AVPlayer` + `AVPlayerItem` over the plan; the rebuild-vs-refresh decision (§7.6); coalesced exact seeks; JKL rates; loop range; `preferredMaximumResolution` = canvas size. **Preview Quality** (View ▸ Preview Quality ▸ Full / Half / Quarter) scales the PLAYER's render size on a `mutableCopy()` of the built video composition, so `CompositionBuilder.build` is untouched and the export and `render_frame` paths are UNREACHABLE from the setting rather than merely unchanged by it; the size always carries the canvas's EXACT aspect (`m · (w/g, h/g)`, `g = gcd(w,h)`, `m = ceil(g/divisor)`), falling back to the next coarser exact size and finally to Full for a coprime canvas, because the overlay maps every drag handle through `AVPlayerLayer.videoRect`. **Preview Window** (⇧⌘P) is a second `AVPlayerLayer` on the SAME player in an `NSPanel` — a panel because a titled window becomes MAIN and every ⌘-item whose action is on `EditorViewController` then resolves to nothing |
 | `CompositionBuilder.swift` | plan JSON → `AVMutableComposition` + `AVMutableAudioMix` + `AVMutableVideoComposition` (+ `CompositionInstruction`). Since road map 3, `fill` HOLDS a video track's last frame over any part of a segment's source range the track does not cover (§7.2): a screen recording's video track ends at the last screen change while its sound runs on, and AVFoundation inserts the uncovered range without clamping and renders it black |
 | `Compositor.swift` | the `AVVideoCompositing` class and its Metal pipeline (§7.5) |
-| `LayerRenderers.swift` · `LayerRenderersText.swift` | text (Core Text) and shape (Core Graphics) descriptions → premultiplied BGRA `MTLTexture`s, LRU-cached by hash; reports measured text sizes to the overlay; draws a shape's `gradient` (format version 6) by CLIPPING to the path and running `CGGradient`, sorting the stops the core deliberately does not police (§5.2). The TEXT half — the layout caches, the attributed string and the three §5.2 reveals drawn over the recipe's `reveal`, so a reveal can never reflow the box — went out to `LayerRenderersText.swift` under the size rule when phase 6 came to add the gradient |
-| `CaptionImporter.swift` · `CaptionLayout.swift` · `Transcriber.swift` (+`Extract` `Jobs` `Languages`) · `CaptionExporter.swift` | captions in both directions: the SubRip grammar; the placement every producer shares (the frame grid, the overlap trim, the Caption preset, the new front-most track); on-device speech recognition and the cue builder over it; the extractor, the job list and the language table BOTH engines share; and the `.srt` / `.vtt` writer |
+| `LayerRenderers.swift` · `LayerRenderersText.swift` · `LayerRenderersReveal.swift` · `LayerRenderersWords.swift` | text (Core Text) and shape (Core Graphics) descriptions → premultiplied BGRA `MTLTexture`s, LRU-cached by hash; reports measured text sizes to the overlay; draws a shape's `gradient` (format version 6) by CLIPPING to the path and running `CGGradient`, sorting the stops the core deliberately does not police (§5.2). The TEXT half — the layout caches, the attributed string (laid from `laidContent`, `case` applied), the per-axis insets and `drawText`, which dispatches — went out to `LayerRenderersText.swift` under the size rule when phase 6 came to add the gradient, so a reveal can never reflow the box; road map 8's W3 moved its three §5.2 reveals out again to `LayerRenderersReveal.swift` (a pure move) before the FOURTH routine landed in `LayerRenderersWords.swift`: a timed word-caption page drawn over the recipe's `word` / `word_pop` — the base pass, the active word's pill and its pop about the pill's centre — and `wordHeadroom`, the room that pop needs, inside `measuredSize` so the overlay's handles and the pager pay for it. `renderTextBitmap` is the drawn bitmap `renderText` uploads |
+| `TextProps.swift` · `WordProps.swift` · `TextPatch.swift` | the text group of the read-only mirror and the recipe's `RecipeReveal` (with `word` / `wordPop`, format version 9), out of `ProjectSnapshot.swift`; the word-caption vocabulary mirroring `model_words.rs` (`TextCase`, `TextWord`, `WordMode`, `ActivePill`, `WordStyle`), the `TextProps` facts the renderer and inspector share (`laidContent`, `tokenCount`, `isUntimedPage`), `TextPatch.contentEdit` and `InspectorBinding.contentOps` — the Content write, per clip; and the typed text patch (with `case` and `words`), out of `ReelCore.swift`. Both moves were pure and gated alone, made because Swift cannot add a stored property in an extension |
+| `CaptionImporter.swift` · `CaptionLayout.swift` · `CaptionStyle.swift` · `CaptionPages.swift` · `Transcriber.swift` (+`Extract` `Jobs` `Languages`) · `CaptionExporter.swift` | captions in both directions: the SubRip grammar; the placement every producer shares (the frame grid, the overlap trim, the Caption preset or a word caption style's page patch, the new front-most track, the restyle's replaced tracks); the five word caption styles (road map 8 §5h) and the pager that fills a word caption's pages to a measured width inside each job's span (§11 W-7); on-device speech recognition (`SpeechEngine.swift`, the one `async` file W-8 adds, over `SpeechAnalyzer`/`SpeechTranscriber`) and the cue builder over it; the extractor, the job list and the language table BOTH engines share — the supported locales, each marked installed, and the sheet's Download row (`TranscribeSheetController+Download.swift`); and the `.srt` / `.vtt` writer |
 | `CloudTranscriber.swift` (+`Report`, +`Media`) · `MediaTranscript.swift` · `TranscriptStamp.swift` · `CloudProgress.swift` · `CloudEstimate.swift` · `AssemblyAIClient.swift` (+`Session`, +`Submission`) · `AssemblyAITranscript.swift` · `AssemblyAIConfiguration.swift` · `AssemblyAILanguages.swift` · `SecretStore.swift` | road map 6's C1, captions from the cloud: the run that groups a scope's clips by MEDIA, uploads each file once, maps the words back through every clip's own window and deletes the transcript at the far end; the per-media cache in the package and R6-15's four-field source marker; R6-16's all-cached keyless admission and deferred cleanup report; the one progress number and the words beside it; what a run WOULD cost, before the button; AssemblyAI's REST calls over one `URLSession` with its retry, its poll ceiling and its cancel token, plus R6-14's bounded lost-submit recovery; the wire values; WHERE the client speaks and WHAT it says it is (spec §11's R6-6 and R6-9, the one reader of `-RCAssemblyAIEndpoint`, `-RCSecretFolder` and `RC_ASSEMBLYAI_KEY`); the twenty-one languages the popup offers; and the `0600` key file |
-| `MediaImporter.swift` | `AVURLAsset` probing (the **one** place `async`/`await` is allowed — AVFoundation's loading API is async-only going forward), thumbnails via `AVAssetImageGenerator` — the seconds at or past the video track's end ask for its last frame once and hold it, the strip's half of the rule `CompositionBuilder` applies to the picture — peaks via `AVAssetReader` + vDSP, cache files in the package |
+| `MediaImporter.swift` | `AVURLAsset` probing (one of the TWO places `async`/`await` is allowed — AVFoundation's loading API is async-only going forward; `SpeechEngine.swift` is the other, §11 W-8), thumbnails via `AVAssetImageGenerator` — the seconds at or past the video track's end ask for its last frame once and hold it, the strip's half of the rule `CompositionBuilder` applies to the picture — peaks via `AVAssetReader` + vDSP, cache files in the package |
 | `Exporter.swift` | picks the pipeline for the core's settings — `ExportWriter` (`AVAssetReader`/`AVAssetWriter`: chapters, explicit bitrates, the loudness gain) or the ImageIO frame sequence for GIF/APNG — runs the loudness MEASUREMENT pass ahead of the write, reports progress, and renders one frame offline for `render_frame` |
 | `ExporterSettings.swift` | the resolved settings in AVFoundation's vocabulary — the time range, the fallback session preset, the file type, the UTI, the extension, `isAudioOnly` — cut out of `Exporter.swift` under the size rule when phase 7 gave `export` and `renderFrame` a `RecipeOptions` argument; `renderFrame` stayed behind because it is the app's only `copyCGImage` call and the build baseline names that warning by file |
 | `FrameWriter.swift` | a CGImage and a format in, a written file out (PNG / JPEG / HEIC) — the ONE writer File ▸ Save Frame… and `render_frame` both call, which is what makes their PNGs byte-identical by construction rather than by luck; PNG passes NIL destination properties, and JPEG flattens a transparent canvas onto black because the container has no alpha |
@@ -2509,9 +2593,20 @@ quiet, which is why the note beside `pending_peaks` promises nothing about a
 media this answer already proposes a span inside — and is folded with the
 waveform waiters into `pending_peaks`,
 `transcribe {clips?, language?, place?, engine?, speakers?, vocabulary?,
-refresh?}` and `export_captions {track?, path, format?}` (road map 2's
-phase 4 — the mirrors of File ▸ Generate Captions… and File ▸ Export
-Captions… — with `transcribe`'s four last arguments road map 6's C1).
+refresh?, style?, replace?}` and `export_captions {track?, path, format?}`
+(road map 2's phase 4 — the mirrors of File ▸ Generate Captions… and File ▸
+Export Captions… — with `transcribe`'s `engine` … `refresh` road map 6's C1
+and `style`/`replace` road map 8's W4a). `style` is `subtitles` (the
+default, today's cues) or one of the five word caption styles —
+`highlight`, `pill`, `karaoke`, `build`, `one_word` — a misspelling refused
+with the six named; under a word style each result cue adds `words`
+(`[{start, end, text}]`, timeline ticks) and `size` where a lone word
+shrank, and the placed pages carry the style's face, `case`, `word_style`
+and the words in clip time. `replace: true` removes, in the same undo step,
+every caption track this command could have made over the scope (named
+"Captions" or "Captions N", only text clips, each overlapping a clip being
+transcribed) and the result lists them under `replaced` whenever `replace`
+was given; it is refused by name with `subtitles` or with `place: false`.
 `transcribe` returns the cues in TICKS whether or not it placed them —
 `place: false` is a read, like `detect_silence`, and registers no undo
 step — and reports every named clip it could not read under `skipped`.
@@ -2533,17 +2628,12 @@ It refuses the run only when it is the only media there is. MEASURED.) The cloud
 (media ids), `audio_seconds` (what was billed), `speech_model_used`,
 `language_detected` with its confidence, and `note` when there is something
 to say — a vocabulary that was capped, R6-8's fallback, or a remote delete
-still owed. Two refusals are unlike anything else in the catalog. macOS gates
-speech recognition, and the on-device engine never asks: it REFUSES with the
-authorization status named, because the system prompt needs a frontmost app
-and an agent-driven one never is (`target`'s own fact, read across), so the
-grant has to have been given once from the sheet. And its work can stop short
-of the answer rather than fail: a run cut off by the framework's one-minute
-ceiling reports `truncated` with the second it stopped at, instead of
-presenting a partial transcript as the whole of what was said. `truncated` is
-NEVER present for the cloud engine — there is no such ceiling on the other
-side of a REST call, and its absence is a claim
-`tools/proof/cloud_captions_proof.py` makes. `export_captions` never guesses its track: with no all-text track,
+still owed. The on-device engine (`SpeechTranscriber` since road map 8's W2,
+§11 W-8) needs no grant and has no length ceiling, so its result carries no
+`truncated` and no `note` — neither engine's does. Its models are installed
+per Mac: a language whose model is not installed is REFUSED by name ("a
+person has to install it"), and the tool never downloads one — a download is
+a person's act, from the sheet's Download row. `export_captions` never guesses its track: with no all-text track,
 or more than one, it refuses and lists the candidates by id and name — the
 posture `remove_media` and `export` already take when an answer is not
 unique — and it edits nothing, so it registers no undo step either.
@@ -2609,6 +2699,7 @@ concern is a new module with its own `impl Project` block.
 | `model_text.rs` | the text vocabulary — `TextProps`, the `TextAlign` and `TextVAlign` it is placed by, the `Outline` and `Backdrop` drawn with it, and the `TextAnimation` and `TextAnimationKind` that reveal it. Cut out of `model_props.rs` under the size rule (road map 2, phase 6) and re-exported whole by it, and cut HERE because text is the one property group the model cannot MEASURE: every other group is quantities the core bounds, interpolates and solves against, while only the platform can lay a string out and the size comes back the other way through a cache (§5.3, §11). `TextAnimationKind`'s declaration order is NOT load-bearing — the recipe carries a reveal's kind by NAME — where `ObscureKind`'s and `BlendMode`'s are shader discriminants; the JSON spelling of every variant is, so a rename needs a migration step |
 | `model_shape.rs` | the shape vocabulary — `ShapeProps`, the `ShapeKind` it draws, the `Stroke` around it, and the `Gradient`, `GradientKind`, `GradientStop` and `MAX_GRADIENT_STOPS` that fill it. Cut out of `model_props.rs` under the size rule (road map 5, E2) and re-exported whole by it, and cut HERE because it is `model_text.rs`'s seam read a second time: shape and text are the two sources the model only DESCRIBES, drawn on the CPU and keyed by the recipe's content hash, where everything left in `model_props.rs` is read straight into the compositor's uniform block. Nothing here is ever a shader discriminant — `GradientKind` may gain a kind at the END and nothing derives a number from the order, where `BlendMode`'s order IS the discriminant |
 | `model_motion.rs` | the motion vocabulary (format version 8, road map 5's E2) — `Motion` and the `MotionEdge`, `MotionDuring`, `EdgeMotion` and `DuringMotion` it is made of. Its own module for a seam rather than for room: every other member of the video group is a quantity the compositor reads more or less straight, while these five say only what a clip should DO and the placement that comes out of them is computed at render time by `motion.rs`. Re-exported whole by `model_props.rs`; neither enum's declaration order is load-bearing, and both are closed |
+| `model_words.rs` | the word-caption vocabulary (format version 9, road map 8's W1b; §5.2, §11 W-1 to W-6) — `TextCase`, `Word`, `WordMode`, `ActivePill` and `WordStyle` (with `template()` for `patch.rs`), re-exported through `model_props.rs` like the other vocabularies; the FIELDS stay on `TextProps`. And the two facts every writer of `text.words` shares, `pub(crate)` and named directly by their callers: `token_count` (`split_whitespace` — the core is the one counter) and `rebase_words` (the one saturating subtraction `trim_start`, `roll`, `add_transition`'s handle form and `split`'s second half make) |
 | `model_query.rs` | reading a project: `Project::new`, id allocation, the `clip` / `track` / `media` / `marker` / `nest` lookups, `clips_on`, `duration`, `validate` with its nesting walk, and `source_size` — the source's pixel size when the model knows it, `None` for text and for a media, nest or shape with no positive size. That last one was TWO private readers, `edit_props.rs`'s and `edit_background.rs`'s stricter one, collapsed here by road map 5's T0f, so a source kind added to `model.rs` is answered once. The three source-window measurements moved out to `source_window.rs` (road map 7 §10, phase A) |
 | `frame_grid.rs` | One clip-time normalization concern (D7-3): placement start, `source_window.rs`'s bounded duration, action spans and present base motion/text timing. Called by canvas, both paste paths and unnest; source positions, action-end payloads and audio envelopes are untouched. |
 | `source_window.rs` | THE source window — how much material a clip shows and how much lies either side of it, in the unit its name says (road map 7 §10, phase A). The three readers moved out of `model_query.rs` with their units in their names (`content_length_in_source`, `source_head_on_timeline`, `source_length_on_timeline`), `SourceBound` in place of the `Option` whose `None` meant two opposite things, `longest_duration_on_grid` (the bound, snapped DOWN — §11's #22), the two tail readers `slip` and `freeze_frame` clamp against, the five functions phase B added so that every writer of a media clip's window reads ONE bound (§11's D4-2 to D4-5) — `longest_duration_on_grid_of`, which takes the pieces with the clip's `start` among them, `latest_end_on_grid` and `earliest_start_on_grid`, the two timeline POSITIONS an edge is held to, `duration_resnapped`, what every re-snap of a media duration writes, and `duration_at_speed`, what `set_speed` writes — and the ONE mover — `in_advanced` / `source_advanced`, the `round(Δ × speed)` advance of a source in point that `trim_start`, `roll`, `split_clip`, `freeze_frame`, `slip` and `add_transition` each used to write out |
@@ -2638,6 +2729,7 @@ concern is a new module with its own `impl Project` block.
 | `evaluate.rs` | `composition_plan()` (A/B assignment, instruction tiling) and the `assign()` the recipe shares with it |
 | `recipe.rs` | `frame_recipe(t)`: the layer list at one instant — like every walk over what plays, it consumes `nest.rs`'s instances — and the keys of each layer in it, `blend` included. It is also where a clip's `video.motion` becomes placement, through the two `motion::apply` calls in `layer` and `frame_of` (§5.3); no layer key was added for it. `content_hash` and the FNV under it stay here and are `pub(crate)`: a SHAPE layer hashes its description through the same function, so the hash is the recipe's texture-cache primitive rather than a text concern. Phase 7 added `RecipeOptions` (what a caller wanted besides `t`; `frame_recipe(t)` is `frame_recipe_opts(t, defaults)`, one implementation so the two cannot drift) and `RecipeLayer`, the twenty layer keys written in ONE place — the burn-in is a second producer of layers, and a copied skeleton would drift silently, since `RecipeLayer.init(from:)` defaults a missing key with no diagnostic |
 | `recipe_text.rs` | what a text layer SHOWS at one instant: the `reveal`, its phase and its kind (§7.3), computed in the core so everything that draws reads one description, folded into the layer's content hash so a per-frame picture cannot be served a stale texture, and assembled into the layer's `source` object by `text_source`. Cut out of `recipe.rs` under the size rule (road map 2, phase 7) and re-exported by it, so `crate::recipe::text_source` still resolves, and cut HERE because placement is the same question for every layer while text is the one kind that is not finished when its placement is — the model can only state an intent (§5.3, §11), and an ANIMATED intent is not even fixed. `text_source` takes a description, a clip time and a duration and nothing else — no clip, no instance — so a text layer the core synthesizes is a text layer like any other. The cut paid for itself at once: `burn_in_layer`, the timecode layer `burn_in_timecode` appends, is here, with no animation (so `Reveal::WHOLE`), a fraction-of-the-height placement rather than a bottom anchor, and the non-drop and project-time readings §7.3 records |
+| `recipe_words.rs` | what a timed text PAGE shows at one instant (format version 9, road map 8's W1b; §7.3, §11 W-4): `Words::of` — `word`, how many of `text.words` have started, and `word_pop`, how far the active word's pop has got over `WORD_POP` (0.12 s) — both null unless the text has a `word_style`, non-empty `words` and a matching token count. Total and order-blind (a count, a saturating subtraction and a clamp), because a paste payload and the file reader store `words` unchecked. `recipe_text.rs` emits the two keys on every text layer and folds them into the hash only for a styled page |
 | `motion.rs` | `video.motion` turned into PLACEMENT (§5.3): the two edge tables and the during table of road map 5 §5b, the tent rule, the `rem_euclid(360)` reduction — including the reduction's OWN 360, which `f64::rem_euclid` answers for a tiny negative and which is mapped back to 0 — and, with it, a BAND under a whole turn: `partnerBox`'s `rotation == 0` guard compares the recipe's f64 EXACTLY, so a layer that is unrotated to the eye must publish an exact 0, and every total that rounds to 360 as an f32 of DEGREES (within 2⁻¹⁶°, which moves the corner of a 4K frame by at most 5.87e-4 px) is published as 0. That width is CHOSEN, not a consumer's precision: the only f32 is the Metal uniform, `Float(rotation · π/180)`, in RADIANS, which the guard never reads — the visible-centre pivot and the slide geometry. `apply` takes the EVALUATED props, the clip time, the clip's own duration, the source's pixel size and the container's canvas and answers the same props with five fields moved; `recipe.rs`'s `layer` and `frame_of` are its only two callers, which is what keeps everything that EDITS reading the clip un-moved (§5.4). It never trusts the file — a degenerate duration, period or amount is inactive or clamped, and no NaN reaches the recipe — and it SHORT-CIRCUITS to `video.clone()` when no slot is running, so a frame past an arrival is byte-identical to the same clip with no preset |
 | `nest.rs` | flattening a nest: the walk that turns a nest clip into the clips it stands for, and the transform they inherit |
 | `audio.rs` | envelopes: fades, volume actions, ducking, mute and solo — solo judged per container (the timeline, or a nest's own tracks) in `Voice::of` against that container's track set, never in the plan |
@@ -2668,7 +2760,7 @@ bad id is `Err`, never a panic; the NULL-safety sweep over every export.
 reelcut/
   CLAUDE.md           # points here; commands; the rules below
   Makefile            # app / test / lint / typecheck / project / run — Rasterize's, renamed
-  project.yml         # xcodegen; macOS 15, arm64; document types below
+  project.yml         # xcodegen; macOS 26, arm64; document types below
   core/
     Cargo.toml        # reelcut-core; lib name reelcut_core; serde, serde_json, serde_path_to_error, tiny_http; lto
     include/reelcut_core.h
@@ -2721,7 +2813,7 @@ and the builders in `ReelCore.swift` still move together; every export
 frozen-file / extension-file rule (base VC, canvas, timeline, agent server
 and sheets take wiring only); one document mutation point; no `!`, `as!`,
 `try!`; `[weak self]`; main-thread AppKit; `async`/`await` only inside
-`MediaImporter`; `DispatchQueue` only at the documented seams (compositor
+`MediaImporter` and `SpeechEngine` (§11 W-8); `DispatchQueue` only at the documented seams (compositor
 render queue, composition rebuild, import); MCP parity for every op;
 `DS` tokens for all chrome; 4-space indent, ~100 columns; `cargo fmt` and
 a clean `make lint` before finishing Rust work.
@@ -2979,6 +3071,14 @@ assisted import.
   general licence. Screen recording (road map 3) did not earn one either:
   every ScreenCaptureKit and AVFoundation capture call it needs has a
   completion-handler form, and `ScreenRecorder` uses those.
+  **Amended 2026-09-22, by W-8 (road map 8's W2): the deployment target
+  moved to macOS 26 and speech recognition EARNED the named file this
+  paragraph foresaw.** `SpeechEngine.swift` is the second place `async`
+  is allowed, and the only one this phase adds: the engine
+  (`SpeechAnalyzer`, `SpeechTranscriber`, `AssetInventory`) is
+  `async`-only, so the file runs it in a `Task.detached` and hands every
+  caller a synchronous wrapper or a main-queue completion. `Transcriber`,
+  the sheet and the tool stay synchronous. `SFSpeechRecognizer` is gone.
 - **Transcription reads EXTRACTED audio, not the media file.** Each clip's
   own source window is written to a temporary mono 16 kHz WAV and the
   recogniser is handed that. Whether `SFSpeechURLRecognitionRequest` can
@@ -2992,6 +3092,12 @@ assisted import.
   entirely. The framework's roughly one-minute ceiling per task is
   REPORTED, not chunked around; chunking at the silences `detect_silence`
   already finds is the recorded follow-up.
+  **Amended 2026-09-22, by W-8 (road map 8's W2): the extracted audio
+  stays, and the ceiling GOES.** `SpeechTranscriber` reads the same WAV
+  through `AVAudioFile`, and W0 q1 found no ceiling (the last word of a
+  613.7 s file ended at 612.6 s), so there is nothing to report:
+  `Truncation`, `Outcome.truncations`, the sheet's sentence and the tool's
+  `truncated` key are deleted, and chunking is no longer a follow-up.
 - **Media is referenced, not copied**, by path + bookmark (not
   security-scoped; the app is not sandboxed). Consolidate is M3.
 - **Screen recording is IN; camera recording and callouts stay OUT** (road
@@ -3616,7 +3722,10 @@ assisted import.
   versions remain readable if admitted; an out-of-envelope file fails by
   named path without being rewritten. The same rule applies to writes and
   completed edits, without changing format version 8 or the accepted range of
-  finite positive speeds. Property vocabulary times are outside this rule.
+  finite positive speeds. Property vocabulary times are outside this rule,
+  except `text.words` (format version 9, W-3): each word's `start` and `end`
+  is held to the same envelope by `check_text` at every patch door, and a
+  refusal names the path (`text.words[2].end`).
 - **D7-2 — Transition searches are bounded while retaining their chosen
   result.** On an initially valid affected track, handle transitions retain
   the larger-side decrement path and ripple transitions retain the greatest
@@ -3658,3 +3767,107 @@ assisted import.
   does not change thumbnail, speech or transcript cache identities, project
   format or the provider upload decision. A failed decode writes no usable
   waveform and remains retriable.
+- **W-1 — A word caption is an ordinary text clip holding one PAGE.** Its
+  words are timed inside it (`text.words`, format version 9); it is not one
+  clip per word and not a new source kind. R6-1 stands and is extended:
+  File ▸ Generate Captions… and `transcribe` remain the one way captions are
+  made from speech, and a style is a popup and an argument, never a second
+  command.
+- **W-2 — `text.words` is one `{start, end}` per whitespace token of
+  `content`, and the core is the one counter.** The token rule is
+  `str::split_whitespace` (road map 8's W0 q4 measured it against the
+  renderer's tokenizer: the COUNT agrees in every row). A non-empty `words`
+  whose length differs is an **error** (§5.5's fourth answer, no undo step)
+  in the rule's own words — `this text is timed word by word: 4 timings for
+  5 words` — and the core never pads or drops a timing. An empty `words` is
+  untimed. A content edit that changes the count sends `words: []` in the
+  same patch.
+- **W-3 — Word times are clip time, and they move with the content, not
+  with the clip's length.** `split` gives the second half every word,
+  rebased by the cut — a negative start is legal and means "already said",
+  so a split is invisible — and leaves the first half's alone; a second half
+  whose evaluated content has a different token count (a finished action
+  switched it) stores `words: []` instead, because a half is a clip the door
+  must accept again. `trim_start` rebases them by its delta, unlike actions,
+  which a head trim leaves in place: a word is anchored to speech that stays
+  where it is on the timeline. `roll` and `add_transition`'s handle form
+  rebase them the same way. Nothing rescales them. They are snapped to the
+  frame grid like every tick a patch carries, D7-3's normalization included,
+  after the range check; two words may snap to one frame, and the later one
+  wins it. They stay inside D7-1's envelope; starts never decrease and an
+  `end` is never before its `start`.
+- **W-4 — `word_style` is a closed vocabulary, and the recipe carries a
+  computed answer, never the timings.** `words` is stripped from the
+  recipe's description, as `animation` is. Two computed keys ride on every
+  text layer: `word`, how many words have started, or null; `word_pop`,
+  0..1, or null (§7.3). The text hash folds them in only when `word_style`
+  is set, so an unstyled clip's hash is byte-identical whether or not it
+  carries `words`. A value may be added to the vocabulary at the end, and
+  never renamed.
+- **W-5 — `word_style` and `animation` do not compose; `word_style` wins.**
+  The recipe emits a whole reveal — `reveal` 1.0, the phase and kind null —
+  when `word_style` is set. The combination is not refused: a paste landing
+  a `word_style` on an animated title must not fail for a reason nobody can
+  see. Whole-layer `video.motion` still composes with it.
+- **W-6 — `words` is not an animation target, and `paste_attributes`
+  treats it as part of `content`.** An action end patch naming `text.words`,
+  a `null` included, is an **error** (§5.5's fourth answer, no undo step):
+  `text.words is not an animation target`. `paste_attributes` copies text
+  "but content", and the target's `words` stay with its content. A count
+  mismatch that only an action switching `content` (or a paste payload or a
+  hand-written file, which are stored whole) can produce degrades in the
+  recipe: `word` becomes null and the page draws static.
+- **W-7 — Pages are filled to a MEASURED width, in one Swift builder, and
+  the cue builder does not change** (road map 8 §4 W-7, §5c; built by W4a,
+  §10.9). `CaptionPages` fills each page greedily by
+  `LayerRenderers.measuredSize` of the page as it will be placed — face,
+  size, case, outline and word-style headroom — against 0.86 of the canvas
+  width; a page wraps only when a lone word does not fit even at 80 % of its
+  size, and Karaoke pages to two lines by design. `CaptionCues` keeps its
+  five rules and Subtitles output is byte-identical. **Pauses are word gaps
+  of 0.25 s or more plus sentence punctuation**: `SilenceDetector` and
+  `MediaSpeech` are not consulted, because the pager is pure and
+  `Transcriber.transcribe` has no cache directory to ask (W4a measured the
+  pangram's two pauses breaking by punctuation alone). **Each engine's
+  `lead` lives in `CaptionPages.lead(for:)`** — on-device +270 ms,
+  AssemblyAI −60 ms — applied once in its normalisation and never in
+  `CaptionCues`. **A page is confined to its job's span** `[start, start +
+  duration)` (`Transcriber.Job.span`): `lead` and `hold` never carry a page
+  past its clip, a word pushed off the end sits on the clip's last frame
+  (`upper − frame`, since the core snaps to the nearest frame), and the last
+  page ends by the bound, so pages of abutting clips abut at most and
+  `place`'s trim pass never fires on a transcript. A shrunk page's outline
+  is em × its SHRUNK size: `CaptionStyle.textProps` is the one construction
+  the pager measures and the sheet previews, and `pagePatch`, built from it,
+  is what `place` writes — so the committed page is the measured one (W4b
+  residue, §10.10).
+- **W-8 — The minimum is macOS 26, and the on-device engine is
+  `SpeechTranscriber`** (road map 8 §4 W-8, §5f; built by W2, §10.6).
+  `SpeechAnalyzer` + `SpeechTranscriber` replace `SFSpeechRecognizer`
+  behind the unchanged `Transcriber.Job → Outcome → CaptionCues.build`
+  path, over the SAME extracted 16 kHz mono WAVs. `SpeechEngine.swift` is
+  the ONE new file allowed `async`/`await` (the amendment to the
+  `MediaImporter` decision below), its only callers reach it through
+  synchronous wrappers, and nothing else gains `async`. The one-minute
+  ceiling and the TCC grant are DELETED on W0 q1's measurement: 99.81 % of
+  a 613.7 s file came back in one analysis, and `authorizationStatus()`
+  read `notDetermined` before and after every run. So `transcribe` loses
+  its grant tier and its `truncated`/`note` keys under `apple` (a key that
+  can never be true teaches a caller to read for a ceiling that no longer
+  exists), and `project.yml`'s `NSSpeechRecognitionUsageDescription` is
+  REMOVED: no code path asks for the grant any more, and W0 q1 ran the
+  engine inside a hardened-runtime bundle without the key. The locale
+  lists are ASKED for (`supportedLocales`, `installedLocales`), never
+  written down, and `AssetInventory.status(forModules:)` is the only
+  installed test. Every path that constructs a transcriber releases the
+  locale it reserved (W0 q3: a cap of 5). **A download is a person's act,
+  never a tool's** — R6-12's argument read across: the sheet's Download
+  row drives `assetInstallationRequest(supporting:)` and
+  `downloadAndInstall()`, while `transcribe` refuses an uninstalled locale
+  by name ("a person has to install it") and never downloads. Closing the
+  sheet mid-download lets the download run on in the framework.
+  `DictationTranscriber` is not built until a locale asks for it.
+- **W-10 (the core's sentence) — `set_text` can patch `case`, `words` and
+  `word_style`,** because deepening D1 makes every declared key patchable.
+  That is the agent's door, and it is not a promise that a hand-restyled
+  page still fits: restyling is regenerating (road map 8 §4 W-10).

@@ -12,7 +12,7 @@ import time
 
 
 TARGET = "aarch64-apple-darwin"
-SWIFT_TARGET = "arm64-apple-macos15.0"
+SWIFT_TARGET = "arm64-apple-macos26.0"
 FLAGS = ("-target", SWIFT_TARGET, "-module-name", "Reelcut",
          "-D", "HARNESS_REFERENCE_BUILD")
 OVERRIDES = ("RUSTFLAGS", "CARGO_ENCODED_RUSTFLAGS", "RUSTUP_TOOLCHAIN", "RUSTC", "CARGO", "CC", "CFLAGS",

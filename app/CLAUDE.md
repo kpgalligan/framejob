@@ -16,7 +16,10 @@ detail there.
   (handle + lazily decoded `ProjectSnapshot`; `json`, `snapshot` and
   `planJSON` are memoised PER HANDLE, so keep handles rather than minting
   them), timecode, snapping, export presets/sizes/settings, `RecipeSource`,
-  the `dictionary` extensions on the property types and the typed patches.
+  the `dictionary` extensions on the property types and the typed patches —
+  except `TextPatch` (with `case`, `words` and `word_style`), which is
+  `TextPatch.swift`'s, moved out so it could grow. `word_style` has ONE
+  app-side writer, `CaptionLayout.place` (W-10).
   It is also where the op table is read BACK: `ReelOp.coreNames()` over
   `rc_op_names`, and `ReelOp.coreSchemas()` over `rc_op_schemas` — every
   op's ARGUMENTS as JSON Schema, keyed by op name, which
@@ -61,8 +64,9 @@ detail there.
   `ReelEdit?` too for the `try?` probes. In the fold **a refusal does not
   stop the list** — a later op still runs after one, exactly as after an
   identity — and the FIRST refusal is answered only when nothing applied.
-- `ProjectSnapshot.swift` · `MotionProps.swift` — the `Codable`, READ-ONLY
-  mirror of spec §5.2 every view draws from. **Its enums decode LENIENTLY**
+- `ProjectSnapshot.swift` · `TextProps.swift` · `MotionProps.swift` ·
+  `WordProps.swift` — the `Codable`, READ-ONLY mirror of spec §5.2 every view
+  draws from. **Its enums decode LENIENTLY**
   — a misspelt kind becomes the first case, a `T??` field a clear — which is
   why a caller-authored object is never decoded through them (below): no
   agent handler reads a caller-authored OBJECT at all. A scalar enum
@@ -75,6 +79,21 @@ detail there.
   APP's writer saying all three slots, not a replace rule, and it is the only
   edge that writes a whole motion. `MotionEdge` also supplies nonpersisted
   zero-duration activity and inactive display/menu titles (E2-27).
+  `TextProps.swift` is the text group and `RecipeReveal` (with format version
+  9's `textCase` / `words` / `wordStyle` and the recipe's `word` / `wordPop`),
+  a pure move out of `ProjectSnapshot.swift` because a stored property cannot
+  be added from an extension. `WordProps.swift` mirrors `model_words.rs`
+  (`TextCase`, `TextWord`, `WordMode`, `ActivePill`, `WordStyle`)
+  — `WordStyle.dictionary` writes ALL six keys, `NSNull` for a nil slot,
+  `MotionProps.dictionary`'s rule, because the core deep-merges
+  `word_style` — and holds
+  what the renderer and the inspector share: `laidContent` (`case` applied —
+  every layout and string index is in ITS UTF-16 space, never `content`'s),
+  `tokenCount`, `isUntimedPage`, `TextPatch.contentEdit` and
+  `InspectorBinding.contentOps` / `ops(textContent:)` — the Content write,
+  decided PER CLIP: `words: []` beside the content in one `set_text` only for
+  base clips whose count changed, and never `words` in an action end (W-2,
+  W-6). It lives there, not in `InspectorPane.swift`, for the size rule.
 
 **The document.**
 - `ProjectDocument.swift` (+`DisplayStem`, +`Recording`) — NSDocument,
@@ -210,6 +229,12 @@ the key map behind it.
   row controls). `VideoPane+Motion.swift` owns the local wrapping
   `MotionInactiveNote` for selected zero-duration edges; it refreshes with
   the section and leaves stored kind and Duration editable.
+  `TextPane.swift`'s Style section carries UPPERCASE (`case`, through
+  `binding.apply` like `align`); its Content write is
+  `binding.ops(textContent:)` (`WordProps.swift`). On a word-styled page the
+  Animation section's three rows are greyed with W-5's sentence, and a styled
+  page left untimed carries the Content footnote; nothing in the inspector
+  writes `word_style` (W-10).
 - Pitfalls, each measured: **a section factory is not a section until
   `makeSections()` calls it** — nothing type-checks the omission, and two
   phases shipped a section invisible in the app; `editedList` — a write of a
@@ -268,15 +293,32 @@ the key map behind it.
   equal, until Preview Quality. A layer mid-transition blends `normal`
   because the CORE emits it; grow no second opinion here. Where two obscure
   regions cover one fragment the GREATER hiding wins.
-- `LayerRenderers.swift` · `LayerRenderersText.swift` — text and shape
-  descriptions to textures, keyed by the recipe's `hash` (`RecipeSourceRef.cacheHash`
-  is the WHOLE key; nothing here may append to it). Text draws the reveal the
-  recipe computed; the LAYOUT is always the full text's, cached without the
-  reveal, and `reveal = 1` takes the plain `CTFrameDraw` path so a full reveal
-  is byte-identical to no animation; a line at PARTIAL alpha draws inside a
-  transparency layer so fill and stroke composite once. A shape's gradient
-  SORTS its stops (the core does not police order), projects a linear ramp
-  onto the box, and is ignored by `line` and `arrow`.
+- `LayerRenderers.swift` · `LayerRenderersText.swift` · `LayerRenderersReveal.swift`
+  · `LayerRenderersWords.swift` — text and shape descriptions to textures,
+  keyed by the recipe's `hash` (`RecipeSourceRef.cacheHash` is the WHOLE key;
+  nothing here may append to it). Text draws what the recipe computed; the
+  LAYOUT is always the full text's, laid from `laidContent`, cached without
+  the reveal or the word, and `reveal = 1` takes the plain `CTFrameDraw` path
+  so a full reveal is byte-identical to no animation; a line or token at
+  PARTIAL alpha draws inside a transparency layer so fill and stroke composite
+  once. `LayerRenderersText` is measuring, layout, the per-axis `textInsets`
+  and `drawText`, which dispatches — the words arm FIRST, then the three
+  reveals, which are `LayerRenderersReveal`'s. `LayerRenderersWords` is a
+  timed page (road map 8's W3): tokens of `laidContent` only, clipped at the
+  whitespace midpoints; the active token `word − 1` scaled about its pill's
+  centre, the pill filled UNCLIPPED, then the midpoint clip set in TEXT space
+  so it scales with the token. `wordHeadroom` sits inside `measuredSize`
+  (zero with no style or a colour-only one; 0.45 em and 0.30 em are FLOORS
+  under the formula, plus `wordHeadroomEdgePx` horizontally and `wordHeadroomVerticalEdgePx`
+  vertically; with NO pill the horizontal term ADDS the popped stroke,
+  `peak × outline / 2`, where a pill's keeps `− outline` — road map 8
+  §10.7, W4a), so the box never depends on
+  `word`, and `layoutKey` gains `case` and the headroom's inputs only when set
+  — never `words`, `word` or `word_pop`. `renderTextBitmap` is the drawn
+  bitmap `renderText` uploads; its body is `static textBitmap`, which the
+  Generate Captions sheet's preview draws with, off-Metal (road map 8's W4b). A shape's gradient SORTS its stops (the core
+  does not police order), projects a linear ramp onto the box, and is ignored
+  by `line` and `arrow`.
 - `AudioTap.swift` · `AudioDSP.swift` — the `MTAudioProcessingTap` playback
   and export share, and the four sample-level effects: noise reduction (a
   512-sample delay), the compressor, the mono fold (BEFORE the pan, or it is
@@ -304,13 +346,47 @@ the key map behind it.
 
 **Captions.** A caption is an ordinary text clip, which is what makes burn-in
 free.
-- `CaptionLayout.swift` — placement ONLY (snap, abut, drop sub-frame cues, a
-  new front-most track in the Caption preset), shared by every producer, and
+- `CaptionLayout.swift` — placement ONLY (snap, abut, drop sub-frame
+  cues, a new front-most track), shared by every producer, and
   `CaptionCues` at its foot — the FIVE cue rules (≤ 2 lines, ≤ 42
-  characters, ≤ 6 s, a frame between cues, and never two speakers in one
-  cue), used only by a producer that must INVENT line breaks. An SRT brings
-  its own. `Word.speaker` defaults to nil, so every caller that knows nothing
-  about speakers is byte-identical to what it was.
+  characters, ≤ 6 s, a frame between cues, and never two speakers in
+  one cue), used only by a producer that must INVENT line breaks. An
+  SRT brings its own. `Word.speaker` defaults to nil, so every caller
+  that knows nothing about speakers is byte-identical to what it was.
+  `place` takes a `CaptionStyle`: `.subtitles` is the Caption-preset
+  path, byte for byte; a word style writes `CaptionStyle.pagePatch` per
+  page — the pager's own props at the page's size (a shrunk one or the
+  style's), its wrap `width`, and the cue's `words` in CLIP time — at the
+  style's `y`. `replacing` removes caption tracks WITH
+  their clips as the plan's FIRST ops (a removal mints no id, so the
+  new track is still `next_id`), and `replaceableTracks` is the one
+  test of which qualify: named "Captions"/"Captions N", AT LEAST ONE
+  clip, only text clips, each overlapping a job's `span` — an empty caption
+  track is never replaced.
+- `CaptionStyle.swift` — road map 8 §5h's five word styles and
+  Subtitles as one enum: the PostScript face, `case`, size (of
+  min(W, H)), `y` (of H), outline, `word_style`, `maxWords`, `maxLines`,
+  `textProps`, the ONE construction the pager
+  measures and the sheet previews, and `pagePatch`, the patch `place` writes,
+  built from it — so a committed page is the measured one and a shrunk
+  page's outline is em × its own size. A GENERATION choice, not an inspector preset;
+  `defaultsKey` is the sheet's remembered style, read when the Style popup
+  is built and written by `styleChanged`; the tool never reads it (R6-2
+  read across).
+- `CaptionPages.swift` — word-caption PAGES (spec §11 W-7), pure and
+  synchronous so it runs on whichever engine thread calls it:
+  `normalize` (trim, split, sort, the per-engine `lead` — its ONE home —
+  and the clamp into the job's `span`, a word pushed off the end on the
+  clip's last frame), the pager (speaker, 0.25 s gap, sentence mark,
+  3 s, `maxWords`, and the MEASURED width through
+  `LayerRenderers.measuredSize`), the balance step once per width
+  break, the clause preference, shrink-then-wrap for a lone word, and
+  page timing that abuts under `breakGap` and never passes the span.
+  `cues(...)` is what both engines call: `.subtitles` goes to
+  `CaptionCues.build`, untouched. `samplePage` is `cues(...)`'s first page
+  over a span past the words' hold — the sheet's preview page, a real one,
+  balance step included. Pauses are word gaps and punctuation;
+  `SilenceDetector`/`MediaSpeech` are not consulted.
 - `CaptionImporter.swift` (SubRip grammar) · `CaptionExporter.swift` (`.srt` /
   `.vtt` from one all-text track, never guessed; a popup built from
   `NSMenuItem`s carrying `representedObject`, because `addItem(withTitle:)`
@@ -324,8 +400,8 @@ free.
   of its media's one transcript. `+Report` holds what the `Outcome` has no room
   for (`uploaded` with the initial transcript-write result, `cached`,
   `janitorDeleted`, `janitorFailed`, `janitorDeferred`, `held`) and owns the
-  shared cleanup warning wording for the sheet and MCP result or failure;
-  `truncations` is always empty. A nil client admits only a nonempty, entirely
+  shared cleanup warning wording for the sheet and MCP result or failure.
+  A nil client admits only a nonempty, entirely
   current batch and skips janitor/network, retaining pending IDs as deferred.
   One media's failure is one media's problem
   and the run carries on, with exactly two exceptions: a CANCEL and a
@@ -412,29 +488,75 @@ free.
   path, clamped in `Int` to ±`Ticks.max / 600` first and deliberately NOT to
   `maxSourceTicks` (R6-10's extension).
   `Loader` is `MediaPeaks.Loader`'s shape; `undeleted(in:)` is the janitor's.
+- `SpeechEngine.swift` — the on-device engine (`SpeechAnalyzer`,
+  `SpeechTranscriber`, `AssetInventory`) and the ONE file under
+  `app/Sources` that imports Speech or says `async` for it (spec §11 W-8).
+  Every entry point is synchronous or a main-queue completion: `transcribe`
+  refuses main by precondition and blocks its caller on a semaphore a
+  `Task.detached` analysis signals, waited for in 0.1 s slices so a cancel
+  answers at once, bounded at max(120, 4× the audio); the asks
+  (`supportedLocales`, `installedLocales`, `isInstalled`) answer `[]` or nil
+  past `askBound` (10 s); `download` is the Download row's alone and no tool
+  calls it. **Never `Task {}` here** — a main-thread caller's actor would be
+  inherited and the semaphore would deadlock. `Handle` is what
+  `CancelToken` holds for a running analysis. Two host facts it is built on
+  (road map 8 §10.6): `status(forModules:)` is `.installed` only for a
+  RESERVED locale, so `isInstalled` reserves, reads and releases what it
+  reserved; and `release(reservedLocale:)` matches the framework's own
+  spelling (`fr_FR`, not `fr-FR`), so a release walks `reservedLocales` by
+  BCP-47 tag. Every path that constructs a transcriber releases on every
+  exit (a cap of 5). Reserve → status → release and every release run one
+  at a time, in arrival order, through the `Gate` actor; `releaseNow` is the
+  in-gate form, and an analysis or a download SIGNALS its caller before it
+  queues its release, so a stalled gate cannot hold a finished run hostage.
 - `Transcriber.swift` (+`Languages`, +`Extract`, +`Jobs`) ·
   `TranscribeSheetController.swift` (+`Cloud`: the AssemblyAI half — the
   Language popup's second population, `RunRequest` (the ONE function from
   the card's controls to what a run would receive), the estimate's readout,
   §5e's two hint texts, the notes and `beginCloud`; +`Commit`: the run's one
-  exit, `cloudReportLines` and the menu command with its validator arm) —
-  on-device recognition through the
-  CALLBACK API (spec §11: no second `async` exception) over each clip's source
-  window EXTRACTED to a temporary mono 16 kHz WAV; the recogniser's queue is
-  set explicitly because it defaults to MAIN. "Has sound" is `enabled.audio`,
-  not the media's track. One job's failure is reported under `problems` and
-  the run carries on. The SHEET is the only caller of `requestAuthorization`;
-  the tool refuses by status. The tool's refusal ORDER is the caller's own
-  mistakes first, then the ENGINE, then — under `apple` — the grant and the
-  model, so a headless proof can measure the first tier. `Job` carries
-  `media` for the cloud engine, which uploads a MEDIA once; `CancelToken`
-  holds a `URLSessionTask` beside the speech task, under the same lock and
-  cancelled outside it. `+Jobs` is no longer a pure move: it owns
-  `maxSourceTicks` (1e15) and `placed(offset:in:)`, the ONE door both caption
-  mappings convert through, because spec §11's R6-10 says a hand-written
-  `speed` the ops cannot write reaches the app and every `Double → Ticks`
-  there has to clamp IN `Double` first — the offset at one end, the source
-  length and `Job.sourceIn` at the other. `+Extract` is no
+  exit, `cloudReportLines` and the menu command with its validator arm;
+  +`Download`: the Download row; +`Style`: the Style popup, the preview and
+  the Replace checkbox with its list — `style`, `replaceExisting` and
+  `pagesRequest` COMPUTED off those controls) — on-device recognition through
+  `SpeechEngine` (spec §11 W-8: no grant, no ceiling, nothing `async` here)
+  over each clip's source window EXTRACTED to a temporary mono 16 kHz WAV,
+  on `Transcriber`'s serial `work` queue with the one completion posted to
+  main. "Has sound" is `enabled.audio`, not the media's track. One job's
+  failure is reported under `problems` and the run carries on. `transcribe`
+  asks `SpeechEngine.isInstalled` for the ONE chosen locale first — nil (a
+  slow ask) is `.unavailable`, false is `.notInstalled`, never the other way
+  round. `+Languages` ASKS both lists of the engine and tags every row in
+  BCP-47 (`identifier(.bcp47)`, `en-US`, never `en_US` — a raw compare
+  never matches); `languages()` is the installed rows, `supportedLanguages()`
+  every row marked `installed` from the installed SET (no transcriber per
+  locale: a reservation cap of 5), `forgetLanguages()` drops both caches,
+  and `defaultLanguage(in:)` prefers an installed row at each step. The
+  tool's refusal ORDER is the caller's own mistakes first (scope, `engine`,
+  cloud-only arguments, the tag's spelling), then the installed model, then
+  the run; the tool NEVER downloads — a person does, from the sheet. `Job`
+  carries `media` for the cloud engine, which uploads a MEDIA once;
+  `CancelToken` holds a `SpeechEngine.Handle` and a `URLSessionTask`, under
+  one lock and cancelled outside it. Both engines hand each job's words to `CaptionPages.cues` with the
+  job's `span` and their own `TranscriptionEngine`; `Job.span`
+  (`+Jobs`) is the one spelling of a job's timeline span. The sheet's `style` is read off the Style popup's item and
+  `replaceExisting` is true only while the checkbox is ENABLED and on —
+  enabled only for a word style over tracks `replaceableTracks` names, the
+  tool's two rules — and `finish` passes both to `place`, so the sheet
+  commits what `transcribe {style, replace}` commits. The preview is
+  `CaptionPages.samplePage` of the first job's cached transcript (up to
+  twelve words) else "This is how it looks", laid out by the style's
+  `textProps` and drawn by `LayerRenderers.textBitmap`: two stacked frames
+  for a word style (the first word active, then the second), one for
+  Subtitles, over `DS.captionPreviewPlate`. `sampleWordsCache` stores the
+  ANSWER per clip, a miss included, and the drawn preview is cached under
+  `PreviewKey` (style, first job's clip, canvas) in `previewKey`, so a
+  Vocabulary keystroke reads and draws nothing. `refresh()`'s `defer` runs
+  `refreshStyleRow()` then `refreshDownloadRow()`. `+Jobs` is no longer a pure move: it
+  owns `maxSourceTicks` (1e15) and `placed(offset:in:)`, the ONE door both
+  caption mappings convert through, because spec §11's R6-10 says a
+  hand-written `speed` the ops cannot write reaches the app and every
+  `Double → Ticks` there has to clamp IN `Double` first — the offset at one
+  end, the source length and `Job.sourceIn` at the other. `+Extract` is no
   longer only the on-device extractor: `extractAudio(url:name:range:to:)` is
   the general form, `wholeAsset` is what a cloud run asks for,
   `writeFLAC(fromWAV:to:)` is the 16 kHz mono 16-bit FLAC through
@@ -443,13 +565,22 @@ free.
   `extractUpload` is the pair with the WAV as the fallback when the FLAC
   write refuses. **The sheet's three readouts — `refresh`, `noteText` and
   `startClicked` — dispatch on `engine` as their FIRST statement**, and
-  under `.assemblyai` none of them reads `language`, `languages`,
-  `isBlocked`, `authorizationStatus` or `requestAuthorization`: a Mac with
-  no on-device model can still transcribe in the cloud. `init` takes
-  `store`, `defaults`, `environment` and `languages` so a probe can build
-  every one of those states.
-
-**Silence and sound.**
+  under `.assemblyai` none of them reads `language` or `languages`: a Mac
+  with no on-device model can still transcribe in the cloud. The Language
+  popup lists every SUPPORTED locale, a missing model titled "— not
+  installed", and Generate is live only for an installed one. **The
+  Download row** (grid row 1; `cloudRows` is `[3, 4, 5]`; Style,
+  preview and Replace are rows 7, 8 and 9) shows for an
+  uninstalled apple language or while a download runs; `downloading` names
+  the running download's locale, and while it is set BOTH popups are
+  locked — applied in `refreshDownloadRow()`, AFTER `populateLanguages()`
+  sets the popup's own `isEnabled`, never inside it — and the label names
+  that locale whatever the popup shows. `downloadFinished` captures the
+  identifier before `populateLanguages()` reselects the default and selects
+  it again after; a cancel is not reported. Closing the sheet mid-download
+  lets the download run on (a decision). `init` takes `store`, `defaults`,
+  `environment` and `languages` so a probe can build every one of those
+  states.
 - `SilenceDetector.swift` (+`Walls`) · `SilenceSheetController.swift` ·
   `SileroVAD.swift` · `MediaSpeech.swift` · `MediaPeaks.swift` — Remove
   Silences and `detect_silence`. The detector has a `Mode`, `voice` (default)
@@ -736,17 +867,20 @@ non-NSCoder class: `@available(*, unavailable) required init?(coder:)
 { fatalError("<Type> does not support NSCoder") }`. `[weak self]` in retained
 closures, never `unowned`. Main-thread AppKit. **`async`/`await` is allowed
 only inside `MediaImporter.swift`** (AVFoundation's loading API is
-async-only), and nothing else earns the exception by asking — speech
-recognition and screen recording both have complete callback APIs and use
-them. **`import Synchronization` is allowed only inside `LevelMeter.swift`**,
+async-only) **and `SpeechEngine.swift`** (spec §11 W-8: `SpeechAnalyzer`
+is async-only; every caller gets a synchronous wrapper or a main-queue
+completion, and `Task.detached`, never `Task {}`). Nothing else earns the
+exception by asking — screen recording has a complete callback API and
+uses it. **`import Synchronization` is allowed only inside `LevelMeter.swift`**,
 whose `publish` runs on the audio render thread where a lock invites priority
 inversion and `main.async` allocates; every other cross-thread value is an
 `NSLock` or a main hop. `DispatchQueue` only at the documented seams: the
 compositor's render queue, the composition rebuild, import, the export
-progress timer, `Transcriber`'s serial queue and the recogniser's
-`OperationQueue`, `CloudTranscriber`'s serial queue and the AssemblyAI
-client's delegate `OperationQueue` (spec §11's R6-7: `Transcriber`'s
-two-queue shape, carried over), `FFmpegRewrap`'s serial queue, the two one-frame render
+progress timer, `Transcriber`'s serial queue, `CloudTranscriber`'s serial
+queue and the AssemblyAI client's delegate `OperationQueue` (spec §11's
+R6-7), the transcribe sheet's Download row's KVO main hop
+(`DispatchQueue.main.async` from `Progress`'s `fractionCompleted`
+observation), `FFmpegRewrap`'s serial queue, the two one-frame render
 queues (`eyedropperQueue`, `frameGrabQueue` — a third one-frame render joins
 this entry rather than growing the list), `ScreenRecorder.shareableContent`'s
 global hop, and the cache's main hop. The recorder adds NO queue of its own:

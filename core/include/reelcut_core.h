@@ -63,8 +63,17 @@ extern "C" {
  * defaults, which mean a different transition rather than none. Version
  * 8's is the quietest of all: a clip whose motion was dropped is still on
  * screen, still placed where it was placed, and simply no longer moves,
- * with nothing left in the file to say it ever did. */
-#define RC_FORMAT_VERSION 8
+ * with nothing left in the file to say it ever did.
+ *
+ * Version 9 is word captions: on the text group, `case` (a transform
+ * applied before layout), `words` (one `{start, end}` per whitespace token
+ * of `content`, in clip time) and `word_style` (how the word being said is
+ * drawn), in that order, closing the object. All three default, so there
+ * is again no migration step; an older build would drop a page's timings,
+ * which nothing left in the file could rebuild short of transcribing the
+ * audio again. The recipe's `word` and `word_pop` are computed, never
+ * stored. */
+#define RC_FORMAT_VERSION 9
 
 /* Reader caps enforced by the writer, so every file this build produces can
  * be read back (the `MAX_*` constants in core/src/format.rs). A nest's tracks and clips

@@ -3,7 +3,7 @@
 A native macOS video editor in a screencast editor's shape: open a movie, arrange it on
 layered tracks over a fixed canvas, trim, split, annotate, animate, export.
 Swift/AppKit UI over a Rust core — the core decides, AVFoundation and Metal do.
-Apple Silicon, macOS 15+.
+Apple Silicon, macOS 26+.
 
 The opening flow is the point. File ▸ Open on a `.mov` or `.mp4` (or a drop on
 the Dock icon, or the welcome window's Open Video…) creates an *untitled*
@@ -93,7 +93,8 @@ normative: §5.2 is the project schema, §6 the op table, §7 the architecture.
 - **Words.** Captions go in and out: File ▸ Import Captions… reads a
   SubRip file, **Generate Captions…** writes one from the clip's own audio —
   **on this Mac** with Apple's own recogniser (a language, a scope, a
-  progress bar, and a grant macOS asks you for once) or **with AssemblyAI**
+  progress bar, no length limit, and a Download button for a language whose
+  model this Mac does not have yet) or **with AssemblyAI**
   in the cloud, which knows far more languages and hears them better — and
   **Export Captions…** writes a track back out as `.srt` or `.vtt`. The
   cloud engine sends audio off this machine, so the sheet says so before the
@@ -106,13 +107,24 @@ normative: §5.2 is the project schema, §6 the op table, §7 the architecture.
   already has a current readable transcript in the package, Generate Captions
   can reuse the whole batch without an API key or network request. Pending
   remote deletion remains recorded and is reported as deferred; a later run
-  with the originating account and region's key retries safe deletion IDs. A caption is an ordinary text clip
+  with the originating account and region's key retries safe deletion IDs.
+  Either engine can also make **word captions**, the large one-row style of
+  shorts and reels, in one of five styles — Highlight, Pill, Karaoke, Build
+  and One Word — where each page is filled to the width it will actually
+  MEASURE on your canvas rather than to a word count, the word being said
+  lights up as it is said, and a word too wide for the frame shrinks before
+  it wraps; generating again with Replace restyles a track in one undo step
+  (the sheet's Style popup previews each style on your canvas, and its Replace
+  checkbox names the tracks it will replace).
+  A caption is an ordinary text clip
   either way, which is what makes burn-in on export free and lets you drag
   one to retime it. Text clips also arrive and leave under their own power:
   a **typewriter**, a **word fade** or a **line rise**, with separate in
   and out durations. The core computes how far along a reveal is, once per
   frame, so the preview, a rendered frame and an export cannot disagree
-  about it.
+  about it. Four display faces for word captions ship inside the app under
+  the SIL Open Font License, their licences beside them: Montserrat
+  ExtraBold, Montserrat Black, Anton and Bebas Neue.
 - **Sound.** The four sample-level audio properties — pan, mix to mono, a
   compressor and noise reduction — run in one processing tap per composition
   audio track, and the preview and the export share it. **Normalize** (the
@@ -256,7 +268,7 @@ Makefile              Build orchestration
 | `ProjectDocument.swift` | NSDocument, `.reelcut` package read/write, and the single mutation point (`applyEdit`, the live-edit trio, undo as a handle stack) |
 | `MediaImporter.swift` | `AVURLAsset` probing (the one file allowed `async`/`await`), thumbnails, waveform peaks |
 | `CompositionBuilder.swift` · `Compositor.swift` · `LayerRenderers.swift` · `LayerRenderersText.swift` · `Playback.swift` | plan → `AVComposition`; the `AVVideoCompositing` Metal pipeline — five states from three fragment functions, one of them reading the destination so a layer can blend; text/shape/image textures, a shape's gradient and the three text reveals the recipe asks for; the player and its rebuild-vs-refresh rule |
-| `CaptionImporter.swift` · `CaptionLayout.swift` · `Transcriber.swift` (+`Extract` `Jobs` `Languages`) · `CaptionExporter.swift` | captions in and out: the SubRip grammar, the placement every producer shares, on-device speech recognition and the cue builder over it, the extractor and the job list both engines share, and the `.srt` / `.vtt` writer |
+| `CaptionImporter.swift` · `CaptionLayout.swift` · `CaptionStyle.swift` · `CaptionPages.swift` · `Transcriber.swift` (+`Extract` `Jobs` `Languages`) · `CaptionExporter.swift` | captions in and out: the SubRip grammar, the placement every producer shares, the five word caption styles and the pager that fills their pages to a measured width, on-device speech recognition and the cue builder over it, the extractor and the job list both engines share, and the `.srt` / `.vtt` writer |
 | `CloudTranscriber.swift` (+`Media`) · `MediaTranscript.swift` · `AssemblyAIClient.swift` (+`Session`) · `AssemblyAITranscript.swift` · `AssemblyAIConfiguration.swift` · `AssemblyAILanguages.swift` · `SecretStore.swift` · `CloudProgress.swift` · `CloudEstimate.swift` | captions from the cloud (road map 6): the run that groups clips by media and deletes what it fetched, the transcript cache in the package, AssemblyAI's five REST calls and their wire values, where the client speaks and what it says it is, the `0600` key file, the progress number and the price the sheet shows before the button |
 | `Exporter.swift` · `ExporterSettings.swift` · `ExporterWriter.swift` · `ExportSheetController.swift` (with `ExportSheetOptions` `ExportSheetResolve` `ExportSheetPresets` `ExportProgressSheetController`) | writing a file — two passes wherever it holds sound, the first measuring loudness — and rendering one frame offline; the sheet's controls, the resolution behind them and the progress sheet |
 | `FrameWriter.swift` · `EditorViewController+SaveFrame.swift` | one composed frame to a PNG, JPEG or HEIC — a value type with no AppKit in it, called by File ▸ Save Frame… and by `render_frame` alike — and the panel that picks the URL |
@@ -277,7 +289,7 @@ Makefile              Build orchestration
 
 ## Building
 
-Requires Xcode, Rust (cargo), and [xcodegen](https://github.com/yonaskolb/XcodeGen).
+Requires Xcode 26 or later (the macOS 26 SDK), Rust (cargo), and [xcodegen](https://github.com/yonaskolb/XcodeGen).
 
 ```sh
 make app        # cargo build --release + xcodegen + xcodebuild → build/Build/Products/Release/Reelcut.app
@@ -370,7 +382,7 @@ hue rather than paints with it, is the one `[r, g, b]` in the model.
 | `import_captions {path, track?}` | an SRT file as text clips (File ▸ Import Captions…) |
 | `consolidate_media {}` | copies every referenced file into the package (File ▸ Consolidate Media…) |
 | `record_screen {seconds, display?, window?, microphone?, system_audio?, show_clicks?, rate?, size?, place?, path?}` | records a display (index, 0 = main) or a window (a `CGWindowID`) for `seconds` and lands it as a clip at the target document's playhead — or as an untitled document rated at `rate` when nothing is open (File ▸ New Recording…). `microphone` records the default microphone to a second file on a Microphone track; `path` is a FOLDER override. It reads the two grants and never asks: the refusal names the System Settings pane, and a shell-launched instance runs under its TERMINAL's grants |
-| `transcribe {clips?, language?, place?, engine?, speakers?, vocabulary?, refresh?}` | speech recognition into caption clips (File ▸ Generate Captions…). Returns the cues in ticks whether or not it places them, and `place: false` changes nothing at all. `engine` is `apple` (the default, on this Mac, nothing uploaded) or `assemblyai` (the whole audio of each media file goes to AssemblyAI and is billed; the transcript is cached in the package and deleted at the far end). macOS gates the on-device recogniser and this tool never asks: without the grant it refuses with the status named, since the system prompt needs a frontmost app and an agent-driven one never is. `speakers`, `vocabulary` and `refresh` apply only to the cloud engine and are refused by name without it |
+| `transcribe {clips?, language?, place?, engine?, speakers?, vocabulary?, refresh?, style?, replace?}` | speech recognition into caption clips (File ▸ Generate Captions…). Returns the cues in ticks whether or not it places them, and `place: false` changes nothing at all. `style` is `subtitles` (the default) or a word caption style — `highlight`, `pill`, `karaoke`, `build`, `one_word` — whose pages are filled to a measured width and whose cues carry their `words`; `replace: true` swaps out the caption tracks it would have made over the same clips in the same undo step and lists them under `replaced`. `engine` is `apple` (the default, on this Mac, nothing uploaded) or `assemblyai` (the whole audio of each media file goes to AssemblyAI and is billed; the transcript is cached in the package and deleted at the far end). The on-device engine needs no grant and has no length limit; a language whose model is not installed on this Mac is refused by name and never downloaded by the tool — a person installs it from the sheet's Download row. `speakers`, `vocabulary` and `refresh` apply only to the cloud engine and are refused by name without it |
 | `export_captions {track?, path, format?}` | one text track out as `.srt` or `.vtt` (File ▸ Export Captions…). The track is never guessed — with no all-text track, or more than one, it refuses and lists the candidates |
 | `detect_silence {clips?, mode?, voice_confidence?, threshold_db?, min_length?, padding?}` | the quiet spans of the timeline, which `ripple_delete_ranges` then cuts — the same detector Clip ▸ Remove Silences… uses, so an agent and the sheet propose the same cuts. It changes nothing. `mode` is `voice` (the default, the cached Silero probability against `voice_confidence`) or `level`; either way a moment the mix envelope alone puts under `threshold_db` is quiet, so mute and solo are already in the answer, and the result names any file still being analysed and any judged by level |
 | `normalize_clip {clips, peak_db?}` | sets each clip's volume so its own loudest moment lands at `peak_db` (default −1 dBFS) — the Volume section's Normalize button and Clip ▸ Normalize. Measured from the waveform cache over the part that plays, so it knows nothing about the volume, fades, ducking, mute or solo already on the clip; it replaces the volume rather than multiplying it, writes the clip's base level even inside an action, and leaves `muted` alone. One gain per clip, one undo step, and what it could not measure comes back under `skipped` |

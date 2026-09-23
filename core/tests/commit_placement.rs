@@ -139,7 +139,8 @@ fn four_addition_callers_append_in_id_order() {
                     "color":[1.0,1.0,1.0,1.0], "content":"Title",
                     "font":"SourceSans3-Bold", "line_spacing":1.0,
                     "outline":null, "size":72.0, "tracking":0.0,
-                    "valign":"middle", "width":null
+                    "valign":"middle", "width":null,
+                    "case":"as_written", "words":[], "word_style":null
                 });
             }
             "add_shape_clip" => {

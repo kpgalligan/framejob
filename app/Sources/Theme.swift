@@ -37,6 +37,10 @@ enum DS {
     static let checkerA = NSColor(white: 0.886, alpha: 1)
     static let checkerB = NSColor(white: 0.941, alpha: 1)
 
+    /// The Generate Captions sheet's preview plate: a stand-in for footage,
+    /// the same in both appearances, so a white caption always reads.
+    static let captionPreviewPlate = NSColor(srgbRed: 0.14, green: 0.14, blue: 0.16, alpha: 1)
+
     // MARK: - Timeline (spec §4.4)
 
     /// Clip tints by source kind — "video slate, audio green, still violet,

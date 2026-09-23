@@ -1105,7 +1105,7 @@ def build_player_probe():
     sdk = subprocess.run(["xcrun", "--show-sdk-path", "--sdk", "macosx"],
                          capture_output=True, text=True, check=True).stdout.strip()
     build = subprocess.run(
-        ["swiftc", "-sdk", sdk, "-target", "arm64-apple-macos15.0", "-module-name", "Reelcut",
+        ["swiftc", "-sdk", sdk, "-target", "arm64-apple-macos26.0", "-module-name", "Reelcut",
          "-import-objc-header",
          os.path.join(ROOT, "app", "Bridging", "Reelcut-Bridging-Header.h"),
          "-L", os.path.join(ROOT, "core", "target", "release"), "-lreelcut_core",

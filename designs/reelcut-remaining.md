@@ -355,6 +355,20 @@ which came back one line UNDER where it was. Every new file is inside the
 400-line cap; `MediaTranscript.swift` at **383** is the closest to it and is
 the one to watch.
 
+**What road map 8's W3 did to it** (2026-09-22, `wc -l`; road map 8
+§10.7). Three tolls, each a pure move gated alone before the word-caption
+picture took anything on: `LayerRenderersText.swift` **577 → 408** (its three
+reveal routines to `LayerRenderersReveal.swift`, **186**, new), then **440**
+with the feature; `ProjectSnapshot.swift` **2516 → 2289** (the text group
+and `RecipeReveal` to `TextProps.swift`, **241**, new), then **2293** —
+`RecipeSourceRef`'s four lines for `word` / `word_pop`, the only growth; and
+`ReelCore.swift` **1542 → 1440** (`TextPatch` to `TextPatch.swift`, **113**,
+new), unchanged by the feature. `AgentCatalog+Clips.swift` grew **792 →
+799**, `set_text`'s three new keys in `textPatchDescription`'s prose, which
+cannot move purely; `TextPane.swift` **513 → 530**. New and inside the cap:
+`WordProps.swift` **215**, `LayerRenderersWords.swift` **247**, and
+`TextProps.swift` / `TextPatch.swift` at **274** / **133** with the feature.
+
 Regenerate the list with
 `wc -l app/Sources/*.swift core/src/*.rs | awk '$1>600 && $2!="total"' | sort -rn`
 rather than trusting the numbers here; the standing exemptions are
@@ -363,10 +377,10 @@ row per op.
 
 | File | Lines |
 |---|---|
-| `app/Sources/ProjectSnapshot.swift` | 2516 |
+| `app/Sources/ProjectSnapshot.swift` | 2293 (2516 before road map 8's W3) |
 | `app/Sources/InspectorPane.swift` | 1665 |
 | `app/Sources/TimelineView.swift` | 1652 |
-| `app/Sources/ReelCore.swift` | 1542 |
+| `app/Sources/ReelCore.swift` | 1440 (1542 before road map 8's W3) |
 | `app/Sources/VideoPane.swift` | 1411 |
 | `app/Sources/Compositor.swift` | 1391 |
 | `app/Sources/ProjectDocument.swift` | 1352 |
@@ -381,7 +395,7 @@ row per op.
 | `app/Sources/AudioDSP.swift` | 890 |
 | `app/Sources/AgentServer+Clips.swift` | 847 |
 | `core/src/edit.rs` | 838 |
-| `app/Sources/AgentCatalog+Clips.swift` | 792 |
+| `app/Sources/AgentCatalog+Clips.swift` | 799 (792 before road map 8's W3) |
 | `app/Sources/AgentServer.swift` | 785 |
 | `app/Sources/FFmpegRewrap.swift` | 768 |
 | `app/Sources/Loudness.swift` | 742 |
@@ -768,6 +782,109 @@ and the closing above added the rest.
     so the sentence the card would print has been proved only against the
     stand-in.
 
+- **The word-captions spike, road map 8's W0 (2026-09-22)** — what that run
+  could not reach on this host. Its record is
+  `designs/reelcut-roadmap-8.md` §10.1, and §10.3 names what did not run:
+  - **(W2 owes these two since it built the Download row, 2026-09-22; road
+    map 8 §10.6.)** **`AssetInventory` with no network.** W0 q3 read
+    `supportedLocales`, `installedLocales`, `reservedLocales`,
+    `status(forModules:)` and the progress an installation request reports,
+    and W2 read them again from the app, but nobody has measured any of them
+    with the network gone: that would change this host's network state.
+    What the sheet's Download row says, and what `transcribe` refuses with,
+    when there is no network is a person's check.
+  - **The model download on a Mac that has never had one — W2's Download
+    row, pressed.** `downloadAndInstall()` has never been called on this
+    host — a download is a person's decision, R6-12's argument, and
+    `speech_engine_proof.py` drives the row by hand without pressing it — so
+    nobody has watched one run. W0 measured what the row can show BEFORE it
+    starts, and it is nothing: the request's `Progress` reports
+    `totalUnitCount` 0, `fractionCompleted` 0 and `isIndeterminate` true.
+    Whether the bar turns determinate and fills in once the download begins,
+    whether the label's percentage moves, and whether the downloaded row is
+    then selected, marked installed and Generate becomes live, is unmeasured.
+  - **The Download row LOOKED AT.** No offscreen photograph or person has
+    seen the row: its placement under Language, the indeterminate bar, the
+    "Downloading French (France)… 42%" label, and the "— not installed"
+    popup titles. `speech_engine_probe.swift`'s P5 reads the controls'
+    STATE, not the picture.
+  - **`Progress.cancel()` during a real download.** Cancel calls the
+    request's own `Progress.cancel()`; whether `downloadAndInstall()` then
+    throws promptly, leaves nothing half-installed, and the row returns to
+    "Download" with no note (a cancel is not reported) has not been run.
+  - **The popups' lock, seen mid-download.** P5 sets `downloading` by hand
+    and reads `isEnabled` off both popups; a person has not watched Language
+    and Engine stay disabled for the length of a real download and come back
+    at its end, or closed the sheet mid-download (a decision: the download
+    runs on in the framework). A consequence of that decision nobody has
+    seen: reopening the sheet mid-download shows the same locale
+    "— not installed" with Download ENABLED, so a person can start a second
+    request for a locale already downloading; what the framework does with
+    it is unmeasured.
+  - **A downloaded model SURVIVES.** `SpeechEngine.download` releases the
+    locale right after `downloadAndInstall()`, so the app holds no
+    reservation for a model a person has just downloaded. Whether that
+    locale is still installed — listed by `installedLocales`, and
+    transcribing — straight after, after a relaunch, and days later, is a
+    person's check after a real download (road map 8 §10.6's review).
+  - **Whether the four bundled display faces resolve on a Mac that does not
+    already have them installed.** This host carries Montserrat, Anton and
+    Bebas Neue in `/Library/Fonts`, so W0 q6's five byte-distinct
+    `render_frame` PNGs and five byte-distinct export frames prove the faces
+    DRAW and differ from each other and from a control name — not that the
+    app BUNDLE is what supplied them. A Mac without those families is the
+    only place that claim can be made.
+  - **Whether the highlight feels in sync.** W0 q2 measured the bias — the
+    on-device engine starts a word a median 270 ms EARLY against a known
+    start, AssemblyAI 62 ms late — and road map 8 §8 turned those into two
+    `lead` defaults. Whether either reads as in time with the voice is a
+    person watching a real recording.
+  - **(W3 owes these three since it drew the page, 2026-09-22; road map 8
+    §10.7.)** **The look on real footage.** `words_picture_proof.py` proves
+    frames differ and hold byte for byte where they should, and the probe
+    that no ink leaves the box — not that a highlighted, popped, pilled
+    page reads well over a real picture, on 9:16 and 16:9.
+  - **60 fps with a pop on every word.** A pop re-rasterizes the page for
+    the 0.12 s `WORD_POP` after each word start (W0 q5 measured about half a
+    millisecond a raster at 1080×1920); nobody has played a dense page
+    through the preview at 60 fps and watched for a dropped frame.
+  - **The BUNDLE on a Mac without the families.** W3's probe row P5 found
+    that with the app's `Fonts/` registered at process scope, CoreText
+    resolves each of the four faces to the BUNDLED file (the pinned sha256
+    at `kCTFontURLAttribute`) even on this host, whose `/Library/Fonts`
+    copies are different files. That is the probe's registration, not the
+    app's `ATSApplicationFontsPath`; the app itself on a Mac with none of
+    the families is still a person's check.
+  - **(W4a owes these three since it generates pages, 2026-09-23; road map
+    8 §10.9.)** **Sync by eye, per engine.** `CaptionPages.lead(for:)`
+    shifts every on-device word +270 ms and every AssemblyAI word −60 ms
+    (W0 q2's medians); the probe proves the shift is applied and confined to
+    the clip, not that a generated Highlight page lights each word as it is
+    heard. A person watching a real recording through each engine is the
+    only judge, and the two constants are where a correction goes.
+  - **Each style on real footage, 9:16 and 16:9.** `word_captions_proof.py`
+    reads a generated Highlight track's ink off `render_frame` pixels and
+    finds it inside the budget's columns on a 1080×1920 canvas; nobody has
+    looked at Highlight, Pill, Karaoke, Build and One Word pages over a real
+    talking head at either aspect, at their §5h sizes and heights.
+  - **60 fps with generated pages.** W3's pop owes the same check for one
+    hand-written page; a generated track is a page every second or two,
+    each re-rasterizing for `WORD_POP` after every word — played through the
+    preview at 60 fps and watched for a dropped frame.
+  - **(W4b owes these two since it built the sheet's Style row, 2026-09-23;
+    road map 8 §10.10.)** **The sheet's preview, LOOKED AT.** The harness
+    photographs the card as a window's content and the probe proves six
+    byte-distinct previews, a different picture per canvas and a transcript's
+    own words when one is cached — not that a 258 × 80 pt preview of two
+    stacked frames reads as "this is the style, and this is the second word
+    lit", nor that the dark plate is a fair stand-in for footage. A person
+    looking at the running sheet on 9:16 and 16:9 projects is the judge.
+  - **The sheet's Style row seen in the app.** A sheet cannot be put up
+    offscreen, so nobody has seen File ▸ Generate Captions… present the
+    three new rows as a SHEET: the card's new height, the popup opening on
+    the style chosen before a relaunch, and the Replace list on a real
+    project with two caption tracks, checked, then Generate, then one ⌘Z.
+
 - **The track context menu (2026-09-23)** — `track_menu_probe.py` sends
   synthetic right-mouse-downs through the content view's `menu(for:)` and
   performs the items; what it cannot reach:
@@ -780,6 +897,31 @@ and the closing above added the rest.
 ---
 
 ## 5. Where a third road map would start
+
+**Road map 8, word captions, is BUILT (2026-09-23; road map 8 §10, W0 to
+W4b).** Both engines page a run's words into width-measured, word-timed
+pages in five styles besides Subtitles; each page is an ordinary text clip
+carrying `words`, `word_style` and `case` (format version 9), drawn by a
+fourth text routine; File ▸ Generate Captions… chooses the style with a
+preview drawn by the renderer and can Replace the caption tracks it made,
+and `transcribe` takes the same `style` and `replace`. **Next work on word
+captions starts at road map 8 §7's not-built list** — AI emphasis and emoji,
+a sliding pill, a karaoke fill within a word and "dim during silence",
+restyling in place, WebVTT inline timestamps, filler words, per-word
+confidence styling — each with the reason it was left there. **One residue
+W4b found and did not fix**: `cloud_captions_probe.py` leaves its
+`cloudprobe-*` `UserDefaults` suites in `~/Library/Preferences` (1 619 files
+after W4b's run of it) — `removePersistentDomain(forName:)` cannot win
+against cfprefsd's late write, and the harness's `MemoryDefaults` is the
+shape that does (road map 8 §10.10). The 1 619 files were deleted by hand
+on 2026-09-23 at the user's request; the probe still writes new ones on
+every run until it moves to `MemoryDefaults`. **Detector
+pauses are NOT owed**: W4a's P10 measured the pangram's two pauses breaking
+by sentence punctuation alone, and road map 4's detector intervals injected
+as forced breaks changed no page; a recording whose pauses carry no
+punctuation is where that measurement would have to be taken again.
+
+**Word captions, road map 8 (designed 2026-09-22; W0 SPIKED the same day; BUILT 2026-09-23 — the paragraph above).** The user asked for social-video captions: one row of large styled text, each word shown or highlighted as it is spoken, from either engine, with a style chosen at generation and pages filled to the measured width rather than a word count. `designs/reelcut-roadmap-8.md` holds the research, the design and the user's answers (§6), including the move to a macOS 26 minimum with `SpeechTranscriber` as the on-device engine. **Its spike W0 has run: all seven rows of §3 measured, §10.1 the record, §3a the list of design sections a row overturned, `tools/proof/words_spike/` the instruments.** **W1a, the macOS 26 bump, LANDED 2026-09-22** (road map 8 §10.4): `make typecheck` 0 errors / 7 warnings, `make app` rc 0, the same three frames byte for byte out of the 15.0 and 26.0 builds, 40 proof files moved off `arm64-apple-macos15.0`; the root `CLAUDE.md` baseline sentence is owed by hand.
 
 **Road map 7 continuation:** all six §12.2 items were implemented in sequence
 and passed independent review: structural-time and bounded-transition work

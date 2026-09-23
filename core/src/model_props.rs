@@ -70,6 +70,15 @@ pub use crate::model_regions::*;
 /// cannot measure — which is why they are a file of their own.
 pub use crate::model_text::*;
 
+/// The word-caption types — [`TextCase`], [`Word`], [`WordMode`],
+/// [`ActivePill`] and [`WordStyle`] — live in `model_words.rs` and are
+/// re-exported whole, so every `crate::model_props::WordStyle` path (and,
+/// through `model.rs`'s own glob, every `crate::model::WordStyle` one)
+/// still resolves. See that module's doc for the seam: a word caption is a
+/// text clip holding one page, and the core is the one counter of its
+/// words. Its two `pub(crate)` functions are not widened by this glob.
+pub use crate::model_words::*;
+
 /// The shape types — [`ShapeProps`], the [`ShapeKind`] it draws, the
 /// [`Stroke`] around it, and the [`Gradient`], [`GradientKind`],
 /// [`GradientStop`] and [`MAX_GRADIENT_STOPS`] that fill it — live in

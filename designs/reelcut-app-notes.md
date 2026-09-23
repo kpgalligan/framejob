@@ -2393,3 +2393,186 @@ mutants: five against the full 463 and three (`stale-tooltip`,
 with every instance now launched `-ReelcutCaptionEngine assemblyai` and one
 more mutant (`agent-reads-remembered-engine`), which is what turns row 8
 from a row that could not fail into one that can.
+
+## Five caption files change role, 2026-09-22 — road map 8's W2
+
+Road map 8 §10.6 is the pipeline's record and has the scores; this is what
+happened to each file whose ROLE changed. Two are new and three were
+rewritten around the new engine (spec §11 W-8).
+
+**`SpeechEngine.swift` — new, 358.** The on-device engine,
+`SpeechAnalyzer` + `SpeechTranscriber` + `AssetInventory`, and the ONE file
+under `app/Sources` that imports Speech or says `async` for it. Every entry
+point is synchronous or a main-queue completion: `transcribe` blocks its
+caller (it refuses main by precondition) on a semaphore a `Task.detached`
+signals, waited for in 0.1 s slices so a cancel is answered at once; the
+three asks (`supportedLocales`, `installedLocales`, `isInstalled`) wait at
+most `askBound` (10 s). `Handle` is what `CancelToken` holds for a running
+analysis: `Task.cancel()` plus a detached `cancelAndFinishNow()`. Two
+measurements W2 made on this host shaped it and are not W0's: (1)
+`AssetInventory.status(forModules:)` answers `.supported` for an INSTALLED
+model this process has not reserved, and `.installed` once it has —
+constructing a transcriber reserves nothing and a reservation downloads
+nothing — so `isInstalled` reserves, reads and gives back a reservation it
+made; (2) `release(reservedLocale:)` answers false for `fr-FR` when the
+reserved locale is `fr_FR`, so `release` also walks `reservedLocales` and
+releases every entry with the same BCP-47 tag.
+
+**`Transcriber.swift` 583 → 340.** The `SFSpeechRecognizer` half deleted:
+`TaskSink`, `delivery`, `sink`, `recognizer`, the authorization block
+(`authorizationStatus`, `isAuthorized`, `name(of:)`, `authorizationRefusal`,
+`canAsk`, `requestAuthorization`), `truncationSlack`, `recognize`,
+`Truncation`, `Outcome.truncations` and `TranscribeError.notAuthorized`;
+`noOnDeviceModel` renamed `notInstalled`, whose sentence names the sheet's
+Download row. `transcribe` guards `SpeechEngine.isAvailable`, then
+`isInstalled` for the ONE chosen locale (nil — a slow ask — is
+`.unavailable`, never `.notInstalled`), and each job's runs become
+`CaptionCues.Word`s through the unchanged `project`. `run` and its `work`
+queue are unchanged; the `OperationQueue` is gone.
+
+**`Transcriber+Languages.swift` 172 → 176.** Both lists are asked of
+`SpeechEngine` and tagged in BCP-47 (`identifier(.bcp47)`: `en-US`, never
+`en_US`); `Language` gained `installed` (defaulting to true so a probe's
+synthetic rows compile unchanged) and `forgetLanguages()` drops both caches.
+`supportedLanguages()` marks each row from the installed SET — no
+transcriber is constructed per locale. `defaultLanguage(in:)` was REWRITTEN
+over `identifier(.bcp47)` preferring an installed row at each step: the raw
+compare against `Locale.current.identifier` never matched a BCP-47 row and
+fell through to the first English row by name, "English (Australia)".
+
+**`TranscribeSheetController.swift` 540 → 514**, with
+**`TranscribeSheetController+Download.swift` — new, 163.** The grant branch
+of `startClicked` and `begin`, `isBlocked` and the grant note are gone; the
+popup lists every SUPPORTED locale and marks a missing model "— not
+installed"; Generate is live only for an installed language. The Download
+row is grid row 1 (`cloudRows` moved to `[3, 4, 5]`), and while a download
+runs `downloading` names its locale, both popups are locked (applied in
+`refreshDownloadRow()` after `populateLanguages()` sets the popup's own
+`isEnabled`), and the label names that locale whatever the popup shows.
+`downloadFinished` captures the identifier before `populateLanguages()`
+reselects the default and selects it again after. Three widenings the new
+file forced: `language`, `grid` and `refresh()` are internal. The progress
+is observed on `fractionCompleted` alone — `NSProgress` notifies that key
+when either unit count changes — so the one stored `downloadObservation`
+covers `totalUnitCount` too.
+
+**`AgentServer+Captions.swift` 439 → 401.** No grant tier; the apple arm's
+`truncated`/`note` block deleted (the key goes for both engines, because a
+key that can never be true teaches a caller to read for a ceiling that no
+longer exists); `noModelRefusal` renamed `notInstalledRefusal`, whose
+sentence says a person has to install the model and names the Download row.
+
+## Three text files pay first, 2026-09-22 — road map 8's W3 tolls
+
+Road map 8 §10.7 is the pipeline's record and has the scores. Three size
+tolls were paid before the word-caption picture took anything on, each a pure
+move, and the three were gated together and alone — `make typecheck` 0 errors
+and the same 7 warnings, `make app`, `reveal_toll_proof.py compare` 6/6
+against frames captured on the unchanged build, `target_bump_proof.py compare`
+3/3, `words_core_proof.py` 27/27 (its CONTROL still identical) and
+`phase4_proof.py` 83/83 — with nothing of the feature in the diff.
+
+**`LayerRenderersText.swift` 577 → 408.** The three reveal routines and what
+only they read — `wordOverlap`, `lineRiseFraction`, `staggered`,
+`staggerIndex`, `typedPrefix`, `typewriter`, `wordFade`, `lineRise` — are
+`LayerRenderersReveal.swift`'s (**186**), verbatim with their doc comments
+and in their own order. `drawText` stayed and dispatches to them, so
+`typewriter`, `wordFade` and `lineRise` came out of `private`; the six
+members they share with what stayed — `TextLine`, `TextLayout`,
+`drawLaidLine`, `drawFaded`, `tokens(of:)`, `midpoint` — and
+`attributedString`, which the fourth routine's headroom measures with, did
+too, because `private` on an extension member reaches only its own file.
+The other five stayed `private` in their new file.
+
+**`ProjectSnapshot.swift` 2516 → 2289.** `TextAnimationKind`,
+`OutlineProps`, `BackdropProps`, `TextAnimation`, `TextProps` and
+`RecipeReveal` are `TextProps.swift`'s (**241**), verbatim, `MotionProps.swift`
+the precedent. The reason is the stored property: format version 9's three
+text fields and the recipe's two word keys could not have been added to
+those types from an extension file.
+
+**`ReelCore.swift` 1542 → 1440.** `struct TextPatch` — its fields, init,
+decoder, `dictionary` and `isEmpty` — is `TextPatch.swift`'s (**113**), for
+the same reason; the `dictionary` extensions on `OutlineProps`,
+`BackdropProps` and `TextAnimation` it calls stayed with every other
+property type's.
+
+Then the feature: `TextProps.swift` 274, `TextPatch.swift` 133,
+`ProjectSnapshot.swift` 2293 (`RecipeSourceRef`'s four lines, the only
+growth), `LayerRenderersText.swift` 440, and two new files,
+`WordProps.swift` (215) and `LayerRenderersWords.swift` (247); the feature
+widened one more member, `layout(for:)`, which the fourth routine draws its
+recoloured tokens from.
+
+## Two sheet files and a renderer seam, 2026-09-23 — road map 8's W4b
+
+Road map 8 §10.10 is the pipeline's record and has the scores. File ▸
+Generate Captions… gained the Style popup, the preview and the Replace
+checkbox (§5e), and the sheet's `style`, `replaceExisting` and
+`pagesRequest` stopped being stored flags: they are computed off the
+controls, so `begin`, `beginCloud` and `finish` — unchanged callers — commit
+exactly what `transcribe {style, replace}` commits. No size toll was owed:
+the capped sheet file gave up the three members it moved out before it took
+the rows on, in the same diff, and ended at its size.
+
+**`TranscribeSheetController.swift` 526 → 526.** `style`,
+`replaceExisting` and `pagesRequest` moved out (eleven lines); in came four
+stored views (`stylePopup`, `previewView`, `replaceCheckbox`,
+`replaceLabel` — `let`s, configured by the row builders), `sampleWordsCache`
+with its three doc lines, three grid rows after From: (rows 7, 8 and 9;
+`cloudRows` stays `[3, 4, 5]`), and `refreshStyleRow()` in `refresh()`'s
+`defer`, before `refreshDownloadRow()`.
+
+**`TranscribeSheetController+Style.swift`, new, 239.** The three rows, the
+remembered style under `CaptionStyle.defaultsKey` (read when the popup is
+built, written by `styleChanged`), the replace list, and the preview:
+`sampleWords()` (the first job's cached transcript, up to twelve words, else
+`fixedSampleWords` — the ANSWER cached per clip, a miss included, because
+`refresh` runs per keystroke), `previewProps` (`place`'s two patches,
+mirrored) and `preview()` (two frames for a word style, one for Subtitles,
+each `LayerRenderers.textBitmap` scaled into a 258 × 36 pt slot over
+`DS.captionPreviewPlate`, at 2×).
+
+**`LayerRenderersText.swift` 444 → 451.** `renderTextBitmap`'s body is
+`static func textBitmap`; the instance method forwards to it. The sheet
+draws with the renderer's own routine and no Metal device.
+
+**`CaptionPages.swift` 335 → 349.** `samplePage(_:request:frame:)`, the
+first page `cues(...)` makes — the preview's page is a real one, balance
+step included.
+
+**`CaptionLayout.swift` 556 → 557.** `replaceableTracks` requires at least
+one clip on the track (W4a's review, nit 1): an empty "Captions" track is no
+longer removed or listed.
+
+**`Theme.swift` 201 → 205.** `DS.captionPreviewPlate`, the preview's
+stand-in for footage, the same in both appearances.
+
+**`CaptionStyle.swift` 145 → 145.** `defaultsKey`'s doc comment, which
+said nothing read the key, now says who does.
+
+## W4b residue, 2026-09-23
+
+Road map 8 §10.10's "W4b residue" paragraph is the record and has the
+scores. The review's six nits and the orchestrator's addendum; no size toll
+was owed, and every capped file ended at or under its size.
+
+**`CaptionStyle.swift` 145 → 152.** `basePatch(canvas:)` deleted;
+`pagePatch(content:size:width:words:)` added under `textProps` and built
+from it, so the page `place` commits is the page the pager measured and the
+sheet previews — a shrunk page's outline is em × its own size. The header
+and `textProps`' doc name the three readers.
+
+**`CaptionLayout.swift` 557 → 555.** `place`'s word branch is one
+`pagePatch` call per cue at `cue.size ?? style.size(for:)`; the Subtitles
+branch and the `set_video` patch are unchanged, and so are an unshrunk
+page's ops.
+
+**`TranscribeSheetController+Style.swift` 239 → 252.** `PreviewKey` (the
+style, the first job's clip, the canvas); `refreshStyleRow` computes the
+jobs once and redraws the preview only when the key changes;
+`previewProps`' doc rewritten, its code unchanged.
+
+**`TranscribeSheetController.swift` 526 → 529.** The stored
+`previewKey: PreviewKey?` beside `sampleWordsCache` — a stored property
+cannot live in the extension.

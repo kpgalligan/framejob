@@ -9,7 +9,7 @@
 // that pair does to a track that starts late.
 //
 // Built by the runner with
-//   xcrun swiftc -O -target arm64-apple-macos15.0 extract.swift -o bin/extract
+//   xcrun swiftc -O -target arm64-apple-macos26.0 extract.swift -o bin/extract
 // and every mode prints ONE JSON object on stdout.
 //
 //   extract wav   <in> <out>            → {ok, frames, seconds, bytes, first_pts_seconds}

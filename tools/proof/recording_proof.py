@@ -1261,7 +1261,7 @@ def display_probe():
         sdk = subprocess.run(["xcrun", "--show-sdk-path", "--sdk", "macosx"],
                              capture_output=True, text=True).stdout.strip()
         built = subprocess.run(
-            ["swiftc", "-sdk", sdk, "-target", "arm64-apple-macos15.0", PROBE_SOURCE, "-o",
+            ["swiftc", "-sdk", sdk, "-target", "arm64-apple-macos26.0", PROBE_SOURCE, "-o",
              PROBE], capture_output=True, text=True)
         if built.returncode != 0:
             print(built.stderr[:800])

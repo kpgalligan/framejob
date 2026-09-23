@@ -991,7 +991,7 @@ def build_probe(sources):
     ).stdout.strip()
     start = time.time()
     result = subprocess.run(
-        ["swiftc", "-sdk", sdk, "-target", "arm64-apple-macos15.0", "-module-name", "Reelcut",
+        ["swiftc", "-sdk", sdk, "-target", "arm64-apple-macos26.0", "-module-name", "Reelcut",
          "-import-objc-header", os.path.join(ROOT, "app", "Bridging", "Reelcut-Bridging-Header.h"),
          "-L", os.path.dirname(lib), "-lreelcut_core"] + files + [entry, "-o", binary],
         capture_output=True, text=True)

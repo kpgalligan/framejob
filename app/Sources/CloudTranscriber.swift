@@ -27,7 +27,7 @@ import Foundation
 /// here or below it, one serial queue, the body synchronous on it, the single
 /// completion posted to main.
 enum TranscriptionEngine: String, CaseIterable {
-    /// On-device `SFSpeechRecognizer` — `Transcriber`, the default.
+    /// On-device `SpeechTranscriber` — `Transcriber`, the default.
     case apple
     /// AssemblyAI over the network — `CloudTranscriber`.
     case assemblyai
@@ -93,15 +93,16 @@ final class CloudTranscriber {
     /// own queue and its caller bounces it.
     func run(
         jobs: [Transcriber.Job], options: TranscriptOptions, refresh: Bool, frame: Ticks,
-        cancel: Transcriber.CancelToken, progress: ((Double, String) -> Void)? = nil,
+        pages: CaptionPages.Request, cancel: Transcriber.CancelToken,
+        progress: ((Double, String) -> Void)? = nil,
         completion: @escaping (Result<Transcriber.Outcome, any Error>) -> Void
     ) {
         work.async { [weak self] in
             guard let self = self else { return }
             let outcome = Result {
                 try self.transcribe(
-                    jobs, options: options, refresh: refresh, frame: frame, cancel: cancel,
-                    progress: progress)
+                    jobs, options: options, refresh: refresh, frame: frame, pages: pages,
+                    cancel: cancel, progress: progress)
             }
             DispatchQueue.main.async { completion(outcome) }
         }
@@ -134,13 +135,13 @@ final class CloudTranscriber {
     /// The synchronous body, road map 6 §5a. Call it off the main thread; a
     /// tool that already runs on the server thread calls it directly.
     ///
-    /// `truncations` is ALWAYS empty and that is a claim, not an oversight:
-    /// there is no one-minute ceiling on the other side of a REST call, so
-    /// the tool's `truncated` key can never appear for this engine and the
-    /// proof says so.
+    /// There is no ceiling to report on the other side of a REST call, and
+    /// since W2 there is none on this Mac either (spec §11 W-8): the tool's
+    /// `truncated` key is gone for both engines, and the proof says so.
     func transcribe(
         _ jobs: [Transcriber.Job], options: TranscriptOptions, refresh: Bool, frame: Ticks,
-        cancel: Transcriber.CancelToken, progress: ((Double, String) -> Void)? = nil
+        pages: CaptionPages.Request, cancel: Transcriber.CancelToken,
+        progress: ((Double, String) -> Void)? = nil
     ) throws -> Transcriber.Outcome {
         report = Report()
         var last = 0.0
@@ -295,7 +296,10 @@ final class CloudTranscriber {
             for job in grouped[id] ?? [] {
                 let words = MediaTranscript.words(for: job, in: file)
                     .filter { $0.start < job.start + job.duration }
-                cues.append(contentsOf: CaptionCues.build(from: words, frame: frame, clip: job.clip))
+                cues.append(
+                    contentsOf: CaptionPages.cues(
+                        from: words, span: job.span, frame: frame, request: pages,
+                        engine: .assemblyai, clip: job.clip))
                 if words.isEmpty {
                     problems.append(
                         CaptionLayout.Problem(
@@ -319,7 +323,6 @@ final class CloudTranscriber {
             throw Transcriber.TranscribeError.nothingRecognized
         }
         publish(1, "")
-        return Transcriber.Outcome(
-            cues: cues, problems: problems, truncations: [], clips: clips)
+        return Transcriber.Outcome(cues: cues, problems: problems, clips: clips)
     }
 }

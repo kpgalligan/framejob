@@ -1460,7 +1460,7 @@ def versions_part(mcp):
     old_nest = {"id": 4, "track": 2, "start": 2 * SEC, "duration": 2 * SEC,
                 "source": {"kind": "nest", "project": "/gone/Old Group.reelcut"},
                 "video": {}}
-    for version in (1, 2, 3, 4, 5, 6, 7, 8):
+    for version in (1, 2, 3, 4, 5, 6, 7, 8, 9):
         extra = (old_nest,) if version == 1 else ()
         try:
             mcp.call_with("open_project", {"path": package(version, extra)})
@@ -1468,9 +1468,9 @@ def versions_part(mcp):
             check(False, f"a version-{version} file opens in the built app ({error})")
             continue
         reported = project(mcp)
-        check(reported["version"] == 8 and reported["clips"][0]["text"]["content"]
+        check(reported["version"] == 9 and reported["clips"][0]["text"]["content"]
               == f"v{version}",
-              f"a version-{version} file opens in the built app and is stamped 8 in "
+              f"a version-{version} file opens in the built app and is stamped 9 in "
               f"memory, its content intact")
 
     # The migrated nest is the interesting one: version 1's path string is
@@ -1496,8 +1496,8 @@ def versions_part(mcp):
     # `core/CLAUDE.md` records: the moment RC_FORMAT_VERSION reaches the
     # number written here this stops testing the gate and starts testing
     # that a current file opens, green either way.
-    future = refusal(mcp, "open_project", {"path": package(9)})
-    check(future is not None and "version 9 is newer than this build understands" in future,
+    future = refusal(mcp, "open_project", {"path": package(10)})
+    check(future is not None and "version 10 is newer than this build understands" in future,
           f"and a file one version PAST the current one is still refused at the door: "
           f"{future!r}")
 

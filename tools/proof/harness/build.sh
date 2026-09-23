@@ -47,7 +47,7 @@ mkdir -p "$out"
 start=$(date +%s)
 swiftc \
     -sdk "$(xcrun --show-sdk-path --sdk macosx)" \
-    -target arm64-apple-macos15.0 \
+    -target arm64-apple-macos26.0 \
     -module-name Reelcut \
     -import-objc-header "$root/app/Bridging/Reelcut-Bridging-Header.h" \
     -L "$root/core/target/release" -lreelcut_core \

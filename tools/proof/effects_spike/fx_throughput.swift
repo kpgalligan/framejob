@@ -1,7 +1,7 @@
 // fx_throughput.swift — q1 (synchronous offline render, × realtime per unit and
 // for a four-unit chain) and q6 (the cost of re-rendering a 10 s window 30 s in).
 //
-// Build: xcrun swiftc -O -parse-as-library -target arm64-apple-macos15.0 \
+// Build: xcrun swiftc -O -parse-as-library -target arm64-apple-macos26.0 \
 //          fx_common.swift fx_throughput.swift -o ../work/effects_spike/fx_throughput
 // Run from this directory (fixtures default to ../work/effects_spike/fx).
 

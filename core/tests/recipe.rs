@@ -53,16 +53,19 @@ const LAYER_KEYS: [&str; 20] = [
     "y",
 ];
 
-/// The six keys a TEXT layer's `source` object carries (spec §7.3): the
-/// tagged kind, the cache hash, the description, and the three computed
-/// reveal keys that are emitted whether the layer animates or not.
-const TEXT_SOURCE_KEYS: [&str; 6] = [
+/// The eight keys a TEXT layer's `source` object carries (spec §7.3): the
+/// tagged kind, the cache hash, the description, the three computed
+/// reveal keys and the two computed word keys (format version 9), all
+/// emitted whether the layer animates or is word-timed or not.
+const TEXT_SOURCE_KEYS: [&str; 8] = [
     "hash",
     "kind",
     "reveal",
     "reveal_kind",
     "reveal_phase",
     "text",
+    "word",
+    "word_pop",
 ];
 
 /// The ticks a test sweeps unless it wants a particular reading: inside

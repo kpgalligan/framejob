@@ -176,3 +176,12 @@ extension Transcriber {
         }
     }
 }
+
+extension Transcriber.Job {
+    /// The job's clip on the timeline, `[start, start + duration)` — the ONE
+    /// spelling of it. `CaptionPages` confines every page it makes for this
+    /// job to it (road map 8's W4a), so pages of two abutting clips abut at
+    /// most. `duration` is positive: `jobs(for:in:urls:)` refuses a clip
+    /// whose length is not.
+    var span: Range<Ticks> { start ..< start + duration }
+}

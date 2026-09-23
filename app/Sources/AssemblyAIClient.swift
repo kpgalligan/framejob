@@ -7,9 +7,10 @@ import Foundation
 /// socket at all.
 ///
 /// **R6-7: no `async`.** Each method builds a task and waits on a semaphore
-/// the delegate signals — `Transcriber`'s `TaskSink` shape, and the delegate
-/// queue is one of ours for its reason: the framework's default would make an
-/// off-main tool's wait depend on somebody else's queue staying free.
+/// the delegate signals — the shape the old on-device `TaskSink` had, and
+/// the delegate queue is one of ours for its reason: the framework's default
+/// would make an off-main tool's wait depend on somebody else's queue staying
+/// free.
 ///
 /// **A redirect is never followed.** `willPerformHTTPRedirection` always
 /// answers nil, so the 3xx is delivered as the task's own response and comes

@@ -1025,3 +1025,53 @@ The review's third core change is a test file, `core/tests/motion_edges.rs`
 under a whole turn, then **375** when the residue run restated the band's
 reason in its comments): the seven inputs those two fixes, R3·1 and that
 widening came from, each with a named mutant that fails it.
+
+## 2026-09-22 — word captions, the core's half (road map 8's W1b, format version 9)
+
+Two new modules, both under the 400-line cap for a new file.
+`model_words.rs` (170) holds the vocabulary — `TextCase`, `Word`, `WordMode`,
+`ActivePill`, `WordStyle` with the `template()` `patch.rs` walks against — and
+is re-exported through `model_props.rs` beside `model_text.rs`, the fields
+themselves (`case`, `words`, `word_style`) closing `TextProps` in that order.
+It also holds the two facts every writer of `text.words` shares, both
+`pub(crate)`: `token_count` (`split_whitespace`, the count W0 q4 measured
+against the renderer's tokenizer) and `rebase_words`, the one saturating
+subtraction `trim_start`, `roll`, `add_transition`'s handle form and
+`split`'s second half make. A glob re-export cannot widen a `pub(crate)`
+item, so those five callers and `props_check.rs` name `crate::model_words`
+directly. `recipe_words.rs` (83) is `Words::of` and `WORD_POP`: a COUNT of
+started words and a saturating, clamped pop, because a paste payload and the
+file reader store `words` unchecked, so an unsorted list or an `i64::MIN`
+start reaches the recipe and must still come out in 0..1 (`ramp` in
+`recipe_text.rs` was the precedent). It is a module of its own rather than
+more of `recipe_text.rs` (510 → 552) because it is a second, independent
+account of a text layer's content over time, and W-5 says the two do not
+compose.
+
+**`snap_animation` was widened, not joined.** It now snaps every
+`words[i].start` and `end` as well as the animation's two durations, so its
+four existing callers — `set_text`, `add_text_clip`, `paste_attributes`
+(through `normalise_and_check_group`) and `frame_grid.rs`'s
+`resnap_clip_times` — cover words without a new call site, D7-3's rate
+change included. Nearest, never clamped: a negative start stays negative.
+The check still runs first at every door, so a refusal names the caller's
+number.
+
+**The description rule.** `text_source` strips `words` from the description
+as it strips `animation`, and keeps `word_style` only when set and `case`
+only when it is not `as_written`: a version-9 key rides in the description
+only when it changes the picture, so an unstyled, as-written title hashes
+byte for byte as it did before version 9 and `evaluate_tests.rs`'s
+pre-version-5 constant still stands. The hash's keyed map gains `word` and
+`word_pop` only when `word_style` is set.
+
+**The split rule.** `split_clip` stores the EVALUATED text on the second
+half, so a finished action whose end patch switched `content` (which
+`set_action_end` still lets through) laid a new content over base `words`.
+Stored as-is, that half would be refused by the count rule on every later
+`set_text` or `paste_attributes`, a colour change included. So a second half
+whose evaluated content's token count differs from `words.len()` stores
+`words: []`; otherwise it is rebased by the cut. The first half is never
+touched. The same mismatch arriving through `paste`'s stored-whole payload
+is NOT normalised (road map 5 §12, R2·2) and is road map 8 §10.5's known
+limit.

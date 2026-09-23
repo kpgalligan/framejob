@@ -23,6 +23,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::edit_clip::clip_end;
 use crate::model::{Clip, Curve, Project, Source, Transition, TransitionKind};
+use crate::model_words::rebase_words;
 use crate::outcome::Outcome;
 use crate::source_window::source_advanced;
 use crate::time::Ticks;
@@ -201,7 +202,9 @@ impl Project {
     ///    where a transition reveals material in FRONT of a first frame
     ///    that was never meant to move. B's `fade_in` and its text reveal
     ///    are measured from B's new first frame and so begin under the
-    ///    transition, which is what a transition is for.
+    ///    transition, which is what a transition is for. B's `text.words`
+    ///    are rebased the same way (spec §11, W-3): a word stays on its
+    ///    speech.
     /// 10. The kind: the argument if given, else B's own stored kind if it
     ///     has one (Clip ▸ Transition ▸ stores an undrawn one at a hard
     ///     cut), else `cross_dissolve`. A stored transition keeps its
@@ -390,6 +393,9 @@ impl Project {
         let (grown, mut moved) = extended(&earlier, &later, tail, head);
         for action in &mut moved.actions {
             action.start = action.start.saturating_add(head);
+        }
+        if let Some(text) = moved.text.as_mut() {
+            rebase_words(text, head.saturating_neg());
         }
         moved.transition_in = Some(match (kind, later.transition_in) {
             (Some(kind), Some(stored)) => Transition { kind, ..stored },

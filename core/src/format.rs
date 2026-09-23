@@ -132,7 +132,30 @@ use crate::model::{Canvas, Project};
 /// a picture a careful reader could compare, where a preset that is gone
 /// looks in every still frame exactly like a preset that was never
 /// chosen.
-pub const RC_FORMAT_VERSION: u32 = 8;
+///
+/// Version 9 is word captions (road map 8, W1b): THREE keys on the text
+/// group, closing it in this order. [`crate::model::TextProps::case`] is a
+/// transform applied before layout, `as_written` or `upper`;
+/// [`crate::model::TextProps::words`] is one `{start, end}` per whitespace
+/// token of `content`, in clip time, or empty for an untimed text; and
+/// [`crate::model::TextProps::word_style`] is an optional
+/// [`crate::model::WordStyle`] saying how the word being said is drawn. All
+/// three default (`as_written`, `[]`, `None`), so a version-8 file reads
+/// unchanged and there is no migration step. The per-frame `word` and
+/// `word_pop` the recipe carries are computed by `recipe_words.rs` and
+/// never stored.
+///
+/// The argument for bumping is versions 5 through 8's, written out again
+/// because the shape of THIS loss is different again: it is not one key but
+/// the relation between two. A version-8 build handed a version-9 file
+/// would open it, drop every page's timings and style on read and write
+/// the loss back — and what is left is a page of text that is still on
+/// screen for exactly as long as it was, still says every word it said,
+/// and simply no longer knows WHEN any of them was spoken. The timings came
+/// from a recogniser run over the audio; nothing in the file that survives
+/// could rebuild them, so the loss is the one version whose repair is not a
+/// click in the inspector but a second transcription.
+pub const RC_FORMAT_VERSION: u32 = 9;
 
 /// Reader caps, mirrored by the `RC_MAX_*` defines in the C header. They
 /// exist so a corrupt or generated file cannot make the app allocate
@@ -306,7 +329,7 @@ pub fn read(json: &str) -> Result<Project, String> {
 
     // MIGRATION HOOK. Each bump adds one step here, applied in order from
     // `version` up to RC_FORMAT_VERSION, rewriting `value` in place before
-    // it is deserialized. Versions 3, 4, 5, 6, 7 and 8 needed no rewrite —
+    // it is deserialized. Versions 3, 4, 5, 6, 7, 8 and 9 needed no rewrite —
     // every field any of them added carries a serde default — so none has a
     // line; the next version that changes a field's SHAPE adds its own
     // below.
