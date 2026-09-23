@@ -27,7 +27,7 @@ enum TimelineBar {
 
     /// The design's 12 pt edge padding and 12 pt between clusters.
     private static let padding: CGFloat = 12
-    /// Edit-action buttons: 28 × 24 at 17 pt, on the 4 pt button radius.
+    /// Edit-action buttons: 28 × 24 at 17 pt, on the square button radius.
     private static let actionSize = NSSize(width: 28, height: 24)
     private static let actionPointSize: CGFloat = 17
 
@@ -159,9 +159,9 @@ enum TimelineBar {
             size: actionSize, pointSize: 15, cornerRadius: DS.buttonRadius)
         into.target = owner
 
-        // The one raw AppKit control in the app's chrome: spec §4.4 asks for
-        // a zoom SLIDER and `OptionControls.swift` (which is Rasterize's, and
-        // stays in sync with it) has no slider to borrow.
+        // Spec §4.4's zoom SLIDER is the shared file's `BlockSlider`
+        // (`Controls.swift`, Rasterize's, kept in sync): a 3 pt track and a
+        // 7 × 11 pt block knob in place of the system knob.
         let slider = owner.zoomSlider
         slider.target = owner
         slider.action = #selector(TimelineView.zoomSliderChanged(_:))
@@ -298,7 +298,7 @@ final class TimelineSelectionBlock: NSView {
             x: 0, y: (bounds.height - Self.chip.height) / 2,
             width: Self.chip.width, height: Self.chip.height)
         content.tint.setFill()
-        NSBezierPath(roundedRect: chip, xRadius: 2, yRadius: 2).fill()
+        chip.fill()
 
         let textX = chip.maxX + Self.gap
         let textWidth = max(bounds.width - textX, 0)

@@ -266,7 +266,7 @@ final class AccentButton: NSButton {
 /// `size`, `pointSize` and `cornerRadius` default to the Rasterize-copied
 /// original, so the shared file is extended rather than forked: the window
 /// toolbar asks for 34 × 26 at 19 pt and the timeline bar for 28 × 24 at 17 pt,
-/// both on the 4 pt button radius.
+/// both on the square button radius (`DS.buttonRadius`).
 final class GhostButton: NSButton {
     private let iconName: String
     private let fallbackGlyph: String
@@ -279,7 +279,7 @@ final class GhostButton: NSButton {
     init(
         symbol: String, fallback: String, caption: String?, tooltip: String,
         action: Selector?, size: NSSize? = nil, pointSize: CGFloat = 15,
-        cornerRadius: CGFloat = 8
+        cornerRadius: CGFloat = DS.buttonRadius
     ) {
         self.iconName = symbol
         self.fallbackGlyph = fallback
@@ -406,9 +406,9 @@ extension NSImage {
 // MARK: - Styled fields
 
 enum DSField {
-    /// Styles a text field as the design's 7px-radius bordered field with
-    /// mono content ("a 7px rectangle means: type here"). The toolbar's
-    /// timecode passes the compact trio — 24 pt on the 4 pt button radius,
+    /// Styles a text field as the design's square bordered field with
+    /// mono content ("a bordered rectangle means: type here"). The toolbar's
+    /// timecode passes the compact trio — 24 pt on the square button radius,
     /// mono 12 medium — and everything else takes the defaults.
     static func style(
         _ field: NSTextField, height: CGFloat = 26, radius: CGFloat = DS.fieldRadius,
@@ -425,6 +425,90 @@ enum DSField {
         field.layer?.borderColor = DS.borderStrong.cgColor
         field.layer?.cornerRadius = radius
         field.heightAnchor.constraint(equalToConstant: height).isActive = true
+    }
+}
+
+// MARK: - BlockSlider
+
+/// A slider with the sharp chrome's 3pt track and 7×11pt block knob. All the
+/// drawing lives in `BlockSliderCell`; the control only installs the cell.
+final class BlockSlider: NSSlider {
+    override class var cellClass: AnyClass? {
+        get { BlockSliderCell.self }
+        set {}
+    }
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("BlockSlider does not support NSCoder")
+    }
+}
+
+/// The block slider's cell: a 3pt track (border colour, accent up to the
+/// knob) and a plain rectangular knob. The knob's x comes from AppKit's own
+/// `knobRect(flipped:)`, so drawing, the accent fill and pointer tracking
+/// share one value mapping.
+final class BlockSliderCell: NSSliderCell {
+    private static let knobSize = NSSize(width: 7, height: 11)
+    private static let trackHeight: CGFloat = 3
+
+    override init() {
+        super.init()
+    }
+
+    override init(textCell string: String) {
+        super.init(textCell: string)
+    }
+
+    override init(imageCell image: NSImage?) {
+        super.init(imageCell: image)
+    }
+
+    @available(*, unavailable)
+    required init(coder: NSCoder) {
+        fatalError("BlockSliderCell does not support NSCoder")
+    }
+
+    override var knobThickness: CGFloat { Self.knobSize.width }
+
+    override func knobRect(flipped: Bool) -> NSRect {
+        let midX = super.knobRect(flipped: flipped).midX
+        let midY = barRect(flipped: flipped).midY
+        let size = Self.knobSize
+        return NSRect(
+            x: midX - size.width / 2, y: midY - size.height / 2,
+            width: size.width, height: size.height)
+    }
+
+    override func drawBar(inside rect: NSRect, flipped: Bool) {
+        let track = NSRect(
+            x: rect.minX, y: rect.midY - Self.trackHeight / 2,
+            width: rect.width, height: Self.trackHeight)
+        // Reelcut's one fork of Rasterize's copy (spec §11 SH-2): the disabled
+        // dim is the context's alpha, because `withAlphaComponent` REPLACES the
+        // translucent `DS.border`'s own alpha and painted the track in the
+        // knob's solid ink. `.sourceOver`, so the translucent track blends.
+        let context = NSGraphicsContext.current?.cgContext
+        context?.saveGState()
+        context?.setAlpha(isEnabled ? 1 : 0.42)
+        DS.border.setFill()
+        track.fill(using: .sourceOver)
+        let knobMidX = knobRect(flipped: flipped).midX
+        let filled = NSRect(
+            x: track.minX, y: track.minY,
+            width: max(0, min(knobMidX, track.maxX) - track.minX), height: track.height)
+        DS.accent.setFill()
+        filled.fill(using: .sourceOver)
+        context?.restoreGState()
+    }
+
+    override func drawKnob(_ knobRect: NSRect) {
+        DS.textStrong.withAlphaComponent(isEnabled ? 1 : 0.42).setFill()
+        knobRect.fill()
     }
 }
 

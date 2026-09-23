@@ -4,7 +4,9 @@ import AppKit
 /// so the app matches the OS in both appearances — an image editor's chrome
 /// should stay neutral. The only fixed colors are the brand mark (welcome
 /// motif, selection marquee) and the transparency checkerboard; fonts remain
-/// the vendored Balopy faces.
+/// the vendored Balopy faces. The chrome is square: every chrome radius token
+/// below is 0, so controls, rows, fields and panels draw with sharp corners.
+/// A clip bar is content, not chrome, and keeps `clipRadius`.
 enum DS {
     // MARK: - Chrome colors (system palette)
 
@@ -135,10 +137,10 @@ enum DS {
 
     static let railWidth: CGFloat = 48
     static let railSlot: CGFloat = 34
-    static let railSlotRadius: CGFloat = 5
+    static let railSlotRadius: CGFloat = 0
     static let optionsBarHeight: CGFloat = 36
     static let controlHeight: CGFloat = 22
-    static let controlRadius: CGFloat = 3
+    static let controlRadius: CGFloat = 0
     static let statusBarHeight: CGFloat = 26
     static let panelWidth: CGFloat = 304
     static let tabHeight: CGFloat = 32
@@ -161,7 +163,7 @@ enum DS {
 
     /// A clip bar: its corner, the name strip along its top, the grips that
     /// appear on the selected one, and the width of one filmstrip tile.
-    static let clipRadius: CGFloat = 4
+    static let clipRadius: CGFloat = 2
     static let clipHeaderHeight: CGFloat = 16
     static let trimGripWidth: CGFloat = 6
     static let filmstripThumb: CGFloat = 34
@@ -175,11 +177,11 @@ enum DS {
         [58, 116, 82],
     ]
 
-    /// The radius scale: 3 for controls (`controlRadius`), 4 for buttons and
-    /// clips, 5 for list rows, 7 for the bordered fields that predate it.
-    static let buttonRadius: CGFloat = 4
-    static let listRowRadius: CGFloat = 5
-    static let fieldRadius: CGFloat = 7
+    /// The radius scale: the chrome is square, so controls (`controlRadius`),
+    /// buttons, list rows and the bordered fields are all 0; a clip keeps 2.
+    static let buttonRadius: CGFloat = 0
+    static let listRowRadius: CGFloat = 0
+    static let fieldRadius: CGFloat = 0
 
     // MARK: - Motion
 

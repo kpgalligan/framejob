@@ -1,0 +1,4 @@
+@import "https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,300..500,0..1,0&display=block";
+@import "tokens.css";
+a{color:var(--link);text-decoration:none}a:hover{color:var(--link-hover)}
+.ms{font-family:var(--font-icon);font-weight:normal;font-style:normal;line-height:1;letter-spacing:normal;text-transform:none;white-space:nowrap;direction:ltr;-webkit-font-smoothing:antialiased;font-feature-settings:"liga"}

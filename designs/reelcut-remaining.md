@@ -207,8 +207,8 @@ Every file over the ~600-line cap as of 2026-09-20 — 27 of them, the
 list regenerated row by row against `wc -l` at road map 7's D3·6, which
 closed deepening D3, and regenerated again by the command below when road
 map 6's C1 tolls took two files off it. `core/src/edit_track.rs` came off
-it at D2·3 (674 → 522, `edit_canvas.rs` cut out of it) and nothing has
-joined since.
+it at D2·3 (674 → 522, `edit_canvas.rs` cut out of it) and nothing had
+joined since until `app/Sources/Controls.swift` joined on 2026-09-23.
 
 **What deepening D3 did to this list**, measured against `main` rather than
 summed from the tickets (road map 7 §7–§9). `core/src/edit.rs` lost its
@@ -399,6 +399,7 @@ row per op.
 | `app/Sources/AgentServer.swift` | 785 |
 | `app/Sources/FFmpegRewrap.swift` | 768 |
 | `app/Sources/Loudness.swift` | 742 |
+| `app/Sources/Controls.swift` | 651 (567 before the sharp pass; Rasterize's own copy is 624 — the sync rule, app/CLAUDE.md "Shared chrome", is why it took `BlockSlider` verbatim and shed nothing; the seven lines over the verbatim block are the SH-2 fork of `drawBar`) |
 | `app/Sources/ExportSheetController.swift` | 639 |
 | `app/Sources/Exporter.swift` | 609 |
 | `app/Sources/ClipPane.swift` | 609 |
@@ -550,6 +551,16 @@ product cap.
 These are not tasks so much as a list to run through at the machine once. The
 first two have been owed since M1 and spec §10 records them; phases 8 and 9
 and the closing above added the rest.
+
+- **The sharp chrome, LOOKED AT (2026-09-23)** — in both appearances, in the
+  running app. `sharp_chrome.py` photographs the resting chrome offscreen and
+  reads its corners, but the harness cannot show hover (a `GhostButton` draws
+  only when hovered, so its now-square hover fill has never been rendered),
+  press, a disabled `BlockSlider`, dragging the zoom knob, or the Metal well.
+  Worth judging: whether the zoom slider's grey track and white (dark) or
+  black (light) block read well beside the accent fill (spec §11 SH-2), and
+  whether the square Export button, S/M/L, Snap box and fields sit well
+  beside the sheets' still-pill `StickerButton`s (SH-1).
 
 - **The cloud captions parts, road map 6's c1-parts (2026-09-20)** — what no
   instrument in that pipeline could reach. Every one of them needs a real

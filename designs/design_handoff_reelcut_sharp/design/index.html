@@ -1,0 +1,43 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>Reelcut — Editor</title><link rel="stylesheet" href="styles.css">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="runtime/ds_bundle.js"></script><script src="data.js"></script>
+<style>html,body{margin:0;background:var(--surface-window);color:var(--text-body);font:var(--type-body);overflow:hidden}#root{width:1440px;height:862px}</style></head><body><div id="root"></div>
+<script type="text/babel" src="toolbar.jsx"></script><script type="text/babel" src="preview.jsx"></script><script type="text/babel" src="inspector.jsx"></script><script type="text/babel" src="timeline-bar.jsx"></script><script type="text/babel" src="timeline.jsx"></script>
+<script type="text/babel">
+const { TitleBar } = window.ReelcutDesignSystem_2b6440;
+function App() {
+  const [clips, setClips] = React.useState(RC.CLIPS);
+  RC.CLIPS = clips;
+  const [selected, setSelected] = React.useState("v1");
+  const [tab, setTab] = React.useState("Clip");
+  const [size, setSize] = React.useState("M");
+  const [snap, setSnap] = React.useState(true);
+  const [safe, setSafe] = React.useState(false);
+  const [fit, setFit] = React.useState("Fit");
+  const [zoom, setZoom] = React.useState(0.42);
+  const [time, setTime] = React.useState(4.2);
+  const [playing, setPlaying] = React.useState(false);
+  const [toast, setToast] = React.useState(null);
+  React.useEffect(() => { if (!playing) return; let last = performance.now(), raf; const f = (n) => { setTime((t) => { const x = t + (n - last) / 1000; if (x >= RC.DURATION) { setPlaying(false); return RC.DURATION; } return x; }); last = n; raf = requestAnimationFrame(f); }; raf = requestAnimationFrame(f); return () => cancelAnimationFrame(raf); }, [playing]);
+  const jump = (t) => setTime(Math.max(0, Math.min(RC.DURATION, t)));
+  const select = (id) => { setSelected(id); if (id) setTab("Clip"); };
+  const blade = () => { const c = clips[selected]; if (!c || time <= c.start || time >= c.end) return; const id = selected + "b" + Date.now(); setClips({ ...clips, [selected]: { ...c, end: time }, [id]: { ...c, start: time } }); };
+  const del = () => { if (!selected) return; const n = { ...clips }; delete n[selected]; setClips(n); setSelected(null); };
+  const dup = () => { const c = clips[selected]; if (!c) return; const id = selected + "d" + Date.now(); const len = c.end - c.start; setClips({ ...clips, [id]: { ...c, start: Math.min(c.end, RC.DURATION - len), end: Math.min(c.end + len, RC.DURATION) } }); setSelected(id); };
+  React.useEffect(() => { const k = (e) => { if (e.code === "Space") { e.preventDefault(); setPlaying((p) => !p); } if (e.key === "b") blade(); if (e.key === "Backspace") del(); }; window.addEventListener("keydown", k); return () => window.removeEventListener("keydown", k); });
+  return <div style={{ width: 1440, height: 862, display: "flex", flexDirection: "column", background: "var(--surface-window)", position: "relative" }}>
+    <TitleBar title="Untitled Project" meta="1080 × 1920 · 25.106 fps · edited" />
+    <Toolbar time={time} playing={playing} onPlay={() => setPlaying(!playing)} onJump={jump} safe={safe} setSafe={setSafe} fit={fit} setFit={setFit} onExport={() => { setToast("Export queued — Untitled Project.mp4"); setTimeout(() => setToast(null), 2200); }} />
+    <div style={{ display: "flex", height: 470, flex: "none" }}>
+      <Preview safe={safe} fit={fit} />
+      <Inspector tab={tab} setTab={setTab} selected={selected} />
+    </div>
+    <TimelineBar selected={selected} onBlade={blade} onDelete={del} onDuplicate={dup} snap={snap} setSnap={setSnap} zoom={zoom} setZoom={setZoom} size={size} setSize={setSize} />
+    <Timeline clips={clips} selected={selected} onSelect={select} size={size} time={time} onScrub={jump} zoom={zoom} />
+    {toast && <div style={{ position: "absolute", left: "50%", top: 84, transform: "translateX(-50%)", background: "var(--surface-titlebar)", border: "1px solid var(--border-strong)", padding: "8px 12px", font: "var(--type-label)", color: "var(--text-body)", zIndex: 20 }}>{toast}</div>}
+  </div>;
+}
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script></body></html>

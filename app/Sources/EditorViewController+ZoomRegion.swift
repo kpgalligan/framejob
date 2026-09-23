@@ -491,7 +491,7 @@ final class CanvasRegionView: NSView, CanvasModalMode {
             width: (size.width + Self.hintPadding * 2).rounded(),
             height: (size.height + 6).rounded())
         guard pill.width < bounds.width else { return pill.height }
-        let path = NSBezierPath(roundedRect: pill, xRadius: 4, yRadius: 4)
+        let path = NSBezierPath(rect: pill)
         DS.chromeBackground.withAlphaComponent(0.92).setFill()
         path.fill()
         DS.accent.setStroke()

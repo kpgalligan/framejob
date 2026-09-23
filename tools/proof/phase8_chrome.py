@@ -2036,7 +2036,9 @@ class Image:
         The threshold is EVERY pixel and not most of them, which is what tells
         a rule from a control: the search field spans the same width, but its
         bezel is rounded, so its top scanline misses the corner pixels (564 of
-        568, measured) where a bar's hairline runs edge to edge (568)."""
+        568, measured) where a bar's hairline runs edge to edge (568). Since
+        the sharp pass (2026-09-23) the bezel is square and the field's box is
+        excluded by position instead — section 7's `band_rules`."""
         s = self.scale
         total = int(x1 * s) - int(x0 * s)
         hits = []
@@ -3013,7 +3015,16 @@ def main():
           f"{os.path.basename(renders['six'])} vs "
           f"{os.path.basename(renders['six-again'])}")
 
-    rules = six.full_width_rules(105, 215)
+    # 2026-09-23, the sharp pass (`design_handoff_reelcut_sharp/`): the search
+    # field's bezel is SQUARE now (`DS.fieldRadius` 0), so its top and bottom
+    # borders run edge to edge like a hairline and `full_width_rules` can no
+    # longer tell them apart by the corners. The field's own 24 pt box on line
+    # 1 is excluded instead; the band's two hairlines lie outside it.
+    def band_rules(image):
+        return [r for r in image.full_width_rules(105, 215)
+                if not (LINE1_Y0 - 1 <= r[0] and r[1] <= LINE1_Y0 + FIELD_H + 1)]
+
+    rules = band_rules(six)
     check("the pane draws exactly TWO full-width hairlines between the section header and "
           "the list — the action row's and the find band's, both `BarView(border: .bottom)`",
           len(rules) == 2, f"rules at {[f'{a:g}–{b:g}' for a, b in rules]} pt")
@@ -3151,7 +3162,7 @@ def main():
           f"row 1 changed {not first_row_same}, row 2 changed {second_row_gone}")
 
     nomatch = images["nomatch"]
-    nomatch_rules = nomatch.full_width_rules(105, 215)
+    nomatch_rules = band_rules(nomatch)
     check("a search that matches NOTHING keeps the band exactly where it was — both "
           "hairlines still there, still 67 pt apart",
           len(nomatch_rules) == 2

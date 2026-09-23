@@ -1,0 +1,220 @@
+/* ---- fonts.css ---- */
+@font-face{font-family:"Source Sans 3";src:url("assets/fonts/SourceSans3.ttf") format("truetype");font-weight:200 900;font-style:normal;font-display:swap}
+@font-face{font-family:"IBM Plex Mono";src:url("assets/fonts/IBMPlexMono-Regular.ttf") format("truetype");font-weight:400;font-style:normal;font-display:swap}
+@font-face{font-family:"IBM Plex Mono";src:url("assets/fonts/IBMPlexMono-Medium.ttf") format("truetype");font-weight:500;font-style:normal;font-display:swap}
+@font-face{font-family:"Darker Grotesque";src:url("assets/fonts/DarkerGrotesque.ttf") format("truetype");font-weight:300 900;font-style:normal;font-display:swap}
+
+/* ---- colors.css ---- */
+/* Reelcut dark chrome — values from designs/design_handoff_reelcut/Reelcut Editor.dc.html */
+:root{
+/* neutral ramp (macOS-style dark gray) */
+--gray-1000:#101010;--gray-950:#171717;--gray-925:#1a1a1a;--gray-900:#1d1d1d;--gray-875:#1f1f1f;--gray-850:#232323;--gray-840:#242424;--gray-830:#262626;--gray-820:#2a2a2a;--gray-810:#2b2b2b;--gray-800:#2c2c2c;--gray-790:#303030;--gray-780:#333333;--gray-750:#3a3a3a;--gray-600:#55554f;--gray-500:#6e6e68;--gray-450:#7c7c76;--gray-400:#8f8f8a;--gray-350:#9a9a95;--gray-300:#a3a39c;--gray-250:#b9b9b3;--gray-200:#c8c8c2;--gray-150:#dcdcd8;--gray-100:#e6e6e4;--gray-50:#f0efe9;
+/* accent (system blue, dark appearance) */
+--blue-600:#3d6ea8;--blue-550:#4a7fbd;--blue-500:#4a7fd0;--blue-400:#62b0ff;--blue-300:#8cc6ff;--blue-50:#f0f6ff;
+/* brand inks */
+--brand-paper:#FBF8F1;--brand-forest:#1F8564;--brand-butter:#F2C14E;--brand-overlap:#1D651F;--brand-coral:#F4653F;--brand-ink:#101915;
+/* clip kind tints — fixed across appearances */
+--clip-video:#3E5063;--clip-audio:#2C7A58;--clip-still:#6A4B93;--clip-text:#B17C1E;--clip-shape:#247686;--clip-nest:#55595F;
+/* macOS traffic lights */
+--traffic-close:#ff5f57;--traffic-min:#febc2e;--traffic-zoom:#28c840;
+
+/* ---- semantic ---- */
+--surface-desk:var(--gray-1000);
+--surface-window:var(--gray-850);
+--surface-titlebar:var(--gray-800);
+--surface-bar:var(--gray-830);
+--surface-panel:var(--gray-840);
+--surface-well:var(--gray-950);
+--surface-timeline:var(--gray-900);
+--surface-ruler:var(--gray-850);
+--surface-lane:var(--gray-875);
+--surface-lane-alt:var(--gray-925);
+--surface-control:var(--gray-810);
+--surface-field:var(--gray-900);
+--surface-tab-active:var(--gray-800);
+--hover-fill:var(--gray-780);
+--hover-row:var(--gray-820);
+--selection-fill:rgba(10,132,255,0.24);
+--check-fill:rgba(10,132,255,0.3);
+
+--border:var(--gray-750);
+--border-subtle:var(--gray-790);
+--border-lane:var(--gray-820);
+--border-strong:var(--gray-600);
+
+--text-bright:var(--gray-50);
+--text-strong:var(--gray-100);
+--text-body:var(--gray-150);
+--text-icon:var(--gray-200);
+--text-muted:var(--gray-250);
+--text-icon-muted:var(--gray-300);
+--text-dim:var(--gray-350);
+--text-meta:var(--gray-400);
+--text-tick:var(--gray-450);
+--text-faint:var(--gray-500);
+--text-ghost:var(--gray-600);
+
+--accent:var(--blue-600);
+--accent-hover:var(--blue-550);
+--accent-border:var(--blue-500);
+--accent-rule:var(--blue-400);
+--accent-text:var(--blue-300);
+--on-accent:var(--blue-50);
+--link:var(--blue-400);
+--link-hover:var(--blue-300);
+
+--playhead:var(--brand-coral);
+--marquee:rgba(244,101,63,0.9);
+--snap-guide:var(--brand-butter);
+--range-shade:rgba(244,101,63,0.12);
+--candidate-shade:rgba(244,101,63,0.24);
+--meter-fill:var(--clip-audio);
+--meter-clip:var(--brand-coral);
+--safe-outer:rgba(244,101,63,0.85);
+--safe-inner:rgba(244,101,63,0.5);
+
+/* clip drawing */
+--clip-border:rgba(255,255,255,0.14);
+--clip-strip:rgba(0,0,0,0.26);
+--clip-name:rgba(255,255,255,0.92);
+--clip-icon:rgba(255,255,255,0.62);
+--clip-caption:rgba(255,255,255,0.72);
+--clip-wave:rgba(255,255,255,0.44);
+--clip-grip:rgba(255,255,255,0.38);
+--clip-hatch:rgba(255,255,255,0.26);
+--clip-hatch-edge:rgba(255,255,255,0.4);
+
+
+}
+
+/* ---- typography.css ---- */
+:root{
+--font-sans:"Source Sans 3",system-ui,-apple-system,sans-serif;
+--font-mono:"IBM Plex Mono",ui-monospace,monospace;
+--font-display:"Darker Grotesque",system-ui,sans-serif;
+--font-icon:"Material Symbols Outlined";
+
+--weight-regular:400;--weight-medium:500;--weight-semibold:600;--weight-black:900;
+
+/* sizes (pt in AppKit = px here) */
+--size-9:9px;--size-10:10px;--size-11:11px;--size-12:12px;--size-13:13px;
+--tracking-micro:0.09em;--tracking-caption:0.06em;--tracking-wordmark:-0.015em;
+
+/* semantic type */
+--type-title:600 12px/1 var(--font-sans);
+--type-label:400 11px/1 var(--font-sans);
+--type-label-strong:600 11px/1 var(--font-sans);
+--type-body:400 12px/1 var(--font-sans);
+--type-tab:600 12px/1 var(--font-sans);
+--type-clip-name:600 10px/1 var(--font-sans);
+--type-hint:400 10px/1 var(--font-sans);
+--type-mono:400 11px/1 var(--font-mono);
+--type-mono-sm:400 10px/1 var(--font-mono);
+--type-mono-xs:400 9px/1 var(--font-mono);
+--type-timecode:500 12px/1 var(--font-mono);
+--type-micro:500 10px/1 var(--font-mono); /* UPPERCASE, tracking-micro */
+--type-display:900 68px/1 var(--font-display); /* never below 28px */
+}
+
+/* ---- spacing.css ---- */
+:root{
+/* spacing scale (handoff: 2 / 3 / 6 / 8 / 10 / 12) */
+--space-2:2px;--space-3:3px;--space-6:6px;--space-7:7px;--space-8:8px;--space-9:9px;--space-10:10px;--space-12:12px;
+
+/* radii — SHARP redesign. Source app used 3/4/5/7; the new system squares everything off. */
+--radius-none:0px;
+--radius-control:0px;   /* was 3 — fields, checkboxes, segmented */
+--radius-button:0px;    /* was 4 — Accent / Ghost / bordered buttons */
+--radius-clip:2px;      /* was 4 — timeline clips; the one softened object */
+--radius-row:0px;       /* was 5 — list rows */
+--radius-field:0px;     /* was 7 — legacy bordered fields */
+--radius-window:8px;    /* macOS window — owned by the OS */
+
+--border-width:1px;
+--rule-active:2px;      /* tab underline, selection ring */
+
+/* chrome metrics */
+--titlebar-height:30px;
+--toolbar-height:44px;
+--timeline-bar-height:36px;
+--tab-height:32px;
+--control-height:22px;
+--button-height:26px;
+--field-height:24px;
+--panel-width:304px;
+--track-header-width:132px;
+--ruler-height:22px;
+--clip-header-height:16px;
+--trim-grip-width:6px;
+--filmstrip-thumb:34px;
+--section-header-height:28px;
+--selection-header-height:44px;
+--media-row-height:52px;
+--label-column:76px;
+
+/* track heights: text / video / audio */
+--track-s-text:30px;--track-s-video:54px;--track-s-audio:40px;
+--track-m-text:44px;--track-m-video:84px;--track-m-audio:60px;
+--track-l-text:58px;--track-l-video:116px;--track-l-audio:82px;
+}
+
+/* ---- effects.css ---- */
+:root{
+--shadow-window:0 24px 60px rgba(0,0,0,0.55);
+--shadow-preview:0 0 0 1px var(--gray-750),0 8px 30px rgba(0,0,0,0.5);
+--ring-selected:0 0 0 2px var(--brand-coral);
+--hatch-transition:repeating-linear-gradient(45deg,rgba(255,255,255,0.26) 0 3px,rgba(255,255,255,0) 3px 7px); /* @kind other */
+--ease-standard:cubic-bezier(0.2,0.7,0.3,1); /* @kind other */
+--duration-hover:140ms; /* @kind other */
+--duration-state:220ms; /* @kind other */
+--press-scale:0.97; /* @kind other */
+--disabled-opacity:0.42; /* @kind other */
+}
+
+/* ---- theme-light.css ---- */
+/* Light appearance. Apply with <html data-theme="light">. Clip tints, brand inks and clip-drawing overlays are fixed and not overridden. */
+[data-theme="light"]{
+--surface-desk:#cfcfcc;
+--surface-window:#ececea;
+--surface-titlebar:#e4e4e2;
+--surface-bar:#f2f2f0;
+--surface-panel:#f5f5f3;
+--surface-well:#dcdcda;
+--surface-timeline:#e8e8e6;
+--surface-ruler:#eeeeec;
+--surface-lane:#f3f3f1;
+--surface-lane-alt:#e9e9e7;
+--surface-control:#ffffff;
+--surface-field:#ffffff;
+--surface-tab-active:#ffffff;
+--hover-fill:#e2e2df;
+--hover-row:#ebebe9;
+--selection-fill:rgba(10,110,230,0.14);
+--check-fill:rgba(10,110,230,0.18);
+--border:#d2d2ce;
+--border-subtle:#e0e0dc;
+--border-lane:#dededa;
+--border-strong:#a3a39e;
+--text-bright:#131311;
+--text-strong:#1b1b19;
+--text-body:#282826;
+--text-icon:#3a3a37;
+--text-muted:#50504b;
+--text-icon-muted:#5d5d58;
+--text-dim:#686863;
+--text-meta:#72726c;
+--text-tick:#7c7c76;
+--text-faint:#85857f;
+--text-ghost:#a3a39e;
+--accent:#1f66c2;
+--accent-hover:#2b76d6;
+--accent-border:#3d82e0;
+--accent-rule:#0a7aff;
+--accent-text:#0f5fc4;
+--on-accent:#ffffff;
+--link:#0a64d6;
+--link-hover:#0a4fa8;
+--shadow-window:0 20px 50px rgba(0,0,0,0.22);
+--shadow-preview:0 0 0 1px #c4c4c0,0 8px 30px rgba(0,0,0,0.18);
+}
+

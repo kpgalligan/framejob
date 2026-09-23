@@ -314,6 +314,33 @@ def bar_rect(width=WIDTH, height=HEIGHT):
     return Rect("the timeline bar", 0, height - TIMELINE_H, width, BAR_H)
 
 
+# The sharp chrome pass (2026-09-23, `designs/design_handoff_reelcut_sharp/`)
+# changed four controls in this row BY DESIGN against the pre-meter tree: the
+# selection block's kind chip and the Snap box lost their radius, the zoom
+# slider became a `BlockSlider`, and S/M/L's end cells went square. Their
+# columns, full bar height, from the constants above so they hold at every
+# width, are masked where each bar-scoped set is MADE (sections 3, 3b, 5, 6)
+# and the masked count is printed, not scored. Nothing else may differ.
+SNAP_X0 = PADDING + 176 + PADDING + DIVIDER_W + PADDING + 238 + PADDING + DIVIDER_W + PADDING
+SNAP_BOX = 13            # OptionCheckboxControl.boxSize
+
+
+def sharp_columns(width=WIDTH, height=HEIGHT):
+    top, slider_x0 = height - TIMELINE_H, meter_rect(width).x1 + PADDING + ACTION_W + ZOOM_SPACING
+    return [Rect("the kind chip", PADDING, top, 8, BAR_H),
+            Rect("the Snap box", SNAP_X0, top, SNAP_BOX, BAR_H),
+            Rect("the zoom slider", slider_x0, top, ZOOM_SLIDER_W, BAR_H),
+            Rect("S/M/L", width - PADDING - SIZE_W, top, SIZE_W, BAR_H)]
+
+
+def sharp(pixels, width, scale):
+    """A bar-scoped set without the four sharp-pass columns."""
+    kept = outside(pixels, sharp_columns(width), scale)
+    print(f"      the sharp pass's four columns: {len(pixels) - len(kept)} px masked, "
+          "NOT scored")
+    return kept
+
+
 # ---------------------------------------------------------------------------
 # The package, by hand (spec §5.2). One text clip, 0–5 s, on one track.
 #
@@ -893,8 +920,7 @@ def ink_checks(image, diff, rect, what):
           f"{[c for c, _ in chromatic[:3]]}")
     ink, count = ranked[0]
     check(f"{what}: one ink covers the meter — DS.meterTrough, over "
-          f"{count * 100 // len(diff)} % of it, the rest being the 2 pt "
-          "corner radius", count >= 0.9 * len(diff),
+          f"{count * 100 // len(diff)} % of it", count >= 0.9 * len(diff),
           f"{ink[:3]} over {count} of {len(diff)} px")
     background = image.point(rect.x0 - 6, rect.y0 + METER_H / 2)
     check(f"{what}: and it is not the bar's own background, which is what makes "
@@ -1459,7 +1485,7 @@ def main():
         ("now-a", "was-a", "dark"), ("now-light", "was-light", "light"),
     ):
         diff = changed_pixels(images[was], images[tag])
-        in_bar = inside(diff, [bar], scale)
+        in_bar = sharp(inside(diff, [bar], scale), WIDTH, scale)
         elsewhere = outside(diff, [bar], scale)
         boxes = clusters(in_bar)
         print(f"\n   {appearance}: {len(in_bar)} changed pixels in the bar, "
@@ -1471,7 +1497,9 @@ def main():
         stray = outside(in_bar, [rect], scale)
         check(f"{appearance}: inside {bar}, every changed pixel is inside {rect} — the "
               "zoom cluster, S/M/L, the snap box, the eight actions and the selection "
-              "block are all exactly where they were before the meter existed", not stray,
+              "block are all exactly where they were before the meter existed (the four "
+              "columns the sharp pass redrew — kind chip, Snap box, zoom slider, S/M/L — "
+              "masked, 2026-09-23)", not stray,
               "" if not stray else f"{len(stray)} px elsewhere in the bar:\n"
               + describe(clusters(stray), scale))
         box = extent(in_bar, scale)
@@ -1503,7 +1531,7 @@ def main():
     shifted = Image(
         render(binary, package, png("now-shifted"), playhead=2), WIDTH)
     diff = changed_pixels(images["was-a"], shifted)
-    in_bar = inside(diff, [bar], scale)
+    in_bar = sharp(inside(diff, [bar], scale), WIDTH, scale)
     elsewhere = outside(diff, [bar], scale)
     print(f"      {len(diff)} changed pixels, {len(elsewhere)} of them outside the bar "
           f"in {len(clusters(elsewhere))} cluster(s)")
@@ -1542,7 +1570,7 @@ def main():
               "measurement of another window", a.width == int(width * scale),
               f"{a.width} px at scale {scale:g}")
         # Scoped to the bar, for section 3's reason.
-        diff = inside(changed_pixels(a, b), [bar_rect(width)], scale)
+        diff = sharp(inside(changed_pixels(a, b), [bar_rect(width)], scale), width, scale)
         boxes = clusters(diff)
         want = meter_rect(width)
         stray = outside(diff, [want], scale)
@@ -1551,7 +1579,8 @@ def main():
         check(f"{width} pt: the only thing that changed in the bar is the meter, at "
               f"x {want.x0:g}–{want.x1:g} pt — {METER_RIGHT_INSET} pt in from the right "
               "edge, the same inset at every width, so the zoom cluster and S/M/L never "
-              "move", not stray and got == (want.x0, want.x1),
+              "move (the kind chip, Snap box, zoom slider and S/M/L columns masked for "
+              "the sharp pass, 2026-09-23)", not stray and got == (want.x0, want.x1),
               f"{len(boxes)} cluster(s), x {got} pt"
               + ("" if not stray else f"; {len(stray)} px outside the meter"))
         check(f"{width} pt: it is {METER_W} pt wide — its intrinsic size, never stretched "
@@ -1571,11 +1600,12 @@ def main():
     narrow_was = Image(renders[f"was-{MINIMUM_WIDTH}"], MINIMUM_WIDTH)
     narrow = Image(renders[f"now-{MINIMUM_WIDTH}"], MINIMUM_WIDTH)
     narrow_diff = changed_pixels(narrow_was, narrow)
-    narrow_bar = inside(narrow_diff, [bar_rect(MINIMUM_WIDTH)], scale)
+    narrow_bar = sharp(
+        inside(narrow_diff, [bar_rect(MINIMUM_WIDTH)], scale), MINIMUM_WIDTH, scale)
     check(
         f"at {MINIMUM_WIDTH} pt the timeline bar is byte-identical to the build before "
         "the meter existed — the meter drew nothing, and nothing else in the row moved "
-        "to make space for it",
+        "to make space for it (outside the sharp pass's four masked columns, 2026-09-23)",
         not narrow_bar,
         "" if not narrow_bar else f"{len(narrow_bar)} px differ:\n"
         + describe(clusters(narrow_bar), scale))

@@ -768,6 +768,12 @@ heights S/M/L per kind), `Controls.swift`, `OptionControls.swift`,
 `Sheets.swift`, `EditorChrome.swift` (`BarView`), `FileDropView.swift`
 (Finder drops + the first responder the bare-key map needs), `BrandMark.swift`
 — copied from Rasterize; keep them in sync rather than forking.
+`Controls.swift`'s `BlockSlider` is the timeline's zoom slider. Two known
+divergences, each recorded: `StickerButton` still has its pill, the one
+place `Controls.swift` lags Rasterize (spec §11 SH-1, owed); and
+`BlockSliderCell.drawBar` dims through the context's alpha rather than
+`withAlphaComponent`, the one deliberate fork (SH-2) — Rasterize's spelling
+paints the translucent `DS.border` track opaque in the knob's own ink.
 
 ## Rules
 

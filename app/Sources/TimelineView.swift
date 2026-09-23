@@ -121,7 +121,7 @@ final class TimelineView: NSView, NSTextFieldDelegate {
     var snapToggle: OptionCheckboxControl?
     var heightControl: OptionSegmentedControl?
     var selectionBlock: TimelineSelectionBlock?
-    let zoomSlider = NSSlider(
+    let zoomSlider = BlockSlider(
         value: 0.5, minValue: 0, maxValue: 1, target: nil, action: nil)
 
     /// Content-space origin of the two floating bands, refreshed on every
@@ -1630,7 +1630,7 @@ final class TimelineHeaderView: NSView {
                 box.origin.y += rect.minY
                 if toggle.3 {
                     DS.selectionFill.setFill()
-                    NSBezierPath(roundedRect: box, xRadius: 3, yRadius: 3).fill()
+                    box.fill()
                 }
                 TimelineDraw.symbol(
                     toggle.1, fallback: toggle.2, in: box,

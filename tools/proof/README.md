@@ -908,6 +908,23 @@ flag is not named after the meter. A build it cannot make is a scored
 FAILURE rather than an exit, so a rotted reference instrument cannot take
 the independent model checks down with it.
 
+**2026-09-23, the sharp pass redrew the bar itself** — the re-baseline the
+paragraph above predicted. Four controls in the row now differ from the
+pre-meter tree BY DESIGN: the selection block's kind chip and the Snap box
+lost their radius, the zoom slider is a `BlockSlider`, and S/M/L's end cells
+are square. `sharp_columns(width)` names their columns, full bar height, from
+the file's own constants (chip `PADDING`…`+ 8`; Snap box at 476, 13 wide;
+the slider at `meter_rect(width).x1 + 48`, 110 wide; S/M/L at
+`width − 90`…`width − 12`), so they hold at 900, 1080, 1440 and 1600, and
+`sharp()` removes them where each bar-scoped set is MADE — sections 3 (both
+appearances, which also feeds `bands`, `extent`, dark == light and section
+4), 3b, 5 and 6 — printing the masked count (2 282 px at 1440 dark, not
+scored). Everything else in the bar must still be byte-identical to the
+reference: **81/81** with the mask. The meter's own fills are square now
+too, but they lie inside its rectangle and change no row; the "one ink"
+sentence lost its "2 pt corner radius" clause, and 100 % of the meter is
+the trough ink.
+
 Its section 8 (twenty-three checks) is the METER'S READING and
 is not a picture at all: the contract's −20 dBFS claim is about the model,
 the harness has no player so a lit meter could not be photographed, and the
@@ -3036,6 +3053,41 @@ no drag is the one row that can see the press-time clear.
 What it cannot see is a real `mouseDown` delivered by AppKit below the
 lanes — `designs/reelcut-remaining.md` §4 lists it for a person at the
 machine.
+
+## The sharp chrome pass (`sharp_chrome.py`)
+
+`python3 tools/proof/sharp_chrome.py`, no port and no running app,
+**29/29**. The sharp handoff (`designs/design_handoff_reelcut_sharp/`,
+2026-09-23) squared every chrome radius token, kept a clip bar at 2 pt and
+put `Controls.swift`'s `BlockSlider` (a 3 pt track, a 7 × 11 pt block knob)
+in for the zoom slider. Two instruments on `e2_chrome.py`'s helpers. A
+PROBE compiled from `app/Sources` (a build failure is a scored FAILURE):
+the six tokens; `TimelineLayout.clipRadius`; the timeline's slider and cell
+classes; a standalone `BlockSlider` in the bar's own configuration
+(`.small`, 110 wide, its intrinsic 14 pt height) whose knob is 7 × 11 at 0,
+0.5 and 1, centred on the bar and inside the bounds; a `cacheDisplay`
+bitmap of it (`recording_probe.py`'s `renderBase64` path) whose four
+corner pixels equal the knob's centre, whose track differs at x 10 and x 100
+and is background 4 pt above; and an `AccentButton` whose corner pixel is
+its fill. The HARNESS, the editor at 1440 × 862, dark and light, two
+processes each (byte-identical), with the playhead at 2 s — at 0 s its
+coral line covers the clip corner: the Export and S/M/L corner pixels
+against their edges; the clip corner `(132, 627)` read along the diagonal,
+`D_0 ≠ E` (not square) and `D_(s−1) ≠ L` (not 4 pt); and the zoom slider on
+the bar's centreline — a knob run of 7·s px (7·s − 1 allowed at scale 1,
+where the half-point ends blend) with the accent on its left and a different
+colour on its right, 11·s px tall, its four corners in the knob's ink, and
+the pixel over the track 4 pt to its left neither accent nor knob. Every
+harness row is in POINTS through `Image.scale`. Made to fail three times:
+`DS.clipRadius` 4 (25/29), an oval `drawKnob` (20/29 — the oval's centre
+row is 12 px of ink at scale 2, so the run is not found and all four
+slider rows go), `DS.buttonRadius` 4 (25/29). The fork it guards is spec
+§11 SH-2: Rasterize's `withAlphaComponent` painted the track in the knob's
+own solid ink, which the slider row caught. ~3 min with a probe rebuild.
+A person still looks at both appearances (remaining §4). One earlier row
+moved with the pass, in place and dated: `phase8_chrome.py` section 7 told
+the find band's hairlines from the search field by the field's rounded
+corners, and now excludes the square field's box by position (150/150).
 
 ## The reversed mirror, spelled once (`source_mirror_probe.py`)
 

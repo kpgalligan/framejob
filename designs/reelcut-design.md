@@ -71,7 +71,11 @@ The chrome below is the one the design handoff in
 `designs/design_handoff_reelcut/` specifies; it replaced the first cut, whose
 toolbar was a grab bag, whose Export was a system pill, and whose clips had no
 visible boundary. That handoff's README is the normative source for the
-metrics; this section is the summary.
+metrics; this section is the summary. The sharp pass in
+`designs/design_handoff_reelcut_sharp/` (2026-09-23) then squared every
+chrome corner (a clip keeps 2 pt) and gave the zoom slider a block knob; its
+README is normative for radii and the knob, with the deviations in §11 SH-1
+and SH-2.
 
 ```
 ┌────────────────────────────────────────────────────────────────────────────────┐
@@ -131,7 +135,7 @@ Project, New Recording… (road map 3) and Recent, under the stacked wordmark.
 44 pt, `BarView(border: .bottom)`, 12 pt padding, 12 pt between clusters, with
 a 1 pt `DS.border` rule between them.
 
-- **Transport**: six `GhostButton`s at 34 × 26 pt on the 4 pt button radius,
+- **Transport**: six `GhostButton`s at 34 × 26 pt on the square button radius,
   19 pt symbols, 2 pt gaps — go to start, previous edit point, play/pause,
   next edit point, go to end, loop (loops the in/out range when set, else all).
 - **Timecode** in the mono face: a 24 pt bordered field on the button radius
@@ -142,11 +146,11 @@ a 1 pt `DS.border` rule between them.
   (`rc_timecode_format` / `rc_timecode_parse`).
 - **Canvas zoom** popup (Fit, 50, 100, 200 %) and a title-safe /
   action-safe guide toggle (90 % and 80 % rectangles).
-- **Export…** (⌘E) is an `AccentButton`: 26 pt, the 4 pt radius, `DS.accent`
+- **Export…** (⌘E) is an `AccentButton`: 26 pt, square, `DS.accent`
   fill, `DS.onAccent` at 12 pt semibold, a 15 pt `square.and.arrow.up` at a
   6 pt gap. Hover lightens the fill; that is the whole state model. It is
   deliberately **not** `StickerButton` — the sticker pill was retired in the
-  Rasterize redesign and the chrome follows, square-ish and quiet.
+  Rasterize redesign and the chrome follows, square and quiet.
   `StickerButton` stays for the sheets and the welcome screen.
 
 Add Text, Add Shape, Add Marker and Duplicate are in the **timeline bar**
@@ -612,7 +616,8 @@ header column and ruler are floating subviews pinned in `scroll(_:)`).
   window toolbar. Add Shape is here rather than nowhere because it has no
   menu item anywhere in the app.
 - **Snap** (N), then the **output level meter**, then the zoom cluster —
-  minus, the slider, plus, Fit (⇧Z) — and the **S / M / L** track size.
+  minus, the slider (a `BlockSlider`: a 3 pt track, accent up to a 7 × 11 pt
+  block knob), plus, Fit (⇧Z) — and the **S / M / L** track size.
 
 **The level meter** (road map 2's phase 5, `LevelMeterView`) is a
 120 × 12 pt two-channel meter in the flexible gap left of the zoom cluster:
@@ -658,7 +663,7 @@ on, then Remove Track — disabled on the last track, and asking first when
 the track still holds clips, as Track > Remove Track does. A right-click on
 a clip opens nothing.
 
-**Clips are objects, not bands.** A clip is a 4 pt-rounded body inset 3 pt
+**Clips are objects, not bands.** A clip is a 2 pt-rounded body inset 3 pt
 from the lane's top and bottom, clipped to that shape, with a 1 pt
 `rgba(white, 0.14)` border — so you can see where one ends and the next
 begins, which was the whole complaint.
@@ -3871,3 +3876,26 @@ assisted import.
   `word_style`,** because deepening D1 makes every declared key patchable.
   That is the agent's door, and it is not a promise that a hand-restyled
   page still fits: restyling is regenerating (road map 8 §4 W-10).
+- **SH-1 — `StickerButton` keeps its pill** (the sharp pass, 2026-09-23).
+  The sharp handoff deletes it "once it has no callers"; it has callers in
+  13 files (`Sheets`, `Welcome`, `Settings`, `Recorder`, `ExportQueue`,
+  `Relink`, `ReverseRenderer`, `Silence`, `Transcribe`, `ExportProgress`,
+  `ExportSheet`, `Consolidate`, `RecorderPanel`) and `recording_probe.py`
+  §6 measures its 2 pt shadow margins against a reference build. Squaring
+  it (Rasterize's shape) or moving its callers is a phase of its own; it is
+  the one place `Controls.swift` lags Rasterize.
+- **SH-2 — `BlockSliderCell.drawBar` is forked from Rasterize's copy** (the
+  sharp pass, 2026-09-23; the user's call: the handoff is a guideline, and a
+  working Reelcut wins). Rasterize's cell dims its two fills with
+  `withAlphaComponent(isEnabled ? 1 : 0.42)`. On a dynamic, translucent
+  system colour that REPLACES the colour's own alpha rather than scaling it,
+  so the enabled track (`DS.border`, `.separatorColor`) painted OPAQUE — the
+  same solid white (dark) or black (light) as the `DS.textStrong` knob, and
+  the knob vanished into the track on its right (measured in the harness:
+  one 115 px run of (255, 255, 255) from the knob to the track's end).
+  Reelcut's cell dims through the context's alpha instead and fills with
+  `.sourceOver`, so the track is the quiet grey the handoff asks for
+  (measured (52, 52, 52) dark over the bar's (30, 30, 30), (230, 230, 230)
+  light; the handoff's `#3a3a3a`) and the knob reads against it. It is the
+  ONE deliberate divergence in the synced chrome files; Rasterize's copy
+  very likely has the same defect, owed there.

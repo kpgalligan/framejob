@@ -445,14 +445,13 @@ final class InspectorSliderControl: NSView, OptionControl {
         let rail = NSRect(
             x: inset, y: mid - Self.track / 2, width: max(bounds.width - Self.knob, 1),
             height: Self.track)
-        let railPath = NSBezierPath(roundedRect: rail, xRadius: 1.5, yRadius: 1.5)
         DS.border.setFill()
-        railPath.fill()
+        rail.fill()
 
         let filled = NSRect(
             x: rail.minX, y: rail.minY, width: rail.width * fraction, height: rail.height)
         DS.accent.setFill()
-        NSBezierPath(roundedRect: filled, xRadius: 1.5, yRadius: 1.5).fill()
+        filled.fill()
 
         let center = rail.minX + rail.width * fraction
         let knob = NSRect(

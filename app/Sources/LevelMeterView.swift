@@ -263,38 +263,31 @@ final class LevelMeterView: NSView {
         let gaps = Self.channelGap * (rows - 1)
         let rowHeight = max(1, ((bounds.height - gaps) / rows).rounded(.down))
         let top = ((bounds.height - (rowHeight * rows + gaps)) / 2).rounded()
-        let radius = min(2, rowHeight / 2)
 
         for (index, bar) in bars.enumerated() {
             let y = top + CGFloat(index) * (rowHeight + Self.channelGap)
 
             let trough = NSRect(x: 0, y: y, width: scaleWidth, height: rowHeight)
             DS.meterTrough.setFill()
-            NSBezierPath(roundedRect: trough, xRadius: radius, yRadius: radius).fill()
+            trough.fill()
 
             let cell = NSRect(
                 x: bounds.width - Self.clipCell, y: y,
                 width: Self.clipCell, height: rowHeight)
             (now < bar.clipUntil ? DS.meterClip : DS.meterTrough).setFill()
-            NSBezierPath(roundedRect: cell, xRadius: radius, yRadius: radius).fill()
+            cell.fill()
 
             // The instantaneous peak washes the trough behind the RMS bar, so
             // one glance gives both the body of the sound and its transients.
             let peakWidth = Self.width(forDB: bar.peak, in: scaleWidth)
             if peakWidth > 0 {
                 DS.meterFill.withAlphaComponent(0.35).setFill()
-                NSBezierPath(
-                    roundedRect: NSRect(x: 0, y: y, width: peakWidth, height: rowHeight),
-                    xRadius: radius, yRadius: radius
-                ).fill()
+                NSRect(x: 0, y: y, width: peakWidth, height: rowHeight).fill()
             }
             let rmsWidth = Self.width(forDB: bar.rms, in: scaleWidth)
             if rmsWidth > 0 {
                 DS.meterFill.setFill()
-                NSBezierPath(
-                    roundedRect: NSRect(x: 0, y: y, width: rmsWidth, height: rowHeight),
-                    xRadius: radius, yRadius: radius
-                ).fill()
+                NSRect(x: 0, y: y, width: rmsWidth, height: rowHeight).fill()
             }
             // The hold mark. It is never behind the RMS bar (`step` keeps the
             // three ordered), so it always reads against the trough or against

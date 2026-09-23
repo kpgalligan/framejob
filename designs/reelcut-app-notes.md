@@ -2576,3 +2576,71 @@ jobs once and redraws the preview only when the key changes;
 **`TranscribeSheetController.swift` 526 → 529.** The stored
 `previewKey: PreviewKey?` beside `sampleWordsCache` — a stored property
 cannot live in the extension.
+
+## Sharp chrome, 2026-09-23
+
+The sharp handoff (`designs/design_handoff_reelcut_sharp/`) applied: every
+chrome radius to 0, a clip to 2 pt, the zoom slider's system knob replaced
+by the 7 × 11 pt block. Visual only; no core, FFI, op or MCP change. The
+record is `designs/reelcut-roadmap.md` §1's row; the deviations are spec
+§11 SH-1 and SH-2. Scores: `sharp_chrome.py` 29/29 (made to fail three
+times: `clipRadius` 4 → 25/29, an oval knob → 20/29, `buttonRadius` 4 →
+25/29), `phase5_chrome.py` 81/81 with the mask, `make typecheck` 0 errors
+and the 7 baseline warnings, `make app` clean. Re-run green: `recording_probe.py
+--only welcome` 29/29 (`StickerButton` untouched), `phase2_chrome.py` 26/26,
+`phase3` 33/33, `phase4` 59/59, `phase6` 70/70, `phase7` 78/78, `phase8`
+150/150 (after the one in-place row update below), `phase9` 62/62, `e1`
+21/21, `e2` 52/52, `word_captions_chrome.py` 31/31, `words_picture_chrome.py`
+5/5, `marquee_probe.py` 28/28, `track_menu_probe.py` 22/22, `make test` (816
+passed, 0 failed) and `make lint` clean.
+
+**`Theme.swift` 205 → 207.** `controlRadius`, `buttonRadius`,
+`listRowRadius`, `fieldRadius` and `railSlotRadius` to 0, `clipRadius` 4 → 2;
+the header takes Rasterize's "the chrome is square" sentence plus one clause
+saying a clip is content and keeps its radius.
+
+**`Controls.swift` 567 → 651, OVER the cap and on the ledger (remaining
+§3).** `GhostButton`'s default `cornerRadius` is `DS.buttonRadius`;
+`BlockSlider` and `BlockSliderCell` copied from Rasterize's `Controls.swift`
+l.261–336 (76 lines, not the 83 the spec counted) between `DSField` and
+`DividerView`; three stale comments reworded. It sheds nothing because the
+sync rule forbids a structural fork of a file Rasterize's own copy of is 624
+lines. **One deliberate fork (SH-2):** Rasterize's `drawBar` dims with
+`withAlphaComponent(isEnabled ? 1 : 0.42)`, which REPLACES the translucent
+`.separatorColor`'s own alpha — the enabled track painted opaque, in the
+knob's own ink (measured: one 115 px run of (255, 255, 255) from the knob
+to the track's end in dark). Reelcut's cell dims through the context's alpha
+and fills with `.sourceOver`: the track measures (52, 52, 52) over the bar's
+(30, 30, 30) in dark and (230, 230, 230) in light. Rasterize's copy very
+likely has the same defect; owed there. `StickerButton` untouched (SH-1).
+
+**`TimelineView.swift` (frozen) 1651 → 1651.** Two one-token edits: the
+zoom slider is `BlockSlider(value:minValue:maxValue:target:action:)` (the
+inherited convenience init resolved), and the header toggle's selected box is
+`box.fill()`.
+
+**`TimelineBar.swift` 323 → 323.** The kind chip is `chip.fill()`; two
+comments (the action size, and the slider, which is no longer "the one raw
+AppKit control").
+
+**`ClipPane.swift` 609 → 609**, the header chip; **`InspectorPane.swift`
+1665 → 1664**, `InspectorSliderControl`'s rail and fill (its oval knob
+stays); **`LevelMeterView.swift` 320 → 313**, `radius` removed and four plain
+fills; **`OptionControls.swift` 1081 → 1082**, `MoreButton` on
+`DS.buttonRadius` (Rasterize l.1035 parity);
+**`EditorViewController+Eyedropper.swift` 318 → 318** and
+**`EditorViewController+ZoomRegion.swift` 502 → 502**, the hint pills as
+`NSBezierPath(rect:)`; **`EditorViewController+Toolbar.swift` 180 → 180**,
+a comment.
+
+**Instruments.** `tools/proof/sharp_chrome.py` is new (407 lines, on
+`e2_chrome.py`'s helpers); its clip-corner row renders with the harness
+playhead at 2 s, because at 0 s the coral playhead line covers the corner
+pixels it reads. `tools/proof/phase5_chrome.py` 1642 → 1672: the pre-meter
+comparison masks the four columns the pass redrew (`sharp_columns`/`sharp`)
+where each bar-scoped set is made. `tools/proof/phase8_chrome.py`
+3370 → 3381: section 7's hairline rows told the find band's `BarView` rules
+from the search field by the field's ROUNDED corners (564 of 568 pixels
+inked); the square field inked all 568 and the two rows read four rules
+(147/150). Updated in place, dated: `band_rules` excludes the field's own
+24 pt box by position.

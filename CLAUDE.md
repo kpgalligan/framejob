@@ -37,6 +37,7 @@ changes a file's role or adds a rule. Never append a status paragraph here.
 | `designs/reelcut-effects-survey.md` | The survey road map 5 came from. E3–E9 (tone, filters, looks, adjustment clips, LUT import, voice effects, background removal) are DEFERRED by the user. Concat is AGPL-3.0: its behaviour was studied, and none of its code, shaders, chains or colour tables may be carried over. |
 | `designs/reelcut-milestones.md` | The per-phase record this file carried until 2026-09-17, moved out verbatim. Not maintained. |
 | `designs/design_handoff_reelcut/` | The shipped chrome cleanup and identity; its README is normative for the redesign's metrics. |
+| `designs/design_handoff_reelcut_sharp/` | The sharp pass (2026-09-23): square chrome, 2 pt clips, the zoom slider's block knob. Its README is normative for radii and the knob, with spec §11 SH-1 and SH-2 as the deviations. |
 | `tools/proof/README.md` | The proof scripts, the MCP client and the offscreen harness. |
 | `README.md` | User-facing. |
 

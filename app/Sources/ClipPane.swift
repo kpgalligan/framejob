@@ -567,7 +567,7 @@ final class ClipSelectionHeaderView: NSView, OptionControl {
 
         let chip = NSRect(x: InspectorMetrics.inset, y: bounds.midY - 13, width: 8, height: 26)
         chipColor.setFill()
-        NSBezierPath(roundedRect: chip, xRadius: 4, yRadius: 4).fill()
+        chip.fill()
 
         let left = Self.nameLeft
         var nameRight = bounds.width - InspectorMetrics.inset

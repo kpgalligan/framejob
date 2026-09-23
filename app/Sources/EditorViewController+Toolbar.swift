@@ -50,9 +50,9 @@ extension EditorViewController {
     func buildToolbar() -> NSView {
         let bar = BarView(border: .bottom)
 
-        // 24 pt on the button radius rather than the 26/7 field default: the
-        // timecode sits in a row of 26 pt buttons and a taller, rounder field
-        // would be the only soft shape in it.
+        // 24 pt on the button radius rather than the 26 pt field default: the
+        // timecode sits in a row of 26 pt buttons and a taller field would be
+        // the only thing out of line in it.
         DSField.style(
             timecodeField, height: 24, radius: DS.buttonRadius,
             font: DS.mono(12, weight: .medium))

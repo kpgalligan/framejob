@@ -1048,7 +1048,8 @@ final class MoreButton: NSView {
 
     override func draw(_ dirtyRect: NSRect) {
         let path = NSBezierPath(
-            roundedRect: bounds.insetBy(dx: 0.5, dy: 0.5), xRadius: 4, yRadius: 4)
+            roundedRect: bounds.insetBy(dx: 0.5, dy: 0.5),
+            xRadius: DS.buttonRadius, yRadius: DS.buttonRadius)
         if hovered {
             DS.hoverFill.setFill()
             path.fill()
