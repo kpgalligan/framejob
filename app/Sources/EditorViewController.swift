@@ -731,6 +731,7 @@ final class EditorViewController: NSViewController {
             goToStart(nil)
         case UInt32(NSEndFunctionKey):
             goToEnd(nil)
+        case 27: return deselectActionCommand()
         default:
             return handleEditorCharacter(Character(scalar), shift: shift)
         }

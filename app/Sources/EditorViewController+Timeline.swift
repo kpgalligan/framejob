@@ -48,6 +48,7 @@ extension EditorViewController {
         timeline.onTrackHeightChanged = { [weak self] index in self?.applyTrackHeight(index) }
         timeline.onBreadcrumb = { [weak self] level in self?.leaveAllNests(to: level) }
         timeline.onOpenNest = { [weak self] id in self?.openNest(clipID: id) }
+        timeline.onActionSelected = { [weak self] clip, id in self?.selectAction(id, on: clip) }
 
         timeline.snappingEnabled = snappingEnabled
         timeline.trackHeightIndex = trackHeight
@@ -74,12 +75,19 @@ extension EditorViewController {
         // The trail is NOT part of `update(...)`: it describes where the
         // snapshot came FROM, which the snapshot itself cannot say.
         timeline.breadcrumb = nestBreadcrumb()
+        timeline.selectedAction = document.selectedAction
     }
 
     /// Playhead → timeline. Separate from `refreshTimeline` because playback
     /// moves it thirty times a second and nothing else changes.
     func timelinePlayheadMoved() {
         timeline?.setPlayhead(document?.playhead ?? 0)
+        // Entering a span selects it (spec §11 CI-1), so a moved playhead can
+        // change the selected action; pushed only on a change, since the
+        // setter redraws the lanes and the ruler.
+        if timeline?.selectedAction != document?.selectedAction {
+            timeline?.selectedAction = document?.selectedAction
+        }
     }
 
     /// `View ▸ Timeline Track Height` and the timeline bar's S/M/L, in one
@@ -208,6 +216,11 @@ extension EditorViewController {
     /// between the two keys is only whether the hole closes.
     func deleteSelection() {
         guard let document = document else { return }
+        // With an action selected ⌫ removes IT, not its clip (spec §9).
+        if document.selectedActionSnapshot != nil {
+            removeSelectedActionCommand()
+            return
+        }
         if document.selection.isEmpty {
             guard let range = document.inOutRange, range.end > range.start else {
                 NSSound.beep()

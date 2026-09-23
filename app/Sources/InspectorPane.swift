@@ -1148,12 +1148,13 @@ final class InspectorBinding {
 
     // MARK: Actions
 
-    /// The action of `clip` the playhead is inside, if any. `start` is CLIP
-    /// time (§5.4), so the playhead is converted before the test.
+    /// The SELECTED action when it is `clip`'s (spec §11 CI-2). The playhead
+    /// is not consulted: the editing target is the selection, so a field
+    /// neither moves with the playhead nor writes to a span it happens to sit
+    /// in.
     func action(_ clip: ClipSnapshot) -> ActionSnapshot? {
-        guard clip.contains(playhead) else { return nil }
-        let t = clip.clipTime(playhead)
-        return clip.actions.first { t >= $0.start && t < $0.endTime }
+        guard let id = document?.selectedAction else { return nil }
+        return clip.actions.first { $0.id == id }
     }
 
     /// True when at least one selected clip would have its edit land on an
@@ -1162,23 +1163,22 @@ final class InspectorBinding {
         clips.contains { action($0) != nil }
     }
 
-    /// The line a Video/Audio/Text section header carries while the playhead
-    /// is inside an action (§4.3).
-    var actionNote: String? {
-        guard editsAction else { return nil }
-        if let clip = primary, clips.count == 1, let action = action(clip) {
-            let index = (clip.actions.firstIndex { $0.id == action.id }) ?? 0
-            return "Editing action \(index + 1)'s end state"
-        }
-        return "Editing the end state of the actions under the playhead"
-    }
+    /// The document's selected action, when it is on the single selected clip.
+    var selectedAction: ActionSnapshot? { document?.selectedActionSnapshot }
+
+    /// The lane's and the Clip chip's intent; nil leaves the mode.
+    func selectAction(_ id: UInt32?) { inspector?.onSelectAction?(id) }
 
     // MARK: Evaluated reads
 
     private func evaluated(_ clip: ClipSnapshot) -> Evaluated {
         if let cached = cache[clip.id] { return cached }
         var state = Evaluated()
-        if action(clip) != nil, let raw = project?.clipState(clip.id, at: playhead) {
+        // At the END tick: the core has merged every action ending there and
+        // none starting there has progressed, so this is the end state.
+        if let inside = action(clip),
+            let raw = project?.clipState(clip.id, at: clip.start + inside.endTime)
+        {
             state.video = InspectorBinding.decode(VideoProps.self, raw["video"])
             state.audio = InspectorBinding.decode(AudioProps.self, raw["audio"])
             state.text = InspectorBinding.decode(TextProps.self, raw["text"])
@@ -1388,10 +1388,25 @@ final class InspectorBinding {
             structural: { self.structural(video: $0, for: $1) })
     }
 
+    /// Spec §11 CI-3: pan, mono, compressor, noise reduction, duck and
+    /// keep-pitch are the clip's, whatever is selected.
+    private func structural(audio patch: AudioPatch, for clip: ClipSnapshot)
+        -> (base: AudioPatch?, animatable: AudioPatch?)
+    {
+        let base = AudioPatch(
+            duck: patch.duck, mono: patch.mono, keepPitch: patch.keepPitch, pan: patch.pan,
+            compressor: patch.compressor, noiseReduction: patch.noiseReduction)
+        var animatable = patch
+        (animatable.duck, animatable.mono, animatable.keepPitch) = (nil, nil, nil)
+        (animatable.pan, animatable.compressor, animatable.noiseReduction) = (nil, nil, nil)
+        return (base.isEmpty ? nil : base, animatable.isEmpty ? nil : animatable)
+    }
+
     func ops(audio patch: AudioPatch) -> [ReelOp] {
         split(
             audioClips, patch, patch.isEmpty, base: { .setAudio(clips: $0, patch: $1) },
-            action: { ActionPatch(audio: $0) })
+            action: { ActionPatch(audio: $0) },
+            structural: { self.structural(audio: $0, for: $1) })
     }
 
     func ops(text patch: TextPatch) -> [ReelOp] {

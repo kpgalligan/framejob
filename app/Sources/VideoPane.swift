@@ -1,8 +1,8 @@
 import AppKit
 
 /// The Clip tab's PIXEL sections (spec §4.3): Transform, Crop, Corner Radius,
-/// Colour, Chroma Key, Filters, Reflection, Spotlight, Obscure, Speed,
-/// Actions and — when the clip overlaps its predecessor — Transition.
+/// Colour, Chroma Key, Filters, Reflection, Spotlight, Obscure, Speed and —
+/// when the clip overlaps its predecessor — Transition.
 ///
 /// **This pane is never shown.** Since the six tabs became three it is a
 /// factory: `ClipPane` holds one instance and calls the section methods below
@@ -111,14 +111,12 @@ final class VideoPane: InspectorPaneView {
                 guard abs(props.rotation) >= 0.05 else { return scale }
                 return scale + String(format: " · %.0f°", props.rotation)
             },
-            // The action note first: where an edit LANDS outranks anything
-            // about what it looks like. Then the nest note, which says why a
-            // row is GREY — a disabled control the reader cannot explain
-            // outranks a warning about one that works — and the blend note
-            // last, since it only ever appears when the mode is one that
-            // cannot be seen at all.
+            // The nest note first, which says why a row is GREY — a disabled
+            // control the reader cannot explain outranks a warning about one
+            // that works — and the blend note last, since it only ever
+            // appears when the mode is one that cannot be seen at all.
             note: { [weak self] in
-                binding.actionNote ?? self?.nestBlendNote() ?? self?.blendNote()
+                self?.nestBlendNote() ?? self?.blendNote()
             },
             reset: {
                 binding.apply(
@@ -338,7 +336,6 @@ final class VideoPane: InspectorPaneView {
                 guard c.l != 0 || c.t != 0 || c.r != 0 || c.b != 0 else { return "none" }
                 return String(format: "%.0f·%.0f·%.0f·%.0f", c.l, c.t, c.r, c.b)
             },
-            note: { binding.actionNote },
             reset: { binding.apply("Crop", video: VideoPatch(crop: .zero)) },
             defaultExpanded: false,
             rows: [
@@ -373,7 +370,6 @@ final class VideoPane: InspectorPaneView {
         return InspectorSection(
             id: "video.corner", title: "Corner Radius",
             summary: { String(format: "%.0f px", binding.videoProps.cornerRadius) },
-            note: { binding.actionNote },
             reset: { binding.apply("Corner Radius", video: VideoPatch(cornerRadius: 0)) },
             defaultExpanded: false,
             rows: [
@@ -395,7 +391,6 @@ final class VideoPane: InspectorPaneView {
         return InspectorSection(
             id: "video.color", title: "Color",
             summary: { color().isIdentity ? "neutral" : "adjusted" },
-            note: { binding.actionNote },
             reset: { binding.apply("Color", video: VideoPatch(color: .identity)) },
             defaultExpanded: false,
             rows: [
@@ -476,7 +471,6 @@ final class VideoPane: InspectorPaneView {
         return InspectorSection(
             id: "video.chroma", title: "Chroma Key",
             summary: { on() ? String(format: "%.0f%%", current().tolerance * 100) : "off" },
-            note: { binding.actionNote },
             reset: { binding.apply("Chroma Key", video: VideoPatch(chroma: .some(nil))) },
             defaultExpanded: false,
             rows: [
@@ -740,7 +734,6 @@ final class VideoPane: InspectorPaneView {
                 return stack.count == 1
                     ? stack[0].kind.displayName.lowercased() : "\(stack.count) filters"
             },
-            note: { binding.actionNote },
             reset: { binding.apply("Filters", video: VideoPatch(filters: [])) },
             defaultExpanded: false,
             rows: rows)
@@ -768,7 +761,6 @@ final class VideoPane: InspectorPaneView {
         return InspectorSection(
             id: "video.reflection", title: "Reflection",
             summary: { on() ? String(format: "%.0f%%", current().opacity * 100) : "off" },
-            note: { binding.actionNote },
             reset: { binding.apply("Reflection", video: VideoPatch(reflection: .some(nil))) },
             defaultExpanded: false,
             rows: [
@@ -878,7 +870,6 @@ final class VideoPane: InspectorPaneView {
         return InspectorSection(
             id: "video.spotlight", title: "Spotlight",
             summary: { on() ? current().shape.displayName.lowercased() : "off" },
-            note: { binding.actionNote },
             reset: { binding.apply("Spotlight", video: VideoPatch(spotlight: .some(nil))) },
             defaultExpanded: false,
             rows: [
@@ -1209,7 +1200,6 @@ final class VideoPane: InspectorPaneView {
                 return regions.count == 1
                     ? regions[0].kind.displayName.lowercased() : "\(regions.count) regions"
             },
-            note: { binding.actionNote },
             reset: { binding.apply("Obscure", video: VideoPatch(obscure: [])) },
             defaultExpanded: false,
             rows: rows)
@@ -1254,158 +1244,5 @@ final class VideoPane: InspectorPaneView {
                     ops: { value in speedOps(rate(), keepPitch: value) },
                     mixed: { binding.mixedAudio { $0.keepPitch } }),
             ])
-    }
-
-    // MARK: Actions
-
-    /// The actions table (§4.3). One clip at a time: an action id belongs to
-    /// its clip, so a table over a multi-selection would be lying about which
-    /// span it edits.
-    func actionsSection() -> InspectorSection {
-        let binding = self.binding
-        var rows: [NSView] = []
-        if binding.isSingle, let clip = binding.primary {
-            for (index, action) in clip.actions.enumerated() {
-                rows.append(actionRow(clip: clip.id, action: action.id, index: index))
-                rows.append(curveRow(clip: clip.id, action: action.id))
-            }
-            if clip.actions.isEmpty {
-                rows.append(inspectorRow(nil, [InspectorRowLabel("No actions on this clip.")]))
-            }
-            let add = OptionButtonControl(
-                title: "Add Action", action: { [weak self] in self?.addAction(clip.id) },
-                enabled: { true }, onEdit: {})
-            add.toolTip = "Add an action at the playhead (⌥⌘K)"
-            rows.append(inspectorButtonRow([add, InspectorRowLabel("⌥⌘K")]))
-            // The screencast zoom (§4.2's region mode, `add_zoom_action`).
-            // Both are ordinary actions once they land — they appear in the
-            // table above with `scale, x, y` as their end patch — which is
-            // why they are buttons in THIS section rather than a section of
-            // their own. Neither has a menu item: the road map's list does
-            // not name one and C's crop mode is the precedent for a canvas
-            // mode reached by a bare key and a pane button.
-            let zoom = OptionButtonControl(
-                title: "Zoom to Region…",
-                action: { [weak self] in
-                    self?.inspector?.onCommand?(#selector(EditorViewController.zoomToRegion(_:)))
-                },
-                enabled: { true }, onEdit: {})
-            zoom.toolTip = "Drag a rectangle on the canvas to zoom to it (Z; ⇧ fills)"
-            let back = OptionButtonControl(
-                title: "Zoom Back",
-                action: { [weak self] in
-                    self?.inspector?.onCommand?(#selector(EditorViewController.zoomBack(_:)))
-                },
-                enabled: { true }, onEdit: {})
-            back.toolTip = "Add an action at the playhead returning the clip to its own transform"
-            rows.append(inspectorButtonRow([zoom, back]))
-        } else {
-            rows.append(
-                inspectorRow(nil, [InspectorRowLabel("Select one clip to edit its actions.")]))
-        }
-        return InspectorSection(
-            id: "video.actions", title: "Actions",
-            summary: {
-                guard binding.isSingle, let clip = binding.primary else { return nil }
-                return clip.actions.isEmpty ? "none" : "\(clip.actions.count)"
-            },
-            defaultExpanded: false, rows: rows)
-    }
-
-    /// A row binds by ID, never by the captured value: an edit elsewhere in
-    /// the section moves the action, and the row is refreshed rather than
-    /// rebuilt, so a captured `ActionSnapshot` would show yesterday's numbers.
-    private func actionRow(clip: UInt32, action: UInt32, index: Int) -> NSView {
-        let binding = self.binding
-        func current() -> ActionSnapshot? {
-            binding.snapshot.clip(clip)?.actions.first { $0.id == action }
-        }
-        func span() -> Double {
-            max(ReelTime.seconds(binding.snapshot.clip(clip)?.duration ?? 0), 0.01)
-        }
-        let start = OptionFieldControl(
-            width: 54, unit: " s", decimals: 2, min: 0, max: 36000, quick: [],
-            read: { ReelTime.seconds(current()?.start ?? 0) },
-            write: { value in
-                binding.apply(
-                    "Move Action",
-                    [
-                        .setAction(
-                            clip: clip, action: action,
-                            start: ReelTime.snapToFrame(
-                                ReelTime.ticks(seconds: min(value, span())),
-                                fps: binding.canvas.fps))
-                    ])
-            },
-            enabled: { true },
-            onEdit: { binding.edited() })
-        let duration = OptionFieldControl(
-            width: 54, unit: " s", decimals: 2, min: 0.01, max: 36000, quick: [0.25, 0.5, 1, 2],
-            read: { ReelTime.seconds(current()?.duration ?? 0) },
-            write: { value in
-                binding.apply(
-                    "Resize Action",
-                    [
-                        .setAction(
-                            clip: clip, action: action,
-                            duration: ReelTime.snapToFrame(
-                                ReelTime.ticks(seconds: min(value, span())),
-                                fps: binding.canvas.fps))
-                    ])
-            },
-            enabled: { true },
-            onEdit: { binding.edited() })
-        let remove = OptionButtonControl(
-            title: "Remove",
-            action: { binding.apply("Remove Action", [.removeAction(clip: clip, action: action)]) },
-            enabled: { true }, onEdit: {})
-        return inspectorRow("Action \(index + 1)", [start, duration, remove])
-    }
-
-    private func curveRow(clip: UInt32, action: UInt32) -> NSView {
-        let binding = self.binding
-        let curves = Curve.allCases
-        func current() -> ActionSnapshot? {
-            binding.snapshot.clip(clip)?.actions.first { $0.id == action }
-        }
-        let popup = OptionPopupControl(
-            width: 96, items: curves.map { $0.displayName },
-            read: { curves.firstIndex(of: current()?.curve ?? .easeInOut) ?? 0 },
-            write: { index in
-                guard curves.indices.contains(index) else { return }
-                binding.apply(
-                    "Action Curve", [.setAction(clip: clip, action: action, curve: curves[index])])
-            },
-            enabled: { true },
-            onEdit: { binding.edited() })
-        return inspectorRow(
-            "Curve",
-            [
-                popup,
-                inspectorReadout(width: 96) {
-                    VideoPane.summary(of: current()?.end ?? ActionPatch())
-                },
-            ])
-    }
-
-    /// "which properties change" (§4.3) — the end patch's keys, spelled the
-    /// way the model spells them.
-    static func summary(of patch: ActionPatch) -> String {
-        var keys: [String] = []
-        if let video = patch.video { keys.append(contentsOf: video.dictionary.keys) }
-        if let audio = patch.audio { keys.append(contentsOf: audio.dictionary.keys) }
-        if let text = patch.text { keys.append(contentsOf: text.dictionary.keys) }
-        return keys.isEmpty ? "no change" : keys.sorted().joined(separator: ", ")
-    }
-
-    /// ⌥⌘K, and the section's own button: an action at the playhead, in CLIP
-    /// time (§6 `add_action`). Refuses off the clip rather than asking the
-    /// core to clamp a nonsense start.
-    private func addAction(_ id: UInt32) {
-        guard let clip = binding.snapshot.clip(id), clip.contains(binding.playhead) else {
-            NSSound.beep()
-            return
-        }
-        binding.apply("Add Action", [.addAction(clip: id, at: clip.clipTime(binding.playhead))])
     }
 }

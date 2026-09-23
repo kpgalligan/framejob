@@ -80,8 +80,7 @@ extension VideoPane {
             summary: summary,
             note: {
                 binding.editsAction
-                    ? "Motion belongs to the clip; the action under the playhead does not"
-                        + " animate it"
+                    ? "Motion belongs to the clip; the selected action does not animate it"
                     : nil
             },
             reset: { binding.apply("Motion", video: VideoPatch(motion: .some(nil))) },

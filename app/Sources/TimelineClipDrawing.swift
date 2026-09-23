@@ -42,10 +42,10 @@ extension TimelineContentView {
             height: max(body.height - DS.clipHeaderHeight, 0))
     }
 
-    /// One clip bar, in paint order: body, media, name strip, action band,
-    /// fade handles, grips, border, the transition zone — which belongs to two
-    /// clips and so is drawn outside the body's clip — and the selection ring
-    /// last, so nothing paints over it.
+    /// One clip bar, in paint order: body, media, the selected action's wash,
+    /// name strip, action lane, fade handles, grips, border, the transition
+    /// zone — which belongs to two clips and so is drawn outside the body's
+    /// clip — and the selection ring last, so nothing paints over it.
     func draw(
         clip: ClipSnapshot, in rect: CGRect, track: TrackSnapshot, previous: ClipSnapshot?,
         owner: TimelineView, visible: CGRect
@@ -87,24 +87,9 @@ extension TimelineContentView {
             let muted = clip.audioProps.muted || track.muted || silencedBySolo
             drawWaveform(clip, in: regions.audio, owner: owner, visible: visible, muted: muted)
         }
+        drawActionWash(clip, body: body, owner: owner)
         drawNameStrip(clip, in: body, owner: owner)
-
-        // An action is a darker band over its span; its start is CLIP time, so
-        // it maps back through the clip's own start. It sits immediately UNDER
-        // the name strip rather than inside it: the strip is a black wash of
-        // its own and a darker band inside it would be invisible, while under
-        // it the band still reads as an edge along the top of the media.
-        if content.height > 0 {
-            for action in clip.actions where action.duration > 0 {
-                let from = layout.x(for: clip.start + action.start)
-                let to = layout.x(for: clip.start + action.endTime)
-                NSColor.black.withAlphaComponent(0.34).setFill()
-                NSRect(
-                    x: from, y: content.minY, width: max(to - from, 2),
-                    height: min(4, content.height)
-                ).fill()
-            }
-        }
+        drawActionBands(clip, rect: rect, owner: owner)
 
         if hasAudio, regions.audio.height >= TimelineLayout.fadeHandle + 2 {
             for edge in [TimelineEdge.start, TimelineEdge.end] {

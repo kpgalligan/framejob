@@ -17,7 +17,7 @@
 //
 //   harness <project.reelcut|welcome> <out.png> <light|dark>
 //           [w] [h] [selectIndex] [playheadSec] [sizeIndex 0-2] [clip|media|document]
-//           [candidateSpans] [expandSections] [mediaFilter]
+//           [candidateSpans] [expandSections] [mediaFilter] [selectAction]
 //
 // `selectIndex` picks the clip at that index in START order (-1 for none).
 // The PNG is written at the main screen's backing scale (2x on a Retina
@@ -58,6 +58,13 @@
 //                      pane — a filtered list, "2 of 6 items", the "No media
 //                      matches" line — cannot be photographed at all, and the
 //                      narrowed pane is the whole of what phase 8c added.
+//   `selectAction`     the selected action (road map 9, spec §11 CI-1): an
+//                      index into `ActionBands.ordered` of the selected clip,
+//                      or "-" for none, applied AFTER the playhead through
+//                      `document.selectAction`. Absent leaves whatever the
+//                      playhead's entry selected. APPENDED, for
+//                      `tools/proof/clip_inspector_proof.py`; compiled out of
+//                      a `-D HARNESS_REFERENCE_BUILD` harness.
 //
 //                      **It drives the app's own controls and sets nothing
 //                      itself**: `MediaPane.filter` is private and stays that
@@ -1000,6 +1007,8 @@ let expandSections = Harness.list(arguments.count > 11 ? arguments[11] : "-")
 /// `phase8_chrome.py`. See the header: view state a package cannot carry, and
 /// the only thing that writes it in the app is a person at the controls.
 let mediaFilterSpec = arguments.count > 12 && arguments[12] != "-" ? arguments[12] : ""
+/// The selected action — the thirteenth argument (see the header).
+let selectActionSpec = arguments.count > 13 ? arguments[13] : ""
 
 Harness.pinDefaults(sizeIndex: sizeIndex, expand: expandSections)
 let app = NSApplication.shared
@@ -1064,6 +1073,13 @@ if selectIndex >= 0, clips.indices.contains(selectIndex) {
     document.selection = [clips[selectIndex].id]
 }
 document.playhead = Ticks(playheadSeconds * 600_000)
+#if !HARNESS_REFERENCE_BUILD
+if !selectActionSpec.isEmpty {
+    let ordered = document.singleSelectedClip.map { ActionBands.ordered($0) } ?? []
+    let index = Int(selectActionSpec) ?? -1
+    document.selectAction(ordered.indices.contains(index) ? ordered[index].id : nil)
+}
+#endif
 let controller = EditorViewController(document: document)
 controller.trackHeight = sizeIndex
 let window = NSWindow(

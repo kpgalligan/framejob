@@ -546,6 +546,32 @@ product cap.
 
 **R6-16 size toll (#32, 2026-09-22).** Before behavior, the complete `Report` declaration moved from `CloudTranscriber.swift` (356 lines) into `CloudTranscriber+Report.swift` as a pure move. Typecheck passed with the four established warnings; the existing `run,cache_write,chrome` probe passed 143/143. The isolated move patch is in the issue handoff. Final product sizes are coordinator **325**, +Report **85**, +Media **220**, estimate **333**, sheet +Cloud **334**, agent +Cloud **279**, and catalog +Captions **221** lines, all under 400; proof scripts remain exempt. Road map 6 §10.20 records the final checks. Existing modification-second/recorded-duration identity limits, unreadable malformed files whose deletion IDs cannot be recovered by the reader, and the need for the originating account/region key to retry a safe ID remain.
 
+**Road map 9's phase 1, the selected action (2026-09-23, `wc -l`; road map
+9 §2).** Four over-cap files paid or took the tolls the phase's spec set,
+each measured against `87aa425`: `app/Sources/ProjectDocument.swift`
+1352 → **1368** (+16 of the +20 allowed: the two stored properties of the
+sixth piece of view state, `selection`'s new `didSet`, the sync call in
+`playhead`'s, and the two clamp lines above `clampViewState`'s playhead
+write — stored properties cannot live in an extension, which is
+`+DisplayStem`'s precedent; the queries and the entry rule went to the new
+`ProjectDocument+SelectedAction.swift`, **63**);
+`app/Sources/InspectorPane.swift` 1664 → **1679** (+15 of +40:
+`action(_:)` rewired, `actionNote` deleted, `selectedAction`,
+`selectAction(_:)` and `structural(audio:for:)` added);
+`app/Sources/ClipPane.swift` 609 → **608** (the Actions section's line
+gone, `makeHeader()` rewired); and `app/Sources/VideoPane.swift`
+1411 → **1248**, DOWN 163 — the Actions section, its two row builders,
+`summary(of:)` and `addAction` deleted, and the ten `actionNote` lines with
+them. The frozen files took wiring only: `TimelineView.swift` 1651 →
+**1663** (twelve lines) and `EditorViewController.swift` 1123 → **1124**
+(esc). Four more new files, all under the 400-line cap:
+`ActionLaneView.swift` **378** (the one to watch), `ActionBands.swift`
+**133**, `TimelineActionBands.swift` **107** and
+`EditorViewController+Actions.swift` **84**. `TimelineClipDrawing.swift`
+454 → **439**. The instruments, exempt: `tools/proof/clip_inspector_probe.swift`
+**395**, `tools/proof/clip_inspector_proof.py` **384**,
+`tools/proof/harness/main.swift` 1116 → **1132**.
+
 ## 4. What only a person at the machine can check
 
 These are not tasks so much as a list to run through at the machine once. The
@@ -908,6 +934,17 @@ and the closing above added the rest.
 ---
 
 ## 5. Where a third road map would start
+
+**Road map 9, the clip inspector redesign, has its phase 1 BUILT
+(2026-09-23; road map 9 §2).** The selected action is the sixth piece of
+view state (spec §11 CI-1 to CI-4): the timeline and the Clip tab's new
+action lane highlight it, the inspector's fields show and write its END
+state, esc and the Clip chip leave it, ⌫ removes it. **Next work starts at
+road map 9 §0's phases 2 to 5** — sub-tabs and the lane pinned above the
+scroll view (2), row marks, Reset/Clear and the refusal strip (3), band
+drags on the lane and the timeline (4), canvas drags following the mode and
+keyed-off switches (5) — and at §2's deviations, each of which one of those
+phases retires.
 
 **Road map 8, word captions, is BUILT (2026-09-23; road map 8 §10, W0 to
 W4b).** Both engines page a run's words into width-measured, word-timed

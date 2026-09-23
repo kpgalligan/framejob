@@ -1,0 +1,12 @@
+:root{
+--shadow-window:0 24px 60px rgba(0,0,0,0.55);
+--shadow-preview:0 0 0 1px var(--gray-750),0 8px 30px rgba(0,0,0,0.5);
+--shadow-popover:0 12px 34px rgba(0,0,0,0.5);
+--ring-selected:0 0 0 2px var(--brand-coral);
+--hatch-transition:repeating-linear-gradient(45deg,rgba(255,255,255,0.26) 0 3px,rgba(255,255,255,0) 3px 7px); /* @kind other */
+--ease-standard:cubic-bezier(0.2,0.7,0.3,1); /* @kind other */
+--duration-hover:140ms; /* @kind other */
+--duration-state:220ms; /* @kind other */
+--press-scale:0.97; /* @kind other */
+--disabled-opacity:0.42; /* @kind other */
+}

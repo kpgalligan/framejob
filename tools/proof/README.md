@@ -3089,6 +3089,8 @@ moved with the pass, in place and dated: `phase8_chrome.py` section 7 told
 the find band's hairlines from the search field by the field's rounded
 corners, and now excludes the square field's box by position (150/150).
 
+**The selected action** — `python3 tools/proof/clip_inspector_proof.py` (and `--mutant entry`, exit 0 when only S1 fails): road map 9 phase 1's probe rows S1–S6 and five harness rows over the harness's thirteenth argument, `selectAction`, with the expected inks converted into the PNG's own colour space by the probe's `--convert`; road map 9 §2 is the record.
+
 ## The reversed mirror, spelled once (`source_mirror_probe.py`)
 
 `python3 tools/proof/source_mirror_probe.py`, no port and no running app,

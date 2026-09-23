@@ -79,6 +79,9 @@ final class TimelineView: NSView, NSTextFieldDelegate {
         }
     }
 
+    /// The document's selected action (spec §11 CI-1), pushed in like the playhead.
+    var selectedAction: UInt32? { didSet { [content, ruler].forEach { $0.needsDisplay = true } } }
+
     /// Points per second.
     private(set) var zoom = TimelineLayout.defaultZoom
 
@@ -108,6 +111,7 @@ final class TimelineView: NSView, NSTextFieldDelegate {
     /// The track context menu's Remove Track (`TimelineView+TrackMenu.swift`):
     /// the controller asks first when the track still holds clips.
     var onRemoveTrack: ((UInt32) -> Void)?
+    var onActionSelected: ((UInt32, UInt32) -> Void)?
 
     // MARK: - Views
 
@@ -645,6 +649,10 @@ final class TimelineView: NSView, NSTextFieldDelegate {
                 clip: id, edge: edge, clipStart: clip.start, clipEnd: clip.end,
                 length: edge == .start ? props.fadeIn : props.fadeOut)
             onLiveBegin?()
+
+        case .action(let clip, let action):
+            selectClip(clip, flags: [])
+            onActionSelected?(clip, action)
 
         case .lane(let row, let time):
             // A double-click in empty lane space closes the gap it landed
@@ -1229,6 +1237,9 @@ final class TimelineContentView: NSView {
                     return .fade(clip.id, edge)
                 }
             }
+            if let id = actionBandHit(clip, rect: rect, at: point) {
+                return .action(clip: clip.id, action: id)
+            }
             // A bar too narrow to hold two grab zones is all body: trimming a
             // 3 pt clip by eye is not an interaction, it is a trap.
             if rect.width > TimelineLayout.edgeGrab * 3 {
@@ -1447,6 +1458,7 @@ final class TimelineRulerView: NSView {
                 width: layout.width(of: range.end - range.start), height: bounds.height
             ).fill()
         }
+        drawSelectedActionSpan(owner: owner, layout: layout)
         drawCandidateSpans(owner: owner, layout: layout)
 
         let steps = layout.rulerSteps()

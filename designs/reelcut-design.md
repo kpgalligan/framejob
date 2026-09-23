@@ -314,10 +314,20 @@ Chroma key — or to a media source, which is Speed.
   rendered" state, which is what a cancelled or failed render leaves
   behind. Nothing retries on its own: a render the user stopped must not
   restart itself on the next keystroke.
-- *Actions*: table of the clip's actions (start, duration, curve, which
-  properties change); Add Action at the playhead (⌥⌘K), Remove, curve
-  popup. While the playhead is inside an action, edits in this tab set
-  that action's end state and the section header says so — with one
+- *Actions* is not a section: the **action lane** under the selection
+  header replaces it (§11 CI-1 to CI-4; road map 9 §1). A header row —
+  ACTIONS, the count or `none`, "· editing N" in the action ink, and Zoom
+  to Region, Zoom Back and Add Action (⌥⌘K); a lane row — the Clip chip,
+  active when no action is selected, then the whole clip with its actions
+  as bands by fraction, numbered in time order, and the playhead; and,
+  only while an action is selected, a detail row — Start (clip-relative
+  timecode), Length, Curve and Remove. Clicking a band SELECTS the action
+  (and parks the playhead at its end); the Clip chip and esc leave the
+  mode. With an action selected, edits in this tab show and set that
+  action's END state (§11 CI-2); the per-section note that used to say so
+  is gone, and the lane's "editing N" and its wash say it instead. Pan,
+  mono, compressor, noise reduction, duck and keep-pitch go to the clip's
+  base props whatever is selected (§11 CI-3), and so does one more
   exception, ADDING or REMOVING an entry of a list-valued property
   (`video.filters`, `video.obscure`), which always writes the base props.
   §5.4's list rule interpolates per index only while the two lengths
@@ -388,7 +398,7 @@ is enabled.
   averages EVERY channel of the composition track and writes the average to
   all of them, and it is inert below two channels. Detach Audio (⌥⌘D; also
   Clip menu).
-- Volume actions share the Actions table.
+- Volume actions share the action lane.
 - M3 — Pan, "Smooth volume levels" (compressor), "Remove background
   noise". Unlike everything above, these three — and Mix to mono, which
   joined them in road map 2's phase 5 — cannot be a gain curve, so
@@ -688,8 +698,17 @@ begins, which was the whole complaint.
   at both ends — on the selected clip only, and only where the clip is wide
   enough and its track unlocked for a trim to be possible, so a grip never
   offers what a click cannot take.
-- An action is a darker band under the name strip over its span. A
-  **transition** is the overlap zone, drawn above both bars: a 45° hatch at
+- An action is a band in the clip's **action lane**, directly under the
+  name strip on a black-22 % backing (drawn only on a clip that has an
+  action with a length), 5 / 12 / 18 pt tall at S / M / L: the action ink
+  at 34 % with 1 pt ends at 75 %, numbered in time order from M, with the
+  zoom glyph for a scale-x-y zoom and, at L, the keys it changes. The
+  SELECTED action (§11 CI-1) is solid ink with its number in `#101010` and
+  its curve drawn inside from M, a 12 % wash with 55 % ends down the clip
+  body under its span, and the span shaded on the ruler at 20 % over a
+  2 pt rule. Clicking a band selects the clip and the action; the fade
+  handles are tested first, since on an audio-only clip they sit inside the
+  lane. A **transition** is the overlap zone, drawn above both bars: a 45° hatch at
   `rgba(white, 0.26)`, 3 pt on a 7 pt perpendicular period, with a solid
   edge down each side, and its kind named only when the word fits. Locked
   track: hatched overlay. Fade handles are small squares at the audio
@@ -2834,7 +2853,8 @@ a clean `make lint` before finishing Rust work.
 | Home / End | Start / end |
 | ⌘T | Split at playhead |
 | W / E | Trim start / end to playhead |
-| ⌫ | Delete the selection, leaving a gap — or LIFT the in/out range when nothing is selected |
+| ⌫ | Delete the selection, leaving a gap — or LIFT the in/out range when nothing is selected. With an action selected (§11 CI-1) it removes THAT action instead |
+| esc | Leave the selected action (§11 CI-1) — the Clip tab's fields go back to the clip's base props. With no action selected the key is not consumed |
 | ⌘⌫ | Ripple delete (selection, or the in/out range) |
 | ⇧⌘F | Freeze frame |
 | ⌥⌘D | Detach audio |
@@ -3899,3 +3919,42 @@ assisted import.
   light; the handoff's `#3a3a3a`) and the knob reads against it. It is the
   ONE deliberate divergence in the synced chrome files; Rasterize's copy
   very likely has the same defect, owed there.
+- **CI-1 — The selected action is the SIXTH piece of view state** (road map
+  9 §1, the clip inspector redesign's phase 1). `ProjectDocument.selectedAction`
+  is nil or ONE action of the SINGLE selected clip, and the document's
+  `selectAction(_:)` enforces it: an id that is not `singleSelectedClip`'s is
+  stored as nil, so a multi-selection never holds one. Like the other five it
+  is not undoable, not persisted and has no MCP mirror — agents address
+  actions by id through `add_action` / `set_action` / `set_action_end` /
+  `remove_action`, which is the whole capability. It is AUTO-selected when
+  the playhead ENTERS a span by moving (`lastInsideAction` records the span
+  it was last inside, so only a change counts), and never by an edit: an
+  edit, an undo or a redo under a stationary playhead enters nothing,
+  because `clampViewState` re-reads `lastInsideAction` BEFORE its playhead
+  write. It is KEPT when the playhead leaves the span, and cleared by esc,
+  by the lane's Clip chip and by any change of the clip selection (which
+  then auto-selects the new clip's action under the playhead, if any).
+- **CI-2 — The editing target is the selected action, not the playhead.**
+  With an action selected every animatable field shows AND writes its END
+  state: `InspectorBinding.action(_:)` answers the selected action, and
+  `evaluated(_:)` reads `clip_state` at `clip.start + action.endTime`,
+  where the core has merged every action ending at or before that tick and
+  none that starts there has progressed — keyed keys at their end values,
+  unkeyed ones at what is held. The playhead no longer decides where an
+  edit lands, so fields do not move with it. Selecting an action parks the
+  playhead at its end (one frame short when the action ends with the clip,
+  whose end tick composes nothing), so the preview shows the state the
+  fields show.
+- **CI-3 — Pan, mono, compressor, noise reduction, duck and keep-pitch go
+  to the BASE props whatever is selected.** The app routes them there
+  (`InspectorBinding.structural(audio:for:)`, beside
+  `structural(video:for:)`'s motion and list-length rule); the core's door
+  is unchanged and `set_action_end` still takes them from an agent. They
+  are switches or effects an action cannot usefully ramp, and a write
+  that disappeared into an end patch was the redesign's P7.
+- **CI-4 — Mint is the action ink, and nothing else uses it.**
+  `DS.action` (dark `#5CD6B0`, light `#1E8F6E`) with `DS.actionInk`
+  (`#101010`) on a solid band. The Clip tab's pinned action lane REPLACES
+  the Actions section, and actions are numbered by TIME order (start, then
+  id), not by creation — the timeline's bands, the lane and "editing N"
+  all count the same way (`ActionBands.ordered`).

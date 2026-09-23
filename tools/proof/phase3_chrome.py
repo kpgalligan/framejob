@@ -83,7 +83,7 @@ BUILD = os.path.join(HERE, "harness", "build.sh")
 # nothing about it can be measured — the inspector's scroll view starts at
 # the top and the harness cannot scroll it. TALL is the height at which the
 # whole section is on screen AND the content still overflows: with Timing and
-# Actions held open (`INSPECTOR_BELOW`) the stack has no slack to redistribute,
+# Motion held open (`INSPECTOR_BELOW`) the stack has no slack to redistribute,
 # so opening Obscure moves nothing above it and the arithmetic below is a
 # pure downward shift. Measured, not guessed: at 1400 and above the empty-list
 # package regains slack and the sections above Obscure start to move.
@@ -129,8 +129,9 @@ CANDIDATES = f"{SPAN_A[0]:g}-{SPAN_A[1]:g},{SPAN_B[0]:g}-{SPAN_B[1]:g}"
 
 # The two `InspectorSection` ids BELOW Obscure in the Clip tab, held open in
 # every inspector render so the section stack has no spare height to give
-# back when Obscure opens (see the note on TALL).
-INSPECTOR_BELOW = "clip.timing,video.actions"
+# back when Obscure opens (see the note on TALL). Changed 2026-09-23: road
+# map 9's phase 1 deleted `video.actions`, so Motion is held open in its place.
+INSPECTOR_BELOW = "clip.timing,video.motion"
 OBSCURE_ID = "video.obscure"
 
 # `DS.timelineCandidateShade` is `coral.withAlphaComponent(0.24)` and

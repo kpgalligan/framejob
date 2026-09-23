@@ -95,6 +95,21 @@ enum DS {
     static var meterTrough: NSColor { .quaternaryLabelColor }
     static var meterClip: NSColor { coral }
 
+    /// The action ink (spec §11 CI-4): bands, the lane, the selected span's
+    /// washes and "editing N" — and nothing else. Mint in dark, a deeper
+    /// green in light, where the design has only settled the ink.
+    static let action = NSColor(name: nil) { appearance in
+        let dark = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        return dark
+            ? NSColor(srgbRed: 0x5C / 255, green: 0xD6 / 255, blue: 0xB0 / 255, alpha: 1)
+            : NSColor(srgbRed: 0x1E / 255, green: 0x8F / 255, blue: 0x6E / 255, alpha: 1)
+    }
+    /// Text on a SOLID action band.
+    static let actionInk = NSColor(
+        srgbRed: 0x10 / 255, green: 0x10 / 255, blue: 0x10 / 255, alpha: 1)
+    /// The timeline's action lane under the name strip, by track size S/M/L.
+    static let actionLaneHeights: [CGFloat] = [5, 12, 18]
+
     // MARK: - Type
 
     /// Source Sans 3 for UI text; system face when the vendored font is

@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="_ds/reelcut-design-system-2b6440ca-3b4a-4f1b-a40b-66a71401af03/styles.css">
+<script src="_ds/reelcut-design-system-2b6440ca-3b4a-4f1b-a40b-66a71401af03/_ds_bundle.js"></script>
+</helmet>
+<div style="box-sizing:border-box;border:1px solid {{ border }};background:{{ bg }};display:flex;flex-direction:column">
+  <div style="height:30px;display:flex;align-items:center;gap:7px;padding:0 8px 0 7px">
+    <div style="width:16px;height:16px;flex:none;box-sizing:border-box;border:1px solid {{ ac }};background:{{ numBg }};color:{{ numColor }};display:flex;align-items:center;justify-content:center;font:600 10px/1 var(--font-mono)">{{ n }}</div>
+    <sc-if value="{{ isZoom }}" hint-placeholder-val="{{ false }}">
+      <div style="width:22px;height:13px;flex:none;box-sizing:border-box;border:1px solid var(--text-faint);position:relative">
+        <div style="position:absolute;left:3px;top:4px;width:8px;height:5px;box-sizing:border-box;border:1px solid {{ ac }}"></div>
+      </div>
+    </sc-if>
+    <span style="font:600 12px/1 var(--font-sans);color:var(--text-strong);white-space:nowrap">{{ name }}</span>
+    <div style="flex:1"></div>
+    <span style="font:400 10px/1 var(--font-mono);color:var(--text-meta);white-space:nowrap">{{ range }}</span>
+    <svg width="20" height="12" viewBox="0 0 20 12" style="flex:none"><path d="{{ curveD }}" fill="none" stroke="{{ ac }}" stroke-width="1.4"></path></svg>
+  </div>
+  <sc-if value="{{ collapsed }}" hint-placeholder-val="{{ true }}">
+    <div style="padding:0 8px 8px 30px;font:400 10px/1.4 var(--font-mono);color:var(--text-dim)">{{ summary }}</div>
+  </sc-if>
+  <sc-if value="{{ selected }}" hint-placeholder-val="{{ false }}">
+    <div style="display:grid;grid-template-columns:minmax(0,1fr) 62px minmax(0,1.3fr);gap:5px;padding:0 8px 8px 8px">
+      <div style="display:flex;flex-direction:column;gap:3px">
+        <span style="font:400 9px/1 var(--font-mono);color:var(--text-faint);letter-spacing:0.06em">START</span>
+        <div style="height:22px;box-sizing:border-box;border:1px solid var(--border-strong);background:var(--surface-field);display:flex;align-items:center;padding:0 5px;font:500 11px/1 var(--font-mono);color:var(--text-body)">{{ start }}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:3px">
+        <span style="font:400 9px/1 var(--font-mono);color:var(--text-faint);letter-spacing:0.06em">LENGTH</span>
+        <div style="height:22px;box-sizing:border-box;border:1px solid var(--border);background:var(--surface-control);display:flex;align-items:center;justify-content:space-between;padding:0 4px 0 5px;font:400 11px/1 var(--font-mono);color:var(--text-body)">{{ dur }}<x-import component-from-global-scope="ReelcutDesignSystem_2b6440.Icon" name="expand_more" size="{{ 12 }}" color="var(--text-ghost)" hint-size="12px,12px"></x-import></div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:3px">
+        <span style="font:400 9px/1 var(--font-mono);color:var(--text-faint);letter-spacing:0.06em">CURVE</span>
+        <div style="height:22px;box-sizing:border-box;border:1px solid var(--border);background:var(--surface-control);display:flex;align-items:center;justify-content:space-between;padding:0 4px 0 5px;font:400 11px/1 var(--font-mono);color:var(--text-body);white-space:nowrap;overflow:hidden">{{ curve }}<x-import component-from-global-scope="ReelcutDesignSystem_2b6440.Icon" name="unfold_more" size="{{ 13 }}" color="var(--text-meta)" hint-size="13px,13px"></x-import></div>
+      </div>
+    </div>
+    <div style="border-top:1px solid {{ divider }};padding:5px 0 6px">
+      <sc-for list="{{ changes }}" as="c" hint-placeholder-count="3">
+        <div style="height:22px;display:flex;align-items:center;gap:0;padding:0 4px 0 0">
+          <span style="width:22px;flex:none;text-align:center;font:400 9px/1 var(--font-mono);color:{{ ac }}">◆</span>
+          <span style="width:74px;flex:none;font:400 11px/1 var(--font-sans);color:var(--text-muted)">{{ c.label }}</span>
+          <span style="font:400 10px/1 var(--font-mono);color:var(--text-faint);white-space:nowrap">{{ c.from }}</span>
+          <span style="font:400 10px/1 var(--font-mono);color:var(--text-ghost);padding:0 5px">→</span>
+          <span style="font:500 11px/1 var(--font-mono);color:var(--text-bright);white-space:nowrap">{{ c.to }}</span>
+          <div style="flex:1"></div>
+          <x-import component-from-global-scope="ReelcutDesignSystem_2b6440.Icon" name="close" size="{{ 13 }}" color="var(--text-faint)" hint-size="13px,13px"></x-import>
+        </div>
+      </sc-for>
+      <div style="display:flex;gap:6px;padding:4px 8px 0 22px">
+        <x-import component-from-global-scope="ReelcutDesignSystem_2b6440.Button" size="sm" icon="add" hint-size="auto,22px">Property</x-import>
+        <div style="flex:1"></div>
+        <x-import component-from-global-scope="ReelcutDesignSystem_2b6440.Button" size="sm" hint-size="auto,22px">Remove</x-import>
+      </div>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:284,&quot;height&quot;:200}}">
+class Component extends DCLogic {
+  renderVals() {
+    const p = this.props;
+    const ac = p.ac || '#E07BD8';
+    const rgba = (h, a) => { const n = parseInt(h.slice(1), 16); return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a})`; };
+    const sel = p.selected === '1' || p.selected === true;
+    const curves = { linear: 'M1,11 L19,1', in: 'M1,11 C9,11 15,6 19,1', out: 'M1,11 C5,6 11,1 19,1', inout: 'M1,11 C8,11 12,1 19,1' };
+    return {
+      ac, n: p.n || '1', name: p.name || 'Action', range: p.range || '', start: p.start || '', dur: p.dur || '', curve: p.curve || 'Ease In Out',
+      summary: p.summary || '', changes: p.changes || [], isZoom: p.zoom === '1',
+      selected: sel, collapsed: !sel,
+      border: sel ? ac : 'var(--border)', bg: sel ? rgba(ac, 0.07) : 'var(--surface-control)', divider: sel ? rgba(ac, 0.3) : 'var(--border)',
+      numBg: sel ? ac : 'transparent', numColor: sel ? '#101010' : ac,
+      curveD: curves[p.curveKind || 'inout'],
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -62,12 +62,26 @@ final class ProjectDocument: NSDocument {
     /// NOT in the model. They live here so every view agrees on them, but
     /// they neither dirty the document nor register an undo step.
     var playhead: Ticks = 0 {
-        didSet { playhead = max(0, playhead) }
+        didSet {
+            playhead = max(0, playhead)
+            syncSelectedAction()
+        }
     }
 
     /// Selected clip ids. Re-clamped to ids that still exist on every change,
     /// so a delete or an undo never leaves a phantom selection behind.
-    var selection: Set<UInt32> = []
+    var selection: Set<UInt32> = [] {
+        didSet {
+            guard selection != oldValue else { return }
+            selectedAction = nil
+            lastInsideAction = nil
+            syncSelectedAction()
+        }
+    }
+
+    /// The SIXTH piece of view state (spec §11 CI-1, `+SelectedAction`).
+    var selectedAction: UInt32?
+    var lastInsideAction: UInt32?
 
     /// The in/out range (§4.4) when one is set. Scopes the playback loop,
     /// ripple-delete-range and export.
@@ -1337,6 +1351,8 @@ final class ProjectDocument: NSDocument {
         {
             selectedMedia = nil
         }
+        if selectedActionSnapshot == nil { selectedAction = nil }
+        lastInsideAction = actionUnderPlayhead?.id
         playhead = max(0, playhead)
     }
 

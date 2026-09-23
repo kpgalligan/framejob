@@ -39,6 +39,9 @@ enum TimelineHit: Equatable {
     case clip(UInt32)
     case clipEdge(UInt32, TimelineEdge)
     case fade(UInt32, TimelineEdge)
+    /// An action band in the clip's action lane (`TimelineActionBands.swift`):
+    /// selects the clip and the action.
+    case action(clip: UInt32, action: UInt32)
     /// Empty lane: a marquee. The row is for the double-click, which closes
     /// the gap it landed in.
     case lane(row: Int, time: Ticks)

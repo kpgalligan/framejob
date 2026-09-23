@@ -1,0 +1,27 @@
+:root{
+--font-sans:"Source Sans 3",system-ui,-apple-system,sans-serif;
+--font-mono:"IBM Plex Mono",ui-monospace,monospace;
+--font-display:"Darker Grotesque",system-ui,sans-serif;
+--font-icon:"Material Symbols Outlined";
+
+--weight-regular:400;--weight-medium:500;--weight-semibold:600;--weight-black:900;
+
+/* sizes (pt in AppKit = px here) */
+--size-9:9px;--size-10:10px;--size-11:11px;--size-12:12px;--size-13:13px;
+--tracking-micro:0.09em;--tracking-caption:0.06em;--tracking-wordmark:-0.015em;
+
+/* semantic type */
+--type-title:600 12px/1 var(--font-sans);
+--type-label:400 11px/1 var(--font-sans);
+--type-label-strong:600 11px/1 var(--font-sans);
+--type-body:400 12px/1 var(--font-sans);
+--type-tab:600 12px/1 var(--font-sans);
+--type-clip-name:600 10px/1 var(--font-sans);
+--type-hint:400 10px/1 var(--font-sans);
+--type-mono:400 11px/1 var(--font-mono);
+--type-mono-sm:400 10px/1 var(--font-mono);
+--type-mono-xs:400 9px/1 var(--font-mono);
+--type-timecode:500 12px/1 var(--font-mono);
+--type-micro:500 10px/1 var(--font-mono); /* UPPERCASE, tracking-micro */
+--type-display:900 68px/1 var(--font-display); /* never below 28px */
+}

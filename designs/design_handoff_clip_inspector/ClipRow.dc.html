@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="_ds/reelcut-design-system-2b6440ca-3b4a-4f1b-a40b-66a71401af03/styles.css">
+<script src="_ds/reelcut-design-system-2b6440ca-3b4a-4f1b-a40b-66a71401af03/_ds_bundle.js"></script>
+</helmet>
+<div style="position:relative;display:flex;align-items:center;min-height:22px;padding:0 10px 0 0;box-sizing:border-box;opacity:{{ rowOpacity }}">
+  <div style="width:14px;flex:none;align-self:flex-start;height:22px;display:flex;align-items:center;justify-content:center;font:400 9px/1 var(--font-mono)">
+    <sc-if value="{{ mKeyed }}" hint-placeholder-val="{{ false }}"><span style="color:{{ ac }}">◆</span></sc-if>
+    <sc-if value="{{ mHeld }}" hint-placeholder-val="{{ false }}"><span style="color:var(--text-faint)">◇</span></sc-if>
+    <sc-if value="{{ mDerived }}" hint-placeholder-val="{{ false }}"><span style="color:{{ ac }};font-size:10px">○</span></sc-if>
+    <sc-if value="{{ mLocked }}" hint-placeholder-val="{{ false }}"><span style="color:var(--text-faint);font-size:10px">⊘</span></sc-if>
+  </div>
+  <sc-if value="{{ hasLabel }}" hint-placeholder-val="{{ true }}">
+    <div style="width:64px;flex:none;align-self:flex-start;height:22px;display:flex;align-items:center;font:400 11px/1 var(--font-sans);color:{{ labelColor }};white-space:nowrap;overflow:hidden">{{ label }}</div>
+  </sc-if>
+  <div style="flex:1;min-width:0;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+    <sc-if value="{{ isSlider }}" hint-placeholder-val="{{ false }}">
+      <div style="flex:1;min-width:48px;height:11px;position:relative">
+        <div style="position:absolute;left:0;right:0;top:4px;height:3px;background:var(--border)"></div>
+        <div style="position:absolute;left:0;top:4px;height:3px;width:{{ fillW }};background:{{ fillColor }}"></div>
+        <sc-if value="{{ showSpan }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;top:4px;height:3px;left:{{ spanL }};width:{{ spanW }};background:{{ spanColor }}"></div></sc-if>
+        <sc-if value="{{ showNow }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;top:0;height:11px;width:2px;margin-left:-1px;left:{{ nowL }};background:var(--playhead)"></div></sc-if>
+        <sc-if value="{{ showTarget }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;top:0;width:7px;height:11px;margin-left:-3.5px;left:{{ targetL }};box-sizing:border-box;border:1px solid {{ ac }}"></div></sc-if>
+        <div style="position:absolute;top:0;width:7px;height:11px;margin-left:-3.5px;left:{{ knobL }};background:{{ knobColor }}"></div>
+      </div>
+    </sc-if>
+    <sc-if value="{{ hasBox }}" hint-placeholder-val="{{ false }}">
+      <div style="width:{{ boxW }};flex:none;height:22px;box-sizing:border-box;border-width:1px;border-style:{{ boxBorderStyle }};border-color:{{ boxBorder }};box-shadow:{{ boxRing }};background:var(--surface-control);display:flex;align-items:center;justify-content:space-between;gap:4px;padding:0 5px 0 6px;font:400 11px/1 var(--font-mono);color:{{ valueColor }}">
+        <span style="white-space:nowrap;overflow:hidden">{{ value }}</span>
+        <sc-if value="{{ showTargetChip }}" hint-placeholder-val="{{ false }}"><span style="color:{{ ac }};white-space:nowrap;font-size:10px">→{{ end }}</span></sc-if>
+        <sc-if value="{{ isPopup }}" hint-placeholder-val="{{ false }}"><x-import component-from-global-scope="ReelcutDesignSystem_2b6440.Icon" name="unfold_more" size="{{ 13 }}" color="var(--text-meta)" hint-size="13px,13px"></x-import></sc-if>
+        <sc-if value="{{ hasQuick }}" hint-placeholder-val="{{ false }}"><x-import component-from-global-scope="ReelcutDesignSystem_2b6440.Icon" name="expand_more" size="{{ 12 }}" color="var(--text-ghost)" hint-size="12px,12px"></x-import></sc-if>
+      </div>
+    </sc-if>
+    <sc-if value="{{ isReadout }}" hint-placeholder-val="{{ false }}"><span style="font:400 11px/22px var(--font-mono);color:{{ valueColor }}">{{ value }}</span></sc-if>
+    <sc-if value="{{ isColor }}" hint-placeholder-val="{{ false }}"><div style="width:22px;height:22px;box-sizing:border-box;border-width:1px;border-style:solid;border-color:{{ boxBorder }};background:{{ swatch }}"></div></sc-if>
+    <sc-if value="{{ isCheck }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;align-items:center;gap:6px;height:22px">
+        <span style="width:13px;height:13px;box-sizing:border-box;border-width:1px;border-style:{{ boxBorderStyle }};border-color:{{ checkBorder }};background:{{ checkBg }};display:inline-flex;align-items:center;justify-content:center;font:500 9px/1 var(--font-mono);color:var(--accent-text)">{{ tick }}</span>
+        <span style="font:400 11px/1 var(--font-sans);color:{{ labelColor }}">{{ value }}</span>
+      </div>
+    </sc-if>
+    <sc-if value="{{ isSeg }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex">
+        <sc-for list="{{ segs }}" as="s" hint-placeholder-count="3">
+          <div style="width:28px;height:22px;box-sizing:border-box;margin-left:-1px;border:1px solid {{ s.border }};background:{{ s.bg }};display:flex;align-items:center;justify-content:center;position:relative;z-index:{{ s.z }}">
+            <x-import component-from-global-scope="ReelcutDesignSystem_2b6440.Icon" name="{{ s.icon }}" size="{{ 14 }}" color="{{ s.color }}" hint-size="14px,14px"></x-import>
+          </div>
+        </sc-for>
+      </div>
+    </sc-if>
+    <sc-if value="{{ isText }}" hint-placeholder-val="{{ false }}">
+      <div style="flex:1;min-height:56px;box-sizing:border-box;border-width:1px;border-style:solid;border-color:{{ boxBorder }};background:var(--surface-field);padding:6px 7px;font:400 12px/1.35 var(--font-sans);color:var(--text-body)">{{ value }}</div>
+    </sc-if>
+    <sc-if value="{{ isButtons }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <sc-for list="{{ buttonList }}" as="b" hint-placeholder-count="2">
+          <x-import component-from-global-scope="ReelcutDesignSystem_2b6440.Button" disabled="{{ b.disabled }}" hint-size="auto,24px">{{ b.label }}</x-import>
+        </sc-for>
+      </div>
+    </sc-if>
+    <sc-if value="{{ isNote }}" hint-placeholder-val="{{ false }}"><div style="font:400 11px/1.35 var(--font-sans);color:{{ noteColor }};text-wrap:pretty;padding:3px 0">{{ value }}</div></sc-if>
+    <sc-if value="{{ isGroup }}" hint-placeholder-val="{{ false }}"><div style="font:500 9px/1 var(--font-mono);letter-spacing:0.09em;text-transform:uppercase;color:var(--text-faint);padding-top:4px">{{ value }}</div></sc-if>
+    <sc-if value="{{ tagNow }}" hint-placeholder-val="{{ false }}"><span style="font:400 10px/1 var(--font-mono);color:var(--playhead);white-space:nowrap">{{ tag }}</span></sc-if>
+    <sc-if value="{{ tagClip }}" hint-placeholder-val="{{ false }}"><span style="font:400 9px/1 var(--font-mono);color:var(--text-meta);border:1px solid var(--border);padding:3px 4px;white-space:nowrap">{{ tag }}</span></sc-if>
+    <sc-if value="{{ tagEnd }}" hint-placeholder-val="{{ false }}"><span style="font:400 10px/1 var(--font-mono);color:{{ ac }};white-space:nowrap">{{ tag }}</span></sc-if>
+    <sc-if value="{{ tagMuted }}" hint-placeholder-val="{{ false }}"><span style="font:400 10px/1 var(--font-mono);color:var(--text-faint);white-space:nowrap">{{ tag }}</span></sc-if>
+  </div>
+  <sc-if value="{{ tagRemove }}" hint-placeholder-val="{{ false }}">
+    <div style="width:18px;height:22px;flex:none;display:flex;align-items:center;justify-content:center;margin-left:4px">
+      <x-import component-from-global-scope="ReelcutDesignSystem_2b6440.Icon" name="close" size="{{ 13 }}" color="var(--text-meta)" hint-size="13px,13px"></x-import>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:304,&quot;height&quot;:40}}">
+class Component extends DCLogic {
+  renderVals() {
+    const p = this.props;
+    const ac = p.ac || '#E07BD8';
+    const kind = p.kind || 'slider';
+    const mark = p.mark || '';
+    const num = (x) => (x === undefined || x === null || x === '' ? null : parseFloat(x));
+    const v = num(p.pct) ?? 50, st = num(p.startPct), nw = num(p.nowPct);
+    const p8now = p.p8 === 'now';
+    const keyed = mark === 'keyed' || mark === 'switch';
+    const locked = mark === 'locked';
+    const focus = p.focus === '1' || p.focus === true;
+    const knob = keyed && p8now && nw != null ? nw : v;
+    const rgba = (h, a) => { const n = parseInt(h.slice(1), 16); return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a})`; };
+    const boxW = p.w || (kind === 'slider' ? '70px' : kind === 'popup' ? '116px' : '72px');
+    const tk = p.tagKind || '';
+    const segIdx = num(p.segOn) ?? 1;
+    const segs = (p.segs || '').split(',').filter(Boolean).map((icon, i) => ({
+      icon, bg: i === segIdx ? 'var(--selection-fill)' : 'var(--surface-control)',
+      border: i === segIdx ? 'var(--accent-border)' : 'var(--border)', z: i === segIdx ? 1 : 0,
+      color: i === segIdx ? 'var(--accent-text)' : 'var(--text-icon-muted)' }));
+    const checked = p.checked === '1' || p.checked === true;
+    return {
+      ac, label: p.label || '', value: p.value || '', end: p.end || '', tag: p.tag || '', swatch: p.swatch || '#fff',
+      rowOpacity: p.disabled === '1' ? 0.42 : 1,
+      mKeyed: keyed, mHeld: mark === 'held', mDerived: mark === 'derived', mLocked: locked,
+      hasLabel: !['check', 'buttons', 'note', 'group'].includes(kind) || !!p.label,
+      labelColor: locked ? 'var(--text-dim)' : keyed ? 'var(--text-strong)' : 'var(--text-muted)',
+      isSlider: kind === 'slider',
+      fillW: keyed ? '0%' : knob + '%',
+      fillColor: locked ? 'var(--text-ghost)' : 'var(--accent-rule)',
+      showSpan: keyed && st != null, spanL: Math.min(st ?? 0, v) + '%', spanW: Math.abs(v - (st ?? 0)) + '%',
+      spanColor: p8now ? rgba(ac, 0.45) : ac,
+      showNow: keyed && nw != null && !p8now, nowL: (nw ?? 0) + '%',
+      showTarget: keyed && p8now, targetL: v + '%',
+      knobL: knob + '%', knobColor: locked ? 'var(--text-dim)' : 'var(--text-strong)',
+      hasBox: (kind === 'slider' && p.nofield !== '1') || kind === 'field' || kind === 'popup',
+      boxW, boxBorderStyle: locked ? 'dashed' : 'solid',
+      boxBorder: focus ? 'var(--accent-border)' : keyed ? ac : 'var(--border)',
+      boxRing: focus ? '0 0 0 2px rgba(74,127,208,0.45)' : 'none',
+      valueColor: locked ? 'var(--text-dim)' : keyed && p8now ? 'var(--text-dim)' : 'var(--text-body)',
+      showTargetChip: keyed && p8now && !!p.end,
+      isPopup: kind === 'popup', hasQuick: p.quick === '1',
+      isReadout: kind === 'readout', isColor: kind === 'color',
+      isCheck: kind === 'check', tick: checked ? '✓' : '',
+      checkBorder: keyed ? ac : checked ? 'var(--accent-border)' : 'var(--border-strong)',
+      checkBg: checked ? 'var(--check-fill)' : 'var(--surface-control)',
+      isSeg: kind === 'seg', segs,
+      isText: kind === 'text',
+      isButtons: kind === 'buttons',
+      buttonList: (p.buttons || '').split('|').filter(Boolean).map((l) => ({ label: l.replace(/^~/, ''), disabled: l.startsWith('~') })),
+      isNote: kind === 'note', noteColor: p.noteColor || 'var(--text-dim)',
+      isGroup: kind === 'group',
+      tagNow: tk === 'now', tagClip: tk === 'clip', tagEnd: tk === 'end', tagMuted: tk === 'muted', tagRemove: tk === 'remove' || p.remove === '1',
+    };
+  }
+}
+</script>
+</body>
+</html>

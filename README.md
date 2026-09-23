@@ -51,11 +51,16 @@ normative: §5.2 is the project schema, §6 the op table, §7 the architecture.
 - **Inspector** with three tabs — Clip, Media, Document. The Clip tab is a
   selection header — the clip's name, editable there for a single clip and
   the one place a name can be cleared back to what the clip shows, with its
-  label dot — over the sections that selection's kind earns (transform,
-  crop, filters, text, shape, audio, actions…), each collapsible. Every field
-  reads the *evaluated* value at the playhead and writes to the clip's base
-  props — or, when the playhead is inside an animation action, to that
-  action's end state.
+  label dot — and the clip's **action lane**: its actions as numbered bands
+  you click to select, with Zoom to Region, Zoom Back and Add Action, and
+  the selected action's start, length, curve and Remove — over the sections
+  that selection's kind earns (transform, crop, filters, text, shape,
+  audio…), each collapsible. Every field shows and writes the clip's base
+  props — or, while an action is selected, that action's END state, read
+  at its end tick. Playing or scrubbing INTO an action selects it; esc or
+  the lane's Clip chip leaves it, and ⌫ removes it. The timeline draws each
+  clip's actions in a lane under its name, the selected one solid mint
+  with its span washed down the clip and shaded on the ruler.
 - **Editing**: move, nudge, trim, slip, roll, split, delete, lift, ripple
   delete (one range, or many at once), close gap, insert time, insert and
   overwrite, duplicate, speed, freeze frame, detach audio, transitions,
@@ -81,7 +86,7 @@ normative: §5.2 is the project schema, §6 the op table, §7 the architecture.
   says which files those were. It measures what you HEAR, not what is
   in the file: the level it tests is the waveform peak times the mix
   envelope, so a muted or soloed-out clip is silent for free. **Zoom to
-  Region** (Z, or the Actions section's button) is the screencast zoom:
+  Region** (Z, or the action lane's zoom button) is the screencast zoom:
   drag a rectangle over the selected clip and release, and the core solves
   for the scale and position that bring it to the canvas — through the
   clip's rotation and crop, eased at both ends, one action, one undo step;

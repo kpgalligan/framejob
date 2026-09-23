@@ -159,9 +159,9 @@ extension EditorViewController {
             NSSound.beep()
             return
         }
-        document.applyEdit(
-            "Zoom Back",
-            .addZoomAction(clip: clip.id, at: clip.clipTime(document.playhead), region: nil))
+        let at = clip.clipTime(document.playhead)
+        document.applyEdit("Zoom Back", .addZoomAction(clip: clip.id, at: at, region: nil))
+        selectAddedAction(on: clip.id, at: at, countBefore: clip.actions.count)
     }
 
     // MARK: - What the mode is aimed at
@@ -255,11 +255,12 @@ extension EditorViewController {
             return
         }
         endRegionMode()
+        let at = clip.clipTime(document.playhead)
         document.applyEdit(
             "Zoom to Region",
             .addZoomAction(
-                clip: clip.id, at: clip.clipTime(document.playhead), region: region,
-                fit: session.fill ? .fill : .fit))
+                clip: clip.id, at: at, region: region, fit: session.fill ? .fill : .fit))
+        selectAddedAction(on: clip.id, at: at, countBefore: clip.actions.count)
     }
 
     /// One more `video.obscure` entry, with the rest of its fields at the

@@ -53,6 +53,8 @@ final class InspectorViewController: NSViewController {
     var onSeek: ((Ticks) -> Void)?
     /// Hand a command back to the editor (Crop on Canvas, Detach Audio).
     var onCommand: ((Selector) -> Void)?
+    /// Select an action of the single selected clip, or nil to leave the mode.
+    var onSelectAction: ((UInt32?) -> Void)?
 
     // MARK: - State
 

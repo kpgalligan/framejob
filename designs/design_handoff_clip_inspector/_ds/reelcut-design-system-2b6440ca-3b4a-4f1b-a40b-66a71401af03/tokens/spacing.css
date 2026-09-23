@@ -1,0 +1,50 @@
+:root{
+/* spacing scale (handoff: 2 / 3 / 6 / 8 / 10 / 12) */
+--space-2:2px;--space-3:3px;--space-6:6px;--space-7:7px;--space-8:8px;--space-9:9px;--space-10:10px;--space-12:12px;
+
+/* radii — SHARP redesign. Source app used 3/4/5/7; the new system squares everything off. */
+--radius-none:0px;
+--radius-control:0px;   /* was 3 — fields, checkboxes, segmented */
+--radius-button:0px;    /* was 4 — Accent / Ghost / bordered buttons */
+--radius-clip:2px;      /* was 4 — timeline clips; the one softened object */
+--radius-row:0px;       /* was 5 — list rows */
+--radius-field:0px;     /* was 7 — legacy bordered fields */
+--radius-window:8px;    /* macOS window — owned by the OS */
+
+--border-width:1px;
+--rule-active:2px;      /* tab underline, selection ring */
+
+/* chrome metrics */
+--titlebar-height:30px;
+--toolbar-height:44px;
+--timeline-bar-height:36px;
+--options-bar-height:36px;
+--tab-height:32px;
+--control-height:22px;
+--button-height:26px;
+--field-height:24px;
+--panel-width:304px;
+--track-header-width:132px;
+--ruler-height:22px;
+--clip-header-height:16px;
+--trim-grip-width:6px;
+--filmstrip-thumb:34px;
+--section-header-height:28px;
+--selection-header-height:44px;
+--media-row-height:52px;
+--label-column:76px;
+/* Rasterize */
+--rail-width:48px;
+--rail-slot:34px;
+--status-bar-height:26px;
+--layer-row-height:44px;
+--popover-width:268px;
+--menu-min-width:206px;
+--menu-row-height:28px;
+--zoom-pill-height:30px;
+
+/* track heights: text / video / audio */
+--track-s-text:30px;--track-s-video:54px;--track-s-audio:40px;
+--track-m-text:44px;--track-m-video:84px;--track-m-audio:60px;
+--track-l-text:58px;--track-l-video:116px;--track-l-audio:82px;
+}

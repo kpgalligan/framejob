@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="_ds/reelcut-design-system-2b6440ca-3b4a-4f1b-a40b-66a71401af03/styles.css">
+<script src="_ds/reelcut-design-system-2b6440ca-3b4a-4f1b-a40b-66a71401af03/_ds_bundle.js"></script>
+<style>
+html,body{margin:0;height:100%;background:#171717!important;overflow:auto}
+a{color:#62b0ff;text-decoration:none}a:hover{color:#8cc6ff}
+input,textarea{outline:none}
+</style>
+</helmet>
+<div onMouseDown="{{ closeMenus }}" style="height:100vh;min-height:620px;display:flex;flex-direction:column;background:var(--surface-window);color:var(--text-body);font:400 12px/1 var(--font-sans);user-select:none">
+
+  <div style="height:44px;flex:none;box-sizing:border-box;display:flex;align-items:center;gap:12px;padding:0 12px;background:var(--surface-bar);border-bottom:1px solid var(--border)">
+    <div style="display:flex;gap:2px">
+      <x-import component-from-global-scope="ReelcutDesignSystem_2b6440.GhostButton" icon="skip_previous" title="To start" onClick="{{ toStart }}" hint-size="30px,26px"></x-import>
+      <x-import component-from-global-scope="ReelcutDesignSystem_2b6440.GhostButton" icon="{{ playIcon }}" title="Play (space)" onClick="{{ togglePlay }}" hint-size="30px,26px"></x-import>
+      <x-import component-from-global-scope="ReelcutDesignSystem_2b6440.GhostButton" icon="skip_next" title="To end" onClick="{{ toEnd }}" hint-size="30px,26px"></x-import>
+    </div>
+    <div style="width:1px;height:20px;background:var(--border)"></div>
+    <div style="height:24px;box-sizing:border-box;border:1px solid var(--border-strong);background:var(--surface-field);display:flex;align-items:center;padding:0 8px;font:500 12px/1 var(--font-mono);color:var(--text-bright)">{{ tcNow }}</div>
+    <span style="font:400 11px/1 var(--font-mono);color:var(--text-meta)">/ 00:00:09:15</span>
+    <div style="flex:1"></div>
+    <span style="font:400 10px/1.3 var(--font-mono);color:var(--text-faint);text-align:right">space play · ← → frame · esc clip · ⌥⌘K add · Z zoom · ⌫ remove action</span>
+  </div>
+
+  <div style="flex:1;min-height:0;display:flex">
+    <div style="flex:1;min-width:0;background:var(--surface-desk);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:24px">
+      <div style="width:100%;max-width:620px;aspect-ratio:16/9;background:#000;box-shadow:0 0 0 1px rgba(255,255,255,0.08)"></div>
+      <span style="font:400 10px/1 var(--font-mono);color:var(--text-meta)">1920 × 1080 · 30 fps · preview not simulated</span>
+    </div>
+
+    <div ref="{{ inspRef }}" style="width:304px;flex:none;position:relative;display:flex;flex-direction:column;background:var(--surface-panel);border-left:1px solid var(--border);min-height:0">
+      <x-import component-from-global-scope="ReelcutDesignSystem_2b6440.PanelTabs" tabs="{{ topTabs }}" value="Clip" hint-size="100%,32px"></x-import>
+      <x-import component-from-global-scope="ReelcutDesignSystem_2b6440.SelectionBlock" kind="{{ clipKind }}" name="{{ clipName }}" meta="{{ clipMeta }}" variant="header" hint-size="100%,44px"></x-import>
+
+      <div style="flex:none;padding:8px 10px 9px;border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:6px;background:{{ laneBg }}">
+        <div style="display:flex;align-items:center;gap:6px;height:18px">
+          <span style="font:500 10px/1 var(--font-mono);letter-spacing:0.09em;color:var(--text-muted)">ACTIONS</span>
+          <span style="font:400 10px/1 var(--font-mono);color:var(--text-faint)">{{ actCount }}</span>
+          <sc-if value="{{ hasAct }}" hint-placeholder-val="{{ false }}"><span style="font:400 10px/1 var(--font-mono);color:{{ ac }};white-space:nowrap">· editing {{ actN }}</span></sc-if>
+          <div style="flex:1"></div>
+          <x-import component-from-global-scope="ReelcutDesignSystem_2b6440.GhostButton" icon="zoom_in" size="track" title="Zoom to Region (Z)" onClick="{{ addZoom }}" hint-size="20px,18px"></x-import>
+          <x-import component-from-global-scope="ReelcutDesignSystem_2b6440.GhostButton" icon="zoom_out" size="track" title="Zoom Back" onClick="{{ addZoomBack }}" hint-size="20px,18px"></x-import>
+          <x-import component-from-global-scope="ReelcutDesignSystem_2b6440.GhostButton" icon="add" size="track" title="Add Action (⌥⌘K)" onClick="{{ addPlain }}" hint-size="20px,18px"></x-import>
+        </div>
+        <div style="display:flex;gap:4px;height:28px">
+          <div onClick="{{ leave }}" title="Edit the clip (esc)" style="width:40px;flex:none;box-sizing:border-box;border:1px solid {{ chipBorder }};background:{{ chipBg }};display:flex;align-items:center;justify-content:center;font:600 11px/1 var(--font-sans);color:{{ chipColor }};cursor:pointer">Clip</div>
+          <div data-lane="1" onMouseDown="{{ laneDown }}" style="flex:1;position:relative;box-sizing:border-box;border:1px solid var(--border);background:var(--surface-well);cursor:text;overflow:hidden">
+            <sc-if value="{{ lane.hasTrans }}" hint-placeholder-val="{{ false }}"><div title="Transition" style="position:absolute;left:0;top:0;bottom:0;width:{{ lane.transW }};box-sizing:border-box;background:repeating-linear-gradient(45deg,var(--clip-hatch) 0 3px,transparent 3px 7px);border-right:1px solid var(--clip-hatch-edge)"></div></sc-if>
+            <sc-if value="{{ lane.hasFadeIn }}" hint-placeholder-val="{{ false }}"><div title="Fade in" style="position:absolute;left:0;bottom:0;height:10px;width:{{ lane.fadeInW }};background:rgba(255,255,255,0.16);clip-path:polygon(0 100%,100% 0,100% 100%)"></div></sc-if>
+            <sc-if value="{{ lane.hasFadeOut }}" hint-placeholder-val="{{ false }}"><div title="Fade out" style="position:absolute;right:0;bottom:0;height:10px;width:{{ lane.fadeOutW }};background:rgba(255,255,255,0.16);clip-path:polygon(0 0,100% 100%,0 100%)"></div></sc-if>
+            <sc-if value="{{ lane.hasMIn }}" hint-placeholder-val="{{ false }}"><div title="Motion in" style="position:absolute;left:0;top:0;height:8px;width:{{ lane.wedgeW }};background:var(--text-faint);clip-path:polygon(0 0,100% 0,0 100%)"></div></sc-if>
+            <sc-if value="{{ lane.hasMOut }}" hint-placeholder-val="{{ false }}"><div title="Motion out" style="position:absolute;right:0;top:0;height:8px;width:{{ lane.wedgeW }};background:var(--text-faint);clip-path:polygon(0 0,100% 0,100% 100%)"></div></sc-if>
+            <sc-if value="{{ lane.empty }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font:400 10px/1 var(--font-mono);color:var(--text-faint);pointer-events:none">no actions · ⌥⌘K adds one</div></sc-if>
+            <sc-for list="{{ lane.bands }}" as="b" hint-placeholder-count="2">
+              <div onMouseDown="{{ b.onDown }}" title="{{ b.title }}" style="position:absolute;top:4px;bottom:4px;left:{{ b.l }};width:{{ b.w }};box-sizing:border-box;background:{{ b.bg }};border-left:1px solid {{ b.edge }};border-right:1px solid {{ b.edge }};display:flex;align-items:center;gap:2px;padding:0 4px;overflow:hidden;cursor:grab;font:600 9px/1 var(--font-mono);color:{{ b.text }}">
+                {{ b.n }}
+                <sc-if value="{{ b.zoom }}" hint-placeholder-val="{{ false }}"><x-import component-from-global-scope="ReelcutDesignSystem_2b6440.Icon" name="zoom_in" size="{{ 11 }}" color="{{ b.text }}" hint-size="11px,11px"></x-import></sc-if>
+                <div onMouseDown="{{ b.onL }}" style="position:absolute;left:0;top:0;bottom:0;width:4px;cursor:col-resize"></div>
+                <div onMouseDown="{{ b.onR }}" style="position:absolute;right:0;top:0;bottom:0;width:4px;cursor:col-resize"></div>
+              </div>
+            </sc-for>
+            <sc-if value="{{ lane.ph }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;top:0;bottom:0;left:{{ lane.phL }};width:1px;background:var(--playhead);pointer-events:none"></div></sc-if>
+          </div>
+        </div>
+        <sc-if value="{{ hasAct }}" hint-placeholder-val="{{ false }}">
+          <div style="display:grid;grid-template-columns:76px 58px minmax(0,1fr) 22px;gap:5px;position:relative;align-items:center">
+            <div style="height:22px;box-sizing:border-box;border:1px solid var(--border-strong);background:var(--surface-field);display:flex;align-items:center;padding:0 5px">
+              <input title="Start (clip time)" value="{{ act.startVal }}" onFocus="{{ act.startFocus }}" onChange="{{ onDraft }}" onBlur="{{ act.startBlur }}" onKeyDown="{{ onFieldKey }}" style="width:100%;min-width:0;background:transparent;border:0;padding:0;font:500 11px/1 var(--font-mono);color:var(--text-body)">
+            </div>
+            <div style="height:22px;box-sizing:border-box;border:1px solid var(--border);background:var(--surface-control);display:flex;align-items:center;padding:0 5px">
+              <input title="Length" value="{{ act.durVal }}" onFocus="{{ act.durFocus }}" onChange="{{ onDraft }}" onBlur="{{ act.durBlur }}" onKeyDown="{{ onFieldKey }}" style="width:100%;min-width:0;background:transparent;border:0;padding:0;font:400 11px/1 var(--font-mono);color:var(--text-body)">
+            </div>
+            <div onMouseDown="{{ stop }}" onClick="{{ act.onCurve }}" title="Curve" style="height:22px;box-sizing:border-box;border:1px solid var(--border);background:var(--surface-control);display:flex;align-items:center;justify-content:space-between;gap:4px;padding:0 3px 0 5px;font:400 11px/1 var(--font-mono);color:var(--text-body);white-space:nowrap;overflow:hidden;cursor:pointer">
+              <svg width="16" height="10" viewBox="0 0 20 12" style="flex:none"><path d="{{ act.curveD }}" fill="none" stroke="{{ ac }}" stroke-width="1.6"></path></svg>
+              <span style="flex:1;overflow:hidden">{{ act.curveShort }}</span>
+              <x-import component-from-global-scope="ReelcutDesignSystem_2b6440.Icon" name="unfold_more" size="{{ 13 }}" color="var(--text-meta)" hint-size="13px,13px"></x-import>
+            </div>
+            <div onClick="{{ removeAction }}" title="Remove action (⌫)" style="height:22px;box-sizing:border-box;border:1px solid var(--border);background:var(--surface-control);display:flex;align-items:center;justify-content:center;cursor:pointer">
+              <x-import component-from-global-scope="ReelcutDesignSystem_2b6440.Icon" name="delete" size="{{ 13 }}" color="var(--text-icon-muted)" hint-size="13px,13px"></x-import>
+            </div>
+            <sc-if value="{{ act.curveOpen }}" hint-placeholder-val="{{ false }}">
+              <div onMouseDown="{{ stop }}" style="position:absolute;top:24px;left:144px;z-index:30;min-width:110px;background:var(--surface-popover);border:1px solid var(--border-popover);padding:3px 0">
+                <sc-for list="{{ act.curveItems }}" as="m" hint-placeholder-count="4">
+                  <div onClick="{{ m.onPick }}" style="height:22px;padding:0 10px;display:flex;align-items:center;gap:6px;font:400 11px/1 var(--font-mono);color:var(--text-body);cursor:pointer;background:{{ m.bg }}" style-hover="background:var(--menu-highlight)">{{ m.label }}</div>
+                </sc-for>
+              </div>
+            </sc-if>
+          </div>
+        </sc-if>
+      </div>
+
+      <div style="flex:none;display:flex;padding:8px 10px;border-bottom:1px solid var(--border)">
+        <sc-for list="{{ subtabs }}" as="t" hint-placeholder-count="3">
+          <div onClick="{{ t.onClick }}" style="flex:1;height:24px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;gap:5px;border:1px solid {{ t.border }};margin-left:{{ t.ml }};background:{{ t.bg }};font:600 11px/1 var(--font-sans);color:{{ t.color }};position:relative;z-index:{{ t.z }};cursor:pointer">{{ t.label }}<sc-if value="{{ t.hasBadge }}" hint-placeholder-val="{{ false }}"><span style="font:500 9px/1 var(--font-mono);color:{{ ac }}">◆{{ t.badge }}</span></sc-if></div>
+        </sc-for>
+      </div>
+
+      <div style="flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;scrollbar-color:var(--border-strong) transparent">
+        <sc-for list="{{ sections }}" as="s" hint-placeholder-count="6">
+          <div onClick="{{ s.onToggle }}" style="height:28px;box-sizing:border-box;display:flex;align-items:center;gap:6px;padding:0 6px 0 4px;border-top:1px solid var(--border-subtle);background:var(--surface-bar);cursor:pointer" style-hover="background:var(--hover-row)">
+            <x-import component-from-global-scope="ReelcutDesignSystem_2b6440.Icon" name="{{ s.chevron }}" size="{{ 15 }}" color="var(--text-meta)" hint-size="15px,15px"></x-import>
+            <span style="font:500 10px/1 var(--font-mono);letter-spacing:0.09em;text-transform:uppercase;color:var(--text-muted);white-space:nowrap">{{ s.title }}</span>
+            <sc-if value="{{ s.hasKeys }}" hint-placeholder-val="{{ false }}"><span style="font:500 9px/1 var(--font-mono);color:{{ ac }}">◆{{ s.keys }}</span></sc-if>
+            <sc-if value="{{ s.held }}" hint-placeholder-val="{{ false }}"><span style="font:500 9px/1 var(--font-mono);color:var(--text-faint)">◇</span></sc-if>
+            <sc-if value="{{ s.locked }}" hint-placeholder-val="{{ false }}"><span style="font:400 10px/1 var(--font-mono);color:var(--text-faint)">⊘</span></sc-if>
+            <div style="flex:1;min-width:4px"></div>
+            <span style="font:400 10px/1 var(--font-mono);color:{{ s.summaryColor }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0">{{ s.summary }}</span>
+            <sc-if value="{{ s.hasReset }}" hint-placeholder-val="{{ false }}">
+              <x-import component-from-global-scope="ReelcutDesignSystem_2b6440.Button" size="sm" onClick="{{ s.onReset }}" title="{{ s.resetTitle }}" hint-size="auto,22px">{{ s.resetLabel }}</x-import>
+            </sc-if>
+          </div>
+          <sc-if value="{{ s.open }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;flex-direction:column;gap:7px;padding:8px 0 10px">
+              <sc-if value="{{ s.hasNote }}" hint-placeholder-val="{{ false }}"><div style="padding:0 10px 0 14px;font:400 11px/1.35 var(--font-sans);color:var(--text-dim);text-wrap:pretty">{{ s.note }}</div></sc-if>
+              <sc-for list="{{ s.rows }}" as="r" hint-placeholder-count="3">
+                <div onMouseEnter="{{ r.onEnter }}" onMouseLeave="{{ r.onLeave }}" onContextMenu="{{ r.onCtx }}" style="position:relative;display:flex;align-items:center;min-height:22px;padding:0 6px 0 0;opacity:{{ r.opacity }}">
+                  <div style="width:14px;flex:none;align-self:flex-start;height:22px;display:flex;align-items:center;justify-content:center;font:400 9px/1 var(--font-mono)">
+                    <sc-if value="{{ r.mKeyed }}" hint-placeholder-val="{{ false }}"><span style="color:{{ ac }}">◆</span></sc-if>
+                    <sc-if value="{{ r.mHeld }}" hint-placeholder-val="{{ false }}"><span title="{{ r.heldTitle }}" style="color:var(--text-faint)">◇</span></sc-if>
+                    <sc-if value="{{ r.mDerived }}" hint-placeholder-val="{{ false }}"><span style="color:{{ ac }};font-size:10px">○</span></sc-if>
+                    <sc-if value="{{ r.mLocked }}" hint-placeholder-val="{{ false }}"><span style="color:var(--text-faint);font-size:10px">⊘</span></sc-if>
+                  </div>
+                  <sc-if value="{{ r.hasLabel }}" hint-placeholder-val="{{ true }}">
+                    <div style="width:64px;flex:none;align-self:flex-start;height:22px;display:flex;align-items:center;font:400 11px/1 var(--font-sans);color:{{ r.labelColor }};white-space:nowrap;overflow:hidden">{{ r.label }}</div>
+                  </sc-if>
+                  <div style="flex:1;min-width:0;display:flex;align-items:center;gap:8px">
+                    <sc-if value="{{ r.isSlider }}" hint-placeholder-val="{{ false }}">
+                      <div onMouseDown="{{ r.onRail }}" style="flex:1;min-width:40px;height:15px;position:relative;cursor:pointer">
+                        <div style="position:absolute;left:0;right:0;top:6px;height:3px;background:var(--border)"></div>
+                        <div style="position:absolute;left:0;top:6px;height:3px;width:{{ r.fillW }};background:{{ r.fillColor }}"></div>
+                        <sc-if value="{{ r.showSpan }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;top:6px;height:3px;left:{{ r.spanL }};width:{{ r.spanW }};background:{{ ac }}"></div></sc-if>
+                        <sc-if value="{{ r.showNow }}" hint-placeholder-val="{{ false }}"><div title="{{ r.nowTitle }}" style="position:absolute;top:2px;height:11px;width:2px;margin-left:-1px;left:{{ r.nowL }};background:var(--playhead)"></div></sc-if>
+                        <div style="position:absolute;top:2px;width:7px;height:11px;margin-left:-3.5px;left:{{ r.knobL }};background:{{ r.knobColor }}"></div>
+                      </div>
+                    </sc-if>
+                    <sc-if value="{{ r.hasBox }}" hint-placeholder-val="{{ false }}">
+                      <div style="width:{{ r.boxW }};flex:none;height:22px;box-sizing:border-box;border-width:1px;border-style:{{ r.boxStyle }};border-color:{{ r.boxBorder }};background:var(--surface-control);display:flex;align-items:center;gap:2px;padding:0 3px 0 6px">
+                        <input value="{{ r.inputVal }}" onFocus="{{ r.onFocus }}" onChange="{{ onDraft }}" onBlur="{{ r.onBlur }}" onKeyDown="{{ onFieldKey }}" style="flex:1;width:100%;min-width:0;background:transparent;border:0;padding:0;font:400 11px/1 var(--font-mono);color:{{ r.valueColor }}">
+                        <sc-if value="{{ r.hasQuick }}" hint-placeholder-val="{{ false }}"><div onMouseDown="{{ stop }}" onClick="{{ r.onMenu }}" style="display:flex;cursor:pointer"><x-import component-from-global-scope="ReelcutDesignSystem_2b6440.Icon" name="expand_more" size="{{ 12 }}" color="var(--text-ghost)" hint-size="12px,12px"></x-import></div></sc-if>
+                      </div>
+                    </sc-if>
+                    <sc-if value="{{ r.isPopup }}" hint-placeholder-val="{{ false }}">
+                      <div onMouseDown="{{ stop }}" onClick="{{ r.onMenu }}" style="width:{{ r.boxW }};flex:none;height:22px;box-sizing:border-box;border-width:1px;border-style:{{ r.boxStyle }};border-color:{{ r.boxBorder }};background:var(--surface-control);display:flex;align-items:center;justify-content:space-between;gap:4px;padding:0 4px 0 6px;font:400 11px/1 var(--font-mono);color:{{ r.valueColor }};cursor:pointer;white-space:nowrap;overflow:hidden">{{ r.valueText }}<x-import component-from-global-scope="ReelcutDesignSystem_2b6440.Icon" name="unfold_more" size="{{ 13 }}" color="var(--text-meta)" hint-size="13px,13px"></x-import></div>
+                    </sc-if>
+                    <sc-if value="{{ r.isReadout }}" hint-placeholder-val="{{ false }}"><span style="font:400 11px/22px var(--font-mono);color:{{ r.valueColor }};white-space:nowrap">{{ r.valueText }}</span></sc-if>
+                    <sc-if value="{{ r.isCheck }}" hint-placeholder-val="{{ false }}">
+                      <div onClick="{{ r.onCheck }}" style="display:flex;align-items:center;gap:6px;height:22px;cursor:pointer">
+                        <span style="width:13px;height:13px;box-sizing:border-box;border-width:1px;border-style:{{ r.boxStyle }};border-color:{{ r.checkBorder }};background:{{ r.checkBg }};display:inline-flex;align-items:center;justify-content:center;font:500 9px/1 var(--font-mono);color:var(--accent-text)">{{ r.tick }}</span>
+                        <span style="font:400 11px/1 var(--font-sans);color:{{ r.labelColor }};white-space:nowrap">{{ r.label }}</span>
+                      </div>
+                    </sc-if>
+                    <sc-if value="{{ r.isColor }}" hint-placeholder-val="{{ false }}"><div onClick="{{ r.onColor }}" title="Click to change" style="width:22px;height:22px;box-sizing:border-box;border:1px solid {{ r.boxBorder }};background:{{ r.swatch }};cursor:pointer"></div></sc-if>
+                    <sc-if value="{{ r.isSeg }}" hint-placeholder-val="{{ false }}">
+                      <div style="display:flex">
+                        <sc-for list="{{ r.segs }}" as="g" hint-placeholder-count="3">
+                          <div onClick="{{ g.onClick }}" style="width:28px;height:22px;box-sizing:border-box;margin-left:-1px;border:1px solid {{ g.border }};background:{{ g.bg }};display:flex;align-items:center;justify-content:center;position:relative;z-index:{{ g.z }};cursor:pointer">
+                            <x-import component-from-global-scope="ReelcutDesignSystem_2b6440.Icon" name="{{ g.icon }}" size="{{ 14 }}" color="{{ g.color }}" hint-size="14px,14px"></x-import>
+                          </div>
+                        </sc-for>
+                      </div>
+                    </sc-if>
+                    <sc-if value="{{ r.isText }}" hint-placeholder-val="{{ false }}">
+                      <textarea value="{{ r.textVal }}" onChange="{{ r.onText }}" style="flex:1;min-height:56px;box-sizing:border-box;border:1px solid {{ r.boxBorder }};background:var(--surface-field);padding:6px 7px;font:400 12px/1.35 var(--font-sans);color:var(--text-body);resize:vertical"></textarea>
+                    </sc-if>
+                    <sc-if value="{{ r.isButtons }}" hint-placeholder-val="{{ false }}">
+                      <div style="display:flex;gap:6px;flex-wrap:wrap">
+                        <sc-for list="{{ r.btns }}" as="bt" hint-placeholder-count="2">
+                          <x-import component-from-global-scope="ReelcutDesignSystem_2b6440.Button" onClick="{{ bt.onClick }}" hint-size="auto,24px">{{ bt.label }}</x-import>
+                        </sc-for>
+                      </div>
+                    </sc-if>
+                    <sc-if value="{{ r.tagNow }}" hint-placeholder-val="{{ false }}"><span style="font:400 10px/1 var(--font-mono);color:var(--playhead);white-space:nowrap">{{ r.tag }}</span></sc-if>
+                    <sc-if value="{{ r.tagEnd }}" hint-placeholder-val="{{ false }}"><span style="font:400 10px/1 var(--font-mono);color:{{ ac }};white-space:nowrap">{{ r.tag }}</span></sc-if>
+                    <sc-if value="{{ r.tagClip }}" hint-placeholder-val="{{ false }}"><span style="font:400 9px/1 var(--font-mono);color:var(--text-meta);border:1px solid var(--border);padding:3px 4px;white-space:nowrap">{{ r.tag }}</span></sc-if>
+                  </div>
+                  <sc-if value="{{ r.showRemove }}" hint-placeholder-val="{{ false }}">
+                    <div onClick="{{ r.onRemove }}" title="{{ r.removeTitle }}" style="position:absolute;right:0;top:0;width:18px;height:22px;display:flex;align-items:center;justify-content:center;cursor:pointer;background:var(--surface-panel)">
+                      <x-import component-from-global-scope="ReelcutDesignSystem_2b6440.Icon" name="close" size="{{ 13 }}" color="var(--text-muted)" hint-size="13px,13px"></x-import>
+                    </div>
+                  </sc-if>
+                  <sc-if value="{{ r.menuOpen }}" hint-placeholder-val="{{ false }}">
+                    <div onMouseDown="{{ stop }}" style="position:absolute;top:24px;left:78px;z-index:30;min-width:116px;max-height:220px;overflow-y:auto;background:var(--surface-popover);border:1px solid var(--border-popover);padding:3px 0">
+                      <sc-for list="{{ r.menuItems }}" as="m" hint-placeholder-count="4">
+                        <div onClick="{{ m.onPick }}" style="height:22px;padding:0 10px;display:flex;align-items:center;font:400 11px/1 var(--font-mono);color:var(--text-body);cursor:pointer;white-space:nowrap;background:{{ m.bg }}" style-hover="background:var(--menu-highlight)">{{ m.label }}</div>
+                      </sc-for>
+                    </div>
+                  </sc-if>
+                </div>
+              </sc-for>
+            </div>
+          </sc-if>
+        </sc-for>
+        <div style="height:28px;border-top:1px solid var(--border-subtle)"></div>
+      </div>
+
+      <sc-if value="{{ hasCtx }}" hint-placeholder-val="{{ false }}">
+        <div onMouseDown="{{ stop }}" style="position:absolute;left:{{ ctxX }};top:{{ ctxY }};z-index:40;min-width:190px;background:var(--surface-popover);border:1px solid var(--border-popover);padding:3px 0">
+          <sc-for list="{{ ctxItems }}" as="m" hint-placeholder-count="2">
+            <div onClick="{{ m.onPick }}" style="height:24px;padding:0 12px;display:flex;align-items:center;font:400 12px/1 var(--font-sans);color:var(--text-body);cursor:pointer;white-space:nowrap" style-hover="background:var(--menu-highlight)">{{ m.label }}</div>
+          </sc-for>
+        </div>
+      </sc-if>
+      <sc-if value="{{ hasToast }}" hint-placeholder-val="{{ false }}">
+        <div style="position:absolute;left:10px;right:10px;bottom:10px;z-index:41;background:var(--surface-popover);border:1px solid var(--border-popover);padding:9px 10px;font:400 11px/1.4 var(--font-sans);color:var(--text-body);text-wrap:pretty">{{ toast }}</div>
+      </sc-if>
+    </div>
+  </div>
+
+  <div style="flex:none;display:flex;flex-direction:column;border-top:1px solid var(--border);background:var(--surface-timeline)">
+    <div style="height:36px;box-sizing:border-box;display:flex;align-items:center;gap:12px;padding:0 12px;background:var(--surface-bar);border-bottom:1px solid var(--border)">
+      <x-import component-from-global-scope="ReelcutDesignSystem_2b6440.SelectionBlock" kind="{{ clipKind }}" name="{{ clipName }}" meta="{{ trackMeta }}" hint-size="176px,24px"></x-import>
+      <div style="flex:1"></div>
+      <span style="font:400 10px/1 var(--font-mono);color:var(--text-faint)">drag a band to move · drag its ends to retime</span>
+      <div style="width:1px;height:18px;background:var(--border)"></div>
+      <div style="display:flex">
+        <sc-for list="{{ sizeSeg }}" as="z" hint-placeholder-count="3">
+          <div onClick="{{ z.onClick }}" style="width:26px;height:22px;box-sizing:border-box;margin-left:-1px;border:1px solid {{ z.border }};background:{{ z.bg }};display:flex;align-items:center;justify-content:center;font:500 10px/1 var(--font-mono);color:{{ z.color }};position:relative;z-index:{{ z.z }};cursor:pointer">{{ z.label }}</div>
+        </sc-for>
+      </div>
+    </div>
+    <div style="display:flex">
+      <div style="width:132px;flex:none;border-right:1px solid var(--border);background:var(--surface-lane)">
+        <div style="height:22px;box-sizing:border-box;border-bottom:1px solid var(--border);background:var(--surface-ruler)"></div>
+        <sc-for list="{{ tracks }}" as="t" hint-placeholder-count="2">
+          <div style="height:{{ t.h }};box-sizing:border-box;border-bottom:1px solid var(--border-lane);padding:7px 10px;font:600 11px/1 var(--font-sans);color:var(--text-strong)">{{ t.name }}</div>
+        </sc-for>
+        <div style="height:28px"></div>
+      </div>
+      <div style="flex:1;min-width:0;overflow-x:auto;overflow-y:hidden">
+        <div style="position:relative;width:{{ tlW }}">
+          <div onMouseDown="{{ rulerDown }}" style="height:22px;box-sizing:border-box;position:relative;border-bottom:1px solid var(--border);background:var(--surface-ruler);cursor:text;overflow:hidden">
+            <sc-if value="{{ range.show }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;top:0;bottom:0;left:{{ range.l }};width:{{ range.w }};background:{{ range.bg }};box-shadow:inset 0 -2px 0 {{ ac }}"></div></sc-if>
+            <sc-for list="{{ ticks }}" as="k" hint-placeholder-count="10">
+              <div style="position:absolute;bottom:0;left:{{ k.l }};height:{{ k.h }};border-left:1px solid var(--text-ghost)"></div>
+            </sc-for>
+            <sc-for list="{{ labels }}" as="k" hint-placeholder-count="10">
+              <div style="position:absolute;top:4px;left:{{ k.l }};padding-left:4px;font:400 9px/1 var(--font-mono);color:var(--text-tick);pointer-events:none">{{ k.label }}</div>
+            </sc-for>
+            <div style="position:absolute;top:0;left:{{ phHeadL }};width:9px;height:9px;background:var(--playhead)"></div>
+          </div>
+          <sc-for list="{{ tracks }}" as="t" hint-placeholder-count="2">
+            <div style="height:{{ t.h }};position:relative;box-sizing:border-box;border-bottom:1px solid var(--border-lane);background:var(--surface-lane)">
+              <sc-for list="{{ t.clips }}" as="cl" hint-placeholder-count="1">
+                <div onMouseDown="{{ cl.onDown }}" style="position:absolute;left:{{ cl.l }};width:{{ cl.w }};top:3px;height:{{ cl.h }};z-index:{{ cl.z }}">
+                  <div style="position:absolute;inset:0;box-sizing:border-box;border-radius:2px;overflow:hidden;background:{{ cl.tint }};border:1px solid var(--clip-border);outline:{{ cl.ring }};display:flex;flex-direction:column;cursor:pointer">
+                    <div style="height:16px;flex:none;background:var(--clip-strip);display:flex;align-items:center;gap:5px;padding:0 6px;overflow:hidden">
+                      <x-import component-from-global-scope="ReelcutDesignSystem_2b6440.Icon" name="{{ cl.icon }}" size="{{ 11 }}" color="var(--clip-icon)" hint-size="11px,11px"></x-import>
+                      <span style="font:600 10px/1 var(--font-sans);color:var(--clip-name);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ cl.name }}</span>
+                    </div>
+                    <div data-lane="1" style="position:relative;flex:none;height:{{ cl.laneH }};background:rgba(0,0,0,0.22)">
+                      <sc-for list="{{ cl.ghosts }}" as="gh" hint-placeholder-count="0">
+                        <div style="position:absolute;top:0;bottom:0;left:{{ gh.l }};width:{{ gh.w }};box-sizing:border-box;border:1px dashed {{ ac }}"></div>
+                      </sc-for>
+                      <sc-for list="{{ cl.bands }}" as="b" hint-placeholder-count="1">
+                        <div onMouseDown="{{ b.onDown }}" onMouseEnter="{{ b.onEnter }}" onMouseLeave="{{ b.onLeave }}" title="{{ b.title }}" style="position:absolute;top:0;bottom:0;left:{{ b.l }};width:{{ b.w }};box-sizing:border-box;background:{{ b.bg }};border-left:1px solid {{ b.edge }};border-right:1px solid {{ b.edge }};display:flex;align-items:center;gap:4px;padding:0 6px;overflow:hidden;cursor:grab">
+                          <sc-if value="{{ b.showCurve }}" hint-placeholder-val="{{ false }}"><svg viewBox="0 0 100 10" preserveAspectRatio="none" style="position:absolute;left:0;top:2px;width:100%;height:calc(100% - 4px);pointer-events:none"><path d="{{ b.curveD }}" fill="none" stroke="rgba(16,16,16,0.45)" stroke-width="1.25" vector-effect="non-scaling-stroke"></path></svg></sc-if>
+                          <sc-if value="{{ b.showNum }}" hint-placeholder-val="{{ false }}"><span style="position:relative;font:600 9px/1 var(--font-mono);color:{{ b.text }}">{{ b.n }}</span></sc-if>
+                          <sc-if value="{{ b.showZoom }}" hint-placeholder-val="{{ false }}"><x-import component-from-global-scope="ReelcutDesignSystem_2b6440.Icon" name="zoom_in" size="{{ 11 }}" color="{{ b.text }}" hint-size="11px,11px"></x-import></sc-if>
+                          <sc-if value="{{ b.showLabel }}" hint-placeholder-val="{{ false }}"><span style="position:relative;font:600 10px/1 var(--font-sans);color:{{ b.text }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ b.label }}</span></sc-if>
+                          <div onMouseDown="{{ b.onL }}" style="position:absolute;left:0;top:0;bottom:0;width:5px;cursor:col-resize;background:{{ b.gripC }}"></div>
+                          <div onMouseDown="{{ b.onR }}" style="position:absolute;right:0;top:0;bottom:0;width:5px;cursor:col-resize;background:{{ b.gripC }}"></div>
+                        </div>
+                      </sc-for>
+                    </div>
+                    <div style="flex:1;position:relative;min-height:0;background:{{ cl.bodyBg }}">
+                      <sc-for list="{{ cl.guides }}" as="gd" hint-placeholder-count="0">
+                        <div style="position:absolute;top:0;bottom:0;left:{{ gd.l }};width:{{ gd.w }};box-sizing:border-box;background:{{ gd.bg }};border-left:1px solid {{ gd.edge }};border-right:1px solid {{ gd.edge }};pointer-events:none"></div>
+                      </sc-for>
+                      <sc-if value="{{ cl.hasAudio }}" hint-placeholder-val="{{ false }}">
+                        <div style="position:absolute;left:0;right:0;bottom:0;height:38%;background:rgba(255,255,255,0.06);border-top:1px solid rgba(0,0,0,0.25)"><div style="position:absolute;left:0;right:0;top:40%;height:2px;background:rgba(255,255,255,0.32)"></div></div>
+                      </sc-if>
+                    </div>
+                    <sc-if value="{{ cl.hasTrans }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;left:0;top:0;bottom:0;width:{{ cl.transW }};box-sizing:border-box;background:repeating-linear-gradient(45deg,var(--clip-hatch) 0 3px,transparent 3px 7px);border-right:1px solid var(--clip-hatch-edge);pointer-events:none"></div></sc-if>
+                    <sc-if value="{{ cl.selected }}" hint-placeholder-val="{{ false }}">
+                      <div style="position:absolute;left:0;top:0;bottom:0;width:5px;background:var(--clip-grip);pointer-events:none"></div>
+                      <div style="position:absolute;right:0;top:0;bottom:0;width:5px;background:var(--clip-grip);pointer-events:none"></div>
+                    </sc-if>
+                  </div>
+                  <sc-for list="{{ cl.huds }}" as="h" hint-placeholder-count="0">
+                    <div style="position:absolute;top:-2px;left:{{ h.l }};transform:translateY(-100%);height:20px;box-sizing:border-box;padding:0 6px;display:flex;align-items:center;gap:6px;background:var(--surface-popover);border:1px solid var(--border-popover);font:400 10px/1 var(--font-mono);color:var(--text-body);white-space:nowrap;z-index:5;pointer-events:none">{{ h.t }}<span style="color:var(--text-faint)">{{ h.d }}</span></div>
+                  </sc-for>
+                </div>
+              </sc-for>
+            </div>
+          </sc-for>
+          <div onMouseDown="{{ rulerDown }}" style="height:28px"></div>
+          <div style="position:absolute;top:0;bottom:0;left:{{ phX }};width:1px;background:var(--playhead);pointer-events:none;z-index:6"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;actionColor&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;Mint&quot;,&quot;Orchid&quot;,&quot;Ink&quot;],&quot;default&quot;:&quot;Mint&quot;,&quot;tsType&quot;:&quot;'Mint'|'Orchid'|'Ink'&quot;},&quot;baseMarks&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;}}">
+class Component extends DCLogic {
+  get S() { return this._S || (this._S = this.buildSchema()); }
+  get inspRef() { return this._ref || (this._ref = React.createRef()); }
+  ensure() { if (!this.state || !this.state.clips) this.state = Object.assign(this.initState(), this.state || {}); }
+
+  buildSchema() {
+    const f = (k, v) => this.fmt(k, v);
+    const P = {
+      scale: { label: 'Scale', t: 'slider', min: 1, max: 1000, unit: '%', dec: 1, def: 100, anim: 1, quick: [25, 50, 100, 200, 300, 400] },
+      x: { label: 'Position X', t: 'field', unit: 'px', dec: 0, def: 0, anim: 1 },
+      y: { label: 'Position Y', t: 'field', unit: 'px', dec: 0, def: 0, anim: 1 },
+      rotation: { label: 'Rotation', t: 'slider', min: -180, max: 180, unit: '°', dec: 1, def: 0, anim: 1, quick: [-90, -45, 0, 45, 90, 180] },
+      opacity: { label: 'Opacity', t: 'slider', min: 0, max: 100, unit: '%', dec: 0, def: 100, anim: 1, quick: [0, 25, 50, 75, 100] },
+      blend: { label: 'Blend', t: 'popup', opts: ['Normal', 'Multiply', 'Screen', 'Add', 'Overlay', 'Darken', 'Lighten', 'Difference'], def: 'Normal', anim: 1, sw: 1 },
+      fitfill: { t: 'buttons', btns: [['Fit to Canvas', { scale: 300, x: 0, y: 0 }], ['Fill Canvas', { scale: 300, x: 0, y: 0 }]], anim: 1 },
+      cropL: { label: 'Left', t: 'field', unit: 'px', dec: 0, def: 0, anim: 1, min: 0 },
+      cropT: { label: 'Top', t: 'field', unit: 'px', dec: 0, def: 0, anim: 1, min: 0 },
+      cropR: { label: 'Right', t: 'field', unit: 'px', dec: 0, def: 0, anim: 1, min: 0 },
+      cropB: { label: 'Bottom', t: 'field', unit: 'px', dec: 0, def: 0, anim: 1, min: 0 },
+      brightness: { label: 'Brightness', t: 'slider', min: -1, max: 1, dec: 2, def: 0, anim: 1 },
+      contrast: { label: 'Contrast', t: 'slider', min: -1, max: 1, dec: 2, def: 0, anim: 1 },
+      saturation: { label: 'Saturation', t: 'slider', min: -1, max: 1, dec: 2, def: 0, anim: 1 },
+      hue: { label: 'Hue', t: 'slider', min: -180, max: 180, unit: '°', dec: 0, def: 0, anim: 1 },
+      shadowOn: { label: 'Drop shadow', t: 'check', def: false, anim: 1, sw: 1 },
+      shadowOpacity: { label: 'Opacity', t: 'slider', min: 0, max: 100, unit: '%', dec: 0, def: 50, anim: 1 },
+      shadowBlur: { label: 'Blur', t: 'slider', min: 0, max: 200, unit: 'px', dec: 0, def: 12, anim: 1 },
+      shadowDist: { label: 'Distance', t: 'slider', min: 0, max: 200, unit: 'px', dec: 0, def: 8, anim: 1 },
+      filterKind: { label: 'Filter', t: 'popup', opts: ['None', 'Blur', 'Sharpen', 'Pixelate', 'Sepia', 'Noir', 'Vignette', 'Invert'], def: 'None', anim: 1, sw: 1 },
+      filterAmt: { label: 'Amount', t: 'slider', min: 0, max: 100, unit: '%', dec: 0, def: 50, anim: 1 },
+      reflOn: { label: 'Mirror the layer below itself', t: 'check', def: false, anim: 1, sw: 1 },
+      reflOpacity: { label: 'Opacity', t: 'slider', min: 0, max: 100, unit: '%', dec: 0, def: 35, anim: 1 },
+      spotOn: { label: 'Spotlight a region', t: 'check', def: false, anim: 1, sw: 1 },
+      spotDim: { label: 'Dim', t: 'slider', min: 0, max: 100, unit: '%', dec: 0, def: 60, anim: 1 },
+      spotZoom: { label: 'Zoom', t: 'slider', min: 1, max: 2, unit: '×', dec: 2, def: 1, anim: 1 },
+      volume: { label: 'Volume', t: 'slider', min: 0, max: 400, unit: '%', dec: 0, def: 100, anim: 1, quick: [0, 50, 100, 150, 200] },
+      gain: { label: 'Gain', t: 'readout', derived: 'volume', fn: (V) => this.dB(V.volume) },
+      mute: { label: 'Mute', t: 'check', def: false, anim: 1, sw: 1 },
+      normalize: { t: 'buttons', btns: [['Normalize', { volume: 112 }]], anim: 0 },
+      fadeIn: { label: 'Fade in', t: 'slider', min: 0, max: 10, unit: 's', dec: 2, def: 0, anim: 1 },
+      fadeOut: { label: 'Fade out', t: 'slider', min: 0, max: 10, unit: 's', dec: 2, def: 0, anim: 1 },
+      duckOn: { label: 'Duck other audio', t: 'check', def: false, anim: 0 },
+      duckLevel: { label: 'Level', t: 'slider', min: 0, max: 100, unit: '%', dec: 0, def: 20, anim: 0 },
+      noise: { label: 'Remove noise', t: 'slider', min: 0, max: 100, unit: '%', dec: 0, def: 0, anim: 0 },
+      compOn: { label: 'Smooth volume levels', t: 'check', def: false, anim: 0 },
+      compThresh: { label: 'Threshold', t: 'slider', min: -60, max: 0, unit: 'dB', dec: 1, def: -18, anim: 0 },
+      pan: { label: 'Pan', t: 'slider', min: -100, max: 100, dec: 0, def: 0, anim: 0 },
+      panPos: { label: 'Position', t: 'readout', fn: (V) => this.panWord(V.pan) },
+      mono: { label: 'Mix to mono', t: 'check', def: false, anim: 0 },
+      inTc: { label: 'In', t: 'readout', fn: (V, c) => this.tc(c.start) },
+      outTc: { label: 'Out', t: 'readout', fn: (V, c) => this.tc(c.start + c.dur) },
+      durTc: { label: 'Duration', t: 'readout', fn: (V, c) => this.tc(c.dur) },
+      reverse: { label: 'Reverse', t: 'check', def: false, anim: 0 },
+      rate: { label: 'Rate', t: 'field', unit: '×', dec: 2, def: 1, anim: 0, min: 0.1, max: 10, quick: [0.5, 1, 2, 4] },
+      keepPitch: { label: 'Keep pitch', t: 'check', def: true, anim: 0 },
+      trKind: { label: 'Kind', t: 'popup', opts: ['None', 'Cross Dissolve', 'Fade Through Black', 'Push Left', 'Wipe', 'Slide', 'Zoom'], def: 'Cross Dissolve', anim: 0, w: 140 },
+      trCurve: { label: 'Curve', t: 'popup', opts: ['Linear', 'Ease In', 'Ease Out', 'Ease In Out'], def: 'Ease In Out', anim: 0 },
+      trDur: { label: 'Duration', t: 'field', unit: 's', dec: 2, def: 0.5, anim: 0, min: 0.02, max: 10, quick: [0.25, 0.5, 1, 2] },
+      motionIn: { label: 'In', t: 'popup', opts: ['None', 'Fade', 'Zoom In', 'Zoom Out', 'Slide Left', 'Slide Right', 'Spin', 'Pop'], def: 'None', anim: 0 },
+      motionOut: { label: 'Out', t: 'popup', opts: ['None', 'Fade', 'Zoom In', 'Zoom Out', 'Slide Left', 'Slide Right', 'Spin', 'Pop'], def: 'None', anim: 0 },
+      motionDuring: { label: 'During', t: 'popup', opts: ['None', 'Pulse', 'Shake', 'Spin', 'Bounce', 'Drift'], def: 'None', anim: 0 },
+      content: { t: 'text', def: '', anim: 1, sw: 1 },
+      family: { label: 'Family', t: 'popup', opts: ['Source Sans 3', 'IBM Plex Mono', 'Darker Grotesque'], def: 'Source Sans 3', anim: 1, sw: 1, w: 150 },
+      fstyle: { label: 'Style', t: 'popup', opts: ['Regular', 'Semibold', 'Black'], def: 'Regular', anim: 1, sw: 1 },
+      size: { label: 'Size', t: 'field', unit: 'px', dec: 0, def: 72, anim: 1, min: 6, max: 800, quick: [24, 36, 48, 72, 96, 144] },
+      color: { label: 'Color', t: 'color', opts: ['#ffffff', '#8cc6ff', '#f4c9a8', '#101010'], def: '#ffffff', anim: 1 },
+      align: { label: 'Align', t: 'seg', opts: ['left', 'center', 'right'], icons: ['format_align_left', 'format_align_center', 'format_align_right'], def: 'center', anim: 1, sw: 1 },
+      tracking: { label: 'Tracking', t: 'slider', min: -20, max: 100, unit: 'px', dec: 1, def: 0, anim: 1 },
+      lineSpacing: { label: 'Line spacing', t: 'slider', min: 0.5, max: 4, unit: '×', dec: 2, def: 1, anim: 1 },
+      outlineOn: { label: 'Outline', t: 'check', def: false, anim: 1, sw: 1 },
+      outlineWidth: { label: 'Width', t: 'slider', min: 0, max: 20, unit: 'px', dec: 1, def: 2, anim: 1 },
+      backdropOn: { label: 'Backdrop', t: 'check', def: false, anim: 1, sw: 1 },
+      backdropPad: { label: 'Padding', t: 'slider', min: 0, max: 100, unit: 'px', dec: 0, def: 12, anim: 1 },
+      reveal: { label: 'Reveal', t: 'popup', opts: ['None', 'Typewriter', 'Word Fade', 'Line Rise'], def: 'None', anim: 1, sw: 1 },
+    };
+    const SEC = {
+      transform: { title: 'Transform', rows: ['scale', 'x', 'y', 'rotation', 'opacity', 'blend', 'fitfill'], sum: (V) => f('scale', V.scale) + (Math.abs(V.rotation) >= 0.05 ? ' · ' + f('rotation', V.rotation) : '') },
+      crop: { title: 'Crop', rows: ['cropL', 'cropT', 'cropR', 'cropB'], sum: (V) => (V.cropL || V.cropT || V.cropR || V.cropB ? [V.cropL, V.cropT, V.cropR, V.cropB].map(Math.round).join('·') : 'none') },
+      color: { title: 'Color', rows: ['brightness', 'contrast', 'saturation', 'hue'], sum: (V) => (V.brightness || V.contrast || V.saturation || V.hue ? 'adjusted' : 'neutral') },
+      shadow: { title: 'Shadow', rows: ['shadowOn', 'shadowOpacity', 'shadowBlur', 'shadowDist'], sum: (V) => (V.shadowOn ? f('shadowBlur', V.shadowBlur) : 'off') },
+      filters: { title: 'Filters', rows: ['filterKind', 'filterAmt'], sum: (V) => (V.filterKind === 'None' ? 'none' : V.filterKind.toLowerCase()) },
+      reflection: { title: 'Reflection', rows: ['reflOn', 'reflOpacity'], sum: (V) => (V.reflOn ? f('reflOpacity', V.reflOpacity) : 'off') },
+      spotlight: { title: 'Spotlight', rows: ['spotOn', 'spotDim', 'spotZoom'], sum: (V) => (V.spotOn ? 'rectangle' : 'off') },
+      volume: { title: 'Volume', rows: ['volume', 'gain', 'mute', 'normalize'], sum: (V) => (V.mute ? 'muted' : this.dB(V.volume)) },
+      fades: { title: 'Fades', rows: ['fadeIn', 'fadeOut'], sum: (V) => (V.fadeIn || V.fadeOut ? V.fadeIn.toFixed(2) + ' · ' + V.fadeOut.toFixed(2) + ' s' : 'none') },
+      ducking: { title: 'Ducking', rows: ['duckOn', 'duckLevel'], sum: (V) => (V.duckOn ? f('duckLevel', V.duckLevel) : 'off') },
+      noise: { title: 'Noise Reduction', rows: ['noise'], sum: (V) => (V.noise ? f('noise', V.noise) : 'off') },
+      compressor: { title: 'Compressor', rows: ['compOn', 'compThresh'], sum: (V) => (V.compOn ? '3.0:1' : 'off') },
+      mix: { title: 'Mix', rows: ['pan', 'panPos', 'mono'], sum: (V) => this.panWord(V.pan) + (V.mono ? ' · mono' : '') },
+      timing: { title: 'Timing', rows: ['inTc', 'outTc', 'durTc', 'reverse'], sum: (V, c) => this.tc(c.dur), noReset: 1 },
+      speed: { title: 'Speed', rows: ['rate', 'keepPitch'], sum: (V) => f('rate', V.rate) },
+      transition: { title: 'Transition', rows: ['trKind', 'trCurve', 'trDur'], sum: (V) => V.trKind.toLowerCase() + ' · ' + f('trDur', V.trDur), noReset: 1 },
+      motion: { title: 'Motion presets', rows: ['motionIn', 'motionOut', 'motionDuring'], sum: (V) => { const p = []; if (V.motionIn !== 'None') p.push('in ' + V.motionIn.toLowerCase()); if (V.motionOut !== 'None') p.push('out ' + V.motionOut.toLowerCase()); if (V.motionDuring !== 'None') p.push(V.motionDuring.toLowerCase()); return p.join(' · ') || 'off'; } },
+      content: { title: 'Content', rows: ['content'], sum: (V) => (V.content || '').split('\n')[0], noReset: 1 },
+      font: { title: 'Font', rows: ['family', 'fstyle', 'size'], sum: (V) => f('size', V.size) },
+      style: { title: 'Style', rows: ['color', 'align', 'tracking', 'lineSpacing'], sum: (V) => V.align },
+      outline: { title: 'Outline', rows: ['outlineOn', 'outlineWidth'], sum: (V) => (V.outlineOn ? f('outlineWidth', V.outlineWidth) : 'off') },
+      backdrop: { title: 'Backdrop', rows: ['backdropOn', 'backdropPad'], sum: (V) => (V.backdropOn ? f('backdropPad', V.backdropPad) : 'off') },
+      reveal: { title: 'Reveal', rows: ['reveal'], sum: (V) => V.reveal.toLowerCase() },
+    };
+    const TABS = {
+      video: [{ id: 'picture', label: 'Picture', secs: ['transform', 'crop', 'color', 'shadow', 'filters', 'reflection', 'spotlight'] }, { id: 'sound', label: 'Sound', secs: ['volume', 'fades', 'ducking', 'noise', 'compressor', 'mix'] }, { id: 'clip', label: 'Clip', secs: ['timing', 'speed', 'transition', 'motion'] }],
+      text: [{ id: 'text', label: 'Text', secs: ['content', 'font', 'style', 'outline', 'backdrop', 'reveal'] }, { id: 'picture', label: 'Picture', secs: ['transform', 'shadow', 'filters', 'reflection'] }, { id: 'clip', label: 'Clip', secs: ['timing', 'motion'] }],
+    };
+    return { P, SEC, TABS };
+  }
+
+  initState() {
+    const { P } = this.S;
+    const base = (o) => { const b = {}; for (const k in P) if ('def' in P[k]) b[k] = P[k].def; return Object.assign(b, o); };
+    const clips = {
+      text: { id: 'text', name: 'Building a timeline in Reelcut', kind: 'text', track: 0, start: 0.5, dur: 3, meta: 'text · 00:00:03:00', base: base({ content: 'Building a timeline in Reelcut', motionIn: 'Fade', motionOut: 'Fade' }), actions: [{ id: 't1', start: 1.0, dur: 0.5, curve: 'Ease Out', keys: { size: 96, tracking: 2 } }] },
+      intro: { id: 'intro', name: 'Intro demo', kind: 'video', track: 1, start: 0, dur: 5, audio: true, meta: 'video · 00:00:05:00 · 640×360 · 30 fps', base: base({ scale: 300, shadowOn: true, shadowBlur: 20, filterKind: 'Vignette', filterAmt: 40, fadeIn: 0.5 }), actions: [{ id: 'a1', start: 0.5, dur: 1, curve: 'Ease In Out', zoom: true, keys: { scale: 600, x: -600, y: 240 } }, { id: 'a2', start: 2.5, dur: 1.5, curve: 'Ease In Out', keys: { rotation: 2.7, opacity: 77, saturation: -0.27, volume: 68 } }] },
+      av: { id: 'av', name: 'AV.mov', kind: 'video', track: 1, start: 4.5, dur: 5, audio: true, transition: true, meta: 'video · 00:00:05:00 · 640×360 · 30 fps', base: base({ scale: 300, fadeOut: 1 }), actions: [] },
+    };
+    return { clips, sel: 'intro', selAction: 'a2', lastInside: 'a2', playhead: 3.2, playing: false, tab: 'picture', open: { transform: 1, color: 1, volume: 1, content: 1, font: 1, timing: 1 }, size: 'M', menu: null, ctx: null, hoverRow: null, hoverBand: null, edit: null, draft: '', drag: null, toast: null };
+  }
+
+  componentDidMount() {
+    this.onKey = (e) => {
+      const tg = e.target.tagName;
+      if (tg === 'INPUT' || tg === 'TEXTAREA') return;
+      if (e.code === 'Space') { e.preventDefault(); this.togglePlay(); }
+      else if (e.key === 'Escape') this.leave();
+      else if (e.altKey && e.metaKey && e.code === 'KeyK') { e.preventDefault(); this.addAction('plain'); }
+      else if ((e.key === 'z' || e.key === 'Z') && !e.metaKey && !e.ctrlKey) this.addAction('zoom');
+      else if (e.key === 'Backspace' || e.key === 'Delete') { e.preventDefault(); this.removeAction(); }
+      else if (e.key === 'ArrowLeft') { e.preventDefault(); this.movePlayhead(this.state.playhead - 1 / 30); }
+      else if (e.key === 'ArrowRight') { e.preventDefault(); this.movePlayhead(this.state.playhead + 1 / 30); }
+    };
+    window.addEventListener('keydown', this.onKey);
+  }
+  componentWillUnmount() { window.removeEventListener('keydown', this.onKey); cancelAnimationFrame(this.raf); clearTimeout(this.toastT); }
+
+  // ---------- helpers
+  clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+  snap(s) { return Math.round(s * 30) / 30; }
+  pad(n) { return String(n).padStart(2, '0'); }
+  tc(s) { const f = Math.round(s * 30); return [Math.floor(f / 108000), Math.floor(f / 1800) % 60, Math.floor(f / 30) % 60, f % 30].map((n) => this.pad(n)).join(':'); }
+  tcShort(s) { const f = Math.round(s * 30); return [Math.floor(f / 1800) % 60, Math.floor(f / 30) % 60, f % 30].map((n) => this.pad(n)).join(':'); }
+  parseTime(str) { const s = String(str).replace(/[^\d:.]/g, ''); if (s.includes(':')) { const p = s.split(':').map(Number); const ff = p.pop() || 0; const ss = p.pop() || 0; const mm = p.pop() || 0; return mm * 60 + ss + ff / 30; } return parseFloat(s); }
+  dB(v) { if (v <= 0) return '−∞ dB'; const d = 20 * Math.log10(v / 100); const s = Math.abs(d).toFixed(1); return (d < -0.05 ? '−' : '+') + s + ' dB'; }
+  panWord(p) { const r = Math.round(p); return r === 0 ? 'centre' : (r < 0 ? 'left ' : 'right ') + Math.abs(r); }
+  rgba(h, a) { const n = parseInt(h.slice(1), 16); return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a})`; }
+  fmt(k, v) {
+    const d = this.S.P[k];
+    if (typeof v !== 'number') return String(v);
+    let s = Math.abs(v).toFixed(d.dec ?? 0);
+    if (v < 0 && parseFloat(s) !== 0) s = '−' + s;
+    const u = d.unit || '';
+    return s + (!u || u === '%' || u === '°' || u === '×' ? u : ' ' + u);
+  }
+  parseNum(k, str) {
+    const d = this.S.P[k];
+    const n = parseFloat(String(str).replace(/−/g, '-').replace(/[^\d.\-]/g, ''));
+    if (isNaN(n)) return null;
+    return this.clamp(n, d.min ?? -1e9, d.max ?? 1e9);
+  }
+  ease(c, f) { f = this.clamp(f, 0, 1); if (c === 'Ease In') return f * f; if (c === 'Ease Out') return 1 - (1 - f) * (1 - f); if (c === 'Ease In Out') return f < 0.5 ? 2 * f * f : 1 - Math.pow(-2 * f + 2, 2) / 2; return f; }
+  lerpHex(a, b, f) { const pa = parseInt(a.slice(1), 16), pb = parseInt(b.slice(1), 16); const ch = (s) => Math.round(((pa >> s) & 255) + ((((pb >> s) & 255) - ((pa >> s) & 255)) * f)); return '#' + [16, 8, 0].map((s) => ch(s).toString(16).padStart(2, '0')).join(''); }
+  sorted(c) { return [...c.actions].sort((a, b) => a.start - b.start); }
+  evalP(c, k, t) {
+    const d = this.S.P[k];
+    let cur = c.base[k];
+    for (const a of this.sorted(c)) {
+      if (!(k in a.keys)) continue;
+      const end = a.start + a.dur;
+      if (t >= end - 1e-9) { cur = a.keys[k]; continue; }
+      if (t > a.start) { const fr = this.ease(a.curve, (t - a.start) / a.dur); if (typeof cur === 'number') cur = cur + (a.keys[k] - cur) * fr; else if (d.t === 'color') cur = this.lerpHex(cur, a.keys[k], fr); }
+      break;
+    }
+    return cur;
+  }
+  insideAt(c, local) { return c.actions.find((a) => local > a.start + 1e-6 && local <= a.start + a.dur + 1e-6) || null; }
+  openFor(a, open) { const o = { ...open }; for (const sk in this.S.SEC) if (this.S.SEC[sk].rows.some((k) => k in a.keys)) o[sk] = 1; return o; }
+  updClip(id, fn) { this.setState((s) => { const c = JSON.parse(JSON.stringify(s.clips[id])); fn(c); return { clips: { ...s.clips, [id]: c } }; }); }
+  showToast(t) { clearTimeout(this.toastT); this.setState({ toast: t }); this.toastT = setTimeout(() => this.setState({ toast: null }), 3200); }
+  label(c, a) { const ks = Object.keys(a.keys).map((k) => (this.S.P[k].label || k).toLowerCase()); if (!ks.length) return 'no change'; return ks.slice(0, 2).join(', ') + (ks.length > 2 ? ' +' + (ks.length - 2) : ''); }
+
+  // ---------- actions / modes
+  movePlayhead(t) {
+    t = this.clamp(t, 0, 9.5);
+    this.setState((s) => {
+      const c = s.clips[s.sel];
+      const inside = this.insideAt(c, t - c.start);
+      const id = inside ? inside.id : null;
+      const upd = { playhead: t, lastInside: id };
+      if (id && id !== s.lastInside && id !== s.selAction) { upd.selAction = id; upd.open = this.openFor(inside, s.open); }
+      return upd;
+    });
+  }
+  selectAction(clipId, id) {
+    this.setState((s) => {
+      const c = s.clips[clipId]; const a = c.actions.find((x) => x.id === id); if (!a) return null;
+      return { sel: clipId, selAction: id, lastInside: id, playhead: c.start + a.start + a.dur, open: this.openFor(a, s.open), tab: s.sel === clipId ? s.tab : this.S.TABS[c.kind][0].id };
+    });
+  }
+  selectClip(id) {
+    this.setState((s) => {
+      if (s.sel === id) return null;
+      const c = s.clips[id]; const inside = this.insideAt(c, s.playhead - c.start);
+      return { sel: id, selAction: inside ? inside.id : null, lastInside: inside ? inside.id : null, tab: this.S.TABS[c.kind][0].id, open: inside ? this.openFor(inside, s.open) : s.open, menu: null, ctx: null, edit: null };
+    });
+  }
+  leave() { this.setState({ selAction: null, menu: null, ctx: null }); }
+  togglePlay() {
+    if (this.state.playing) { this.setState({ playing: false }); cancelAnimationFrame(this.raf); return; }
+    if (this.state.playhead >= 9.49) this.movePlayhead(0);
+    this.setState({ playing: true });
+    let last = performance.now();
+    const tick = (ts) => {
+      if (!this.state.playing) return;
+      const dt = (ts - last) / 1000; last = ts;
+      const t = this.state.playhead + dt;
+      if (t >= 9.5) { this.movePlayhead(9.5); this.setState({ playing: false }); return; }
+      this.movePlayhead(t);
+      this.raf = requestAnimationFrame(tick);
+    };
+    this.raf = requestAnimationFrame(tick);
+  }
+  addAction(kind) {
+    const s = this.state; const c = s.clips[s.sel];
+    const t = this.snap(s.playhead - c.start);
+    if (t < 0 || t >= c.dur - 1e-6) return this.showToast('Refused: the playhead is outside this clip. Move the playhead onto the clip, then add the action.');
+    const acts = this.sorted(c);
+    if (acts.some((a) => t >= a.start - 1e-6 && t < a.start + a.dur - 1e-6)) return this.showToast('Refused: actions on one clip can\'t overlap. Move the playhead into a gap between actions.');
+    const next = acts.find((a) => a.start > t);
+    const dur = this.snap(Math.min(1, (next ? next.start : c.dur) - t));
+    if (dur < 2 / 30) return this.showToast('Refused: there is no room for an action here. Move the playhead into a longer gap.');
+    const held = (k) => this.evalP(c, k, t);
+    const keys = kind === 'zoom' ? { scale: Math.round(held('scale') * 1.5), x: -320, y: 180 } : kind === 'back' ? { scale: c.base.scale, x: c.base.x, y: c.base.y } : {};
+    const id = 'n' + Date.now();
+    this.updClip(c.id, (cc) => cc.actions.push({ id, start: t, dur, curve: kind === 'plain' ? 'Linear' : 'Ease In Out', zoom: kind !== 'plain', keys }));
+    this.setState({}, () => this.selectAction(c.id, id));
+  }
+  removeAction() {
+    const s = this.state; if (!s.selAction) return;
+    this.updClip(s.sel, (c) => { c.actions = c.actions.filter((a) => a.id !== s.selAction); });
+    this.setState({ selAction: null, lastInside: s.selAction });
+  }
+  edit(k, v) {
+    const s = this.state; const d = this.S.P[k];
+    this.updClip(s.sel, (c) => { const a = s.selAction && c.actions.find((x) => x.id === s.selAction); if (a && d.anim) a.keys[k] = v; else c.base[k] = v; });
+  }
+  unkey(ks) { const s = this.state; this.updClip(s.sel, (c) => { const a = c.actions.find((x) => x.id === s.selAction); if (a) ks.forEach((k) => delete a.keys[k]); }); }
+  resetBase(ks) { const { P } = this.S; this.updClip(this.state.sel, (c) => ks.forEach((k) => { if ('def' in P[k]) c.base[k] = P[k].def; })); }
+  commit(k) {
+    const s = this.state; if (s.edit !== k) return;
+    if (k === '@start' || k === '@dur') {
+      const val = this.parseTime(s.draft);
+      if (!isNaN(val)) this.updClip(s.sel, (c) => {
+        const a = c.actions.find((x) => x.id === s.selAction); if (!a) return;
+        const others = this.sorted(c).filter((x) => x.id !== a.id);
+        const prevEnd = Math.max(0, ...others.filter((x) => x.start < a.start).map((x) => x.start + x.dur));
+        const nextStart = Math.min(c.dur, ...others.filter((x) => x.start > a.start).map((x) => x.start));
+        if (k === '@start') a.start = this.snap(this.clamp(val, prevEnd, nextStart - a.dur));
+        else a.dur = this.snap(this.clamp(val, 2 / 30, nextStart - a.start));
+      });
+    } else {
+      const d = this.S.P[k]; const n = this.parseNum(k, s.draft);
+      if (n !== null) this.edit(k, d.dec != null ? parseFloat(n.toFixed(d.dec)) : n);
+    }
+    this.setState({ edit: null });
+  }
+  bandDown(clipId, actId, mode) {
+    return (e) => {
+      if (e.button !== 0) return;
+      e.stopPropagation(); e.preventDefault();
+      const lane = e.currentTarget.closest('[data-lane]');
+      const c0 = this.state.clips[clipId];
+      const spp = c0.dur / lane.getBoundingClientRect().width;
+      const a0 = c0.actions.find((x) => x.id === actId);
+      const orig = { start: a0.start, dur: a0.dur };
+      const x0 = e.clientX; let moved = false;
+      this.setState({ sel: clipId, selAction: actId, lastInside: actId, menu: null, ctx: null, tab: this.state.sel === clipId ? this.state.tab : this.S.TABS[c0.kind][0].id });
+      const mv = (ev) => {
+        const dx = ev.clientX - x0; if (!moved && Math.abs(dx) < 3) return; moved = true;
+        const ds = dx * spp;
+        this.setState({ drag: { clipId, actId, orig } });
+        this.updClip(clipId, (c) => {
+          const a = c.actions.find((x) => x.id === actId);
+          const others = c.actions.filter((x) => x.id !== actId);
+          const prevEnd = Math.max(0, ...others.filter((x) => x.start < orig.start).map((x) => x.start + x.dur));
+          const nextStart = Math.min(c.dur, ...others.filter((x) => x.start > orig.start).map((x) => x.start));
+          const minD = 2 / 30; const end0 = orig.start + orig.dur;
+          if (mode === 'move') { a.start = this.snap(this.clamp(orig.start + ds, prevEnd, nextStart - orig.dur)); }
+          else if (mode === 'l') { const ns = this.snap(this.clamp(orig.start + ds, prevEnd, end0 - minD)); a.start = ns; a.dur = this.snap(end0 - ns); }
+          else { const ne = this.snap(this.clamp(end0 + ds, orig.start + minD, nextStart)); a.dur = this.snap(ne - orig.start); }
+        });
+      };
+      const up = () => { window.removeEventListener('mousemove', mv); window.removeEventListener('mouseup', up); this.setState({ drag: null }); this.selectAction(clipId, actId); };
+      window.addEventListener('mousemove', mv); window.addEventListener('mouseup', up);
+    };
+  }
+  scrubFrom(e, toTime) {
+    e.preventDefault();
+    const r = e.currentTarget.getBoundingClientRect();
+    const go = (cx) => this.movePlayhead(toTime((cx - r.left) / r.width, r));
+    go(e.clientX);
+    const mv = (ev) => go(ev.clientX);
+    const up = () => { window.removeEventListener('mousemove', mv); window.removeEventListener('mouseup', up); };
+    window.addEventListener('mousemove', mv); window.addEventListener('mouseup', up);
+  }
+  railDown(k, d) {
+    return (e) => {
+      e.preventDefault();
+      const r = e.currentTarget.getBoundingClientRect();
+      const set = (cx) => { const fr = this.clamp((cx - r.left) / r.width, 0, 1); const v = d.min + fr * (d.max - d.min); this.edit(k, parseFloat(v.toFixed(d.dec ?? 0))); };
+      set(e.clientX);
+      const mv = (ev) => set(ev.clientX);
+      const up = () => { window.removeEventListener('mousemove', mv); window.removeEventListener('mouseup', up); };
+      window.addEventListener('mousemove', mv); window.addEventListener('mouseup', up);
+    };
+  }
+
+  // ---------- rows
+  row(k, x) {
+    const { P } = this.S; const d = P[k]; const t = d.t;
+    const { c, act, acts, actN, ac, local, inClip, disp, V, Vnow, sectionLocked, baseMarks } = x;
+    const st = this.state;
+    const keyed = !!act && k in act.keys;
+    const otherIdx = acts.findIndex((a) => a !== act && k in a.keys);
+    const derivedKeyed = !!(d.derived && act && d.derived in act.keys);
+    const locked = !!act && !d.anim && t !== 'readout';
+    const held = !keyed && otherIdx >= 0 && !!d.anim && (!!act || baseMarks);
+    const v = t === 'readout' ? d.fn(V, c) : disp(k);
+    const isNum = typeof v === 'number';
+    const now = inClip && d.anim && t !== 'readout' ? this.evalP(c, k, local) : v;
+    const differs = isNum && typeof now === 'number' && Math.abs(now - v) > Math.pow(10, -(d.dec ?? 0)) / 2;
+    const pct = (z) => (this.clamp((z - d.min) / (d.max - d.min), 0, 1) * 100);
+    const startV = keyed && isNum ? this.evalP(c, k, act.start) : null;
+    let tag = '', tagKind = '';
+    if (keyed && (d.sw || t === 'check')) { tag = 'at end'; tagKind = 'end'; }
+    else if (locked && !sectionLocked && t === 'buttons') { tag = 'clip'; tagKind = 'clip'; }
+    else if (t === 'field' && differs) { tag = 'now ' + this.fmt(k, now); tagKind = 'now'; }
+    else if (derivedKeyed) { const nv = d.fn(Vnow, c); if (nv !== v) { tag = 'now ' + nv; tagKind = 'now'; } }
+    const editing = st.edit === k;
+    const menuOpen = st.menu === k;
+    const menuVals = t === 'popup' ? d.opts : d.quick || [];
+    const btnApply = (vals) => () => Object.entries(vals).forEach(([kk, vv]) => this.edit(kk, vv));
+    const hasLabel = !['check', 'buttons', 'text'].includes(t);
+    return {
+      key: k, label: d.label || '', hasLabel,
+      opacity: 1,
+      mKeyed: keyed, mHeld: held, mDerived: derivedKeyed, mLocked: locked,
+      heldTitle: otherIdx >= 0 ? 'Changed by action ' + (otherIdx + 1) : '',
+      labelColor: locked ? 'var(--text-dim)' : keyed ? 'var(--text-strong)' : 'var(--text-muted)',
+      isSlider: t === 'slider',
+      fillW: keyed ? '0%' : (isNum ? pct(v) : 0) + '%',
+      fillColor: locked ? 'var(--text-ghost)' : 'var(--accent-rule)',
+      showSpan: keyed && isNum, spanL: Math.min(pct(startV ?? v), pct(v)) + '%', spanW: Math.abs(pct(v) - pct(startV ?? v)) + '%',
+      showNow: t === 'slider' && differs, nowL: (isNum ? pct(now) : 0) + '%', nowTitle: 'At the playhead: ' + (isNum ? this.fmt(k, now) : ''),
+      knobL: (isNum ? pct(v) : 0) + '%', knobColor: locked ? 'var(--text-dim)' : 'var(--text-strong)',
+      hasBox: t === 'slider' || t === 'field',
+      boxW: (d.w || (t === 'slider' ? 70 : t === 'popup' ? 116 : 76)) + 'px',
+      boxStyle: locked ? 'dashed' : 'solid',
+      boxBorder: editing ? 'var(--accent-border)' : keyed ? ac : 'var(--border)',
+      valueColor: locked ? 'var(--text-dim)' : 'var(--text-body)',
+      inputVal: editing ? st.draft : this.fmt(k, v),
+      onFocus: (e) => { this.setState({ edit: k, draft: this.fmt(k, v) }); const el = e.target; setTimeout(() => el.select && el.select(), 0); },
+      onBlur: () => this.commit(k),
+      hasQuick: !!d.quick,
+      isPopup: t === 'popup', valueText: typeof v === 'number' ? this.fmt(k, v) : String(v),
+      onMenu: () => this.setState({ menu: menuOpen ? null : k, ctx: null }),
+      menuOpen, menuItems: menuVals.map((o) => ({ label: typeof o === 'number' ? this.fmt(k, o) : o, bg: o === v ? 'var(--hover-fill)' : 'transparent', onPick: () => { this.edit(k, o); this.setState({ menu: null }); } })),
+      isReadout: t === 'readout',
+      isCheck: t === 'check', tick: v ? '✓' : '',
+      checkBorder: keyed ? ac : v ? 'var(--accent-border)' : 'var(--border-strong)', checkBg: v ? 'var(--check-fill)' : 'var(--surface-control)',
+      onCheck: () => this.edit(k, !v),
+      isColor: t === 'color', swatch: String(v), onColor: () => { const i = d.opts.indexOf(v); this.edit(k, d.opts[(i + 1) % d.opts.length]); },
+      isSeg: t === 'seg', segs: (t === 'seg' ? d.opts : []).map((o, i) => { const on = o === v; return { icon: d.icons[i], z: on ? 1 : 0, bg: on ? 'var(--selection-fill)' : 'var(--surface-control)', border: on ? (keyed ? ac : 'var(--accent-border)') : 'var(--border)', color: on ? 'var(--accent-text)' : 'var(--text-icon-muted)', onClick: () => this.edit(k, o) }; }),
+      isText: t === 'text', textVal: String(v || ''), onText: (e) => this.edit(k, e.target.value),
+      isButtons: t === 'buttons', btns: (d.btns || []).map(([label, vals]) => ({ label, onClick: btnApply(vals) })),
+      tag, tagNow: tagKind === 'now', tagEnd: tagKind === 'end', tagClip: tagKind === 'clip',
+      showRemove: keyed && st.hoverRow === k, removeTitle: 'Remove from action ' + actN,
+      onRemove: () => this.unkey([k]),
+      onEnter: () => this.state.hoverRow !== k && this.setState({ hoverRow: k }),
+      onLeave: () => this.state.hoverRow === k && this.setState({ hoverRow: null }),
+      onCtx: (e) => {
+        if (t === 'readout') return;
+        e.preventDefault();
+        const r = this.inspRef.current.getBoundingClientRect();
+        const items = [];
+        if (keyed) items.push({ label: 'Remove from action ' + actN, onPick: () => { this.unkey([k]); this.setState({ ctx: null }); } });
+        if (otherIdx >= 0 && !keyed) items.push({ label: 'Go to action ' + (otherIdx + 1), onPick: () => { this.selectAction(c.id, acts[otherIdx].id); this.setState({ ctx: null }); } });
+        if ('def' in d) items.push({ label: act && d.anim ? 'Set end value to default' : 'Reset to default', onPick: () => { this.edit(k, d.def); this.setState({ ctx: null }); } });
+        if (!items.length) return;
+        this.setState({ ctx: { x: Math.min(e.clientX - r.left, 304 - 196), y: e.clientY - r.top, items }, menu: null });
+      },
+    };
+  }
+
+  renderVals() {
+    return this.rv();
+  }
+  rv() {
+    this.ensure();
+    const { P, SEC, TABS } = this.S;
+    const st = this.state;
+    const ac = ({ Mint: '#5CD6B0', Orchid: '#E07BD8', Ink: '#E6E6E4' })[this.props.actionColor ?? 'Mint'] || '#5CD6B0';
+    const baseMarks = this.props.baseMarks ?? true;
+    const c = st.clips[st.sel];
+    const acts = this.sorted(c);
+    const act = st.selAction ? acts.find((a) => a.id === st.selAction) || null : null;
+    const actN = act ? acts.indexOf(act) + 1 : 0;
+    const local = st.playhead - c.start;
+    const inClip = local >= 0 && local <= c.dur;
+    const disp = (k) => (act ? (k in act.keys ? act.keys[k] : this.evalP(c, k, act.start)) : c.base[k]);
+    const V = new Proxy({}, { get: (_, k) => disp(k) });
+    const Vnow = new Proxy({}, { get: (_, k) => (inClip ? this.evalP(c, k, local) : disp(k)) });
+
+    const tabs = TABS[c.kind];
+    const tab = tabs.find((t) => t.id === st.tab) || tabs[0];
+    const subtabs = tabs.map((t, i) => {
+      const on = t.id === tab.id;
+      const n = act ? t.secs.flatMap((sk) => SEC[sk].rows).filter((k) => k in act.keys).length : 0;
+      return { label: t.label, hasBadge: n > 0, badge: n, ml: i ? '-1px' : '0', z: on ? 1 : 0, border: on ? 'var(--accent-border)' : 'var(--border)', bg: on ? 'var(--selection-fill)' : 'var(--surface-control)', color: on ? 'var(--text-strong)' : 'var(--text-muted)', onClick: () => this.setState({ tab: t.id, menu: null }) };
+    });
+
+    const sections = tab.secs.filter((sk) => sk !== 'transition' || c.transition).map((sk) => {
+      const sd = SEC[sk]; const rows = sd.rows;
+      const keyed = act ? rows.filter((k) => k in act.keys).length : 0;
+      const hasAnim = rows.some((k) => P[k].anim);
+      const locked = !!act && !hasAnim;
+      const heldAny = !keyed && rows.some((k) => P[k].anim && acts.some((a) => a !== act && k in a.keys)) && (!!act || baseMarks);
+      const changed = rows.some((k) => 'def' in P[k] && c.base[k] !== P[k].def);
+      const open = !!st.open[sk];
+      const x = { c, act, acts, actN, ac, local, inClip, disp, V, Vnow, sectionLocked: locked, baseMarks };
+      return {
+        key: sk, title: sd.title, open, chevron: open ? 'expand_more' : 'chevron_right',
+        onToggle: () => this.setState((s) => ({ open: { ...s.open, [sk]: s.open[sk] ? 0 : 1 } })),
+        summary: sd.sum(V, c), summaryColor: keyed ? ac : changed ? 'var(--text-body)' : 'var(--text-faint)',
+        hasKeys: keyed > 0, keys: keyed, held: heldAny, locked,
+        hasReset: act ? keyed > 0 : changed && !sd.noReset,
+        resetLabel: act ? 'Clear' : 'Reset', resetTitle: act ? 'Remove this section from action ' + actN : 'Return to default',
+        onReset: (e) => { e.stopPropagation(); if (act) this.unkey(rows); else this.resetBase(rows); },
+        hasNote: locked, note: 'Actions don\'t animate this. Edits here change the clip.',
+        rows: open ? rows.map((k) => this.row(k, x)) : [],
+      };
+    });
+
+    // pinned lane
+    const pctC = (s) => (s / c.dur) * 100 + '%';
+    const lane = {
+      bands: acts.map((a, i) => { const sel = act && a.id === act.id; return { l: pctC(a.start), w: pctC(a.dur), bg: sel ? ac : this.rgba(ac, 0.34), edge: sel ? ac : this.rgba(ac, 0.75), text: sel ? '#101010' : '#ffffff', n: i + 1, zoom: !!a.zoom, title: 'Action ' + (i + 1) + ' · ' + this.label(c, a), onDown: this.bandDown(c.id, a.id, 'move'), onL: this.bandDown(c.id, a.id, 'l'), onR: this.bandDown(c.id, a.id, 'r') }; }),
+      empty: acts.length === 0,
+      ph: inClip, phL: pctC(this.clamp(local, 0, c.dur)),
+      hasTrans: !!c.transition, transW: pctC(c.base.trDur),
+      hasFadeIn: c.base.fadeIn > 0, fadeInW: pctC(c.base.fadeIn),
+      hasFadeOut: c.base.fadeOut > 0, fadeOutW: pctC(c.base.fadeOut),
+      hasMIn: c.base.motionIn !== 'None', hasMOut: c.base.motionOut !== 'None', wedgeW: pctC(0.5),
+    };
+    const curves = { Linear: 'M1,11 L19,1', 'Ease In': 'M1,11 C9,11 15,6 19,1', 'Ease Out': 'M1,11 C5,6 11,1 19,1', 'Ease In Out': 'M1,11 C8,11 12,1 19,1' };
+    const actV = act ? {
+      startVal: st.edit === '@start' ? st.draft : this.tcShort(act.start),
+      durVal: st.edit === '@dur' ? st.draft : act.dur.toFixed(2) + ' s',
+      startFocus: (e) => { this.setState({ edit: '@start', draft: this.tcShort(act.start) }); const el = e.target; setTimeout(() => el.select(), 0); },
+      durFocus: (e) => { this.setState({ edit: '@dur', draft: act.dur.toFixed(2) }); const el = e.target; setTimeout(() => el.select(), 0); },
+      startBlur: () => this.commit('@start'), durBlur: () => this.commit('@dur'),
+      curveD: curves[act.curve], curveShort: act.curve.replace('Ease ', ''),
+      curveOpen: st.menu === '@curve', onCurve: () => this.setState({ menu: st.menu === '@curve' ? null : '@curve' }),
+      curveItems: Object.keys(curves).map((cv) => ({ label: cv, bg: cv === act.curve ? 'var(--hover-fill)' : 'transparent', onPick: () => { this.updClip(c.id, (cc) => { cc.actions.find((a) => a.id === act.id).curve = cv; }); this.setState({ menu: null }); } })),
+    } : {};
+
+    // timeline
+    const pps = 110;
+    const sz = { S: { text: 30, video: 54, lane: 5 }, M: { text: 44, video: 84, lane: 12 }, L: { text: 58, video: 116, lane: 18 } }[st.size];
+    const bandCurves = { Linear: 'M0,10 L100,0', 'Ease In': 'M0,10 C40,10 70,10 100,0', 'Ease Out': 'M0,10 C30,0 60,0 100,0', 'Ease In Out': 'M0,10 C45,10 55,0 100,0' };
+    const clipView = (cl) => {
+      const selClip = cl.id === st.sel;
+      const cacts = this.sorted(cl);
+      const bands = cacts.map((a, i) => {
+        const sel = selClip && act && a.id === act.id;
+        const hov = st.hoverBand === a.id;
+        const w = a.dur * pps;
+        return {
+          l: a.start * pps + 'px', w: w + 'px', n: i + 1, label: a.zoom ? 'Zoom ' + (a.keys.scale ? this.fmt('scale', a.keys.scale).replace('.0', '') : '') : this.label(cl, a), title: 'Action ' + (i + 1) + ' · ' + this.label(cl, a),
+          bg: sel ? ac : hov ? this.rgba(ac, 0.62) : this.rgba(ac, 0.34), edge: sel || hov ? ac : this.rgba(ac, 0.75), text: sel ? '#101010' : '#ffffff',
+          showNum: st.size !== 'S', showZoom: !!a.zoom && st.size !== 'S' && w > 34,
+          showLabel: st.size !== 'S' && (sel || hov || st.size === 'L') && w > 44,
+          showCurve: st.size !== 'S' && sel, curveD: bandCurves[a.curve],
+          gripC: sel ? 'rgba(16,16,16,0.45)' : hov ? 'rgba(255,255,255,0.8)' : 'transparent',
+          onDown: this.bandDown(cl.id, a.id, 'move'), onL: this.bandDown(cl.id, a.id, 'l'), onR: this.bandDown(cl.id, a.id, 'r'),
+          onEnter: () => this.setState({ hoverBand: a.id }), onLeave: () => this.state.hoverBand === a.id && this.setState({ hoverBand: null }),
+        };
+      });
+      const dragging = st.drag && st.drag.clipId === cl.id ? st.drag : null;
+      const da = dragging ? cl.actions.find((a) => a.id === dragging.actId) : null;
+      return {
+        l: cl.start * pps + 'px', w: cl.dur * pps + 'px', h: (cl.kind === 'text' ? sz.text : sz.video) - 6 + 'px', z: selClip ? 3 : cl.id === 'av' ? 2 : 1,
+        tint: cl.kind === 'text' ? '#B17C1E' : '#3E5063', icon: cl.kind === 'text' ? 'title' : 'movie', name: cl.name,
+        ring: selClip ? '2px solid var(--playhead)' : 'none', selected: selClip, laneH: sz.lane + 'px',
+        bands, ghosts: da ? [{ l: dragging.orig.start * pps + 'px', w: dragging.orig.dur * pps + 'px' }] : [],
+        huds: da ? [{ l: da.start * pps + 'px', t: this.tcShort(da.start) + ' → ' + this.tcShort(da.start + da.dur), d: (() => { const df = Math.round((da.start - dragging.orig.start) * 30); const dd = Math.round((da.dur - dragging.orig.dur) * 30); return dd && df === 0 ? 'len ' + (dd > 0 ? '+' : '−') + Math.abs(dd) + 'f' : (df >= 0 ? '+' : '−') + Math.floor(Math.abs(df) / 30) + ':' + this.pad(Math.abs(df) % 30); })() }] : [],
+        guides: selClip && act ? [{ l: act.start * pps + 'px', w: act.dur * pps + 'px', bg: this.rgba(ac, 0.12), edge: this.rgba(ac, 0.55) }] : [],
+        bodyBg: cl.kind === 'video' ? 'repeating-linear-gradient(90deg,rgba(255,255,255,0.05) 0 17px,rgba(0,0,0,0.08) 17px 34px)' : 'transparent',
+        hasAudio: !!cl.audio && st.size !== 'S', hasTrans: !!cl.transition, transW: cl.base.trDur * pps + 'px',
+        onDown: (e) => { if (e.button === 0) this.selectClip(cl.id); },
+      };
+    };
+    const tracks = [
+      { name: 'Titles', h: sz.text + 'px', clips: [clipView(st.clips.text)] },
+      { name: 'Track 1', h: sz.video + 'px', clips: [clipView(st.clips.intro), clipView(st.clips.av)] },
+    ];
+    const ticks = []; for (let i = 0; i <= 50; i++) ticks.push({ l: i * 22 + 'px', h: i % 5 === 0 ? '8px' : '4px' });
+    const labels = []; for (let s = 0; s <= 10; s++) labels.push({ l: s * pps + 'px', label: '00:' + this.pad(s) + ':00' });
+    const sizeSeg = ['S', 'M', 'L'].map((z) => { const on = z === st.size; return { label: z, z: on ? 1 : 0, border: on ? 'var(--accent-border)' : 'var(--border)', bg: on ? 'var(--selection-fill)' : 'var(--surface-control)', color: on ? 'var(--accent-text)' : 'var(--text-muted)', onClick: () => this.setState({ size: z }) }; });
+
+    return {
+      ac, topTabs: ['Clip', 'Media', 'Document'],
+      clipKind: c.kind, clipName: c.name, clipMeta: c.meta, trackMeta: (c.track ? 'Track 1' : 'Titles') + ' · ' + c.kind,
+      tcNow: this.tc(st.playhead), playIcon: st.playing ? 'pause' : 'play_arrow',
+      togglePlay: () => this.togglePlay(), toStart: () => this.movePlayhead(0), toEnd: () => this.movePlayhead(9.5),
+      closeMenus: () => (st.menu || st.ctx) && this.setState({ menu: null, ctx: null }),
+      stop: (e) => e.stopPropagation(),
+      onDraft: (e) => this.setState({ draft: e.target.value }),
+      onFieldKey: (e) => { if (e.key === 'Enter') e.target.blur(); else if (e.key === 'Escape') { this.setState({ edit: null }); setTimeout(() => e.target.blur(), 0); } },
+      laneBg: act ? this.rgba(ac, 0.07) : 'transparent',
+      actCount: acts.length || 'none', hasAct: !!act, actN, act: actV,
+      chipBorder: act ? 'var(--border)' : 'var(--accent-border)', chipBg: act ? 'var(--surface-control)' : 'var(--selection-fill)', chipColor: act ? 'var(--text-muted)' : 'var(--text-strong)',
+      leave: () => this.leave(), addZoom: () => this.addAction('zoom'), addZoomBack: () => this.addAction('back'), addPlain: () => this.addAction('plain'), removeAction: () => this.removeAction(),
+      laneDown: (e) => { if (e.button === 0) this.scrubFrom(e, (fr) => c.start + this.clamp(fr, 0, 1) * c.dur); },
+      lane, subtabs, sections,
+      hasCtx: !!st.ctx, ctxX: (st.ctx ? st.ctx.x : 0) + 'px', ctxY: (st.ctx ? st.ctx.y : 0) + 'px', ctxItems: st.ctx ? st.ctx.items : [],
+      hasToast: !!st.toast, toast: st.toast || '',
+      sizeSeg, tracks, ticks, labels, tlW: 10.5 * pps + 'px',
+      phX: st.playhead * pps + 'px', phHeadL: st.playhead * pps - 4 + 'px',
+      rulerDown: (e) => { if (e.button === 0) this.scrubFrom(e, (fr, r) => (fr * r.width) / pps); },
+      range: act ? { show: true, l: (c.start + act.start) * pps + 'px', w: act.dur * pps + 'px', bg: this.rgba(ac, 0.2) } : { show: false },
+    };
+  }
+}
+</script>
+</body>
+</html>

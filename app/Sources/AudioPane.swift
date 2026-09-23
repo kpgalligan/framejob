@@ -61,7 +61,6 @@ final class AudioPane: InspectorPaneView {
                 guard props.decibels.isFinite else { return "silent" }
                 return String(format: "%+.1f dB", props.decibels)
             },
-            note: { binding.actionNote },
             reset: { binding.apply("Volume", audio: AudioPatch(volume: 1, muted: false)) },
             defaultExpanded: false,
             rows: [

@@ -96,12 +96,21 @@ detail there.
   W-6). It lives there, not in `InspectorPane.swift`, for the size rule.
 
 **The document.**
-- `ProjectDocument.swift` (+`DisplayStem`, +`Recording`) — NSDocument,
-  `.reelcut` package read/write, and the single mutation point (see Undo).
-  Holds the FIVE pieces of view state nothing persists — playhead, clip
-  selection, in/out range, `selectedMedia`, `nestPath` — re-clamped by
-  `clampViewState` in that order with the scope FIRST, since the selection
-  clamp measures against whatever container the scope left. `nestPath` is a
+- `ProjectDocument.swift` (+`DisplayStem`, +`Recording`, +`SelectedAction`)
+  — NSDocument, `.reelcut` package read/write, and the single mutation
+  point (see Undo). Holds the SIX pieces of view state nothing persists —
+  playhead, clip selection, in/out range, `selectedMedia`, `nestPath` and
+  `selectedAction` — re-clamped by `clampViewState` in that order with the
+  scope FIRST, since the selection clamp measures against whatever
+  container the scope left. `selectedAction` (spec §11 CI-1) is nil or one
+  action of the SINGLE selected clip; `+SelectedAction` holds its queries,
+  its one deliberate writer `selectAction(_:)` (which stores nil for an id
+  that is not `singleSelectedClip`'s) and the ENTRY rule
+  `syncSelectedAction()`, run from `playhead`'s and `selection`'s `didSet`
+  against `lastInsideAction`. The clamp re-reads `lastInsideAction` BEFORE
+  its last line writes the playhead, so an edit, undo or redo under a
+  stationary playhead never enters a span — keep those two lines above
+  that write. `nestPath` is a
   PATH of (nest, clip) steps, not a nest id, because two clips can show one
   nest at two starts; `editedProject` is a STORED, memoised `rc_project_scoped`
   handle, and `project` still means the parent for save, export and
@@ -161,7 +170,12 @@ the key map behind it.
 - `EditorViewController+Timeline` / `+Canvas` / `+Inspector` / `+Toolbar` —
   installing the three panes and the toolbar (transport · timecode — view ·
   Export, nothing else). `+Timeline` holds the delete family, including ⌫
-  with a range and nothing selected, which LIFTS.
+  with a range and nothing selected, which LIFTS, and ⌫ with an action
+  selected, which removes the action. `+Actions` selects an action (the
+  playhead to its end FIRST, then `document.selectAction`), leaves the mode
+  (esc, `case 27` in `handleEditorKey`, false when nothing was selected),
+  removes the selected one, and selects what ⌥⌘K, Zoom to Region and Zoom
+  Back just added.
 - `+AddClips` (Add Text / Add Shape: the front track, else a new one),
   `+Clipboard` (⌘X/⌘C/⌘V over the `com.kgalligan.reelcut.clips` pasteboard,
   the `paste` op's payload; ⌥⌘V Paste Attributes with no `groups`),
@@ -201,7 +215,14 @@ the key map behind it.
   `onRemoveTrack` to `removeTrackCommand`, which asks when clips would go;
   a clip hit answers no menu) · `+Candidates` (Remove Silences' wash, drawn not
   overlaid) · `+NestScope` (the breadcrumb, painted LAST in the ruler's
-  corner so it stays above the header column when scrolled).
+  corner so it stays above the header column when scrolled) ·
+  `TimelineActionBands.swift` (each clip's action lane under its name strip,
+  the band hit — which `hit(at:)` asks AFTER the fade handles, since on an
+  audio-only clip they sit inside the lane, and BEFORE the edge grabs — the
+  selected span's wash down the body and its shade on the ruler).
+  `ActionBands.swift` is what the timeline and the Clip tab's lane share:
+  time order (an action's NUMBER is its index there plus one), the label's
+  keys, the zoom test and the ONE band painter.
 - `ClipLabel.swift` — the ONE home of the label and marker colour
   vocabulary; the core stores names unvalidated, so an unknown name draws in
   `DS.textStrong`. `ClipKindStyle.swift` — the ONE mapping from a clip to its
@@ -218,11 +239,19 @@ the key map behind it.
 **Inspector.**
 - `InspectorViewController.swift` (frozen: the tab strip) · `InspectorPane.swift`
   (the pane base, `InspectorSection`, the row builders, and `InspectorBinding`
-  — the one place that knows a read is evaluated inside an action and a write
-  there goes to `set_action_end`, with `structural(video:for:)` the exception
-  that sends a list of a different LENGTH, or `motion`, to the BASE props) ·
-  `ClipPane.swift` (the selection header and `makeSections()`, the function
-  from a selection's kind to its sections) · `VideoPane.swift` (+`Transition`,
+  — the one place that knows the fields read the SELECTED action's END state
+  (`action(_:)` answers the selected action and never consults the playhead;
+  `evaluated(_:)` asks `clip_state` at `clip.start + action.endTime`, spec
+  §11 CI-2) and a write there goes to `set_action_end`, with
+  `structural(video:for:)` the exception that sends a list of a different
+  LENGTH, or `motion`, to the BASE props, and `structural(audio:for:)` the
+  one that sends pan, mono, compressor, noise reduction, duck and
+  keep-pitch there (CI-3)) ·
+  `ClipPane.swift` (`makeSections()`, the function from a selection's kind
+  to its sections, and the selection header, which `makeHeader()` wraps in
+  `ActionLaneView.swift`'s `ClipHeaderBlock` over the action lane — the
+  Actions section's replacement, built once per pane build with the clip
+  and action ids it shows captured) · `VideoPane.swift` (+`Transition`,
   +`Motion`) · `AudioPane.swift` · `TextPane.swift` · `ShapePane.swift` ·
   `DocumentPane.swift` (reads `documentSnapshot`, never the scoped one: its
   ops are document-level) · `OptionControls.swift` (the descriptor-driven

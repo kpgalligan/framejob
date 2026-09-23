@@ -78,7 +78,7 @@ final class ClipPane: InspectorPaneView {
     }
 
     override func makeHeader() -> (any OptionControl)? {
-        ClipSelectionHeaderView(binding: binding)
+        ClipHeaderBlock(binding: binding, inspector: inspector)
     }
 
     // MARK: - Kind → sections
@@ -149,7 +149,6 @@ final class ClipPane: InspectorPaneView {
             // took Reverse out of reach with it.
             sections.append(reverseTimingSection())
         }
-        sections.append(videoPane.actionsSection())
         if binding.isSingle, let clip = binding.primary, videoPane.overlap(before: clip) != nil {
             sections.append(videoPane.transitionSection(clip.id))
         }

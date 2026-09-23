@@ -51,6 +51,7 @@ extension EditorViewController {
         inspector.onProbe = { [weak self] ops in self?.inspectorProbe(ops) }
         inspector.onSeek = { [weak self] time in self?.inspectorSeek(time) }
         inspector.onCommand = { [weak self] selector in self?.inspectorCommand(selector) }
+        inspector.onSelectAction = { [weak self] id in self?.selectAction(id) }
 
         timeline?.registerForDraggedTypes([.reelcutMedia])
         previewCanvas?.registerForDraggedTypes([.reelcutMedia])
@@ -121,10 +122,10 @@ extension EditorViewController {
 
     // MARK: - Commands the inspector made real
 
-    /// ⌥⌘K and the Actions section's button: an action at the playhead on the
-    /// selected clip. `add_action` takes CLIP time (§6), and refuses an
-    /// overlap or a span past the clip end — so the only check here is that
-    /// the playhead is actually on a selected clip.
+    /// ⌥⌘K and the action lane's `+`: an action at the playhead on the
+    /// selected clip, then selected (spec §11 CI-1). `add_action` takes CLIP
+    /// time (§6), and refuses an overlap or a span past the clip end — so the
+    /// only check here is that the playhead is actually on a selected clip.
     func addActionAtPlayheadCommand() {
         guard let document = document,
               let clip = selectedClips.first(where: { $0.contains(document.playhead) })
@@ -132,8 +133,9 @@ extension EditorViewController {
             NSSound.beep()
             return
         }
-        document.applyEdit(
-            "Add Action", .addAction(clip: clip.id, at: clip.clipTime(document.playhead)))
+        let at = clip.clipTime(document.playhead)
+        document.applyEdit("Add Action", .addAction(clip: clip.id, at: at))
+        selectAddedAction(on: clip.id, at: at, countBefore: clip.actions.count)
     }
 
     /// Clip ▸ Transition ▸ — the sender's tag indexes `TransitionKind.allCases`

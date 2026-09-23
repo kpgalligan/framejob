@@ -634,7 +634,7 @@ extension AgentServer {
     // MARK: - Actions
 
     /// `add_action` — ⌥⌘K (`EditorViewController+Inspector`'s
-    /// `addActionAtPlayheadCommand`) and the Video tab's Add Action button.
+    /// `addActionAtPlayheadCommand`) and the Clip tab's action lane's `+`.
     /// `at` is CLIP time, not project time: it is measured from the clip's own
     /// start (spec §5.4).
     func addAction(_ a: [String: Any]) throws -> String {
@@ -649,8 +649,8 @@ extension AgentServer {
 
     /// `add_zoom_action` — the canvas's `Z` rubber band
     /// (`ZoomRegionSession`, `EditorViewController+ZoomRegion.swift`) and the
-    /// Video tab's Actions section, whose "Zoom to Region…" arms the same
-    /// mode and whose "Zoom Back" sends this with a null region.
+    /// Clip tab's action lane, whose zoom-in button arms the same mode and
+    /// whose zoom-out button ("Zoom Back") sends this with a null region.
     ///
     /// One op rather than `add_action` + `set_action_end` because the
     /// arithmetic that turns a rectangle into a scale and an offset belongs
@@ -781,8 +781,8 @@ extension AgentServer {
         return curve
     }
 
-    /// `set_action` — dragging an action's band in the Video tab's action
-    /// table, and its curve popup.
+    /// `set_action` — the Clip tab's action lane: the selected action's
+    /// Start, Length and Curve in its detail row.
     func setAction(_ a: [String: Any]) throws -> String {
         let document = try target(a)
         let clip = try clipArg(a, "clip", document)
@@ -835,7 +835,8 @@ extension AgentServer {
             [.setActionEndRaw(clip: clip.id, action: action.id, patch: patch)])
     }
 
-    /// `remove_action` — the Video tab's action-row Remove button.
+    /// `remove_action` — the action lane's trash button, and ⌫ with an
+    /// action selected.
     func removeAction(_ a: [String: Any]) throws -> String {
         let document = try target(a)
         let clip = try clipArg(a, "clip", document)

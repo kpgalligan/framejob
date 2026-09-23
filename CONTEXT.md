@@ -27,3 +27,7 @@ _Avoid_: parameter, field, key, option
 **Patch**:
 A partial object a caller writes to say what to change — a clip's property group, a clip's own name and label, or an action's end state. It merges key by key at every depth; a key set to null clears that key, or removes it from an end state; an array replaces the whole list. A key or value the vocabulary does not have is refused by its dotted path, and never dropped, corrected or clamped. The core is the one that reads it, wherever it came from.
 _Avoid_: update, delta, diff, replacement
+
+**Selected action**:
+The one action of the single selected clip that the Clip tab is editing, or none. It is view state, like the playhead and the clip selection: not an edit, not undoable, not saved, and not something an agent sets — an agent names an action by its id. It is chosen by clicking the action's band, or by the playhead ENTERING the action's span; it stays chosen when the playhead leaves, and goes when the clip selection changes, on esc, or on the lane's Clip chip. While one is chosen the fields show and write its END state (spec §11 CI-1, CI-2). Actions are numbered by time order.
+_Avoid_: current action, active action, "the action under the playhead" (the playhead no longer decides)

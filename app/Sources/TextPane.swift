@@ -54,7 +54,7 @@ final class TextPane: InspectorPaneView {
                 return line.isEmpty ? "empty" : line
             },
             note: {
-                binding.actionNote ?? (binding.textProps.isUntimedPage ? Self.untimedNote : nil)
+                binding.textProps.isUntimedPage ? Self.untimedNote : nil
             },
             rows: [area])
     }
@@ -96,7 +96,6 @@ final class TextPane: InspectorPaneView {
         return InspectorSection(
             id: "text.font", title: "Font",
             summary: { String(format: "%.0f px", binding.textProps.size) },
-            note: { binding.actionNote },
             defaultExpanded: false,
             rows: [
                 inspectorRow(
@@ -147,7 +146,6 @@ final class TextPane: InspectorPaneView {
         return InspectorSection(
             id: "text.style", title: "Style",
             summary: { binding.textProps.align },
-            note: { binding.actionNote },
             reset: {
                 let defaults = TextProps()
                 binding.apply(
@@ -358,7 +356,7 @@ final class TextPane: InspectorPaneView {
                 return animation.kind.displayName.lowercased()
                     + String(format: " · %.2f s", ReelTime.seconds(animation.inDuration))
             },
-            note: { binding.actionNote ?? (free() ? nil : Self.wordStyleNote) },
+            note: { free() ? nil : Self.wordStyleNote },
             reset: { binding.apply("Animation", text: TextPatch(animation: .some(nil))) },
             defaultExpanded: false,
             rows: [
