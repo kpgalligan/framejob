@@ -2001,6 +2001,94 @@ sound and not about samples; and (3) that a −14 LUFS export sits at the
 same apparent level as commercial material, which is the whole point of
 normalising and is not a number.
 
+#### #34 — mixed audio formats on one track (2026-09-24)
+
+kpgalligan/reelcut#34: an AAC clip (`.m4a`) then a WAV on ONE timeline
+track previewed silent from the WAV on, and the WAV on a second track
+played. `CompositionBuilder.fill` put every segment of a plan audio track
+into one composition track; `insertTimeRange` accepts an AAC segment then an
+LPCM one, and the track carries two format descriptions. The preview's build
+is the one metering build (`Playback.startRebuild`), every audio track gets
+an `MTAudioProcessingTap`, and an `AVPlayerItem` over a tapped track that
+changes format does not play. The export's reader (untapped) always did.
+
+**What landed.** `app/Sources/CompositionBuilder+AudioTracks.swift` (new,
+the audio half of `build`: `AudioFormatSignature`, `AudioFamily`,
+`audioFormatSignature(of:)`, `placeholderTrackID`, `firstExtraTrackID`,
+`resolveSource`, `audioFamilies`, `addAudioTracks`); an audio plan track
+becomes one composition track per distinct source stream description, the
+first keeping the plan's id and later ones taking ids past every plan id and
+the placeholder's (spec §11 R2-1). A same-format track is one family with
+the plan's id and all its segments, the composition it always was. First as
+a PURE MOVE, gated alone (`make typecheck`, `make app`,
+`preview_validity_probe.py` 24/24), then the families.
+`CompositionBuilder.swift` 601 → 577 lines; `AudioTap.swift` 595 → 595
+(`AudioTrackDSP.init(segments:parameters:)`). No core change, no FFI, no
+format bump: the plan is byte-identical.
+
+**Measured.** `tools/proof/mixed_audio_probe.py` **37/37** on the fix, with
+section 4 RUN (output device: AirPods Max). Its player rows on the fix:
+`mixed` at 0.5 s before 0.500 → after 1.207 s, peakLeftDB −20.9; `mixed` at
+3.5 s 3.500 → 4.191 s, −21.1; CONTROL `split` 3.500 → 4.255 s, −21.1;
+CONTROL `same` 3.500 → 4.206 s, −20.8; all silent after pause. Over the
+baseline tree (`git archive 3e1bd19 app/Sources`, `--sources`) **31/37**,
+failing by name: section 1 (1001 carries two descriptions, AAC and LPCM);
+section 2's `mixed` ids `[1001]`, `three` ids `[1001]` and `three`'s 1001
+holding four segments; and section 4's `mixed` at 0.5 s and at 3.5 s — the
+**STALL form**: before 0.500 → after 0.500 s and 3.500 → 3.500 s, peakLeftDB
+−200 (silent), no tap output at all. Both CONTROLs passed on the baseline
+(`split` 3.500 → 4.225 s, −21.1; `same` 3.500 → 4.203 s, −20.8), so the
+failing `mixed` rows are the defect and not the host. Section 3 passed on
+the baseline and `tools/proof/mixed_audio_proof.py` is a regression guard
+that would pass there too, because the export path was never the defect:
+**13/13** over MCP (the WAV exports at −24.08 dBFS against the file's
+−24.08). Regression runs on the fix: `phase2_proof.py` **86/86**,
+`phase5_proof.py` **88/88**; `make test` 827 passed; `make lint` clean;
+`make typecheck` 0 errors, 7 warnings.
+
+**Deviations from the spec's numbers, each measured on both trees.**
+(1) Section 4's clock threshold is 0.4 s, not 0.8 s: on this host's
+Bluetooth output the player's clock starts 0.45–0.6 s late, and the CONTROLs
+moved 0.70–0.76 s in 1.2 s, so 0.8 failed every row on the fix and both
+CONTROLs on the baseline; the stall moves 0.000 s. (2) `mixed` against
+`split` (probe section 3, proof row) leaves out 3.000–3.026 s (the measured span, 3.0000208–3.0249896 s, rounded up): the plan
+track's envelope steps 0 → 1 at the WAV's start, that step is on `mixed`'s
+WAV track (its plan track's ramps, gap included) and not on `split`'s, and
+AVFoundation's mix smooths it over 1200 frames — max |Δ| 2855 there on BOTH
+trees, 0 everywhere else. (3) `same`'s "one format" is one stream
+description, not one format description: two AAC files are two
+descriptions of one format on both trees. Cross-tree, the fix's `mixed`
+decodes against the baseline's at max |Δ| 2 — the same AAC wobble `same`
+shows between two processes with an unchanged composition.
+
+**Recorded, not changed.** A 44.1 kHz WAV on a track of its own reads
+10.9886 s of an 11 s composition on BOTH trees (measured with the probe's
+decode over a two-track package); `three`'s 44.1 kHz family is now such a
+track, so its decode is 11 ms short where the baseline's heterogeneous
+track read 10.9988 s, and that clip's resampling phase differs by about two
+frames — every window still loud. A reversed clip's source is
+`ReverseRenderer`'s `.mov`, whose format may found a family of its own. And
+`AudioTrackDSP.usesNoiseReduction` is now per family, so a noise-reduced clip
+alone in its family delays only itself, as it would on the workaround's
+second track.
+
+**Owed.** Section 4 was measured on a Bluetooth output only; a run on the
+built-in speakers would show the clock threshold's margin there. A person at
+the machine has not LISTENED to the fixed preview (the meter and the clock
+are the probe's evidence). The meter's sink holding its last buffer across
+empty time is pre-existing and not this issue. `app/CLAUDE.md`'s map entry
+`CompositionBuilder.swift (+InstructionRanges)` gains `+AudioTracks` —
+applied by the orchestrator after review.
+
+**Review** (litecode, verdict pass, no blockers). Three nits, applied by the
+orchestrator: the `ADVANCE` comment's CONTROL range corrected to the printed
+0.70–0.76 s; the left-out envelope span narrowed from 3.000–3.050 s to
+3.000–3.026 s (the measured span rounded up); and `audioFamilies` now puts a
+zero-length segment in family 0 rather than letting it found a family —
+`fill` skips such a segment, so it would have added an empty composition
+track. After them: `make typecheck` 0 errors, 7 warnings; `make app` built;
+`mixed_audio_probe.py` **37/37**; `mixed_audio_proof.py` **13/13**.
+
 ---
 
 ### Phase 6 — Looks

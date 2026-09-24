@@ -1908,7 +1908,12 @@ every edit and compares).
   are left empty (AVFoundation treats them as no frame). The whole
   assignment runs over the FLATTENED timeline: a clip inside a nest gets a
   segment at `nest clip start + its own start`, clipped to the nest clip's
-  extent, exactly as a timeline clip does.
+  extent, exactly as a timeline clip does. **An audio plan track is split by
+  source FORMAT in Swift** (§11 R2-1): `CompositionBuilder` puts each
+  distinct source audio format of one plan audio track on a composition
+  track of its own — the first keeps the plan's id, later ones take ids past
+  every plan id and the placeholder's — because the preview's tapped item
+  does not play a track that changes format; the plan does not change.
 - **Speed / freeze.** `duration != source_duration` means Swift inserts
   the source range then `scaleTimeRange` to `duration`. A `still` clip is
   a segment whose `source_duration` is exactly one source frame — the
@@ -4265,3 +4270,17 @@ assisted import.
   Rasterize's one door, which runs the change unanimated when the system's
   Reduce Motion is on. `reveal()` (an action's auto-open) stays instant;
   hover, bands and gutters are painted in `draw(_:)` and do not animate.
+- **R2-1 — One composition audio track per source audio format**
+  (kpgalligan/reelcut#34, 2026-09-24). An audio plan track becomes one
+  composition track per distinct source audio format, because the preview's
+  tapped item does not play a track that changes format — measured: an
+  `AVPlayerItem` over a tapped track holding an AAC segment then an LPCM one
+  stalls at its playhead with no tap callback, while the same segments on
+  two tracks play and the export's untapped reader always played both. The
+  format is the source's stream description (format, rate, channels, flags,
+  bit depth); a segment with no readable source joins the first family. The
+  first family keeps the plan's id; later ones take ids past every plan id
+  and the placeholder's (`CompositionBuilder.firstExtraTrackID`). The recipe
+  never names an audio track, and the plan and its JSON compare are
+  untouched: this is AVFoundation's decoder rule, applied in Swift, not a
+  timeline decision.

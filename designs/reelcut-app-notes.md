@@ -297,6 +297,21 @@ lockstep are in the root `CLAUDE.md`; the full design is
   validation delegate is the instrument that names it, and an offline render
   never sees it — `tools/proof/preview_validity_probe.py` measures both
   that and the player's own layer.
+- `CompositionBuilder+AudioTracks.swift` (2026-09-24, kpgalligan/reelcut#34)
+  — the audio half of `build`, first as a pure move that took
+  `CompositionBuilder.swift` from the cap (601) to 577, then the format
+  FAMILIES: an audio plan track becomes one composition track per distinct
+  source stream description (spec §11 R2-1). An AAC clip then a WAV on one
+  track put two format descriptions on one composition track, and the
+  preview's tapped `AVPlayerItem` STALLED over it — clock at the playhead,
+  no tap callback — while the export's untapped reader played it. Family 0
+  keeps the plan's id; later families take ids from `firstExtraTrackID`,
+  past every plan id and the placeholder's, shared across plan tracks. A
+  segment with no readable source joins family 0, which adopts the first
+  real format it meets, so a same-format track is exactly the track it was.
+  The signature is read by KEY (`formatDescriptions`), `oneFrame`'s reason.
+  `tools/proof/mixed_audio_probe.py` section 4 is the proof, over the
+  editor's own `Playback`; the record is road map 2 §2, Phase 5.
 - `Playback.swift` · `CompositionBuilder.swift` · `Compositor.swift` ·
   `CompositorEffects.swift` · `MediaImporter.swift` ·
   `Exporter.swift` · `ExporterLoudness.swift` · `ExporterSettings.swift` ·

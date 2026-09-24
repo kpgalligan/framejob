@@ -54,6 +54,12 @@ copy to make the endpoint and saved-file rows fail, or restore an enumerating
 transition loop there to make the child watchdog fail. Restore the source and
 rerun green before recording a proof claim.
 
+Issue #34's pair makes its own media per run under `work/mixed-audio/`:
+`python3 tools/proof/mixed_audio_probe.py [--sources PATH]` (no port; its
+section 4 is the proof of the fix) and `python3 tools/proof/mixed_audio_proof.py
+<port>` (the export path's regression guard); "Mixed audio formats on one
+track" below.
+
 Make the test media once (ffmpeg is not a product dependency — see spec §11
 — but it is the obvious way to get a frame-numbered test card):
 
@@ -2451,6 +2457,59 @@ the probe rebuilt: `instructionRanges` returning the plan's ranges
 unconditionally **14/24** (the built composition invalid, the absorbing rows,
 and all five player rows — the reported defect exactly); the bound widened
 from one tick to eleven **21/24** (the three whole-tick rows).
+
+## Mixed audio formats on one track (`mixed_audio_probe.py`, `mixed_audio_proof.py`)
+
+kpgalligan/reelcut#34: an AAC clip then a WAV on ONE timeline track previewed
+silent, while the WAV on a second track played. `CompositionBuilder` put every
+segment of a plan audio track into one composition track, which then carried
+two format descriptions; the preview's build is the one METERING build, every
+audio track gets an `MTAudioProcessingTap`, and an `AVPlayerItem` over a tapped
+track that changes format does not play. The builder now makes one composition
+track per source audio format (`CompositionBuilder+AudioTracks.swift`, spec
+§11 R2-1) — the user's workaround, applied for them.
+
+**Section 4 of the probe is the proof of the fix, and nothing else is.** The
+export's reader always played the heterogeneous track, so the probe's section
+3 and the whole of `mixed_audio_proof.py` pass on the baseline too: they are
+REGRESSION GUARDS for the export path, whose track count the fix changes. The
+probe is `preview_validity_probe.py`'s shape — a `main.swift` over the whole
+of `app/Sources` with the harness's swiftc line, `Compositor.metal` and
+`Blank.mp4` beside it, a build failure scored — plus `peaks_probe.py`'s
+`--sources PATH` to build it over another tree (one binary directory per
+tree). It writes four tone files with `ffmpeg` per run (48 kHz stereo AAC
+twice, 48 kHz stereo 16-bit WAV, 44.1 kHz mono 16-bit WAV) and four
+hand-written packages: `mixed` (the report), `same` (two AAC — CONTROL),
+`three` (AAC, WAV, AAC, 44.1 kHz WAV) and `split` (the workaround). Sections:
+1, the MECHANISM (`mixed`'s first composition track carries one format
+description); 2, the composition track ids, one mix input and one meter per
+track, the video composition valid; 3, the reader over each build's audio
+mix, loud in every clip and silent between, and `mixed` against `split`
+sample for sample; 4, the editor's own `Playback` in a real window — seek,
+play 1.2 s, the meter lit and the clock moved at least 0.4 s, silent after
+pause — at `mixed` 0.5 s and 3.5 s and the CONTROLs `split` and `same` at
+3.5 s. Section 4 is skipped by name only for a host with no default output
+device, and that skip means the defect was NOT reproduced.
+
+Two readings are calibrated to what was measured, both on the baseline and
+the fix alike. The clock threshold is 0.4 s, not 0.8: on a Bluetooth output
+(AirPods Max) the player's clock starts 0.45–0.6 s late and the CONTROLs move
+0.70–0.76 s in 1.2 s, where the stall moves 0.000. And `mixed` against
+`split` leaves out 3.000–3.026 s (the measured span, 3.0000208–3.0249896 s, rounded up): the plan track's envelope steps 0 → 1 at the
+WAV's start, that step sits on `mixed`'s WAV track and not on `split`'s, and
+AVFoundation's mix smooths it over 1200 frames; outside it the two are
+byte-equal. `same`'s "one format" is one stream description, because two AAC
+files are two format descriptions of one format.
+
+**37/37** on the fix. Over the baseline (`git archive 3e1bd19 app/Sources |
+tar -x -C tools/proof/work/mixed-audio/baseline`, then `--sources
+tools/proof/work/mixed-audio/baseline/app/Sources`) **31/37**: section 1, three
+section-2 id rows, and `mixed` at 0.5 s and 3.5 s — the STALL form, the clock
+at 0.000 s and the meter silent — while both CONTROLs and all of section 3
+pass. `mixed_audio_proof.py` **13/13**: `import_media`, both clips on one
+track, an `audio_wav` export loud, silent between and the WAV at its own
+level (−24.08 dBFS against the file's −24.08), the `split` CONTROL equal to it
+outside the step, and the `same` CONTROL loud.
 
 ## The paused preview that did not follow an edit (`preview_refresh_probe.py`)
 

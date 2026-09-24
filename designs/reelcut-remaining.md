@@ -404,7 +404,7 @@ row per op.
 | `app/Sources/Exporter.swift` | 609 |
 | `app/Sources/ClipPane.swift` | 609 |
 | `app/Sources/MediaImporter.swift` | 604 at the pre-#23 baseline; 580 after its separately gated move |
-| `app/Sources/CompositionBuilder.swift` | 601 |
+| `app/Sources/CompositionBuilder.swift` | 601 at the pre-#34 baseline; 577 after its separately gated move to `CompositionBuilder+AudioTracks.swift` |
 
 Road map 7 part 1 did not pay a size toll on those capped files. At this
 gate `edit_transition.rs` is 537 lines, `edit_transition_shift.rs` 119,
@@ -423,7 +423,7 @@ when a fix took each over its line — and left two files AT the cap:
 | `AgentServer+Scope.swift` | 592 | ON the cap. Seam: the envelope rule (`checkCallScope`, `effectiveScope`, `idScope`, `addressed`, `checkDocumentLevelTicks`, `scopeLanding`, `scopeFailure`) against `set_scope` THE TOOL and its path arithmetic (`setScope`, `nestScopePath`, `pathToClip`, `applyNestScope`, `commonPrefix`, `scopeReport`) |
 | `MediaImporter.swift` | 580 after #23's pure move | Went to 619 when road map 3's held tail landed in it, and paid mid-wave: the await-free half — `ImportError`, `isImage`/`probeImage`, the rate table — to `MediaImporter+Probe.swift` (121), a pure move. #23's separate move takes the synchronous reader and writer to `MediaImporter+Peaks.swift` (39) and the buckets from `MediaCacheFiles.swift` (556 → 478) to `MediaPeakBuckets.swift` (82); the asset and track awaits stay here. |
 | `AgentCatalog.swift` | 454 | Was cut to 665 in `b410125`, phase 9 put it back over at 807, and road map 3's R1·toll paid the cut the file's own header had named, first and alone: the FILE groups — Media, Captions, Rendering and export — are `AgentCatalog+Files.swift` (**609** with `record_screen`'s entry — over the cap since R2 hoisted the entry's pause and result paragraphs into two locals for the type checker's budget; the cut it owes is that entry's sentences, whose description is the longest in the catalog; the cut it will owe is that entry's sentences), spliced after the Canvas group as the clip rows are. The header's "sharing no hoisted local" was false by ONE, `ticks`, which `fileTools(ticks:)` takes as an argument |
-| `CompositionBuilder.swift` | 601 | AT the cap since road map 3's held tail (+83); the next addition pays first — the audio-parameter half (`audioParameters` and the `AudioTap.make` call) is the natural cut |
+| `CompositionBuilder.swift` | 577 after #34's pure move | Was AT the cap (601) since road map 3's held tail (+83); #34 paid first and alone — the audio loop of `build` and `fill`'s source resolution moved to `CompositionBuilder+AudioTracks.swift` (159 with the format families), a pure move gated before the families landed. `audioParameters` stays here; it is the next cut |
 | `ReelOps.swift` | 925 | Created by `b410125` at 853. It is a TABLE — one factory per row of `edit.rs`'s op table — so it has the same standing exemption `edit.rs` has on the Rust side |
 | `ProjectDocument.swift` | 1348 | Stored properties cannot move to an extension; the natural cut is the media/reverse machinery, NOT the scope. `ProjectDocument+DisplayStem.swift` is the shape a pure addition takes meanwhile; road map 3 added ONE internal method (`adoptImported`, +12 lines) so `ProjectDocument+Recording.swift` could build the untitled document by File ▸ Open's own spelling |
 | `TimelineView.swift` | 1652 | Frozen. Of the five lines the cache marker added, one is behaviour (the hit-clearing under `replaced`); the marquee's `.outside` case and `beginMarquee` added fourteen net on 2026-09-19, and road map 7 §10's phase C eight more for `sourceTime`'s reversed arm on 2026-09-20 — the dispatch the file says it holds |
@@ -1230,6 +1230,14 @@ tolls; the final files are `MediaImporter.swift` **576**,
 `MediaCacheFiles.swift` **486**, `MediaImporter+Peaks.swift` **116** and
 `MediaPeakBuckets.swift` **161** lines. A real-user listen and visual waveform
 judgment are still part of §4's acceptance rather than an automated claim.
+
+**Mixed audio formats on one track #34 (2026-09-24):** an AAC clip then a
+WAV on one timeline track previewed silent — the preview's tapped item stalls
+over a composition track that changes format. `CompositionBuilder` now makes
+one composition audio track per source format (spec §11 R2-1); the record,
+the baseline's failing rows and what is owed are road map 2 §2, Phase 5,
+"#34 — mixed audio formats on one track" (kpgalligan/reelcut#34). A listen
+at the machine, and section 4 on the built-in speakers, are still owed.
 
 **Bounded recovery after a lost AssemblyAI submit reply (#28).** R6-14 reads
 only the newest page of 200 transcripts at most three times. An outage,

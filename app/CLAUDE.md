@@ -393,7 +393,7 @@ the key map behind it.
   divide `g`, Full for a coprime canvas); `AVPlayerItem.videoComposition` is
   a COPY property, so the setter re-assigns. `makePreviewLayer` is the one
   door to a second `AVPlayerLayer`.
-- `CompositionBuilder.swift` (+`InstructionRanges`) — the app's ONE
+- `CompositionBuilder.swift` (+`InstructionRanges`, +`AudioTracks`) — the app's ONE
   constructor of `AVMutableVideoComposition`, shared by the preview, both
   export passes and the offline frame. **Do not give it a preview-shaped
   argument**; the `metering` flag is passed true by `Playback.startRebuild`
@@ -402,7 +402,11 @@ the key map behind it.
   the last screen change). `+InstructionRanges` ends the last instruction
   exactly on the composition when the two differ by under a tick — AVPlayer
   refuses an invalid composition SILENTLY, black at every time, while the
-  generator and the writer tolerate it.
+  generator and the writer tolerate it. `+AudioTracks` builds the audio
+  half: an audio plan track becomes one composition track per source stream
+  format (spec §11 R2-1) — a tapped track that changes format part-way
+  STALLS the player (kpgalligan/reelcut#34), so never feed one composition
+  track two formats.
 - `Compositor.swift` · `CompositorEffects.swift` · `Resources/Shaders/Compositor.metal`
   — the per-layer pass. The uniform block's field ORDER is a contract with the
   shader checked only by reading both, so change them in one edit; it is 104
