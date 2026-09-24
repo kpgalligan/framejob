@@ -2672,3 +2672,33 @@ rail split into two colours on its centreline. The typed popup init lives in
 `OptionControls+Choices.swift` so `OptionControls.swift` (Rasterize's)
 stays unforked; the Curve popup is its first caller and the Popups rule
 names it.
+
+## The Clip tab's row marks, 2026-09-23 — road map 9's phase 3a
+
+Two pure moves first, typechecked alone at the baseline (0 errors, 7
+warnings) before anything else landed: `InspectorSection` and
+`InspectorSectionHeader` from `InspectorPane.swift` (1679, over the cap) to
+`InspectorSection.swift`, verbatim, and `InspectorBinding`'s `// MARK:
+Writes` … `edited()` to `InspectorBinding+Writes.swift` as an extension,
+verbatim but for `inspector` losing `private` (the extension reads it). The
+record is `designs/reelcut-roadmap-9.md` §5–§6; the decisions are spec §11
+CI-7 and CI-8; the sizes are remaining §3's phase-3a paragraph.
+
+**Roles that changed.** `inspectorRow` puts an `InspectorMarkGutter`
+(`InspectorMarks.swift`) FIRST on every row, with no spacing after it, so
+every control column moved right by exactly 14 pt — the Document and Media
+tabs included, where the gutter is always blank. It takes `binding`,
+`writes` and `follows`; the typed builders pass `writes: ops(read())`, so a
+row's marks come from the ops it would send. The gutter is as tall as its
+row (a fixed 22 would have grown the bare-text rows) and owns the label's
+ink and the keyed border of its row's fields and popups, set through their
+`layer` so the Rasterize files stay unforked. `InspectorSliderControl`
+takes `start` and `now` and a settable `keyed`, and draws the mint segment
+and the coral tick. `InspectorBinding` reads at three times (`ReadMode`,
+`at(_:_:)`, a cache keyed by clip and mode) and lost `editsAction`, whose
+one caller was Motion presets' note, now replaced by the section's own ⊘
+note. `InspectorSection` folds `marks`, draws them in its header, has
+`reveal()` (expand, no preference) and `didToggle` (the header's click
+only); `KeyedReveal` beside it is `ClipPane`'s per-selection auto-open
+memory. `InspectorTextArea` hugs at priority 1 so the Content area, now
+inside an `inspectorRow`, stretches like a slider.

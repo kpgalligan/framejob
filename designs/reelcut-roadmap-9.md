@@ -1,7 +1,7 @@
 # Reelcut — road map 9: the clip inspector redesign
 
-**Status: phases 1 and 2 BUILT, 2026-09-23 (§2, §4). Phases 3–5 are
-designed by the handoff and not built (§0).**
+**Status: phases 1, 2 and 3a BUILT, 2026-09-23 (§2, §4, §6). Phases 3b, 4
+and 5 are designed by the handoff and not built (§0).**
 
 The handoff is `designs/design_handoff_clip_inspector/` — its README is the
 normative text for the redesign's metrics, inks and behaviour, with this
@@ -28,10 +28,16 @@ the view state everything else hangs on lands first.
    Sound · Clip), the section regrouping and the two renames (Motion
    presets, Reveal), the selection header and lane PINNED above the scroll
    view, the 7 × 11 block knob on the inspector's sliders, sub-tab badges.
-3. **Marks and Reset/Clear** (P5, P11) — the row marks ◆ ◇ ○ ⊘ and "at
-   end", the coral playhead tick, header badges, auto-opening the sections
-   an action keys, summary colours, the Reset/Clear model with per-row ×,
-   the row context menus, and the refusal strip at the panel's foot.
+3. **Marks and Reset/Clear** (P5, P11), split in two:
+   - **3a, the row marks** — BUILT, §5 and §6. The ◆ ◇ ○ ⊘ gutter and "at
+     end", the keyed slider segment and field border, the coral playhead
+     tick and the "now" tag, header badges, summary ink, the all-⊘ note,
+     and auto-opening the sections an action keys.
+   - **3b, Reset/Clear** — not built. Reset only when a section differs from
+     its default and the summary's body tier; Clear in the header with an
+     action selected; per-row × on hover; the row context menus (Remove
+     from action N, Go to action M, Reset to default, Set end value to
+     default); the refusal strip at the panel's foot.
 4. **Retiming by drag** — band drags in the lane and on the timeline
    (`set_action`), hover, grips, the HUD and the ghost; the lane's fades,
    wedges, hatch and curve glyph.
@@ -295,3 +301,138 @@ appearances, the block staying put while the sections scroll, and a real
 click on a sub-tab (remaining §4). The other Clip-tab photographs
 (`phase2`, `phase4`, `phase6`–`phase9`, `e1`, the word-caption chrome) were
 not re-run in this phase; each now opens on its selection's first sub-tab.
+
+## 5. Phase 3a's design
+
+**Two pure moves first** (app/CLAUDE.md "Placement"), each typechecked at
+the baseline alone: `InspectorSection` and `InspectorSectionHeader` out of
+`InspectorPane.swift` into `InspectorSection.swift`, and the binding's
+`// MARK: Writes` … `edited()` into `InspectorBinding+Writes.swift` as an
+extension (its `inspector` loses `private`).
+
+**The mark** (spec §11 CI-7, `InspectorMarks.swift`). A row's paths are the
+`"group.key"` strings of the ops it writes — `set_video`, `set_audio` and
+`set_text` by their patch's keys, `set_action_end` by its patch's groups —
+taken from the row's own `ops(read())` at BUILD time, so they are right
+whether the write lands on the base or on the end patch; any other op has
+none. `RowMark` is `.none`, `.keyed`, `.keyedAtEnd`, `.other(N)`,
+`.follows` or `.notAnimatable`. Both lists empty is `.none`, action or no
+action. With an action selected: writes and no `set_action_end` among them
+is ⊘; a write in the action's end patch is ◆ (`.keyedAtEnd` for a popup or
+a checkbox); a follow in it is ○; another action keying one is ◇ with that
+action's time-order NUMBER; else none. With none selected, ◇ when any
+action keys it. The gutter (`InspectorMarkGutter`, 14 pt, the row's FIRST
+view with no stack spacing after it) draws the glyph in mono 10 — ◆ and ○
+`DS.action`, ◇ and ⊘ `DS.textFaint` — sets the label's ink (`textStrong`
+keyed, `textFaint` ⊘, else `textMuted`) and a 1 pt `DS.action` layer border
+on the row's fields and popups while keyed. "at end" is an
+`InspectorRowTag`; a field-only value row gets a coral "now …" tag when the
+value at the playhead differs by more than half a display unit.
+
+**Reads at three times.** `InspectorBinding.at(_:_:)` runs a read in a
+`ReadMode` — `.end` (the selected action's end, CI-2), `.start`
+(`clip_state` at `clip.start + action.start`) or `.playhead` (the document's
+playhead whenever it is inside the clip, whatever is selected) — over a
+cache keyed by clip and mode. `startValue` and `nowValue` are the slider's
+two new inputs: keyed, its fill runs in `DS.action` from the start's
+fraction to the knob (no accent fill), and a 2 × 11 pt `DS.playhead` tick
+marks the playhead's value, over the fill and under the knob.
+
+**The section** folds its gutters into `marks` (keys written that the
+action holds, any ◇, all-⊘) at the end of `init` and on every `refresh()`,
+draws `◆N` / ◇ / ⊘ after its title and the summary in `DS.action` when
+keyed, and shows the ⊘ note first in its content when every writing row is
+⊘ — which replaces Motion presets' own note. `reveal()` expands without a
+preference; only the header's click (`toggle()`) writes one and calls
+`didToggle`.
+
+**Auto-open** (spec §11 CI-8). `KeyedReveal`, one per `ClipPane`, is
+applied at the end of `makeSections()` with the selected action's id and
+the sub-tab: a new action resets it; a sub-tab not yet seen adds its keyed
+sections; every section it holds is revealed on each rebuild; a header
+click removes that section. Nothing changes in `InspectorViewController`.
+
+## 6. Phase 3a's record
+
+**What landed.** Three new files — `InspectorSection.swift` and
+`InspectorBinding+Writes.swift` (the two pure moves out of
+`InspectorPane.swift`, each typechecked at the baseline alone, 0 errors and
+7 warnings, before anything else landed) and `InspectorMarks.swift` — and
+changes in `InspectorPane` (the metric, the gutter in `inspectorRow`, the
+builders' `writes:`, the slider's segment and tick, the "now" tag,
+`ReadMode` and `at(_:_:)`, `editsAction` deleted), `ClipPane` (the
+`KeyedReveal` and its call; In and Out's `writes:`), `VideoPane` (the
+`writes:` of Blend, the filter row, the Region row, Center and Size),
+`VideoPane+Motion` (its note deleted), `TextPane` (Content inside an
+`inspectorRow`; `writes:` on Family, Style, Align, Vertical and Mode) and
+`AudioPane` (Gain's `follows:`). `InspectorViewController` (frozen) took 0
+lines. No core, FFI, op or tool change. The sizes are
+`designs/reelcut-remaining.md` §3's phase-3a paragraph.
+
+**What was measured** (2026-09-23). `make typecheck` 0 errors and 7
+warnings after each move and at the end; `make test` (816 passed, 0
+failed) and `make lint` clean, the core untouched; `make app` rc 0, and the
+built app's log carries no `Reelcut: ` line. `clip_inspector3_proof.py`
+**31/31** — the probe's 24 rows (M1 ×11, M2 ×4, M3 ×2, M4 ×4, M5, M6, M7
+×2) plus its build and presence rows, and five harness rows (H1, H2, H3 ×2,
+H4): on this host, scale 2 in Display P3, Opacity's rail at 412.5 pt held
+78 mint px and no accent, the coral tick was one 4 px run 22 px tall, and
+the gutter's ◆ sat at 412–417 pt with none in the Scale row.
+`--mutant marks` (a `keyedPaths()` that answers nothing) exits 0: eleven
+rows of M1, M2, M3, M4 and M6 fail — Opacity, Volume, Gain and the filter
+row, Transform's header, "at end", all four auto-open rows and the `◆N`
+agreement — and M5, M7 and the rows that do not read the selected action's
+keys (◇, ⊘, blank) hold.
+
+**Re-runs.** `clip_inspector_proof.py` **39/39**,
+`clip_inspector2_proof.py` **32/32**, `phase3_chrome.py` **33/33**,
+`sharp_chrome.py` **29/29** and `e2_chrome.py` **52/52** hold on this
+tree. No row needed re-measuring for the 14 pt shift: none of them reads a
+control column's x. `e2_chrome.py` scored **51/52** until one row was
+updated in place, dated: "zero In inside an action keeps the base-props
+note" looked for Motion presets' deleted sentence and now looks for the ⊘
+note that replaces it. **`e1_chrome.py` scores 10/15**, its first run since
+phase 1, and scores the SAME 10/15 on phase 2's tree (`835c399`, run in a
+worktree): five rows fail for a phase-2 reason — the Transition section
+lives on the Clip sub-tab since phase 2, and the instrument photographs and
+probes a shape clip on its default tab (Shape), so "this tree's Transition
+section opens", "the two trees' section bodies are compared", "Kind, Curve
+and Duration, in that order", the Crossfade Audio checkbox and "both style
+rows are reachable" find no Transition section. **Owed**, not fixed here:
+the instrument asks for the `clip` sub-tab (the harness's fourteenth
+argument, and `selectClipSubTab` in its probe).
+
+**Deviations, each for a reason.**
+
+- **`inspectorRow` takes `binding:`** beside `writes:` and `follows:`. The
+  gutter asks the binding about the selected action and a `ReelOp` carries
+  none, so every call site that passes `writes:` passes the binding too;
+  the gutter holds it weakly and a row without one is `.none`.
+- **A row is DISCRETE by its controls**, not by a builder argument: a
+  popup, a checkbox or a segmented control. That covers the typed builders
+  and the hand-built Blend, filter, Region, Family, Style, Align, Vertical
+  and Mode rows alike. A colour row is continuous (a colour ramps), so it
+  never says "at end".
+- **The gutter is as tall as its row, not 22 pt.** A fixed 22 would have
+  grown every row of bare text ("No filters on this clip.", "No markers…")
+  and moved everything under it.
+- **◇ is the single selected clip's.** An action's number is its clip's;
+  with several clips selected no row is ◇.
+- **The Content area stretches**: `InspectorTextArea` hugs at priority 1 and
+  `inspectorRow` gives it no trailing spacer, as it does a slider.
+- **The "at end" tag is on every row**, hidden unless the gutter says
+  `.keyedAtEnd`; the "now" tag is on every field-only value row, hidden
+  unless the playhead's value differs by more than half a display unit.
+  Both are detached while hidden, so neither moves a row.
+- **Not built, from the handoff:** the 64 pt label (76 stays, CI-7), the
+  dashed ⊘ border, the boxed "clip" tag on a lone ⊘ button, a "now"
+  readout on ○ and on colour and popup rows, a keyed border on colour
+  wells, `DS.textDim` (⊘ is `DS.textFaint`), hover states, Reduce Motion
+  and the 8/10 body padding.
+
+**Owed.** Phase 3b (§0). A person checks the marks, the segment, the tick
+and the auto-open in both appearances in the running app (remaining §4).
+`e1_chrome.py`'s five phase-2 rows, above. The other Clip-tab photographs
+(`phase2`, `phase4`, `phase6`–`phase9`, the word-caption chrome) were not
+re-run in this phase; every control column in them is 14 pt right of
+where it was.

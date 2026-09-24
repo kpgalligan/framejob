@@ -56,7 +56,8 @@ final class TextPane: InspectorPaneView {
             note: {
                 binding.textProps.isUntimedPage ? Self.untimedNote : nil
             },
-            rows: [area])
+            rows: [inspectorRow(nil, [area], binding: binding,
+                                writes: binding.ops(textContent: binding.textProps.content))])
     }
 
     // MARK: Face
@@ -66,6 +67,7 @@ final class TextPane: InspectorPaneView {
         let families = TextFace.families
         let family = TextFace.family(of: binding.textProps.font)
         let members = TextFace.members(of: family)
+        let font = binding.ops(text: TextPatch(font: binding.textProps.font))
 
         let familyPopup = OptionPopupControl(
             width: 150, items: families,
@@ -99,8 +101,9 @@ final class TextPane: InspectorPaneView {
             defaultExpanded: false,
             rows: [
                 inspectorRow(
-                    "Family", [familyPopup], mixed: { binding.mixedText { $0.font } }),
-                inspectorRow("Style", [stylePopup]),
+                    "Family", [familyPopup], mixed: { binding.mixedText { $0.font } },
+                    binding: binding, writes: font),
+                inspectorRow("Style", [stylePopup], binding: binding, writes: font),
                 inspectorValueRow(
                     "Size", binding, name: "Font Size", unit: " px", decimals: 0, min: 6,
                     max: 800, quick: [24, 36, 48, 72, 96, 144], slider: false,
@@ -116,6 +119,7 @@ final class TextPane: InspectorPaneView {
         let binding = self.binding
         let aligns = ["left", "center", "right"]
         let valigns = ["top", "middle", "bottom"]
+        let text = binding.textProps
         let align = OptionSegmentedControl(
             segments: [
                 ("text.alignleft", "L", "Align left"),
@@ -161,8 +165,10 @@ final class TextPane: InspectorPaneView {
                     "Color", binding, name: "Text Color", read: { binding.textProps.color },
                     ops: { binding.ops(text: TextPatch(color: $0)) },
                     mixed: { binding.mixedText { $0.color } }),
-                inspectorRow("Align", [align], mixed: { binding.mixedText { $0.align } }),
-                inspectorRow("Vertical", [valign], mixed: { binding.mixedText { $0.valign } }),
+                inspectorRow("Align", [align], mixed: { binding.mixedText { $0.align } },
+                    binding: binding, writes: binding.ops(text: TextPatch(align: text.align))),
+                inspectorRow("Vertical", [valign], mixed: { binding.mixedText { $0.valign } },
+                    binding: binding, writes: binding.ops(text: TextPatch(valign: text.valign))),
                 inspectorCheckRow(
                     "UPPERCASE", binding, name: "Case",
                     read: { binding.textProps.textCase == .upper },
@@ -303,7 +309,9 @@ final class TextPane: InspectorPaneView {
             reset: { binding.apply("Text Box", text: TextPatch(width: .some(nil))) },
             defaultExpanded: false,
             rows: [
-                inspectorRow("Mode", [mode], mixed: { binding.mixedText { $0.width != nil } }),
+                inspectorRow("Mode", [mode], mixed: { binding.mixedText { $0.width != nil } },
+                    binding: binding,
+                    writes: binding.ops(text: TextPatch(width: .some(binding.textProps.width)))),
                 inspectorValueRow(
                     "Width", binding, name: "Text Width", unit: " px", decimals: 0, min: 20,
                     max: 20000, slider: false,

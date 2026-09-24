@@ -244,17 +244,30 @@ the key map behind it.
   `ClipPane.forgetSubTab()` whenever the selection's ids change, spec §11
   CI-5) · `InspectorPane.swift`
   (the pane base — `pinnedBlock` is the header `makeHeader()` built, never
-  stacked — `InspectorSection` with its `id` and `title` readable, the row
-  builders, `InspectorSliderControl` with the 7 × 11 block knob snapped to
-  device pixels (CI-6), and `InspectorBinding`
+  stacked — the row builders, `InspectorSliderControl` with the 7 × 11 block
+  knob snapped to device pixels (CI-6) and, keyed, the mint segment from the
+  action's start value and the coral playhead tick, and `InspectorBinding`
   — the one place that knows the fields read the SELECTED action's END state
   (`action(_:)` answers the selected action and never consults the playhead;
   `evaluated(_:)` asks `clip_state` at `clip.start + action.endTime`, spec
-  §11 CI-2) and a write there goes to `set_action_end`, with
-  `structural(video:for:)` the exception that sends a list of a different
-  LENGTH, or `motion`, to the BASE props, and `structural(audio:for:)` the
-  one that sends pan, mono, compressor, noise reduction, duck and
-  keep-pitch there (CI-3)) ·
+  §11 CI-2, or in `at(.start)` / `at(.playhead)` at the action's start or
+  the playhead, over a cache keyed by clip and `ReadMode`)) ·
+  `InspectorBinding+Writes.swift` (a pure move: a write with an action
+  selected goes to `set_action_end`, with `structural(video:for:)` the
+  exception that sends a list of a different LENGTH, or `motion`, to the
+  BASE props, and `structural(audio:for:)` the one that sends pan, mono,
+  compressor, noise reduction, duck and keep-pitch there (CI-3)) ·
+  `InspectorSection.swift` (`InspectorSection` with its `id`, `title` and
+  folded `marks` readable, `reveal()` which writes no preference, and
+  `didToggle`, called by the header's click alone; the header with its
+  `◆N` / ◇ / ⊘; and `KeyedReveal`, `ClipPane`'s auto-open, CI-8) ·
+  `InspectorMarks.swift` (spec §11 CI-7: `RowMark`, `SectionMarks`, the
+  14 pt `InspectorMarkGutter` that is the FIRST view of every
+  `inspectorRow` — blank at `.none`, so it must stay first for the refresh
+  walk to reach it before the controls whose label ink and layer border it
+  sets — `InspectorRowTag` ("at end", "now …"), and the binding's mark
+  queries; a row's paths come from the ops it WRITES, `writes:` /
+  `follows:`, and an un-annotated row is `.none`, never ⊘) ·
   `ClipPane.swift` (the sub-tabs — `subTabs` by kind, `activeSubTab`, and
   `choose` / `forgetSubTab`, which never refresh — and `makeSections()`, the
   function from the selection's kind and the active sub-tab to its
@@ -271,7 +284,9 @@ the key map behind it.
   row controls) · `OptionControls+Choices.swift` (the typed, value-carrying
   `OptionPopupControl` init over the index one). `VideoPane+Motion.swift` owns the local wrapping
   `MotionInactiveNote` for selected zero-duration edges; it refreshes with
-  the section and leaves stored kind and Duration editable.
+  the section and leaves stored kind and Duration editable. Its old "Motion
+  belongs to the clip" note is gone: every Motion presets row is ⊘, so the
+  section's own ⊘ note says it.
   `TextPane.swift`'s Style section carries UPPERCASE (`case`, through
   `binding.apply` like `align`); its Content write is
   `binding.ops(textContent:)` (`WordProps.swift`). On a word-styled page the

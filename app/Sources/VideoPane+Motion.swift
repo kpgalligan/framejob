@@ -78,11 +78,6 @@ extension VideoPane {
         return InspectorSection(
             id: "video.motion", title: "Motion presets",
             summary: summary,
-            note: {
-                binding.editsAction
-                    ? "Motion belongs to the clip; the selected action does not animate it"
-                    : nil
-            },
             reset: { binding.apply("Motion", video: VideoPatch(motion: .some(nil))) },
             defaultExpanded: false,
             rows: [

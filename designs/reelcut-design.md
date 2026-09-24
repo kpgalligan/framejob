@@ -281,6 +281,23 @@ Transform opens by default and the rest are closed; on any sub-tab where
 nothing is open, the first section with no stored preference opens
 instead, so a tab is never a wall of shut headers.
 
+**Row marks** (§11 CI-7 and CI-8; road map 9 §5). Every row starts with a
+14 pt mark gutter that says what the selected action does to it: ◆ in the
+action ink when the row writes a key the action's end patch holds (with a
+mono "at end" after a discrete control, which switches rather than ramps),
+○ when the row follows a keyed value (Gain follows Volume), ◇ faint when
+ANOTHER action keys it (its tooltip names the action), and ⊘ faint when the
+row writes the clip whatever is selected (Motion presets, pan, a list's
+length). A keyed row's label is in the strong ink and its field and popup
+wear a 1 pt action-ink border; ⊘ greys the label. A keyed slider fills in
+the action ink from the value at the action's START to the knob, and a
+coral tick marks the value at the PLAYHEAD when the playhead is inside the
+clip; a field-only row shows that value as a "now" tag instead. Section
+headers carry `◆N` (keys), ◇ and ⊘ after the title, a keyed section's
+summary is in the action ink, and a section whose every writing row is ⊘
+says "Actions don't animate this. Edits here change the clip." Selecting an
+action opens the sections of the showing sub-tab that it keys.
+
 **Note on the section list.** The design handoff's table sketches five groups
 (Transform, Video, Audio, Effects, Timing). What shipped keeps the panes'
 EXISTING sections as the units and filters them by kind, because merging them
@@ -4018,3 +4035,32 @@ assisted import.
   pixels (`backingAlignedRect`, nearest) with the accent fill running to the
   snapped knob's centre; the accent fill is kept until phase 3's keyed
   segment replaces it.
+- **CI-7 — Every inspector row carries the 14 pt mark gutter, and the label
+  stays 76** (road map 9 §5, the clip inspector redesign's phase 3a). The
+  gutter is the FIRST view of every `inspectorRow`, blank when its mark is
+  none, so the label column lines up down the whole inspector — the
+  Document and Media tabs included, where no row can be marked. It is
+  followed by no stack spacing, so every control column moves right by
+  exactly `InspectorMetrics.markGutter` = 14 pt (a labelled row's controls
+  from 82 to 96 pt, an unlabelled row's from 0 to 14). The label field
+  stays 76 pt, not the handoff's 64: "Remove noise" measures 64.1 pt in
+  `DS.sans(11)`, "Corner radius" 62.1 and "Out Duration" 59.3, and the
+  label truncates at its tail. A row's mark is derived from the ops it
+  WRITES (`writes:`, the typed builders' own `ops(read())`) and the ones it
+  FOLLOWS (`follows:`): none when both are empty, with or without an action;
+  with an action selected ⊘ when it writes and none of its writes reach
+  `set_action_end`, ◆ (or ◆ with "at end" for a discrete control) when it
+  writes a key the selected action's end patch holds, ○ when it follows one,
+  ◇ when another action keys it; with none selected ◇ when any action keys
+  it. ⊘'s ink is `DS.textFaint`; no `DS` token is new. The header's `◆N`
+  counts KEYS, CI-6's count, so a section's `◆N` and its sub-tab's agree.
+- **CI-8 — A section the selected action keys opens once per selection,
+  and a person's close sticks** (phase 3a). When an action is selected the
+  sections of the showing sub-tab that write one of its keys are revealed
+  (`KeyedReveal`) — expanded WITHOUT writing the collapsed preference, so
+  the panel goes back to the person's own layout when the action is left.
+  The reveal is remembered per action selection: a rebuild under the same
+  action (a filter added, a family changed) re-reveals the same sections, a
+  sub-tab first shown later adds its own, a header click that closes one
+  drops it for the rest of that selection, and selecting another action
+  (or the same one again after leaving it) starts over.

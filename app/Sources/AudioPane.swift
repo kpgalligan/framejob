@@ -78,7 +78,8 @@ final class AudioPane: InspectorPaneView {
                             guard decibels.isFinite else { return "silent" }
                             return String(format: "%+.1f dB", decibels)
                         }
-                    ]),
+                    ], binding: binding,
+                    follows: binding.ops(audio: AudioPatch(volume: binding.audioProps.volume))),
                 inspectorCheckRow(
                     "Mute", binding, name: "Mute",
                     read: { binding.audioProps.muted },

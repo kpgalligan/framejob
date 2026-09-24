@@ -463,8 +463,9 @@ func controlAfter(_ label: InspectorRowLabel) -> [String: Any] {
 }
 
 /// Every `InspectorSection` in tree order, with the rows inside it. The
-/// section's own id is `private`, so a section is named by WHERE it is and
-/// by what it holds — which is all any of these rows needs.
+/// section's own id has been readable since road map 9's phase 2; a section
+/// is still named by WHERE it is and by what it holds — which is all any of
+/// these rows needs.
 func sections(_ root: NSView) -> [[String: Any]] {
     walk(root).compactMap { view -> [String: Any]? in
         guard let section = view as? InspectorSection else { return nil }
@@ -851,7 +852,8 @@ def main():
 
     # The Transition section is the LAST one a shape clip with an overlap
     # gets (the audio group below it is empty), so it is named by its place
-    # and by what it holds — `InspectorSection.id` is private.
+    # and by what it holds — as it always was, though `InspectorSection.id`
+    # has been readable since road map 9's phase 2.
     #
     # **Crossfade Audio is a CHECKBOX row and carries no `InspectorRowLabel`
     # at all**: `inspectorCheckRow` passes `nil` for the label and the title

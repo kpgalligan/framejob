@@ -37,6 +37,8 @@ final class ClipPane: InspectorPaneView {
     /// The sub-tab picked by hand, if any. Forgotten by the CONTROLLER when
     /// the selection's ids change (`forgetSubTab()`), never here.
     private var chosen: ClipSubTab?
+    /// The sections the selected action keys, opened once per selection (CI-8).
+    private let reveal = KeyedReveal()
 
     override init(inspector: InspectorViewController) {
         videoPane = VideoPane(inspector: inspector)
@@ -199,6 +201,7 @@ final class ClipPane: InspectorPaneView {
                 if section.expandByDefault() { break }
             }
         }
+        reveal.apply(sections, action: binding.selectedAction?.id, subTab: activeSubTab.rawValue)
         return sections
     }
 
@@ -283,8 +286,8 @@ final class ClipPane: InspectorPaneView {
         end.toolTip = "Where the clip ends — trims its back edge"
 
         var rows: [NSView] = [
-            inspectorRow("In", [start]),
-            inspectorRow("Out", [end]),
+            inspectorRow("In", [start], writes: [.trimStart(clip: id, to: clip()?.start ?? 0)]),
+            inspectorRow("Out", [end], writes: [.trimEnd(clip: id, to: clip()?.end ?? 0)]),
             inspectorRow("Duration", [inspectorReadout { duration() }]),
         ]
         // Reverse is a media-source op (`set_reversed`, §6); a text or shape

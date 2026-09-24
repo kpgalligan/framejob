@@ -315,10 +315,11 @@ def harness_checks(chrome, probe):
         check(HARNESS_ROWS[4], False, f"no mint in the inspector column x {column:g}")
         return
     # The FIRST run of mint rows down the column: since phase 2 the sub-tab
-    # strip's mint `◆1` sits below the lane (40 pt and more under the band),
-    # near this column, and the band is above it. A gap of up to 4 pt stays
-    # inside the run, because the selected band's curve crosses the column
-    # (measured: mint at 156–164.5 and 167–175.5 pt).
+    # strip's mint `◆1` sits below the lane — its cell spans this column
+    # (the cell's x-range includes it), 40 pt and more under the band — and
+    # the band is above it. A gap of up to 4 pt stays inside the run,
+    # because the selected band's curve crosses the column (measured: mint
+    # at 156–164.5 and 167–175.5 pt).
     run = [ys[0]]
     for y in ys[1:]:
         if y - run[-1] > 4:

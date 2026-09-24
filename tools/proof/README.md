@@ -3092,8 +3092,8 @@ corners, and now excludes the square field's box by position (150/150).
 **The selected action** — `python3 tools/proof/clip_inspector_proof.py` (and `--mutant entry`, exit 0 when only S1 fails): road map 9 phase 1's probe rows S1–S6 and five harness rows over the harness's thirteenth argument, `selectAction`, with the expected inks converted into the PNG's own colour space by the probe's `--convert`; road map 9 §2 is the record.
 
 Road map 9's phase 2 took a FOURTEENTH argument, appended after
-`selectAction` in the shape phase 3 set, so every earlier call renders what
-it did:
+`selectAction` in the shape phase 3 set, so every earlier call's argument
+positions hold:
 
 ```
 harness … [mediaFilter] [selectAction] [subTab]
@@ -3111,6 +3111,8 @@ Obscure lives) and `e2_chrome.py`'s four inspector renders ask for `clip`
 (where Motion presets lives).
 
 **The sub-tabs and the pinned block** — `python3 tools/proof/clip_inspector2_proof.py` (and `--mutant tabs`, exit 0 when only T2 rows fail in a copy whose `makeSections()` ignores the active tab): road map 9 phase 2's probe rows T1–T7 (the tabs per kind and the default, the section ids per tab, the choice kept on an action and forgotten on a selection change, the two renamed titles, the `◆N` key count, the block pinned outside every `NSScrollView`, and the park clamp on a clip shorter than a frame — which fails on the unfixed clamp, parked at 1 180 000) and harness rows H1–H4 over `subTab` (deterministic twice; the active cell's fill swaps between `picture` and `clip`; ≥ 8 px of converted mint in the Picture cell with the second action selected and none without; the Transform Scale slider's knob a single-colour run of exactly 7·s px on its centreline at scale 2, 11·s tall, its four corners in its ink). ~3 min with a probe rebuild; road map 9 §4 is the record.
+
+**The row marks** — `python3 tools/proof/clip_inspector3_proof.py` (and `--mutant marks`, exit 0 when rows of M1, M2, M3, M4 and M6 fail and nothing else does, in a copy whose `keyedPaths()` answers nothing): road map 9 phase 3a's probe rows M1–M7 (the mark per row — Opacity ◆, Position X ◇ naming action 2, Blend blank, the filter row ◆ at end, Motion presets ⊘, Timing's Duration blank, and on a video with sound Volume ◆, Gain ○, Pan ⊘, Depth blank; the header marks and the ⊘ note; "at end" on a keyed Blend; the auto-open with collapsed keys pinned, over a rebuild, a header click and a reselect; `at(.start / .end / .playhead)`; the header's `◆N` against the sub-tab's; and a Document-tab row whose controls moved by exactly the 14 pt gutter) and harness rows H1–H4 over `selectAction` `0` and `subTab` `picture` at 1.0 s (deterministic twice; Opacity's rail holds converted mint and no converted accent; the coral tick a run of exactly 2·s px, 11·s tall; the gutter's ◆ mint in the Opacity row and absent in Scale's). ~3 min with a probe rebuild; road map 9 §6 is the record.
 
 ## The reversed mirror, spelled once (`source_mirror_probe.py`)
 

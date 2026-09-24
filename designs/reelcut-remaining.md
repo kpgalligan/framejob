@@ -594,11 +594,52 @@ exempt: `tools/proof/clip_inspector2_proof.py` **393** and
 1132 → **1154**, `e2_chrome.py` 1481 → **1493**, `phase3_chrome.py`
 768 → **768**, `clip_inspector_proof.py` 385 → **393**.
 
+**Road map 9's phase 3a, the row marks (2026-09-23, `wc -l`; road map 9
+§6).** `app/Sources/InspectorPane.swift`, over the cap at 1679, gave up
+first, in two pure moves typechecked at the baseline alone: `InspectorSection`
+and `InspectorSectionHeader` to the new `InspectorSection.swift` (268 as
+moved) and the binding's writes to the new `InspectorBinding+Writes.swift`
+(**219**, `inspector` no longer `private`), which left it at 1196. Then
+`InspectorPane.swift` 1196 → **1292** (the metric, the gutter in
+`inspectorRow`, the slider's segment and tick, the "now" tag, `ReadMode`
+and `at(_:_:)`, `editsAction` deleted) — net 1679 → 1292, DOWN 387, inside
+the spec's 1300; `InspectorSection.swift` 268 → **368** (the fold, the
+header marks, the ⊘ note, `reveal()`, `didToggle`, `KeyedReveal`); the new
+`InspectorMarks.swift` **244**. **Two tolls, paid on purpose:**
+`ClipPane.swift`, at its 400 cap, 400 → **403** (the `KeyedReveal` property
+with its comment and the one call — `KeyedReveal` itself lives in
+`InspectorSection.swift` for this reason — and In/Out's `writes:` inside
+their existing lines), and `VideoPane.swift` 1248 → **1253** (+5 of the
++6 allowed: the `writes:` arguments of Blend, the filter row, the Region
+row, Center and Size). `TextPane.swift` 528 → **536** (+8 of +8: a `font`
+and a `text` local and the `writes:` arguments), `AudioPane.swift` 444 →
+**445** (Gain's `follows:`), `VideoPane+Motion.swift` 242 → **237** (the
+note deleted). `InspectorViewController.swift` (frozen) untouched at 332.
+The instruments, exempt: `tools/proof/clip_inspector3_proof.py` **306** and
+`clip_inspector3_probe.swift` **331** (new); `e1_chrome.py` and
+`clip_inspector_proof.py` changed in comments only, `e2_chrome.py` in
+comments and one row (road map 9 §6).
+
 ## 4. What only a person at the machine can check
 
 These are not tasks so much as a list to run through at the machine once. The
 first two have been owed since M1 and spec §10 records them; phases 8 and 9
 and the closing above added the rest.
+
+- **The Clip tab's row marks, LOOKED AT (road map 9's phase 3a,
+  2026-09-23)** — in both appearances, in the running app. The harness
+  photographs one state in the dark (`clip_inspector3_proof.py`: the ◆ in
+  the gutter, the mint segment and the coral tick on Opacity's rail); the
+  light appearance and everything that moves were not photographed. Worth
+  judging: ◆ ◇ ○ ⊘ in the gutter and in the section headers in both
+  appearances (⊘ and ◇ are `DS.textFaint`, which may be too quiet in
+  light); the keyed field's and popup's 1 pt border; the mint segment and
+  the coral tick while the playhead is scrubbed through a span; the "now"
+  tag on a field-only row (Position X inside another action's span); "at
+  end" on a keyed popup; and the AUTO-OPEN in the running app — selecting
+  an action opens the sections it keys on the showing sub-tab, a section
+  closed by hand stays closed while that action is selected, and leaving
+  the action returns the panel to the person's own layout.
 
 - **The Clip tab's sub-tabs and pinned block, LOOKED AT (road map 9's
   phase 2, 2026-09-23)** — in both appearances, in the running app. The
@@ -977,9 +1018,9 @@ piece of view state (spec §11 CI-1 to CI-4): the timeline and the Clip
 tab's action lane highlight it, the inspector's fields show and write its
 END state, esc and the Clip chip leave it, ⌫ removes it. The Clip tab is
 sub-tabs by kind under a block pinned above the scroll view (CI-5), with
-`◆N` key counts and the block knob (CI-6). **Next work starts at road map
-9 §0's phases 3 to 5** — row marks, Reset/Clear and the refusal strip (3,
-which may re-count `◆N` to rows and must say so), band drags on the lane
+`◆N` key counts and the block knob (CI-6), and its rows carry marks (3a,
+CI-7, CI-8). **Next work starts at road map 9 §0's phases 3b to 5** —
+Reset/Clear, the context menus and the refusal strip (3b), band drags on the lane
 and the timeline (4), canvas drags following the mode and keyed-off
 switches (5) — and at §2's and §4's deviations.
 

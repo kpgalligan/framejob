@@ -59,7 +59,10 @@ normative: §5.2 is the project schema, §6 the op table, §7 the architecture.
   presets; a mint `◆N` marks a tab the selected action keys), over that
   tab's sections, each collapsible. Every field shows and writes the clip's base
   props — or, while an action is selected, that action's END state, read
-  at its end tick. Playing or scrubbing INTO an action selects it; esc or
+  at its end tick. Each row is marked ◆ (the action keys it), ◇ (another
+  action does), ○ (it follows a keyed value) or ⊘ (actions cannot animate
+  it), and a slider shows the value at the playhead as a coral tick.
+  Playing or scrubbing INTO an action selects it; esc or
   the lane's Clip chip leaves it, and ⌫ removes it. The timeline draws each
   clip's actions in a lane under its name, the selected one solid mint
   with its span washed down the clip and shaded on the ruler.

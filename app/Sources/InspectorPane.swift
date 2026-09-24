@@ -109,6 +109,8 @@ enum InspectorMetrics {
     static let fieldWidth: CGFloat = 58
     static let wideFieldWidth: CGFloat = 72
     static let popupWidth: CGFloat = 116
+    /// The row-mark column in front of every row's label (spec §11 CI-7).
+    static let markGutter: CGFloat = 14
 }
 
 // MARK: - Refreshing
@@ -356,6 +358,13 @@ final class InspectorSliderControl: NSView, OptionControl {
     private let begin: () -> Void
     private let end: () -> Void
     private let enabled: () -> Bool
+    /// The value at the selected action's START and at the PLAYHEAD
+    /// (`InspectorBinding.startValue` / `nowValue`), nil when there is none.
+    private let start: () -> Double?
+    private let now: () -> Double?
+    /// Whether the row is keyed — set by `inspectorValueRow` from the row's
+    /// gutter once the row exists.
+    var keyed: () -> Bool = { false }
     private var isActive = true
     private var dragging = false
 
@@ -365,8 +374,11 @@ final class InspectorSliderControl: NSView, OptionControl {
     init(
         min lower: Double, max upper: Double, read: @escaping () -> Double,
         write: @escaping (Double) -> Void, begin: @escaping () -> Void,
-        end: @escaping () -> Void, enabled: @escaping () -> Bool
+        end: @escaping () -> Void, enabled: @escaping () -> Bool,
+        start: @escaping () -> Double?, now: @escaping () -> Double?
     ) {
+        self.start = start
+        self.now = now
         self.lower = lower
         self.upper = Swift.max(upper, lower + 0.000_001)
         self.read = read
@@ -400,8 +412,10 @@ final class InspectorSliderControl: NSView, OptionControl {
         needsDisplay = true
     }
 
-    private var fraction: CGFloat {
-        let value = Swift.min(Swift.max(read(), lower), upper)
+    private var fraction: CGFloat { fraction(of: read()) }
+
+    private func fraction(of raw: Double) -> CGFloat {
+        let value = Swift.min(Swift.max(raw, lower), upper)
         return CGFloat((value - lower) / (upper - lower))
     }
 
@@ -456,9 +470,29 @@ final class InspectorSliderControl: NSView, OptionControl {
             NSRect(x: center - knobSize.width / 2, y: mid - knobSize.height / 2,
                    width: knobSize.width, height: knobSize.height),
             options: .alignAllEdgesNearest)
-        DS.accent.setFill()
-        NSRect(x: rail.minX, y: rail.minY, width: max(knob.midX - rail.minX, 0),
-               height: rail.height).fill()
+        // Keyed (spec §4.3's marks): no accent fill, and the action ink from
+        // the value at the action's START to the knob, either way round.
+        if let from = start(), keyed() {
+            let startX = rail.minX + rail.width * fraction(of: from)
+            DS.action.setFill()
+            NSRect(x: min(startX, knob.midX), y: rail.minY, width: abs(knob.midX - startX),
+                   height: rail.height).fill()
+        } else {
+            DS.accent.setFill()
+            NSRect(x: rail.minX, y: rail.minY, width: max(knob.midX - rail.minX, 0),
+                   height: rail.height).fill()
+        }
+        // The playhead's value: a coral tick over the fill, under the knob,
+        // when it is not where the knob is.
+        if let value = now(), abs(value - read()) > (upper - lower) / 1000 {
+            let x = rail.minX + rail.width * fraction(of: value)
+            DS.playhead.setFill()
+            backingAlignedRect(
+                NSRect(x: x - 1, y: mid - knobSize.height / 2, width: 2,
+                       height: knobSize.height),
+                options: .alignAllEdgesNearest
+            ).fill()
+        }
         DS.textStrong.withAlphaComponent(1).setFill()
         knob.fill()
     }
@@ -488,6 +522,7 @@ final class InspectorTextArea: NSView, OptionControl, NSTextViewDelegate {
         self.onEdit = onEdit
         super.init(frame: .zero)
         wantsLayer = true
+        setContentHuggingPriority(NSLayoutConstraint.Priority(1), for: .horizontal)
         textView.isRichText = false
         textView.font = DS.sans(12)
         textView.textColor = DS.textStrong
@@ -557,294 +592,48 @@ final class InspectorTextArea: NSView, OptionControl, NSTextViewDelegate {
     }
 }
 
-// MARK: - Sections
-
-/// One disclosure group: a header with the title, a right-aligned summary of
-/// what the group currently says, an optional reset-to-default button, and the
-/// rows. Collapsed state is per section id in `UserDefaults`, so a pane
-/// rebuilt after every edit does not keep re-opening a group the user closed.
-///
-/// **The stored value records COLLAPSED, not expanded** — a section nobody has
-/// touched has no stored value at all, which is what lets `defaultExpanded`
-/// mean anything. Flipping that spelling would invert every saved panel.
-final class InspectorSection: NSView {
-    /// `UserDefaults` key prefix; the suffix is the section's stable id.
-    static let collapsedKeyPrefix = "ReelcutInspectorSection."
-
-    let id: String
-    let title: String
-    private let header = InspectorSectionHeader()
-    private let content = NSStackView()
-    private(set) var isExpanded = true
-
-    /// `summary` is a closure rather than a string because it is re-read on
-    /// every `refresh()`: a collapsed section still has to tell the truth
-    /// about the value under it. `defaultExpanded` is the state before the
-    /// user has ever touched THIS section — the design opens Transform and
-    /// the primary section of a text or shape selection, and closes the rest.
-    init(
-        id: String, title: String, summary: (() -> String?)? = nil,
-        note: (() -> String?)? = nil, reset: (() -> Void)? = nil,
-        defaultExpanded: Bool = true, rows: [NSView]
-    ) {
-        self.id = id
-        self.title = title
-        super.init(frame: .zero)
-        let key = Self.collapsedKeyPrefix + id
-        if let collapsed = UserDefaults.standard.object(forKey: key) as? Bool {
-            isExpanded = !collapsed
-        } else {
-            isExpanded = defaultExpanded
-        }
-
-        content.orientation = .vertical
-        content.alignment = .leading
-        content.spacing = InspectorMetrics.rowSpacing
-        content.edgeInsets = NSEdgeInsets(
-            top: 2, left: InspectorMetrics.inset, bottom: 8, right: InspectorMetrics.inset)
-        if let note = note {
-            addRow(InspectorNoteLabel(note: note))
-        }
-        for row in rows { addRow(row) }
-
-        header.configure(title: title, summary: summary, reset: reset)
-        header.onToggle = { [weak self] in self?.toggle() }
-
-        let stack = NSStackView(views: [header, content])
-        stack.orientation = .vertical
-        stack.alignment = .leading
-        stack.spacing = 0
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(stack)
-        NSLayoutConstraint.activate([
-            stack.topAnchor.constraint(equalTo: topAnchor),
-            stack.bottomAnchor.constraint(equalTo: bottomAnchor),
-            stack.leadingAnchor.constraint(equalTo: leadingAnchor),
-            stack.trailingAnchor.constraint(equalTo: trailingAnchor),
-            header.widthAnchor.constraint(equalTo: stack.widthAnchor),
-            content.widthAnchor.constraint(equalTo: stack.widthAnchor),
-        ])
-        content.isHidden = !isExpanded
-        header.isExpanded = isExpanded
-    }
-
-    @available(*, unavailable)
-    required init?(coder: NSCoder) {
-        fatalError("InspectorSection does not support NSCoder")
-    }
-
-    private func addRow(_ row: NSView) {
-        content.addArrangedSubview(row)
-        row.widthAnchor.constraint(
-            equalTo: content.widthAnchor, constant: -2 * InspectorMetrics.inset).isActive = true
-    }
-
-    private func toggle() {
-        isExpanded.toggle()
-        content.isHidden = !isExpanded
-        header.isExpanded = isExpanded
-        UserDefaults.standard.set(!isExpanded, forKey: Self.collapsedKeyPrefix + id)
-    }
-
-    /// Opens the section as a DEFAULT, for a pane that decided after building
-    /// it that this is the group to open (`ClipPane`'s "the first section is
-    /// open when there is no Transform"). `defaultExpanded` cannot say it: the
-    /// pane only knows which section is first once it has them all.
-    ///
-    /// **It defers to the user and writes nothing.** A section the user has
-    /// ever toggled has a stored value, and re-opening a group somebody closed
-    /// on every rebuild would be worse than the closed panel this fixes;
-    /// storing the state here would then make that override permanent.
-    /// Returns whether it opened the section, so a caller walking a list can
-    /// stop at the first one that had no stored preference.
-    @discardableResult
-    func expandByDefault() -> Bool {
-        guard UserDefaults.standard.object(forKey: Self.collapsedKeyPrefix + id) == nil,
-              !isExpanded
-        else { return false }
-        isExpanded = true
-        content.isHidden = false
-        header.isExpanded = true
-        return true
-    }
-
-    func refresh() {
-        header.refreshSummary()
-        refreshOptionControls(in: content)
-    }
-}
-
-/// The section header: disclosure triangle, title in the micro-label face, the
-/// current-state summary, and the reset button pinned to the trailing edge.
-/// The button is a subview so it eats its own clicks — everything else toggles
-/// the group.
-final class InspectorSectionHeader: NSView {
-    var onToggle: (() -> Void)?
-    var isExpanded = true {
-        didSet { needsDisplay = true }
-    }
-    private var title = ""
-    private var summary: (() -> String?)?
-    /// The last summary drawn, so a refresh only redraws when it CHANGED —
-    /// the panel refreshes on every document change and on every playhead
-    /// move inside an action.
-    private var lastSummary: String?
-    /// Held so the summary can stop short of it: the two share the header's
-    /// trailing end, and a summary drawn under the button would be unreadable.
-    private weak var resetButton: NSView?
-
-    override init(frame frameRect: NSRect) {
-        super.init(frame: frameRect)
-        wantsLayer = true
-    }
-
-    @available(*, unavailable)
-    required init?(coder: NSCoder) {
-        fatalError("InspectorSectionHeader does not support NSCoder")
-    }
-
-    convenience init() {
-        self.init(frame: .zero)
-    }
-
-    override var isFlipped: Bool { true }
-
-    override var intrinsicContentSize: NSSize {
-        NSSize(width: NSView.noIntrinsicMetric, height: InspectorMetrics.headerHeight)
-    }
-
-    func configure(title: String, summary: (() -> String?)?, reset: (() -> Void)?) {
-        self.title = title
-        self.summary = summary
-        lastSummary = summary?()
-        guard let reset = reset else { return }
-        let button = OptionButtonControl(
-            title: "Reset", action: reset, enabled: { true }, onEdit: {})
-        button.toolTip = "Reset this section to its defaults"
-        button.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(button)
-        resetButton = button
-        NSLayoutConstraint.activate([
-            button.trailingAnchor.constraint(
-                equalTo: trailingAnchor, constant: -InspectorMetrics.inset),
-            button.centerYAnchor.constraint(equalTo: centerYAnchor),
-        ])
-    }
-
-    /// Re-reads the summary closure; redraws only when the answer moved.
-    func refreshSummary() {
-        let next = summary?()
-        guard next != lastSummary else { return }
-        lastSummary = next
-        needsDisplay = true
-    }
-
-    override func mouseDown(with event: NSEvent) {
-        onToggle?()
-    }
-
-    override func draw(_ dirtyRect: NSRect) {
-        // **Pitfall:** `DS.hoverFill` is `quaternaryLabelColor`, which is
-        // ALREADY about 10% ink — taking 0.35 of it left a 3.5% wash that is
-        // invisible in the light appearance, so the header did not separate
-        // from the rows under it. Drawn at its own alpha it is a quiet band
-        // that reads in both appearances.
-        DS.hoverFill.setFill()
-        bounds.fill()
-        DS.border.setFill()
-        NSRect(x: 0, y: bounds.height - 1, width: bounds.width, height: 1).fill()
-
-        let glyph = isExpanded ? "chevron.down" : "chevron.right"
-        let box = NSRect(x: InspectorMetrics.inset, y: bounds.midY - 5, width: 10, height: 10)
-        if let icon = NSImage(systemSymbolName: glyph, accessibilityDescription: title)?
-            .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 9, weight: .semibold))
-        {
-            let tinted = icon.tinted(with: DS.textMuted)
-            let size = tinted.size
-            tinted.draw(
-                in: NSRect(
-                    x: box.minX, y: box.midY - size.height / 2, width: size.width,
-                    height: size.height))
-        } else {
-            let attributes: [NSAttributedString.Key: Any] = [
-                .font: DS.sans(9), .foregroundColor: DS.textMuted,
-            ]
-            (isExpanded ? "▾" : "▸").draw(
-                at: NSPoint(x: box.minX, y: box.minY), withAttributes: attributes)
-        }
-
-        let label = Self.titleLabel(title)
-        label.draw(at: NSPoint(x: box.maxX + 6, y: bounds.midY - label.size().height / 2))
-        drawSummary(after: box.maxX + 6 + label.size().width)
-    }
-
-    /// The title in the micro-label FACE — mono 10, uppercase, 0.09em tracking
-    /// — but not in the micro-label's ink.
-    ///
-    /// **Pitfall:** `DS.microLabel` paints in `DS.textFaint`
-    /// (`tertiaryLabelColor`), which over this header's fill is grey on grey;
-    /// with the Clip tab now stacking up to twenty collapsed headers, that
-    /// reads as a list of DISABLED rows rather than a list of groups. Built
-    /// here rather than by changing `DS.microLabel`, whose other callers draw
-    /// one quiet label over the chrome, where faint is right. The summary
-    /// beside it stays `textFaint`: it is secondary to the title.
-    private static func titleLabel(_ title: String) -> NSAttributedString {
-        let size: CGFloat = 10
-        return NSAttributedString(
-            string: title.uppercased(),
-            attributes: [
-                .font: DS.mono(size), .kern: size * 0.09, .foregroundColor: DS.textMuted,
-            ])
-    }
-
-    /// The state summary, right-aligned in whatever room is left between the
-    /// title and the Reset button. Truncated rather than clipped: it is a
-    /// sentence fragment, and half a word with no ellipsis reads as a bug.
-    private func drawSummary(after titleEnd: CGFloat) {
-        guard let text = summary?(), !text.isEmpty else { return }
-        // A Reset button that Auto Layout has not placed yet has a zero frame,
-        // and taking its minX would put the summary's right edge at −6 and skip
-        // it below. `refreshSummary` only redraws when the TEXT changes, so a
-        // summary skipped on the first pass would stay missing until its value
-        // moved — hence the unplaced button falls back to the inset.
-        let button = resetButton.map { $0.frame.width > 0 ? $0.frame.minX : nil } ?? nil
-        let right = (button ?? bounds.width - InspectorMetrics.inset) - 6
-        let left = titleEnd + 8
-        guard right - left > 14 else { return }
-        let paragraph = NSMutableParagraphStyle()
-        paragraph.alignment = .right
-        paragraph.lineBreakMode = .byTruncatingTail
-        let attributes: [NSAttributedString.Key: Any] = [
-            .font: DS.mono(10), .foregroundColor: DS.textFaint, .paragraphStyle: paragraph,
-        ]
-        let height = text.size(withAttributes: attributes).height
-        text.draw(
-            in: NSRect(x: left, y: bounds.midY - height / 2, width: right - left, height: height),
-            withAttributes: attributes)
-    }
-}
-
 // MARK: - Row builders
 
-/// One labelled row: the leading label column, then the controls, then the
-/// mixed badge when the selection disagrees. Every pane builds rows through
-/// here so the label column lines up down the whole inspector.
+/// One labelled row: the mark gutter, the leading label column, then the
+/// controls, then the mixed badge when the selection disagrees. Every pane
+/// builds rows through here so the label column lines up down the whole
+/// inspector.
+///
+/// The gutter (spec §11 CI-7) is on EVERY row, blank when the row has
+/// nothing to say, and no spacing follows it, so every control column sits
+/// exactly `InspectorMetrics.markGutter` right of where it was. `writes` and
+/// `follows` are the ops the row writes and the ones whose keys it only
+/// follows; `binding` is what the gutter asks about the selected action. A
+/// popup, a checkbox or a segmented control is DISCRETE: keyed, it switches
+/// at the action's end, and the row says "at end".
 func inspectorRow(
-    _ label: String?, _ controls: [NSView], mixed: (() -> Bool)? = nil
+    _ label: String?, _ controls: [NSView], mixed: (() -> Bool)? = nil,
+    binding: InspectorBinding? = nil, writes: [ReelOp] = [], follows: [ReelOp] = []
 ) -> NSView {
-    var views: [NSView] = []
-    if let label = label {
-        let field = InspectorRowLabel(label)
+    let field = label.map { InspectorRowLabel($0) }
+    let discrete = controls.contains {
+        $0 is OptionPopupControl || $0 is OptionCheckboxControl || $0 is OptionSegmentedControl
+    }
+    let gutter = InspectorMarkGutter(
+        binding: binding, writes: writes, follows: follows, label: field, controls: controls,
+        discrete: discrete)
+    var views: [NSView] = [gutter]
+    if let field {
         field.translatesAutoresizingMaskIntoConstraints = false
         field.widthAnchor.constraint(equalToConstant: InspectorMetrics.labelWidth).isActive = true
         views.append(field)
     }
     views.append(contentsOf: controls)
+    views.append(
+        InspectorRowTag(
+            text: { [weak gutter] in gutter?.mark == .keyedAtEnd ? "at end" : nil },
+            color: DS.action))
     if let mixed = mixed { views.append(InspectorMixedBadge(mixed: mixed)) }
     // A slider is the row's stretchy element, so a row that has one gets NO
     // trailing spacer — two views hugging at the same priority would split
-    // the free space and leave the slider half as wide as it should be.
-    if !controls.contains(where: { $0 is InspectorSliderControl }) {
+    // the free space and leave the slider half as wide as it should be. The
+    // Content area stretches the same way.
+    if !controls.contains(where: { $0 is InspectorSliderControl || $0 is InspectorTextArea }) {
         let trailing = NSView()
         trailing.setContentHuggingPriority(NSLayoutConstraint.Priority(1), for: .horizontal)
         trailing.setContentCompressionResistancePriority(
@@ -856,6 +645,10 @@ func inspectorRow(
     row.orientation = .horizontal
     row.alignment = .centerY
     row.spacing = 6
+    row.setCustomSpacing(0, after: gutter)
+    // As tall as the row and no taller: a fixed height would grow a row of
+    // bare text (the "No filters" lines) and move everything under it.
+    gutter.heightAnchor.constraint(equalTo: row.heightAnchor).isActive = true
     return row
 }
 
@@ -888,15 +681,15 @@ func inspectorValueRow(
     mixed: (() -> Bool)? = nil, enabled: @escaping () -> Bool = { true }
 ) -> NSView {
     var controls: [NSView] = []
-    if slider {
-        controls.append(
-            InspectorSliderControl(
-                min: lower, max: upper, read: read,
-                write: { [weak binding] value in binding?.liveUpdate(ops(value)) },
-                begin: { [weak binding] in binding?.liveBegin() },
-                end: { [weak binding] in binding?.liveEnd(name) },
-                enabled: enabled))
-    }
+    let track = slider ? InspectorSliderControl(
+        min: lower, max: upper, read: read,
+        write: { [weak binding] value in binding?.liveUpdate(ops(value)) },
+        begin: { [weak binding] in binding?.liveBegin() },
+        end: { [weak binding] in binding?.liveEnd(name) },
+        enabled: enabled,
+        start: { [weak binding] in binding?.startValue(read) },
+        now: { [weak binding] in binding?.nowValue(read) }) : nil
+    if let track { controls.append(track) }
     controls.append(
         OptionFieldControl(
             width: width, unit: unit, decimals: decimals, min: lower, max: upper, quick: quick,
@@ -904,7 +697,24 @@ func inspectorValueRow(
             write: { [weak binding] value in binding?.apply(name, ops(value)) },
             enabled: enabled,
             onEdit: { [weak binding] in binding?.edited() }))
-    return inspectorRow(label, controls, mixed: mixed)
+    // A field-only row has no rail to put the playhead's tick on, so it says
+    // the value in words when it differs by more than half a display unit.
+    if !slider {
+        controls.append(
+            InspectorRowTag(
+                text: { [weak binding] in
+                    guard let value = binding?.nowValue(read),
+                          abs(value - read()) > 0.5 * pow(10, -Double(decimals))
+                    else { return nil }
+                    return "now " + String(format: "%.\(decimals)f", value) + unit
+                },
+                color: DS.playhead))
+    }
+    let row = inspectorRow(
+        label, controls, mixed: mixed, binding: binding, writes: ops(read()))
+    let gutter = row.subviews.first as? InspectorMarkGutter
+    track?.keyed = { [weak gutter] in gutter?.mark == .keyed || gutter?.mark == .keyedAtEnd }
+    return row
 }
 
 /// A boolean bound to one property. The checkbox carries its own label, so
@@ -920,7 +730,7 @@ func inspectorCheckRow(
         write: { [weak binding] value in binding?.apply(name, ops(value)) },
         enabled: enabled,
         onEdit: { [weak binding] in binding?.edited() })
-    return inspectorRow(nil, [check], mixed: mixed)
+    return inspectorRow(nil, [check], mixed: mixed, binding: binding, writes: ops(read()))
 }
 
 /// A colour well bound to one property, with the unchanged-colour guard the
@@ -938,7 +748,7 @@ func inspectorColorRow(
         },
         enabled: enabled,
         onEdit: {})
-    return inspectorRow(label, [swatch], mixed: mixed)
+    return inspectorRow(label, [swatch], mixed: mixed, binding: binding, writes: ops(read()))
 }
 
 /// A popup bound to one property.
@@ -953,7 +763,7 @@ func inspectorPopupRow(
         write: { [weak binding] index in binding?.apply(name, ops(index)) },
         enabled: enabled,
         onEdit: { [weak binding] in binding?.edited() })
-    return inspectorRow(label, [popup], mixed: mixed)
+    return inspectorRow(label, [popup], mixed: mixed, binding: binding, writes: ops(read()))
 }
 
 /// A button that runs one edit.
@@ -1073,7 +883,7 @@ func changedRGBA(_ color: NSColor, from current: RGBA) -> RGBA? {
 /// the start of each refresh drops the evaluated-state cache so a moved
 /// playhead is never read stale.
 final class InspectorBinding {
-    private weak var inspector: InspectorViewController?
+    weak var inspector: InspectorViewController?
 
     /// Evaluated props per clip, filled lazily. Only clips the playhead is
     /// inside an action of ever reach the FFI; everything else reads its base
@@ -1083,7 +893,27 @@ final class InspectorBinding {
         var audio: AudioProps?
         var text: TextProps?
     }
-    private var cache: [UInt32: Evaluated] = [:]
+    private struct CacheKey: Hashable {
+        let clip: UInt32
+        let mode: ReadMode
+    }
+    private var cache: [CacheKey: Evaluated] = [:]
+
+    /// WHEN a read is answered for (road map 9 §5): `.end` is the selected
+    /// action's end state (spec §11 CI-2) and what every field shows;
+    /// `.start` is the selected action's start, the keyed slider segment's
+    /// far end; `.playhead` is the document's playhead whenever it is inside
+    /// the clip, whatever is selected — the coral tick and the "now" tag.
+    enum ReadMode: Hashable { case end, start, playhead }
+    private(set) var mode: ReadMode = .end
+
+    /// Runs `read` in `mode` and restores the mode it found.
+    func at<T>(_ mode: ReadMode, _ read: () -> T) -> T {
+        let saved = self.mode
+        self.mode = mode
+        defer { self.mode = saved }
+        return read()
+    }
 
     init(inspector: InspectorViewController) {
         self.inspector = inspector
@@ -1158,12 +988,6 @@ final class InspectorBinding {
         return clip.actions.first { $0.id == id }
     }
 
-    /// True when at least one selected clip would have its edit land on an
-    /// action's end patch instead of its base props.
-    var editsAction: Bool {
-        clips.contains { action($0) != nil }
-    }
-
     /// The document's selected action, when it is on the single selected clip.
     var selectedAction: ActionSnapshot? { document?.selectedActionSnapshot }
 
@@ -1173,18 +997,23 @@ final class InspectorBinding {
     // MARK: Evaluated reads
 
     private func evaluated(_ clip: ClipSnapshot) -> Evaluated {
-        if let cached = cache[clip.id] { return cached }
+        let key = CacheKey(clip: clip.id, mode: mode)
+        if let cached = cache[key] { return cached }
         var state = Evaluated()
         // At the END tick: the core has merged every action ending there and
         // none starting there has progressed, so this is the end state.
-        if let inside = action(clip),
-            let raw = project?.clipState(clip.id, at: clip.start + inside.endTime)
-        {
+        let time: Ticks?
+        switch mode {
+        case .end: time = action(clip).map { clip.start + $0.endTime }
+        case .start: time = action(clip).map { clip.start + $0.start }
+        case .playhead: time = clip.start <= playhead && playhead < clip.end ? playhead : nil
+        }
+        if let time, let raw = project?.clipState(clip.id, at: time) {
             state.video = InspectorBinding.decode(VideoProps.self, raw["video"])
             state.audio = InspectorBinding.decode(AudioProps.self, raw["audio"])
             state.text = InspectorBinding.decode(TextProps.self, raw["text"])
         }
-        cache[clip.id] = state
+        cache[key] = state
         return state
     }
 
@@ -1280,222 +1109,6 @@ final class InspectorBinding {
     func mixedShape<T: Equatable>(_ read: @escaping (ShapeProps) -> T) -> Bool {
         mixed(shapeClips) { read(shape($0)) }
     }
-
-    // MARK: Writes
-
-    /// The part of a video patch that changes what the clip IS, and the part
-    /// an action can animate. Either half may be nil; together they are the
-    /// whole patch.
-    ///
-    /// **A list-valued key whose new LENGTH differs from the clip's own is
-    /// the first kind, wherever the playhead sits.** `actions.rs`'s list rule
-    /// interpolates an array PER INDEX only while the two lengths match, and
-    /// otherwise holds the whole list at its start value and switches on the
-    /// action's last tick. So a `filters` or `obscure` list of a different
-    /// length written into an action's END patch is invisible for the entire
-    /// span the user is looking at: the added region does not appear, and the
-    /// section does not even grow a row, because `VideoPane`'s
-    /// `structureSignature` counts the EVALUATED list. Worse, it does not
-    /// survive: the next write of that list sends the whole array the pane
-    /// can read — the base one, without the new entry — and replaces the end
-    /// patch with it. Adding, removing and clearing therefore land on the
-    /// BASE props even inside an action, where they are visible and keep.
-    ///
-    /// Dialling a value INSIDE an existing entry still goes to the action,
-    /// which is what phase 3c's list rule exists for: a region's `amount`
-    /// ramped from 0 to 1 is exactly that, and it works.
-    ///
-    /// The length is compared against `editedList` above — the action's own
-    /// end list where there is one, the clip's base list otherwise — and never
-    /// against the EVALUATED list the section reads, because that array is the
-    /// one an end patch has to match to interpolate at all.
-    ///
-    /// **The sentence that used to stand here said "nothing the inspector does
-    /// can put a different length into an end patch", and it was one action
-    /// short of true.** With two actions on a clip and the first one's end
-    /// patch changing the filter COUNT, the evaluated list at a playhead
-    /// inside the SECOND action is longer than the base, so a comparison
-    /// against the base classified an ordinary dial as structural and wrote
-    /// the clip's base stack — changing every frame before the first action.
-    /// With the pair above the section can only ever write the length it can
-    /// see, so the guarantee holds; what it cannot promise is anything about a
-    /// length a hand-written file or a `set_action_end` call put there.
-    ///
-    /// Do not fold this back into the single `set_action_end` it looks like.
-    /// The two writes are the same shape from here and behave nothing alike
-    /// three layers down, and every step of the failure is silent.
-    ///
-    /// Two residuals, both left deliberately and both smaller than what they
-    /// replace:
-    ///
-    ///  - Changing an entry's DISCRIMINANT (a filter's `kind`, a region's
-    ///    `kind` or `shape`) inside an action still writes the end patch,
-    ///    because unlike a length change that IS a coherent animation —
-    ///    `ENTRY_DISCRIMINANTS` in `actions.rs` holds the entry and switches
-    ///    it at the end, which is what §5.4 says a discrete value does. It
-    ///    reads back as unchanged until then, which is the inspector's
-    ///    standing habit of showing the value AT THE PLAYHEAD while writing
-    ///    the action's end, and not a property of lists.
-    ///  - Adding or removing an entry while an action ALREADY animates that
-    ///    list leaves the end patch at the old length, so that animation
-    ///    degrades to a switch at the end until the end state is written
-    ///    again. There is no way to say "drop this key" from here — a
-    ///    `VideoPatch`'s list keys are single optionals, so nil is absent
-    ///    rather than null — and a visible degradation is worth more than an
-    ///    invisible append.
-    private func structural(video patch: VideoPatch, for clip: ClipSnapshot)
-        -> (base: VideoPatch?, animatable: VideoPatch?)
-    {
-        var base = VideoPatch()
-        var animatable = patch
-        if let filters = patch.filters,
-            filters.count != editedList(clip, action: { $0.filters }, base: { $0.filters }).count
-        {
-            base.filters = filters
-            animatable.filters = nil
-        }
-        if let obscure = patch.obscure,
-            obscure.count != editedList(clip, action: { $0.obscure }, base: { $0.obscure }).count
-        {
-            base.obscure = obscure
-            animatable.obscure = nil
-        }
-        // Motion is not an animation target (the core refuses it in
-        // `set_action_end`), so it ALWAYS lands on the base props.
-        if patch.motion != nil {
-            base.motion = patch.motion
-            animatable.motion = nil
-        }
-        return (base.isEmpty ? nil : base, animatable.isEmpty ? nil : animatable)
-    }
-
-    /// One clip's ops for a video patch: the action's end state when the
-    /// playhead is inside one, the base props otherwise — and the base props
-    /// for whatever `structural(video:for:)` pulls out, either way.
-    func ops(video patch: VideoPatch, for clip: ClipSnapshot) -> [ReelOp] {
-        split(
-            [clip], patch, patch.isEmpty, base: { .setVideo(clips: $0, patch: $1) },
-            action: { ActionPatch(video: $0) },
-            structural: { self.structural(video: $0, for: $1) })
-    }
-
-    /// The selection's ops for a video patch. Clips outside an action share
-    /// ONE `set_video` with several ids (§4.3); the ones inside get their own
-    /// `set_action_end`, less the structural part.
-    func ops(video patch: VideoPatch) -> [ReelOp] {
-        split(
-            videoClips, patch, patch.isEmpty, base: { .setVideo(clips: $0, patch: $1) },
-            action: { ActionPatch(video: $0) },
-            structural: { self.structural(video: $0, for: $1) })
-    }
-
-    /// Spec §11 CI-3: pan, mono, compressor, noise reduction, duck and
-    /// keep-pitch are the clip's, whatever is selected.
-    private func structural(audio patch: AudioPatch, for clip: ClipSnapshot)
-        -> (base: AudioPatch?, animatable: AudioPatch?)
-    {
-        let base = AudioPatch(
-            duck: patch.duck, mono: patch.mono, keepPitch: patch.keepPitch, pan: patch.pan,
-            compressor: patch.compressor, noiseReduction: patch.noiseReduction)
-        var animatable = patch
-        (animatable.duck, animatable.mono, animatable.keepPitch) = (nil, nil, nil)
-        (animatable.pan, animatable.compressor, animatable.noiseReduction) = (nil, nil, nil)
-        return (base.isEmpty ? nil : base, animatable.isEmpty ? nil : animatable)
-    }
-
-    func ops(audio patch: AudioPatch) -> [ReelOp] {
-        split(
-            audioClips, patch, patch.isEmpty, base: { .setAudio(clips: $0, patch: $1) },
-            action: { ActionPatch(audio: $0) },
-            structural: { self.structural(audio: $0, for: $1) })
-    }
-
-    func ops(text patch: TextPatch) -> [ReelOp] {
-        split(
-            textClips, patch, patch.isEmpty, base: { .setText(clips: $0, patch: $1) },
-            action: { ActionPatch(text: $0) })
-    }
-
-    /// Shapes have no action form (§5.4's patch covers video, audio and text),
-    /// so this is always one `set_shape` over every selected shape clip.
-    func ops(shape patch: ShapePatch) -> [ReelOp] {
-        let ids = shapeClips.map { $0.id }
-        guard !patch.isEmpty, !ids.isEmpty else { return [] }
-        return [.setShape(clips: ids, patch: patch)]
-    }
-
-    /// The shared rule: clips outside an action share ONE op with several ids
-    /// (§4.3's "one op with several clip ids"); each clip the playhead is
-    /// inside an action of gets its own `set_action_end` instead — less the
-    /// part `structural` pulls back onto its base props, which is a change to
-    /// the clip and not to how it animates.
-    ///
-    /// Audio and text pass no `structural`, and the default says why they
-    /// need none: `VideoPatch` is the only patch with an array-valued key, so
-    /// video is the only one whose write can change a LENGTH.
-    private func split<Patch>(
-        _ clips: [ClipSnapshot], _ patch: Patch, _ isEmpty: Bool,
-        base: ([UInt32], Patch) -> ReelOp,
-        action end: (Patch) -> ActionPatch,
-        structural: (Patch, ClipSnapshot) -> (base: Patch?, animatable: Patch?) = {
-            whole, _ in (base: nil, animatable: whole)
-        }
-    ) -> [ReelOp] {
-        guard !isEmpty, !clips.isEmpty else { return [] }
-        var ops: [ReelOp] = []
-        var ids: [UInt32] = []
-        for clip in clips {
-            guard let inside = action(clip) else {
-                ids.append(clip.id)
-                continue
-            }
-            let parts = structural(patch, clip)
-            if let onClip = parts.base { ops.append(base([clip.id], onClip)) }
-            if let animated = parts.animatable {
-                ops.append(.setActionEnd(clip: clip.id, action: inside.id, patch: end(animated)))
-            }
-        }
-        if !ids.isEmpty { ops.insert(base(ids, patch), at: 0) }
-        return ops
-    }
-
-    // MARK: Commits
-
-    func apply(_ name: String, _ ops: [ReelOp]) {
-        guard !ops.isEmpty else {
-            NSSound.beep()
-            return
-        }
-        inspector?.onEdit?(name, ops)
-    }
-
-    func apply(_ name: String, video patch: VideoPatch) { apply(name, ops(video: patch)) }
-    func apply(_ name: String, audio patch: AudioPatch) { apply(name, ops(audio: patch)) }
-    func apply(_ name: String, text patch: TextPatch) { apply(name, ops(text: patch)) }
-    func apply(_ name: String, shape patch: ShapePatch) { apply(name, ops(shape: patch)) }
-
-    /// Off-event commits (a sheet's completion, an alert's answer) — the
-    /// grouped entry point is mandatory there (app/CLAUDE.md's undo pitfall).
-    func applyGrouped(_ name: String, _ ops: [ReelOp]) {
-        guard !ops.isEmpty else {
-            NSSound.beep()
-            return
-        }
-        inspector?.onGroupedEdit?(name, ops)
-    }
-
-    // MARK: Live gestures
-
-    func liveBegin() { inspector?.onLiveBegin?() }
-    func liveUpdate(_ ops: [ReelOp]) {
-        guard !ops.isEmpty else { return }
-        inspector?.onLiveUpdate?(ops)
-    }
-    func liveEnd(_ name: String) { inspector?.onLiveEnd?(name) }
-
-    /// The refresh a control asks for after it writes, so the readouts and
-    /// dependent fields in the same section catch up.
-    func edited() { inspector?.refresh(isLive: false) }
 }
 
 // MARK: - Pane

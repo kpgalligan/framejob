@@ -532,8 +532,8 @@ func controlAfter(_ label: InspectorRowLabel) -> (NSView?, Double) {
 }
 
 /// Every `InspectorSection` in tree order with the rows inside it. A
-/// section's `id` is private, so a section is named by WHERE it is and by
-/// what it holds.
+/// section's `id` has been readable since road map 9's phase 2; a section is
+/// still named here by WHERE it is and by what it holds.
 func sections(_ root: NSView) -> [[String: Any]] {
     walk(root).compactMap { view -> [String: Any]? in
         guard let section = view as? InspectorSection else { return nil }
@@ -967,8 +967,9 @@ def submenu(menu, *titles):
 
 
 def motion_section(panes):
-    """The section that holds the Motion run — named by what it holds, since
-    `InspectorSection.id` is private."""
+    """The section that holds the Motion run — named by what it holds, as it
+    always was (`InspectorSection.id` has been readable since road map 9's
+    phase 2)."""
     run = ["In", "In Duration", "Out", "Out Duration", "During", "Amount", "Period"]
     for pane in panes:
         if pane["labels"] == run:
@@ -1426,8 +1427,10 @@ def main():
           and "In" in different["note"]["text"])
     action = answer["zeroAction"]
     action_clip = json.loads(action["project"])["clips"][0]
+    # Road map 9's phase 3a (2026-09-23) replaced Motion presets' own note
+    # with the section's ⊘ note, which says the same: edits land on the clip.
     check("zero In inside an action keeps the base-props note and writes base Duration",
-          any("Motion belongs to the clip" in text for text in action["notes"])
+          any("Actions don't animate this" in text for text in action["notes"])
           and not action["inactive"]["hidden"]
           and action_clip["video"]["motion"]["in"]["duration"] == 160_000
           and all("motion" not in a["end"].get("video", {}) for a in action_clip["actions"]))

@@ -165,7 +165,9 @@ final class VideoPane: InspectorPaneView {
                 // discrete value does — and `structural`'s own doc already
                 // settles the identical case for a filter's `kind`. Keep that
                 // function about LENGTH alone.
-                inspectorRow("Blend", [blend], mixed: { binding.mixedVideo { $0.blend } }),
+                inspectorRow(
+                    "Blend", [blend], mixed: { binding.mixedVideo { $0.blend } }, binding: binding,
+                    writes: binding.ops(video: VideoPatch(blend: binding.videoProps.blend))),
                 inspectorButtonRow([
                     OptionButtonControl(
                         title: "Fit to Canvas",
@@ -682,7 +684,7 @@ final class VideoPane: InspectorPaneView {
                     binding.mixedVideo { props in
                         props.filters.indices.contains(index) ? props.filters[index].kind : nil
                     }
-                })
+                }, binding: binding, writes: ops(writeList()))
         }
 
         var rows: [NSView] = []
@@ -1106,7 +1108,8 @@ final class VideoPane: InspectorPaneView {
             rows.append(
                 inspectorRow(
                     "Region \(index + 1)", [kind, remove],
-                    mixed: { mixedAt(index) { $0.kind } }))
+                    mixed: { mixedAt(index) { $0.kind } },
+                    binding: binding, writes: edited(index)))
             rows.append(
                 inspectorPopupRow(
                     "Shape", binding, name: "Obscure Shape",
@@ -1142,7 +1145,8 @@ final class VideoPane: InspectorPaneView {
                             index, name: "Obscure Center", min: -20000, max: 20000,
                             read: { $0.y }, write: { i, value in edited(i, y: value) }),
                     ],
-                    mixed: { mixedAt(index) { $0.x } || mixedAt(index) { $0.y } }))
+                    mixed: { mixedAt(index) { $0.x } || mixedAt(index) { $0.y } },
+                    binding: binding, writes: edited(index, x: writeAt(index)?.x)))
             // The core takes width and height as strictly greater than zero
             // (`above`, not `at_least`), exactly as it does the spotlight's:
             // a region with no area hides nothing and cannot be grabbed back,
@@ -1160,7 +1164,8 @@ final class VideoPane: InspectorPaneView {
                             quick: [68, 135, 270, 540], read: { $0.height },
                             write: { i, value in edited(i, height: value) }),
                     ],
-                    mixed: { mixedAt(index) { $0.width } || mixedAt(index) { $0.height } }))
+                    mixed: { mixedAt(index) { $0.width } || mixedAt(index) { $0.height } },
+                    binding: binding, writes: edited(index, width: writeAt(index)?.width)))
         }
         if count == 0 {
             rows.append(inspectorRow(nil, [InspectorRowLabel("No obscured regions.")]))
