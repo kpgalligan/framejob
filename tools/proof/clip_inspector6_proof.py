@@ -7,6 +7,7 @@ the three open nits.
     python3 tools/proof/clip_inspector6_proof.py
     python3 tools/proof/clip_inspector6_proof.py --mutant target
     python3 tools/proof/clip_inspector6_proof.py --mutant live
+    python3 tools/proof/clip_inspector6_proof.py --mutant push
 
 Two instruments, `clip_inspector4_proof.py`'s shape:
 
@@ -44,6 +45,11 @@ under a mutant: it is the tree's binary, not the copy's.
   instead of the target captured at mouse-down. Exactly the capture row
   fails: the drag's tick keys action 4's end once the playhead has scrubbed
   into its span.
+* `push`: `canvasPlayheadMoved` never writes `editTarget`. The scrub row and
+  the capture row fail — the capture row asserts the live target became
+  action 4 (`clip_inspector6_probe.swift:381`), which is the push's doing;
+  the `live` mutant's row holds under `target` and fails alone under `live`,
+  as before.
 """
 
 import json
@@ -71,6 +77,13 @@ PORT = 4851
 TICKS = e2.TICKS
 SIX = 6 * TICKS
 
+SCRUB_ROW = ("K1 scrubbing the playhead into action 4's span selects it and a nudge keys its "
+             "END x 100 → 110 (base 0); scrubbed back out, a nudge keys it again 110 → 120 "
+             "(base 0)")
+CAPTURE_ROW = ("K1 a move begun with no action selected and held while the playhead scrubs "
+               "into action 4's span (the live editTarget becomes action 4) writes the BASE x "
+               "0 → 10 and leaves its end x at 100 — the target captured at mouse-down")
+
 MUTANTS = {
     "target": {
         "file": "CanvasEditTarget.swift",
@@ -88,8 +101,7 @@ MUTANTS = {
             "0); with none the BASE x goes 0 → 10 (end 110)",
             # Added 2026-09-24 (phase 5 review, finding 2): the playhead's entry rule is a
             # routing row.
-            "K1 scrubbing the playhead into action 4's span selects it and a nudge keys its END "
-            "x 100 → 110 (base 0); scrubbed back out, a nudge keys it again 110 → 120 (base 0)",
+            SCRUB_ROW,
         ],
         "note": "CanvasEditTarget.op(video:clip:) answers .setVideo always",
     },
@@ -99,12 +111,17 @@ MUTANTS = {
         "anchor": "    private(set) var gestureTarget = CanvasEditTarget.base\n",
         "replacement": ("    // mutant: the gesture reads the LIVE target on every tick\n"
                         "    var gestureTarget: CanvasEditTarget { get { editTarget } set {} }\n"),
-        "expected": [
-            "K1 a move begun with no action selected and held while the playhead scrubs into "
-            "action 4's span (the live editTarget becomes action 4) writes the BASE x 0 → 10 "
-            "and leaves its end x at 100 — the target captured at mouse-down",
-        ],
+        "expected": [CAPTURE_ROW],
         "note": "PreviewCanvasView.gestureTarget reads the LIVE editTarget",
+    },
+    "push": {
+        "file": "EditorViewController+Canvas.swift",
+        "anchor": ("        let target = CanvasEditTarget.current(document)\n"
+                   "        if canvas.editTarget != target { canvas.editTarget = target }\n"),
+        "replacement": ("        // mutant: the playhead's entry rule never reaches the canvas\n"
+                        "        _ = (document, canvas)\n"),
+        "expected": [SCRUB_ROW, CAPTURE_ROW],
+        "note": "canvasPlayheadMoved never writes editTarget",
     },
 }
 PROBE_COUNTS = {"K1": 9, "K2": 3, "K4": 2, "K5": 1, "K6": 2}

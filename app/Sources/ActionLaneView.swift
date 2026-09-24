@@ -244,10 +244,10 @@ final class ActionLaneView: NSView, OptionControl {
             invalidateIntrinsicContentSize()
         }
         needsDisplay = true
-        let clip = clip
+        let shown = clip  // one snapshot lookup for the two reads below
         let key = (
-            clip: clipID, bands: (clip?.actions ?? []).map { ($0.id, $0.start, $0.duration) },
-            frame: binding.canvas.fps.frameDuration, length: clip?.duration ?? 0)
+            clip: clipID, bands: (shown?.actions ?? []).map { ($0.id, $0.start, $0.duration) },
+            frame: binding.canvas.fps.frameDuration, length: shown?.duration ?? 0)
         if let old = cursorKey, old.clip == key.clip, old.frame == key.frame,
            old.length == key.length, old.bands.elementsEqual(key.bands, by: ==) { return }
         cursorKey = key

@@ -994,14 +994,57 @@ pass fixes both:
   `clip_inspector6_probe.swift` 481 → **532**, `clip_inspector6_proof.py`
   345 → **373**.
 
+**The open-work pass (2026-09-24).** It closes the four Owed items above
+that were not a person's:
+- **`phase6_proof.py`'s stale `VERSION`.** The script now reads
+  `RC_FORMAT_VERSION` off the tree's own header
+  (`core/include/reelcut_core.h`) at import, through `format_version()`,
+  instead of carrying a copy that went stale twice (6 → 8 → 9). Its check
+  reads "the saved project.json is version 9, the header's
+  RC_FORMAT_VERSION", so the claim is that the BUILT app saves what the
+  header names, and a stale build fails it. Made to fail on purpose with
+  `VERSION = format_version() - 1` on a fresh instance on port 4823:
+  exactly "the saved project.json is version 8, the header's
+  RC_FORMAT_VERSION" failed, **167/168**; reverted, **168/168** (4823).
+- **Review 2's nit 5, the `push` mutant.** `clip_inspector6_proof.py`
+  gains `--mutant push`: a copy whose `canvasPlayheadMoved` never writes
+  `editTarget`. It exits 0 with exactly **two** rows failing, the scrub row
+  and the capture row, and not one. The scrub row fails because the canvas
+  never hears the action the entry rule selects (detail: `selected nil →
+  4; inside: end 100.0, base 10.0`). The capture row fails because it
+  asserts `live == selected` (`clip_inspector6_probe.swift:381`), that the
+  live target BECAME action 4, which is the push's doing: `setPlayhead`
+  reaches the canvas only through `canvasPlayheadMoved`, and
+  `syncSelectedAction` fires no `viewStateDidChange`. The mutant's anchor
+  is the push's two lines, not the `guard`, which `refreshCanvas` shares.
+  The two row names are now the constants `SCRUB_ROW` and `CAPTURE_ROW`,
+  which `target` and `live` reference. `--mutant target` still exits 0 with
+  its four rows and `--mutant live` with its one; the plain run is
+  **25/25** (K1 ×9; port 4851).
+- **Review 2's nit 6.** `ActionLaneView.refresh()`'s local is `shown`, with
+  a comment saying why it exists: `clip` is a computed linear search over
+  the snapshot, and the local runs it once for the two reads.
+- **Remaining §5 and the documents.** Remaining §5 records road map 9 as
+  COMPLETE with nothing scheduled next, names §4's person checks and §6's
+  not-built handoff items, and says the deviations stand. The root
+  `CLAUDE.md` row for this document now names all five phases (phase 3 as 3a and 3b) and their
+  sections. `tools/proof/README.md`'s phase-5 entry names `--mutant push`.
+
+Scores: `make typecheck` 0 errors, 7 warnings (the baseline); `make app`
+succeeds; `clip_inspector6_proof.py` **25/25** (4851), `--mutant push`,
+`target` and `live` each exit 0; `phase6_proof.py` **168/168** (4823, a
+fresh instance, no `Reelcut: ` line in its log). Sizes (`wc -l`, remaining
+§3): `ActionLaneView.swift` 375 → **375**, and the instruments, exempt,
+`clip_inspector6_proof.py` 373 → **390**, `phase6_proof.py` 1783 →
+**1794**.
+
+A finding, not fixed or run here: two sibling proofs carry the same stale
+copy. `e1_proof.py:89` has `VERSION = 8` against its own save check
+(l.719); it was last scored 99/99 before W1b (remaining §4 l.938,
+2026-09-20). `phase8_proof.py:202` has the same `VERSION = 8` against its
+checks at l.930 and l.953, and no document dates a score for it (remaining
+§4 l.895 says only what it proves).
+
 **Owed.**
 - A person feels the canvas in the mode, the width drag, the keyed-off
   switches and the collapse with Reduce Motion on and off (remaining §4).
-- `phase6_proof.py`'s stale `VERSION`.
-- Remaining §5 still names phases 4 and 5 as next work; that was outside
-  this phase's list.
-- Review 2's nit 5: no mutant removes the `canvasPlayheadMoved` push by
-  itself. The scrub row fails under `--mutant target` only because of
-  `op(video:)`.
-- Review 2's nit 6: `ActionLaneView.swift:247` has a `let clip = clip`
-  local.

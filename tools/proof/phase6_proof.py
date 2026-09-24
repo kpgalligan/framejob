@@ -211,9 +211,20 @@ CANVAS = (640, 360)
 TOOLS = 73
 
 # What this build writes. An older file must still OPEN — that is
-# `core/tests/schema_v6.rs`'s claim — but what THIS build saves is version 6,
-# and that number moves with every bump.
-VERSION = 8
+# `core/tests/schema_v6.rs`'s claim — but what THIS build saves is the
+# version the tree's own header names, read at import: the claim is that the
+# BUILT app saves what the header says, so a stale build fails it.
+HEADER = os.path.join(HERE, "..", "..", "core", "include", "reelcut_core.h")
+
+
+def format_version():
+    """`RC_FORMAT_VERSION` off the tree's own header, not a copy: the copy went stale twice (6 → 8 → 9)."""
+    with open(HEADER) as f:
+        text = f.read()
+    return int(re.search(r"#define RC_FORMAT_VERSION (\d+)", text).group(1))
+
+
+VERSION = format_version()
 
 # The one lossless card section 8 decodes, written per run. **It is not the
 # `qtrle` line `README.md` gives**, and the substitution is measured rather
@@ -1721,7 +1732,7 @@ def catalog_part(mcp):
     s.op("set_video", clips=[clip], patch={"blend": "screen"})
     text = s.save()
     check(re.search(r'"version"\s*:\s*(\d+)', text).group(1) == str(VERSION),
-          f"the saved project.json is version {VERSION}")
+          f"the saved project.json is version {VERSION}, the header's RC_FORMAT_VERSION")
     # Read off the WRITTEN TEXT, because a parsed value sorts its keys and
     # the claim is about ORDER: an appended key lands at the END and never in
     # the middle, which is the whole of what the append-only rule rests on.

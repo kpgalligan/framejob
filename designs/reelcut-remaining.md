@@ -707,7 +707,10 @@ Inside their caps: `ActionLaneView.swift` 364 → **375** (the cursor key),
 its doc comment, four one-line captures in the `begin*` methods, four reads
 swapped in `continueGesture` — and `CanvasEditTarget.swift` 89 → **92** (its
 header), with the instruments, exempt, `clip_inspector6_probe.swift` 481 →
-**532** and `clip_inspector6_proof.py` 345 → **373**.
+**532** and `clip_inspector6_proof.py` 345 → **373**. The open-work pass
+(road map 9 §12): `ActionLaneView.swift` 375 → **375**, and the
+instruments, exempt, `clip_inspector6_proof.py` 373 → **390**,
+`phase6_proof.py` 1783 → **1794**.
 
 ## 4. What only a person at the machine can check
 
@@ -1152,21 +1155,28 @@ and the closing above added the rest.
 
 ## 5. Where a third road map would start
 
-**Road map 9, the clip inspector redesign, has its phases 1, 2, 3a and 3b
-BUILT (2026-09-23; road map 9 §2, §4, §6 and §8).** The selected action is
-the sixth piece of view state (spec §11 CI-1 to CI-4): the timeline and the
-Clip tab's action lane highlight it, the inspector's fields show and write
-its END state, esc and the Clip chip leave it, ⌫ removes it. The Clip tab is
-sub-tabs by kind under a block pinned above the scroll view (CI-5), with
-`◆N` key counts and the block knob (CI-6); its rows carry marks (3a, CI-7,
-CI-8); and Reset shows only when a section differs, Clear takes a
-section's keys out of the selected action, a keyed row's ◆ is a × on
-hover, every row has a context menu, and a person's refusal is shown at
-the inspector's foot (3b, CI-9, CI-10). **Next work starts at road map 9
-§0's phases 4 and 5** — band drags on the lane and the timeline (4), canvas
-drags following the mode, keyed-off switches, `mixed` on sub-rows and
-Reduce Motion (5) — and at §2's, §4's, §6's and §8's deviations and owed
-items.
+**Road map 9, the clip inspector redesign, is COMPLETE (phases 1, 2, 3a
+and 3b 2026-09-23, phases 4 and 5 2026-09-24; road map 9 §2, §4, §6, §8,
+§10 and §12).** The selected action is the sixth piece of view state (spec
+§11 CI-1 to CI-4): the timeline and the Clip tab's action lane highlight it,
+the inspector's fields show and write its END state, esc and the Clip chip
+leave it, ⌫ removes it. The Clip tab is sub-tabs by kind under a block
+pinned above the scroll view (CI-5), with `◆N` key counts and the block knob
+(CI-6); its rows carry marks (3a, CI-7, CI-8); and Reset shows only when a
+section differs, Clear takes a section's keys out of the selected action, a
+keyed row's ◆ is a × on hover, every row has a context menu, and a person's
+refusal is shown at the inspector's foot (3b, CI-9, CI-10). A band is
+dragged in the lane and on the timeline with the HUD and the ghost, and the
+lane carries the hatch, fades and wedges (4, CI-11, CI-12); the canvas's
+handles follow the mode, a switch inside an action keys the property off,
+every sub-row carries `mixed` and the collapse honours Reduce Motion (5,
+CI-13 to CI-15). **Nothing in it is scheduled next.** What is left of it is
+a person's — §4's checks per phase — and the handoff items road map 9 §6
+lists as not built (the 64 pt label, the dashed ⊘ border, the boxed "clip"
+tag, a "now" readout on ○ and on colour and popup rows, a keyed border on
+colour wells, `DS.textDim`, hover states, the 8/10 body padding; Reduce
+Motion is built), each a decision to take up rather than a phase owed, and
+the deviations each record keeps, which stand.
 
 **Road map 8, word captions, is BUILT (2026-09-23; road map 8 §10, W0 to
 W4b).** Both engines page a run's words into width-measured, word-timed
