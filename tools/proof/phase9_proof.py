@@ -161,6 +161,20 @@ UNUSED_MEDIA = os.path.join(HERE, "media", "A.mov")
 SPARE_MEDIA = os.path.join(HERE, "media", "B.mov")
 
 SEC = 600_000
+HEADER = os.path.join(HERE, "..", "..", "core", "include", "reelcut_core.h")
+
+
+def format_version():
+    """`RC_FORMAT_VERSION` off the tree's own header, not a copy: a copy goes stale at every bump."""
+    with open(HEADER) as f:
+        text = f.read()
+    match = re.search(r"#define RC_FORMAT_VERSION (\d+)", text)
+    if match is None:
+        raise RuntimeError(f"{HEADER} has no `#define RC_FORMAT_VERSION <n>` line")
+    return int(match.group(1))
+
+
+CURRENT_VERSION = format_version()
 
 # The whole catalog after phase 9: phase 7's 73 plus `set_scope`, which is
 # not an op — view state like `set_playhead`, `set_range` and
@@ -1460,7 +1474,7 @@ def versions_part(mcp):
     old_nest = {"id": 4, "track": 2, "start": 2 * SEC, "duration": 2 * SEC,
                 "source": {"kind": "nest", "project": "/gone/Old Group.reelcut"},
                 "video": {}}
-    for version in (1, 2, 3, 4, 5, 6, 7, 8, 9):
+    for version in range(1, CURRENT_VERSION + 1):
         extra = (old_nest,) if version == 1 else ()
         try:
             mcp.call_with("open_project", {"path": package(version, extra)})
@@ -1468,10 +1482,10 @@ def versions_part(mcp):
             check(False, f"a version-{version} file opens in the built app ({error})")
             continue
         reported = project(mcp)
-        check(reported["version"] == 9 and reported["clips"][0]["text"]["content"]
-              == f"v{version}",
-              f"a version-{version} file opens in the built app and is stamped 9 in "
-              f"memory, its content intact")
+        check(reported["version"] == CURRENT_VERSION
+              and reported["clips"][0]["text"]["content"] == f"v{version}",
+              f"a version-{version} file opens in the built app and is stamped "
+              f"{CURRENT_VERSION} in memory, its content intact")
 
     # The migrated nest is the interesting one: version 1's path string is
     # now a real Nest, and phase 9 can scope into it.
@@ -1492,12 +1506,13 @@ def versions_part(mcp):
           "…and edit in it, which is the one thing a project rescued from version 1 could "
           "never have had done to it before")
 
-    # ONE PAST the current version, and it moves with every bump — the trap
-    # `core/CLAUDE.md` records: the moment RC_FORMAT_VERSION reaches the
-    # number written here this stops testing the gate and starts testing
-    # that a current file opens, green either way.
-    future = refusal(mcp, "open_project", {"path": package(10)})
-    check(future is not None and "version 10 is newer than this build understands" in future,
+    # ONE PAST the current version, read off the header so it moves with
+    # every bump by itself (the trap `core/CLAUDE.md` records was a literal
+    # here that had to be walked forward by hand).
+    past = CURRENT_VERSION + 1
+    future = refusal(mcp, "open_project", {"path": package(past)})
+    check(future is not None
+          and f"version {past} is newer than this build understands" in future,
           f"and a file one version PAST the current one is still refused at the door: "
           f"{future!r}")
 

@@ -58,6 +58,20 @@ MEDIA = os.path.join(HERE, "media")
 WORK = os.path.join(HERE, "work")
 
 SEC = 600_000
+HEADER = os.path.join(HERE, "..", "..", "core", "include", "reelcut_core.h")
+
+
+def format_version():
+    """`RC_FORMAT_VERSION` off the tree's own header, not a copy: a copy goes stale at every bump."""
+    with open(HEADER) as f:
+        text = f.read()
+    match = re.search(r"#define RC_FORMAT_VERSION (\d+)", text)
+    if match is None:
+        raise RuntimeError(f"{HEADER} has no `#define RC_FORMAT_VERSION <n>` line")
+    return int(match.group(1))
+
+
+CURRENT_VERSION = format_version()
 # One peaks bucket, in ticks: `ReelTime.perSecond / MediaImporter.peakBucketsPerSecond`
 # (`MediaPeaks.bucketTicks`). The detector's resolution, and the tolerance
 # CONTRACT §6 allows a detected span.
@@ -1319,8 +1333,8 @@ def schema_part(mcp):
         text = handle.read()
     root = json.loads(text)
     check(
-        root["version"] == 9,
-        f"the saved project.json is version 9 (got {root['version']})",
+        root["version"] == CURRENT_VERSION,
+        f"the saved project.json is version {CURRENT_VERSION} (got {root['version']})",
     )
     # Version 4 put `obscure` last and this check pinned it there. Version 6
     # appended `blend` after it and version 8 `motion` after that, each
@@ -1362,7 +1376,8 @@ def schema_part(mcp):
     )
     v3 = Session(mcp, "obscure-v3", open_from=fixture)
     project = v3.project()
-    check(project["version"] == 9, "a version-3 file opens and reports version 9")
+    check(project["version"] == CURRENT_VERSION,
+          f"a version-3 file opens and reports version {CURRENT_VERSION}")
     check(
         all(c["video"]["obscure"] == [] for c in project["clips"] if c["video"]),
         "and every clip reads an EMPTY region list",

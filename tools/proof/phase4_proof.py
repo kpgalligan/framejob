@@ -75,6 +75,20 @@ MEDIA = os.path.join(HERE, "media")
 WORK = os.path.join(HERE, "work")
 
 SEC = 600_000
+HEADER = os.path.join(HERE, "..", "..", "core", "include", "reelcut_core.h")
+
+
+def format_version():
+    """`RC_FORMAT_VERSION` off the tree's own header, not a copy: a copy goes stale at every bump."""
+    with open(HEADER) as f:
+        text = f.read()
+    match = re.search(r"#define RC_FORMAT_VERSION (\d+)", text)
+    if match is None:
+        raise RuntimeError(f"{HEADER} has no `#define RC_FORMAT_VERSION <n>` line")
+    return int(match.group(1))
+
+
+CURRENT_VERSION = format_version()
 CANVAS = (640, 360)
 
 # The whole catalog after phase 4: 53 ops (`core/src/edit.rs`'s OP_NAMES) plus
@@ -1058,7 +1072,8 @@ def schema_part(mcp, session):
     with open(os.path.join(session.path, "project.json"), encoding="utf-8") as handle:
         text = handle.read()
     root = json.loads(text)
-    check(root["version"] == 9, f"the saved project.json is version 9 (got {root['version']})")
+    check(root["version"] == CURRENT_VERSION,
+          f"the saved project.json is version {CURRENT_VERSION} (got {root['version']})")
     check(
         all(list(c["text"].keys())[-4:] == ["animation", "case", "words", "word_style"]
             for c in root["clips"] if c["text"]),
@@ -1088,7 +1103,8 @@ def schema_part(mcp, session):
     )
     v4 = Session(mcp, "textanim-v4", open_from=fixture)
     project = v4.project()
-    check(project["version"] == 9, "a version-4 file opens and reports version 9")
+    check(project["version"] == CURRENT_VERSION,
+          f"a version-4 file opens and reports version {CURRENT_VERSION}")
     check(
         all(c["text"]["animation"] is None for c in project["clips"] if c["text"]),
         "and every text clip reads a NULL animation",

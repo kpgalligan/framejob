@@ -71,10 +71,23 @@ SEC = 600_000
 FRAME = 20_000
 CANVAS = (640, 360)
 VERSION = 8
+HEADER = os.path.join(ROOT, "core", "include", "reelcut_core.h")
+
+
+def format_version():
+    """`RC_FORMAT_VERSION` off the tree's own header, not a copy: a copy goes stale at every bump."""
+    with open(HEADER) as f:
+        text = f.read()
+    match = re.search(r"#define RC_FORMAT_VERSION (\d+)", text)
+    if match is None:
+        raise RuntimeError(f"{HEADER} has no `#define RC_FORMAT_VERSION <n>` line")
+    return int(match.group(1))
+
+
 # What a save writes: the CURRENT format version, which moved past E2's own
 # when road map 8's W1b bumped it to 9. `VERSION` stays E2's, because the
 # hand-written fixtures below are version-8 files on purpose.
-CURRENT_VERSION = 9
+CURRENT_VERSION = format_version()
 
 # Floors, not exact counts: since road map 7's D3 the exact numbers belong to
 # `op_argument_proof.py` (tools/proof/README.md's handover rule).

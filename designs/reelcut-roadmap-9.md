@@ -1071,6 +1071,28 @@ that project writes version 8, the header's RC_FORMAT_VERSION (found
 deliberate, l.74–76) and `phase9_proof.py:1499`'s `package(10)` ("one
 past current", whose comment at l.1495–1498 already names the trap).
 
+**The last literals (2026-09-24).** Those two, and three more a sweep
+found, now read the header too:
+- `e2_proof.py`: `CURRENT_VERSION = format_version()`.
+- `phase9_proof.py`: `CURRENT_VERSION = format_version()`. Its "one past"
+  fixture is `package(CURRENT_VERSION + 1)`. Its every-version loop, which
+  hard-coded 1 to 9 and so would have left a new version unopened, is
+  `range(1, CURRENT_VERSION + 1)`, and its "stamped 9 in memory" check now
+  uses the current version too.
+- `phase2_proof.py`, `phase3_proof.py` and `phase4_proof.py`: their
+  `== 9` save and open checks.
+
+`core/CLAUDE.md`'s format-changes rule now says a proof never writes the
+current version as a literal, and phase 9 has left its trap list. The
+results were measured on fresh instances after a fresh `make app`, and
+none of the logs has a parity complaint:
+- phase2 **86/86**, phase3 **123/123**, phase4 **83/83**, phase9
+  **217/217**, e2 **69/69**.
+- With `CURRENT_VERSION = format_version() - 1`, each fails only its
+  version rows: phase2 on its 4 (the byte-copy reopen row included), phase3
+  and phase4 on 2 each, phase9 on its 8 stamped rows and the "one past"
+  refusal (the version-9 file now opens), and e2 on its 1. Reverted.
+
 **Owed.**
 - A person feels the canvas in the mode, the width drag, the keyed-off
   switches and the collapse with Reduce Motion on and off (remaining §4).

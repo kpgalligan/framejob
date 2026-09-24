@@ -455,11 +455,18 @@ SHAPE adds a step at the migration hook (`migrate_1_to_2`). Each bump gets a
 `schema_vN.rs` test that opens the previous versions' fixtures and reads the
 new keys' ORDER off the written text, since a parsed `Value` sorts them.
 **Trap:** the "one past the current version, refuse" fixtures in
-`core/tests/schema_v3.rs`, `core/tests/model_tests.rs` and
-`tools/proof/phase9_proof.py` must be walked forward with every bump, or they
-stop testing the gate and pass either way; each says "one past the current
-version" in its comment rather than a number, and `schema_v4.rs`'s claim
-about which key closes the video object travels to the newest key.
+`core/tests/schema_v3.rs` and `core/tests/model_tests.rs` must be walked
+forward with every bump, or they stop testing the gate and pass either way;
+each says "one past the current version" in its comment rather than a
+number, and `schema_v4.rs`'s claim about which key closes the video object
+travels to the newest key. **A proof script never writes the current
+version as a literal:** `tools/proof/*_proof.py` read `RC_FORMAT_VERSION`
+off the header through a `format_version()` helper (`e1`, `e2`, `phase2`,
+`phase3`, `phase4`, `phase6`, `phase8` and `phase9` do, and `phase9`'s
+"one past" fixture is `format_version() + 1`), so a bump needs no proof
+edit, and a proof that expects a literal fails weeks later in someone
+else's session with nothing pointing at the bump. A script's own FIXTURE
+version (`e2_proof.py`'s `VERSION = 8`) is a literal on purpose.
 
 **Tests.** All tests are black-box in `core/tests/` (no `#[cfg(test)]` in
 `src/`), exercised **through the FFI** wherever possible, and verified
