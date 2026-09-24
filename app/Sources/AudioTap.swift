@@ -81,10 +81,10 @@ struct AudioTrackDSP: Equatable {
     /// mid-programme.
     let usesNoiseReduction: Bool
 
-    init(planTrack: PlanTrack, parameters: AudioDSPParameters) {
+    init(segments: [PlanSegment], parameters: AudioDSPParameters) {
         var spans: [AudioDSPSpan] = []
-        spans.reserveCapacity(planTrack.segments.count)
-        for segment in planTrack.segments where segment.duration > 0 {
+        spans.reserveCapacity(segments.count)
+        for segment in segments where segment.duration > 0 {
             let dsp = parameters.dsp(for: segment.clip)
             guard !dsp.isInert else { continue }
             spans.append(

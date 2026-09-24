@@ -90,8 +90,8 @@ enum CompositionBuilder {
         for planTrack in plan.videoTracks {
             let track = try makeTrack(in: composition, mediaType: .video, id: planTrack.id)
             try fill(
-                track, from: planTrack, mediaType: .video, urls: urls, reverse: reverse,
-                assets: &assets, reversedAssets: &reversedAssets)
+                track, segments: planTrack.segments, mediaType: .video, urls: urls,
+                reverse: reverse, assets: &assets, reversedAssets: &reversedAssets)
         }
 
         try addPlaceholderIfNeeded(to: composition, plan: plan)
@@ -102,25 +102,9 @@ enum CompositionBuilder {
         // change to them as structural and rebuilds, exactly as it already
         // does for a volume change — volume IS in the plan, as ramps.
         let dsp = AudioDSPSource.shared.parameters(for: recipeKey)
-        var inputParameters: [AVAudioMixInputParameters] = []
-        var meters: [LevelMeterTrack] = []
-        for planTrack in plan.audioTracks {
-            let track = try makeTrack(in: composition, mediaType: .audio, id: planTrack.id)
-            try fill(
-                track, from: planTrack, mediaType: .audio, urls: urls, reverse: reverse,
-                assets: &assets, reversedAssets: &reversedAssets)
-            let sink = metering ? LevelMeterSink() : nil
-            if let sink = sink {
-                meters.append(
-                    LevelMeterTrack(id: planTrack.id, ramps: planTrack.ramps, sink: sink))
-            }
-            inputParameters.append(
-                audioParameters(
-                    for: track, plan: planTrack,
-                    dsp: dsp.isEmpty
-                        ? nil : AudioTrackDSP(planTrack: planTrack, parameters: dsp),
-                    meter: sink))
-        }
+        let (inputParameters, meters) = try addAudioTracks(
+            to: composition, plan: plan, urls: urls, reverse: reverse, dsp: dsp,
+            metering: metering, assets: &assets, reversedAssets: &reversedAssets)
 
         // Source orientation is read once per media and then attached per
         // instruction, so the compositor can turn a rotated source's sampling
@@ -194,8 +178,8 @@ enum CompositionBuilder {
         else { return }
         let asset = AVURLAsset(url: url)
         guard let source = firstTrack(of: asset, mediaType: .video) else { return }
-        let id = (plan.audioTracks.map(\.id).max() ?? 0) + 1
-        let track = try makeTrack(in: composition, mediaType: .video, id: id)
+        let track = try makeTrack(
+            in: composition, mediaType: .video, id: placeholderTrackID(plan))
         let frame = CMTimeRange(start: .zero, duration: timeRange(of: source).duration)
         try track.insertTimeRange(frame, of: source, at: .zero)
         track.scaleTimeRange(
@@ -210,7 +194,7 @@ enum CompositionBuilder {
     /// different one. The recipe names its sources by that id (§7.2), so a
     /// silently renumbered track would render an empty canvas with no error
     /// anywhere — the failure this check exists to make loud.
-    private static func makeTrack(
+    static func makeTrack(
         in composition: AVMutableComposition, mediaType: AVMediaType, id: Int
     ) throws -> AVMutableCompositionTrack {
         let requested = CMPersistentTrackID(id)
@@ -260,13 +244,13 @@ enum CompositionBuilder {
     /// stretched over the rest — §7.2's freeze idiom inside one segment,
     /// BEFORE the speed step below, which scales the `sourceDuration` it
     /// always did. Video only; a covered range takes the one insert it always took.
-    private static func fill(
-        _ track: AVMutableCompositionTrack, from planTrack: PlanTrack, mediaType: AVMediaType,
+    static func fill(
+        _ track: AVMutableCompositionTrack, segments: [PlanSegment], mediaType: AVMediaType,
         urls: [UInt32: URL], reverse: ReverseResolution, assets: inout [UInt32: AVURLAsset],
         reversedAssets: inout [UInt32: AVURLAsset]
     ) throws {
         var cursor: Ticks = 0
-        for segment in planTrack.segments {
+        for segment in segments {
             if segment.start > cursor {
                 track.insertEmptyTimeRange(
                     CMTimeRange(start: time(cursor), duration: time(segment.start - cursor)))
@@ -274,18 +258,10 @@ enum CompositionBuilder {
             }
             guard segment.duration > 0 else { continue }
 
-            let source: AVAssetTrack?
-            if let reversed = reverse.ready[segment.clip] {
-                source = assetTrack(
-                    at: reversed, key: segment.media, mediaType: mediaType,
-                    assets: &reversedAssets)
-            } else if reverse.pending.contains(segment.clip) {
-                source = nil
-            } else {
-                source = sourceTrack(
-                    for: segment.media, mediaType: mediaType, urls: urls, assets: &assets)
-            }
-            guard let source = source else {
+            guard let source = resolveSource(
+                for: segment, mediaType: mediaType, urls: urls, reverse: reverse,
+                assets: &assets, reversedAssets: &reversedAssets)
+            else {
                 // Missing media, unreadable media, or a reverse that has not
                 // been rendered: hold the place with empty time so every later
                 // segment keeps its timeline position, and let the compositor
@@ -329,7 +305,7 @@ enum CompositionBuilder {
 
     /// The asset track a segment reads from, cached per media id so a clip
     /// split into twenty segments opens its file once.
-    private static func sourceTrack(
+    static func sourceTrack(
         for media: UInt32, mediaType: AVMediaType, urls: [UInt32: URL],
         assets: inout [UInt32: AVURLAsset]
     ) -> AVAssetTrack? {
@@ -341,7 +317,7 @@ enum CompositionBuilder {
     /// media id in every case; the caller keeps FORWARD and REVERSED assets in
     /// separate dictionaries, so the same movie can be open both ways at once
     /// without either eviction touching the other.
-    private static func assetTrack(
+    static func assetTrack(
         at url: URL, key: UInt32, mediaType: AVMediaType, assets: inout [UInt32: AVURLAsset]
     ) -> AVAssetTrack? {
         let asset: AVURLAsset
@@ -420,7 +396,7 @@ enum CompositionBuilder {
     }
 
     /// A property by key; nil, not an exception, for one the SDK dropped.
-    private static func keyed(_ track: AVAssetTrack, _ key: String) -> Any? {
+    static func keyed(_ track: AVAssetTrack, _ key: String) -> Any? {
         track.responds(to: NSSelectorFromString(key)) ? track.value(forKey: key) : nil
     }
 
@@ -548,12 +524,12 @@ enum CompositionBuilder {
     /// where possible" described something the API cannot do — and the plan
     /// carries no such flag either. A project that saved `mono: true` before
     /// this landed does now sound different, which is the feature.
-    private static func audioParameters(
-        for track: AVMutableCompositionTrack, plan: PlanTrack, dsp: AudioTrackDSP?,
-        meter: LevelMeterSink?
+    static func audioParameters(
+        for track: AVMutableCompositionTrack, segments: [PlanSegment], ramps: [PlanRamp]?,
+        dsp: AudioTrackDSP?, meter: LevelMeterSink?
     ) -> AVAudioMixInputParameters {
         let parameters = AVMutableAudioMixInputParameters(track: track)
-        if let pitch = plan.segments.compactMap({ $0.pitch }).first {
+        if let pitch = segments.compactMap({ $0.pitch }).first {
             switch pitch {
             case "spectral": parameters.audioTimePitchAlgorithm = .spectral
             case "off": parameters.audioTimePitchAlgorithm = .varispeed
@@ -561,7 +537,7 @@ enum CompositionBuilder {
             default: break
             }
         }
-        for ramp in plan.ramps ?? [] where ramp.duration > 0 {
+        for ramp in ramps ?? [] where ramp.duration > 0 {
             parameters.setVolumeRamp(
                 fromStartVolume: Float(ramp.from), toEndVolume: Float(ramp.to),
                 timeRange: CMTimeRange(start: time(ramp.start), duration: time(ramp.duration)))
