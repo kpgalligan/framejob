@@ -46,6 +46,23 @@ extension TimelineContentView {
         }?.id
     }
 
+    /// What a press at `point` grabs on the clip's action lane: a band's grip
+    /// (`.actionEdge`) or its body (`.action`), or nil off every band. The
+    /// band is `actionBandHit`'s, unchanged; the grip is asked of that band's
+    /// own rect (spec §11 CI-11).
+    func actionHit(_ clip: ClipSnapshot, rect: CGRect, at point: CGPoint) -> TimelineHit? {
+        guard let owner = timeline, let id = actionBandHit(clip, rect: rect, at: point),
+              let action = clip.actions.first(where: { $0.id == id })
+        else { return nil }
+        let lane = Self.actionLane(
+            content: Self.contentRect(rect), sizeIndex: owner.trackHeightIndex)
+        let band = Self.bandRect(action, clip: clip, lane: lane, layout: owner.layout)
+        if let edge = ActionBands.gripEdge(in: band, at: point.x) {
+            return .actionEdge(clip: clip.id, action: id, edge)
+        }
+        return .action(clip: clip.id, action: id)
+    }
+
     /// The selected span down the whole clip body: the action ink at 12 %
     /// with 1 pt ends at 55 %. Drawn before the name strip, so the strip
     /// still reads over it.
@@ -81,7 +98,9 @@ extension TimelineContentView {
                 number: index + 1,
                 label: ActionBands.keys(of: action.end).joined(separator: ", "),
                 curve: action.curve, zoom: ActionBands.isZoom(action),
-                selected: owner.selectedAction == action.id, level: level)
+                selected: owner.selectedAction == action.id,
+                hovered: owner.bandHover?.clip == clip.id && owner.bandHover?.action == action.id,
+                level: level)
         }
     }
 }

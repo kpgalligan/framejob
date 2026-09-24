@@ -782,7 +782,9 @@ extension AgentServer {
     }
 
     /// `set_action` — the Clip tab's action lane: the selected action's
-    /// Start, Length and Curve in its detail row.
+    /// Start, Length and Curve in its detail row, and dragging a band's body
+    /// (move) or its outer 5 pt (resize) in that lane or on the timeline's
+    /// action lane (spec §11 CI-11).
     func setAction(_ a: [String: Any]) throws -> String {
         let document = try target(a)
         let clip = try clipArg(a, "clip", document)

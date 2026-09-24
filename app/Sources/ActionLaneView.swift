@@ -11,20 +11,32 @@ import AppKit
 /// the selected action changes (the default `structureSignature` keys on
 /// `InspectorBinding.action(_:)`), so the ids captured here are the ones on
 /// screen, and every read goes fresh through them.
+///
+/// A band is dragged here as on the timeline (spec §11 CI-11,
+/// `ActionLaneView+Drag.swift`), and the well carries the clip's hatch, fades
+/// and wedges under the bands (CI-12, `ActionLaneDecor.swift`).
 final class ActionLaneView: NSView, OptionControl {
     static let headerRow: CGFloat = 18, laneRow: CGFloat = 28, detailRow: CGFloat = 22
     static let chipWidth: CGFloat = 40
-    private static let top: CGFloat = 8, bottom: CGFloat = 9, gap: CGFloat = 6
-    private static let side = InspectorMetrics.inset
+    static let top: CGFloat = 8
+    private static let bottom: CGFloat = 9, gap: CGFloat = 6
+    static let side = InspectorMetrics.inset
 
-    private let binding: InspectorBinding
+    let binding: InspectorBinding
     private weak var inspector: InspectorViewController?
     /// The single selected clip at build time; nil for a multi-selection.
-    private let clipID: UInt32?
+    let clipID: UInt32?
     /// The selected action at build time.
-    private let actionID: UInt32?
+    let actionID: UInt32?
     private let detail = NSView()
     private var controls: [any OptionControl] = []
+
+    /// The live band drag; nil for a zero-length band, which is never dragged.
+    var drag: ActionDragSession?
+    /// The band under the mouse-down — what `releaseBand` selects.
+    var pressed: UInt32?
+    /// The band under the pointer while nothing is pressed.
+    var hover: ActionBandHover? { didSet { if hover != oldValue { needsDisplay = true } } }
 
     init(binding: InspectorBinding, inspector: InspectorViewController?) {
         self.binding = binding
@@ -54,10 +66,10 @@ final class ActionLaneView: NSView, OptionControl {
 
     // MARK: Reads
 
-    private var clip: ClipSnapshot? { clipID.flatMap { binding.snapshot.clip($0) } }
+    var clip: ClipSnapshot? { clipID.flatMap { binding.snapshot.clip($0) } }
 
     /// The captured action, while it is still the selected one.
-    private var action: ActionSnapshot? {
+    var action: ActionSnapshot? {
         guard let id = actionID, binding.selectedAction?.id == id else { return nil }
         return clip?.actions.first { $0.id == id }
     }
@@ -69,7 +81,7 @@ final class ActionLaneView: NSView, OptionControl {
 
     // MARK: Geometry
 
-    private var laneTop: CGFloat { Self.top + Self.headerRow + Self.gap }
+    var laneTop: CGFloat { Self.top + Self.headerRow + Self.gap }
 
     var chipRect: CGRect {
         CGRect(x: Self.side, y: laneTop, width: Self.chipWidth, height: Self.laneRow)
@@ -181,8 +193,9 @@ final class ActionLaneView: NSView, OptionControl {
             },
             enabled: { true }, onEdit: { binding.edited() })
         duration.toolTip = "How long the action takes"
+        let glyph = CurveGlyphView(read: { current()?.curve ?? .linear })
         let curve = OptionPopupControl(
-            width: 70, choices: Curve.allCases.map { ($0.displayName, $0) },
+            width: 70, choices: Curve.allCases.map { ($0.laneName, $0) },
             read: { current()?.curve ?? .linear },
             write: { value in
                 binding.apply(
@@ -195,7 +208,7 @@ final class ActionLaneView: NSView, OptionControl {
             action: #selector(removePressed(_:)), size: NSSize(width: 22, height: 22),
             pointSize: 13)
         remove.target = self
-        let views: [NSView] = [start, duration, curve, remove]
+        let views: [NSView] = [start, duration, glyph, curve, remove]
         for view in views {
             view.translatesAutoresizingMaskIntoConstraints = false
             detail.addSubview(view)
@@ -205,11 +218,12 @@ final class ActionLaneView: NSView, OptionControl {
         NSLayoutConstraint.activate([
             start.leadingAnchor.constraint(equalTo: detail.leadingAnchor),
             duration.leadingAnchor.constraint(equalTo: start.trailingAnchor, constant: 5),
-            curve.leadingAnchor.constraint(equalTo: duration.trailingAnchor, constant: 5),
+            glyph.leadingAnchor.constraint(equalTo: duration.trailingAnchor, constant: 5),
+            curve.leadingAnchor.constraint(equalTo: glyph.trailingAnchor, constant: 3),
             curve.trailingAnchor.constraint(lessThanOrEqualTo: remove.leadingAnchor, constant: -5),
             remove.trailingAnchor.constraint(equalTo: detail.trailingAnchor),
         ])
-        controls = [start, duration, curve]
+        controls = [start, duration, glyph, curve]
     }
 
     @objc private func removePressed(_ sender: Any?) {
@@ -226,9 +240,10 @@ final class ActionLaneView: NSView, OptionControl {
             invalidateIntrinsicContentSize()
         }
         needsDisplay = true
+        window?.invalidateCursorRects(for: self)
     }
 
-    // MARK: Mouse
+    // MARK: Mouse — the bodies are `ActionLaneView+Drag.swift`'s
 
     override func mouseDown(with event: NSEvent) {
         guard clipID != nil else { return }
@@ -238,10 +253,23 @@ final class ActionLaneView: NSView, OptionControl {
             return
         }
         guard laneRect.contains(point) else { return }
-        if let hit = bandRects().first(where: { $0.rect.contains(point) }) {
-            binding.selectAction(hit.id)
-        }
+        _ = pressBand(at: point)
     }
+
+    override func mouseDragged(with event: NSEvent) {
+        dragBand(to: convert(event.locationInWindow, from: nil))
+    }
+
+    override func mouseUp(with event: NSEvent) { releaseBand() }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        installLaneTracking()
+    }
+
+    override func mouseMoved(with event: NSEvent) { hoverMoved(with: event) }
+    override func mouseExited(with event: NSEvent) { hoverExited() }
+    override func resetCursorRects() { addBandCursorRects() }
 
     // MARK: Drawing
 
@@ -267,6 +295,7 @@ final class ActionLaneView: NSView, OptionControl {
         lane.fill()
         DS.border.setStroke()
         NSBezierPath(rect: lane.insetBy(dx: 0.5, dy: 0.5)).stroke()
+        drawDecor(clip, in: lane)
         let ordered = ActionBands.ordered(clip)
         if ordered.isEmpty {
             TimelineDraw.label(
@@ -278,8 +307,10 @@ final class ActionLaneView: NSView, OptionControl {
             let a = ordered[index]
             ActionBands.draw(
                 band: band.rect, number: index + 1, label: nil, curve: a.curve,
-                zoom: ActionBands.isZoom(a), selected: a.id == action?.id, level: .number)
+                zoom: ActionBands.isZoom(a), selected: a.id == action?.id,
+                hovered: hover?.action == a.id, level: .number)
         }
+        drawDragOverlay()
         if clip.contains(binding.playhead), clip.duration > 0 {
             let fraction = CGFloat(clip.clipTime(binding.playhead)) / CGFloat(clip.duration)
             DS.playhead.setFill()
@@ -290,7 +321,10 @@ final class ActionLaneView: NSView, OptionControl {
         }
     }
 
+    /// ACTIONS, the count and "· editing N" — or nothing while a drag has
+    /// moved, when the HUD takes the text's place (`drawDragOverlay`).
     private func drawHeaderRow() {
+        guard drag?.didMove != true else { return }
         let row = CGRect(x: Self.side, y: Self.top, width: bounds.width, height: Self.headerRow)
         let title = DS.microLabel("Actions")
         let titleSize = title.size()

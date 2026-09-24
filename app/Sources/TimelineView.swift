@@ -145,6 +145,11 @@ final class TimelineView: NSView, NSTextFieldDelegate {
     var markerDrag: MarkerDragSession?
     var fadeDrag: FadeHandleSession?
     var trackDrag: TrackDragSession?
+    var actionDrag: ActionDragSession?
+    /// The band under the pointer (`TimelineActionDrag.swift`); nil while a drag is live.
+    var bandHover: ActionBandHover? {
+        didSet { if bandHover != oldValue { content.needsDisplay = true } }
+    }
 
     /// The handle a clip drag started from, kept because the live preview
     /// changes `snapshot` under the gesture (a previewed `add_track` restacks
@@ -653,6 +658,12 @@ final class TimelineView: NSView, NSTextFieldDelegate {
         case .action(let clip, let action):
             selectClip(clip, flags: [])
             onActionSelected?(clip, action)
+            beginActionDrag(clip: clip, action: action, mode: .move, at: point)
+
+        case .actionEdge(let clip, let action, let edge):
+            selectClip(clip, flags: [])
+            onActionSelected?(clip, action)
+            beginActionDrag(clip: clip, action: action, mode: .resize(edge), at: point)
 
         case .lane(let row, let time):
             // A double-click in empty lane space closes the gap it landed
@@ -725,6 +736,8 @@ final class TimelineView: NSView, NSTextFieldDelegate {
         } else if var session = trackDrag {
             session.update(row: layout.unclampedRow(atY: point.y))
             trackDrag = session
+        } else if actionDrag != nil {
+            continueActionDrag(at: point)
         }
         content.needsDisplay = true
     }
@@ -763,6 +776,8 @@ final class TimelineView: NSView, NSTextFieldDelegate {
             if let op = session.op, session.didMove {
                 onEdit?("Reorder Track", [op])
             }
+        } else if actionDrag != nil {
+            endActionDrag()
         }
         content.needsDisplay = true
         headers.needsDisplay = true
@@ -1237,9 +1252,7 @@ final class TimelineContentView: NSView {
                     return .fade(clip.id, edge)
                 }
             }
-            if let id = actionBandHit(clip, rect: rect, at: point) {
-                return .action(clip: clip.id, action: id)
-            }
+            if let hit = actionHit(clip, rect: rect, at: point) { return hit }
             // A bar too narrow to hold two grab zones is all body: trimming a
             // 3 pt clip by eye is not an interaction, it is a trap.
             if rect.width > TimelineLayout.edgeGrab * 3 {
@@ -1281,6 +1294,10 @@ final class TimelineContentView: NSView {
         timeline?.endGesture(at: convert(event.locationInWindow, from: nil), flags: flags(event))
     }
 
+    override func updateTrackingAreas() { super.updateTrackingAreas(); installBandTracking() }
+    override func mouseMoved(with event: NSEvent) { bandHoverMoved(with: event) }
+    override func mouseExited(with event: NSEvent) { bandHoverExited() }
+
     /// Pinch to zoom about the pointer (spec §4.4).
     override func magnify(with event: NSEvent) {
         guard let owner = timeline else { return }
@@ -1321,6 +1338,7 @@ final class TimelineContentView: NSView {
                     cursor: .resizeLeftRight)
             }
         }
+        addActionBandCursorRects(owner: owner, layout: layout, visible: visible)
     }
 
     // MARK: Drawing
@@ -1413,6 +1431,7 @@ final class TimelineContentView: NSView {
             path.lineWidth = 2
             path.stroke()
         }
+        drawActionDragOverlay(owner: owner, layout: layout)
     }
 }
 

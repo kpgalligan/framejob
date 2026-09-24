@@ -51,15 +51,31 @@ enum ActionBands {
         }
     }
 
-    /// One band. Normal: the action ink at 34 % with 1 pt ends at 75 %.
-    /// Selected: solid, its text in `DS.actionInk`, and — from M — the curve
-    /// as a 1.25 pt black-45 % line from the bottom-left corner to the
-    /// top-right. The number, the glyph and the label run from the LEADING
-    /// edge, so the band's bottom-right corner holds fill only (the proof
-    /// samples it there).
+    /// The resize zone at each end of a band (spec §11 CI-11): its outer
+    /// 5 pt, on a band wide enough to hold two of them and a body.
+    static let grip: CGFloat = 5
+
+    /// Which end of `band` the x falls in the grip of, or nil for the body —
+    /// always nil on a band 15 pt wide or less, which is all body.
+    static func gripEdge(in band: CGRect, at x: CGFloat) -> TimelineEdge? {
+        guard band.width > grip * 3 else { return nil }
+        if x - band.minX <= grip { return .start }
+        if band.maxX - x <= grip { return .end }
+        return nil
+    }
+
+    /// One band. Normal: the action ink at 34 % with 1 pt ends at 75 %;
+    /// hovered, 62 % with solid ends. Selected: solid, its text in
+    /// `DS.actionInk`, and — from M — the curve as a 1.25 pt black-45 % line
+    /// from the bottom-left corner to the top-right. The number, the glyph
+    /// and the label run from the LEADING edge, so the band's bottom-right
+    /// corner holds fill only (the proof samples it there). Hovered, a band
+    /// wide enough to resize draws its two 5 pt grips last — white 80 %, or
+    /// black 45 % on the selected band — so an unhovered band never has
+    /// them (CI-11).
     static func draw(
         band: CGRect, number: Int, label: String?, curve: Curve, zoom: Bool, selected: Bool,
-        level: Level
+        hovered: Bool, level: Level
     ) {
         guard band.width > 0, band.height > 0 else { return }
         NSGraphicsContext.current?.saveGraphicsState()
@@ -68,17 +84,28 @@ enum ActionBands {
             DS.action.setFill()
             band.fill()
         } else {
-            DS.action.withAlphaComponent(0.34).setFill()
+            DS.action.withAlphaComponent(hovered ? 0.62 : 0.34).setFill()
             band.fill()
-            DS.action.withAlphaComponent(0.75).setFill()
+            DS.action.withAlphaComponent(hovered ? 1 : 0.75).setFill()
             NSRect(x: band.minX, y: band.minY, width: 1, height: band.height).fill()
             NSRect(x: band.maxX - 1, y: band.minY, width: 1, height: band.height).fill()
         }
-        guard level != .bars else {
+        defer {
+            if hovered, band.width > grip * 3 {
+                (selected ? NSColor.black.withAlphaComponent(0.45)
+                    : NSColor.white.withAlphaComponent(0.8)).setFill()
+                NSRect(x: band.minX, y: band.minY, width: grip, height: band.height).fill()
+                NSRect(x: band.maxX - grip, y: band.minY, width: grip, height: band.height).fill()
+            }
             NSGraphicsContext.current?.restoreGraphicsState()
-            return
         }
-        if selected { drawCurve(curve, in: band) }
+        guard level != .bars else { return }
+        if selected {
+            let path = curvePath(curve, in: band)
+            path.lineWidth = 1.25
+            NSColor.black.withAlphaComponent(0.45).setStroke()
+            path.stroke()
+        }
         let ink = selected ? DS.actionInk : NSColor.white
         let numberFont = DS.mono(9, weight: .semibold)
         let text = "\(number)"
@@ -101,23 +128,21 @@ enum ActionBands {
             TimelineDraw.truncated(
                 label, in: room, font: DS.sans(10, weight: .semibold), color: ink)
         }
-        NSGraphicsContext.current?.restoreGraphicsState()
     }
 
-    /// The easing as a line across the band: progress along x, the eased
-    /// value up the band (the view is flipped, so "up" is toward `minY`).
-    private static func drawCurve(_ curve: Curve, in band: CGRect) {
+    /// The easing as a line across `rect`: progress along x, the eased value
+    /// up the rect (the view is flipped, so "up" is toward `minY`). The
+    /// selected band strokes it, and so does the lane's `CurveGlyphView`.
+    static func curvePath(_ curve: Curve, in rect: CGRect) -> NSBezierPath {
         let path = NSBezierPath()
         let steps = 16
         for step in 0...steps {
             let t = CGFloat(step) / CGFloat(steps)
             let point = CGPoint(
-                x: band.minX + t * band.width, y: band.maxY - eased(curve, t) * band.height)
+                x: rect.minX + t * rect.width, y: rect.maxY - eased(curve, t) * rect.height)
             if step == 0 { path.move(to: point) } else { path.line(to: point) }
         }
-        path.lineWidth = 1.25
-        NSColor.black.withAlphaComponent(0.45).setStroke()
-        path.stroke()
+        return path
     }
 
     /// A glyph's easing, not the core's: the shape reads as the curve, and no

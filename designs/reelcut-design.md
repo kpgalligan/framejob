@@ -379,10 +379,15 @@ Chroma key — or to a media source, which is Speed.
   ACTIONS, the count or `none`, "· editing N" in the action ink, and Zoom
   to Region, Zoom Back and Add Action (⌥⌘K); a lane row — the Clip chip,
   active when no action is selected, then the whole clip with its actions
-  as bands by fraction, numbered in time order, and the playhead; and,
-  only while an action is selected, a detail row — Start (clip-relative
-  timecode), Length, Curve and Remove. Clicking a band SELECTS the action
-  (and parks the playhead at its end); the Clip chip and esc leave the
+  as bands by fraction, numbered in time order, over the clip's own
+  transition hatch, audio fades and motion wedges (§11 CI-12), and the
+  playhead; and, only while an action is selected, a detail row — Start
+  (clip-relative timecode), Length, a curve glyph and Curve (its titles
+  without "Ease "), and Remove. Clicking a band SELECTS the action (and
+  parks the playhead at its end), on mouse-UP; dragging its body moves the
+  action and dragging its outer 5 pt resizes it, as ONE undo step, with a
+  dashed ghost at the original span and the HUD in place of the header
+  row's text (§11 CI-11); the Clip chip and esc leave the
   mode. With an action selected, edits in this tab show and set that
   action's END state (§11 CI-2); the per-section note that used to say so
   is gone, and the lane's "editing N" and its wash say it instead. Pan,
@@ -771,7 +776,10 @@ begins, which was the whole complaint.
   body under its span, and the span shaded on the ruler at 20 % over a
   2 pt rule. Clicking a band selects the clip and the action; the fade
   handles are tested first, since on an audio-only clip they sit inside the
-  lane. A **transition** is the overlap zone, drawn above both bars: a 45° hatch at
+  lane. A band's outer 5 pt are its GRIPS (none on a band 15 pt wide or
+  less); hovered, a band fills at 62 % with solid ends and draws its grips
+  (white 80 %, black 45 % on the selected band), under `.openHand` /
+  `.resizeLeftRight` cursors (§11 CI-11). A **transition** is the overlap zone, drawn above both bars: a 45° hatch at
   `rgba(white, 0.26)`, 3 pt on a 7 pt perpendicular period, with a solid
   edge down each side, and its kind named only when the word fits. Locked
   track: hatched overlay. Fade handles are small squares at the audio
@@ -788,6 +796,12 @@ begins, which was the whole complaint.
   source's ends; stills, text and shapes have no source bound.
 - ⌥-drag an edge: rate-stretch — speed changes so the content fills the
   new length.
+- Drag an action band's body: moves the action inside its clip; drag a
+  grip: moves that end. Frame-grid snap only, at least one frame, stopping
+  at the neighbouring actions and the clip's ends; one `set_action` per
+  tick, ONE undo step ("Move Action" / "Resize Action"), a dashed ghost at
+  the original span and a HUD 18 pt above the clip; the drop re-selects the
+  action and parks the playhead at its new end (§11 CI-11).
 - Overlapping a neighbour on the same track makes a transition (default
   Cross Dissolve). Clips never push each other.
 - Marquee-select from any empty timeline space — a lane's gap, the strip
@@ -4123,3 +4137,65 @@ assisted import.
   (app/CLAUDE.md "A refusal is the CORE's sentence"). Agent edits never
   reach it (`AgentServer.performGroupedEdit` answers its refusal before any
   document call) and a live drag's refused tick stays swallowed.
+- **CI-11 — A band is dragged: its body moves the action, its outer 5 pt
+  resize it, in the timeline's lane and the Clip tab's lane alike** (road
+  map 9 §9, the clip inspector redesign's phase 4). A band 15 pt wide or
+  less is all body. One gesture is ONE undo step through the live trio
+  (`onLiveBegin/Update/End` on the timeline, `binding.liveBegin/liveUpdate/
+  liveEnd` in the lane), one `set_action` per tick carrying start AND
+  duration, named "Move Action" or "Resize Action". Times snap to the frame
+  grid only — no candidate snapping and no guide (the handoff leaves
+  band-to-playhead snapping uncovered) — and the minimum is ONE frame, the
+  core's own, not the handoff's two. The session (`ActionDragSession`)
+  clamps to the two walls the core's refusals name — `edit_action.rs`
+  `overlapping_action`'s `start < o.end && o.start < end` and the clip's
+  length — so the band stops where the core would refuse (a zero-length
+  action at the band's start or end would be a wall by the same test).
+  **A zero-length action is never dragged**: in either lane a press on one
+  would select and start no session, because the core answers
+  `duration ≤ 0` as INVALID INPUT (`edit_action.rs`, the `err_out`
+  channel), not a refusal, so the swallowed-refusal decision does not cover
+  it and a session sending `duration: 0` every tick would be an error per
+  tick. Measured while building it: no opened or committed project can hold
+  one — `model_query.rs` `check_clips` refuses an action whose duration is
+  not positive, on open and on every commit — so both lanes' guards are
+  defensive, and the proof asks the wall of an in-memory clip. A tick the core
+  still refuses stays SWALLOWED (#8's eighth decision, CI-10's last
+  sentence): nothing new surfaces a drag's refusal, and the typed Start and
+  Length fields remain where a person hears the sentence. A drop re-selects
+  the action and parks the playhead at its NEW end through the existing
+  `selectAction(_:on:)`. The timeline selects at mouse-DOWN, as it did; the
+  lane selects at mouse-UP, because a selection rebuilds the pane and the
+  pane must not rebuild under the pointer (`refresh(isLive:)` skips
+  rebuilds while `isLiveEditing`). Grips draw on HOVER only (white 80 %,
+  black 45 % on the selected band), so an unhovered selected band is phase
+  1's pixels; a hovered band fills at 62 % with solid ends. Cursors are
+  `.openHand` over a body and `.resizeLeftRight` over a grip, by cursor
+  rects, and there is no closed hand. While a drag has moved, a HUD —
+  mono 10 `DS.textStrong` on `DS.chromeBackground`, a 1 pt
+  `DS.borderStrong` edge, 16 pt tall, 4 pt padding — reads "new start →
+  new end  ±s:ff" for a move or a start resize and "len ±Nf" for an end
+  resize: on the timeline at the band's left, 18 pt above the clip,
+  clamped to the lanes' top and the visible rect; in the lane IN PLACE of
+  the header row's text, its buttons staying. A 1 pt dashed [3, 3]
+  `DS.action` ghost marks the original band. No `DS` token is new.
+- **CI-12 — The Clip tab's lane carries the clip's transition hatch, fades
+  and motion wedges, and its Curve popup a glyph and the short names**
+  (phase 4). Drawn under the bands, with the timeline's gates verbatim: the
+  hatch when `clip.transitionIn` is set and the track's predecessor (the
+  last clip with an earlier start) ends after the clip's start, as wide as
+  the overlap's fraction of the clip (at least 2 pt), the timeline's hatch
+  (white 26 %, 3 pt on a 7 pt perpendicular period) with a 1 pt white-40 %
+  right edge; a fade when `InspectorTab.hasAudio` and `fade_in` /
+  `fade_out` is positive, a 10 pt-tall right triangle at the lane's bottom
+  corner, white 16 %, as wide as the fade's fraction (at least 2 pt); a
+  wedge when `InspectorTab.hasPixels` and the motion edge is active, 8 pt
+  tall at the lane's top corner in `DS.textFaint`, as long as the EDGE —
+  `drawMotionWedges`' rule, not the handoff's fixed 0.5 s. The detail
+  row's Curve popup titles drop "Ease " in the lane only (`Curve.laneName`;
+  `displayName` is untouched everywhere else), and a 16 × 10
+  `CurveGlyphView` in the action ink precedes it with a 3 pt gap: the popup
+  gives up 19 pt and, already at `.defaultLow` compression resistance,
+  truncates first at the panel's minimum width. `OptionPopupControl` is
+  Rasterize's and is not forked, so the glyph sits beside the popup rather
+  than inside it.

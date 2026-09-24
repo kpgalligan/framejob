@@ -1,7 +1,8 @@
 # Reelcut — road map 9: the clip inspector redesign
 
-**Status: phases 1, 2, 3a and 3b BUILT, 2026-09-23 (§2, §4, §6, §8).
-Phases 4 and 5 are designed by the handoff and not built (§0).**
+**Status: phases 1, 2, 3a and 3b BUILT, 2026-09-23 (§2, §4, §6, §8);
+phase 4 BUILT, 2026-09-24 (§9, §10). Phase 5 is designed by the handoff and
+not built (§0).**
 
 The handoff is `designs/design_handoff_clip_inspector/` — its README is the
 normative text for the redesign's metrics, inks and behaviour, with this
@@ -38,9 +39,9 @@ the view state everything else hangs on lands first.
      header with an action selected; per-row × on hover; the row context
      menus (Remove from action N, Go to action M, Reset to default, Set end
      value to default); the refusal strip at the panel's foot.
-4. **Retiming by drag** — band drags in the lane and on the timeline
-   (`set_action`), hover, grips, the HUD and the ghost; the lane's fades,
-   wedges, hatch and curve glyph.
+4. **Retiming by drag** — BUILT, §9 and §10. Band drags in the lane and on
+   the timeline (`set_action`), hover, grips, the HUD and the ghost; the
+   lane's fades, wedges, hatch and curve glyph.
 5. **The rest of the mode** (P9, P10, P12) — canvas handle drags following
    the mode, keyed-off switches, `mixed` on sub-rows, Reduce Motion.
 
@@ -624,3 +625,148 @@ fixed:
   tree before review 05's fix as well, so nothing proves `span(_:)` is
   needed. Showing, clearing and re-showing the strip at a changed inspector
   width would.
+
+## 9. Phase 4's design
+
+**Decisions first** (spec §11 CI-11 and CI-12), written before the code.
+
+**One session, two lanes.** `ActionDragSession` (`ActionDragSession.swift`)
+is the one gesture struct both lanes drag with, in CLIP time: the mode
+(`move`, or `resize` of one edge), the original span, the grab offset, one
+frame of the grid, and the two WALLS the core's refusals name — the latest
+end at or before the start among the clip's other actions (else 0), and
+the earliest start at or after the end (else the clip's length), read in
+`ActionBands.ordered` order. `update(clipTime:)` moves the grabbed edge (both
+for a move) by the pointer's travel, snaps it to the frame grid, and clamps
+it — a move to `[lowerWall, upperWall − length]`, a start resize to
+`[lowerWall, end − frame]`, an end resize to `[start + frame, upperWall]`.
+Its `op` is one `set_action` with start AND duration; `undoName` is "Move
+Action" or "Resize Action"; `hud` is "start → end  ±s:ff" or "len ±Nf". A
+PREVIEW clamp, `TrimSession`'s kind: the core still checks, and a refused
+tick is swallowed by `updateLiveEdit`.
+
+**The timeline.** `TimelineHit.actionEdge(clip:action:edge)` is a band's
+grip, from `actionHit` (`TimelineActionBands.swift`): `actionBandHit`,
+unchanged, then `ActionBands.gripEdge` on that band's rect (nil on a band
+15 pt wide or less). `beginGesture`'s `.action` arm selects as before and
+starts a move; the new `.actionEdge` arm selects and starts a resize. The
+bodies are `TimelineActionDrag.swift`'s (`beginActionDrag`, which refuses a
+locked track and a zero-length action, `continueActionDrag`,
+`endActionDrag`, which re-selects the action after a real drag), and so are
+the hover (`bandHover` from `hit(at:)`, nil while a drag is live), the
+cursor rects and the overlay — the dashed ghost of the original band and
+the HUD 18 pt above the clip, clamped into the lanes and the visible rect.
+`TimelineView.swift` takes only wiring.
+
+**The lane.** `ActionLaneView` keeps `drag`, `pressed` and `hover`;
+`mouseDown` / `mouseDragged` / `mouseUp` forward to `pressBand` /
+`dragBand` / `releaseBand` (`ActionLaneView+Drag.swift`). The press records
+the band and starts a session only for an action with a length; the release
+ends the live edit and THEN selects the pressed band, so the pane rebuilds
+after the gesture, not under it. The last band holding the point wins,
+since that is the one painted on top. The HUD takes the header row's text's
+place, in clip-relative times like the Start field.
+
+**The decor.** `ActionLaneDecor` is the lane's hatch, fades and wedges as
+geometry, each by the timeline's own gate (`drawTransition`'s predecessor
+test, `InspectorTab.hasAudio`, `InspectorTab.hasPixels` with an active
+edge), drawn under the bands. The detail row's Curve popup says "In Out"
+(`Curve.laneName`) after a 16 × 10 `CurveGlyphView` stroking
+`ActionBands.curvePath`, the selected band's own curve.
+
+**One painter.** `ActionBands.draw` gains `hovered:` — 62 % with solid ends,
+and the two 5 pt grips drawn last (white 80 %, black 45 % on the selected
+band) only while hovered and only where a resize is possible.
+
+
+## 10. Phase 4's record
+
+**What landed** (2026-09-24). Spec §11's CI-11 and CI-12 were written
+before the code, and §4.3's lane paragraph, §4.4's band bullet and a new
+gesture bullet after it. Four new files — `ActionDragSession.swift`,
+`TimelineActionDrag.swift`, `ActionLaneView+Drag.swift` and
+`ActionLaneDecor.swift` — and changes in `ActionBands.swift` (`grip`,
+`gripEdge`, `draw(…hovered:…)`, `curvePath` internal),
+`TimelineSessions.swift` (`TimelineHit.actionEdge`),
+`TimelineActionBands.swift` (`actionHit`; `actionBandHit` unchanged, its
+`duration > 0` filter kept), `ActionLaneView.swift` (the stored `drag`,
+`pressed` and `hover`, the forwarding mouse and tracking overrides,
+`resetCursorRects`, the decor and overlay calls, the glyph and the short
+names), `TimelineView.swift` (frozen, wiring only: 22 lines in, 3 out) and
+`AgentServer+Clips.swift` (`set_action`'s comment names the two drags). No
+core, FFI, op, schema or tool change; the parity check is untouched. The
+sizes are remaining §3's phase-4 paragraph.
+
+**What was measured.** `make typecheck` 0 errors and 7 warnings; `make
+test` 816 passed, 0 failed, and `make lint` clean, the core untouched;
+`make app` rc 0, and the built app's log (port 4841) carries no `Reelcut: `
+line.
+`clip_inspector5_proof.py` **35/35** — the probe's 30 rows (D1 ×8, D2 ×7,
+D3 ×5, D4 ×4, D5 ×2, D6 ×4) with its build and presence rows, and three
+harness rows: on this host (scale 2, dark) the `av` lane's bottom-left
+10 pt held 21 pixels lighter than the well (40, 40, 40) and its
+bottom-right corner none; the selected band's last 5 pt, lower half, were
+its fill (126, 211, 178) with no other pixel. `--mutant walls` (an
+`update` whose walls are `Ticks.min / 4` and `Ticks.max / 4`) exits 0:
+exactly D1's three wall rows and D2's abutting drop fail — the copy's one
+far tick asked for 5.5–6.5 s, the core refused it past the clip's end, and
+the band stayed at 0.5 s.
+
+**Re-runs on this tree**, each full with nothing re-measured:
+`clip_inspector_proof.py` **39/39**, `clip_inspector2_proof.py` **32/32**,
+`clip_inspector3_proof.py` **31/31**, `clip_inspector4_proof.py` **46/46**,
+`sharp_chrome.py` **29/29**, `e2_chrome.py` **52/52**, `phase3_chrome.py`
+**33/33**, `e1_chrome.py` **21/21**. `clip_inspector_probe.swift`'s S5
+"beside" point sits 13 pt into a 42 pt band, outside its 5 pt grip, so it
+still answers `.action`; `e2_chrome.py` and `e1_chrome.py`, which the
+spec named because their fixtures would now draw wedges or a hatch in the
+lane, pass unchanged.
+
+**Deviations, each for a reason.**
+
+- **No project can hold a zero-length action.** The spec's `zero` fixture
+  (the card plus action 5 of length 0 at 0.5 s) does not open: the core's
+  `model_query.rs` `check_clips` refuses "action 5 on clip 2 has
+  non-positive duration 0", on open and on every commit. So D1's
+  zero-length wall is asked of the chrome card IN MEMORY (a `ClipSnapshot`
+  with the zero-length action added), and D3's fifth row reads the core's
+  refusal of the fixture rather than pressing a band no lane can show. The
+  `duration > 0` guards in `beginActionDrag`, `pressBand` and
+  `addBandCursorRects` stay, as the spec asks — defensive, not
+  load-bearing. CI-11's text says so.
+- **The lane's hit takes the LAST band holding the point**, not the first
+  as phase 1's `mouseDown` did: bands paint in time order, so the last is
+  the one on top.
+- **The grabbed edge travels by the pointer's travel** (`grabOffset` for
+  every mode, not only a move), so a resize does not jump by the grip's
+  inset on its first tick.
+- **The lane's HUD is in clip time** (`hud(base: 0)`), the Start field's;
+  the timeline's is in timeline time (`base: clip.start`), the ruler's.
+  The offset's sign is "+" or "−" (U+2212), and "len" says "+0f" at no
+  change.
+- **The ghost and the HUD draw only once the drag has moved** (`didMove`),
+  on the timeline as in the lane, so a still press paints nothing new.
+- **The HUD and ghost painters live on `ActionDragSession`** (a static
+  extension in its file), because both lanes call them and neither lane's
+  file is the other's.
+- **The fades are the handoff's triangles** — rising toward the clip's
+  inside along the bottom — and the wedges its, deepest at the clip's edge.
+- **The proof's `av` fixture** puts the fade and the in-edge on clip 2 and
+  the transition on clip 3 (the overlap's hatch is the INCOMING clip's),
+  and H2 renders clip 2.
+
+**Owed.** A person feels the drag, the hover and the cursors in both
+appearances (remaining §4). Phase 5 (§0). The two phase-3b nits (§8) are
+untouched. Two review nits from this phase, not fixed:
+- With no action after the band, the drag's upper wall is the clip's
+  length (`ActionDragSession` init). When that length is off the frame
+  grid, a clamped start or end is off the grid too, and the core's
+  nearest-snap can round it past the clip's end. That refusal is
+  swallowed, so the band stops one tick short. The fix is to floor that
+  wall to the grid.
+- `ActionLaneView.refresh()` invalidates cursor rects on every call,
+  playhead-only refreshes during playback included. The fix is to
+  invalidate only when the clip, its actions or the frame change.
+
+The spec's `pkill` line for the proof instance cannot match, because the
+port is in the environment rather than argv. Kill the instance by its pid.

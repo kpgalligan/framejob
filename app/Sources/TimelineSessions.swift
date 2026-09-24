@@ -42,6 +42,10 @@ enum TimelineHit: Equatable {
     /// An action band in the clip's action lane (`TimelineActionBands.swift`):
     /// selects the clip and the action.
     case action(clip: UInt32, action: UInt32)
+    /// One of a band's two grips, its outer 5 pt (`ActionBands.gripEdge`):
+    /// selects the clip and the action, then resizes that end (spec §11
+    /// CI-11). A band 15 pt wide or less has none and is all `.action`.
+    case actionEdge(clip: UInt32, action: UInt32, TimelineEdge)
     /// Empty lane: a marquee. The row is for the double-click, which closes
     /// the gap it landed in.
     case lane(row: Int, time: Ticks)

@@ -655,11 +655,49 @@ lines. The instruments, exempt: `tools/proof/clip_inspector4_proof.py`
 `phase3_chrome.py` 768 → **780**, `phase4_chrome.py` 1222 → **1228**,
 `phase6_chrome.py` 1592 → **1659**, `phase7_chrome.py` 2214 → **2226**.
 
+**Road map 9's phase 4, retiming by drag (2026-09-24, `wc -l`; road map 9
+§10).** Four new files, each under the 400 cap and the spec's 250 aim:
+`ActionDragSession.swift` **173** (the session, the mode, the hover value,
+and the HUD and ghost painters both lanes call), `TimelineActionDrag.swift`
+**135**, `ActionLaneView+Drag.swift` **145** and `ActionLaneDecor.swift`
+**163** (the decor, `Curve.laneName`, `CurveGlyphView`). Then
+`ActionLaneView.swift` 330 → **364** (inside its 400: the three stored
+properties, the forwarding overrides, the decor and overlay calls, the
+glyph), `ActionBands.swift` 133 → **158** (`grip`, `gripEdge`, the hover arm
+and grips, `curvePath` made internal), `TimelineActionBands.swift` 107 →
+**126** (`actionHit`, `hovered:`), `TimelineSessions.swift` 438 → **442**
+(the `.actionEdge` case), `AgentServer+Clips.swift` 851 → **853** (comment
+only). `TimelineView.swift` (frozen) 1663 → **1682**: 22 lines in, 3 out,
+all wiring — the two stored properties, `hit(at:)`'s one line, the
+`.actionEdge` arm and one line in the `.action` arm, one arm each in
+`continueGesture` and `endGesture`, one call each in `drawOverlays` and
+`resetCursorRects`, and three one-line overrides on `TimelineContentView`.
+`EditorViewController.swift` and `InspectorViewController.swift` took 0
+lines. The instruments, exempt: `tools/proof/clip_inspector5_proof.py` and
+`clip_inspector5_probe.swift` (new).
+
 ## 4. What only a person at the machine can check
 
 These are not tasks so much as a list to run through at the machine once. The
 first two have been owed since M1 and spec §10 records them; phases 8 and 9
 and the closing above added the rest.
+
+- **Retiming by drag, FELT (road map 9's phase 4, 2026-09-24)** — in both
+  appearances, in the running app, on the timeline and in the Clip tab's
+  lane. The probe drives both gestures through their own entry points and
+  the harness photographs the lane's decor and an unhovered selected band;
+  no real pointer moved, so hover, cursors and the drag's feel are unseen.
+  Worth judging: the hover's 62 % fill and the grips appearing under the
+  pointer (white 80 %, black 45 % on the selected band) and leaving with
+  it; `.openHand` over a body and `.resizeLeftRight` over a grip, and none
+  on a band too narrow to resize; the band stopping flush against its
+  neighbour and the clip's ends; the dashed ghost and the HUD ("start →
+  end  +s:ff", "len +Nf") — on the timeline 18 pt above the clip, in the
+  lane in place of ACTIONS; the drop re-selecting the action and parking
+  the playhead at its new end; one ⌘Z undoing the whole drag; a lane click
+  selecting on RELEASE without the pane jumping; the lane's hatch, fade
+  triangles and wedges against the timeline's for the same clip; and the
+  curve glyph beside "In Out", including at the panel's narrowest.
 
 - **Reset, Clear, the ×, the row menus and the refusal strip, LOOKED AT
   (road map 9's phase 3b, 2026-09-23)** — in both appearances, in the

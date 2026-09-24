@@ -52,8 +52,10 @@ normative: §5.2 is the project schema, §6 the op table, §7 the architecture.
   selection header — the clip's name, editable there for a single clip and
   the one place a name can be cleared back to what the clip shows, with its
   label dot — and the clip's **action lane**: its actions as numbered bands
-  you click to select, with Zoom to Region, Zoom Back and Add Action, and
-  the selected action's start, length, curve and Remove — pinned above the
+  you click to select and drag to move (or drag by an end to resize — on
+  the timeline's bands too, one undo step), over the clip's transition,
+  fades and motion presets, with Zoom to Region, Zoom Back and Add Action,
+  and the selected action's start, length, curve and Remove — pinned above the
   scroll view with a row of sub-tabs the selection's kind earns (Text or
   Shape, Picture, Sound, and Clip for timing, speed, transitions and motion
   presets; a mint `◆N` marks a tab the selected action keys), over that

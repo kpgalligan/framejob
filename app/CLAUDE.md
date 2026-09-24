@@ -219,12 +219,26 @@ the key map behind it.
   overlaid) · `+NestScope` (the breadcrumb, painted LAST in the ruler's
   corner so it stays above the header column when scrolled) ·
   `TimelineActionBands.swift` (each clip's action lane under its name strip,
-  the band hit — which `hit(at:)` asks AFTER the fade handles, since on an
-  audio-only clip they sit inside the lane, and BEFORE the edge grabs — the
-  selected span's wash down the body and its shade on the ruler).
+  the band hit — `actionHit`, which `hit(at:)` asks AFTER the fade handles,
+  since on an audio-only clip they sit inside the lane, and BEFORE the edge
+  grabs, answering `.actionEdge` in a band's grip and `.action` in its body
+  over the unchanged `actionBandHit` — the selected span's wash down the
+  body and its shade on the ruler) · `TimelineActionDrag.swift` (spec §11
+  CI-11: the band drag's begin/continue/end bodies, the hover, the cursor
+  rects and the ghost with its HUD; `TimelineView.swift` keeps
+  `actionDrag`, `bandHover`, one arm per gesture phase, a draw call, a
+  cursor call and three one-line overrides on `TimelineContentView`).
   `ActionBands.swift` is what the timeline and the Clip tab's lane share:
   time order (an action's NUMBER is its index there plus one), the label's
-  keys, the zoom test and the ONE band painter.
+  keys, the zoom test, the 5 pt `grip` and `gripEdge` (none on a band 15 pt
+  wide or less), `curvePath`, and the ONE band painter — hover and grips
+  are its `hovered:` argument, never a second painter.
+  `ActionDragSession.swift` is the ONE session both lanes drag a band with,
+  in clip time: frame snap, the two walls the core's refusals name, one
+  `set_action` of start AND duration per tick, "Move Action" / "Resize
+  Action", the HUD's text, and the HUD and ghost painters. It is only ever
+  built for an action with a positive duration (`duration: 0` is invalid
+  input to the core, not a refusal; no opened project holds one).
 - `ClipLabel.swift` — the ONE home of the label and marker colour
   vocabulary; the core stores names unvalidated, so an unknown name draws in
   `DS.textStrong`. `ClipKindStyle.swift` — the ONE mapping from a clip to its
@@ -304,7 +318,15 @@ the key map behind it.
   `ClipSubTabsView`, and `ClipHeaderBlock` — header, lane, sub-tabs — which
   `makeHeader()` builds once per pane build) · `ActionLaneView.swift` (the
   action lane, the Actions section's replacement, with the clip and action
-  ids it shows captured) · `VideoPane.swift` (+`Transition`,
+  ids it shows captured, and the stored `drag` / `pressed` / `hover` its
+  forwarding mouse overrides feed) · `ActionLaneView+Drag.swift` (the band
+  drag in the lane, CI-11: a press records the band and starts a session
+  only for a positive length, and the RELEASE selects — a click and a drop
+  alike — so the pane never rebuilds under the pointer; the last band
+  holding a point wins, the one painted on top) · `ActionLaneDecor.swift`
+  (CI-12: the lane's hatch, fades and wedges as geometry by the timeline's
+  own gates, drawn under the bands; `Curve.laneName`; `CurveGlyphView`,
+  beside the Curve popup because `OptionPopupControl` is not forked) · `VideoPane.swift` (+`Transition`,
   +`Motion`, +`Obscure` — the Obscure section, a pure move) · `AudioPane.swift` · `TextPane.swift` · `ShapePane.swift` ·
   `DocumentPane.swift` (reads `documentSnapshot`, never the scoped one: its
   ops are document-level) · `OptionControls.swift` (the descriptor-driven
