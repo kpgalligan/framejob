@@ -5046,3 +5046,46 @@ tools/proof/harness/build.sh --force
 python3 tools/proof/word_captions_chrome.py                                 # → 31/31
 python3 tools/proof/word_captions_chrome.py --mutant replace-empty-track    # exit 0 = S3 FAILED
 ```
+
+## Space is the transport's (`space_key_proof.py`, `space_key_probe.swift`)
+
+kpgalligan/reelcut#35, spec §11 K-1: a bare Space toggles play from any
+focus but a field being typed into, decided by `EditorWindow.sendEvent`
+before dispatch. The probe is compiled AS `main.swift` over `app/Sources`
+(`harness/build.sh`'s swiftc line, a build failure is a scored FAILURE) with
+the app's `Compositor.metal` built into a `default.metallib` beside it. S1
+asks `SpaceKey.route` directly — window, plain view and slider are the
+transport's; an editable `NSTextView`, `NSButton`, `NSPopUpButton`,
+`NSSegmentedControl`, `CanvasOverlayView` and an attached sheet keep the
+key; an auto-repeat is held; ⌘/⌥/⌃ Space, a `j` and a key-up are not
+routed; ⇧ and ⇪ are. S2 drives the app's OWN window
+(`makeWindowControllers()`) with synthesized events through
+`NSWindow.sendEvent` and reads `editor.playback.isPlaying`: (a) from the
+window as first responder — the state an inspector field's commit leaves —
+Space plays and pauses; (b) a custom view first responder never sees the
+key and play toggles; (c) the timecode field types it; (d) the canvas
+overlay toggles on key-UP; (e) an `NSButton` first responder is handed the
+Space (its `keyDown` sees it once — whether AppKit then presses it depends on
+Full Keyboard Access, a host setting, so FKA and the press are printed in the
+detail and not scored; `designs/reelcut-remaining.md` §4 is the press's
+hands-on check); (f) an auto-repeat is
+swallowed; (g) the window is an `EditorWindow`. The beep is not observable;
+(a) and (b) together are the claim that the window returned before
+`super.sendEvent`.
+
+The package is the grey card at 0–6 s plus 6 s of `media/A.mov` after it:
+over a shape-only plan `Playback` has no item and `play()` refuses, so a
+media track is what lets the transport move. Needs `media/A.mov` (a scored
+row when missing), no ffmpeg.
+
+`--baseline <commit>` builds the same probe over `git archive <commit>
+app/Sources` with `-D HARNESS_REFERENCE_BUILD` (S1 and S2g compiled out) in
+`work/space-key/baseline/`, and exits 0 only when EXACTLY S2a and S2b fail
+there. Measured 2026-09-24: 28/28 on the fix; `--baseline b69972e` fails
+exactly S2a and S2b and exits 0. Road map 2 §2 Phase 8's #35 record says why
+S2e scores the hand-off rather than the press.
+
+```sh
+python3 tools/proof/space_key_proof.py                      # → 28/28
+python3 tools/proof/space_key_proof.py --baseline b69972e   # exit 0 = exactly S2a, S2b FAIL
+```

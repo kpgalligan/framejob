@@ -206,6 +206,11 @@ the key map behind it.
   `AppDelegate.swift` (+`Menus`, +`Recording`), `main.swift` — the window,
   the no-document window, the launch/terminate flow and the whole menu bar
   (spec §9). Menu items are nil-target selectors down the responder chain.
+- `EditorWindow.swift` — the editor's `NSWindow` subclass: its `sendEvent`
+  routes a bare Space to play/pause unless the first responder types or
+  presses on it (spec §11 K-1), so Space never beeps when focus has fallen
+  to the window. A new text-taking or Space-handling view must be added to
+  `SpaceKey.route` and to `tools/proof/space_key_probe.swift`.
 
 **Timeline.**
 - `TimelineView.swift` (frozen) · `TimelineLayout.swift` (every ticks ↔

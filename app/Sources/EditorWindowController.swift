@@ -4,7 +4,7 @@ import AppKit
 /// editor itself is `EditorViewController`.
 final class EditorWindowController: NSWindowController {
     init(document: ProjectDocument) {
-        let window = NSWindow(
+        let window = EditorWindow(
             contentRect: NSRect(x: 0, y: 0, width: 1280, height: 800),
             styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered,

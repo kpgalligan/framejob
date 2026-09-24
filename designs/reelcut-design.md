@@ -2951,7 +2951,7 @@ a clean `make lint` before finishing Rust work.
 
 | Keys | Action |
 |---|---|
-| Space | Play / pause |
+| Space | Play / pause — from any focus but a field being typed into (§11 K-1) |
 | J / K / L | Reverse / pause / forward; L again for 2×, 4× |
 | ← / → | Previous / next frame (⇧: 10 frames) |
 | ↑ / ↓ | Previous / next edit point |
@@ -4284,3 +4284,18 @@ assisted import.
   never names an audio track, and the plan and its JSON compare are
   untouched: this is AVFoundation's decoder rule, applied in Swift, not a
   timeline decision.
+- **K-1 — Space is the transport's unless the first responder is typing or
+  claims it** (kpgalligan/reelcut#35, 2026-09-24). The editor window routes
+  a bare Space key-down (⇧ and ⇪ allowed, any other modifier untouched)
+  before dispatch: it toggles play/pause unless the first responder is an
+  editable `NSTextView` — every field editor, the Text tab's area, the
+  canvas's inline editor, the Media tab's search field, so a Space is typed
+  there — an `NSButton` or `NSSegmentedControl` (they press on Space by
+  AppKit's own convention, reachable only under Full Keyboard Access, and an
+  accessibility user keeps it), the canvas overlay (its own Space arms a pan
+  and toggles on key-up, `PreviewCanvasView.handleKeyUp`), or a sheet is
+  attached. An auto-repeat of a Space the window took is swallowed. A
+  non-editable field editor (a selectable label), a slider, the window
+  itself and every custom inspector control are the transport's. No MCP
+  mirror: playback is view state, app/CLAUDE.md's exemption, and no play
+  tool exists today; `set_playhead` stays the capability.

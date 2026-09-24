@@ -1154,6 +1154,12 @@ and the closing above added the rest.
   - **The menu, LOOKED AT**: that it pops up at the pointer over a header
     and over an empty lane, and that the checkmarks read at a glance.
 
+- **Space from anywhere (#35, 2026-09-24)** — `space_key_proof.py` proves
+  the route and that play toggles; it cannot hear. At the machine: commit
+  an inspector number field with Return, press Space, and hear NO beep as
+  play starts; then turn Full Keyboard Access on, Tab to a checkbox or a
+  button, and press Space — the control presses and play does not start.
+
 ---
 
 ## 5. Where a third road map would start
@@ -1238,6 +1244,21 @@ one composition audio track per source format (spec §11 R2-1); the record,
 the baseline's failing rows and what is owed are road map 2 §2, Phase 5,
 "#34 — mixed audio formats on one track" (kpgalligan/reelcut#34). A listen
 at the machine, and section 4 on the built-in speakers, are still owed.
+
+**Space beeped off a committed inspector field #35 (2026-09-24):** an
+inspector number field's commit left the WINDOW first responder, and a bare
+Space beeped instead of playing. `EditorWindow` now routes a bare Space
+before dispatch (spec §11 K-1); the record, the baseline's failing rows and
+what is owed are road map 2 §2, Phase 8, "#35 — Space toggles play wherever
+nothing is typing" (kpgalligan/reelcut#35). The proof is 28/28 and its
+baseline fails exactly S2a and S2b; its S2e row scores that the window hands
+an `NSButton` the Space, not the press, which needs Full Keyboard Access and
+is §4's hands-on check. Owed and NOT fixed there: every OTHER bare key
+(J/K/L, W/E, I/O …) is still dead after an inspector field commit until a click
+(`OptionControls.swift:244`'s `makeFirstResponder(nil)`), and
+`handleEditorKey` refuses every bare key while Caps Lock is on
+(`flags.subtracting(.shift)` at `EditorViewController.swift:716` leaves
+`.capsLock`), where the new Space route allows it.
 
 **Bounded recovery after a lost AssemblyAI submit reply (#28).** R6-14 reads
 only the newest page of 200 transcripts at most three times. An outage,

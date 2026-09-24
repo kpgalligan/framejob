@@ -33,7 +33,8 @@ normative: §5.2 is the project schema, §6 the op table, §7 the architecture.
 - **Timeline** with a frame-accurate ruler, filmstrips and waveforms from a
   per-media cache, three row heights, magnify/⌥-wheel zoom about the cursor,
   and gesture sessions for drag, trim, rate-stretch (⌥ on the end edge),
-  slip (⌥⇧ on a body), roll (⌥⇧ on an edge), marquee select, playhead scrub,
+  slip (⌥⇧ on a body), roll (⌥⇧ on an edge), marquee select, playhead scrub
+  (and Space plays and pauses from anywhere but a field being typed into),
   marker drag, audio fade handles and track reorder — each one undo step,
   each snapping to clip edges, markers and the playhead (N toggles, ⌘
   suppresses). Double-clicking an empty span closes that gap; a media row

@@ -3069,6 +3069,75 @@ road map, by a completion marker that makes the sentence true
 (`designs/reelcut-remaining.md` records it; `MediaCacheFiles.swift`'s
 `CacheStamp` is the code).
 
+#### #35 — Space toggles play wherever nothing is typing (2026-09-24)
+
+kpgalligan/reelcut#35: a bare Space beeped instead of playing after an
+inspector number field was committed. `OptionFieldControl.finishEditing`
+(`OptionControls.swift:244`) ends every edit with
+`window?.makeFirstResponder(nil)`, which leaves the WINDOW as first
+responder; `NSWindow.keyDown` forwards to nothing and
+`NSResponder.noResponder(for:)` beeps, so the key never reached
+`EditorViewController.keyDown`, whose `case " "` was correct and
+unreachable from that state. `TimelineView.endRename` already documented the
+state and patched it for renames only.
+
+**What landed.** `app/Sources/EditorWindow.swift` (new): `SpaceKeyRoute`,
+`SpaceKey.route` — one pure function deciding a bare Space key-down BEFORE
+dispatch — and `EditorWindow: NSWindow`, whose `sendEvent` toggles play
+through `EditorViewController.playPause` on `.transport`, swallows `.held`
+(an auto-repeat) and passes everything else to `super` (spec §11 K-1). Its
+two inits only forward or refuse: the unavailable `init?(coder:)` alone
+stops Swift inheriting `NSWindow`'s designated init, so the forwarding one
+is declared beside it. `EditorWindowController.swift` constructs
+`EditorWindow` — one word. No frozen file edited; `handleEditorKey`'s
+`NSText` and `attachedSheet` guards stay for the preview panel's forward.
+No core change, no FFI, no MCP mirror (playback is view state).
+
+**Measured.** `tools/proof/space_key_proof.py` over its probe
+`space_key_probe.swift`: **28/28** on the fix, exit 0. All eighteen S1 rows
+pass (`SpaceKey.route`, pure), and S2a–S2g pass in the app's own window: S2a
+from the window as first responder, Space plays (isPlaying true) and Space
+again pauses; S2b a custom `NSView` first responder sees no keyDown and play
+toggles; S2c the timecode field's field editor types the Space (string
+`" "`, paused); S2d the canvas overlay's down leaves play alone and its up
+toggles; S2e an `NSButton` first responder is handed the Space (its keyDown
+sees it once); S2f an auto-repeat is swallowed; S2g the document's window is
+an `EditorWindow`. `--baseline b69972e` (`git archive`,
+`-D HARNESS_REFERENCE_BUILD`) fails EXACTLY S2a (isPlaying false after both
+Spaces — the beep path) and S2b (keyDowns 1, the key walked the chain), as
+predicted, and exits 0.
+
+**S2e scores the hand-off, not the press.** As first written the row
+asserted AppKit's own Space-press on the button (presses 1, play paused);
+it failed on BOTH trees (presses 0), because a button presses on Space only
+under Full Keyboard Access, which is off on this host
+(`NSApp.isFullKeyboardAccessEnabled` false) — and with it off, by AppKit's
+convention (not measured here), a click does not make a button first
+responder, so the product does not reach that state. What the WINDOW decides is
+that the button gets the key, so the row asserts that (a counting
+`keyDown` override that calls `super`, count 1) on either host; FKA, the
+press count and `isPlaying` are printed in the detail only. A row branched
+on FKA was rejected: its FKA-on branch would never have run on any host,
+and only the recording proof may skip a row for a host condition. The
+press itself is `designs/reelcut-remaining.md` §4's hands-on check.
+
+**Deviation from the spec's fixture.** The spec's package was one 6 s grey
+shape card. Measured in a scratch probe: over a shape-only plan
+`playerLayer.player` had NO `currentItem` (`Playback.startRebuild` drops
+the item when the plan has neither a video nor an audio track), so `play()`
+beeps and nothing toggles in any tree. The package keeps the card at 0–6 s
+and adds 6 s of `tools/proof/media/A.mov` after it; the playhead starts on
+the card. The proof also builds the app's `Compositor.metal` into a
+`default.metallib` beside the binary (`mixed_audio_probe.py`'s
+`build_shader`). The `.accessory` activation fallback was NOT needed: S2c
+typed its Space under `.prohibited`.
+
+**Owed.** The beep's absence and a button's Space press under Full
+Keyboard Access, at the machine: `designs/reelcut-remaining.md` §4 carries
+those checks and §5 the paragraph. `app/CLAUDE.md`'s "Dialogs and windows"
+map entry gains `EditorWindow.swift` — applied by the orchestrator after
+review 2 (verdict pass), with that review's two prose nits.
+
 ---
 
 ### Phase 9 — Inside the nest

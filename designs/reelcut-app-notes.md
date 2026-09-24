@@ -962,6 +962,22 @@ lockstep are in the root `CLAUDE.md`; the full design is
   `resolved`, and `resolveCard()` — which is what every path in the card calls
   instead of `resolve()` — copies that ANSWER onto Add to Queue rather than
   reading `resolved` a second time.
+- `EditorWindow.swift` (2026-09-24, kpgalligan/reelcut#35) — the
+  document window's class, which `EditorWindowController` constructs, and
+  the one thing it decides: where a bare Space goes (spec §11 K-1).
+  `SpaceKey.route` is pure and runs BEFORE dispatch: a Space key-down with
+  flags ⊆ ⇧⇪ toggles play unless the first responder is an editable
+  `NSTextView`, an `NSButton` / `NSSegmentedControl`, or the canvas overlay,
+  or a sheet is attached; an auto-repeat is swallowed. The defect it closes:
+  `OptionFieldControl.finishEditing` leaves the WINDOW first responder, and
+  `NSWindow.keyDown` beeped the key away before `EditorViewController.keyDown`
+  saw it. Its two inits are the shape a next `NSWindow` subclass copies:
+  the unavailable coder init alone stops Swift inheriting
+  `init(contentRect:styleMask:backing:defer:)`, so that one is declared
+  beside it and only forwards. `handleEditorCharacter`'s `case " "` stays for
+  the preview panel's forward and is dead for this window.
+  `tools/proof/space_key_proof.py` is the proof; the record is road map 2 §2,
+  Phase 8.
 - `ExportQueueController.swift` · `ExportQueueWindowController.swift` — the
   export queue (Window ▸ Export Queue, road map 2's phase 7e), and the split
   between them is the feature. **The controller has no AppKit in it**: the job
