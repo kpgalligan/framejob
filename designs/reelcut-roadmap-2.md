@@ -1635,6 +1635,88 @@ the area:
 
 The rest were smaller and each is argued where it lives.
 
+#### #36 — the canvas text editor grows as you type (2026-09-24)
+
+kpgalligan/reelcut#36: typing into a text clip's in-canvas editor (the
+double-click `NSTextView` of spec §4.2) wrapped the text inside a frame
+that never changed, and the box jumped to its real size on commit. The
+editor's frame was set once, from the box the clip had when editing began
+(`editorFrame(for:)`), and again only when the canvas laid out; the text
+view's own vertical resizing grew it DOWNWARD from the old corner as the
+text wrapped.
+
+**What landed.** `app/Sources/PreviewCanvasView+TextEditFrame.swift` (new):
+`fitTextEditor(_:to:)` sizes the editor from `LayerRenderers.measuredSize`
+over the clip's text with the typed string in place of its content, placed
+by `canvasRect` exactly as `CanvasLayerBox.uncroppedRect` places it — the
+measurement that sizes the box after apply, not a second one — with the
+2-canvas-pixel margin the editor always had. Both resizable flags are off,
+so the frame is the only authority; the wrap width follows the frame, less
+a container inset of those 2 canvas pixels in view points and a
+line-fragment padding of `LayerRenderers.textInsets` (the backdrop's
+padding, the outline's overshoot) at the box's scale, which leaves exactly
+the width CoreText lays the text in. `PreviewCanvasView.swift` (frozen)
+keeps the wiring: `CanvasTextView` gains `onChange`, called from
+`didChangeText` (every typed, pasted or deleted change); `beginTextEditing`
+fits once, and `refitTextEditor()` — called from `onChange` and from
+`layoutCanvas`, which used to reassign `editorFrame(for:)` (gone) — refits,
+and reassigns the editor's font at the canvas's current scale, so a zoom
+or a resize mid-edit rescales the glyphs with the wrap width (review nit 3;
+unmeasured — no probe row zooms mid-edit). Key handling is untouched
+(#37 owns Return and Esc). No core change, no FFI, no MCP mirror: the
+committed op is the `set_text` it always was.
+
+**Deviations.** Two, both inside the one function. (1) The container inset
+was a fixed 2 pt; measured, with it an auto-sized "Hello " wrapped to two
+lines inside a frame that was exactly its applied box, because the frame's
+margin is 2 CANVAS pixels (about 1.2 pt at the probe's zoom) and the inset
+took 2 pt back. It is now `2 × canvasScale`. (2) The 60 × 24 pt floor is
+kept and still hung from the box's top, but widened from the edge the text
+is ALIGNED to — the left edge for left, the right for right, about the
+centre for centre — so a string shorter than the floor starts where it
+renders. (The first cut centred the floor on both axes; the review found
+that started a short left-aligned string (60 − w) / 2 pt early and a tiny
+one (24 − h) / 2 pt high, and T3 below is the row that catches it: it
+failed, 14/15, with the centred floor put back.) Right- and centre-aligned
+strings under the floor are not measured.
+
+**Measured.** `tools/proof/text_edit_proof.py` over its probe
+`text_edit_probe.swift`, in the app's own window: **15/15** on the fix, exit
+0. T3 opens the editor over "Hi", 12 px, auto-sized and left-aligned (a box
+9.6 × 12.6 pt with its margin, under the floor — a CONTROL) and finds the
+editor's frame hung from the box's top-left, 0.25 pt off against a 1 pt
+tolerance; both T3 rows pass on the baseline too, which hung its floor from
+that corner. T1 types " world, and more" after "Hello" (auto-sized, centred) and T2
+" a longer sentence that must wrap twice" after "Wrap me" (700 px wide,
+left, a 24 px backdrop), one key event at a time through `sendEvent`; each
+typed prefix is then applied through the canvas's `onEdit` and the box the
+canvas draws is compared. Worst frame deviation 0.00 pt over 16 keys (T1)
+and 39 keys (T2), against a stated tolerance of 1 pt; the editor's line
+count equals CoreText's at every key on both. CONTROLS, passing on both
+trees: the font resolves, every key reached the editor, every prefix
+applied, and the applied box moved (T1 218 → 916 px wide on one line; T2
+185 → 593 px tall, four lines). `--baseline b76a2f3` (`git archive`,
+`-D HARNESS_REFERENCE_BUILD`, nothing compiled out) fails EXACTLY the four
+fix rows and exits 0: worst deviation 493.06 pt (T1, the editor 134 pt
+wide and 578 pt tall against a 553 pt-wide one-line box) and 122.61 pt
+(T2); 16 of 16 T1 prefixes shown on more lines than rendered, and 13 of 39
+T2 prefixes on a different count (each of the four printed on fewer). The probe registers `app/Resources/Fonts` itself:
+without them the editor's `NSFont` and CoreText fall back to DIFFERENT
+faces and their line breaks part — measured, one T2 row failed on the fix
+for that reason alone before the fonts were registered.
+
+**Limits, not fixed.** The editor still shows the text AS WRITTEN in the
+clip's face at `size × scale`, clamped 8–300 pt, with no tracking and no
+line spacing — its pre-existing font rule, kept as the issue asked. So its
+FRAME is always the applied box, but its line breaks can differ from the
+render for an UPPERCASE (`case`) text, a non-zero `tracking`, a
+`line_spacing` other than 1, or a zoom that hits the clamp; and a rotated
+clip still edits in an axis-aligned frame. Input-method composition
+(marked text) is not measured. **Owed:** the look at the machine,
+`designs/reelcut-remaining.md` §4. `app/CLAUDE.md`'s Canvas map entry
+("frozen, 1121 lines") is now 1133 and does not name the new file — for the
+orchestrator, which edits the CLAUDE.md files.
+
 ---
 
 ### Phase 5 — Sound

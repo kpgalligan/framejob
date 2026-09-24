@@ -712,6 +712,16 @@ header), with the instruments, exempt, `clip_inspector6_probe.swift` 481 →
 instruments, exempt, `clip_inspector6_proof.py` 373 → **390**,
 `phase6_proof.py` 1783 → **1794**.
 
+**The canvas text editor grows as you type (#36, 2026-09-24).**
+`PreviewCanvasView.swift` (frozen) 1121 → **1133**, wiring only: the
+editor's one-line `onChange` forward and its clearing, the `didChangeText`
+override and `onChange` property on `CanvasTextView`, a fit at begin, and
+`refitTextEditor()` (the live editor to its box and its font to the
+canvas's scale, called from `onChange` and from `layoutCanvas`) in place of `editorFrame(for:)`, which is gone
+with the fixed `textContainerInset` line. The sizing is the new
+`PreviewCanvasView+TextEditFrame.swift` **62**. The instruments, exempt:
+`tools/proof/text_edit_probe.swift` and `text_edit_proof.py`, new.
+
 ## 4. What only a person at the machine can check
 
 These are not tasks so much as a list to run through at the machine once. The
@@ -1160,6 +1170,16 @@ and the closing above added the rest.
   play starts; then turn Full Keyboard Access on, Tab to a checkbox or a
   button, and press Space — the control presses and play does not start.
 
+- **The text editor grows as you type (#36, 2026-09-24)** —
+  `text_edit_proof.py` measures the editor's frame and line count against
+  the applied box; it cannot watch. At the machine: double-click a centred
+  auto-sized text on the canvas and type — the field widens about its
+  centre with no wrap, and committing the edit moves nothing on screen but
+  the editor's grey plate going away; then the same on a fixed-width text, where the field
+  keeps its width and grows downward line by line. Also unmeasured: a
+  composition through an input method (marked text), which may not refit
+  until the composition is committed.
+
 ---
 
 ## 5. Where a third road map would start
@@ -1259,6 +1279,14 @@ is §4's hands-on check. Owed and NOT fixed there: every OTHER bare key
 `handleEditorKey` refuses every bare key while Caps Lock is on
 (`flags.subtracting(.shift)` at `EditorViewController.swift:716` leaves
 `.capsLock`), where the new Space route allows it.
+
+**The canvas text editor did not grow as you typed #36 (2026-09-24):** the
+in-canvas editor kept the frame the box had when editing began, so typed
+text wrapped inside it and the box jumped to its real size on commit. The
+editor is now sized, after every change, from the same measurement that
+sizes the applied box; the record, the baseline's failing rows and the
+limits left are road map 2 §2, Phase 4, "#36 — the canvas text editor grows
+as you type" (kpgalligan/reelcut#36). A look at the machine is §4's.
 
 **Bounded recovery after a lost AssemblyAI submit reply (#28).** R6-14 reads
 only the newest page of 200 transcripts at most three times. An outage,

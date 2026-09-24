@@ -206,8 +206,9 @@ timeline concern.
   band are one overlay each and only one may be up, or a drag begun for one
   commits the other's edit.
 - **Text** clips edit inline on double-click (an `NSTextView` overlay
-  positioned in canvas space). Line and arrow shapes have endpoint
-  handles.
+  positioned in canvas space, sized after every change to the box the
+  typed string will have once applied — it grows and wraps as the text
+  will). Line and arrow shapes have endpoint handles.
 - **Snapping** while dragging: canvas center lines, edges, thirds, and
   other visible clips' edges and centers. Guides draw while snapped;
   ⌘ suppresses. Candidates are computed in Swift from the layer rects;

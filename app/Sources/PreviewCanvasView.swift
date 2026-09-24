@@ -244,9 +244,7 @@ final class PreviewCanvasView: NSView {
         playerLayer?.frame = playerHost.bounds
         playerHost.layer?.backgroundColor = canvas.background.nsColor.cgColor
         CATransaction.commit()
-        if let editor = textEditor, let id = editingClip, let box = box(for: id) {
-            editor.frame = editorFrame(for: box)
-        }
+        refitTextEditor()
     }
 
     /// Keeps the canvas from being dragged out of the pane: a pan is only
@@ -762,15 +760,16 @@ final class PreviewCanvasView: NSView {
         }
         cancelTextEditing()
         setCropMode(false)
-        let editor = CanvasTextView(frame: editorFrame(for: box))
+        let editor = CanvasTextView(frame: .zero)
         editor.isRichText = false
         editor.drawsBackground = true
         editor.backgroundColor = DS.chromeBackground.withAlphaComponent(0.92)
         editor.textColor = DS.textStrong
         editor.font = editorFont(for: props, box: box)
         editor.alignment = alignment(props.align)
-        editor.textContainerInset = NSSize(width: 2, height: 2)
         editor.string = props.content
+        fitTextEditor(editor, to: box)
+        editor.onChange = { [weak self] in self?.refitTextEditor() }
         editor.onCommit = { [weak self] in self?.commitTextEditing() }
         editor.onCancel = { [weak self] in self?.cancelTextEditing() }
         editor.onBlur = { [weak self] in self?.finishTextEditing(commit: true, focus: false) }
@@ -804,6 +803,7 @@ final class PreviewCanvasView: NSView {
         editor.onCommit = nil
         editor.onCancel = nil
         editor.onBlur = nil
+        editor.onChange = nil
         editor.removeFromSuperview()
         // Back to the overlay: it holds the canvas keys, and leaving the
         // window itself as first responder silently drops every one of them.
@@ -813,10 +813,14 @@ final class PreviewCanvasView: NSView {
         onEdit?("Edit Text", [.setText(clips: [id], patch: TextPatch(content: value))])
     }
 
-    private func editorFrame(for box: CanvasLayerBox) -> CGRect {
-        let rect = canvasToView(box.uncroppedRect.insetBy(dx: -2, dy: -2))
-        return CGRect(
-            x: rect.minX, y: rect.minY, width: max(rect.width, 60), height: max(rect.height, 24))
+    /// The live editor to the box its string will have, in the font at the
+    /// canvas's current scale (#36).
+    private func refitTextEditor() {
+        guard let editor = textEditor, let id = editingClip, let box = box(for: id),
+              let props = box.clip.text else { return }
+        let font = editorFont(for: props, box: box)
+        if editor.font != font { editor.font = font }
+        fitTextEditor(editor, to: box)
     }
 
     private func editorFont(for props: TextProps, box: CanvasLayerBox) -> NSFont {
@@ -1099,6 +1103,9 @@ final class CanvasTextView: NSTextView {
     /// `onCommit` so the owner can clear it before tearing the editor down —
     /// removing the view resigns first responder and would otherwise recurse.
     var onBlur: (() -> Void)?
+    /// Every change to the string, typed, pasted or deleted — the owner
+    /// refits the frame to the box the string will have (#36).
+    var onChange: (() -> Void)?
 
     override func keyDown(with event: NSEvent) {
         // 36 = Return, 76 = keypad Enter, 53 = Esc.
@@ -1111,6 +1118,11 @@ final class CanvasTextView: NSTextView {
             return
         }
         super.keyDown(with: event)
+    }
+
+    override func didChangeText() {
+        super.didChangeText()
+        onChange?()
     }
 
     override func resignFirstResponder() -> Bool {

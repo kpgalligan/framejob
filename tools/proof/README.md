@@ -5089,3 +5089,40 @@ S2e scores the hand-off rather than the press.
 python3 tools/proof/space_key_proof.py                      # → 28/28
 python3 tools/proof/space_key_proof.py --baseline b69972e   # exit 0 = exactly S2a, S2b FAIL
 ```
+
+## The text editor grows as you type (`text_edit_proof.py`, `text_edit_probe.swift`)
+
+kpgalligan/reelcut#36: the in-canvas text editor is sized, after every
+change, to the box the typed string will have once applied. The probe is
+compiled AS `main.swift` over `app/Sources` (`harness/build.sh`'s swiftc
+line, a build failure is a scored FAILURE) with the app's `Compositor.metal`
+built into a `default.metallib` beside it, and registers
+`app/Resources/Fonts` itself — a bare binary has no bundle, and without the
+fonts the editor and CoreText fall back to different faces (T0 is that
+CONTROL). In the app's own window it opens the editor over a text clip with
+`beginTextEditing`, puts the caret at the end and types one key event at a
+time through `NSWindow.sendEvent`, recording the editor's frame and its
+laid-out line count after each; it then cancels, APPLIES each typed prefix
+through the canvas's `onEdit` (the `set_text` a commit sends), and compares
+with the box the canvas draws, grown by the editor's 2 canvas-pixel margin,
+within 1 pt per edge, and with CoreText's line count for the applied text
+(`LayerRenderers.layout(for:)`). T1 is an auto-sized centred text, T2 a
+700 px fixed-width left-aligned one on a 24 px backdrop. Each group has
+three CONTROLS (every key typed, every prefix applied, the applied box
+moved) and the two rows of the fix. T3 opens the editor over a 12 px
+left-aligned "Hi" whose box is under the editor's 60 × 24 pt floor (a
+CONTROL) and checks the frame hangs from the box's top-left, within 1 pt —
+it passes on the baseline too, and fails if the floor is widened about the
+box's centre. No media, no ffmpeg.
+
+`--baseline <commit>` builds the same probe over `git archive <commit>
+app/Sources` with `-D HARNESS_REFERENCE_BUILD` (nothing compiled out) in
+`work/text-edit/baseline/`, and exits 0 only when EXACTLY the four fix rows
+fail there. Measured 2026-09-24: 15/15 on the fix; `--baseline b76a2f3`
+fails exactly those four and exits 0. Road map 2 §2 Phase 4's #36 record
+has the numbers.
+
+```sh
+python3 tools/proof/text_edit_proof.py                      # → 15/15
+python3 tools/proof/text_edit_proof.py --baseline b76a2f3   # exit 0 = exactly the four fix rows FAIL
+```

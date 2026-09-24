@@ -256,12 +256,16 @@ the key map behind it.
   `enabled.video`, which is the Detach switch.
 
 **Canvas.**
-- `PreviewCanvasView.swift` (frozen, 1121 lines after road map 9 phase 5's
-  wiring) · `CanvasSessions.swift` — the picture at
+- `PreviewCanvasView.swift` (frozen, 1133 lines) · `CanvasSessions.swift`
+  · `PreviewCanvasView+TextEditFrame.swift` — the picture at
   document size and the handle gestures. All coordinate mapping goes through
   `viewToCanvas` / `canvasToView`, and every handle maps through
   `AVPlayerLayer.videoRect`, which is the aspect of the BUFFER — the reason
-  Preview Quality must keep the canvas's exact aspect.
+  Preview Quality must keep the canvas's exact aspect. `+TextEditFrame`
+  sizes the on-canvas text editor after every keystroke from the SAME
+  measurement that sizes the applied box (`LayerRenderers.measuredSize`
+  placed by `canvasRect`); never give the editor a second sizing rule, or
+  the text jumps at apply (kpgalligan/reelcut#36).
 - `CanvasEditTarget.swift` — what a gesture edits (spec §11 CI-13): the
   base, or the selected action's END state. It reaches the canvas as
   `editTarget` through two writers, `refreshCanvas` and

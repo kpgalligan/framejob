@@ -2773,3 +2773,21 @@ once and forwards to `InspectorViewController.showRefusal`; the strip
 container and clears when `refresh(isLive:)` finds another
 `editedProject` handle. In and Out lost their `writes:` — a trim has no
 patch, so it always answered `[]`.
+
+## The canvas text editor's frame, 2026-09-24 — kpgalligan/reelcut#36
+
+**`PreviewCanvasView+TextEditFrame.swift` — new, 55.** `fitTextEditor(_:to:)`,
+the one place the in-canvas text editor is sized: `LayerRenderers.measuredSize`
+over the clip's text with the typed string as its content, placed by
+`canvasRect` as `CanvasLayerBox.uncroppedRect` is, 2 canvas pixels outside
+it; both resizable flags off so AppKit's `sizeToFit` never overrules the
+frame; a container inset of those 2 canvas pixels and a line-fragment
+padding of `LayerRenderers.textInsets` at the box's scale, so the wrap
+width is CoreText's. A fileprivate `TextProps.withContent` beside it.
+**`PreviewCanvasView.swift` (frozen) 1121 → 1133**, wiring only:
+`CanvasTextView.onChange` from `didChangeText`, a fit at begin, and
+`refitTextEditor()` from `onChange` and `layoutCanvas`, which also
+reassigns the editor's font at the canvas's current scale; `editorFrame(for:)` and the fixed 2 pt
+`textContainerInset` removed. The record, the measurement and the limits
+are road map 2 §2, Phase 4's #36 block; `tools/proof/text_edit_proof.py`
+is the proof.
