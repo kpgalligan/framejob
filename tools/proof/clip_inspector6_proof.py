@@ -6,6 +6,7 @@ the three open nits.
 
     python3 tools/proof/clip_inspector6_proof.py
     python3 tools/proof/clip_inspector6_proof.py --mutant target
+    python3 tools/proof/clip_inspector6_proof.py --mutant live
 
 Two instruments, `clip_inspector4_proof.py`'s shape:
 
@@ -13,10 +14,11 @@ Two instruments, `clip_inspector4_proof.py`'s shape:
   every file in `app/Sources` but the app's own `main.swift` on
   `harness/build.sh`'s swiftc line (a probe that will not build is a scored
   FAILURE, never an exit). Rows K1 (the target, the move session through the
-  live edit, the nudge in a real editor, a text clip's width drag, a shape's
-  box scale), K2 (the Drop shadow switch keyed off, and Clear), K4 (`mixed`
-  on Shadow ▸ Blur and Compressor ▸ Ratio), K5 (the header click's state is
-  synchronous) and K6 (Box ▸ Width's default, the lane's cursor rects).
+  live edit, the nudge in a real editor, the scrub into a span, a move held
+  across that scrub, a text clip's width drag, a shape's box scale), K2 (the
+  Drop shadow switch keyed off, and Clear), K4 (`mixed` on Shadow ▸ Blur and
+  Compressor ▸ Ratio), K5 (the header click's state is synchronous) and K6
+  (Box ▸ Width's default, the lane's cursor rects).
   K6's other two rows live where their instruments are: the floored wall in
   `clip_inspector5_probe.swift`, the strip at two widths in
   `clip_inspector4_probe.swift`.
@@ -29,12 +31,19 @@ Two instruments, `clip_inspector4_proof.py`'s shape:
   argument gate; the log carries no `Reelcut: ` line. The script kills only
   the process it started.
 
-`--mutant target` builds the probe over a COPY of `app/Sources` whose
-`CanvasEditTarget.op(video:clip:)` answers `.setVideo` always. Exit 0 means
-EXACTLY the K1 routing rows in `MUTANT_EXPECTED` failed in the copy and
-nothing else did — the shape row, the text row (which routes through
-`op(text:)`) and the start-state rows hold. The built app is not re-run
-under the mutant: it is the tree's binary, not the copy's.
+`--mutant MODE` builds the probe over a COPY of `app/Sources` with one
+mutation, `MUTANTS[MODE]`, and exit 0 means EXACTLY that mode's `expected`
+rows failed in the copy and nothing else did. The built app is not re-run
+under a mutant: it is the tree's binary, not the copy's.
+
+* `target`: `CanvasEditTarget.op(video:clip:)` answers `.setVideo` always.
+  The four K1 routing rows fail; the shape row, the text row (which routes
+  through `op(text:)`), the start-state rows and the mouse-down capture row
+  (both arms then answer `set_video`) hold.
+* `live`: `PreviewCanvasView.gestureTarget` reads the LIVE `editTarget`
+  instead of the target captured at mouse-down. Exactly the capture row
+  fails: the drag's tick keys action 4's end once the playhead has scrubbed
+  into its span.
 """
 
 import json
@@ -62,21 +71,43 @@ PORT = 4851
 TICKS = e2.TICKS
 SIX = 6 * TICKS
 
-MUTANT_FILE = "CanvasEditTarget.swift"
-MUTANT_ANCHOR = ("        return .setActionEnd(clip: clip, action: action, "
-                 "patch: ActionPatch(video: patch))\n")
-MUTANT_EXPECTED = [
-    "K1 op(video:): the selected action's clip → set_action_end on action 4; another clip → "
-    "set_video; .base → set_video",
-    "K1 a CanvasMoveSession's ops(to:) through the live edit moves action 4's END x by the "
-    "delta (100 → 130, y 0 → 20) and leaves the base at 0 — ONE undo step",
-    "K1 nudge in a real editor: with action 4 selected its END x goes 100 → 110 (base 0); with "
-    "none the BASE x goes 0 → 10 (end 110)",
-    # Added 2026-09-24 (phase 5 review, finding 2): the playhead's entry rule is a routing row.
-    "K1 scrubbing the playhead into action 4's span selects it and a nudge keys its END x "
-    "100 → 110 (base 0); scrubbed back out, a nudge keys it again 110 → 120 (base 0)",
-]
-PROBE_COUNTS = {"K1": 8, "K2": 3, "K4": 2, "K5": 1, "K6": 2}
+MUTANTS = {
+    "target": {
+        "file": "CanvasEditTarget.swift",
+        "anchor": ("        return .setActionEnd(clip: clip, action: action, "
+                   "patch: ActionPatch(video: patch))\n"),
+        "replacement": ("        // mutant: every video op is set_video\n"
+                        "        _ = action\n"
+                        "        return .setVideo(clips: [clip], patch: patch)\n"),
+        "expected": [
+            "K1 op(video:): the selected action's clip → set_action_end on action 4; another "
+            "clip → set_video; .base → set_video",
+            "K1 a CanvasMoveSession's ops(to:) through the live edit moves action 4's END x by "
+            "the delta (100 → 130, y 0 → 20) and leaves the base at 0 — ONE undo step",
+            "K1 nudge in a real editor: with action 4 selected its END x goes 100 → 110 (base "
+            "0); with none the BASE x goes 0 → 10 (end 110)",
+            # Added 2026-09-24 (phase 5 review, finding 2): the playhead's entry rule is a
+            # routing row.
+            "K1 scrubbing the playhead into action 4's span selects it and a nudge keys its END "
+            "x 100 → 110 (base 0); scrubbed back out, a nudge keys it again 110 → 120 (base 0)",
+        ],
+        "note": "CanvasEditTarget.op(video:clip:) answers .setVideo always",
+    },
+    # Added 2026-09-24 (phase 5 review 2): the target a drag writes is captured at mouse-down.
+    "live": {
+        "file": "PreviewCanvasView.swift",
+        "anchor": "    private(set) var gestureTarget = CanvasEditTarget.base\n",
+        "replacement": ("    // mutant: the gesture reads the LIVE target on every tick\n"
+                        "    var gestureTarget: CanvasEditTarget { get { editTarget } set {} }\n"),
+        "expected": [
+            "K1 a move begun with no action selected and held while the playhead scrubs into "
+            "action 4's span (the live editTarget becomes action 4) writes the BASE x 0 → 10 "
+            "and leaves its end x at 100 — the target captured at mouse-down",
+        ],
+        "note": "PreviewCanvasView.gestureTarget reads the LIVE editTarget",
+    },
+}
+PROBE_COUNTS = {"K1": 9, "K2": 3, "K4": 2, "K5": 1, "K6": 2}
 
 RESULTS = []
 
@@ -160,7 +191,7 @@ def probe_checks(sources, out, paths):
     with open(answer) as f:
         rows = json.load(f)["rows"]
     counts = {k: sum(1 for r in rows if r["name"].startswith(k + " ")) for k in PROBE_COUNTS}
-    check("the probe answers every K-row (K1 ×8, K2 ×3, K4 ×2, K5 ×1, K6 ×2) and no K0 "
+    check("the probe answers every K-row (K1 ×9, K2 ×3, K4 ×2, K5 ×1, K6 ×2) and no K0 "
           "fixture row", counts == PROBE_COUNTS
           and not any(r["name"].startswith("K0 ") for r in rows), f"{counts}")
     for row in rows:
@@ -293,43 +324,40 @@ def mcp_checks(chrome):
 # ---------------------------------------------------------------------------
 
 
-def mutant():
+def mutant(mode):
+    spec = MUTANTS[mode]
+    expected = spec["expected"]
     began = time.time()
-    with tempfile.TemporaryDirectory(prefix="reelcut-clip-inspector6-target-") as temp:
+    with tempfile.TemporaryDirectory(prefix=f"reelcut-clip-inspector6-{mode}-") as temp:
         sources = os.path.join(temp, "Sources")
         shutil.copytree(os.path.join(ROOT, "app", "Sources"), sources)
-        path = os.path.join(sources, MUTANT_FILE)
+        path = os.path.join(sources, spec["file"])
         with open(path) as f:
             text = f.read()
-        if text.count(MUTANT_ANCHOR) != 1:
-            print(f"MUTANT FAILURE: the anchor occurs {text.count(MUTANT_ANCHOR)} times")
+        if text.count(spec["anchor"]) != 1:
+            print(f"MUTANT FAILURE: the anchor occurs {text.count(spec['anchor'])} times")
             return 2
         with open(path, "w") as f:
-            f.write(text.replace(
-                MUTANT_ANCHOR,
-                "        // mutant: every video op is set_video\n"
-                "        _ = action\n"
-                "        return .setVideo(clips: [clip], patch: patch)\n", 1))
-        print(f"MUTANT target: CanvasEditTarget.op(video:clip:) answers .setVideo always, in "
-              f"{sources}")
+            f.write(text.replace(spec["anchor"], spec["replacement"], 1))
+        print(f"MUTANT {mode}: {spec['note']}, in {sources}")
         paths = packages()
         probe_checks(sources, os.path.join(temp, "probe"), paths)
     failed = [n for n, ok in RESULTS if not ok]
     built = bool(RESULTS) and RESULTS[0][1]
     elapsed = time.time() - began
-    if built and sorted(failed) == sorted(MUTANT_EXPECTED):
-        print(f"MUTANT PASS: target — exactly the {len(MUTANT_EXPECTED)} expected row(s) FAILED "
+    if built and sorted(failed) == sorted(expected):
+        print(f"MUTANT PASS: {mode} — exactly the {len(expected)} expected row(s) FAILED "
               f"in the copy and nothing else did, {elapsed:.0f} s")
         return 0
-    print(f"MUTANT FAILURE: target — built {built}; missing failures "
-          f"{[n for n in MUTANT_EXPECTED if n not in failed]}; unexpected failures "
-          f"{[n for n in failed if n not in MUTANT_EXPECTED]}, {elapsed:.0f} s")
+    print(f"MUTANT FAILURE: {mode} — built {built}; missing failures "
+          f"{[n for n in expected if n not in failed]}; unexpected failures "
+          f"{[n for n in failed if n not in expected]}, {elapsed:.0f} s")
     return 1
 
 
 def main():
-    if len(sys.argv) == 3 and sys.argv[1] == "--mutant" and sys.argv[2] == "target":
-        return mutant()
+    if len(sys.argv) == 3 and sys.argv[1] == "--mutant" and sys.argv[2] in MUTANTS:
+        return mutant(sys.argv[2])
     if len(sys.argv) != 1:
         sys.exit(__doc__)
     print("Road map 9, phase 5 — the rest of the mode")

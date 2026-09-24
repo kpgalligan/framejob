@@ -4235,8 +4235,11 @@ assisted import.
   `set_video` that pins the box's pivot must land beside it, so splitting
   the gesture would put the box and its placement on two different states.
   An endpoint drag is `set_shape` too and stays base. The mode reaches the
-  canvas through the refresh that already follows a selection
-  (`refreshCanvas`), as a `CanvasEditTarget` value; no new channel.
+  canvas as a `CanvasEditTarget` value on the refresh that already follows a
+  selection (`refreshCanvas`) AND on the playhead's own path
+  (`canvasPlayheadMoved`), and a gesture writes through the target captured
+  at mouse-down (`gestureTarget`), so playback entering a span mid-drag
+  does not move the drag's writes.
 - **CI-14 — `set_action_end.off` keys an optional property OFF at the end**
   (phase 5, P10). The end state holding `null` at an optional key is the
   property switched off when the action finishes: the evaluator already

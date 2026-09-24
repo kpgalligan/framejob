@@ -79,6 +79,11 @@ final class PreviewCanvasView: NSView {
     private(set) var playhead: Ticks = 0
     /// What a gesture starts from and writes (spec §11 CI-13).
     var editTarget = CanvasEditTarget.base
+    /// The target a gesture writes, captured at mouse-down and used for every
+    /// tick: `editTarget` is rewritten while a drag is held — by `refreshCanvas`
+    /// on each live tick and by `canvasPlayheadMoved` as playback enters a span —
+    /// and a session's start state was read from the target it began with.
+    private(set) var gestureTarget = CanvasEditTarget.base
     /// Echoes `EditorViewController.snappingEnabled` (the N toggle).
     var snappingEnabled = true
     private(set) var cropMode = false
@@ -488,21 +493,21 @@ final class PreviewCanvasView: NSView {
         if var session = moving {
             session.update(point: canvasPoint, snapper: snapper)
             moving = session
-            onLiveUpdate?(session.ops(to: editTarget))
+            onLiveUpdate?(session.ops(to: gestureTarget))
         } else if var session = scaling {
             session.update(
                 point: canvasPoint, aspectFree: flags.contains(.shift),
                 aboutCentre: flags.contains(.option))
             scaling = session
-            onLiveUpdate?(session.ops(to: editTarget))
+            onLiveUpdate?(session.ops(to: gestureTarget))
         } else if var session = rotating {
             session.update(point: canvasPoint, snapping: flags.contains(.shift))
             rotating = session
-            onLiveUpdate?([session.op(to: editTarget)])
+            onLiveUpdate?([session.op(to: gestureTarget)])
         } else if var session = cropping {
             session.update(point: canvasPoint)
             cropping = session
-            onLiveUpdate?([session.op(to: editTarget)])
+            onLiveUpdate?([session.op(to: gestureTarget)])
         } else if var session = endpointDrag {
             guard let box = box(for: session.clip) else { return }
             session.update(unit: box.endpointUnit(canvasPoint))
@@ -552,11 +557,12 @@ final class PreviewCanvasView: NSView {
     private func beginMove(anchor: UInt32, at point: CGPoint, flags: NSEvent.ModifierFlags) {
         let ids = selection.contains(anchor) ? selection : [anchor]
         var bases: [UInt32: CGPoint] = [:]
+        gestureTarget = editTarget
         for id in ids {
             guard let clip = snapshot.clip(id),
                   snapshot.track(clip.track)?.locked != true
             else { continue }
-            let props = editTarget.start(of: clip, in: project).video
+            let props = gestureTarget.start(of: clip, in: project).video
             bases[id] = CGPoint(x: props.x, y: props.y)
         }
         guard !bases.isEmpty, let box = box(for: anchor) else { return }
@@ -569,6 +575,7 @@ final class PreviewCanvasView: NSView {
     private func beginScale(_ id: UInt32, handle: CanvasHandle) {
         guard let box = box(for: id), let clip = snapshot.clip(id) else { return }
         let route = editTarget.forScale(of: clip)
+        gestureTarget = route
         let start = route.start(of: clip, in: project)
         let base = start.video
         let rect = startRect(of: box, base: base)
@@ -592,7 +599,8 @@ final class PreviewCanvasView: NSView {
 
     private func beginRotate(_ id: UInt32, at point: CGPoint) {
         guard let clip = snapshot.clip(id) else { return }
-        let base = editTarget.start(of: clip, in: project).video
+        gestureTarget = editTarget
+        let base = gestureTarget.start(of: clip, in: project).video
         let anchor = canvasAnchor(of: clip, in: snapshot.canvas, video: base)
         rotating = CanvasRotateSession(
             clip: id, base: base, anchor: anchor,
@@ -603,7 +611,8 @@ final class PreviewCanvasView: NSView {
 
     private func beginCrop(_ id: UInt32, handle: CanvasHandle) {
         guard let box = box(for: id), let clip = snapshot.clip(id) else { return }
-        let base = editTarget.start(of: clip, in: project).video
+        gestureTarget = editTarget
+        let base = gestureTarget.start(of: clip, in: project).video
         cropping = CanvasCropSession(
             clip: id, handle: handle, base: base, sourceSize: box.sourceSize,
             startRect: startRect(of: box, base: base), rotation: base.rotation, crop: base.crop)

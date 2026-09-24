@@ -251,7 +251,7 @@ the key map behind it.
   `enabled.video`, which is the Detach switch.
 
 **Canvas.**
-- `PreviewCanvasView.swift` (frozen, 1112 lines after road map 9 phase 5's
+- `PreviewCanvasView.swift` (frozen, 1121 lines after road map 9 phase 5's
   wiring) · `CanvasSessions.swift` — the picture at
   document size and the handle gestures. All coordinate mapping goes through
   `viewToCanvas` / `canvasToView`, and every handle maps through
@@ -259,7 +259,9 @@ the key map behind it.
   Preview Quality must keep the canvas's exact aspect.
 - `CanvasEditTarget.swift` — what a gesture edits (spec §11 CI-13): the
   base, or the selected action's END state. It reaches the canvas as
-  `editTarget` through `refreshCanvas` alone; the sessions' `ops(to:)` /
+  `editTarget` through two writers, `refreshCanvas` and
+  `canvasPlayheadMoved`, and a gesture captures it at mouse-down as
+  `gestureTarget`, which every tick writes through; the sessions' `ops(to:)` /
   `op(to:)` ask it for `set_video` or `set_action_end` (and `set_text` for a
   text clip's width), and every `begin*` and the nudge start from
   `start(of:in:)` — one `clip_state` at the action's end, decoded through

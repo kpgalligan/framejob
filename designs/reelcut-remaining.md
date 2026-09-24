@@ -701,7 +701,13 @@ Inside their caps: `ActionLaneView.swift` 364 → **375** (the cursor key),
 `tools/proof/clip_inspector6_proof.py` **342** and
 `clip_inspector6_probe.swift` **441** (new), `clip_inspector4_probe.swift`
 437 → **470**, `clip_inspector5_probe.swift` 480 → **500**,
-`clip_inspector5_proof.py` 292 → **295**.
+`clip_inspector5_proof.py` 292 → **295**. The review-2 fix pass (road map 9
+§12, the target captured at mouse-down) grew `PreviewCanvasView.swift`
+(frozen) 1112 → **1121**, wiring only — the `gestureTarget` property and
+its doc comment, four one-line captures in the `begin*` methods, four reads
+swapped in `continueGesture` — and `CanvasEditTarget.swift` 89 → **92** (its
+header), with the instruments, exempt, `clip_inspector6_probe.swift` 481 →
+**532** and `clip_inspector6_proof.py` 345 → **373**.
 
 ## 4. What only a person at the machine can check
 

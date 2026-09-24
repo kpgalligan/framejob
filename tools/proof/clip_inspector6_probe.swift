@@ -341,6 +341,57 @@ if let document = opened("chrome") {
     document.close()
 }
 
+// Added 2026-09-24 (phase 5 review 2): a drag writes the target it STARTED
+// from. The move begins with no action selected; the playhead then scrubs
+// into action 4's span, so `canvasPlayheadMoved` rewrites the live
+// `editTarget` mid-drag; the tick must still go to the BASE. ⌘ suppresses
+// snapping at the press and on every tick.
+if let document = opened("chrome") {
+    document.selection = [2]
+    document.playhead = at(5.0)
+    NSDocumentController.shared.addDocument(document)
+    document.makeWindowControllers()
+    document.showWindows()
+    spin(1.0)
+    let controller = document.windowControllers.first?.contentViewController
+        as? EditorViewController
+    var ok = false
+    var detail = "editor \(controller != nil), no canvas"
+    if let controller, let canvas = controller.previewCanvas, canvas.canvasFrame.width > 2,
+       let box = canvas.box(for: 2)
+    {
+        let centre = canvas.canvasToView(CGPoint(x: box.bounds.midX, y: box.bounds.midY))
+        let hit = canvas.hit(at: centre)
+        canvas.beginGesture(at: centre, flags: [.command], clicks: 1)
+        let began = canvas.moving != nil
+        let atPress = canvas.gestureTarget
+        controller.setPlayhead(at(3.0))
+        spin(0.3)
+        let entered = document.selectedAction
+        let live = canvas.editTarget
+        let held = canvas.gestureTarget
+        let point = CGPoint(x: centre.x + 10 * canvas.canvasScale, y: centre.y)
+        canvas.continueGesture(at: point, flags: [.command])
+        spin(0.2)
+        canvas.endGesture(at: point, flags: [.command])
+        spin(0.2)
+        let baseX = base(document, 2)?.videoProps.x
+        let endX = number(group(storedEnd(document, 2, 4), "video")?["x"])
+        let name = document.undoManager?.undoActionName
+        ok = hit == .body(2) && began && atPress == .base && entered == 4 && live == selected
+            && held == .base && abs((baseX ?? -1) - 10) < 0.01 && endX == 100
+            && name == "Move" && canvas.moving == nil
+        detail = "hit \(hit), began \(began), selected \(describe(entered)), gestureTarget "
+            + "\(atPress) → \(held), editTarget \(live); base x \(describe(baseX)), end x "
+            + "\(describe(endX)), undo \(describe(name)), moving after \(canvas.moving != nil)"
+    }
+    check("K1 a move begun with no action selected and held while the playhead scrubs into "
+            + "action 4's span (the live editTarget becomes action 4) writes the BASE x 0 → 10 "
+            + "and leaves its end x at 100 — the target captured at mouse-down",
+          ok, detail)
+    document.close()
+}
+
 // MARK: - K2 a switch keyed OFF inside an action (CI-14)
 
 if let (document, inspector, pane) = clipPane("chrome", playhead: 1.0, action: 3) {

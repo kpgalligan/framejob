@@ -4,11 +4,14 @@ import Foundation
 /// the selected action's END state — the same choice the inspector's fields
 /// make (CI-2), so a drag, a nudge and a typed value all write one place.
 ///
-/// It reaches the canvas as a value on the refresh that already follows a
-/// selection (`EditorViewController.refreshCanvas`), and the sessions in
-/// `CanvasSessions.swift` ask it for their ops rather than naming
-/// `set_video` themselves. A multi-selection is always `.base`: no action is
-/// selected then (CI-1).
+/// It reaches the canvas as a value on two channels: the refresh that already
+/// follows a selection (`EditorViewController.refreshCanvas`) and the
+/// playhead's own path (`canvasPlayheadMoved`, since the entry rule selects
+/// an action without a refresh). A gesture captures it at mouse-down as
+/// `PreviewCanvasView.gestureTarget` and writes through that for every tick,
+/// and the sessions in `CanvasSessions.swift` ask it for their ops rather
+/// than naming `set_video` themselves. A multi-selection is always `.base`:
+/// no action is selected then (CI-1).
 ///
 /// **The box on screen is still the frame at the PLAYHEAD.** A gesture
 /// STARTS from `start(of:in:)` — the end state, for the selected action's

@@ -937,26 +937,71 @@ both fixed:
   0 with six rows failing.
 - Every other score above held on the re-run.
 
-**Unresolved after review 2** (litecode runs one fix pass only):
-- **Should-fix, a correctness bug.** `PreviewCanvasView.continueGesture`
-  routes every tick through the LIVE `editTarget`, but each gesture's start
-  state was captured at mouse-down. `canvasPlayheadMoved` now rewrites
-  `editTarget` as playback runs. So a canvas drag held while playback
-  enters an action's span switches from `set_video` to `set_action_end`
-  mid-gesture, and writes base-derived values into the end state. The fix
-  is to capture the target once in each `begin*` and pass that to
-  `ops(to:)`/`op(to:)` on every tick.
-- **Should-fix, stale documentation.** `app/CLAUDE.md` (the Canvas entry)
-  and `CanvasEditTarget.swift`'s header both say the target reaches the
-  canvas through `refreshCanvas` alone; `canvasPlayheadMoved` now pushes it
-  too. `tools/proof/README.md`'s phase-5 entry still has the pre-fix counts
-  and does not list the scrub row.
-- **Nits.** No mutant removes the `canvasPlayheadMoved` push by itself; the
-  scrub row fails under `--mutant target` because of `op(video:)`. And
-  `ActionLaneView.refresh()` has a `let clip = clip` local.
+**The review-2 fix pass (2026-09-24).** Review 2 found two should-fix
+items. First, a correctness bug: `PreviewCanvasView.continueGesture` sent
+every tick through the LIVE `editTarget`, but each gesture read its start
+state at mouse-down. `canvasPlayheadMoved` rewrites `editTarget` as the
+playhead moves. So a canvas drag held while playback entered an action's
+span switched from `set_video` to `set_action_end` mid-gesture and wrote
+base-derived values into the end state. Second, stale documents. This
+pass fixes both:
+- **The capture.** `PreviewCanvasView` has one new stored property,
+  `private(set) var gestureTarget`. `beginMove`, `beginRotate` and
+  `beginCrop` set it from `editTarget`, and `beginScale` sets it to its
+  `forScale(of:)` route. Each `begin*` then reads its start state from
+  `gestureTarget`, and the four session calls in `continueGesture` write
+  through it. `beginEndpoint`, `endGesture`, `cancelGesture` and the nudge
+  are unchanged. The nudge is not a gesture, so it keeps the live target
+  (the nudge and scrub rows depend on that). `canvasPlayheadMoved` and
+  `refreshCanvas` both still write `editTarget`.
+- **The row.** A new K1 row runs in a real editor. With clip 2 selected and
+  the playhead at 5 s (no action selected), it presses on the clip's body
+  with ⌘ held (no snapping). It then scrubs the editor's playhead to 3 s,
+  so action 4 becomes selected and the live `editTarget` becomes action 4.
+  It drags 10 canvas pixels right and releases. The row passes when the
+  BASE x goes 0 → 10, the end x stays 100, the undo name is "Move", and
+  `gestureTarget` stayed `.base` while `editTarget` changed. It was run
+  first with the property declared but NOT wired. The probe built, and
+  exactly this row failed, with the detail: `hit body(2), began true,
+  selected 4, gestureTarget CanvasEditTarget(selected: nil) →
+  CanvasEditTarget(selected: nil), editTarget CanvasEditTarget(selected:
+  Optional(Reelcut.CanvasEditTarget.Selected(clip: 2, action: 4, endTime:
+  2400000))); base x 0.0, end x 10.0, undo Move, moving after false`. So
+  the tick went through the live target and keyed the end state.
+- **The `live` mutant.** `clip_inspector6_proof.py`'s mutant is now a
+  table, `MUTANTS`, with two modes. `--mutant target` is the old one,
+  unchanged, with the same four expected rows. The new row holds under it,
+  because both arms then answer `set_video`. `--mutant live` replaces
+  `gestureTarget` with a computed property that reads the live
+  `editTarget`, and exactly the new row fails.
+- **The documents.** `CanvasEditTarget.swift`'s header, `app/CLAUDE.md`'s
+  Canvas entry and spec §11 CI-13's last sentence now name both writers of
+  `editTarget` (`refreshCanvas` and `canvasPlayheadMoved`) and the capture
+  at mouse-down. `tools/proof/README.md`'s phase-5 entry has the current
+  counts, the scrub row, the new row and `--mutant live`. Its phase-4
+  entry's walls mutant now names the six rows `MUTANT_EXPECTED` lists
+  (D1 ×5, D2 ×1).
 
-**Owed.** A person feels the canvas in the mode, the width drag, the
-keyed-off switches and the collapse with Reduce Motion on and off
-(remaining §4). `phase6_proof.py`'s stale `VERSION`. Remaining §5 still
-names phases 4 and 5 as next work; it was outside this phase's list. The
-unresolved review-2 findings above.
+**These supersede the scores above:**
+- `clip_inspector6_proof.py` is **25/25** (K1 ×9).
+- `--mutant target` exits 0 with the same four rows failing.
+- `--mutant live` exits 0 with one row failing, the new one.
+- `make typecheck` has 0 errors and 7 warnings (the baseline). `make app`
+  succeeds. `make test` passes 826 tests and `make lint` is clean; no Rust
+  was touched.
+- Sizes (`wc -l`, remaining §3): `PreviewCanvasView.swift` 1112 →
+  **1121** (wiring only), `CanvasEditTarget.swift` 89 → **92**,
+  `clip_inspector6_probe.swift` 481 → **532**, `clip_inspector6_proof.py`
+  345 → **373**.
+
+**Owed.**
+- A person feels the canvas in the mode, the width drag, the keyed-off
+  switches and the collapse with Reduce Motion on and off (remaining §4).
+- `phase6_proof.py`'s stale `VERSION`.
+- Remaining §5 still names phases 4 and 5 as next work; that was outside
+  this phase's list.
+- Review 2's nit 5: no mutant removes the `canvasPlayheadMoved` push by
+  itself. The scrub row fails under `--mutant target` only because of
+  `op(video:)`.
+- Review 2's nit 6: `ActionLaneView.swift:247` has a `let clip = clip`
+  local.
