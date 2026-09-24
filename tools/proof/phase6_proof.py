@@ -221,7 +221,10 @@ def format_version():
     """`RC_FORMAT_VERSION` off the tree's own header, not a copy: the copy went stale twice (6 → 8 → 9)."""
     with open(HEADER) as f:
         text = f.read()
-    return int(re.search(r"#define RC_FORMAT_VERSION (\d+)", text).group(1))
+    match = re.search(r"#define RC_FORMAT_VERSION (\d+)", text)
+    if match is None:
+        raise RuntimeError(f"{HEADER} has no `#define RC_FORMAT_VERSION <n>` line")
+    return int(match.group(1))
 
 
 VERSION = format_version()

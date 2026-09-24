@@ -125,7 +125,7 @@ op and no tool, so a fourth phase in a row asserts it unchanged, and no tool
 name mentions the preview or the quality — the parity rule owes a mirror to
 every user-visible EDIT and this edits nothing. The startup parity log is
 empty for every instance this run touches, its own two included. The schema
-is still version 8 — the number road map 5's E2 bumped it to — in
+is still the header's `RC_FORMAT_VERSION`, read off `core/include/reelcut_core.h` at import and never copied, in
 `get_project` and in a saved `project.json`. And the
 three view-state calls an agent has (`set_playhead`, `set_selection`,
 `set_range`) leave the project JSON byte-identical and the frame at one
@@ -198,8 +198,21 @@ CANVAS = (640, 360)
 TOOLS = 73
 
 # What this build writes. Phase 8 declares "no schema; view state
-# throughout", so this is phase 6's number for the third phase running.
-VERSION = 8
+# throughout", so the number is whatever the tree's header names, read at import: the copy this file carried went stale at road map 8's W1b (8 → 9).
+HEADER = os.path.join(ROOT, "core", "include", "reelcut_core.h")
+
+
+def format_version():
+    """`RC_FORMAT_VERSION` off the tree's own header, not a copy: a copy goes stale at every bump."""
+    with open(HEADER) as f:
+        text = f.read()
+    match = re.search(r"#define RC_FORMAT_VERSION (\d+)", text)
+    if match is None:
+        raise RuntimeError(f"{HEADER} has no `#define RC_FORMAT_VERSION <n>` line")
+    return int(match.group(1))
+
+
+VERSION = format_version()
 
 # The app's own defaults key and bundle id. The first is read off the source
 # in section 0 as well as spelled here, so a rename shows up as a failure
@@ -929,7 +942,8 @@ def unchanged_part(mcp):
     project = s.project()
     check(project["version"] == VERSION,
           f"the project this build holds is schema version {project['version']}, still "
-          f"{VERSION}: phase 8 is view state throughout and bumps nothing")
+          f"{VERSION}, the header's RC_FORMAT_VERSION: phase 8 is view state throughout "
+          f"and bumps nothing")
 
     before = canonical(project)
     frame_before = read(s.png(2 * SEC))
@@ -951,7 +965,7 @@ def unchanged_part(mcp):
 
     text = s.save()
     check(re.search(r'"version"\s*:\s*(\d+)', text).group(1) == str(VERSION),
-          f"the saved project.json is version {VERSION}")
+          f"the saved project.json is version {VERSION}, the header's RC_FORMAT_VERSION")
     reopened = json.loads(text)
     check(canonical(numeric(reopened)) == canonical(numeric(json.loads(before))),
           "…and what it wrote is the document it was holding, key for key — compared with "

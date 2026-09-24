@@ -1038,12 +1038,38 @@ fresh instance, no `Reelcut: ` line in its log). Sizes (`wc -l`, remaining
 `clip_inspector6_proof.py` 373 → **390**, `phase6_proof.py` 1783 →
 **1794**.
 
-A finding, not fixed or run here: two sibling proofs carry the same stale
-copy. `e1_proof.py:89` has `VERSION = 8` against its own save check
-(l.719); it was last scored 99/99 before W1b (remaining §4 l.938,
-2026-09-20). `phase8_proof.py:202` has the same `VERSION = 8` against its
-checks at l.930 and l.953, and no document dates a score for it (remaining
-§4 l.895 says only what it proves).
+**The proof-version pass (2026-09-24).** The finding this section's
+first record left open is closed: `e1_proof.py` and `phase8_proof.py` no
+longer carry a copy of the format version (`VERSION = 8` in both, stale
+against 9 since W1b). All three scripts now share one shape at module
+level: a `HEADER` path to `core/include/reelcut_core.h`, a
+`format_version()` that reads `#define RC_FORMAT_VERSION (\d+)` off it,
+and `VERSION = format_version()`; and all three raise
+``RuntimeError(f"{HEADER} has no `#define RC_FORMAT_VERSION <n>` line")``
+when the `#define` is absent, where `phase6_proof.py`'s read used to die
+on `None.group`. The check messages name the source: "saving that project
+writes version 9, the header's RC_FORMAT_VERSION (found 9)" in E1, and
+"…still 9, the header's RC_FORMAT_VERSION: phase 8 is view state
+throughout and bumps nothing" and "the saved project.json is version 9,
+the header's RC_FORMAT_VERSION" in phase 8. `tools/proof/README.md`'s E1
+entry says "saves as the header's `RC_FORMAT_VERSION`". After a fresh
+`make app`: `phase8_proof.py` **79/79** (4861, launching 4862/4863
+itself) and `e1_proof.py` **99/99** (4825, reference build on 4826, no
+`SKIPPED:` block), with no `Reelcut: ` line in the three logs. Pointing
+each script's `HEADER` at `/dev/null` prints the guard's `RuntimeError`
+three times, one per script. Made to fail on purpose with
+`VERSION = format_version() - 1` on relaunched instances (4861, 4825;
+the 4826 reference stayed up): `phase8_proof.py` exits 1 at **77/79**,
+exactly its two version rows failing ("the project this build holds is
+schema version 9, still 8, …" and "the saved project.json is version 8,
+…"), and `e1_proof.py` exits 1 at **98/99**, exactly its one ("saving
+that project writes version 8, the header's RC_FORMAT_VERSION (found
+9)"); reverted. Sizes (`wc -l`, instruments, exempt): `e1_proof.py`
+1383 → **1396**, `phase8_proof.py` 1245 → **1259**, `phase6_proof.py`
+1794 → **1797**. Two other copies were found and left as they are:
+`e2_proof.py:77`'s `CURRENT_VERSION = 9` (its `VERSION = 8` is
+deliberate, l.74–76) and `phase9_proof.py:1499`'s `package(10)` ("one
+past current", whose comment at l.1495–1498 already names the trap).
 
 **Owed.**
 - A person feels the canvas in the mode, the width drag, the keyed-off

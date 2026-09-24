@@ -3538,7 +3538,7 @@ padding rather than the op.
   `== 55` on the reference, and both parity logs grepped empty. The two
   counts are what tells the instances apart.
 * **1, the schema.** A hand-written version-6 file opens with `curve:
-  linear, audio: false`; a copy of it saves as version 8 with `audio` the
+  linear, audio: false`; a copy of it saves as the header's `RC_FORMAT_VERSION` with `audio` the
   LAST key of `transition_in`, read off the text; `set_transition` over a
   stored style keeps the curve and the flag; and `set_transition_style` at a
   hard cut stores a MINTED transition that nothing draws (the frame at the

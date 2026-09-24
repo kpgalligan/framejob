@@ -892,7 +892,8 @@ and the closing above added the rest.
 - **A nest PLAYS once open** — the scoped composition's audio and its frame
   rate. `render_frame` is a still.
 - **Whether Preview Quality is actually FASTER.** Section 5 of
-  `phase8_proof.py` proves the player is asked for a smaller buffer; a render
+  `phase8_proof.py` proves the player is asked for a smaller buffer
+  (`phase8_proof.py` **79/79**, 2026-09-24); a render
   size is not a frame rate, and nobody has measured a frame time at any
   quality. Note the shadow passes do NOT get cheaper — `shadowSilhouette`
   allocates at canvas size — so the saving is not a clean 4×.
@@ -935,9 +936,11 @@ and the closing above added the rest.
   band draw and the selection block count up.
 - **Transitions and motion, watched and heard** — road map 5 §4g's and
   §6g's checks, now that §4e's and §6e's instruments have landed
-  (`e1_proof.py` 99/99, `e2_proof.py` 61/61, `e1_chrome.py` 21/21,
-  `e2_chrome.py` 35/35; all four are at their post-review counts of
-  2026-09-20, road map 5 §12 — E1's review moved `e1_proof.py` and
+  (`e1_proof.py` 99/99 on 2026-09-24, reading `RC_FORMAT_VERSION` off
+  the header, and `e2_proof.py` 61/61; `e1_chrome.py` 21/21 and
+  `e2_chrome.py` 52/52 as re-run through road map 9, whose sub-tabs
+  re-measured `e1_chrome.py` (road map 9 §8). The post-review counts of
+  2026-09-20 are road map 5 §12 — E1's review moved `e1_proof.py` and
   `e1_chrome.py`, E2's took `e2_chrome.py` from 24/24 to 33/33 and its
   residue run of 2026-09-20 to 35/35, with the four N·1 rows, the two N·2
   rows, the two N·3 rows, the per-clip write and its undo control, and the

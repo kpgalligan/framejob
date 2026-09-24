@@ -33,7 +33,7 @@ the reference's `== 75` / `== 55` stay exact, because that tree is frozen.
 
 * **0** the two instances: tool and op counts, and both parity logs empty.
 * **1** the schema: a hand-written version-6 file opens with
-  `curve: linear, audio: false`; a copy of it saves as version 8 with `audio`
+  `curve: linear, audio: false`; a copy of it saves as the header's `RC_FORMAT_VERSION` with `audio`
   the LAST key of `transition_in`; `set_transition` over a stored style keeps
   the curve; `set_transition_style` at a hard cut stores a minted transition
   that nothing draws.
@@ -86,7 +86,20 @@ REFERENCE_TREE = os.path.join(WORK, "e1-reference")
 SEC = 600_000
 FRAME = 20_000
 CANVAS = (640, 360)
-VERSION = 8
+HEADER = os.path.join(ROOT, "core", "include", "reelcut_core.h")
+
+
+def format_version():
+    """`RC_FORMAT_VERSION` off the tree's own header, not a copy: a copy goes stale at every bump."""
+    with open(HEADER) as f:
+        text = f.read()
+    match = re.search(r"#define RC_FORMAT_VERSION (\d+)", text)
+    if match is None:
+        raise RuntimeError(f"{HEADER} has no `#define RC_FORMAT_VERSION <n>` line")
+    return int(match.group(1))
+
+
+VERSION = format_version()
 
 # This build's floors (D3's `op_argument_proof.py` owns the exact numbers),
 # and the reference build's exact counts — that tree is frozen at 1c3e92e.
@@ -717,7 +730,7 @@ def schema_part(mcp, v6_wipe):
     text = copy.save()
     found_version = re.search(r'"version"\s*:\s*(\d+)', text)
     check(f'"version": {VERSION}' in text,
-          f"saving that project writes version {VERSION} "
+          f"saving that project writes version {VERSION}, the header's RC_FORMAT_VERSION "
           f"(found {found_version.group(1) if found_version else 'no version key'})")
     pattern = (r'"transition_in"\s*:\s*\{\s*"kind"\s*:\s*"wipe"\s*,\s*'
                r'"curve"\s*:\s*"linear"\s*,\s*"audio"\s*:\s*false\s*\}')
