@@ -1093,6 +1093,28 @@ none of the logs has a parity complaint:
   and phase4 on 2 each, phase9 on its 8 stamped rows and the "one past"
   refusal (the version-9 file now opens), and e2 on its 1. Reverted.
 
+**The core's own version literals (2026-09-24).** The two Rust tests of
+the "one past current" refusal changed:
+- `schema_v3.rs`'s `a_file_one_version_newer_is_refused_with_the_exact_message`
+  and `model_tests.rs`'s `a_newer_format_version_is_refused_and_says_so`
+  now compute `RC_FORMAT_VERSION + 1`, as does the float case. They still
+  assert the whole message with both numbers.
+- `core/CLAUDE.md` used to say that a fixture left un-walked "passes either
+  way". That was wrong for these tests, since both assert the exact
+  message, and the rule now reads as the list of what reads the number.
+
+A new test, `schema_v3.rs`'s
+`the_header_states_the_same_format_version_as_the_core`, holds the
+header's `#define` to `format.rs`'s constant, because the proofs trust the
+header. `make test` is 827 passed and `make lint` is clean. Made to fail:
+- The header's `#define` set to 10 fails exactly the new test.
+- The gate loosened to `> RC_FORMAT_VERSION + 1` fails
+  `a_newer_format_version_is_refused_and_says_so`, and, run alone,
+  `a_file_one_version_newer_is_refused_with_the_exact_message`. Cargo
+  stops at the first failing test binary.
+
+Both files are restored.
+
 **Owed.**
 - A person feels the canvas in the mode, the width drag, the keyed-off
   switches and the collapse with Reduce Motion on and off (remaining §4).

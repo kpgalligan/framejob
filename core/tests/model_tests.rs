@@ -40,6 +40,7 @@ use reelcut_core::ffi_query::{
     rc_project_frame_recipe, rc_project_frame_recipe_opts, rc_project_snap_candidates,
     rc_snap_resolve,
 };
+use reelcut_core::format::RC_FORMAT_VERSION;
 
 /// Every `TransitionKind`, every `ShapeKind`, every `Curve` — the wire
 /// spellings from spec §5.2. A variant added to the model without a line
@@ -1046,16 +1047,17 @@ fn an_unknown_source_kind_is_a_schema_error() {
 
 #[test]
 fn a_newer_format_version_is_refused_and_says_so() {
-    // 10 is ONE PAST the current version, and it moves with every bump: the
-    // moment RC_FORMAT_VERSION reaches the number written here the test
-    // stops exercising the gate and starts asserting that a current file
-    // opens, which is a different claim entirely. The comment says "one
-    // past the current version" rather than naming a number, so the next
-    // bump does not have to rediscover that.
-    let msg = Handle::try_from_value(&json!({ "version": 10 }))
+    // ONE PAST the current version, computed rather than written, so a bump
+    // needs no edit here.
+    let current = RC_FORMAT_VERSION;
+    let future = current + 1;
+    let msg = Handle::try_from_value(&json!({ "version": future }))
         .expect_err("a newer format version must be refused");
-    assert_contains(&msg, "version 10 is newer than this build understands");
-    assert_contains(&msg, "(version 9)");
+    assert_contains(
+        &msg,
+        &format!("version {future} is newer than this build understands"),
+    );
+    assert_contains(&msg, &format!("(version {current})"));
     assert_contains(&msg, "update Reelcut");
 
     // The gate reads the RAW json, so it has to cope with however the
@@ -1064,9 +1066,12 @@ fn a_newer_format_version_is_refused_and_says_so() {
     // fall back to "current", and reach the user as a schema error about a
     // field this build has never heard of.
     // One past the current version again, written as a float.
-    let msg = Handle::try_from_value(&json!({ "version": 10.0 }))
+    let msg = Handle::try_from_value(&json!({ "version": f64::from(future) }))
         .expect_err("a newer format version written as a float must be refused");
-    assert_contains(&msg, "version 10 is newer than this build understands");
+    assert_contains(
+        &msg,
+        &format!("version {future} is newer than this build understands"),
+    );
 
     // A version that is not a number at all is named rather than ignored.
     let msg = Handle::try_from_value(&json!({ "version": "two" }))

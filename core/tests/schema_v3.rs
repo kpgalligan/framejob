@@ -17,8 +17,8 @@
 //!   silently dropping every name and label in a newer file (unknown keys
 //!   are ignored, by design — `model.rs`'s module doc), so the bump has to
 //!   be there even though no field needed rewriting. The number the test
-//!   uses tracks `RC_FORMAT_VERSION` + 1; the claim is about the gate, not
-//!   about any one version.
+//!   uses is `RC_FORMAT_VERSION` + 1, computed; the claim is about the
+//!   gate, not about any one version.
 //! - **Identity travels with the clip, and no further.** A split clone
 //!   carries name and label to both halves (`duplicate`, `detach_audio` and
 //!   `paste` clone the same way); `nest` copies `solo` into the nest's own
@@ -33,6 +33,8 @@
 mod common;
 
 use serde_json::{json, Value};
+
+use reelcut_core::format::RC_FORMAT_VERSION;
 
 use common::{array, at, by_id, flag, int, text, Handle};
 
@@ -110,18 +112,35 @@ fn a_version_one_file_reads_the_same_way() {
 
 #[test]
 fn a_file_one_version_newer_is_refused_with_the_exact_message() {
-    // 10 is ONE PAST the current version, and it has to move with every
-    // bump: the moment RC_FORMAT_VERSION reaches the number written here,
-    // this stops testing the gate and starts testing that a current file
-    // opens. The comment says "one past the current version" rather than a
-    // number so the next bump does not have to rediscover that.
-    let msg = Handle::try_from_value(&json!({ "version": 10 }))
+    // ONE PAST the current version, computed rather than written: a literal
+    // here had to be walked forward by hand at every bump. The message is
+    // still asserted whole, with both numbers in it.
+    let current = RC_FORMAT_VERSION;
+    let future = current + 1;
+    let msg = Handle::try_from_value(&json!({ "version": future }))
         .expect_err("a newer format version must be refused");
     assert_eq!(
         msg,
-        "project format version 10 is newer than this build understands (version 9); \
-         update Reelcut to open it"
+        format!(
+            "project format version {future} is newer than this build understands \
+             (version {current}); update Reelcut to open it"
+        )
     );
+}
+
+#[test]
+fn the_header_states_the_same_format_version_as_the_core() {
+    // The version lives twice, `format.rs` and the C header's `#define`, and
+    // a bump must move both (core/CLAUDE.md, "Format changes"). The proof
+    // scripts read the HEADER's, so a bump that moved only `format.rs` would
+    // leave every proof testing the old number; this is the one place the
+    // two are compared.
+    let header = include_str!("../include/reelcut_core.h");
+    let stated = header
+        .lines()
+        .find_map(|line| line.strip_prefix("#define RC_FORMAT_VERSION "))
+        .expect("the header has a `#define RC_FORMAT_VERSION <n>` line");
+    assert_eq!(stated.trim().parse::<u32>().ok(), Some(RC_FORMAT_VERSION));
 }
 
 // ---- the round trip ------------------------------------------------------

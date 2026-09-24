@@ -454,19 +454,26 @@ and write the loss back on the next save; a bump that changes a field's
 SHAPE adds a step at the migration hook (`migrate_1_to_2`). Each bump gets a
 `schema_vN.rs` test that opens the previous versions' fixtures and reads the
 new keys' ORDER off the written text, since a parsed `Value` sorts them.
-**Trap:** the "one past the current version, refuse" fixtures in
-`core/tests/schema_v3.rs` and `core/tests/model_tests.rs` must be walked
-forward with every bump, or they stop testing the gate and pass either way;
-each says "one past the current version" in its comment rather than a
-number, and `schema_v4.rs`'s claim about which key closes the video object
-travels to the newest key. **A proof script never writes the current
-version as a literal:** `tools/proof/*_proof.py` read `RC_FORMAT_VERSION`
-off the header through a `format_version()` helper (`e1`, `e2`, `phase2`,
-`phase3`, `phase4`, `phase6`, `phase8` and `phase9` do, and `phase9`'s
-"one past" fixture is `format_version() + 1`), so a bump needs no proof
-edit, and a proof that expects a literal fails weeks later in someone
-else's session with nothing pointing at the bump. A script's own FIXTURE
-version (`e2_proof.py`'s `VERSION = 8`) is a literal on purpose.
+**Nothing that checks the version writes the current number as a
+literal**, so a bump edits `format.rs` and the header and no test or proof:
+- The "one past the current version, refused" tests in
+  `core/tests/schema_v3.rs` and `core/tests/model_tests.rs` compute
+  `RC_FORMAT_VERSION + 1` and assert the refusal's whole message with
+  both numbers.
+- `schema_v3.rs`'s `the_header_states_the_same_format_version_as_the_core`
+  holds the header's `#define` to `format.rs`'s constant, so a bump that
+  moves only one of them fails `make test`.
+- The proof scripts (`tools/proof/*_proof.py`) read the HEADER's number
+  through a `format_version()` helper. `phase9`'s "one past" fixture is
+  `format_version() + 1`, and its every-version loop runs up to the current
+  version. A proof that expected a literal would fail weeks later, in
+  someone else's session, with nothing pointing at the bump.
+
+A fixture's own version (`e2_proof.py`'s `VERSION = 8`, a
+`schema_vN.rs`'s older files) is a literal on purpose. One claim still
+moves with the schema rather than the number: when a bump appends a key to
+the video object, `schema_v4.rs`'s text assertion about what follows
+`obscure` fails in `make test` and names the new neighbour.
 
 **Tests.** All tests are black-box in `core/tests/` (no `#[cfg(test)]` in
 `src/`), exercised **through the FFI** wherever possible, and verified
