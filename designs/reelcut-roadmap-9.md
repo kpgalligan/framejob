@@ -1,8 +1,8 @@
 # Reelcut — road map 9: the clip inspector redesign
 
 **Status: phases 1, 2, 3a and 3b BUILT, 2026-09-23 (§2, §4, §6, §8);
-phase 4 BUILT, 2026-09-24 (§9, §10). Phase 5 is designed by the handoff and
-not built (§0).**
+phase 4 BUILT, 2026-09-24 (§9, §10); phase 5 BUILT, 2026-09-24 (§11, §12).
+The road map is complete; what a person still owes is remaining §4.**
 
 The handoff is `designs/design_handoff_clip_inspector/` — its README is the
 normative text for the redesign's metrics, inks and behaviour, with this
@@ -42,8 +42,9 @@ the view state everything else hangs on lands first.
 4. **Retiming by drag** — BUILT, §9 and §10. Band drags in the lane and on
    the timeline (`set_action`), hover, grips, the HUD and the ghost; the
    lane's fades, wedges, hatch and curve glyph.
-5. **The rest of the mode** (P9, P10, P12) — canvas handle drags following
-   the mode, keyed-off switches, `mixed` on sub-rows, Reduce Motion.
+5. **The rest of the mode** (P9, P10, P12) — BUILT, §11 and §12. Canvas
+   handle drags following the mode, keyed-off switches, `mixed` on
+   sub-rows, Reduce Motion.
 
 ## 1. Phase 1's design
 
@@ -770,3 +771,192 @@ untouched. Two review nits from this phase, not fixed:
 
 The spec's `pkill` line for the proof instance cannot match, because the
 port is in the environment rather than argv. Kill the instance by its pid.
+
+## 11. Phase 5's design
+
+**Decisions first** (spec §11 CI-13, CI-14 and CI-15), written before the
+code, with §4.2's canvas bullet, §4.3's row-marks sentence, §5.4's stored
+`null` and §6's `set_action_end {clip, action, patch, off?}`.
+
+**The canvas follows the mode (P9, CI-13).** `CanvasEditTarget` is a value:
+nil, or the selected action's clip, id and end time. It reaches
+`PreviewCanvasView.editTarget` through `refreshCanvas`, which every
+selection change already runs (`viewStateDidChange`); no new channel. The
+sessions' `ops(to:)` / `op(to:)` ask it for their op — `set_action_end` for
+the selected action's clip, `set_video` (or `set_text` for a width) for any
+other — and every `begin*` and the nudge read its `start(of:in:)`, one
+`clip_state` at the action's end decoded through `InspectorBinding.decode`,
+the inspector's own read. A shape's box scale is `.base` whole
+(`forScale(of:)`), because `set_shape` has no action form and the
+`set_video` that pins the pivot must land on the same state; the `.box` arm
+ignores the target for both its ops. An endpoint drag is `set_shape` too
+and stays base; a multi-selection is `.base` because no action is selected
+then (CI-1).
+
+**Keyed off (P10, CI-14).** The core's end-patch `null` is a removal, so an
+unchecked switch inside an action used to REMOVE the key rather than key it
+off. `set_action_end` gains `off: Option<Vec<String>>` — `Kind::Texts` in
+the table, `{"type": "array", "items": {"type": "string"}}` in the schema,
+absence and `null` alike by the table's null contract — whose
+`"group.key"` paths are written as `null` after the merge and the prune.
+`check_off` refuses, in order, a path that is not `group.key`, a group an
+end patch may not name (the walk's `unknown key`), `video.motion` and
+`text.words` (the op's two sentences, shared with `patch` through
+`not_a_target`), a path the patch also names, and whatever
+`merge_group::<Props>` says of a `null` at that key — an unknown key, a
+required one. A non-object group slot (a file's `end` is stored as found) is
+replaced by `{}` before the write. The typed `ReelOp.setActionEnd` lifts
+every top-level null into `off`; the raw builder, which `clearOps` and
+every agent call use, keeps a null a removal. `InspectorBinding.paths(of:)`
+unions `off`, or a switch row inside an action would be ⊘.
+
+**`mixed` and the collapse (P12, CI-15).** Twenty-two sub-rows gain
+`mixed:` in the chroma rows' pattern — Shadow ×5, Duck ×3, Compressor ×5,
+Outline ×2, Backdrop ×3, Box ▸ Width, Stroke ×2, Fill ×2 — and
+`InspectorSection.toggle()` runs its change through
+`DS.animate(DS.stateDuration)`, Rasterize's one door, unanimated under
+Reduce Motion; `reveal()` and `expandByDefault()` stay instant.
+
+**The nits.** Box ▸ Width passes `resets: false` (§8); the lane-drag wall is
+the clip's length floored to the frame grid (§10); `ActionLaneView.refresh()`
+invalidates its cursor rects only when its key — the clip, its actions'
+spans, the frame and the clip's length — changes (§10); the strip row
+re-measured at two widths (§8). The stale `pkill` line is in no repo
+document but §10's own note; nothing changed.
+
+## 12. Phase 5's record
+
+**What landed** (2026-09-24). Spec §11's CI-13, CI-14 and CI-15 were
+written before the code, with §4.2, §4.3, §5.4 and §6. The core first:
+`set_action_end` takes `off` (`edit.rs`'s field, row and dispatch;
+`edit_action.rs`'s `not_a_target`, `check_off` and `key_off`;
+`op_table.rs`'s `Kind::Texts` and the row; `op_schema.rs`'s arm), with
+`core/tests/action_off.rs` (10 tests) and the per-kind arms in
+`op_table.rs`, `op_schemas.rs` and `op_nullability.rs` (inventory 55 and
+51; `op_schemas.rs`'s kind count 17 → 18, its test renamed
+`all_eighteen_kinds_are_carried_by_an_argument`). `edit_zoom.rs`'s one
+internal call passes `&[]`. No new `rc_*` export, the header untouched, no
+format bump. Then the app: `ReelOps.swift` (the raw `off`, the typed lift),
+`AgentServer+Clips.swift` (`off` through `stringsArg`, `setVideo`'s
+comment), `AgentCatalog+Clips.swift` (`off`'s description, which parity
+part 5 demands), `InspectorMarks.swift` (`paths(of:)` unions `off`); a new
+`CanvasEditTarget.swift`, the sessions' `to:` forms in
+`CanvasSessions.swift`, `PreviewCanvasView.swift` (frozen, wiring only) and
+`EditorViewController+Canvas.swift`'s `refreshCanvas`; `mixed:` on the 22
+sub-rows (`InspectorPane.swift`, `AudioPane.swift`, `TextPane.swift`,
+`ShapePane.swift`), Box ▸ Width's `resets: false`, `InspectorSection.toggle()`
+through `DS.animate`, the floored wall in `ActionDragSession.swift` and the
+cursor key in `ActionLaneView.swift`. The sizes are remaining §3's phase-5
+paragraph.
+
+**What was measured.** `make test` **826** passed, 0 failed (816 + the 10
+in `action_off.rs`), and `make lint` clean; `make typecheck` 0 errors and
+7 warnings; `make app` rc 0, and the built app's logs (ports 4851, 4903,
+4863, 4823, 4901) carry no `Reelcut: ` line. `clip_inspector6_proof.py`
+**23/23** — the probe's build and count rows, K1 ×7, K2 ×3, K4 ×2, K5 ×1,
+K6 ×2, and K3 ×6 over MCP against the built app on port 4851: `off:
+["video.shadow"]` stores `{"opacity": 0.5, "shadow": null}`, the frame at
+1.5 s is byte-identical (39 372 B) to the base shadow removed and differs
+from the frame before (43 261 B), `off: ["video.opacity"]` answers `cannot
+key "video.opacity" off: bad value at "opacity" in a video patch: invalid
+type: null, expected f64`, `["video.motion"]` answers the op's own
+sentence, and `offf` is refused by the gate naming the six arguments the
+tool takes. `--mutant target` exits 0: exactly K1's three routing rows
+fail — `op(video:)` per clip, the move session through the live edit, the
+nudge — and the shape row, the text row (which routes through
+`op(text:)`) and the start-state rows hold.
+
+**Re-runs on this tree.** `clip_inspector_proof.py` **39/39**,
+`clip_inspector2_proof.py` **32/32**, `clip_inspector3_proof.py` **31/31**,
+`clip_inspector4_proof.py` **46/46**, `clip_inspector5_proof.py` **36/36**
+(35 + the new D1 row; its `--mutant walls` exits 0 with five rows, the new
+one among them), `op_argument_proof.py` **133/133** (port 4903),
+`op_catalog_proof.py` **23/23** (4863), `op_contract_proof.py` BASELINE
+PASS (4 suites, 15 tests), `op_schema_probe.py` **28/28**,
+`patch_door_proof.py` **261/261** (4823), `phase3_chrome.py` **33/33**,
+`e2_chrome.py` **52/52**, `e1_chrome.py` **21/21**, `sharp_chrome.py`
+**29/29**, `phase4_proof.py` **83/83** (4901). `phase6_proof.py` scores
+**167/168** (4823): its one failure, "the saved project.json is version 8",
+is the script's own `VERSION = 8` against format version 9, stale since
+road map 8's W1b (`532e115`) and nothing this phase touched; it is left
+for its own fix. Rows re-measured in place, each dated 2026-09-24 in its
+file:
+
+- `clip_inspector4_probe.swift` R7's "spans the inspector's width" row
+  (§8's second nit) now shows the strip, clears it, widens the inspector
+  40 pt through the editor's vertical split and shows it again: 304 pt,
+  then 344 pt, the strip matching both; the identity row's count of heard
+  refusals is 2, the re-show's included.
+- `clip_inspector5_probe.swift` gains one D1 row (§10's first nit): a
+  3 310 000-tick clip at 30 fps floors its upper wall to 3 300 000 and a
+  far end resize answers 3 300 000. `clip_inspector5_proof.py`'s count
+  (D1 ×9) and its mutant's expected rows (five) follow it.
+
+**Deviations, each for a reason.**
+
+- **The drag starts from the END state, not from the box on screen.** The
+  canvas draws the recipe at the PLAYHEAD; a gesture with an action
+  selected starts from `start(of:in:)` — the end state — and moves it by
+  the pointer's travel, the inspector's "fields show the value they write".
+  With the playhead away from the action's end the box and what is written
+  differ by the animation's progress; a person judges that (remaining §4).
+- **`ActionLaneView`'s cursor key carries the clip's LENGTH beside the
+  spec's clip, spans and frame**: the bands' rects are laid out against
+  the clip's length, so a trim that keeps every span would otherwise keep
+  stale rects.
+- **`off`'s refusal for a required key names the full path** — `cannot key
+  "video.opacity" off: ` before the walk's own sentence, which names only
+  `opacity` in `a video patch`.
+- **The two `patch` checks now call `not_a_target`**, the function `off`
+  shares, so the two sentences are written once.
+- **K2's "checkbox reads off" is the row's own read** —
+  `binding.videoProps.shadow == nil`, the closure the checkbox draws from —
+  because `OptionCheckboxControl` publishes no state.
+- **K1's nudge row drives the editor's own `selectAction(_:)`** with the
+  playhead first outside every span: `ProjectDocument.selectAction` alone
+  fires no `viewStateDidChange`, so the canvas would not hear it — the
+  editor's intent is the path a person's click takes.
+
+**The review round (2026-09-24).** Review 1 raised two should-fix findings,
+both fixed:
+- `ActionDragSession`'s floored clip-length wall could sit below the
+  action's own end. When an action ends at an off-grid clip end, any move
+  shifted the band left by the sub-frame remainder. The wall is now
+  `max(floored, end)`. A new D1 row covers it, and it fails under the
+  walls mutant.
+- The canvas missed an action that the playhead's entry rule selects:
+  `canvasPlayheadMoved` never refreshed `editTarget`. A new K1 row scrubs
+  into action 4's span and out again, nudging each time, and it failed
+  before the fix (base x 10, end x 100). `canvasPlayheadMoved` now pushes
+  `CanvasEditTarget.current(document)` when it differs.
+
+**These supersede the scores above:**
+- `clip_inspector6_proof.py` is **24/24** (K1 ×8). `--mutant target` exits
+  0 with four rows failing: the three `op(video:)` rows and the scrub row.
+- `clip_inspector5_proof.py` is **37/37** (D1 ×10). `--mutant walls` exits
+  0 with six rows failing.
+- Every other score above held on the re-run.
+
+**Unresolved after review 2** (litecode runs one fix pass only):
+- **Should-fix, a correctness bug.** `PreviewCanvasView.continueGesture`
+  routes every tick through the LIVE `editTarget`, but each gesture's start
+  state was captured at mouse-down. `canvasPlayheadMoved` now rewrites
+  `editTarget` as playback runs. So a canvas drag held while playback
+  enters an action's span switches from `set_video` to `set_action_end`
+  mid-gesture, and writes base-derived values into the end state. The fix
+  is to capture the target once in each `begin*` and pass that to
+  `ops(to:)`/`op(to:)` on every tick.
+- **Should-fix, stale documentation.** `app/CLAUDE.md` (the Canvas entry)
+  and `CanvasEditTarget.swift`'s header both say the target reaches the
+  canvas through `refreshCanvas` alone; `canvasPlayheadMoved` now pushes it
+  too. `tools/proof/README.md`'s phase-5 entry still has the pre-fix counts
+  and does not list the scrub row.
+- **Nits.** No mutant removes the `canvasPlayheadMoved` push by itself; the
+  scrub row fails under `--mutant target` because of `op(video:)`. And
+  `ActionLaneView.refresh()` has a `let clip = clip` local.
+
+**Owed.** A person feels the canvas in the mode, the width drag, the
+keyed-off switches and the collapse with Reduce Motion on and off
+(remaining §4). `phase6_proof.py`'s stale `VERSION`. Remaining §5 still
+names phases 4 and 5 as next work; it was outside this phase's list. The
+unresolved review-2 findings above.

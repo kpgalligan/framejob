@@ -120,7 +120,8 @@ file is what governs a module now.
   dimensions, sourced from `edit_canvas.rs`'s own constants and never
   retyped — and never where it CLAMPS, which is the app's to say in its
   prose. A row holds no prose, no semantics and no default spelled twice;
-  `Kind` is closed, carries each vocabulary's members, and has exactly ONE
+  `Kind` is closed (eighteen kinds; `Texts`, a list of strings, is
+  `set_action_end`'s `off`), carries each vocabulary's members, and has exactly ONE
   kind per answer serde gives, because a distinction the
   decoder cannot see is one no test could prove. Nothing here is the
   authority — the enum's fields are, and `core/tests/op_table.rs` proves
@@ -264,7 +265,12 @@ file is what governs a module now.
   read per group. The door is composed here because which groups an end
   patch names, and what a `null` in one means, are facts about an ACTION;
   values are deliberately not range-checked, and `actions.rs`'s
-  `clamp_video` is the last line of defence for them. `nest` and `unnest`
+  `clamp_video` is the last line of defence for them. `set_action_end`'s
+  `off` (spec §11 CI-14) is the one way to STORE a `null` — the optional
+  property keyed OFF at the end — written after the merge and the prune;
+  `check_off` refuses what `patch` refuses (`not_a_target`'s two sentences,
+  and `merge_group`'s read of a `null` for an unknown or a required key),
+  and a non-object group slot is replaced by `{}`, never indexed. `nest` and `unnest`
   (fresh ids, content byte-equal);
   `paste`, whose payload schema is its module doc, and `paste_attributes`,
   which copies the EARLIEST clip's property groups (then the front-most, then

@@ -67,7 +67,7 @@ extension EditorViewController {
         // layers rather than the timeline's with a flattened nest among them.
         canvas.update(
             project: document.editedProject, selection: document.selection,
-            playhead: document.playhead)
+            playhead: document.playhead, target: CanvasEditTarget.current(document))
         // Selection travels on this same channel (`viewStateDidChange`), and
         // an armed eyedropper is armed for particular clips
         // (EditorViewController+Eyedropper.swift), so this is where it learns
@@ -94,6 +94,11 @@ extension EditorViewController {
     /// its recipe lazily, so this costs nothing with an empty selection.
     func canvasPlayheadMoved() {
         previewCanvas?.setPlayhead(document?.playhead ?? 0)
+        // Entering a span selects it (spec §11 CI-1) with no refresh, so the
+        // gesture target is pushed here too, only on a change.
+        guard let document = document, let canvas = previewCanvas else { return }
+        let target = CanvasEditTarget.current(document)
+        if canvas.editTarget != target { canvas.editTarget = target }
     }
 
     // MARK: - Intents from the view

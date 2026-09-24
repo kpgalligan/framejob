@@ -465,10 +465,11 @@ extension AgentServer {
     /// and every canvas gesture (`CanvasMoveSession` and its siblings).
     ///
     /// **The inspector's redirect is deliberately NOT mirrored here**: with
-    /// an action SELECTED (spec §11 CI-2) the panes write `set_action_end`
-    /// instead, because that is what editing an action's end state means.
-    /// The agent says which it wants — `set_video` changes the clip's BASE
-    /// props, `set_action_end` an action's end state.
+    /// an action SELECTED (spec §11 CI-2) the panes — and, since CI-13, the
+    /// canvas gestures — write `set_action_end` instead, because that is
+    /// what editing an action's end state means. The agent still chooses —
+    /// `set_video` changes the clip's BASE props, `set_action_end` an
+    /// action's end state.
     ///
     /// **The patch goes to the core UNREAD** (deepening D1·3,
     /// `designs/reelcut-roadmap-7.md` §2.3). Decoding the object into a
@@ -835,9 +836,11 @@ extension AgentServer {
         let clip = try clipArg(a, "clip", document)
         let action = try actionArg(a, "action", clip)
         let patch = try rawPatchArg(a, "patch")
+        // `off` (CI-14) is the caller's own choice; its refusals are the core's.
+        let off = try stringsArg(a, "off") ?? []
         return try editResult(
             document, "Action End",
-            [.setActionEndRaw(clip: clip.id, action: action.id, patch: patch)])
+            [.setActionEndRaw(clip: clip.id, action: action.id, patch: patch, off: off)])
     }
 
     /// `remove_action` — the action lane's trash button, and ⌫ with an

@@ -980,19 +980,39 @@ extension ReelOp {
     /// rather than any one group's. `video.motion` is refused by the core
     /// too, because a preset is anchored to the clip's two ends and an
     /// action is a ramp between two states.
-    static func setActionEndRaw(clip: UInt32, action: UInt32, patch: Any) -> ReelOp {
+    ///
+    /// `off` is `"group.key"` paths the core writes as `null` after the
+    /// merge — the property keyed OFF at the end (spec §11 CI-14) — and is
+    /// written only when non-empty, so every call without it is the JSON it
+    /// always was. A null in `patch` stays a REMOVAL (`clearOps`, agents).
+    static func setActionEndRaw(
+        clip: UInt32, action: UInt32, patch: Any, off: [String] = []
+    ) -> ReelOp {
         var a = OpArgs()
         a.put("clip", clip)
         a.put("action", action)
         a.put("patch", patch)
+        if !off.isEmpty { a.put("off", off) }
         return ReelOp(name: "set_action_end", args: a.values)
     }
 
-    /// Merges into the action's end patch. A key the patch sets to null is
-    /// REMOVED from the end state — see `VideoPatch.shadow`'s double
-    /// optional, which is how "clear it" is spelled.
+    /// Merges into the action's end patch. A typed `.some(nil)` — a switch
+    /// the inspector turned OFF (`VideoPatch.shadow`'s double optional) — is
+    /// LIFTED out of the patch into `off`, so the end state holds the
+    /// property off rather than losing the key (spec §11 CI-14). Removal
+    /// keeps its one spelling: `InspectorBinding.clearOps`' raw nulls.
     static func setActionEnd(clip: UInt32, action: UInt32, patch: ActionPatch) -> ReelOp {
-        setActionEndRaw(clip: clip, action: action, patch: patch.dictionary)
+        var groups = patch.dictionary
+        var off: [String] = []
+        for (group, body) in groups {
+            guard var fields = body as? [String: Any] else { continue }
+            for (key, value) in fields where value is NSNull {
+                off.append("\(group).\(key)")
+                fields[key] = nil
+            }
+            groups[group] = fields
+        }
+        return setActionEndRaw(clip: clip, action: action, patch: groups, off: off.sorted())
     }
 
     static func removeAction(clip: UInt32, action: UInt32) -> ReelOp {

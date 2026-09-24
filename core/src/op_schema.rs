@@ -132,6 +132,7 @@ fn schema_of_kind(kind: Kind) -> Value {
         Kind::Number => json!({"type": "number"}),
         Kind::Boolean => json!({"type": "boolean"}),
         Kind::Text => json!({"type": "string"}),
+        Kind::Texts => json!({"type": "array", "items": {"type": "string"}}),
         Kind::Object => json!({"type": "object"}),
         Kind::Color => json!({
             "type": "array",

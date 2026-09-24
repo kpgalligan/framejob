@@ -201,6 +201,42 @@ if let (card, fps) = sessionFixture("chrome"),
     check("D1 the zero session fixture", false)
 }
 
+// Added 2026-09-24 (road map 9 phase 5, §10's first nit): a clip whose length
+// is OFF the frame grid — 3 310 000 ticks at 30 fps, half a frame past
+// 3 300 000 — floors its upper wall to the grid, so a far end resize stops on
+// a frame the core's nearest-snap cannot round past the clip's end.
+if let (card, fps) = sessionFixture("chrome") {
+    let three = ActionSnapshot(id: 3, start: at(0.5), duration: at(1.0))
+    let clip = ClipSnapshot(
+        id: card.id, track: card.track, start: 0, duration: 3_310_000, source: card.source,
+        actions: [three])
+    var session = ActionDragSession(
+        clip: clip, action: three, mode: .resize(.end), grabAt: at(1.5), fps: fps)
+    session.update(clipTime: at(20))
+    check("D1 walls: a 3 310 000-tick clip at 30 fps floors its upper wall to the grid — an "
+            + "end resize far right answers end 3 300 000",
+          session.upperWall == 3_300_000 && session.endTime == 3_300_000,
+          "upper wall \(session.upperWall), end \(session.endTime)")
+    // Added 2026-09-24 (phase 5 review, finding 1): an action ENDING at that
+    // off-grid clip end keeps its own end as the wall — a move right leaves it
+    // where it is and registers nothing.
+    let tail = ActionSnapshot(id: 3, start: at(4.5), duration: 3_310_000 - at(4.5))
+    let tailClip = ClipSnapshot(
+        id: card.id, track: card.track, start: 0, duration: 3_310_000, source: card.source,
+        actions: [tail])
+    var move = ActionDragSession(
+        clip: tailClip, action: tail, mode: .move, grabAt: at(5.0), fps: fps)
+    move.update(clipTime: at(20))
+    check("D1 walls: an action ending at a 3 310 000-tick clip's off-grid end, moved right, "
+            + "stays put — its own end is the wall, and nothing changed",
+          move.upperWall == 3_310_000 && move.start == at(4.5) && move.endTime == 3_310_000
+            && !move.changed,
+          "upper wall \(move.upperWall), start \(move.start), end \(move.endTime), "
+            + "changed \(move.changed)")
+} else {
+    check("D1 the off-grid session fixture", false)
+}
+
 // MARK: - D2 the timeline, D4 its hover, D5 its hit test
 
 func timelineBand(_ timeline: TimelineView, clip id: UInt32, action: UInt32) -> CGRect? {

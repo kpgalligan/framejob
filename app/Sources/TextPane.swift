@@ -222,6 +222,7 @@ final class TextPane: InspectorPaneView {
                             text: TextPatch(
                                 outline: .some(OutlineProps(width: value, color: current().color))))
                     },
+                    mixed: { binding.mixedText { $0.outline?.width } },
                     enabled: on),
                 inspectorColorRow(
                     "Color", binding, name: "Outline Color", read: { current().color },
@@ -230,6 +231,7 @@ final class TextPane: InspectorPaneView {
                             text: TextPatch(
                                 outline: .some(OutlineProps(width: current().width, color: color))))
                     },
+                    mixed: { binding.mixedText { $0.outline?.color } },
                     enabled: on),
             ])
     }
@@ -264,6 +266,7 @@ final class TextPane: InspectorPaneView {
                                 color: color, padding: current().padding,
                                 radius: current().radius))
                     },
+                    mixed: { binding.mixedText { $0.backdrop?.color } },
                     enabled: on),
                 inspectorValueRow(
                     "Padding", binding, name: "Backdrop Padding", unit: " px", decimals: 0,
@@ -274,6 +277,7 @@ final class TextPane: InspectorPaneView {
                             BackdropProps(
                                 color: current().color, padding: value, radius: current().radius))
                     },
+                    mixed: { binding.mixedText { $0.backdrop?.padding } },
                     enabled: on),
                 inspectorValueRow(
                     "Radius", binding, name: "Backdrop Radius", unit: " px", decimals: 0, min: 0,
@@ -284,6 +288,7 @@ final class TextPane: InspectorPaneView {
                             BackdropProps(
                                 color: current().color, padding: current().padding, radius: value))
                     },
+                    mixed: { binding.mixedText { $0.backdrop?.radius } },
                     enabled: on),
             ])
     }
@@ -324,7 +329,8 @@ final class TextPane: InspectorPaneView {
                     max: 20000, slider: false,
                     read: currentWidth,
                     ops: { binding.ops(text: TextPatch(width: .some($0))) },
-                    enabled: fixed),
+                    mixed: { binding.mixedText { $0.width } },
+                    enabled: fixed, resets: false),
             ])
     }
 

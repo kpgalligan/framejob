@@ -100,6 +100,7 @@ final class ShapePane: InspectorPaneView {
                             shape: ShapePatch(
                                 stroke: .some(StrokeProps(width: value, color: current().color))))
                     },
+                    mixed: { binding.mixedShape { $0.stroke?.width } },
                     enabled: on),
                 inspectorColorRow(
                     "Color", binding, name: "Stroke Color", read: { current().color },
@@ -108,6 +109,7 @@ final class ShapePane: InspectorPaneView {
                             shape: ShapePatch(
                                 stroke: .some(StrokeProps(width: current().width, color: color))))
                     },
+                    mixed: { binding.mixedShape { $0.stroke?.color } },
                     enabled: on),
             ])
     }
@@ -137,6 +139,7 @@ final class ShapePane: InspectorPaneView {
                 inspectorColorRow(
                     "Color", binding, name: "Fill Color", read: current,
                     ops: { binding.ops(shape: ShapePatch(fill: .some($0))) },
+                    mixed: { binding.mixedShape { $0.fill } },
                     enabled: on),
                 inspectorValueRow(
                     "Opacity", binding, name: "Fill Opacity", unit: "%", decimals: 0, min: 0,
@@ -148,6 +151,7 @@ final class ShapePane: InspectorPaneView {
                         color[3] = value / 100
                         return binding.ops(shape: ShapePatch(fill: .some(color)))
                     },
+                    mixed: { binding.mixedShape { $0.fill?.last } },
                     enabled: on),
             ])
     }

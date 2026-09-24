@@ -129,8 +129,8 @@ enum CanvasHit: Equatable {
 ///
 /// The recipe carries EVALUATED properties (actions already applied, §5.4),
 /// which is what must be drawn; the ops a gesture emits are written against
-/// the clip's BASE props instead, because that is what `set_video` merges
-/// into. The two are the same value until a clip has actions (M3).
+/// the target's props instead (`CanvasEditTarget`: the base, or the selected
+/// action's end state), never the playhead's interpolated value.
 struct CanvasLayerBox {
     let clip: ClipSnapshot
     let canvas: CanvasSnapshot
@@ -260,9 +260,9 @@ struct CanvasLayerBox {
     ///
     /// **It reads the EVALUATED props, and that is the opposite of every
     /// gesture session in this file.** Move, Scale, Rotate and Crop all
-    /// capture the clip's BASE props at mouse-down, because `set_video`
-    /// merges into base props and a clip inside an action must not be baked
-    /// to its animated value. A region is measured the other way round: the
+    /// capture the target's props at mouse-down (`CanvasEditTarget.start`),
+    /// because the op merges into them and a clip inside an action must not
+    /// be baked to its animated value. A region is measured the other way round: the
     /// user drags over what is ON SCREEN, and a source-pixel answer is
     /// transform-invariant only if the un-transform matches the transform
     /// that drew it. `video` here IS the recipe's evaluated state, so a clip
@@ -455,10 +455,10 @@ func chromaKeyComponents(_ color: RGBA) -> [Double] {
 /// clip moves by the same canvas-space delta; the anchor clip's rectangle is
 /// what snapping tests, so the whole selection clicks into place together.
 ///
-/// The op writes BASE props plus the delta, never the evaluated position, so
-/// a clip inside an action is not silently baked to its animated value.
+/// The op writes the target's props plus the delta (the base, or the selected
+/// action's end state — CI-13), never the evaluated position at the playhead.
 struct CanvasMoveSession {
-    /// Base `(x, y)` per clip, captured from the gesture-start snapshot.
+    /// The target's `(x, y)` per clip, captured at mouse-down.
     let bases: [UInt32: CGPoint]
     let anchor: UInt32
     /// The anchor's rotated bounds at mouse-down.
@@ -473,15 +473,15 @@ struct CanvasMoveSession {
     /// only selects must not register an undo step.
     var didMove = false
 
-    /// One `set_video` per clip: each keeps its own base position, so a
-    /// multi-clip move cannot collapse the selection onto one point.
-    var ops: [ReelOp] {
+    /// One op per clip, routed by `target`: each keeps its own position, so
+    /// a multi-clip move cannot collapse the selection onto one point.
+    func ops(to target: CanvasEditTarget) -> [ReelOp] {
         bases.keys.sorted().compactMap { id in
             guard let base = bases[id] else { return nil }
-            return .setVideo(
-                clips: [id],
-                patch: VideoPatch(
-                    x: canvasRound(base.x + delta.dx), y: canvasRound(base.y + delta.dy)))
+            return target.op(
+                video: VideoPatch(
+                    x: canvasRound(base.x + delta.dx), y: canvasRound(base.y + delta.dy)),
+                clip: id)
         }
     }
 
@@ -525,7 +525,7 @@ struct CanvasScaleSession {
     let clip: UInt32
     let handle: CanvasHandle
     let target: CanvasScaleTarget
-    /// The clip's BASE video props at mouse-down (see `CanvasLayerBox`).
+    /// The target's video props at mouse-down (`CanvasEditTarget.start`).
     let base: VideoProps
     /// The uncropped rectangle at mouse-down, un-rotated, canvas space. Its
     /// centre IS the rotation anchor, which is what makes the position
@@ -549,15 +549,17 @@ struct CanvasScaleSession {
     static let minBox = 4.0
     static let maxBox = 20000.0
 
-    var ops: [ReelOp] {
+    func ops(to edit: CanvasEditTarget) -> [ReelOp] {
         let placement = VideoPatch(
             x: canvasRound(base.x + offset.dx), y: canvasRound(base.y + offset.dy))
         var uniform = placement
         uniform.scale = canvasRound(scale)
         switch target {
         case .uniform:
-            return [.setVideo(clips: [clip], patch: uniform)]
+            return [edit.op(video: uniform, clip: clip)]
         case .box:
+            // Base whatever `edit` says (CI-13): `set_shape` has no action
+            // form, and the placement that pins the pivot travels with it.
             return [
                 .setShape(
                     clips: [clip],
@@ -566,10 +568,8 @@ struct CanvasScaleSession {
                 .setVideo(clips: [clip], patch: placement),
             ]
         case .textWidth:
-            guard widthOnly else { return [.setVideo(clips: [clip], patch: uniform)] }
-            return [
-                .setText(clips: [clip], patch: TextPatch(width: .some(canvasRound(textWidth))))
-            ]
+            guard widthOnly else { return [edit.op(video: uniform, clip: clip)] }
+            return [edit.op(text: TextPatch(width: .some(canvasRound(textWidth))), clip: clip)]
         }
     }
 
@@ -686,8 +686,8 @@ struct CanvasRotateSession {
 
     static let snapDegrees = 15.0
 
-    var op: ReelOp {
-        .setVideo(clips: [clip], patch: VideoPatch(rotation: canvasRound(rotation)))
+    func op(to target: CanvasEditTarget) -> ReelOp {
+        target.op(video: VideoPatch(rotation: canvasRound(rotation)), clip: clip)
     }
 
     mutating func update(point: CGPoint, snapping: Bool) {
@@ -735,7 +735,9 @@ struct CanvasCropSession {
     /// floor, which is also what the core enforces.
     static let minRemaining = 1.0
 
-    var op: ReelOp { .setVideo(clips: [clip], patch: VideoPatch(crop: crop)) }
+    func op(to target: CanvasEditTarget) -> ReelOp {
+        target.op(video: VideoPatch(crop: crop), clip: clip)
+    }
 
     mutating func update(point: CGPoint) {
         let centre = CGPoint(x: startRect.midX, y: startRect.midY)

@@ -108,7 +108,12 @@ final class InspectorSection: NSView {
 
     private func toggle() {
         isExpanded.toggle()
-        content.isHidden = !isExpanded
+        // The redesign's one animation (spec §11 CI-15): through `DS.animate`,
+        // which runs it unanimated under Reduce Motion. The state is set at once.
+        DS.animate(DS.stateDuration) {
+            content.isHidden = !isExpanded
+            superview?.layoutSubtreeIfNeeded()
+        }
         header.isExpanded = isExpanded
         UserDefaults.standard.set(!isExpanded, forKey: Self.collapsedKeyPrefix + id)
         didToggle?(self)

@@ -788,6 +788,8 @@ extension AgentServer {
                     "action": "Action id.",
                     "patch": "{video?: {...}, audio?: {...}, text?: {...}} — the "
                         + "properties the animation ends at.",
+                    "off": "\"group.key\" paths (video.shadow, text.width) to switch OFF at the "
+                        + "end — stored as null, where a null in patch removes. Optional keys only.",
                 ]),
             opTool(
                 "remove_action",

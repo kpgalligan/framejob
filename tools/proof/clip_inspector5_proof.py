@@ -11,7 +11,7 @@ Two instruments, `clip_inspector4_proof.py`'s shape:
 * **the probe**, `clip_inspector5_probe.swift`, compiled AS `main.swift` over
   every file in `app/Sources` but the app's own `main.swift` on
   `harness/build.sh`'s swiftc line (a probe that will not build is a scored
-  FAILURE, never an exit). Rows D1–D6: the session's arithmetic (D1 ×8), the
+  FAILURE, never an exit). Rows D1–D6: the session's arithmetic (D1 ×10), the
   timeline driven through `beginGesture` / `continueGesture` / `endGesture`
   in a real editor (D2 ×7), the lane driven by synthesized mouse events into
   its own handlers (D3 ×5), the hover and the grip rule (D4 ×4), `hit(at:)`
@@ -79,6 +79,12 @@ MUTANT_EXPECTED = [
     "D1 walls: a zero-length action at the band's start (0.5 s) is a wall — a move left "
     "stops there",
     "D2 walls: one far tick (+5 s) lands abutting action 4 (start 1.5 s)",
+    # Added 2026-09-24 (road map 9 phase 5): the floored wall is a wall row too.
+    "D1 walls: a 3 310 000-tick clip at 30 fps floors its upper wall to the grid — an "
+    "end resize far right answers end 3 300 000",
+    # Added 2026-09-24 (phase 5 review, finding 1): the action's own end bounds the floor.
+    "D1 walls: an action ending at a 3 310 000-tick clip's off-grid end, moved right, "
+    "stays put — its own end is the wall, and nothing changed",
 ]
 
 RESULTS = []
@@ -126,7 +132,7 @@ def build_probe(sources, out):
     return ci.build_probe(sources, out)
 
 
-PROBE_COUNTS = {"D1": 8, "D2": 7, "D3": 5, "D4": 4, "D5": 2, "D6": 4}
+PROBE_COUNTS = {"D1": 10, "D2": 7, "D3": 5, "D4": 4, "D5": 2, "D6": 4}
 
 
 def probe_checks(sources, out, paths):
@@ -149,7 +155,7 @@ def probe_checks(sources, out, paths):
     with open(answer) as f:
         rows = json.load(f)["rows"]
     counts = {k: sum(1 for r in rows if r["name"].startswith(k + " ")) for k in PROBE_COUNTS}
-    check("the probe answers every D-row (D1 ×8, D2 ×7, D3 ×5, D4 ×4, D5 ×2, D6 ×4) and no "
+    check("the probe answers every D-row (D1 ×10, D2 ×7, D3 ×5, D4 ×4, D5 ×2, D6 ×4) and no "
           "D0 fixture row", counts == PROBE_COUNTS
           and not any(r["name"].startswith("D0 ") for r in rows), f"{counts}")
     for row in rows:

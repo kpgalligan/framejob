@@ -37,6 +37,10 @@ final class ActionLaneView: NSView, OptionControl {
     var pressed: UInt32?
     /// The band under the pointer while nothing is pressed.
     var hover: ActionBandHover? { didSet { if hover != oldValue { needsDisplay = true } } }
+    /// What the cursor rects were last built from: `refresh()` invalidates
+    /// them only when this changes, never on a playhead-only refresh.
+    private var cursorKey:
+        (clip: UInt32?, bands: [(UInt32, Ticks, Ticks)], frame: Ticks, length: Ticks)?
 
     init(binding: InspectorBinding, inspector: InspectorViewController?) {
         self.binding = binding
@@ -240,6 +244,13 @@ final class ActionLaneView: NSView, OptionControl {
             invalidateIntrinsicContentSize()
         }
         needsDisplay = true
+        let clip = clip
+        let key = (
+            clip: clipID, bands: (clip?.actions ?? []).map { ($0.id, $0.start, $0.duration) },
+            frame: binding.canvas.fps.frameDuration, length: clip?.duration ?? 0)
+        if let old = cursorKey, old.clip == key.clip, old.frame == key.frame,
+           old.length == key.length, old.bands.elementsEqual(key.bands, by: ==) { return }
+        cursorKey = key
         window?.invalidateCursorRects(for: self)
     }
 

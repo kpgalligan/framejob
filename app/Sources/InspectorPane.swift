@@ -657,6 +657,7 @@ func inspectorShadowSection(_ binding: InspectorBinding) -> InspectorSection {
                             color: color, opacity: s.opacity, blur: s.blur, angle: s.angle,
                             distance: s.distance))
                 },
+                mixed: { binding.mixedVideo { $0.shadow?.color } },
                 enabled: on),
             inspectorValueRow(
                 "Opacity", binding, name: "Shadow Opacity", unit: "%", decimals: 0, min: 0,
@@ -669,6 +670,7 @@ func inspectorShadowSection(_ binding: InspectorBinding) -> InspectorSection {
                             color: s.color, opacity: value / 100, blur: s.blur, angle: s.angle,
                             distance: s.distance))
                 },
+                mixed: { binding.mixedVideo { $0.shadow?.opacity } },
                 enabled: on),
             inspectorValueRow(
                 "Blur", binding, name: "Shadow Blur", unit: " px", decimals: 0, min: 0, max: 200,
@@ -681,6 +683,7 @@ func inspectorShadowSection(_ binding: InspectorBinding) -> InspectorSection {
                             color: s.color, opacity: s.opacity, blur: value, angle: s.angle,
                             distance: s.distance))
                 },
+                mixed: { binding.mixedVideo { $0.shadow?.blur } },
                 enabled: on),
             inspectorValueRow(
                 "Angle", binding, name: "Shadow Angle", unit: "°", decimals: 0, min: 0, max: 360,
@@ -693,6 +696,7 @@ func inspectorShadowSection(_ binding: InspectorBinding) -> InspectorSection {
                             color: s.color, opacity: s.opacity, blur: s.blur, angle: value,
                             distance: s.distance))
                 },
+                mixed: { binding.mixedVideo { $0.shadow?.angle } },
                 enabled: on),
             inspectorValueRow(
                 "Distance", binding, name: "Shadow Distance", unit: " px", decimals: 0, min: 0,
@@ -705,6 +709,7 @@ func inspectorShadowSection(_ binding: InspectorBinding) -> InspectorSection {
                             color: s.color, opacity: s.opacity, blur: s.blur, angle: s.angle,
                             distance: value))
                 },
+                mixed: { binding.mixedVideo { $0.shadow?.distance } },
                 enabled: on),
         ])
 }
@@ -870,7 +875,7 @@ final class InspectorBinding {
 
     /// One property group of `rc_project_clip_state`'s untyped reply, decoded
     /// through the same lenient path as the project itself.
-    private static func decode<T: Decodable>(_ type: T.Type, _ value: Any?) -> T? {
+    static func decode<T: Decodable>(_ type: T.Type, _ value: Any?) -> T? {
         guard let object = value, JSONSerialization.isValidJSONObject(object),
               let data = try? JSONSerialization.data(withJSONObject: object),
               let text = String(data: data, encoding: .utf8)

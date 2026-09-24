@@ -261,6 +261,7 @@ extension InspectorBinding {
                 found.formUnion(patch.keys.map { group + "." + $0 })
             } else if op.name == "set_action_end" {
                 found.formUnion(paths(inPatch: patch))
+                found.formUnion(op.args["off"] as? [String] ?? [])  // keyed OFF (CI-14)
             }
         }
         return found.sorted()

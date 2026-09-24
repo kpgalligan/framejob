@@ -47,7 +47,8 @@ normative: §5.2 is the project schema, §6 the op table, §7 the architecture.
   rotate and crop handles, line/arrow endpoint handles, safe-area guides,
   snapping to the canvas centre and edges, inline text editing, a region
   band on Z for a zoom or an obscured area, and Fit / 50 % / 100 % / 200 %
-  zoom stops.
+  zoom stops. With an action selected, a drag or an arrow-key nudge edits
+  that action's end state, as the inspector does.
 - **Inspector** with three tabs — Clip, Media, Document. The Clip tab is a
   selection header — the clip's name, editable there for a single clip and
   the one place a name can be cleared back to what the clip shows, with its
@@ -61,7 +62,8 @@ normative: §5.2 is the project schema, §6 the op table, §7 the architecture.
   presets; a mint `◆N` marks a tab the selected action keys), over that
   tab's sections, each collapsible. Every field shows and writes the clip's base
   props — or, while an action is selected, that action's END state, read
-  at its end tick. Each row is marked ◆ (the action keys it), ◇ (another
+  at its end tick; unchecking a switch there (a shadow, an outline) keys it
+  off at the action's end. Each row is marked ◆ (the action keys it), ◇ (another
   action does), ○ (it follows a keyed value) or ⊘ (actions cannot animate
   it), and a slider shows the value at the playhead as a coral tick.
   A section offers Reset only while it differs from its default, and Clear

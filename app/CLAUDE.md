@@ -40,6 +40,11 @@ detail there.
   argument is the caller's (a colour, a region, a new clip's patch) the typed
   factory DELEGATES to the raw one, mapping its optional explicitly, because
   an `Optional<T>.none` widened to `Any?` is a non-nil `Any` wrapping a nil.
+  The typed `setActionEnd` LIFTS every top-level null out of its patch into
+  `off` (spec §11 CI-14: a typed `.some(nil)` is a switch turned OFF, kept
+  at the end); `setActionEndRaw`'s nulls stay removals, which is what
+  `clearOps` and every agent call send, and it writes `off` only when
+  non-empty.
   `addZoomActionRaw`'s region is `Any` and not `Any?`: an absent key and an
   explicit null are opposite intentions there, and only the tool can tell
   them apart.
@@ -246,11 +251,20 @@ the key map behind it.
   `enabled.video`, which is the Detach switch.
 
 **Canvas.**
-- `PreviewCanvasView.swift` (frozen) · `CanvasSessions.swift` — the picture at
+- `PreviewCanvasView.swift` (frozen, 1112 lines after road map 9 phase 5's
+  wiring) · `CanvasSessions.swift` — the picture at
   document size and the handle gestures. All coordinate mapping goes through
   `viewToCanvas` / `canvasToView`, and every handle maps through
   `AVPlayerLayer.videoRect`, which is the aspect of the BUFFER — the reason
   Preview Quality must keep the canvas's exact aspect.
+- `CanvasEditTarget.swift` — what a gesture edits (spec §11 CI-13): the
+  base, or the selected action's END state. It reaches the canvas as
+  `editTarget` through `refreshCanvas` alone; the sessions' `ops(to:)` /
+  `op(to:)` ask it for `set_video` or `set_action_end` (and `set_text` for a
+  text clip's width), and every `begin*` and the nudge start from
+  `start(of:in:)` — one `clip_state` at the action's end, decoded through
+  `InspectorBinding.decode`. A shape's box scale is `.base` whole
+  (`forScale(of:)`): `set_shape` has no action form.
 
 **Inspector.**
 - `InspectorViewController.swift` (frozen: the tab strip, and the PINNED
@@ -288,7 +302,10 @@ the key map behind it.
   `InspectorSection.swift` (`InspectorSection` with its `id`, `title`,
   `header` and folded `marks` readable — `differs` from an explicit closure
   else the rows' defaults, `editing` the selected action's number when a
-  row animates — `clear()`, `reveal()` which writes no preference, and
+  row animates — `clear()`, `reveal()` which writes no preference and is
+  instant, the header click's `toggle()`, the redesign's one animation,
+  through `DS.animate(DS.stateDuration)` (unanimated under Reduce Motion,
+  spec §11 CI-15; the state is set at once), and
   `didToggle`, called by the header's click alone; and `KeyedReveal`,
   `ClipPane`'s auto-open, CI-8) · `InspectorSectionHeader.swift` (a pure
   move, then CI-9: the `◆N` / ◇ / ⊘, the one trailing slot — Clear while

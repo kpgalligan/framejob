@@ -43,9 +43,10 @@
 //! give**, which is the rule that says how many there are: two kinds serde
 //! refuses identically would be a distinction the table claims and no test
 //! could prove. So [`Kind::Ticks`], [`Kind::Number`], [`Kind::Boolean`],
-//! [`Kind::Text`], [`Kind::Ids`] and [`Kind::Ranges`] are `Ticks`, `f64`,
-//! `bool`, `String`, `Vec<u32>` and the silence cut's `Vec<[Ticks; 2]>`,
-//! and the nine named types map like this:
+//! [`Kind::Text`], [`Kind::Texts`], [`Kind::Ids`] and [`Kind::Ranges`] are
+//! `Ticks`, `f64`, `bool`, `String`, `Vec<String>` (`set_action_end`'s
+//! `off` paths), `Vec<u32>` and the silence cut's `Vec<[Ticks; 2]>`, and
+//! the nine named types map like this:
 //!
 //! - [`Kind::Id`] — `u32`: an id naming a clip, track, action, marker or
 //!   media, and the canvas's two pixel dimensions, which are the same whole
@@ -132,6 +133,7 @@ pub enum Kind {
     Number,
     Boolean,
     Text,
+    Texts,
     Object,
     Color,
     FrameRate,
@@ -174,8 +176,8 @@ impl Kind {
             Curve => &["linear", "ease_in", "ease_out", "ease_in_out"],
             Fit => &["fit", "fill"],
             Groups => &["video", "audio", "text", "shape"],
-            Ticks | Id | Index | Ids | Ranges | Number | Boolean | Text | Object | Color
-            | FrameRate | Region => &[],
+            Ticks | Id | Index | Ids | Ranges | Number | Boolean | Text | Texts | Object
+            | Color | FrameRate | Region => &[],
         }
     }
 }
@@ -276,7 +278,8 @@ pub const OP_TABLE: [OpRow; OP_COUNT] = [
     op("set_action",
        &[req("clip", Id), req("action", Id), opt("start", Ticks), opt("duration", Ticks),
          opt("curve", Curve)]),
-    op("set_action_end", &[req("clip", Id), req("action", Id), req("patch", Object)]),
+    op("set_action_end",
+       &[req("clip", Id), req("action", Id), req("patch", Object), opt("off", Texts)]),
     op("remove_action", &[req("clip", Id), req("action", Id)]),
 
     // ---- tracks, markers, canvas, media ---------------------------------

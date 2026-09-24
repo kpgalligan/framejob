@@ -217,6 +217,7 @@ final class AudioPane: InspectorPaneView {
                                 level: value / 100, attack: current().attack,
                                 release: current().release))
                     },
+                    mixed: { binding.mixedAudio { $0.duck?.level } },
                     enabled: on),
                 inspectorValueRow(
                     "Attack", binding, name: "Duck Attack", unit: " s", decimals: 2, min: 0,
@@ -228,6 +229,7 @@ final class AudioPane: InspectorPaneView {
                                 level: current().level, attack: ticks(value),
                                 release: current().release))
                     },
+                    mixed: { binding.mixedAudio { $0.duck?.attack } },
                     enabled: on),
                 inspectorValueRow(
                     "Release", binding, name: "Duck Release", unit: " s", decimals: 2, min: 0,
@@ -239,6 +241,7 @@ final class AudioPane: InspectorPaneView {
                                 level: current().level, attack: current().attack,
                                 release: ticks(value)))
                     },
+                    mixed: { binding.mixedAudio { $0.duck?.release } },
                     enabled: on),
             ])
     }
@@ -337,6 +340,7 @@ final class AudioPane: InspectorPaneView {
                                 attack: current().attack, release: current().release,
                                 makeupDb: current().makeupDb))
                     },
+                    mixed: { binding.mixedAudio { $0.compressor?.thresholdDb } },
                     enabled: on),
                 inspectorValueRow(
                     "Ratio", binding, name: "Compressor Ratio", unit: ":1", decimals: 1, min: 1,
@@ -349,6 +353,7 @@ final class AudioPane: InspectorPaneView {
                                 attack: current().attack, release: current().release,
                                 makeupDb: current().makeupDb))
                     },
+                    mixed: { binding.mixedAudio { $0.compressor?.ratio } },
                     enabled: on),
                 inspectorValueRow(
                     "Attack", binding, name: "Compressor Attack", unit: " ms", decimals: 0, min: 0,
@@ -361,6 +366,7 @@ final class AudioPane: InspectorPaneView {
                                 attack: ticks(value), release: current().release,
                                 makeupDb: current().makeupDb))
                     },
+                    mixed: { binding.mixedAudio { $0.compressor?.attack } },
                     enabled: on),
                 inspectorValueRow(
                     "Release", binding, name: "Compressor Release", unit: " ms", decimals: 0,
@@ -373,6 +379,7 @@ final class AudioPane: InspectorPaneView {
                                 attack: current().attack, release: ticks(value),
                                 makeupDb: current().makeupDb))
                     },
+                    mixed: { binding.mixedAudio { $0.compressor?.release } },
                     enabled: on),
                 inspectorValueRow(
                     "Makeup", binding, name: "Compressor Makeup", unit: " dB", decimals: 1, min: 0,
@@ -385,6 +392,7 @@ final class AudioPane: InspectorPaneView {
                                 attack: current().attack, release: current().release,
                                 makeupDb: value))
                     },
+                    mixed: { binding.mixedAudio { $0.compressor?.makeupDb } },
                     enabled: on),
             ])
     }

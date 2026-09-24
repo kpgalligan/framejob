@@ -47,7 +47,7 @@ struct ActionDragSession {
     /// actions, or 0.
     let lowerWall: Ticks
     /// The earliest start at or after the original end among the clip's
-    /// OTHER actions, or the clip's length.
+    /// OTHER actions, or the clip's length floored to the frame grid.
     let upperWall: Ticks
     let fps: Fps
 
@@ -71,7 +71,9 @@ struct ActionDragSession {
         self.fps = fps
         let end = action.endTime
         var lower: Ticks = 0
-        var upper = clip.duration
+        // Floored: an off-grid length would let a clamped edge snap past it.
+        // Never below the action's own end, or a move would clamp it left.
+        var upper = max(clip.duration - clip.duration % frame, end)
         for other in ActionBands.ordered(clip) where other.id != action.id {
             if other.endTime <= action.start { lower = max(lower, other.endTime) }
             if other.start >= end { upper = min(upper, other.start) }

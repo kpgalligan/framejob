@@ -361,9 +361,41 @@ if let document = opened("chrome") {
     let inspectorView = controller?.inspector?.view
     inspectorView?.layoutSubtreeIfNeeded()
     let spans = (strip?.frame.width, inspectorView?.bounds.width)
-    check("R7 … the shown strip spans the inspector's width",
-          strip?.superview != nil && spans.0 != nil && spans.0 == spans.1 && (spans.1 ?? 0) > 0,
-          "strip \(spans.0.map { "\($0)" } ?? "nil") pt, inspector \(spans.1.map { "\($0)" } ?? "nil") pt")
+    // Re-measured 2026-09-24 (road map 9 phase 5, §8's second nit): the row
+    // passed on the tree before that fix too, so it now shows the strip,
+    // clears it, widens the inspector 40 pt through the editor's split view
+    // and shows it again — the width must follow to the NEW inspector width.
+    strip?.clear()
+    let widthKey = EditorViewController.inspectorWidthKey
+    let storedWidth = UserDefaults.standard.object(forKey: widthKey)
+    // The vertical split whose trailing pane holds the inspector.
+    let split = controller.map { walk($0.view) }?.compactMap { $0 as? NSSplitView }.first { split in
+        guard split.isVertical, let pane = split.subviews.last, let inspectorView else {
+            return false
+        }
+        return inspectorView.isDescendant(of: pane)
+    }
+    if let split, let leading = split.subviews.first {
+        split.setPosition(leading.frame.width - 40, ofDividerAt: 0)
+        split.layoutSubtreeIfNeeded()
+    }
+    controller?.addActionAtPlayheadCommand()
+    spin(0.3)
+    inspectorView?.layoutSubtreeIfNeeded()
+    let wider = (strip?.frame.width, inspectorView?.bounds.width)
+    if let storedWidth {
+        UserDefaults.standard.set(storedWidth, forKey: widthKey)
+    } else {
+        UserDefaults.standard.removeObject(forKey: widthKey)
+    }
+    check("R7 … the shown strip spans the inspector's width; cleared, the inspector widened "
+            + "40 pt and shown again, it spans the new width",
+          strip?.superview != nil && spans.0 != nil && spans.0 == spans.1 && (spans.1 ?? 0) > 0
+            && strip?.isHidden == false && wider.0 != nil && wider.0 == wider.1
+            && wider.1 == (spans.1 ?? 0) + 40,
+          "strip \(spans.0.map { "\($0)" } ?? "nil") pt, inspector \(spans.1.map { "\($0)" } ?? "nil") pt; "
+            + "after: strip \(wider.0.map { "\($0)" } ?? "nil") pt, inspector "
+            + "\(wider.1.map { "\($0)" } ?? "nil") pt, split \(split != nil)")
     controller?.refreshInspector(isLive: false)
     check("R7 … a refresh under the same project keeps it", strip?.text == "Refused: " + reason,
           "strip '\(strip?.text ?? "nil")'")
@@ -374,8 +406,9 @@ if let document = opened("chrome") {
           "strip '\(strip?.text ?? "nil")', hidden \(strip?.isHidden ?? false)")
     document.applyEdit("Scale", [scale2])
     spin(0.3)
+    // 2026-09-24: two refusals were heard now, the re-show's included.
     check("R7 … an identity edit (scale 2 again) posts nothing and leaves it hidden",
-          heard.count == 1 && strip?.text == nil && strip?.isHidden == true,
+          heard.count == 2 && strip?.text == nil && strip?.isHidden == true,
           "heard \(heard.count), strip '\(strip?.text ?? "nil")'")
     NotificationCenter.default.removeObserver(token)
 }

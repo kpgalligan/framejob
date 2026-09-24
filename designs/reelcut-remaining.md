@@ -676,11 +676,55 @@ all wiring — the two stored properties, `hit(at:)`'s one line, the
 lines. The instruments, exempt: `tools/proof/clip_inspector5_proof.py` and
 `clip_inspector5_probe.swift` (new).
 
+**Road map 9's phase 5, the rest of the mode (2026-09-24, `wc -l`; road map
+9 §12).** One new file, `CanvasEditTarget.swift` **89** (under the spec's
+130). The four files over the cap took what the spec allowed and no pure
+move: `CanvasSessions.swift` 1088 → **1090** (the four `to:` forms, the
+`.box` arm's comment, the doc comments), `InspectorPane.swift` 1151 →
+**1156** (`decode` loses `private`; Shadow's five sub-rows gain `mixed:`),
+`AgentServer+Clips.swift` 853 → **856** (`off` read through `stringsArg`,
+`setVideo`'s comment), `AgentCatalog+Clips.swift` 799 → **801** (`off`'s
+description). `PreviewCanvasView.swift` (frozen) 1104 → **1112**: 27 lines
+in, 19 out, all wiring — `editTarget`, `update(…target:)`, the four
+`begin*` reads, the four session calls and the nudge. `ReelOps.swift` 1143
+→ **1163** (the raw `off` and the typed lift; `edit.rs`'s table exemption).
+Inside their caps: `ActionLaneView.swift` 364 → **375** (the cursor key),
+`ActionDragSession.swift` 173 → **174**, `InspectorSection.swift` 220 →
+**225**, `InspectorMarks.swift` 359 → **360**, `AudioPane.swift` 445 →
+**453**, `TextPane.swift` 543 → **549**, `ShapePane.swift` 418 → **422**;
+`EditorViewController+Canvas.swift` **161** unchanged. The core:
+`edit_action.rs` 369 → **451** (`not_a_target`, `check_off`, `key_off`),
+`edit.rs` 840 → **843**, `op_table.rs` 328 → **331**, `op_schema.rs` 173 →
+**174**, `edit_zoom.rs` **467** (one argument), and `core/tests/action_off.rs`
+**187** new; `op_table.rs`, `op_schemas.rs` and `op_nullability.rs` in
+`core/tests/` +2, +1, +1. The instruments, exempt:
+`tools/proof/clip_inspector6_proof.py` **342** and
+`clip_inspector6_probe.swift` **441** (new), `clip_inspector4_probe.swift`
+437 → **470**, `clip_inspector5_probe.swift` 480 → **500**,
+`clip_inspector5_proof.py` 292 → **295**.
+
 ## 4. What only a person at the machine can check
 
 These are not tasks so much as a list to run through at the machine once. The
 first two have been owed since M1 and spec §10 records them; phases 8 and 9
 and the closing above added the rest.
+
+- **The rest of the mode, FELT (road map 9's phase 5, 2026-09-24)** — in
+  the running app. The probe drives the canvas sessions, the nudge and the
+  inspector rows through their own entry points; no real pointer moved.
+  Worth judging: with an action selected, a canvas drag (move, scale,
+  rotate, crop) and an arrow-key nudge landing on the action's END state
+  while the box on screen is the frame at the playhead — the drag starts
+  from the end state and moves it by the pointer's travel, so a playhead
+  away from the action's end shows the box offset from what is being
+  written (spec §11 CI-13); a TEXT clip's width drag inside an action
+  starting from the action's end width rather than jumping to it; a shape's
+  box drag inside an action still resizing the shape itself; unchecking
+  Drop shadow (or an outline, a backdrop, a stroke) inside an action
+  showing ◆ "at end" and switching off only at the action's end; and a
+  section's header click with System Settings ▸ Accessibility ▸ Display ▸
+  Reduce motion ON (the collapse snaps) and OFF (it animates at 0.22 s),
+  an action's auto-open staying instant either way.
 
 - **Retiming by drag, FELT (road map 9's phase 4, 2026-09-24)** — in both
   appearances, in the running app, on the timeline and in the Clip tab's

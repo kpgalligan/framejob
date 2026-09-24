@@ -147,7 +147,7 @@
 //! | `add_action` | A new action at CLIP time `at` (the caller subtracts `clip.start`), 1 s long when `duration` is absent, end patch empty. Refuses when it would overlap another action or run past the clip. |
 //! | `add_zoom_action` | An `add_action` whose end patch is the `scale`, `x` and `y` that bring `region` to the canvas — the screencast zoom. An absent `duration` is 1 s, an absent `fit` is `fit` and an absent `curve` is `ease_in_out`. `region`'s `x`/`y` are its **CENTRE** and `width`/`height` its size, both SOURCE pixels from the centre of the clip's cropped rect (the spotlight's frame); `fit` shows the whole region, `fill` covers the whole canvas, both measured THROUGH the clip's rotation. Rotation and crop are read from the clip evaluated at `at`; the scale clamps to the layer maximum and the offsets follow the CLAMPED value, so a region too small to fill the canvas still lands centred. `region` absent or `null` is a zoom BACK: the end patch is the clip's base `scale`, `x`, `y`. The region is read the way a patch is: it must BE an object (a four-number list is refused, not read member by member), and an unknown, missing or wrong-typed member is an `Err` naming it. Same refusals as `add_action`; a clip with no video properties is an `Err`. |
 //! | `set_action` | Retimes or re-curves one action; omitted fields keep their value, same overlap checks. |
-//! | `set_action_end` | Merges into the action's `end` patch; a key set to `null` is removed from it, at any depth. Walked for keys and kinds like every other patch, over the three groups §5.4 allows (a `shape` object is an unknown key); values are NOT range-checked. A `video` object naming `motion` is an `Err`, and so is a `text` object naming `words`, a `null` included (W-6). |
+//! | `set_action_end` | Merges into the action's `end` patch; a key set to `null` is removed from it, at any depth. Walked for keys and kinds like every other patch, over the three groups §5.4 allows (a `shape` object is an unknown key); values are NOT range-checked. A `video` object naming `motion` is an `Err`, and so is a `text` object naming `words`, a `null` included (W-6). `off` (absent or `null`: none) is a list of `"group.key"` paths written as `null` AFTER the merge — the optional property keyed OFF at the end, where a `null` in `patch` removes (spec §11 CI-14); each is an `Err` when malformed, when it is `video.motion` or `text.words` (the same two sentences), when it names a key the group lacks or a required key, and when `patch` names it too. |
 //! | `remove_action` | Removes the action. |
 //!
 //! The placement equation `add_zoom_action` solves, and the two limits it
@@ -492,6 +492,8 @@ pub enum Op {
         clip: u32,
         action: u32,
         patch: Value,
+        #[serde(default)]
+        off: Option<Vec<String>>,
     },
     RemoveAction {
         clip: u32,
@@ -781,7 +783,8 @@ impl Project {
                 clip,
                 action,
                 patch,
-            } => self.set_action_end(*clip, *action, patch),
+                off,
+            } => self.set_action_end(*clip, *action, patch, off.as_deref().unwrap_or_default()),
             Op::RemoveAction { clip, action } => self.remove_action(*clip, *action),
 
             // ---- tracks, markers, canvas, media --------------------------

@@ -33,13 +33,13 @@
 //! any end patch carries, which is what closes a hand-written file, a
 //! pasted action and a project from another tool at once.
 
-use serde_json::Value;
+use serde_json::{json, Map, Value};
 
 use crate::actions::{self, MAX_PATCH_DEPTH};
 use crate::export::describe;
-use crate::model::{Action, Curve, Project};
+use crate::model::{Action, AudioProps, Curve, Project, ShapeProps, TextProps, VideoProps};
 use crate::outcome::Outcome;
-use crate::patch::{check_group_patch, unknown_key, Group};
+use crate::patch::{check_group_patch, merge_group, unknown_key, Group};
 use crate::time::{Ticks, TIMESCALE};
 
 /// Default duration for `add_action`: one second of animation, the length
@@ -158,6 +158,82 @@ fn check_end_patch(patch: &Value) -> Result<(), String> {
         check_group_patch(body, group, END_PATCH, key)?;
     }
     Ok(())
+}
+
+/// The two refusals that are about this op rather than the vocabulary,
+/// asked of a group and a key wherever they came from — a `patch`'s keys
+/// and an `off` path go through the same two sentences.
+fn not_a_target(group: &str, key: &str) -> Result<(), String> {
+    match (group, key) {
+        ("video", "motion") => Err("video.motion is not an animation target".to_string()),
+        ("text", "words") => Err("text.words is not an animation target".to_string()),
+        _ => Ok(()),
+    }
+}
+
+/// Reads `set_action_end`'s `off` list (spec §11 CI-14) into its
+/// `(group, key)` pairs, refusing in this order: a path that is not
+/// `group.key`, a group an end patch may not name, `video.motion` and
+/// `text.words`, a path `patch` also names, and then whatever the group's
+/// own read says of a `null` at that key — an unknown key, and a REQUIRED
+/// key (`video.opacity`), which no group can hold as `null`.
+fn check_off<'a>(patch: &Value, off: &'a [String]) -> Result<Vec<(&'a str, &'a str)>, String> {
+    let mut paths = Vec::with_capacity(off.len());
+    for path in off {
+        let (group_name, key) = match path.split_once('.') {
+            Some((g, k)) if !g.is_empty() && !k.is_empty() && !k.contains('.') => (g, k),
+            _ => {
+                return Err(format!(
+                    "off path \"{path}\" must be \"group.key\", a group of video, audio or \
+                     text and one of its top-level keys"
+                ))
+            }
+        };
+        let group = END_GROUPS
+            .into_iter()
+            .find(|group| group.name() == group_name)
+            .ok_or_else(|| unknown_key(group_name, END_PATCH))?;
+        not_a_target(group_name, key)?;
+        if patch
+            .get(group_name)
+            .and_then(|body| body.get(key))
+            .is_some()
+        {
+            return Err(format!(
+                "\"{path}\" is named in both the patch and off; an end state cannot both \
+                 hold it and key it off"
+            ));
+        }
+        let probe = json!({ key: null });
+        let read = match group {
+            Group::Video => merge_group(&VideoProps::default(), &probe, group).map(|_| ()),
+            Group::Audio => merge_group(&AudioProps::default(), &probe, group).map(|_| ()),
+            Group::Text => merge_group(&TextProps::default(), &probe, group).map(|_| ()),
+            Group::Shape => merge_group(&ShapeProps::default(), &probe, group).map(|_| ()),
+        };
+        read.map_err(|why| format!("cannot key \"{path}\" off: {why}"))?;
+        paths.push((group_name, key));
+    }
+    Ok(paths)
+}
+
+/// Writes `null` at `group.key` of an end state — the property keyed OFF.
+/// `end` is an object after `actions::merge` with an object patch; its
+/// GROUP slot need not be (`end` is stored as the file had it), and a
+/// non-object slot is replaced by `{}` rather than indexed into.
+fn key_off(end: &mut Value, group: &str, key: &str) {
+    let Value::Object(groups) = end else {
+        return;
+    };
+    let slot = groups
+        .entry(group.to_string())
+        .or_insert_with(|| Value::Object(Map::new()));
+    if !slot.is_object() {
+        *slot = Value::Object(Map::new());
+    }
+    if let Value::Object(fields) = slot {
+        fields.insert(key.to_string(), Value::Null);
+    }
 }
 
 impl Project {
@@ -311,7 +387,18 @@ impl Project {
     /// version 9, spec §11 W-6): a word's times are anchored to speech, not
     /// a state a clip ramps toward, and interpolating two lists of ticks
     /// would move every word off what it times.
-    pub fn set_action_end(&self, clip: u32, action: u32, patch: &Value) -> Result<Outcome, String> {
+    ///
+    /// `off` (spec §11 CI-14) is the one way to STORE a `null`: each
+    /// `"group.key"` path is written as `null` after the merge and the
+    /// prune, which keys that optional property off at the action's end.
+    /// It refuses what `patch` refuses ([`check_off`]).
+    pub fn set_action_end(
+        &self,
+        clip: u32,
+        action: u32,
+        patch: &Value,
+        off: &[String],
+    ) -> Result<Outcome, String> {
         let target = self.require_clip(clip)?;
         let existing = target
             .actions
@@ -326,23 +413,18 @@ impl Project {
         }
         // Present at all — a `null` included, since writing `motion: null`
         // into an end patch is still asking an action to decide a preset.
-        if patch
-            .get("video")
-            .and_then(|video| video.get("motion"))
-            .is_some()
-        {
-            return Err("video.motion is not an animation target".to_string());
-        }
-        if patch
-            .get("text")
-            .and_then(|text| text.get("words"))
-            .is_some()
-        {
-            return Err("text.words is not an animation target".to_string());
+        for (group, key) in [("video", "motion"), ("text", "words")] {
+            if patch.get(group).and_then(|body| body.get(key)).is_some() {
+                not_a_target(group, key)?;
+            }
         }
         check_end_patch(patch)?;
+        let off = check_off(patch, off)?;
         let mut merged = actions::merge(&existing.end, patch);
         prune_removed(&mut merged, patch, 0);
+        for (group, key) in off {
+            key_off(&mut merged, group, key);
+        }
 
         let mut next = self.clone();
         if let Some(slot) = next

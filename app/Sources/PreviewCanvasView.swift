@@ -77,6 +77,8 @@ final class PreviewCanvasView: NSView {
     private(set) var snapshot = ProjectSnapshot.empty
     private(set) var selection: Set<UInt32> = []
     private(set) var playhead: Ticks = 0
+    /// What a gesture starts from and writes (spec §11 CI-13).
+    var editTarget = CanvasEditTarget.base
     /// Echoes `EditorViewController.snappingEnabled` (the N toggle).
     var snappingEnabled = true
     private(set) var cropMode = false
@@ -144,8 +146,11 @@ final class PreviewCanvasView: NSView {
     /// The ONE path from the document to this pane. `project` is the handle
     /// frame recipes are asked of; the snapshot rides along for names, tracks
     /// and the canvas.
-    func update(project: ReelProject?, selection: Set<UInt32>, playhead: Ticks) {
+    func update(
+        project: ReelProject?, selection: Set<UInt32>, playhead: Ticks, target: CanvasEditTarget
+    ) {
         self.project = project
+        editTarget = target
         snapshot = project?.snapshot ?? .empty
         self.selection = selection
         self.playhead = playhead
@@ -483,21 +488,21 @@ final class PreviewCanvasView: NSView {
         if var session = moving {
             session.update(point: canvasPoint, snapper: snapper)
             moving = session
-            onLiveUpdate?(session.ops)
+            onLiveUpdate?(session.ops(to: editTarget))
         } else if var session = scaling {
             session.update(
                 point: canvasPoint, aspectFree: flags.contains(.shift),
                 aboutCentre: flags.contains(.option))
             scaling = session
-            onLiveUpdate?(session.ops)
+            onLiveUpdate?(session.ops(to: editTarget))
         } else if var session = rotating {
             session.update(point: canvasPoint, snapping: flags.contains(.shift))
             rotating = session
-            onLiveUpdate?([session.op])
+            onLiveUpdate?([session.op(to: editTarget)])
         } else if var session = cropping {
             session.update(point: canvasPoint)
             cropping = session
-            onLiveUpdate?([session.op])
+            onLiveUpdate?([session.op(to: editTarget)])
         } else if var session = endpointDrag {
             guard let box = box(for: session.clip) else { return }
             session.update(unit: box.endpointUnit(canvasPoint))
@@ -551,7 +556,7 @@ final class PreviewCanvasView: NSView {
             guard let clip = snapshot.clip(id),
                   snapshot.track(clip.track)?.locked != true
             else { continue }
-            let props = clip.videoProps
+            let props = editTarget.start(of: clip, in: project).video
             bases[id] = CGPoint(x: props.x, y: props.y)
         }
         guard !bases.isEmpty, let box = box(for: anchor) else { return }
@@ -563,28 +568,31 @@ final class PreviewCanvasView: NSView {
 
     private func beginScale(_ id: UInt32, handle: CanvasHandle) {
         guard let box = box(for: id), let clip = snapshot.clip(id) else { return }
-        let base = clip.videoProps
-        let start = startRect(of: box, base: base)
+        let route = editTarget.forScale(of: clip)
+        let start = route.start(of: clip, in: project)
+        let base = start.video
+        let rect = startRect(of: box, base: base)
         let target: CanvasScaleTarget
         if let shape = clip.shape, case .shape = clip.source {
             target = .box(shape.boxSize)
-        } else if let text = clip.text, case .text = clip.source {
+        } else if clip.text != nil, case .text = clip.source {
             // An auto-sized text clip has no stored width, so the measured box
             // (divided back out of the scale) is the width the drag starts from.
-            target = .textWidth(text.width ?? (Double(start.width) / max(base.scale, 0.001)))
+            target = .textWidth(
+                start.text?.width ?? (Double(rect.width) / max(base.scale, 0.001)))
         } else {
             target = .uniform
         }
         scaling = CanvasScaleSession(
-            clip: id, handle: handle, target: target, base: base, startRect: start,
+            clip: id, handle: handle, target: target, base: base, startRect: rect,
             rotation: base.rotation, scale: base.scale,
-            boxSize: clip.shape?.boxSize ?? .zero, textWidth: clip.text?.width ?? 0)
+            boxSize: clip.shape?.boxSize ?? .zero, textWidth: start.text?.width ?? 0)
         onLiveBegin?()
     }
 
     private func beginRotate(_ id: UInt32, at point: CGPoint) {
         guard let clip = snapshot.clip(id) else { return }
-        let base = clip.videoProps
+        let base = editTarget.start(of: clip, in: project).video
         let anchor = canvasAnchor(of: clip, in: snapshot.canvas, video: base)
         rotating = CanvasRotateSession(
             clip: id, base: base, anchor: anchor,
@@ -595,7 +603,7 @@ final class PreviewCanvasView: NSView {
 
     private func beginCrop(_ id: UInt32, handle: CanvasHandle) {
         guard let box = box(for: id), let clip = snapshot.clip(id) else { return }
-        let base = clip.videoProps
+        let base = editTarget.start(of: clip, in: project).video
         cropping = CanvasCropSession(
             clip: id, handle: handle, base: base, sourceSize: box.sourceSize,
             startRect: startRect(of: box, base: base), rotation: base.rotation, crop: base.crop)
@@ -611,7 +619,7 @@ final class PreviewCanvasView: NSView {
     }
 
     /// The uncropped rectangle a session starts from, computed from the
-    /// clip's BASE props (what `set_video` merges into) rather than the
+    /// target's props (what the op merges into, CI-13) rather than the
     /// recipe's evaluated ones — the two differ only once a clip has actions.
     private func startRect(of box: CanvasLayerBox, base: VideoProps) -> CGRect {
         let uncropped = VideoProps(
@@ -684,13 +692,13 @@ final class PreviewCanvasView: NSView {
         for id in selection.sorted() {
             guard let clip = snapshot.clip(id), snapshot.track(clip.track)?.locked != true
             else { continue }
-            let props = clip.videoProps
+            let props = editTarget.start(of: clip, in: project).video
             ops.append(
-                .setVideo(
-                    clips: [id],
-                    patch: VideoPatch(
+                editTarget.op(
+                    video: VideoPatch(
                         x: canvasRound(props.x + Double(dx)),
-                        y: canvasRound(props.y + Double(dy)))))
+                        y: canvasRound(props.y + Double(dy))),
+                    clip: id))
         }
         guard !ops.isEmpty else { return false }
         onEdit?("Nudge", ops)

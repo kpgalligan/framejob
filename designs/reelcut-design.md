@@ -176,6 +176,14 @@ timeline concern.
   ⇧ frees it; edges scale one axis), a rotation handle above the top
   edge, drag inside to move, ⌥ scales about the center. Arrow keys nudge
   1 px, ⇧-arrows 10 px.
+  **The handles follow the mode** (§11 CI-13): with an action selected, a
+  move, scale, rotate or crop drag and an arrow-key nudge start from that
+  action's END state and write it through `set_action_end`, as the
+  inspector's fields do — the box on screen is still the frame at the
+  playhead, and the drag moves the end state by the pointer's travel. A
+  multi-selection writes the base, and so does a shape's box scale, whole:
+  `set_shape` has no action form and the placement that pins its pivot
+  travels with it.
 - **Crop mode** (C, or double-click a video clip): the handles become
   crop edges in source space; the uncropped source ghosts at 30 %.
   Esc or Return leaves.
@@ -296,7 +304,9 @@ clip; a field-only row shows that value as a "now" tag instead. Section
 headers carry `◆N` (keys), ◇ and ⊘ after the title, a keyed section's
 summary is in the action ink, and a section whose every writing row is ⊘
 says "Actions don't animate this. Edits here change the clip." Selecting an
-action opens the sections of the showing sub-tab that it keys.
+action opens the sections of the showing sub-tab that it keys. Every
+sub-row — a shadow's Blur, a compressor's Ratio — carries the `mixed` badge
+its parent row does when the selected clips disagree (§11 CI-15).
 
 **Reset, Clear and the row menu** (§11 CI-9 and CI-10; road map 9 §7). A
 section's Reset shows only while the section differs from its default, and
@@ -1386,6 +1396,18 @@ enforce (opacity 0–1, scale 0.01–10, gain 0–4, non-negative radii and
 crops) and collapse a NaN to that field's neutral value. The compositor
 never has to defend itself, and one bad number cannot blank a frame.
 
+**A STORED `null` on an optional key is "off at the end"** (§11 CI-14): an
+end state holding `"shadow": null` switches the shadow off when the action
+finishes — the evaluator already switches a `null` at the end, and the
+removal rule above leaves a stored `null` alone. A `null` in a PATCH cannot
+write one, because there it is a removal, so `set_action_end` takes a second
+argument, `off`: a list of `"group.key"` paths, each written as a `null`
+into the end state after the patch is merged. `off` refuses what `patch`
+refuses — `video.motion`, `text.words`, a key the group does not have, and a
+REQUIRED key (`video.opacity`, `video.crop`), whose `null` no group can
+hold — plus a malformed path and a path the patch also names. No format
+bump: `end` is stored as found and such a `null` was always legal on read.
+
 ### 5.5 Purity and undo
 
 Every edit is `fn(&Project, args) -> Result<Outcome, String>`
@@ -1689,7 +1711,7 @@ many clips`, `too many tracks`, `nests are more than 8 deep at nest N`.
 | `add_action {clip, at, duration=1 s}` | Refuses if it would overlap another action or run past the clip end. End patch starts empty (= no change until edited). |
 | `add_zoom_action {clip, at, duration=1 s, region: {x, y, width, height} \| null, fit="fit", curve="ease_in_out"}` | An `add_action` whose end patch is the `scale`, `x` and `y` that bring `region` to the canvas — the screencast zoom. **`region`'s `x` and `y` are its CENTRE** and `width`/`height` its size, both source pixels from the centre of the cropped rect (§5.3's one region frame); the field names say neither, so the tool description and the core's doc say it too. `fit` shows the whole region, `fill` covers the whole canvas, both measured THROUGH the clip's rotation — a rectangle contains a rotated rectangle exactly when it contains its four corners, and the test collapses to the naive form at 0°. Rotation and crop — and nothing else — are read from the clip evaluated at `at`, the frame the rectangle was drawn on: the `scale`, `x` and `y` it writes are absolute, so the placement never reads a transform, base or evaluated. A rotation animated between `at` and `at + duration` is not tracked. The scale clamps to the layer maximum and the offsets are derived from the CLAMPED value, so a region too small to reach it still lands centred and only the magnification degrades. `region` absent or `null` is a zoom BACK: the end patch is the clip's STORED base `scale`, `x`, `y` — the one thing here that is NOT read evaluated, because "back" means where the clip sits when nothing is animating it, which is also what a later zoom on the same clip measures from. It composes `add_action` + `set_action` + `set_action_end`, so it is one undo step and inherits every `add_action` refusal rather than restating it; a clip with no video properties is an **error**. The region is read the way a patch is: it must BE an object (a four-number LIST is refused rather than read member by member), an unknown member and a missing member are **errors** naming the member beside the four it takes, and a wrong-typed one names its path (`bad value at "region.width"`). A non-finite or non-positive number is an **error** too — `region.width must be greater than 0` — because a zero-width region asks for an infinite scale. |
 | `set_action {clip, action, start?, duration?, curve?}` | Same overlap checks. |
-| `set_action_end {clip, action, patch}` | Merges into the end patch; a key set to `null` removes it, at any depth. The patch is walked like every other one (§5.4): the three groups it may name are `video`, `audio` and `text`, and an unknown key, a value of the wrong JSON kind or a misspelt variant anywhere in it is an **error** naming the dotted path with the group in it — `unknown key "video.filters[1].kindd" in an action end patch` — and a `shape` object is an unknown key, because a shape is not animatable and the key would be stored, reported as success and animate nothing. VALUES are not range-checked, so an end state may name what no stored group could hold and the evaluator clamps it (§5.4's `clamp_video`). One refusal is about the op rather than the vocabulary: a `video` object naming `motion` is an **error** (format version 8, §5.4), because a preset is anchored to the clip's two ends rather than being a value to ramp between two states, and the evaluator would restore the base value anyway. A `text` object naming `words` — a `null` included — is an **error** too (format version 9, §11 W-6): a word's times are anchored to speech, not a state to ramp toward. |
+| `set_action_end {clip, action, patch, off?}` | Merges into the end patch; a key set to `null` removes it, at any depth. `off` — a list of `"group.key"` paths, `group` one of `video`, `audio`, `text` and `key` a top-level key of it — writes a `null` at each AFTER the merge, which keys that optional property OFF at the end (§5.4, §11 CI-14); a malformed path, `video.motion`, `text.words`, a required key (`video.opacity`), a key the group does not have and a path the patch also names are each an **error**. Absent or `null` is none. The patch is walked like every other one (§5.4): the three groups it may name are `video`, `audio` and `text`, and an unknown key, a value of the wrong JSON kind or a misspelt variant anywhere in it is an **error** naming the dotted path with the group in it — `unknown key "video.filters[1].kindd" in an action end patch` — and a `shape` object is an unknown key, because a shape is not animatable and the key would be stored, reported as success and animate nothing. VALUES are not range-checked, so an end state may name what no stored group could hold and the evaluator clamps it (§5.4's `clamp_video`). One refusal is about the op rather than the vocabulary: a `video` object naming `motion` is an **error** (format version 8, §5.4), because a preset is anchored to the clip's two ends rather than being a value to ramp between two states, and the evaluator would restore the base value anyway. A `text` object naming `words` — a `null` included — is an **error** too (format version 9, §11 W-6): a word's times are anchored to speech, not a state to ramp toward. |
 | `remove_action {clip, action}` | |
 
 **Tracks, markers, canvas, media**
@@ -4199,3 +4221,44 @@ assisted import.
   truncates first at the panel's minimum width. `OptionPopupControl` is
   Rasterize's and is not forked, so the glyph sits beside the popup rather
   than inside it.
+- **CI-13 — The canvas's handles follow the mode** (road map 9 §11, the
+  clip inspector redesign's phase 5, P9). With an action selected, a move,
+  scale, rotate or crop drag on the canvas and an arrow-key nudge START
+  from that action's END state — `clip_state` at the clip's start plus the
+  action's end, decoded as the inspector decodes it (CI-2) — and WRITE it
+  through `set_action_end`, one undo step per gesture as before. The box
+  drawn is still the frame at the PLAYHEAD; the drag moves the end state by
+  the pointer's travel, the inspector's "fields show the value they write".
+  A text clip's wrap-width drag follows the same rule. Two things stay on
+  the base: a multi-selection (CI-1: no action is selected then), and a
+  SHAPE's box scale, whole — `set_shape` has no action form, and the
+  `set_video` that pins the box's pivot must land beside it, so splitting
+  the gesture would put the box and its placement on two different states.
+  An endpoint drag is `set_shape` too and stays base. The mode reaches the
+  canvas through the refresh that already follows a selection
+  (`refreshCanvas`), as a `CanvasEditTarget` value; no new channel.
+- **CI-14 — `set_action_end.off` keys an optional property OFF at the end**
+  (phase 5, P10). The end state holding `null` at an optional key is the
+  property switched off when the action finishes: the evaluator already
+  switches a `null` at the end, and `prune_removed` already leaves a stored
+  `null` alone. A `null` in `patch` stays a REMOVAL (§6, CI-9's Clear), so
+  the off state needs its own spelling: `off`, a list of `"group.key"`
+  paths written as `null` after the merge. `off` refuses what `patch`
+  refuses — `video.motion` and `text.words` in the op's own two sentences,
+  a key the group lacks, and a required key (`video.opacity`, `video.crop`)
+  in the walk's words — plus a malformed path and a path `patch` also
+  names. No format bump: `end` is stored as found, and such a `null` was
+  always legal on read. On the app side the TYPED builder
+  (`ReelOp.setActionEnd`) lifts every top-level null in its patch's groups
+  into `off`, because a typed `.some(nil)` is the inspector's "switch it
+  off"; the RAW builder, which `clearOps` and every agent call use,
+  forwards its nulls as removals and its caller chooses `off` itself.
+- **CI-15 — Every sub-row carries `mixed`, and the collapse is the one
+  animation** (phase 5, P12 and Reduce Motion). A row nested under a switch
+  (a shadow's Blur, a compressor's Ratio, a stroke's Width) shows the
+  `mixed` badge when the selected clips disagree on it, like every
+  top-level row. The only animation the redesign adds is a section's
+  header-click collapse, at `DS.stateDuration` through `DS.animate` —
+  Rasterize's one door, which runs the change unanimated when the system's
+  Reduce Motion is on. `reveal()` (an action's auto-open) stays instant;
+  hover, bands and gutters are painted in `draw(_:)` and do not animate.
