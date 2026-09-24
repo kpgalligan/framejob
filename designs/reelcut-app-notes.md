@@ -2702,3 +2702,43 @@ note. `InspectorSection` folds `marks`, draws them in its header, has
 only); `KeyedReveal` beside it is `ClipPane`'s per-selection auto-open
 memory. `InspectorTextArea` hugs at priority 1 so the Content area, now
 inside an `inspectorRow`, stretches like a slider.
+
+## Reset, Clear, the row menus and the refusal strip, 2026-09-23 — road map 9's phase 3b
+
+Three pure moves first, each typechecked alone at the baseline (0 errors, 7
+warnings): `InspectorSectionHeader` from `InspectorSection.swift` to
+`InspectorSectionHeader.swift`, `InspectorSliderControl` from
+`InspectorPane.swift` to `InspectorSlider.swift`, and the Obscure section
+(`// MARK: Obscure` … `obscureSection()`) from `VideoPane.swift` to
+`VideoPane+Obscure.swift` as an extension, all verbatim. The record is
+`designs/reelcut-roadmap-9.md` §7–§8; the decisions are spec §11 CI-9 and
+CI-10; the sizes are remaining §3's phase-3b paragraph.
+
+**Roles that changed.** `inspectorRow` answers an `InspectorRowView`
+(`InspectorRowMenu.swift`) — the same horizontal stack, gutter first with
+no spacing after it — which tracks the pointer over itself (its OWN
+tracking area, `.inVisibleRect`) to set the gutter's `hovered`, and answers
+`menu(for:)` with its context menu; a field and a popup keep their own
+menus because neither forwards a right-click. It takes `default:`, an
+`InspectorRowDefault` (`InspectorMarks.swift`): an undo name, `differs` and
+the ops that restore it. The four typed builders build one with
+`.derived(binding, name:read:ops:)` — the row's own `read` run in the new
+`ReadMode.defaults`, in which the four props readers answer the types'
+defaults with no FFI — unless called `resets: false`, which the eleven
+rows whose read bypasses the props pass. `InspectorSection` takes
+`differs:` and exposes `header` and `clear()`; its fold adds `differs` and
+`editing` (the selected action's number when any row animates) to
+`SectionMarks`, and the header shows Clear or Reset in one slot from them
+and inks the summary in three tiers. The gutter holds the row default,
+exposes `animates`, `binding`, `isKeyed`, `hovered`, `showsRemove`, draws ×
+while hovered and keyed, removes the row's keys on a click then, and
+re-resolves its keyed border's `CGColor` on an appearance change.
+`InspectorBinding.clearOps` is the one `set_action_end` of nulls a Clear,
+a × and "Remove from action N" send. `ProjectDocument.applyEdit` splits its
+two non-applied arms: both beep, and `.refused` then posts
+`projectDocumentDidRefuse`, which `EditorViewController+Inspector` observes
+once and forwards to `InspectorViewController.showRefusal`; the strip
+(`InspectorRefusalStrip.swift`) lives in the controller's new foot
+container and clears when `refresh(isLive:)` finds another
+`editedProject` handle. In and Out lost their `writes:` — a trim has no
+patch, so it always answered `[]`.

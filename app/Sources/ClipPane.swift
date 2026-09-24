@@ -286,8 +286,8 @@ final class ClipPane: InspectorPaneView {
         end.toolTip = "Where the clip ends — trims its back edge"
 
         var rows: [NSView] = [
-            inspectorRow("In", [start], writes: [.trimStart(clip: id, to: clip()?.start ?? 0)]),
-            inspectorRow("Out", [end], writes: [.trimEnd(clip: id, to: clip()?.end ?? 0)]),
+            inspectorRow("In", [start]),
+            inspectorRow("Out", [end]),
             inspectorRow("Duration", [inspectorReadout { duration() }]),
         ]
         // Reverse is a media-source op (`set_reversed`, §6); a text or shape
@@ -395,7 +395,7 @@ final class ClipPane: InspectorPaneView {
                 ops: { value in
                     clips().map { ReelOp.setReversed(clip: $0.id, reversed: value) }
                 },
-                mixed: mixed),
+                mixed: mixed, resets: false),
             inspectorRow("Reversed frames", [inspectorReadout { status().summary }]),
             inspectorButtonRow([render]),
         ]

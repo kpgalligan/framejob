@@ -38,6 +38,7 @@ final class ShapePane: InspectorPaneView {
             id: "shape.kind", title: "Shape",
             summary: { binding.shapeProps.kind.displayName.lowercased() },
             reset: { binding.apply("Shape", shape: ShapePatch(radius: 0)) },
+            differs: { binding.shapeProps.radius != 0 },
             rows: [
                 inspectorPopupRow(
                     "Kind", binding, name: "Shape Kind", items: kinds.map { $0.displayName },
@@ -80,6 +81,7 @@ final class ShapePane: InspectorPaneView {
             id: "shape.stroke", title: "Stroke",
             summary: { on() ? String(format: "%.1f px", current().width) : "off" },
             reset: { binding.apply("Stroke", shape: ShapePatch(stroke: .some(StrokeProps()))) },
+            differs: { binding.shapeProps.stroke.map { $0 != StrokeProps() } ?? false },
             defaultExpanded: false,
             rows: [
                 inspectorCheckRow(

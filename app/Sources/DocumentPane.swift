@@ -199,14 +199,14 @@ final class DocumentPane: InspectorPaneView {
                     read: { Double(binding.documentCanvas.width) },
                     ops: { value in
                         sizeOps(width: Int(value.rounded()), height: binding.documentCanvas.height)
-                    }),
+                    }, resets: false),
                 inspectorValueRow(
                     "Height", binding, name: "Canvas Size", unit: " px", decimals: 0, min: 16,
                     max: 16384, slider: false, width: InspectorMetrics.wideFieldWidth,
                     read: { Double(binding.documentCanvas.height) },
                     ops: { value in
                         sizeOps(width: binding.documentCanvas.width, height: Int(value.rounded()))
-                    }),
+                    }, resets: false),
                 inspectorRow(
                     nil,
                     [
@@ -389,20 +389,25 @@ final class DocumentPane: InspectorPaneView {
                             background: [0, 0, 0, 1], fitNewClips: true, timecodeFrames: true)
                     ])
             },
+            differs: {
+                let canvas = binding.documentCanvas
+                return canvas.background != [0, 0, 0, 1] || !canvas.fitNewClips
+                    || !canvas.timecodeFrames
+            },
             rows: [
                 inspectorColorRow(
                     "Background", binding, name: "Background",
                     read: { binding.documentCanvas.background },
-                    ops: { [.setCanvas(background: $0)] }),
+                    ops: { [.setCanvas(background: $0)] }, resets: false),
                 inspectorPopupRow(
                     "Timecode", binding, name: "Timecode Format",
                     items: ["Frames", "Milliseconds"], width: 132,
                     read: { binding.documentCanvas.timecodeFrames ? 0 : 1 },
-                    ops: { [.setCanvas(timecodeFrames: $0 == 0)] }),
+                    ops: { [.setCanvas(timecodeFrames: $0 == 0)] }, resets: false),
                 inspectorCheckRow(
                     "Fit new clips to canvas", binding, name: "Fit New Clips",
                     read: { binding.documentCanvas.fitNewClips },
-                    ops: { [.setCanvas(fitNewClips: $0)] }),
+                    ops: { [.setCanvas(fitNewClips: $0)] }, resets: false),
             ])
     }
 

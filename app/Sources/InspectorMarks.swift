@@ -30,14 +30,45 @@ enum RowMark: Equatable {
 
 /// A section's marks, folded from its gutters: how many KEYS its rows write
 /// that the selected action holds (CI-6's count, so a section's `◆N` agrees
-/// with its sub-tab's), whether any row is ◇, and whether every row that
-/// writes is ⊘.
+/// with its sub-tab's), whether any row is ◇, whether every row that writes
+/// is ⊘, whether the section differs from its default (spec §11 CI-9), and
+/// the number of the action it is EDITING — the selected one, when any of
+/// its rows animates — which is what turns its Reset slot into Clear.
 struct SectionMarks: Equatable {
     var keyed: Int
     var other: Bool
     var allNotAnimatable: Bool
+    var differs = false
+    var editing: Int? = nil
 
     static let empty = SectionMarks(keyed: 0, other: false, allNotAnimatable: false)
+}
+
+/// A row's default (spec §11 CI-9): the undo name its reset runs under,
+/// whether the row differs from its default now, and the ops that put the
+/// default back — on the base props, or on the selected action's end.
+struct InspectorRowDefault {
+    let name: String
+    let differs: () -> Bool
+    let ops: () -> [ReelOp]
+
+    /// The default a typed row derives from its own `read` and `ops`: the
+    /// value `read` answers in `.defaults`, written through `ops`.
+    static func derived<T: Equatable>(
+        _ binding: InspectorBinding, name: String, read: @escaping () -> T,
+        ops: @escaping (T) -> [ReelOp]
+    ) -> InspectorRowDefault {
+        InspectorRowDefault(
+            name: name,
+            differs: { [weak binding] in
+                guard let binding else { return false }
+                return read() != binding.at(.defaults, read)
+            },
+            ops: { [weak binding] in
+                guard let binding else { return [] }
+                return ops(binding.at(.defaults, read))
+            })
+    }
 }
 
 /// The 14 pt column in front of every `inspectorRow`, blank at `.none`. It is
@@ -45,24 +76,43 @@ struct SectionMarks: Equatable {
 /// before the row's controls — which is what lets its `refresh()` set the
 /// label's ink and the controls' keyed border with nothing after it undoing
 /// them (`OptionFieldControl.refresh()` never touches its layer).
+///
+/// Hovered while keyed (spec §11 CI-9) its ◆ draws as a × and a click on it
+/// removes the row's keys from the selected action. The row sets `hovered`
+/// (`InspectorRowView`), because the pointer is over the row, not the gutter.
 final class InspectorMarkGutter: NSView, OptionControl {
     let writes: [String]
     let follows: [String]
     private(set) var mark: RowMark = .none
-    private weak var binding: InspectorBinding?
-    private let animates: Bool
+    private(set) weak var binding: InspectorBinding?
+    let animates: Bool
+    let `default`: InspectorRowDefault?
     private let discrete: Bool
     private weak var label: InspectorRowLabel?
     private let controls: [NSView]
 
+    /// ◆ or ◆ "at end".
+    var isKeyed: Bool { mark == .keyed || mark == .keyedAtEnd }
+    var hovered = false {
+        didSet {
+            guard hovered != oldValue else { return }
+            needsDisplay = true
+            updateToolTip()
+        }
+    }
+    /// The × — hover alone is not enough, the row must be keyed.
+    var showsRemove: Bool { hovered && isKeyed }
+
     init(
         binding: InspectorBinding?, writes: [ReelOp], follows: [ReelOp],
-        label: InspectorRowLabel?, controls: [NSView], discrete: Bool
+        label: InspectorRowLabel?, controls: [NSView], discrete: Bool,
+        default: InspectorRowDefault?
     ) {
         self.writes = InspectorBinding.paths(of: writes)
         self.follows = InspectorBinding.paths(of: follows)
         self.binding = binding
         self.animates = InspectorBinding.animates(writes)
+        self.default = `default`
         self.discrete = discrete
         self.label = label
         self.controls = controls
@@ -86,6 +136,13 @@ final class InspectorMarkGutter: NSView, OptionControl {
         return binding.keyedPaths().intersection(writes)
     }
 
+    /// Takes the row's keys out of the selected action's end patch — the ×
+    /// and the menu's "Remove from action N".
+    func removeFromAction() {
+        guard let binding else { return }
+        binding.apply("Remove from Action", binding.clearOps(keyedWrites()))
+    }
+
     func refresh() {
         let next = binding?.mark(
             writes: writes, follows: follows, animates: animates, discrete: discrete) ?? .none
@@ -93,14 +150,25 @@ final class InspectorMarkGutter: NSView, OptionControl {
             mark = next
             needsDisplay = true
         }
-        let keyed = mark == .keyed || mark == .keyedAtEnd
-        let ink = keyed ? DS.textStrong : mark == .notAnimatable ? DS.textFaint : DS.textMuted
+        let ink = isKeyed ? DS.textStrong : mark == .notAnimatable ? DS.textFaint : DS.textMuted
         if let label, label.textColor != ink { label.textColor = ink }
-        if case .other(let number) = mark {
+        updateToolTip()
+        paintBorders()
+    }
+
+    private func updateToolTip() {
+        if showsRemove, let number = binding?.selectedActionNumber {
+            toolTip = "Remove from action \(number)"
+        } else if case .other(let number) = mark {
             toolTip = "Changed by action \(number)"
         } else {
             toolTip = nil
         }
+    }
+
+    /// The keyed rows' 1 pt action-ink border on their fields and popups.
+    private func paintBorders() {
+        let keyed = isKeyed
         for control in controls where control is OptionFieldControl
             || control is OptionPopupControl
         {
@@ -115,12 +183,28 @@ final class InspectorMarkGutter: NSView, OptionControl {
         }
     }
 
+    /// A `CGColor` does not follow the appearance, so the border is resolved
+    /// again when it changes.
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        paintBorders()
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        guard showsRemove else {
+            super.mouseDown(with: event)
+            return
+        }
+        removeFromAction()
+    }
+
     override func draw(_ dirtyRect: NSRect) {
         let glyph: String
         let ink: NSColor
         switch mark {
         case .none: return
-        case .keyed, .keyedAtEnd: (glyph, ink) = ("◆", DS.action)
+        case .keyed, .keyedAtEnd:
+            (glyph, ink) = showsRemove ? ("×", DS.textMuted) : ("◆", DS.action)
         case .follows: (glyph, ink) = ("○", DS.action)
         case .other: (glyph, ink) = ("◇", DS.textFaint)
         case .notAnimatable: (glyph, ink) = ("⊘", DS.textFaint)
@@ -213,6 +297,37 @@ extension InspectorBinding {
             else { return nil }
             return index + 1
         }
+    }
+
+    /// The selected action's time-order NUMBER on the single selected clip
+    /// (`ActionBands.ordered`), nil with none selected.
+    var selectedActionNumber: Int? {
+        guard let id = selectedAction?.id, let clip = primary else { return nil }
+        return ActionBands.ordered(clip).firstIndex { $0.id == id }.map { $0 + 1 }
+    }
+
+    /// The id of the single selected clip's action numbered `number`.
+    func actionID(number: Int) -> UInt32? {
+        guard isSingle, let clip = primary else { return nil }
+        let ordered = ActionBands.ordered(clip)
+        return ordered.indices.contains(number - 1) ? ordered[number - 1].id : nil
+    }
+
+    /// ONE `set_action_end` that nulls every `"group.key"` of `paths` in the
+    /// selected action's end patch — a null REMOVES the key (spec §11 CI-9),
+    /// so the value falls back to what was held. Nothing without a selected
+    /// action on a single clip, or without a path.
+    func clearOps(_ paths: Set<String>) -> [ReelOp] {
+        guard let action = selectedAction, isSingle, let clip = primary, !paths.isEmpty
+        else { return [] }
+        var patch: [String: [String: Any]] = [:]
+        for path in paths.sorted() {
+            let parts = path.split(separator: ".", maxSplits: 1).map(String.init)
+            guard parts.count == 2 else { continue }
+            patch[parts[0], default: [:]][parts[1]] = NSNull()
+        }
+        guard !patch.isEmpty else { return [] }
+        return [.setActionEndRaw(clip: clip.id, action: action.id, patch: patch)]
     }
 
     /// Spec §11 CI-7's rule, in its order.

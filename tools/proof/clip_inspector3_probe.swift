@@ -141,6 +141,15 @@ func gutters(_ section: InspectorSection?) -> [InspectorMarkGutter] {
 
 func describe(_ mark: RowMark?) -> String { mark.map { "\($0)" } ?? "no row" }
 
+/// A section's PHASE-3A marks — `keyed`, `other`, `allNotAnimatable` — with
+/// phase 3b's `differs` and `editing` (spec §11 CI-9) left at their
+/// defaults, so M2 compares what this phase measured (2026-09-23, 3b).
+func marks3a(_ marks: SectionMarks?) -> SectionMarks? {
+    marks.map {
+        SectionMarks(keyed: $0.keyed, other: $0.other, allNotAnimatable: $0.allNotAnimatable)
+    }
+}
+
 func visibleNote(_ section: InspectorSection?, _ text: String) -> Bool {
     guard let section else { return false }
     return walk(section).contains {
@@ -165,13 +174,13 @@ if let (document, inspector, pane) = clipPane("chrome", playhead: 1.0, action: 3
     check("M1 … Blend is blank (.none)", blend == RowMark.none, describe(blend))
     let marks = transform?.marks
     check("M2 Transform's header: ◆1 and ◇, not ⊘",
-          marks == SectionMarks(keyed: 1, other: true, allNotAnimatable: false),
+          marks3a(marks) == SectionMarks(keyed: 1, other: true, allNotAnimatable: false),
           "\(marks.map { "\($0)" } ?? "no section")")
     let count = document.selectedActionSnapshot.map { ClipSubTab.picture.keyedCount(in: $0.end) }
     check("M6 Transform's marks.keyed equals the Picture sub-tab's ◆N (\(count ?? -1))",
           marks?.keyed == count && count == 1, "section \(marks?.keyed ?? -1)")
     let shadow = section(picture, "video.shadow")?.marks
-    check("M2 Shadow's header: nothing", shadow == .empty,
+    check("M2 Shadow's header: nothing", marks3a(shadow) == .empty,
           "\(shadow.map { "\($0)" } ?? "no section")")
 
     let clip = sections(pane, .clip)

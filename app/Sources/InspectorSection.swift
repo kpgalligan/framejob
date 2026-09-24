@@ -16,10 +16,14 @@ final class InspectorSection: NSView {
 
     let id: String
     let title: String
-    private let header = InspectorSectionHeader()
+    let header = InspectorSectionHeader()
     private let content = NSStackView()
     private(set) var isExpanded = true
     private let summary: (() -> String?)?
+    /// An explicit "differs from its default" (spec §11 CI-9), for a section
+    /// whose rows do not read the props or whose Reset writes fewer keys
+    /// than its rows read; nil folds the rows' own defaults.
+    private let differs: (() -> Bool)?
     /// The rows' marks, folded (road map 9 §5) at the end of `init` and on
     /// every `refresh()`.
     private(set) var marks = SectionMarks.empty
@@ -37,11 +41,12 @@ final class InspectorSection: NSView {
     init(
         id: String, title: String, summary: (() -> String?)? = nil,
         note: (() -> String?)? = nil, reset: (() -> Void)? = nil,
-        defaultExpanded: Bool = true, rows: [NSView]
+        differs: (() -> Bool)? = nil, defaultExpanded: Bool = true, rows: [NSView]
     ) {
         self.id = id
         self.title = title
         self.summary = summary
+        self.differs = differs
         super.init(frame: .zero)
         let key = Self.collapsedKeyPrefix + id
         if let collapsed = UserDefaults.standard.object(forKey: key) as? Bool {
@@ -67,7 +72,7 @@ final class InspectorSection: NSView {
         }
         for row in rows { addRow(row) }
 
-        header.configure(title: title, reset: reset)
+        header.configure(title: title, reset: reset, clear: { [weak self] in self?.clear() })
         header.onToggle = { [weak self] in self?.toggle() }
 
         let stack = NSStackView(views: [header, content])
@@ -145,6 +150,16 @@ final class InspectorSection: NSView {
         foldMarks()
     }
 
+    /// The header's Clear (spec §11 CI-9): every key the section's rows
+    /// write that the selected action holds, out of its end patch in ONE
+    /// `set_action_end`.
+    func clear() {
+        let gutters = Self.gutters(in: content)
+        guard let binding = gutters.lazy.compactMap({ $0.binding }).first else { return }
+        let keys = gutters.reduce(into: Set<String>()) { $0.formUnion($1.keyedWrites()) }
+        binding.apply("Clear", binding.clearOps(keys))
+    }
+
     /// The rows' gutters, in the order `refreshOptionControls(in:)` walks.
     private static func gutters(in view: NSView) -> [InspectorMarkGutter] {
         view.subviews.flatMap { subview -> [InspectorMarkGutter] in
@@ -154,188 +169,25 @@ final class InspectorSection: NSView {
     }
 
     /// `marks` from the gutters as they stand, then the two things drawn from
-    /// it: the ⊘ note and the header.
+    /// it: the ⊘ note and the header. A section is EDITING the selected
+    /// action when any of its rows animates; one that none does (Document,
+    /// Shape, a ⊘-only section) keeps its Reset, since its edits go to the
+    /// clip.
     private func foldMarks() {
         let gutters = Self.gutters(in: content)
         let writing = gutters.filter { !$0.writes.isEmpty }
+        let binding = gutters.lazy.compactMap { $0.binding }.first
         marks = SectionMarks(
             keyed: gutters.reduce(into: Set<String>()) { $0.formUnion($1.keyedWrites()) }.count,
             other: gutters.contains {
                 if case .other = $0.mark { return true } else { return false }
             },
             allNotAnimatable: !writing.isEmpty
-                && writing.allSatisfy { $0.mark == .notAnimatable })
+                && writing.allSatisfy { $0.mark == .notAnimatable },
+            differs: differs?() ?? gutters.contains { $0.default?.differs() == true },
+            editing: gutters.contains { $0.animates } ? binding?.selectedActionNumber : nil)
         inertNote?.refresh()
         header.refresh(summary: summary?(), marks: marks)
-    }
-}
-
-/// The section header: disclosure triangle, title in the micro-label face, the
-/// current-state summary, and the reset button pinned to the trailing edge.
-/// The button is a subview so it eats its own clicks — everything else toggles
-/// the group.
-final class InspectorSectionHeader: NSView {
-    var onToggle: (() -> Void)?
-    var isExpanded = true {
-        didSet { needsDisplay = true }
-    }
-    private var title = ""
-    /// The last summary and marks drawn, so a refresh only redraws when one
-    /// CHANGED — the panel refreshes on every document change and on every
-    /// playhead move inside an action.
-    private var lastSummary: String?
-    private var marks = SectionMarks.empty
-    /// Held so the summary can stop short of it: the two share the header's
-    /// trailing end, and a summary drawn under the button would be unreadable.
-    private weak var resetButton: NSView?
-
-    override init(frame frameRect: NSRect) {
-        super.init(frame: frameRect)
-        wantsLayer = true
-    }
-
-    @available(*, unavailable)
-    required init?(coder: NSCoder) {
-        fatalError("InspectorSectionHeader does not support NSCoder")
-    }
-
-    convenience init() {
-        self.init(frame: .zero)
-    }
-
-    override var isFlipped: Bool { true }
-
-    override var intrinsicContentSize: NSSize {
-        NSSize(width: NSView.noIntrinsicMetric, height: InspectorMetrics.headerHeight)
-    }
-
-    func configure(title: String, reset: (() -> Void)?) {
-        self.title = title
-        guard let reset = reset else { return }
-        let button = OptionButtonControl(
-            title: "Reset", action: reset, enabled: { true }, onEdit: {})
-        button.toolTip = "Reset this section to its defaults"
-        button.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(button)
-        resetButton = button
-        NSLayoutConstraint.activate([
-            button.trailingAnchor.constraint(
-                equalTo: trailingAnchor, constant: -InspectorMetrics.inset),
-            button.centerYAnchor.constraint(equalTo: centerYAnchor),
-        ])
-    }
-
-    /// Takes the summary and the marks; redraws only when either moved.
-    func refresh(summary: String?, marks: SectionMarks) {
-        guard summary != lastSummary || marks != self.marks else { return }
-        lastSummary = summary
-        self.marks = marks
-        needsDisplay = true
-    }
-
-    override func mouseDown(with event: NSEvent) {
-        onToggle?()
-    }
-
-    override func draw(_ dirtyRect: NSRect) {
-        // **Pitfall:** `DS.hoverFill` is `quaternaryLabelColor`, which is
-        // ALREADY about 10% ink — taking 0.35 of it left a 3.5% wash that is
-        // invisible in the light appearance, so the header did not separate
-        // from the rows under it. Drawn at its own alpha it is a quiet band
-        // that reads in both appearances.
-        DS.hoverFill.setFill()
-        bounds.fill()
-        DS.border.setFill()
-        NSRect(x: 0, y: bounds.height - 1, width: bounds.width, height: 1).fill()
-
-        let glyph = isExpanded ? "chevron.down" : "chevron.right"
-        let box = NSRect(x: InspectorMetrics.inset, y: bounds.midY - 5, width: 10, height: 10)
-        if let icon = NSImage(systemSymbolName: glyph, accessibilityDescription: title)?
-            .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 9, weight: .semibold))
-        {
-            let tinted = icon.tinted(with: DS.textMuted)
-            let size = tinted.size
-            tinted.draw(
-                in: NSRect(
-                    x: box.minX, y: box.midY - size.height / 2, width: size.width,
-                    height: size.height))
-        } else {
-            let attributes: [NSAttributedString.Key: Any] = [
-                .font: DS.sans(9), .foregroundColor: DS.textMuted,
-            ]
-            (isExpanded ? "▾" : "▸").draw(
-                at: NSPoint(x: box.minX, y: box.minY), withAttributes: attributes)
-        }
-
-        let label = Self.titleLabel(title)
-        label.draw(at: NSPoint(x: box.maxX + 6, y: bounds.midY - label.size().height / 2))
-        drawSummary(after: drawMarks(after: box.maxX + 6 + label.size().width))
-    }
-
-    /// `◆N` in the action ink, then ◇ and ⊘ faint, after the title; answers
-    /// where they end.
-    private func drawMarks(after titleEnd: CGFloat) -> CGFloat {
-        var x = titleEnd
-        var parts: [(String, NSFont, NSColor)] = []
-        if marks.keyed > 0 {
-            parts.append(("◆\(marks.keyed)", DS.mono(9, weight: .medium), DS.action))
-        }
-        if marks.other { parts.append(("◇", DS.mono(9), DS.textFaint)) }
-        if marks.allNotAnimatable { parts.append(("⊘", DS.mono(9), DS.textFaint)) }
-        for (text, font, ink) in parts {
-            let mark = NSAttributedString(
-                string: text, attributes: [.font: font, .foregroundColor: ink])
-            let size = mark.size()
-            mark.draw(at: NSPoint(x: x + 6, y: bounds.midY - size.height / 2))
-            x += 6 + size.width
-        }
-        return x
-    }
-
-    /// The title in the micro-label FACE — mono 10, uppercase, 0.09em tracking
-    /// — but not in the micro-label's ink.
-    ///
-    /// **Pitfall:** `DS.microLabel` paints in `DS.textFaint`
-    /// (`tertiaryLabelColor`), which over this header's fill is grey on grey;
-    /// with the Clip tab now stacking up to twenty collapsed headers, that
-    /// reads as a list of DISABLED rows rather than a list of groups. Built
-    /// here rather than by changing `DS.microLabel`, whose other callers draw
-    /// one quiet label over the chrome, where faint is right. The summary
-    /// beside it stays `textFaint`: it is secondary to the title.
-    private static func titleLabel(_ title: String) -> NSAttributedString {
-        let size: CGFloat = 10
-        return NSAttributedString(
-            string: title.uppercased(),
-            attributes: [
-                .font: DS.mono(size), .kern: size * 0.09, .foregroundColor: DS.textMuted,
-            ])
-    }
-
-    /// The state summary, right-aligned in whatever room is left between the
-    /// title and the Reset button. Truncated rather than clipped: it is a
-    /// sentence fragment, and half a word with no ellipsis reads as a bug.
-    private func drawSummary(after titleEnd: CGFloat) {
-        guard let text = lastSummary, !text.isEmpty else { return }
-        // A Reset button that Auto Layout has not placed yet has a zero frame,
-        // and taking its minX would put the summary's right edge at −6 and skip
-        // it below. `refreshSummary` only redraws when the TEXT changes, so a
-        // summary skipped on the first pass would stay missing until its value
-        // moved — hence the unplaced button falls back to the inset.
-        let button = resetButton.map { $0.frame.width > 0 ? $0.frame.minX : nil } ?? nil
-        let right = (button ?? bounds.width - InspectorMetrics.inset) - 6
-        let left = titleEnd + 8
-        guard right - left > 14 else { return }
-        let paragraph = NSMutableParagraphStyle()
-        paragraph.alignment = .right
-        paragraph.lineBreakMode = .byTruncatingTail
-        let attributes: [NSAttributedString.Key: Any] = [
-            .font: DS.mono(10), .foregroundColor: marks.keyed > 0 ? DS.action : DS.textFaint,
-            .paragraphStyle: paragraph,
-        ]
-        let height = text.size(withAttributes: attributes).height
-        text.draw(
-            in: NSRect(x: left, y: bounds.midY - height / 2, width: right - left, height: height),
-            withAttributes: attributes)
     }
 }
 

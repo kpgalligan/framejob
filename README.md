@@ -62,6 +62,11 @@ normative: §5.2 is the project schema, §6 the op table, §7 the architecture.
   at its end tick. Each row is marked ◆ (the action keys it), ◇ (another
   action does), ○ (it follows a keyed value) or ⊘ (actions cannot animate
   it), and a slider shows the value at the playhead as a coral tick.
+  A section offers Reset only while it differs from its default, and Clear
+  (taking its keys out of the selected action) while that action keys it;
+  a keyed row's ◆ becomes a × on hover, a right-click offers Remove from
+  action, Go to action and Reset to default, and an edit the project
+  refuses says why at the inspector's foot.
   Playing or scrubbing INTO an action selects it; esc or
   the lane's Clip chip leaves it, and ⌫ removes it. The timeline draws each
   clip's actions in a lane under its name, the selected one solid mint

@@ -465,8 +465,8 @@ extension AgentServer {
     /// and every canvas gesture (`CanvasMoveSession` and its siblings).
     ///
     /// **The inspector's redirect is deliberately NOT mirrored here**: with
-    /// the playhead inside an action the panes write `set_action_end` instead,
-    /// because that is what dragging a handle inside an animated span means.
+    /// an action SELECTED (spec §11 CI-2) the panes write `set_action_end`
+    /// instead, because that is what editing an action's end state means.
     /// The agent says which it wants — `set_video` changes the clip's BASE
     /// props, `set_action_end` an action's end state.
     ///
@@ -802,9 +802,12 @@ extension AgentServer {
             ])
     }
 
-    /// `set_action_end` — every inspector field written while the playhead is
-    /// inside an action (`InspectorBinding.ops(video:for:)`). The patch is the
-    /// action's END state, merged; a key set to null is REMOVED from it.
+    /// `set_action_end` — every inspector field written with an action
+    /// SELECTED (spec §11 CI-2, `InspectorBinding.ops(video:for:)`). The patch
+    /// is the action's END state, merged; a key set to null is REMOVED from
+    /// it — the UI path of a null is a section header's Clear, a keyed row's
+    /// × and its menu's "Remove from action N" (`InspectorBinding.clearOps`,
+    /// spec §11 CI-9).
     ///
     /// **The patch goes to the core UNREAD** (deepening D1·5,
     /// `designs/reelcut-roadmap-7.md` §2.5) — the LAST door of the six, and

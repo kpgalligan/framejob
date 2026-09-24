@@ -708,15 +708,24 @@ def main():
               "" if not stray else f"{len(stray)} px elsewhere:\n"
               + describe(clusters(stray), scale))
         top, bottom = extent(diff, scale)
+        # Re-measured in place 2026-09-23 (road map 9 phase 3b, spec §11
+        # CI-9): Reset now shows only while the list differs from its empty
+        # default, so "one region vs an empty list" ALSO changes the header's
+        # Reset button — a second cluster, inside the same header. The band
+        # is that first pair's extent, and the later pairs (Reset shown in
+        # both) must lie inside it, rather than start at its top.
+        allowed = 2 if header_band is None else 1
         check("they fit inside one section header (InspectorMetrics.headerHeight)",
-              top is not None and len(boxes) == 1 and bottom - top <= SECTION_HEADER_H,
+              top is not None and 1 <= len(boxes) <= allowed
+              and bottom - top <= SECTION_HEADER_H,
               f"{len(boxes)} cluster(s), y {top}–{bottom} pt")
         if header_band is None:
             header_band = (top, bottom)
         else:
             check("and in the same band as the first — one section, not three",
-                  None not in (top, header_band[0]) and abs(top - header_band[0]) <= 1,
-                  f"y {top} pt vs {header_band[0]} pt")
+                  None not in (top, header_band[0])
+                  and header_band[0] - 1 <= top and bottom <= header_band[1] + 1,
+                  f"y {top}–{bottom} pt vs {header_band[0]}–{header_band[1]} pt")
 
     # 6. The Obscure section, open — the ROWS.
     print("\n6. the Obscure section, open — the rows grow with the list")
@@ -734,10 +743,13 @@ def main():
           f"{len(diff)} px open vs {len(closed)} px closed "
           f"({len(diff) / max(len(closed), 1):.0f}×)")
     top, _ = extent(diff, scale)
+    # Inside the header's band rather than at its top: since phase 3b the
+    # band's top is the Reset button's, above the summary (2026-09-23).
     check("the change begins at the section header, so nothing above it moved",
-          None not in (top, header_band[0]) and abs(top - header_band[0]) <= 1,
-          f"first changed row y {top} pt; the header's summary is at "
-          f"{header_band[0]} pt")
+          None not in (top, header_band[0])
+          and header_band[0] - 1 <= top <= header_band[1] + 1,
+          f"first changed row y {top} pt; the header's band is "
+          f"{header_band[0]}–{header_band[1]} pt")
     scores = shift_match(images["open-one"], images["open-two"], SHIFT_BAND)
     best, runner = scores[0], scores[1]
     print(f"      best shifts (mismatched rows, points): {scores[:4]}")

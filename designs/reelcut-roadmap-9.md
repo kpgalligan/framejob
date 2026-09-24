@@ -1,7 +1,7 @@
 # Reelcut — road map 9: the clip inspector redesign
 
-**Status: phases 1, 2 and 3a BUILT, 2026-09-23 (§2, §4, §6). Phases 3b, 4
-and 5 are designed by the handoff and not built (§0).**
+**Status: phases 1, 2, 3a and 3b BUILT, 2026-09-23 (§2, §4, §6, §8).
+Phases 4 and 5 are designed by the handoff and not built (§0).**
 
 The handoff is `designs/design_handoff_clip_inspector/` — its README is the
 normative text for the redesign's metrics, inks and behaviour, with this
@@ -33,11 +33,11 @@ the view state everything else hangs on lands first.
      end", the keyed slider segment and field border, the coral playhead
      tick and the "now" tag, header badges, summary ink, the all-⊘ note,
      and auto-opening the sections an action keys.
-   - **3b, Reset/Clear** — not built. Reset only when a section differs from
-     its default and the summary's body tier; Clear in the header with an
-     action selected; per-row × on hover; the row context menus (Remove
-     from action N, Go to action M, Reset to default, Set end value to
-     default); the refusal strip at the panel's foot.
+   - **3b, Reset/Clear** — BUILT, §7 and §8. Reset only when a section
+     differs from its default and the summary's body tier; Clear in the
+     header with an action selected; per-row × on hover; the row context
+     menus (Remove from action N, Go to action M, Reset to default, Set end
+     value to default); the refusal strip at the panel's foot.
 4. **Retiming by drag** — band drags in the lane and on the timeline
    (`set_action`), hover, grips, the HUD and the ghost; the lane's fades,
    wedges, hatch and curve glyph.
@@ -436,3 +436,191 @@ and the auto-open in both appearances in the running app (remaining §4).
 (`phase2`, `phase4`, `phase6`–`phase9`, the word-caption chrome) were not
 re-run in this phase; every control column in them is 14 pt right of
 where it was.
+
+## 7. Phase 3b's design
+
+**Three pure moves first** (app/CLAUDE.md "Placement"), each typechecked at
+the baseline alone: `InspectorSectionHeader` out of `InspectorSection.swift`
+into `InspectorSectionHeader.swift`, `InspectorSliderControl` out of
+`InspectorPane.swift` into `InspectorSlider.swift`, and Obscure's section
+out of `VideoPane.swift` into `VideoPane+Obscure.swift` as an extension.
+
+**A row's default** (spec §11 CI-9). `InspectorBinding.ReadMode` gains
+`.defaults`, in which the four props readers answer `VideoProps.identity`,
+`AudioProps()`, `TextProps()` and `ShapeProps()` with no FFI call and no
+cache entry. `InspectorRowDefault` is a row's undo name, whether it
+differs and the ops that restore it; `.derived` builds one from the row's
+own `read` and `ops`: it differs when `read()` is not `at(.defaults, read)`,
+and it restores `ops(at(.defaults, read))`. The four typed builders derive
+one unless called with `resets: false`, which the eleven rows whose read
+bypasses the props pass (Rate; Transition's Kind, Curve, Crossfade Audio and
+Duration; Reverse; Canvas Width and Height; Appearance's Background,
+Timecode and Fit) — a derived default there could never differ. Blend,
+Align, Vertical and Mode build theirs by hand from their existing `read` and
+`ops`.
+
+**Reset and Clear.** A section differs when its explicit `differs` says so,
+else when any gutter's default differs; Speed, Filters, Obscure, Shape,
+Stroke and Appearance pass an explicit one (their rows do not read the
+props, or their Reset writes fewer keys than their rows read). A section is
+EDITING action N when an action is selected and any of its rows animates.
+The header then builds the Clear button always and shows it iff the
+section's `◆N` is above zero (tooltip "Remove this section from action
+N"); otherwise it shows the Reset button (built only when the section has a
+`reset`) iff the section differs. `InspectorSection.clear()` gathers the
+keys every gutter writes that the action holds and applies ONE
+`set_action_end` whose patch nulls them, under the undo name "Clear". The
+summary is drawn short of the VISIBLE button only, in `DS.action` when
+keyed, `DS.textMuted` when it differs, else `DS.textFaint`.
+
+**The row.** `inspectorRow` answers an `InspectorRowView` — the horizontal
+stack it always built, which now tracks the pointer over itself and owns a
+context menu. Hovered, a keyed gutter draws × in `DS.textMuted` in place of
+◆, with the tooltip "Remove from action N", and a click on it removes the
+row's keys from the action ("Remove from Action"). The menu, never read
+from the hover: "Remove from action N" when the gutter is keyed, "Go to
+action M" when it is ◇ (selecting action M), then, when the row has a
+default, "Set end value to default" with an action selected on a row that
+animates, else "Reset to default", enabled only while the default differs.
+A field's or a popup's own right-click keeps its own menu.
+
+**The refusal strip** (spec §11 CI-10). `applyEdit`'s `.refused` arm beeps
+and posts `projectDocumentDidRefuse`; the editor forwards the refusal to
+`InspectorViewController.showRefusal`, and `InspectorRefusalStrip` in the
+new foot container under the scroll view shows "Refused: " and the core's
+sentence (sans 11, `DS.textStrong`, over `DS.hoverFill` with a 1 pt
+`DS.border` top, up to three lines). It remembers the project handle it was
+shown under and clears on the first refresh whose `editedProject` is a
+different handle — an applied edit, undo, redo or a scope change — or on a
+click. An identity still only beeps; an agent's refusal and a live tick's
+never reach it.
+
+## 8. Phase 3b's record
+
+**What landed** (2026-09-23). Spec §11's CI-9 and CI-10, §4.3's "Reset,
+Clear and the row menu" paragraph and §5.5's amendment were written before
+the code. Three pure moves, each typechecked at the baseline alone (0
+errors, 7 warnings) before anything else: `InspectorSectionHeader.swift`,
+`InspectorSlider.swift` and `VideoPane+Obscure.swift`. Then two new files,
+`InspectorRowMenu.swift` (`InspectorRowView`: the row's own tracking area
+and its context menu) and `InspectorRefusalStrip.swift` (the strip and
+`showRefusal`), and changes in `InspectorMarks.swift` (`InspectorRowDefault`
+and `.derived`, `SectionMarks.differs` / `editing`, the gutter's hover, ×,
+`removeFromAction()` and appearance-change border, `selectedActionNumber`,
+`actionID(number:)`, `clearOps`), `InspectorPane.swift` (`ReadMode.defaults`
+and the four readers' short-circuit, `inspectorRow`'s `default:` and
+`InspectorRowView`, the four typed builders' `resets:`), `InspectorSection`
+(`differs:`, `header`, `clear()`, the fold), the header (Clear,
+`buttonTitle`, `summaryInk`), `InspectorViewController` (frozen, +14: the
+foot container, the strip, one line in `refresh(isLive:)`),
+`ProjectDocument` (`projectDocumentDidRefuse`, `applyEdit`'s two arms),
+`EditorViewController+Inspector` (the observer and `documentDidRefuse`),
+and the panes: Blend, Align, Vertical and Mode build `.derived` by hand;
+Speed, Filters, Obscure, Shape, Stroke and Appearance pass an explicit
+`differs`; Rate, Transition's four rows, Reverse, Canvas Width/Height and
+Appearance's three rows pass `resets: false`. No core, FFI, op, schema or
+tool change; the parity check is untouched. The sizes are remaining §3's
+phase-3b paragraph.
+
+**What was measured.** `make typecheck` 0 errors and 7 warnings after each
+move and at the end; `make test` 816 passed, 0 failed, and `make lint`
+clean, the core untouched; `make app` rc 0, and the built app's log (port
+4833) carries no `Reelcut: ` line. `clip_inspector4_proof.py` **46/46** —
+the probe's 41 rows (R1 ×4, R2 ×3, R3 ×5, R4 ×4, R5 ×9, R6 ×2, R7 ×6, R8
+×8; R7's sixth, that the shown strip spans the inspector's width, added by
+the review's fix — it passed on the unfixed tree as well) with its build and presence rows, and three
+harness rows: on this host (scale 2, dark) the Transform header's trailing
+70 pt, found to end at x 1423 pt (the scroller keeps the rest), held a
+tallest non-fill run of 7.5 pt with no action — the "100%" summary — and
+22 pt with action 1 selected, the Clear button's edge. `--mutant reset` (a
+`derived` whose `differs` answers true) exits 0: exactly R1's
+Transform-at-default and Shadow-off rows, R2's faint tier, R5's disabled
+row and H2 fail, and R8's explicit rows hold.
+
+**Re-runs on this tree.** `clip_inspector_proof.py` **39/39**,
+`clip_inspector2_proof.py` **32/32**, `clip_inspector3_proof.py` **31/31**,
+`phase3_chrome.py` **33/33**, `e2_chrome.py` **52/52**, `sharp_chrome.py`
+**29/29**; the eight owed since phase 2: `phase2_chrome.py` **26/26**,
+`phase4_chrome.py` **59/59**, `phase6_chrome.py` **70/70** (54/70 before the
+review's fix, below),
+`phase7_chrome.py` **78/78**, `phase8_chrome.py` **150/150**,
+`phase9_chrome.py` **62/62**, `words_picture_chrome.py` **5/5**,
+`word_captions_chrome.py` **31/31**. Rows re-measured in place, each dated
+2026-09-23 in its file:
+
+- `clip_inspector3_probe.swift` scored **29/31** first: M2's two header
+  rows compared a whole `SectionMarks`, which gained `differs` and
+  `editing`; they now compare the three fields phase 3a measured.
+- `phase3_chrome.py` scored **29/33** first and `phase4_chrome.py`
+  **57/59**: Reset now appears only once a section leaves its default, so
+  the "one region vs an empty list" and "typewriter vs no animation" pairs
+  also change the header's Reset — a second cluster inside the same
+  header, whose top sits above the summary's. The band is now that first
+  pair's extent, and the later pairs must lie inside it.
+- `phase7_chrome.py` scored **76/78** first: the translucent canvas makes
+  Appearance differ from its default, so its Reset appears; that one
+  control-tall cluster straddling the section's line is excused from
+  "nothing above moved", and the note's row is found under it.
+- `phase6_chrome.py` scored **40/70** first. Its blend fixtures now ask for
+  the `picture` sub-tab (Transform is not on a shape clip's default tab),
+  and the Transform Reset that Opacity 90% and multiply now show — the
+  pixels the two diffs SHARE — is taken out of the row inks and excused
+  from the "only the Blend row" checks, which brought it to 54/70. Its 16
+  Gradient rows (sections 4–6) failed for a phase-2 reason: on the Shape
+  sub-tab only Arrowheads follows Gradient, so a band starting 250 pt
+  under the header held only pane fill and every body solved to 0 pt. The
+  review's fix pins Arrowheads open in every gradient render and reads the
+  band in the SHUT render right under the header, found again in the open
+  one (`shift_under`): every body is an exact match at 0 mismatched rows
+  against a runner-up of 76, two stops 177 pt as the arithmetic predicts,
+  **70/70**.
+
+**e1.** `e1_chrome.py` asks for the `clip` sub-tab in its renders
+(arguments 12–14 `-`, `-`, `clip`) and its probe calls
+`selectClipSubTab(.clip)` before it reads — the spec's fix — and, beyond
+it, finds the Transition section by its id rather than as the LAST
+section, because on the Clip sub-tab Motion presets follows it. It scores
+**21/21**, not 15/15: the "15" was the count phase 3a saw with sections
+2 and 3 short-circuited, and all 21 rows now run. The extent row scored
+20/21 first: opening Transition moved the Motion presets section below it
+and shut Timing (opened by default only while no other section is), so
+this tree's changed-pixel extent was 197 pt against the reference's 71 pt.
+The review's fix opens Timing in both of this tree's renders and cuts the
+extent at the header of the section that follows Transition: B_now 129 pt,
+B_ref 71 pt, 58 = 2 × 29.
+
+**Deviations, each for a reason.**
+
+- **H2 is read as "no button", not "only the header fill".** With Reset
+  hidden the summary stops short of the VISIBLE button only, so it is drawn
+  inside the trailing 70 pt; H2 asks that no column there carry a run of
+  non-fill pixels of 14 pt or more (a mono 10 glyph is under 12), and H3
+  that one carries 18 pt or more (a 22 pt button's edge).
+- **`SectionMarks.differs` and `editing` have default values**, so the
+  three-field initialiser phase 3a's probe and `.empty` use still compiles.
+- **The × is the gutter's own glyph** (`DS.textMuted`) and the summary's
+  body tier is `DS.textMuted` — CI-9's two recorded deviations from the
+  handoff.
+- **A hovered row's × needs a key window** (`.activeInKeyWindow`); the
+  menu's "Remove from action N" does not, since it reads `isKeyed`.
+
+**Phase 3a's review nits.** (1) In and Out's `writes:` are deleted: a trim
+has no patch, so `paths(of:)` always answered `[]` and the rows were
+`.none` either way. (2) The binding's `Evaluated` doc says a clip under the
+playhead reaches the FFI too, in `.playhead`. (3) The header's comment names
+`refresh(summary:marks:)`. (4) `inspectorValueRow` reads `row.gutter`
+rather than `row.subviews.first`. (5) The gutter re-resolves its keyed
+border's `CGColor` in `viewDidChangeEffectiveAppearance()`.
+
+**Owed.** A person checks Reset, Clear, the ×, the menus and the strip in both
+appearances (remaining §4). Phases 4 and 5 (§0). Two review-2 nits, not
+fixed:
+- Box ▸ Width's derived default is `currentWidth()` in `.defaults`, which
+  is `canvas.width × 0.6`, so its "Reset to default" writes a FIXED width
+  rather than returning the box to auto-size (`TextPane.swift`, the Width
+  row). The fix is `resets: false` there, since Mode's own default already
+  restores auto.
+- The probe's "shown strip spans the inspector's width" row passed on the
+  tree before review 05's fix as well, so nothing proves `span(_:)` is
+  needed. Showing, clearing and re-showing the strip at a changed inspector
+  width would.

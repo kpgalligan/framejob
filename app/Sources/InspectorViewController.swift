@@ -69,6 +69,9 @@ final class InspectorViewController: NSViewController {
     private let pinnedContainer = NSStackView()
     /// The previous block, held one generation — `buildTabs()`'s pitfall.
     private var retiredPinned: NSView?
+    /// The foot under the scroll view and the refusal strip it hosts (CI-10).
+    let footContainer = NSStackView()
+    let refusalStrip = InspectorRefusalStrip()
     private var scroll: NSScrollView!
     private var panes: [InspectorTab: InspectorPaneView] = [:]
     private var currentPane: InspectorPaneView?
@@ -113,6 +116,12 @@ final class InspectorViewController: NSViewController {
         scroll.drawsBackground = false
         scroll.borderType = .noBorder
         root.addSubview(scroll)
+        footContainer.translatesAutoresizingMaskIntoConstraints = false
+        footContainer.addArrangedSubview(refusalStrip)
+        footContainer.orientation = .vertical
+        root.addSubview(footContainer)
+        let footCollapse = footContainer.heightAnchor.constraint(equalToConstant: 0)
+        footCollapse.priority = NSLayoutConstraint.Priority(1)
 
         NSLayoutConstraint.activate([
             tabsContainer.topAnchor.constraint(equalTo: root.topAnchor),
@@ -126,7 +135,11 @@ final class InspectorViewController: NSViewController {
             scroll.topAnchor.constraint(equalTo: pinnedContainer.bottomAnchor),
             scroll.leadingAnchor.constraint(equalTo: root.leadingAnchor),
             scroll.trailingAnchor.constraint(equalTo: root.trailingAnchor),
-            scroll.bottomAnchor.constraint(equalTo: root.bottomAnchor),
+            scroll.bottomAnchor.constraint(equalTo: footContainer.topAnchor),
+            footContainer.leadingAnchor.constraint(equalTo: root.leadingAnchor),
+            footContainer.trailingAnchor.constraint(equalTo: root.trailingAnchor),
+            footContainer.bottomAnchor.constraint(equalTo: root.bottomAnchor),
+            footCollapse,
         ])
         view = root
         buildTabs()
@@ -291,6 +304,7 @@ final class InspectorViewController: NSViewController {
     /// rebuilds: mid-gesture the values change but the shape does not.
     func refresh(isLive: Bool) {
         guard isViewLoaded else { return }
+        refusalStrip.clearIfStale(document?.editedProject)
         binding.invalidate()
         let clips = selectedClips
 

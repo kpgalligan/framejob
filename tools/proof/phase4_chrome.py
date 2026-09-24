@@ -1069,11 +1069,17 @@ def main():
               top is not None and bottom - top <= SECTION_HEADER_H,
               f"{len(boxes)} cluster(s), y {top}–{bottom} pt")
         bands[what] = (top, bottom)
+    # Re-measured in place 2026-09-23 (road map 9 phase 3b, spec §11 CI-9):
+    # Reset now shows only while the section differs from its default, so
+    # "typewriter vs no animation" ALSO changes the header's Reset button,
+    # whose top sits above the summary's. The later pairs (Reset shown in
+    # both) must lie INSIDE the first pair's band rather than start at its top.
     first = list(bands.values())[0]
-    for what, (top, _) in list(bands.items())[1:]:
+    for what, (top, bottom) in list(bands.items())[1:]:
         check(f"…and in the same band as the first — one summary, not three ({what})",
-              None not in (top, first[0]) and abs(top - first[0]) <= 1,
-              f"y {top} pt vs {first[0]} pt")
+              None not in (top, first[0])
+              and first[0] - 1 <= top and bottom <= first[1] + 1,
+              f"y {top}–{bottom} pt vs {first[0]}–{first[1]} pt")
 
     # 5. The open section's ROWS — each reads its own key and nothing else's.
     print("\n5. the open section — three rows, each bound to one key")

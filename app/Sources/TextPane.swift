@@ -166,9 +166,14 @@ final class TextPane: InspectorPaneView {
                     ops: { binding.ops(text: TextPatch(color: $0)) },
                     mixed: { binding.mixedText { $0.color } }),
                 inspectorRow("Align", [align], mixed: { binding.mixedText { $0.align } },
-                    binding: binding, writes: binding.ops(text: TextPatch(align: text.align))),
+                    binding: binding, writes: binding.ops(text: TextPatch(align: text.align)),
+                    default: .derived(binding, name: "Alignment", read: { binding.textProps.align },
+                                      ops: { binding.ops(text: TextPatch(align: $0)) })),
                 inspectorRow("Vertical", [valign], mixed: { binding.mixedText { $0.valign } },
-                    binding: binding, writes: binding.ops(text: TextPatch(valign: text.valign))),
+                    binding: binding, writes: binding.ops(text: TextPatch(valign: text.valign)),
+                    default: .derived(
+                        binding, name: "Alignment", read: { binding.textProps.valign },
+                        ops: { binding.ops(text: TextPatch(valign: $0)) })),
                 inspectorCheckRow(
                     "UPPERCASE", binding, name: "Case",
                     read: { binding.textProps.textCase == .upper },
@@ -311,7 +316,9 @@ final class TextPane: InspectorPaneView {
             rows: [
                 inspectorRow("Mode", [mode], mixed: { binding.mixedText { $0.width != nil } },
                     binding: binding,
-                    writes: binding.ops(text: TextPatch(width: .some(binding.textProps.width)))),
+                    writes: binding.ops(text: TextPatch(width: .some(binding.textProps.width))),
+                    default: .derived(binding, name: "Text Box", read: { binding.textProps.width },
+                                      ops: { binding.ops(text: TextPatch(width: .some($0))) })),
                 inspectorValueRow(
                     "Width", binding, name: "Text Width", unit: " px", decimals: 0, min: 20,
                     max: 20000, slider: false,

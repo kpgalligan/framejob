@@ -298,6 +298,22 @@ summary is in the action ink, and a section whose every writing row is ⊘
 says "Actions don't animate this. Edits here change the clip." Selecting an
 action opens the sections of the showing sub-tab that it keys.
 
+**Reset, Clear and the row menu** (§11 CI-9 and CI-10; road map 9 §7). A
+section's Reset shows only while the section differs from its default, and
+its summary is then in the body tier (`DS.textMuted`) rather than faint.
+With an action selected, a section whose rows the action can animate shows
+**Clear** in the same slot instead, and only while the action keys one of
+those rows; it removes the section's keys from the action's end patch, so
+the values fall back to what was held. On hover a keyed row's ◆ becomes a
+× that removes that row's keys from the action ("Remove from action N").
+Right-clicking a row opens its menu: "Remove from action N" on a keyed row,
+"Go to action M" on a ◇ row (which selects that action), and "Set end value
+to default" (with an action selected, on a row it can animate) or "Reset to
+default", disabled when the row already holds its default. A refusal the
+core writes for a person's edit is shown at the inspector's foot as
+"Refused: " and the rule's own sentence until the project next changes or
+the strip is clicked.
+
 **Note on the section list.** The design handoff's table sketches five groups
 (Transform, Video, Audio, Effects, Timing). What shipped keeps the panes'
 EXISTING sections as the units and filters them by kind, because merging them
@@ -1375,9 +1391,10 @@ that `Result`: invalid arguments, unknown ids and parse failures, reported
 at the FFI through `err_out`, never a panic. It is not an arm of `Outcome`
 because it is about the REQUEST where a refusal is about the PROJECT.
 
-**An identity and a refusal are identical to the person at the machine** —
-both beep, neither makes an undo step — and differ only in what a caller can
-be told. **Which of §6's "refuses" carry a sentence today is a list that
+**An identity and a refusal sound identical to the person at the machine**
+— both beep, neither makes an undo step — and differ in what a caller can
+be told and in one thing a person sees: a refusal's sentence is also shown,
+verbatim after "Refused: ", at the inspector's foot (§11 CI-10). **Which of §6's "refuses" carry a sentence today is a list that
 grows**, and `Outcome::Identity`'s own doc comment is the one place it is
 kept, so a reader does not grep ten modules for it. Two families are
 identities on purpose and will not join it: an op handed an **empty
@@ -4064,3 +4081,45 @@ assisted import.
   sub-tab first shown later adds its own, a header click that closes one
   drops it for the rest of that selection, and selecting another action
   (or the same one again after leaving it) starts over.
+- **CI-9 — Reset shows only while a section differs from its default, and
+  with an action selected the same slot reads Clear** (road map 9 §7, the
+  clip inspector redesign's phase 3b). A row's DEFAULT is its own `read`
+  run in `InspectorBinding.ReadMode.defaults`, where the four props readers
+  answer `VideoProps.identity`, `AudioProps()`, `TextProps()` and
+  `ShapeProps()` without the FFI; a section differs when its explicit
+  `differs` says so, else when any of its rows' defaults differs. **A
+  section's `differs` is false right after its own `reset` runs**: the
+  Reset writes every key its `differs` reads, or `differs` reads only what
+  the Reset writes — measured for every derived section, and made true for
+  Shape (whose Reset writes only `radius`) and Stroke (whose Reset writes
+  `StrokeProps()`, where the default is no stroke) by an explicit
+  `differs`; the existing Reset closures are unchanged. A section with a
+  row that animates, while an action is selected, shows **Clear** instead,
+  and only while the action keys one of its rows: it removes those keys
+  from the action's end patch through `set_action_end` nulls, so the values
+  fall back to what was held (tooltip "Remove this section from action
+  N"). A section none of whose rows animates (Document, Shape, a ⊘-only
+  section) keeps the Reset arm, since its edits go to the clip. Rows whose
+  read bypasses the props (Rate, In/Out, Transition, Reverse, Canvas,
+  Appearance, a list entry's kind) carry no row default, so no "Reset to
+  default" item and nothing toward `differs`. A keyed row's ◆ becomes a ×
+  on hover — the gutter's own glyph, not the handoff's right-end button,
+  because an arranged view shown on hover would shrink a slider under the
+  pointer and an overlay would cover a field's tail — and every row has a
+  right-click menu: "Remove from action N" (keyed), "Go to action M" (◇),
+  then "Set end value to default" (an action selected and the row animates)
+  or "Reset to default", disabled when the row is already at its default.
+  The summary's middle tier ("differs") is `DS.textMuted`, not the
+  handoff's `--text-body`: no `DS` token is new.
+- **CI-10 — A person's refusal is shown, in the core's own sentence, at the
+  inspector's foot** (phase 3b). `ProjectDocument.applyEdit` still beeps
+  for both non-applied arms and makes no undo step for either (§5.5); on a
+  `.refused` it also posts `projectDocumentDidRefuse`, and the editor puts
+  "Refused: " and the rule's sentence VERBATIM in a strip under the
+  inspector's scroll view. The strip lasts until the project changes — the
+  next applied edit, an undo, a redo or a scope change — or it is clicked;
+  a playhead or selection move leaves it. It is not the handoff's "rule
+  plus what to do" phrasing and has no timer: the sentence is the core's
+  (app/CLAUDE.md "A refusal is the CORE's sentence"). Agent edits never
+  reach it (`AgentServer.performGroupedEdit` answers its refusal before any
+  document call) and a live drag's refused tick stays swallowed.

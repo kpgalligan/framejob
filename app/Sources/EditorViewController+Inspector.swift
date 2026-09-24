@@ -52,10 +52,22 @@ extension EditorViewController {
         inspector.onSeek = { [weak self] time in self?.inspectorSeek(time) }
         inspector.onCommand = { [weak self] selector in self?.inspectorCommand(selector) }
         inspector.onSelectAction = { [weak self] id in self?.selectAction(id) }
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(documentDidRefuse(_:)),
+            name: .projectDocumentDidRefuse, object: document)
 
         timeline?.registerForDraggedTypes([.reelcutMedia])
         previewCanvas?.registerForDraggedTypes([.reelcutMedia])
         refreshInspector(isLive: false)
+    }
+
+    /// A person's edit the core refused (spec §11 CI-10): its sentence goes
+    /// to the inspector's foot. `applyEdit` has already beeped.
+    @objc func documentDidRefuse(_ note: Notification) {
+        guard let document, note.object as? ProjectDocument === document,
+              let refusal = note.userInfo?["refusal"] as? ReelRefusal
+        else { return }
+        inspector?.showRefusal(refusal)
     }
 
     /// Project → inspector, from `refreshFromDocument`. `isLive` rides

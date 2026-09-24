@@ -191,10 +191,11 @@ HEIGHT = 862
 # would earn it back is a render of one fixture at TALL + 200 whose solved
 # body height equals TALL's, scored as a row of its own.
 TALL = 1600
-# The band under the section starts this far below its header. It must clear
-# the tallest body any fixture here has (235 pt, four stops) or the
-# measurement would be reading the section against itself — section 4 scores
-# that too, rather than leaving it as a comment.
+# The tallest body the solve is scored against (235 pt, four stops, fits
+# under it). Until 2026-09-23 the band started this far below the header;
+# since the review of road map 9's phase 3b it is read in the SHUT render,
+# right under the header, and found again up to 260 pt lower
+# (`body_height`), so this is the reach section 4 scores, not the band's top.
 BODY_MAX = 250
 # What "an exact shift" means, in IMAGE rows of the band. The winner may
 # leave a few rows unexplained — the band's own top edge straddles a row of
@@ -239,6 +240,11 @@ CONTROL_X1 = INSPECTOR_X + INSPECTOR_W - INSET - SCROLLER_W
 GRADIENT_ID = "shape.gradient"            # ShapePane.gradientSection
 FILL_ID = "shape.fill"                    # ShapePane.fillSection
 ABSENT_ID = GRADIENT_ID + ".nope"         # an id no section has
+# Pinned open in EVERY gradient render (2026-09-23, review of road map 9's
+# phase 3b): on the Shape sub-tab (phase 2) the one section under Gradient
+# is Arrowheads, so it is what the body height is solved from, and open it
+# gives the solve rows enough to win by (`body_height`).
+BELOW_ID = "shape.arrows"                 # ShapePane's Arrowheads section
 
 # The Transform section's rows, in `VideoPane.transformSection`'s order. The
 # Blend popup is the LAST value row, immediately below Opacity, and the two
@@ -467,16 +473,23 @@ def build_harness():
     return binary
 
 
-def render(binary, package, out, expand="-", height=HEIGHT, select=0):
+def render(binary, package, out, expand="-", height=HEIGHT, select=0, sub_tab=None):
     """One render, with the harness's arguments in the order every earlier
     chrome script depends on. `expandSections` is phase 3's argument and is
     used here for what it was built for — a section written
     `defaultExpanded: false` draws nothing but its header — so this script
-    adds no instrument to the renderer at all."""
+    adds no instrument to the renderer at all.
+
+    `sub_tab` is the harness's fourteenth argument (road map 9's phase 2):
+    Transform, where Blend and its note live, is on the Picture sub-tab and
+    a shape clip opens on Shape, so the blend fixtures ask for `picture`
+    (2026-09-23, phase 3b)."""
     args = [
         binary, package, out, "light", str(WIDTH), str(height), str(select), "0", "1",
         "clip", "-", expand,
     ]
+    if sub_tab:
+        args += ["-", "-", sub_tab]
     result = subprocess.run(args, capture_output=True, text=True)
     if result.returncode != 0 or not os.path.exists(out):
         sys.stderr.write(result.stdout + result.stderr)
@@ -985,6 +998,28 @@ def intersect(intervals):
     return max(lows), min(highs)
 
 
+def shift_under(shut, opened, band, limit=260):
+    """How far DOWN the rows of `band`, read in the SHUT render, sit in the
+    open one — `shift_match` read from the other end. The band is under the
+    section's header in the shut render, where nothing of the section is
+    drawn, so every row of it is something the open body pushed down."""
+    scale = shut.scale
+    ch = shut.channels
+    x0, x1 = int(band.x0 * scale) * ch, int(band.x1 * scale) * ch
+    y0, y1 = int(band.y0 * scale), int(band.y1 * scale)
+    scores = []
+    for points in range(limit):
+        offset = int(points * scale)
+        if y1 + offset > opened.height:
+            break
+        mismatch = sum(
+            1 for y in range(y0, y1)
+            if shut.rows[y][x0:x1] != opened.rows[y + offset][x0:x1])
+        scores.append((mismatch, points))
+    scores.sort()
+    return scores
+
+
 def body_height(images, tag, band):
     """How much taller the pane is with a section OPEN, solved out of the
     pixels below it — which is the section's whole body, header excluded.
@@ -992,8 +1027,15 @@ def body_height(images, tag, band):
     Returns `(mismatched rows, points)` for the winner and the runner-up, so
     a caller can score the MARGIN. A shift that wins by two rows out of four
     hundred is not a measurement, and at the window height this script used
-    to render at, that is exactly what every one of these was."""
-    scores = shift_match(images[f"{tag}-shut"], images[f"{tag}-open"], band)
+    to render at, that is exactly what every one of these was.
+
+    Re-measured in place 2026-09-23 (review of road map 9's phase 3b): on
+    the Shape sub-tab only Arrowheads (`BELOW_ID`, pinned open) is under
+    Gradient, so a band starting BODY_MAX below the header held nothing but
+    pane fill and every body solved to 0 pt. The band is now the rows under
+    the header in the SHUT render, found again in the open one
+    (`shift_under`)."""
+    scores = shift_under(images[f"{tag}-shut"], images[f"{tag}-open"], band)
     return scores[0], scores[1]
 
 
@@ -1017,27 +1059,32 @@ def main():
     for name in list(PACKAGES):
         if name.startswith(("blend-", "note-")):
             select = 1 if PACKAGES[name].get("behind") else 0
-            renders[name] = render(binary, packages[name], png(name), select=select)
+            renders[name] = render(binary, packages[name], png(name), select=select,
+                                   sub_tab="picture")
     # …and one repeat, for section 1.
     renders["blend-normal-again"] = render(
-        binary, packages["blend-normal"], png("blend-normal-again"))
+        binary, packages["blend-normal"], png("blend-normal-again"), sub_tab="picture")
     # The gradient fixtures: shut and open, at the tall window.
     for name in list(PACKAGES):
         if name.startswith("grad-") or name == "text-clip":
             if name not in OPEN_ONLY:
                 renders[f"{name}-shut"] = render(
-                    binary, packages[name], png(f"{name}-shut"), height=TALL)
+                    binary, packages[name], png(f"{name}-shut"), expand=BELOW_ID, height=TALL)
             renders[f"{name}-open"] = render(
-                binary, packages[name], png(f"{name}-open"), expand=GRADIENT_ID, height=TALL)
+                binary, packages[name], png(f"{name}-open"),
+                expand=f"{GRADIENT_ID},{BELOW_ID}", height=TALL)
     renders["grad-2-open-again"] = render(
-        binary, packages["grad-2"], png("grad-2-open-again"), expand=GRADIENT_ID, height=TALL)
+        binary, packages["grad-2"], png("grad-2-open-again"),
+        expand=f"{GRADIENT_ID},{BELOW_ID}", height=TALL)
     # The Fill section pinned instead, so section 4 can say WHERE Gradient
     # sits relative to it, and an id no section has, so it can say that the
     # pin is about THIS id.
     renders["grad-2-fillpin"] = render(
-        binary, packages["grad-2"], png("grad-2-fillpin"), expand=FILL_ID, height=TALL)
+        binary, packages["grad-2"], png("grad-2-fillpin"), expand=f"{FILL_ID},{BELOW_ID}",
+        height=TALL)
     renders["grad-2-absent"] = render(
-        binary, packages["grad-2"], png("grad-2-absent"), expand=ABSENT_ID, height=TALL)
+        binary, packages["grad-2"], png("grad-2-absent"), expand=f"{ABSENT_ID},{BELOW_ID}",
+        height=TALL)
     print(f"rendered {len(renders)} PNGs in {time.time() - start:.1f} s")
 
     start = time.time()
@@ -1087,6 +1134,21 @@ def main():
               bool(diff) and not stray,
               "" if not stray else f"{len(stray)} px elsewhere:\n"
               + describe(clusters(stray), scale))
+    # Re-measured in place 2026-09-23 (road map 9 phase 3b, spec §11 CI-9):
+    # Transform's Reset now shows only while the section differs from its
+    # default, so every non-default fixture ALSO draws the Reset button in
+    # Transform's header. Its pixels are the ones the Opacity and Blend diffs
+    # SHARE — measured, not written down — and every row claim below is made
+    # without them; `header_rect` is their box, excused where a diff may
+    # carry it.
+    common = set(opacity_diff) & set(blend_diff)
+    header_top, header_bottom = extent(sorted(common), scale)
+    xs = [x for x, _ in common] or [0]
+    header_rect = Rect("Transform's Reset", min(xs) / scale, header_top or 0,
+                       (max(xs) + 1 - min(xs)) / scale, (header_bottom or 0) - (header_top or 0))
+    print(f"      {len(common)} px both diffs share: {header_rect}")
+    opacity_diff = [p for p in opacity_diff if p not in common]
+    blend_diff = [p for p in blend_diff if p not in common]
     opacity_band = extent(opacity_diff, scale)
     blend_band = extent(blend_diff, scale)
     print(f"      Opacity ink y {opacity_band[0]}–{opacity_band[1]} pt · "
@@ -1133,7 +1195,7 @@ def main():
     for mode in BLEND_MODES[1:]:
         diff = changed_pixels(images["blend-normal"], images[f"blend-{mode}"])
         moved[mode] = bool(inside(diff, blend_row, scale, slop=1))
-        out = outside(diff, [blend_row], scale, slop=1)
+        out = outside(diff, [blend_row, header_rect], scale, slop=1)
         if out:
             strays[mode] = out
     check("and each of the seven changes that one row and NOTHING else — no summary, no "
@@ -1148,8 +1210,11 @@ def main():
     # only when the trap is live, and four fixtures ask it the four questions
     # its guards answer.
     print("\n3. the note — `blendNote`, which fires only when the trap is live")
-    note_band = Rect("above the rows", INSPECTOR_X, TOOLBAR + TAB, INSPECTOR_W,
-                     (opacity_band[0] or 0) - (TOOLBAR + TAB))
+    # From under Transform's Reset (phase 3b, above), which a non-normal mode
+    # now shows too, rather than from the tab strip.
+    note_top = header_bottom if header_bottom is not None else TOOLBAR + TAB
+    note_band = Rect("above the rows", INSPECTOR_X, note_top, INSPECTOR_W,
+                     (opacity_band[0] or 0) - note_top)
     note_diff, _ = report(
         images, "note-normal", "note-multiply",
         "black canvas, nothing behind: normal vs multiply", scale)
@@ -1190,7 +1255,7 @@ def main():
         a, b = (("blend-normal", "blend-multiply") if tag == "blend"
                 else ("note-behind-normal", "note-behind-multiply"))
         diff = changed_pixels(images[a], images[b])
-        stray = outside(diff, [blend_row], scale, slop=1)
+        stray = outside(diff, [blend_row, header_rect], scale, slop=1)
         check(f"{what} suppresses the note: the only thing that changes is the Blend row",
               bool(diff) and not stray,
               f"{len(diff)} px, all in {blend_row}" if not stray
@@ -1271,9 +1336,11 @@ def main():
           f"Fill's first changed row y {fill_top} pt, Gradient's y {grad_top} pt")
 
     # How TALL it is, per fixture, solved out of what it pushed down.
-    band_top = header[0] + SECTION_HEADER_H + BODY_MAX
+    # Under the header in the SHUT render, down to where a shift of the
+    # solve's whole reach still lands inside the pane (`body_height`).
+    band_top = header[1] + SECTION_HEADER_H
     band = Rect("shift band", INSPECTOR_X, band_top, INSPECTOR_W - SCROLLER_W,
-                (TALL - TIMELINE_H) - band_top)
+                (TALL - TIMELINE_H) - 260 - band_top)
     print(f"\n   the section's body height, solved from what it pushes down, over {band}:")
     bodies, margins = {}, {}
     for tag in ("grad-2", "grad-3", "grad-4", "grad-off", "grad-fill", "grad-ellipse",
@@ -1296,9 +1363,9 @@ def main():
           all(m[0] <= SHIFT_SLOP and m[1] - m[0] >= SHIFT_MARGIN for m in margins.values()),
           "; ".join(f"{t} {m[0]}/{m[1]}" for t, m in margins.items()
                     if not (m[0] <= SHIFT_SLOP and m[1] - m[0] >= SHIFT_MARGIN)) or "all clean")
-    check(f"…and no body reached the band, so none was measured against itself — the "
-          f"tallest is {max(bodies.values(), default=0)} pt against {BODY_MAX} pt of "
-          "clearance under the header",
+    check(f"…and every body is inside the solve's reach, so the band it is read over "
+          f"lands in the pane — the tallest is {max(bodies.values(), default=0)} pt against "
+          f"{BODY_MAX} pt",
           bodies and 0 < max(bodies.values()) < BODY_MAX,
           f"{sorted(bodies.values())[-3:]} pt")
 

@@ -98,7 +98,9 @@ detail there.
 **The document.**
 - `ProjectDocument.swift` (+`DisplayStem`, +`Recording`, +`SelectedAction`)
   — NSDocument, `.reelcut` package read/write, and the single mutation
-  point (see Undo). Holds the SIX pieces of view state nothing persists —
+  point (see Undo); `applyEdit`'s `.refused` arm beeps and then posts
+  `projectDocumentDidRefuse` with the `ReelRefusal` (spec §11 CI-10), which
+  the editor forwards to the inspector's refusal strip. Holds the SIX pieces of view state nothing persists —
   playhead, clip selection, in/out range, `selectedMedia`, `nestPath` and
   `selectedAction` — re-clamped by `clampViewState` in that order with the
   scope FIRST, since the selection clamp measures against whatever
@@ -239,35 +241,60 @@ the key map behind it.
 **Inspector.**
 - `InspectorViewController.swift` (frozen: the tab strip, and the PINNED
   container between it and the scroll view that hosts a pane's
-  `pinnedBlock`, one generation retired like the strip; `selectClipSubTab`
+  `pinnedBlock`, one generation retired like the strip; the FOOT container
+  under the scroll view, collapsed at priority 1 like the pinned one, which
+  hosts `refusalStrip`, and the first line of `refresh(isLive:)` that
+  clears a stale refusal; `selectClipSubTab`
   is a sub-tab pick's one refresh, and `refresh(isLive:)` calls
   `ClipPane.forgetSubTab()` whenever the selection's ids change, spec §11
-  CI-5) · `InspectorPane.swift`
+  CI-5) · `InspectorRefusalStrip.swift` (spec §11 CI-10: "Refused: " and the
+  core's sentence verbatim, remembered with the `editedProject` handle it
+  was shown under and cleared on the first refresh under another handle or
+  a click; `showRefusal` is the editor's forward of
+  `projectDocumentDidRefuse`) · `InspectorPane.swift`
   (the pane base — `pinnedBlock` is the header `makeHeader()` built, never
-  stacked — the row builders, `InspectorSliderControl` with the 7 × 11 block
-  knob snapped to device pixels (CI-6) and, keyed, the mint segment from the
-  action's start value and the coral playhead tick, and `InspectorBinding`
-  — the one place that knows the fields read the SELECTED action's END state
+  stacked — the row builders, whose four typed ones derive a row's DEFAULT
+  from its own `read` and `ops` unless `resets: false`, and
+  `InspectorBinding` — the one place that knows the fields read the
+  SELECTED action's END state
   (`action(_:)` answers the selected action and never consults the playhead;
   `evaluated(_:)` asks `clip_state` at `clip.start + action.endTime`, spec
   §11 CI-2, or in `at(.start)` / `at(.playhead)` at the action's start or
-  the playhead, over a cache keyed by clip and `ReadMode`)) ·
+  the playhead, over a cache keyed by clip and `ReadMode`; `.defaults` is
+  what a row resets to — `VideoProps.identity`, `AudioProps()`,
+  `TextProps()`, `ShapeProps()` — with no FFI and no cache entry, CI-9)) ·
+  `InspectorSlider.swift` (`InspectorSliderControl`, a pure move: the 7 × 11
+  block knob snapped to device pixels (CI-6) and, keyed, the mint segment
+  from the action's start value and the coral playhead tick) ·
   `InspectorBinding+Writes.swift` (a pure move: a write with an action
   selected goes to `set_action_end`, with `structural(video:for:)` the
   exception that sends a list of a different LENGTH, or `motion`, to the
   BASE props, and `structural(audio:for:)` the one that sends pan, mono,
   compressor, noise reduction, duck and keep-pitch there (CI-3)) ·
-  `InspectorSection.swift` (`InspectorSection` with its `id`, `title` and
-  folded `marks` readable, `reveal()` which writes no preference, and
-  `didToggle`, called by the header's click alone; the header with its
-  `◆N` / ◇ / ⊘; and `KeyedReveal`, `ClipPane`'s auto-open, CI-8) ·
-  `InspectorMarks.swift` (spec §11 CI-7: `RowMark`, `SectionMarks`, the
+  `InspectorSection.swift` (`InspectorSection` with its `id`, `title`,
+  `header` and folded `marks` readable — `differs` from an explicit closure
+  else the rows' defaults, `editing` the selected action's number when a
+  row animates — `clear()`, `reveal()` which writes no preference, and
+  `didToggle`, called by the header's click alone; and `KeyedReveal`,
+  `ClipPane`'s auto-open, CI-8) · `InspectorSectionHeader.swift` (a pure
+  move, then CI-9: the `◆N` / ◇ / ⊘, the one trailing slot — Clear while
+  editing an action that keys the section, else Reset while it differs —
+  `buttonTitle`, and `summaryInk`'s three tiers; the summary stops short of
+  the VISIBLE button) ·
+  `InspectorMarks.swift` (spec §11 CI-7: `RowMark`, `SectionMarks`,
+  `InspectorRowDefault` (CI-9), the
   14 pt `InspectorMarkGutter` that is the FIRST view of every
   `inspectorRow` — blank at `.none`, so it must stay first for the refresh
   walk to reach it before the controls whose label ink and layer border it
-  sets — `InspectorRowTag` ("at end", "now …"), and the binding's mark
-  queries; a row's paths come from the ops it WRITES, `writes:` /
-  `follows:`, and an un-annotated row is `.none`, never ⊘) ·
+  sets; hovered while keyed it draws × and a click removes the row's keys —
+  `InspectorRowTag` ("at end", "now …"), and the binding's mark
+  queries, `selectedActionNumber`, `actionID(number:)` and `clearOps`, the
+  ONE `set_action_end` of nulls; a row's paths come from the ops it WRITES,
+  `writes:` / `follows:`, and an un-annotated row is `.none`, never ⊘) ·
+  `InspectorRowMenu.swift` (`InspectorRowView`, the row's stack: its own
+  tracking area sets the gutter's hover, and its context menu — Remove from
+  action N, Go to action M, Reset to default / Set end value to default —
+  never reads the hover) ·
   `ClipPane.swift` (the sub-tabs — `subTabs` by kind, `activeSubTab`, and
   `choose` / `forgetSubTab`, which never refresh — and `makeSections()`, the
   function from the selection's kind and the active sub-tab to its
@@ -278,7 +305,7 @@ the key map behind it.
   `makeHeader()` builds once per pane build) · `ActionLaneView.swift` (the
   action lane, the Actions section's replacement, with the clip and action
   ids it shows captured) · `VideoPane.swift` (+`Transition`,
-  +`Motion`) · `AudioPane.swift` · `TextPane.swift` · `ShapePane.swift` ·
+  +`Motion`, +`Obscure` — the Obscure section, a pure move) · `AudioPane.swift` · `TextPane.swift` · `ShapePane.swift` ·
   `DocumentPane.swift` (reads `documentSnapshot`, never the scoped one: its
   ops are document-level) · `OptionControls.swift` (the descriptor-driven
   row controls) · `OptionControls+Choices.swift` (the typed, value-carrying
@@ -858,7 +885,9 @@ hang for good.
 
 **A refusal is the CORE's sentence, and nothing on this side writes one.**
 An op answers `.applied`, `.identity` or `.refused` (`ReelEdit.swift`); a
-person hears a beep for both non-applied arms, and an agent hears
+person hears a beep for both non-applied arms and, for a refusal, reads the
+core's sentence verbatim after "Refused: " at the inspector's foot (spec
+§11 CI-10), and an agent hears
 `<Action> made no change: the project is already in that state.` or
 `<Action> was refused at <op>: <the rule's own sentence>`, written once in
 `AgentServer.performGroupedEdit`. **No handler applies an op to see what
@@ -955,8 +984,9 @@ framework callbacks are stamped where they land and hopped to main. Colors,
 fonts and metrics come from `DS` tokens; shared controls go in
 `Controls.swift`. **A refusal and an identity both beep** (`NSSound.beep()`)
 and neither makes an undo step — that is what makes a person's experience of
-the two identical, and it is deliberate (spec §5.5); only invalid input
-throws, and errors never crash.
+the two alike, and it is deliberate (spec §5.5); a refusal ALSO shows its
+sentence at the inspector's foot (CI-10), the one difference a person
+sees; only invalid input throws, and errors never crash.
 4-space indent, ~100 columns.
 
 **`make typecheck` is authoritative for TYPE errors, and only those.** It

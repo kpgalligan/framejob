@@ -83,7 +83,7 @@ extension VideoPane {
                     ops: { index in
                         let kind = index == 0 ? nil : kinds[min(max(index - 1, 0), kinds.count - 1)]
                         return [.setTransition(clip: clip, kind: kind)]
-                    }),
+                    }, resets: false),
                 inspectorPopupRow(
                     "Curve", binding, name: "Transition Curve",
                     items: curves.map { $0.displayName },
@@ -91,11 +91,11 @@ extension VideoPane {
                     ops: { index in
                         styleOps(
                             curve: curves[min(max(index, 0), curves.count - 1)], audio: nil)
-                    }),
+                    }, resets: false),
                 inspectorCheckRow(
                     "Crossfade Audio", binding, name: "Transition Audio",
                     read: crossfades,
-                    ops: { value in styleOps(curve: nil, audio: value) }),
+                    ops: { value in styleOps(curve: nil, audio: value) }, resets: false),
                 inspectorValueRow(
                     "Duration", binding, name: "Transition Duration", unit: " s", decimals: 2,
                     min: 0.02, max: 10, quick: [0.25, 0.5, 1, 2], slider: false,
@@ -107,7 +107,7 @@ extension VideoPane {
                                 duration: ReelTime.snapToFrame(
                                     ReelTime.ticks(seconds: value), fps: binding.canvas.fps))
                         ]
-                    }),
+                    }, resets: false),
             ])
     }
 }

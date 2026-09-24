@@ -338,166 +338,6 @@ final class InspectorNoteLabel: NSTextField, OptionControl {
     }
 }
 
-// MARK: - Slider
-
-/// A continuous value slider whose drag is a LIVE edit: `begin` on mouse
-/// down, `write` on every move, `end` on mouse up (§4.3, the document's
-/// `beginLiveEdit`/`updateLiveEdit`/`endLiveEdit` trio). Paired with an
-/// `OptionFieldControl` in the same row, which commits typed values as a
-/// single `applyEdit` instead.
-///
-/// It lives here rather than in `OptionControls.swift` because that file is
-/// carried verbatim from Rasterize (app/CLAUDE.md: keep it in sync, do not
-/// fork); it still conforms to `OptionControl` so `refreshOptionControls`
-/// finds it like every other control.
-final class InspectorSliderControl: NSView, OptionControl {
-    private let lower: Double
-    private let upper: Double
-    private let read: () -> Double
-    private let write: (Double) -> Void
-    private let begin: () -> Void
-    private let end: () -> Void
-    private let enabled: () -> Bool
-    /// The value at the selected action's START and at the PLAYHEAD
-    /// (`InspectorBinding.startValue` / `nowValue`), nil when there is none.
-    private let start: () -> Double?
-    private let now: () -> Double?
-    /// Whether the row is keyed — set by `inspectorValueRow` from the row's
-    /// gutter once the row exists.
-    var keyed: () -> Bool = { false }
-    private var isActive = true
-    private var dragging = false
-
-    private static let knobSize = NSSize(width: 7, height: 11)
-    private static let track: CGFloat = 3
-
-    init(
-        min lower: Double, max upper: Double, read: @escaping () -> Double,
-        write: @escaping (Double) -> Void, begin: @escaping () -> Void,
-        end: @escaping () -> Void, enabled: @escaping () -> Bool,
-        start: @escaping () -> Double?, now: @escaping () -> Double?
-    ) {
-        self.start = start
-        self.now = now
-        self.lower = lower
-        self.upper = Swift.max(upper, lower + 0.000_001)
-        self.read = read
-        self.write = write
-        self.begin = begin
-        self.end = end
-        self.enabled = enabled
-        super.init(frame: .zero)
-        wantsLayer = true
-        setContentHuggingPriority(NSLayoutConstraint.Priority(1), for: .horizontal)
-        setContentCompressionResistancePriority(NSLayoutConstraint.Priority(1), for: .horizontal)
-        translatesAutoresizingMaskIntoConstraints = false
-        widthAnchor.constraint(greaterThanOrEqualToConstant: 60).isActive = true
-        refresh()
-    }
-
-    @available(*, unavailable)
-    required init?(coder: NSCoder) {
-        fatalError("InspectorSliderControl does not support NSCoder")
-    }
-
-    override var isFlipped: Bool { true }
-
-    override var intrinsicContentSize: NSSize {
-        NSSize(width: NSView.noIntrinsicMetric, height: DS.controlHeight)
-    }
-
-    func refresh() {
-        isActive = enabled()
-        alphaValue = isActive ? 1 : 0.42
-        needsDisplay = true
-    }
-
-    private var fraction: CGFloat { fraction(of: read()) }
-
-    private func fraction(of raw: Double) -> CGFloat {
-        let value = Swift.min(Swift.max(raw, lower), upper)
-        return CGFloat((value - lower) / (upper - lower))
-    }
-
-    private func value(atX x: CGFloat) -> Double {
-        let inset = Self.knobSize.width / 2
-        let span = Swift.max(bounds.width - Self.knobSize.width, 1)
-        let t = Swift.min(Swift.max((x - inset) / span, 0), 1)
-        return lower + Double(t) * (upper - lower)
-    }
-
-    // MARK: Mouse
-
-    override func mouseDown(with event: NSEvent) {
-        guard isActive else { return }
-        dragging = true
-        begin()
-        write(value(atX: convert(event.locationInWindow, from: nil).x))
-        needsDisplay = true
-    }
-
-    override func mouseDragged(with event: NSEvent) {
-        guard dragging else { return }
-        write(value(atX: convert(event.locationInWindow, from: nil).x))
-        needsDisplay = true
-    }
-
-    override func mouseUp(with event: NSEvent) {
-        guard dragging else { return }
-        dragging = false
-        // Ends the gesture even when the value never moved: the document
-        // registers no undo step for an unchanged handle, so this is free.
-        end()
-        needsDisplay = true
-    }
-
-    // MARK: Drawing
-
-    override func draw(_ dirtyRect: NSRect) {
-        let knobSize = Self.knobSize
-        let mid = bounds.midY
-        let rail = NSRect(
-            x: knobSize.width / 2, y: mid - Self.track / 2,
-            width: max(bounds.width - knobSize.width, 1), height: Self.track)
-        DS.border.setFill()
-        rail.fill()
-
-        // The block knob (`BlockSliderCell.drawKnob`'s shape), snapped to
-        // device pixels; the fill runs to the SNAPPED centre so the two meet
-        // on a pixel edge.
-        let center = rail.minX + rail.width * fraction
-        let knob = backingAlignedRect(
-            NSRect(x: center - knobSize.width / 2, y: mid - knobSize.height / 2,
-                   width: knobSize.width, height: knobSize.height),
-            options: .alignAllEdgesNearest)
-        // Keyed (spec §4.3's marks): no accent fill, and the action ink from
-        // the value at the action's START to the knob, either way round.
-        if let from = start(), keyed() {
-            let startX = rail.minX + rail.width * fraction(of: from)
-            DS.action.setFill()
-            NSRect(x: min(startX, knob.midX), y: rail.minY, width: abs(knob.midX - startX),
-                   height: rail.height).fill()
-        } else {
-            DS.accent.setFill()
-            NSRect(x: rail.minX, y: rail.minY, width: max(knob.midX - rail.minX, 0),
-                   height: rail.height).fill()
-        }
-        // The playhead's value: a coral tick over the fill, under the knob,
-        // when it is not where the knob is.
-        if let value = now(), abs(value - read()) > (upper - lower) / 1000 {
-            let x = rail.minX + rail.width * fraction(of: value)
-            DS.playhead.setFill()
-            backingAlignedRect(
-                NSRect(x: x - 1, y: mid - knobSize.height / 2, width: 2,
-                       height: knobSize.height),
-                options: .alignAllEdgesNearest
-            ).fill()
-        }
-        DS.textStrong.withAlphaComponent(1).setFill()
-        knob.fill()
-    }
-}
-
 // MARK: - Multi-line text
 
 /// The Text tab's content editor: an `NSTextView` that commits on blur (and
@@ -605,18 +445,21 @@ final class InspectorTextArea: NSView, OptionControl, NSTextViewDelegate {
 /// `follows` are the ops the row writes and the ones whose keys it only
 /// follows; `binding` is what the gutter asks about the selected action. A
 /// popup, a checkbox or a segmented control is DISCRETE: keyed, it switches
-/// at the action's end, and the row says "at end".
+/// at the action's end, and the row says "at end". `default` is the row's
+/// reset (spec §11 CI-9): a row without one has no reset item in its menu
+/// and counts nothing toward its section's `differs`.
 func inspectorRow(
     _ label: String?, _ controls: [NSView], mixed: (() -> Bool)? = nil,
-    binding: InspectorBinding? = nil, writes: [ReelOp] = [], follows: [ReelOp] = []
-) -> NSView {
+    binding: InspectorBinding? = nil, writes: [ReelOp] = [], follows: [ReelOp] = [],
+    default rowDefault: InspectorRowDefault? = nil
+) -> InspectorRowView {
     let field = label.map { InspectorRowLabel($0) }
     let discrete = controls.contains {
         $0 is OptionPopupControl || $0 is OptionCheckboxControl || $0 is OptionSegmentedControl
     }
     let gutter = InspectorMarkGutter(
         binding: binding, writes: writes, follows: follows, label: field, controls: controls,
-        discrete: discrete)
+        discrete: discrete, default: rowDefault)
     var views: [NSView] = [gutter]
     if let field {
         field.translatesAutoresizingMaskIntoConstraints = false
@@ -640,16 +483,7 @@ func inspectorRow(
             NSLayoutConstraint.Priority(1), for: .horizontal)
         views.append(trailing)
     }
-
-    let row = NSStackView(views: views)
-    row.orientation = .horizontal
-    row.alignment = .centerY
-    row.spacing = 6
-    row.setCustomSpacing(0, after: gutter)
-    // As tall as the row and no taller: a fixed height would grow a row of
-    // bare text (the "No filters" lines) and move everything under it.
-    gutter.heightAnchor.constraint(equalTo: row.heightAnchor).isActive = true
-    return row
+    return InspectorRowView(views: views, gutter: gutter)
 }
 
 /// A row of buttons with no label column — "Fit to Canvas / Fill Canvas",
@@ -673,12 +507,17 @@ func inspectorReadout(width: CGFloat = 96, _ read: @escaping () -> String) -> Op
 /// that commits once (spec §4.3). `ops` turns a value into the edit — the
 /// binding decides whether that is a `set_video` or an action's end patch, so
 /// no pane repeats that rule.
+///
+/// The four typed builders derive the row's default from `read` and `ops`
+/// (spec §11 CI-9); `resets: false` is for a row whose `read` bypasses the
+/// props readers, where a derived default could never differ.
 func inspectorValueRow(
     _ label: String, _ binding: InspectorBinding, name: String, unit: String = "",
     decimals: Int = 0, min lower: Double, max upper: Double, quick: [Double] = [],
     slider: Bool = true, width: CGFloat = InspectorMetrics.fieldWidth,
     read: @escaping () -> Double, ops: @escaping (Double) -> [ReelOp],
-    mixed: (() -> Bool)? = nil, enabled: @escaping () -> Bool = { true }
+    mixed: (() -> Bool)? = nil, enabled: @escaping () -> Bool = { true },
+    resets: Bool = true
 ) -> NSView {
     var controls: [NSView] = []
     let track = slider ? InspectorSliderControl(
@@ -711,9 +550,10 @@ func inspectorValueRow(
                 color: DS.playhead))
     }
     let row = inspectorRow(
-        label, controls, mixed: mixed, binding: binding, writes: ops(read()))
-    let gutter = row.subviews.first as? InspectorMarkGutter
-    track?.keyed = { [weak gutter] in gutter?.mark == .keyed || gutter?.mark == .keyedAtEnd }
+        label, controls, mixed: mixed, binding: binding, writes: ops(read()),
+        default: resets ? .derived(binding, name: name, read: read, ops: ops) : nil)
+    let gutter = row.gutter
+    track?.keyed = { [weak gutter] in gutter?.isKeyed == true }
     return row
 }
 
@@ -723,14 +563,16 @@ func inspectorValueRow(
 func inspectorCheckRow(
     _ label: String, _ binding: InspectorBinding, name: String, read: @escaping () -> Bool,
     ops: @escaping (Bool) -> [ReelOp], mixed: (() -> Bool)? = nil,
-    enabled: @escaping () -> Bool = { true }
+    enabled: @escaping () -> Bool = { true }, resets: Bool = true
 ) -> NSView {
     let check = OptionCheckboxControl(
         label: label, read: read,
         write: { [weak binding] value in binding?.apply(name, ops(value)) },
         enabled: enabled,
         onEdit: { [weak binding] in binding?.edited() })
-    return inspectorRow(nil, [check], mixed: mixed, binding: binding, writes: ops(read()))
+    return inspectorRow(
+        nil, [check], mixed: mixed, binding: binding, writes: ops(read()),
+        default: resets ? .derived(binding, name: name, read: read, ops: ops) : nil)
 }
 
 /// A colour well bound to one property, with the unchanged-colour guard the
@@ -738,7 +580,7 @@ func inspectorCheckRow(
 func inspectorColorRow(
     _ label: String, _ binding: InspectorBinding, name: String, read: @escaping () -> RGBA,
     ops: @escaping (RGBA) -> [ReelOp], mixed: (() -> Bool)? = nil,
-    enabled: @escaping () -> Bool = { true }
+    enabled: @escaping () -> Bool = { true }, resets: Bool = true
 ) -> NSView {
     let swatch = OptionSwatchControl(
         read: { read().nsColor },
@@ -748,7 +590,9 @@ func inspectorColorRow(
         },
         enabled: enabled,
         onEdit: {})
-    return inspectorRow(label, [swatch], mixed: mixed, binding: binding, writes: ops(read()))
+    return inspectorRow(
+        label, [swatch], mixed: mixed, binding: binding, writes: ops(read()),
+        default: resets ? .derived(binding, name: name, read: read, ops: ops) : nil)
 }
 
 /// A popup bound to one property.
@@ -756,14 +600,16 @@ func inspectorPopupRow(
     _ label: String, _ binding: InspectorBinding, name: String, items: [String],
     width: CGFloat = InspectorMetrics.popupWidth, read: @escaping () -> Int,
     ops: @escaping (Int) -> [ReelOp], mixed: (() -> Bool)? = nil,
-    enabled: @escaping () -> Bool = { true }
+    enabled: @escaping () -> Bool = { true }, resets: Bool = true
 ) -> NSView {
     let popup = OptionPopupControl(
         width: width, items: items, read: read,
         write: { [weak binding] index in binding?.apply(name, ops(index)) },
         enabled: enabled,
         onEdit: { [weak binding] in binding?.edited() })
-    return inspectorRow(label, [popup], mixed: mixed, binding: binding, writes: ops(read()))
+    return inspectorRow(
+        label, [popup], mixed: mixed, binding: binding, writes: ops(read()),
+        default: resets ? .derived(binding, name: name, read: read, ops: ops) : nil)
 }
 
 /// A button that runs one edit.
@@ -885,9 +731,10 @@ func changedRGBA(_ color: NSColor, from current: RGBA) -> RGBA? {
 final class InspectorBinding {
     weak var inspector: InspectorViewController?
 
-    /// Evaluated props per clip, filled lazily. Only clips the playhead is
-    /// inside an action of ever reach the FFI; everything else reads its base
-    /// props straight off the snapshot.
+    /// Evaluated props per clip, filled lazily. Only a clip with a selected
+    /// action (`.end`, `.start`) or with the playhead inside it (`.playhead`)
+    /// ever reaches the FFI; everything else reads its base props straight
+    /// off the snapshot, and `.defaults` reads neither.
     private struct Evaluated {
         var video: VideoProps?
         var audio: AudioProps?
@@ -903,8 +750,11 @@ final class InspectorBinding {
     /// action's end state (spec §11 CI-2) and what every field shows;
     /// `.start` is the selected action's start, the keyed slider segment's
     /// far end; `.playhead` is the document's playhead whenever it is inside
-    /// the clip, whatever is selected — the coral tick and the "now" tag.
-    enum ReadMode: Hashable { case end, start, playhead }
+    /// the clip, whatever is selected — the coral tick and the "now" tag;
+    /// `.defaults` is what a row resets to (spec §11 CI-9): the four props
+    /// readers answer `VideoProps.identity`, `AudioProps()`, `TextProps()`
+    /// and `ShapeProps()`, with no FFI call and no cache entry.
+    enum ReadMode: Hashable { case end, start, playhead, defaults }
     private(set) var mode: ReadMode = .end
 
     /// Runs `read` in `mode` and restores the mode it found.
@@ -1007,6 +857,7 @@ final class InspectorBinding {
         case .end: time = action(clip).map { clip.start + $0.endTime }
         case .start: time = action(clip).map { clip.start + $0.start }
         case .playhead: time = clip.start <= playhead && playhead < clip.end ? playhead : nil
+        case .defaults: time = nil
         }
         if let time, let raw = project?.clipState(clip.id, at: time) {
             state.video = InspectorBinding.decode(VideoProps.self, raw["video"])
@@ -1027,12 +878,20 @@ final class InspectorBinding {
         return ReelJSON.decode(type, from: text)
     }
 
-    func video(_ clip: ClipSnapshot) -> VideoProps { evaluated(clip).video ?? clip.videoProps }
-    func audio(_ clip: ClipSnapshot) -> AudioProps { evaluated(clip).audio ?? clip.audioProps }
-    func text(_ clip: ClipSnapshot) -> TextProps { evaluated(clip).text ?? clip.text ?? TextProps() }
+    func video(_ clip: ClipSnapshot) -> VideoProps {
+        mode == .defaults ? .identity : evaluated(clip).video ?? clip.videoProps
+    }
+    func audio(_ clip: ClipSnapshot) -> AudioProps {
+        mode == .defaults ? AudioProps() : evaluated(clip).audio ?? clip.audioProps
+    }
+    func text(_ clip: ClipSnapshot) -> TextProps {
+        mode == .defaults ? TextProps() : evaluated(clip).text ?? clip.text ?? TextProps()
+    }
     /// Shapes are not animatable (§5.4's patch covers video, audio and text),
     /// so this is always the base description.
-    func shape(_ clip: ClipSnapshot) -> ShapeProps { clip.shape ?? ShapeProps() }
+    func shape(_ clip: ClipSnapshot) -> ShapeProps {
+        mode == .defaults ? ShapeProps() : clip.shape ?? ShapeProps()
+    }
 
     /// The list a WRITE of a list-valued video key must be built from — and
     /// the length `structural` below must measure a new one against.

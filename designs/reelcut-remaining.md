@@ -620,11 +620,63 @@ The instruments, exempt: `tools/proof/clip_inspector3_proof.py` **306** and
 `clip_inspector_proof.py` changed in comments only, `e2_chrome.py` in
 comments and one row (road map 9 §6).
 
+**Road map 9's phase 3b, Reset/Clear, the row menus and the refusal strip
+(2026-09-23, `wc -l`; road map 9 §8).** Three pure moves first, each
+typechecked at the baseline alone (0 errors, 7 warnings):
+`InspectorSectionHeader` out of `InspectorSection.swift` (368 → 199) into
+the new `InspectorSectionHeader.swift` (170 as moved);
+`InspectorSliderControl` out of `InspectorPane.swift` (1292 → 1132) into
+the new `InspectorSlider.swift` (**161**, unchanged after); and Obscure's
+section out of `VideoPane.swift` (1253 → 996) into the new
+`VideoPane+Obscure.swift` (260 as moved, an extension). Then
+`InspectorPane.swift` 1132 → **1151** (the builders' `default:` and
+`resets:`, `ReadMode.defaults` and the readers' short-circuit; inside the
+spec's 1170), `InspectorSection.swift` 199 → **220** (`differs:`,
+`clear()`, the fold; inside 260), `InspectorSectionHeader.swift` 170 →
+**211** (Clear, `buttonTitle`, `summaryInk`), `VideoPane.swift` 996 →
+**1001** (inside 1010), `VideoPane+Obscure.swift` 260 → **261**,
+`InspectorMarks.swift` 244 → **359** (`InspectorRowDefault`, the hover and
+the ×, `clearOps`), and two new files, `InspectorRowMenu.swift` **110** and
+`InspectorRefusalStrip.swift` **114** (102 before the review's fix, which
+pins the strip's width on each show). `InspectorViewController.swift`
+(frozen) 332 → **346** (+14 of the +15 allowed: the foot container, the
+strip and one line in `refresh(isLive:)`). `ClipPane.swift` 403 → **403**
+(In/Out's dead `writes:` deleted inside their lines, Reverse's `resets:`
+inside its own), `VideoPane+Transition.swift` 113 → **113**,
+`TextPane.swift` 536 → **543** (+7 of +9), `ShapePane.swift` 416 → **418**,
+`DocumentPane.swift` 506 → **511**, `ProjectDocument.swift` 1368 → **1380**
+(+12 of +14), `EditorViewController+Inspector.swift` 383 → **395**,
+`ReelEdit.swift` 122 → **123**, `AgentServer+Clips.swift` 848 → **851**
+(comments). `EditorViewController.swift` and `TimelineView.swift` took 0
+lines. The instruments, exempt: `tools/proof/clip_inspector4_proof.py`
+**323** and `clip_inspector4_probe.swift` **437** (new), `e1_chrome.py`
+943 → **1001**, and the rows re-measured in place for a phase-2 or 3b reason
+(road map 9 §8): `clip_inspector3_probe.swift` 331 → **340**,
+`phase3_chrome.py` 768 → **780**, `phase4_chrome.py` 1222 → **1228**,
+`phase6_chrome.py` 1592 → **1659**, `phase7_chrome.py` 2214 → **2226**.
+
 ## 4. What only a person at the machine can check
 
 These are not tasks so much as a list to run through at the machine once. The
 first two have been owed since M1 and spec §10 records them; phases 8 and 9
 and the closing above added the rest.
+
+- **Reset, Clear, the ×, the row menus and the refusal strip, LOOKED AT
+  (road map 9's phase 3b, 2026-09-23)** — in both appearances, in the
+  running app. The harness photographs one header in the dark with and
+  without a button (`clip_inspector4_proof.py`), and the probe reads the
+  rest as state; nothing was hovered, right-clicked or refused on screen.
+  Worth judging: that Reset appears the moment a section leaves its
+  default and goes when it returns; that Clear replaces it in the same slot
+  with an action selected, and that the summary's middle tier
+  (`DS.textMuted`) reads as different from the faint one in light; the ×
+  under the pointer over a keyed row's gutter (it needs a KEY window) and
+  its tooltip; a right-click on a row's label, slider and empty space
+  opening the row's menu, and on a field or a popup opening THEIR own;
+  "Go to action M" landing on that action; and the refusal strip — press
+  ⌥⌘K inside an existing action: the beep, then "Refused: …" under the
+  panel, wrapped to at most three lines, gone on the next edit, undo or
+  click and kept across a playhead move.
 
 - **The Clip tab's row marks, LOOKED AT (road map 9's phase 3a,
   2026-09-23)** — in both appearances, in the running app. The harness
@@ -1012,17 +1064,21 @@ and the closing above added the rest.
 
 ## 5. Where a third road map would start
 
-**Road map 9, the clip inspector redesign, has its phases 1 and 2 BUILT
-(2026-09-23; road map 9 §2 and §4).** The selected action is the sixth
-piece of view state (spec §11 CI-1 to CI-4): the timeline and the Clip
-tab's action lane highlight it, the inspector's fields show and write its
-END state, esc and the Clip chip leave it, ⌫ removes it. The Clip tab is
+**Road map 9, the clip inspector redesign, has its phases 1, 2, 3a and 3b
+BUILT (2026-09-23; road map 9 §2, §4, §6 and §8).** The selected action is
+the sixth piece of view state (spec §11 CI-1 to CI-4): the timeline and the
+Clip tab's action lane highlight it, the inspector's fields show and write
+its END state, esc and the Clip chip leave it, ⌫ removes it. The Clip tab is
 sub-tabs by kind under a block pinned above the scroll view (CI-5), with
-`◆N` key counts and the block knob (CI-6), and its rows carry marks (3a,
-CI-7, CI-8). **Next work starts at road map 9 §0's phases 3b to 5** —
-Reset/Clear, the context menus and the refusal strip (3b), band drags on the lane
-and the timeline (4), canvas drags following the mode and keyed-off
-switches (5) — and at §2's and §4's deviations.
+`◆N` key counts and the block knob (CI-6); its rows carry marks (3a, CI-7,
+CI-8); and Reset shows only when a section differs, Clear takes a
+section's keys out of the selected action, a keyed row's ◆ is a × on
+hover, every row has a context menu, and a person's refusal is shown at
+the inspector's foot (3b, CI-9, CI-10). **Next work starts at road map 9
+§0's phases 4 and 5** — band drags on the lane and the timeline (4), canvas
+drags following the mode, keyed-off switches, `mixed` on sub-rows and
+Reduce Motion (5) — and at §2's, §4's, §6's and §8's deviations and owed
+items.
 
 **Road map 8, word captions, is BUILT (2026-09-23; road map 8 §10, W0 to
 W4b).** Both engines page a run's words into width-measured, word-timed

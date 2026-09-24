@@ -2132,7 +2132,19 @@ def main():
           f"exactly what an `InspectorNoteLabel` at 11 pt costs",
           ROW_SPACING < shift < CONTROL_H + ROW_SPACING,
           f"{shift} pt = {ROW_SPACING} pt of spacing + a {shift - ROW_SPACING} pt label")
-    stray = outside(inside(note_diff, above, scale), [summary], scale)
+    # Re-measured in place 2026-09-23 (road map 9 phase 3b, spec §11 CI-9):
+    # the Appearance section's Reset now shows only while it differs from
+    # its default (opaque black), so the translucent render ALSO draws that
+    # button in the section's header — the one cluster of the diff exactly
+    # one control tall that straddles `ABOVE_Y1`. It is excused here, and the
+    # note's row below is found under it rather than at it.
+    resets = [Rect("the Appearance section's Reset", b[0] / scale, b[1] / scale,
+                   (b[2] + 1 - b[0]) / scale, (b[3] + 1 - b[1]) / scale)
+              for b in clusters(note_diff)
+              if abs((b[3] + 1 - b[1]) / scale - CONTROL_H) <= 0.5
+              and b[1] < ABOVE_Y1 * scale <= b[3]]
+    print("      " + ("; ".join(str(r) for r in resets) or "no Reset button in the diff"))
+    stray = outside(inside(note_diff, above, scale), [summary] + resets, scale)
     check("nothing above the Appearance section moved or redrew except the Document "
           "summary, which legitimately reads \"Black · 50%\" instead of \"Black\" — so the "
           "note is INSIDE the section whose value it is about, and the Canvas and Frame "
@@ -2145,7 +2157,7 @@ def main():
     # first row below the sections above that the two renders disagree about is
     # where the Appearance section's content begins, and the note is the
     # `shift - ROW_SPACING` points from there.
-    below_top = [p for p in note_diff if p[1] >= ABOVE_Y1 * scale]
+    below_top = [p for p in outside(note_diff, resets, scale) if p[1] >= ABOVE_Y1 * scale]
     content_top = min((p[1] for p in below_top), default=0) / scale
     note_row = Rect("the note row", LABEL_X0, content_top, CONTROL_X1 - LABEL_X0,
                     max(shift - ROW_SPACING, 1))

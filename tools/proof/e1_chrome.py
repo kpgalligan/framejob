@@ -39,6 +39,21 @@ every one of those is the same in both trees, so they cancel. (The
 Transition section is the LAST one in a shape clip's stack — the audio group
 below it is empty — so opening it moves nothing, and there is no shift to
 find. Recorded as a deviation.)
+
+**Since road map 9's phase 2 the section is on the Clip SUB-TAB** (§3), and a
+shape clip opens on Shape, so this tree's renders ask for `clip` (the
+harness's fourteenth argument) and the probe calls `selectClipSubTab(.clip)`
+before it reads a row; the section is found by its id, `video.transition`,
+because Motion presets now FOLLOWS it (2026-09-23, phase 3b). That also means
+opening it is no longer the last change in the stack: the Motion presets
+section below it moves, and Timing — opened by default only while no other
+section is — shuts when Transition opens, so the uncut extent covered both
+(B_now 197 pt against B_ref 71 pt, a FAIL). **Re-measured in place
+2026-09-23 (review of phase 3b)**: on THIS tree Timing is opened in both
+renders and the extent is cut at the header of the section that follows
+Transition (`next_header`), which ends it at the body's last control as the
+reference's does — B_now 129 pt, B_ref 71 pt, 58 = 2 × 29. The target is
+21/21 (the 15 that became 21 when sections 2 and 3 were reached again).
 """
 
 import json
@@ -349,9 +364,13 @@ def build_harness(build_script, label):
 def render(binary, package, out, expand="-", select=1):
     """One render, with the harness's arguments in the order every earlier
     chrome script depends on — and the order the REFERENCE harness takes too
-    (`expandSections` is `arguments[11]` in both)."""
+    (`expandSections` is `arguments[11]` in both). The last three are
+    `mediaFilter`, `selectAction` and `subTab`: since road map 9's phase 2 the
+    Transition section lives on the Clip sub-tab, and a shape clip opens on
+    Shape, so THIS tree is asked for `clip` (2026-09-23, phase 3b); the
+    reference harness reads no argument past `expandSections`."""
     args = [binary, package, out, "light", str(WIDTH), str(HEIGHT), str(select),
-            "0", "1", "clip", "-", expand]
+            "0", "1", "clip", "-", expand, "-", "-", "clip"]
     result = subprocess.run(args, capture_output=True, text=True)
     if result.returncode != 0 or not os.path.exists(out):
         return None, (result.stdout + result.stderr).strip()[-400:]
@@ -360,18 +379,43 @@ def render(binary, package, out, expand="-", select=1):
     return out, None
 
 
-def body_extent(binary, package, tag):
+def next_header(image, top):
+    """The first row, in points, below `top` where a section header's fill
+    starts again at the inspector's left edge — the header of the section
+    that FOLLOWS the one whose triangle is at `top` — or None. The fill is
+    read off the image at `top`, inside the opened section's own header."""
+    x = int((WIDTH - 304 + 4) * image.scale)
+    ch = image.channels
+    y = int(top * image.scale)
+    fill = image.rows[y][x * ch:(x + 1) * ch]
+    while y < image.height and image.rows[y][x * ch:(x + 1) * ch] == fill:
+        y += 1
+    while y < image.height and image.rows[y][x * ch:(x + 1) * ch] != fill:
+        y += 1
+    return y / image.scale if y < image.height else None
+
+
+def body_extent(binary, package, tag, also=None):
     """How far the pixels that OPENING the section changes reach, in points.
 
-    The extent and not a shift: the section is the last one in the stack, so
-    nothing below it moves (see the module doc). It is only ever read as a
-    difference between two trees, where the header's triangle and the body's
-    insets cancel."""
-    shut, error = render(binary, package, os.path.join(CHROME, f"{tag}-shut.png"))
+    On the reference tree the extent and not a shift: the section is the last
+    one there, so nothing below it moves (see the module doc). It is only
+    ever read as a difference between two trees, where the header's triangle
+    and the body's insets cancel.
+
+    `also` is THIS tree's (2026-09-23, review of phase 3b): Timing is opened
+    in BOTH renders, because on the Clip sub-tab it is the section opened by
+    default only while no other is open, and the extent is cut at the header
+    of the section that follows Transition (Motion presets), so the section
+    below moving is not counted. Below the body's last control and above
+    that header both renders hold the pane's background, so the cut ends the
+    extent where the reference's does."""
+    shut, error = render(binary, package, os.path.join(CHROME, f"{tag}-shut.png"),
+                         expand=also or "-")
     if error:
         return None, error, None
     opened, error = render(binary, package, os.path.join(CHROME, f"{tag}-open.png"),
-                           expand="video.transition")
+                           expand=",".join(filter(None, [also, "video.transition"])))
     if error:
         return None, error, None
     a, b = Image(shut), Image(opened)
@@ -379,6 +423,12 @@ def body_extent(binary, package, tag):
     top, bottom = extent(diff, a.scale)
     if top is None:
         return None, "opening the section changed no pixel at all", None
+    if also:
+        below = next_header(b, top)
+        if below is None:
+            return None, "no section header follows the opened Transition section", None
+        top, bottom = extent([p for p in diff if p[1] < below * a.scale], a.scale)
+        print(f"      the next section's header starts at y {below:.1f} pt; cut there")
     return bottom - top, None, (diff, a.scale)
 
 
@@ -472,6 +522,7 @@ func sections(_ root: NSView) -> [[String: Any]] {
         let inside = walk(section)
         let labels = inside.compactMap { $0 as? InspectorRowLabel }
         return [
+            "id": section.id,
             "labels": labels.map { $0.stringValue },
             "rows": labels.map { label -> [String: Any] in
                 var row = controlAfter(label)
@@ -534,16 +585,21 @@ if let rows = request["rows"] as? [String: Any] {
     spin(1.2)
     let controller =
         document.windowControllers.first!.contentViewController as! EditorViewController
+    // The Transition section is on the Clip sub-tab (road map 9 §3); a shape
+    // clip opens on Shape.
+    controller.inspector?.selectClipSubTab(.clip)
+    spin(0.4)
     answer["rows"] = walk(controller.view).compactMap {
         ($0 as? InspectorRowLabel)?.stringValue
     }
     answer["sections"] = sections(controller.view)
 }
 
-/// The Transition section's own controls, by row label. The section is the
-/// LAST one in the stack, so its labels are unambiguous.
+/// The Transition section's own controls, by row label. The section is found
+/// by its id: on the Clip sub-tab Motion presets follows it (road map 9 §3).
 func transitionControl(_ root: NSView, _ label: String) -> NSView? {
-    guard let section = walk(root).compactMap({ $0 as? InspectorSection }).last else { return nil }
+    guard let section = walk(root).compactMap({ $0 as? InspectorSection })
+        .first(where: { $0.id == "video.transition" }) else { return nil }
     let inside = walk(section)
     // The checkbox carries its own title and so has no row label of its own
     // — which is one of section 2's own claims.
@@ -586,6 +642,8 @@ if let writes = request["writes"] as? [String: Any] {
             spin(1.2)
             let controller =
                 document.windowControllers.first!.contentViewController as! EditorViewController
+            controller.inspector?.selectClipSubTab(.clip)
+            spin(0.4)
             let shown = storedTransition(document, target)
             guard let control = transitionControl(controller.view, row) else {
                 runs.append(["row": row, "cleared": clear, "found": false])
@@ -727,7 +785,7 @@ def main():
         failure("this tree's harness builds", error)
         now_extent = None
     else:
-        now_extent, error, diff = body_extent(now_binary, pair, "now")
+        now_extent, error, diff = body_extent(now_binary, pair, "now", also="clip.timing")
         if error:
             failure("this tree's Transition section opens", error)
         else:
@@ -850,10 +908,10 @@ def main():
           and all(v == "off" for k, v in states.items() if k != "D (an overlap)"),
           f"push_left (tag 3): {states}")
 
-    # The Transition section is the LAST one a shape clip with an overlap
-    # gets (the audio group below it is empty), so it is named by its place
-    # and by what it holds — as it always was, though `InspectorSection.id`
-    # has been readable since road map 9's phase 2.
+    # The Transition section is on the Clip sub-tab since road map 9's phase 2
+    # (§3), where Motion presets FOLLOWS it, so it is named by its id —
+    # `InspectorSection.id`, readable since that phase — and by what it holds
+    # (2026-09-23, phase 3b; it was named by its place, the LAST section).
     #
     # **Crossfade Audio is a CHECKBOX row and carries no `InspectorRowLabel`
     # at all**: `inspectorCheckRow` passes `nil` for the label and the title
@@ -861,10 +919,10 @@ def main():
     # counted rather than read by name, and no private member is widened.
     # Recorded as a deviation.
     panes = answer.get("sections", [])
-    last = panes[-1] if panes else {}
+    last = next((p for p in panes if p.get("id") == "video.transition"), {})
     check("the Transition section builds Kind, Curve and Duration, in that order",
           last.get("labels") == ["Kind", "Curve", "Duration"],
-          f"the last of {len(panes)} sections holds {last.get('labels')}")
+          f"video.transition, of {len(panes)} sections, holds {last.get('labels')}")
     check("…and one Crossfade Audio CHECKBOX between Curve and Duration, which "
           "carries its own title and so no row label",
           last.get("checkboxes") == 1 and last.get("popups") == 2,

@@ -29,6 +29,11 @@ extension Notification.Name {
     /// slates and all. The editor answers this by dropping the item and
     /// rebuilding.
     static let reversedMediaDidChange = Notification.Name("ReelcutReversedMediaDidChange")
+
+    /// Posted by `applyEdit` (object: the document) when the core REFUSED a
+    /// person's edit; `userInfo["refusal"]` is the `ReelRefusal`, whose
+    /// sentence the inspector's foot shows (spec §11 CI-10).
+    static let projectDocumentDidRefuse = Notification.Name("ReelcutProjectDocumentDidRefuse")
 }
 
 /// The document, and **the single mutation point**. Every edit in the app —
@@ -1149,8 +1154,10 @@ final class ProjectDocument: NSDocument {
     /// (freeze frame, a multi-file import) is one thing to undo.
     ///
     /// Four answers (spec §5.5): `.applied` registers undo and publishes,
-    /// `.identity` and `.refused` are BOTH a beep and no undo step, and a
-    /// throw is the core's own message. `ReelEdit` argues the middle two.
+    /// `.identity` and `.refused` are BOTH a beep and no undo step — a
+    /// refusal also posts `projectDocumentDidRefuse` with its sentence (spec
+    /// §11 CI-10) — and a throw is the core's own message. `ReelEdit` argues
+    /// the middle two.
     func applyEdit(_ actionName: String, _ ops: [ReelOp]) {
         let current = project
         do {
@@ -1160,9 +1167,14 @@ final class ProjectDocument: NSDocument {
                 project = updated
                 countEditChange(.changeDone)
                 projectDidChange()
-            case .identity, .refused:
-                // Both arms alike: a beep, and NO undo step.
+            case .identity:
                 NSSound.beep()
+            case .refused(let refusal):
+                // The identity's beep and NO undo step, then the sentence.
+                NSSound.beep()
+                NotificationCenter.default.post(
+                    name: .projectDocumentDidRefuse, object: self,
+                    userInfo: ["refusal": refusal])
             }
         } catch {
             present(error)
