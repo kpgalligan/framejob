@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """A graphic clip DRAWN, against the built app: road map 10's G3b and G3c
 (§10.6) — the draw, then a failing graphic's error card, `render_frame`'s
-diagnostics, the export gate and the pinned set — and G4a (§10.7), the
+diagnostics, the export gate and the pinned set — G4a (§10.7), the
 agent's write/read loop: `write_graphic`, `get_graphic`, `graphic_reference`,
-`get_project`'s `graphics` and the reference written into `graphics/`.
+`get_project`'s `graphics` and the reference written into `graphics/` — and
+G4b (§10.7), `render_graphic`'s contact sheet, the two imports and the loop
+end to end.
 
 One owned instance on its own port, launched and stopped by PID, with its log
 at `tools/proof/work/graphics/reelcut-<port>.log`; nothing else is ever
@@ -52,6 +54,9 @@ E1  (P1 reopened, `throw10.js`, `spin.js`, `nofont.js` mv'd into it and a
     the card's border (230,40,40) and (1900,1060) its fill (64,8,8); an
     `export {preset: h264}` answers an error naming `"throw10"` and `frame
     10`, and no file is at the path;
+C4  `render_graphic {name: throw10, frames: [9, 10], max_width: 8192}` names
+    `"throw10"`, `frame 10` and `boom at ten`; cell 1 is the error card
+    ((1929,540) BORDER, (3828,1060) CARD) and cell 0's (50,50) is RED;
 E2  `spin` (`while(true){}`): `render_frame` at frame 0 returns within 3 s
     (wall clock printed) with `budget` in its text; `get_project` then
     answers within 5 s;
@@ -98,6 +103,45 @@ G5  `write_graphic {name: Bad}` is an error saying "is not a module name";
     `write_graphic {name: x}` with no source is an error naming `source`;
 G7  `new_project {path: NG}`, `add_track`, `save_project`: NG/graphics is ABSENT
     (the manual never creates it) and `get_graphic {}` says so;
+C1  (after G7, on WG, whose bar.js is BLUE since G4) `render_graphic {frames:
+    [0, 0], background: "#000000", max_width: 8192}` is a 3848×1104 PNG whose
+    cell 0 (columns 0–1919) and cell 1 (1928–3847) are byte-identical over
+    rows 0–1079, the text naming "2 frame"; `frames: [0, 30]`: the cells differ;
+C2  Placement: `render_frame` at frame 30 and `render_graphic {frame: 30,
+    background: "#000000", max_width: 8192}` agree in every RGB pixel of the
+    1920×1080 cell (0 of 2 073 600 differ — F1's comparison);
+C3  `render_graphic {frame: 30, format: "svg"}`: ok, frame 30, the rect at
+    `x="120"`, no diagnostics;
+I1  `write_graphic needsfont` (120 px white text in `'Oswald'`): its sheet over
+    black has 0 lit pixels and names Oswald; `import_graphic_font` of
+    `/Library/Fonts/Oswald-Medium.ttf` answers families `["Oswald"]` (the
+    engine's name; CoreText says "Oswald Medium"), `library_families` holding
+    Oswald, IBM Plex Mono and Source Sans 3, its path in `fonts/`, not
+    replaced, and `get_graphic {}`'s `families` the same list; the sheet then
+    lights pixels and names no Oswald; Arial answers `["Arial"]` and replaces
+    the second time; a `.ttf` holding text is refused with "loaded no face"
+    and a `.txt` naming ".ttf". A missing Oswald file is a FAIL, not a skip;
+I2  `write_graphic usesasset` (`<image href="${asset("red.png")}">`): its sheet
+    names red.png and (50,50) is black; `import_graphic_asset` of
+    `graphic/tests/assets/red.png` answers name red.png and assets
+    `["red.png"]`, and so does `get_graphic {}`; the sheet's (50,50) is then
+    (255,0,0) with no red.png in the text; an empty file is refused with
+    "empty" and a `.txt` naming "PNG";
+G9  `chmod 311 <WG>/graphics`: `write_graphic {name: ghost}` is refused saying
+    it "was written" and the scan "does not list" it; `chmod 755`: the same
+    write is ok;
+I3  `save_project` on WG: `fonts/Oswald-Medium.ttf`, `fonts/Arial.ttf` and
+    `assets/red.png` are in the package, `unsaved_changes` false;
+I4  a new IE, its `graphics/` holding no module: `import_graphic_font` of
+    Oswald-Medium.ttf lists Oswald in `library_families` at once, and
+    `needsfont` written after it renders lit pixels naming no Oswald (the
+    store posts nothing with no module, so the import rebuilds the library
+    itself);
+L2  the loop of §5h on a new LP: `graphic_reference`, `write_graphic`
+    BROKEN_BAR (ok false, line 2), `write_graphic` bar (ok), `render_graphic
+    {frames: [0, 15, 30]}` at the DEFAULT max_width is exactly 2048×1202 and
+    names "3 frame", `add_graphic_clip`, `render_frame` at frame 30 has
+    (122,50) RED, `set_graphic {props: {title: "Looped"}}` changes that frame;
 G8  (a fresh instance) an untitled `new_project`; its root from `get_graphic
     {}` (existing, no modules) given `fonts/Anton-Regular.ttf` only;
     `save_project {path: NF}`: `NF/graphics/fonts/Anton-Regular.ttf` exists,
@@ -149,7 +193,8 @@ RED, BLUE, BLACK = (255, 90, 54), (45, 127, 249), (0, 0, 0)
 BORDER, CARD = (230, 40, 40), (64, 8, 8)
 SECOND = 30 * FRAME
 ROWS = ["G6", "P1", "P2", "P3", "S1", "R1", "H1", "L1", "F1", "K1", "K2", "T1", "K3", "A1",
-        "G1", "G2", "G3", "G4", "G5", "G7", "G8", "E1", "E2", "E3", "E4", "Q1", "Q2", "Q3", "Z1"]
+        "G1", "G2", "G3", "G4", "G5", "G7", "C1", "C2", "C3", "I1", "I2", "G9", "I3", "I4", "L2",
+        "G8", "E1", "C4", "E2", "E3", "E4", "Q1", "Q2", "Q3", "Z1"]
 DOC_MD = ROOT / "docs/graphics-api.md"
 DOC_DTS = ROOT / "docs/graphics-api.d.ts"
 ANCHOR = "frame: frame, propsJSON: propsJSON, ctxJSON: ctxJSON,"
@@ -200,6 +245,16 @@ SPIN_JS = module("  while (true) {}")
 NOFONT_JS = module(
     "  return svg(ctx, `<text x=\"100\" y=\"300\" font-family=\"'Nope Sans'\" "
     "font-size=\"120\" fill=\"#ffffff\">Nope</text>`);")
+NEEDSFONT_JS = module(
+    "  return svg(ctx, `<text x=\"100\" y=\"300\" font-family=\"'Oswald'\" "
+    "font-size=\"120\" fill=\"#ffffff\">Hello</text>`);")
+USESASSET_JS = module(
+    '  return svg(ctx, `<image href="${asset("red.png")}" x="0" y="0" width="200" '
+    'height="200"/>`);')
+OSWALD = Path("/Library/Fonts/Oswald-Medium.ttf")
+ARIAL = Path("/System/Library/Fonts/Supplemental/Arial.ttf")
+RED_PNG = ROOT / "graphic/tests/assets/red.png"
+PURE_RED = (255, 0, 0)
 
 
 class Instance:
@@ -407,6 +462,74 @@ def poll_pixel(client, project, x, y, want, tag):
     return seen
 
 
+def decode_rgba(path):
+    """A PNG at `path` as (width, height, RGBA bytes) through ffmpeg — the
+    sheets are up to 3848 px wide, too slow for `decode_png`'s loops — or
+    None. Binary output, so not `bounded.run`; bounded all the same."""
+    try:
+        data = Path(path).read_bytes()
+        width, height = struct.unpack(">II", data[16:24])
+        raw = subprocess.run(["ffmpeg", "-v", "error", "-i", str(path), "-f", "rawvideo",
+                              "-pix_fmt", "rgba", "-"], capture_output=True, timeout=120,
+                             env=bounded.child_env()).stdout
+    except (OSError, struct.error, subprocess.TimeoutExpired):
+        return None
+    return (width, height, raw) if len(raw) == width * height * 4 else None
+
+
+def rgb_at(image, x, y):
+    if image is None:
+        return None
+    width, _, raw = image
+    i = (y * width + x) * 4
+    return tuple(raw[i:i + 3])
+
+
+def cell_row(image, x, y, w):
+    """Row `y` of the `w` pixels from column `x`, RGBA."""
+    width, _, raw = image
+    return raw[(y * width + x) * 4:(y * width + x + w) * 4]
+
+
+def rgb_mismatches(a, ax, b, bx, w, h):
+    """Pixels of the `w`×`h` block at column `ax` of `a` and `bx` of `b`
+    (both from row 0) whose RGB differ."""
+    if a is None or b is None:
+        return None
+    count = 0
+    for y in range(h):
+        ra, rb = cell_row(a, ax, y, w), cell_row(b, bx, y, w)
+        if all(ra[c::4] == rb[c::4] for c in range(3)):
+            continue
+        count += sum(1 for i in range(w) if ra[4 * i:4 * i + 3] != rb[4 * i:4 * i + 3])
+    return count
+
+
+def nonblack(image, w, h):
+    """Pixels of the `w`×`h` block at the top left whose RGB is not black."""
+    if image is None:
+        return None
+    count = 0
+    for y in range(h):
+        row = cell_row(image, 0, y, w)
+        channels = [row[c::4] for c in range(3)]
+        if all(ch.count(0) == w for ch in channels):
+            continue
+        count += sum(1 for i in range(w) if any(ch[i] for ch in channels))
+    return count
+
+
+def sheet(client, project, arguments, tag):
+    """`render_graphic` into `work/<tag>.png`: (ok, its text or error, the
+    decoded sheet or None)."""
+    path = WORK / f"{tag}.png"
+    if path.exists():
+        path.unlink()
+    got = attempt(client, "render_graphic", with_project(project, dict(arguments, path=str(path))))
+    text = str(got["reply"] if got["ok"] else got["error"])
+    return got["ok"], text, decode_rgba(path) if got["ok"] and path.exists() else None
+
+
 def run_p1_p2(client, p1):
     """P1 and P2 — the rows the mutant is driven through too. The clip, the
     track and frame 30's bytes."""
@@ -545,6 +668,9 @@ def run(app, port):
 
         run_a1(client, pa)
         run_g(client, wg, ng)
+        run_c(client, wg)
+        run_i(client, wg)
+        run_loop(client, WORK / "LP.reelcut")
         # A fresh instance, K3's pattern: the untitled draft is the implicit
         # target of every call.
         instance.stop()
@@ -728,6 +854,197 @@ def run_g(client, wg, ng):
           f"{(ng / 'graphics').exists()}, get_graphic {after}")
 
 
+def run_c(client, wg):
+    """C1–C3 on WG, whose bar.js is BLUE since G4 and whose clip is at 0."""
+    ok0, text0, same = sheet(client, wg, {"name": "bar", "frames": [0, 0],
+                                          "background": "#000000", "max_width": 8192}, "c1-same")
+    ok1, _, apart = sheet(client, wg, {"name": "bar", "frames": [0, 30],
+                                       "background": "#000000", "max_width": 8192}, "c1-apart")
+    size = same[:2] if same else None
+    equal = same is not None and all(cell_row(same, 0, y, 1920) == cell_row(same, 1928, y, 1920)
+                                     for y in range(1080))
+    differ = apart is not None and any(cell_row(apart, 0, y, 1920)
+                                       != cell_row(apart, 1928, y, 1920) for y in range(1080))
+    check("C1 render_graphic frames [0, 0] at max_width 8192 is a 3848×1104 sheet whose two cells "
+          "are byte-identical, naming 2 frame(s); frames [0, 30]: the cells differ",
+          ok0 and ok1 and size == (3848, 1104) and equal and differ and "2 frame" in text0,
+          f"size {size}, identical {equal}, [0, 30] differ {differ}, says {text0!r}")
+
+    frame_png = WORK / "c2-frame.png"
+    rendered = render(client, wg, 30 * FRAME, "c2-frame")
+    frame = decode_rgba(frame_png) if rendered is not None else None
+    ok, text, cell = sheet(client, wg, {"name": "bar", "frame": 30, "background": "#000000",
+                                        "max_width": 8192}, "c2-cell")
+    missed = rgb_mismatches(cell, 0, frame, 0, 1920, 1080) \
+        if frame is not None and frame[:2] == (1920, 1080) else None
+    check("C2 Placement: render_frame at frame 30 and render_graphic {frame: 30} over black agree "
+          "in every RGB pixel of the 1920×1080 cell",
+          ok and missed == 0,
+          f"render_frame {frame[:2] if frame else None}, sheet {cell[:2] if cell else None}, "
+          f"{missed} of 2073600 differ, says {text!r}")
+
+    got = attempt(client, "render_graphic", {"project": str(wg), "name": "bar", "frame": 30,
+                                             "format": "svg"})
+    r = got.get("reply") or {}
+    check("C3 render_graphic {frame: 30, format: svg}: ok, frame 30, the rect at x=\"120\", no "
+          "diagnostics",
+          got["ok"] and r.get("ok") is True and r.get("frame") == 30
+          and 'x="120"' in (r.get("svg") or "") and r.get("diagnostics") == [],
+          f"{got}")
+
+
+def run_i(client, wg):
+    """I1, I2, G9 and I3 on WG: a font and an asset imported, the reason-less
+    write fixed, and the imports saved with the package."""
+    folder = wg / "graphics"
+    wrote = attempt(client, "write_graphic", {"project": str(wg), "name": "needsfont",
+                                              "source": NEEDSFONT_JS})
+    args = {"name": "needsfont", "frame": 0, "background": "#000000", "max_width": 8192}
+    ok0, before, image0 = sheet(client, wg, args, "i1-before")
+    lit0 = nonblack(image0, 1920, 1080)
+    font = attempt(client, "import_graphic_font", {"project": str(wg), "path": str(OSWALD)})
+    f = font.get("reply") or {}
+    listed = (attempt(client, "get_graphic", {"project": str(wg)}).get("reply") or {})
+    ok1, after, image1 = sheet(client, wg, args, "i1-after")
+    lit1 = nonblack(image1, 1920, 1080)
+    arial = attempt(client, "import_graphic_font", {"project": str(wg), "path": str(ARIAL)})
+    again = attempt(client, "import_graphic_font", {"project": str(wg), "path": str(ARIAL)})
+    fake = WORK / "fake.ttf"
+    fake.write_text("this is not a font")
+    faceless = attempt(client, "import_graphic_font", {"project": str(wg), "path": str(fake)})
+    notes = WORK / "notes.txt"
+    notes.write_text("notes")
+    texty = attempt(client, "import_graphic_font", {"project": str(wg), "path": str(notes)})
+    library = set(f.get("library_families") or [])
+    check("I1 needsfont (font-family 'Oswald') renders nothing and names Oswald; "
+          "import_graphic_font Oswald-Medium.ttf answers the ENGINE's [\"Oswald\"], lands in "
+          "fonts/, and get_graphic {} lists the same families; the render then draws with no "
+          "warning; Arial answers [\"Arial\"] and replaces the second time; a faceless .ttf and "
+          "a .txt are refused",
+          OSWALD.exists() and wrote["ok"] and ok0 and "Oswald" in before and lit0 == 0
+          and font["ok"] and f.get("families") == ["Oswald"]
+          and {"Oswald", "IBM Plex Mono", "Source Sans 3"} <= library
+          and f.get("path") == str(folder / "fonts/Oswald-Medium.ttf")
+          and f.get("replaced") is False
+          and listed.get("families") == f.get("library_families")
+          and ok1 and "Oswald" not in after and (lit1 or 0) > 0
+          and arial["ok"] and (arial.get("reply") or {}).get("families") == ["Arial"]
+          and again["ok"] and (again.get("reply") or {}).get("replaced") is True
+          and not faceless["ok"] and "loaded no face" in faceless["error"]
+          and not texty["ok"] and ".ttf" in texty["error"],
+          f"{OSWALD} exists {OSWALD.exists()}, write {wrote['ok']}, before {before!r} lit "
+          f"{lit0}, import {font}, get_graphic families {listed.get('families')}, after "
+          f"{after!r} lit {lit1}, arial {arial}, again {again}, faceless {faceless}, txt {texty}")
+
+    wrote = attempt(client, "write_graphic", {"project": str(wg), "name": "usesasset",
+                                              "source": USESASSET_JS})
+    args = {"name": "usesasset", "frame": 0, "background": "#000000", "max_width": 8192}
+    ok0, before, image0 = sheet(client, wg, args, "i2-before")
+    asset = attempt(client, "import_graphic_asset", {"project": str(wg), "path": str(RED_PNG)})
+    a = asset.get("reply") or {}
+    listed = (attempt(client, "get_graphic", {"project": str(wg)}).get("reply") or {})
+    ok1, after, image1 = sheet(client, wg, args, "i2-after")
+    empty = WORK / "empty.png"
+    empty.write_bytes(b"")
+    zero = attempt(client, "import_graphic_asset", {"project": str(wg), "path": str(empty)})
+    texty = attempt(client, "import_graphic_asset", {"project": str(wg), "path": str(notes)})
+    black, red = rgb_at(image0, 50, 50), rgb_at(image1, 50, 50)
+    check("I2 usesasset names red.png and draws black; import_graphic_asset red.png lists "
+          "[\"red.png\"] (and get_graphic {} does); the render then draws (255,0,0) with no "
+          "warning; an empty file and a .txt are refused",
+          wrote["ok"] and ok0 and "red.png" in before and black == BLACK
+          and asset["ok"] and a.get("name") == "red.png" and a.get("assets") == ["red.png"]
+          and listed.get("assets") == ["red.png"]
+          and ok1 and red == PURE_RED and "red.png" not in after
+          and not zero["ok"] and "empty" in zero["error"]
+          and not texty["ok"] and "PNG" in texty["error"],
+          f"write {wrote['ok']}, before {before!r} (50,50) {black}, import {asset}, get_graphic "
+          f"assets {listed.get('assets')}, after {after!r} (50,50) {red}, empty {zero}, "
+          f"txt {texty}")
+
+    locked = bounded.run(["chmod", "311", str(folder)], 30)["rc"]
+    ghost = attempt(client, "write_graphic", {"project": str(wg), "name": "ghost",
+                                              "source": bar()})
+    unlocked = bounded.run(["chmod", "755", str(folder)], 30)["rc"]
+    again = attempt(client, "write_graphic", {"project": str(wg), "name": "ghost",
+                                              "source": bar()})
+    check("G9 a module written into an unreadable graphics/ is refused saying it was written "
+          "and the scan does not list it; readable again, the same write is ok",
+          locked == 0 and not ghost["ok"] and "was written" in ghost["error"]
+          and "does not list" in ghost["error"] and unlocked == 0 and again["ok"]
+          and (again.get("reply") or {}).get("ok") is True,
+          f"chmod {locked}/{unlocked}, locked write {ghost}, again {again}")
+
+    saved = attempt(client, "save_project", {"project": str(wg)})
+    present = [(folder / name).exists() for name in
+               ("fonts/Oswald-Medium.ttf", "fonts/Arial.ttf", "assets/red.png")]
+    clean = (project_of_reply(client, wg) or {}).get("unsaved_changes")
+    check("I3 save_project on WG: fonts/Oswald-Medium.ttf, fonts/Arial.ttf and assets/red.png "
+          "are in the package and the project is clean",
+          saved["ok"] and all(present) and clean is False,
+          f"save {saved}, present {present}, unsaved_changes {clean}")
+
+    fresh = WORK / "IE.reelcut"
+    made = attempt(client, "new_project", {"path": str(fresh)})
+    font = attempt(client, "import_graphic_font", {"project": str(fresh), "path": str(OSWALD)})
+    library = (font.get("reply") or {}).get("library_families") or []
+    wrote = attempt(client, "write_graphic", {"project": str(fresh), "name": "needsfont",
+                                              "source": NEEDSFONT_JS})
+    ok, text, image = sheet(client, fresh, {"name": "needsfont", "frame": 0,
+                                            "background": "#000000", "max_width": 8192}, "i4")
+    lit = nonblack(image, 1920, 1080)
+    check("I4 a font imported into a graphics/ holding NO module is in library_families at "
+          "once, and a module written after it draws with it, no warning",
+          made["ok"] and font["ok"] and "Oswald" in library and wrote["ok"]
+          and (wrote.get("reply") or {}).get("ok") is True and ok and "Oswald" not in text
+          and (lit or 0) > 0,
+          f"new {made['ok']}, import {font}, write {wrote.get('ok')}, says {text!r}, lit {lit}")
+
+
+def run_loop(client, lp):
+    """L2 — the agent's loop of §5h on a new project, as an agent would run it."""
+    made = attempt(client, "new_project", {"path": str(lp)})
+    reference = attempt(client, "graphic_reference", {})
+    broken = attempt(client, "write_graphic", {"project": str(lp), "name": "bar",
+                                               "source": BROKEN_BAR})
+    b = broken.get("reply") or {}
+    first = (b.get("diagnostics") or [{}])[0]
+    good = attempt(client, "write_graphic", {"project": str(lp), "name": "bar",
+                                             "source": bar()})
+    looked = attempt(client, "render_graphic", {"project": str(lp), "name": "bar",
+                                                "frames": [0, 15, 30]})
+    text = str(looked.get("reply") or looked.get("error"))
+    written = re.search(r"Written to (\S+\.png)\.$", text)
+    size = None
+    if written and Path(written.group(1)).exists():
+        size = struct.unpack(">II", Path(written.group(1)).read_bytes()[16:24])
+    track = ((project_of(client, lp) or {}).get("tracks") or [{}])[0].get("id")
+    added = attempt(client, "add_graphic_clip", {"project": str(lp), "name": "bar",
+                                                 "track": track, "at": 0})
+    clips = [c for c in (project_of(client, lp) or {}).get("clips", [])
+             if (c.get("graphic") or {}).get("name") == "bar"]
+    before = render(client, lp, 30 * FRAME, "l2-before")
+    titled = attempt(client, "set_graphic", {"project": str(lp),
+                                             "clips": [c["id"] for c in clips],
+                                             # Not "Loop": bar() draws only the title's
+                                             # LENGTH, and "Loop" is as long as "Jane".
+                                             "patch": {"props": {"title": "Looped"}}})
+    after = render(client, lp, 30 * FRAME, "l2-after")
+    check("L2 the loop: reference, a broken write (ok false, line 2), a good one, render_graphic "
+          "of frames 0, 15, 30 at the default max_width is exactly 2048×1202, add_graphic_clip, "
+          "render_frame's (122,50) is RED, set_graphic props changes the frame",
+          made["ok"] and reference["ok"] and broken["ok"] and b.get("ok") is False
+          and first.get("line") == 2 and good["ok"] and (good.get("reply") or {}).get("ok")
+          and looked["ok"] and "3 frame" in text and "frames 0, 15, 30" in text
+          and size == (2048, 1202) and added["ok"] and len(clips) == 1
+          and pixel(before, 122, 50) == RED and titled["ok"] and after is not None
+          and after != before,
+          f"new {made['ok']}, reference {reference['ok']}, broken {b.get('ok')} line "
+          f"{first.get('line')}, good {good.get('ok')}, render says {text!r}, size {size}, "
+          f"add {added['ok']} clips {len(clips)}, (122,50) {pixel(before, 122, 50)}, "
+          f"set {titled['ok']}, differs {after is not None and after != before}")
+
+
 def run_g8(client, nf):
     """G8 — an untitled root holding only fonts/ is carried by the first save."""
     made = attempt(client, "new_project", {})
@@ -819,6 +1136,17 @@ def run_e(client, p1):
           f"{setup}, clip {clip is not None} {why!r}, (50,50)@9 {red9}, frame 9 says "
           f"{text9!r}, frame 10 says {text10!r}, (1,540) {border}, (1900,1060) {fill}, "
           f"export {exported}, left {left}")
+
+    ok, text, image = sheet(client, p1, {"name": "throw10", "frames": [9, 10],
+                                         "max_width": 8192}, "c4")
+    border, fill, red = rgb_at(image, 1929, 540), rgb_at(image, 1928 + 1900, 1060), \
+        rgb_at(image, 50, 50)
+    check("C4 render_graphic throw10 frames [9, 10]: the text names \"throw10\", frame 10 and "
+          "boom at ten; cell 1 is the error card (border at (1929,540), fill at (3828,1060)); "
+          "cell 0's (50,50) is RED",
+          ok and '"throw10"' in text and "frame 10" in text and "boom at ten" in text
+          and border == BORDER and fill == CARD and red == RED,
+          f"says {text!r}, (1929,540) {border}, (3828,1060) {fill}, (50,50) {red}")
 
     clip, why = land(client, p1, "spin", track, 0)
     text0, _, seconds = render_text(client, p1, 0, "e2-f0")
@@ -1021,8 +1349,9 @@ def main():
         print("the mutant is CAUGHT: P1 held and P2 failed" if verdict
               else "the mutant was NOT caught")
         return 0 if verdict else 1
-    print("G3b/G3c/G4a graphics — a graphic clip drawn, one failing, and the agent's "
-          "write/read loop, against the built app (proof)", flush=True)
+    print("G3b/G3c/G4a/G4b graphics — a graphic clip drawn, one failing, the agent's "
+          "write/read loop, its contact sheet and imports, against the built app (proof)",
+          flush=True)
     if not args.app.exists():
         print(f"  FAIL the app is not built: {args.app}")
         print(f"0/{len(ROWS)}")

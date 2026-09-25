@@ -16,7 +16,8 @@ import Foundation
 ///
 /// Road map 10's G4a appends three APP-STATE rows after them, `tool`'s, with
 /// their own schemas and no `scope` (they have no op): `write_graphic`,
-/// `get_graphic` and `graphic_reference`.
+/// `get_graphic` and `graphic_reference`; G4b three more the same way:
+/// `render_graphic`, `import_graphic_font` and `import_graphic_asset`.
 extension AgentServer {
     /// The graphic rows, given the sentences the clip group already hoisted.
     func graphicTools(
@@ -107,6 +108,105 @@ extension AgentServer {
                     + "Markdown, for an LLM to read once before writing a graphic. Needs no "
                     + "project open.",
                 [:]),
+            tool(
+                "render_graphic",
+                "Renders a module in graphics/ WITHOUT a clip — to look at it before placing "
+                    + "it. png (the default) answers a contact sheet: the frames on a grid, "
+                    + "each frame number printed under its cell, the cells scaled down (never "
+                    + "the gaps or labels) so the sheet fits max_width; plus one sentence per "
+                    + "frame that failed (drawn as its error card) or warned, with the "
+                    + "engine's location. svg answers one frame's SVG text, its diagnostics and "
+                    + "the ctx it was drawn with. ctx is a clip's: the canvas fps, "
+                    + "durationInFrames from meta (else 5 s), the size from width/height, else "
+                    + "meta, else the canvas. Mirrors G5's Graphic sub-tab preview strip, not "
+                    + "built yet.",
+                [
+                    "name": [
+                        "type": "string",
+                        "description": "The module: graphics/<name>.js.",
+                    ],
+                    "frames": [
+                        "type": "array",
+                        "items": ["type": "integer", "minimum": 0],
+                        "maxItems": 16,
+                        "description": "The frames to draw, 1 to 16 of them, in order. Not with "
+                            + "frame. Omit both for frame 0.",
+                    ],
+                    "frame": [
+                        "type": "integer", "minimum": 0,
+                        "description": "One frame to draw. Not with frames.",
+                    ],
+                    "props": [
+                        "type": "object",
+                        "description": "The values to draw with, keyed by the schema's names; "
+                            + "a key left out draws with the schema's default.",
+                    ],
+                    "width": [
+                        "type": "integer", "minimum": 1, "maximum": 8192,
+                        "description": "Width to draw at, in pixels. Default: meta.width, else "
+                            + "the canvas.",
+                    ],
+                    "height": [
+                        "type": "integer", "minimum": 1, "maximum": 8192,
+                        "description": "Height to draw at, in pixels. Default: meta.height, "
+                            + "else the canvas.",
+                    ],
+                    "max_width": [
+                        "type": "integer", "minimum": 64, "maximum": 8192,
+                        "description": "The widest the png sheet may be, in pixels. Default "
+                            + "2048; 8192 keeps a 1920-wide graphic's two cells at full size.",
+                    ],
+                    "background": [
+                        "type": "string",
+                        "description": "What the png sheet is painted on: transparent (the "
+                            + "default), checker, or a hex colour (#rgb, #rrggbb, #rrggbbaa).",
+                    ],
+                    "format": [
+                        "type": "string", "enum": ["png", "svg"],
+                        "description": "png (default): the contact sheet. svg: one frame's "
+                            + "SVG text.",
+                    ],
+                    "path": [
+                        "type": "string",
+                        "description": "Where to write the png sheet; its folder must exist. "
+                            + "Omit for a temporary file. The reply ends \"Written to <path>.\"",
+                    ],
+                ], required: ["name"]),
+            tool(
+                "import_graphic_font",
+                "Copies a .ttf or .otf file into the project's graphics/fonts/ (creating the "
+                    + "folders if they are absent), rebuilds the graphics' font set, and answers "
+                    + "families — the family names the ENGINE reads from that file, which are "
+                    + "the exact strings a font-family must say (they can differ from what "
+                    + "other apps show) — and library_families, every family the graphics can "
+                    + "now draw with. A file that loads no face is refused in the engine's "
+                    + "words. A file of the same name is replaced (replaced is true). Not "
+                    + "undoable. Mirrors File ▸ Add Font to Graphics…, which G5 builds.",
+                [
+                    "path": [
+                        "type": "string",
+                        "description": "The font file to copy; ~ is expanded.",
+                    ],
+                ], required: ["path"]),
+            tool(
+                "import_graphic_asset",
+                "Copies a PNG, JPEG, GIF, WebP, SVG or SVGZ file into the project's "
+                    + "graphics/assets/ (creating the folders if they are absent), where a "
+                    + "module draws it with <image href=\"${asset(name)}\">; answers every "
+                    + "asset the folder now holds. Anything else, and an empty file, is "
+                    + "refused. A file of the same name is replaced (replaced is true). Not "
+                    + "undoable. Mirrors File ▸ Add Image to Graphics…, which G5 builds.",
+                [
+                    "path": [
+                        "type": "string",
+                        "description": "The picture to copy; ~ is expanded.",
+                    ],
+                    "name": [
+                        "type": "string",
+                        "description": "The name to file it under, which asset(name) says; its "
+                            + "extension must be one of the six. Default: the file's own name.",
+                    ],
+                ], required: ["path"]),
         ]
     }
 }

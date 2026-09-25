@@ -145,23 +145,29 @@ extension LayerRenderers {
         return cached(key, graphic: true) {
             guard let context = LayerRenderers.bitmap(size) else { return nil }
             let bounds = CGRect(x: 0, y: 0, width: context.width, height: context.height)
-            context.setFillColor(CGColor(srgbRed: 230 / 255, green: 40 / 255, blue: 40 / 255, alpha: 1))
-            context.fill(bounds)
-            context.setFillColor(CGColor(srgbRed: 64 / 255, green: 8 / 255, blue: 8 / 255, alpha: 1))
-            context.fill(bounds.insetBy(dx: 2, dy: 2))
-            let point = max(11, (min(bounds.width, bounds.height) / 28).rounded())
-            let rect = bounds.insetBy(dx: 3 * point, dy: 3 * point)
-            if rect.width > 0, rect.height > 0 {
-                let attributed = NSAttributedString(
-                    string: text,
-                    attributes: [.font: DS.mono(point), .foregroundColor: NSColor.white])
-                let framesetter = CTFramesetterCreateWithAttributedString(attributed)
-                let frame = CTFramesetterCreateFrame(
-                    framesetter, CFRange(location: 0, length: 0),
-                    CGPath(rect: rect, transform: nil), nil)
-                CTFrameDraw(frame, context)
-            }
+            Self.paintErrorCard(text, in: context, bounds: bounds)
             return self.upload(context, size: bounds.size)
+        }
+    }
+
+    /// The card's drawing, into `bounds` of an unflipped `context`: the one
+    /// painter, shared by `errorCard` and `render_graphic`'s contact sheet.
+    static func paintErrorCard(_ text: String, in context: CGContext, bounds: CGRect) {
+        context.setFillColor(CGColor(srgbRed: 230 / 255, green: 40 / 255, blue: 40 / 255, alpha: 1))
+        context.fill(bounds)
+        context.setFillColor(CGColor(srgbRed: 64 / 255, green: 8 / 255, blue: 8 / 255, alpha: 1))
+        context.fill(bounds.insetBy(dx: 2, dy: 2))
+        let point = max(11, (min(bounds.width, bounds.height) / 28).rounded())
+        let rect = bounds.insetBy(dx: 3 * point, dy: 3 * point)
+        if rect.width > 0, rect.height > 0 {
+            let attributed = NSAttributedString(
+                string: text,
+                attributes: [.font: DS.mono(point), .foregroundColor: NSColor.white])
+            let framesetter = CTFramesetterCreateWithAttributedString(attributed)
+            let frame = CTFramesetterCreateFrame(
+                framesetter, CFRange(location: 0, length: 0),
+                CGPath(rect: rect, transform: nil), nil)
+            CTFrameDraw(frame, context)
         }
     }
 

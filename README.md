@@ -230,6 +230,12 @@ normative: §5.2 is the project schema, §6 the op table, §7 the architecture.
   size is the document's own, or for a GIF or APNG the format's cap fitted to
   it — and an optional loudness target and timecode burn-in over it, plus an
   offline single-frame render used for verification and by File ▸ Save Frame….
+- **Motion graphics, for an agent.** A graphic clip is drawn every frame by
+  a small JavaScript module in the package's `graphics/` folder. An agent can
+  do the whole job over MCP today: read the reference, write a module, look
+  at its frames without placing it, bring in a font or a picture, put it on
+  the timeline and change its properties. The inspector, menus and templates
+  a person would use come next.
 - **MCP agent** (below): one tool per edit op, plus open/new/save/read,
   import, playhead, frame render and export.
 
@@ -416,6 +422,7 @@ hue rather than paints with it, is the one `[r, g, b]` in the model.
 | `undo` · `redo` | one step each (⌘Z / ⇧⌘Z), reporting the step's name |
 | `render_frame {t, max_width?, path?, format?, burn_in_timecode?}` | **the verification hook**. With neither `path` nor `format` it writes a PNG to a temporary file, exactly the call it always was. `format` is `png`, `jpeg` or `heic` and WINS over the path's extension, which is replaced rather than appended to (`{path: "shot.jpg", format: "png"}` writes `shot.png`); `png` and `heic` keep the canvas's alpha and `jpeg` flattens onto black. It is the same writer File ▸ Save Frame… uses, so a still from the menu and one from here are byte-identical. `burn_in_timecode` draws the document's timecode over the picture — the only way a burn-in can be photographed |
 | `export {preset, path, size?, range?, video_bitrate?, audio_bitrate?, loudness_lufs?, peak_dbtp?, burn_in_timecode?}` | writes a file and waits for it; `preset` is the encoding, `size` a Size-popup row (`document`, `1080p`, …) or `[width, height]`, default the document's size (a GIF or APNG's cap); `range: "in_out"` scopes it to the in/out range; the bitrates are the sheet's Quality popup in bits per second; `loudness_lufs` normalises the whole mix by one gain to that integrated target and `peak_dbtp` is the ceiling that gain is capped against (a ceiling with no target is refused — there would be nothing to cap). `burn_in_timecode` draws the document's own timecode over every frame (the export sheet's checkbox), showing PROJECT time even in a file written from the in/out range. The result reports what the file's sound MEASURED, asked for or not, and echoes the burn-in either way |
+| `graphic_reference` · `write_graphic {name, source}` · `get_graphic {name?}` · `render_graphic {name, frames?, frame?, props?, width?, height?, max_width?, background?, format?, path?}` · `import_graphic_font {path}` · `import_graphic_asset {path, name?}` | the six graphics tools, the agent's whole loop for a motion graphic: read the API once, write `graphics/<name>.js` and read its compile back (`ok` and `diagnostics`, not an error), look at up to 16 of its frames as a contact sheet with no clip (or one frame's SVG), copy a `.ttf`/`.otf` into `graphics/fonts/` — its reply names the exact family names the engine reads — or a picture into `graphics/assets/`; then `add_graphic_clip` and `set_graphic` place and change it. File writes are not undoable. The Graphic sub-tab, the menus and Help ▸ Graphics Reference they mirror are not built yet |
 
 `set_range`, `set_selection`, `set_scope`, `undo` and `redo` exist so that
 spec §10's own verifications —

@@ -1,4 +1,4 @@
-//! The nine `rc_graphic_*` exports (road map 10 §5e), black box through the
+//! The ten `rc_graphic_*` exports (road map 10 §5e), black box through the
 //! FFI: a library built from the app's bundled faces, the `lower-third`
 //! fixture compiled and drawn, and every answer read back off the C side.
 //!
@@ -20,8 +20,8 @@ use sha2::{Digest, Sha256};
 use common::{cstring, take_string};
 use reelcut_core::ffi_graphic::{
     rc_graphic_compile, rc_graphic_describe, rc_graphic_free, rc_graphic_library_add_asset,
-    rc_graphic_library_add_font, rc_graphic_library_free, rc_graphic_library_new,
-    rc_graphic_rasterize, rc_graphic_svg, RcGraphic, RcGraphicLibrary,
+    rc_graphic_library_add_font, rc_graphic_library_families, rc_graphic_library_free,
+    rc_graphic_library_new, rc_graphic_rasterize, rc_graphic_svg, RcGraphic, RcGraphicLibrary,
 };
 
 const FONTS: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../app/Resources/Fonts");
@@ -375,6 +375,29 @@ fn a_library_freezes_at_first_use_and_outlives_its_free() {
     unsafe { rc_graphic_library_free(lib) };
     assert_eq!(svg(g, 30, None).0.as_deref(), Some(before.as_str()));
     unsafe { rc_graphic_free(g) };
+}
+
+#[test]
+fn families_answers_the_bundled_faces_sorted_and_freezes() {
+    let fonts = font_files();
+    let lib = library();
+    let text = take_string(unsafe { rc_graphic_library_families(lib) }).expect("a family list");
+    let families: Value = serde_json::from_str(&text).unwrap_or_else(|e| panic!("{e}: {text}"));
+    // The eight files' own family names: six families, two duplicates dropped.
+    assert_eq!(
+        families,
+        json!([
+            "Anton",
+            "Bebas Neue",
+            "Darker Grotesque",
+            "IBM Plex Mono",
+            "Montserrat",
+            "Source Sans 3"
+        ])
+    );
+    assert_eq!(add_font(lib, &fonts[0]).as_deref(), Some(FROZEN));
+    assert!(unsafe { rc_graphic_library_families(ptr::null()) }.is_null());
+    unsafe { rc_graphic_library_free(lib) };
 }
 
 #[test]

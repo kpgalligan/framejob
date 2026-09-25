@@ -30,7 +30,7 @@ The sections, in order:
    whose prose names nothing. Each must be named with its op, its argument and
    the side that has it. An app-state tool broken the same way must draw
    NOTHING, which is the fourth part's skip rule.
-1. **The catalog's size**, EXACTLY 82 — this script owns the exact count now
+1. **The catalog's size**, EXACTLY 85 — this script owns the exact count now
    and every older script keeps the floor the proof README's handover rule
    gives it — and the shipped binary's own parity log, which must be empty.
 2. **Every difference between a tool's schema and the core's table is one the
@@ -119,12 +119,12 @@ WORK = os.path.join(ROOT, "tools", "proof", "work", "op-argument-probe")
 MEDIA = os.path.join(ROOT, "tools", "proof", "media", "AV.mov")
 
 # This script owns the EXACT tool count (`tools/proof/README.md`'s handover
-# rule): 59 ops plus the twenty-three app-state tools (G3b added the two graphic ops'
-# tools, G4a the three app-state graphics tools). D3 adds no tool and renames
+# rule): 59 ops plus the twenty-six app-state tools (G3b added the two graphic ops'
+# tools, G4a the three app-state graphics tools, G4b three more). D3 adds no tool and renames
 # none, so it is road map 3's 75 plus phase 9's set_scope and… no: it is the
 # number the catalog has had since road map 5's E1, taken exactly here for the
 # first time. Every older script keeps its floor.
-TOOLS = 82
+TOOLS = 85
 OPS = 59
 PARITY = "Reelcut: "
 

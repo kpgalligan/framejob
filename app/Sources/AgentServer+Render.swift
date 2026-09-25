@@ -137,7 +137,7 @@ extension AgentServer {
 
     /// One graphic's report as `render_frame` says it: failed at a frame,
     /// did not compile, or warned — each diagnostic with its location.
-    private static func graphicSentence(_ report: GraphicReport) -> String {
+    static func graphicSentence(_ report: GraphicReport) -> String {
         let said = report.diagnostics.map { $0.located }.joined(separator: "; ")
         guard let frame = report.frame else {
             return "Graphic \"\(report.name)\" does not compile: \(said)."

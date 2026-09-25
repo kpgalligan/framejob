@@ -1,4 +1,4 @@
-//! C FFI: the motion-graphics engine (road map 10 §5e) — nine `rc_graphic_*`
+//! C FFI: the motion-graphics engine (road map 10 §5e) — ten `rc_graphic_*`
 //! exports delegating to the `graphic` crate. **The only module of the core
 //! that names that crate** (G-2): the core still does no pixel work and
 //! reaches no file; it hands the app's bytes to the engine and the engine's
@@ -176,6 +176,30 @@ pub unsafe extern "C" fn rc_graphic_library_add_asset(
         Ok(())
     };
     unsafe { fallible_op(err_out, "adding an asset", false, body, |()| true) }
+}
+
+/// The frozen library's families as a JSON array of strings, sorted and
+/// deduplicated: the engine's own names, the exact strings a `font-family`
+/// must match. Freezes the library as a compile would. NULL only for NULL.
+///
+/// # Safety
+/// `lib` must be NULL or a live handle from [`rc_graphic_library_new`]. The
+/// string is freed with `rc_string_free`.
+#[no_mangle]
+pub unsafe extern "C" fn rc_graphic_library_families(lib: *const RcGraphicLibrary) -> *mut c_char {
+    if lib.is_null() {
+        return ptr::null_mut();
+    }
+    let body = || Ok(Value::from(frozen(unsafe { &*lib }).families().to_vec()).to_string());
+    unsafe {
+        fallible_op(
+            ptr::null_mut(),
+            "listing families",
+            ptr::null_mut(),
+            body,
+            out_string,
+        )
+    }
 }
 
 /// Releases a library handle. NULL-tolerant. A graphic compiled against it

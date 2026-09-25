@@ -334,8 +334,8 @@ must print nothing before a proof run means anything.
 
 **The EXACT tool count belongs to the newest phase's script**, because it is
 what tells a stale binary on the port from the build under test: road map 7's
-`op_argument_proof.py` asserts **82** since road map 10's G4a (79 from G3b,
-77 from D3·5), and every script before it keeps
+`op_argument_proof.py` asserts **85** since road map 10's G4b (82 from G4a,
+79 from G3b, 77 from D3·5), and every script before it keeps
 a floor — phases 1 to 9's 63, 65, 68, 70, 71, 73, 73, 73 and 74, and road map
 3's 75 — so a later phase's tools never fail an older proof.
 Road map 5's own proof landed AFTER D3 and asserts FLOORS for that reason:
@@ -4956,6 +4956,65 @@ fell alone; (c) `holdsContent` counting regular files only — G8 fell alone.
 
 ```sh
 make app && python3 tools/proof/graphics_proof.py --port 4883          # → 29/29
+python3 tools/proof/graphics_proof.py --mutant frame-plus-one          # exit 0 = P2 FAILED
+```
+
+## Road map 10's G4b — the contact sheet, the imports, the loop (`graphics_proof.py` C1–C4, I1–I4, G9, L2)
+
+The same script, ten rows more; the score is **39/39**. The sheets are
+decoded through ffmpeg (`decode_rgba`) — `decode_png`'s Python loops are too
+slow for a 3848 px row — and every pixel claim is an RGB read or a row
+comparison of that decode. On WG after G7, where `bar.js` is BLUE since G4
+and its clip sits at 0: **C1** `render_graphic {frames: [0, 0], background:
+"#000000", max_width: 8192}` is a 3848×1104 PNG whose cell 0 (columns
+0–1919) and cell 1 (1928–3847) are byte-identical over rows 0–1079 and whose
+text names "2 frame"; `frames: [0, 30]` makes the two cells differ. **C2**
+Placement: `render_frame` at frame 30 and `render_graphic {frame: 30,
+background: "#000000", max_width: 8192}` agree in every RGB pixel of the
+1920×1080 cell — 0 of 2 073 600 differ, F1's comparison. **C3** `{frame: 30,
+format: "svg"}` answers ok, frame 30, a rect at `x="120"` and no
+diagnostics. **I1** `needsfont` (120 px white text in `'Oswald'`): its sheet
+over black has 0 lit pixels and names Oswald; `import_graphic_font
+/Library/Fonts/Oswald-Medium.ttf` answers `families ["Oswald"]` — the
+engine's name; CoreText's is "Oswald Medium" — with `library_families`
+holding Oswald, IBM Plex Mono and Source Sans 3, its path in `fonts/`, not
+replaced, and `get_graphic {}`'s `families` the same list; the sheet then
+lights pixels and names no Oswald; Arial answers `["Arial"]` and says
+`replaced` the second time; a `.ttf` of text is refused "loaded no face" and
+a `.txt` naming ".ttf". A missing Oswald file is a FAIL, never a skip.
+**I2** `usesasset` (`<image href="${asset("red.png")}">`) names red.png and
+is black at (50,50); `import_graphic_asset graphic/tests/assets/red.png`
+answers `red.png` and `assets ["red.png"]`, as `get_graphic {}` does; the
+sheet is then (255,0,0) there with no red.png in the text; an empty file is
+refused "empty" and a `.txt` naming "PNG". **G9** `chmod 311 <WG>/graphics`
+(bounded): `write_graphic {name: ghost}` is refused saying it "was written"
+and the scan "does not list" it; after `chmod 755` the same write is ok.
+**I3** `save_project` on WG: `fonts/Oswald-Medium.ttf`, `fonts/Arial.ttf`
+and `assets/red.png` are in the package and `unsaved_changes` is false.
+**I4** a new IE whose `graphics/` holds NO module: the Oswald import's
+`library_families` holds Oswald at once, and `needsfont` written after it
+lights pixels with no warning (the store posts nothing with no module, so
+the import rebuilds the registry's set itself). **L2** the loop of §5h on a
+new LP: `graphic_reference`, BROKEN_BAR (ok false, line 2), `bar()` (ok),
+`render_graphic {frames: [0, 15, 30]}` at the DEFAULT `max_width` — its
+path read out of "Written to …" — is exactly **2048×1202** and names "3
+frame", `add_graphic_clip`, `render_frame` at frame 30 is RED at (122,50),
+and `set_graphic {props: {title: "Looped"}}` changes that frame ("Loop"
+would not: `bar()` draws the title's LENGTH, and "Jane" is four letters
+too). **C4**, in `run_e` after E1 on P1: `render_graphic {name: throw10,
+frames: [9, 10], max_width: 8192}` names `"throw10"`, `frame 10` and `boom
+at ten`; cell 1 is the card — (1929,540) BORDER, (3828,1060) CARD — and cell
+0's (50,50) is RED.
+
+**Made to fail by hand (2026-09-25)**, each reverted and rebuilt: (a) the
+module asked for `frame + 1` in `renderGraphic` — C2 (1440 pixels differ),
+C3 and C4 fell (36/39); (b) `store.rescan()` deleted from
+`importGraphicFont` — I1 and I4 fell (37/39); (c) the extension check
+deleted from `importGraphicAsset` — I2 fell alone; (d) `catchUpLibrary`
+deleted from `importGraphicFont` — I4 fell alone.
+
+```sh
+make app && python3 tools/proof/graphics_proof.py --port 4883          # → 39/39
 python3 tools/proof/graphics_proof.py --mutant frame-plus-one          # exit 0 = P2 FAILED
 ```
 

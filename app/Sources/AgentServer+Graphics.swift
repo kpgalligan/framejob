@@ -3,7 +3,8 @@
 // app-state tools, the agent's write/read loop over the package's
 // `graphics/`: `write_graphic`, `get_graphic` and `graphic_reference`, with
 // `graphicsSummary`, which `get_project` reports as `graphics`. G4b's three
-// are not built.
+// are next door: `render_graphic` in `AgentServer+GraphicRender.swift`, the
+// two imports in `AgentServer+GraphicImports.swift`.
 //
 // **The app fills `schema`, and only the app can** (G-4): the core has no
 // filesystem, so the schema a `props` patch is checked against is read here
@@ -36,7 +37,7 @@ extension AgentServer {
         let width = try graphicSide(a, "width")
         let height = try graphicSide(a, "height")
         let props = a["props"]
-        let (meta, schema) = try compiledModule(named: name, document)
+        let (_, meta, schema) = try compiledModule(named: name, document)
         let frame = max(document.project.snapshot.canvas.fps.frameDuration, 1)
         // `meta` is only the fallback: a caller's own `duration` is never
         // refused for a `durationInFrames` it does not use.
@@ -116,7 +117,10 @@ extension AgentServer {
         }
         store.rescan()
         guard store.module(named: name) != nil else {
-            throw ToolError(message: noModuleSentence(name, document))
+            throw ToolError(
+                message: "graphics/\(name).js was written but the folder's scan does not list it "
+                    + "— graphics/ may not be readable by Reelcut, or was replaced mid-write; "
+                    + "get_graphic {} shows what the scan sees")
         }
         var result = moduleReport(named: name, document)
         result["name"] = name
@@ -138,6 +142,8 @@ extension AgentServer {
                 "folder": store.folderURL.path,
                 "folder_exists": FileManager.default.fileExists(atPath: store.folderURL.path),
                 "modules": graphicsSummary(document),
+                "families": libraryFamilies(document),
+                "assets": store.scan.assets.map(\.name),
             ])
         }
         guard let file = store.module(named: name) else {
@@ -184,7 +190,15 @@ extension AgentServer {
         }
     }
 
-    private func graphicStore(_ document: ProjectDocument) throws -> GraphicStore {
+    /// The families of the library the document's graphics draw with — the
+    /// engine's own names, the exact strings a `font-family` must match; `[]`
+    /// with no set. May freeze the set's library, which nothing adds to after
+    /// `install`. Main.
+    func libraryFamilies(_ document: ProjectDocument) -> [String] {
+        GraphicRegistry.shared.snapshot(for: document.recipeKey)?.library.families() ?? []
+    }
+
+    func graphicStore(_ document: ProjectDocument) throws -> GraphicStore {
         guard let store = document.graphicStore else {
             throw ToolError(
                 message: "This project has no graphics folder open (its window has not been made)")
@@ -216,7 +230,11 @@ extension AgentServer {
             result["ok"] = false
             result["meta"] = [String: Any]()
             result["schema"] = [String: Any]()
-            result["diagnostics"] = [[String: Any]]()
+            result["diagnostics"] = [Self.diagnosticJSON(GraphicDiagnostic(
+                level: "error",
+                message: "The module \"\(name)\" is in graphics/ but the app has not compiled "
+                    + "it yet — call again",
+                line: nil, column: nil, frame: nil))]
         }
         return result
     }
@@ -229,7 +247,7 @@ extension AgentServer {
         return clips.filter { $0.graphic?.name == name }.map { Int($0.id) }.sorted()
     }
 
-    private static func diagnosticJSON(_ d: GraphicDiagnostic) -> [String: Any] {
+    static func diagnosticJSON(_ d: GraphicDiagnostic) -> [String: Any] {
         [
             "level": d.level, "message": d.message,
             "line": d.line ?? NSNull(), "column": d.column ?? NSNull(),
@@ -239,19 +257,19 @@ extension AgentServer {
 
     // MARK: - What only the app can know
 
-    private var sides: ClosedRange<Int> { 1...GraphicLibrary.maxSide }
+    var sides: ClosedRange<Int> { 1...GraphicLibrary.maxSide }
 
-    /// A module's `meta` and `schema` from its current revision, or the
-    /// sentence saying the folder does not hold it or it did not compile.
-    private func compiledModule(
+    /// A module, its `meta` and its `schema` from its current revision, or
+    /// the sentence saying the folder does not hold it or it did not compile.
+    func compiledModule(
         named name: String, _ document: ProjectDocument
-    ) throws -> (meta: [String: Any], schema: [String: Any]) {
+    ) throws -> (module: GraphicModule, meta: [String: Any], schema: [String: Any]) {
         guard document.graphicStore?.module(named: name) != nil,
             let entry = GraphicRegistry.shared.entry(named: name, for: document.recipeKey)
         else { throw ToolError(message: noModuleSentence(name, document)) }
         switch entry {
-        case .compiled(_, _, let meta, let schema):
-            return (meta, schema)
+        case .compiled(let module, _, let meta, let schema):
+            return (module, meta, schema)
         case .failed(let diagnostics, _):
             let first = diagnostics.first
             let line = first?.line.map { " (line \($0))" } ?? ""
@@ -262,14 +280,14 @@ extension AgentServer {
     }
 
     /// The sentence for a module the folder does not hold, naming what it does.
-    private func noModuleSentence(_ name: String, _ document: ProjectDocument) -> String {
+    func noModuleSentence(_ name: String, _ document: ProjectDocument) -> String {
         let held = (document.graphicStore?.scan.modules.keys).map { Array($0).sorted() } ?? []
         let listed = held.isEmpty ? "nothing" : held.joined(separator: ", ")
         return "No module named \"\(name)\" in graphics/ — the folder holds: \(listed)"
     }
 
     /// `width` or `height` as a side, refused by name outside 1…8192.
-    private func graphicSide(_ a: [String: Any], _ key: String) throws -> UInt32? {
+    func graphicSide(_ a: [String: Any], _ key: String) throws -> UInt32? {
         guard let value = try intArg(a, key) else { return nil }
         guard sides.contains(value) else {
             throw ToolError(message: "\(key) is not a side of 1–\(GraphicLibrary.maxSide): \(value)")
@@ -279,7 +297,7 @@ extension AgentServer {
 
     /// `meta[key]` as a whole number in `range`, nil when the module does
     /// not declare it, refused by name when it declares something else.
-    private func metaWhole(
+    func metaWhole(
         _ meta: [String: Any], _ key: String, _ name: String, in range: ClosedRange<Int>
     ) throws -> Int? {
         guard let raw = meta[key], !(raw is NSNull) else { return nil }

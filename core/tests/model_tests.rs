@@ -36,8 +36,8 @@ use reelcut_core::ffi_agent::{
 use reelcut_core::ffi_edit::rc_project_apply;
 use reelcut_core::ffi_graphic::{
     rc_graphic_compile, rc_graphic_describe, rc_graphic_free, rc_graphic_library_add_asset,
-    rc_graphic_library_add_font, rc_graphic_library_free, rc_graphic_library_new,
-    rc_graphic_rasterize, rc_graphic_svg,
+    rc_graphic_library_add_font, rc_graphic_library_families, rc_graphic_library_free,
+    rc_graphic_library_new, rc_graphic_rasterize, rc_graphic_svg,
 };
 use reelcut_core::ffi_query::{
     rc_export_presets, rc_export_settings, rc_export_sizes, rc_op_names, rc_op_schemas,
@@ -2178,6 +2178,9 @@ fn sweep_every_export_with_nulls() -> Vec<String> {
         )
     });
     cover("rc_graphic_library_add_asset");
+
+    assert!(unsafe { rc_graphic_library_families(ptr::null()) }.is_null());
+    cover("rc_graphic_library_families");
 
     let source = cstring("export function render() { return \"\"; }");
     let mut diag: *mut c_char = ptr::null_mut();

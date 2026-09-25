@@ -1283,6 +1283,13 @@ final class GraphicLibrary {
         if !ok { throw ReelCoreError(message: takeErrorMessage(err, fallback: "No asset added.")) }
     }
 
+    /// The engine's own family names, sorted — the exact strings a
+    /// `font-family` must match. FREEZES the library, as a compile would.
+    func families() -> [String] {
+        guard let json = takeString(rc_graphic_library_families(handle)) else { return [] }
+        return ReelJSON.decode([String].self, from: json) ?? []
+    }
+
     /// `svg` drawn at `width`×`height`, rows `width × 4` bytes apart.
     func rasterize(_ svg: String, width: Int, height: Int) throws -> GraphicRaster {
         let sides = 0...Self.maxSide

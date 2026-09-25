@@ -388,6 +388,11 @@ bool rc_graphic_library_add_font(RcGraphicLibrary *lib, const uint8_t *bytes, si
 bool rc_graphic_library_add_asset(RcGraphicLibrary *lib, const char *name, const uint8_t *bytes,
                                   size_t len, char **err_out);
 
+/* The frozen library's families as a JSON array of strings, sorted and
+ * deduplicated — the exact names a `font-family` must match (freezes the
+ * library as a compile would). NULL only for NULL. */
+char *rc_graphic_library_families(const RcGraphicLibrary *lib);
+
 /* Releases a library. NULL-tolerant. */
 void rc_graphic_library_free(RcGraphicLibrary *lib);
 

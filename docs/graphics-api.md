@@ -290,13 +290,14 @@ set for a problem found while drawing.
 
 ## Working over MCP
 
-Read `graphic_reference` once, before or after a project is open. Then
-`write_graphic {name, source}` and read its `diagnostics`; fix the source and
-write it again until `ok` is true. `add_graphic_clip {name}` puts it on the
-timeline, `render_frame` shows a frame, and `set_graphic {patch: {props}}`
-changes what it draws. `get_graphic` reads a module back, or with no `name`
-names the folder, which your own file tools may edit too; the folder's
-`API.md` and `API.d.ts` are this page and its TypeScript declarations.
+Read `graphic_reference` once. `write_graphic {name, source}` answers `ok` and
+`diagnostics`: write again until `ok` is true. `render_graphic {name, frames}`
+draws up to 16 frames on a contact sheet with no clip; `add_graphic_clip {name}`
+places it, `render_frame` shows a frame, `set_graphic {patch: {props}}` changes
+it. `import_graphic_font {path}` answers `families`, the exact names
+`font-family` must say; `import_graphic_asset {path}` adds a picture for
+`asset(name)`. `get_graphic` reads a module or names the folder, which your file
+tools may edit too; its `API.md` is this page, `API.d.ts` its types.
 
 ## Idioms
 

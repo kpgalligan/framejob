@@ -51,7 +51,7 @@ extension AgentServer {
     /// free: with several projects open a call would otherwise be ambiguous,
     /// and the property costs nothing when only one is.
     ///
-    /// **Its own callers are the twenty-three APP-STATE tools** — the ones
+    /// **Its own callers are the twenty-six APP-STATE tools** — the ones
     /// with no op behind them, which have no row in the core's table to
     /// print and so spell their arguments out here: the ten of the Projects
     /// group below (`open_project` … `redo`), the two composites of
@@ -59,11 +59,12 @@ extension AgentServer {
     /// eight `fileTools` returns (`import_media`, `import_captions`,
     /// `consolidate_media`, `transcribe`, `export_captions`, `render_frame`,
     /// `export`, `record_screen` — the three caption rows of them built in
-    /// `AgentCatalog+Captions.swift`) and the three of
+    /// `AgentCatalog+Captions.swift`) and the six of
     /// `AgentCatalog+Graphics.swift` (`write_graphic`, `get_graphic`,
-    /// `graphic_reference`). Every
+    /// `graphic_reference`, `render_graphic`, `import_graphic_font`,
+    /// `import_graphic_asset`). Every
     /// op tool is `opTool`'s since road map 7's D3·4, and `opTool` goes
-    /// through here, so this is still where all eighty-two get `project`
+    /// through here, so this is still where all eighty-five get `project`
     /// and where all fifty-nine get `scope`.
     ///
     /// Internal rather than private for one reason and no other: three other
@@ -125,7 +126,7 @@ extension AgentServer {
     /// map 7's D3·4 — the clip and action rows, the two transitions, the
     /// two graphics, the three raw media ops, the tracks, the markers and the canvas — so no
     /// tool anywhere declares an argument's type, its vocabulary or its
-    /// required-ness by hand. What is left in `tool` is the twenty-three app-state
+    /// required-ness by hand. What is left in `tool` is the twenty-six app-state
     /// tools, which have no op to read.
     func opTool(
         _ name: String, _ description: String, _ prose: [String: String]
@@ -160,7 +161,7 @@ extension AgentServer {
     /// tools, and the startup parity check asks that each of them has a tool
     /// AND that the tool declares the property. One list, so the three
     /// cannot disagree — and a `static let`, so the FFI call and the JSON
-    /// decode behind it happen once per process instead of eighty-two
+    /// decode behind it happen once per process instead of eighty-five
     /// times per catalog build.
     ///
     /// **An empty answer is a silent catastrophe, so it is not allowed to be

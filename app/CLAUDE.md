@@ -21,10 +21,14 @@ detail there.
   `TextPatch.swift`'s, moved out so it could grow. `word_style` has ONE
   app-side writer, `CaptionLayout.place` (W-10).
   The graphics engine's wrappers are here too: `GraphicLibrary` (`addFont`,
-  `addAsset`, `rasterize`; frozen by its first compile or rasterize) and
+  `addAsset`, `rasterize`, `families()`; frozen by its first compile,
+  rasterize or `families()`) and
   `GraphicModule` (`compile`, `describeJSON`, `svg`; it holds its library
   strongly), with `GraphicDiagnostic`, `GraphicFailure` (what a `diag_out`
   failure throws; `err_out` stays `ReelCoreError`) and `GraphicRaster`.
+  `MediaDescriptor`, `mediaURL(for:)` and `bookmarkString(for:)` are
+  `MediaDescriptor.swift`'s: a `media[]` element minus its id, and the
+  media-file resolvers; they call no `rc_*`.
   It is also where the op table is read BACK: `ReelOp.coreNames()` over
   `rc_op_names`, and `ReelOp.coreSchemas()` over `rc_op_schemas` — every
   op's ARGUMENTS as JSON Schema, keyed by op name, which
@@ -948,10 +952,26 @@ free.
   the three app-state ones — `write_graphic` (the store's one writer, then a
   synchronous `rescan()` so the reply is the compile of THAT text; a failed
   compile is `ok: false`, not an error; not undoable, never dirty, G-3),
-  `get_graphic` (one module, or the folder with `folder_exists`) and
+  `get_graphic` (one module, or the folder with `folder_exists`, the
+  engine's `families` and the `assets`) and
   `graphic_reference` (the bundled `GraphicsAPI.md`; it never calls
   `target(a)`, so it answers with no project open) — and `graphicsSummary`,
-  `get_project`'s `graphics`. `AgentCatalog.swift`
+  `get_project`'s `graphics`. `+GraphicRender` is `render_graphic`, an
+  `offMainTools` member: one `onMain` for the target, the registry's
+  compiled module, the canvas and `meta`; then, off main, the ctx built by
+  hand (`recipe_graphic.rs`'s keys) and a contact sheet or one frame's SVG;
+  a failing frame is its error card, drawn by
+  `LayerRenderers.paintErrorCard`, the one card painter.
+  `+GraphicImports` is `import_graphic_font` / `import_graphic_asset`, on
+  main: the copy through `GraphicStore+Import.swift`'s `importFile` (via
+  `ensureFolder()`, G-14, then `.partial` moved into place), `rescan()`,
+  then `catchUpLibrary`, which re-`install`s the registry's set when its
+  `libraryVersion` lags the scan's, because the store posts nothing for a
+  pass with no module names; a font's `families` come from a throwaway
+  library holding that file alone. `GraphicContactSheet.swift` is pure: the
+  layout (the scale is over the cells alone, so the sheet is exactly
+  `width × height ≤ max_width × 8192`), the painter and
+  `GraphicRaster.cgImage()`. `AgentCatalog.swift`
   (+`Clips`, +`Audio`, +`Transitions`, +`Files`, +`Captions`, +`Graphics`,
   +`Declarations`)
   — the catalog, spliced in ORDER (`recording_probe.py` reads the last eleven
@@ -960,12 +980,12 @@ free.
   from the core's published table (`Self.opSchemas` over `rc_op_schemas`).
   **Every one of the fifty-nine op tools is `opTool`'s** and carries no
   `"type"`, no `"enum"` and no hand-written required list; `tool`'s remaining
-  callers are the twenty-three APP-STATE tools, which have no op behind them
+  callers are the twenty-six APP-STATE tools, which have no op behind them
   and so nothing to read from the table — the ten of the Projects group,
   `AgentCatalog+Audio.swift`'s two composites and
   `AgentCatalog+Captions.swift`'s three, spliced back at the two points they
   left, the five other file tools, `record_screen` among them, and
-  `AgentCatalog+Graphics.swift`'s three, after its two `opTool` rows. `opTool`
+  `AgentCatalog+Graphics.swift`'s six, after its two `opTool` rows. `opTool`
   goes THROUGH `tool`, so `project` and `scope` are injected by one piece of
   code either way. `AgentCatalog+Declarations.swift` is the one list of places
   a tool deliberately takes more or less than its op does — a bare-string
@@ -991,7 +1011,7 @@ free.
   `AgentServer+Scope.swift` with the feature it is about; all five assert in
   debug, log `Reelcut: ` in release and start the server either way.
   `AgentServer+Gate.swift` is the CALL-time half of the same contract
-  (kpgalligan/reelcut#21): one comparison in `dispatch`, for all eighty-two
+  (kpgalligan/reelcut#21): one comparison in `dispatch`, for all eighty-five
   tools, of a caller's keys against the schema the tool published, every
   stranger refused by name — the tool, the strangers and the whole of what it
   takes — before the scope or any handler reads a thing. Its map is read once
@@ -1001,7 +1021,8 @@ free.
   document through `NSApp.orderedDocuments`, never `documents.first`, and an
   explicit path through `AgentServer.canonical`. `offMainTools` names the
   handlers that wait for something the main thread must deliver
-  (`import_media`, `transcribe`, `record_screen`, `export`, …); the criterion
+  (`import_media`, `transcribe`, `record_screen`, `export`,
+  `render_graphic`, …); the criterion
   is "waits on main", not "touches the disk".
 - `AgentServer+Arguments.swift` — the shared argument vocabulary
   (`intArg`, `timeArg`, `rangesArg`, `rawPatchArg`, …), each refusing a

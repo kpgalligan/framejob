@@ -1855,6 +1855,7 @@ typedef struct RcGraphic RcGraphic;
 RcGraphicLibrary *rc_graphic_library_new(void);                                     /* never NULL */
 bool  rc_graphic_library_add_font(RcGraphicLibrary *, const uint8_t *bytes, size_t len, char **err_out);
 bool  rc_graphic_library_add_asset(RcGraphicLibrary *, const char *name, const uint8_t *bytes, size_t len, char **err_out);
+char *rc_graphic_library_families(const RcGraphicLibrary *);      /* JSON array, sorted: the engine's own family names; freezes; NULL only for NULL */
 void  rc_graphic_library_free(RcGraphicLibrary *);
 RcGraphic *rc_graphic_compile(const RcGraphicLibrary *, const char *name, const char *source,
                               uint32_t budget_ms, char **diag_out);
@@ -2745,7 +2746,7 @@ only the app can fill and so does not publish (the two graphic ops'
 difference is a row of `AgentCatalog+Declarations.swift` with the op, the
 argument, what the app adds and why, and the schema declares it, so an agent
 can SEE a shorthand rather than discover it. What still declares a schema of
-its own is the twenty-three APP-STATE tools, which have no op to read one from.
+its own is the twenty-six APP-STATE tools, which have no op to read one from.
 
 **A fifth part of the startup parity check holds that identity up**
 (`AgentServer+Parity.swift`, road map 7's D3·5). For every op tool the
@@ -2763,7 +2764,7 @@ caught rather than dropped in silence. App-state tools are skipped by the same r
 part 4 uses — the core's own op list, which has no row for a tool with no op
 behind it. What no comparison of two lists can see is a
 CALL. A call's KEYS are compared to the tool's published schema at the
-dispatch — the argument gate, kpgalligan/reelcut#21, for all eighty-two
+dispatch — the argument gate, kpgalligan/reelcut#21, for all eighty-five
 tools — so a name no tool published is refused naming the tool and what it
 takes, where it used to be dropped in silence; and that an argument the
 catalog prints is one a hand-written handler really reads is put to the
@@ -2935,7 +2936,26 @@ module back (its source, revision and compile) or, with no name, the folder
 `graphics: [{name, revision, ok, clips}]`, always present. The reference is
 also written into an EXISTING `graphics/` as `API.md` and `API.d.ts` (never
 a reason to create the folder, G-14, and not content that makes an untitled
-root worth carrying).
+root worth carrying). `get_graphic {}` also lists `families` (the engine's own
+names, `rc_graphic_library_families`) and `assets`.
+
+G4b adds three. `render_graphic {name, frames | frame, props?, width?,
+height?, max_width?, background?, format?, path?}` draws a module WITHOUT a
+clip, on the server thread: the ctx a clip would get (the canvas's fps,
+`durationInFrames` from `meta` else 5 s, the size from the arguments, else
+`meta`, else the canvas), up to 16 frames on a contact sheet — the cells
+scaled down to `max_width` (default 2048), never the 8 px gaps or the 24 px
+label strips, a failing frame drawn as its error card — written through
+`FrameWriter` as a PNG, with one sentence per frame that failed or warned
+before "Written to <path>."; `format: "svg"` answers one frame's SVG, its
+diagnostics and its ctx. `import_graphic_font {path}` copies a `.ttf`/`.otf`
+into `graphics/fonts/` through the store (G-14), rescans, and answers
+`families` — the family names the ENGINE reads from that file, from a
+throwaway library holding it alone, because CoreText names some files
+differently — and `library_families`; a file that loads no face is refused
+in the engine's words. `import_graphic_asset {path, name?}` copies a PNG,
+JPEG, GIF, WebP, SVG or SVGZ into `graphics/assets/` and refuses anything
+else and an empty file. Both are not undoable and never dirty the document.
 
 Handlers use `performGroupedEdit` so off-event edits get their own undo group
 (Rasterize's `AgentServer.performGroupedEdit`). Default port 4817; env
@@ -3005,7 +3025,7 @@ concern is a new module with its own `impl Project` block.
 | `export_table.rs` | the rows themselves — the `Container` enum with the four questions a container answers about ITSELF (extension, UTI, whether a leading index is worth rewriting, whether it can hold sound at all), `Preset`, the `PRESETS` set one row per encoding in menu order, and the `preset(id)` lookup both resolvers share. Cut out of `export.rs` under the size rule (road map 2, phase 7 — the second cut that file has paid, after `export_overrides.rs`) and cut HERE because everything in it is a constant no project can influence, where `export_settings` is the only half handed a `&self`; `export.rs` re-exports both functions, so `crate::export::presets()` and `crate::export::preset(id)` resolve as they did |
 | `agent.rs` | MCP server (copied) |
 | `ffi.rs` / `ffi_edit.rs` / `ffi_query.rs` / `ffi_agent.rs` / `ffi_util.rs` | thin shims; `ffi_util` holds `catch_unwind` + `err_out` + CString helpers (copy Rasterize's) |
-| `ffi_graphic.rs` | the nine `rc_graphic_*` exports (§7.1), delegating to the `graphic` crate — the ONLY module that names it (G-2): the library builder that freezes into one `Arc<graphic::Library>` at first use, the compiled module's handle, and `diag_out`'s JSON array of Diagnostics |
+| `ffi_graphic.rs` | the ten `rc_graphic_*` exports (§7.1), delegating to the `graphic` crate — the ONLY module that names it (G-2): the library builder that freezes into one `Arc<graphic::Library>` at first use, the compiled module's handle, and `diag_out`'s JSON array of Diagnostics |
 
 Tests: black-box in `core/tests/` through the FFI, oracle-checked, no
 golden files. Required from M1: JSON round-trip for every field; timecode
@@ -4578,7 +4598,9 @@ assisted import.
   that fails during the export aborts it, naming the graphic and the frame.
   An error card is never written into a video. Built by G3c (road map 10
   §10.6): the card's border is 2 PIXELS of the layer's texture, and the
-  missing module draws a card of its own; `render_graphic` is G4's.
+  missing module draws a card of its own; `render_graphic` was built by
+  G4b (road map 10 §10.7): a failing frame is its cell's error card, through
+  the same painter.
 - **G-9 — A graphic has its own timeline: `in` and `length`, and `split`
   pins it** (road map 10 §4, 2026-09-25; built by G2b). `graphic.in`
   (ticks, ≥ 0) is where on the graphic's own timeline the clip's first

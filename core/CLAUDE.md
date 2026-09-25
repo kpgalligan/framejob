@@ -430,7 +430,7 @@ file is what governs a module now.
   only; shared plumbing lives in `ffi_util.rs`, never copy-pasted.
   `ffi_query.rs`'s rule: a query never allocates a handle and has no
   `err_out`, which is why `rc_project_scoped` lives in `ffi.rs`.
-- `ffi_graphic.rs` — the nine `rc_graphic_*` exports (road map 10 §5e)
+- `ffi_graphic.rs` — the ten `rc_graphic_*` exports (road map 10 §5e)
   and the ONLY module of `core/src/` that names the `graphic` crate (spec
   §11 G-2; `core/tests/graphic_ffi.rs` reads `core/src/` to hold it). An
   `RcGraphicLibrary` is a BUILDER that the first compile or rasterize
@@ -439,7 +439,15 @@ file is what governs a module now.
   refused. `RcGraphic` wraps `graphic::Module`, whose `Arc` keeps the
   fonts alive past the library's free. `diag_out` is a JSON array of
   Diagnostics, exactly one error on failure; its panic arm goes through
-  `ffi_util.rs`'s `fallible_op_wrapped`.
+  `ffi_util.rs`'s `fallible_op_wrapped`. `rc_graphic_library_families`
+  answers the frozen library's family names as JSON — the engine's own,
+  which a `font-family` must match (CoreText names 13 of 2500 host fonts
+  differently) — and freezes it. At 397 of 400: the next export pays a toll,
+  and nothing crate-free is left in it (`diag_json`/`diag_error` name
+  `Diagnostic`). `ffi_util.rs` holds the two crate-free helpers it gave up:
+  `read_bytes` (a pointer and a length into an owned `Vec`, `bytes is NULL`
+  refused) and `free_boxed` (drops a handle `boxed` made, under
+  `fallible_op` with no channel; NULL a no-op).
 
 ## Rules
 

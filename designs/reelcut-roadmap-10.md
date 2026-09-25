@@ -764,6 +764,7 @@ typedef struct RcGraphic RcGraphic;
 RcGraphicLibrary *rc_graphic_library_new(void);
 bool  rc_graphic_library_add_font(RcGraphicLibrary *, const uint8_t *bytes, size_t len, char **err_out);
 bool  rc_graphic_library_add_asset(RcGraphicLibrary *, const char *name, const uint8_t *bytes, size_t len, char **err_out);
+char *rc_graphic_library_families(const RcGraphicLibrary *);   // G4b, the tenth: the engine's family names, JSON; freezes
 void  rc_graphic_library_free(RcGraphicLibrary *);
 RcGraphic *rc_graphic_compile(const RcGraphicLibrary *, const char *name, const char *source, char **diag_out);
 char *rc_graphic_describe(const RcGraphic *);                  // {"meta":…, "schema":…, "revision":…}
@@ -3041,8 +3042,9 @@ user's decision (§9a).
 
 §9's G4 is split in two: **G4a** the write/read loop and the reference
 (below), and **G4b** `render_graphic`, `import_graphic_font`,
-`import_graphic_asset`, §5l's Contact-sheet row and the Help menu item —
-not built.
+`import_graphic_asset`, §5l's Contact-sheet and Placement rows and the loop
+end to end (below). Both are built; G4's closing paragraph follows G4b. The
+Help menu item is G5's.
 
 #### G4a — `write_graphic`, `get_graphic`, `graphic_reference`, and the reference in three places (2026-09-25)
 
@@ -3176,3 +3178,226 @@ neither observer runs a handler), and that `recording_proof.py`'s 186/187 is
 the Bluetooth head-loss row remaining §4 names (a FAIL by design on this
 host, not a skip). The `app/CLAUDE.md` and root `CLAUDE.md` entries were
 written by the orchestrator from the pipeline's drafts after the review.
+
+#### G4b — `render_graphic`, `import_graphic_font`, `import_graphic_asset`; the tenth export (2026-09-25)
+
+Against baseline `e7dfacb`, branch `svg-motion`.
+
+**What landed.**
+- **Two tolls, each landed and gated alone, each its own patch, before any
+  feature line.** *Core* (`step1a-move.patch`): `read_bytes` moved out of
+  `ffi_graphic.rs` into `ffi_util.rs` verbatim but for `pub(crate)` (the
+  diff of the ten lines against `e7dfacb` is that one line), and the two
+  frees' identical bodies became `ffi_util.rs`'s `free_boxed<T>(p, what)`,
+  each free keeping its doc, attribute and signature with a one-line body —
+  nothing else crate-free in the file was large enough (`diag_json` and
+  `diag_error` name `Diagnostic`). `ffi_graphic.rs` **397 → 373**,
+  `ffi_util.rs` **161 → 189**; gated alone — `make test` core 868 + graphic
+  99, 0 failed (a CONTROL: the counts before it), `make lint` clean. *App*
+  (`step1b-move.patch`): `ReelCore.swift`'s `// MARK: - Media descriptors`
+  block (`MediaDescriptor`) and `// MARK: - Media files` block
+  (`mediaURL(for:)`, `bookmarkString(for:)`) moved verbatim into the new
+  `MediaDescriptor.swift` after `import Foundation` — `git show
+  e7dfacb:app/Sources/ReelCore.swift | sed -n '732,793p;1277,1309p'` diffs
+  EMPTY against `sed -n '3,$p' app/Sources/MediaDescriptor.swift` — and the
+  header's type list and size-payment paragraph say so. `ReelCore.swift`
+  **1440 → 1346**, `MediaDescriptor.swift` **97**; gated alone — `make
+  typecheck` 0 errors and the 7 baseline warnings, `make app` built.
+- **The tenth export, `rc_graphic_library_families`** (Rust → header →
+  `GraphicLibrary.families()`): the frozen library's family names as a
+  sorted, deduplicated JSON array — the ENGINE's own names, what a
+  `font-family` must say — freezing the library as a compile would; NULL
+  only for NULL; through `fallible_op` with no channel. `graphic_ffi.rs`'s
+  `families_answers_the_bundled_faces_sorted_and_freezes` (the eight bundled
+  files are six families: Anton, Bebas Neue, Darker Grotesque, IBM Plex
+  Mono, Montserrat, Source Sans 3; an add after it answers `FROZEN`; NULL is
+  NULL) and the null-safety sweep's line. `ffi_graphic.rs` **373 → 397** of
+  400, `ReelCore.swift` **1346 → 1353**. Why an export and not CoreText: the
+  spec review ran fontdb 0.24 (the pinned version) and CoreText's
+  `kCTFontFamilyNameAttribute` over every `.ttf`/`.otf` on this host and
+  they disagreed on **13 of 2500** files — `/Library/Fonts/Oswald-Medium.ttf`
+  is "Oswald Medium" to CoreText and "Oswald" to the engine, likewise
+  `PublicSans-Light.ttf`, `PowerrLight.ttf`, cuts of Archivo, Bodoni Moda,
+  Bricolage Grotesque and Noto Sans Kannada, and `SFNS.ttf` (".SF NS" vs
+  "System Font"); the eight bundled faces and Arial agree. (That run was the
+  review's, recorded in the pipeline's objections; this phase did not
+  repeat it. Row I1 measures the one file that matters to it.) A second
+  copy of fontdb's name rule in Swift would drift silently on an upgrade.
+- **`render_graphic`** (`AgentServer+GraphicRender.swift`, 263 lines, NEW;
+  an `offMainTools` member): one `onMain` for the target, the module as the
+  registry compiled it (`compiledModule` now answers the `GraphicModule`
+  too), the canvas and `meta`; then, off main, the ctx `recipe_graphic.rs`
+  builds for a clip — `fps`, `time`, `durationInFrames` (`meta`, else 5 s at
+  the canvas rate, ceiled), `progress`, `width`/`height` (the arguments,
+  else `meta`, else the canvas) and `canvas` — per frame, `svg` and
+  `rasterize` at `GraphicRegistry.offlineBudgetMs`. A frame that throws or
+  will not rasterize is its ERROR CARD in the cell — `LayerRenderers.
+  paintErrorCard`, extracted from `errorCard` so the preview's card and the
+  sheet's are one painter — and a sentence (`graphicSentence`, now
+  internal); a warning is a sentence. `frames` (1…16, whole, ≥ 0) or
+  `frame`, never both, `[0]` for neither; each refused by name.
+  `format: "svg"` answers `{name, frame, ok, svg, diagnostics, ctx}` for one
+  frame. The PNG goes through `FrameWriter.write` with its nil properties
+  dictionary and the reply ends "Written to <path>." like `render_frame`'s.
+- **The sheet** (`GraphicContactSheet.swift`, 189 lines, NEW, pure): the
+  layout rule of the spec's objection 2 — the scale is over the CELLS alone
+  (`min(1, (max_width − (c−1)·8) / (c·w), (8192 − r·24 − (r−1)·8) /
+  (r·h))`), the 8 px gaps and 24 px label strips drawn full size — so the
+  context is exactly the sheet and `width ≤ max_width`, `height ≤ 8192` by
+  construction; at scale 1 a cell is the raster's own bytes at an integer
+  origin. Backgrounds `transparent` (default), `checker` (16 px, 128/192),
+  or `#rgb`/`#rrggbb`/`#rrggbbaa`. `GraphicRaster.cgImage()`.
+- **`import_graphic_font` and `import_graphic_asset`**
+  (`AgentServer+GraphicImports.swift`, 123 lines, NEW; main): the copy is
+  `GraphicStore+Import.swift`'s `importFile` (37 lines, NEW; through
+  `ensureFolder()`, G-14, then `<name>.partial` moved into place, write's
+  shape — `GraphicStore.swift` untouched), then `store.rescan()` from the
+  handler. A font is checked on a throwaway `GraphicLibrary` first (a
+  refusal is "<path>: font bytes loaded no face", the engine's words) and
+  that throwaway's `families()` is the reply's `families`;
+  `library_families` is the registry's set. An asset's name (default the
+  file's) must carry one of the six extensions, and an empty file is
+  refused before the copy (it would cross the FFI as NULL). Both answer
+  `replaced` and the note; neither is undoable.
+- **The library catch-up** — found by this phase, not in the spec. The
+  store posts NO `.graphicsDidChange` for a pass whose module list is empty
+  (`drain()` skips an outcome with no names), so a face imported into a
+  `graphics/` holding no module never reached the registry: the reply's
+  `library_families` lacked it, and a module written AFTER it recompiled
+  against the set's OLD library and drew nothing, with the missing-family
+  warning (measured on a probe instance before the fix). Both imports now
+  end with `catchUpLibrary`: when the registry's `libraryVersion` differs
+  from the scan's, `GraphicRegistry.install` rebuilds the set — main, from
+  the handler, never from an observer. Row I4 proves it. The watcher path
+  (a person dropping a font into an empty `graphics/`) still has the gap;
+  owed below.
+- **The two nits G4a owed.** `write_graphic` whose file the scan does not
+  list answers "graphics/<name>.js was written but the folder's scan does
+  not list it — graphics/ may not be readable by Reelcut, or was replaced
+  mid-write; get_graphic {} shows what the scan sees" (row G9); a module
+  with no registry entry answers `ok: false` with ONE error diagnostic, "The
+  module "<name>" is in graphics/ but the app has not compiled it yet — call
+  again" (no row reaches it: the rescan is synchronous through to the
+  registry in every path a script can drive).
+- **`get_graphic {}`** gains `families` (the export, through
+  `libraryFamilies`) and `assets`.
+- **Counts**: 85 tools (59 op + 26 app-state); `AgentServer.swift` (frozen)
+  took three handler lines, the `offMainTools` entry and "eight"; the
+  catalog prose, the gate, spec §7.9, `op_argument_proof.py`'s `TOOLS = 85`
+  and the three `APP_STATE_TOOLS` sets with their "twenty-six" labels.
+  `docs/graphics-api.md`'s "Working over MCP" reworded in place (**400**
+  lines).
+
+**Measured.** `make test` core **869** + graphic **99**, 0 failed; `make
+lint` and both `cargo fmt --check` clean; `make typecheck` 0 errors and the
+7 baseline warnings (distinct `file:line:col`); `make app` built.
+`graphics_proof.py --port 4883` **39/39**; `--mutant frame-plus-one` caught
+(P1 held, P2 failed, exit 0). On a fresh 4823 instance:
+`op_catalog_proof.py` 23/23, `op_argument_proof.py` **144/144** (EXACTLY 85
+tools, 26 of them app-state), `phase9_proof.py` 218/218,
+`recording_proof.py` 186/187 — the one FAIL is the Bluetooth head-loss row
+remaining §4 names, two tone rows skipped by name —
+`recording_probe.py --only catalog` 28/28; the parity grep empty on every
+launch. **A 16-frame 4K sheet**: `render_graphic` of `title-card` at
+3840×2160, frames 0, 8, … 112, 119, `max_width` 8192, took **1.03 s** wall
+clock on a probe instance (well under `CALL_BOUND`'s 300 s), a sheet of
+**8192×4712** at scale 0.531771 on 4×4 — the float did not floor low.
+
+**The rows** (`graphics_proof.py`, now 39): C1 C2 C3 on WG after G7, then
+I1 I2 G9 I3 I4, then L2 on a new LP; C4 in `run_e` after E1.
+`tools/proof/README.md`'s G4b section has each row. The sheets are decoded
+through ffmpeg (`decode_rgba`), because `decode_png`'s Python loops are too
+slow for 3848 px rows. C2, the placement row: `render_frame` at frame 30
+and `render_graphic {frame: 30}` over black agree in every RGB pixel, **0
+of 2 073 600** differ.
+
+**Made to fail by hand (2026-09-25)**, each reverted and rebuilt:
+- (a) `module.svg(frame: frame + 1, …)` in `renderGraphic`: **36/39** — C2
+  fell (1440 of 2 073 600 pixels differ), and so did C3 (its SVG is frame
+  31's, `x="124"`) and C4 (frame 9's cell became frame 10's card and frame
+  10's cell frame 11's rect). The spec expected C2 alone; the other two go
+  through the same call and are right to fall.
+- (b) `store.rescan()` deleted from `importGraphicFont`: **37/39** — I1
+  (`library_families` without Oswald, the render still warning) and I4 (the
+  same reply on the module-less package).
+- (c) the extension check deleted from `importGraphicAsset`: **38/39**, I2
+  alone (`notes.txt` was copied, not refused).
+- (d) `catchUpLibrary` deleted from `importGraphicFont`: **38/39**, I4 alone
+  (`library_families` without Oswald on the module-less package).
+
+**Deviations from the spec.**
+- The loop row is **L2**, not L1: `graphics_proof.py` already has an L1 (the
+  stale-colour row), and `rows` is keyed by the two characters.
+- L2's `set_graphic` title is **"Looped"**, not "Loop": `bar()` draws only
+  the title's LENGTH and "Loop" is as long as the default "Jane", so the
+  frame did not change (the first run's one failure, 37/38).
+- **I4 and `catchUpLibrary`** are additions (above); the score is 39, not
+  the spec's 38.
+- By-hand failure (a) dropped three rows, not one (above).
+- `render_graphic`'s arguments are read BEFORE its `onMain`, so a bad
+  argument is refused before a document is looked up; the spec's order put
+  them after. Nothing reads a document off main either way.
+- `docs/graphics-api.md`'s paragraph kept the `API.d.ts` mention by
+  rewrapping rather than adding a line (400, the cap).
+
+**Owed.**
+- The watcher path of the library gap: a font or picture put into a
+  `graphics/` holding no module by hand (or by any writer but the two
+  imports) never reaches the registry, and a module written after it draws
+  without it until a font or asset changes again or the project reopens.
+  The fix is `GraphicStore`'s (post the library change with no names, or
+  have `update` rebuild when the scan's `libraryVersion` moved) and was
+  out of this phase's files.
+- Under `format: "svg"`, `render_graphic`'s `background` and `max_width`
+  are checked and then unused, and `path` is not read at all (all three are
+  declared, so the gate passes them).
+- `frames` larger than the graphic's length draw (progress clamps), as a
+  clip held past its length does; nothing refuses them.
+- From G4a, still: `graphic_reference` ignores its injected `project`;
+  `AgentServer.swift`'s numerals and the rest of G3b's list;
+  `holdsContent`'s `.partial` nit.
+- (Review nit.) A contact sheet keeps every cell's full-size raster until
+  it paints, and copies each once more on the way: 16 frames at 8192×8192
+  (what the schema allows) would peak near 4 GB; the measured 16-frame 4K
+  case is about 530 MB. Painting each cell as it is rendered would cap it
+  at one raster.
+- G5 — below.
+
+**Review.** One should-fix, in the RECORD: this section and remaining §3
+gave `AgentServer+GraphicImports.swift` as 108 lines, measured before
+`catchUpLibrary`; it is 123, corrected by the orchestrator. Its nits (the
+`svg` form's unused arguments, the sheet's peak memory) are the two owed
+lines above. The review read `render_graphic`'s threading (every document
+and registry touch inside its one `onMain`), `catchUpLibrary` (no race; it
+cannot loop) and the tenth export against `core/CLAUDE.md`'s FFI rules,
+and found nothing. The `CLAUDE.md` sentences were written by the
+orchestrator after the review.
+
+#### G4 closed — the merge point (§9a)
+
+**What an agent can do now, end to end, over MCP alone:** read the API
+(`graphic_reference`); write a module and read its compile back —
+`ok: false` with the engine's line is an answer, not an error
+(`write_graphic`); look at up to sixteen of its frames with no clip, as a
+contact sheet with each frame number printed and a failing frame shown as
+its error card, or at one frame's SVG (`render_graphic`); bring in a font —
+told the exact family names the engine reads from it — or a picture
+(`import_graphic_font`, `import_graphic_asset`); place it
+(`add_graphic_clip`), look at it in the timeline (`render_frame`, which
+agrees with `render_graphic` pixel for pixel), change its props
+(`set_graphic`), save, and export — which refuses a module that does not
+compile and stops at a frame that fails. `graphics_proof.py`'s L2 is that
+loop in one row.
+
+**What a person cannot do yet — G5:** the Graphic sub-tab (§5j: the module
+picker, the props form from the schema, the source and diagnostics, the
+preview strip `render_graphic` mirrors), File ▸ Add Font to Graphics… and
+File ▸ Add Image to Graphics… (which the two imports mirror), Help ▸
+Graphics Reference (which `graphic_reference` mirrors), and the six
+templates (§5k). Until then a person sees a graphic clip drawn and can
+move, trim and split it, and edits its module in their own editor.
+
+**Merging `svg-motion` into `main` is the user's decision now** (§9a:
+"stop after G4 and report"). Owed across G4: the list above and G4a's, the
+person's playback check (remaining §4), and kpgalligan/reelcut#38 (the
+export-cancel crash's cherry-pick to `main`).

@@ -103,7 +103,7 @@ final class AgentServer {
     /// main thread and each says so in its own handler.
     static let offMainTools: Set<String> = [
         "import_media", "render_frame", "export", "save_project", "new_project", "transcribe",
-        "record_screen",
+        "record_screen", "render_graphic",
     ]
 
     // MARK: - Lifecycle
@@ -277,6 +277,9 @@ final class AgentServer {
         "write_graphic": { $0.writeGraphic },
         "get_graphic": { $0.getGraphic },
         "graphic_reference": { $0.graphicReference },
+        "render_graphic": { $0.renderGraphic },
+        "import_graphic_font": { $0.importGraphicFont },
+        "import_graphic_asset": { $0.importGraphicAsset },
         "set_clip": { $0.setClip },
         "set_enabled": { $0.setEnabled },
         "set_transition": { $0.setTransition },
@@ -764,7 +767,7 @@ final class AgentBox<Value> {
 /// C callback for `RcAgentToolHandler`: hops to the main thread, executes, and
 /// hands the result back as a core-owned string.
 ///
-/// The seven `offMainTools` deliberately do NOT hop — they wait on work the
+/// The eight `offMainTools` deliberately do NOT hop — they wait on work the
 /// main thread has to perform, so taking it first would deadlock — and reach
 /// the main thread through `AgentServer.onMain` instead.
 private func agentToolTrampoline(
