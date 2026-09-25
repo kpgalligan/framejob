@@ -3409,7 +3409,7 @@ export-cancel crash's cherry-pick to `main`).
 
 ### 10.8. After G4 — a defect the person found, and where G5 stands
 
-#### The defect: a project of only graphics does not play (DIAGNOSED 2026-09-25; OWED, deferred by the user)
+#### The defect: a project of only graphics does not play (DIAGNOSED 2026-09-25; FIXED 2026-09-25)
 
 **What the user saw.** The user built Reelcut from `svg-motion` and opened
 the three playback-check projects (`tools/proof/work/playback-check/`, made
@@ -3453,11 +3453,70 @@ refuse — through a probe driving `Playback`, or an MCP row if one can read
 the live player's state — made to fail on purpose, then the person's
 re-check of the three sample projects without a video underneath.
 
-**Still owed from the same look:** `ProjectSnapshot.sourceSize(of:)`
-answers nil for `.graphic` (`ProjectSnapshot.swift:~1791`, under a stale
-comment saying G3 would read `graphic.width`/`height` once `ClipSnapshot`
-decoded them — G3a did). It affects canvas handles and Fit/Fill, not the
-picture.
+**The fix, as taken (2026-09-25).** The probe was written first and run
+over the unfixed tree. It confirmed the cause read from the code: for a
+graphic, text, shape and image timeline alike the player held NO item after
+open, so F·1 failed for the predicted reason. The guard in
+`Playback.startRebuild` is now `guard request.plan.duration > 0` (net 0
+lines; `Playback.swift` stays at 600). The item is dropped only for an EMPTY
+timeline, and every other plan goes to `CompositionBuilder.build`, whose
+`addPlaceholderIfNeeded` gives it the one-frame `Blank.mp4` track to tick
+against. `CompositionBuilder.swift`'s doc for it now names graphics and the
+preview, and says what a missing resource does now (net 0 lines, 577). No
+core, FFI, op, tool or format change.
+
+Neighbours were checked by reading, and none needed a change. The
+transport validator (`EditorViewController.swift:1057-1059`) already tests
+`editedProject.duration > 0`. `applyLoopRange` (`:418-430`) uses the
+duration. `timeAdvanced`'s loop wrap, `play()`, `setRate`, `seek` and
+`refreshPausedFrame` (`Playback.swift`) all gate on `player.currentItem`,
+which the fix makes non-nil. `meterReading` answers `.silent` for a build
+with no meters. `PreviewCanvasView.videoRectInView` falls back to
+`canvasFrame` with no item. As a consequence, the paused-frame refresh that
+`EditorViewController+Graphics.swift` runs on a module change now works for
+these timelines too. The core stays as it was: `segment_of` gives these
+clips no segment by design (spec §7.2), and `Project::duration` counts
+every clip.
+
+**The proof**, `tools/proof/media_less_playback_probe.py` with its
+instrument `media_less_playback_probe.swift`, drives the editor's own
+`Playback` in a real window. Its fixtures are four one-clip timelines
+(`graphic`, `text`, `shape`, `image`) and the CONTROL `empty`. It prints
+**32/32** at the fix, console unlocked. Over cadc45d's `app/Sources`
+(`--sources tools/proof/work/media-less-playback/baseline/app/Sources`) it
+prints **8/32**. The rows that fail there are the ones predicted before the
+fix: F·1, F·2, F·4, F·5 and F·6 for all four media-less fixtures, plus G·7,
+G·8, G·9 and E·4. The F·3 validator rows and E·1, E·2, E·3 and E·5 pass
+on both trees. One instrument deviation from the spec: G·7's "two samples
+1 s apart while playing" read their frames from an
+`AVPlayerItemVideoOutput` added to the item for the run, not from
+`displayedPixelBuffer()`. That call answers nil for any PLAYING layer, and
+`preview_refresh_probe.py`'s media test card measured the same. So the
+first run at the fix scored 31/32 on an instrument artifact, not a defect.
+Values at the fix: the bar's mean is 98 at 0.5 s and 226 at 2.5 s, the
+playing frames 81 and 144, and `setRate(2)` advanced 2.40 s in 1.2 s.
+Regressions after the fix: `preview_refresh_probe.py` 58/58,
+`preview_validity_probe.py` 24/24, `mixed_audio_probe.py` 37/37 and
+`phase7_chrome.py` 78/78. `make test`, `make lint` and `make app` are clean,
+`make typecheck` shows 0 errors and the 7 baseline warnings, and the
+parity grep printed nothing.
+
+**Owed:** the person's watched re-check. That means the three
+playback-check projects with NO video beneath them: the preview shows the
+graphics, Play runs, and scrubbing and an in/out loop look right
+(remaining §4). The probe reads states and means and cannot judge
+smoothness.
+
+**The `sourceSize(of:)` gap found in the same look is closed.** G5a
+(§10.9) made `ProjectSnapshot.sourceSize(of:)` answer a graphic's
+`width × height`.
+
+**From the fix's review (a nit, not fixed):**
+`tools/proof/media_less_playback_probe.py:210-211`. If `--sources` names a
+path that does not exist, `os.path.samefile` / `os.listdir` raise and the
+script ends in a traceback instead of scoring every row a failure. Fix:
+check that the path is a directory in `build_probe` and return a failure
+reason if it is not.
 
 #### G5 — paused on 2026-09-25, resumed the same day
 
@@ -3736,9 +3795,9 @@ event (`applyEdit`); the two panels' completions are off-event
   built in `AppDelegate+GraphicMenu.swift`, so its "ten menus" stays true.
 
 **Owed.**
-- **Insert ▸ Graphic into an empty document lands a clip that does not
-  PLAY** — §10.8's graphics-only playback defect, deferred by the user; no
-  proof here needs it to play.
+- ~~Insert ▸ Graphic into an empty document lands a clip that does not
+  PLAY~~ — §10.8's graphics-only playback defect, FIXED 2026-09-25 (§10.8,
+  "The fix, as taken"); only the person's watched re-check is owed.
 - G5a's nits, carried: the Title field's height, `ClipPane.swift`'s "four
   factories" comment, the number row's decimals with no `step`, the
   signature's re-parse per refresh, the asset popup vs signature builders,
@@ -3779,7 +3838,7 @@ Add Font/Image to Graphics…) and read the API (Help ▸ Graphics Reference).
 Every one of those is the same code as its MCP tool, and each tool's
 comment names its UI path. The watcher gap G4b owed is closed.
 
-**Owed across G5.** The graphics-only playback defect (§10.8, deferred by
-the user); the G5a and G4b lists above; the person's playback check
+**Owed across G5.** The graphics-only playback defect is FIXED (§10.8,
+2026-09-25; the person's re-check owed); the G5a and G4b lists above; the person's playback check
 (remaining §4). **G6 is deferred**: no stutter at 4K on the user's M2 Max (§9's G6). **Merging
 `svg-motion` into `main` is the user's decision.**

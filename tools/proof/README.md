@@ -2560,6 +2560,54 @@ the picture has to change); the refresh-while-seeking dropped **57/58** (the
 held-thread row alone); the end branch removed **54/58** (the four end rows,
 the layer black on the end tick).
 
+## A timeline with no media, played (`media_less_playback_probe.py`)
+
+A timeline of ONLY graphics, text, shapes or images — Insert ▸ Graphic into
+an empty document is the common way to make one — showed nothing in the
+editor and Play beeped (road map 10 §10.8). The core gives those layers no
+composition segment (spec §7.2), so the plan has no track, and
+`Playback.startRebuild` dropped the player item for any plan with no track:
+a guard meant for the EMPTY timeline. `CompositionBuilder`'s placeholder,
+which exports and `render_frame` already used, never got the chance. The
+guard now drops the item only when the plan's duration is 0.
+
+**No MCP script can see this one.** `render_frame` composes offline and
+drew these timelines all along; the defect is in the editor's own player.
+The instrument is `media_less_playback_probe.swift`, compiled as
+`main.swift` over the whole of `app/Sources` (`--sources PATH` builds it
+over another tree, `mixed_audio_probe.py`'s tag scheme), with the app's
+`Compositor.metal`, `Fonts` and `Blank.mp4` beside it. Every subprocess
+goes through `graphics_spike/bounded.py`, and a build failure scores every
+row as a FAILURE. It writes five one-clip packages under
+`work/media-less-playback/` each run (no ffmpeg; the image is a white PNG
+written with `zlib`): `graphic` (a module whose white bar grows from a
+quarter of the width to all of it), `text`, `shape` and `image`, each
+white on a black 432 × 280 canvas, and `empty`, the CONTROL. It opens each
+in a real editor window and reads the editor's own player: the item and its
+video composition's validity, the Play/Pause validator, play, `setRate(2)`,
+the in/out loop, moves of the playhead, a paused opacity edit (the
+refresh branch on the placeholder item), and `displayedPixelBuffer()` as a
+40 × 40-grid mean. For `empty` it checks that nothing plays, that Insert ▸
+Shape then brings an item that plays, and that undo takes it away again.
+
+**What the instrument had to learn.** `displayedPixelBuffer()` answers nil
+for ANY playing layer. A media clip's did too (measured on
+`preview_refresh_probe.py`'s test card, 2026-09-25). So the row that needs
+frames drawn WHILE PLAYING reads them from an `AVPlayerItemVideoOutput`
+added to the item for the run: the same item, composition and compositor.
+The rows that read the picture (F·2, F·5, F·6, G·7) are skipped BY NAME on
+a locked console (`IOConsoleLocked`). Every other row is always scored,
+and a skip means the proof is not complete.
+
+**32/32** at the fix, console unlocked. Made to fail over cadc45d's
+`app/Sources` (`git archive cadc45d app/Sources | tar -x -C
+tools/proof/work/media-less-playback/baseline`, then `--sources
+tools/proof/work/media-less-playback/baseline/app/Sources`): **8/32**.
+F·1, F·2, F·4, F·5 and F·6 fail for all four media-less fixtures (no
+item), and G·7, G·8, G·9 and E·4 fail. The four F·3 validator rows and
+E·1, E·2, E·3 and E·5 pass on both trees, so a failing row is the
+defect and not the host.
+
 ## The transition sheet (`transition_sheet_probe.py`)
 
 Clip ▸ Transition ▸ at a hard cut between two WHOLE files used to beep and

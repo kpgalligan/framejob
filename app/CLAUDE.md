@@ -513,6 +513,11 @@ the key map behind it.
   divide `g`, Full for a coprime canvas); `AVPlayerItem.videoComposition` is
   a COPY property, so the setter re-assigns. `makePreviewLayer` is the one
   door to a second `AVPlayerLayer`.
+  The item is dropped only for an EMPTY timeline (`plan.duration <= 0`,
+  where the transport beeps). Never gate it on the plan's track lists: a
+  timeline of only graphics, text, shapes or images has no plan track and
+  plays over the builder's placeholder (road map 10 §10.8,
+  `media_less_playback_probe.py`).
 - `CompositionBuilder.swift` (+`InstructionRanges`, +`AudioTracks`) — the app's ONE
   constructor of `AVMutableVideoComposition`, shared by the preview, both
   export passes and the offline frame. **Do not give it a preview-shaped
@@ -527,6 +532,10 @@ the key map behind it.
   format (spec §11 R2-1) — a tapped track that changes format part-way
   STALLS the player (kpgalligan/reelcut#34), so never feed one composition
   track two formats.
+  `addPlaceholderIfNeeded` gives a plan with no video track but a duration
+  a one-frame `Blank.mp4` track scaled across it. The preview's item, both
+  export passes and the offline frame all rely on it for a media-less
+  timeline.
 - `RecipeSource.swift` — the process-wide registry the compositor reads a
   recipe from (§7.6): a slot per document (`ProjectDocument.recipeKey`) and
   per export (`Exporter` mints its own), the project published under `set`
