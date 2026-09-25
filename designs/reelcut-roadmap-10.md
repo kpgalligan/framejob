@@ -1704,3 +1704,81 @@ One file-state caveat: the fix pass's verification re-run overwrote
 `tools/proof/work/graphics_spike/q3.csv`, `frames/`, `q7/` and `q9/`, so
 those artefacts no longer match the record. `answers.json` is the recorded
 run, with q6 replaced by the post-fix re-run (the spike README says so).
+
+### 10.4. G1 — the engine
+
+G1 runs as four `/litecode` pipelines, each committed on its own (the
+user, 2026-09-24: "Break down large phases as needed. Commit after each
+completed phase."): **G1a** the `ReelCore.swift` toll; **G1b** the
+`graphic/` crate's drawing half (library, fonts, raster, `measureText`, the
+font-family warning); **G1c** its JavaScript half (runtime, sandbox,
+module, standard library, props, fixtures); **G1d** the link into the core
+and the app (`ffi_graphic.rs`, the header, the `ReelCore.swift` wrappers,
+the probe, `docs/graphics-api.md`, the spec's amendments). The split is by
+what each can prove alone.
+
+#### G1a — the ReelCore.swift toll (2026-09-24)
+
+A pure move, landed and gated alone before G1d's wrappers (§5e, §9 step 9),
+against baseline `c5f3265`.
+
+**What moved, and why this and not §5e's candidate.** `final class
+RecipeSource` — the compositor's process-wide recipe registry, from its
+`// MARK: - The compositor's recipe registry` line through the class's
+closing brace (baseline lines 1274–1406, **133** lines measured) — is
+`app/Sources/RecipeSource.swift`'s, verbatim, after `import Foundation` and
+a blank line. It was picked over §5e's candidate, `MediaDescriptor` +
+`mediaURL(for:)` + `bookmarkString(for:)` (baseline lines 729–789 and
+1408–1440, ~94 by line arithmetic), because it is larger than the ~110 lines
+G1d will add where the media candidate is not, and because it is the one
+concern in the file that is not the core's edge at all: it exists because
+AVFoundation instantiates the compositing class itself (spec §7.6), it names
+no `rc_*` symbol and none of the file's three `private` helpers
+(`takeString`, `takeErrorMessage`, `jsonArray`), and every caller reaches it
+through `RecipeSource.shared`, so no caller changed. `RecipeOptions` stayed
+in `ReelCore.swift` beside `recipeJSON`, whose header spelling its `json`
+is.
+
+**Measured** (`wc -l`): `ReelCore.swift` **1440 → 1309** — the 133-line
+block and the blank line before it out (134), and 3 lines in: the header's
+new sentence naming `RecipeSource.swift` as the payment owed at 1440.
+`RecipeSource.swift` **135**, new (133 + the import and its blank). The
+move frees 131 lines net against G1d's ~110.
+
+**Verbatim check.** `git show c5f3265:app/Sources/ReelCore.swift | sed -n
+'1274,1406p' | diff - <(sed -n '3,$p' app/Sources/RecipeSource.swift)`
+printed nothing, then `VERBATIM`.
+
+**Verified**, each printed by a run:
+
+| Command | Result |
+|---|---|
+| `wc -l` | `ReelCore.swift` 1309, `RecipeSource.swift` 135 |
+| the verbatim diff | empty, `VERBATIM` |
+| `make typecheck` | exit 0; 0 `error:` lines; the 7 baseline deprecation warnings and no eighth (`grep -c 'warning:'` prints 14, because each diagnostic prints its `warning:` twice — on its location line and in its source excerpt; the 7 location lines are exactly the root `CLAUDE.md`'s list) |
+| `make test` | exit 0; 54 `test result:` lines, 827 passed, 0 failed (a control: no `core/` file touched) |
+| `make lint` | exit 0; no warning or error (a control) |
+| `make app` | exit 0, `** BUILD SUCCEEDED **`, `Reelcut.app` present |
+| `tools/proof/harness/build.sh --force` | exit 0, `built …/tools/proof/work/harness/harness in 86 s` — every file in `app/Sources` compiles together |
+
+Nothing was launched; no MCP session was needed.
+
+**Pointers and records edited.** `ReelCore.swift`'s header (the type list
+loses `RecipeSource`; the size-payment paragraph gains the sentence);
+`Compositor.swift:32`, the one comment that named the FILE, now
+`RecipeSource.swift`; spec §7.4's Swift file map (`RecipeSource` out of
+`ReelCore.swift`'s row, a `RecipeSource.swift` row after `Compositor.swift`'s);
+the README's file map (both rows). Also this record, remaining §3 and
+`designs/reelcut-app-notes.md`. `app/CLAUDE.md`'s two sentences (the
+`ReelCore.swift` bullet's list, a new `RecipeSource.swift` bullet under
+Playback and rendering) were written by the orchestrator after the
+review, not by the pipeline. The review passed first time with no blocker or
+should-fix (nit: `ReelCore.swift:6`'s "and … and" is the spec's exact text,
+left as written).
+
+**Owed.** If G1d's wrappers measure more than the 131 lines this move
+freed, G1d pays a second pure move first: the next seam is §5e's own
+candidate, `MediaDescriptor` + `mediaURL(for:)` + `bookmarkString(for:)`
+(baseline lines 729–789 and 1408–1440, ~94 by line arithmetic), then the
+`dictionary` extensions (baseline 791–896). §5e's candidate sentence and
+§9's table row were left as written; this record says what was picked.

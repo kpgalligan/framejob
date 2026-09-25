@@ -15,8 +15,8 @@ detail there.
 - `ReelCore.swift` — the **only** home for `rc_*` calls: `ReelProject`
   (handle + lazily decoded `ProjectSnapshot`; `json`, `snapshot` and
   `planJSON` are memoised PER HANDLE, so keep handles rather than minting
-  them), timecode, snapping, export presets/sizes/settings, `RecipeSource`,
-  the `dictionary` extensions on the property types and the typed patches —
+  them), timecode, snapping, export presets/sizes/settings, the
+  `dictionary` extensions on the property types and the typed patches —
   except `TextPatch` (with `case`, `words` and `word_style`), which is
   `TextPatch.swift`'s, moved out so it could grow. `word_style` has ONE
   app-side writer, `CaptionLayout.place` (W-10).
@@ -420,6 +420,11 @@ the key map behind it.
   format (spec §11 R2-1) — a tapped track that changes format part-way
   STALLS the player (kpgalligan/reelcut#34), so never feed one composition
   track two formats.
+- `RecipeSource.swift` — the process-wide registry the compositor reads a
+  recipe from (§7.6): a slot per document (`ProjectDocument.recipeKey`) and
+  per export (`Exporter` mints its own), the project published under `set`
+  after every edit and the `RecipeOptions` stored BESIDE it per key, both
+  read under one lock hold in `recipe(for:at:)`.
 - `Compositor.swift` · `CompositorEffects.swift` · `Resources/Shaders/Compositor.metal`
   — the per-layer pass. The uniform block's field ORDER is a contract with the
   shader checked only by reading both, so change them in one edit; it is 104

@@ -369,6 +369,14 @@ cannot move purely; `TextPane.swift` **513 → 530**. New and inside the cap:
 `WordProps.swift` **215**, `LayerRenderersWords.swift` **247**, and
 `TextProps.swift` / `TextPatch.swift` at **274** / **133** with the feature.
 
+**What road map 10's G1a did to it** (2026-09-24, `wc -l` against
+`c5f3265`; road map 10 §10.4). One toll, a pure move gated alone before
+G1d's graphics wrappers take anything on: `ReelCore.swift` **1440 → 1309**
+(`RecipeSource`, the compositor's recipe registry, to `RecipeSource.swift`,
+**135**, new — a 133-line block and the blank before it out, 3 header lines
+in). It frees 131 lines against G1d's ~110; if the wrappers measure more,
+the next seam is road map 10 §5e's own candidate, the media helpers (~94).
+
 Regenerate the list with
 `wc -l app/Sources/*.swift core/src/*.rs | awk '$1>600 && $2!="total"' | sort -rn`
 rather than trusting the numbers here; the standing exemptions are
@@ -380,7 +388,7 @@ row per op.
 | `app/Sources/ProjectSnapshot.swift` | 2293 (2516 before road map 8's W3) |
 | `app/Sources/InspectorPane.swift` | 1665 |
 | `app/Sources/TimelineView.swift` | 1652 |
-| `app/Sources/ReelCore.swift` | 1440 (1542 before road map 8's W3) |
+| `app/Sources/ReelCore.swift` | 1309 (1440 before road map 10's G1a; 1542 before road map 8's W3) |
 | `app/Sources/VideoPane.swift` | 1411 |
 | `app/Sources/Compositor.swift` | 1391 |
 | `app/Sources/ProjectDocument.swift` | 1352 |

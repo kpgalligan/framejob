@@ -2808,3 +2808,17 @@ route, the class doc restated. `EditorViewController+Canvas.swift` forwards
 `onGroupedEdit` to `document.performGroupedEdit`. Spec §11 K-2 is the
 decision; the record and the measurement are road map 2 §2, Phase 4's #37
 block; `tools/proof/text_apply_proof.py` is the proof.
+
+## The ReelCore.swift toll, 2026-09-24 — road map 10's G1a
+
+**`ReelCore.swift` 1440 → 1309.** `final class RecipeSource` — its MARK
+line, its doc comment and the class, baseline lines 1274–1406 — is
+`RecipeSource.swift`'s (**135**), verbatim after `import Foundation` and a
+blank line, `ReelEdit.swift`, `ReelOpSchema.swift` and `TextPatch.swift` the
+precedent: it names no `rc_*` symbol and none of the file's `private`
+helpers, and every caller reaches it through `RecipeSource.shared`, so no
+caller changed. `RecipeOptions` stayed beside `recipeJSON`. Three pointer
+edits: `ReelCore.swift`'s header drops `RecipeSource` from its type list
+and gains a sentence naming `RecipeSource.swift` as the payment owed at
+1440 (the 3 lines in), and `Compositor.swift:32` names `RecipeSource.swift`
+as the slot's file. Road map 10 §10.4 is the record and has the scores.

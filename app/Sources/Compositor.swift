@@ -29,7 +29,7 @@ final class RecipeInstruction: NSObject, AVVideoCompositionInstructionProtocol {
     /// composition rebuild (§7.6).
     let passthroughTrackID: CMPersistentTrackID = kCMPersistentTrackID_Invalid
 
-    /// The document's `RecipeSource` slot (`ReelCore.swift`) — or an
+    /// The document's `RecipeSource` slot (`RecipeSource.swift`) — or an
     /// export's own, which is a fresh one. It names the project a frame is
     /// composed from AND, since phase 7, the `RecipeOptions` that project is
     /// asked with, so an option never has to be threaded through the
