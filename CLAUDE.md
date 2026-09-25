@@ -47,8 +47,8 @@ changes a file's role or adds a rule. Never append a status paragraph here.
 
 ```sh
 make app        # cargo build --release + xcodegen + xcodebuild → build/Build/Products/Release/Reelcut.app
-make test       # cd core && cargo test --release  (black-box tests through the FFI)
-make lint       # cargo clippy --all-targets -- -D warnings
+make test       # cd core && cargo test --release, then cd graphic && cargo test --release  (black-box tests)
+make lint       # cargo clippy --all-targets -- -D warnings, in core/ then graphic/
 make typecheck  # swiftc -typecheck of app/Sources/*.swift — the ONLY authoritative Swift check
 make project    # xcodegen generate (Reelcut.xcodeproj is generated; project.yml is the source of truth)
 make run        # make app, then launch
@@ -56,7 +56,7 @@ make run        # make app, then launch
 
 - Single Rust test: `cd core && cargo test --release --test edge slip`
   (test-file name, then a name filter). Finish Rust work with `cargo fmt` in
-  `core/` and a clean `make lint`.
+  `core/` (and `graphic/`) and a clean `make lint`.
 - There are no Swift unit tests. App-side verification is `make typecheck`
   plus driving the built app over MCP and the probes in `tools/proof/`.
 - `make typecheck` is fast; run it before `make app` (~90 s). Its baseline is
@@ -82,6 +82,9 @@ core/                Rust staticlib — the model, the ops, the plan, the recipe
   include/…_core.h     export settings, the generic MCP server. THE FFI CONTRACT
   src/                 core/CLAUDE.md has the module map
   tests/               black-box, through the FFI
+graphic/             Rust crate — the graphics engine (road map 10): the font and
+  src/                 asset Library, rasterize (usvg → resvg → BGRA), measure_text;
+  tests/               graphic/CLAUDE.md has its rules
 app/
   Sources/             AppKit app, programmatic UI (app/CLAUDE.md has the map)
   Resources/Shaders/   Compositor.metal — the per-layer compositing pass

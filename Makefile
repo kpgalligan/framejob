@@ -19,12 +19,15 @@ rust:
 
 test:
 	cd core && cargo test --release
+	cd graphic && cargo test --release
 
 lint:
 	cd core && cargo clippy --all-targets -- -D warnings
+	cd graphic && cargo clippy --all-targets -- -D warnings
 
 fmt:
 	cd core && cargo fmt
+	cd graphic && cargo fmt
 
 project:
 	xcodegen generate
@@ -47,3 +50,4 @@ run: app
 clean:
 	rm -rf $(BUILD_DIR) $(APP).xcodeproj app/Info.plist
 	cd core && cargo clean
+	cd graphic && cargo clean

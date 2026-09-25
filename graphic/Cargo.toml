@@ -1,0 +1,25 @@
+[package]
+name = "graphic"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+name = "graphic"
+
+[dependencies]
+# resvg's defaults minus `system-fonts` and `memmap-fonts`, which reach the
+# file system (G-6, G-2) — never excluded for size (road map 10 §5a).
+resvg = { version = "0.48.1", default-features = false, features = ["text", "raster-images", "svgz"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+sha2 = "0.10"
+# usvg 0.48.1's own pins: `font-family` and CSS read exactly as usvg reads them.
+svgtypes = "0.16.1"
+simplecss = "0.2"
+
+[dev-dependencies]
+flate2 = "1"
+
+[profile.release]
+# No LTO (designs/reelcut-remaining.md §6).
+incremental = true

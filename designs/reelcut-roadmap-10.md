@@ -1782,3 +1782,116 @@ candidate, `MediaDescriptor` + `mediaURL(for:)` + `bookmarkString(for:)`
 (baseline lines 729–789 and 1408–1440, ~94 by line arithmetic), then the
 `dictionary` extensions (baseline 791–896). §5e's candidate sentence and
 §9's table row were left as written; this record says what was picked.
+
+#### G1b — the drawing half (2026-09-25)
+
+The `graphic/` crate at the repo root, its drawing half only, against
+baseline `b54c1be`: the Library, `rasterize`, `measure_text` and the
+Diagnostic, with no QuickJS (G1c) and no dependency from `core/` (G1d).
+
+**What landed.** `graphic/Cargo.toml` (resvg 0.48.1 with `text`,
+`raster-images`, `svgz` and no default features; `serde_json` with
+`preserve_order`; `sha2`; `svgtypes` 0.16.1 and `simplecss` 0.2, usvg's own
+pins, so a `font-family` value and a CSS sheet are read exactly as usvg
+reads them; dev `flate2`), its `Cargo.lock`, and five `src/` files:
+`lib.rs` (declarations and re-exports, `#![forbid(unsafe_code)]`),
+`diagnostic.rs`, `library.rs` (the font set from bytes, the asset map, the
+content version, the `measure_text` memo, and the crate-private
+`options()` whose resolvers record into a per-call probe), `raster.rs`
+(`rasterize`, `MAX_SIDE` = 8192, the RGBA→BGRA row copy into the caller's
+strided buffer, and every warning text) and `measure.rs`. The Makefile's
+`test`, `lint`, `fmt` and `clean` each run the crate after the core;
+`.gitignore` gains `/graphic/target/`. Four committed 8×8 test images in
+`graphic/tests/assets/` with a README holding the ImageMagick 7.1.2
+command and colour of each (`ls -l`: `red.png` 312 bytes, `steel.jpg` 285,
+`blue-then-yellow.gif` 101, `magenta.webp` 36).
+
+`wc -l`: `diagnostic.rs` 59, `lib.rs` 19, `library.rs` 226, `measure.rs`
+173, `raster.rs` 250 — each under 400.
+
+**What `rasterize` reports that resvg never does**, each as a warning
+(deduplicated, first-occurrence order) while the frame still draws: a
+family list no face answers (`select_font` wraps usvg's default selector
+and records the list when it answers `None`); a `font-family` value usvg
+could not parse — found by a scan of attributes, `style` attributes and
+`<style>` sheets through svgtypes and simplecss, run only when the probe
+recorded usvg's default family — with the quoting advice when an unquoted
+word starts with a digit (`Source Sans 3`); a `<text>` with no family; an
+`<image>` href that is not an asset; a data: URL; an asset that is not an
+image; and a root whose rounded size is not the graphic's.
+
+**Tests** — 40 in six binaries, black-box through `graphic::`, every pixel
+claim read back from `out`:
+
+| File | Tests | What it proved |
+|---|---|---|
+| `pixels.rs` | 6 | a `#ff8000` rect is exactly `[0x00,0x80,0xff,0xff]` inside and `0` outside; half-alpha white is **128** on all four channels; stride 32 at width 5 leaves the padding bytes `0xAB`; the five refusals by leading text, each leaving `out` untouched; four threads draw identical bytes; `Library: Send + Sync` |
+| `edges.rs` | 1 | white Montserrat 800 at 64 px, composited premultiplied: every channel over white is 255 and over black equals the source, across 2 017 partially covered pixels |
+| `images.rs` | 7 | PNG, JPEG, GIF (its first frame, blue) and WebP each draw the README's colour at the centre (JPEG measured exact, `[192,128,64,255]`) and nothing at the corner; an `.svg` asset and its gzip `.svgz` draw byte-identical frames; the unknown-href (with and without assets), data:, not-an-image and size-mismatch warnings, exact text |
+| `families.rs` | 10 | a missing family is named with the set and draws nothing; `Source Sans 3` unquoted draws nothing and gets the digit advice, from an attribute, a `style` attribute and a sheet; quoted, and `Nope, Montserrat`, draw without a warning; a list of misses is named as a list; no family gets the default's sentence; a sheet's missing family is seen; a nested `.svg` asset's missing family is seen, and the test completes (the lock-discipline oracle) |
+| `measure.rs` | 9 | parity over 288 cases (24 strings × Montserrat 800, Anton, IBM Plex Mono, Bebas Neue × 24/64/160 px): `|ink_width − columns|` ≤ 2.0, worst **1.656 px** (IBM Plex Mono 24 px `"résumé naïve"`: 169.344 vs 171 columns); whitespace collapses; variable faces widen with weight; the four errors; whitespace-only is zeros; letter-spacing widens the advance; the memo answers `==`; `to_json`'s key order |
+| `library.rs` | 7 | the six bundled families sorted; one `Source Sans 3` face (`SourceSans3-Roman`, weight 200) and one `Darker Grotesque` (300); the version is 64 lowercase hex, stable, and changes with one asset byte; `version_differs_at_entry_boundaries`; a 16-zero-byte blob is named by index; an empty library draws a rect; the Diagnostic's JSON key order |
+
+Measured through `measure_text` at 64 px, `"Hamburgefonstiv"`, weights
+200/400/700/900: **Source Sans 3** 438.912, 462.336, 491.456, 502.656;
+**Darker Grotesque** 379.456, 389.568, 419.712, 439.936. One `measure_text`
+call measured 197.9 µs cold and 583 ns from the memo.
+
+**Made to fail**, each reverted: removing the byte swap fails
+`pixels::a_rect_draws_in_bgra_and_nothing_else_is_touched`; dropping the
+`select_font` wrapper fails eight of `families.rs`'s ten; `resolve_string`
+answering `None` fails five of `images.rs`'s seven; answering the advance
+as `ink_width` fails `measure::ink_width_matches_the_ink_a_composed_render_draws`;
+hashing without the length prefixes fails only
+`library::version_differs_at_entry_boundaries`; compositing un-premultiplied
+fails `edges::white_text_edges_composite_exactly`. A seventh, recorded and not kept
+as a test: holding the probe lock across `from_data_nested` hung
+`families::a_missing_family_inside_a_nested_svg_asset_is_seen` (the other
+nine passed) until Rule H's 900 s bound killed it (`expired: True`, rc −9).
+
+**Verified**, each through `bounded.run` where it runs tests: `cargo fmt
+--check` and `cargo clippy --all-targets -- -D warnings` in `graphic/` exit
+0; `cargo test --release -- --nocapture` in `graphic/` exit 0, 40 passed, 0
+failed, 2.8 s warm; `make test` exit 0, 62 `test result:` lines, **867**
+passed (the core's 827, unchanged, plus these 40), 0 failed; `make lint`
+exit 0; `make typecheck` exit 0, 0 `error:`, the 7 baseline warning
+locations and no eighth (a control); `rg 'std::(fs|env|net|time)'
+graphic/src` prints nothing.
+
+**Deviations from the design.**
+- A fourth `src/` file beyond §5a's list, `measure.rs`, so each file stays
+  under 400.
+- `letter_spacing` is in the `measure_text` memo key: §5c's key list omits
+  it, and it changes the advance (a test proves it).
+- Two warnings §5 does not list: a data: URL is refused (drawn as nothing,
+  with the way out — put the file in `graphics/assets/` and use `asset(name)`),
+  so every image a graphic draws is an asset the Library's version covers;
+  and a root whose size is not the graphic's is drawn at 1:1 (G-7) and
+  warned.
+- The digit warning says "a family name with a word that starts with a
+  digit must be quoted", because svgtypes refuses `Source Sans 3` on its
+  third word, not its first.
+
+**Review.** Passed first time, no blocker or should-fix. Its three nits,
+kept as they are and owed here:
+- `raster.rs:76`: an SVG that names `font-family="Times New Roman"`
+  explicitly is warned "a <text> has no font-family", because usvg's
+  fallback family and an explicit one look the same to the resolver; and
+  when one `<text>` has no family while another's cannot be parsed, only
+  the second warning appears (the gate at `raster.rs:205`). Both follow the
+  design as written; a sharper sentence is owed if an agent is misled.
+- `tests/edges.rs:30`: the "over black" composite cannot fail (source plus
+  zero is the source); only "over white" tests anything. A per-channel
+  `colour ≤ alpha` assertion would give it teeth.
+- `raster.rs:85`: the asset-name list is rebuilt per unknown href inside
+  the loop (cost only).
+
+`graphic/CLAUDE.md` and the root `CLAUDE.md`'s Commands and File map lines
+were written by the orchestrator from this pipeline's drafts, after the
+review.
+
+**Owed.** G1c (the JavaScript half), G1d (the link into the core and app).
+Out of scope and not built: generic CSS families mapped to bundled faces
+(`sans-serif` is warned like any missing name), the `font` shorthand in the
+scan, `xml:space="preserve"` measurement, an in-place render when
+`stride == width × 4` (a G6 candidate), and asset-name validation.
