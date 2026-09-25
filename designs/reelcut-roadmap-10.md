@@ -171,7 +171,7 @@ numbers behind it.
 | §1 table, worker pool | "only if G0/G3 measure a need" | not owed: worst 1080p p95 7.62 ms per frame | q3 |
 | §4 G-2, licences | `tiny-skia` Apache-2.0 OR MIT; `rustybuzz` | the resolved graph: `tiny-skia` BSD-3-Clause; usvg 0.48 shapes with `harfrust`, not `rustybuzz`; QuickJS is quickjs-ng | q1, q2 |
 | §4 G-6, fonts | "a `font-family` the set does not have is a warning" | the same, and now necessary: a missing family draws NOTHING (no fallback), and a family name starting with a digit (`Source Sans 3`) lays out nothing unless quoted | q4 |
-| §5a, the crate's features | `raster-images` OFF, "usvg's own image support" decodes PNG/JPEG; a cargo feature if `make test` slows > 2× | `raster-images` ON (resvg 0.48.1 skips every `<image>` decode without it — a reading, `src/image.rs:26-32`), priced at +974 352 bytes of staticlib; NO cargo feature (`make test` 1.12× warm); `serde_json` with `preserve_order` | q1, q2 |
+| §5a, the crate's features | `raster-images` OFF, "usvg's own image support" decodes PNG/JPEG; a cargo feature if `make test` slows > 2× | `raster-images` ON (resvg 0.48.1 skips every `<image>` decode without it — a reading, `src/image.rs:26-32`), priced at +974 352 bytes of staticlib, and then (the user, 2026-09-24: size is not a reason) resvg's defaults minus the two file-system features, so `svgz` too; NO cargo feature (`make test` 1.12× warm); `serde_json` with `preserve_order` | q1, q2 |
 | §5b, the runtime | the limits and refusals as designed | CONFIRMED by 18 cases, each a structured answer, the process alive; REWRITTEN in detail: where an interrupt's line points, the loader's refusal sentence, a big string that is built but cannot be read, no `line()`/`column()` in rquickjs 0.14 | q6 |
 | §5c, the module and `measureText` | "ES2020+ as QuickJS evaluates it"; `measureText` returns `{width, ascent, descent, lineHeight}` | quickjs-ng 0.16.2 takes §5c's module verbatim; `measureText` also returns the INK box, which is what agrees with the pixels; whitespace and family quoting stated | q2, q4 |
 | §5d, JavaScript every frame | "q3 measures its cost" | measured: JavaScript p95 ≤ 1.67 ms at 1080p; 85–252 of 299 consecutive frames repeat their SVG, so the SVG-keyed texture cache pays | q3 |
@@ -451,7 +451,7 @@ layer. Keyframed props are listed in §7.
 
 ```
 graphic/
-  Cargo.toml         rquickjs (loader), resvg (default-features = false, features = ["text", "raster-images"]),
+  Cargo.toml         rquickjs (loader), resvg (default-features = false, features = ["text", "raster-images", "svgz"]),
                      serde_json (preserve_order), sha2
   CLAUDE.md          the crate's rules: purity, no filesystem, limits, the one exception to oracle-only tests
   src/lib.rs         Library, Module, render — the whole public surface
@@ -481,15 +481,35 @@ graphic/
 - **`rasterize(library, svg, width, height, out, stride) → diagnostics`**
   draws. The two are separate calls on purpose, because the app keys its
   texture cache on the SVG text (§5d).
-- `resvg`'s `system-fonts` and `memmap-fonts` default features are OFF, and
-  `raster-images` is ON. Images in a graphic are PNG and JPEG from
-  `graphics/assets/`, and resvg 0.48.1 decodes no raster `<image>` without
-  that feature: `src/image.rs:26-32` logs "Images decoding was disabled by
-  a build feature" and draws nothing (a reading; G0 did not render an
-  image). q1c priced it: the staticlib grows from 34 438 200 to 35 412 552
-  bytes (+974 352, 917 → 960 archive members), and the one core build after
-  the flip took 28.3 s. The feature also brings GIF and WebP decoders,
-  which §5c's `asset` type (PNG and JPEG) does not offer.
+- **`resvg` takes its default features minus the two that reach the
+  file system**: `text`, `raster-images` and `svgz` are ON, and
+  `system-fonts` and `memmap-fonts` are OFF. Those two are off for G-6
+  (fonts are the bundled faces and the package's) and for G-2 (the crate
+  reads no files, and the app hands it bytes), and NOT for size. **The
+  user's ruling (2026-09-24): binary size and clean-build time are not
+  reasons to leave a feature out.** So no feature is excluded to save
+  bytes or seconds.
+  - **`raster-images` is required, not optional.** resvg 0.48.1 decodes no
+    raster `<image>` without it: `src/image.rs:26-32` logs "Images decoding
+    was disabled by a build feature" and draws nothing. That is a reading;
+    G0 did not render an image, and G1's tests must. q1c measured it at
+    +974 352 bytes of staticlib. It brings the JPEG, GIF and WebP decoders
+    (PNG decoding is tiny-skia's), so §5c's `asset` type offers all four,
+    with GIF drawing its first frame.
+  - **`svgz`** lets an asset be a gzipped SVG. It is on because it is a
+    default and costs nothing that matters. An `.svg` asset needs no
+    feature at all, because usvg parses a nested SVG image with itself
+    (a reading, confirmed by G1's tests), so `asset` also offers `.svg`
+    and `.svgz`.
+- **`rquickjs` takes `loader`**, which the sandbox needs to refuse imports
+  in its own sentence. Its other features are Rust-side conveniences
+  (`macro`, `classes`, `properties`), debug dumps, or async (`futures`,
+  which G-5 rules out). None of them changes what a script can do.
+- **What quickjs-ng itself lacks** has nothing to do with any feature:
+  there is no `Intl`, so `toLocaleString` does not format by locale, and
+  no `structuredClone` (q2). The standard library gains
+  `formatNumber(n, {decimals, separator})` so a counter does not have to
+  hand-roll thousands separators.
 - `serde_json` takes `preserve_order`. Without it a module's `schema` crosses
   as a `BTreeMap` and comes out ALPHABETICAL (q2 printed §5c's schema as
   `accent, align, boxed, logo, size, subtitle, title`), and the inspector
@@ -673,6 +693,7 @@ the engine emits it.
   - `textLines(lines, {x, y, lineHeight, anchor, font})` returns
     `<text>` + `<tspan>` markup.
 - `escapeXml(s)`.
+- `formatNumber(n, {decimals, separator})`, because quickjs-ng has no `Intl` (§5a).
 - `asset(name)` returns the href the rasterizer resolves. An unknown name is
   a warning naming the folder's files.
 - The path helpers (length, point at length, draw-on by dash) are §7's,
@@ -777,7 +798,7 @@ Talk.reelcut/
     lower-third.js
     title-card.js
     fonts/             # optional; .ttf/.otf (G-6)
-    assets/            # optional; .png/.jpg (§5c `asset`)
+    assets/            # optional; .png/.jpg/.gif/.webp/.svg/.svgz (§5a, §5c `asset`)
 ```
 
 **The store.** `GraphicStore` owns one document's graphics:
@@ -906,7 +927,7 @@ tools and six app-state tools):
 | `get_graphic` | `name?` | With a name: `{path, source, revision, meta, schema, diagnostics, clips}`. Without one: every module's `{name, revision, ok, clips}`, plus `folder`, the absolute path of `graphics/`, which an agent with its own file tools may edit directly. | the Graphic sub-tab's Source section |
 | `render_graphic` | `name`, `frames` (list, ≤ 16) or `frame`, `props?`, `width?`, `height?`, `max_width?`, `background?` (`transparent` \| `checker` \| a CSS colour), `format?` (`png` \| `svg`) | Renders the module WITHOUT a clip, as a contact sheet of the frames with each frame number printed under its cell, plus the diagnostics per frame. `svg` returns the SVG text of one frame, for debugging. The images are written the way `render_frame` writes them (`FrameWriter`). | the Graphic sub-tab's preview strip (G5) |
 | `import_graphic_font` | `path` | Copies a `.ttf`/`.otf` into `graphics/fonts/`, rebuilds the library, and answers the new family list | File ▸ Add Font to Graphics… |
-| `import_graphic_asset` | `path`, `name?` | Copies a PNG/JPEG into `graphics/assets/` | File ▸ Add Image to Graphics… |
+| `import_graphic_asset` | `path`, `name?` | Copies a PNG, JPEG, GIF, WebP, SVG or SVGZ file into `graphics/assets/` | File ▸ Add Image to Graphics… |
 | `graphic_reference` | — | The API reference as markdown (the bundled `GraphicsAPI.md`, §5i) | Help ▸ Graphics Reference |
 
 - **Declarations rows**:
