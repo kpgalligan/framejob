@@ -2791,3 +2791,20 @@ reassigns the editor's font at the canvas's current scale; `editorFrame(for:)` a
 `textContainerInset` removed. The record, the measurement and the limits
 are road map 2 §2, Phase 4's #36 block; `tools/proof/text_edit_proof.py`
 is the proof.
+
+## The canvas text editor's keys, 2026-09-24 — kpgalligan/reelcut#37
+
+**`PreviewCanvasView+TextEditKeys.swift` — new, 73.** `TextEditKey.route`,
+the pure rule for Return, keypad Enter and Esc in the in-canvas editor (a
+bare Return applies, a modified one is a new line, nothing is routed while
+an input method holds marked text), and `escapeTextEditing()`, the Esc arm:
+leave an unchanged edit, or ask Cancel / Revert / Apply in an `NSAlert`
+sheet with the editor's blur-commit suspended until Cancel restores it.
+Apply sends through the canvas's new `onGroupedEdit`, because a sheet's
+completion is not an AppKit event. **`PreviewCanvasView.swift` (frozen)
+1133 → 1132**, wiring only: `textEditor` `private(set)`, `onGroupedEdit`,
+`CanvasTextView.onCancel` renamed `onEscape`, `keyDown` a switch over the
+route, the class doc restated. `EditorViewController+Canvas.swift` forwards
+`onGroupedEdit` to `document.performGroupedEdit`. Spec §11 K-2 is the
+decision; the record and the measurement are road map 2 §2, Phase 4's #37
+block; `tools/proof/text_apply_proof.py` is the proof.

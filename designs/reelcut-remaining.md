@@ -722,6 +722,17 @@ with the fixed `textContainerInset` line. The sizing is the new
 `PreviewCanvasView+TextEditFrame.swift` **62**. The instruments, exempt:
 `tools/proof/text_edit_probe.swift` and `text_edit_proof.py`, new.
 
+**Return applies in the canvas text editor (#37, 2026-09-24).**
+`PreviewCanvasView.swift` (frozen) 1133 → **1132**, wiring only:
+`textEditor` `private(set)`, the `onGroupedEdit` closure beside `onEdit`,
+`CanvasTextView.onCancel` renamed `onEscape` and wired to
+`escapeTextEditing()`, `keyDown` a four-arm switch over `TextEditKey.route`
+(four lines shorter than the two `if`s it replaced), the class doc
+restated. The route and the Esc sheet are the new
+`PreviewCanvasView+TextEditKeys.swift` **73**. `EditorViewController+Canvas.swift`
++1, the forward. The instruments, exempt: `tools/proof/text_apply_probe.swift`
+and `text_apply_proof.py`, new.
+
 ## 4. What only a person at the machine can check
 
 These are not tasks so much as a list to run through at the machine once. The
@@ -1180,6 +1191,18 @@ and the closing above added the rest.
   composition through an input method (marked text), which may not refit
   until the composition is committed.
 
+- **Return applies in the canvas text editor; Esc asks (#37, 2026-09-24)** —
+  `text_apply_proof.py` drives Return, the modified Returns and Esc into the
+  editor, but presses the sheet's buttons with `performClick`: offscreen the
+  sheet never becomes key, so which button Return and Esc press there is
+  READ (Apply the default button cell, Cancel's Esc key equivalent), not
+  driven. At the machine: double-click a text on the canvas, type, press
+  Return — the edit applies and ⌘Z takes it back; ⇧Return starts a new line.
+  Type again and press Esc — a sheet asks; Esc on it goes back to typing
+  with the text kept, Return on it applies. Also unmeasured: Return and Esc
+  while an input method is composing (marked text), which the route leaves
+  to the input method.
+
 ---
 
 ## 5. Where a third road map would start
@@ -1287,6 +1310,16 @@ editor is now sized, after every change, from the same measurement that
 sizes the applied box; the record, the baseline's failing rows and the
 limits left are road map 2 §2, Phase 4, "#36 — the canvas text editor grows
 as you type" (kpgalligan/reelcut#36). A look at the machine is §4's.
+
+**Return did not apply in the canvas text editor, and Esc dropped a change
+#37 (2026-09-24):** a plain Return inserted a newline (only ⌘Return
+applied), and Esc discarded a changed string without asking. A bare Return
+now applies, a modified Return is a new line, and Esc on a changed string
+asks Cancel / Revert / Apply (spec §11 K-2); the record, the baseline's
+failing rows and the limits left are road map 2 §2, Phase 4, "#37 — Return
+applies in the canvas text editor; Esc asks" (kpgalligan/reelcut#37). The
+Text tab's `InspectorTextArea` keeps its own keys by decision; a look at
+the machine is §4's.
 
 **Bounded recovery after a lost AssemblyAI submit reply (#28).** R6-14 reads
 only the newest page of 200 transcripts at most three times. An outage,

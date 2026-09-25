@@ -208,7 +208,9 @@ timeline concern.
 - **Text** clips edit inline on double-click (an `NSTextView` overlay
   positioned in canvas space, sized after every change to the box the
   typed string will have once applied — it grows and wraps as the text
-  will). Line and arrow shapes have endpoint handles.
+  will). Return applies the text and ⇧Return starts a new line; Esc leaves
+  an unchanged edit and asks Cancel / Revert / Apply before dropping a
+  changed one (§11 K-2). Line and arrow shapes have endpoint handles.
 - **Snapping** while dragging: canvas center lines, edges, thirds, and
   other visible clips' edges and centers. Guides draw while snapped;
   ⌘ suppresses. Candidates are computed in Swift from the layer rects;
@@ -2961,6 +2963,8 @@ a clean `make lint` before finishing Rust work.
 | W / E | Trim start / end to playhead |
 | ⌫ | Delete the selection, leaving a gap — or LIFT the in/out range when nothing is selected. With an action selected (§11 CI-1) it removes THAT action instead |
 | esc | Leave the selected action (§11 CI-1) — the Clip tab's fields go back to the clip's base props. With no action selected the key is not consumed |
+| ↩ (canvas text editor) | Apply the text and leave the editor; ⇧↩, ⌘↩, ⌥↩ or ⌃↩ insert a new line (§11 K-2) |
+| esc (canvas text editor) | Leave an unchanged edit; with the text changed, ask Cancel / Revert / Apply (§11 K-2) |
 | ⌘⌫ | Ripple delete (selection, or the in/out range) |
 | ⇧⌘F | Freeze frame |
 | ⌥⌘D | Detach audio |
@@ -4300,3 +4304,20 @@ assisted import.
   itself and every custom inspector control are the transport's. No MCP
   mirror: playback is view state, app/CLAUDE.md's exemption, and no play
   tool exists today; `set_playhead` stays the capability.
+- **K-2 — In the canvas text editor Return applies, a modified Return is a
+  new line, and Esc asks before dropping a change** (kpgalligan/reelcut#37,
+  2026-09-24). A bare Return or keypad Enter (⇪ allowed) commits the string
+  and leaves the editor — the `set_text` it always sent, one undo step,
+  nothing for an unchanged string; Return with ⇧, ⌘, ⌥ or ⌃ inserts "\n",
+  one rule, so ⌃Return no longer inserts AppKit's U+2028 line separator;
+  while an input method holds marked text none of the three keys is routed.
+  Esc leaves an unchanged edit at once; with the string changed a sheet
+  asks: Cancel (Esc — back to typing, text kept), Revert (editor closed,
+  clip untouched, no undo step), Apply (Return, the default — editor
+  closed, the change applied, one undo step). Apply is the default because
+  Return applies everywhere in the session and Apply is undoable; Revert is
+  the one destructive answer and is never the default. The Text tab's
+  `InspectorTextArea` keeps its form-field bargain (Return a newline,
+  ⌘Return a commit in place, blur commits): it sits among fields that
+  commit on blur, and a session that must be left is the canvas's alone. No
+  MCP mirror: the keys are view state, `set_text` is the apply.

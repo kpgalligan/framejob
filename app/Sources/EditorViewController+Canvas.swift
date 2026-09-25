@@ -46,6 +46,7 @@ extension EditorViewController {
         canvas.onLiveUpdate = { [weak self] ops in self?.document?.updateLiveEdit(ops) }
         canvas.onLiveEnd = { [weak self] name in self?.document?.endLiveEdit(name) }
         canvas.onEdit = { [weak self] name, ops in self?.document?.applyEdit(name, ops) }
+        canvas.onGroupedEdit = { [weak self] name, ops in self?.document?.performGroupedEdit(name, ops) }
         canvas.onZoomStep = { [weak self] delta in self?.canvasZoomStepped(delta) }
         canvas.onCropModeChanged = { [weak self] _ in self?.canvasCropModeChanged() }
         canvas.onSpaceTapped = { [weak self] in self?.playPause(nil) }

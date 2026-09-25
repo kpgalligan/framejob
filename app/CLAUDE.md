@@ -256,8 +256,8 @@ the key map behind it.
   `enabled.video`, which is the Detach switch.
 
 **Canvas.**
-- `PreviewCanvasView.swift` (frozen, 1133 lines) · `CanvasSessions.swift`
-  · `PreviewCanvasView+TextEditFrame.swift` — the picture at
+- `PreviewCanvasView.swift` (frozen, 1132 lines) · `CanvasSessions.swift`
+  · `PreviewCanvasView+TextEditFrame.swift` · `+TextEditKeys` — the picture at
   document size and the handle gestures. All coordinate mapping goes through
   `viewToCanvas` / `canvasToView`, and every handle maps through
   `AVPlayerLayer.videoRect`, which is the aspect of the BUFFER — the reason
@@ -265,7 +265,11 @@ the key map behind it.
   sizes the on-canvas text editor after every keystroke from the SAME
   measurement that sizes the applied box (`LayerRenderers.measuredSize`
   placed by `canvasRect`); never give the editor a second sizing rule, or
-  the text jumps at apply (kpgalligan/reelcut#36).
+  the text jumps at apply (kpgalligan/reelcut#36). `+TextEditKeys` is the
+  editor's keys (spec §11 K-2): bare Return applies, a modified Return is a
+  newline, Esc over changed text asks Cancel · Revert · Apply in a sheet
+  whose Apply goes through `performGroupedEdit` (a sheet completion is
+  outside an AppKit event).
 - `CanvasEditTarget.swift` — what a gesture edits (spec §11 CI-13): the
   base, or the selected action's END state. It reaches the canvas as
   `editTarget` through two writers, `refreshCanvas` and

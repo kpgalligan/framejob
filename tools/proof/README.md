@@ -5126,3 +5126,37 @@ has the numbers.
 python3 tools/proof/text_edit_proof.py                      # → 15/15
 python3 tools/proof/text_edit_proof.py --baseline b76a2f3   # exit 0 = exactly the four fix rows FAIL
 ```
+
+## Return applies in the canvas text editor (`text_apply_proof.py`, `text_apply_probe.swift`)
+
+kpgalligan/reelcut#37 (spec §11 K-2): in the in-canvas text editor a bare
+Return applies, a Return with ⇧, ⌘, ⌥ or ⌃ is a new line, and Esc on a
+changed string asks Cancel / Revert / Apply in a sheet. The probe is
+compiled AS `main.swift` over `app/Sources` (`harness/build.sh`'s swiftc
+line, a build failure is a scored FAILURE) with the app's `Compositor.metal`
+built into a `default.metallib` beside it. K1 asks `TextEditKey.route` row
+by row (pure). A0–A11 open the app's own window over one text clip "Hello"
+(`text_edit_proof.text_clip`), each row its own `beginTextEditing` session
+with the caret at the end, send the keys through `NSWindow.sendEvent`, and
+read the clip's content, whether a `CanvasTextView` is still in the tree,
+`window.attachedSheet` and `document.undoManager` back; between rows the
+probe ends any sheet, cancels the editor and undoes every step. A0 and A7
+are CONTROLS. The sheet never becomes key under `.prohibited`, so its
+buttons are pressed with `performClick`, and which one Return and Esc press
+is READ: Apply as the panel's `defaultButtonCell` (macOS 26's `NSAlert`
+leaves the first button's own `keyEquivalent` empty — measured), Cancel by
+its `keyEquivalent`. No fonts, no media, no ffmpeg.
+
+`--baseline <commit>` builds the same probe over `git archive <commit>
+app/Sources` with `-D HARNESS_REFERENCE_BUILD` (K1 compiled out) in
+`work/text-apply/baseline/`, and exits 0 only when EXACTLY the labels in
+`BASELINE_EXPECTED` fail there and no K1 row is present. Measured
+2026-09-24: 27/27 on the fix; `--baseline 7e946ed` fails exactly A1, A2,
+A4, A6, A8, A9, A10 and A11 (A3's ⇧Return and A5's ⌥Return already put a
+"\n" there) and exits 0. Road map 2 §2 Phase 4's #37 record has the
+details.
+
+```sh
+python3 tools/proof/text_apply_proof.py                      # → 27/27
+python3 tools/proof/text_apply_proof.py --baseline 7e946ed   # exit 0 = exactly A1 A2 A4 A6 A8–A11 FAIL
+```

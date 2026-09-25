@@ -49,6 +49,9 @@ final class PreviewCanvasView: NSView {
     var onLiveUpdate: (([ReelOp]) -> Void)?
     var onLiveEnd: ((String) -> Void)?
     var onEdit: ((String, [ReelOp]) -> Void)?
+    /// An edit from a sheet's completion — outside an AppKit event — which
+    /// the document groups itself.
+    var onGroupedEdit: ((String, [ReelOp]) -> Void)?
     /// +1 / -1 through the zoom stops (pinch, and ⌥-wheel).
     var onZoomStep: ((Int) -> Void)?
     var onCropModeChanged: ((Bool) -> Void)?
@@ -111,7 +114,7 @@ final class PreviewCanvasView: NSView {
     private var pinchAccumulator: CGFloat = 0
     private var spaceHeld = false
     private var spaceDidPan = false
-    private var textEditor: CanvasTextView?
+    private(set) var textEditor: CanvasTextView?
     private(set) var editingClip: UInt32?
 
     // MARK: - Life cycle
@@ -771,7 +774,7 @@ final class PreviewCanvasView: NSView {
         fitTextEditor(editor, to: box)
         editor.onChange = { [weak self] in self?.refitTextEditor() }
         editor.onCommit = { [weak self] in self?.commitTextEditing() }
-        editor.onCancel = { [weak self] in self?.cancelTextEditing() }
+        editor.onEscape = { [weak self] in self?.escapeTextEditing() }
         editor.onBlur = { [weak self] in self?.finishTextEditing(commit: true, focus: false) }
         addSubview(editor, positioned: .above, relativeTo: overlay)
         textEditor = editor
@@ -801,7 +804,7 @@ final class PreviewCanvasView: NSView {
         textEditor = nil
         editingClip = nil
         editor.onCommit = nil
-        editor.onCancel = nil
+        editor.onEscape = nil
         editor.onBlur = nil
         editor.onChange = nil
         editor.removeFromSuperview()
@@ -1092,12 +1095,12 @@ final class CanvasOverlayView: NSView {
 
 // MARK: - Inline text editor
 
-/// The in-canvas text session's editor. ⌘Return commits and Esc cancels;
-/// plain Return is a newline, because a text clip's content is multi-line
-/// (spec §4.3's Text tab edits the same string).
+/// The in-canvas text session's editor. Return applies, a modified Return is a
+/// newline and Esc leaves or asks (`TextEditKey.route`, spec §11 K-2); the
+/// Text tab's area keeps its own form-field keys for the same string.
 final class CanvasTextView: NSTextView {
     var onCommit: (() -> Void)?
-    var onCancel: (() -> Void)?
+    var onEscape: (() -> Void)?
     /// Clicking away commits, the way every other in-place editor in the app
     /// does (the timeline's rename field, the timecode). Separate from
     /// `onCommit` so the owner can clear it before tearing the editor down —
@@ -1108,16 +1111,12 @@ final class CanvasTextView: NSTextView {
     var onChange: (() -> Void)?
 
     override func keyDown(with event: NSEvent) {
-        // 36 = Return, 76 = keypad Enter, 53 = Esc.
-        if event.modifierFlags.contains(.command), event.keyCode == 36 || event.keyCode == 76 {
-            onCommit?()
-            return
+        switch TextEditKey.route(event, hasMarkedText: hasMarkedText()) {
+        case .apply: onCommit?()
+        case .newline: insertNewline(nil)
+        case .escape: onEscape?()
+        case nil: super.keyDown(with: event)
         }
-        if event.keyCode == 53 {
-            onCancel?()
-            return
-        }
-        super.keyDown(with: event)
     }
 
     override func didChangeText() {

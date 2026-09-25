@@ -1717,6 +1717,82 @@ clip still edits in an axis-aligned frame. Input-method composition
 ("frozen, 1121 lines") is now 1133 and does not name the new file — for the
 orchestrator, which edits the CLAUDE.md files.
 
+#### #37 — Return applies in the canvas text editor; Esc asks (2026-09-24)
+
+kpgalligan/reelcut#37: in the in-canvas text editor a plain Return inserted
+a newline and only ⌘Return applied, so the obvious key never left the
+editor; Esc threw a changed string away without a word. Spec §11 K-2 is the
+decision, written before the code, with §4.2's Text bullet and two §9 rows.
+
+**What landed.** `app/Sources/PreviewCanvasView+TextEditKeys.swift` (new,
+73): `TextEditKeyRoute` and the pure `TextEditKey.route(_:hasMarkedText:)`
+— a key-down of Return (36) or keypad Enter (76) with none of ⇧ ⌘ ⌥ ⌃ is
+`.apply` (⇪, fn and the keypad flag ignored), with any of them `.newline`,
+Esc (53) `.escape`, anything else, a key-up or any key while an input
+method holds marked text `nil` — and `PreviewCanvasView.escapeTextEditing()`:
+an unchanged string (or no window) cancels at once; a changed one suspends
+the editor's blur-commit and puts up an `NSAlert` sheet, "Apply your
+changes to this text?", buttons added Apply (first, the default), Revert,
+Cancel (its `keyEquivalent` set to Esc explicitly). The completion, guarded
+by `textEditor === editor`, applies through `cancelTextEditing()` and then
+`onGroupedEdit` (a sheet completion is not an AppKit event — app/CLAUDE.md's
+undo pitfall), reverts through `cancelTextEditing()`, or on Cancel (and any
+other response) restores the blur-commit and puts the caret back.
+`PreviewCanvasView.swift` (frozen) **1133 → 1132**, wiring only:
+`textEditor` is `private(set)`, `onGroupedEdit` sits beside `onEdit`,
+`CanvasTextView.onCancel` is `onEscape` and is wired to
+`escapeTextEditing()`, `keyDown` is a four-arm switch over the route
+(`.newline` is `insertNewline(nil)`, so ⌃Return no longer inserts AppKit's
+U+2028), and the class doc says so. `EditorViewController+Canvas.swift`
+gains the one forward `onGroupedEdit → document.performGroupedEdit`. No
+core change, no FFI, no MCP mirror: `set_text` is the apply, as before.
+
+**Deviations.** One, in the probe, none in the product. The spec's A8 row
+read Apply's `keyEquivalent == "\r"`; measured on macOS 26, `NSAlert`'s
+first button (an `_NSAlertButton` over a hosting view) has an EMPTY
+`keyEquivalent` and is instead the panel's `defaultButtonCell`, which is
+what Return presses. A8 reads `sheet.defaultButtonCell === apply.cell`;
+Cancel's key equivalent is read as specified (`"\u{1b}"`, set by the
+product). A Return could not be DRIVEN into the sheet to prove the press:
+under `.prohibited` the sheet never becomes key, and a Return sent through
+its `sendEvent`, `NSApp.sendEvent`, `performKeyEquivalent` or `keyDown`
+pressed nothing (measured, each one). The buttons are pressed with
+`performClick`. A K1 row for fn Return and one for Esc with marked text
+were added beside the spec's list.
+
+**Measured.** `tools/proof/text_apply_proof.py` over its probe
+`text_apply_probe.swift`: **27/27**, exit 0 — two structural checks, 13 K1
+route rows, A0–A11 in the app's own window over one text clip "Hello".
+A1: "!" then Return → content "Hello!", editor gone, `canUndo` false → true,
+one `undo()` → "Hello", `canUndo` false. A2: Return unchanged → editor gone,
+no undo step. A3–A6: ⇧/⌘/⌥/⌃Return → the editor open with "Hello\n". A7
+(CONTROL): Esc unchanged → editor gone, no sheet. A8: "!" then Esc → a sheet
+with Apply, Revert, Cancel, Apply the default button, Cancel on Esc. A9:
+Cancel → sheet gone, editor open with "Hello!", the field first responder,
+a typed "?" lands ("Hello!?"). A10: Revert → editor gone, "Hello", no undo
+step. A11: Apply → editor gone, "Hello!", one undo step. A0 (CONTROL): the
+editor opens as first responder. `--baseline 7e946ed` (K1 compiled out)
+fails EXACTLY A1, A2, A4, A6, A8, A9, A10, A11 and exits 0, as predicted:
+A1 left the editor open with "Hello!\n", A2 with "Hello\n", A4's ⌘Return
+committed and closed the editor, A6's ⌃Return inserted U+2028, and A8–A11
+found no sheet (Esc cancelled). A3 (⇧Return) and A5 (⌥Return) PASSED on the
+baseline — AppKit's own `insertNewline:` / `insertNewlineIgnoringFieldEditor:`
+already put "\n" there. `text_edit_proof.py` 15/15 and
+`space_key_proof.py` 28/28 after the change.
+
+**Limits, not fixed.** Return and Esc pressing the sheet's buttons from the
+keyboard are READ (the default button cell, Cancel's key equivalent), not
+driven — see Deviations; the look at the machine is
+`designs/reelcut-remaining.md` §4. Input-method composition is covered by
+the route's K1 rows only (marked text → not routed); no composition was
+driven. No `--mutant` mode: that Apply goes through `performGroupedEdit`
+rather than `applyEdit` is read in the code, not caught by a row. The Text
+tab's `InspectorTextArea` keeps its own keys (Return a newline, ⌘Return a
+commit), as K-2 records. **Owed:** the §4 look at the machine. `app/CLAUDE.md`'s Canvas map entry
+now names `PreviewCanvasView+TextEditKeys.swift` and the frozen file's new
+count (1132) — applied by the orchestrator after review (verdict pass, one
+prose nit, also applied).
+
 ---
 
 ### Phase 5 — Sound
