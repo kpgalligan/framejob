@@ -1284,6 +1284,77 @@ the branch `svg-motion`. G2 alone bumps the format.
   a before and after measurement. An SVG-string cache is not among them:
   the JavaScript is the smallest of the three costs (§5d).
 
+### 9a. How the phases run, and what each inherits from G0
+
+**The user's instruction (2026-09-24):** "Each phase should be run with
+/litecode, with a commit after each."
+- The phases run one pipeline at a time, in order: G1, G2, G3, G4, G5.
+  §9's "G2 beside G1" is a fact about dependencies, not a schedule.
+- Each pipeline's baseline is the HEAD commit it starts from. Its
+  `request.md` names that commit and this section's list for the phase.
+- A phase is committed only after its last review passes. The commit
+  message says what was verified and what is owed, and so does the
+  phase's §10 record.
+- After G4 the feature works end to end for an agent. Merging
+  `svg-motion` into `main` is the user's decision at that point, so stop
+  after G4 and report.
+- The commits so far on `svg-motion`: `c874069` (the design), `0d3c376`
+  (G0), `9899fca` (§5a's features, after the user's ruling on size).
+- **Do not re-run the spike.** Its output under
+  `tools/proof/work/graphics_spike/` is what §10.1 quotes, and a re-run
+  overwrites it (§10.3).
+
+**What G1 (the engine) must carry from G0.** Every item is a test or a
+line of code, and none is optional:
+1. `serde_json` with `preserve_order`, so the schema keeps the module's
+   order (q2).
+2. resvg with `text`, `raster-images` and `svgz` (§5a). A test renders an
+   `<image>` of each of PNG, JPEG, GIF, WebP and a nested `.svg`, because
+   all five are readings so far (§10.2).
+3. The sandbox, with all EIGHTEEN q6 cases as tests. That includes the
+   four `.constructor` escapes the G0 review found: `new
+   Date().constructor.now()`, and the Async, Generator and AsyncGenerator
+   function constructors. Add a case for `performance` too, and delete it
+   if quickjs-ng defines it (§10.3 item 1).
+4. Line and column come from the exception's `stack`, because rquickjs
+   0.14's `Exception` has no `line()`/`column()`. An interrupt's position
+   points at the enclosing function, not at the loop, and the diagnostic
+   says so (§5b).
+5. `measureText` returns the advance AND the ink box, and the parity test
+   compares the ink box within 2 px (q4, §5c, §5l).
+6. **A missing font family draws NOTHING in resvg, with no fallback**, and
+   an unquoted family name starting with a digit (`Source Sans 3`) lays out
+   nothing (q4). So the engine must itself detect a `font-family` the font
+   set cannot resolve and emit the G-6 warning naming the families it
+   does have. usvg will not report it. Every standard library helper
+   quotes the family name (§10.3 item 2 — the spike's `textLines` does
+   not).
+7. `formatNumber` in the standard library (§5a, §5c).
+8. The error for a string too large to read out is the engine's own
+   sentence, not rquickjs's message, which names nothing (§5b, §8).
+9. The `ReelCore.swift` toll first, landed and gated alone (§5e).
+
+**What G2 (the model) inherits:** nothing from G0. It stands on §4 and §5g
+as designed.
+
+**What G3 (the picture) must carry from G0:**
+1. **One `DispatchSource` per module file, plus one on the folder.** A
+   folder source raises `.write` only, never `.rename`, and an editor that
+   saves IN PLACE raises nothing on the folder (q7). The folder's source
+   catches files being added and removed; each file's own source catches
+   edits.
+2. Call `packageContentsDidChangeOnDisk()` after CREATING `graphics/`
+   (or a subfolder) in an open package, and not after every event. Only
+   creating a folder trips NSDocument's "changed by another application"
+   (q7).
+3. The "Package" proof rows run against `graphics/` itself. G0 measured
+   through `media/` as a stand-in, and the direct measurement is G3's
+   (§10.2).
+4. The G-6 missing-font warning from item 6 above shows on the clip and
+   in `render_frame`'s reply.
+5. The person's playback check includes a 4K canvas with `title-card`
+   (q3: 26 ms p95 there). If it stutters, G6 is owed.
+
 ---
 
 ## 10. Record
