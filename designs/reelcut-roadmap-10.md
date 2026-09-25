@@ -3404,62 +3404,59 @@ export-cancel crash's cherry-pick to `main`).
 
 ### 10.8. After G4 — a defect the person found, and where G5 stands
 
-#### The defect: graphic clips do not preview or play in the editor (OPEN, 2026-09-25)
+#### The defect: a project of only graphics does not play (DIAGNOSED 2026-09-25; OWED, deferred by the user)
 
 **What the user saw.** The user built Reelcut from `svg-motion` and opened
 the three playback-check projects (`tools/proof/work/playback-check/`, made
 by `tools/proof/graphics_playback_samples.py`, remaining §4's graphics
 bullet). "The clips are there, but they show no preview, and playback just
-plays a beep." The user's ruling: **resolve this before any more G5 work.**
+plays a beep."
 
-**What IS proved, and so is not the fault.** For the same three packages,
-the built app's `render_frame` (an OFFLINE render: `Exporter.renderFrame`,
-its own composition, a PINNED key) drew all three correctly — `title-card`
-at 4K, `kinetic-type` at 1080p, and the error card from frame 60 — checked
-by eye on 2026-09-25 at `dd3d30c`. `graphics_proof.py`'s 39 rows are all
-`render_frame`, `render_graphic` or export. So the engine, the recipe, the
-registry's pinned path, `LayerRenderersGraphic` and the compositor's
-`.graphic` case work OFFLINE.
+**What the user then found (2026-09-25).** The same graphics PLAY once any
+video clip is on the timeline: "I added a video and stacked it below the
+'graphic' clips. Then it plays fine. Scrolling seems smooth, or smooth
+enough. It actually works quite well. I added an action to one that would
+fade it out, and it worked perfectly." So the live path — `Playback`'s
+`AVPlayer`, the document's `RecipeSource` key through
+`GraphicRegistry.resolve`'s 250 ms preview arm, `LayerRenderersGraphic`,
+the compositor, and an action on a graphic clip — works in the running app
+when the timeline has a video track. The user's ruling: **graphics by
+themselves must be playable, but later — record it and move on**; G5 is
+unblocked.
 
-**The gap in the proofs.** No proof ever played a graphic through the LIVE
-path — `Playback`'s `AVPlayer`, the document's own `RecipeSource` key
-(`GraphicRegistry.resolve`'s 250 ms preview arm), the paused-frame refresh.
-The offscreen harness cannot see the picture (a Metal layer has no drawable
-offscreen), so the live path needs either a probe that drives `Playback`
-and reads a frame back, or the person.
+**The cause, read from the code (not yet driven by a probe).**
+`Playback.startRebuild` (`app/Sources/Playback.swift:360-371`) drops the
+player item when `plan.videoTracks.isEmpty && plan.audioTracks.isEmpty`
+("An empty timeline has no tracks to compose"), and `Playback.play()`
+(`:448-452`) beeps on a nil `currentItem` — the beep the user heard. The
+core's `segment_of` (`core/src/evaluate.rs:271-275`) gives NO segment to
+`Image`, `Text`, `Shape` or `Graphic` clips, so a project made only of them
+has no tracks at all and never reaches `CompositionBuilder.build`, whose
+`addPlaceholderIfNeeded` (`CompositionBuilder.swift:173-188`) exists for
+exactly that case (a one-frame `Blank.mp4` scaled to `plan.duration`).
+`render_frame` and export go through the builder directly, which is why
+they drew all three samples. The guard dates from the first commit
+(`da962fa`), so the defect is **not graphics-specific**: a timeline of
+only text, shapes or images should fail the same way — inferred from the
+code, not run.
 
-**Where to start (hypotheses, NOT verified):**
-1. **The beep.** Find what beeps on Play: `NSSound.beep()` /
-   `NSBeep` callers in `Playback.swift` and the transport — likely a play
-   refused because the player item failed or the composition has zero
-   duration. `CompositionBuilder.addPlaceholderIfNeeded`
-   (`CompositionBuilder.swift:173-188`) adds the one-frame `Blank.mp4`
-   track only when `plan.videoTracks.isEmpty && plan.duration > 0`; check
-   the core plan's `duration` counts graphic clips (G2a made
-   `evaluate.rs`'s `draws()` true and `segment_of` None for a graphic;
-   whether the PLAN's duration and track logic see it has not been checked).
-   A project of ONLY graphics is exactly the playback-check projects' case;
-   `render_frame` may survive what `AVPlayer` does not (the offline path
-   builds its own composition).
-2. **No preview.** If the player item is fine, check the document key's
-   registry entry in the live app: `ProjectDocument+Graphics.startGraphicStore()`
-   (from `makeWindowControllers()`) installs the set; `resolve` answers nil
-   (→ the `missing` slate, not a blank) only with no set. A BLANK preview
-   (not a slate) points back at the composition/player rather than the
-   registry.
-3. `ProjectSnapshot.sourceSize(of:)` still answers nil for `.graphic`
-   (`ProjectSnapshot.swift:~1791`, a stale "G3 reads … once ClipSnapshot
-   decodes" comment — G3a DID decode it). That affects canvas handles and
-   Fit/Fill, probably not the picture, but it is wrong and cheap.
+**The fix, when it is taken.** The guard in `startRebuild` should test
+`plan.duration > 0` (the empty-timeline case) rather than the track
+lists, and let the builder add the placeholder. It owes a live proof that
+fails today: a graphics-only (and a text-only) project whose Play does not
+refuse — through a probe driving `Playback`, or an MCP row if one can read
+the live player's state — made to fail on purpose, then the person's
+re-check of the three sample projects without a video underneath.
 
-**The fix owes a live proof**: a probe (or an MCP row driving `set_playhead`
-plus a live-frame read, if one exists) that fails today on a graphics-only
-project and passes after — made to fail on purpose, per the proof rules —
-and a person's re-check of the three sample projects.
+**Still owed from the same look:** `ProjectSnapshot.sourceSize(of:)`
+answers nil for `.graphic` (`ProjectSnapshot.swift:~1791`, under a stale
+comment saying G3 would read `graphic.width`/`height` once `ClipSnapshot`
+decoded them — G3a did). It affects canvas handles and Fit/Fill, not the
+picture.
 
-#### G5 — paused
+#### G5 — paused on 2026-09-25, resumed the same day
 
-G5 (the person: road map 9-style Graphic sub-tab, menus, templates) was
+Paused for the defect above and resumed once the user deferred it. G5 (the person: road map 9-style Graphic sub-tab, menus, templates) was
 split into two `/litecode` pipelines. Neither has changed code:
 - **G5a — the Graphic sub-tab.** `request.md` and triage (full route) are
   written in `~/.claude/litecode/reelcut/graphics-g5a-graphic-subtab/`; the
