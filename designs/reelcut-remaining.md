@@ -1207,6 +1207,8 @@ and the closing above added the rest.
 
 ## 5. Where a third road map would start
 
+**Road map 10, graphics (DESIGNED 2026-09-24, EXPERIMENTAL on the branch `svg-motion`, nothing built).** The user asked for Remotion-style motion graphics: a clip whose JavaScript module, in the package's `graphics/` folder, returns SVG per frame, written mostly by an agent over MCP. `designs/reelcut-roadmap-10.md` is the design, reviewing the user's input plan `designs/svg-motion-components-plan.md` in its §1. **Next work is its spike G0** (§3, nine questions: build cost, render cost, measureText parity, determinism, the sandbox, and whether an external write into the package survives autosave). Its decisions G-1 to G-13 are proposals until the phase that needs each copies it into spec §11; G-1 and G-2 amend spec §1's plugin non-goal and §7's pixel rule. Nothing merges to `main` until the user decides, after G4.
+
 **Road map 9, the clip inspector redesign, is COMPLETE (phases 1, 2, 3a
 and 3b 2026-09-23, phases 4 and 5 2026-09-24; road map 9 §2, §4, §6, §8,
 §10 and §12).** The selected action is the sixth piece of view state (spec
