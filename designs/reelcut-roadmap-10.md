@@ -1,17 +1,17 @@
 # Reelcut — road map 10: graphics, motion graphics drawn by code
 
-**Status: DESIGNED 2026-09-24, nothing built. EXPERIMENTAL, on the branch
+**Status: SPIKED 2026-09-24 — G0 ran complete, all nine rows of §3 measured
+on this host (§10.1); no product code built. EXPERIMENTAL, on the branch
 `svg-motion`.** Nothing here lands on `main` until the user decides to merge
 it (§9). The input to this design was `designs/svg-motion-components-plan.md`,
 a tech plan the user had drafted. §1 reviews that plan against this codebase,
 and every section after §1 is the design that came out of the review.
 
 Every claim about the code is a scout's reading at `ed42a56`, cited with a
-`file:line`. Every claim about a crate or a framework was taken from a
-document and has not been measured. §3 lists the questions that only G0,
-the spike, can settle. When G0 measures something this document only read
-about, the section that depended on it is REWRITTEN, not annotated, as in
-road map 8.
+`file:line`. The claims about the crates and frameworks that §3 asked about
+were MEASURED by G0 on 2026-09-24 (§10.1), and every section that depended
+on one was REWRITTEN, not annotated, as in road map 8; §3a lists them. A
+crate claim §3 did not ask about is still a reading.
 
 The baseline this design was written against:
 - format version 9 (`core/src/format.rs:158`);
@@ -65,7 +65,7 @@ each point became and why.
 | Name "motion component" | **graphic** (`Source::Graphic`, `add_graphic_clip`, `graphics/`) | "motion" is taken: `video.motion` presets, `model_motion.rs`, `motion.rs`, spec §11 R5-4/R5-5. |
 | Script paths / `asset://` ids from "the asset manager" | Package-relative names only: `graphics/<name>.js`, `graphics/fonts/`, `graphics/assets/` | Reelcut has no asset manager. Media is referenced by absolute path plus bookmark (`model.rs:116-124`), and a graphic's files travel with the package instead (G-3). |
 | Frame cache keyed on script+props+frame+size+fonts+assets | Two levels. The recipe hash gives which JavaScript result to ask for. The texture cache is keyed on the **SVG text** plus size | A graphic that has settled returns the same SVG every frame, so a hold costs one JavaScript call and no rasterization. An SVG hash also cannot go stale when a file changes (§5d). |
-| Worker pool, parallel prefetch, parallel export | Not in the first build (G6, only if G0/G3 measure a need) | The compositor is one serial queue with one frame in flight (`Compositor.swift:112,162-217`), and export is serial (`ExporterWriter.swift:103-111`). Parallelism is a change to both, and would be paid only against a measured shortfall. |
+| Worker pool, parallel prefetch, parallel export | Not built (G6 is NOT owed: G0's q3 measured the six graphics at 1920×1080 at a worst p95 of 7.62 ms per frame, JavaScript, parse and raster together, against the 12 ms line) | The compositor is one serial queue with one frame in flight (`Compositor.swift:112,162-217`), and export is serial (`ExporterWriter.swift:103-111`). Parallelism is a change to both, and is paid only against a measured shortfall, which 1080p does not have (§10.1 q3). |
 | Export ProRes 4444 and HEVC with alpha | Nothing new. ProRes 4444 and APNG already carry alpha from a transparent canvas | Spec §7.8 "ProRes 4444, and what `alpha` means". HEVC-with-alpha is a separate encoder row and goes in §7 as not built. |
 | Reduced-resolution preview by scaling the pixmap | Rendered at the graphic's own size, 1 source px = 1 canvas px | That is exactly what text and shapes do (`LayerRenderers.swift:175-179`, `:53-56`). Preview Quality already scales the composition (`Playback.swift:329-334`). |
 | Schema drives an auto-generated inspector | Kept, and it is the FIRST data-driven section | Every section today is hand-built from closures (`InspectorSection.swift:41`). The row builders it needs already exist (`InspectorPane.swift:514-616`). |
@@ -157,9 +157,32 @@ number or a transcript, as road map 8 §10.1 was.
 | q8 | Is QuickJS's `Math.sin`/`Math.pow` bit-identical between a debug build, a release build and the test binary on this host? | Hash 10 000 results | Whether preview (app) and `cargo test` can be compared byte for byte |
 | q9 | Is a `#[no_mangle]` function defined in core's `ffi_graphic.rs` and delegating to the `graphic` crate present in `libreelcut_core.a` and callable from Swift? | `nm` and a harness call | The FFI shape of §5e. A second staticlib is ruled out in advance: two Rust staticlibs in one binary duplicate `std`'s symbols |
 
-## 3a. What G0 changes in this document
+**All nine ran on 2026-09-24. §10.1 is the record, row by row; §3a lists what
+each one changed, and the instruments are `tools/proof/graphics_spike/` with
+their own README.** Nothing below this line in §3 is a prediction any more:
+read the section a row names, which has been rewritten, and §10.1 for the
+numbers behind it.
 
-Empty until G0 runs.
+## 3a. What G0 changed in this document
+
+| Section | Before G0 | Now | Row |
+|---|---|---|---|
+| Status header, intro | designed, nothing built; crate claims unmeasured | spiked; the crate claims §3 asked about are measured | all |
+| §1 table, worker pool | "only if G0/G3 measure a need" | not owed: worst 1080p p95 7.62 ms per frame | q3 |
+| §4 G-2, licences | `tiny-skia` Apache-2.0 OR MIT; `rustybuzz` | the resolved graph: `tiny-skia` BSD-3-Clause; usvg 0.48 shapes with `harfrust`, not `rustybuzz`; QuickJS is quickjs-ng | q1, q2 |
+| §4 G-6, fonts | "a `font-family` the set does not have is a warning" | the same, and now necessary: a missing family draws NOTHING (no fallback), and a family name starting with a digit (`Source Sans 3`) lays out nothing unless quoted | q4 |
+| §5a, the crate's features | `raster-images` OFF, "usvg's own image support" decodes PNG/JPEG; a cargo feature if `make test` slows > 2× | `raster-images` ON (resvg 0.48.1 skips every `<image>` decode without it — a reading, `src/image.rs:26-32`), priced at +974 352 bytes of staticlib; NO cargo feature (`make test` 1.12× warm); `serde_json` with `preserve_order` | q1, q2 |
+| §5b, the runtime | the limits and refusals as designed | CONFIRMED by 18 cases, each a structured answer, the process alive; REWRITTEN in detail: where an interrupt's line points, the loader's refusal sentence, a big string that is built but cannot be read, no `line()`/`column()` in rquickjs 0.14 | q6 |
+| §5c, the module and `measureText` | "ES2020+ as QuickJS evaluates it"; `measureText` returns `{width, ascent, descent, lineHeight}` | quickjs-ng 0.16.2 takes §5c's module verbatim; `measureText` also returns the INK box, which is what agrees with the pixels; whitespace and family quoting stated | q2, q4 |
+| §5d, JavaScript every frame | "q3 measures its cost" | measured: JavaScript p95 ≤ 1.67 ms at 1080p; 85–252 of 299 consecutive frames repeat their SVG, so the SVG-keyed texture cache pays | q3 |
+| §5e, the FFI | the shape, unmeasured | CONFIRMED: an export in `ffi_graphic.rs` is in `libreelcut_core.a` and Swift calls it byte-identically; the engine rides in the app (+7 194 848 bytes) whether or not anything calls it | q9 |
+| §5f, the watcher | `.write`, `.rename`, `.delete` on the folder; "an editor's atomic save shows as a rename" | a folder source raises `.write` only, never `.rename`; an IN-PLACE save raises nothing on the folder, so each module file gets its own source; only CREATING a folder inside the open package trips NSDocument | q7 |
+| §5l, parity and sandbox tests | "within 1 px"; "q6's eight cases" | the ink box against whole-pixel columns within 2 px; eighteen cases | q4, q6 |
+| §5m, `core/Cargo.toml` | "behind a feature if q1 says so" | a plain path dependency | q1 |
+| §6 item 6 | the target, unmeasured | met with room at 1080p30 | q3 |
+| §8 | — | a row for the largest string a render can hand back | q6 |
+| §9 G6 | "only if owed" | not owed at 1080p; 4K full-frame fills are the case a person watches | q3 |
+| §10 | "Empty." | §10.1 the record, §10.2 what did not run | all |
 
 ---
 
@@ -209,10 +232,15 @@ Why not JavaScriptCore and a platform rasterizer:
 - **One call in, pixels out** is a smaller seam than JavaScriptCore in Swift
   plus resvg over FFI.
 
-Licences:
-- `rquickjs` MIT, QuickJS MIT;
-- `resvg`, `usvg` and `tiny-skia` Apache-2.0 OR MIT;
-- `fontdb` and `rustybuzz` MIT.
+Licences, of the graph G0 resolved (`tools/proof/graphics_spike/Cargo.lock`,
+q1):
+- `rquickjs`, `rquickjs-core`, `rquickjs-sys` 0.14.0 MIT; the QuickJS it
+  vendors is quickjs-ng 0.16.2, MIT (q2);
+- `resvg` and `usvg` 0.48.1 Apache-2.0 OR MIT;
+- `tiny-skia` 0.12.0 BSD-3-Clause (not Apache-2.0 OR MIT, as this section
+  first said);
+- `fontdb` 0.24.0 and `harfrust` 0.12.0 MIT — usvg 0.48 shapes with
+  `harfrust`, not `rustybuzz`; `skrifa`/`read-fonts` MIT OR Apache-2.0.
 
 No copyleft code, and no code from Remotion (whose licence is not
 permissive).
@@ -313,8 +341,20 @@ The engine's font set has two parts:
 The system's fonts are NOT loaded. A graphic authored on this Mac then
 renders the same on another, and the agent is told exactly what exists: a
 `font-family` the set does not have is a warning naming the families it
-does have, not a silent fallback. `import_graphic_font` (§5h) copies a font
-into the package. This is the open question from the plan, answered.
+does have. G0 measured why the warning cannot be skipped (q4): with no
+system fonts there is NO fallback, so a `<text>` whose family the set lacks
+draws nothing at all and `measureText` has nothing to measure; a list
+(`"Nope, Montserrat"`) falls through to the family it names. A family name
+that starts with a digit is not a CSS identifier: `font-family="Source Sans
+3"` lays out nothing, and `font-family="'Source Sans 3'"` draws. So the
+standard library quotes every family it writes, the reference says to
+quote, and the warning names an unquoted digit-led family as the likely
+cause. The variable faces load as one face each (`SourceSans3-Roman`
+weight 200, `DarkerGrotesque-Light` weight 300) and draw the instance
+`font-weight` asks for: Source Sans 3's advance for the same word at 64 px
+is 438.9, 462.3, 491.5 and 502.7 px at weights 200, 400, 700 and 900.
+`import_graphic_font` (§5h) copies a font into the package. This is the
+open question from the plan, answered.
 
 ### G-7 — A graphic draws at its own size, and crosses the FFI as premultiplied BGRA
 
@@ -411,7 +451,8 @@ layer. Keyframed props are listed in §7.
 
 ```
 graphic/
-  Cargo.toml         rquickjs, resvg (default-features = false, features = ["text"]), serde_json, sha2
+  Cargo.toml         rquickjs (loader), resvg (default-features = false, features = ["text", "raster-images"]),
+                     serde_json (preserve_order), sha2
   CLAUDE.md          the crate's rules: purity, no filesystem, limits, the one exception to oracle-only tests
   src/lib.rs         Library, Module, render — the whole public surface
   src/library.rs     the font set (Arc<fontdb::Database>) and the asset map, and their versions
@@ -440,35 +481,83 @@ graphic/
 - **`rasterize(library, svg, width, height, out, stride) → diagnostics`**
   draws. The two are separate calls on purpose, because the app keys its
   texture cache on the SVG text (§5d).
-- `resvg`'s `system-fonts` and `raster-images` default features are OFF.
-  Images in a graphic are PNG and JPEG from `graphics/assets/`, decoded by
-  usvg's own `image` support, if G0 confirms that it builds without
-  `raster-images`, and otherwise that feature comes back on.
-- If q1 finds the 32 core test binaries slowed by more than ~2×, the
-  dependency sits behind `features = ["graphic"]`: on for the staticlib
-  build in the Makefile, and off for `cargo test` in `core/`. The engine's
-  own tests run in `graphic/`.
+- `resvg`'s `system-fonts` and `memmap-fonts` default features are OFF, and
+  `raster-images` is ON. Images in a graphic are PNG and JPEG from
+  `graphics/assets/`, and resvg 0.48.1 decodes no raster `<image>` without
+  that feature: `src/image.rs:26-32` logs "Images decoding was disabled by
+  a build feature" and draws nothing (a reading; G0 did not render an
+  image). q1c priced it: the staticlib grows from 34 438 200 to 35 412 552
+  bytes (+974 352, 917 → 960 archive members), and the one core build after
+  the flip took 28.3 s. The feature also brings GIF and WebP decoders,
+  which §5c's `asset` type (PNG and JPEG) does not offer.
+- `serde_json` takes `preserve_order`. Without it a module's `schema` crosses
+  as a `BTreeMap` and comes out ALPHABETICAL (q2 printed §5c's schema as
+  `accent, align, boxed, logo, size, subtitle, title`), and the inspector
+  builds its rows in schema order (§5j).
+- NO cargo feature. q1 measured the core's own `make test` at 13.62 s before
+  the dependency and 15.20 s after, on the same warm edit (1.12×, far under
+  the 2× that would have put the engine behind `features = ["graphic"]`),
+  and the cold `cargo build --release` at 25.0 s before and 43.2 s after:
+  QuickJS's C is compiled once per clean build. The engine's own tests run
+  in `graphic/`.
 
 ### 5b. The runtime and its limits
+
+G0's q6 ran every refusal below in its own process, and each ended in a
+structured answer with the process alive and the SAME engine then loading
+and drawing `lower-third` byte-identically to a fresh one (18 of 18; §10.1).
 
 - One `rquickjs::Runtime` and one `Context` per (thread, module).
   - `set_memory_limit(64 MB)` and `set_max_stack_size(1 MB)`.
   - `set_interrupt_handler` compares a monotonic deadline set before each
-    call (250 ms preview, 2 s export and `render_frame`, G-5).
+    call (250 ms preview, 2 s export and `render_frame`, G-5). `while (true)
+    {}` answered at 250.07 ms with `InternalError: interrupted`.
+- The fields of the Rust type that holds them drop in the order the saved
+  `render` function, then the context, then the runtime: dropping the
+  runtime first aborts the process in QuickJS's `JS_FreeRuntime` assertion
+  (`list_empty(&rt->gc_obj_list)`), which G0 hit before it fixed the order.
 - Nothing from `rquickjs`'s `std`/`os` loaders. The module loader resolves
-  NO specifier, so `import "x"` is "imports are not available in a graphic;
-  the standard library is global".
-- Replaced globals are `Math.random` and `Date` (G-5). The deletions are
-  `eval`, `Function` and `WebAssembly` if present: one source of code is
-  the module.
+  NO specifier. Both a static `import x from "x"` and a top-level `await
+  import("x")` fail the module's LOAD with `ReferenceError: Error resolving
+  module 'x' from '<name>': imports are not available in a graphic; the
+  standard library is global` — the prefix is QuickJS's, the sentence
+  ours — with no line or column. An `import()` inside `render` returns a
+  promise nobody awaits, so it is only refused if the module awaits it.
+- Replaced globals are `Math.random` (throws `Math.random is not available;
+  use random(seed)`) and `Date` (`Date.now()` is 946684800000 and `new
+  Date()` is 2000-01-01T00:00:00Z). `Date.prototype.constructor` is
+  redefined to the frozen `Date` too, or `new Date().constructor.now()`
+  reads the wall clock (it answers 946684800000). The deletions are `eval`
+  (a call is then `ReferenceError: eval is not defined`) and `Function`:
+  the global, `Function.prototype.constructor`, and the `constructor` of
+  the AsyncFunction, GeneratorFunction and AsyncGeneratorFunction
+  prototypes, each of which otherwise compiles code from a string
+  (`(async () => {}).constructor("…")`); every one throws the sandbox's own
+  sentence. G0's review found the `Date` and three function-kind holes;
+  the cases were then shown to leak against the sandbox without those four
+  lines. quickjs-ng 0.16.2 defines no `WebAssembly` (a
+  reading of its `quickjs.c`; the sandbox deletes it anyway).
+- Memory: `new Array(1e9)` is NOT an allocation (it answers `length`
+  1000000000); a loop pushing 1 MiB `Uint8Array`s and `"x".repeat(1e8)`
+  both end in `InternalError: out of memory` with a line and column.
+  `"<svg" + "x".repeat(5e7)` is BUILT and returned, but reading it out of
+  QuickJS allocates inside the same 64 MB heap and fails, and rquickjs
+  names that failure "QuickJS library created a unknown error"; the engine
+  must answer it in its own words ("render's string could not be read —
+  is it tens of megabytes?"), and §8 records the ceiling. Deep recursion
+  is `RangeError: Maximum call stack size exceeded` with a line and column.
 - A syntax error at compile, and an exception, timeout or out-of-memory at
   render, each become a Diagnostic `{level: "error", message, line, column,
-  frame}`. QuickJS's backtrace gives line and column. The column is
-  mapped back through the module wrapper's fixed offset.
+  frame}`. rquickjs 0.14's `Exception` has NO `line()`/`column()`: the
+  position is parsed from `stack` (quickjs-ng writes `at render
+  (<name>:L:C)`), preferring a frame in the module's own name. An
+  interrupt's position is the FUNCTION's line, not the loop's (the case's
+  `render` opens on line 3 and loops on line 4; the answer said 3:1). The
+  module is evaluated unwrapped, so there is no offset to map back.
 - `render` must return a string that starts with `<svg`. Anything else is an
   error naming what came back ("render returned undefined at frame 12 —
-  did you forget `return`?"). An agent's most common mistake gets its own
-  sentence.
+  did you forget `return`?"; q6 printed it word for word, at frame 0). An agent's
+  most common mistake gets its own sentence.
 
 ### 5c. The module format and the API
 
@@ -503,6 +592,14 @@ export function render(frame, props, ctx) {
     </g>`);
 }
 ```
+
+**What runs it.** `rquickjs` 0.14.0 vendors quickjs-ng 0.16.2 (its
+`quickjs.h` defines `QJS_VERSION_MAJOR 0`, `MINOR 16`, `PATCH 2`; q2), not
+Bellard's QuickJS. It evaluates the module above VERBATIM — `export const`,
+the template literal, the object literals — and `??`, `?.`, `**`,
+`Array.prototype.at`, `Object.hasOwn`, `replaceAll` and `findLast` all work.
+`structuredClone` does not exist, and there is no `navigator` (so no
+`userAgent`); neither is needed.
 
 **The schema's types.** A schema has at most 64 keys, each matching
 `^[A-Za-z_][A-Za-z0-9_]{0,31}$`.
@@ -547,9 +644,28 @@ the engine emits it.
 - `interpolateColors(value, input, colors)` works in OKLab and returns hex.
 - `random(seed)` is splitmix32 → [0, 1). `seed` is a number or a string.
 - `noise2D(seed, x, y)` and `noise3D(seed, x, y, z)` are simplex.
-- `measureText(text, font)` returns `{width, ascent, descent, lineHeight}`.
-  `font` is `{family, size, weight, style, letterSpacing}`, and it is a host
-  function (§5b).
+- `measureText(text, font)` returns `{width, ascent, descent, lineHeight,
+  inkX, inkWidth}`. `font` is `{family, size, weight, style,
+  letterSpacing}`, and it is a host function (§5b) that parses a one-`<text>`
+  SVG with the engine's own options — step 1 of the plan, and q4 found no
+  step 2 (direct shaping) is needed. `width` is the text node's
+  `bounding_box()`, the ADVANCE box, which is what layout wants (the next
+  word starts there) and is NOT the ink: over 2 400 measurements it differed
+  from the drawn ink by p50 3.46 px and up to 78 px (a monospace face's
+  side bearings at 160 px). `inkX`/`inkWidth` are the flattened glyphs'
+  box (`flattened().abs_bounding_box()`), and those agree with the pixels
+  of the same text drawn inside a composed SVG to within 1.70 px counted in
+  whole pixel columns (p50 0.77, p95 1.46). `ascent` and `descent` are read
+  off the advance box around the baseline. A result is memoised per
+  `(family, size, weight, style, text)`, which changes no output.
+- It measures as the default `xml:space` draws: runs of spaces collapse and
+  leading and trailing spaces go, so `"a  b"`, `"a b "` and `" a b"` all
+  measure 103.30 px like `"a b"` (Montserrat 800, 64 px), and 121.92 px
+  under `xml:space="preserve"`. A helper that relies on a trailing space
+  measures without one.
+- Every family the helpers write is QUOTED (`font-family="'Source Sans
+  3'"`, G-6), and a family the set lacks throws from `measureText` naming the
+  families it has.
 - The text helpers are built on `measureText`:
   - `wrapText(text, maxWidth, font)` returns lines, breaking an over-long
     word by characters;
@@ -580,9 +696,13 @@ Compositor.serve (serial renderQueue)
   one `case .graphic` in the compositor's source switch, and the drawing in
   a new `LayerRenderersGraphic.swift`. `Compositor.swift` (1391) takes a
   call line only.
-- **The JavaScript still runs every frame.** q3 measures its cost, and a
-  string cache keyed by the recipe hash is G6's if the measurement asks
-  for it.
+- **The JavaScript still runs every frame**, and q3 measured it cheap: at
+  1920×1080 its p95 per frame is 0.10 ms (`title-card`) to 1.67 ms
+  (`kinetic-type`, which wraps and measures every word), against a parse of
+  0.32–0.68 ms and a raster of 1.85–7.29 ms. A string cache keyed by the
+  recipe hash would save the smallest of the three and is not built. What
+  the SVG-keyed texture cache saves is the RASTER: of 299 consecutive frame
+  pairs, 85 (`kinetic-type`) to 252 (`title-card`) returned the same SVG.
 - **The error card** (G-8) is drawn by `LayerRenderersGraphic` with Core
   Graphics into the same bitmap type. Its key is the diagnostic's text, so
   it is cached like any texture.
@@ -621,6 +741,21 @@ void  rc_graphic_free(RcGraphic *);
   tolerance first, strings freed with `rc_string_free`, and every export
   both tested and in the null-safety sweep (`core/CLAUDE.md:440-444,478-485`).
 
+**The shape, measured (q9).** A `#[no_mangle]` export in a throwaway
+`core/src/ffi_graphic.rs` delegating to the spike crate is in
+`libreelcut_core.a` (`nm -g` finds it once, and `JS_NewRuntime` three
+times), a Swift probe linked with `-lreelcut_core` alone calls it, and its
+render of `lower-third` frame 30 at 1920×1080 is byte-identical to the
+spike's own CLI given the same one font (SHA-256 `86f017e8…`). One staticlib
+is enough; the second is not needed. What the link costs is q1's app: the
+Release binary grows from 12 661 264 to 19 856 112 bytes (+7 194 848; the
+bundle 15 368 → 22 392 KiB) with NOTHING calling the export — the app's
+dead-stripping dropped `rc_graphic_spike_render` (`nm` ×0) and kept QuickJS
+(`JS_NewRuntime` ×2). So G1's app is about 7 MB bigger from its first
+build, before any graphic draws. The two probes differ by only 25 072 bytes
+because the CONTROL probe, which calls only `rc_op_names`, carries QuickJS
+too; that difference is not the engine's cost.
+
 **The toll on `ReelCore.swift` (1440 lines, over the cap).** Its rule is
 that it is the ONLY file calling `rc_*`, so the ~110 lines of wrappers
 (`GraphicLibrary`, `GraphicModule`) must go in it. It first gives up at
@@ -653,19 +788,37 @@ Talk.reelcut/
 - **The scan**: every `*.js` with a legal name → `(name, bytes, revision)`,
   plus a font and asset scan → `library.version`.
 - **The watch**: a `DispatchSource.makeFileSystemObjectSource` on
-  `graphics/` and on each subfolder, for `.write`, `.rename` and `.delete`.
-  An editor's atomic save shows as a rename in the folder (q7 verifies
-  this). Events are coalesced over 100 ms, then the folder is rescanned
-  and only changed revisions are recompiled.
+  `graphics/` and on each subfolder, AND one on each `*.js` file. q7(c)
+  measured what a folder source raises: a file moved in from outside, a
+  write to `x.js.tmp` renamed over `x.js` (an editor's atomic save) and a
+  removal each raise `.write` on the folder — never `.rename` — and an
+  IN-PLACE save (the file truncated and rewritten, `O_TRUNC`) raises
+  NOTHING on the folder, because no directory entry changed. The per-file
+  source (`.write`, `.extend`, `.delete`, `.rename`) catches that editor,
+  and is re-armed on every folder event, since an atomic save replaces the
+  inode it was watching. The number of folder events per action is not
+  stable (the rename-over raised two `.write`s 1 ms apart in one run and
+  one in another), so events are coalesced over 100 ms, then the folder
+  is rescanned and only changed revisions are recompiled.
 - **What a change does**: it posts `.graphicsDidChange(names)`. Playback
   refreshes the paused frame, the inspector re-reads the schema, and
   `GraphicRegistry` swaps the preview's modules.
 - **Writing**: the app's own writes (`write_graphic`, templates, `API.md`)
   go to `<name>.js.partial` and are then moved into place, as
   `ReverseRenderer` does (`:437-461`). After the folder is CREATED, the
-  store calls `packageContentsDidChangeOnDisk()` (`ProjectDocument.swift:793-798`).
-  If q7 finds that a file write inside `graphics/` also trips NSDocument's
-  modification check, it calls it after every event.
+  store calls `packageContentsDidChangeOnDisk()` (`ProjectDocument.swift:793-798`),
+  and only then. q7 measured both halves with the unchanged app and
+  `media/` as the stand-in for `graphics/` (the same lazy `directoryWrapper`,
+  inert at open): creating a folder inside an OPEN package moves the
+  package's own date, and the next save is refused with "The document
+  “P2.reelcut” could not be saved. The file has been changed by another
+  application."; a file moved into a folder that already exists does not
+  move it, and the save succeeds. A file written by another process
+  survives a save both when it landed while the app was closed and while
+  it was open, and survives an autosave in place (one fired 16.0 s after an
+  edit, with all three files still there). The CONTROL — the same file in
+  `graphics/`, which today's whitelist does not name — was gone after the
+  save, folder and all, which is the whitelist line this design adds.
 
 **What `ProjectDocument` takes.** `ProjectDocument.swift` (1380, over the
 cap) takes one whitelist line in `fileWrapper(ofType:)` and one line in the
@@ -871,16 +1024,20 @@ oracles:
   coverage.
 - **Determinism** (q5, kept as a test): 6 fixtures × 20 frames, 8 threads,
   shuffled, compared byte for byte.
-- **Sandbox**: q6's eight cases each end in a named Diagnostic within the
-  budget.
+- **Sandbox**: q6's eighteen cases (`tools/proof/graphics_spike/src/rows_stress.rs`'s
+  `CASES`) each end in the answer G0 recorded (§10.1 q6) within the budget,
+  and the same engine then draws a control frame byte-identically.
 - **The standard library**: JavaScript unit tests in
   `graphic/tests/js/*.test.js` run by a Rust harness. They cover
   `interpolate` extrapolation and multi-segment ranges, easing endpoints
   (0 → 0, 1 → 1), `spring` settling to `to` within a tolerance and being
   independent of call order, `wrapText` on a word longer than the width,
   and `random` being stable across calls.
-- **measureText parity** (q4, kept): the measured width equals the
-  rendered ink box within 1 px.
+- **measureText parity** (q4, kept): the measured INK box (`inkWidth`)
+  equals the ink drawn inside a composed SVG within 2 px counted in whole
+  pixel columns — a fractional box rounds out on both sides, so G0's worst
+  was 1.70 px and "within 1 px" held for only 1 680 of 2 400. The advance
+  `width` is not compared with ink; it is what layout wants.
 - **The props overlay**: defaults, stale keys and wrong types → warnings
   (G-4).
 - **The reference**: every code block in `docs/graphics-api.md` evaluates.
@@ -949,7 +1106,7 @@ visible stutter. If q3 predicted a shortfall, G6 runs first.
 | File | Lines now | What happens |
 |---|---|---|
 | `graphic/**` | — | new crate; each `src/` file under 400 |
-| `core/Cargo.toml` | — | `graphic = { path = "../graphic" }` (behind a feature if q1 says so); the `core/CLAUDE.md` dependency list gains its reason |
+| `core/Cargo.toml` | — | `graphic = { path = "../graphic" }`, a plain dependency (q1: `make test` 1.12× warm, no feature); the `core/CLAUDE.md` dependency list gains its reason |
 | `core/src/ffi_graphic.rs` | — | new, the nine exports |
 | `core/src/model_graphic.rs` · `edit_graphic.rs` · `recipe_graphic.rs` | — | new, each under 400 |
 | `core/src/model.rs` | 505 | `Source::Graphic`, `Clip.graphic` — a few lines |
@@ -997,8 +1154,10 @@ picks, and each is cheap to reverse before its phase starts:
    combines with what is under it through blend modes and track order.
    Mattes are §7's.
 6. **Performance target: 1080p30 in preview for the six templates**, with
-   export allowed to be slower. G0 measures, and G6 exists only if the
-   measurement misses.
+   export allowed to be slower. G0 measured it met with room: the six at
+   1920×1080 cost a p95 of 2.38 to 7.62 ms per frame (JavaScript, parse and
+   raster; worst max 15.81 ms), on the one serial queue, against 33 ms a
+   frame. G6 is not owed.
 7. **Experimental on `svg-motion`.** Merging to `main` is the user's call
    after G4 (§9).
 
@@ -1045,6 +1204,7 @@ picks, and each is cheap to reverse before its phase starts:
 | Default duration without `meta` | 5 s | §5h |
 | Contact sheet frames | ≤ 16 | §5h |
 | Watcher coalescing | 100 ms | §5f |
+| Largest string a `render` can hand back | well under 50 MB: a 50 MB string is built but cannot be read out of a 64 MB heap (q6) | §5b |
 | Frozen epoch | 2000-01-01T00:00:00Z | G-5 |
 
 ---
@@ -1092,13 +1252,363 @@ the branch `svg-motion`. G2 alone bumps the format.
     Editor and Duplicate as New Graphic.
   - Proved by the harness photographs and a probe over
     `GraphicSchemaRows` (a row per schema type, and a stale key shown).
-- **G6 — performance, only if owed.** An SVG-string cache, prefetch of the
-  next N frames on a concurrent queue during playback, and parallel frame
-  rendering in export with an ordered writer, each against a before and
-  after measurement.
+- **G6 — performance, NOT owed by G0.** q3's worst 1080p p95 was 7.62 ms per
+  frame against the 12 ms line, so the six templates need no cache,
+  prefetch or parallel export at 1080p30. At 3840×2160 the full-frame
+  gradient of `title-card` costs a p95 of 26.19 ms (max 57.74 ms) and
+  `kinetic-type` 13.33 ms, which is the case the person's playback check
+  (G3, remaining §4) watches on a 4K canvas. If that check stutters, G6 is:
+  prefetch of the next N frames on a concurrent queue during playback, and
+  parallel frame rendering in export with an ordered writer, each against
+  a before and after measurement. An SVG-string cache is not among them:
+  the JavaScript is the smallest of the three costs (§5d).
 
 ---
 
 ## 10. Record
 
-Empty. G0's run is §10.1.
+### 10.1. G0 — the spike, run on 2026-09-24
+
+Nine rows, all `run`, exit 0, and the tree's `core/` and `app/` back at
+`c874069` (`git diff c874069 --stat -- core app` and `git status --short --
+core app` both empty, in `answers.json`'s `git_check`). The instruments are
+`tools/proof/graphics_spike/` and its README says how to run them again;
+every number below was printed by a run and is in the CURRENT
+`tools/proof/work/graphics_spike/answers.json`, which three runs wrote: the
+full run (all nine rows, exit 0), then `--only q5 --mutant` (which writes
+`mutants.q5` and leaves `rows.q5` alone, exit 0), then `--only q7` (which
+rewrote `rows.q7`, exit 0; the file's `carried_forward` names the other
+eight).
+
+**The host.** macOS 26.5.1 (build 25F80) on an Apple M2 Max (Mac14,6, 12
+cores); Xcode 26.2 (17C52); Apple Swift 6.2.3; rustc and cargo 1.92.0;
+Python 3.14.5. **The crates, as resolved** in the spike's `Cargo.lock`:
+`rquickjs`, `rquickjs-core`, `rquickjs-sys` 0.14.0; `resvg` and `usvg`
+0.48.1; `tiny-skia` 0.12.0; `fontdb` 0.24.0; `harfrust` 0.12.0; `skrifa`
+0.44.0; `roxmltree` 0.21.1; `svgtypes` 0.16.1; `serde_json` 1.0.151; `sha2`
+0.10.9; `cc` 1.4.7. The spike depends on `resvg` with `default-features =
+false, features = ["text"]` and reaches `usvg`, `tiny-skia` and `fontdb`
+through it, so none is duplicated. Fonts are `app/Resources/Fonts/*.ttf`,
+read by the caller and handed over as bytes; `load_system_fonts` is never
+called.
+
+**The workload.** The six graphics of §5k, written from scratch in §5c's
+shape (`tools/proof/graphics_spike/graphics/`), over a standard library of
+the functions they use (`src/stdlib.js`). Each was rendered at frames 0, 30
+and 150 to `work/graphics_spike/frames/` and looked at once. One change came
+of looking: `lower-third`'s subtitle was first set in Source Sans 3, which
+drew nothing (q4's unquoted-family finding), and is set in Montserrat,
+which also keeps q9's one-font comparison a comparison of drawn text.
+
+---
+
+#### q1 — does the engine build into the core, and at what cost?
+
+**Measured.** The same sequence on each side: `rm -rf core/target`, a cold
+`cargo build --release`, `make test`, a comment line prepended to
+`core/src/outcome.rs` (remaining §6's edit) with `cargo build --release`
+and `make test` again, the comment removed, then `make app`. PATCHED is
+`graphics_spike = { path = "../tools/proof/graphics_spike" }` in
+`core/Cargo.toml`, `pub mod ffi_graphic;` and the one throwaway export.
+
+| | BASELINE (`c874069`) | PATCHED | |
+|---|---|---|---|
+| cold `cargo build --release` | 25.0 s | 43.2 s | +18.2 s (QuickJS's C) |
+| `make test`, first | 47.0 s, 827 passed | 48.0 s, 827 passed | |
+| warm `cargo build --release` after the edit | 1.36 s | 2.24 s | |
+| `make test` after the edit | 13.62 s, 827 passed | 15.20 s, 827 passed | **1.12×** |
+| `libreelcut_core.a` | 22 680 048 bytes, 591 members | 34 438 200 bytes, 917 members | +11 758 152 |
+| `make app` (incremental) | 5.6 s | 19.1 s | |
+| `Reelcut.app` (`du -sk`) | 15 368 KiB | 22 392 KiB | +7 024 KiB |
+| `Contents/MacOS/Reelcut` | 12 661 264 bytes | 19 856 112 bytes | +7 194 848 |
+
+q1c, `raster-images` switched ON in the spike's `Cargo.toml` while patched:
+one core build 28.3 s, the staticlib 35 412 552 bytes and 960 members
+(+974 352 over PATCHED); switched back, it rebuilt in 3.0 s to 34 438 200
+bytes exactly.
+
+**Verdict.** §5a **CHANGED**: the engine builds as a path dependency into
+the `staticlib`+`rlib`, and the core's own `make test` slows 1.12×, so the
+cargo feature §5a held in reserve is dropped (§5m's `core/Cargo.toml` row
+with it). The cold build pays 18 s once per clean build. `raster-images` is
+ON, priced. The app is ~7 MB bigger from the first build (q9 says why).
+
+---
+
+#### q2 — which QuickJS, and does it take §5c's module?
+
+**Measured.** `rquickjs-sys` 0.14.0's vendored `quickjs.h` defines
+`QJS_VERSION_MAJOR 0`, `QJS_VERSION_MINOR 16`, `QJS_VERSION_PATCH 2`,
+suffix empty: **quickjs-ng 0.16.2**. `navigator` is undefined (userAgent
+`null`). The feature probes: `??`, `?.`, `**`, template literals,
+`Array.prototype.at`, `Object.hasOwn`, `String.prototype.replaceAll` and
+`Array.prototype.findLast` all **true**; `structuredClone` **false**. §5c's
+module, evaluated VERBATIM as an ES module: `ok`, its `meta` and `schema`
+read back, and `render` at frame 30 returned a string starting `<svg
+xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0
+1920 1080">`. The schema came back with its keys ALPHABETICAL (`accent,
+align, boxed, logo, size, subtitle, title`), because the spike carries it
+through `serde_json` without `preserve_order`.
+
+**Verdict.** §5c **CONFIRMED** (the module format stands) and extended with
+what runs it; §5a **CHANGED** (`serde_json` takes `preserve_order`, so the
+inspector's rows keep the module's order); §4 G-2's licence list names
+quickjs-ng.
+
+---
+
+#### q3 — render cost per frame, in three parts
+
+**Measured.** Six graphics × 300 frames × two sizes, one thread, release
+build, `durationInFrames` 300, each frame's JavaScript call, usvg parse and
+resvg raster (the BGRA swizzle included) timed apart. Per-frame rows are
+`work/graphics_spike/q3.csv`; milliseconds:
+
+| Graphic | Size | JS p95 | Parse p95 | Raster p95 | Total p50 | Total p95 | Total max | First frame | Same SVG as the frame before |
+|---|---|---|---|---|---|---|---|---|---|
+| `bar-chart` | 1920×1080 | 0.94 | 0.68 | 4.07 | 3.28 | 5.90 | 15.81 | 4.67 | 96 |
+| `callout` | 1920×1080 | 0.18 | 0.33 | 1.95 | 2.03 | 2.38 | 3.55 | 2.11 | 197 |
+| `counter` | 1920×1080 | 0.22 | 0.32 | 1.90 | 1.81 | 2.38 | 9.75 | 1.43 | 89 |
+| `kinetic-type` | 1920×1080 | 1.67 | 0.57 | 3.32 | 3.97 | 5.10 | 12.00 | 2.38 | 85 |
+| `lower-third` | 1920×1080 | 0.34 | 0.32 | 1.85 | 1.80 | 2.45 | 5.26 | 1.57 | 139 |
+| `title-card` | 1920×1080 | 0.10 | 0.35 | 7.29 | 6.07 | **7.62** | 10.57 | 7.60 | 252 |
+| `bar-chart` | 3840×2160 | 0.85 | 0.64 | 9.94 | 8.60 | 11.20 | 16.01 | 9.48 | 96 |
+| `callout` | 3840×2160 | 0.25 | 0.51 | 8.92 | 5.25 | 9.59 | 51.00 | 4.91 | 197 |
+| `counter` | 3840×2160 | 0.25 | 0.46 | 9.85 | 5.16 | 10.48 | 48.06 | 10.97 | 89 |
+| `kinetic-type` | 3840×2160 | 1.78 | 1.01 | 11.15 | 9.10 | 13.33 | 32.12 | 5.70 | 85 |
+| `lower-third` | 3840×2160 | 0.33 | 0.32 | 6.30 | 5.16 | 6.86 | 11.01 | 3.99 | 139 |
+| `title-card` | 3840×2160 | 0.11 | 0.38 | 25.85 | 21.05 | **26.19** | 57.74 | 27.90 | 252 |
+
+Module load (compile and evaluate once) took 0.55–1.40 ms. The whole row
+took 252.6 s of wall clock, most of it SHA-256 over every raster for the
+CSV, which is not a render cost.
+
+**Verdict.** G6 **CONFIRMED not owed** at 1080p: the worst p95 is 7.62 ms,
+under §3's 12 ms line, and the raster — not the JavaScript — is most of
+every frame. §1's table, §5d, §6 item 6 and §9 G6 are REWRITTEN with the
+numbers; 4K full-frame fills are named as what the person's check watches.
+
+---
+
+#### q4 — `measureText` parity
+
+**Measured.** 200 strings from a seeded generator (words, digits,
+punctuation, `é`/`ü`, 1–40 characters) × Montserrat 800, Anton, IBM Plex
+Mono 400 and Bebas Neue × 24, 64 and 160 px = 2 400 measurements. Each was
+measured from a lone `<text>` and compared with the ink drawn by the same
+text inside a COMPOSED SVG (a bar above, a disc below, the text in a
+translated group), ink read as the columns with alpha > 0 in the text's
+band.
+
+| | p50 | p95 | max | within 1 px |
+|---|---|---|---|---|
+| `bounding_box()` width (the advance box) vs ink | 3.46 px | 20.0 px | 78.0 px | 495 / 2 400 |
+| flattened glyphs' box vs ink | 0.77 px | 1.46 px | 1.70 px | 1 680 / 2 400 |
+
+Per face, the flattened box's worst is 1.66 (Montserrat), 1.69 (Anton),
+1.63 (IBM Plex Mono) and 1.70 px (Bebas Neue); the advance box's worst is
+78.0 px, in IBM Plex Mono, whose narrow glyphs sit in wide cells.
+Whitespace, Montserrat 800 at 64 px: `"a b"`, `"a  b"`, `"a b "` and `" a
+b"` all measure 103.30 px by default and 103.30, 121.92, 121.92 and 121.92
+px under `xml:space="preserve"`. Variable fonts: `SourceSans3.ttf` loads as
+ONE face, `SourceSans3-Roman` at weight 200, and `DarkerGrotesque.ttf` as
+one, `DarkerGrotesque-Light` at 300; the instance drawn follows
+`font-weight` (Source Sans 3's advance at 64 px: 438.91, 462.34, 491.46 and
+502.66 px at 200, 400, 700, 900; Darker Grotesque's 379.46, 389.57, 419.71,
+439.94). Family attributes: `Source Sans 3` unquoted lays out **nothing**,
+`'Source Sans 3'` lays out; `Darker Grotesque` lays out; `Nope` lays out
+nothing; `Nope, Montserrat` lays out.
+
+**Verdict.** §5c **CHANGED**: step 1 (a one-node parse) is enough and no
+direct shaping is needed, but only the flattened box agrees with the
+pixels, so `measureText` answers both the advance (for layout) and the ink
+box, and §5l's parity test compares the ink box within 2 px of whole-pixel
+columns. §4 G-6 **CHANGED**: a missing family draws nothing, and a
+digit-led family must be quoted.
+
+---
+
+#### q5 — determinism
+
+**Measured.** The six graphics × frames 0, 7, 30, 90, 150 and 299 at
+1920×1080: a reference render each (one engine per graphic, in order), then
+8 threads sharing one `Arc` font database, each with its own engines,
+rendering all 36 three times in its own shuffled order — 864 renders.
+**0 raster mismatches and 0 SVG mismatches** against the reference (6.9 s).
+After each graphic's engine had rendered frames 0–299, its six frames were
+rendered again: **equal, 6 of 6**. Frames of the one engine in QuickJS are
+therefore a function of their inputs, across threads, orders and history.
+
+The on-purpose failure (`--mutant`): a copy of `counter.js` with a
+module-level call counter drawn into its frame, the graphic G-5 says the
+standard library cannot stop. The same 864 renders: **137 raster and 137
+SVG mismatches**, and `counter`'s after-300 check **unequal**; the other
+five stayed equal.
+
+**Verdict.** §4 G-5 **CONFIRMED**, and the instrument that must catch the
+one thing G-5 cannot prevent caught it.
+
+---
+
+#### q6 — the sandbox
+
+**Measured.** Eighteen cases, each its own process under a 30 s bound, with
+the §5b limits (64 MB heap, 1 MB stack, 250 ms). Every process exited 0
+within 0.55 s, and in every one the SAME engine then loaded `lower-third`
+and drew frame 0 byte-identically to a fresh engine (**control 18 of 18**).
+The table is the `--only q6` re-run after the review's sandbox fix (the
+four `constructor` rows are new); the other rows answer word for word as
+in the full run, with these timings.
+
+| Case | Answer | Line:col | ms |
+|---|---|---|---|
+| `while (true) {}` | `over the 250 ms budget at frame 0 (InternalError: interrupted)` | 3:1 | 250.14 |
+| `new Array(1e9)` | ok — `length` 1000000000, no allocation | — | 0.05 |
+| deep recursion | `RangeError: Maximum call stack size exceeded` | 4:26 | 0.17 |
+| `"<svg" + "x".repeat(5e7)` returned | `render's string could not be read at frame 0: QuickJS library created a unknown error` | — | 116.46 |
+| the same with `1e8` | `InternalError: out of memory` | 4:23 | 0.05 |
+| `Math.random()` | `Error: Math.random is not available; use random(seed)` | 4:31 | 0.04 |
+| `Date.now()`, `new Date()` | ok — `946684800000`, `2000-01-01T00:00:00…` | — | 0.05 |
+| `eval("1")` | `ReferenceError: eval is not defined` | 4:26 | 0.04 |
+| `new Function("return 1")()` | `Error: Function is not available in a graphic; the module is the one source of code` | 4:30 | 0.04 |
+| `new Date().constructor.now()` | ok — `946684800000` (the wall clock, 1790304515352, without the fix) | — | 0.04 |
+| `(async () => {}).constructor("return 1")` | the `Function` sentence (a function, without the fix) | 4:50 | 0.05 |
+| `(function* () {}).constructor("yield 1")` | the `Function` sentence (a function, without the fix) | 4:51 | 0.04 |
+| `(async function* () {}).constructor("yield 1")` | the `Function` sentence (a function, without the fix) | 4:57 | 0.04 |
+| `await import("x")` at top level | `ReferenceError: Error resolving module 'x' from 'dynamic_import': imports are not available in a graphic; the standard library is global` | — | 0.03 |
+| `import x from "x"` | the same sentence, from `'static_import'` | — | 0.03 |
+| `typeof WebAssembly` | ok — `undefined` | — | 0.04 |
+| push 1 MiB `Uint8Array`s forever | `InternalError: out of memory` | 4:59 | 0.29 |
+| `render` without `return` | ``render returned undefined at frame 0 — did you forget `return`?`` | — | 0.04 |
+
+Each case's `render` opens on line 3 and its body is line 4.
+
+**Verdict.** §5b **CONFIRMED** for the limits and **REWRITTEN** for what
+they answer: an interrupt points at the function, not the loop; the import
+refusal carries QuickJS's prefix and no position; a string of tens of
+megabytes is built but cannot be read out, under an rquickjs message that
+names nothing (a new §8 row); line and column come from `stack`, since
+rquickjs 0.14's `Exception` has no `line()`/`column()`.
+
+---
+
+#### q7 — the package, with the unchanged app
+
+**Measured.** `rows_app.py`, run as `--only q7` after the full run: the git
+check empty, `make app` (rc 0, 2.7 s, incremental), and the launched binary's
+SHA-256 `228faea7b13c8c71483cccc454edc0b11704d398773bd077c078b9f0794007d0`.
+One owned instance on port
+4843, by PID, launched twice; `grep "Reelcut: "` over its log printed
+nothing.
+
+The app at `c874069` whitelists `project.json`, `cache/` and `media/` in
+`fileWrapper(ofType:)` (`ProjectDocument.swift:659-677`), so `graphics/`
+cannot survive a save today. **`media/` is the STAND-IN**: it goes through
+the same lazy `directoryWrapper` (`:694-702`) a `graphics/` line would call,
+and the app reads it at open only to re-anchor missing media by name
+(`:557-572`), so a stray `.js` there is inert. `graphics/` is run once as
+the **CONTROL**.
+
+| Sub-row | What was done | Answer |
+|---|---|---|
+| (a) | `new_project P1`; app stopped; `mkdir P1/media`, `mv` from outside to `P1/media/x.js`; relaunched; `open_project`, `add_track`, `save_project` | save ok; `x.js` **present** |
+| (a2) | `mv` `y.js` into the existing `P1/media/` while open; `add_track`; `save_project` | save ok (0.03 s), no conflict; `x.js` and `y.js` **present** |
+| (a-auto) | `mv` `z.js` in; `add_track`; poll `project.json`'s mtime | an autosave in place wrote it **16.0 s** after the edit; `x.js`, `y.js`, `z.js` **present** |
+| (ctrl) CONTROL | the same as (a) with `P3/graphics/x.js` | save ok; `x.js` **ABSENT**, and the `graphics/` folder gone, as the whitelist predicts |
+| (b) | `new_project P2` open; `mkdir P2/media` and `mv` `w.js` in (the package's own mtime moved); `add_track`; `save_project` | refused: "The document “P2.reelcut” could not be saved. The file has been changed by another application." |
+| (c) | `q7_watch` (a `DispatchSource` on a plain folder's fd, every mask) | `mv` in from outside: `.write` ×1; `x.js.tmp` written then renamed over `x.js`: `.write` ×2 (1.1 ms apart); in-place `O_TRUNC` rewrite of `x.js`: **nothing**; `rm`: `.write` ×1. **No `.rename`, ever.** |
+
+The full run's q7, whose transcript is kept as
+`work/graphics_spike/full-run.log` (its `answers.json` entry was replaced
+by this run's), printed the same (a)–(b) answers and ONE `.write` for (c)'s
+rename-over, so the COUNT of folder events per action is not stable.
+
+**Verdict.** §5f **CHANGED**. What a whitelisted, lazily wrapped folder
+does with a file another process put there is measured by proxy: it
+survives a save and an autosave in place, landed while closed or while
+open. NSDocument's check trips only when a folder is CREATED in the open
+package, so `packageContentsDidChangeOnDisk()` is called after creating
+`graphics/` and not after every event. The watcher's premise was wrong: a
+folder source raises `.write`, not `.rename`, and misses in-place saves
+entirely, so each module file gets its own source.
+
+---
+
+#### q8 — is QuickJS's floating point the same in every build?
+
+**Measured.** `math_hash()`, SHA-256 over the bit patterns of 10 000 results
+of `Math.sin`, `cos`, `tan`, `pow` and `exp`+`log`, from the release
+binary, the debug binary, `cargo test --release --test q8` and `cargo test
+--test q8`: all four
+`ff4d9866561df3268abc62a9729cca14a6e87c3c81fee58199f2eeed424eb47a`.
+
+**Verdict.** **CONFIRMED**: preview (a release build) and the engine's tests
+(either profile) can be compared byte for byte on this host.
+
+---
+
+#### q9 — the FFI shape
+
+**Measured.** With the core patched (q1): `nm -g libreelcut_core.a` finds
+`rc_graphic_spike_render` **once** and `JS_NewRuntime` three times.
+`q9_probe.swift`, built `xcrun swiftc -O -target arm64-apple-macos26.0
+-import-objc-header q9_probe.h -L core/target/release -lreelcut_core` (no
+other flag), called it on `lower-third.js` frame 30 at 1920×1080 with
+`Montserrat-ExtraBold.ttf` as its one font: SHA-256
+`86f017e88897403b38f8fc2fd5692d19f882b88ae91598558393df8dd7c2a595`, 613
+bytes of SVG. The REFERENCE, `graphics_spike render --fonts
+work/graphics_spike/q9_fonts/` (that one font, nothing else): the **same
+SHA-256**. The engine probe is 12 235 712 bytes and the CONTROL probe
+(`-D CONTROL`, calling only `rc_op_names`) 12 210 640, a difference of 25 072
+— but the CONTROL holds `JS_NewRuntime` ×2 as the engine probe does, so
+that difference is the export's own code, not the engine's. The patched
+app's `nm` shows `rc_graphic_spike_render` ×0 and `JS_NewRuntime` ×2.
+
+**Verdict.** §5e **CONFIRMED**: an export in `core/src/ffi_graphic.rs`
+delegating to a separate crate is in the one staticlib and callable from
+Swift, byte-identically; no second staticlib. What is new is the cost: the
+linker keeps QuickJS in any binary that links the archive, whether or not
+the export is referenced, which is q1's +7 194 848 bytes of app.
+
+### 10.2. Not run
+
+Every row and sub-row ran. Two things were measured by PROXY and are named
+as such: q7's (a), (a2) and (a-auto) used `media/` as the stand-in for
+`graphics/`, because adding the whitelist line is G1's and `app/` had to
+stay at `c874069` (the direct measurement is §5l's "Package" proof row, in
+G3); and no `<image>` was rendered, so "resvg 0.48.1 decodes nothing
+without `raster-images`" is a reading of `src/image.rs:26-32`, priced by
+q1c but not photographed. q1's `make app` times are incremental builds
+over a warm `build/` and compare only with each other.
+
+### 10.3. Owed from G0's review
+
+G0's second review passed with four nits, none of which changes a §10.1
+answer. They are written here so G1 finds them:
+
+1. **`performance` is untouched by the sandbox**
+   (`tools/proof/graphics_spike/src/runtime.rs:144`). If quickjs-ng defines
+   `performance.now()`, that is a clock the frozen `Date` does not cover.
+   It is unverified: no q6 case checks it. **Owed to G1:** a
+   `typeof performance` case in the sandbox tests, and the global deleted
+   if it exists (G-5).
+2. **`textLines` writes `font-family` unquoted**
+   (`tools/proof/graphics_spike/src/stdlib.js:181`), against the rewritten
+   §5c. The spike's fixtures never call it with a spaced family. **Owed to
+   G1:** the engine's `stdlib.js` quotes the family in every helper.
+3. **The name `engine_linked_bytes` is wrong**
+   (`tools/proof/graphics_spike/rows_build.py:245,272`). The key and its
+   printed label contradict §10.1 q9, which says that difference is not
+   the engine's cost. This is an instrument label, and the record's prose
+   is the one that holds.
+4. **`patch()` never checks its anchors**
+   (`tools/proof/graphics_spike/rows_build.py:152,160`). If an anchor were
+   missing, q1 would silently measure the baseline twice. The recorded run
+   shows different before and after numbers, so it did not happen here. It
+   would matter only if the spike is re-run against a changed
+   `core/src/lib.rs`.
+
+One file-state caveat: the fix pass's verification re-run overwrote
+`tools/proof/work/graphics_spike/q3.csv`, `frames/`, `q7/` and `q9/`, so
+those artefacts no longer match the record. `answers.json` is the recorded
+run, with q6 replaced by the post-fix re-run (the spike README says so).

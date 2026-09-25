@@ -4679,6 +4679,45 @@ closed. One SUB-row did not run and is named in road map 8 §10.3 and in
 `designs/reelcut-remaining.md` §4: q3's no-network case, which would change
 host network state.
 
+## Road map 10 — the graphics spike (`graphics_spike/`)
+
+G0, run complete on 2026-09-24: the nine questions
+`designs/reelcut-roadmap-10.md` §3 asks before any graphics code is written.
+**The answers are in that document's §10.1, and §3a lists every design
+section a row rewrote.** `tools/proof/graphics_spike/README.md` is how to
+run it again; this paragraph is the entry in this table.
+
+```sh
+python3 tools/proof/graphics_spike/graphics_spike.py                    # all nine
+python3 tools/proof/graphics_spike/graphics_spike.py --only q4,q5       # a subset; the rest carry forward
+python3 tools/proof/graphics_spike/graphics_spike.py --only q5 --mutant # the on-purpose failure: exit 0 only if caught
+python3 tools/proof/graphics_spike/graphics_spike.py --only q7          # git check, make app, the app on port 4843
+```
+
+The instruments are a scratch Rust crate (`rquickjs` 0.14.0 and `resvg`
+0.48.1 with only `text`, its own `[workspace]`, a CLI whose every
+subcommand prints one JSON object), the six §5k graphics, two Swift probes
+(`q9_probe.swift` calls a throwaway core export; `q7_watch.swift` is a
+`DispatchSource` on a folder) and a Python runner over `bounded.py`, which
+puts every child in its own process group under a hard bound, drains its
+pipes while it waits (the 64 KiB lesson of the words spike above) and
+answers an expiry as `expired: True`. **q1 and q9 patch the core** —
+`core/Cargo.toml`, `core/Cargo.lock`, `core/src/lib.rs` and a new
+`core/src/ffi_graphic.rs` — and **delete `core/target`** for their cold
+builds; `rows_build.revert()` always runs after them and writes `git diff
+c874069 --stat -- core app` and `git status --short -- core app`, both
+empty, into `answers.json`. q7 runs last, on the app built from the reverted
+tree, launches its own instance on port 4843 by PID and kills only that;
+`grep "Reelcut: " tools/proof/work/graphics_spike/reelcut-4843.log` must
+print nothing. q7 measures the package with `media/` as the STAND-IN for
+`graphics/`, which the unchanged app's whitelist cannot keep; the
+`graphics/` run is the CONTROL, expected absent.
+
+The full run scored **exit 0 with all nine rows `run`** and the git check
+empty; `--only q5 --mutant` caught the counter mutant (137 mismatches,
+exit 0) and `--only q7` re-ran q7 (exit 0). Nothing was left unrun; two
+answers are by proxy or by reading, and road map 10 §10.2 names them.
+
 ## The deployment target, rendered (`target_bump_proof.py`)
 
 W1a, road map 8 §10.4: the macOS 26 bump recompiles `Compositor.metal`
