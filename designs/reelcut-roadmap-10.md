@@ -3401,3 +3401,72 @@ move, trim and split it, and edits its module in their own editor.
 "stop after G4 and report"). Owed across G4: the list above and G4a's, the
 person's playback check (remaining §4), and kpgalligan/reelcut#38 (the
 export-cancel crash's cherry-pick to `main`).
+
+### 10.8. After G4 — a defect the person found, and where G5 stands
+
+#### The defect: graphic clips do not preview or play in the editor (OPEN, 2026-09-25)
+
+**What the user saw.** The user built Reelcut from `svg-motion` and opened
+the three playback-check projects (`tools/proof/work/playback-check/`, made
+by `tools/proof/graphics_playback_samples.py`, remaining §4's graphics
+bullet). "The clips are there, but they show no preview, and playback just
+plays a beep." The user's ruling: **resolve this before any more G5 work.**
+
+**What IS proved, and so is not the fault.** For the same three packages,
+the built app's `render_frame` (an OFFLINE render: `Exporter.renderFrame`,
+its own composition, a PINNED key) drew all three correctly — `title-card`
+at 4K, `kinetic-type` at 1080p, and the error card from frame 60 — checked
+by eye on 2026-09-25 at `dd3d30c`. `graphics_proof.py`'s 39 rows are all
+`render_frame`, `render_graphic` or export. So the engine, the recipe, the
+registry's pinned path, `LayerRenderersGraphic` and the compositor's
+`.graphic` case work OFFLINE.
+
+**The gap in the proofs.** No proof ever played a graphic through the LIVE
+path — `Playback`'s `AVPlayer`, the document's own `RecipeSource` key
+(`GraphicRegistry.resolve`'s 250 ms preview arm), the paused-frame refresh.
+The offscreen harness cannot see the picture (a Metal layer has no drawable
+offscreen), so the live path needs either a probe that drives `Playback`
+and reads a frame back, or the person.
+
+**Where to start (hypotheses, NOT verified):**
+1. **The beep.** Find what beeps on Play: `NSSound.beep()` /
+   `NSBeep` callers in `Playback.swift` and the transport — likely a play
+   refused because the player item failed or the composition has zero
+   duration. `CompositionBuilder.addPlaceholderIfNeeded`
+   (`CompositionBuilder.swift:173-188`) adds the one-frame `Blank.mp4`
+   track only when `plan.videoTracks.isEmpty && plan.duration > 0`; check
+   the core plan's `duration` counts graphic clips (G2a made
+   `evaluate.rs`'s `draws()` true and `segment_of` None for a graphic;
+   whether the PLAN's duration and track logic see it has not been checked).
+   A project of ONLY graphics is exactly the playback-check projects' case;
+   `render_frame` may survive what `AVPlayer` does not (the offline path
+   builds its own composition).
+2. **No preview.** If the player item is fine, check the document key's
+   registry entry in the live app: `ProjectDocument+Graphics.startGraphicStore()`
+   (from `makeWindowControllers()`) installs the set; `resolve` answers nil
+   (→ the `missing` slate, not a blank) only with no set. A BLANK preview
+   (not a slate) points back at the composition/player rather than the
+   registry.
+3. `ProjectSnapshot.sourceSize(of:)` still answers nil for `.graphic`
+   (`ProjectSnapshot.swift:~1791`, a stale "G3 reads … once ClipSnapshot
+   decodes" comment — G3a DID decode it). That affects canvas handles and
+   Fit/Fill, probably not the picture, but it is wrong and cheap.
+
+**The fix owes a live proof**: a probe (or an MCP row driving `set_playhead`
+plus a live-frame read, if one exists) that fails today on a graphics-only
+project and passes after — made to fail on purpose, per the proof rules —
+and a person's re-check of the three sample projects.
+
+#### G5 — paused
+
+G5 (the person: road map 9-style Graphic sub-tab, menus, templates) was
+split into two `/litecode` pipelines. Neither has changed code:
+- **G5a — the Graphic sub-tab.** `request.md` and triage (full route) are
+  written in `~/.claude/litecode/reelcut/graphics-g5a-graphic-subtab/`; the
+  designer was stopped by the user mid-exploration, before `01-spec.md`.
+  Resume from the design stage.
+- **G5b — menus, templates, G4b's watcher library gap, closing G5.**
+  `request.md` drafted in `~/.claude/litecode/reelcut/graphics-g5b-menus-templates/`
+  (its baseline and "what earlier pipelines found" section are filled in
+  when G5a lands).
+The requests' substance: §5j, §5k, and G4b's owed watcher gap (§10.7 G4b).
