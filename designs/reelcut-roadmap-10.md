@@ -1,9 +1,11 @@
 # Reelcut — road map 10: graphics, motion graphics drawn by code
 
-**Status: SPIKED 2026-09-24 — G0 ran complete, all nine rows of §3 measured
-on this host (§10.1); no product code built. EXPERIMENTAL, on the branch
-`svg-motion`.** Nothing here lands on `main` until the user decides to merge
-it (§9). The input to this design was `designs/svg-motion-components-plan.md`,
+**Status: BUILT and MERGED into `main` 2026-09-25** (§10.10). G0 spiked
+2026-09-24 (§10.1); G1–G5 built 2026-09-24/25 on the branch `svg-motion`
+(§10.4–§10.9); G6 (performance) deferred by the user. The status line
+below this one is history: it was written when only G0 had run, and
+"nothing lands on `main` until the user decides to merge it (§9)" held
+until §10.10. The input to this design was `designs/svg-motion-components-plan.md`,
 a tech plan the user had drafted. §1 reviews that plan against this codebase,
 and every section after §1 is the design that came out of the review.
 
@@ -3840,5 +3842,18 @@ comment names its UI path. The watcher gap G4b owed is closed.
 
 **Owed across G5.** The graphics-only playback defect is FIXED (§10.8,
 2026-09-25; the person's re-check owed); the G5a and G4b lists above; the person's playback check
-(remaining §4). **G6 is deferred**: no stutter at 4K on the user's M2 Max (§9's G6). **Merging
-`svg-motion` into `main` is the user's decision.**
+(remaining §4). **G6 is deferred**: no stutter at 4K on the user's M2 Max (§9's G6). Merging
+`svg-motion` into `main` was the user's decision; they made it (§10.10).
+
+### 10.10. Merged into `main` (2026-09-25)
+
+The user said "Merge both to main": the branch `svg-motion` and the
+export-Cancel crash fix (kpgalligan/reelcut#38). The fix, G3c's
+`ExporterWriter.swift` hunk (3a5df08), is on `svg-motion`, so the one merge
+carries both and no cherry-pick was made. `main` had no commit that
+`svg-motion` lacked. The merge was made with `--no-ff`, so the branch's
+history stays visible as one merge commit. What `main` holds from here:
+road map 10's G1–G5, the §10.8 playback fix, and #38's fix. Still owed, all
+recorded above: the person's watched re-check of the playback-check
+projects (remaining §4), the G4b, G5a and G5b nits (§10.7, §10.9), the
+probe nit (§10.8), and G6, deferred.
