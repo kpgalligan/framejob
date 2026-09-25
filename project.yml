@@ -149,6 +149,28 @@ targets:
         outputFiles:
           - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/GraphicsAPI.md
           - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/GraphicsAPI.d.ts
+      # The graphic templates (road map 10's G5b): Insert ▸ Graphic lists the
+      # six modules of graphic/tests/graphics/, copied as they are.
+      - name: Copy Graphic Templates
+        script: |
+          set -e
+          dest="$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/GraphicTemplates"
+          mkdir -p "$dest"
+          cp "$PROJECT_DIR"/graphic/tests/graphics/*.js "$dest/"
+        inputFiles:
+          - $(PROJECT_DIR)/graphic/tests/graphics/bar-chart.js
+          - $(PROJECT_DIR)/graphic/tests/graphics/callout.js
+          - $(PROJECT_DIR)/graphic/tests/graphics/counter.js
+          - $(PROJECT_DIR)/graphic/tests/graphics/kinetic-type.js
+          - $(PROJECT_DIR)/graphic/tests/graphics/lower-third.js
+          - $(PROJECT_DIR)/graphic/tests/graphics/title-card.js
+        outputFiles:
+          - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/GraphicTemplates/bar-chart.js
+          - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/GraphicTemplates/callout.js
+          - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/GraphicTemplates/counter.js
+          - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/GraphicTemplates/kinetic-type.js
+          - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/GraphicTemplates/lower-third.js
+          - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/GraphicTemplates/title-card.js
 
 schemes:
   Reelcut:

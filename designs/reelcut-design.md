@@ -2957,6 +2957,13 @@ in the engine's words. `import_graphic_asset {path, name?}` copies a PNG,
 JPEG, GIF, WebP, SVG or SVGZ into `graphics/assets/` and refuses anything
 else and an empty file. Both are not undoable and never dirty the document.
 
+G5b gives the person the same doors (§9): File ▸ Add Font to Graphics… and
+Add Image to Graphics… run the two imports' own body
+(`GraphicStore.importFont` / `importAsset`), Help ▸ Graphics Reference opens
+the file `graphic_reference` answers, and **Insert ▸ Graphic is
+`write_graphic` of a template (or a chosen `.js`) then `add_graphic_clip`**
+— one undo step, "Insert Graphic", placed by Add Text's rule (§11 G-16).
+
 Handlers use `performGroupedEdit` so off-event edits get their own undo group
 (Rasterize's `AgentServer.performGroupedEdit`). Default port 4817; env
 `RC_AGENT_PORT`; launch flag `-AgentServerEnabled YES`.
@@ -3222,7 +3229,16 @@ bound" table claims no row for it and every bare letter belongs to the
 editor's own `keyDown`; the queue's window sets
 `isExcludedFromWindowsMenu`, since this menu is `NSApp.windowsMenu` and
 AppKit would otherwise list it a second time under its own title — Bring All
-to Front), Help.
+to Front), Help (Reelcut Help, Graphics Reference — road map 10's G5b: the
+bundled `GraphicsAPI.md` opened in the person's own app, live while the
+bundle holds it, with no document needed).
+Road map 10's G5b adds **Insert**, right after Edit, holding **Graphic ▸**:
+one item per bundled template (the six of `graphic/tests/graphics/`, copied
+into the app's `GraphicTemplates/`, titled from the file stem —
+`lower-third.js` is Lower Third — never by compiling it), a separator and
+From File…; and File gains **Add Font to Graphics…** and **Add Image to
+Graphics…** right after Consolidate Media…. None of the ten items takes a
+key equivalent, for the caption items' reason; §11 G-16 has the rules.
 All menu items are nil-target selectors validated in
 `validateUserInterfaceItem`.
 
@@ -4727,3 +4743,24 @@ assisted import.
   `multiline`**, not §5j's value row: `OptionFieldControl` is numeric.
   (f) **No preview strip.** `render_graphic` has no inspector control; a
   person looks at the preview well.
+- **G-16 — Insert ▸ Graphic: where the clip goes, what the module is
+  called, and what a module that does not compile does** (road map 10
+  §10.9 G5b, 2026-09-25). Insert ▸ Graphic is `write_graphic` of a template
+  or a chosen `.js`, then `add_graphic_clip` at the module's `meta`
+  duration and size, as ONE undo step "Insert Graphic" (the file write is
+  not undoable, G-3).
+  (a) **Placement is Add Text's** (`addGeneratedClip`, §4.1 "at the
+  playhead"): the front track if the clip fits there, else a new track
+  above everything. So no track, or a playhead over a clip, never disables
+  the item; it validates on the document's graphics store alone.
+  (b) **The name is the file's stem made a module name, then made free**:
+  lowercased, every run of anything but `a-z0-9` one `-`, trimmed, at most
+  63 (`graphic` when nothing is left) — `My Counter (v2).js` is
+  `my-counter-v2` — then `GraphicStore.uniqueModuleName`: the name when
+  the folder holds no module of it, else `-2`, `-3`, …, so an insert never
+  overwrites a module another clip draws. Duplicate as New Graphic…'s
+  suggestion uses the same rule.
+  (c) **A module that does not compile stays on disk and places nothing**:
+  the person reads "graphics/<name>.js was written but does not compile:
+  <the first diagnostic> (line N)" in a sheet, and can fix the file where
+  it is.

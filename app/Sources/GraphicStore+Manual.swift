@@ -25,6 +25,13 @@ extension GraphicStore {
 
     var manualDirectory: URL { Self.manualDirectory(besideFonts: bundledFonts) }
 
+    /// The app bundle's own `GraphicsAPI.md`, no document involved:
+    /// `graphic_reference` answers it and Help ▸ Graphics Reference opens it.
+    static var bundledReferenceURL: URL {
+        manualDirectory(besideFonts: ProjectDocument.bundledFontsDirectory)
+            .appendingPathComponent(bundledManualNames[0])
+    }
+
     /// Main. Nothing unless `folderURL` exists; each file written
     /// (`.atomic`) only when its bytes differ from the bundled one; a
     /// bundled file that is absent is skipped silently.

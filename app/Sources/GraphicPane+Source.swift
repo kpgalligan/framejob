@@ -183,13 +183,7 @@ extension GraphicPane {
     /// `write_graphic` of the source under the new name, then `set_graphic`.
     func duplicateAsNewGraphic(_ file: GraphicModuleFile, schema: [String: Any]?) {
         guard let store = binding.document?.graphicStore else { return NSSound.beep() }
-        let held = Set(store.scan.modules.keys)
-        var suggestion = file.name + "-copy"
-        var n = 2
-        while held.contains(suggestion) {
-            suggestion = file.name + "-copy-\(n)"
-            n += 1
-        }
+        let suggestion = store.uniqueModuleName(file.name + "-copy")
         let alert = NSAlert()
         alert.alertStyle = .informational
         alert.messageText = "Duplicate \(file.name).js as a new graphic"

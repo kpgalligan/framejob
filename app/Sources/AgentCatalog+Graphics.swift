@@ -33,7 +33,8 @@ extension AgentServer {
                     + "against the module's own schema, read by the app from the file as it "
                     + "is now; a key the schema lacks, a wrong type or a value out of range "
                     + "is refused by its dotted path. Like a shape it has no source: "
-                    + "set_graphic changes what it is drawn from, set_video places it.",
+                    + "set_graphic changes what it is drawn from, set_video places it. "
+                    + "Insert ▸ Graphic is write_graphic of a template then this op.",
                 [
                     "track": trackDescription,
                     "at": "Start, \(ticks)",
@@ -106,7 +107,7 @@ extension AgentServer {
                 "Answers the whole graphics API — the module's shape, ctx, the schema's "
                     + "types, the standard library, fonts, the sandbox, limits and idioms — as "
                     + "Markdown, for an LLM to read once before writing a graphic. Needs no "
-                    + "project open.",
+                    + "project open. Help ▸ Graphics Reference opens the same file.",
                 [:]),
             tool(
                 "render_graphic",
@@ -181,7 +182,7 @@ extension AgentServer {
                     + "other apps show) — and library_families, every family the graphics can "
                     + "now draw with. A file that loads no face is refused in the engine's "
                     + "words. A file of the same name is replaced (replaced is true). Not "
-                    + "undoable. Mirrors File ▸ Add Font to Graphics…, which G5 builds.",
+                    + "undoable. Mirrors File ▸ Add Font to Graphics…",
                 [
                     "path": [
                         "type": "string",
@@ -195,7 +196,7 @@ extension AgentServer {
                     + "module draws it with <image href=\"${asset(name)}\">; answers every "
                     + "asset the folder now holds. Anything else, and an empty file, is "
                     + "refused. A file of the same name is replaced (replaced is true). Not "
-                    + "undoable. Mirrors File ▸ Add Image to Graphics…, which G5 builds.",
+                    + "undoable. Mirrors File ▸ Add Image to Graphics…",
                 [
                     "path": [
                         "type": "string",

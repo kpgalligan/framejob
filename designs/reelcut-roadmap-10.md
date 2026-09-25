@@ -3628,3 +3628,153 @@ clipped to "1920 p:"; they now use `InspectorMetrics.wideFieldWidth`.
   default, until the selection changes.
 - G5b is next: the menus, the templates, G4b's watcher library gap, and
   closing G5.
+
+#### G5b — the menus, the templates, the watcher gap (2026-09-25)
+
+**What a person can now do.**
+- **Insert ▸ Graphic** (a new menu, right after Edit) lists the six bundled
+  templates — Bar Chart, Callout, Counter, Kinetic Type, Lower Third, Title
+  Card — then From File…. Choosing one writes the module into the package's
+  `graphics/` under a free name (`lower-third`, then `lower-third-2`),
+  rescans, and places a clip drawn by it at the playhead, at the module's
+  `meta` duration and size: the front track if it fits, else a new track
+  above everything, Add Text's rule. That is one undo step, "Insert
+  Graphic"; the file stays (G-3). From File… does the same with a `.js` the
+  person picks; its stem is made a module name (`My Counter (v2).js` →
+  `my-counter-v2`). A module that does not compile stays on disk and places
+  nothing; the sheet reads "graphics/<name>.js was written but does not
+  compile: <first diagnostic> (line N)". Spec §11 **G-16** records the
+  three rules.
+- **File ▸ Add Font to Graphics…** and **Add Image to Graphics…** (after
+  Consolidate Media…) copy a `.ttf`/`.otf` into `graphics/fonts/` or a
+  picture into `graphics/assets/`, with the same refusals, in the same
+  words, as `import_graphic_font` / `import_graphic_asset` — one body now,
+  `GraphicStore.importFont(from:)` / `importAsset(from:as:)`.
+- **Help ▸ Graphics Reference** opens the bundled `GraphicsAPI.md` in the
+  person's own app, with no document open; it is live while the bundle
+  holds the file.
+- None of the ten new items takes a key equivalent (spec §9's bare-letter
+  reason). The four editor items validate on the document's graphics store
+  alone, so an empty timeline never disables Insert ▸ Graphic.
+
+**The watcher gap is closed.** `GraphicStore.drain()` now posts
+`.graphicsDidChange` when the font and asset set moved even if no module
+changed (`names` is then empty), so a font or picture dropped by hand into
+a module-less `graphics/` reaches the registry through the store's own
+post. G4b's `catchUpLibrary` is deleted; I4 still passing proves the post
+does its job, and the new W1 proves the shell path.
+
+**Where it lives.** `GraphicTemplates.swift` (**77**, new: the list, the
+title from the stem, the stem made a module name); `GraphicStore.swift`
+**376 → 388** (`uniqueModuleName`, the `drain()` fix, the post's doc);
+`GraphicStore+Import.swift` **37 → 120** (the two import bodies, moved from
+the handlers with their sentences, each ending in `rescan()`);
+`GraphicStore+Manual.swift` **53 → 60** (`bundledReferenceURL`, moved from
+`AgentServer+Graphics.swift`); `AgentServer+GraphicImports.swift` **123 →
+57** (the handlers thinned; `catchUpLibrary` and `graphicImport` deleted);
+`AgentServer+Graphics.swift` **314 → 314** (`metaWhole` and `sides` static,
+the private reference URL gone, UI-path comments naming the menus);
+`AgentServer+GraphicRender.swift` 263 (`Self.`); `AgentCatalog+Graphics.swift`
+**212 → 213** (prose); `AppDelegate+Menus.swift` **549 → 561** (`item` and
+`submenuItem` internal, the Insert menu hung, File's two items, Help's
+item); `AppDelegate+GraphicMenu.swift` (**48**, new: `insertMenu()`,
+`graphicMenu()`, `showGraphicsReference`); `AppDelegate.swift` **248 →
+253** (one `validateMenuItem` arm); `EditorViewController+AddClips.swift`
+**347 → 356** (`addGeneratedClip` internal, with `grouped`);
+`EditorViewController+GraphicMenus.swift` (**172**, new: the four commands,
+`insertGraphic(from:grouped:)`, the validator arm); the FROZEN
+`EditorViewController.swift` **1127 → 1128** (one validator line);
+`GraphicPane+Source.swift` **280 → 274** (Duplicate's suggestion through
+`uniqueModuleName`); `project.yml` **159 → 181** (the "Copy Graphic
+Templates" post-build script). The template item runs inside its menu
+event (`applyEdit`); the two panels' completions are off-event
+(`performGroupedEdit`).
+
+**Proved.**
+- `tools/proof/graphics_menu_proof.py --port 4889` **14/14**: R1 (the
+  bundle's six, byte-equal), the fixture, M1–M10 and Z1
+  (`tools/proof/README.md`'s G5b section has each row).
+- `graphics_proof.py --port 4883` **40/40** (the 39 and W1).
+- `graphics_inspector_proof.py --port 4887` still **50/50**.
+- `op_catalog_proof.py 4823` **23/23** and `op_argument_proof.py 4823`
+  **144/144** on a fresh instance.
+- `make test` 968 passed, 0 failed; `make lint` clean; `make typecheck` 0
+  errors and the 7 baseline warnings (distinct `file:line:col`); `make app`
+  built; `harness/build.sh --force` built; the parity grep over every
+  launch's log printed nothing.
+
+**Made to fail by hand (2026-09-25)**, each reverted (and the app rebuilt):
+- (a) `|| outcome.library` removed from `drain()`: `graphics_proof.py`
+  **38/40**, I4 and W1 alone.
+- (b) From File… dropped from `graphicMenu()`: M2 alone, **13/14**.
+- (c) M7's run-loop turn removed from the probe: **12/14** — M7's own
+  "level 0" check and M8 fell. With the implicit event group still open,
+  M8's `performGroupedEdit` nested inside it and one undo removed
+  `lower-third-2` as well ("after undo []"), so M8 can tell the grouped
+  path from an open group.
+
+**Deviations from the spec.**
+- The spec's `op_catalog_proof.py --port 4823` / `op_argument_proof.py
+  --port 4823` do not parse `--port`; both take the port POSITIONALLY and
+  need a running instance on it. They were run as `… 4823` against an
+  owned instance on 4823, killed by PID afterwards.
+- The import sentences name `source.path` (the URL's path) where the
+  handlers named the `~`-expanded string; for an absolute path they are
+  the same text, and a relative `path` now reads as its absolute form.
+- `insertGraphic` reads the frame duration from `document.project`'s
+  canvas, as `add_graphic_clip`'s handler does, rather than the edited
+  (nest-scoped) project's.
+- The parity grep's `/tmp/reelcut-*.log` glob matches other sessions'
+  proof-summary logs that QUOTE the grep; it was run over this session's
+  own instance log (`/tmp/reelcut-4823.log`) and `tools/proof/work/*/`.
+- `AppDelegate+Menus.swift`'s header now says Insert is the eleventh menu,
+  built in `AppDelegate+GraphicMenu.swift`, so its "ten menus" stays true.
+
+**Owed.**
+- **Insert ▸ Graphic into an empty document lands a clip that does not
+  PLAY** — §10.8's graphics-only playback defect, deferred by the user; no
+  proof here needs it to play.
+- G5a's nits, carried: the Title field's height, `ClipPane.swift`'s "four
+  factories" comment, the number row's decimals with no `step`, the
+  signature's re-parse per refresh, the asset popup vs signature builders,
+  an enum's `options` / a number's bounds stale until the selection
+  changes.
+- G4b's other owed lines, carried: `render_graphic`'s unused `svg`-form
+  arguments, frames past the length, the contact sheet's peak memory,
+  `graphic_reference` ignoring its injected `project`, `holdsContent`'s
+  `.partial` nit.
+- M3's "ten new items" is counted from the items found, so with From File…
+  missing it counts the separator in its place (b fell at M2 regardless).
+- From G5b's review (nits, not fixed):
+  - `EditorViewController+GraphicMenus.swift:87` chooses the free module
+    name from the store's LAST scan. A `.js` saved from outside the app just
+    before the watcher sees it can be overwritten by Insert ▸ Graphic, and
+    the file write is not undoable (G-3). Modules clips already draw are not
+    at risk. Fix: `store.rescan()` before `uniqueModuleName`.
+  - `:89` reads a From File… module with `String(decoding:as: UTF8.self)`,
+    which turns a non-UTF-8 file into replacement characters silently. Fix:
+    `String(data:encoding: .utf8)` and a sentence saying the file is not
+    UTF-8.
+  - `AppDelegate+Menus.swift:31`: one 111-column comment line left
+    unwrapped.
+  - `AgentServer+GraphicImports.swift:48`: both handlers ignore the `path`
+    half of `graphicImportSource`'s result; it could return the URL alone.
+- `app/CLAUDE.md` was brought up to date by the orchestrator at the G5b
+  commit (the imports' shared body, the store's name-less post,
+  `uniqueModuleName`, the three new files, `addGeneratedClip(grouped:)`).
+
+#### G5 closed
+
+**What G5 delivered.** A person can now do what an agent could after G4:
+put a graphic on the timeline from a template or their own file (Insert ▸
+Graphic), read and edit everything its schema declares in the Clip tab's
+Graphic sub-tab — Source with its diagnostics, Properties, Size, Timeline —
+duplicate a module under a new name, bring in fonts and pictures (File ▸
+Add Font/Image to Graphics…) and read the API (Help ▸ Graphics Reference).
+Every one of those is the same code as its MCP tool, and each tool's
+comment names its UI path. The watcher gap G4b owed is closed.
+
+**Owed across G5.** The graphics-only playback defect (§10.8, deferred by
+the user); the G5a and G4b lists above; the person's playback check
+(remaining §4). **G6 is owed only if that check stutters.** **Merging
+`svg-motion` into `main` is the user's decision.**

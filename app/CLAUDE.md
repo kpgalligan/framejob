@@ -200,7 +200,10 @@ detail there.
   arms BEFORE it scans; events coalesce over 100 ms. The queue owns the diff
   and an outbox; main publishes in order through `drain()` (`scan`, the
   callback, `.graphicsDidChange` with sorted names — every module and
-  `library: true` when the font/asset set moved). **`drain()` is not
+  `library: true` when the font/asset set moved; with NO names when the
+  folder holds no module and only the library moved, which still posts, G5b).
+  `uniqueModuleName(_:)` is the one free-name rule (`-copy`, `-copy-N`)
+  Duplicate and Insert ▸ Graphic share. **`drain()` is not
   re-entrant: never call `rescan()` from a `.graphicsDidChange` observer.**
   `stop()` bumps a generation under `queue.sync`. `makeLibrary()` is a NEW
   builder every call (a library freezes on first use). It also writes the
@@ -209,7 +212,11 @@ detail there.
   `write()`; only when the bytes differ) — never a reason to create the
   folder (G-14).
 - `GraphicScan.swift` — `GraphicModuleFile`, `GraphicFile` and `GraphicScan`,
-  what one pass of the store found. `GraphicStore+Manual.swift` — the
+  what one pass of the store found. `GraphicTemplates.swift` — pure: the
+  bundled `GraphicTemplates/` modules (copied by `project.yml`'s post-build
+  script), their titles from the file stem (never compiled — every chrome
+  probe builds the menu bar) and a stem sanitised to a legal module name.
+  `GraphicStore+Manual.swift` — the
   manual: `manualNames` (`API.md`, `API.d.ts`), `bundledManualNames`
   (`GraphicsAPI.md`, `GraphicsAPI.d.ts`, copied into Resources by
   `project.yml`'s post-build step from `docs/`), `manualDirectory(besideFonts:)`,
@@ -252,7 +259,14 @@ the key map behind it.
   (esc, `case 27` in `handleEditorKey`, false when nothing was selected),
   removes the selected one, and selects what ⌥⌘K, Zoom to Region and Zoom
   Back just added.
-- `+AddClips` (Add Text / Add Shape: the front track, else a new one),
+- `+AddClips` (Add Text / Add Shape: the front track, else a new one;
+  `addGeneratedClip` is internal and takes `grouped:` — `performGroupedEdit`
+  when the edit lands outside the menu's event, as a panel's completion does),
+  `+GraphicMenus` (Insert ▸ Graphic's templates and From File…, File ▸ Add
+  Font/Image to Graphics…; the template item runs in-event through
+  `applyEdit`, the panels through `performGroupedEdit`; the shared body
+  `insertGraphic(from:grouped:) throws` shows no dialog, and a module that
+  does not compile stays on disk and places nothing — G-16),
   `+Clipboard` (⌘X/⌘C/⌘V over the `com.kgalligan.reelcut.clips` pasteboard,
   the `paste` op's payload; ⌥⌘V Paste Attributes with no `groups`),
   `+Edge` (slip, roll, close gap, insert, overwrite, the `,` / `.` nudge —
@@ -272,7 +286,9 @@ the key map behind it.
   of every session in `CanvasSessions.swift`) because a region is drawn on
   what is on screen; ⇧ during the drag chooses `fill`.
 - `EditorWindowController.swift`, `WelcomeWindowController.swift`,
-  `AppDelegate.swift` (+`Menus`, +`Recording`), `main.swift` — the window,
+  `AppDelegate.swift` (+`Menus`, +`Recording`, +`GraphicMenu` — the Insert
+  menu's builder and Help ▸ Graphics Reference, `showGraphicsReference`, on
+  the delegate), `main.swift` — the window,
   the no-document window, the launch/terminate flow and the whole menu bar
   (spec §9). Menu items are nil-target selectors down the responder chain.
 - `EditorWindow.swift` — the editor's `NSWindow` subclass: its `sendEvent`
@@ -985,11 +1001,11 @@ free.
   a failing frame is its error card, drawn by
   `LayerRenderers.paintErrorCard`, the one card painter.
   `+GraphicImports` is `import_graphic_font` / `import_graphic_asset`, on
-  main: the copy through `GraphicStore+Import.swift`'s `importFile` (via
-  `ensureFolder()`, G-14, then `.partial` moved into place), `rescan()`,
-  then `catchUpLibrary`, which re-`install`s the registry's set when its
-  `libraryVersion` lags the scan's, because the store posts nothing for a
-  pass with no module names; a font's `families` come from a throwaway
+  main, thin: they call `GraphicStore+Import.swift`'s `importFont(from:)` /
+  `importAsset(from:as:)` — the ONE body File ▸ Add Font/Image to Graphics…
+  also runs (the copy via `ensureFolder()`, G-14, `.partial` moved into
+  place, then `rescan()`), and the store's own post reaches the registry; a
+  font's `families` come from a throwaway
   library holding that file alone. `GraphicContactSheet.swift` is pure: the
   layout (the scale is over the cells alone, so the sheet is exactly
   `width × height ≤ max_width × 8192`), the painter and

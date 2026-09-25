@@ -63,10 +63,10 @@ extension AgentServer {
             let canvas = document.project.snapshot.canvas
             let tick = max(canvas.fps.frameDuration, 1)
             let width = try requestedWidth.map(Int.init)
-                ?? self.metaWhole(compiled.meta, "width", name, in: self.sides) ?? canvas.width
+                ?? Self.metaWhole(compiled.meta, "width", name, in: Self.sides) ?? canvas.width
             let height = try requestedHeight.map(Int.init)
-                ?? self.metaWhole(compiled.meta, "height", name, in: self.sides) ?? canvas.height
-            let length = try self.metaWhole(
+                ?? Self.metaWhole(compiled.meta, "height", name, in: Self.sides) ?? canvas.height
+            let length = try Self.metaWhole(
                 compiled.meta, "durationInFrames", name, in: 1...Int.max / Int(tick))
                 ?? Int((5 * canvas.fps.double).rounded(.up))
             return (compiled.module, width, height, canvas.fps, canvas, length)

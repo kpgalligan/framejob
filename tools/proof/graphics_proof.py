@@ -5,7 +5,8 @@ diagnostics, the export gate and the pinned set — G4a (§10.7), the
 agent's write/read loop: `write_graphic`, `get_graphic`, `graphic_reference`,
 `get_project`'s `graphics` and the reference written into `graphics/` — and
 G4b (§10.7), `render_graphic`'s contact sheet, the two imports and the loop
-end to end.
+end to end — and G5b (§10.9), W1: a font landed from the shell in a
+module-less `graphics/` reaches the library through the store's own post.
 
 One owned instance on its own port, launched and stopped by PID, with its log
 at `tools/proof/work/graphics/reelcut-<port>.log`; nothing else is ever
@@ -135,8 +136,13 @@ I3  `save_project` on WG: `fonts/Oswald-Medium.ttf`, `fonts/Arial.ttf` and
 I4  a new IE, its `graphics/` holding no module: `import_graphic_font` of
     Oswald-Medium.ttf lists Oswald in `library_families` at once, and
     `needsfont` written after it renders lit pixels naming no Oswald (the
-    store posts nothing with no module, so the import rebuilds the library
-    itself);
+    store posts when the library moved even with no module, G5b, so the
+    import's own `rescan()` rebuilds the library);
+W1  a new IW, module-less: `get_graphic {}`'s families lack Oswald (CONTROL);
+    from the SHELL `mkdir -p IW/graphics/fonts` and `cp` Oswald-Medium.ttf in;
+    `get_graphic {}` polled for at most 5 s until its families hold Oswald;
+    `write_graphic needsfont` then renders lit pixels naming no Oswald — the
+    watcher's own post, with no tool in the path (G5b);
 L2  the loop of §5h on a new LP: `graphic_reference`, `write_graphic`
     BROKEN_BAR (ok false, line 2), `write_graphic` bar (ok), `render_graphic
     {frames: [0, 15, 30]}` at the DEFAULT max_width is exactly 2048×1202 and
@@ -193,7 +199,8 @@ RED, BLUE, BLACK = (255, 90, 54), (45, 127, 249), (0, 0, 0)
 BORDER, CARD = (230, 40, 40), (64, 8, 8)
 SECOND = 30 * FRAME
 ROWS = ["G6", "P1", "P2", "P3", "S1", "R1", "H1", "L1", "F1", "K1", "K2", "T1", "K3", "A1",
-        "G1", "G2", "G3", "G4", "G5", "G7", "C1", "C2", "C3", "I1", "I2", "G9", "I3", "I4", "L2",
+        "G1", "G2", "G3", "G4", "G5", "G7", "C1", "C2", "C3", "I1", "I2", "G9", "I3", "I4", "W1",
+        "L2",
         "G8", "E1", "C4", "E2", "E3", "E4", "Q1", "Q2", "Q3", "Z1"]
 DOC_MD = ROOT / "docs/graphics-api.md"
 DOC_DTS = ROOT / "docs/graphics-api.d.ts"
@@ -1000,6 +1007,40 @@ def run_i(client, wg):
           and (lit or 0) > 0,
           f"new {made['ok']}, import {font}, write {wrote.get('ok')}, says {text!r}, lit {lit}")
 
+    run_w1(client, WORK / "IW.reelcut")
+
+
+def run_w1(client, iw):
+    """W1 — the watcher's path for a font landed by ANOTHER process in a
+    module-less graphics/: the store's own post reaches the registry (G5b)."""
+    made = attempt(client, "new_project", {"path": str(iw)})
+    before = (attempt(client, "get_graphic", {"project": str(iw)}).get("reply") or {})
+    control = "Oswald" not in (before.get("families") or [])
+    fonts = iw / "graphics" / "fonts"
+    made_dir = bounded.run(["mkdir", "-p", str(fonts)], 30)["rc"]
+    copied = bounded.run(["cp", str(OSWALD), str(fonts / OSWALD.name)], 30)["rc"]
+    families, deadline = [], time.monotonic() + 5
+    while time.monotonic() < deadline:
+        families = ((attempt(client, "get_graphic", {"project": str(iw)}).get("reply") or {})
+                    .get("families") or [])
+        if "Oswald" in families:
+            break
+        time.sleep(0.25)
+    wrote = attempt(client, "write_graphic", {"project": str(iw), "name": "needsfont",
+                                              "source": NEEDSFONT_JS})
+    ok, text, image = sheet(client, iw, {"name": "needsfont", "frame": 0,
+                                         "background": "#000000", "max_width": 8192}, "w1")
+    lit = nonblack(image, 1920, 1080)
+    check("W1 a font cp'd from the shell into a module-less graphics/fonts/ reaches "
+          "get_graphic's families within 5 s (CONTROL: absent before), and a module written "
+          "after it draws with it, no warning",
+          OSWALD.exists() and made["ok"] and control and made_dir == 0 and copied == 0
+          and "Oswald" in families and wrote["ok"]
+          and (wrote.get("reply") or {}).get("ok") is True and ok and "Oswald" not in text
+          and (lit or 0) > 0,
+          f"new {made['ok']}, before {before.get('families')}, mkdir {made_dir}, cp {copied}, "
+          f"families {families}, write {wrote.get('ok')}, says {text!r}, lit {lit}")
+
 
 def run_loop(client, lp):
     """L2 — the agent's loop of §5h on a new project, as an agent would run it."""
@@ -1349,7 +1390,7 @@ def main():
         print("the mutant is CAUGHT: P1 held and P2 failed" if verdict
               else "the mutant was NOT caught")
         return 0 if verdict else 1
-    print("G3b/G3c/G4a/G4b graphics — a graphic clip drawn, one failing, the agent's "
+    print("G3b/G3c/G4a/G4b/G5b graphics — a graphic clip drawn, one failing, the agent's "
           "write/read loop, its contact sheet and imports, against the built app (proof)",
           flush=True)
     if not args.app.exists():

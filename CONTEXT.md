@@ -36,6 +36,10 @@ _Avoid_: current action, active action, "the action under the playhead" (the pla
 A clip whose picture is drawn by code: a **Module** in the package's `graphics/` folder, run per frame with the clip's props, rasterized at the graphic's own size. It is a clip's CONTENT, in the place a media file or an image sits — not an effect, and not a plugin: its code reaches no other clip, no timeline, no model and no file, and the same frame with the same props always draws the same pixels (spec §11 G-1, G-5).
 _Avoid_: effect, plugin, overlay, template (a template is a graphic someone else wrote)
 
+**Template**:
+A **Module** the app ships, which a person copies into their package with Insert ▸ Graphic: the file is written into `graphics/` under a free name (`lower-third`, then `lower-third-2`) and a clip drawn by it is placed at the playhead. Once copied it is the package's own module — editing it changes no other package, and no later app version reaches it. Its menu title comes from its file name, never from running it (spec §11 G-16).
+_Avoid_: preset (a preset is stored settings, not code), sample, built-in graphic
+
 **Error card**:
 What a **Graphic** draws in its own box when it cannot draw itself — its **Module** is missing or does not compile, or a frame throws, runs past its budget or will not rasterize: dark red, a bright red border, and the graphic's name, its frame and the first diagnostic with its line and column in white. Never the last good frame, which would hide the error from someone scrubbing. An export never delivers one: it is refused before it starts, or stopped at the frame, with no file left (spec §11 G-8).
 _Avoid_: slate (the slate is what a layer with no source at all draws), error frame, placeholder

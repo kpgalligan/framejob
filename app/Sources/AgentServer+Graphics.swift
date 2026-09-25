@@ -22,7 +22,9 @@ import Foundation
 
 extension AgentServer {
 
-    /// `add_graphic_clip` — UI path: Insert ▸ Graphic, G5b.
+    /// `add_graphic_clip` — UI path: Insert ▸ Graphic, which is
+    /// `write_graphic` of a template (or a chosen `.js`) then this op
+    /// (`EditorViewController+GraphicMenus.swift`).
     ///
     /// `duration`, `width` and `height` default from the module's `meta`
     /// (`durationInFrames` at the canvas rate; `width` / `height`), and
@@ -41,14 +43,16 @@ extension AgentServer {
         // `meta` is only the fallback: a caller's own `duration` is never
         // refused for a `durationInFrames` it does not use.
         let metaDuration: Ticks? = try duration != nil ? nil
-            : metaWhole(meta, "durationInFrames", name, in: 1...Int.max / Int(frame))
+            : Self.metaWhole(meta, "durationInFrames", name, in: 1...Int.max / Int(frame))
                 .map { Ticks($0) * frame }
         return try editResult(
             document, "Add Graphic",
             [.addGraphicClipRaw(
                 track: track.id, at: at, duration: duration ?? metaDuration, name: name,
-                width: try width ?? metaWhole(meta, "width", name, in: sides).map(UInt32.init),
-                height: try height ?? metaWhole(meta, "height", name, in: sides).map(UInt32.init),
+                width: try width
+                    ?? Self.metaWhole(meta, "width", name, in: Self.sides).map(UInt32.init),
+                height: try height
+                    ?? Self.metaWhole(meta, "height", name, in: Self.sides).map(UInt32.init),
                 props: props, schema: schema)])
     }
 
@@ -88,15 +92,11 @@ extension AgentServer {
 
     static let notUndoableNote = "not undoable; keep your own copy if you want the old one back"
 
-    /// `<Resources>/GraphicsAPI.md`, from the app bundle, no document involved.
-    private static var bundledReferenceURL: URL {
-        GraphicStore.manualDirectory(besideFonts: ProjectDocument.bundledFontsDirectory)
-            .appendingPathComponent(GraphicStore.bundledManualNames[0])
-    }
-
-    /// `write_graphic` — UI path: the file on disk (an external editor); no
-    /// menu; and Duplicate as New Graphic…, which writes the copy through the
-    /// same `store.write` then repoints with `set_graphic {name}`.
+    /// `write_graphic` — UI path: the file on disk (an external editor);
+    /// Insert ▸ Graphic, which writes a template or a chosen `.js` through
+    /// the same `store.write` then places it (`add_graphic_clip`); and
+    /// Duplicate as New Graphic…, which writes the copy through the same
+    /// `store.write` then repoints with `set_graphic {name}`.
     ///
     /// Writes `graphics/<name>.js` through the store's one writer, then
     /// rescans at once, so the registry has compiled THAT text before the
@@ -155,13 +155,13 @@ extension AgentServer {
         return try jsonResult(result)
     }
 
-    /// `graphic_reference` — UI path: none yet — Help ▸ Graphics Reference
-    /// (G5).
+    /// `graphic_reference` — UI path: Help ▸ Graphics Reference, which
+    /// opens the same file (`AppDelegate+GraphicMenu.swift`).
     ///
     /// The bundled `GraphicsAPI.md`, verbatim. Needs no open document, so
     /// it never calls `target(a)`.
     func graphicReference(_ a: [String: Any]) throws -> String {
-        guard let data = try? Data(contentsOf: Self.bundledReferenceURL) else {
+        guard let data = try? Data(contentsOf: GraphicStore.bundledReferenceURL) else {
             throw ToolError(
                 message: "The bundled reference GraphicsAPI.md is missing from the app's Resources")
         }
@@ -257,7 +257,7 @@ extension AgentServer {
 
     // MARK: - What only the app can know
 
-    var sides: ClosedRange<Int> { 1...GraphicLibrary.maxSide }
+    static var sides: ClosedRange<Int> { 1...GraphicLibrary.maxSide }
 
     /// A module, its `meta` and its `schema` from its current revision, or
     /// the sentence saying the folder does not hold it or it did not compile.
@@ -289,7 +289,7 @@ extension AgentServer {
     /// `width` or `height` as a side, refused by name outside 1…8192.
     func graphicSide(_ a: [String: Any], _ key: String) throws -> UInt32? {
         guard let value = try intArg(a, key) else { return nil }
-        guard sides.contains(value) else {
+        guard Self.sides.contains(value) else {
             throw ToolError(message: "\(key) is not a side of 1–\(GraphicLibrary.maxSide): \(value)")
         }
         return UInt32(value)
@@ -297,7 +297,7 @@ extension AgentServer {
 
     /// `meta[key]` as a whole number in `range`, nil when the module does
     /// not declare it, refused by name when it declares something else.
-    func metaWhole(
+    static func metaWhole(
         _ meta: [String: Any], _ key: String, _ name: String, in range: ClosedRange<Int>
     ) throws -> Int? {
         guard let raw = meta[key], !(raw is NSNull) else { return nil }

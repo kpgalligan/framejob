@@ -21,8 +21,9 @@ import Foundation
 extension Notification.Name {
     /// Posted on main (object: the store) when modules were added, changed
     /// or removed, or the font and asset set moved. `userInfo[namesKey]`:
-    /// the names, sorted (all of them when the library moved);
-    /// `[libraryKey]`: whether it moved.
+    /// the names, sorted (all of them when the library moved — so EMPTY
+    /// when it moved in a folder holding no module); `[libraryKey]`:
+    /// whether it moved.
     static let graphicsDidChange = Notification.Name("ReelcutGraphicsDidChange")
 
     /// Posted on main by a `GraphicStore` (object: the store) when the first
@@ -49,6 +50,17 @@ final class GraphicStore {
             ("a"..."z").contains(s) || ("0"..."9").contains(s)
         }
         return lowerOrDigit(head) && scalars.allSatisfy { lowerOrDigit($0) || $0 == "-" }
+    }
+
+    /// `base` when the scan holds no module of that name, else `base-2`,
+    /// `base-3`, … — `base` cut to 60 scalars first, so a suffix fits.
+    func uniqueModuleName(_ base: String) -> String {
+        let root = String(String.UnicodeScalarView(base.unicodeScalars.prefix(60)))
+        let held = scan.modules
+        guard held[root] != nil else { return root }
+        var n = 2
+        while held["\(root)-\(n)"] != nil { n += 1 }
+        return "\(root)-\(n)"
     }
 
     private static let nameRule = "is not a module name (lowercase letters, digits and -, "
@@ -230,7 +242,7 @@ final class GraphicStore {
         for outcome in outcomes {
             scan = outcome.scan
             if outcome.folderAppeared { folderDidAppear?() }
-            guard !outcome.names.isEmpty else { continue }
+            guard !outcome.names.isEmpty || outcome.library else { continue }
             NotificationCenter.default.post(
                 name: .graphicsDidChange, object: self,
                 userInfo: [Self.namesKey: outcome.names, Self.libraryKey: outcome.library])

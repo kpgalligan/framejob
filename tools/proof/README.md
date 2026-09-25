@@ -4993,8 +4993,10 @@ and the scan "does not list" it; after `chmod 755` the same write is ok.
 and `assets/red.png` are in the package and `unsaved_changes` is false.
 **I4** a new IE whose `graphics/` holds NO module: the Oswald import's
 `library_families` holds Oswald at once, and `needsfont` written after it
-lights pixels with no warning (the store posts nothing with no module, so
-the import rebuilds the registry's set itself). **L2** the loop of §5h on a
+lights pixels with no warning (since G5b the store posts a library change
+even with no module, so the import's own `rescan()` rebuilds the registry's
+set; G4b's `catchUpLibrary` is gone, and I4 passing is what proves the post
+does its job). **L2** the loop of §5h on a
 new LP: `graphic_reference`, BROKEN_BAR (ok false, line 2), `bar()` (ok),
 `render_graphic {frames: [0, 15, 30]}` at the DEFAULT `max_width` — its
 path read out of "Written to …" — is exactly **2048×1202** and names "3
@@ -5559,3 +5561,56 @@ The mutant builds the probe over a copy of `app/Sources` whose
 `GraphicSchemaRows.staleKeys` returns `[]`. It makes a fresh fixture in a
 temporary directory. The one I5 row it cannot touch is the compile row
 naming line 2, so that row is not expected to fail.
+
+## Road map 10's G5b — the graphics menus and templates (`graphics_menu_proof.py`, `graphics_menu_probe.swift`; `graphics_proof.py` W1)
+
+Road map 10 §10.9 G5b; spec §11 G-16. Two instruments and one row:
+
+- **R1, the bundle.** The built app's `Contents/Resources/GraphicTemplates/`
+  holds exactly the six modules of `graphic/tests/graphics/`, byte-equal
+  (project.yml's "Copy Graphic Templates" script).
+- **The fixture, over MCP.** One owned instance on its own port (default
+  4889; its log is `work/graphics-menu/reelcut-<port>.log`) runs
+  `new_project {path: GM}` and `save_project`: a package with NO module.
+- **The probe** is compiled as `main.swift` over `app/Sources` on
+  `harness/build.sh`'s swiftc line, with `app/Resources/Fonts`,
+  `GraphicTemplates/` (from `graphic/tests/graphics/`) and `GraphicsAPI.md`
+  (from `docs/graphics-api.md`) copied beside it — its `resourceURL`, where
+  the app finds all three. It runs over two COPIES of GM and scores M1–M10:
+  the probe builds (M1, a scored failure otherwise); the menu bar's Insert
+  right after Edit and its Graphic submenu, each template's URL byte-equal
+  to its source (M2); File's two items after Consolidate Media…, Help's
+  Graphics Reference, no key equivalent on the ten new items (M3); no
+  target for the four editor selectors with no window, and Graphics
+  Reference live until the copied `GraphicsAPI.md` is moved away, a CONTROL
+  (M4); the four validate false before `startGraphicStore()` and true after
+  (M5); the Lower Third item at 2 s — the file byte-equal, one clip at
+  1 200 000 lasting 3 000 000, "Insert Graphic", level 0 after a run-loop
+  turn, one undo removes it and the file stays (M6); again → `lower-third-2`
+  (M7); `insertGraphic(from: "My Counter (v2).js", grouped: true)` →
+  `my-counter-v2`, level 0 at once, one undo removes it and `lower-third-2`
+  STAYS (M8); a module that does not compile throws naming it and places
+  nothing (M9); `importFont` / `importAsset` on the second copy, the
+  registry's library holding Oswald at once, the refusals naming ".ttf" and
+  "PNG" (M10). **The probe never calls `endUndoGrouping`**: a command run
+  outside an AppKit event opens the implicit event group, and the probe
+  closes it the way AppKit does, a run-loop turn in `.default` mode
+  (`text_apply_probe.swift`'s `spin`).
+- **W1, in `graphics_proof.py`** (after I4): a new module-less IW; its
+  families lack Oswald (CONTROL); from the SHELL `mkdir -p IW/graphics/fonts`
+  and `cp` Oswald in; `get_graphic {}` polled for at most 5 s until its
+  families hold Oswald; `write_graphic needsfont` then lights pixels naming
+  no Oswald — the watcher's own post, no tool in the path.
+
+**Made to fail by hand (2026-09-25)**, each reverted: (a) `|| outcome.library`
+removed from `GraphicStore.drain()` (app rebuilt) — `graphics_proof.py` fell
+to 38/40, I4 and W1 alone; (b) From File… dropped from `graphicMenu()` — M2
+fell alone (13/14); (c) M7's run-loop turn removed from the probe — M7's own
+level check and M8 fell (12/14): with the implicit group still open, M8's
+grouped edit nested inside it and one undo took `lower-third-2` too.
+
+```sh
+make app
+python3 tools/proof/graphics_menu_proof.py --port 4889    # → 14/14
+python3 tools/proof/graphics_proof.py --port 4883         # → 40/40
+```
