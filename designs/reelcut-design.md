@@ -2304,12 +2304,12 @@ pass nothing, because each wants the picture rather than a deliverable.
 | `Compositor.swift` | the `AVVideoCompositing` class and its Metal pipeline (§7.5) |
 | `RecipeSource.swift` | the process-wide registry the compositor reads a recipe from (§7.6), keyed per document and per export, with the `RecipeOptions` stored beside the project per key (§7.3); out of `ReelCore.swift` as a pure move at road map 10's G1a, because it names no `rc_*` symbol |
 | `LayerRenderers.swift` · `LayerRenderersText.swift` · `LayerRenderersReveal.swift` · `LayerRenderersWords.swift` | text (Core Text) and shape (Core Graphics) descriptions → premultiplied BGRA `MTLTexture`s, LRU-cached by hash; reports measured text sizes to the overlay; draws a shape's `gradient` (format version 6) by CLIPPING to the path and running `CGGradient`, sorting the stops the core deliberately does not police (§5.2). The TEXT half — the layout caches, the attributed string (laid from `laidContent`, `case` applied), the per-axis insets and `drawText`, which dispatches — went out to `LayerRenderersText.swift` under the size rule when phase 6 came to add the gradient, so a reveal can never reflow the box; road map 8's W3 moved its three §5.2 reveals out again to `LayerRenderersReveal.swift` (a pure move) before the FOURTH routine landed in `LayerRenderersWords.swift`: a timed word-caption page drawn over the recipe's `word` / `word_pop` — the base pass, the active word's pill and its pop about the pill's centre — and `wordHeadroom`, the room that pop needs, inside `measuredSize` so the overlay's handles and the pager pay for it. `renderTextBitmap` is the drawn bitmap `renderText` uploads |
-| `GraphicRegistry.swift` · `LayerRenderersGraphic.swift` | a graphic layer drawn (road map 10's G3b, §5d): `GraphicRegistry` maps a `RecipeSource` key to one immutable `GraphicSet` — the document's library and every module of its `graphics/` compiled against it — installed when the document's store starts and swapped for a new set on every `.graphicsDidChange` (a new library and every module recompiled when the font and asset set moved, only the named modules otherwise), so preview follows the newest revision (§11 G-13); an offline key (`render_frame`, an export) resolves to the set of the document whose published handle it carries, and to nothing — the slate — when none matches. `LayerRenderersGraphic.swift` is `LayerRenderers`' graphic entry: the module's SVG for the layer's frame from the core's own `props_json` / `ctx_json` (a 250 ms budget in preview, 2 s offline), a texture cached by the SVG TEXT, the size and the library's version — not by the recipe's hash, and in a six-entry LRU pool of its own so an animating graphic cannot evict the text and shape textures — rasterized at the layer's own size and uploaded premultiplied BGRA; any failure is nil and the compositor draws the slate |
+| `GraphicRegistry.swift` · `LayerRenderersGraphic.swift` | a graphic layer drawn (road map 10's G3b, §5d): `GraphicRegistry` maps a `RecipeSource` key to one immutable `GraphicSet` — the document's library and every module of its `graphics/` compiled against it — installed when the document's store starts and swapped for a new set on every `.graphicsDidChange` (a new library and every module recompiled when the font and asset set moved, only the named modules otherwise), so preview follows the newest revision (§11 G-13); an offline key (`render_frame`, an export, Save Frame, the eyedropper, a queued job) draws with the set its caller PINNED on it (road map 10's G3c) — the document's set as it stood when the frame or the export was asked for — and a key with neither a set nor a pin resolves to nothing, the slate. A pin also keeps what its graphics REPORTED: the first failure in a slot of its own and up to 64 distinct warnings. `LayerRenderersGraphic.swift` is `LayerRenderers`' graphic entry: the module's SVG for the layer's frame from the core's own `props_json` / `ctx_json` (a 250 ms budget in preview, 2 s offline), a texture cached by the SVG TEXT, the size and the library's version — not by the recipe's hash, and in a six-entry LRU pool of its own so an animating graphic cannot evict the text and shape textures — rasterized at the layer's own size and uploaded premultiplied BGRA. A graphic that FAILS (no module of that name, a module that did not compile, a throw or a timeout, a raster the engine refused) draws its ERROR CARD (§11 G-8), keyed by its own text in the same pool, and records the failure; a warning is recorded too, a raster's carried in `Rendered.warnings` so a pool hit still reports it. Only a key with no set, or an upload that fails, is nil and the slate |
 | `TextProps.swift` · `WordProps.swift` · `TextPatch.swift` | the text group of the read-only mirror and the recipe's `RecipeReveal` (with `word` / `wordPop`, format version 9), out of `ProjectSnapshot.swift`; the word-caption vocabulary mirroring `model_words.rs` (`TextCase`, `TextWord`, `WordMode`, `ActivePill`, `WordStyle`), the `TextProps` facts the renderer and inspector share (`laidContent`, `tokenCount`, `isUntimedPage`), `TextPatch.contentEdit` and `InspectorBinding.contentOps` — the Content write, per clip; and the typed text patch (with `case` and `words`), out of `ReelCore.swift`. Both moves were pure and gated alone, made because Swift cannot add a stored property in an extension |
 | `CaptionImporter.swift` · `CaptionLayout.swift` · `CaptionStyle.swift` · `CaptionPages.swift` · `Transcriber.swift` (+`Extract` `Jobs` `Languages`) · `CaptionExporter.swift` | captions in both directions: the SubRip grammar; the placement every producer shares (the frame grid, the overlap trim, the Caption preset or a word caption style's page patch, the new front-most track, the restyle's replaced tracks); the five word caption styles (road map 8 §5h) and the pager that fills a word caption's pages to a measured width inside each job's span (§11 W-7); on-device speech recognition (`SpeechEngine.swift`, the one `async` file W-8 adds, over `SpeechAnalyzer`/`SpeechTranscriber`) and the cue builder over it; the extractor, the job list and the language table BOTH engines share — the supported locales, each marked installed, and the sheet's Download row (`TranscribeSheetController+Download.swift`); and the `.srt` / `.vtt` writer |
 | `CloudTranscriber.swift` (+`Report`, +`Media`) · `MediaTranscript.swift` · `TranscriptStamp.swift` · `CloudProgress.swift` · `CloudEstimate.swift` · `AssemblyAIClient.swift` (+`Session`, +`Submission`) · `AssemblyAITranscript.swift` · `AssemblyAIConfiguration.swift` · `AssemblyAILanguages.swift` · `SecretStore.swift` | road map 6's C1, captions from the cloud: the run that groups a scope's clips by MEDIA, uploads each file once, maps the words back through every clip's own window and deletes the transcript at the far end; the per-media cache in the package and R6-15's four-field source marker; R6-16's all-cached keyless admission and deferred cleanup report; the one progress number and the words beside it; what a run WOULD cost, before the button; AssemblyAI's REST calls over one `URLSession` with its retry, its poll ceiling and its cancel token, plus R6-14's bounded lost-submit recovery; the wire values; WHERE the client speaks and WHAT it says it is (spec §11's R6-6 and R6-9, the one reader of `-RCAssemblyAIEndpoint`, `-RCSecretFolder` and `RC_ASSEMBLYAI_KEY`); the twenty-one languages the popup offers; and the `0600` key file |
 | `MediaImporter.swift` | `AVURLAsset` probing (one of the TWO places `async`/`await` is allowed — AVFoundation's loading API is async-only going forward; `SpeechEngine.swift` is the other, §11 W-8), thumbnails via `AVAssetImageGenerator` — the seconds at or past the video track's end ask for its last frame once and hold it, the strip's half of the rule `CompositionBuilder` applies to the picture — peaks via `AVAssetReader` + vDSP, cache files in the package |
-| `Exporter.swift` | picks the pipeline for the core's settings — `ExportWriter` (`AVAssetReader`/`AVAssetWriter`: chapters, explicit bitrates, the loudness gain) or the ImageIO frame sequence for GIF/APNG — runs the loudness MEASUREMENT pass ahead of the write, reports progress, and renders one frame offline for `render_frame` |
+| `Exporter.swift` · `ExporterErrors.swift` · `ExporterGraphics.swift` | picks the pipeline for the core's settings — `ExportWriter` (`AVAssetReader`/`AVAssetWriter`: chapters, explicit bitrates, the loudness gain) or the ImageIO frame sequence for GIF/APNG — runs the loudness MEASUREMENT pass ahead of the write, reports progress, and renders one frame offline for `render_frame` (`renderFrameReported`, with what the frame's graphics reported). Every way an export stops is `ExportError`, in `ExporterErrors.swift` (a pure move at road map 10's G3c). `ExporterGraphics.swift` is an export's graphics (§7.8's closing paragraph): the compile gate, and the mapping from a graphic that failed mid-export to `.graphicFailed` |
 | `ExporterSettings.swift` | the resolved settings in AVFoundation's vocabulary — the time range, the fallback session preset, the file type, the UTI, the extension, `isAudioOnly` — cut out of `Exporter.swift` under the size rule when phase 7 gave `export` and `renderFrame` a `RecipeOptions` argument; `renderFrame` stayed behind because it is the app's only `copyCGImage` call and the build baseline names that warning by file |
 | `FrameWriter.swift` | a CGImage and a format in, a written file out (PNG / JPEG / HEIC) — the ONE writer File ▸ Save Frame… and `render_frame` both call, which is what makes their PNGs byte-identical by construction rather than by luck; PNG passes NIL destination properties, and JPEG flattens a transparent canvas onto black because the container has no alpha |
 | `AudioTap.swift` · `AudioDSP.swift` · `LevelMeter.swift` · `LevelMeterView.swift` | the sample-level audio the plan cannot carry: one `MTAudioProcessingTap` per composition audio track running noise reduction, the compressor and the Mix stage (the mono fold, then the pan), and the level meter's model and its one view — the model publishing a raw per-channel peak and RMS lock-free off the render thread, the view owning the ballistics |
@@ -2697,6 +2697,28 @@ the file will have — a vertical 1080 × 1920 timeline's "GIF default" is
 152 × 270 — and `ExporterImageSequence` draws each frame at exactly that
 size rather than fitting a second time.
 
+**Graphics** (road map 10's G3c; §11 G-8 and G-13). An export is handed
+the document's compiled `GraphicSet` as it stood when the export was asked
+for — by the sheet, a queued job (captured at ENQUEUE, beside the media
+URLs), or the `export` tool — and PINS it on its own `RecipeSource` key for
+its whole life (`GraphicRegistry.pin`, unpinned in `finish` and in
+`deinit`), so a module saved mid-export, or a document edited or closed
+under a queued job, cannot change what the file draws. Before the build it
+runs the GATE: every graphic clip overlapping the range, and every graphic
+clip of each nest a clip in the range shows, whose module did not compile
+or is not in `graphics/` refuses the export before anything is written,
+each named with its first diagnostic. Nothing is gated for an audio-only
+row. The gate is compile-only; a frame that fails while the file is being
+written records the failure on the export's key, the progress timer sees
+it and cancels, and `finish` answers `.graphicFailed` — the graphic, its
+frame and the message — and removes the file, whatever the pipeline had
+answered. GIF and APNG pin the same set per frame and stop on a failed
+report. An error card is therefore never delivered in a video. The writer's
+cancel only sets a flag its pumps read before each sample; the reader and
+the writer are torn down once every pump has left its loop, because
+cancelling the reader under a running pump crashed the process (road map
+10 §10.6 G3c).
+
 ### 7.9 Agent
 
 `agent.rs` is copied from Rasterize (generic streamable-HTTP MCP, tools
@@ -2863,7 +2885,11 @@ too, which is what makes those two files byte-identical by construction
 rather than by luck, and the only way the line can be checked at all, since
 no script can press a save panel. `burn_in_timecode` is the recipe option of
 §7.3 and not an export override, and this tool is the only one that can
-photograph a burn-in, and
+photograph a burn-in. When a graphic in the frame warned or failed, one
+sentence per report precedes that last one — `Graphic "x" failed at frame
+N: <message> (line L, column C).`, `… warned at frame N: …` or `… does not
+compile: …` — and a failed graphic draws its error card in the picture
+(road map 10's G3c); the call is still not an error, and
 `normalize_clip {clips, peak_db?}` (road map 2's phase 5 — the mirror of
 the Audio section's Normalize button and Clip ▸ Normalize; it is a
 composite the UI offers as one command, not an op, and it reports each
@@ -4532,7 +4558,9 @@ assisted import.
   the image. An EXPORT compiles every module a clip in the range names
   before it starts and refuses on a compile error, listing each; a frame
   that fails during the export aborts it, naming the graphic and the frame.
-  An error card is never written into a video.
+  An error card is never written into a video. Built by G3c (road map 10
+  §10.6): the card's border is 2 PIXELS of the layer's texture, and the
+  missing module draws a card of its own; `render_graphic` is G4's.
 - **G-9 — A graphic has its own timeline: `in` and `length`, and `split`
   pins it** (road map 10 §4, 2026-09-25; built by G2b). `graphic.in`
   (ticks, ≥ 0) is where on the graphic's own timeline the clip's first
@@ -4610,7 +4638,9 @@ assisted import.
   (`Playback.refreshPausedFrame`). An EXPORT pins, at its start, the
   revisions (and the font and asset sets) it compiled, so an agent editing
   a file mid-export cannot produce a video whose first half is one version
-  and its second half another.
+  and its second half another. Built by G3c (road map 10 §10.6): the pin is
+  the whole compiled `GraphicSet`, retained, captured on main when the
+  export (or a queued job, or `render_frame`) is asked for.
 - **G-14 — `graphics/` is created on the app's first write into it, never
   at open** (road map 10 §4, 2026-09-25, G3a; amends G-3's last sentence).
   A package that never gets a graphic is not touched: opening, saving and

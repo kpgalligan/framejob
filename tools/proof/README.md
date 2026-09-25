@@ -4876,6 +4876,48 @@ make app && python3 tools/proof/graphics_proof.py --port 4879          # → 14/
 python3 tools/proof/graphics_proof.py --mutant frame-plus-one          # exit 0 = P2 FAILED
 ```
 
+## Road map 10's G3c — a failing graphic and the export pin (`graphics_proof.py` E1–Q3)
+
+The same script, seven rows after A1; the score is **21/21**. E1–E3 reopen
+P1, `mv` in three modules of the script's own and add ONE front track, and
+each row adds its clip there and `undo`es it (a `spin` clip left behind
+would cost every later render its budget). E1 `throw10` (throws
+`"boom at ten"` at frame 10): frame 9 names no `throw10` and draws RED;
+frame 10's reply names it, `frame 10` and the message, and the picture is
+the error card — (1,540) its border (230,40,40), (1900,1060) its fill
+(64,8,8); `export` answers an error naming both, and nothing is at the
+path. `bar`'s stale-`color` warning from L1 appears in every E reply and is
+right (G-4). E2 `spin` (`while(true){}`): `render_frame` returns within 3 s
+naming the budget, and `get_project` answers within 5 s. E3 `nofont`: the
+reply names `Nope Sans` and the set's `IBM Plex Mono`. E4 a fresh project's
+`pin.js` clip exported `prores_4444` over MCP is RED at 2 s — the `export`
+tool passes the document's set, since an unpinned offline key slates. **No
+MCP row can race a module swap**: the server is one thread and `export`
+holds it until the file is written, so the swap is made deterministic
+in-process instead. Q1–Q3 are `graphics_pin_probe.swift`, built like
+`phase7_chrome.py`'s probe (every `app/Sources` file but `main.swift`, the
+harness's swiftc line, `Fonts`, `Blank.mp4` and a `default.metallib`
+beside it, cached in `work/graphics-pin-probe/`; a probe that will not
+build is three FAILURES) over the saved project PQ: Q1 a job ENQUEUED with
+the document's set, then the canvas turned blue and the document's set
+REMOVED (`stopGraphicStore()`) before the run loop spins — the file is RED
+at (480,540) and BLACK at (1440,540), and the CONTROL with no set is the
+slate; Q2 the same through `Exporter.export`; Q3 one `LayerRenderers` asked
+twice for `nofont` warns both times and the second answer is the pool's
+texture. ffmpeg's rawvideo is read through `subprocess.run(timeout=120)`.
+
+**Made to fail by hand (2026-09-25).** (a) `finish`'s mapping line deleted:
+E1 fell alone — the export answered "The export was cancelled." instead of
+naming the graphic (20/21). (b) the `pin` line in `Exporter.export`
+deleted: E4, Q1 and Q2 fell, with the pixel the slate's (25,28,33) — and
+A1 (the slate is opaque) and E1 (the export succeeded, a slate in place of
+the card) with them (16/21). Each was reverted and rebuilt.
+
+```sh
+make app && python3 tools/proof/graphics_proof.py --port 4881          # → 21/21
+python3 tools/proof/graphics_proof.py --mutant frame-plus-one          # exit 0 = P2 FAILED
+```
+
 ## The deployment target, rendered (`target_bump_proof.py`)
 
 W1a, road map 8 §10.4: the macOS 26 bump recompiles `Compositor.metal`

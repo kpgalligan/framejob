@@ -36,6 +36,10 @@ _Avoid_: current action, active action, "the action under the playhead" (the pla
 A clip whose picture is drawn by code: a **Module** in the package's `graphics/` folder, run per frame with the clip's props, rasterized at the graphic's own size. It is a clip's CONTENT, in the place a media file or an image sits — not an effect, and not a plugin: its code reaches no other clip, no timeline, no model and no file, and the same frame with the same props always draws the same pixels (spec §11 G-1, G-5).
 _Avoid_: effect, plugin, overlay, template (a template is a graphic someone else wrote)
 
+**Error card**:
+What a **Graphic** draws in its own box when it cannot draw itself — its **Module** is missing or does not compile, or a frame throws, runs past its budget or will not rasterize: dark red, a bright red border, and the graphic's name, its frame and the first diagnostic with its line and column in white. Never the last good frame, which would hide the error from someone scrubbing. An export never delivers one: it is refused before it starts, or stopped at the frame, with no file left (spec §11 G-8).
+_Avoid_: slate (the slate is what a layer with no source at all draws), error frame, placeholder
+
 **Module**:
 A graphic's source: one JavaScript ES module exporting `render(frame, props, ctx)`, which returns SVG, and optionally `meta` and `schema`. It is compiled once and drawn many times; the standard library is global and nothing can be imported. Many clips may name one module, as many clips share one media file.
 _Avoid_: script, component, file (the file holds the module), plugin

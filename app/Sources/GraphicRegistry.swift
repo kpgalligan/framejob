@@ -12,17 +12,20 @@
 // `store.rescan()`: `drain()` is not re-entrant (road map 10 §10.6 G3a).
 //
 // **Threading.** `install`, `update`, `remove` and `entry` are main-only,
-// because the store's scan is. `resolve` is the one cross-thread read — the
-// compositor's render queue and a `render_frame` generator thread — and the
-// lock covers only the map; a module draws on a thread that did not compile
-// it (the engine keeps per-thread runtimes, G1c).
+// because the store's scan is. `resolve`, `snapshot` and the pin's five
+// calls are any-thread — the compositor's render queue and a `render_frame`
+// generator thread — and the lock covers only the two maps; a module draws
+// on a thread that did not compile it (the engine keeps per-thread
+// runtimes, G1c).
 //
 // **An offline key** — the one `Exporter.renderFrame` or an export mints —
-// has no entry of its own. It is matched to a document by HANDLE, the way
-// `ReverseSource.resolution(publishedFor:)` does: the project published
-// under the offline key is the very handle some document last published
-// under its own. When no document's handle matches, `resolve` answers nil
-// and the layer draws the slate (road map 10 §10.6 G3b lists the cases).
+// draws with the set its caller PINNED on it (G-13, G3c): the document's
+// set as it stood when the export or the frame was asked for, retained for
+// the key's life however the document's own set changes. A key with no
+// set and no pin resolves nil and the layer draws the slate. A pin also
+// holds what the key's graphics REPORTED — the first failure in a slot of
+// its own, then up to 64 distinct warnings — for `render_frame`'s reply and
+// the export's abort.
 
 import Foundation
 
@@ -49,6 +52,16 @@ final class GraphicSet {
     }
 }
 
+/// What one graphic reported while an offline key drew it: a failure (the
+/// error card was drawn) or a warning, with the graphic's own frame — nil
+/// when the module did not compile.
+struct GraphicReport: Equatable {
+    let name: String
+    let frame: Int?
+    let failed: Bool
+    let diagnostics: [GraphicDiagnostic]
+}
+
 final class GraphicRegistry {
     static let shared = GraphicRegistry()
 
@@ -63,8 +76,21 @@ final class GraphicRegistry {
         case failed([GraphicDiagnostic], revision: String)
     }
 
+    /// An offline key's pinned set and what its graphics reported. The
+    /// FIRST failure owns `failure` for the pin's life, so a graphic that
+    /// warns on every frame can fill `warnings` and never hide it.
+    private struct Pin {
+        let set: GraphicSet
+        var failure: GraphicReport?
+        var warnings: [GraphicReport]
+    }
+
+    /// Warnings a pin keeps; a later distinct one is dropped.
+    static let warningLimit = 64
+
     private let lock = NSLock()
     private var sets: [Int: GraphicSet] = [:]
+    private var pins: [Int: Pin] = [:]
 
     private init() {}
 
@@ -136,20 +162,74 @@ final class GraphicRegistry {
         return sets[key]?.modules[name]
     }
 
+    /// The set a document keyed `key` draws with right now — what an export
+    /// or a `render_frame` pins. Any thread.
+    func snapshot(for key: Int) -> GraphicSet? {
+        lock.lock()
+        defer { lock.unlock() }
+        return sets[key]
+    }
+
+    /// Opens `key`'s pin on `set`: an offline key draws with it until
+    /// `unpin`, and records its reports. Any thread.
+    func pin(_ set: GraphicSet, for key: Int) {
+        lock.lock()
+        defer { lock.unlock() }
+        pins[key] = Pin(set: set, failure: nil, warnings: [])
+    }
+
+    /// Drops `key`'s pin and its reports; a no-op for a key never pinned.
+    /// Any thread.
+    func unpin(_ key: Int) {
+        lock.lock()
+        defer { lock.unlock() }
+        pins.removeValue(forKey: key)
+    }
+
+    /// Keeps `report` against a pinned key; a no-op for any other key. A
+    /// failure fills the failure slot if it is empty and is dropped
+    /// otherwise; a warning is appended unless an equal one is held or
+    /// `warningLimit` are. Any thread.
+    func record(_ report: GraphicReport, for key: Int) {
+        lock.lock()
+        defer { lock.unlock() }
+        guard var pin = pins[key] else { return }
+        if report.failed {
+            guard pin.failure == nil else { return }
+            pin.failure = report
+        } else {
+            guard pin.warnings.count < Self.warningLimit, !pin.warnings.contains(report)
+            else { return }
+            pin.warnings.append(report)
+        }
+        pins[key] = pin
+    }
+
+    /// Everything `key`'s pin holds: the failure first, then the warnings in
+    /// the order they arrived. Any thread.
+    func reports(for key: Int) -> [GraphicReport] {
+        lock.lock()
+        defer { lock.unlock() }
+        guard let pin = pins[key] else { return [] }
+        return (pin.failure.map { [$0] } ?? []) + pin.warnings
+    }
+
+    /// The pin's failure slot — the first failure it recorded. Any thread.
+    func failure(for key: Int) -> GraphicReport? {
+        lock.lock()
+        defer { lock.unlock() }
+        return pins[key]?.failure
+    }
+
     /// The set a recipe under `key` draws with, and the per-frame budget:
-    /// a document's own key answers its set at the preview budget; an
-    /// offline key answers the set of the document whose published handle
-    /// is the one published under it, at the offline budget; anything else
-    /// is nil. Any thread.
+    /// a document's own key answers its set at the preview budget; a
+    /// pinned offline key answers its pinned set at the offline budget;
+    /// anything else is nil. Any thread.
     func resolve(_ key: Int) -> (set: GraphicSet, budgetMs: Int)? {
         lock.lock()
-        let current = sets
-        lock.unlock()
-        if let own = current[key] { return (own, Self.previewBudgetMs) }
-        guard let handle = RecipeSource.shared.project(for: key) else { return nil }
-        for (document, set) in current where RecipeSource.shared.project(for: document) === handle {
-            return (set, Self.offlineBudgetMs)
-        }
+        defer { lock.unlock() }
+        if let own = sets[key] { return (own, Self.previewBudgetMs) }
+        if let pinned = pins[key] { return (pinned.set, Self.offlineBudgetMs) }
         return nil
     }
 

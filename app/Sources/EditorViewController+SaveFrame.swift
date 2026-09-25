@@ -185,10 +185,11 @@ extension EditorViewController {
     ) {
         let project = document.editedProject
         let urls = document.mediaURLs()
+        let graphics = GraphicRegistry.shared.snapshot(for: document.recipeKey)
         EditorViewController.frameGrabQueue.async { [weak self] in
             let result: Result<URL, Error>
             if let image = Exporter.renderFrame(
-                project: project, urls: urls, at: time, maxWidth: nil)
+                project: project, urls: urls, at: time, maxWidth: nil, graphics: graphics)
             {
                 result = Result { try FrameWriter.write(image, as: format, to: url) }
             } else {

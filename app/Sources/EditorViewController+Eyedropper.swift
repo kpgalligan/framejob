@@ -189,9 +189,10 @@ extension EditorViewController {
         // collapses them to.
         let project = (try? document.editedProject.applying([session.suppression])).project
             ?? document.editedProject
+        let graphics = GraphicRegistry.shared.snapshot(for: document.recipeKey)
         EditorViewController.eyedropperQueue.async { [weak self] in
             let frame = Exporter.renderFrame(
-                project: project, urls: urls, at: time, maxWidth: nil)
+                project: project, urls: urls, at: time, maxWidth: nil, graphics: graphics)
             let picked = frame.flatMap {
                 CanvasEyedropperSession.color(at: target, in: $0, canvas: snapshot)
             }

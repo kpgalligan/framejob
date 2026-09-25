@@ -485,14 +485,22 @@ the key map behind it.
   `.graphicsDidChange` — a NEW library and every module recompiled only when
   `library` is true (or the last library failed to build), else just the
   named modules against the existing (frozen) library. `install`/`update`/
-  `remove`/`entry` are main-only; `resolve` is the one cross-thread read: a
-  document's own key at the 250 ms preview budget, an offline key
-  (`render_frame`, an export) by HANDLE match against what a document last
-  published at 2 s, else nil — the slate. `LayerRenderersGraphic` hands the
-  engine the core's own `props_json` / `ctx_json` untouched and keys the
-  texture by the SVG TEXT, the size and the library version, in
-  `LayerRenderers`' separate six-entry graphic pool; any failure is nil and
-  the compositor slates.
+  `remove`/`entry` are main-only; `resolve` is the one cross-thread read of
+  the set: a document's own key at the 250 ms preview budget, a PINNED
+  offline key at 2 s, else nil — the slate. **An offline key draws only what
+  its caller pinned** (`pin(set, for: key)` with the document's
+  `snapshot(for: recipeKey)`, captured on main): every `pin` has its `unpin`
+  — `Exporter.finish` AND `deinit`, and `renderFrameReported`'s `defer`. A
+  pin also keeps its REPORTS: the first failure in a slot of its own for the
+  pin's life, then at most 64 distinct warnings, so a warning can never
+  displace a failure. `LayerRenderersGraphic` hands the engine the core's
+  own `props_json` / `ctx_json` untouched and keys the texture by the SVG
+  TEXT, the size and the library version, in `LayerRenderers`' separate
+  six-entry graphic pool. A graphic that fails — no module, not compiled, a
+  throw or timeout, a refused raster — draws its ERROR CARD, keyed by its
+  own text in the graphic pool, never the last good frame; a raster's
+  warnings ride in `Rendered.warnings` so a pool hit still reports them.
+  Only no set and a failed upload are nil.
 - `Compositor.swift` · `CompositorEffects.swift` · `Resources/Shaders/Compositor.metal`
   — the per-layer pass. The uniform block's field ORDER is a contract with the
   shader checked only by reading both, so change them in one edit; it is 104
@@ -542,7 +550,8 @@ the key map behind it.
   algebraically self-cancelling) and pan (constant-power, unity at centre).
   A track whose clips ask for none is bit-identical.
 - `Exporter.swift` · `ExporterLoudness.swift` · `ExporterSettings.swift` ·
-  `ExporterWriter.swift` · `ExporterImageSequence.swift` — the writer
+  `ExporterWriter.swift` · `ExporterImageSequence.swift` ·
+  `ExporterErrors.swift` · `ExporterGraphics.swift` — the writer
   (`ExportWriter` REPLACED `AVAssetExportSession` so chapters, bitrate and
   size have one path) and the one-frame offline render. An export is TWO
   passes wherever the file holds sound: a measurement build of its own in
@@ -554,7 +563,17 @@ the key map behind it.
   grow the guard. GIF and APNG refuse past 600 frames rather than truncate.
   `renderFrame` is documented off-main. Audio export is NOT bit-deterministic
   within an 8 ms window at a duck ramp edge (AVFoundation's mix); a duck-free
-  project decodes byte-identical.
+  project decodes byte-identical. `ExportError` is `ExporterErrors.swift`'s.
+  An export PINS the `GraphicSet` it was handed for its whole life, GATES it
+  before the build (`ExporterGraphics.graphicsRefusal`: a graphic clip in the
+  range, or in a nest a clip in the range shows, whose module did not
+  compile or is missing, refuses before the destination is touched), and
+  ABORTS on a recorded failure: `pollProgress` cancels and `finish` removes
+  the file and answers `.graphicFailed`, whatever the pipeline said.
+  **`ExportWriter.cancel()` only sets the flag**; the reader and the writer
+  are cancelled in `allInputsFinished`, after every pump has left its loop —
+  cancelling the reader under a running `copyNextSampleBuffer` crashed the
+  process. Never call `cancelReading` from another thread while a pump runs.
 - `FrameWriter.swift` — a `CGImage` and a format in, a URL out, no panel:
   Save Frame and `render_frame` both call it, so their PNGs are
   byte-identical by construction. PNG keeps a NIL properties dictionary
@@ -839,7 +858,8 @@ free.
 - `ExportQueueController.swift` · `ExportQueueWindowController.swift` — the
   controller has NO AppKit in it so a probe can drive it; one job at a time on
   the MAIN thread with a fresh `Exporter` each (two concurrent ones deadlock);
-  `mediaURLs()` captured at ENQUEUE. No MCP mirror: `export` called N times is
+  `mediaURLs()` AND the document's compiled graphics (`Job.graphics`)
+  captured at ENQUEUE. No MCP mirror: `export` called N times is
   the capability.
 - `SettingsWindowController.swift` — Reelcut ▸ Settings… ⌘,, the app's one
   window for something PERSISTED beyond view state, with

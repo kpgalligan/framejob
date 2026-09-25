@@ -56,7 +56,8 @@ extension EditorViewController {
         presentAsSheet(
             ExportProgressSheetController(
                 project: document.project, urls: document.mediaURLs(), settings: settings,
-                to: url, options: options))
+                to: url, options: options,
+                graphics: GraphicRegistry.shared.snapshot(for: document.recipeKey)))
     }
 
     /// Called by `ExportSheetController`'s **Add to Queue** once the save
@@ -86,7 +87,8 @@ extension EditorViewController {
         }
         ExportQueueController.shared.enqueue(
             project: document.project, urls: document.mediaURLs(), settings: settings,
-            to: url, options: options)
+            to: url, options: options,
+            graphics: GraphicRegistry.shared.snapshot(for: document.recipeKey))
         // Adding to a queue shows the queue: the job has no sheet of its own,
         // so this window is the only thing that says it exists.
         ExportQueueWindowController.shared.show()

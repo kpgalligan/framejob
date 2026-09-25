@@ -61,6 +61,7 @@ final class LayerRenderers {
     struct Rendered {
         let texture: MTLTexture
         let size: CGSize
+        var warnings: [GraphicDiagnostic] = []
     }
 
     init(device: MTLDevice) {

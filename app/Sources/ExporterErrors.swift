@@ -47,6 +47,13 @@ extension Exporter {
         /// cancelled and had no error of its own — or one of the reader's or
         /// writer's own steps refused with a message worth showing.
         case failed(String)
+        /// Graphic clips in the range whose module does not compile, or is
+        /// not in `graphics/`, each with what is wrong: the export was refused
+        /// before it started (G-8). Sorted by name.
+        case graphicsNotCompiled([(name: String, message: String)])
+        /// A graphic failed while the export drew it, at its own frame — nil
+        /// when it did not compile. The export stopped and its file is gone.
+        case graphicFailed(name: String, frame: Int?, message: String)
 
         var errorDescription: String? {
             switch self {
@@ -68,6 +75,16 @@ extension Exporter {
                 return "The export was cancelled."
             case .failed(let message):
                 return message
+            case .graphicsNotCompiled(let refused):
+                let clauses = refused.map { "the graphic \"\($0.name)\" \($0.message)" }
+                return "The export was not started: " + clauses.joined(separator: "; ")
+                    + ". Fix the module and export again."
+            case .graphicFailed(let name, let frame?, let message):
+                return "The export was stopped at frame \(frame) of the graphic \"\(name)\": "
+                    + "\(message). No file was written."
+            case .graphicFailed(let name, nil, let message):
+                return "The export was stopped: the graphic \"\(name)\" does not compile — "
+                    + "\(message). No file was written."
             }
         }
     }

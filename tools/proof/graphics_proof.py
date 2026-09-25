@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-"""A graphic clip DRAWN, against the built app: road map 10's G3b (§10.6).
+"""A graphic clip DRAWN, against the built app: road map 10's G3b and G3c
+(§10.6) — the draw, then a failing graphic's error card, `render_frame`'s
+diagnostics, the export gate and the pinned set.
 
 One owned instance on its own port, launched and stopped by PID, with its log
 at `tools/proof/work/graphics/reelcut-<port>.log`; nothing else is ever
@@ -39,6 +41,36 @@ K3  an untitled `new_project`, `bar.js` moved into its new
     `save_project {path: P2}`, relaunch, `open_project`: frame 30 identical;
 A1  a transparent canvas plus `callout`, exported as `prores_4444`, decoded
     at 2 s with ffmpeg: alpha 0 at (0,0) and 255 at (1300,432), the stroke;
+E1  (P1 reopened, `throw10.js`, `spin.js`, `nofont.js` mv'd into it and a
+    front track added; each E row adds its own clip there and `undo`es it)
+    `throw10`: frame 9's reply does not name `throw10` (`bar`'s stale-`color`
+    warning from L1 is G-4's leniency and stays) and (50,50) is RED; frame
+    10's reply names `"throw10"`, `frame 10` and `boom at ten`, (1,540) is
+    the card's border (230,40,40) and (1900,1060) its fill (64,8,8); an
+    `export {preset: h264}` answers an error naming `"throw10"` and `frame
+    10`, and no file is at the path;
+E2  `spin` (`while(true){}`): `render_frame` at frame 0 returns within 3 s
+    (wall clock printed) with `budget` in its text; `get_project` then
+    answers within 5 s;
+E3  `nofont` (`font-family="'Nope Sans'"`): one `render_frame` at frame 0
+    names `Nope Sans` and `IBM Plex Mono` (the pool's hit path is Q3's —
+    every `render_frame` builds a fresh compositor);
+E4  a fresh project with `pin.js` and a 3 s `pin` clip, exported as
+    `prores_4444` over MCP, decoded at 2 s: (480,540) within ±6 of RED —
+    `export` passes the document's set (an offline key with no pin slates).
+    It does NOT race a module swap: the server is one thread and `export`
+    holds it, so no MCP call can observe the registry mid-export;
+Q1  (`graphics_pin_probe.swift`, built from `app/Sources` like
+    `phase7_chrome.py`'s probe, over the saved project PQ — `pin.js` and
+    `nofont.js`, a 3 s `pin` clip) `queue pin`: the job enqueued with the
+    document's set, then the canvas turned blue and the document's set
+    REMOVED before any frame: at 1 s (480,540) within ±6 of RED and
+    (1440,540) of BLACK; CONTROL `queue nopin`: (480,540) is NOT RED;
+Q2  the same through `Exporter.export` directly: `direct pin` RED,
+    `direct nopin` not;
+Q3  `hit`: one `LayerRenderers` asked twice for `nofont`: both answers'
+    `warnings` name `Nope Sans`, and the second is the pool's hit (the same
+    texture object);
 Z1  `grep "Reelcut: "` over every launch's log prints nothing.
 
     python3 tools/proof/graphics_proof.py [--port 4879] [--app PATH]
@@ -55,6 +87,7 @@ both sides of them, so they are not expected to fail.
 
 import argparse
 import glob
+import json
 import os
 import re
 import shutil
@@ -75,10 +108,16 @@ WORK = ROOT / "tools/proof/work/graphics"
 APP = ROOT / "build/Build/Products/Release/Reelcut.app/Contents/MacOS/Reelcut"
 FIXTURES = ROOT / "graphic/tests/graphics"
 FFI_BGRA = ROOT / "tools/proof/work/graphics-ffi-probe/lower-third-30.bgra"
+PIN_PROBE_SOURCE = ROOT / "tools/proof/graphics_pin_probe.swift"
+# Outside WORK, which every run empties, so an up-to-date probe is not rebuilt.
+PIN_PROBE_DIR = ROOT / "tools/proof/work/graphics-pin-probe"
 CALL_BOUND = 300
 FRAME = 20000
 RED, BLUE, BLACK = (255, 90, 54), (45, 127, 249), (0, 0, 0)
-ROWS = ["P1", "P2", "P3", "S1", "R1", "H1", "L1", "F1", "K1", "K2", "T1", "K3", "A1", "Z1"]
+BORDER, CARD = (230, 40, 40), (64, 8, 8)
+SECOND = 30 * FRAME
+ROWS = ["P1", "P2", "P3", "S1", "R1", "H1", "L1", "F1", "K1", "K2", "T1", "K3", "A1",
+        "E1", "E2", "E3", "E4", "Q1", "Q2", "Q3", "Z1"]
 ANCHOR = "frame: frame, propsJSON: propsJSON, ctxJSON: ctxJSON,"
 rows = {}
 
@@ -102,6 +141,26 @@ def bar(color="#ff5a36", with_color=True, width=100):
             "export function render(frame, props, ctx) {\n"
             "  return svg(ctx, `" + body + "`);\n"
             "}\n").replace("@{", "${")
+
+
+def module(render_body, frames=120):
+    """A schema-less module whose `render` is `render_body`."""
+    return ("export const meta = { name: \"G3c\", durationInFrames: " + str(frames) + " };\n"
+            "export function render(frame, props, ctx) {\n" + render_body + "\n}\n")
+
+
+PIN_JS = ("export const meta = { name: \"Pin\", durationInFrames: 90 };\n"
+          "export const schema = { color: { type: \"color\", default: \"#ff5a36\" } };\n"
+          "export function render(frame, props, ctx) {\n"
+          "  return svg(ctx, `<rect x=\"0\" y=\"0\" width=\"960\" height=\"1080\" "
+          "fill=\"${props.color}\"/>`);\n}\n")
+THROW10_JS = module(
+    '  if (frame === 10) throw new Error("boom at ten");\n'
+    '  return svg(ctx, `<rect x="0" y="0" width="100" height="100" fill="#ff5a36"/>`);')
+SPIN_JS = module("  while (true) {}")
+NOFONT_JS = module(
+    "  return svg(ctx, `<text x=\"100\" y=\"300\" font-family=\"'Nope Sans'\" "
+    "font-size=\"120\" fill=\"#ffffff\">Nope</text>`);")
 
 
 class Instance:
@@ -189,7 +248,7 @@ def project_of(client, project):
     return got["reply"]["project"] if got["ok"] else None
 
 
-def land(client, project, name, track, at):
+def land(client, project, name, track, at, extra=None):
     """`add_graphic_clip` polled for at most 5 s — a refusal is an answer
     while the store has not seen the module. The new clip, or None and the
     last sentence."""
@@ -197,7 +256,8 @@ def land(client, project, name, track, at):
     last = ""
     while time.monotonic() < deadline:
         got = attempt(client, "add_graphic_clip",
-                      with_project(project, {"name": name, "track": track, "at": at}))
+                      with_project(project, dict({"name": name, "track": track, "at": at},
+                                                 **(extra or {}))))
         if got["ok"]:
             clips = (project_of(client, project) or {}).get("clips", [])
             ours = [c for c in clips if (c.get("graphic") or {}).get("name") == name]
@@ -217,6 +277,20 @@ def render(client, project, t, tag):
         print(f"  render {tag}: {got.get('error', 'no file')}", flush=True)
         return None
     return path.read_bytes()
+
+
+def render_text(client, project, t, tag):
+    """`render_frame` at `t`: (its reply text, the PNG's bytes, the wall
+    clock in seconds)."""
+    path = WORK / f"{tag}.png"
+    if path.exists():
+        path.unlink()
+    started = time.monotonic()
+    got = attempt(client, "render_frame", with_project(project, {"t": t, "path": str(path)}))
+    seconds = time.monotonic() - started
+    text = got["reply"] if got["ok"] else got["error"]
+    data = path.read_bytes() if got["ok"] and path.exists() else None
+    return str(text), data, seconds
 
 
 def decode_png(data, upto=None):
@@ -429,6 +503,9 @@ def run(app, port):
               f"save {saved}, present {present}, identical {k3 == k3_ref}")
 
         run_a1(client, pa)
+        run_e(client, p1)
+        run_e4(client, WORK / "E4.reelcut")
+        make_pq(client, WORK / "PQ.reelcut")
     finally:
         instance.stop()
     return log
@@ -494,6 +571,209 @@ def run_a1(client, pa):
           f"decoded {len(raw)} bytes, alpha {corner} / {centre}")
 
 
+def near(found, want, slack=6):
+    return found is not None and all(abs(a - b) <= slack for a, b in zip(found, want))
+
+
+def decode_movie(movie, seconds):
+    """One RGBA frame of `movie` at `seconds` through ffmpeg, or b"" — binary
+    output, so not `bounded.run` (a text-mode child); bounded all the same."""
+    try:
+        return subprocess.run(["ffmpeg", "-v", "error", "-ss", str(seconds), "-i", str(movie),
+                               "-vframes", "1", "-f", "rawvideo", "-pix_fmt", "rgba", "-"],
+                              capture_output=True, timeout=120,
+                              env=bounded.child_env()).stdout
+    except (OSError, subprocess.TimeoutExpired):
+        return b""
+
+
+def movie_pixel(raw, x, y, width=1920, height=1080):
+    if len(raw) != width * height * 4:
+        return None
+    i = (y * width + x) * 4
+    return tuple(raw[i:i + 3])
+
+
+def run_e(client, p1):
+    """E1–E3 on P1, reopened in this instance: three modules mv'd in, a
+    FRONT track added, and each row's clip undone before the next."""
+    opened = attempt(client, "open_project", {"path": str(p1)})
+    rcs = [mv_in(p1 / "graphics", name, text) for name, text in
+           (("throw10.js", THROW10_JS), ("spin.js", SPIN_JS), ("nofont.js", NOFONT_JS))]
+    added = attempt(client, "add_track", {"project": str(p1)})
+    track = ((project_of(client, p1) or {}).get("tracks") or [{}])[-1].get("id")
+    setup = f"open {opened['ok']}, mv rcs {rcs}, track {added['ok']} {track}"
+
+    clip, why = land(client, p1, "throw10", track, 0)
+    text9, f9, _ = render_text(client, p1, 9 * FRAME, "e1-f9")
+    text10, f10, _ = render_text(client, p1, 10 * FRAME, "e1-f10")
+    movie = WORK / "e1-export.mp4"
+    exported = attempt(client, "export", {"project": str(p1), "preset": "h264",
+                                          "path": str(movie)})
+    # The path itself. AVFoundation's own `<name>.sb-…` temporary can outlive
+    # a cancelled write for a moment and is not the file (measured, G3c).
+    left = [str(movie)] if movie.exists() else []
+    undone = attempt(client, "undo", {"project": str(p1)})
+    error = exported.get("error", "")
+    red9, border, fill = pixel(f9, 50, 50), pixel(f10, 1, 540), pixel(f10, 1900, 1060)
+    check("E1 throw10: frame 9 does not name throw10 and draws RED; frame 10 names \"throw10\", "
+          "frame 10 and boom at ten over the error card; the export is stopped naming both, "
+          "and leaves no file",
+          opened["ok"] and rcs == [0, 0, 0] and added["ok"] and clip is not None
+          and 'Graphic "throw10"' not in text9 and red9 == RED
+          and '"throw10"' in text10 and "frame 10" in text10 and "boom at ten" in text10
+          and border == BORDER and fill == CARD
+          and not exported["ok"] and '"throw10"' in error and "frame 10" in error
+          and left == [] and undone["ok"],
+          f"{setup}, clip {clip is not None} {why!r}, (50,50)@9 {red9}, frame 9 says "
+          f"{text9!r}, frame 10 says {text10!r}, (1,540) {border}, (1900,1060) {fill}, "
+          f"export {exported}, left {left}")
+
+    clip, why = land(client, p1, "spin", track, 0)
+    text0, _, seconds = render_text(client, p1, 0, "e2-f0")
+    started = time.monotonic()
+    got = attempt(client, "get_project", {"project": str(p1)})
+    answered = time.monotonic() - started
+    undone = attempt(client, "undo", {"project": str(p1)})
+    print(f"  E2 render_frame took {seconds:.2f} s, get_project {answered:.2f} s", flush=True)
+    check("E2 spin: render_frame at frame 0 returns within 3 s naming the budget; get_project "
+          "then answers within 5 s",
+          clip is not None and seconds < 3 and "budget" in text0 and got["ok"]
+          and answered < 5 and undone["ok"],
+          f"clip {clip is not None} {why!r}, {seconds:.2f} s, says {text0!r}, "
+          f"get_project {got['ok']} in {answered:.2f} s")
+
+    clip, why = land(client, p1, "nofont", track, 0)
+    text0, _, _ = render_text(client, p1, 0, "e3-f0")
+    undone = attempt(client, "undo", {"project": str(p1)})
+    check("E3 nofont: render_frame names Nope Sans and IBM Plex Mono",
+          clip is not None and "Nope Sans" in text0 and "IBM Plex Mono" in text0
+          and undone["ok"],
+          f"clip {clip is not None} {why!r}, says {text0!r}")
+
+
+def pin_project(client, package, names):
+    """A fresh project at `package` with `names` mv'd into its graphics/ and a
+    3 s `pin` clip. (made, mv rcs, clip, last refusal)."""
+    made = attempt(client, "new_project", {"path": str(package)})
+    sources = {"pin.js": PIN_JS, "nofont.js": NOFONT_JS}
+    rcs = [mv_in(package / "graphics", name, sources[name], make_folder=True) for name in names]
+    track = ((project_of(client, package) or {}).get("tracks") or [{}])[0].get("id")
+    clip, why = land(client, package, "pin", track, 0, {"duration": 3 * SECOND})
+    return made["ok"], rcs, clip, why
+
+
+def run_e4(client, package):
+    made, rcs, clip, why = pin_project(client, package, ["pin.js"])
+    movie = WORK / "e4.mov"
+    exported = attempt(client, "export", {"project": str(package), "preset": "prores_4444",
+                                          "path": str(movie)})
+    raw = decode_movie(movie, 2)
+    found = movie_pixel(raw, 480, 540)
+    check("E4 a pin clip exported as prores_4444 over MCP: at 2 s (480,540) is RED — export "
+          "passes the document's set",
+          made and rcs == [0] and clip is not None and exported["ok"] and near(found, RED),
+          f"clip {clip is not None} {why!r}, export {exported.get('error', 'ok')}, "
+          f"decoded {len(raw)} bytes, (480,540) {found}")
+
+
+def make_pq(client, package):
+    """PQ, the probe's project: pin.js and nofont.js, a 3 s pin clip, saved."""
+    made, rcs, clip, why = pin_project(client, package, ["pin.js", "nofont.js"])
+    saved = attempt(client, "save_project", {"project": str(package)})
+    print(f"  PQ: new {made}, mv rcs {rcs}, clip {clip is not None} {why!r}, "
+          f"saved {saved['ok']}", flush=True)
+
+
+def build_pin_probe():
+    """`graphics_pin_probe.swift` as `main.swift` over every other file in
+    `app/Sources`, on `harness/build.sh`'s swiftc line, with the app's
+    `Fonts`, `Blank.mp4` and a `default.metallib` of `Compositor.metal`
+    beside it — `phase7_chrome.py`'s `build_probe` and `build_shader`. Rebuilt
+    only when stale. The binary, or None and why."""
+    PIN_PROBE_DIR.mkdir(parents=True, exist_ok=True)
+    binary = PIN_PROBE_DIR / "graphics_pin_probe"
+    entry = PIN_PROBE_DIR / "main.swift"
+    if not entry.exists() or entry.read_text() != PIN_PROBE_SOURCE.read_text():
+        entry.write_text(PIN_PROBE_SOURCE.read_text())
+    fonts = PIN_PROBE_DIR / "Fonts"
+    resources = ROOT / "app/Resources"
+    if not fonts.is_dir() or (resources / "Fonts").stat().st_mtime > fonts.stat().st_mtime:
+        shutil.rmtree(fonts, ignore_errors=True)
+        shutil.copytree(resources / "Fonts", fonts)
+    if not (PIN_PROBE_DIR / "Blank.mp4").exists():
+        shutil.copy2(resources / "Blank.mp4", PIN_PROBE_DIR / "Blank.mp4")
+    shader = resources / "Shaders/Compositor.metal"
+    metallib, air = PIN_PROBE_DIR / "default.metallib", PIN_PROBE_DIR / "Compositor.air"
+    if not metallib.exists() or shader.stat().st_mtime > metallib.stat().st_mtime:
+        step = bounded.run(["xcrun", "-sdk", "macosx", "metal", "-c", str(shader), "-o",
+                            str(air)], 300)
+        if step["rc"] == 0:
+            step = bounded.run(["xcrun", "-sdk", "macosx", "metallib", str(air), "-o",
+                                str(metallib)], 300)
+        if step["rc"] != 0 or not metallib.exists():
+            return None, f"the shader did not build: {step['stderr'][-400:]}"
+    sources = sorted(path for path in (ROOT / "app/Sources").glob("*.swift")
+                     if path.name != "main.swift")
+    lib = ROOT / "core/target/release/libreelcut_core.a"
+    if not lib.exists():
+        return None, f"{lib} is missing — run `cd core && cargo build --release` first"
+    if binary.exists() and all(path.stat().st_mtime < binary.stat().st_mtime
+                               for path in sources + [entry, lib]):
+        return binary, ""
+    sdk = bounded.run(["xcrun", "--show-sdk-path", "--sdk", "macosx"], 60)["stdout"].strip()
+    built = bounded.run(
+        ["swiftc", "-sdk", sdk, "-target", "arm64-apple-macos26.0", "-module-name", "Reelcut",
+         "-import-objc-header", str(ROOT / "app/Bridging/Reelcut-Bridging-Header.h"),
+         "-L", str(lib.parent), "-lreelcut_core"]
+        + [str(path) for path in sources] + [str(entry), "-o", str(binary)], 900)
+    if built["rc"] != 0 or not binary.exists():
+        errors = [line for line in built["stderr"].splitlines() if ": error:" in line]
+        tail = built["stderr"].strip().splitlines()[-4:]
+        return None, f"swiftc rc {built['rc']}: {(errors or tail or ['(no output)'])[:6]}"
+    return binary, ""
+
+
+def run_probe(binary, mode, pin, tag):
+    """One probe run over PQ: its JSON answer (or an error), and the decoded
+    frame at 1 s for the two export modes."""
+    if binary is None:
+        return {"error": "the probe did not build"}, b""
+    movie = WORK / f"{tag}.mov"
+    got = bounded.run([str(binary), str(WORK / "PQ.reelcut"), mode, pin, str(movie)], 600)
+    try:
+        answer = json.loads(got["stdout"].strip().splitlines()[-1])
+    except (IndexError, ValueError):
+        answer = {"error": f"rc {got['rc']}, expired {got['expired']}: "
+                           f"{(got['stdout'] + got['stderr'])[-400:]}"}
+    raw = decode_movie(movie, 1) if mode != "hit" and movie.exists() else b""
+    return answer, raw
+
+
+def run_q(binary, why):
+    """Q1–Q3 through the probe; a probe that did not build fails all three."""
+    for row, mode in (("Q1", "queue"), ("Q2", "direct")):
+        pinned, raw = run_probe(binary, mode, "pin", f"{row.lower()}-pin")
+        control, raw_control = run_probe(binary, mode, "nopin", f"{row.lower()}-nopin")
+        left, right = movie_pixel(raw, 480, 540), movie_pixel(raw, 1440, 540)
+        bare = movie_pixel(raw_control, 480, 540)
+        check(f"{row} {mode}: the set pinned at the call draws RED at (480,540) after the "
+              "document's set is removed, (1440,540) BLACK; CONTROL with no pin is not RED",
+              pinned.get("setCaptured") and pinned.get("setAfterStop") is False
+              and near(left, RED) and near(right, BLACK)
+              and control.get("setAfterStop") is False and bare is not None
+              and not near(bare, RED),
+              f"{why}pin {pinned}, (480,540) {left}, (1440,540) {right}; nopin {control}, "
+              f"(480,540) {bare}")
+    hit, _ = run_probe(binary, "hit", "pin", "q3-hit")
+    first, second = hit.get("first") or [], hit.get("second") or []
+    check("Q3 one LayerRenderers asked twice for nofont: both answers warn of Nope Sans, the "
+          "second from the pool (the same texture)",
+          any("Nope Sans" in m for m in first) and any("Nope Sans" in m for m in second)
+          and hit.get("sameTexture") is True,
+          f"{why}{hit}")
+
+
 def build_mutant():
     """A COPY of `app/` and `project.yml` with `core/` linked, the anchor
     replaced, built by xcodegen and xcodebuild. The binary, or None and why."""
@@ -529,7 +809,7 @@ def main():
     shutil.rmtree(WORK, ignore_errors=True)
     WORK.mkdir(parents=True)
     if args.mutant:
-        print("G3b graphics — the frame-plus-one MUTANT (P2 must FAIL)", flush=True)
+        print("G3b/G3c graphics — the frame-plus-one MUTANT (P2 must FAIL)", flush=True)
         binary, why = build_mutant()
         if binary is None:
             print(f"  FAIL the mutant builds — {why}")
@@ -547,12 +827,15 @@ def main():
         print("the mutant is CAUGHT: P1 held and P2 failed" if verdict
               else "the mutant was NOT caught")
         return 0 if verdict else 1
-    print("G3b graphics — a graphic clip drawn, against the built app (proof)", flush=True)
+    print("G3b/G3c graphics — a graphic clip drawn, and one failing, against the built app "
+          "(proof)", flush=True)
     if not args.app.exists():
         print(f"  FAIL the app is not built: {args.app}")
         print(f"0/{len(ROWS)}")
         return 1
     log = run(args.app, args.port)
+    binary, why = build_pin_probe()
+    run_q(binary, f"the probe did not build — {why}; " if binary is None else "")
     found = complaints(log)
     check("Z1 grep \"Reelcut: \" over every launch's log prints nothing", found == [],
           f"{found[:5]}")

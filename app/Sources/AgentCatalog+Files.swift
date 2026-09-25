@@ -262,7 +262,9 @@ extension AgentServer {
                     + "as an image block and as a file on disk whose path the text names. Use it "
                     + "before and after every edit. It writes a PNG to a temporary file unless "
                     + "path or format says otherwise, so a call that names neither is exactly "
-                    + "the call it always was.",
+                    + "the call it always was. When a graphic in the frame warned or failed, a "
+                    + "sentence before the last names the graphic, its frame and the "
+                    + "diagnostic; a failed graphic draws its error card in the picture.",
                 [
                     "t": [
                         "type": "integer",
@@ -303,7 +305,9 @@ extension AgentServer {
                     + "MEASURED on the way through, under loudness: integrated_lufs, "
                     + "true_peak_dbtp and the gain_db that was applied. Those are read off "
                     + "the mix that was written, so they are what the file holds rather than "
-                    + "what was asked for.",
+                    + "what was asked for. A graphic clip whose module does not compile "
+                    + "refuses the export before it starts; a graphic that fails during it "
+                    + "stops the export with no file left, naming the graphic and the frame.",
                 [
                     "preset": exportPresetProperty,
                     "path": [

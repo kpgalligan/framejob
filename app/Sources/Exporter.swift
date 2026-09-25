@@ -105,6 +105,8 @@ final class Exporter {
     /// republishes on every edit, and a frame already queued must not be
     /// composed from a project the user changed halfway through the write.
     private var recipeKey: Int?
+    /// Where this export writes — removed by `finish` when a graphic failed.
+    private var destination: URL?
     private var progressHandler: ((Double) -> Void)?
     private var completionHandler: ((Result<URL, any Error>) -> Void)?
 
@@ -165,7 +167,10 @@ final class Exporter {
 
     deinit {
         timer?.invalidate()
-        if let key = recipeKey { RecipeSource.shared.unregister(key) }
+        if let key = recipeKey {
+            RecipeSource.shared.unregister(key)
+            GraphicRegistry.shared.unpin(key)
+        }
         scratchStorage?.deallocate()
     }
 
@@ -194,9 +199,14 @@ final class Exporter {
     ///
     /// The default is `.none`, so a caller that says nothing writes exactly
     /// the file it wrote before phase 7.
+    ///
+    /// **`graphics` is the document's compiled set as the export was asked
+    /// for** (G-13, `ExporterGraphics.swift`): pinned on this export's key
+    /// for its whole life, gated before the build, and the export stopped
+    /// on the first frame a graphic fails. nil draws every graphic's slate.
     func export(
         project: ReelProject, urls: [UInt32: URL], settings: ExportSettings, to url: URL,
-        options: RecipeOptions = .none,
+        options: RecipeOptions = .none, graphics: GraphicSet? = nil,
         progress: @escaping (Double) -> Void,
         completion: @escaping (Result<URL, any Error>) -> Void
     ) {
@@ -206,6 +216,7 @@ final class Exporter {
         pendingLoudness = nil
         progressHandler = progress
         completionHandler = completion
+        destination = url
 
         guard let plan = project.plan else {
             finish(.failure(ExportError.noPlan))
@@ -227,6 +238,7 @@ final class Exporter {
         // makes this enough: `finish` unregisters the key and takes them with
         // it, and nothing else in the process can be reading it.
         RecipeSource.shared.setOptions(options, for: key)
+        if let graphics = graphics { GraphicRegistry.shared.pin(graphics, for: key) }
 
         measureShare = Exporter.measuresLoudness(settings)
             ? (settings.isAudioOnly ? 0.5 : 0.1) : 0
@@ -241,7 +253,11 @@ final class Exporter {
                 try CompositionBuilder.build(
                     plan: plan, planJSON: planJSON, urls: urls, recipeKey: key)
             }
-            let result = Result(catching: build)
+            // A module that does not compile refuses the export here, through
+            // `startWriting`'s `.failure` arm, before the destination is touched.
+            let result = Exporter.graphicsRefusal(
+                project: project, settings: settings, graphics: graphics
+            ).map { Result<BuiltComposition, any Error>.failure($0) } ?? Result(catching: build)
             // Read here, not on the main thread: the markers come off the
             // SNAPSHOT, and on a handle nothing has looked at yet that is the
             // first decode of the whole project JSON.
@@ -260,7 +276,7 @@ final class Exporter {
             DispatchQueue.main.async { [weak self] in
                 self?.startWriting(
                     result, project: project, urls: urls, chapters: chapters,
-                    settings: settings, loudness: loudness, to: url)
+                    settings: settings, loudness: loudness, graphics: graphics, to: url)
             }
         }
     }
@@ -296,7 +312,7 @@ final class Exporter {
     private func startWriting(
         _ result: Result<BuiltComposition, any Error>, project: ReelProject,
         urls: [UInt32: URL], chapters: [ExportChapter], settings: ExportSettings,
-        loudness: ExportLoudness?, to url: URL
+        loudness: ExportLoudness?, graphics: GraphicSet?, to url: URL
     ) {
         guard completionHandler != nil else { return }
         pendingLoudness = loudness
@@ -331,7 +347,7 @@ final class Exporter {
         do {
             writer = try Exporter.pipeline(
                 built: built, project: project, urls: urls, settings: settings,
-                chapters: chapters, options: options, to: url)
+                chapters: chapters, options: options, graphics: graphics, to: url)
         } catch {
             finish(.failure(error))
             return
@@ -374,6 +390,9 @@ final class Exporter {
     }
 
     private func pollProgress() {
+        // A graphic failed on the render thread: stop the write, and `finish`
+        // says which graphic and which frame.
+        if let key = recipeKey, GraphicRegistry.shared.failure(for: key) != nil { cancel() }
         progressHandler?(currentProgress)
     }
 
@@ -407,12 +426,14 @@ final class Exporter {
     /// here rather than cleared: both callers read it after their completion
     /// has fired.
     private func finish(_ result: Result<URL, any Error>) {
+        let result = Exporter.graphicOutcome(result, key: recipeKey, destination: destination)
         loudnessReport = pendingLoudness
         pendingLoudness = nil
         timer?.invalidate()
         timer = nil
         if let key = recipeKey {
             RecipeSource.shared.unregister(key)
+            GraphicRegistry.shared.unpin(key)
             recipeKey = nil
         }
         writer = nil
@@ -486,18 +507,38 @@ final class Exporter {
     /// callers that pass something are the export sheet, the `export` tool
     /// and `render_frame` — the last one both for agent parity and because it
     /// is the only way a proof script can photograph a burn-in at all.
+    ///
+    /// `graphics` is pinned on the frame's own key, as `export` pins it on
+    /// its own; nil draws every graphic's slate.
     static func renderFrame(
         project: ReelProject, urls: [UInt32: URL], at t: Ticks, maxWidth: Int?,
-        options: RecipeOptions = .none
+        options: RecipeOptions = .none, graphics: GraphicSet? = nil
     ) -> CGImage? {
+        renderFrameReported(
+            project: project, urls: urls, at: t, maxWidth: maxWidth, options: options,
+            graphics: graphics
+        ).image
+    }
+
+    /// `renderFrame`, with what the frame's graphics reported while it was
+    /// drawn — read off the key's pin before it is dropped.
+    static func renderFrameReported(
+        project: ReelProject, urls: [UInt32: URL], at t: Ticks, maxWidth: Int?,
+        options: RecipeOptions, graphics: GraphicSet?
+    ) -> RenderedFrame {
         // No videoTracks is NOT a refusal: CompositionBuilder gives a
         // timeline of nothing but text, shapes and images a placeholder track
         // so the recipe can still drive every frame. Only a genuinely empty
         // timeline has nothing to render.
-        guard let plan = project.plan, plan.duration > 0 else { return nil }
+        guard let plan = project.plan, plan.duration > 0 else {
+            return RenderedFrame(image: nil, graphics: [])
+        }
         let key = RecipeSource.shared.register()
         defer { RecipeSource.shared.unregister(key) }
         RecipeSource.shared.set(project, for: key)
+        if let graphics = graphics { GraphicRegistry.shared.pin(graphics, for: key) }
+        // Runs after the `return` below has read the reports.
+        defer { GraphicRegistry.shared.unpin(key) }
         // Before the build, not after: the generator may ask for a frame the
         // moment the composition exists, and a frame composed against this
         // key's defaults would be one frame short of what was asked for.
@@ -508,7 +549,7 @@ final class Exporter {
             built = try CompositionBuilder.build(
                 plan: plan, planJSON: project.planJSON, urls: urls, recipeKey: key)
         } catch {
-            return nil
+            return RenderedFrame(image: nil, graphics: GraphicRegistry.shared.reports(for: key))
         }
 
         let generator = AVAssetImageGenerator(asset: built.composition)
@@ -522,8 +563,9 @@ final class Exporter {
         if let maxWidth = maxWidth, maxWidth > 0 {
             generator.maximumSize = scaledSize(built.videoComposition.renderSize, to: maxWidth)
         }
-        return try? generator.copyCGImage(
+        let image = try? generator.copyCGImage(
             at: CompositionBuilder.time(max(0, t)), actualTime: nil)
+        return RenderedFrame(image: image, graphics: GraphicRegistry.shared.reports(for: key))
     }
 
     /// `size` capped to `maxWidth`, aspect kept, never upscaled and never

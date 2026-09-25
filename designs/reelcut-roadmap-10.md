@@ -2799,3 +2799,237 @@ while no nest is open. Nil, therefore:
   number the six-entry graphic texture pool was sized without. G4/G5: the six
   app-state tools, `get_project`'s `graphics` block, the Graphic sub-tab,
   typed builders in `ReelOps.swift`.
+
+#### G3c — failure and export: the error card, `render_frame`'s diagnostics, the export gate and pin (2026-09-25)
+
+Against baseline `b29d981`: G-8 (the error card, the reply, the gate and the
+abort), G-13's export pin, §9a's G3 items 4 and 5, and G3b's three slate
+cases (a)–(c), which the pin retires.
+
+**What landed.**
+- **The toll, first and alone.** `Exporter.ExportError` moved verbatim to the
+  new `ExporterErrors.swift` as `extension Exporter { enum ExportError … }`:
+  `Exporter.swift` **609 → 539**, `ExporterErrors.swift` **74**; gated alone
+  (`make typecheck` 0 errors and the 7 baseline warnings, `make app`
+  built). Then two cases: `.graphicsNotCompiled([(name, message)])` —
+  "The export was not started: the graphic "x" does not compile — <m>; the
+  graphic "y" has no module in graphics/. Fix the module and export again."
+  — and `.graphicFailed(name:frame:message:)` — "The export was stopped at
+  frame N of the graphic "x": <m>. No file was written."
+- **The pin replaces the handle match** (`GraphicRegistry.swift` 183 →
+  263). `snapshot(for:)` is a document's set; `pin(set, for: key)` opens a
+  `Pin {set, failure, warnings}` on an offline key and `unpin` drops it;
+  `resolve` answers a document's own key at 250 ms, a PINNED key at
+  2000 ms, and anything else nil — the slate. `record` keeps a failure only
+  in the pin's `failure` slot, first one wins for the pin's life, and a
+  warning in a list of at most 64 distinct ones, so a graphic that warns on
+  every frame can never hide a later failure; `reports(for:)` is the
+  failure first, then the warnings. A pin is a RETAIN of an immutable set,
+  not a recompile; it outlives `remove(recipeKey)`.
+- **Every offline door passes the set**, captured on main from
+  `document.recipeKey` (never a scoped handle): `render_frame` and `export`
+  inside their `onMain` blocks, the export sheet and Add to Queue
+  (`Job.graphics`, captured at ENQUEUE — the queue type doc's "anything
+  else the picture depends on … joins that list"), Save Frame, and the
+  eyedropper. `Exporter.export(… graphics:)` pins on its key and unpins in
+  `finish` and in `deinit` (the build and `startWriting` hold `self`
+  weakly, so a released exporter never reaches `finish`);
+  `renderFrameReported` pins on its own key and `defer`s the unpin after
+  reading the reports; GIF and APNG go through it per frame.
+- **The error card** (`LayerRenderersGraphic.swift` 78 → 195): the layer
+  is nil only with no set or a failed upload. No module of the name, a
+  module that did not compile, an `svg` throw or timeout, a `rasterize`
+  throw — each draws `errorCard(text:size:)`: sRGB (64,8,8), a 2-pixel
+  (230,40,40) border, and `<name> · frame <N>` (or `· does not compile`),
+  the message and `line L, column C` in white `DS.mono(max(11, min(w,h) /
+  28))` through a `CTFramesetter` inset by three times its point size,
+  keyed `graphic-error:<sha256(text)>:WxH` in the graphic pool — so a
+  failed frame never serves the last good frame's texture. Each failure and
+  warning is RECORDED on the recipe key (a no-op for a preview key); a
+  raster's warnings ride in `LayerRenderers.Rendered.warnings` (one new
+  field) and are reported from the returned value on every call, so a pool
+  hit still warns.
+- **`render_frame`'s reply**: one sentence per report before the last —
+  `Graphic "x" failed at frame N: <m> (line L, column C).`, `… warned at
+  frame N: …`, `… does not compile: …` — and still `isError: false`; the
+  last sentence stays ` Written to <path>.`. §9a item 4's missing-font
+  warning arrives this way: "font-family "Nope Sans" is not in the font
+  set; the set has: Anton, Bebas Neue, Darker Grotesque, IBM Plex Mono,
+  Montserrat, Source Sans 3".
+- **The gate and the abort** (`ExporterGraphics.swift`, 95, new).
+  `graphicsRefusal` runs on `buildQueue` BEFORE the build and flows through
+  `startWriting`'s `.failure` arm, so an existing file at the destination
+  is untouched: every top-level graphic clip overlapping the range, plus
+  every graphic clip of each nest a clip in the range shows (the whole
+  nest, over-inclusive by decision), nothing for an audio-only row. A frame
+  that fails mid-export records the failure; `pollProgress` sees it on
+  main and cancels; `finish` — before anything else — removes the file and
+  answers `.graphicFailed`, whatever the pipeline said.
+- **Two catalog sentences** (`AgentCatalog+Files.swift`), prose only.
+
+**The crash the abort found, and the Cancel button shared.** The first
+proof run lost the app at E1's export. Both crash reports carry the same two
+stacks: on `com.kgalligan.reelcut.export.video`, `ExportWriter.pump` →
+`-[AVAssetReaderOutput copyNextSampleBuffer]` →
+`CMVideoFormatDescriptionMatchesImageBuffer` → `CFDictionaryGetValue`,
+EXC_BREAKPOINT; on main, `Exporter.pollProgress` → `Exporter.cancel` →
+`ExportWriter.cancel` → `-[AVAssetReader cancelReading]` →
+`_tearDownFigAssetReader`, releasing. `ExportWriter.cancel()` had cancelled
+the reader from main while a pump was inside a copy — and that is the path
+the export sheet's and the queue's Cancel buttons had taken since road map
+2's phase 7; the abort only made it frequent. `ExportWriter.stopped(with:)`
+did the same from one pump's queue under another's copy. **The fix**
+(`ExporterWriter.swift`, 1114 → 1096, so no toll): `cancel()` sets the flag
+the pumps already test before each sample and nothing else; `stopped` only
+records the failure; `allInputsFinished` — which runs on main from the
+pumps' `DispatchGroup` once every pump has left its loop — cancels the
+reader, then the writer (which removes the part-file), then reports.
+`started`, whose only job was to keep `cancelReading` away from an unstarted
+reader, went with its paragraph; `start` still refuses a cancel that came
+first. The cost: a pump blocked on a slow read finishes that one sample
+before it stops — measured at 0.1–0.3 s from a cancel to the completion on
+a 4K graphic export.
+
+| Row | Before the fix (CONTROL) | After |
+|---|---|---|
+| Failing exports over MCP (a project with `bar` plus `throw10` on a front track, `export h264`, the app relaunched after each crash) | 40 exports: **16 crashed**, 24 stopped cleanly | 40 exports: **0 crashed**, 40 stopped naming `"throw10"` and `frame 10`, no file |
+| Mid-export cancels through `Exporter.cancel()` (an in-process probe; a 4K canvas with `title-card` and a 3840 × 2160 `kinetic-type`, 10 s, `h264`, 12.8 s to export whole; the cancel at a random 0.5–8 s) | 30 cancels: **12 crashed**, same stack | 30 cancels: **0 crashed**, 30 answered "cancelled" with no file |
+
+(An earlier, shorter reproduction put the failing-export rate at 1 in 7;
+the 40-export CONTROL above is the one recorded. The two loops are scratch
+instruments, not in the tree — kept with their outputs in the pipeline's
+handoff, `~/.claude/litecode/reelcut/graphics-g3c-failure-export/instruments/`;
+the cancel probe is `graphics_pin_probe.swift`'s build line with a
+`main.swift` that cancels on a timer.)
+
+**Measured.** `make test` 966 passed, 0 failed; `make lint` clean; `make
+typecheck` 0 errors and exactly the 7 baseline warning locations (the
+`copyCGImage` one still in `Exporter.swift`, now line 566); `make app`
+built. `graphics_proof.py --port 4881` **21/21**: P1…A1 as in G3b; E1 frame
+10's reply `Graphic "throw10" failed at frame 10: Error: boom at ten (line
+3, column 31).`, (1,540) (230,40,40), (1900,1060) (64,8,8), the export
+stopped and no file; E2 `render_frame` in 2.04 s, "over the 2000 ms budget
+at frame 0", `get_project` at once; E3 the Nope Sans warning above; E4
+(255,90,55); Q1 and Q2 pinned (255,90,55) and (0,0,0), unpinned (25,28,33)
+— the slate; Q3 both answers warn and the texture is the same object; Z1
+empty. `--mutant frame-plus-one` exit 0 (P1 held, P2 failed). **Made to
+fail by hand**, each reverted and rebuilt: (a) `finish`'s mapping line
+deleted — E1 alone fell, the export answering "The export was cancelled."
+(20/21); (b) the `pin` line in `Exporter.export` deleted — E4, Q1 and Q2
+fell to the slate's (25,28,33), and A1 (the slate is opaque) and E1 (the
+export succeeded with a slate for the card) fell with them (16/21).
+`phase7_chrome.py`, whose queue section cancels a job mid-write, was
+re-run against the fix: **78/78**, the cancelled job's half-written file
+removed and the next job run.
+
+**Measured, not raced: a module swap cannot be observed over MCP.** The
+core's agent server is one `tiny_http` thread and `export` holds it on a
+semaphore until the file is written, so no second call can land while an
+export runs. E4 therefore proves only that the `export` tool passes the
+document's set (an unpinned offline key slates), and the swap is Q1's and
+Q2's, made deterministic in-process: `stopGraphicStore()` removes the
+document's set synchronously after the job is enqueued and before the run
+loop turns, and the file still draws the set it was handed.
+
+**Deviations from the spec.**
+- `ExporterWriter.swift` was out of scope in the spec; the orchestrator
+  brought it in for the cancel fix alone (the decision record is the
+  pipeline's `04b-orchestrator-decision.md`). It shrank, so no pure move.
+- E1 checks that frame 9 names no `Graphic "throw10"`, not no graphic at
+  all: P1's `bar` clip keeps the `color` prop L1 stored after its schema
+  dropped it, and its "props.color is not in the schema; it is passed
+  through" warning on every frame is G-4's leniency, correct.
+- E1 checks the exact destination path: AVFoundation's `<path>.sb-<hex>-…`
+  temporary sits beside a cancelled `.mp4` for a moment and is not the
+  file.
+- A MISSING module's report carries the frame ("failed at frame N: No
+  module named "x" in graphics/"); only a module that did not compile has
+  frame nil.
+- The gate's clause text is carried in each entry ("has no module in
+  graphics/", "does not compile — <m (line L, column C)>"), and a
+  `.graphicFailed` with no frame reads "…the graphic "x" does not compile —
+  <m>. No file was written."
+- A warned report with several diagnostics is one sentence, the messages
+  joined by "; ".
+- The E rows share one FRONT track added to P1, so each row's clip draws
+  over `bar`; P1 is reopened with `open_project` since K3's relaunch
+  closed it.
+
+**Owed from G3c.**
+- The gate walks ONE nest level; a graphic in a nest inside a nest is
+  caught by the mid-export abort instead of the gate.
+- `Exporter.cancel()` still cancels the loudness MEASUREMENT's reader from
+  main while `buildQueue` may be inside its `copyNextSampleBuffer`
+  (`ExporterLoudness.swift`). It is an audio-mix reader with no compositor
+  and was not seen to crash, but it is the same shape as the race fixed
+  above; unmeasured.
+- A successful export's warnings are recorded and dropped at `unpin`: no
+  channel reports them, and the clip's own surface for a warning is G5's
+  Graphic sub-tab (§9a item 4's second half).
+- The playback check, now `designs/reelcut-remaining.md` §4's first
+  bullet.
+- (Review nit.) A `copyNextSampleBuffer` that never returns — a pump
+  starved because the other pump stopped reading — can no longer be woken
+  by a cancel, since `cancel()` only sets the flag; the completion would
+  then never fire, so an MCP `export` would hold the server's one thread
+  and a queue would stall. Not seen in 70 runs; the doc at
+  `ExporterWriter.swift`'s `cancel()` says so.
+- G3b's list: the frozen `AgentServer.swift`'s numerals,
+  `words_core_proof.py`'s version literal, `add_transition`'s handle form,
+  and the `app/CLAUDE.md` entries below.
+
+**Drafted for app/CLAUDE.md**, landed by the orchestrator after the
+review (which passed first time, no blocker or should-fix; its nits: the
+hung-pump case above, a stale comment in `ExporterImageSequence.swift`
+reworded, and the loudness reader already owed).
+- `GraphicRegistry.swift` · `LayerRenderersGraphic.swift` (replacing the
+  entry's `resolve` and failure sentences): "`resolve` is the one
+  cross-thread read of the set: a document's own key at the 250 ms preview
+  budget, a PINNED offline key at 2 s, else nil — the slate. **An offline
+  key draws only what its caller pinned** (`pin(set, for: key)` with the
+  document's `snapshot(for: recipeKey)`, captured on main): every
+  `pin` has its `unpin` — `Exporter.finish` AND `deinit`, and
+  `renderFrameReported`'s `defer`. A pin also keeps its REPORTS: the first
+  failure in a slot of its own for the pin's life, then at most 64 distinct
+  warnings, so a warning can never displace a failure. A graphic that fails
+  — no module, not compiled, a throw or timeout, a refused raster — draws
+  its ERROR CARD, keyed by its own text in the graphic pool, never the last
+  good frame; a raster's warnings ride in `Rendered.warnings` so a pool hit
+  still reports them. Only no set and a failed upload are nil."
+- `Exporter.swift` · `ExporterErrors.swift` · `ExporterGraphics.swift`
+  (added to the export entry): "`ExportError` is `ExporterErrors.swift`'s.
+  An export PINS the `GraphicSet` it was handed for its whole life, GATES
+  it before the build (`ExporterGraphics.graphicsRefusal`: a graphic clip
+  in the range, or in a nest a clip in the range shows, whose module did
+  not compile or is missing, refuses before the destination is touched),
+  and ABORTS on a recorded failure: `pollProgress` cancels and `finish`
+  removes the file and answers `.graphicFailed`, whatever the pipeline
+  said. **`ExportWriter.cancel()` only sets the flag**; the reader and the
+  writer are cancelled in `allInputsFinished`, after every pump has left
+  its loop — cancelling the reader under a running `copyNextSampleBuffer`
+  crashed the process (road map 10 §10.6 G3c). Never call `cancelReading`
+  from another thread while a pump runs."
+- `ExportQueueController.swift` (added): "`mediaURLs()` AND the document's
+  compiled graphics (`Job.graphics`) are captured at ENQUEUE."
+
+#### G3 closed — what it delivered against §9a
+
+G3 (G3a–G3c, 2026-09-25) is BUILT. §9a's G3 checklist, item by item:
+1. One `DispatchSource` per module file plus one on the folder — BUILT
+   (G3a): `GraphicStore.swift`.
+2. `packageContentsDidChangeOnDisk()` after CREATING `graphics/`, not per
+   event — BUILT (G3a): `folderDidAppear`, `ensureFolder()` the one
+   creator.
+3. The package rows against `graphics/` itself — BUILT (G3a):
+   `graphics_store_proof.py`.
+4. The G-6 missing-font warning in `render_frame`'s reply — BUILT (G3c):
+   E3 names the family and the set. On the CLIP it is not shown: the clip
+   has no surface for it until G5's Graphic sub-tab.
+5. The person's playback check, 4K `title-card` included — WRITTEN, not
+   run: `designs/reelcut-remaining.md` §4's first bullet, with the memory
+   reading the six-entry pool was sized without. If it stutters, G6 is
+   owed.
+
+**G4 (the six app-state tools, §5h) is next.** After G4 the feature works
+end to end for an agent, and merging `svg-motion` into `main` is the
+user's decision (§9a).
