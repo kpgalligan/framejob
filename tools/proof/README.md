@@ -5516,3 +5516,46 @@ built app's MCP tools (its own instance on port 4891, killed after), into
 Run `python3 tools/proof/graphics_playback_samples.py` after `make app`;
 it replaces the three packages. Built 2026-09-25 at `0ade58c`, with a
 `render_frame` of each confirmed by eye.
+
+## Road map 10's G5a — the Graphic sub-tab (`graphics_inspector_proof.py`, `graphics_inspector_probe.swift`)
+
+One script with three instruments (road map 10 §10.9 G5a; spec §11 G-15):
+
+- **The fixture, over MCP.** One owned instance on its own port (default
+  4887; its log is `work/graphics-inspector/reelcut-<port>.log`) runs
+  `new_project`, `write_graphic six` (one schema entry of each type: a
+  string whose default holds `{"}:`, a number 12–200, an unbounded number, a
+  boolean, a colour defaulting to "#FF5A36", an enum and an asset; text drawn
+  in `'Nope Sans'`), `import_graphic_asset red.png`, `add_graphic_clip`,
+  `set_graphic {props: {size: 90}}` and `save_project`. The instance is then
+  stopped, and `"old": 1` and `"zzz": 2` are written into the clip's props in
+  `project.json`: the external edit G-4 tolerates, which the tool refuses.
+- **The probe** is compiled as `main.swift` over `app/Sources` on
+  `harness/build.sh`'s swiftc line, with `app/Resources/Fonts` copied beside
+  it. It runs over a COPY of the fixture and scores rows I1–I12. These cover
+  the module's key order, one row per type, Reset against the default, the
+  colour arithmetic and the null rule, stale keys and ⌫, the structure
+  signature, the tabs and section ids, the first-frame report, the tool's
+  edit read back, Fit to Canvas, `sourceSize(of:)` and the graphic's own In
+  point after a trim. A probe that will not build is a scored FAILURE. The
+  readout's text and the popup's items are private, so the probe reads them
+  by `Mirror`. Nothing in the app is widened for it.
+- **The harness** (`harness/build.sh`) renders the fixture at 1440 × 1500
+  with the subTab set to `graphic` and the four sections expanded. It renders
+  light twice (H1) and dark twice (H2). Each pair must be byte-identical, and
+  light must differ from dark. The PNGs are kept as
+  `work/graphics-inspector/gi-{light,dark}-{a,b}.png`, for a person to LOOK
+  at. The harness now starts the document's graphic store
+  (`startGraphicStore()`, under `#if !HARNESS_REFERENCE_BUILD`). Without that
+  call a graphic clip's sub-tab has no schema.
+
+```sh
+make app
+python3 tools/proof/graphics_inspector_proof.py --port 4887    # → 50/50
+python3 tools/proof/graphics_inspector_proof.py --mutant stale # exit 0 = the five I5 rows FAIL alone
+```
+
+The mutant builds the probe over a copy of `app/Sources` whose
+`GraphicSchemaRows.staleKeys` returns `[]`. It makes a fresh fixture in a
+temporary directory. The one I5 row it cannot touch is the compile row
+naming line 2, so that row is not expected to fail.

@@ -118,8 +118,8 @@ extension AgentServer {
                     + "engine's location. svg answers one frame's SVG text, its diagnostics and "
                     + "the ctx it was drawn with. ctx is a clip's: the canvas fps, "
                     + "durationInFrames from meta (else 5 s), the size from width/height, else "
-                    + "meta, else the canvas. Mirrors G5's Graphic sub-tab preview strip, not "
-                    + "built yet.",
+                    + "meta, else the canvas. No inspector control mirrors it: a person looks at "
+                    + "the preview well.",
                 [
                     "name": [
                         "type": "string",

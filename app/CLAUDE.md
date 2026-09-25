@@ -413,9 +413,14 @@ the key map behind it.
   `ClipPane.swift` (the sub-tabs — `subTabs` by kind, `activeSubTab`, and
   `choose` / `forgetSubTab`, which never refresh — and `makeSections()`, the
   function from the selection's kind and the active sub-tab to its
-  sections, with the open rule per tab) · `ClipSelectionHeader.swift`
+  sections, with the open rule per tab) · `ClipPane+Timing.swift` (the
+  Timing section — `timingSection`, `reverseTimingSection`, `reverseRows` —
+  a pure move out of `ClipPane.swift`; `makeSections()` is its only caller) ·
+  `ClipSelectionHeader.swift`
   (`ClipSelectionHeaderView`, a pure move out of `ClipPane.swift`) ·
-  `ClipPinnedBlock.swift` (`ClipSubTab` with its `◆N` key count,
+  `ClipPinnedBlock.swift` (`ClipSubTab` — six cases in display order, text,
+  shape, graphic, picture, sound, clip; `graphic` keys nothing, G-10 — with
+  its `◆N` key count,
   `ClipSubTabsView`, and `ClipHeaderBlock` — header, lane, sub-tabs — which
   `makeHeader()` builds once per pane build) · `ActionLaneView.swift` (the
   action lane, the Actions section's replacement, with the clip and action
@@ -429,6 +434,23 @@ the key map behind it.
   own gates, drawn under the bands; `Curve.laneName`; `CurveGlyphView`,
   beside the Curve popup because `OptionPopupControl` is not forked) · `VideoPane.swift` (+`Transition`,
   +`Motion`, +`Obscure` — the Obscure section, a pure move) · `AudioPane.swift` · `TextPane.swift` · `ShapePane.swift` ·
+  `GraphicPane.swift` (the Graphic sub-tab, road map 10 §5j, spec §11 G-15:
+  a factory `ClipPane` calls when EVERY selected clip is a graphic; the
+  shared module from `GraphicRegistry.entry(named:for:)`, main only, never a
+  rescan; a structure signature of schema keys and types, stale keys, the
+  asset popup's names and diagnostics — never values, the revision or the
+  playhead; Properties, Size and Timeline; every write is `set_graphic`) ·
+  `GraphicPane+Source.swift` (Source: name, file, revision, Open / Reveal /
+  Duplicate as New Graphic… — `store.write`, `rescan()` inside the button's
+  event, one `set_graphic {name}` step — and `report(for:)`, the compile's
+  diagnostics plus the first frame rasterized at the clip's OWN size,
+  memoised and frozen during a live gesture) · `GraphicSchemaRows.swift`
+  (pure, probe-callable: the schema in the MODULE's key order —
+  `GraphicSchema.orderedKeys` scans `describeJSON()`'s text because the
+  registry's dictionary lost it — one row per schema type, stale rows
+  sorted with ⌫ writing `null`, CSS ↔ `RGBA`, and the null rule: a value
+  equal to the default is written as `null`, a colour compared by parsed
+  channels) ·
   `DocumentPane.swift` (reads `documentSnapshot`, never the scoped one: its
   ops are document-level) · `OptionControls.swift` (the descriptor-driven
   row controls) · `OptionControls+Choices.swift` (the typed, value-carrying

@@ -1794,9 +1794,8 @@ struct ProjectSnapshot: Codable, Equatable {
         case .text:
             return nil
         case .graphic:
-            // G3 reads `graphic.width` / `graphic.height` here, once
-            // `ClipSnapshot` decodes the clip's `graphic` key.
-            return nil
+            guard let g = clip.graphic, g.width > 0, g.height > 0 else { return nil }
+            return CGSize(width: g.width, height: g.height)
         }
     }
 

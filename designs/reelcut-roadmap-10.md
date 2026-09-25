@@ -3467,3 +3467,164 @@ split into two `/litecode` pipelines. Neither has changed code:
   (its baseline and "what earlier pipelines found" section are filled in
   when G5a lands).
 The requests' substance: §5j, §5k, and G4b's owed watcher gap (§10.7 G4b).
+**G5a is BUILT (2026-09-25); §10.9 is its record.**
+
+
+### 10.9. G5 — the person
+
+#### G5a — the Graphic sub-tab (2026-09-25)
+
+**What a person can now do.** Select a graphic clip and the Clip tab shows
+a **Graphic** sub-tab first, then Picture and Clip. It has four sections:
+
+- **Source** shows the module's `meta.name`, `<name>.js` and the revision's
+  first 8 hex digits. It has three buttons: Open in Editor, Reveal in
+  Finder, and Duplicate as New Graphic…. Duplicate asks for a name
+  (suggesting `<name>-copy`), writes the copy through `store.write`,
+  rescans, and repoints the selected clips with `set_graphic {name}`. That
+  is one undo step "Duplicate Graphic"; the file copy is not undoable (G-3).
+  Below the buttons are the module's diagnostics under "Checked at the
+  clip's first frame": its compile errors, then the warnings from drawing
+  and rasterizing the clip's first frame at the clip's own size. Each row
+  reads "line L, column C — message" and has an Open button; clicking the
+  row opens the file too. **So a graphic's warnings show on the clip for
+  the first time.** This includes a family the font set lacks (G3c's owed
+  missing-font warning, §10.6) and the engine's "props.old is not in the
+  schema; it is passed through".
+- **Properties** has one row per schema key, in the module's order, built
+  with the existing builders. A number is a value row, with a slider only
+  when both bounds exist; the drag goes through the live trio, so it is one
+  undo step. A boolean is a checkbox and a colour is a well. An enum and an
+  asset are popups; the asset popup lists `graphics/assets/`, with "None"
+  first when the default is null. A string is a text field, or a text area
+  when `multiline`. Every write is `set_graphic {clips, patch: {props: {key:
+  v}}, schema}`, and a value equal to the default writes `null` (G-15b).
+  The gutter's Reset shows while a value differs from the default. Stored
+  keys the schema no longer has are listed below, dimmed and sorted, each
+  with a ⌫ that writes `{key: null}`. The section's own Reset nulls every
+  stored key.
+- **Size** has Width and Height, one `set_graphic` per clip in one apply,
+  and Fit to Canvas: the canvas's size, then `set_video {x 0, y 0, scale 1}`.
+- **Timeline** shows In, read-only: `graphic.in`, the point `trim_start`,
+  `roll` and `split` move. Length is a timecode field, and typing pins it.
+  Follow Clip switches it back to the clip's duration (`length: null`).
+
+With several graphic clips, Properties shows only when they share one
+module, and Timeline only for one clip. Clips of different modules get
+Source (naming the modules) and Size. Spec §11 G-15 records this and the
+rest of the pipeline's decisions: the null rule, stale keys sorted, the
+first-frame check, the string row, and no preview strip.
+
+**Where it lives.** `GraphicPane.swift` holds the pane, the signature, the
+report memo, Properties, Size and Timeline. `GraphicPane+Source.swift`
+holds Source, the report and Duplicate. `GraphicSchemaRows.swift` is pure:
+the schema in module order, one row per type, stale rows, CSS ↔ `RGBA`, and
+the null rule. `ClipPane.swift` gave up its Timing section first, as a pure
+move landed and gated alone into `ClipPane+Timing.swift` (remaining §3).
+Its structure signature holds the schema's keys and types, the stale keys,
+the asset popup's names and the diagnostics. It holds no values, no
+revision and no playhead, so an external edit that adds a prop adds a row.
+`EditorViewController+Graphics`' `graphicsDidChange` now refreshes the
+inspector, so that rebuild happens live. `ProjectSnapshot.sourceSize(of:)`
+answers a graphic's size, which closes §10.8's owed item: canvas handles
+and Fit/Fill now work on a graphic clip. For the UI-path comments, the
+`set_graphic`/`get_graphic`/`write_graphic` handlers now name this sub-tab.
+`render_graphic` says no inspector control mirrors it, because a person
+looks at the preview well. The catalog sentence says the same.
+
+**Proved.** `tools/proof/graphics_inspector_proof.py --port 4887` passed
+**50/50**:
+
+- the fixture over MCP;
+- the probe's I1–I12, 45 rows including its build and completeness rows;
+- the harness's H1 and H2;
+- Z1.
+
+`--mutant stale` built the probe over a copy of `app/Sources` whose
+`staleKeys` returns `[]`. It passed: exactly the five expected I5 rows
+FAILED and nothing else did, in 92 s. **Made to fail by hand as well:** I
+made the Timeline's In read `clip.source.sourceIn` (the objection's bug)
+and I12 failed alone at 49/50, with the readout showing `00:00:00:00`. The
+code was then restored.
+
+Everything else passed at the end:
+
+- `make test` passed: 968 tests, 0 failed.
+- `make lint` was clean.
+- `make typecheck` had 0 errors and 7 distinct `file:line:col` warnings, the
+  baseline.
+- `make app` succeeded, and `harness/build.sh --force` built.
+- `graphics_proof.py --port 4883` still passed **39/39**.
+- `clip_inspector2_proof.py` still passed **32/32**.
+- The parity grep printed nothing.
+
+**The photographs** are `tools/proof/work/graphics-inspector/gi-light-a.png`
+and `gi-dark-a.png` (1440 × 1500, the four sections open), and I looked at
+both:
+
+- **Source** reads Six, `six.js`, `9fbced49`, then the three buttons. Under
+  "Checked at the clip's first frame" are three warning rows, each with
+  Open: `props.old …`, `props.zzz … passed through`, and `font-family "Nope
+  Sans" is not in the font set; the set has: Anton, Bebas Neue, Darker
+  Grotesque, IBM Plex Mono, Montserrat, Source Sans 3`. The header summary
+  says "3 warnings".
+- **Properties** (header "7 properties", with Reset shown because size 90
+  differs) has seven rows:
+  - Title: a text field showing `Hi {"}: there`;
+  - Size: a slider and a field showing 90;
+  - Offset: a field alone, showing 0;
+  - "Show box": ticked;
+  - Color: a coral swatch;
+  - Align: a popup showing "left";
+  - Logo: a popup showing "None".
+
+  Below them come the stale rows **old** (1) then **zzz** (2): the keys in
+  faint ink, the values dimmed, each with ⌫.
+- **Size** reads 1920 px × 1080 px with Fit to Canvas.
+- **Timeline** reads In `00:00:00:00`, Length `00:00:05:00` and Follow
+  Clip ticked.
+
+Dark is the same layout in the dark chrome. The first photographs showed
+two defects, both fixed before the final run. The Title field had collapsed
+to zero width; it now has a fixed 170 pt width. Width and Height were
+clipped to "1920 p:"; they now use `InspectorMetrics.wideFieldWidth`.
+
+**Deviations.**
+
+- `tools/proof/harness/main.swift` now calls `document.startGraphicStore()`
+  under `#if !HARNESS_REFERENCE_BUILD`. Without it, the harness opens a
+  package with no store and no registry set, so the sub-tab could not
+  photograph any schema rows.
+- The signature's "assets" part is the asset popups' item names. That is the
+  folder's files, plus any name an asset prop holds that the folder lacks,
+  because each is an item.
+- The diagnostic part spells level, line and column as well as the message,
+  because a row shows all four.
+- `ProjectSnapshot.swift` went −1 line, not +1: the stale comment was three
+  lines.
+
+**Owed and noticed.**
+
+- The Title text field is taller than its neighbours and sits top-aligned
+  in its row (`DSField.style`'s default height). This is cosmetic.
+- The doc comment at the top of `ClipPane.swift` still says "four
+  factories"; there are now five. It was left alone as outside the spec.
+- Changing only a schema DEFAULT does not rebuild the pane (G-15, by
+  design). Until the selection changes, the rows keep the old default for
+  Reset and for the null rule, and the ops carry the schema from when the
+  pane was built.
+- Reordering a module's keys with no key added or removed rebuilds, because
+  the signature spells the keys in the module's order.
+- From G5a's review (nits, not fixed): with no `step`, a number row shows
+  0 decimals, so a 0–1 value with no step reads as 0 or 1
+  (`GraphicSchemaRows.swift:238`); every signature call re-parses
+  `describeJSON()` and asks the core for `recipe(at:)` even when the report
+  memo hits, on every inspector refresh while a graphic is selected
+  (`GraphicPane.swift:92-98`); the signature's asset names and the asset
+  popup's items are built differently (`GraphicPane.swift:117-122` vs
+  `GraphicSchemaRows.swift:305-311`), so in a multi-clip selection the popup
+  can change without a rebuild; and an enum's `options` or a number's
+  `min`/`max` edited outside the app stays stale in the pane, like a
+  default, until the selection changes.
+- G5b is next: the menus, the templates, G4b's watcher library gap, and
+  closing G5.

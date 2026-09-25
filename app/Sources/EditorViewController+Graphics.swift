@@ -12,5 +12,6 @@ extension EditorViewController {
     @objc func graphicsDidChange(_ note: Notification) {
         guard let document = document, note.object as? ProjectDocument === document else { return }
         playback.refreshPausedFrame()
+        inspector?.refresh(isLive: false)
     }
 }

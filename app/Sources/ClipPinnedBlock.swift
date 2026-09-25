@@ -3,12 +3,13 @@ import AppKit
 /// One sub-tab of the Clip tab (spec §11 CI-5). The case order is the display
 /// order: Text and Shape come first for those kinds, Clip is always last.
 enum ClipSubTab: String, CaseIterable {
-    case text, shape, picture, sound, clip
+    case text, shape, graphic, picture, sound, clip
 
     var title: String {
         switch self {
         case .text: return "Text"
         case .shape: return "Shape"
+        case .graphic: return "Graphic"
         case .picture: return "Picture"
         case .sound: return "Sound"
         case .clip: return "Clip"
@@ -22,6 +23,7 @@ enum ClipSubTab: String, CaseIterable {
         switch self {
         case .text: return end.text?.dictionary.count ?? 0
         case .shape: return 0
+        case .graphic: return 0
         case .picture: return end.video?.dictionary.keys.filter { $0 != "motion" }.count ?? 0
         case .sound: return end.audio?.dictionary.count ?? 0
         case .clip: return end.video?.dictionary["motion"] == nil ? 0 : 1

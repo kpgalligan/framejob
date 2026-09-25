@@ -34,6 +34,7 @@ final class ClipPane: InspectorPaneView {
     private let audioPane: AudioPane
     private let textPane: TextPane
     private let shapePane: ShapePane
+    private let graphicPane: GraphicPane
     /// The sub-tab picked by hand, if any. Forgotten by the CONTROLLER when
     /// the selection's ids change (`forgetSubTab()`), never here.
     private var chosen: ClipSubTab?
@@ -45,6 +46,7 @@ final class ClipPane: InspectorPaneView {
         audioPane = AudioPane(inspector: inspector)
         textPane = TextPane(inspector: inspector)
         shapePane = ShapePane(inspector: inspector)
+        graphicPane = GraphicPane(inspector: inspector)
         super.init(inspector: inspector)
     }
 
@@ -77,6 +79,7 @@ final class ClipPane: InspectorPaneView {
             videoPane.structureSignature,
             textPane.structureSignature,
             shapePane.structureSignature,
+            graphicPane.structureSignature,
             audioPane.structureSignature,
             (binding.videoClips.isEmpty ? "-" : "px") + (binding.audioClips.isEmpty ? "-" : "au"),
             activeSubTab.rawValue, subTabs.map(\.rawValue).joined(separator: ","),
@@ -101,6 +104,7 @@ final class ClipPane: InspectorPaneView {
         var tabs: [ClipSubTab] = []
         if textPane.allText { tabs.append(.text) }
         if shapePane.allShape { tabs.append(.shape) }
+        if graphicPane.allGraphic { tabs.append(.graphic) }
         if !binding.videoClips.isEmpty { tabs.append(.picture) }
         if !binding.audioClips.isEmpty { tabs.append(.sound) }
         tabs.append(.clip)
@@ -148,6 +152,13 @@ final class ClipPane: InspectorPaneView {
                 // when it is set and the two rows are read together.
                 shapePane.gradientSection(), shapePane.arrowSection(),
             ]
+        case .graphic:
+            sections = [graphicPane.sourceSection()]
+            if graphicPane.shared() != nil { sections.append(graphicPane.propertiesSection()) }
+            sections.append(graphicPane.sizeSection())
+            if binding.isSingle, let clip = binding.primary {
+                sections.append(graphicPane.timelineSection(clip.id))
+            }
         case .picture:
             sections = [videoPane.transformSection()]
             // `allSourcePixels` asks about the SOURCE KIND, so it says yes to

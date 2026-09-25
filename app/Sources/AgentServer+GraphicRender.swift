@@ -23,8 +23,8 @@ import Foundation
 
 extension AgentServer {
 
-    /// `render_graphic` — UI path: none yet — G5's Graphic sub-tab, its
-    /// preview strip (§5j).
+    /// `render_graphic` — UI path: none — the preview well is a person's
+    /// picture; §5j builds no strip.
     func renderGraphic(_ a: [String: Any]) throws -> String {
         let name = try requiredString(a, "name")
         let frames = try graphicFrames(a)

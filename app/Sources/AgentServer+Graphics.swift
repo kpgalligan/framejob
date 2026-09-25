@@ -22,8 +22,7 @@ import Foundation
 
 extension AgentServer {
 
-    /// `add_graphic_clip` — no UI path yet: G5's Graphic sub-tab (road map
-    /// 10 §5j) is the menu this mirrors.
+    /// `add_graphic_clip` — UI path: Insert ▸ Graphic, G5b.
     ///
     /// `duration`, `width` and `height` default from the module's `meta`
     /// (`durationInFrames` at the canvas rate; `width` / `height`), and
@@ -53,8 +52,8 @@ extension AgentServer {
                 props: props, schema: schema)])
     }
 
-    /// `set_graphic` — no UI path yet: G5's Graphic sub-tab (road map 10
-    /// §5j) is the inspector this mirrors.
+    /// `set_graphic` — UI path: the Graphic sub-tab, Properties/Size/Timeline
+    /// (GraphicPane.swift).
     ///
     /// A patch that carries `props` or `name` is checked against a schema:
     /// the patch's own `name`'s, else the one module every clip shares.
@@ -96,7 +95,8 @@ extension AgentServer {
     }
 
     /// `write_graphic` — UI path: the file on disk (an external editor); no
-    /// menu.
+    /// menu; and Duplicate as New Graphic…, which writes the copy through the
+    /// same `store.write` then repoints with `set_graphic {name}`.
     ///
     /// Writes `graphics/<name>.js` through the store's one writer, then
     /// rescans at once, so the registry has compiled THAT text before the
@@ -128,8 +128,8 @@ extension AgentServer {
         return try jsonResult(result)
     }
 
-    /// `get_graphic` — UI path: none yet — G5's Graphic sub-tab, Source
-    /// section (§5j).
+    /// `get_graphic` — UI path: the Graphic sub-tab, Source section
+    /// (GraphicPane+Source.swift).
     ///
     /// With `name`, one module as the folder holds it now: its source, its
     /// revision and its compile. Without, where the folder is and what it

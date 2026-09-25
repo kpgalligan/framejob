@@ -4700,3 +4700,30 @@ assisted import.
   and the first save carries it into the package only when it holds at
   least one entry. An untitled document restored from autosave has its
   saved `graphics/` copied into a fresh root.
+- **G-15 — The Graphic sub-tab: what it shows for several clips, and what a
+  write sends** (road map 10 §10.9 G5a, 2026-09-25).
+  (a) **Several clips.** The sub-tab exists when EVERY selected clip is a
+  graphic clip. Source and Size always show; Properties shows only when
+  every clip is drawn by ONE module, because that is the one schema rows can
+  be built from and the one `set_graphic` checks against; Timeline shows
+  only for one clip, because `in` and `length` are that clip's own. With
+  clips of different modules, Source names them and says to select one
+  module's clips.
+  (b) **A value equal to the schema's default is written as `null`.** The
+  key leaves the stored props and the module draws its own default, which
+  is what Reset writes too (CI-9), so "differs from the default" and "is
+  stored" agree. A colour is equal by its parsed channels (the core accepts
+  any string as a colour default and normalises only stored values). A
+  default the four hex forms cannot parse (a named colour, `rgb()`) shows
+  as transparent black, and its Reset writes `null`.
+  (c) **Stale keys are listed sorted by key** — the stored props reach the
+  app as a dictionary, which has no order. ⌫ writes `{key: null}` with no
+  schema; a `null` always removes (G-4).
+  (d) **The diagnostics are checked at the clip's FIRST frame**, drawn and
+  rasterized at the clip's own size (the paused frame's two calls), memoised
+  by module, revision, library, frame hash and size, and never recomputed
+  during a live gesture.
+  (e) **A string prop is a one-line text field, or a text area when
+  `multiline`**, not §5j's value row: `OptionFieldControl` is numeric.
+  (f) **No preview strip.** `render_graphic` has no inspector control; a
+  person looks at the preview well.
