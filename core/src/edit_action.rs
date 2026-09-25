@@ -31,7 +31,9 @@
 //! `set_action_end` says so by name. The refusal is a courtesy rather than
 //! the enforcement — `evaluate_clip` restores the base motion over whatever
 //! any end patch carries, which is what closes a hand-written file, a
-//! pasted action and a project from another tool at once.
+//! pasted action and a project from another tool at once. A `graphic`
+//! group, in `patch` or in `off`, is refused the same way (road map 10's
+//! G-10): a graphic animates itself, and `actions.rs` merges no such group.
 
 use serde_json::{json, Map, Value};
 
@@ -146,6 +148,7 @@ fn check_end_patch(patch: &Value) -> Result<(), String> {
         // The three groups, by their own names rather than by three string
         // literals: a group renamed in `patch.rs` cannot drift from the
         // door that lists it.
+        graphic_not_a_target(key)?;
         let group = END_GROUPS
             .into_iter()
             .find(|group| group.name() == key)
@@ -158,6 +161,20 @@ fn check_end_patch(patch: &Value) -> Result<(), String> {
         check_group_patch(body, group, END_PATCH, key)?;
     }
     Ok(())
+}
+
+/// G-10's sentence: a graphic's props are not an action's to animate.
+const GRAPHIC_NOT_A_TARGET: &str =
+    "props are not animated by actions; a graphic animates itself — change the module or its props";
+
+/// `Err` in [`GRAPHIC_NOT_A_TARGET`] for the group `graphic`, asked before
+/// the group lookup so it is not answered as an unknown key.
+fn graphic_not_a_target(group: &str) -> Result<(), String> {
+    if group == "graphic" {
+        Err(GRAPHIC_NOT_A_TARGET.to_string())
+    } else {
+        Ok(())
+    }
 }
 
 /// The two refusals that are about this op rather than the vocabulary,
@@ -189,6 +206,7 @@ fn check_off<'a>(patch: &Value, off: &'a [String]) -> Result<Vec<(&'a str, &'a s
                 ))
             }
         };
+        graphic_not_a_target(group_name)?;
         let group = END_GROUPS
             .into_iter()
             .find(|group| group.name() == group_name)

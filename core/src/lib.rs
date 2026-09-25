@@ -64,6 +64,7 @@ pub mod outcome;
 pub mod patch;
 pub mod props_check;
 pub mod recipe;
+mod recipe_graphic;
 pub mod recipe_text;
 pub mod recipe_words;
 pub mod scope;

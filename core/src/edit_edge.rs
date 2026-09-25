@@ -25,6 +25,7 @@ use crate::edit_clip::clip_end;
 use crate::model::{Project, Source};
 use crate::model_words::rebase_words;
 use crate::outcome::Outcome;
+use crate::recipe_graphic::graphic_advanced;
 use crate::source_window::{source_advanced, timeline_to_source};
 use crate::time::Ticks;
 
@@ -129,7 +130,9 @@ impl Project {
     /// no transition can be gained; the actions on both are clip-relative
     /// and stay where they are, as they do for a trim. This clip's
     /// `text.words` are rebased by the move, as `trim_start` rebases them
-    /// (spec §11, W-3): a word stays on the speech it times.
+    /// (spec §11, W-3): a word stays on the speech it times. Its
+    /// `graphic.in` advances by the move as `trim_start`'s does, and the
+    /// predecessor's `length` is untouched (road map 10's G-9).
     pub fn roll(&self, clip: u32, to: Ticks) -> Result<Outcome, String> {
         let target = self.require_clip(clip)?.clone();
         let Some(previous) = self
@@ -172,6 +175,7 @@ impl Project {
             to.saturating_sub(target.start),
             target.speed,
         );
+        moved.graphic = graphic_advanced(target.graphic.as_ref(), to.saturating_sub(target.start));
         moved.start = to;
         moved.duration = clip_end(&target).saturating_sub(to);
         if let Some(text) = moved.text.as_mut() {

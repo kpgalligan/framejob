@@ -50,6 +50,7 @@ use crate::evaluate::{json, number, Assignment};
 use crate::model::{BlendMode, Clip, Nest, Project, Source, TransitionKind, VideoProps};
 use crate::motion;
 use crate::nest::{Enclosing, Frame, Instance};
+use crate::recipe_graphic::graphic_source;
 use crate::recipe_text::burn_in_layer;
 use crate::time::Ticks;
 use crate::transition;
@@ -505,8 +506,8 @@ impl Project {
     ///
     /// `track` means "sample composition video track N", the id the plan
     /// gave this clip; `image` means "decode this media with ImageIO";
-    /// `text` and `shape` carry the resolved description plus the content
-    /// hash Swift caches the rendered texture by; `missing` is the slate
+    /// `text`, `shape` and `graphic` carry the resolved description plus the
+    /// content hash Swift caches the rendered texture by; `missing` is the slate
     /// (spec §7.3).
     ///
     /// **The `missing` arms are defensive, not a feature path.** They fire
@@ -583,13 +584,12 @@ impl Project {
             // `drawing_instances` has already dropped, so this arm exists
             // to keep the match exhaustive.
             Source::Nest { .. } => (missing_source(), Value::Null),
-            // Road map 10's G2b gives a graphic its layer (`recipe_graphic.rs`).
-            Source::Graphic => (missing_source(), Value::Null),
+            Source::Graphic => graphic_source(clip, clip_t, &self.canvas),
         }
     }
 }
 
-fn missing_source() -> Value {
+pub(crate) fn missing_source() -> Value {
     let mut source = Map::new();
     source.insert("kind".to_string(), Value::from("missing"));
     Value::Object(source)

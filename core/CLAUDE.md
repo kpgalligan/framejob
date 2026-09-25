@@ -187,6 +187,8 @@ file is what governs a module now.
   the cap, known debt (below).
 - `edit_clip_timing.rs` — `trim_start`, `trim_end`, `rate_stretch`, `set_speed`,
   their speed bounds and clip-relative action rescaling.
+  `trim_start` advances a graphic's `in` through `graphic_advanced` (no speed,
+  no head bound, saturating at 0); `trim_end` leaves `length` alone.
 - `edit_commit.rs` — the placement commit protocol: replacements preserve
   caller order and check old tracks before destination tracks; additions
   check caller-allocated candidates against the input project; both write
@@ -199,6 +201,9 @@ file is what governs a module now.
   ends. Every splitter in the crate routes here, so a rule stated once is a
   rule they all obey. A free function over `&mut Project` because it is
   called mid-edit on a clone the caller is still assembling.
+  A graphic's second half gets `in + cut` through `recipe_graphic.rs`'s
+  `graphic_advanced`, and BOTH halves' `length` are pinned to the ORIGINAL's
+  `effective_length` (G-9), so every splitter obeys it.
 - `edit_props.rs` — the five patches (`set_video`, `set_audio`, `set_text`,
   `set_shape`, `set_clip`), `Project::check_group` (the range check
   `paste_attributes` runs on each group it has just replaced — the same
@@ -266,6 +271,8 @@ file is what governs a module now.
   compositions of split + insert time + add made ONE op so a drop is one
   undo step and carries the rule neither half states — an insert cuts only
   the destination track and then shifts every unlocked one.
+  `roll` is a front trim on its clip, so it advances `graphic.in` as
+  `trim_start` does; the predecessor's end is an end trim and keeps `length`.
 - `edit_transition.rs` — the WRITE half of a transition: `set_transition`,
   `set_transition_duration`, `set_gained_transitions` (a clip that gains an
   overlap gains a transition), `add_transition` (an overlap built from the
@@ -297,6 +304,8 @@ file is what governs a module now.
   which copies the EARLIEST clip's property groups (then the front-most, then
   the lower id — never the array's first) onto each target, replaced whole
   and never merged.
+  `graphic` in a `patch` or an `off` path is an `Err` in G-10's sentence,
+  asked before the group lookup.
 - `edit_zoom.rs` — `add_zoom_action`, the screencast zoom, and `ZoomRegion`,
   the one op ARGUMENT that is a caller-authored object: its `Deserialize` is
   written out rather than derived so it answers as a patch does — an object
@@ -352,6 +361,8 @@ file is what governs a module now.
   `content_hash` sorts every object's keys before it hashes — the order
   every texture key was taken in — and nothing may lean on the wire order
   of a map.
+  A graphic layer's source is one arm calling `recipe_graphic.rs`'s
+  `graphic_source`; `missing_source` is `pub(crate)` for it.
 - `recipe_words.rs` — what a timed text PAGE shows at one instant:
   `Words::of` answers `word` (how many of `text.words` have started, 0 to
   n) and `word_pop` (0..1 through the active word's pop over `WORD_POP`,
@@ -364,6 +375,21 @@ file is what governs a module now.
   `word_style` when unset, `case` when `as_written`, so an unstyled title
   hashes as before version 9), and folds the two keys into the hash only
   for a styled page.
+- `recipe_graphic.rs` — a graphic clip's own timeline (road map 10's G-9) and
+  its layer: `effective_length` (`graphic.length`, or `in + duration` when
+  null — G-9·c), `graphic_advanced` (`in` moved through `source_window.rs`'s
+  `in_advanced` at speed 1, never below 0), and `graphic_source`, the layer's
+  `{kind, name, hash, frame, ctx, props}` and `[width, height]` — `frame`
+  floored onto the canvas grid, `durationInFrames` ceiled, `ctx` exactly the
+  engine's keys (the app passes it through verbatim), `ctx.canvas` the
+  PROJECT's size inside a nest too, `props` the stored map cloned whole, the
+  hash over everything `render` is called with (G-9·b). It holds ONE equation
+  for the writers and the reader together: `trim_start`, `roll` and `split`'s
+  second half call `graphic_advanced`, `split` pins both halves' `length` to
+  `effective_length`, and the recipe reads the same `effective_length`.
+  **`Clip.graphic`'s `in` and `length` are written nowhere else**
+  (`set_graphic` refuses `in`). Never write the bare token `graphic::` here
+  (`graphic_ffi.rs` greps `core/src/`).
 - `motion.rs` — `video.motion` turned into PLACEMENT: presets to `scale`,
   `rotation`, `opacity`, `x`, `y` from the clip time, its duration, the
   source size and the container's canvas. **Its only callers are

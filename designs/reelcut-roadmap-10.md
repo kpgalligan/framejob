@@ -2312,3 +2312,145 @@ patch's `5000000000` is named as sent.
   adversary"); not changed here.
 - Named CSS colours and `hsl()` in a `color` prop (with G1c's "named CSS
   colours").
+
+#### G2b — the graphic's timeline rules and its recipe (2026-09-25)
+
+Against baseline `986cf5a`: G-9's timeline arithmetic under `split`,
+`trim_start`, `roll` and `trim_end`, G-10's refusal in `set_action_end`,
+and the real layer source in place of `recipe.rs`'s `missing`
+placeholder. Core only; the app still draws an unknown source kind as the
+`missing` slate (`ProjectSnapshot.swift`'s default), so nothing a person
+sees changes until G3's `LayerRenderersGraphic`.
+
+**What landed.** `core/src/recipe_graphic.rs` (**129**, new, declared
+`mod` in `lib.rs`): `effective_length` (`graphic.length`, or `in +
+duration` when `null`), `graphic_advanced` (`in` through
+`source_window.rs`'s `in_advanced` at speed 1, never below 0) and
+`graphic_source`, the layer's `{kind, name, hash, frame, ctx, props}` and
+`[width, height]` — `frame` floored onto the canvas grid,
+`durationInFrames` ceiled, `progress` over `max(1, durationInFrames − 1)`
+clamped, `ctx.canvas` the PROJECT's size inside a nest too, every float
+through `evaluate::number`, `props` the stored map cloned whole, the hash
+`content_hash` over `{name, frame, ctx, props}`. It holds the arithmetic
+because the writers and the reader must share one equation and the two
+natural homes stand at their caps (`model_graphic.rs` 399, `source_window.rs`
+396). `recipe.rs`: one arm calling `graphic_source`, `missing_source`
+`pub(crate)`, "graphic" in `layer_source`'s kind list (**596 → 596**).
+`edit_split.rs`: the effective length measured on the ORIGINAL, the second
+half's `in` advanced by the cut, BOTH halves' `length` pinned to it —
+written once, so every splitter (`split_clips`, `split_under_playhead`,
+`clear_range` and so the range cuts and `lift_range`, `insert_clip`,
+`overwrite_clip`, `freeze_frame`) obeys it. `edit_clip_timing.rs`'s
+`trim_start` and `edit_edge.rs`'s `roll` each call `graphic_advanced` on
+the clip whose start moves; `trim_end` has no code (null follows the end, a
+number stays). `edit_action.rs`: `GRAPHIC_NOT_A_TARGET` and
+`graphic_not_a_target`, asked in `check_end_patch` and `check_off` BEFORE
+the `END_GROUPS` lookup, so the answer is G-10's sentence rather than
+`unknown key "graphic"`. Docs: `model_graphic.rs`'s `in` comment (`trim_start`,
+`roll` and `split` own it; 399 unchanged), `edit.rs`'s six rows, spec §6's
+six rows, §7.3 (the kind list, a graphic bullet, `source_size`, a graphic
+layer in the example), §7.10 (a `recipe_graphic.rs` row; `recipe.rs`'s row
+names it), and §11 G-6 to G-11 copied from §4, G-9 carrying G-9·a (no
+head bound; `roll` is a front trim), G-9·b (the hash covers `ctx`) and
+G-9·c (a null length is `in + duration`).
+
+**The layer, as published** (`core/tests/fixtures/graphic_v10_recipe.json`,
+from `graphic_v10.json` at t = 740000, 30 fps, `in` 0, `length` null,
+duration 5000000):
+
+```json
+{ "kind": "graphic", "name": "lower-third", "hash": "3f58effee3657324", "frame": 37,
+  "ctx": { "fps": 30.0, "time": 1.2333333333333334, "durationInFrames": 250,
+           "progress": 0.14859437751004015, "width": 1920, "height": 1080,
+           "canvas": { "width": 1920, "height": 1080 } },
+  "props": { "title": "Kevin", "accent": "#2d7ff9" } }
+```
+
+The hash was printed by the first green run and then recomputed
+independently — FNV-1a 64 over Python's `json.dumps(sort_keys=True)` of
+`{name, frame, ctx, props}` — to the same `3f58effee3657324`.
+
+**Measured.** `cargo test --release` in `core/`: **867** (857 + 10 new, all
+in `graphic.rs`, now 24); `make test` **965** (955 + 10); `cargo test
+--release --test edge` 16/16, untouched; `graphic_ffi`'s
+`only_ffi_graphic_names_the_graphic_crate` passes; `cargo fmt --check` and
+`make lint` clean; `make typecheck` 0 errors and the 7 baseline warnings;
+`make app` succeeded; the parity grep on a fresh instance (port 4817)
+printed nothing. `wc -l`: `recipe.rs` 596, `recipe_graphic.rs` 129,
+`model_graphic.rs` 399, `edit_split.rs` 218 → 233, `edit_clip_timing.rs`
+177 → 182, `edit_edge.rs` 203 → 207, `edit_action.rs` 451 → 469,
+`edit.rs` 893 (row clauses only), `lib.rs` 95 → 96, `core/tests/graphic.rs`
+399 → 755.
+
+**Mutants, run by hand, each failing its named test:**
+- (a) the split pin removed (both halves) — `split_advances_the_second_halfs_in_and_pins_both_lengths`,
+  at the first half's stored `length` (`Null` for 3000000);
+- (b) `trim_start` without `graphic_advanced` — `trim_start_advances_in_with_no_head_bound_and_trim_end_leaves_length_alone`
+  (`in` 0 for 600000);
+- (c) `roll` without `graphic_advanced` — `roll_advances_the_graphics_in_as_a_front_trim`
+  (`in` 0 for 600000);
+- (d) `effective_length` as `length.unwrap_or(clip.duration)` — three tests:
+  `frame_and_ctx_follow_the_graphics_own_timeline` (150 for 180), the
+  `trim_start` test (120 for 150) and the `roll` test (60 for 90);
+- (e) the hash over `{name, frame, props}` only — `the_hash_follows_everything_render_is_called_with`
+  (the `trim_end` hash equal) and `the_recipe_publishes_the_seams_shape`
+  (hash `1eec510985f5a1f4` for the fixture's);
+- (f) `graphic_not_a_target` not called — `an_action_end_naming_graphic_is_an_error_in_g10s_sentence`
+  (`unknown key "graphic" in an action end patch`).
+
+**Deviations from the spec.** `core/src/lib.rs` gained `mod recipe_graphic;`
+(a new module must be declared; not in the spec's file list). The mutant
+harness restored each file with `mv`, which left the last restored file
+OLDER than the build and cargo reused the mutant-f build once; the next
+run caught it (the action test failed on clean source), every source was
+`touch`ed and every check in this record was re-run after that — the
+mutant results stand, because each mutant's own build rewrote a file and
+recompiled the crate from the files as they were.
+
+**Owed from G2b.**
+- `add_transition`'s handle form extends the incoming clip's HEAD leftward
+  without moving `graphic.in` (`source_advanced` cannot reach
+  `Clip.graphic`); it is `rebase_words`'s fourth caller and
+  `graphic_advanced`'s missing one. Not fixed here (the spec's out of scope).
+- A canvas rate change does not re-snap `graphic.in` / `length`
+  (`frame_grid.rs`); `validate` does not refuse a graphic clip with no
+  description (the recipe answers `missing` for it); keyframed props and
+  `paste_attributes` for graphics are §7's.
+- `core/CLAUDE.md` is not edited by this phase: its `recipe_graphic.rs`
+  entry, the `edit_split.rs` / `edit_clip_timing.rs` / `edit_edge.rs`
+  clauses and the `recipe.rs` bullet's mention are drafted in the
+  pipeline's `04-impl-notes.md` for the orchestrator to land.
+- Still owed from G2a: `op_catalog_proof.py:282` and `words_core_proof.py`'s
+  version literal (G3's).
+- `set_graphic`'s row (`edit.rs` and spec §6) and spec §5.2 glossed
+  `length: null` as "the clip's duration"; under G-9·c it is `in +
+  duration`. Reworded by the orchestrator after the review. (The root
+  `CLAUDE.md` row this list also named had already been updated at G1d.)
+
+**Review.** Passed first time, no blocker or should-fix. Its three nits,
+kept and owed:
+- `core/tests/graphic.rs:751`: the nest test cannot tell the project's
+  canvas from the nest's, because `nest` freezes the nest's canvas at the
+  project's current size — so "`ctx.canvas` is the PROJECT's inside a nest"
+  is claimed but not proved. A test that changes the project canvas after
+  nesting would prove it.
+- `core/tests/graphic.rs:627`: `Value ==` ignores key order, so `ctx`'s wire
+  key order is never checked (only `source`'s top level is, from the text).
+- `core/tests/graphic.rs:459`: `graphic_starts`'s doc says it returns ids;
+  it returns clip values.
+
+The `core/CLAUDE.md` lines drafted above were written by the orchestrator
+after the review.
+
+#### G2 closed
+
+G2 delivered §5g's model and its timeline: a graphic clip persists (format
+version 10), is added and patched by two ops that check props against the
+schema the op carries, is cut, trimmed and rolled along its own timeline
+with one equation shared by the writers and the recipe, refuses to be an
+action target, and publishes a layer whose `frame`, `ctx` and `hash` are
+everything `render` is called with. What it does not do is DRAW: the app
+still shows the `missing` slate for a graphic layer. G3, the picture
+(§9: `GraphicStore`, the watcher, `LayerRenderersGraphic`, the error card,
+`render_frame`'s diagnostics and the export gate, with the two op tools'
+handlers landing minimally), is next.

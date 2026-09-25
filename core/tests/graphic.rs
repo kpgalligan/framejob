@@ -3,13 +3,16 @@
 //! every props sentence by its dotted path (with a schema and without), the
 //! 64-key limit on the STORED map, the colour normalisation (G-12), and the
 //! props ORDER — read off the written text, since `Project ==` cannot see
-//! it. What a graphic clip is on disk is `schema_v10.rs`'s.
+//! it. What a graphic clip is on disk is `schema_v10.rs`'s. Road map 10's
+//! G2b adds the graphic's own timeline under the trims, `roll` and `split`
+//! (G-9), the refusal of `graphic` as an action target (G-10), and the
+//! layer source the recipe publishes — its frame, its `ctx` and its hash.
 
 mod common;
 
 use serde_json::{json, Map, Value};
 
-use common::{assert_contains, at, Handle, Outcome};
+use common::{array, assert_contains, at, int, num, Handle, Outcome};
 use reelcut_core::model_graphic::{GRAPHIC_MAX_SIDE, GRAPHIC_MIN_SIDE};
 use reelcut_core::op_table::OP_TABLE;
 
@@ -396,4 +399,357 @@ fn a_re_sent_key_keeps_its_slot_and_a_new_one_lands_last() {
         at(&after.value(), "/clips/0/graphic/props/title"),
         &json!("Ada")
     );
+}
+
+// ---- G2b: the graphic's own timeline (G-9, G-10) ---------------------------
+
+/// One frame at 30 fps, in ticks.
+const FRAME: i64 = 20_000;
+
+/// The layer `clip` draws in `recipe`.
+fn layer_of(recipe: &Value, clip: i64) -> Value {
+    array(recipe, "/layers")
+        .iter()
+        .find(|l| int(l, "/clip") == clip)
+        .unwrap_or_else(|| panic!("no layer for clip {clip} in {recipe}"))
+        .clone()
+}
+
+/// The `source` of clip `clip`'s layer at `t`.
+fn source_at(handle: &Handle, clip: i64, t: i64) -> Value {
+    layer_of(&handle.recipe(t), clip)["source"].clone()
+}
+
+/// [`project`] with clip 11's graphic at `in` and `length`.
+fn project_with(r#in: i64, length: Value) -> Handle {
+    let mut value = project().value();
+    value["clips"][0]["graphic"]["in"] = json!(r#in);
+    value["clips"][0]["graphic"]["length"] = length;
+    Handle::from_value(&value)
+}
+
+/// [`project`] with a media clip 30 on track 2 at 0–2 s and clip 11 moved
+/// to 2–5 s, so 30 ends EXACTLY where 11 starts: a cut `roll` can move.
+fn project_with_cut() -> Handle {
+    let mut value = project().value();
+    value["media"] = json!([
+        {"id": 1, "path": "/m/talk.mov", "kind": "video", "duration": 36000000,
+         "width": 1920, "height": 1080, "fps": [30, 1], "has_video": true, "has_audio": true}
+    ]);
+    value["clips"][0]["start"] = json!(2 * SEC);
+    value["clips"][0]["duration"] = json!(3 * SEC);
+    value["clips"].as_array_mut().expect("clips").push(
+        json!({"id": 30, "track": 2, "start": 0, "duration": 2 * SEC,
+                     "source": {"kind": "media", "media": 1, "in": 0},
+                     "video": {}, "audio": {}}),
+    );
+    value["next_id"] = json!(31);
+    Handle::from_value(&value)
+}
+
+/// Clip `id` in `handle`'s project.
+fn clip(handle: &Handle, id: i64) -> Value {
+    array(&handle.value(), "/clips")
+        .iter()
+        .find(|c| int(c, "/id") == id)
+        .unwrap_or_else(|| panic!("no clip {id}"))
+        .clone()
+}
+
+/// The ids of the graphic clips in `handle`, by start.
+fn graphic_starts(handle: &Handle) -> Vec<Value> {
+    let mut clips: Vec<Value> = array(&handle.value(), "/clips")
+        .iter()
+        .filter(|c| c["source"]["kind"] == json!("graphic"))
+        .cloned()
+        .collect();
+    clips.sort_by_key(|c| int(c, "/start"));
+    clips
+}
+
+#[test]
+fn split_advances_the_second_halfs_in_and_pins_both_lengths() {
+    let once = project().apply(&json!({"op": "split", "clips": [11], "at": 2 * SEC}));
+    assert_eq!(at(&clip(&once, 11), "/graphic/in"), &json!(0));
+    assert_eq!(at(&clip(&once, 11), "/graphic/length"), &json!(3_000_000));
+    assert_eq!(at(&clip(&once, 20), "/graphic/in"), &json!(1_200_000));
+    assert_eq!(at(&clip(&once, 20), "/graphic/length"), &json!(3_000_000));
+
+    // The pin's discriminator is the FIRST half: its own `in + duration` is
+    // only the head, 60 frames.
+    let before = source_at(&once, 11, 2 * SEC - FRAME);
+    assert_eq!(before["frame"], json!(59));
+    assert_eq!(before["ctx"]["durationInFrames"], json!(150));
+    let after = source_at(&once, 20, 2 * SEC + FRAME);
+    assert_eq!(after["frame"], json!(61));
+    assert_eq!(after["ctx"]["durationInFrames"], json!(150));
+    // And the second half's, once its end moves: 120 without the pin.
+    let trimmed = once.apply(&json!({"op": "trim_end", "clip": 20, "to": 4 * SEC}));
+    let after = source_at(&trimmed, 20, 2 * SEC + FRAME);
+    assert_eq!(after["ctx"]["durationInFrames"], json!(150));
+
+    let twice = once.apply(&json!({"op": "split", "clips": [20], "at": 4 * SEC}));
+    let pieces = graphic_starts(&twice);
+    assert_eq!(pieces.len(), 3);
+    assert_eq!(pieces[2]["graphic"]["in"], json!(2_400_000));
+    assert_eq!(pieces[2]["graphic"]["length"], json!(3_000_000));
+
+    let lifted = project().apply(&json!({"op": "lift_range", "from": 2 * SEC, "to": 3 * SEC}));
+    let pieces = graphic_starts(&lifted);
+    assert_eq!(pieces.len(), 2);
+    assert_eq!(pieces[0]["graphic"]["in"], json!(0));
+    assert_eq!(pieces[1]["start"], json!(3 * SEC));
+    assert_eq!(pieces[1]["graphic"]["in"], json!(1_800_000));
+    for piece in &pieces {
+        assert_eq!(piece["graphic"]["length"], json!(3_000_000));
+    }
+}
+
+#[test]
+fn trim_start_advances_in_with_no_head_bound_and_trim_end_leaves_length_alone() {
+    let trimmed = project().apply(&json!({"op": "trim_start", "clip": 11, "to": SEC}));
+    assert_eq!(at(&clip(&trimmed, 11), "/graphic/in"), &json!(600_000));
+    assert_eq!(at(&clip(&trimmed, 11), "/graphic/length"), &Value::Null);
+    let source = source_at(&trimmed, 11, SEC);
+    assert_eq!(source["frame"], json!(30));
+    assert_eq!(source["ctx"]["durationInFrames"], json!(150));
+
+    let back = trimmed.apply(&json!({"op": "trim_start", "clip": 11, "to": 0}));
+    assert_eq!(at(&clip(&back, 11), "/graphic/in"), &json!(0));
+    assert_eq!(
+        source_at(&back, 11, 0)["ctx"]["durationInFrames"],
+        json!(150)
+    );
+
+    // No head bound: a start dragged past the graphic's first frame
+    // saturates `in` at 0.
+    let late = project_with(600_000, Value::Null)
+        .apply(&json!({"op": "move_clip", "clips": [11], "delta": 2 * SEC}));
+    let early = late.apply(&json!({"op": "trim_start", "clip": 11, "to": 0}));
+    assert_eq!(at(&clip(&early, 11), "/start"), &json!(0));
+    assert_eq!(at(&clip(&early, 11), "/graphic/in"), &json!(0));
+
+    let longer = project().apply(&json!({"op": "trim_end", "clip": 11, "to": 8 * SEC}));
+    assert_eq!(at(&clip(&longer, 11), "/graphic/length"), &Value::Null);
+    assert_eq!(
+        source_at(&longer, 11, 0)["ctx"]["durationInFrames"],
+        json!(240)
+    );
+    let fixed = project()
+        .apply(&set_bare(json!({"length": 1_800_000})))
+        .apply(&json!({"op": "trim_end", "clip": 11, "to": 8 * SEC}));
+    assert_eq!(at(&clip(&fixed, 11), "/graphic/length"), &json!(1_800_000));
+    assert_eq!(
+        source_at(&fixed, 11, 0)["ctx"]["durationInFrames"],
+        json!(90)
+    );
+}
+
+#[test]
+fn roll_advances_the_graphics_in_as_a_front_trim() {
+    let cut = project_with_cut();
+    let before = source_at(&cut, 11, 3 * SEC);
+    assert_eq!(before["frame"], json!(30));
+    assert_eq!(before["ctx"]["durationInFrames"], json!(90));
+
+    let rolled = cut.apply(&json!({"op": "roll", "clip": 11, "to": 3 * SEC}));
+    let moved = clip(&rolled, 11);
+    assert_eq!(moved["start"], json!(1_800_000));
+    assert_eq!(moved["duration"], json!(1_200_000));
+    assert_eq!(moved["graphic"]["in"], json!(600_000));
+    assert_eq!(moved["graphic"]["length"], Value::Null);
+    assert_eq!(clip(&rolled, 30)["duration"], json!(1_800_000));
+    let after = source_at(&rolled, 11, 3 * SEC);
+    assert_eq!(after["frame"], json!(30), "the frame under the cut stays");
+    assert_eq!(after["ctx"]["durationInFrames"], json!(90));
+
+    let back = rolled.apply(&json!({"op": "roll", "clip": 11, "to": 2 * SEC}));
+    assert_eq!(at(&clip(&back, 11), "/graphic/in"), &json!(0));
+}
+
+#[test]
+fn an_action_end_naming_graphic_is_an_error_in_g10s_sentence() {
+    let sentence =
+        "props are not animated by actions; a graphic animates itself — change the module or its props";
+    let with = project().apply(&json!({"op": "add_action", "clip": 11, "at": 0}));
+    let action = int(&clip(&with, 11), "/actions/0/id");
+    let end = |patch: Value, off: Value| {
+        json!({"op": "set_action_end", "clip": 11, "action": action,
+               "patch": patch, "off": off})
+    };
+    assert_eq!(
+        with.errors(&end(
+            json!({"graphic": {"props": {"title": "Ada"}}}),
+            Value::Null
+        )),
+        sentence
+    );
+    assert_eq!(
+        with.errors(&end(json!({"graphic": null}), Value::Null)),
+        sentence
+    );
+    assert_eq!(
+        with.errors(&end(json!({}), json!(["graphic.props"]))),
+        sentence
+    );
+
+    let payload = json!({"clips": [clip(&project(), 11)], "media": [], "nests": []});
+    assert_contains(
+        &project().errors(&json!({"op": "paste_attributes", "clips": [11],
+                                  "payload": payload, "groups": ["graphic"]})),
+        "graphic",
+    );
+}
+
+#[test]
+fn paste_attributes_leaves_a_graphic_untouched() {
+    let with = project().apply(&add(json!({"width": 1280, "height": 720,
+                                            "props": {"title": "Ada"}})));
+    let before = clip(&with, 20)["graphic"].to_string();
+    let mut source = clip(&with, 11);
+    source["video"]["opacity"] = json!(0.5);
+    source["track"] = json!(0);
+    let payload = json!({"clips": [source], "media": [], "nests": []});
+    let pasted = with.apply(&json!({"op": "paste_attributes", "clips": [20], "payload": payload}));
+    let target = clip(&pasted, 20);
+    assert_eq!(target["video"]["opacity"], json!(0.5));
+    assert_eq!(target["graphic"].to_string(), before);
+}
+
+#[test]
+fn the_recipe_publishes_the_seams_shape() {
+    let fixture: Value =
+        serde_json::from_str(include_str!("fixtures/graphic_v10_recipe.json")).expect("fixture");
+    let project = Handle::from_json(include_str!("fixtures/graphic_v10.json"));
+    let t = int(&fixture, "/t");
+    let recipe = project.recipe(t);
+    let layer = &array(&recipe, "/layers")[0];
+    assert_eq!(layer["source"], fixture["source"]);
+    assert_eq!(layer["source_size"], fixture["source_size"]);
+
+    let written: Value = serde_json::from_str(&project.recipe_text(t)).expect("the recipe");
+    let keys: Vec<&String> = at(&written, "/layers/0/source")
+        .as_object()
+        .expect("source is an object")
+        .keys()
+        .collect();
+    assert_eq!(keys, ["kind", "name", "hash", "frame", "ctx", "props"]);
+}
+
+#[test]
+fn frame_and_ctx_follow_the_graphics_own_timeline() {
+    let project = project();
+    let layer = layer_of(&project.recipe(37 * FRAME), 11);
+    let source = &layer["source"];
+    assert_eq!(source["kind"], json!("graphic"));
+    assert_eq!(source["name"], json!("lower-third"));
+    assert_eq!(source["frame"], json!(37));
+    let ctx = &source["ctx"];
+    assert_eq!(num(ctx, "/fps"), 30.0);
+    assert_eq!(num(ctx, "/time"), 37.0 / 30.0);
+    assert_eq!(ctx["durationInFrames"], json!(150));
+    assert_eq!(num(ctx, "/progress"), 37.0 / 149.0);
+    assert_eq!(ctx["width"], json!(1920));
+    assert_eq!(ctx["height"], json!(1080));
+    assert_eq!(ctx["canvas"], json!({"width": 1920, "height": 1080}));
+    assert_eq!(
+        source["props"],
+        json!({"title": "Kevin", "accent": "#2d7ff9", "subtitle": "Host"})
+    );
+    assert_eq!(layer["source_size"], json!([1920, 1080]));
+    // Floored onto the grid: the last tick of frame 37 is frame 37.
+    assert_eq!(
+        source_at(&project, 11, 37 * FRAME + 19_999)["frame"],
+        json!(37)
+    );
+
+    // `in` 600000 is graphic frame 30 at the clip's first frame, and a null
+    // length ends with the clip, at graphic time `in + duration`.
+    let offset = source_at(&project_with(600_000, Value::Null), 11, FRAME);
+    assert_eq!(offset["frame"], json!(31));
+    assert_eq!(offset["ctx"]["durationInFrames"], json!(180));
+
+    // A length shorter than the clip: the frame runs on, the progress holds.
+    let short = source_at(&project_with(0, json!(1_200_000)), 11, 100 * FRAME);
+    assert_eq!(short["ctx"]["durationInFrames"], json!(60));
+    assert_eq!(short["frame"], json!(100));
+    assert_eq!(num(&short, "/ctx/progress"), 1.0);
+
+    let mut bare = project.value();
+    bare["clips"][0]["graphic"] = Value::Null;
+    let layer = layer_of(&Handle::from_value(&bare).recipe(0), 11);
+    assert_eq!(layer["source"]["kind"], json!("missing"));
+    assert_eq!(layer["source_size"], Value::Null);
+}
+
+#[test]
+fn on_a_29_97_canvas_frame_n_is_at_tick_n_times_20020() {
+    let ntsc = Handle::new(1920, 1080, 30000, 1001);
+    let track = int(&ntsc.value(), "/tracks/0/id");
+    let with = ntsc.apply(&json!({"op": "add_graphic_clip", "track": track, "at": 0,
+                                  "name": "lower-third"}));
+    let id = int(&with.value(), "/clips/0/id");
+    let source = source_at(&with, id, 37 * 20_020);
+    let rate = 30000.0 / 1001.0;
+    assert_eq!(source["frame"], json!(37));
+    assert_eq!(num(&source, "/ctx/fps"), rate);
+    assert_eq!(num(&source, "/ctx/time"), 37.0 / rate);
+    assert_eq!(source_at(&project(), 11, 37 * FRAME)["frame"], json!(37));
+}
+
+#[test]
+fn the_hash_follows_everything_render_is_called_with() {
+    let project = project();
+    let hash = |handle: &Handle, clip: i64, t: i64| -> String {
+        source_at(handle, clip, t)["hash"]
+            .as_str()
+            .expect("a hash")
+            .to_string()
+    };
+    let here = hash(&project, 11, 37 * FRAME);
+    assert_eq!(here.len(), 16, "{here}");
+    assert!(
+        here.chars()
+            .all(|c| c.is_ascii_digit() || ('a'..='f').contains(&c)),
+        "{here}"
+    );
+    assert_eq!(hash(&project, 11, 37 * FRAME), here);
+    assert_ne!(hash(&project, 11, 38 * FRAME), here);
+    let patched = project.apply(&set_bare(json!({"props": {"title": "Ada"}})));
+    assert_ne!(hash(&patched, 11, 37 * FRAME), here);
+    // The same frame of a shorter graphic is a different outro.
+    let shorter = project.apply(&json!({"op": "trim_end", "clip": 11, "to": 4 * SEC}));
+    assert_eq!(source_at(&shorter, 11, 37 * FRAME)["frame"], json!(37));
+    assert_ne!(hash(&shorter, 11, 37 * FRAME), here);
+
+    // Props sent in opposite key orders hash equal: the key is sorted.
+    let pair = project
+        .apply(
+            &json!({"op": "add_graphic_clip", "track": 2, "at": 10 * SEC,
+                       "name": "lower-third", "props": {"title": "Ada", "subtitle": "Host"}}),
+        )
+        .apply(
+            &json!({"op": "add_graphic_clip", "track": 3, "at": 10 * SEC,
+                       "name": "lower-third", "props": {"subtitle": "Host", "title": "Ada"}}),
+        );
+    let t = 10 * SEC + 37 * FRAME;
+    assert_eq!(hash(&pair, 20, t), hash(&pair, 21, t));
+}
+
+#[test]
+fn a_graphic_inside_a_nest_counts_frames_from_its_own_first_frame() {
+    let nested = project().apply(&json!({"op": "nest", "clips": [11]}));
+    let nest_clip = array(&nested.value(), "/clips")
+        .iter()
+        .find(|c| c["source"]["kind"] == json!("nest"))
+        .map(|c| int(c, "/id"))
+        .expect("a nest clip");
+    let moved = nested.apply(&json!({"op": "move_clip", "clips": [nest_clip], "delta": SEC}));
+    let layer = layer_of(&moved.recipe(SEC + 37 * FRAME), 11);
+    assert_eq!(layer["source"]["frame"], json!(37));
+    assert_eq!(
+        layer["source"]["ctx"]["canvas"],
+        json!({"width": 1920, "height": 1080})
+    );
+    assert!(!layer["clip_rect"].is_null(), "{layer}");
 }
