@@ -443,6 +443,26 @@ layer. Keyframed props are listed in §7.
   it compiled, so an agent editing a file mid-export cannot produce a video
   whose first half is one version and its second half another.
 
+### G-14 — `graphics/` is created on first write, never at open
+
+Recorded by G3a (2026-09-25), before its code; amends G-3's last sentence.
+- A package that never gets a graphic is not touched. Opening, saving and
+  autosaving a package without `graphics/` leaves it without one.
+- `GraphicStore.ensureFolder()` is the ONE creator of `graphics/` inside a
+  package. G4's `write_graphic`, G5's templates and the font and asset
+  imports all go through it.
+- While the folder is absent the store watches the package directory
+  itself, so a `graphics/` made from outside (an agent's own `mkdir`) is
+  picked up. The first observed appearance, whether the app made it or
+  found it, calls `packageContentsDidChangeOnDisk()` once (§9a item 2).
+- An untitled document's folder is the app's own scratch,
+  `<NSTemporaryDirectory()>/Reelcut/<UUID>-graphics`, created eagerly. It
+  sits BESIDE the temporary cache root, not under it as G-3 said, because
+  `cacheWrapper()` would carry a child of the cache root into `cache/`.
+  The first save carries it only when it holds at least one entry.
+- An untitled document restored from autosave has its saved `graphics/`
+  copied into a fresh root.
+
 ---
 
 ## 5. The design
@@ -2454,3 +2474,153 @@ still shows the `missing` slate for a graphic layer. G3, the picture
 (§9: `GraphicStore`, the watcher, `LayerRenderersGraphic`, the error card,
 `render_frame`'s diagnostics and the export gate, with the two op tools'
 handlers landing minimally), is next.
+
+### 10.6. G3 — the picture
+
+G3 runs as three pipelines, each committed on its own: G3a the package's
+`graphics/` folder, its store and its watcher; G3b drawing
+(`GraphicRegistry`, `LayerRenderersGraphic`, the compositor case, the two op
+tools); G3c failure and export (the error card, `render_frame`'s
+diagnostics, the export pin, the missing-font warning).
+
+#### G3a — the package's `graphics/` folder, its store and its watcher (2026-09-25)
+
+Against baseline `b1f045e`: §5f's store and watch, §9a's G3 items 1 to 3,
+and the decode of a clip's `graphic`. Nothing draws yet (G3b); nothing
+observes the two notifications yet.
+
+**Decided first.** G-14 (§4, and spec §11 before the code): `graphics/` is
+created on the app's first write, never at open, and an empty untitled
+root is not carried by the first save — so a package that never gets a
+graphic is not touched. It amends G-3's last sentence: the untitled root is
+`<NSTemporaryDirectory()>/Reelcut/<UUID>-graphics`, BESIDE the temporary
+cache root, because `cacheWrapper()` would carry a child of the cache root
+into `cache/`.
+
+**What landed.**
+- **The pure move, first and alone.** `importMedia`, `probeNext` and
+  `commitImport` verbatim from `ProjectDocument.swift` to the new
+  `ProjectDocument+Import.swift` (63), `present(_:)` internal; gated alone
+  (`make typecheck` 0 errors and the 7 baseline warnings, `make app`
+  succeeded) and saved as its own patch before any feature line.
+  `ProjectDocument.swift` 1380 → 1329.
+- **`GraphicStore.swift`** (399). Two modes, chosen on every pass by
+  whether the folder exists: FOLDER (a source on `graphics/`, on each of
+  `fonts/` and `assets/` that exists, and on each legal `*.js`) and PACKAGE
+  (a saved package without `graphics/`: one source on the package
+  directory, so an outside `mkdir` is seen). Every pass cancels and
+  re-opens every source BY PATH, arms FIRST and then scans; events are
+  coalesced over 100 ms into one pass. The queue owns the diff (`lastScan`,
+  `folderPresent`, an outbox of outcomes) and main publishes the outcomes in
+  order through `drain()`, setting `scan`, calling `folderDidAppear` once
+  per observed absent → present, and posting `.graphicsDidChange` with the
+  sorted names (every module, `library: true`, when the font and asset set
+  moved). `stop()` bumps a generation under `queue.sync`, cancels the
+  pending pass and every source and empties the outbox. The scan: a
+  module's revision is CryptoKit's SHA-256 (G-13), a bad stem is warned in
+  the core's sentence, a font is validated on a throwaway `GraphicLibrary`,
+  a 0-byte asset is warned and skipped (an empty `Data` crosses as NULL),
+  and `libraryVersion` hashes the fonts then the assets, name then bytes.
+  `write(name:source:)` refuses a bad name in the core's sentence, calls
+  `ensureFolder()` (the ONE creator inside a package), writes
+  `<name>.js.partial` and moves it into place; `makeLibrary()` is a new
+  builder every call (the bundled faces, then `fonts/`, then `assets/`).
+- **`ProjectDocument+Graphics.swift`** (71): `graphicsWrapper()` — for a
+  saved document a lazy wrapper over `<fileURL>/graphics` read directly,
+  never through the store, so a document with no store cannot drop a saved
+  folder; for an untitled one the store's root, only when it holds an
+  entry — and `startGraphicStore()`, which seeds an untitled document's
+  root from `autosavedContentsFileURL/graphics` and wires
+  `folderDidAppear` to `packageContentsDidChangeOnDisk()` weakly.
+- **`ProjectDocument.swift`** 1329 → 1336: the stored `graphicStore`, its
+  re-point in the `fileURL` setter, `startGraphicStore()` in
+  `makeWindowControllers()`, its stop in `close()`, and the whitelist line.
+- **`ProjectSnapshot+Graphic.swift`** (88): `GraphicSnapshot` (every key
+  defaulted, `in` through an explicit coding key) and `GraphicPropValue`;
+  `ProjectSnapshot.swift` 2305 → 2309 for `ClipSnapshot.graphic`.
+- Spec §5.6's package tree gains `graphics/`; spec §11 and §4 gain G-14.
+
+**Measured.** `make test` 965 (unchanged; nothing in the core moved);
+`make lint` clean; `make typecheck` 0 errors and the 7 baseline warnings;
+`make app` succeeded; `tools/proof/harness/build.sh --force` built (88 s),
+so every app file compiles with CryptoKit in the mix.
+`graphics_store_probe.py` 17/17 (W1–W13, C1–C4); the three mutants each
+exited 0 — `whitelist-removed` (C1's file ABSENT; C2 failed with it),
+`no-file-sources` (W4 failed; W2, W10 and W11 with it, all in-place edits),
+`strong-callback` (C4 failed, `closed_freed` true and `dropped_freed`
+false). Every watcher post landed 0.10–0.11 s after its action.
+`graphics_store_proof.py` 9/9 on its own instance (port 4851), the parity
+grep empty; the autosave in place wrote `project.json` 15.1 s after the
+edit. Made to fail by hand, twice, each reverted and rebuilt: the whitelist
+line commented out, 3/9 with S3's `x.js` ABSENT after the save (S4–S7 and
+S9 with it); and `folderDidAppear` set to nil, 8/9 with S3's save REFUSED —
+"The document “P1.reelcut” could not be saved. The file has been changed
+by another application." — which is the evidence that the observed
+creation's date re-read, not luck, is what lets S3's save through.
+`op_catalog_proof.py` still fails at its first check ("the core declares
+59 ops and every one of them is a tool"), owed to G3b.
+
+**Deviations from the spec.**
+- **`TMPDIR` does not move `NSTemporaryDirectory()`** on this host
+  (measured: it answers `DARWIN_USER_TEMP_DIR` whatever the variable says).
+  The store keeps `NSTemporaryDirectory()`, the cache root's spelling, as
+  the spec's interface says; the probe reports that directory and scores W1
+  and C2 against it (and removes the roots it made), and the proof's S7
+  lists `<getconf DARWIN_USER_TEMP_DIR>/Reelcut/*-graphics` before and
+  after rather than a `<TMPDIR>` the app never used. Both still launch
+  their child with `TMPDIR` set, as specified; it is inert.
+- **C4 has two halves.** As specified — `startGraphicStore()`, `close()`,
+  drop — C4 passes even with `[weak self]` removed, because `close()` sets
+  `graphicStore = nil` and breaks the cycle, so the `strong-callback`
+  mutant could not kill it. C4 also drops a second document WITHOUT
+  closing it; that half is the one the mutant fails. Still one row.
+- `ClipSource.graphic`'s doc said the `graphic` key was "not decoded yet";
+  it now names `ClipSnapshot.graphic`, reworded inside its two lines.
+- `GraphicStore.scan` is behind an `NSLock` (a computed property over a
+  stored copy), because the spec allows `module(named:)` and
+  `makeLibrary()` off main while making `scan` main-confined.
+- A `running` flag beside `generation`, so a `rescan()` after `stop()` does
+  not re-arm.
+- `ensureFolder()` rescans only when it CREATED the folder; with the
+  folder already there the watcher's own pass reports the write.
+
+**Limits, recorded.**
+- `fonts/` and `assets/` have folder sources only: an in-place rewrite of a
+  font or an asset is seen at the next folder event or the next open.
+- An untitled root is never deleted — after the first save, or when an
+  untitled draft is closed — as the temporary cache root is not (§5f's
+  out-of-scope list). `new_project {path}` makes one too, because the
+  document is untitled until the save that follows.
+- Nothing observes `.graphicsDidChange` or `.graphicsLocationDidChange`
+  yet; G3b's registry and `Playback.refreshPausedFrame` will read `scan`
+  after `start()` and observe the posts after that.
+- The `DispatchQueue` the store creates is a new seam; `app/CLAUDE.md`'s
+  list of documented seams names it only once the orchestrator lands the
+  drafted sentences.
+
+**Owed from G3a.**
+- `op_catalog_proof.py:282` (G2a's) and `words_core_proof.py`'s version
+  literal — G3b and later.
+- `app/CLAUDE.md`'s entries for `GraphicStore.swift`,
+  `ProjectDocument+Graphics.swift`, `ProjectDocument+Import.swift` and
+  `ProjectSnapshot+Graphic.swift`, and the store's queue in the hygiene
+  rule's seam list, were written by the orchestrator from the pipeline's
+  drafts after the review.
+
+**Review.** Passed first time, no blocker or should-fix; it read
+`GraphicStore.swift` for races, leaked descriptors and re-arm-after-stop and
+found none. Its four nits, owed:
+- `ProjectDocument+Graphics.swift:44-45`: "the untitled root holds an
+  entry" counts hidden files the scan skips, so a root holding only a
+  `.DS_Store` would be carried into the first save (against G-14).
+- `GraphicStore.swift:338-347`: every pass, even one module's edit,
+  re-reads and re-validates every font through the FFI. **G3b must know**:
+  its registry rebuilds on `.graphicsDidChange`; fonts should be
+  re-validated only when the font set's bytes moved (`library: true`).
+- `GraphicStore.swift:251-260`: `drain()` is not re-entrant — an observer
+  that calls `rescan()` from inside the notification publishes newer
+  results before older ones. Nothing observes it in G3a; **G3b's registry
+  must not call `rescan()` from the observer** (or `drain()` must be made
+  re-entrant first).
+- `GraphicStore.swift:223-228`: a failed move in `write()` leaves
+  `<name>.js.partial` in `graphics/`, which every later save carries.

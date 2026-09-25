@@ -1484,6 +1484,11 @@ Talk.reelcut/
     transcripts/<media id>.complete.json # four-field source and request marker, written last
     reversed/<media id>-<digest>.mov   # pre-rendered reverse (M3)
   media/                # only after Consolidate (M3)
+  graphics/             # road map 10 (§11 G-3, G-14): user content, not a cache;
+                        #   whitelisted in the save; created on the app's first write, never at open
+    <name>.js           # a module; its revision is the SHA-256 of its bytes (G-13)
+    fonts/              # optional; .ttf/.otf (G-6)
+    assets/             # optional; .png/.jpg/.jpeg/.gif/.webp/.svg/.svgz
 ```
 
 The reader accepts every prior version; the writer enforces the reader's
@@ -4596,3 +4601,22 @@ assisted import.
   revisions (and the font and asset sets) it compiled, so an agent editing
   a file mid-export cannot produce a video whose first half is one version
   and its second half another.
+- **G-14 — `graphics/` is created on the app's first write into it, never
+  at open** (road map 10 §4, 2026-09-25, G3a; amends G-3's last sentence).
+  A package that never gets a graphic is not touched: opening, saving and
+  autosaving a package without `graphics/` leaves it without one.
+  `GraphicStore.ensureFolder()` is the ONE creator of `graphics/` inside a
+  package, and every app-side writer — G4's `write_graphic`, G5's
+  templates, the font and asset imports — goes through it. While the folder
+  is absent the store watches the package directory itself, so a
+  `graphics/` made from OUTSIDE (an agent's own `mkdir`) is picked up; the
+  first observed appearance, whether the app made it or found it, calls
+  `packageContentsDidChangeOnDisk()` once, which is what keeps the next
+  save from being refused as "changed by another application". An untitled
+  document's folder is the app's own scratch at
+  `<NSTemporaryDirectory()>/Reelcut/<UUID>-graphics`, created eagerly,
+  BESIDE the temporary cache root rather than under it as G-3 said —
+  `cacheWrapper()` would carry a child of the cache root into `cache/` —
+  and the first save carries it into the package only when it holds at
+  least one entry. An untitled document restored from autosave has its
+  saved `graphics/` copied into a fresh root.

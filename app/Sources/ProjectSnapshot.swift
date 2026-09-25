@@ -1332,8 +1332,8 @@ enum ClipSource: Codable, Equatable {
     case text
     case shape
     /// Drawn by a module in the package's `graphics/` (format version 10).
-    /// The description is the clip's `graphic` key, which this side does
-    /// not decode yet (road map 10's G3).
+    /// The description is the clip's `graphic` key, decoded as
+    /// `ClipSnapshot.graphic` (`ProjectSnapshot+Graphic.swift`).
     case graphic
     /// A group of tracks and clips shown as one clip, by nest id
     /// (`ProjectSnapshot.nests`).
@@ -1463,6 +1463,7 @@ struct ClipSnapshot: Codable, Equatable, Identifiable {
     let audio: AudioProps?
     let text: TextProps?
     let shape: ShapeProps?
+    let graphic: GraphicSnapshot?
     let actions: [ActionSnapshot]
     /// The transition into this clip. Its DURATION is the overlap with the
     /// previous clip on the track; with no overlap it is ignored.
@@ -1480,6 +1481,7 @@ struct ClipSnapshot: Codable, Equatable, Identifiable {
         source: ClipSource = .text, enabled: EnabledFlags = EnabledFlags(),
         speed: Double = 1, video: VideoProps? = nil, audio: AudioProps? = nil,
         text: TextProps? = nil, shape: ShapeProps? = nil,
+        graphic: GraphicSnapshot? = nil,
         actions: [ActionSnapshot] = [], transitionIn: TransitionSnapshot? = nil,
         name: String? = nil, label: String? = nil
     ) {
@@ -1494,6 +1496,7 @@ struct ClipSnapshot: Codable, Equatable, Identifiable {
         self.audio = audio
         self.text = text
         self.shape = shape
+        self.graphic = graphic
         self.actions = actions
         self.transitionIn = transitionIn
         self.name = name
@@ -1513,6 +1516,7 @@ struct ClipSnapshot: Codable, Equatable, Identifiable {
         audio = c.lenient(.audio)
         text = c.lenient(.text)
         shape = c.lenient(.shape)
+        graphic = c.lenient(.graphic)
         actions = c.lenient(.actions, [])
         transitionIn = c.lenient(.transitionIn)
         name = c.lenient(.name)

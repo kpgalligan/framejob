@@ -96,7 +96,12 @@ detail there.
   `TextProps.swift` is the text group and `RecipeReveal` (with format version
   9's `textCase` / `words` / `wordStyle` and the recipe's `word` / `wordPop`),
   a pure move out of `ProjectSnapshot.swift` because a stored property cannot
-  be added from an extension. `WordProps.swift` mirrors `model_words.rs`
+  be added from an extension. `ProjectSnapshot+Graphic.swift` mirrors
+  `model_graphic.rs`'s `GraphicProps` as `GraphicSnapshot` (`in` is
+  `sourceIn`) and `GraphicPropValue` (string, number, bool; anything else
+  `.null`), decoded into `ClipSnapshot.graphic`; `props` keys keep the
+  module's own spelling (snake-case conversion does not reach a dictionary's
+  keys). `WordProps.swift` mirrors `model_words.rs`
   (`TextCase`, `TextWord`, `WordMode`, `ActivePill`, `WordStyle`)
   — `WordStyle.dictionary` writes ALL six keys, `NSNull` for a nil slot,
   `MotionProps.dictionary`'s rule, because the core deep-merges
@@ -110,7 +115,7 @@ detail there.
   W-6). It lives there, not in `InspectorPane.swift`, for the size rule.
 
 **The document.**
-- `ProjectDocument.swift` (+`DisplayStem`, +`Recording`, +`SelectedAction`)
+- `ProjectDocument.swift` (+`DisplayStem`, +`Recording`, +`SelectedAction`, +`Import`, +`Graphics`)
   — NSDocument, `.reelcut` package read/write, and the single mutation
   point (see Undo); `applyEdit`'s `.refused` arm beeps and then posts
   `projectDocumentDidRefuse` with the `ReelRefusal` (spec §11 CI-10), which
@@ -132,6 +137,15 @@ detail there.
   handle, and `project` still means the parent for save, export and
   consolidate. A range is cleared on every scope change: a pair of ticks
   means one thing inside a nest and another to an export.
+  `+Import` is File ▸ Add Media… and every drop into an open project
+  (`importMedia`, the probe chain and the one grouped commit). `+Graphics`
+  is the document's side of the package's `graphics/`:
+  `startGraphicStore()`, run from `makeWindowControllers()` and seeding an
+  untitled document's root from `autosavedContentsFileURL/graphics`, and
+  `graphicsWrapper()`, the lazy wrapper the save whitelist carries — for a
+  SAVED document it reads `<fileURL>/graphics` itself and never asks the
+  store, so a nil store can never drop a saved folder; for an untitled one
+  it carries the store's root only when it holds an entry (spec §11 G-14).
 - `MediaImporter.swift` (+`Probe`, +`Speech`, +`Peaks`) ·
   `MediaPeakBuckets.swift` · `MediaCacheFiles.swift` ·
   `FFmpegRewrap.swift` · `AppSupport.swift` — the import funnel and the
@@ -156,6 +170,29 @@ detail there.
 - `MediaConsolidator.swift` (+`EditorViewController+Consolidate`) — writes
   inside the package behind NSDocument's back, so it MUST call
   `ProjectDocument.packageContentsDidChangeOnDisk()` afterwards.
+- `GraphicStore.swift` — one document's `graphics/` (road map 10 §5f):
+  where it is (`<package>/graphics`, or an untitled document's
+  `<NSTemporaryDirectory()>/Reelcut/<UUID>-graphics`, re-pointed by
+  `packageDidMove(to:)` from the `fileURL` setter, posting
+  `.graphicsLocationDidChange`), the scan (each legal `*.js` with its
+  SHA-256 revision, G-13; `fonts/` validated on a throwaway
+  `GraphicLibrary`; `assets/` with a 0-byte file warned and skipped) and
+  the watch. **`graphics/` is created on the app's first write, never at
+  open** (G-14): `ensureFolder()` is the ONE creator inside a package, and
+  every app-side writer goes through `write(name:source:)` or it. While the
+  folder is absent the store watches the PACKAGE directory, and the first
+  observed appearance calls `folderDidAppear` →
+  `packageContentsDidChangeOnDisk()` once — without it the next save is
+  refused as "changed by another application". A folder source raises
+  `.write` only and an in-place save raises nothing on it (G0 q7), so each
+  module has its own source; every pass re-opens every source BY PATH and
+  arms BEFORE it scans; events coalesce over 100 ms. The queue owns the diff
+  and an outbox; main publishes in order through `drain()` (`scan`, the
+  callback, `.graphicsDidChange` with sorted names — every module and
+  `library: true` when the font/asset set moved). **`drain()` is not
+  re-entrant: never call `rescan()` from a `.graphicsDidChange` observer.**
+  `stop()` bumps a generation under `queue.sync`. `makeLibrary()` is a NEW
+  builder every call (a library freezes on first use).
 - `ReverseRenderer.swift` — `Source::Media.reversed` resolved to
   `cache/reversed/<id>-<digest>.mov`, rendered on demand behind a sheet,
   substituted per CLIP by `CompositionBuilder`.
@@ -1051,7 +1088,10 @@ R6-7), the transcribe sheet's Download row's KVO main hop
 observation), `FFmpegRewrap`'s serial queue, the two one-frame render
 queues (`eyedropperQueue`, `frameGrabQueue` — a third one-frame render joins
 this entry rather than growing the list), `ScreenRecorder.shareableContent`'s
-global hop, and the cache's main hop. The recorder adds NO queue of its own:
+global hop, `GraphicStore`'s serial queue (its file-system sources'
+handlers, the coalesced pass and the outbox; main publishes through
+`drain()` and never waits on it but by `queue.sync`), and the cache's main
+hop. The recorder adds NO queue of its own:
 framework callbacks are stamped where they land and hopped to main. Colors,
 fonts and metrics come from `DS` tokens; shared controls go in
 `Controls.swift`. **A refusal and an identity both beep** (`NSSound.beep()`)

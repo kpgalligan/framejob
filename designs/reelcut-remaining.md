@@ -422,13 +422,13 @@ row per op.
 
 | File | Lines |
 |---|---|
-| `app/Sources/ProjectSnapshot.swift` | 2305 after road map 10's G2a (2293 before it; 2516 before road map 8's W3) |
+| `app/Sources/ProjectSnapshot.swift` | 2309 after road map 10's G3a (2305 after G2a; 2293 before it; 2516 before road map 8's W3) |
 | `app/Sources/InspectorPane.swift` | 1665 |
 | `app/Sources/TimelineView.swift` | 1652 |
 | `app/Sources/ReelCore.swift` | 1440 (1309 after road map 10's G1a, then G1d's wrappers; 1542 before road map 8's W3) |
 | `app/Sources/VideoPane.swift` | 1411 |
 | `app/Sources/Compositor.swift` | 1391 |
-| `app/Sources/ProjectDocument.swift` | 1352 |
+| `app/Sources/ProjectDocument.swift` | 1336 after road map 10's G3a (1380 before it; its media-import block moved out first and alone) |
 | `app/Sources/ReverseRenderer.swift` | 1311 |
 | `app/Sources/ReelOps.swift` | 1191 after road map 10's G2a (1163 before it) |
 | `app/Sources/EditorViewController.swift` | 1123 |
@@ -777,6 +777,22 @@ restated. The route and the Esc sheet are the new
 `PreviewCanvasView+TextEditKeys.swift` **73**. `EditorViewController+Canvas.swift`
 +1, the forward. The instruments, exempt: `tools/proof/text_apply_probe.swift`
 and `text_apply_proof.py`, new.
+
+**The package's `graphics/` store (road map 10's G3a, 2026-09-25).**
+`ProjectDocument.swift` **1380 → 1329 → 1336**: first, alone and gated
+(`make typecheck` 0 errors and the 7 baseline warnings, `make app`
+succeeded), a pure move of `importMedia`, `probeNext` and `commitImport` to
+the new `ProjectDocument+Import.swift` **63** (`present(_:)` lost
+`private`); then seven lines in — the stored `graphicStore` and its doc
+line, one call each in the `fileURL` setter, `makeWindowControllers()` and
+`close()` (two), and the whitelist line in `fileWrapper(ofType:)`.
+`ProjectSnapshot.swift` **2305 → 2309** (`ClipSnapshot.graphic`: the field,
+the memberwise parameter, its assignment and its decode; `ClipSource.graphic`'s
+stale "not decoded yet" comment reworded inside its two lines). New:
+`GraphicStore.swift` **399**, `ProjectDocument+Graphics.swift` **71**,
+`ProjectSnapshot+Graphic.swift` **88**. `ReelCore.swift` 1440, untouched.
+The instruments, exempt: `tools/proof/graphics_store_probe.swift` **415**,
+`graphics_store_probe.py` **317** and `graphics_store_proof.py` **281**, new.
 
 ## 4. What only a person at the machine can check
 

@@ -351,6 +351,8 @@ final class ProjectDocument: NSDocument {
 
     /// Where regenerable caches go while the document has no file yet.
     private var temporaryCacheDirectory: URL?
+    /// This document's `graphics/` (`ProjectDocument+Graphics.swift`).
+    var graphicStore: GraphicStore?
 
     private var didReleaseRecipeKey = false
 
@@ -398,6 +400,7 @@ final class ProjectDocument: NSDocument {
         set {
             if let source = importSourceURL, newValue == source { return }
             super.fileURL = newValue
+            graphicStore?.packageDidMove(to: newValue)
         }
     }
 
@@ -439,6 +442,7 @@ final class ProjectDocument: NSDocument {
         // `addWindowController`, and a resolution published after that would
         // let a reversed clip play forwards for one build.
         publishReverseResolution()
+        startGraphicStore()
         addWindowController(EditorWindowController(document: self))
         // Filmstrips and waveforms for whatever the open brought in. Cheap
         // to ask for repeatedly: `MediaImporter` skips a cache whose marker
@@ -460,6 +464,8 @@ final class ProjectDocument: NSDocument {
             didReleaseRecipeKey = true
             RecipeSource.shared.unregister(recipeKey)
             ReverseSource.shared.unpublish(recipeKey)
+            graphicStore?.stop()
+            graphicStore = nil
         }
         super.close()
     }
@@ -671,6 +677,7 @@ final class ProjectDocument: NSDocument {
         if let media = directoryWrapper(Self.mediaDirectoryName) {
             children[Self.mediaDirectoryName] = media
         }
+        if let graphics = graphicsWrapper() { children[Self.graphicsDirectoryName] = graphics }
         return FileWrapper(directoryWithFileWrappers: children)
     }
 

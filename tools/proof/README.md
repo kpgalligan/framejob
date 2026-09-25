@@ -4751,6 +4751,75 @@ python3 tools/proof/graphics_ffi_probe.py                              # → 9/9
 python3 tools/proof/graphics_ffi_probe.py --mutant frame-off-by-one   # exit 0 = P5 FAILED
 ```
 
+## Road map 10's G3a — the package's `graphics/` store (`graphics_store_probe.py`, `graphics_store_probe.swift`, `graphics_store_proof.py`)
+
+**The probe.** The watcher and the save whitelist have no MCP caller yet,
+so `graphics_store_probe.swift` is compiled from `app/Sources` over
+`harness/build.sh`'s swiftc line (a probe that will not build fails all
+seventeen rows) and drives the app's own `GraphicStore` and
+`ProjectDocument`, under `graphics_spike/bounded.py`'s `run`. Every wait
+pumps `RunLoop.main` — which runs the store's main-queue drain — in polls of
+at most 2 s. It prints one JSON object (kept as
+`work/graphics-store-probe/answer.json`); the Python side scores W1–W13 and
+C1–C4 with oracles of its own: `hashlib` for every revision and its own
+literals for the core's name sentence and the scan's warnings. W1 an
+untitled root made at start, empty and silent; W2 a package store that
+creates nothing, then sees an outside `mkdir graphics` + `mv x.js` (one post,
+ONE `folderDidAppear`) and an in-place edit after it; W3 a rename-over; W4
+an in-place `O_TRUNC` rewrite on the same inode; W5 a removal; W6 two files
+coalesced into one post; W7 `Bad.js` and `d.js.partial` posting nothing and
+`Bad.js` warned; W8 `fonts/` and `assets/` moving the library version (every
+module named, `library: true`, the 0-byte PNG warned and skipped); W9 the
+app's own `write` creating `graphics/` (one callback, no `.partial`) and
+refusing `Bad` in the core's sentence; W10 the folder swapped as a save
+swaps it (no post, then an edit posts: re-armed by path); W11
+`packageDidMove(to:)`; W12 `stop()` dropping a pending pass; W13 a write
+and a `rescan()` at once being ONE post. C1 a saved document's
+`fileWrapper(ofType:)` written over its own package keeps `graphics/x.js`;
+C2 an untitled document restored from autosave seeds its root and its save
+carries the file; C3 a fresh untitled document's save has no `graphics/`;
+C4 a document is freed after `close()` AND after being dropped unclosed.
+
+**`TMPDIR` does not move `NSTemporaryDirectory()`** on this host (measured
+2026-09-25: it answers `DARWIN_USER_TEMP_DIR` whatever the variable says),
+so the untitled roots land in the per-user temporary directory; the probe
+reports that directory, W1 and C2 are scored against it, and the probe
+removes every root it made before it answers.
+
+Three mutants, each built from a COPY of `app/Sources` with one anchor
+asserted to occur exactly once: `whitelist-removed` (the `graphics/` line in
+`fileWrapper(ofType:)` deleted) exits 0 only when C1's file is ABSENT;
+`no-file-sources` (the per-module `arm` deleted) only when W4 FAILED;
+`strong-callback` (`[weak self]` removed from `folderDidAppear`) only when
+C4 FAILED — which it can only do through C4's unclosed half, since
+`close()` drops the store and breaks the cycle either way.
+
+**The proof.** `graphics_store_proof.py` is G0's q7 package rows against
+`graphics/` itself, with the built app: its own instance on its own port
+(default 4851), launched and stopped by PID, the log at
+`work/graphics-store/reelcut-<port>.log`. S2 `new_project {path}` leaves no
+`graphics/`; S3 a `graphics/` made from outside while open is saved without
+"changed by another application"; S4 survives a relaunch and a save; S5 a
+Save As; S6 an autosave in place (15.1 s after the edit in the recorded
+run); S7 an untitled project's first save carries a file moved into its
+root; S8 a package that never gets a graphic stays without `graphics/`
+through a save; S9 a folder made while the app was closed survives open and
+save; S1 the parity grep over every launch prints nothing.
+
+```sh
+python3 tools/proof/graphics_store_probe.py                              # → 17/17
+python3 tools/proof/graphics_store_probe.py --mutant whitelist-removed   # exit 0 = C1 ABSENT
+python3 tools/proof/graphics_store_probe.py --mutant no-file-sources     # exit 0 = W4 FAILED
+python3 tools/proof/graphics_store_probe.py --mutant strong-callback     # exit 0 = C4 FAILED
+make app && python3 tools/proof/graphics_store_proof.py                  # → 9/9
+```
+
+Made to fail by hand (road map 10 §10.6): the whitelist line commented out
+and the app rebuilt, S3 through S7 and S9 failed (3/9), S3 with `x.js`
+ABSENT after the save; and `folderDidAppear` set to nil instead, S3 alone
+failed, its save refused with "The document “P1.reelcut” could not be
+saved. The file has been changed by another application."
+
 ## The deployment target, rendered (`target_bump_proof.py`)
 
 W1a, road map 8 §10.4: the macOS 26 bump recompiles `Compositor.metal`
