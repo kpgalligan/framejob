@@ -30,7 +30,8 @@ use graphic::{Diagnostic, Library, Module};
 use serde_json::Value;
 
 use crate::ffi_util::{
-    boxed, fallible_op, fallible_op_wrapped, out_string, read_cstr, read_opt_cstr, set_message,
+    boxed, fallible_op, fallible_op_wrapped, free_boxed, out_string, read_bytes, read_cstr,
+    read_opt_cstr, set_message,
 };
 
 /// The refusal of an add after the first use.
@@ -83,17 +84,6 @@ fn diag_json(list: &[Diagnostic]) -> String {
 /// One error Diagnostic's array, for an argument this file could not read.
 fn diag_error(message: String) -> String {
     diag_json(&[Diagnostic::error(message)])
-}
-
-/// Reads `len` bytes at `bytes` into an owned vector.
-///
-/// # Safety
-/// `bytes` must be NULL or point to `len` readable bytes.
-unsafe fn read_bytes(bytes: *const u8, len: usize) -> Result<Vec<u8>, String> {
-    if bytes.is_null() {
-        return Err("bytes is NULL".to_string());
-    }
-    Ok(unsafe { slice::from_raw_parts(bytes, len) }.to_vec())
 }
 
 /// A new, empty library builder. Never NULL.
@@ -195,14 +185,7 @@ pub unsafe extern "C" fn rc_graphic_library_add_asset(
 /// `lib` must be NULL or a live handle not already freed.
 #[no_mangle]
 pub unsafe extern "C" fn rc_graphic_library_free(lib: *mut RcGraphicLibrary) {
-    if lib.is_null() {
-        return;
-    }
-    let body = || {
-        drop(unsafe { Box::from_raw(lib) });
-        Ok(())
-    };
-    unsafe { fallible_op(ptr::null_mut(), "freeing a library", (), body, |()| ()) }
+    unsafe { free_boxed(lib, "freeing a library") }
 }
 
 /// Compiles `source` as the ES module `name` against `lib` (freezing it),
@@ -386,12 +369,5 @@ pub unsafe extern "C" fn rc_graphic_rasterize(
 /// `g` must be NULL or a live handle not already freed.
 #[no_mangle]
 pub unsafe extern "C" fn rc_graphic_free(g: *mut RcGraphic) {
-    if g.is_null() {
-        return;
-    }
-    let body = || {
-        drop(unsafe { Box::from_raw(g) });
-        Ok(())
-    };
-    unsafe { fallible_op(ptr::null_mut(), "freeing a graphic", (), body, |()| ()) }
+    unsafe { free_boxed(g, "freeing a graphic") }
 }

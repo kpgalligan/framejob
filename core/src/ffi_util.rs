@@ -8,6 +8,7 @@
 use std::ffi::{c_char, CStr, CString};
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::ptr;
+use std::slice;
 
 use crate::model::Project;
 
@@ -64,6 +65,17 @@ pub(crate) unsafe fn read_opt_cstr(
     unsafe { read_cstr(ptr, what) }.map(Some)
 }
 
+/// Reads `len` bytes at `bytes` into an owned vector.
+///
+/// # Safety
+/// `bytes` must be NULL or point to `len` readable bytes.
+pub(crate) unsafe fn read_bytes(bytes: *const u8, len: usize) -> Result<Vec<u8>, String> {
+    if bytes.is_null() {
+        return Err("bytes is NULL".to_string());
+    }
+    Ok(unsafe { slice::from_raw_parts(bytes, len) }.to_vec())
+}
+
 /// Hands a Rust string to the C side as a heap allocation the caller frees
 /// with `rc_string_free`. Interior NULs are replaced.
 pub(crate) fn out_string(s: String) -> *mut c_char {
@@ -81,6 +93,22 @@ pub(crate) fn out_string(s: String) -> *mut c_char {
 /// Boxes a value and leaks it as the raw handle the C side owns.
 pub(crate) fn boxed<T>(value: T) -> *mut T {
     Box::into_raw(Box::new(value))
+}
+
+/// Drops a handle [`boxed`] made, under [`fallible_op`] with no channel;
+/// NULL is a no-op.
+///
+/// # Safety
+/// `p` must be NULL or a live handle from [`boxed`] not already freed.
+pub(crate) unsafe fn free_boxed<T>(p: *mut T, what: &str) {
+    if p.is_null() {
+        return;
+    }
+    let body = || {
+        drop(unsafe { Box::from_raw(p) });
+        Ok(())
+    };
+    unsafe { fallible_op(ptr::null_mut(), what, (), body, |()| ()) }
 }
 
 /// Runs a fallible FFI body under [`catch_unwind`], mapping `Ok` through
